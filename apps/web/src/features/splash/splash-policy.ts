@@ -39,7 +39,7 @@ export const SPLASH_FORMATION_MS = 1_300;
  * start only then, holding a page that was already there. The overlay
  * enforces this once its code runs (and skips the animation when too
  * little time is left to form the Q); before that, CSS does
- * (`cq-splash-expire` in globals.css uses the same number).
+ * (`cq-splash-expire` in globals.css, timed from the splash's first paint).
  */
 export const SPLASH_DEADLINE_MS = 2_400;
 

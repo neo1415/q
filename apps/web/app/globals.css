@@ -2767,11 +2767,13 @@
   html[data-splash="off"] .cq-splash {
     display: none;
   }
-  /* P9: if the page's code has not taken the splash over by its deadline
-     (SPLASH_DEADLINE_MS in splash-policy.ts), it fades on its own, so a
-     slow line never holds the page behind it. */
+  /* P9: if the page's code has not taken the splash over in time, it fades
+     on its own, so a slow line never holds the page behind it. The delay
+     counts from the splash's first paint (SPLASH_DEADLINE_MS in
+     splash-policy.ts counts from navigation start, which is earlier):
+     about the length of the designed splash, formation plus hold. */
   .cq-splash:not([data-live]) {
-    animation: cq-splash-expire 320ms var(--cq-ease) 2400ms forwards;
+    animation: cq-splash-expire 320ms var(--cq-ease) 1600ms forwards;
   }
   @keyframes cq-splash-expire {
     to {

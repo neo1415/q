@@ -33,7 +33,6 @@ export function SplashOverlay() {
     const element = root.current;
     if (element === null || splashWasSkipped()) return;
     let done = false;
-    let deadline: number | undefined;
     const leave = () => {
       if (done) return;
       done = true;
@@ -69,7 +68,7 @@ export function SplashOverlay() {
       // The formed Q holds for a beat before it hands over.
       onComplete: () => window.setTimeout(leave, 250),
     });
-    deadline = window.setTimeout(leave, left);
+    const deadline = window.setTimeout(leave, left);
     const skip = () => leave();
     window.addEventListener("keydown", skip, { once: true });
     element.addEventListener("pointerdown", skip, { once: true });

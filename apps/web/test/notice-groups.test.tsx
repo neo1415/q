@@ -6,7 +6,7 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { NotificationDto } from "@capital-q/contracts";
 
@@ -22,7 +22,15 @@ vi.mock("../src/features/work/push-setting", () => ({
   PushSetting: () => null,
 }));
 
+/** P9: the bell's first read waits ~1.5 s for the page to settle. */
+async function settleFirstRead(): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3_000);
+  });
+}
+
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   list.mockReset();
   markRead.mockReset();
@@ -90,6 +98,9 @@ describe("groupNotices", () => {
 });
 
 describe("the notification centre", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
   it("shows one row for repeated asks and marks every folded notice read", async () => {
     const { NotificationCenter } =
       await import("../src/features/work/notification-center");
@@ -103,9 +114,7 @@ describe("the notification centre", () => {
     list.mockResolvedValue({ ok: true, value: { items: repeats, unread: 3 } });
     markRead.mockResolvedValue({ ok: true, value: null });
     render(<NotificationCenter />);
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await settleFirstRead();
     fireEvent.click(
       screen.getByRole("button", { name: "Notifications, 3 new" }),
     );
@@ -138,9 +147,7 @@ describe("the notification centre", () => {
     });
     markRead.mockResolvedValue({ ok: true, value: null });
     render(<NotificationCenter />);
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await settleFirstRead();
     fireEvent.click(
       screen.getByRole("button", { name: "Notifications, 2 new" }),
     );

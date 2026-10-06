@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { retryWithBackoff, type RetryOptions } from "./resilient";
 
@@ -40,6 +40,10 @@ function remember(key: string, value: unknown): void {
   }
 }
 
+function isFresh(entry: Entry, freshMs: number): boolean {
+  return Date.now() - entry.at < freshMs;
+}
+
 /** Tests only. */
 export function clearResilientCache(): void {
   cache.clear();
@@ -60,7 +64,10 @@ export function useResilientRead<T>(
   const [status, setStatus] = useState<ResilientStatus>(
     cached === undefined ? "loading" : "ready",
   );
-  const [stale, setStale] = useState(cached !== undefined);
+  const freshMs = options.freshMs ?? 0;
+  const [stale, setStale] = useState(
+    cached !== undefined && !isFresh(cached, freshMs),
+  );
   const [attempt, setAttempt] = useState(0);
   const readRef = useRef(read);
   const optionsRef = useRef(options);
@@ -75,24 +82,16 @@ export function useResilientRead<T>(
     setShownKey(key);
     const known = key === null ? undefined : cache.get(key);
     setData(known?.value as T | undefined);
-    setStale(known !== undefined);
+    setStale(known !== undefined && !isFresh(known, freshMs));
     setStatus(known === undefined ? "loading" : "ready");
   }
 
   useEffect(() => {
     if (key === null) return;
     const known = cache.get(key);
-    const freshMs = optionsRef.current.freshMs ?? 0;
-    if (
-      attempt === 0 &&
-      known !== undefined &&
-      Date.now() - known.at < freshMs
-    ) {
-      setStale(false);
-      return;
-    }
+    const fresh = optionsRef.current.freshMs ?? 0;
+    if (attempt === 0 && known !== undefined && isFresh(known, fresh)) return;
     const controller = new AbortController();
-    if (known === undefined) setStatus("loading");
     retryWithBackoff(() => readRef.current(), {
       ...optionsRef.current,
       signal: controller.signal,
@@ -118,11 +117,18 @@ export function useResilientRead<T>(
   // Back online after a failure: try again without being asked.
   useEffect(() => {
     if (status !== "failed") return;
-    const again = () => setAttempt((n) => n + 1);
+    const again = () => {
+      setStatus("retrying");
+      setAttempt((n) => n + 1);
+    };
     window.addEventListener("online", again);
     return () => window.removeEventListener("online", again);
   }, [status]);
 
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const retry = () => {
+    // Said at once, from the press itself; the read reports the rest.
+    setStatus("retrying");
+    setAttempt((n) => n + 1);
+  };
   return { data, status, stale, retry };
 }

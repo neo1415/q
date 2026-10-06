@@ -175,8 +175,8 @@ describe("useResilientRead", () => {
   afterEach(() => clearResilientCache());
 
   it("ends in failed with a retry instead of loading forever", async () => {
-    const read = vi.fn(
-      (): Promise<string> => Promise.reject(new TypeError("Failed to fetch")),
+    const read = vi.fn((): Promise<string> =>
+      Promise.reject(new TypeError("Failed to fetch")),
     );
     render(<Probe id="a" read={read} />);
     expect(screen.getByTestId("status").textContent).toBe("loading");
