@@ -5060,6 +5060,8 @@ const voiceTurn = timedVoiceTurns(
         }),
     // How each reply should sound, for the speak relay (CQ-VOICE-010).
     performance: speechPerformance,
+    // ADR 0062: the silence ladder's one remembered thread, the person's own.
+    smallTalk: memoryService.smallTalkThread,
     logger,
   }),
   voiceTimings,

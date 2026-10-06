@@ -305,6 +305,31 @@ export {
 } from "./stage.js";
 
 export {
+  nextSilenceBeat,
+  Q_HUM_STYLES,
+  Q_SILENCE_BEAT_KINDS,
+  Q_SILENCE_LADDER,
+  Q_SILENCE_START,
+  Q_SILENCE_THINGS,
+  QSilenceBeatSchema,
+  QSilenceFocusSchema,
+  silenceHum,
+  silenceProgressLine,
+  silenceStageLine,
+  silenceThingForRoute,
+  silenceThreadLine,
+  type QHumStyle,
+  type QSilenceBeat,
+  type QSilenceBeatKind,
+  type QSilenceFocus,
+  type QSilenceInput,
+  type QSilenceState,
+  type QSilenceStep,
+  type QSilenceThing,
+  type QSilenceThread,
+} from "./silence-ladder.js";
+
+export {
   Q_MESSAGE_ROLES,
   Q_RESPONSE_TEXT_MAX_LENGTH,
   QMessageRoleSchema,

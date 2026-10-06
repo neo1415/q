@@ -17,6 +17,8 @@ import {
   type CorrelationId,
   type OnboardingSessionView,
   type OnboardingUnderstanding,
+  type QSilenceFocus,
+  type QSilenceThread,
   type QSubjectRef,
 } from "@capital-q/contracts";
 import type { QActionService } from "@capital-q/q-actions";
@@ -54,7 +56,7 @@ import {
   anchorCues,
   type SpeechPerformanceBoard,
 } from "./speech-performance.js";
-import { withThinkingBeats } from "./thinking-beats.js";
+import { withSilenceLadder, type SilenceLive } from "./narration.js";
 import type { WelcomeHost } from "./welcome.js";
 import { createLiveReply } from "./live-reply.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
@@ -151,6 +153,21 @@ export type VoiceTurnDependencies = {
   /** The application API, for spoken interview turns; absent means Q conversations only. */
   readonly onboarding?:
     | { readonly apiBaseUrl: string; readonly fetch?: typeof fetch | undefined }
+    | undefined;
+  /**
+   * ADR 0062: one of the person's own small-talk threads for the silence
+   * ladder (the memory service's `smallTalkThread`), skipping any already
+   * used. Absent: the ladder never brings one back.
+   */
+  readonly smallTalk?:
+    | ((
+        actor: VoiceSessionBinding["actor"],
+        used: ReadonlySet<string>,
+      ) => Promise<QSilenceThread | null>)
+    | undefined;
+  /** ADR 0062: the subject of the wait, by name, from its own service. */
+  readonly silenceFocus?:
+    | ((binding: VoiceSessionBinding) => Promise<QSilenceFocus | null>)
     | undefined;
   readonly logger: Logger;
 };
@@ -312,6 +329,8 @@ type LiveRun = {
   readonly utterance?: string | undefined;
 };
 const liveRuns = new WeakMap<VoiceSessionBinding, LiveRun>();
+/** ADR 0062: small-talk threads already brought back on this voice session. */
+const smallTalkUsed = new WeakMap<VoiceSessionBinding, Set<string>>();
 
 /** About when a person thinking aloud says "hm", and when they hum. */
 /**
@@ -331,10 +350,6 @@ const LAUGH_LINE = "Ha!";
 const WRITTEN_LAUGH =
   /^(?:hah?|(?:ha|he|hi|ja)(?:[\s-]?(?:ha|he|hi|ja))+)\s*[!.,\u2026]/iu;
 
-const THINKING_HM_AFTER_MS = 2_600;
-const THINKING_HUM_AFTER_MS = 6_500;
-/** The share of slow turns that get a beat: sometimes, never every time. */
-const THINKING_BEAT_SHARE = 0.35;
 /** The share of questions back that open on a rising "Hm?". */
 const QUESTION_BEAT_SHARE = 0.5;
 /**
@@ -1001,6 +1016,8 @@ export function createVoiceTurnHandler(
     let streamedRaw = "";
     let laughed = false;
     let proposedSummary: string | null = null;
+    /** The run's stage as it arrives, for the silence ladder (ADR 0062). */
+    const silence: SilenceLive = { stage: null, approvalWaiting: false };
     const record = await qStream.authorize(actor, runId, correlationId);
     async function* answer(): AsyncGenerator<string> {
       for await (const item of qStream.open({
@@ -1127,6 +1144,8 @@ export function createVoiceTurnHandler(
               : `${event.data.clarification.question} ${joinOptions(event.data.clarification.options)}?`;
             break;
           case "q.action.proposed":
+            // An approval is coming: the silence is theirs from here.
+            silence.approvalWaiting = true;
             // What Q would do, in the words the approver reads on screen.
             proposedSummary = event.data.proposal.summary;
             break;
@@ -1172,11 +1191,12 @@ export function createVoiceTurnHandler(
             recoverySettled(binding);
             return;
           case "q.stage.changed":
-            // Stages are shown, never spoken. A spoken progress line
-            // ("Checking the public web on that.", "One second.") is a
-            // filler, and nothing reaches the voice unless it is part of
-            // the answer (R38: search is quiet; founder live test
-            // 2026-09-27, failure 10).
+            // ADR 0062 (amends R38): the stage is what the silence ladder
+            // may say while nothing of the answer has been heard; it is
+            // never itself spoken as part of the answer.
+            silence.stage = event.data.stage;
+            silence.approvalWaiting =
+              event.data.stage === "WAITING_FOR_APPROVAL";
             break;
           case "q.run.started":
           case "q.finding.available":
@@ -1218,20 +1238,32 @@ export function createVoiceTurnHandler(
           await speaker.speak(line);
         }
       } else {
-        // A "hm" when the first sentence is slow, a hum when slower still;
-        // voiced, never part of what is remembered as the answer.
+        // ADR 0062: the silence ladder fills the wait until the first
+        // sentence; its beats are voiced, never recorded as the answer
+        // (the tap sits inside, on the answer's own sentences).
+        const used = smallTalkUsed.get(binding) ?? new Set<string>();
+        smallTalkUsed.set(binding, used);
+        const smallTalk = dependencies.smallTalk;
+        const silenceFocus = dependencies.silenceFocus;
         await speaker.speak(
-          withThinkingBeats(
+          withSilenceLadder(
             tap(bySentence(answer(), signal), (part) => {
               spokenSoFar += `${part} `;
               rememberSpoken(binding, part);
             }),
             {
-              hmAfterMs: THINKING_HM_AFTER_MS,
-              humAfterMs: THINKING_HUM_AFTER_MS,
-              enabled: Math.random() < THINKING_BEAT_SHARE,
-              pick: (choices) =>
-                choices[Math.floor(Math.random() * choices.length)] ?? "",
+              live: silence,
+              focus:
+                silenceFocus === undefined
+                  ? undefined
+                  : () => silenceFocus(binding),
+              thread:
+                smallTalk === undefined
+                  ? undefined
+                  : () => smallTalk(binding.actor, used),
+              onThread: (id) => used.add(id),
+              narrate: speaker.narrate,
+              seed: Math.floor(Math.random() * 0x7fffffff),
               signal,
             },
           ),
