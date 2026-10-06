@@ -11,6 +11,7 @@ import { NO_SUBJECT, type QSubject } from "@/features/q/q-subject";
 
 import { VerifyNudgeLink } from "@/features/verification/verify-nudge";
 import type { VerifyNudge } from "@/features/verification/verify-state";
+import { WakeIndicator } from "@/features/wake/wake-indicator";
 
 import { AppHeader } from "./app-header";
 import { DesktopSidebar } from "./desktop-sidebar";
@@ -78,6 +79,7 @@ export function AppShell({
               Continue with Q
             </a>
           </header>
+          <WakeIndicator />
           <main id="main" className="cq-shell-main">
             {children}
           </main>
@@ -100,6 +102,7 @@ export function AppShell({
         <div className="cq-shell-body">
           <AppHeader context={context} />
           <NetworkStatus />
+          <WakeIndicator />
           {verifyNudge === null ? null : (
             <div className="cq-verify-nudge-desktop justify-end px-6 pt-3">
               <VerifyNudgeLink nudge={verifyNudge} />

@@ -37,6 +37,7 @@ import {
   ListeningSetting,
   VoiceSetting,
 } from "@/features/settings/voice-setting";
+import { WakeSetting } from "@/features/wake/wake-setting";
 import { PushSetting } from "@/features/work/push-setting";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
 
@@ -213,6 +214,9 @@ export default async function SettingsPage({
             </SettingRow>
             <SettingRow term="Listening sounds">
               <ListeningSetting />
+            </SettingRow>
+            <SettingRow term="Wake word" hint="On this device only">
+              <WakeSetting />
             </SettingRow>
             <SettingRow term="Personality">
               <PersonalitySetting initial={standing?.personality ?? "AUTO"} />
