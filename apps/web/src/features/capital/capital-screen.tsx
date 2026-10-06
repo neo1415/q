@@ -127,7 +127,20 @@ export async function CapitalScreen() {
           {ledger === null ? (
             <QuietEmpty sentence="Your rounds couldn't load." retry />
           ) : (
-            <FounderBook ledger={ledger} draft={draftFrom(objective)} />
+            <FounderBook
+              ledger={ledger}
+              draft={draftFrom(objective)}
+              leads={(relationships ?? []).flatMap((item) =>
+                item.counterpart.kind === "INVESTOR_ORGANISATION"
+                  ? [
+                      {
+                        relationshipId: item.relationshipId,
+                        name: item.counterpart.name,
+                      },
+                    ]
+                  : [],
+              )}
+            />
           )}
           <div className="pt-6">
             <AskQChips asks={asks} />

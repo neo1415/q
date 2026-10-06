@@ -10,6 +10,8 @@ import { CompanyIdSchema } from "@capital-q/companies";
 import {
   CAPITAL_OBJECTIVE_CLOSURE_REASONS,
   CAPITAL_ROUND_INSTRUMENTS,
+  CAPITAL_ROUND_STEPS,
+  CapitalRoundTermsInputSchema,
   CAPITAL_OBJECTIVES_SUFFIX,
   COMPANIES_PATH,
   CapitalObjectiveDtoSchema,
@@ -34,6 +36,7 @@ import {
 } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 import { CLOSE_ROUND, OPEN_ROUND } from "./commitments.js";
+import { REVISE_ROUND, ROUND_STEP } from "./rounds.js";
 
 /**
  * Capital (ADR 0040 checklist): the Capital page's raise form -- create,
@@ -328,9 +331,11 @@ const RaiseTool = z
         "REPLACE",
         "OPEN_ROUND",
         "CLOSE_ROUND",
+        "ROUND_STEP",
+        "REVISE_ROUND",
       ])
       .describe(
-        "CREATE a raise when they have none; UPDATE the current one's fields; CLOSE it (with closureReason); REPLACE it with a deliberately new raise. OPEN_ROUND: open (or plan) a funding round such as Pre-seed or Seed with its target; CLOSE_ROUND: close a round (the current one unless roundName says which).",
+        "CREATE a raise when they have none; UPDATE the current one's fields; CLOSE it (with closureReason); REPLACE it with a deliberately new raise. OPEN_ROUND: open (or plan, or record a past) funding round such as Pre-seed or Seed with its target; CLOSE_ROUND: close a round (the current one unless roundName says which). ROUND_STEP: a step in a round (roundStep: OPEN a planned one, CLOSE a first or later close, TRANCHE, FINAL_CLOSE, REOPEN for an extension or second close, CANCEL one no money closed in), with stepDate, stepAmount, stepNote. REVISE_ROUND: correct a round's terms (roundTerms: valuation, valuationCap, discountPercent, hardCap, proRataRights, targetCloseOn, reportedRaised) or its target.",
       ),
     target: z
       .object({
@@ -377,6 +382,36 @@ const RaiseTool = z
       .describe(
         "OPEN_ROUND: true only if they are planning it, not raising it now.",
       ),
+    roundPast: z
+      .boolean()
+      .optional()
+      .describe(
+        "OPEN_ROUND: true when recording a round that already closed before (history), with stepDate as its close date.",
+      ),
+    roundStep: z
+      .enum(CAPITAL_ROUND_STEPS)
+      .optional()
+      .describe("ROUND_STEP: which step."),
+    stepDate: z
+      .string()
+      .max(10)
+      .optional()
+      .describe("ROUND_STEP: YYYY-MM-DD it happened, if they said."),
+    stepAmount: z
+      .string()
+      .max(32)
+      .optional()
+      .describe(
+        "ROUND_STEP CLOSE/TRANCHE/FINAL_CLOSE: the amount as digits, in the round's currency, only if they said it.",
+      ),
+    stepNote: z
+      .string()
+      .max(300)
+      .optional()
+      .describe("ROUND_STEP: a label or reason (e.g. why it was cancelled)."),
+    roundTerms: CapitalRoundTermsInputSchema.optional().describe(
+      "REVISE_ROUND / OPEN_ROUND: only the terms they stated; amounts as digits in the round's currency; never guess a cap or valuation.",
+    ),
   })
   .strict();
 
@@ -408,6 +443,10 @@ async function roundOperation(
     readonly roundInstrument:
       (typeof CAPITAL_ROUND_INSTRUMENTS)[number] | undefined;
     readonly roundPlanned: boolean | undefined;
+    readonly roundPast?: boolean | undefined;
+    readonly stepDate?: string | undefined;
+    readonly roundTerms?:
+      z.infer<typeof CapitalRoundTermsInputSchema> | undefined;
     readonly target:
       { readonly amount: string; readonly currency: string } | undefined;
     readonly targetStage: string | undefined;
@@ -466,7 +505,103 @@ async function roundOperation(
         name: titleCase(name),
         target: said.target,
         instrument,
-        ...(said.roundPlanned === true ? { status: "PLANNED" as const } : {}),
+        ...(said.roundPast === true
+          ? {
+              status: "CLOSED" as const,
+              ...(said.stepDate === undefined
+                ? {}
+                : { closedOn: said.stepDate }),
+            }
+          : said.roundPlanned === true
+            ? { status: "PLANNED" as const }
+            : {}),
+        ...(said.roundTerms === undefined ? {} : { terms: said.roundTerms }),
+      },
+    },
+  };
+}
+
+/**
+ * A step or a correction to a named round (the current one when no name is
+ * said), read now so the card carries the revision it was prepared against.
+ */
+async function roundChange(
+  ports: AppActionPorts,
+  context: AppActionContext,
+  companyId: z.infer<typeof CompanyIdSchema>,
+  said: {
+    readonly operation: "ROUND_STEP" | "REVISE_ROUND";
+    readonly roundName: string | undefined;
+    readonly roundStep: (typeof CAPITAL_ROUND_STEPS)[number] | undefined;
+    readonly stepDate: string | undefined;
+    readonly stepAmount: string | undefined;
+    readonly stepNote: string | undefined;
+    readonly roundTerms:
+      z.infer<typeof CapitalRoundTermsInputSchema> | undefined;
+    readonly target:
+      { readonly amount: string; readonly currency: string } | undefined;
+  },
+) {
+  if (ports.capitalRounds === undefined) return null;
+  const all = await ports.capitalRounds
+    .listRounds({ actor: context.actor, companyId })
+    .catch(() => []);
+  const wanted = said.roundName?.trim().toLowerCase();
+  const round =
+    wanted === undefined || wanted === ""
+      ? all.find((item) => item.isCurrent)
+      : all.find((item) => item.name.toLowerCase() === wanted);
+  if (round === undefined) {
+    return refusal(
+      wanted === undefined || wanted === ""
+        ? "Which round? You have no current one."
+        : `No round is called ${said.roundName ?? ""}.`,
+    );
+  }
+  const at = { companyId, roundId: round.id };
+  if (said.operation === "ROUND_STEP") {
+    if (said.roundStep === undefined) {
+      return refusal(
+        "Which step: a close, a tranche, the final close, reopen or cancel?",
+      );
+    }
+    const carriesAmount =
+      said.roundStep === "CLOSE" ||
+      said.roundStep === "TRANCHE" ||
+      said.roundStep === "FINAL_CLOSE";
+    return {
+      operation: "ROUND_STEP",
+      input: {
+        ...at,
+        idempotencyKey: context.idempotencyKey,
+        input: {
+          expectedRevision: round.revision,
+          step: said.roundStep,
+          ...(said.stepDate === undefined ? {} : { on: said.stepDate }),
+          ...(carriesAmount && said.stepAmount !== undefined
+            ? { amount: said.stepAmount }
+            : {}),
+          ...(said.stepNote === undefined
+            ? {}
+            : said.roundStep === "CANCEL" || said.roundStep === "REOPEN"
+              ? { note: said.stepNote }
+              : { label: said.stepNote }),
+        },
+      },
+    };
+  }
+  const terms = said.roundTerms ?? {};
+  if (Object.keys(terms).length === 0 && said.target === undefined) {
+    return refusal("What should change in the round?");
+  }
+  return {
+    operation: "REVISE_ROUND",
+    input: {
+      ...at,
+      input: {
+        expectedRevision: round.revision,
+        ...(said.target === undefined ? {} : { target: said.target }),
+        ...(Object.keys(terms).length === 0 ? {} : { terms }),
       },
     },
   };
@@ -481,7 +616,16 @@ export const CAPITAL_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
   short: "change their raise",
   area: "capital",
   does: "Sets up, changes, closes or replaces their company's raise, as the Capital page's form does.",
-  members: { CREATE, UPDATE, CLOSE, REPLACE, OPEN_ROUND, CLOSE_ROUND },
+  members: {
+    CREATE,
+    UPDATE,
+    CLOSE,
+    REPLACE,
+    OPEN_ROUND,
+    CLOSE_ROUND,
+    ROUND_STEP,
+    REVISE_ROUND,
+  },
   tool: {
     name: "change_my_raise",
     description:
@@ -512,14 +656,35 @@ export const CAPITAL_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
         roundName,
         roundInstrument,
         roundPlanned,
+        roundPast,
+        roundStep,
+        stepDate,
+        stepAmount,
+        stepNote,
+        roundTerms,
         ...fields
       } = tool;
+      if (operation === "ROUND_STEP" || operation === "REVISE_ROUND") {
+        return roundChange(ports, context, companyId, {
+          operation,
+          roundName,
+          roundStep,
+          stepDate,
+          stepAmount,
+          stepNote,
+          roundTerms,
+          target: tool.target,
+        });
+      }
       if (operation === "OPEN_ROUND" || operation === "CLOSE_ROUND") {
         return roundOperation(ports, context, companyId, {
           operation,
           roundName,
           roundInstrument,
           roundPlanned,
+          roundPast,
+          stepDate,
+          roundTerms,
           target: tool.target,
           targetStage: tool.targetStage,
         });

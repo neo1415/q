@@ -1133,6 +1133,12 @@ const capitalRounds = createCapitalRoundService({
   authorization,
   companies: createPostgresCompanyQueryPort({ sql: database.sql }),
   audit,
+  // P8: a round with RECEIVED money is final-closed, never cancelled; the
+  // received money is Network's to say, through its own ledger.
+  moneyReceivedInRound: async ({ actor, companyId, roundId }) =>
+    (await commitments.ledger({ actor, side: "COMPANY", companyId })).sums.some(
+      (sum) => sum.roundId === roundId && sum.received !== "0",
+    ),
 });
 /**
  * Post-meeting outcomes (2026-10-02): the investor's Pass, Pause and Resume

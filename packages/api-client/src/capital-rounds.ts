@@ -1,9 +1,13 @@
 import {
   CapitalLedgerDtoSchema,
   CapitalRoundDtoSchema,
+  CapitalRoundHistoryDtoSchema,
   companyCapitalLedgerPath,
   companyCapitalRoundClosePath,
+  companyCapitalRoundHistoryPath,
+  companyCapitalRoundPath,
   companyCapitalRoundsPath,
+  companyCapitalRoundStepsPath,
   IDEMPOTENCY_KEY_HEADER,
   MyCommitmentsDtoSchema,
   NETWORK_MY_COMMITMENTS_PATH,
@@ -14,6 +18,8 @@ import {
   type ConfirmCommitmentAmountRequest,
   type MarkTransferSentRequest,
   type OpenCapitalRoundRequest,
+  type RecordCapitalRoundStepRequest,
+  type ReviseCapitalRoundRequest,
 } from "@capital-q/contracts";
 
 import { call, type ApiSession } from "./request.js";
@@ -51,6 +57,53 @@ export function openCapitalRound(
     companyCapitalRoundsPath(companyId),
     CapitalRoundDtoSchema,
     { body: request, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+/** Correct a round; carries the revision it read. Its history keeps the old values. */
+export function reviseCapitalRound(
+  session: ApiSession,
+  companyId: string,
+  roundId: string,
+  request: ReviseCapitalRoundRequest,
+) {
+  return call(
+    session,
+    "PATCH",
+    companyCapitalRoundPath(companyId, roundId),
+    CapitalRoundDtoSchema,
+    { body: request },
+  );
+}
+
+/** A close, tranche, final close, reopen, cancel or start; one key per press. */
+export function recordCapitalRoundStep(
+  session: ApiSession,
+  companyId: string,
+  roundId: string,
+  request: RecordCapitalRoundStepRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    companyCapitalRoundStepsPath(companyId, roundId),
+    CapitalRoundDtoSchema,
+    { body: request, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+/** A round's history: every change with its previous values. */
+export function getCapitalRoundHistory(
+  session: ApiSession,
+  companyId: string,
+  roundId: string,
+) {
+  return call(
+    session,
+    "GET",
+    companyCapitalRoundHistoryPath(companyId, roundId),
+    CapitalRoundHistoryDtoSchema,
   );
 }
 

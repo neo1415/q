@@ -64,12 +64,13 @@ export function moneyText(amount: string, currency: string): string {
   return `${currency} ${grouped}${cents}`;
 }
 
-const INSTRUMENT_WORDS: Readonly<
+export const INSTRUMENT_WORDS: Readonly<
   Record<CapitalRoundDto["instrument"], string>
 > = {
   SAFE: "SAFE",
   EQUITY: "Equity",
   CONVERTIBLE: "Convertible note",
+  ASA: "Advance subscription (ASA)",
   OTHER: "Other instrument",
 };
 

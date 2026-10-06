@@ -14,7 +14,14 @@ import { apiSession } from "@/features/q/context";
 import { CommitmentCard } from "./commitment-card";
 import { money } from "./money";
 import { OpenRound, type RoundDraft } from "./open-round";
-import { PastRound, RoundCard, TotalCard } from "./round-card";
+import {
+  INSTRUMENT_LABELS,
+  RoundCard,
+  RoundTimeline,
+  TotalCard,
+} from "./round-card";
+import type { LeadOption } from "./round-terms-fields";
+import { PRO_RATA_WORDS, STATUS_WORDS } from "./round-words";
 
 /**
  * The money on Capital (founder direction 2026-10-04): rounds, what each
@@ -110,13 +117,19 @@ export function draftFrom(objective: CapitalObjectiveDto | null): RoundDraft {
 export function FounderBook({
   ledger,
   draft,
+  leads = [],
 }: {
   readonly ledger: CapitalLedgerDto;
   readonly draft: RoundDraft;
+  /** The company's investor relationships, for naming a round's lead. */
+  readonly leads?: readonly LeadOption[];
 }) {
   const current =
     ledger.rounds.find((round) => round.id === ledger.currentRoundId) ?? null;
-  const others = ledger.rounds.filter((round) => round.id !== current?.id);
+  const roundOptions = ledger.rounds.map((round) => ({
+    id: round.id,
+    name: round.name,
+  }));
   const nameOf = new Map(ledger.rounds.map((round) => [round.id, round.name]));
   return (
     <div className="flex flex-col gap-10">
@@ -130,7 +143,12 @@ export function FounderBook({
               Open one to track what you raise in it.
             </p>
             <div>
-              <OpenRound draft={draft} prominent />
+              <OpenRound
+                draft={draft}
+                prominent
+                leads={leads}
+                rounds={roundOptions}
+              />
             </div>
           </div>
         </section>
@@ -139,10 +157,14 @@ export function FounderBook({
           className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
           aria-label="Rounds"
         >
-          <RoundCard round={current} />
+          <RoundCard round={current} rounds={ledger.rounds} leads={leads} />
           <TotalCard totals={ledger.totals} rounds={ledger.rounds} />
           <div className="lg:col-span-2">
-            <OpenRound draft={{ ...draft, name: "" }} />
+            <OpenRound
+              draft={{ ...draft, name: "" }}
+              leads={leads}
+              rounds={roundOptions}
+            />
           </div>
         </section>
       )}
@@ -192,16 +214,22 @@ export function FounderBook({
         )}
       </section>
 
-      {others.length === 0 ? null : (
-        <section className="flex flex-col gap-3" aria-labelledby="rounds-past">
-          <h2 id="rounds-past" className="cq-title-md text-(--cq-text-primary)">
-            Other rounds
+      {ledger.rounds.length === 0 ? null : (
+        <section
+          className="flex flex-col gap-4"
+          aria-labelledby="rounds-timeline"
+        >
+          <h2
+            id="rounds-timeline"
+            className="cq-title-md text-(--cq-text-primary)"
+          >
+            Your rounds
           </h2>
-          <ul className="flex flex-col gap-2">
-            {others.map((round) => (
-              <PastRound key={round.id} round={round} />
-            ))}
-          </ul>
+          <RoundTimeline
+            rounds={ledger.rounds}
+            currentRoundId={ledger.currentRoundId}
+            leads={leads}
+          />
         </section>
       )}
     </div>
@@ -243,6 +271,7 @@ export function InvestorBook({ mine }: { readonly mine: MyCommitmentsDto }) {
           </p>
         ))}
       </article>
+      <ByRound commitments={mine.commitments} />
       {mine.commitments.length === 0 ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
           No commitments yet. When you and a founder agree an amount, it shows
@@ -264,6 +293,79 @@ export function InvestorBook({ mine }: { readonly mine: MyCommitmentsDto }) {
         ))
       )}
     </div>
+  );
+}
+
+/** Basis points as a percent with one decimal: 250 -> "2.5%". */
+function percentOf(basisPoints: number): string {
+  const tenths = Math.floor(basisPoints / 10);
+  return `${String(Math.floor(tenths / 10))}.${String(tenths % 10)}%`;
+}
+
+/**
+ * The investor's commitments per round (plan P8): the company, the round
+ * and its status, their amount, the terms they agreed to, and an ownership
+ * ESTIMATE (amount over post-money, or over a SAFE/ASA cap) with what it
+ * leaves out. Pro-rata is the round's declared right; "not said" stays so.
+ */
+function ByRound({
+  commitments,
+}: {
+  readonly commitments: readonly LedgerCommitmentDto[];
+}) {
+  const inRounds = commitments.flatMap((item) =>
+    item.round === undefined ? [] : [{ item, round: item.round }],
+  );
+  if (inRounds.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-3" aria-labelledby="by-round">
+      <h3 id="by-round" className="cq-label text-(--cq-text-secondary)">
+        By round
+      </h3>
+      <ul className="flex flex-col gap-2">
+        {inRounds.map(({ item, round }) => {
+          const terms = [
+            round.valuationCap === null
+              ? null
+              : `${money(round.valuationCap, item.currencyCode)} cap`,
+            round.discountPercent === null
+              ? null
+              : `${round.discountPercent}% discount`,
+            round.valuation === null
+              ? null
+              : `${money(round.valuation.amount, item.currencyCode)} ${round.valuation.basis === "POST_MONEY" ? "post-money" : "pre-money"}`,
+          ].filter((part): part is string => part !== null);
+          return (
+            <li
+              key={item.id}
+              className="flex flex-col gap-2 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-4 sm:px-5"
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="cq-body font-semibold text-(--cq-text-primary)">
+                  {item.counterpartName}: {round.name}
+                </span>
+                <span className="cq-caption text-(--cq-text-secondary)">
+                  {INSTRUMENT_LABELS[round.instrument]},{" "}
+                  {STATUS_WORDS[round.status].toLowerCase()}
+                </span>
+              </div>
+              <p className="cq-body-sm cq-numeric text-(--cq-text-primary)">
+                Your commitment {money(item.amount, item.currencyCode)}
+                {terms.length === 0 ? "" : ` · ${terms.join(" · ")}`}
+              </p>
+              <p className="cq-caption text-(--cq-text-secondary)">
+                {round.ownershipEstimate === null
+                  ? "Ownership: not enough is known to estimate it."
+                  : `About ${percentOf(round.ownershipEstimate.basisPoints)} ownership, estimated from the ${round.ownershipEstimate.from === "CAP" ? "valuation cap" : "post-money valuation"}, before later dilution.`}{" "}
+                {round.proRataRights === null
+                  ? "Pro-rata rights: not said."
+                  : `${PRO_RATA_WORDS[round.proRataRights]}.`}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

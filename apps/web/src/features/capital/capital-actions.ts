@@ -8,14 +8,22 @@ import {
   confirmCommitmentAmount,
   confirmCommitmentReceived,
   disputeCommitment,
+  getCapitalRoundHistory,
   markCommitmentSent,
   openCapitalRound,
+  recordCapitalRoundStep,
+  reviseCapitalRound,
   type ApiSession,
 } from "@capital-q/api-client";
 import {
   MarkTransferSentRequestSchema,
   OpenCapitalRoundRequestSchema,
+  RecordCapitalRoundStepRequestSchema,
+  ReviseCapitalRoundRequestSchema,
+  type CapitalRoundHistoryDto,
   type OpenCapitalRoundRequest,
+  type RecordCapitalRoundStepRequest,
+  type ReviseCapitalRoundRequest,
 } from "@capital-q/contracts";
 
 import { apiSession, resolveOwnContext } from "@/features/q/context";
@@ -70,7 +78,11 @@ export async function openRoundAction(
 ): Promise<CapitalResult> {
   const parsed = OpenCapitalRoundRequestSchema.safeParse(request);
   if (!parsed.success || !Key.safeParse(key).success) {
-    return { ok: false, message: "Add a name and a target above zero." };
+    return {
+      ok: false,
+      message:
+        "Add a name and a target above zero, and check the amounts: whole numbers or two decimals.",
+    };
   }
   const companyId = await ownCompanyId();
   if (companyId === null)
@@ -78,6 +90,62 @@ export async function openRoundAction(
   return run((session) =>
     openCapitalRound(session, companyId, parsed.data, key),
   );
+}
+
+const NOT_FOUND = "We couldn't find that. Refresh the page and try again.";
+
+/** Correct a round (P8): the API keeps the previous values in its history. */
+export async function reviseRoundAction(
+  roundId: string,
+  request: ReviseCapitalRoundRequest,
+): Promise<CapitalResult> {
+  const parsed = ReviseCapitalRoundRequestSchema.safeParse(request);
+  if (!Id.safeParse(roundId).success) return { ok: false, message: NOT_FOUND };
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Check the amounts: whole numbers or two decimals, no symbols.",
+    };
+  }
+  const companyId = await ownCompanyId();
+  if (companyId === null) return { ok: false, message: NOT_FOUND };
+  return run((session) =>
+    reviseCapitalRound(session, companyId, roundId, parsed.data),
+  );
+}
+
+/** A lifecycle step (P8); one key per sheet, so a retry records it once. */
+export async function roundStepAction(
+  roundId: string,
+  request: RecordCapitalRoundStepRequest,
+  key: string,
+): Promise<CapitalResult> {
+  const parsed = RecordCapitalRoundStepRequestSchema.safeParse(request);
+  if (!Id.safeParse(roundId).success || !Key.safeParse(key).success) {
+    return { ok: false, message: NOT_FOUND };
+  }
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Check the amount: a whole number or two decimals, no symbols.",
+    };
+  }
+  const companyId = await ownCompanyId();
+  if (companyId === null) return { ok: false, message: NOT_FOUND };
+  return run((session) =>
+    recordCapitalRoundStep(session, companyId, roundId, parsed.data, key),
+  );
+}
+
+/** A round's history, read under the founder's own session. */
+export async function roundHistoryAction(
+  roundId: string,
+): Promise<CapitalRoundHistoryDto | null> {
+  if (!Id.safeParse(roundId).success) return null;
+  const companyId = await ownCompanyId();
+  const session = await apiSession();
+  if (companyId === null || session === null) return null;
+  return getCapitalRoundHistory(session, companyId, roundId).catch(() => null);
 }
 
 export async function closeRoundAction(

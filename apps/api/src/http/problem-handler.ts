@@ -11,6 +11,11 @@ import {
   CapitalObjectiveLifecycleError,
   CapitalObjectiveNotFoundError,
   CapitalObjectiveVersionConflictError,
+  CapitalRoundClosedError,
+  CapitalRoundNotFoundError,
+  CapitalRoundRevisionConflictError,
+  CapitalRoundStepRefusedError,
+  CapitalRoundTermsError,
 } from "@capital-q/capital";
 import {
   CompanyCreationConflictError,
@@ -325,6 +330,7 @@ function toProblem(
     error instanceof InvestorMandateNotFoundError ||
     error instanceof InvestorPortfolioReferenceNotFoundError ||
     error instanceof CapitalObjectiveNotFoundError ||
+    error instanceof CapitalRoundNotFoundError ||
     error instanceof TaxonomyVocabularyNotFoundError ||
     error instanceof TaxonomyNodeNotFoundError ||
     error instanceof TaxonomySubjectNotFoundError ||
@@ -660,6 +666,7 @@ function toProblem(
     error instanceof TeamVersionConflictError ||
     error instanceof InvestorVersionConflictError ||
     error instanceof CapitalObjectiveVersionConflictError ||
+    error instanceof CapitalRoundRevisionConflictError ||
     error instanceof PersonProfileVersionConflictError
   ) {
     return createProblemDetails({
@@ -691,7 +698,10 @@ function toProblem(
     error instanceof InvestorOrganisationExistsError ||
     error instanceof InvestorMandateLifecycleError ||
     error instanceof ActiveCapitalObjectiveExistsError ||
-    error instanceof CapitalObjectiveLifecycleError
+    error instanceof CapitalObjectiveLifecycleError ||
+    error instanceof CapitalRoundClosedError ||
+    error instanceof CapitalRoundStepRefusedError ||
+    error instanceof CapitalRoundTermsError
   ) {
     return createProblemDetails({
       code: "RESOURCE_CONFLICT",

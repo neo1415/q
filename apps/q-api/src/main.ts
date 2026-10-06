@@ -2128,6 +2128,11 @@ const appActionPorts: OwnReadPorts = {
     currentRound: (query) => capitalRounds.currentRound(query),
     openRound: (command) => capitalRounds.openRound(command),
     closeRound: (command) => capitalRounds.closeRound(command),
+    reviseRound: (command) => capitalRounds.reviseRound(command),
+    recordStep: (command) => capitalRounds.recordStep(command),
+    roundHistory: (query) => capitalRounds.roundHistory(query),
+    roundsForInvestorCommitments: (roundIds) =>
+      capitalRounds.roundsForInvestorCommitments(roundIds),
   },
   commitments: {
     confirmAmount: (actor, commitmentId, key, roundId) =>
@@ -2586,6 +2591,11 @@ const capitalRounds = createCapitalRoundService({
   authorization,
   companies,
   audit: createPostgresMaterialActionAuditWriter(),
+  // P8: received money (Network's ledger) keeps a round from being cancelled.
+  moneyReceivedInRound: async ({ actor, companyId, roundId }) =>
+    (
+      await meetingCommitments.ledger({ actor, side: "COMPANY", companyId })
+    ).sums.some((sum) => sum.roundId === roundId && sum.received !== "0"),
 });
 const verificationService = createCompanyVerificationService({
   sql: database.sql,

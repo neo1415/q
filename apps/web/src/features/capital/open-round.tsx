@@ -11,7 +11,14 @@ import { Button } from "@capital-q/ui/button";
 import { Input } from "@capital-q/ui/input";
 import { MoneyInput, type MoneyValue } from "@capital-q/ui/money-input";
 
-import { closeRoundAction, openRoundAction } from "./capital-actions";
+import { openRoundAction } from "./capital-actions";
+import { INSTRUMENT_LABELS } from "./round-labels";
+import { EMPTY_DRAFT, saidTerms, termsFromDraft } from "./round-terms";
+import {
+  RoundTermsFields,
+  type LeadOption,
+  type RoundOption,
+} from "./round-terms-fields";
 
 const CURRENCIES = [
   { code: "USD", label: "USD" },
@@ -23,14 +30,12 @@ const CURRENCIES = [
   { code: "ZAR", label: "ZAR" },
 ] as const;
 
-const INSTRUMENTS: readonly {
-  readonly value: CapitalRoundInstrument;
-  readonly label: string;
-}[] = [
-  { value: "SAFE", label: "SAFE" },
-  { value: "EQUITY", label: "Equity" },
-  { value: "CONVERTIBLE", label: "Convertible" },
-  { value: "OTHER", label: "Other" },
+const INSTRUMENTS: readonly CapitalRoundInstrument[] = [
+  "SAFE",
+  "EQUITY",
+  "CONVERTIBLE",
+  "ASA",
+  "OTHER",
 ];
 
 export type RoundDraft = {
@@ -44,37 +49,62 @@ function newKey(): string {
 }
 
 /**
- * Open a round, in place (2026-10-04): name, target, instrument; "Open now"
- * makes it the current round, "Plan it" keeps it for later. Prefilled from
- * the raise when there is one. One key per form, so a double press or a
- * retry opens it once.
+ * Add a round, in place (2026-10-04; P8 2026-10-06): name, target,
+ * instrument; "Open now" makes it the current round, "Plan it" keeps it for
+ * later, "Record a past round" adds one raised before Capital Q to the
+ * history (never current). Terms are optional and stay unknown when empty.
+ * Prefilled from the raise when there is one. One key per form, so a double
+ * press or a retry adds it once.
  */
 export function OpenRound({
   draft,
   prominent = false,
+  leads = [],
+  rounds = [],
 }: {
   readonly draft: RoundDraft;
   readonly prominent?: boolean;
+  readonly leads?: readonly LeadOption[];
+  readonly rounds?: readonly RoundOption[];
 }) {
-  const [open, setOpen] = useState(false);
-  if (!open) {
+  const [open, setOpen] = useState<"NEW" | "PAST" | null>(null);
+  if (open === null) {
     return (
-      <Button
-        variant={prominent ? "primary" : "secondary"}
-        onClick={() => setOpen(true)}
-      >
-        Open a round
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={prominent ? "primary" : "secondary"}
+          onClick={() => setOpen("NEW")}
+        >
+          Add a round
+        </Button>
+        <Button variant="quiet" onClick={() => setOpen("PAST")}>
+          Record a past round
+        </Button>
+      </div>
     );
   }
-  return <RoundForm draft={draft} onDone={() => setOpen(false)} />;
+  return (
+    <RoundForm
+      draft={open === "PAST" ? { ...draft, name: "" } : draft}
+      past={open === "PAST"}
+      leads={leads}
+      rounds={rounds}
+      onDone={() => setOpen(null)}
+    />
+  );
 }
 
 function RoundForm({
   draft,
+  past,
+  leads,
+  rounds,
   onDone,
 }: {
   readonly draft: RoundDraft;
+  readonly past: boolean;
+  readonly leads: readonly LeadOption[];
+  readonly rounds: readonly RoundOption[];
   readonly onDone: () => void;
 }) {
   const id = useId();
@@ -82,20 +112,41 @@ function RoundForm({
   const [name, setName] = useState(draft.name);
   const [target, setTarget] = useState<MoneyValue>(draft.target);
   const [instrument, setInstrument] = useState(draft.instrument);
+  const [openedOn, setOpenedOn] = useState("");
+  const [closedOn, setClosedOn] = useState("");
+  const [terms, setTerms] = useState(EMPTY_DRAFT);
+  const [showTerms, setShowTerms] = useState(past);
   const [key] = useState(newKey);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const submit = (status: OpenCapitalRoundRequest["status"]) =>
+  const submit = (status: NonNullable<OpenCapitalRoundRequest["status"]>) =>
     start(async () => {
+      const said = termsFromDraft(terms, {
+        target: target.amount,
+        currency: target.currency,
+      });
+      if (!said.ok) {
+        setMessage(said.message);
+        return;
+      }
+      if (past && closedOn !== "" && openedOn !== "" && closedOn < openedOn) {
+        setMessage("The close date is before the opening date.");
+        return;
+      }
+      // Only the terms that were said; empty ones stay unknown.
+      const given = saidTerms(said.terms);
       const result = await openRoundAction(
         {
           name: name.trim(),
           target: { amount: target.amount, currency: target.currency },
           instrument,
-          ...(status === undefined ? {} : { status }),
+          status,
+          ...(openedOn === "" ? {} : { openedOn }),
+          ...(status === "CLOSED" && closedOn !== "" ? { closedOn } : {}),
+          ...(Object.keys(given).length === 0 ? {} : { terms: given }),
         },
-        `${key}:${status ?? "OPEN"}`,
+        `${key}:${status}`,
       );
       if (result.ok) {
         onDone();
@@ -105,20 +156,28 @@ function RoundForm({
       }
     });
 
+  const incomplete = name.trim() === "" || target.amount === "";
+  const title = past ? "Record a past round" : "Add a round";
   return (
     <form
       className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-4 rounded-2xl border border-(--cq-border) bg-(--cq-surface-raised) p-5 sm:p-6"
       onSubmit={(event) => {
         event.preventDefault();
-        submit(undefined);
+        submit(past ? "CLOSED" : "OPEN");
       }}
-      aria-label="Open a round"
+      aria-label={title}
     >
-      <h3 className="cq-title-sm text-(--cq-text-primary)">Open a round</h3>
+      <h3 className="cq-title-sm text-(--cq-text-primary)">{title}</h3>
+      {past ? (
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          A round you raised before Capital Q. It goes into your history and
+          never becomes your current round.
+        </p>
+      ) : null}
       <Input
         id={`${id}-name`}
         label="Name"
-        placeholder="Seed"
+        placeholder={past ? "Pre-seed" : "Seed"}
         value={name}
         maxLength={80}
         onChange={(event) => setName(event.target.value)}
@@ -135,98 +194,99 @@ function RoundForm({
           Instrument
         </legend>
         <div className="flex flex-wrap gap-2">
-          {INSTRUMENTS.map((option) => (
+          {INSTRUMENTS.map((value) => (
             <label
-              key={option.value}
+              key={value}
               className="cq-body-sm inline-flex min-h-11 cursor-pointer items-center rounded-full border border-(--cq-border) px-4 text-(--cq-text-primary) has-checked:border-transparent has-checked:bg-(--cq-accent-soft) has-focus-visible:outline-2 has-focus-visible:outline-(--cq-focus-ring)"
             >
               <input
                 type="radio"
                 name={`${id}-instrument`}
-                value={option.value}
-                checked={instrument === option.value}
-                onChange={() => setInstrument(option.value)}
+                value={value}
+                checked={instrument === value}
+                onChange={() => setInstrument(value)}
                 className="sr-only"
               />
-              {option.label}
+              {INSTRUMENT_LABELS[value]}
             </label>
           ))}
         </div>
       </fieldset>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Input
+          id={`${id}-opened`}
+          type="date"
+          label={past ? "Opened" : "Opened (default: today)"}
+          value={openedOn}
+          onChange={(event) => setOpenedOn(event.target.value)}
+        />
+        {past ? (
+          <Input
+            id={`${id}-closed`}
+            type="date"
+            label="Closed"
+            value={closedOn}
+            onChange={(event) => setClosedOn(event.target.value)}
+          />
+        ) : null}
+      </div>
+      {showTerms ? (
+        <RoundTermsFields
+          id={`${id}-terms`}
+          draft={terms}
+          onChange={setTerms}
+          currency={target.currency}
+          leads={leads}
+          rounds={rounds}
+          past={past}
+        />
+      ) : (
+        <div>
+          <Button
+            variant="quiet"
+            size="compact"
+            onClick={() => setShowTerms(true)}
+          >
+            Add terms (cap, discount, valuation, lead…)
+          </Button>
+        </div>
+      )}
       {message === null ? null : (
         <p className="cq-body-sm text-(--cq-danger)" role="alert">
           {message}
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={pending || name.trim() === "" || target.amount === ""}
-        >
-          Open now
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={pending || name.trim() === "" || target.amount === ""}
-          onClick={() => submit("PLANNED")}
-        >
-          Plan it
-        </Button>
+        {past ? (
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={pending || incomplete}
+          >
+            Add to history
+          </Button>
+        ) : (
+          <>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={pending || incomplete}
+            >
+              Open now
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={pending || incomplete}
+              onClick={() => submit("PLANNED")}
+            >
+              Plan it
+            </Button>
+          </>
+        )}
         <Button variant="quiet" disabled={pending} onClick={onDone}>
           Cancel
         </Button>
       </div>
     </form>
-  );
-}
-
-/** Close a round, after one explicit second press. */
-export function CloseRoundButton({
-  roundId,
-  name,
-}: {
-  readonly roundId: string;
-  readonly name: string;
-}) {
-  const router = useRouter();
-  const [asking, setAsking] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  if (!asking) {
-    return (
-      <Button variant="quiet" size="compact" onClick={() => setAsking(true)}>
-        Close round
-      </Button>
-    );
-  }
-  return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <span className="cq-body-sm text-(--cq-text-secondary)">
-        {message ?? `Close ${name}?`}
-      </span>
-      <Button
-        variant="secondary"
-        size="compact"
-        disabled={pending}
-        onClick={() =>
-          start(async () => {
-            const result = await closeRoundAction(roundId);
-            if (result.ok) router.refresh();
-            else setMessage(result.message);
-          })
-        }
-      >
-        Close {name}
-      </Button>
-      <Button
-        variant="quiet"
-        size="compact"
-        disabled={pending}
-        onClick={() => setAsking(false)}
-      >
-        Keep open
-      </Button>
-    </div>
   );
 }

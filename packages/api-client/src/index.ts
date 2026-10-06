@@ -310,6 +310,9 @@ export {
   getMyCommitments,
   markCommitmentSent,
   openCapitalRound,
+  getCapitalRoundHistory,
+  recordCapitalRoundStep,
+  reviseCapitalRound,
 } from "./capital-rounds.js";
 export {
   getRelationshipPass,

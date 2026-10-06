@@ -73,7 +73,24 @@ function portsWith(commitments: readonly LedgerCommitment[]): AppActionPorts {
             status: "OPEN",
             isCurrent: true,
             openedOn: "2026-10-01",
+            firstClosedOn: null,
             closedOn: null,
+            cancelledOn: null,
+            cancelledReason: null,
+            terms: {
+              targetCloseOn: null,
+              valuation: null,
+              valuationCap: "12000000",
+              discountPercent: "20",
+              hardCap: null,
+              proRataRights: "MAJOR_INVESTORS",
+              lead: null,
+              extendsRoundId: null,
+              reportedRaised: null,
+            },
+            closes: [],
+            corrections: 0,
+            revision: 3,
             createdAt: "2026-10-01T09:00:00.000Z",
           },
         ]),
@@ -247,6 +264,128 @@ describe("change_my_raise opens a round", () => {
     expect(await raise.toCanonical(said, context, portsWith([]))).toEqual({
       refused: "What's the round's target, and in which currency?",
     });
+  });
+});
+
+describe("change_my_raise steps and corrects a round (P8)", () => {
+  const raise = toolNamed("change_my_raise");
+  const family = () =>
+    APP_ACTIONS.find((action) => action.name === "capital.objective.change");
+
+  it('"We had our first close at $600k": a CLOSE on the current round, against the revision it read', async () => {
+    const said = raise.input.parse({
+      operation: "ROUND_STEP",
+      roundStep: "CLOSE",
+      stepAmount: "600000",
+      stepDate: "2026-10-05",
+      stepNote: "First close",
+    });
+    const canonical = await raise.toCanonical(said, context, portsWith([]));
+    expect(canonical).toEqual({
+      operation: "ROUND_STEP",
+      input: {
+        companyId: COMPANY,
+        roundId: ROUND,
+        idempotencyKey: "q:run-1:step",
+        input: {
+          expectedRevision: 3,
+          step: "CLOSE",
+          on: "2026-10-05",
+          amount: "600000",
+          label: "First close",
+        },
+      },
+    });
+    expect(family()?.card(canonical)).toEqual({
+      summary: "Record a close",
+      preview: "On 2026-10-05 · amount 600000 · First close",
+    });
+  });
+
+  it("a cancel carries its reason as a note, never an amount", async () => {
+    const said = raise.input.parse({
+      operation: "ROUND_STEP",
+      roundName: "seed",
+      roundStep: "CANCEL",
+      stepAmount: "5",
+      stepNote: "Lead pulled out",
+    });
+    expect(await raise.toCanonical(said, context, portsWith([]))).toMatchObject(
+      {
+        operation: "ROUND_STEP",
+        input: { input: { step: "CANCEL", note: "Lead pulled out" } },
+      },
+    );
+  });
+
+  it("asks which step, and which round, rather than guessing", async () => {
+    expect(
+      await raise.toCanonical(
+        raise.input.parse({ operation: "ROUND_STEP" }),
+        context,
+        portsWith([]),
+      ),
+    ).toEqual({
+      refused:
+        "Which step: a close, a tranche, the final close, reopen or cancel?",
+    });
+    expect(
+      await raise.toCanonical(
+        raise.input.parse({
+          operation: "ROUND_STEP",
+          roundName: "Series B",
+          roundStep: "CLOSE",
+        }),
+        context,
+        portsWith([]),
+      ),
+    ).toEqual({ refused: "No round is called Series B." });
+  });
+
+  it('"The cap is $10M now": a correction whose card says the history keeps the old value', async () => {
+    const said = raise.input.parse({
+      operation: "REVISE_ROUND",
+      roundTerms: { valuationCap: "10000000" },
+    });
+    const canonical = await raise.toCanonical(said, context, portsWith([]));
+    expect(canonical).toEqual({
+      operation: "REVISE_ROUND",
+      input: {
+        companyId: COMPANY,
+        roundId: ROUND,
+        input: { expectedRevision: 3, terms: { valuationCap: "10000000" } },
+      },
+    });
+    expect(family()?.card(canonical)).toEqual({
+      summary: "Correct this round",
+      preview: "valuation cap set. The previous values stay in its history.",
+    });
+  });
+
+  it("records a past round as closed, never current", async () => {
+    const said = raise.input.parse({
+      operation: "OPEN_ROUND",
+      roundName: "Pre-seed",
+      roundInstrument: "ASA",
+      roundPast: true,
+      stepDate: "2024-06-30",
+      target: { amount: "300000", currency: "GBP" },
+      roundTerms: { reportedRaised: "320000" },
+    });
+    expect(await raise.toCanonical(said, context, portsWith([]))).toMatchObject(
+      {
+        operation: "OPEN_ROUND",
+        input: {
+          input: {
+            name: "Pre-Seed",
+            instrument: "ASA",
+            status: "CLOSED",
+            closedOn: "2024-06-30",
+            terms: { reportedRaised: "320000" },
+          },
+        },
+      },
+    );
   });
 });
 
