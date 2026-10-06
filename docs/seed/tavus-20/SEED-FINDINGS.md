@@ -86,3 +86,16 @@ Found while seeding the 20 fictional companies into production through the real 
 - For `series_a` the "Business and traction" step asks revenue shape, paying customers and six-month growth; for seed / pre-seed it is a single signal radio with no numbers.
 - "A few things I still need" sometimes has nothing to ask ("Nothing I still need from you") but is still a step to click through.
 
+### F17. Setup summary: "Go to Home" fails with a raw error code while Q's first reading is still running (S2)
+- Where: `/onboarding/founder`, "Here's what we have so far" (step F8.snapshot).
+- Steps: finish the form; press "Go to Home" a few seconds in, while "Preparing your analysis" shows.
+- Actual: red banner "Couldn't save. The onboarding session does not allow this action right now. (REQUIRED_STEPS_INCOMPLETE) Your answers on this screen are kept." Session stays ACTIVE (`canComplete:false`, F8.snapshot IN_PROGRESS). Waiting and pressing again works.
+- Expected: the button waits for (or does not need) the analysis; never show an internal code.
+
+### F18. Profile "Edit sector" silently caps at 8 categories (S3)
+- When 8 are chosen the search box disappears with no message; a founder with more relevant tags cannot tell why.
+
+### Lead request (raise shared with the network): not done, conflicts with a locked privacy rule
+- The only raise-sharing control is per relationship (`shareRaiseAction(companyId, relationshipId)` on `/company/visibility`), and the page states "Your raise: Private to your company ... it is never shown to the network or the public." There is no network-wide raise share in the product or API. Making the raise network-visible would change a founder-private disclosure rule (CLAUDE.md: founder-private information never silently reaches investors); it needs an ADR / PADL decision, not a seed workaround. Seed leaves raises private; investors see "Raising: Not shared" until a founder shares it with a relationship.
+- Pitches: switched to audience "Everyone on Capital Q" (NETWORK) through the pitch editor, since Explore lists only NETWORK pitches.
+

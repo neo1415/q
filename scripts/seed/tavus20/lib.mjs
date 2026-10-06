@@ -116,8 +116,9 @@ export async function ensureAccount({ email, displayName, seedKey }) {
     method: "POST",
     body: JSON.stringify({
       email,
-      // Random, never stored; later sign-ins use admin magic-link tokens.
-      password: randomBytes(24).toString("base64url"),
+      // The founder's shared seed password (env only, never printed), so
+      // they can sign in as any fictional person; random when unset.
+      password: process.env.CQ_SEED_ACCOUNT_PASSWORD || randomBytes(24).toString("base64url"),
       email_confirm: true,
       user_metadata: {
         display_name: displayName,

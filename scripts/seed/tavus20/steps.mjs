@@ -186,11 +186,17 @@ async function onboardingForm(page, c) {
       }
       await clickContinue(page);
     } else if (/what we have so far/.test(head)) {
-      await page.waitForTimeout(5000);
-      const home = page.getByRole("button", { name: "Go to Home" });
-      if (await home.isVisible().catch(() => false)) {
+      // The snapshot step completes only once Q's first reading is in;
+      // "Go to Home" before that is refused (REQUIRED_STEPS_INCOMPLETE).
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        await page.waitForTimeout(15000);
+        const home = page.getByRole("button", { name: "Go to Home" });
+        if (!(await home.isVisible().catch(() => false))) return;
         await home.click();
         await page.waitForTimeout(8000);
+        if (!/onboarding/.test(page.url())) return;
+        if (!(await page.getByText("Couldn't save").first().isVisible().catch(() => false))) return;
+        log(c, "snapshot not ready; retrying");
       }
       return;
     } else {
@@ -273,6 +279,11 @@ export async function stepProfile(page, c) {
   await page.waitForTimeout(7000);
   out.push(await ui.setField(page, "Company", "City", c.headquarters.city));
   out.push(await ui.setField(page, "Company", "Legal name", c.legalName));
+  if (!plan.COUNTRY_LABEL[c.headquarters.country]) {
+    // Setup offered "Somewhere else" only; the profile can name the country.
+    const name = new Intl.DisplayNames(["en"], { type: "region" }).of(c.headquarters.country);
+    out.push(`country ${name}: ${await ui.setField(page, "Company", "Country", name)}`);
+  }
   {
     const r = await ui.openRegion(page, "Company");
     const opener = r.getByRole("button", { name: /^(Add|Edit) founded$/ });
@@ -381,7 +392,7 @@ export async function stepDocuments(page, c) {
   const email = lib.emailFor(c.founderPerson.name, c.company);
   const token = await lib.accessToken(email);
   const dr0 = (await lib.call(lib.API, token, "GET", `/v1/companies/${s.companyId}/data-room`)).body;
-  const have = new Set((dr0.documents ?? []).map((d) => d.title));
+  const have = new Set((dr0.documents ?? []).map((d) => d.title.normalize("NFC")));
   await login(page, email, "/documents");
   await page.goto(`${lib.WEB}/documents`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(7000);
@@ -403,7 +414,7 @@ export async function stepDocuments(page, c) {
   const todo = [];
   c.dataRoom.forEach((d, i) => {
     const title = d.title.replace(/[/\\]/g, "-");
-    if (!have.has(title) && files[i]) todo.push(stageFile(c, join(drDir, files[i]), `${title}.pdf`));
+    if (!have.has(title.normalize("NFC")) && files[i]) todo.push(stageFile(c, join(drDir, files[i]), `${title}.pdf`));
   });
   if (todo.length) {
     await page.goto(`${lib.WEB}/documents`, { waitUntil: "domcontentloaded" });
@@ -444,7 +455,7 @@ export async function stepDocuments(page, c) {
   const dr = (await lib.call(lib.API, token, "GET", `/v1/companies/${s.companyId}/data-room`)).body;
   const results = [];
   for (const d of c.dataRoom) {
-    const doc = dr.documents.find((x) => x.title === d.title.replace(/[/\\]/g, "-"));
+    const doc = dr.documents.find((x) => x.title.normalize("NFC") === d.title.replace(/[/\\]/g, "-").normalize("NFC"));
     if (!doc) {
       results.push(`MISSING ${d.title}`);
       continue;
@@ -472,7 +483,6 @@ export async function stepDocuments(page, c) {
 // ------------------------------------------------------------------ pitch
 
 export async function stepPitch(page, c) {
-  if (isDone(c, "pitch")) return;
   const { s } = stateOf(c);
   const video = lib.videoFile(c);
   if (!existsSync(video)) {
@@ -482,6 +492,10 @@ export async function stepPitch(page, c) {
   const email = lib.emailFor(c.founderPerson.name, c.company);
   const token = await lib.accessToken(email);
   let pitch = (await lib.call(lib.API, token, "GET", `/v1/companies/${s.companyId}/pitch`)).body?.pitch ?? null;
+  if (pitch?.status === "READY" && pitch.audience === "NETWORK" && pitch.downloadable === true) {
+    done(c, "pitch");
+    return;
+  }
   await login(page, email, "/pitch");
   if (pitch === null) {
     await page.goto(`${lib.WEB}/pitch/new`, { waitUntil: "domcontentloaded" });
@@ -504,9 +518,10 @@ export async function stepPitch(page, c) {
   await page.waitForTimeout(7000);
   const R = page.getByRole("region", { name: "Who sees it" });
   const title = `${c.company}: ${plan.STAGE_LABEL[c.currentStageCode].toLowerCase()} pitch with ${c.founderPerson.name}`;
-  if (pitch.title !== title || pitch.audience !== "INVESTORS") {
+  if (pitch.title !== title || pitch.audience !== "NETWORK") {
     await R.getByRole("textbox", { name: "Title" }).fill(title);
-    await R.getByRole("combobox", { name: "Who can watch it" }).selectOption({ label: "Investors who can find us" });
+    // Everyone on Capital Q (NETWORK): Explore lists only network pitches.
+    await R.getByRole("combobox", { name: "Who can watch it" }).selectOption({ label: "Everyone on Capital Q" });
     await R.getByRole("button", { name: "Save" }).click();
     await page.waitForTimeout(5000);
   }
@@ -520,7 +535,7 @@ export async function stepPitch(page, c) {
   }
   const after = (await lib.call(lib.API, token, "GET", `/v1/companies/${s.companyId}/pitch`)).body.pitch;
   log(c, `pitch ${after.status} ${after.playbackPolicy} ${after.audience} downloadable=${after.downloadable}`);
-  if (after.audience !== "INVESTORS" || after.downloadable !== true) throw new Error("pitch details not saved");
+  if (after.audience !== "NETWORK" || after.downloadable !== true) throw new Error("pitch details not saved");
   done(c, "pitch");
 }
 

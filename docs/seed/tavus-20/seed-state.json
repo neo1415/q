@@ -1,5 +1,84 @@
 {
   "companies": {
+    "10": {
+      "company": "Prumo",
+      "founderUserId": "3d2b4bb6-7d96-4cc1-b206-29e30fe26142",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "f02c2a50-da07-4889-b68f-024fdb9cd131",
+      "organisationId": "773efd35-3216-464e-af9b-62a461d69787",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Juliana Tavares",
+          "userId": "6d981ed5-d3d3-433f-ac00-4f34ec9e6169",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Thiago Albuquerque",
+          "userId": "94598363-772e-467e-8674-9294824b887d",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Camila Rocha",
+          "userId": "5a06e8f3-6d0f-457d-a035-bb937efe9bf1",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "117e57ea-5db4-4428-8920-86a64ad5e6a5",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "11": {
+      "company": "Ferrolith",
+      "founderUserId": "d46121b6-b34e-4b84-be94-1109558297a3"
+    },
+    "12": {
+      "company": "Shiftwell",
+      "founderUserId": "2d5a4ecc-17f7-44fb-a490-345c3c1bf9f2",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "bfa975be-5611-4282-93b9-e886295b1140",
+      "organisationId": "5ef9aef1-8e49-4f45-9d27-7744391136e8",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Marcus Greene",
+          "userId": "593cf75e-923c-47f2-9711-d3080f24b974",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Danielle Ortiz",
+          "userId": "66094dc8-6e23-44e1-9e58-d3968cdc6835",
+          "role": "MEMBER"
+        },
+        {
+          "name": "Brian Kowalski",
+          "userId": "e5d6a8f3-5c95-4ca6-87c0-43cd84ccf0d8",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "c1ff04c2-685a-45c6-8d06-40805ae1daf2",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
     "01": {
       "company": "Ledgerline",
       "companyId": "6f075a0b-8372-4458-9060-09afd73a9c37",
@@ -265,6 +344,45 @@
         }
       ],
       "pitchId": "6446ecd8-59c6-40df-b704-6b8e2f0a5be8",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "08": {
+      "company": "MedTrail",
+      "founderUserId": "3545fbda-98be-4055-af13-065289a8a993",
+      "deckViaOnboarding": true,
+      "founderCount": 2
+    },
+    "09": {
+      "company": "Baridi",
+      "founderUserId": "921cabb4-aabb-4b35-926b-afcfc1f6c494",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "7e5a7a76-857a-4528-9641-08c7bab9cc22",
+      "organisationId": "82818c0d-57da-4946-b9a1-21c9a559ec3a",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Otieno Ouma",
+          "userId": "d59f193e-b4e8-4ab8-97ee-bf5859140674",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Akinyi Achieng",
+          "userId": "0bc12d12-cb67-4fbe-919b-c60c0e4c4d87",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "f2e0f28a-83ac-472d-98d4-4f6ae33163c0",
       "visibility": "network_visible",
       "readiness": "marketplace_ready"
     }
