@@ -59,7 +59,7 @@ export const ROSTER_ORDER: readonly Role[] = [
 ];
 
 /** What a specialist does, for a quiet day. */
-const IDLE_LINES: Readonly<Record<Role, string>> = {
+export const IDLE_LINES: Readonly<Record<Role, string>> = {
   LEAD: "No jobs open",
   OUTREACH: "Opens new relationships",
   MANDATE_WATCHER: "Watches for companies that fit",
@@ -123,7 +123,7 @@ function nameOf(run: WorkforceAgentRunDto | undefined): string {
   return ROLE_NAMES[run.role];
 }
 
-const HELD_WORDS: Readonly<Record<string, string>> = {
+export const HELD_WORDS: Readonly<Record<string, string>> = {
   BELOW_BAR: "It didn't reach your bar, so Q didn't send it.",
   INTEGRITY: "It would have said something Capital Q can't stand behind.",
   REVIEW_UNAVAILABLE: "It couldn't be checked just now, so it wasn't sent.",
