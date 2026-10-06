@@ -4,6 +4,7 @@ import type { MediaAsset } from "@capital-q/media";
 import type { ActorContext } from "@capital-q/security";
 
 import { capitalItems } from "./actions/capital-read.js";
+import { teamItems } from "./actions/team.js";
 import { sharingOf } from "./actions/pitch.js";
 import type { AppActionPorts } from "./ports.js";
 
@@ -31,6 +32,9 @@ export const OWN_READ_KINDS = [
   // 2026-10-04: rounds, what each raised, and every commitment's step, so
   // "how much have I raised" reads the Capital page's own numbers.
   "capital",
+  // G1/G2: the people in their company or firm, each one's role, and the
+  // invitations waiting (admins), as Settings → Team shows them.
+  "team",
 ] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
@@ -189,6 +193,8 @@ export async function readOwn(
         : ports.diligenceAreas(actor);
     case "capital":
       return capitalItems(ports, actor);
+    case "team":
+      return teamItems(ports, actor);
   }
 }
 
@@ -201,6 +207,7 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   uploads: "Files they uploaded",
   diligence: "Diligence requests and shared documents",
   capital: "Rounds, money raised and commitments",
+  team: "Their team: people, roles and invitations",
 };
 
 /** One kind in the "what exists" index: a count and a few titles with state. */

@@ -478,6 +478,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/organisations.ts POST `${ORGANISATIONS_PATH}/:organisationId/activate`":
     ONBOARDING_SETUP,
 
+  // G1/G2: the team's reads (its changes are declared team.* actions).
+  "api/http/team.ts GET TEAM_PATH": cap("tool.read_my"),
+  "api/http/team.ts GET MY_ORGANISATIONS_PATH": exempt(
+    "the switcher's own list of the person's companies and firms; switching is the existing activate route, and Q reads the team itself with read_my(team)",
+  ),
+  "api/http/team.ts GET INVITATION_PREVIEW_PATH": PUBLIC,
+
   "api/http/q-cards.ts GET cardPath": cap("tool.get_q_card"),
   "api/http/q-cards.ts GET `${PUBLIC_HANDLES_PATH}/:handle`": PUBLIC,
   "api/http/q-cards.ts GET `${PUBLIC_CARD_CODES_PATH}/:code`": PUBLIC,
@@ -724,6 +731,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/rehearsals": exempt("development-only page"),
   "/dev/gateq": exempt("development-only page"),
   "/dev/match": exempt("development-only page"),
+  "/dev/team": exempt("development-only page"),
   "/u/[handle]": PUBLIC,
   // GateQ: a gateway's public page and the embed another site frames.
   "/g/[publicId]": PUBLIC,
@@ -790,6 +798,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // DAILY block: The Q Daily (navigate.DAILY; an edition via get_q_daily).
   "/daily": cap("navigate.DAILY"),
   "/daily/[editionId]": cap("tool.get_q_daily"),
+  "/settings/team": cap("tool.read_my"),
+  "/join/[token]": cap("offer.team_join"),
   "/settings/memory": cap("navigate.MEMORY"),
   "/settings/usage": cap("navigate.USAGE"),
   "/settings/billing": cap("tool.get_my_plan"),

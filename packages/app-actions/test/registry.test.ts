@@ -267,6 +267,17 @@ describe("the action registry", () => {
       ["data_room.access.request", "request_data_room_access", "CONSEQUENTIAL"],
       ["data_room.request.decide", "answer_data_room_request", "CONSEQUENTIAL"],
       ["deck.extraction.confirm", "confirm_deck_reading", "CONSEQUENTIAL"],
+      // G1/G2: the team. Q invites and changes roles on a card; the rest
+      // is the person's own decision on the Team page.
+      ["team.invite", "invite_colleague", "CONSEQUENTIAL"],
+      ["team.member.role.set", "change_team_role", "CONSEQUENTIAL"],
+      ["team.invitation.resend", "offer.team_manage", "INSTANT"],
+      ["team.invitation.revoke", "offer.team_manage", "INSTANT"],
+      ["team.member.remove", "offer.team_manage", "CONSEQUENTIAL"],
+      ["team.leave", "offer.team_manage", "CONSEQUENTIAL"],
+      ["team.ownership.offer", "offer.team_manage", "CONSEQUENTIAL"],
+      ["team.ownership.respond", "offer.team_manage", "CONSEQUENTIAL"],
+      ["team.join_request.decide", "offer.team_manage", "CONSEQUENTIAL"],
     ]);
   });
 });
@@ -285,9 +296,15 @@ describe("person-scoped actions (onboarding)", () => {
       "onboarding.reminders.choose",
       "person.name.set",
       "person.profile.edit",
+      "team.invitation.accept",
+      "team.join_request.create",
     ]);
     for (const action of PERSON_ACTIONS) {
-      expect(qCapabilityId(action), action.name).toMatch(/^tool\.[a-z_]+$/);
+      // G1/G2: joining a team is the person's own consent, from the
+      // invitation's link; Q offers it, never takes it.
+      expect(qCapabilityId(action), action.name).toMatch(
+        action.area === "team" ? /^offer\.team_join$/ : /^tool\.[a-z_]+$/,
+      );
     }
   });
 });

@@ -38,11 +38,13 @@ import {
   VoiceSetting,
 } from "@/features/settings/voice-setting";
 import { PushSetting } from "@/features/work/push-setting";
+import { loadMyOrganisations } from "@/features/team/load-organisations";
 
 export const metadata: Metadata = { title: "Settings" };
 
 const SECTIONS = [
   { id: "account", label: "Account" },
+  { id: "team", label: "Team" },
   { id: "appearance", label: "Appearance" },
   { id: "q", label: "Q" },
   { id: "speaking", label: "How Q speaks for you" },
@@ -75,7 +77,7 @@ export default async function SettingsPage({
     qApiSession(),
     apiSession(),
   ]);
-  const [standing, daily, user, context, plan, admin, speaking] =
+  const [standing, daily, user, context, plan, admin, speaking, mine] =
     await Promise.all([
       resolveQStanding(),
       // DAILY: how The Q Daily comes; null when the Q API could not be asked.
@@ -92,7 +94,10 @@ export default async function SettingsPage({
       billingSession === null
         ? Promise.resolve(null)
         : getMyEtiquetteGuide(billingSession).catch(() => null),
+      // G1/G2: their companies and firms; the active one is their team.
+      loadMyOrganisations(),
     ]);
+  const acting = mine.find((organisation) => organisation.active) ?? null;
   const organisation =
     context.kind === "NONE"
       ? null
@@ -112,7 +117,7 @@ export default async function SettingsPage({
               <RowLink href="/profile">Edit profile</RowLink>
             </SettingRow>
             <SettingRow
-              term="Organisation"
+              term={context.kind === "INVESTOR" ? "Firm" : "Company"}
               hint={
                 organisation === null
                   ? "Set up when Q onboards you"
@@ -133,6 +138,36 @@ export default async function SettingsPage({
             </SettingRow>
             <SettingRow term="This device" hint="Ends your session here">
               <SignOutButton />
+            </SettingRow>
+          </SettingsCard>
+
+          {/* G1/G2: the company or firm as a team. One person alone is
+              their own company or firm; Settings says so and offers to
+              invite the rest. */}
+          <SettingsCard
+            id="team"
+            title="Team"
+            description={
+              context.kind === "INVESTOR"
+                ? "Colleagues who work on your firm with you."
+                : "Co-founders and teammates who work on your company with you."
+            }
+          >
+            <SettingRow
+              term={acting?.name ?? "Your team"}
+              hint={
+                acting === null
+                  ? "Set up when Q onboards you"
+                  : acting.memberCount <= 1
+                    ? "Just you, for now"
+                    : `${String(acting.memberCount)} people`
+              }
+            >
+              <RowLink href="/settings/team">
+                {acting !== null && acting.memberCount <= 1
+                  ? "Invite your team"
+                  : "Open"}
+              </RowLink>
             </SettingRow>
           </SettingsCard>
 

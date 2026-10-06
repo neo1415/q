@@ -345,7 +345,7 @@ export const READ_MY = "app.own.read" as const;
 export const ReadMyInputSchema = z
   .object({
     kind: OwnReadKindSchema.describe(
-      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call), uploads (the files their company uploaded: pitch deck, financials and the like, with type and status), diligence (their relationships' diligence areas: requests, which are answered, shared documents).",
+      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call), uploads (the files their company uploaded: pitch deck, financials and the like, with type and status), diligence (their relationships' diligence areas: requests, which are answered, shared documents), capital (their rounds and commitments), team (the people in their company or firm, each one's role, and invitations waiting).",
     ),
     text: z
       .string()
@@ -379,7 +379,7 @@ export function createReadMyTool(own: OwnReadPorts): AnyQToolDefinition {
     status: "ACTIVE",
     providerName: "read_my",
     description:
-      "Reads the person's own records of one kind exactly as their page shows them: their pitch videos (title, who can watch, whether investors can play it), the documents Q made for them, the files they uploaded (their deck, financials), their rehearsals, or the companies in their Discover feed now. Use it before saying they have none, or that a company is not in their feed.",
+      "Reads the person's own records of one kind exactly as their page shows them: their pitch videos (title, who can watch, whether investors can play it), the documents Q made for them, the files they uploaded (their deck, financials), their rehearsals, the companies in their Discover feed now, or the people on their team and their roles. Use it before saying they have none, or that a company is not in their feed.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],

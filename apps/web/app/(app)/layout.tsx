@@ -18,6 +18,7 @@ import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
 import { adminContext } from "@/features/admin/admin-context";
 import { BrandStyle, loadBrandStyle } from "@/features/brand-theme/brand-style";
 import { InstallPrompt } from "@/pwa/install-prompt";
+import { loadMyOrganisations } from "@/features/team/load-organisations";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -81,7 +82,7 @@ export default async function ApplicationLayout({
   // WORK-58: the Admin group shows only to a platform admin, decided by
   // the API (the console's own route refuses anyone else regardless).
   // P5: the brand colour, read alongside so it paints with the first frame.
-  const [verifyNudgeState, admin, brandCss] = await Promise.all([
+  const [verifyNudgeState, admin, brandCss, organisations] = await Promise.all([
     unfinished === null && context.kind !== "NONE"
       ? loadVerifyNudge()
       : Promise.resolve(null),
@@ -89,10 +90,12 @@ export default async function ApplicationLayout({
       .then((found) => found !== null)
       .catch(() => false),
     loadBrandStyle().catch(() => null),
+    // G2: the switcher's list (shown only for two or more).
+    loadMyOrganisations(),
   ]);
   return (
     <AppShell
-      context={{ ...shell, admin }}
+      context={{ ...shell, admin, organisations }}
       subject={subject}
       qConnected={qConnected}
       onboarding={unfinished}

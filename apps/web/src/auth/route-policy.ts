@@ -46,6 +46,8 @@ export const PROTECTED_PATH_PREFIXES = [
   "/documents",
   "/admin",
   "/paused",
+  // G1/G2: an invitation's link; a new person signs up and comes back.
+  "/join",
   // Setting a new password needs the recovery session the callback created.
   "/auth/update-password",
 ] as const;

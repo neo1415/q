@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { buttonClassName } from "@capital-q/ui/button";
 
+import type { MyOrganisationDto } from "@capital-q/contracts";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { DocumentReadyCenter } from "@/features/documents/document-ready-center";
@@ -29,6 +30,11 @@ export type ShellContext = {
   readonly label?: string | undefined;
   /** A platform admin (WORK-58): the sidebar adds the Admin group. */
   readonly admin?: boolean | undefined;
+  /**
+   * G2: the person's companies and firms, for the switcher (shown only for
+   * two or more). Read on the server; switching is the server's to do.
+   */
+  readonly organisations?: readonly MyOrganisationDto[] | undefined;
 };
 
 const UNSET: ShellContext = { scope: "unset" };
@@ -106,6 +112,7 @@ export function AppShell({
           <MobileNavigation
             scope={context.scope}
             admin={context.admin === true}
+            organisations={context.organisations ?? []}
             verifyNudge={verifyNudge}
           />
         </div>

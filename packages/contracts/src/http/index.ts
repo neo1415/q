@@ -1313,3 +1313,5 @@ export * from "./founder-person.js";
 
 // Explore (E1-E5, ADR 0055).
 export * from "./explore.js";
+// G1/G2 block: organisations as teams.
+export * from "./team.js";

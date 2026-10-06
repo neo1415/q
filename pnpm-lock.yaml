@@ -577,6 +577,9 @@ importers:
       '@capital-q/onboarding':
         specifier: workspace:*
         version: link:../onboarding
+      '@capital-q/organisations':
+        specifier: workspace:*
+        version: link:../organisations
       '@capital-q/permissions':
         specifier: workspace:*
         version: link:../permissions
@@ -1402,6 +1405,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      '@capital-q/email':
+        specifier: workspace:*
+        version: link:../email
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../eventing

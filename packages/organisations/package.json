@@ -12,6 +12,10 @@
     "./events": {
       "types": "./dist/events/index.d.ts",
       "default": "./dist/events/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/memory-team-store.d.ts",
+      "default": "./dist/testing/memory-team-store.js"
     }
   },
   "main": "./dist/index.js",
@@ -29,6 +33,7 @@
     "@capital-q/audit": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
+    "@capital-q/email": "workspace:*",
     "@capital-q/eventing": "workspace:*",
     "@capital-q/security": "workspace:*",
     "zod": "4.5.4"

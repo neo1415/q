@@ -298,7 +298,13 @@ import {
   createLogger,
   createTelemetryRuntime,
 } from "@capital-q/observability";
-import { createPostgresOrganisationQueryPort } from "@capital-q/organisations";
+import {
+  createInvitationMailer,
+  createPostgresOrganisationQueryPort,
+  createPostgresTeamJournal,
+  createPostgresTeamStore,
+  createTeamService,
+} from "@capital-q/organisations";
 import {
   createFitQViewer,
   createRecommendationNarrator,
@@ -1902,9 +1908,48 @@ const fitComposition = createFitComposition({
   logger,
 });
 // end MATCH block
+// G1/G2: the company or firm as a team, the same service the API's team
+// routes call, so Q's invite and role change (on an approval card) and the
+// screen are one command. Email through the app's outbound adapter.
+const teamEmailConfig = loadAppEmailConfig(process.env);
+const team = createTeamService({
+  store: createPostgresTeamStore({
+    sql: database.sql,
+    transactions: database.transactions,
+  }),
+  journal: createPostgresTeamJournal({
+    audit: createPostgresMaterialActionAuditWriter(),
+    outbox: createOutboxWriter({
+      registry: createEventRegistry(ORGANISATION_EVENTS),
+    }),
+  }),
+  mailer: createInvitationMailer(
+    teamEmailConfig.brevoApi !== undefined
+      ? recordingEmailSender(
+          createBrevoApiEmailSender(teamEmailConfig.brevoApi),
+          {
+            sql: database.sql,
+            source: "q_api.team_invitation",
+            provider: "BREVO_API",
+          },
+        )
+      : teamEmailConfig.smtp === undefined
+        ? unavailableAppEmailSender
+        : recordingEmailSender(createSmtpAppEmailSender(teamEmailConfig.smtp), {
+            sql: database.sql,
+            source: "q_api.team_invitation",
+            provider: "SMTP",
+          }),
+  ),
+  webOrigin:
+    process.env["CQ_WEB_ORIGIN"] ??
+    "https://capital-qweb-production.up.railway.app",
+});
 const appActionPorts: OwnReadPorts = {
   // ADR 0050: their own speaking guide, saved or removed by asking Q.
   etiquetteGuides,
+  // G1/G2: inviting a colleague, changing a role, reading the team.
+  team,
   media: pitchMedia,
   // The services the dedicated routes call, for the declared actions Q
   // proposes and standing instructions take (live 2026-10-03, card

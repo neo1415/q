@@ -33,6 +33,7 @@
     "@capital-q/media": "workspace:*",
     "@capital-q/network": "workspace:*",
     "@capital-q/onboarding": "workspace:*",
+    "@capital-q/organisations": "workspace:*",
     "@capital-q/permissions": "workspace:*",
     "@capital-q/platform-admin": "workspace:*",
     "@capital-q/public-identity": "workspace:*",

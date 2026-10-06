@@ -275,7 +275,10 @@ describe("@capital-q/organisations against local PostgreSQL", () => {
         expect(organisation.organisationType).toBe("company");
         expect(view.membership.userId).toBe(a.userId);
         expect(view.membership.status).toBe("active");
-        expect(view.roleCodes).toEqual(["organisation_admin"]);
+        expect(view.roleCodes).toEqual([
+          "organisation_admin",
+          "organisation_owner",
+        ]);
         expect(view.isActiveContext).toBe(true);
 
         const { sql } = tx;

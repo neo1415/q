@@ -454,3 +454,5 @@ export {
 } from "./profile-material.js";
 
 export { exploreRelated, exploreSearch, exploreSlate } from "./explore.js";
+// G1/G2 block: teams.
+export * from "./team.js";

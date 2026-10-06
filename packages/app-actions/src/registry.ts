@@ -23,6 +23,7 @@ import { ETIQUETTE_ACTIONS } from "./actions/etiquette.js";
 import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
 import { WORK_ACTIONS } from "./actions/work.js";
 import { GATEQ_ACTIONS } from "./actions/gateq.js";
+import { TEAM_ACTIONS, TEAM_PERSON_ACTIONS } from "./actions/team.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -52,6 +53,8 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...WORK_ACTIONS,
   ...GATEQ_ACTIONS,
   ...DATA_ROOM_ACTIONS,
+  // G1/G2: the company or firm as a team.
+  ...TEAM_ACTIONS,
 ]);
 
 /**
@@ -62,4 +65,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
 export const PERSON_ACTIONS: readonly AnyPersonAction[] = Object.freeze([
   ...ONBOARDING_ACTIONS,
   ...ME_ACTIONS,
+  // G1/G2: accepting an invitation and asking to join, before or beside
+  // any organisation of their own.
+  ...TEAM_PERSON_ACTIONS,
 ]);
