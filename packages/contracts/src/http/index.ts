@@ -1310,3 +1310,6 @@ export * from "./data-room.js";
 export * from "./deck.js";
 export * from "./founder-person.js";
 // end PROFILE block
+
+// Explore (E1-E5, ADR 0055).
+export * from "./explore.js";

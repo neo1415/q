@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { cx } from "@capital-q/ui";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
-import { ICON_SIZE, ICON_STROKE, PanelLeft, Search } from "@capital-q/ui/icons";
+import { ICON_SIZE, ICON_STROKE, PanelLeft } from "@capital-q/ui/icons";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { ThemeMenu } from "@/features/appearance/theme-menu";
@@ -18,7 +18,6 @@ import type { ShellContext } from "./app-shell";
 import { useNotices } from "@/features/work/notice-store";
 
 import {
-  FIND_NAVIGATION,
   isActiveRoute,
   navigationGroupsFor,
   PRIMARY_NAVIGATION,
@@ -97,35 +96,6 @@ export function DesktopSidebar({
             />
           </button>
         </Tooltip>
-      </div>
-
-      {/* Search is a field, not a section (WORK-58). */}
-      <div className={collapsed ? "px-2 pb-2" : "px-3 pb-2"}>
-        {collapsed ? (
-          <SidebarLink
-            href={FIND_NAVIGATION.href}
-            label={FIND_NAVIGATION.label}
-            Icon={FIND_NAVIGATION.icon}
-            active={isActiveRoute(pathname, FIND_NAVIGATION.href)}
-            compact
-          />
-        ) : (
-          <Link
-            href={FIND_NAVIGATION.href}
-            aria-current={
-              isActiveRoute(pathname, FIND_NAVIGATION.href) ? "page" : undefined
-            }
-            className="flex min-h-10 items-center gap-3 rounded-md bg-(--cq-surface-subtle) px-3 cq-body-sm text-(--cq-text-tertiary) transition-colors duration-(--cq-motion-fast) hover:text-(--cq-text-secondary)"
-            data-sidebar-search
-          >
-            <Search
-              aria-hidden="true"
-              size={ICON_SIZE.regular}
-              strokeWidth={ICON_STROKE}
-            />
-            <span>Search</span>
-          </Link>
-        )}
       </div>
 
       {/* Scrolls up and down only. Folded, the rail has no side padding

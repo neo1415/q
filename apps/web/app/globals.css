@@ -2924,3 +2924,295 @@
     }
   }
 }
+
+/* Explore (E1-E5, ADR 0055): the masonry grid, its tiles, and the
+   full-screen "Related to X" feed. Tile boxes are reserved from the stored
+   aspect ratio (no layout shift); posters only, never autoplay. */
+@layer components {
+  .cq-explore-masonry-host {
+    container-type: inline-size;
+    width: 100%;
+  }
+  .cq-explore-masonry {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .cq-explore-cell {
+    position: absolute;
+  }
+  .cq-explore-tile {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+    border-radius: 12px;
+  }
+  .cq-explore-tile:focus-visible {
+    outline: 2px solid var(--cq-focus-ring);
+    outline-offset: 2px;
+  }
+  .cq-explore-poster {
+    position: relative;
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 12px;
+    background: var(--cq-stage-canvas);
+    transition: transform var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-explore-tile:active .cq-explore-poster {
+    transform: scale(0.98);
+  }
+  .cq-explore-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform var(--cq-motion-slow) var(--cq-ease);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .cq-explore-tile:hover .cq-explore-img {
+      transform: scale(1.03);
+    }
+  }
+  .cq-explore-overlay {
+    position: absolute;
+    inset: auto 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 40px 10px 10px;
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-scrim);
+  }
+  .cq-explore-overlay b {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .cq-explore-overlay span {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 12px;
+    color: var(--cq-stage-text-muted);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .cq-explore-duration {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface-strong);
+  }
+  .cq-explore-why {
+    display: flex;
+    height: 32px;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 0 2px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--cq-text-secondary);
+  }
+  .cq-explore-skeleton {
+    width: 100%;
+    border-radius: 12px;
+    background: var(--cq-surface-strong);
+    animation: cq-explore-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes cq-explore-pulse {
+    50% {
+      opacity: 0.55;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-explore-skeleton {
+      animation: none;
+    }
+  }
+
+  /* The opened pitch: full screen on a phone; on a desktop a centred
+     video beside a side panel, the sidebar still showing. */
+  .cq-explore-feed {
+    position: fixed;
+    inset: 0;
+    z-index: var(--cq-z-modal);
+    display: flex;
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-canvas);
+  }
+  .cq-explore-feed-scroller {
+    position: relative;
+    flex: 1;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+  }
+  .cq-explore-feed-scroller::-webkit-scrollbar {
+    display: none;
+  }
+  .cq-explore-feed-item {
+    position: relative;
+    display: flex;
+    height: 100dvh;
+    align-items: center;
+    justify-content: center;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+  .cq-explore-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--cq-stage-canvas);
+  }
+  .cq-explore-stage .cq-feed-player-controls {
+    top: calc(4px + var(--cq-safe-top));
+    right: 4px;
+    left: auto;
+  }
+  .cq-explore-stage-scrim {
+    position: absolute;
+    inset: 0;
+    background: var(--cq-stage-scrim);
+    pointer-events: none;
+  }
+  .cq-explore-feed-top {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: calc(8px + var(--cq-safe-top)) 56px 8px 8px;
+    background: linear-gradient(
+      color-mix(in oklch, var(--cq-stage-canvas) 55%, transparent),
+      transparent
+    );
+    pointer-events: none;
+  }
+  .cq-explore-feed-top > * {
+    pointer-events: auto;
+  }
+  .cq-explore-stage-button {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border-radius: var(--cq-radius-full);
+    color: var(--cq-stage-text);
+  }
+  .cq-explore-stage-button:focus-visible {
+    outline: 2px solid var(--cq-stage-text);
+    outline-offset: 2px;
+  }
+  .cq-explore-info {
+    position: absolute;
+    right: 84px;
+    bottom: calc(24px + var(--cq-safe-bottom));
+    left: 16px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cq-explore-rail {
+    position: absolute;
+    right: 8px;
+    bottom: calc(24px + var(--cq-safe-bottom));
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .cq-explore-rail button {
+    display: flex;
+    min-width: 56px;
+    min-height: 44px;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: 11.5px;
+    color: var(--cq-stage-text);
+  }
+  .cq-explore-rail-icon {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    place-items: center;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-stage-surface-strong);
+  }
+  .cq-explore-chip {
+    display: inline-flex;
+    padding: 3px 9px;
+    border-radius: var(--cq-radius-full);
+    font-size: 12.5px;
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface-strong);
+  }
+  .cq-explore-panel,
+  .cq-explore-updown {
+    display: none;
+  }
+  @media (min-width: 1024px) {
+    .cq-explore-feed {
+      left: var(--cq-sidebar-width);
+    }
+    .cq-explore-stage {
+      width: auto;
+      height: calc(100dvh - 48px);
+      aspect-ratio: 9 / 16;
+      border-radius: 18px;
+    }
+    .cq-explore-info,
+    .cq-explore-rail {
+      display: none;
+    }
+    .cq-explore-feed-top {
+      border-radius: 18px 18px 0 0;
+    }
+    .cq-explore-updown {
+      position: absolute;
+      top: 50%;
+      right: 24px;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transform: translateY(-50%);
+    }
+    .cq-explore-updown button {
+      display: grid;
+      width: 48px;
+      height: 48px;
+      place-items: center;
+      border-radius: var(--cq-radius-full);
+      color: var(--cq-stage-text);
+      background: var(--cq-stage-surface-strong);
+    }
+    .cq-explore-panel {
+      display: flex;
+      width: 420px;
+      flex-direction: column;
+      gap: 18px;
+      overflow-y: auto;
+      padding: 28px;
+      color: var(--cq-text-primary);
+      background: var(--cq-surface);
+      border-left: 1px solid var(--cq-border-subtle);
+    }
+  }
+}

@@ -452,3 +452,5 @@ export {
   requestDataRoomAccess,
   setDataRoomLevel,
 } from "./profile-material.js";
+
+export { exploreRelated, exploreSearch, exploreSlate } from "./explore.js";

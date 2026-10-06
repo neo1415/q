@@ -48,6 +48,7 @@ const EVERY_PORT: QToolPorts = {
   schedule: { dismissReminder: STUB } as never,
   profileChanges: STUB,
   pitchMoments: STUB,
+  explore: STUB,
   visibility: STUB,
   pendingProposals: { inConversation: STUB, approve: STUB, decline: STUB },
   qCards: STUB,

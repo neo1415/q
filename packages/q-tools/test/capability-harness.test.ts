@@ -88,6 +88,7 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     schedule: port(),
     profileChanges: port(),
     pitchMoments: port(),
+    explore: port(),
     visibility: port(),
     pendingProposals: {
       inConversation: port(),
@@ -232,6 +233,8 @@ function sample(schema: unknown): unknown {
  */
 const RELATIONSHIP = { relationshipId: UUID };
 const SCRIPTED_INPUTS: Readonly<Record<string, unknown>> = {
+  // "A company id or name is required" (Explore, ADR 0055).
+  explore_pitches_like: { companyName: "Kora Health" },
   // "Name exactly one of relationshipId, companyId or investorOrganisationId".
   get_relationship: RELATIONSHIP,
   list_messages: RELATIONSHIP,

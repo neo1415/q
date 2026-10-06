@@ -778,3 +778,40 @@ export {
   type FitInputSourceDependencies,
 } from "./infrastructure/fit-inputs.js";
 // end MATCH block
+// Explore (E1-E5, ADR 0055): the network-wide pitch slate.
+export {
+  EXPLORE_CONFIG_V1,
+  EXPLORE_RANKING_VERSION,
+  NO_SIGNALS as EXPLORE_NO_SIGNALS,
+  RELATED_MAX as EXPLORE_RELATED_MAX,
+  diversify as diversifyExplore,
+  exploreCandidates,
+  exploreSlate,
+  relatedPitches,
+  type ExploreCandidate,
+  type ExploreConfig,
+  type ExplorePoolItem,
+  type ExploreSignals,
+  type RelatedPitch,
+} from "./explore/policy.js";
+export {
+  EXPLORE_PAGE_DEFAULT,
+  EXPLORE_PAGE_MAX,
+  ExploreCursorRejectedError,
+  decodeExploreCursor,
+  encodeExploreCursor,
+  exploreSlatePage,
+  type ExploreSlatePage,
+} from "./explore/page.js";
+export {
+  EXPLORE_POOL_MAX,
+  createExploreService,
+  declaredWords,
+  matchesExploreText,
+  normaliseExploreText,
+  type ExploreCompanyFacts,
+  type ExploreNetworkRow,
+  type ExplorePitch,
+  type ExplorePorts,
+  type ExploreService,
+} from "./explore/service.js";

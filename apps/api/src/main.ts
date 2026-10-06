@@ -67,6 +67,7 @@ import {
   createPostgresCompanySectorsPort,
   createMaterialChanges,
   createSlateReadPipeline,
+  createExploreService,
 } from "@capital-q/discovery";
 import {
   CapitalObjectiveNotFoundError,
@@ -930,6 +931,96 @@ const interactions = createInteractionSignalService({
 });
 
 /**
+ * Explore (E1-E5, ADR 0055): every network pitch this viewer may see,
+ * lightly personalised. The pool is the founders' network videos, each
+ * company through the network preview's disclosure rule; sectors through
+ * the company-sectors port only for companies already allowed. Signals are
+ * declared or explicit: the Discover slate (mandate fit), saves, and for a
+ * founder their own company's sectors. Views are never read.
+ */
+const exploreCompanyQuery = createPostgresCompanyQueryPort({
+  sql: database.sql,
+});
+const explore = createExploreService({
+  findNetworkPitches: createPostgresNetworkPitchQueryPort({ sql: database.sql })
+    .findNetworkPitches,
+  company: async (actor, companyId) => {
+    const parsed = CompanyIdSchema.safeParse(companyId);
+    if (!parsed.success) return null;
+    const company = await companyNetworkView.findNetworkVisible(
+      actor,
+      parsed.data,
+    );
+    return company === null
+      ? null
+      : {
+          canonicalName: company.canonicalName,
+          shortDescription: company.shortDescription,
+          headquartersCountry: company.headquartersCountry,
+          currentStageCode: company.currentStageCode,
+          companyStatus: company.companyStatus,
+        };
+  },
+  sectors: async (_actor, companyIds) =>
+    companySectors.sectors === undefined
+      ? new Map<string, readonly string[]>()
+      : companySectors.sectors(companyIds),
+  signals: async (actor) => {
+    const mandate = new Set<string>();
+    const adjacent = new Set<string>();
+    let cursor: string | null = null;
+    for (let page = 0; page < 3; page++) {
+      const served: Awaited<
+        ReturnType<typeof slates.reader.pageCompanies>
+      > | null = await slates.reader
+        .pageCompanies({ actor, limit: 20, cursor })
+        .catch(() => null);
+      if (served === null) break;
+      for (const item of served.items) {
+        mandate.add(item.companyId);
+        if (!item.reasonCodes.includes("STAGE_ALIGNED")) {
+          adjacent.add(item.companyId);
+        }
+      }
+      cursor = served.nextCursor;
+      if (cursor === null) break;
+    }
+    const saved = await interactions
+      .savedCompanyIds({ actor, limit: 100 })
+      .catch(() => [] as readonly string[]);
+    // A founder's own company, for peers: only their own organisation's.
+    const own =
+      actor.organisationId === undefined
+        ? []
+        : (
+            await exploreCompanyQuery
+              .searchCompanies({
+                viewer: {
+                  tenantId: actor.tenantId,
+                  organisationId: actor.organisationId,
+                },
+                limit: 5,
+              })
+              .catch(() => ({ items: [] }))
+          ).items
+            .filter((item) => item.ownedByViewer)
+            .map((item) => item.id);
+    const ownSectors =
+      own.length === 0 || companySectors.sectors === undefined
+        ? new Map<string, readonly string[]>()
+        : await companySectors
+            .sectors(own)
+            .catch(() => new Map<string, readonly string[]>());
+    return {
+      mandateCompanyIds: mandate,
+      adjacentCompanyIds: adjacent,
+      savedCompanyIds: new Set(saved),
+      ownSectorNodeIds: new Set([...ownSectors.values()].flat()),
+    };
+  },
+});
+
+/**
  * Express Interest (CQ-NET-010). Two rules it borrows rather than restates:
  * "which investor organisation is this person acting for" is the feed's
  * own investor subject, and "may they see this company" is the network
@@ -1597,6 +1688,7 @@ const { app, logger } = createApp(config, security, {
     // Founders' network videos (ADR 0021): the media read, then the same
     // disclosure-checked company read the network preview uses.
     networkPitches: createPostgresNetworkPitchQueryPort({ sql: database.sql }),
+    explore,
     // ADR 0023: an investor's own photo and cover on founder-facing reads,
     // asked only for investors discovery already returned to the reader.
     investorImages: (investorOrganisationId) =>

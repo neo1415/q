@@ -19,7 +19,8 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   SAVED: "/discover/saved",
   PASSED: "/discover/passed",
   INVESTORS: "/investors",
-  SEARCH: "/search",
+  // Search lives at the top of Explore now (ADR 0055).
+  SEARCH: "/explore",
   GATEWAY: "/gateway",
   MEMORY: "/settings/memory",
   USAGE: "/settings/usage",

@@ -425,6 +425,7 @@ import {
   createRecordChangeActions,
   createRecordChangeBoard,
 } from "./composition/record-change-actions.js";
+import { createExploreToolPort } from "./composition/explore.js";
 import {
   createDiscoveryService,
   createInteractionSignalService,
@@ -2227,6 +2228,13 @@ const qTools = createQTools({
         };
       },
     },
+    // Explore (ADR 0055): "pitches like X" and "search the network", from
+    // the same Explore read the person's own screen uses.
+    explore: createExploreToolPort({
+      sql: database.sql,
+      companies,
+      disclosure,
+    }),
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {
       momentAround: async (actor, query) => {

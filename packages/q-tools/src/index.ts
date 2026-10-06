@@ -612,3 +612,20 @@ export {
   READ_COMPANY_DECK,
   type ProfileMaterialPort,
 } from "./tools/profile-material.js";
+// Explore (E1-E5, ADR 0055).
+export {
+  EXPLORE_PITCHES_LIKE,
+  SEARCH_NETWORK,
+  ExplorePitchesLikeInputSchema,
+  ExplorePitchesLikeOutputSchema,
+  ExploreToolCompanySchema,
+  ExploreToolPitchSchema,
+  SearchNetworkInputSchema,
+  SearchNetworkOutputSchema,
+  createExploreTools,
+  type ExplorePitchesLikeOutput,
+  type ExploreToolCompany,
+  type ExploreToolPitch,
+  type ExploreToolPort,
+  type SearchNetworkOutput,
+} from "./tools/explore.js";
