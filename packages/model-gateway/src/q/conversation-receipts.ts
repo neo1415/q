@@ -262,7 +262,11 @@ export function screenLines(
       : [`the investor organisation ${screen.investorOrganisationId}`]),
     ...(screen.documentId === undefined
       ? []
-      : [`their document ${screen.documentId} open`]),
+      : [
+          screen.documentPage === undefined
+            ? `their document ${screen.documentId} open`
+            : `their document ${screen.documentId} open in the Q room at page ${String(screen.documentPage)} (this page means page ${String(screen.documentPage)}; work it with control_document, read it with read_document_pages)`,
+        ]),
     ...(screen.artifactId === undefined
       ? []
       : [

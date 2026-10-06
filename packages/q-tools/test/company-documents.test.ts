@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   createOpenCompanyDocumentTool,
   createReadCompanyDocumentTool,
+  createReadDocumentPagesTool,
   matchDocument,
+  pageRange,
   type MaterialDocument,
   type ProfileMaterialPort,
 } from "../src/index.js";
@@ -77,6 +79,20 @@ const material: ProfileMaterialPort = {
           }
         : null,
     );
+  },
+  documentPages: (_actor, _companyId, documentId, range) => {
+    reads.push(documentId);
+    if (documentId === DECK)
+      return Promise.resolve({ pageCount: 0, pages: [] });
+    if (documentId !== CERT) return Promise.resolve(null);
+    const all = [1, 2, 3].map((page) => ({
+      page,
+      text: `Page ${String(page)} of the certificate.`,
+    }));
+    return Promise.resolve({
+      pageCount: all.length,
+      pages: all.filter((p) => p.page >= range.from && p.page <= range.to),
+    });
   },
 };
 
@@ -195,5 +211,81 @@ describe("read_company_document", () => {
     if (decision.outcome !== "ALLOW") return;
     expect(decision.grant).toMatchObject({ status: "ON_REQUEST" });
     expect(reads).toEqual([]);
+  });
+});
+
+describe("read_document_pages (Q room W3)", () => {
+  const tool = createReadDocumentPagesTool(fakePorts(), material);
+
+  it("asks for one page, a range, or the whole bounded", () => {
+    expect(pageRange({})).toEqual({ from: 1, to: 60 });
+    expect(pageRange({ fromPage: 3 })).toEqual({ from: 3, to: 3 });
+    expect(pageRange({ fromPage: 2, toPage: 500 })).toEqual({
+      from: 2,
+      to: 61,
+    });
+    expect(pageRange({ fromPage: 5, toPage: 2 })).toEqual({ from: 5, to: 5 });
+  });
+
+  it("reads page by page, with page numbers, as the company's own material", async () => {
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: CERT, fromPage: 2 },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.grant).toMatchObject({
+      status: "READ",
+      pageCount: 3,
+      pages: [{ page: 2, text: "Page 2 of the certificate." }],
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "DOCUMENT_SUPPORTED",
+    });
+  });
+
+  it("says plainly when a document has no page text, never guesses", async () => {
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: DECK },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.grant).toMatchObject({ status: "NO_PAGE_TEXT" });
+  });
+
+  it("never reads an on-request document, and is refused without the port", async () => {
+    reads.length = 0;
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: TAX },
+      contextFor(actorA, plan),
+    );
+    expect(decision.outcome).toBe("ALLOW");
+    if (decision.outcome !== "ALLOW") return;
+    expect(decision.grant).toMatchObject({ status: "ON_REQUEST" });
+    expect(reads).toEqual([]);
+    const bare = createReadDocumentPagesTool(fakePorts(), {
+      ...material,
+      documentPages: undefined,
+    });
+    const refused = await bare.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: CERT },
+      contextFor(actorA, plan),
+    );
+    expect(refused.outcome).toBe("DENY");
+  });
+
+  it("is refused for a company the plan does not admit", async () => {
+    const other = planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
+      {
+        kind: "COMPANY_PROFILE",
+        companyId: COMPANY_A,
+        sensitivity: "CONFIDENTIAL",
+      },
+    ]);
+    const decision = await tool.authorize(
+      { companyId: COMPANY_B_NETWORK, documentId: CERT },
+      contextFor(actorA, other),
+    );
+    expect(decision.outcome).toBe("DENY");
   });
 });

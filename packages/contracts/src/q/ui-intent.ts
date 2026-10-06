@@ -41,6 +41,7 @@ export const Q_UI_INTENT_KINDS = [
   "OPEN_SETUP",
   "OPEN_SETTINGS",
   "SHOW_IN_Q_ROOM",
+  "DOCUMENT_ACT",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -358,6 +359,10 @@ export const Q_ROOM_OBJECTS = [
   "CAPITAL_ROUND",
   "GATEQ_APPLICATION",
   "SOURCES",
+  // Q room W3 (R6): "That's about 1,100 words. Want it as a PDF?" after a
+  // long web or news answer. Put there by the answer path's own code,
+  // never by a model's show; no id.
+  "PDF_OFFER",
 ] as const;
 export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
 export type QRoomObject = z.infer<typeof QRoomObjectSchema>;
@@ -453,6 +458,44 @@ export const QScreenActIntentSchema = z
   .strict();
 export type QScreenActIntent = z.infer<typeof QScreenActIntentSchema>;
 
+/**
+ * Q room W3 (R3): the document open in the Q room, worked by asking --
+ * "next page", "go to page 3", "read it to me", "summarise it",
+ * "download it", "close it". Every act names a fixed control of the
+ * viewer; a document that is not open makes it do nothing. Reading,
+ * summarising and downloading are the viewer's own, under the same signed,
+ * permission-checked read the Data room tab uses.
+ */
+export const Q_DOCUMENT_ACTS = [
+  "NEXT_PAGE",
+  "PREVIOUS_PAGE",
+  "GO_TO_PAGE",
+  "READ_ALOUD",
+  "STOP_READING",
+  "SUMMARISE",
+  "DOWNLOAD",
+  "CLOSE",
+] as const;
+export const QDocumentActSchema = z.enum(Q_DOCUMENT_ACTS);
+export type QDocumentAct = z.infer<typeof QDocumentActSchema>;
+export const Q_DOCUMENT_PAGE_MAX = 10_000;
+
+export const QDocumentActIntentSchema = z
+  .object({
+    kind: z.literal("DOCUMENT_ACT"),
+    act: QDocumentActSchema,
+    /** GO_TO_PAGE (required), READ_ALOUD (optional): 1-based. */
+    page: z.number().int().min(1).max(Q_DOCUMENT_PAGE_MAX).optional(),
+  })
+  .strict()
+  .refine(
+    (intent) => intent.act !== "GO_TO_PAGE" || intent.page !== undefined,
+    {
+      message: "GO_TO_PAGE names a page",
+    },
+  );
+export type QDocumentActIntent = z.infer<typeof QDocumentActIntentSchema>;
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QScreenActIntentSchema,
   QSetDiscoverFiltersIntentSchema,
@@ -466,6 +509,7 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QOpenSetupIntentSchema,
   QOpenSettingsIntentSchema,
   QShowInQRoomIntentSchema,
+  QDocumentActIntentSchema,
 ]);
 export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
 
@@ -486,6 +530,8 @@ export const Q_CLIENT_ACTION_TOOLS = [
   "set_discover_filters",
   // Q room R4: a card in the Q room.
   "show",
+  // Q room W3: the document open in the room.
+  "control_document",
 ] as const;
 
 /**
@@ -573,6 +619,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QScreenActIntentSchema,
   QOpenSettingsIntentSchema,
   QShowInQRoomIntentSchema,
+  QDocumentActIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

@@ -6,6 +6,7 @@ import {
 } from "@capital-q/contracts";
 
 import {
+  createControlDocumentTool,
   createOpenPageTool,
   createQToolExecutor,
   createQToolRegistry,
@@ -335,5 +336,50 @@ describe("show: a card in the Q room (R4)", () => {
       contextFor(actorA, plan),
     );
     expect(outcome.status).not.toBe("SUCCEEDED");
+  });
+});
+
+describe("control_document (Q room W3)", () => {
+  const tool = createControlDocumentTool();
+
+  it("names one of the viewer's controls, and a page only where it means one", async () => {
+    const go = await tool.authorize(
+      { act: "GO_TO_PAGE", page: 3 },
+      contextFor(actorA, ownPlan()),
+    );
+    expect(go.outcome).toBe("ALLOW");
+    if (go.outcome === "ALLOW") {
+      expect(go.grant).toMatchObject({
+        clientAction: { kind: "DOCUMENT_ACT", act: "GO_TO_PAGE", page: 3 },
+      });
+    }
+    const next = await tool.authorize(
+      { act: "NEXT_PAGE", page: 9 },
+      contextFor(actorA, ownPlan()),
+    );
+    if (next.outcome === "ALLOW") {
+      expect(next.grant).toMatchObject({
+        clientAction: { kind: "DOCUMENT_ACT", act: "NEXT_PAGE" },
+      });
+      expect(JSON.stringify(next.grant)).not.toContain('"page"');
+    } else {
+      expect.unreachable("NEXT_PAGE is allowed");
+    }
+  });
+
+  it("is refused outside their own conversation", async () => {
+    const decision = await tool.authorize(
+      { act: "NEXT_PAGE" },
+      contextFor(actorA, planFor(actorA, "GENERAL_QUESTION", [])),
+    );
+    expect(decision.outcome).toBe("DENY");
+  });
+
+  it("refuses a go-to without a page", async () => {
+    const decision = await tool.authorize(
+      { act: "GO_TO_PAGE" },
+      contextFor(actorA, ownPlan()),
+    );
+    expect(decision.outcome).toBe("DENY");
   });
 });

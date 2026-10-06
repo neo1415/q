@@ -92,6 +92,12 @@ export const QScreenContextSchema = z
     investorOrganisationId: UuidSchema.optional(),
     documentId: UuidSchema.optional(),
     /**
+     * Q room W3 (R3): the page of documentId open in the Q room's viewer
+     * (1-based), so "this page" and "read it to me" mean that page. A
+     * position, never authority.
+     */
+    documentPage: z.number().int().min(1).max(10_000).optional(),
+    /**
      * voiceq-63: a document Q prepared for them, open in a viewer on this
      * Capital Q tab (founder, live 2026-10-04: Q opened the prep PDF and
      * could not read what it showed). An id, never authority: its words

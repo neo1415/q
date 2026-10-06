@@ -54,6 +54,8 @@ const CORE = [
   "set_discover_filters",
   // Q room R4: a card in the room, asked for mid-anything.
   "show",
+  // Q room W3: "next page", "close it" for the document open in the room.
+  "control_document",
   "approve_pending_proposal",
   "decline_pending_proposal",
   "list_pending_approvals",
