@@ -2,13 +2,17 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   CapitalObjectiveNotFoundError,
   isRoundNotFound,
+  ownershipEstimate,
+  roundNotices,
   type CapitalRoundService,
   type CapitalService,
 } from "@capital-q/capital";
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
   CapitalLedgerDtoSchema,
+  CapitalRoundHistoryDtoSchema,
   COMPANY_CAPITAL_LEDGER_PATH,
+  COMPANY_CAPITAL_ROUND_HISTORY_PATH,
   MyCommitmentsDtoSchema,
   NETWORK_MY_COMMITMENTS_PATH,
   createProblemDetails,
@@ -54,7 +58,14 @@ export type CommitmentRoutesDependencies = ActorContextDependencies & {
   readonly capital?:
     Pick<CapitalService, "getCurrentCapitalObjective"> | undefined;
   /** The company's rounds (2026-10-04), for the Capital page's book. */
-  readonly capitalRounds?: Pick<CapitalRoundService, "listRounds"> | undefined;
+  readonly capitalRounds?:
+    | Pick<
+        CapitalRoundService,
+        "listRounds" | "roundHistory" | "roundsForInvestorCommitments"
+      >
+    | undefined;
+  /** Today (UTC, YYYY-MM-DD) for date notices; injectable for tests. */
+  readonly today?: (() => string) | undefined;
 };
 
 type Sums = { raised: string; confirmed: string; pledged: string };
@@ -291,6 +302,9 @@ export function registerCommitmentRoutes(
         companyId,
       });
       void reply.header("Cache-Control", "no-store");
+      const today = (
+        dependencies.today ?? (() => new Date().toISOString().slice(0, 10))
+      )();
       return CapitalLedgerDtoSchema.parse({
         rounds: rounds.map((round) => {
           const sum = ledger.sums.find(
@@ -298,16 +312,46 @@ export function registerCommitmentRoutes(
               item.roundId === round.id &&
               item.currencyCode === round.target.currency,
           );
+          const sums =
+            sum === undefined
+              ? ZERO
+              : {
+                  raised: sum.received,
+                  confirmed: sum.confirmed,
+                  pledged: sum.pledged,
+                };
+          // Money in this round in another currency: shown apart, never
+          // converted, never in the meter.
+          const otherCurrencies = ledger.sums
+            .filter(
+              (item) =>
+                item.roundId === round.id &&
+                item.currencyCode !== round.target.currency,
+            )
+            .map((item) => ({
+              currencyCode: item.currencyCode,
+              raised: item.received,
+              confirmed: item.confirmed,
+              pledged: item.pledged,
+            }));
           return {
             ...round,
-            sums:
-              sum === undefined
-                ? ZERO
-                : {
-                    raised: sum.received,
-                    confirmed: sum.confirmed,
-                    pledged: sum.pledged,
-                  },
+            sums,
+            otherCurrencies,
+            notices: roundNotices({
+              round: {
+                id: round.id,
+                status: round.status,
+                target: round.target.amount,
+                hardCap: round.terms.hardCap,
+                targetCloseOn: round.terms.targetCloseOn,
+                reportedRaised: round.terms.reportedRaised,
+              },
+              sums,
+              otherCurrencyCount: otherCurrencies.length,
+              otherRounds: rounds,
+              today,
+            }),
           };
         }),
         currentRoundId: rounds.find((round) => round.isCurrent)?.id ?? null,
@@ -317,7 +361,39 @@ export function registerCommitmentRoutes(
     },
   );
 
+  // A round's history (P8): every change with its previous values.
+  app.get(
+    COMPANY_CAPITAL_ROUND_HISTORY_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const rawCompanyId = paramOf(request, "companyId");
+      const roundId = paramOf(request, "roundId");
+      if (
+        rawCompanyId === null ||
+        roundId === null ||
+        dependencies.capitalRounds === undefined
+      ) {
+        return reply.callNotFound();
+      }
+      try {
+        const events = await dependencies.capitalRounds.roundHistory({
+          actor: getActorContext(request),
+          companyId: CompanyIdSchema.parse(rawCompanyId),
+          roundId,
+        });
+        void reply.header("Cache-Control", "no-store");
+        return CapitalRoundHistoryDtoSchema.parse({ events });
+      } catch (error: unknown) {
+        if (isRoundNotFound(error)) return reply.callNotFound();
+        throw error;
+      }
+    },
+  );
+
   // An investor's own commitments across companies, and what they invested.
+  // P8: each commitment both sides agreed carries its round's summary --
+  // terms they agreed to and an ownership ESTIMATE -- read only for round
+  // ids Network returned as this investor's own (never target or totals).
   app.get(
     NETWORK_MY_COMMITMENTS_PATH,
     { onRequest: withContext },
@@ -326,10 +402,50 @@ export function registerCommitmentRoutes(
         actor: getActorContext(request),
         side: "INVESTOR",
       });
+      const agreed = new Set(
+        ledger.commitments
+          .filter(
+            (item) =>
+              item.roundId !== null &&
+              (item.status === "CONFIRMED" ||
+                item.status === "TRANSFER_SENT" ||
+                item.status === "RECEIVED"),
+          )
+          .map((item) => item.id),
+      );
+      const roundIds = ledger.commitments.flatMap((item) =>
+        agreed.has(item.id) && item.roundId !== null ? [item.roundId] : [],
+      );
+      const rounds =
+        dependencies.capitalRounds === undefined || roundIds.length === 0
+          ? null
+          : await dependencies.capitalRounds.roundsForInvestorCommitments(
+              roundIds,
+            );
       void reply.header("Cache-Control", "no-store");
       return MyCommitmentsDtoSchema.parse({
         totals: totalsOf(ledger.sums),
-        commitments: ledger.commitments,
+        commitments: ledger.commitments.map((item) => {
+          const found =
+            rounds !== null && agreed.has(item.id) && item.roundId !== null
+              ? rounds.get(item.roundId)
+              : undefined;
+          if (found === undefined) return item;
+          const { currency, ...view } = found;
+          return {
+            ...item,
+            round: {
+              ...view,
+              ownershipEstimate: ownershipEstimate({
+                amount: item.amount,
+                currency: item.currencyCode,
+                roundCurrency: currency,
+                instrument: view.instrument,
+                terms: view,
+              }),
+            },
+          };
+        }),
       });
     },
   );
