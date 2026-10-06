@@ -95,6 +95,10 @@ import {
   type DiscoveryRoutesDependencies,
 } from "./http/discovery.js";
 import {
+  registerExploreRoutes,
+  type ExploreRoutesDependencies,
+} from "./http/explore.js";
+import {
   registerGateQApplyRoutes,
   type GateQApplyRoutesDependencies,
 } from "./http/gateq-apply.js";
@@ -226,6 +230,8 @@ export type ApiModules = {
           DiscoveryRoutesDependencies["yourCompanies"] | undefined;
         /** The playback rule the row lists by. Absent: the row is empty. */
         readonly mayPlay?: DiscoveryRoutesDependencies["mayPlay"] | undefined;
+        /** Explore (E1-E5, ADR 0055). Absent: no Explore route registers. */
+        readonly explore?: ExploreRoutesDependencies["explore"] | undefined;
       })
     | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
@@ -460,6 +466,13 @@ export function createApp(
       mayPlay: modules.discovery.mayPlay,
       namedPhotos: modules.namedPhotos,
     });
+    if (modules.discovery.explore !== undefined) {
+      registerExploreRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        explore: modules.discovery.explore,
+      });
+    }
     if (modules.discovery.interactions !== undefined) {
       registerRecommendationInteractionRoutes(app, {
         authenticator: security.authenticator,
