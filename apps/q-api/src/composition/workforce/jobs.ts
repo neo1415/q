@@ -68,7 +68,7 @@ export type WorkforcePorts = {
     conversation: OpenConversation,
     intent: "WARM_REPLY" | "PROPOSE_TIMES",
     /** J6: the writer's call is priced under the job's own run. */
-    correlationId?: string  ,
+    correlationId?: string,
   ) => Promise<string | null>;
   readonly send: (
     owner: Owner,

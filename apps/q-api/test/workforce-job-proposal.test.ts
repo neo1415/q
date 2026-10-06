@@ -176,9 +176,9 @@ describe("a job the lead Q proposes (J1, J4)", () => {
     expect(plans()).toBe(1);
 
     // Someone else cannot approve another person's job.
-    expect(
-      await definition.authorize(payload, stranger, {}),
-    ).toMatchObject({ outcome: "DENY" });
+    expect(await definition.authorize(payload, stranger, {})).toMatchObject({
+      outcome: "DENY",
+    });
 
     const { actionId, report } = await execute(definition, payload, actor);
     expect(report.outcome).toBe("EXECUTED");

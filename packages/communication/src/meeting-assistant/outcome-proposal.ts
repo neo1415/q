@@ -79,7 +79,7 @@ export async function notesQuestions(
     readonly followUps: readonly QMeetingFollowUp[];
     readonly inCallProposals: number;
   },
-  reader?: MeetingOutcomeReader  ,
+  reader?: MeetingOutcomeReader,
 ): Promise<{ readonly organiser: string; readonly others: string }> {
   // Two readings side by side: the other side's from the shared lines only.
   const [mine, theirs] = await Promise.all([

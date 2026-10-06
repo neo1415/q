@@ -391,9 +391,9 @@ export async function reviewedReply<
    * Told the passing verdict, so the caller records "sent" (`settle`) once
    * its own sender has really sent the graded text.
    */
-  onPassed?: ((verdict: OutwardVerdict) => void)  ,
+  onPassed?: (verdict: OutwardVerdict) => void,
   /** Filed before the first draft, which was priced under the job. */
-  prepared?: PreparedDraft | null  ,
+  prepared?: PreparedDraft | null,
 ): Promise<T | null> {
   if (review === undefined || result === null || result.reply === null) {
     if (review !== undefined && prepared != null) {
