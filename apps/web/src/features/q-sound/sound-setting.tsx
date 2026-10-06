@@ -40,7 +40,8 @@ export function SoundSetting() {
       </div>
       <p className="cq-caption text-(--cq-text-secondary)">
         Small sounds when Q wakes, listens, works and has a result. Quiet keeps
-        only Result ready, Needs you and errors. Never while Q speaks.
+        only a soft tone as Q starts working, Result ready, Needs you and
+        errors. Never while Q speaks.
       </p>
     </div>
   );

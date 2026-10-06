@@ -27,6 +27,7 @@ export const Q_SOUNDS = [
   "needs",
   "error",
   "sent",
+  "working",
 ] as const;
 export type QSound = (typeof Q_SOUNDS)[number];
 
@@ -41,12 +42,25 @@ export const SOUND_MODE_LABELS: Readonly<Record<SoundMode, string>> = {
   OFF: "Off",
 };
 
-/** What Quiet keeps: the sounds that tell you something needs you. */
+/**
+ * What Quiet keeps: the sounds that tell you something needs you, and the
+ * silence ladder's first rung (ADR 0062): one soft tone when Q has been
+ * working 0.7 s, so a wait never starts in dead air.
+ */
 export const QUIET_SOUNDS: ReadonlySet<QSound> = new Set([
   "ping",
   "needs",
   "error",
+  "working",
 ]);
+
+/** ADR 0062: the soft tone plays once Q has worked this long, if it still is. */
+export const WORKING_TONE_AFTER_MS = 700;
+
+/** Whether Q's state is a wait the silence ladder fills. */
+export function isWorkingState(state: QApertureState): boolean {
+  return BUSY.has(state);
+}
 
 /** No two sounds closer than this; the later one is dropped. */
 export const MIN_GAP_MS = 600;
