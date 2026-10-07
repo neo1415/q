@@ -230,8 +230,7 @@ describe("chat only where it can be sent (live seed, Zino)", () => {
     expect(held.verdict === "HOLD" ? held.code : null).toBe("ALREADY_ASKED");
     // Someone else is not held by it.
     expect(
-      validate(chat(body, {}, OTHER_REL), { awaiting: new Set([REL]) })
-        .verdict,
+      validate(chat(body, {}, OTHER_REL), { awaiting: new Set([REL]) }).verdict,
     ).not.toBe("HOLD");
   });
 });
@@ -1435,6 +1434,46 @@ describe("live QA (instruction 76d6f281): code decides from the conversation", (
     ).toMatchObject({ verdict: "REFUSED", code: "OUTSIDE_MANDATE" });
   });
 
+  it("they wrote first: a cold introduction back is refused, a reply to them is not (live seed, 7 Oct)", () => {
+    const theyWrote = new Map([
+      [
+        REL,
+        {
+          lastFrom: "THEM" as const,
+          asksQuestion: false,
+          wantsToMeet: true,
+          proposedTime: null,
+          topicNumbers: [],
+          mentionsTermsOrMoney: false,
+          declined: false,
+          tone: "POSITIVE" as const,
+        },
+      ],
+    ]);
+    expect(
+      check(
+        chat(
+          "Hello Ledgerline team -- checking every invoice at creation brings compliance into the workflow. I came across the company through your Capital Q profile. How are SMEs responding to the product?",
+          { message: { kind: "FIRST", asks: "QUESTION" } },
+        ),
+        { introduced: new Set(), facts: theyWrote },
+      ),
+    ).toMatchObject({ verdict: "REFUSED", code: "COLD_OPEN_IN_REPLY" });
+    expect(
+      check(
+        chat(
+          "Thanks for writing, Tobenna. Please do share the deck -- how are SMEs responding to checks at invoice creation?",
+          { message: { kind: "REPLY", asks: "QUESTION" } },
+        ),
+        { introduced: new Set(), facts: theyWrote },
+      ),
+    ).toMatchObject({ verdict: "AUTO" });
+    // No message from them: the same words are a first message, not refused here.
+    expect(
+      check(firstMessage, { introduced: new Set(), facts: new Map() }),
+    ).toMatchObject({ verdict: "AUTO" });
+  });
+
   it("a message the planner says asks for a meeting is refused without AUTO booking", () => {
     const noBooking = grant({
       actions: grant().actions.filter(
@@ -1494,6 +1533,62 @@ describe("live QA (instruction 76d6f281): code decides from the conversation", (
         { material: SEED_ONLY, facts, introduced: new Set([REL]) },
       ),
     ).toMatchObject({ verdict: "REFUSED", code: "UNGROUNDED_NUMBER" });
+  });
+
+  it("where they wrote first and your side hasn't, the planner is told to reply, not introduce (live seed, 7 Oct)", async () => {
+    const { row } = world([{ steps: [], cannot: [] }]);
+    const seen: string[] = [];
+    const wired = createInstructionEngine({
+      store: {
+        instruction: () => Promise.resolve({ ...row, grant_payload: grant() }),
+        expire: () => Promise.resolve(),
+        recordStep: () => Promise.resolve(true),
+        stepDone: () => Promise.resolve(false),
+        messagesSent: () => Promise.resolve(new Map<string, number>()),
+        history: () => Promise.resolve([]),
+        addSpend: () => Promise.resolve(),
+        pause: () => Promise.resolve(true),
+        notify: () => Promise.resolve(true),
+      },
+      actions: ACTIONS,
+      ports: {},
+      actorFor: () => Promise.resolve(actor),
+      people: () => Promise.resolve(PEOPLE),
+      introduced: () => Promise.resolve(new Set<string>()),
+      readThread: (input: { relationshipId: string }) =>
+        Promise.resolve({
+          facts:
+            input.relationshipId === REL
+              ? {
+                  lastFrom: "THEM" as const,
+                  asksQuestion: false,
+                  wantsToMeet: true,
+                  proposedTime: null,
+                  topicNumbers: [],
+                  mentionsTermsOrMoney: false,
+                  declined: false,
+                  tone: "POSITIVE" as const,
+                }
+              : null,
+          costUsd: 0,
+        }),
+      plan: (_who, variables) => {
+        seen.push(variables.people);
+        return Promise.resolve({
+          plan: { request: "EXECUTE", steps: [], cannot: [] },
+          costUsd: 0,
+        });
+      },
+      ask: () => Promise.resolve(null),
+      now: () => IN_HOURS,
+      autoEnabled: true,
+    });
+    await wired.fire(row.id, "run-0402");
+    expect(seen[0]).toContain(
+      "they wrote first and your side hasn't replied: any message is a reply to them, not an introduction",
+    );
+    // The other conversation, with nothing from them: still a first message.
+    expect(seen[0]).toContain("no message from your side yet");
   });
 
   it("a firing reads each conversation and tells the planner who has heard from them; a failed read counts as written", async () => {
