@@ -535,9 +535,9 @@ export function QRoomDeck({
                     onClick={() => go(at + 1)}
                     data-q-deck-thumb={at + 1}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- an SVG the Q API drew */}
                     {/* R9: tile-sized, decoded off the critical path, and
                         the ones scrolled out of the strip only when near. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element -- an SVG the Q API drew */}
                     <img
                       src={picture}
                       alt=""
