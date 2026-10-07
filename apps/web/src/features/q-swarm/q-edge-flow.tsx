@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
+import type { QApertureState } from "../q-aperture/aperture-state";
 import { useQSessionOptional } from "../q/q-session";
 import { edgeFlowing, edgeParticles } from "./edge-flow";
 
@@ -13,9 +14,14 @@ import { edgeFlowing, edgeParticles } from "./edge-flow";
  * Decorative: hidden from assistive technology, since Q's label and
  * presence already say that it is working.
  */
-export function QEdgeFlow() {
+export function QEdgeFlow({
+  state: forced,
+}: {
+  /** The /dev harness drives it directly; the app reads the session. */
+  readonly state?: QApertureState | undefined;
+} = {}) {
   const session = useQSessionOptional();
-  const state = session?.presence?.state ?? "IDLE";
+  const state = forced ?? session?.presence?.state ?? "IDLE";
   const flowing = edgeFlowing(state);
   const canvas = useRef<HTMLCanvasElement | null>(null);
 

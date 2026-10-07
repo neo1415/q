@@ -19,6 +19,7 @@ import type {
 } from "@/features/company/material/material-actions";
 import type { DocumentActionResult } from "@/features/documents/actions";
 import { QAperture } from "@/features/q-aperture";
+import { QEdgeFlow } from "@/features/q-swarm/q-edge-flow";
 import { performClientAction } from "@/features/q/client-actions";
 import { turnsFrom } from "@/features/q/conversation";
 import { QMaterialViewer } from "@/features/q/material-viewer";
@@ -148,6 +149,8 @@ export function QRoomHarness() {
   const [messages, setMessages] = useState<readonly QMessage[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [wire, setWire] = useState("");
+  // R9: Q "working", so the edge particles run while a test measures.
+  const [working, setWorking] = useState(false);
   const seen = useRef(new Set<string>());
   const read = useCallback(async () => {
     const detail = await fetchRecord();
@@ -204,8 +207,18 @@ export function QRoomHarness() {
         >
           Read wire
         </button>
+        <button
+          type="button"
+          className="cq-ac-btn"
+          aria-pressed={working}
+          onClick={() => setWorking((on) => !on)}
+          data-harness-working
+        >
+          Q working
+        </button>
         <QCanSee />
       </header>
+      <QEdgeFlow state={working ? "WORKING" : "IDLE"} />
       <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-6 px-4 py-4">
         <QPresenceStage
           turns={turns}
