@@ -59,6 +59,7 @@ export const BLUEPRINT_PILLARS = [
   "INVESTMENT_READINESS",
 ] as const;
 export const BlueprintPillarSchema = z.enum(BLUEPRINT_PILLARS);
+export type BlueprintPillar = z.infer<typeof BlueprintPillarSchema>;
 
 /** Who carries a step out (PADL #85: resolve yourself → with Q → expert support). */
 export const BlueprintExecutorSchema = z.enum([

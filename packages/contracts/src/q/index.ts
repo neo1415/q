@@ -1027,6 +1027,10 @@ export * from "./daily.js";
 export * from "./readiness-blueprint.js";
 // end BILLING-2 block
 
+// READINESS block (Q.03/Q.04): the founder-private diagnosis and plan.
+export * from "./readiness.js";
+// end READINESS block
+
 // WORKFORCE block (founder brief J1-J9): Q's workforce of agents.
 export {
   Q_WORKFORCE_JOB_PATH,

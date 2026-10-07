@@ -1,0 +1,34 @@
+{
+  "name": "@capital-q/readiness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The founder's readiness diagnosis (Q.03) and action plan (Q.04): a deterministic, versioned rules assessment per InvestIQ pillar over the company's own records, the action plan and its completion history, and the Blueprint skeleton. Founder-private: never read by discovery, ranking or any investor surface.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/security": "workspace:*"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}
