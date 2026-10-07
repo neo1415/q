@@ -160,7 +160,11 @@ import { withCommitmentNotices } from "./network/commitment-notice-handler.js";
 import { newlyReadyCompanyOf } from "./network/newly-ready-company.js";
 import { createStartupAlertWatcher } from "./network/startup-alert-watcher.js";
 import { withDiligenceSummaries } from "./network/diligence-summary-handler.js";
-import { withDeckReadings } from "./evidence/deck-reading-handler.js";
+import {
+  checkStoredDeckReadings,
+  runReadAgainLoop,
+  withDeckReadings,
+} from "./evidence/deck-reading-handler.js";
 import { runDeckReadingHeal } from "./evidence/deck-reading-backfill.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
@@ -1256,6 +1260,36 @@ void redriveBlockedDocumentsAtStart({
   logger,
 });
 
+// F26: readings stored before the deck figure check get it once at start:
+// deterministic, no model; a corrected copy is appended, never a rewrite.
+const deckChunks = {
+  listActiveByVersion: (
+    executor: Parameters<
+      ReturnType<typeof createPostgresChunkRepository>["listActiveByVersion"]
+    >[0],
+    tenantId: string,
+    documentVersionId: string,
+  ) =>
+    createPostgresChunkRepository().listActiveByVersion(
+      executor,
+      tenantId as never,
+      documentVersionId as never,
+    ),
+};
+void checkStoredDeckReadings({
+  sql: database.sql,
+  chunks: deckChunks,
+  store: createPostgresDataRoom(),
+  logger,
+  limit: 100,
+})
+  .then((healed) => {
+    if (healed > 0) logger.info({ healed }, "deck figure check at start");
+  })
+  .catch((error: unknown) => {
+    logger.warn({ err: error }, "deck figure check at start failed");
+  });
+
 // Q room W3 (R3): paged documents processed before page text existed get
 // their pages from their private artifacts. Bounded, idempotent, never fatal.
 if (storage !== undefined) {
@@ -1324,6 +1358,22 @@ await Promise.all([
   ...(deckReader === undefined
     ? []
     : [
+        // F26: the founder's "Read again" (two per deck version, held by the
+        // database), one a minute, at most 20 a day platform-wide.
+        runReadAgainLoop({
+          reading: {
+            sql: database.sql,
+            reader: deckReader,
+            store: createPostgresDataRoom(),
+            chunks: deckChunks,
+            logger,
+          },
+          queue: createPostgresDataRoom(),
+          intervalMs: 60 * 1000,
+          perSweep: 1,
+          dailyMax: 20,
+          signal: shutdownController.signal,
+        }),
         // …and re-reads up to 10 of them per sweep (each once per process,
         // at most $0.25 a sweep), so a missed reading heals itself.
         runDeckReadingHeal({

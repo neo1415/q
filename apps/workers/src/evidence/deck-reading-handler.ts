@@ -1,7 +1,7 @@
 import { DECK_EXTRACTION_SCHEMA_VERSION } from "@capital-q/q-core";
 import type { EventRegistry } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
-import type { PostgresDataRoom } from "@capital-q/evidence";
+import { verifyDeckReading, type PostgresDataRoom } from "@capital-q/evidence";
 import {
   DECK_READER_PROMPT_VERSION,
   type DeckReader,
@@ -57,7 +57,10 @@ export type DeckReadingOptions = {
   readonly sql: DatabaseExecutor;
   readonly reader: DeckReader;
   readonly chunks: DeckReadingChunks;
-  readonly store: Pick<PostgresDataRoom, "insertExtraction">;
+  readonly store: Pick<
+    PostgresDataRoom,
+    "insertExtraction" | "nextReadingNumber"
+  >;
   readonly logger: RunnerLogger;
 };
 
@@ -92,7 +95,10 @@ export async function readDeckDocument(
   options: DeckReadingOptions,
   documentId: string,
   correlationId: string,
+  /** F26: AGAIN appends a new reading of a version already read. */
+  mode: "FIRST" | "AGAIN" = "FIRST",
 ): Promise<DeckReadingOutcome> {
+  const again = mode === "AGAIN";
   const target = (
     await options.sql<
       {
@@ -112,10 +118,10 @@ export async function readDeckDocument(
          and d.company_id is not null
          and v.processing_status = 'COMPLETED'
          and v.malware_scan_status <> 'BLOCKED'
-         and not exists (
+         and (${again} or not exists (
            select 1 from evidence.deck_extractions x
             where x.document_version_id = v.id
-              and x.prompt_version = ${DECK_READER_PROMPT_VERSION})`
+              and x.prompt_version = ${DECK_READER_PROMPT_VERSION}))`
   )[0];
   if (target === undefined) return { kind: "NOT_ELIGIBLE" };
   const chunks = (
@@ -163,6 +169,11 @@ export async function readDeckDocument(
     );
     return { kind: "EMPTY", documentVersionId: target.version_id };
   }
+  // F26: every figure Q cites as the deck's own must be in its text.
+  const verified = verifyDeckReading(
+    sections,
+    chunks.map((chunk) => chunk.content).join("\n"),
+  );
   const stored = await options.store.insertExtraction(options.sql, {
     tenantId: target.tenant_id,
     companyId: target.company_id,
@@ -171,10 +182,24 @@ export async function readDeckDocument(
     promptVersion: DECK_READER_PROMPT_VERSION,
     schemaVersion: DECK_EXTRACTION_SCHEMA_VERSION,
     pageCount: pages === 0 ? null : pages,
-    sections,
+    sections: verified.sections,
+    setAside: verified.setAside,
+    readingNumber: again
+      ? await options.store.nextReadingNumber(
+          options.sql,
+          target.version_id,
+          DECK_READER_PROMPT_VERSION,
+        )
+      : 1,
+    origin: again ? "READ_AGAIN" : "FIRST_READ",
   });
   options.logger.info(
-    { documentVersionId: target.version_id, stored },
+    {
+      documentVersionId: target.version_id,
+      stored,
+      again,
+      setAside: verified.setAside.length,
+    },
     "Q read a pitch deck into its twelve sections",
   );
   return { kind: "READ", documentVersionId: target.version_id, stored };
@@ -284,6 +309,167 @@ export async function runUnreadDeckAlerts(options: {
       await checkUnreadDecks(options.sql, options.logger);
     } catch (error: unknown) {
       options.logger.warn({ err: error }, "unread-deck check failed");
+    }
+    await abortableSleep(options.intervalMs, options.signal);
+  }
+}
+
+/**
+ * F26: the founder's "Read again", oldest first. Each request is read once
+ * (its outcome is recorded whatever happens) and the platform reads at most
+ * `dailyMax` a day, so a burst of presses never becomes a burst of spend.
+ */
+export async function processReadAgain(options: {
+  readonly reading: DeckReadingOptions;
+  readonly queue: Pick<
+    PostgresDataRoom,
+    "pendingReadAgain" | "recordReadAgain" | "readAgainToday"
+  >;
+  readonly perSweep: number;
+  readonly dailyMax: number;
+}): Promise<number> {
+  const { sql, logger } = options.reading;
+  const room = options.dailyMax - (await options.queue.readAgainToday(sql));
+  if (room <= 0) return 0;
+  const pending = await options.queue.pendingReadAgain(
+    sql,
+    Math.min(options.perSweep, room),
+  );
+  for (const request of pending) {
+    let outcome: "READ" | "EMPTY" | "NO_TEXT" | "NOT_ELIGIBLE" | "FAILED";
+    try {
+      const read = await readDeckDocument(
+        options.reading,
+        request.documentId,
+        `cor_deckagain_${request.requestId}`,
+        "AGAIN",
+      );
+      // The deck moved on (a new version) or was removed: nothing to read.
+      outcome =
+        read.kind === "READ" &&
+        read.documentVersionId !== request.documentVersionId
+          ? "NOT_ELIGIBLE"
+          : read.kind;
+    } catch (error: unknown) {
+      logger.error(
+        {
+          requestId: request.requestId,
+          err: error,
+          alert: "DECK_READING_FAILED",
+        },
+        "read again failed",
+      );
+      outcome = "FAILED";
+    }
+    await options.queue.recordReadAgain(sql, {
+      requestId: request.requestId,
+      tenantId: request.tenantId,
+      outcome,
+    });
+  }
+  return pending.length;
+}
+
+/**
+ * F26 heal: readings stored before the figure check get it now. The
+ * founder's newest unconfirmed reading of each current deck version is
+ * checked against the deck's own passages; where Q cited a figure the deck
+ * never states, a corrected copy is appended as the next reading (no
+ * model, no spend). The original stays, as history.
+ */
+export async function checkStoredDeckReadings(options: {
+  readonly sql: DatabaseExecutor;
+  readonly chunks: DeckReadingChunks;
+  readonly store: Pick<PostgresDataRoom, "insertExtraction">;
+  readonly logger: RunnerLogger;
+  readonly limit: number;
+}): Promise<number> {
+  const rows = await options.sql<
+    {
+      tenant_id: string;
+      company_id: string;
+      document_id: string;
+      document_version_id: string;
+      prompt_version: number;
+      schema_version: number;
+      page_count: number | null;
+      reading_number: number;
+      sections: Parameters<typeof verifyDeckReading>[0];
+    }[]
+  >`
+    select * from (
+      select distinct on (x.document_version_id)
+             x.id, x.tenant_id, x.company_id, x.document_id, x.document_version_id,
+             x.prompt_version, x.schema_version, x.page_count, x.reading_number,
+             x.sections, x.set_aside
+        from evidence.deck_extractions x
+        join evidence.documents d
+          on d.id = x.document_id and d.current_version_id = x.document_version_id
+       where d.status = 'ACTIVE'
+       order by x.document_version_id, x.prompt_version desc,
+                x.reading_number desc, x.created_at desc
+    ) newest
+     where newest.set_aside is null
+       and not exists (select 1 from evidence.deck_extraction_confirmations c
+                        where c.extraction_id = newest.id)
+     limit ${options.limit}`;
+  let healed = 0;
+  for (const row of rows) {
+    const passages = await options.chunks.listActiveByVersion(
+      options.sql,
+      row.tenant_id,
+      row.document_version_id,
+    );
+    if (passages.length === 0) continue;
+    const verified = verifyDeckReading(
+      row.sections,
+      passages
+        .toSorted((a, b) => a.chunkIndex - b.chunkIndex)
+        .slice(0, PASSAGES_MAX)
+        .map((chunk) => chunk.content)
+        .join("\n"),
+    );
+    if (verified.setAside.length === 0) continue;
+    const stored = await options.store.insertExtraction(options.sql, {
+      tenantId: row.tenant_id,
+      companyId: row.company_id,
+      documentId: row.document_id,
+      documentVersionId: row.document_version_id,
+      promptVersion: row.prompt_version,
+      schemaVersion: row.schema_version,
+      pageCount: row.page_count,
+      sections: verified.sections,
+      setAside: verified.setAside,
+      readingNumber: row.reading_number + 1,
+      origin: "FIGURE_CHECK",
+    });
+    if (stored) healed += 1;
+    options.logger.info(
+      {
+        documentVersionId: row.document_version_id,
+        setAside: verified.setAside.map((s) => s.section),
+        stored,
+      },
+      "deck reading: figures the deck never states set aside",
+    );
+  }
+  return healed;
+}
+
+/** F26: "Read again" requests, every `intervalMs` until shutdown. */
+export async function runReadAgainLoop(options: {
+  readonly reading: DeckReadingOptions;
+  readonly queue: Parameters<typeof processReadAgain>[0]["queue"];
+  readonly intervalMs: number;
+  readonly perSweep: number;
+  readonly dailyMax: number;
+  readonly signal: AbortSignal;
+}): Promise<void> {
+  while (!options.signal.aborted) {
+    try {
+      await processReadAgain(options);
+    } catch (error: unknown) {
+      options.reading.logger.warn({ err: error }, "read-again sweep failed");
     }
     await abortableSleep(options.intervalMs, options.signal);
   }
