@@ -7,13 +7,20 @@ import {
   type MaterialActionAuditWriter,
 } from "@capital-q/audit";
 import {
+  DECK_READ_AGAIN_MAX,
   deckSectionForReaders,
   orderDeckSections,
+  unknownDeckSection,
   type CompanyDeckView,
   type CorrelationId,
   type DataRoomLevel,
   type DeckCoaching,
+  type DeckSection,
+  type DeckSectionCode,
   type DeckSectionReading,
+  type DeckSectionReviewAction,
+  type DeckSectionState,
+  type DeckSetAside,
   type UtcTimestamp,
 } from "@capital-q/contracts";
 import type {
@@ -45,6 +52,8 @@ import type { DataRoomCompany } from "./data-room.js";
  */
 
 const CONFIRMED = AuditActionTypeSchema.parse("deck.extraction_confirmed");
+const REVIEWED = AuditActionTypeSchema.parse("deck.section_reviewed");
+const READ_AGAIN = AuditActionTypeSchema.parse("deck.read_again_requested");
 const RESOURCE_DOCUMENT = AuditResourceTypeSchema.parse("document");
 
 export type CompanyDeckRecord = {
@@ -67,7 +76,90 @@ export type CompanyDeckReading = {
   readonly sections: readonly DeckSectionReading[];
   readonly createdAt: string;
   readonly confirmed: boolean;
+  /** F26 (absent from older stores: one reading, no reviews). */
+  readonly readingNumber?: number | undefined;
+  readonly setAside?: readonly DeckSetAside[] | undefined;
+  readonly reviews?: readonly DeckSectionReview[] | undefined;
+  readonly readAgain?:
+    { readonly used: number; readonly pending: boolean } | undefined;
 };
+
+export type DeckSectionReview = {
+  readonly section: DeckSectionCode;
+  readonly action: DeckSectionReviewAction;
+  readonly correction: string | null;
+};
+
+/**
+ * F26: the founder's review applied to Q's reading, section by section.
+ *
+ *   DISMISS   "This is wrong": the section reads as unknown (UNCLEAR)
+ *   CORRECT   their own words replace Q's summary; Q's contradiction facts
+ *             go, the deck's own facts stay (all USER_CLAIM)
+ *   CONFIRM   kept as Q read it
+ *
+ * A whole-reading confirmation confirms every section not otherwise
+ * reviewed. Only CONFIRMED and CORRECTED sections reach an investor.
+ */
+export function reviewedDeckSections(
+  sections: readonly DeckSectionReading[],
+  reviews: readonly DeckSectionReview[],
+  wholeConfirmed: boolean,
+): {
+  readonly sections: DeckSectionReading[];
+  readonly states: DeckSectionState[];
+} {
+  const latest = new Map(reviews.map((review) => [review.section, review]));
+  const out: DeckSectionReading[] = [];
+  const states: DeckSectionState[] = [];
+  for (const section of sections) {
+    const review = latest.get(section.section);
+    if (review?.action === "DISMISS") {
+      out.push({
+        ...unknownDeckSection(section.section, "UNCLEAR"),
+        criteria: section.criteria,
+      });
+      states.push({ section: section.section, state: "DISMISSED" });
+    } else if (review?.action === "CORRECT" && review.correction !== null) {
+      out.push({
+        ...section,
+        status: "PRESENT",
+        summary: review.correction,
+        facts: section.facts.filter(
+          (fact) => fact.unknownReason !== "CONTRADICTORY",
+        ),
+      });
+      states.push({ section: section.section, state: "CORRECTED" });
+    } else {
+      out.push(section);
+      states.push({
+        section: section.section,
+        state:
+          review?.action === "CONFIRM" || wholeConfirmed
+            ? "CONFIRMED"
+            : "PENDING",
+      });
+    }
+  }
+  return { sections: out, states };
+}
+
+/** What an investor sees: only what the founder confirmed or wrote. */
+function forInvestor(
+  sections: readonly DeckSectionReading[],
+  states: readonly DeckSectionState[],
+): DeckSection[] {
+  const shown = new Set(
+    states
+      .filter((s) => s.state === "CONFIRMED" || s.state === "CORRECTED")
+      .map((s) => s.section),
+  );
+  return sections.map((section) =>
+    shown.has(section.section)
+      ? deckSectionForReaders(section)
+      : unknownDeckSection(section.section, "UNCLEAR"),
+  );
+}
 
 /** Structural: `createPostgresDataRoom()` from Evidence satisfies it. */
 export type CompanyDeckStore = {
@@ -87,9 +179,31 @@ export type CompanyDeckStore = {
       readonly userId: string;
     },
   ) => Promise<boolean>;
+  /** F26: absent: per-section review is not offered. */
+  readonly reviewSection?: (
+    tx: TransactionContext,
+    input: {
+      readonly extractionId: string;
+      readonly tenantId: string;
+      readonly userId: string;
+      readonly section: DeckSectionCode;
+      readonly action: DeckSectionReviewAction;
+      readonly correction: string | null;
+    },
+  ) => Promise<void>;
+  /** F26: false when the version's "Read again" budget is spent. */
+  readonly requestReadAgain?: (
+    tx: TransactionContext,
+    input: {
+      readonly extractionId: string;
+      readonly tenantId: string;
+      readonly documentVersionId: string;
+      readonly userId: string;
+    },
+  ) => Promise<boolean>;
 };
 
-export type CompanyDeckRefusal = "NOT_FOUND" | "STALE";
+export type CompanyDeckRefusal = "NOT_FOUND" | "STALE" | "LIMIT";
 
 export function createCompanyDeckService(dependencies: {
   readonly sql: DatabaseExecutor;
@@ -185,9 +299,23 @@ export function createCompanyDeckService(dependencies: {
         null,
       );
       const owner = reader.viewer === "OWNER";
-      // The Write Gate: an investor sees only what the founder confirmed.
-      const shown =
-        reading !== null && (owner || reading.confirmed) ? reading : null;
+      const reviewed =
+        reading === null
+          ? null
+          : reviewedDeckSections(
+              reading.sections,
+              reading.reviews ?? [],
+              reading.confirmed,
+            );
+      const anyShown =
+        reviewed?.states.some(
+          (s) => s.state === "CONFIRMED" || s.state === "CORRECTED",
+        ) ?? false;
+      const allReviewed =
+        reviewed?.states.every((s) => s.state !== "PENDING") ?? false;
+      // The Write Gate, per section (F26): an investor sees only what the
+      // founder confirmed or wrote; the rest reads as unknown.
+      const shown = reading !== null && (owner || anyShown) ? reading : null;
       return {
         viewer: reader.viewer,
         companyId: reader.company.id,
@@ -207,11 +335,36 @@ export function createCompanyDeckService(dependencies: {
                 extractionId: shown.id,
                 readAt: shown.createdAt,
                 versionNumber: deck.versionNumber,
-                confirmed: shown.confirmed,
+                confirmed: owner ? shown.confirmed || allReviewed : true,
                 // The rubric never leaves for anyone: stripped here for all.
-                sections: orderDeckSections(
-                  shown.sections.map(deckSectionForReaders),
-                ),
+                sections:
+                  reviewed === null
+                    ? orderDeckSections(
+                        shown.sections.map(deckSectionForReaders),
+                      )
+                    : owner
+                      ? orderDeckSections(
+                          reviewed.sections.map(deckSectionForReaders),
+                        )
+                      : orderDeckSections(
+                          forInvestor(reviewed.sections, reviewed.states),
+                        ),
+                readingNumber: shown.readingNumber ?? 1,
+                ...(reviewed === null
+                  ? {}
+                  : { sectionStates: reviewed.states }),
+                ...(owner
+                  ? {
+                      setAside: [...(shown.setAside ?? [])],
+                      readAgain: {
+                        left: Math.max(
+                          0,
+                          DECK_READ_AGAIN_MAX - (shown.readAgain?.used ?? 0),
+                        ),
+                        pending: shown.readAgain?.pending ?? false,
+                      },
+                    }
+                  : {}),
               },
         coaching:
           owner && reading !== null
@@ -313,7 +466,179 @@ export function createCompanyDeckService(dependencies: {
         value: { extractionId: reading.id, confirmed: true },
       };
     },
+
+    /**
+     * F26: the founder reviews ONE section of the reading on screen:
+     * confirm it, say it is wrong, or correct it in their own words.
+     * Append-only; bound to the exact reading (a newer one needs its own).
+     */
+    reviewSection: async (command: {
+      readonly actor: ActorContext;
+      readonly companyId: string;
+      readonly documentId: string;
+      readonly extractionId: string;
+      readonly section: DeckSectionCode;
+      readonly action: DeckSectionReviewAction;
+      readonly correction: string | null;
+      readonly correlationId?: CorrelationId | undefined;
+    }): Promise<
+      | {
+          readonly outcome: "OK";
+          readonly value: {
+            readonly extractionId: string;
+            readonly section: DeckSectionCode;
+            readonly state: DeckSectionState["state"];
+          };
+        }
+      | { readonly outcome: "REFUSED"; readonly code: CompanyDeckRefusal }
+    > => {
+      const located = await ownReading(command);
+      if ("code" in located) return { outcome: "REFUSED", code: located.code };
+      const { deck, reading } = located;
+      const reviewSection = store.reviewSection;
+      if (reviewSection === undefined)
+        return { outcome: "REFUSED", code: "NOT_FOUND" };
+      const correction =
+        command.action === "CORRECT" ? command.correction : null;
+      if (command.action === "CORRECT" && (correction ?? "").trim() === "")
+        return { outcome: "REFUSED", code: "NOT_FOUND" };
+      await dependencies.transactions.run(async (tx) => {
+        await reviewSection(tx, {
+          extractionId: reading.id,
+          tenantId: deck.tenantId,
+          userId: command.actor.userId,
+          section: command.section,
+          action: command.action,
+          correction,
+        });
+        await dependencies.audit.record(tx, {
+          ...auditActorFromContext(command.actor),
+          auditEventId: createAuditEventId(),
+          actionType: REVIEWED,
+          resourceType: RESOURCE_DOCUMENT,
+          resourceId: deck.documentId,
+          occurredAt: occurredNow(),
+          outcome: "SUCCEEDED",
+          // Never the founder's words: the action and the section only.
+          metadata: {
+            extractionId: reading.id,
+            section: command.section,
+            action: command.action,
+          },
+          correlationId:
+            command.correlationId ?? dependencies.newCorrelationId(),
+        });
+      });
+      return {
+        outcome: "OK",
+        value: {
+          extractionId: reading.id,
+          section: command.section,
+          state:
+            command.action === "CONFIRM"
+              ? "CONFIRMED"
+              : command.action === "DISMISS"
+                ? "DISMISSED"
+                : "CORRECTED",
+        },
+      };
+    },
+
+    /**
+     * F26: the founder asks Q to read the current version again. A new
+     * reading is appended by the worker (never an overwrite); two per
+     * version at most, held by the database too.
+     */
+    readAgain: async (command: {
+      readonly actor: ActorContext;
+      readonly companyId: string;
+      readonly documentId: string;
+      readonly extractionId: string;
+      readonly correlationId?: CorrelationId | undefined;
+    }): Promise<
+      | {
+          readonly outcome: "OK";
+          readonly value: { readonly requested: true; readonly left: number };
+        }
+      | { readonly outcome: "REFUSED"; readonly code: CompanyDeckRefusal }
+    > => {
+      const located = await ownReading(command);
+      if ("code" in located) return { outcome: "REFUSED", code: located.code };
+      const { deck, reading } = located;
+      const request = store.requestReadAgain;
+      if (request === undefined)
+        return { outcome: "REFUSED", code: "NOT_FOUND" };
+      const used = reading.readAgain?.used ?? 0;
+      // One waiting already: the same answer, no second model reading.
+      if (reading.readAgain?.pending === true) {
+        return {
+          outcome: "OK",
+          value: {
+            requested: true,
+            left: Math.max(0, DECK_READ_AGAIN_MAX - used),
+          },
+        };
+      }
+      if (used >= DECK_READ_AGAIN_MAX)
+        return { outcome: "REFUSED", code: "LIMIT" };
+      const made = await dependencies.transactions.run(async (tx) => {
+        const ok = await request(tx, {
+          extractionId: reading.id,
+          tenantId: deck.tenantId,
+          documentVersionId: deck.versionId,
+          userId: command.actor.userId,
+        });
+        if (ok) {
+          await dependencies.audit.record(tx, {
+            ...auditActorFromContext(command.actor),
+            auditEventId: createAuditEventId(),
+            actionType: READ_AGAIN,
+            resourceType: RESOURCE_DOCUMENT,
+            resourceId: deck.documentId,
+            occurredAt: occurredNow(),
+            outcome: "SUCCEEDED",
+            metadata: {
+              extractionId: reading.id,
+              documentVersionId: deck.versionId,
+            },
+            correlationId:
+              command.correlationId ?? dependencies.newCorrelationId(),
+          });
+        }
+        return ok;
+      });
+      if (!made) return { outcome: "REFUSED", code: "LIMIT" };
+      return {
+        outcome: "OK",
+        value: {
+          requested: true,
+          left: Math.max(0, DECK_READ_AGAIN_MAX - used - 1),
+        },
+      };
+    },
   };
+
+  /** The owner's current reading, exactly the one on their screen. */
+  async function ownReading(command: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+    readonly documentId: string;
+    readonly extractionId: string;
+  }): Promise<
+    | { readonly deck: CompanyDeckRecord; readonly reading: CompanyDeckReading }
+    | { readonly code: CompanyDeckRefusal }
+  > {
+    const reader = await readerOf(command.actor, command.companyId);
+    if (reader === null || reader.viewer !== "OWNER")
+      return { code: "NOT_FOUND" };
+    const deck = await store.currentDeck(sql, reader.company.id);
+    if (deck === null || deck.documentId !== command.documentId)
+      return { code: "NOT_FOUND" };
+    const reading = await store.extractionFor(sql, deck.versionId);
+    if (reading === null || reading.id !== command.extractionId)
+      return { code: "STALE" };
+    return { deck, reading };
+  }
 }
 
 export type CompanyDeckService = ReturnType<typeof createCompanyDeckService>;
