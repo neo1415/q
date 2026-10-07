@@ -2155,6 +2155,9 @@ importers:
       '@capital-q/discovery':
         specifier: workspace:*
         version: link:../discovery
+      '@capital-q/evidence':
+        specifier: workspace:*
+        version: link:../evidence
       '@capital-q/investors':
         specifier: workspace:*
         version: link:../investors
@@ -2189,9 +2192,6 @@ importers:
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../eventing
-      '@capital-q/evidence':
-        specifier: workspace:*
-        version: link:../evidence
       '@capital-q/media':
         specifier: workspace:*
         version: link:../media

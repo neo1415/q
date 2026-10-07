@@ -1110,6 +1110,22 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RECORDS",
     "Ranks their own candidates by fit and puts the top ones side by side.",
   ),
+  // Investor promises (2026-10-07): Q.10, Q.02, Q.07.
+  tool(
+    "fit_compare",
+    "RECORDS",
+    "Puts 2 to 4 of their saved companies side by side on fit.",
+  ),
+  tool(
+    "thesis_reading",
+    "RECORDS",
+    "Shows how Q reads their thesis: declared rules, what they did, and suggestions they approve.",
+  ),
+  tool(
+    "company_assumptions",
+    "RECORDS",
+    "Lists a company's claims as assumptions to test, with evidence labels and questions for the founder.",
+  ),
   tool(
     "research_public_web",
     "RESEARCH",

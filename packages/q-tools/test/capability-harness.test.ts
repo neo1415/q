@@ -236,6 +236,8 @@ const RELATIONSHIP = { relationshipId: UUID };
 const SCRIPTED_INPUTS: Readonly<Record<string, unknown>> = {
   // "A company id or name is required" (Explore, ADR 0055).
   explore_pitches_like: { companyName: "Kora Health" },
+  // Q.02: a suggestion id from thesis_reading (a pattern, not free text).
+  apply_thesis_suggestion: { suggestion: "ADD_COUNTRY:GH" },
   // "Name exactly one of relationshipId, companyId or investorOrganisationId".
   get_relationship: RELATIONSHIP,
   list_messages: RELATIONSHIP,

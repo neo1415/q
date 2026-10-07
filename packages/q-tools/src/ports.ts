@@ -1,4 +1,14 @@
 import type { ProfileMaterialPort } from "./tools/profile-material.js";
+import type { InvestorGateFitDto } from "@capital-q/contracts";
+
+/** Q.05: published gates for the actor's own (founder) company. */
+export type InvestorGatesPort = {
+  readonly forOwnCompany: (
+    actor: ActorContext,
+    companyId: string,
+    investorOrganisationIds: readonly string[],
+  ) => Promise<readonly InvestorGateFitDto[]>;
+};
 import type { ExploreToolPort } from "./tools/explore.js";
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import type { CompanyQueryPort } from "@capital-q/companies";
@@ -367,6 +377,12 @@ export type QToolPorts = {
    * are not offered.
    */
   readonly fit?: FitService | undefined;
+  /**
+   * Q.05 (2026-10-07): investors' published gates, checked against the
+   * founder's own company (met / not met / not known yet per criterion).
+   * Absent: prospects carry no gate.
+   */
+  readonly investorGates?: InvestorGatesPort | undefined;
   readonly research?: PublicWebResearchService | undefined;
   /** Public LinkedIn pages by URL; absent means the lookup tool does not exist. */
   readonly profiles?: PublicProfileLookupProvider | undefined;

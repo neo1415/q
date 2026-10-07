@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { CompanyIdSchema } from "@capital-q/companies";
-import { UuidSchema } from "@capital-q/contracts";
+import { UuidSchema, type InvestorGateFitDto } from "@capital-q/contracts";
 import {
   DISCOVERY_LIMIT_MAX,
   PROSPECT_FIT_VERSION,
@@ -83,6 +83,30 @@ const ProspectSchema = z
       .array(z.object({ kind: z.string(), detail: z.string() }).strict())
       .max(8),
     label: z.literal("likely fit, not evidence of interest"),
+    /**
+     * Q.05: their published gate, checked against the person's own
+     * company (met / not met / not known yet per criterion, by the
+     * investor's label). Null: no published gate, or not their company.
+     */
+    gate: z
+      .object({
+        title: z.string(),
+        acceptingApplications: z.boolean(),
+        criteria: z
+          .array(
+            z
+              .object({
+                label: z.string(),
+                required: z.boolean(),
+                standing: z.enum(["MET", "NOT_MET", "UNKNOWN"]),
+              })
+              .strict(),
+          )
+          .max(64),
+      })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict();
 
@@ -112,9 +136,23 @@ type Grant = {
 };
 
 const NOTES = [
-  "Ranked on investors' network-visible declared profiles only; no investor's private mandate is read.",
+  "Based on what investors publish (their public profile and their published gate); no investor's private mandate is read.",
   "Each is a likely fit to be checked, not evidence of interest.",
 ] as const;
+
+function gateWords(gate: InvestorGateFitDto | undefined) {
+  return gate === undefined
+    ? null
+    : {
+        title: gate.title,
+        acceptingApplications: gate.acceptingApplications,
+        criteria: gate.criteria.map((criterion) => ({
+          label: criterion.label,
+          required: criterion.requiredness === "REQUIRED",
+          standing: criterion.standing,
+        })),
+      };
+}
 
 export function createFindProspectiveInvestorsTool(
   ports: QToolPorts,
@@ -129,7 +167,7 @@ export function createFindProspectiveInvestorsTool(
     status: "ACTIVE",
     providerName: "find_prospective_investors",
     description:
-      "Finds investors on Capital Q a company might approach, from their network-visible declared profiles (where they are based, what kind of investor they are, whether they say they are deploying), each with deterministic reasons and labelled a likely fit, never interest. Call it when the person asks which investors would likely invest in, suit or be worth approaching for a company: pass companyId for their own company, or the company's country and stage as found in cited public sources. Public research remains the source for investors not on Capital Q.",
+      "Finds investors on Capital Q a company might approach, from their network-visible declared profiles (where they are based, what kind of investor they are, whether they say they are deploying), each with deterministic reasons and labelled a likely fit, never interest. For their own company, each investor with a published gate also carries that gate's criteria and whether the company meets each (met, not met, not known yet; unknown is never a no). Call it when the person asks which investors fit them, would likely invest in, suit or be worth approaching for a company: pass companyId for their own company, or the company's country and stage as found in cited public sources. Public research remains the source for investors not on Capital Q.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],
@@ -248,6 +286,24 @@ export function createFindProspectiveInvestorsTool(
           websiteUrl: item.websiteUrl,
         })),
       ).slice(0, input.limit ?? LIMIT_DEFAULT);
+      // Q.05: published gates, only for the person's own company (the
+      // grant proved ownership); a described company is never checked.
+      const gates =
+        grant.source === "CAPITAL_Q_RECORD" &&
+        input.companyId !== undefined &&
+        ports.investorGates !== undefined
+          ? new Map(
+              (
+                await ports.investorGates
+                  .forOwnCompany(
+                    context.actor,
+                    input.companyId,
+                    ranked.map((p) => p.investorOrganisationId),
+                  )
+                  .catch(() => [])
+              ).map((gate) => [gate.investorOrganisationId, gate]),
+            )
+          : new Map<string, InvestorGateFitDto>();
       return {
         fitVersion: PROSPECT_FIT_VERSION,
         companySource: grant.source,
@@ -262,6 +318,7 @@ export function createFindProspectiveInvestorsTool(
           deploymentState: prospect.deploymentState,
           reasons: prospect.reasons.map((reason) => ({ ...reason })),
           label: "likely fit, not evidence of interest" as const,
+          gate: gateWords(gates.get(prospect.investorOrganisationId)),
         })),
         notes:
           slate.items.length === 0

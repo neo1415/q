@@ -782,7 +782,7 @@ export const SHOW = "client.q_room.show" as const;
 export const ShowInputSchema = z
   .object({
     object: QRoomObjectSchema.describe(
-      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. Q_DOCUMENT: a document you made for them (their draft deck, one-pager or memo), by its id from its card or list_my_documents, or by its title; with neither, their latest. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name). READINESS / ACTION_PLAN / FOLLOW_UPS: a founder's own readiness (what could stop their raise, each pillar in words), their action plan, or the questions Q still wants answered (no id or name).",
+      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. Q_DOCUMENT: a document you made for them (their draft deck, one-pager or memo), by its id from its card or list_my_documents, or by its title; with neither, their latest. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name). READINESS / ACTION_PLAN / FOLLOW_UPS: a founder's own readiness (what could stop their raise, each pillar in words), their action plan, or the questions Q still wants answered (no id or name). ASSUMPTIONS / EVIDENCE_BOARD: for an investor, one company's claims they may see, as assumptions to test with questions, or as evidenced / claimed / not known yet (by company id or name). THESIS: an investor's own 'how Q reads your thesis'. SAVED_COMPARISON: an investor's saved companies side by side. INVESTOR_FIT: for a founder, investors by what they publish and their gates (no id or name for these three).",
     ),
     id: z
       .string()
@@ -833,7 +833,7 @@ export function createShowTool(
     id: SHOW,
     providerName: "show",
     description:
-      "Shows one thing in the Q room as a card while you talk, without leaving the page: a company's profile, data room or pitch deck, the chat with a company or investor, one of Q's work items with its plan, a capital round, a GateQ application, the news and web sources this answer read, or a founder's own readiness, action plan or open questions. Use it when they ask to see, show, pull up or bring up something here; use open_page only when they ask to be taken to its page. The card closes by itself when the conversation moves on.",
+      "Shows one thing in the Q room as a card while you talk, without leaving the page: a company's profile, data room or pitch deck, the chat with a company or investor, one of Q's work items with its plan, a capital round, a GateQ application, the news and web sources this answer read, a founder's own readiness, action plan or open questions, a company's assumptions to test or evidence board, an investor's thesis reading or saved comparison, or a founder's investors by published criteria. Use it when they ask to see, show, pull up or bring up something here; use open_page only when they ask to be taken to its page. The card closes by itself when the conversation moves on.",
     input: ShowInputSchema,
     authorize: async (input, { actor, plan }) => {
       if (!ownConversation(actor, plan)) {
@@ -941,9 +941,33 @@ async function roomRecord(
         "the investor";
       return { id, title };
     }
+    case "THESIS":
+    case "SAVED_COMPARISON":
+    case "INVESTOR_FIT": {
+      // Their own organisation only (an investor's thesis and saved list;
+      // a founder's investors), server-resolved: never the model's id.
+      const own =
+        input.object === "INVESTOR_FIT"
+          ? await ports.appActions?.ownCompanyId?.(actor).catch(() => null)
+          : await ports.appActions?.ownInvestorOrganisationId?.(actor).catch(
+              () => null,
+            );
+      if (own === null || own === undefined) return null;
+      return {
+        id: own.toLowerCase(),
+        title:
+          input.object === "THESIS"
+            ? "How Q reads your thesis"
+            : input.object === "SAVED_COMPARISON"
+              ? "Your saved companies, side by side"
+              : "Investors by what they publish",
+      };
+    }
     case "COMPANY_PROFILE":
     case "DATA_ROOM":
     case "PITCH_DECK":
+    case "ASSUMPTIONS":
+    case "EVIDENCE_BOARD":
     case "CHAT_WITH_COMPANY": {
       let id = input.id?.toLowerCase() ?? null;
       if (id === null && input.name !== undefined) {
