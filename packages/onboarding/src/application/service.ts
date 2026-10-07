@@ -67,6 +67,9 @@ export type OnboardingService = {
     | "resolveSuggestion"
     | "answerInterviewQuestion"
     | "dismissInterviewQuestion"
+    | "listFollowUps"
+    | "answerFollowUp"
+    | "dismissFollowUp"
     | "say"
     | "appendInterviewTurns"
     | "listInterviewTurns"
@@ -187,6 +190,9 @@ export function createOnboardingService(
       resolveSuggestion: useCases.resolveSuggestion,
       answerInterviewQuestion: useCases.answerInterviewQuestion,
       dismissInterviewQuestion: useCases.dismissInterviewQuestion,
+      listFollowUps: useCases.listFollowUps,
+      answerFollowUp: useCases.answerFollowUp,
+      dismissFollowUp: useCases.dismissFollowUp,
       say: useCases.say,
       appendInterviewTurns: useCases.appendInterviewTurns,
       listInterviewTurns: useCases.listInterviewTurns,

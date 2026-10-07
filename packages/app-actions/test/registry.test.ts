@@ -297,6 +297,10 @@ describe("the action registry", () => {
       ["company.claim.request", "offer.find_my_startup", "INSTANT"],
       ["gateq.startup_alert.save", "save_startup_alert", "INSTANT"],
       ["company.claim.decide", "offer.team_manage", "CONSEQUENTIAL"],
+      // Q.04/Q.01: their own plan step and Q's questions, their own word.
+      ["readiness.action.state", "mark_plan_step", "INSTANT"],
+      ["readiness.question.answer", "answer_q_question", "INSTANT"],
+      ["readiness.question.dismiss", "set_aside_q_question", "INSTANT"],
     ]);
   });
 });

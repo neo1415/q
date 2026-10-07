@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 
@@ -14,6 +14,7 @@ import {
 } from "@/features/q/q-conversation";
 import { PersonaCards } from "@/features/persona/persona-cards";
 import { WorkPanel } from "@/features/work/work-panel";
+import { FounderNext } from "@/features/readiness/founder-next";
 import type { QSubjectInput } from "@/features/q/actions";
 
 import {
@@ -206,12 +207,24 @@ export async function HomeScreen({
       };
       const greeting = returningGreeting(facts);
       welcome = (
-        <ReturningWelcome
-          greeting={greeting}
-          cards={chooseReturningCards(facts)}
-          subject={askSubject(context)}
-          briefing={briefing}
-        />
+        <>
+          <ReturningWelcome
+            greeting={greeting}
+            cards={chooseReturningCards(facts)}
+            subject={askSubject(context)}
+            briefing={briefing}
+          />
+          {/*
+            Q.01/Q.04: a founder's next question from Q and next three
+            steps. Streams in on its own; renders nothing when there is
+            nothing to show, so Home stays Q first.
+          */}
+          {context.kind === "FOUNDER" ? (
+            <Suspense fallback={null}>
+              <FounderNext />
+            </Suspense>
+          ) : null}
+        </>
       );
       welcomeLine = greeting.spoken;
       welcomeLead = greeting.headline;

@@ -137,6 +137,9 @@ importers:
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../../packages/q-runtime
+      '@capital-q/readiness':
+        specifier: workspace:*
+        version: link:../../packages/readiness
       '@capital-q/results':
         specifier: workspace:*
         version: link:../../packages/results
@@ -291,6 +294,9 @@ importers:
       '@capital-q/q-tools':
         specifier: workspace:*
         version: link:../../packages/q-tools
+      '@capital-q/readiness':
+        specifier: workspace:*
+        version: link:../../packages/readiness
       '@capital-q/results':
         specifier: workspace:*
         version: link:../../packages/results
@@ -607,6 +613,9 @@ importers:
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../q-runtime
+      '@capital-q/readiness':
+        specifier: workspace:*
+        version: link:../readiness
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security
@@ -2192,6 +2201,28 @@ importers:
       '@capital-q/q-firewall':
         specifier: workspace:*
         version: link:../q-firewall
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/readiness:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
+      '@capital-q/security':
+        specifier: workspace:*
+        version: link:../security
+    devDependencies:
+      '@capital-q/config':
+        specifier: workspace:*
+        version: link:../config
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

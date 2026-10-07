@@ -345,7 +345,7 @@ export const READ_MY = "app.own.read" as const;
 export const ReadMyInputSchema = z
   .object({
     kind: OwnReadKindSchema.describe(
-      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call), uploads (the files their company uploaded: pitch deck, financials and the like, with type and status), diligence (their relationships' diligence areas: requests, which are answered, shared documents), capital (their rounds and commitments), team (the people in their company or firm, each one's role, and invitations waiting), gateq (for an investor, the founders' applications in their GateQ inbox: company, fit, rules met, read or unread, reply due).",
+      "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call), uploads (the files their company uploaded: pitch deck, financials and the like, with type and status), diligence (their relationships' diligence areas: requests, which are answered, shared documents), capital (their rounds and commitments), team (the people in their company or firm, each one's role, and invitations waiting), gateq (for an investor, the founders' applications in their GateQ inbox: company, fit, rules met, read or unread, reply due), readiness (a founder's own: what could stop their raise, ranked, and each readiness pillar's status in words with what would move it), plan (a founder's own action plan: each step, why it matters to investors, what to do next, who does it, done or not), questions (the questions Q still wants answered about their company, with ids, why Q asks and quick answers).",
     ),
     text: z
       .string()
@@ -379,7 +379,7 @@ export function createReadMyTool(own: OwnReadPorts): AnyQToolDefinition {
     status: "ACTIVE",
     providerName: "read_my",
     description:
-      "Reads the person's own records of one kind exactly as their page shows them: their pitch videos (title, who can watch, whether investors can play it), the documents Q made for them, the files they uploaded (their deck, financials), their rehearsals, the companies in their Discover feed now, or the people on their team and their roles. Use it before saying they have none, or that a company is not in their feed.",
+      "Reads the person's own records of one kind exactly as their page shows them: their pitch videos (title, who can watch, whether investors can play it), the documents Q made for them, the files they uploaded (their deck, financials), their rehearsals, the companies in their Discover feed now, or the people on their team and their roles; for a founder, also what could stop their raise (readiness), their action plan, and the questions Q still wants answered. Use it before saying they have none, or that a company is not in their feed. For 'what could stop my raise?' read readiness; for 'what should I do next?' read plan; for 'ask me what you still need to know' read questions and ask the first one, then record their reply with answer_q_question.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],

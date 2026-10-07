@@ -38,6 +38,7 @@
     "@capital-q/platform-admin": "workspace:*",
     "@capital-q/public-identity": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/readiness": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@capital-q/verification": "workspace:*",
     "zod": "4.5.4"

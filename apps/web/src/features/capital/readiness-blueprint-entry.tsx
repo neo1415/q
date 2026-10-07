@@ -6,16 +6,16 @@ import { PageSection } from "@/components/app-shell/page-container";
 
 /**
  * The Capital Readiness Blueprint's place on Capital (PADL #85 Layer 2
- * "Pro"; ADR 0036). Not built yet, so it says exactly that: no sample
- * plan, no placeholder steps, nothing that looks like Q's work. The free
- * diagnosis stays one question to Q away.
+ * "Pro"; ADR 0036). The free diagnosis and action plan sit above it; the
+ * Blueprint sequences that same plan over 3, 6 or 12 months (built by
+ * code from the diagnosis, plan-gated at its route). No sample plan here.
  */
 export function ReadinessBlueprintEntry() {
   return (
     <PageSection
       id="readiness-blueprint"
       title="Readiness Blueprint"
-      description="Coming with Pro: Q will turn its diagnosis of your company into a plan of what to fix first, in what order, and what each investor will want to see."
+      description="With Pro, Q sequences the action plan above over 3, 6 or 12 months, each step tied to the gap it closes."
     >
       <div className="flex flex-wrap gap-2">
         <Link

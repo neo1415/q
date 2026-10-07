@@ -5,6 +5,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import { capitalItems } from "./actions/capital-read.js";
 import { gateqItems } from "./actions/gateq-inbox.js";
+import { readinessItems } from "./actions/readiness.js";
 import { teamItems } from "./actions/team.js";
 import { sharingOf } from "./actions/pitch.js";
 import type { AppActionPorts } from "./ports.js";
@@ -38,6 +39,12 @@ export const OWN_READ_KINDS = [
   "team",
   // Q room: the investor's GateQ inbox, as the inbox lists it.
   "gateq",
+  // Q.03/Q.04/Q.01 (founder-private, own company only): what could stop
+  // the raise and each pillar's status in words; the action plan; and the
+  // questions Q still wants answered, with ids and quick answers.
+  "readiness",
+  "plan",
+  "questions",
 ] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
@@ -200,6 +207,10 @@ export async function readOwn(
       return teamItems(ports, actor);
     case "gateq":
       return gateqItems(ports, actor);
+    case "readiness":
+    case "plan":
+    case "questions":
+      return readinessItems(ports, actor, kind);
   }
 }
 
@@ -214,7 +225,21 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   capital: "Rounds, money raised and commitments",
   team: "Their team: people, roles and invitations",
   gateq: "Applications in their GateQ inbox",
+  readiness: "What could stop their raise, and readiness by pillar",
+  plan: "Their action plan",
+  questions: "Questions Q still wants answered",
 };
+
+/**
+ * Read on demand only, never in the every-turn index: the assessment reads
+ * several services, and the index runs on every turn. The read_my tool's
+ * description names these kinds, so Q still knows they exist.
+ */
+const NOT_INDEXED: ReadonlySet<OwnReadKind> = new Set([
+  "readiness",
+  "plan",
+  "questions",
+]);
 
 /** One kind in the "what exists" index: a count and a few titles with state. */
 export type OwnIndexEntry = {
@@ -236,25 +261,27 @@ export async function ownIndex(
   actor: ActorContext,
 ): Promise<readonly OwnIndexEntry[]> {
   const entries = await Promise.all(
-    OWN_READ_KINDS.map(async (kind) => {
-      const items = await readOwn(ports, actor, kind).catch(() => null);
-      if (items === null) return null;
-      return {
-        kind,
-        label: KIND_LABELS[kind],
-        total: items.length,
-        // The state and, where the page shows it, who can watch: "live"
-        // alone read as "not established that investors can play it"
-        // (parity eval 2026-10-02).
-        titles: items
-          .slice(0, INDEX_TITLES)
-          .map((item) =>
-            typeof item.facts["whoCanWatch"] === "string"
-              ? `${item.title} (${item.status}; ${item.facts["whoCanWatch"]} can watch)`
-              : `${item.title} (${item.status})`,
-          ),
-      };
-    }),
+    OWN_READ_KINDS.filter((kind) => !NOT_INDEXED.has(kind)).map(
+      async (kind) => {
+        const items = await readOwn(ports, actor, kind).catch(() => null);
+        if (items === null) return null;
+        return {
+          kind,
+          label: KIND_LABELS[kind],
+          total: items.length,
+          // The state and, where the page shows it, who can watch: "live"
+          // alone read as "not established that investors can play it"
+          // (parity eval 2026-10-02).
+          titles: items
+            .slice(0, INDEX_TITLES)
+            .map((item) =>
+              typeof item.facts["whoCanWatch"] === "string"
+                ? `${item.title} (${item.status}; ${item.facts["whoCanWatch"]} can watch)`
+                : `${item.title} (${item.status})`,
+            ),
+        };
+      },
+    ),
   );
   return entries.filter((entry) => entry !== null);
 }

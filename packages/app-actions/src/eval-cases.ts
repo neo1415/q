@@ -78,6 +78,12 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
       "Who has applied through my GateQ?",
       "Which GateQ applications haven't I answered yet?",
     ],
+    readiness: ["What could stop my raise?", "How ready am I for investors?"],
+    plan: ["What should I do next?", "What's left on my action plan?"],
+    questions: [
+      "Ask me what you still need to know.",
+      "What questions do you still have for me?",
+    ],
   };
 
 export function parityCases(

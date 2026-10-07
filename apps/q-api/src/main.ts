@@ -596,6 +596,14 @@ import {
 // ADMIN block
 import { createResultsReader, resultsWindow } from "@capital-q/results";
 import {
+  createPostgresReadinessStore,
+  createReadinessService,
+  readinessDataRoomFrom,
+  readinessDeckFrom,
+  readinessFollowUps,
+  readinessRaiseFrom,
+} from "@capital-q/readiness";
+import {
   createPlatformAdmin,
   createFlagReader,
   isSuspended as isAccountSuspended,
@@ -2059,7 +2067,35 @@ const gateqInbox = gateqInboxActionsPort(
   }),
 );
 
+// Q.03/Q.04/Q.01: the founder's own readiness, action plan and Q's
+// follow-up questions, for Q's read_my, the plan and question tools, the
+// room's cards and the Blueprint. Founder-private: the company is the
+// actor's own (server-resolved); inputs are read through each context's
+// own service as the founder. Closures: services composed further down.
+const readinessService = createReadinessService({
+  store: createPostgresReadinessStore({ sql: database.sql }),
+  ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
+  deck: readinessDeckFrom(profileMaterial.companyDeck),
+  dataRoom: readinessDataRoomFrom(profileMaterial.dataRoom),
+  raise: readinessRaiseFrom(async (actor, companyId) => {
+    try {
+      return await capitalService.getCurrentCapitalObjective({
+        actor,
+        companyId: CompanyIdSchema.parse(companyId),
+      });
+    } catch (error: unknown) {
+      if (error instanceof CapitalObjectiveNotFoundError) return null;
+      throw error;
+    }
+  }),
+  followUps: readinessFollowUps({
+    listFollowUps: (raw) => onboardingRevisions.runtime.listFollowUps(raw),
+    answerFollowUp: (raw) => onboardingRevisions.runtime.answerFollowUp(raw),
+    dismissFollowUp: (raw) => onboardingRevisions.runtime.dismissFollowUp(raw),
+  }),
+});
 const appActionPorts: OwnReadPorts = {
+  readiness: readinessService,
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
   gateqInbox,
   // F3: "Find my startup": claim requests and saved startup searches.
@@ -5299,6 +5335,7 @@ const { app, logger: appLogger } = createApp(
     // end BILLING block
     // BILLING-2 block (ADR 0036)
     readinessBlueprint: entitlements,
+    readinessBlueprints: readinessService,
     // end BILLING-2 block
     standing: standingStore,
     // DAILY block

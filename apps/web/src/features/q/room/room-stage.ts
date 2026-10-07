@@ -98,6 +98,9 @@ function subjectWords(intent: QShowInQRoomIntent): {
       "one pager",
       "memo",
     ],
+    READINESS: ["readiness", "ready", "stop my raise", "pillar", "pillars"],
+    ACTION_PLAN: ["action plan", "plan", "next step", "steps", "to do"],
+    FOLLOW_UPS: ["question", "questions", "ask me", "still want"],
   };
   return { names, kinds: kinds[intent.object] };
 }
@@ -200,6 +203,12 @@ export function describeCard(intent: QShowInQRoomIntent): string {
       return "the sources";
     case "Q_DOCUMENT":
       return intent.title;
+    case "READINESS":
+      return "your readiness";
+    case "ACTION_PLAN":
+      return "your action plan";
+    case "FOLLOW_UPS":
+      return "Q's questions";
   }
 }
 

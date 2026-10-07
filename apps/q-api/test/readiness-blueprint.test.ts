@@ -18,6 +18,12 @@ import {
 } from "@capital-q/security";
 
 import {
+  assess,
+  buildBlueprint,
+  READINESS_RULES_V1,
+} from "@capital-q/readiness";
+
+import {
   BLUEPRINT_NOT_BUILT,
   registerReadinessBlueprintRoutes,
 } from "../src/http/readiness-blueprint.js";
@@ -37,7 +43,12 @@ const ACTOR: ActorContext = ActorContextSchema.parse({
 });
 const COMPANY = "f0000000-0000-4000-8000-000000000001";
 
-function app(decision: EntitlementDecision) {
+function app(
+  decision: EntitlementDecision,
+  blueprints?: Parameters<
+    typeof registerReadinessBlueprintRoutes
+  >[1]["blueprints"],
+) {
   const checked: string[] = [];
   const entitlements: Pick<EntitlementService, "check"> = {
     check: (_account, feature) => {
@@ -60,6 +71,7 @@ function app(decision: EntitlementDecision) {
         Promise.resolve({ status: "RESOLVED", context: ACTOR }),
     },
     entitlements,
+    blueprints,
   });
   return { server, checked };
 }
@@ -121,6 +133,74 @@ describe("POST /v1/q/readiness-blueprints (stub)", () => {
     });
     expect(response.statusCode).toBe(400);
     expect(checked).toEqual([]);
+    await server.close();
+  });
+});
+
+describe("POST /v1/q/readiness-blueprints (Blueprint v1)", () => {
+  const allowed = { allowed: true, remaining: null, replayed: false } as const;
+
+  it("builds it from the founder's own diagnosis, by code, after the plan gate", async () => {
+    const assessment = assess(
+      {
+        stageCode: "seed",
+        profile: { description: true, website: true, categories: 1 },
+        team: {
+          founderCount: 2,
+          fullTimeFounderCount: 2,
+          teamSize: 6,
+          founderBackgrounds: 0,
+          verifiedFounderIdentities: 0,
+        },
+        verification: { organisation: false, domain: false },
+        claims: [],
+        deck: null,
+        dataRoom: null,
+        raise: null,
+        followUps: [],
+      },
+      READINESS_RULES_V1,
+    );
+    const asked: string[] = [];
+    const { server } = app(allowed, {
+      blueprint: (actor, companyId, horizon) => {
+        asked.push(`${actor.userId}:${companyId}:${String(horizon)}`);
+        return Promise.resolve(
+          buildBlueprint({
+            id: "90000000-0000-4000-8000-000000000001",
+            companyId,
+            version: 1,
+            horizonMonths: horizon,
+            assessment,
+            evidenceAsOf: "2026-10-07T00:00:00.000Z",
+            generatedAt: "2026-10-07T00:00:00.000Z",
+          }),
+        );
+      },
+    });
+    const response = await server.inject({
+      method: "POST",
+      url: Q_READINESS_BLUEPRINTS_PATH,
+      payload: { companyId: COMPANY, horizonMonths: 3 },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = ReadinessBlueprintDtoSchema.parse(response.json());
+    expect(body.roadmap.length).toBeGreaterThan(0);
+    expect(body.roadmap.every((step) => step.closesGapId !== null)).toBe(true);
+    expect(asked).toEqual([`${ACTOR.userId}:${COMPANY}:3`]);
+    await server.close();
+  });
+
+  it("answers 404 for a company that is not the actor's own", async () => {
+    const { server } = app(allowed, {
+      blueprint: () => Promise.resolve(null),
+    });
+    const response = await server.inject({
+      method: "POST",
+      url: Q_READINESS_BLUEPRINTS_PATH,
+      payload: { companyId: COMPANY },
+    });
+    expect(response.statusCode).toBe(404);
     await server.close();
   });
 });

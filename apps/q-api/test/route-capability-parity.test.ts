@@ -606,8 +606,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   // BILLING-2 block (ADR 0036)
   "q-api/http/readiness-blueprint.ts POST Q_READINESS_BLUEPRINTS_PATH": exempt(
-    "the Readiness Blueprint's plan-gated stub (501 until built); its Q tool comes with the feature",
+    "the plan-gated Readiness Blueprint (Pro), built by code from the free diagnosis Q already reads with read_my plan; the sequencing is the page's, the steps are Q's read",
   ),
+  // Q.03/Q.04/Q.01: the founder's own readiness, plan and questions.
+  "api/http/readiness.ts GET READINESS_PATH": cap("tool.read_my"),
   // end BILLING-2 block
   // MEET-HOST (ADR 0037): Recall's live events, signed per meeting.
   "q-api/http/meeting-host.ts POST MEETING_HOST_WEBHOOK_PATH": WEBHOOK,

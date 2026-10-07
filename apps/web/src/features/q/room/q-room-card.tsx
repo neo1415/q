@@ -294,6 +294,11 @@ function cardRef(intent: QShowInQRoomIntent): QManifestRef | null {
       return null;
     case "Q_DOCUMENT":
       return { kind: "ARTIFACT", id: intent.id };
+    // The founder's own company: what these cards are about.
+    case "READINESS":
+    case "ACTION_PLAN":
+    case "FOLLOW_UPS":
+      return { kind: "COMPANY", id: intent.id };
   }
 }
 

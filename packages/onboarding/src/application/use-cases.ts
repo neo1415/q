@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import {
+  ContractValidationError,
   CorrelationIdSchema,
   ONBOARDING_INTERVIEW_TURNS_DEFAULT,
   ONBOARDING_INTERVIEW_TURNS_MAX,
@@ -93,6 +94,13 @@ import {
   requiredStepsComplete,
 } from "../runtime/path.js";
 import { validateOnboardingResponse } from "../runtime/validate-response.js";
+import {
+  followUpQuickAnswers,
+  followUpResponse,
+  followUpTyped,
+  type FollowUpAnswer,
+  type OnboardingFollowUp,
+} from "./follow-ups.js";
 import { getOnboardingMetrics } from "./metrics.js";
 import type {
   OnboardingDefinitionRepository,
@@ -130,6 +138,7 @@ import { utteranceRecordedEvent } from "../events/index.js";
 import {
   createDefinitionCache,
   loadAggregate,
+  pendingQuestionViews,
   toSessionView,
   type OnboardingSessionAggregate,
   presentationOf,
@@ -426,6 +435,45 @@ async function lockedActiveSession(
     throw new OnboardingSessionNotFoundError();
   }
   if (session.status !== "ACTIVE") {
+    throw new OnboardingSessionStateError("SESSION_NOT_ACTIVE");
+  }
+  if (session.version !== expectedVersion) {
+    throw new OnboardingSessionVersionConflictError();
+  }
+  return session;
+}
+
+/**
+ * Q.01 follow-ups: a question Q still wants answered may be answered (or
+ * set aside) after the interview completed, through the same commit as an
+ * interview answer. An answer on a completed session must land on a step
+ * the journey declares revisable (ADR 0024), the same rule reviseResponse
+ * applies; `stepKey` null is a dismissal, which writes nothing.
+ */
+async function lockedQuestionSession(
+  runtime: Runtime,
+  tx: TransactionContext,
+  actor: OnboardingActor,
+  sessionId: OnboardingSessionId,
+  expectedVersion: number,
+  stepKey: string | null,
+): Promise<OnboardingSession> {
+  const session = await runtime.sessions.lockForUpdate(
+    tx,
+    sessionId,
+    actor.userId,
+  );
+  if (session === null) {
+    throw new OnboardingSessionNotFoundError();
+  }
+  if (session.status === "COMPLETED") {
+    if (stepKey !== null) {
+      const revisable = runtime.revisableSteps?.[session.journeyType];
+      if (revisable === undefined || !revisable.has(stepKey)) {
+        throw new OnboardingSessionStateError("STEP_NOT_REVISABLE");
+      }
+    }
+  } else if (session.status !== "ACTIVE") {
     throw new OnboardingSessionStateError("SESSION_NOT_ACTIVE");
   }
   if (session.version !== expectedVersion) {
@@ -1881,12 +1929,13 @@ export function createOnboardingUseCases(
       if (idem.replay) {
         return view(tx.sql, actor, locked);
       }
-      const session = await lockedActiveSession(
+      const session = await lockedQuestionSession(
         runtime,
         tx,
         actor,
         command.sessionId,
         command.expectedSessionVersion,
+        command.stepKey,
       );
       const question = await questions.findById(
         tx.sql,
@@ -1987,12 +2036,13 @@ export function createOnboardingUseCases(
       if (idem.replay) {
         return view(tx.sql, actor, locked);
       }
-      const session = await lockedActiveSession(
+      const session = await lockedQuestionSession(
         runtime,
         tx,
         actor,
         command.sessionId,
         command.expectedSessionVersion,
+        null,
       );
       const question = await questions.findById(
         tx.sql,
@@ -2024,6 +2074,148 @@ export function createOnboardingUseCases(
       });
       return view(tx.sql, actor, updated);
     });
+  };
+
+  /**
+   * Q.01: the follow-ups Q still wants answered in the person's latest
+   * session of a journey, active or completed, most material first, each
+   * with the answers it accepts. Only the caller's own session.
+   */
+  const listFollowUps = async (raw: {
+    readonly actor: OnboardingActor;
+    readonly journeyType: OnboardingJourneyType;
+  }): Promise<readonly OnboardingFollowUp[]> => {
+    const query = z
+      .object({ actor: ActorSchema, journeyType: OnboardingJourneyTypeSchema })
+      .strict()
+      .parse(raw);
+    if (runtime.questions === undefined) return [];
+    const session = await runtime.sessions.findLatest(
+      sql,
+      query.actor.userId,
+      query.journeyType,
+    );
+    if (session === null) return [];
+    const aggregate = await aggregateOf(runtime, sql, session);
+    const revisable = runtime.revisableSteps?.[session.journeyType];
+    return pendingQuestionViews(aggregate).map((question) => {
+      const step = aggregate.stepsByKey.get(question.stepKey);
+      const quickAnswers = followUpQuickAnswers(question, step);
+      const typed = followUpTyped(step);
+      const placeable = quickAnswers.length > 0 || typed !== "NONE";
+      const stepsOk =
+        session.status === "ACTIVE" ||
+        (session.status === "COMPLETED" &&
+          revisable !== undefined &&
+          revisable.has(question.stepKey) &&
+          quickAnswers.every((quick) => revisable.has(quick.stepKey)));
+      return {
+        sessionId: session.id,
+        question,
+        quickAnswers,
+        typed,
+        answerable: placeable && stepsOk,
+      };
+    });
+  };
+
+  /**
+   * Answers one follow-up from a quick pick or typed words, through
+   * answerInterviewQuestion (the interview's own commit). Refusals are
+   * outcomes, never a guess: NOT_FOUND (not theirs, or already resolved),
+   * NOT_ANSWERABLE (lives on another page now), INVALID (cannot be placed).
+   */
+  const answerFollowUp = async (raw: {
+    readonly actor: OnboardingActor;
+    readonly journeyType: OnboardingJourneyType;
+    readonly questionId: string;
+    readonly answer: FollowUpAnswer;
+    readonly idempotencyKey: string;
+    readonly correlationId: CorrelationId;
+  }): Promise<"ANSWERED" | "NOT_FOUND" | "NOT_ANSWERABLE" | "INVALID"> => {
+    const followUp = (
+      await listFollowUps({ actor: raw.actor, journeyType: raw.journeyType })
+    ).find((item) => item.question.id === raw.questionId);
+    if (followUp === undefined) return "NOT_FOUND";
+    if (!followUp.answerable) return "NOT_ANSWERABLE";
+    const response = followUpResponse(followUp, raw.answer);
+    if (response === null) return "INVALID";
+    const sessionId = OnboardingSessionIdSchema.parse(followUp.sessionId);
+    const session = await runtime.sessions.findByIdForUser(
+      sql,
+      sessionId,
+      raw.actor.userId,
+    );
+    if (session === null) return "NOT_FOUND";
+    try {
+      await answerInterviewQuestion({
+        actor: raw.actor,
+        sessionId,
+        questionId: OnboardingInterviewQuestionIdSchema.parse(raw.questionId),
+        stepKey: response.stepKey,
+        response: { value: response.value },
+        expectedSessionVersion: session.version,
+        idempotencyKey: raw.idempotencyKey,
+        correlationId: raw.correlationId,
+      });
+    } catch (error: unknown) {
+      if (error instanceof OnboardingSessionStateError) return "NOT_ANSWERABLE";
+      if (
+        error instanceof OnboardingInterviewQuestionNotFoundError ||
+        error instanceof OnboardingSessionNotFoundError
+      ) {
+        return "NOT_FOUND";
+      }
+      if (
+        error instanceof ContractValidationError ||
+        error instanceof z.ZodError
+      ) {
+        return "INVALID";
+      }
+      throw error;
+    }
+    return "ANSWERED";
+  };
+
+  /** Sets one follow-up aside ("not now"); nothing is written. */
+  const dismissFollowUp = async (raw: {
+    readonly actor: OnboardingActor;
+    readonly journeyType: OnboardingJourneyType;
+    readonly questionId: string;
+    readonly idempotencyKey: string;
+    readonly correlationId: CorrelationId;
+  }): Promise<"DISMISSED" | "NOT_FOUND"> => {
+    const followUp = (
+      await listFollowUps({ actor: raw.actor, journeyType: raw.journeyType })
+    ).find((item) => item.question.id === raw.questionId);
+    if (followUp === undefined) return "NOT_FOUND";
+    const sessionId = OnboardingSessionIdSchema.parse(followUp.sessionId);
+    const session = await runtime.sessions.findByIdForUser(
+      sql,
+      sessionId,
+      raw.actor.userId,
+    );
+    if (session === null) return "NOT_FOUND";
+    try {
+      await dismissInterviewQuestion({
+        actor: raw.actor,
+        sessionId,
+        questionId: OnboardingInterviewQuestionIdSchema.parse(raw.questionId),
+        expectedSessionVersion: session.version,
+        idempotencyKey: raw.idempotencyKey,
+        correlationId: raw.correlationId,
+      });
+    } catch (error: unknown) {
+      if (
+        error instanceof OnboardingInterviewQuestionNotFoundError ||
+        error instanceof OnboardingSessionNotFoundError ||
+        error instanceof OnboardingSessionStateError
+      ) {
+        return "NOT_FOUND";
+      }
+      throw error;
+    }
+    return "DISMISSED";
   };
 
   const utterancesRepo = (): OnboardingUtteranceRepository => {
@@ -2815,6 +3007,9 @@ export function createOnboardingUseCases(
     recordInterviewQuestions,
     answerInterviewQuestion,
     dismissInterviewQuestion,
+    listFollowUps,
+    answerFollowUp,
+    dismissFollowUp,
     say,
     appendInterviewTurns,
     listInterviewTurns,

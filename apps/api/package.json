@@ -41,6 +41,7 @@
     "@capital-q/public-identity": "workspace:*",
     "@capital-q/q-core": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
+    "@capital-q/readiness": "workspace:*",
     "@capital-q/results": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",

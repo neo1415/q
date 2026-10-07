@@ -48,6 +48,13 @@ export function roomCardHref(intent: QShowInQRoomIntent): string {
       return "/home";
     case "Q_DOCUMENT":
       return "/documents";
+    // Q.03/Q.04/Q.01: the founder's own sections on Capital and Home.
+    case "READINESS":
+      return "/capital#readiness";
+    case "ACTION_PLAN":
+      return "/capital#action-plan";
+    case "FOLLOW_UPS":
+      return "/home#follow-ups";
   }
 }
 
@@ -65,4 +72,7 @@ export const ROOM_OBJECT_WORDS: Readonly<
   GATEQ_APPLICATION: "application",
   SOURCES: "sources",
   Q_DOCUMENT: "document",
+  READINESS: "readiness",
+  ACTION_PLAN: "action plan",
+  FOLLOW_UPS: "questions",
 };

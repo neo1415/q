@@ -75,6 +75,9 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('core', 'investor_portfolio_references', 'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objectives',            'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objective_events',      'RLS_REQUIRED',         '{SELECT}'),
+  -- Founder readiness (Q.03/Q.04): founder-private, members only (suite 883).
+  ('core', 'company_readiness_assessments', 'RLS_REQUIRED',         '{SELECT}'),
+  ('core', 'company_readiness_action_events', 'RLS_REQUIRED',       '{SELECT}'),
   -- Capital rounds (2026-10-04): the company's organisation reads them (suite 760).
   ('core', 'capital_rounds',                'RLS_REQUIRED',         '{SELECT}'),
   -- Round history (P8, 2026-10-06): append-only, the company's organisation reads it (suite 765).
