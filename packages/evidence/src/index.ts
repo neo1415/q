@@ -271,6 +271,13 @@ export {
   MINIMUM_STANDARD_SECTIONS,
   scoreDeckSection,
 } from "./domain/deck-coaching.js";
+// F26: every figure "the deck says" must be in the deck's own text.
+export {
+  deckFigureIndex,
+  unverifiedFigures,
+  verifyDeckReading,
+  type DeckVerification,
+} from "./domain/deck-verifier.js";
 // Q.07: assumptions to test and the evidence board (investor readers only).
 export {
   assumptionBoardText,

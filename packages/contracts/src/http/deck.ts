@@ -217,6 +217,84 @@ export const CompanyDeckSchema = z
   .strict();
 export type CompanyDeck = z.infer<typeof CompanyDeckSchema>;
 
+/**
+ * F26: the founder reviews Q's reading one section at a time.
+ *   CONFIRM   this section is right; investors may see it
+ *   DISMISS   "This is wrong": the section reads as unknown, never shown
+ *   CORRECT   the founder's own words replace Q's summary (their claim)
+ * Append-only: the newest review of a section is the one that counts.
+ */
+export const DECK_SECTION_REVIEW_ACTIONS = [
+  "CONFIRM",
+  "DISMISS",
+  "CORRECT",
+] as const;
+export const DeckSectionReviewActionSchema = z.enum(
+  DECK_SECTION_REVIEW_ACTIONS,
+);
+export type DeckSectionReviewAction = z.infer<
+  typeof DeckSectionReviewActionSchema
+>;
+
+export const DeckSectionStateSchema = z
+  .object({
+    section: DeckSectionCodeSchema,
+    state: z.enum(["PENDING", "CONFIRMED", "DISMISSED", "CORRECTED"]),
+  })
+  .strict();
+export type DeckSectionState = z.infer<typeof DeckSectionStateSchema>;
+
+/** Figures Q cited that are not in the deck's text, so were not stored. */
+export const DeckSetAsideSchema = z
+  .object({
+    section: DeckSectionCodeSchema,
+    figures: z.array(z.string().max(60)).max(8),
+  })
+  .strict();
+export type DeckSetAside = z.infer<typeof DeckSetAsideSchema>;
+
+/** "Read again" per deck version: a budget, not a slot machine. */
+export const DECK_READ_AGAIN_MAX = 2;
+
+/** `POST` — the founder reviews one section of the reading on screen. */
+export const DECK_SECTION_REVIEW_PATH =
+  "/v1/documents/:documentId/deck-extractions/:extractionId/sections/:section/review" as const;
+export const DeckSectionReviewRequestSchema = z
+  .object({
+    companyId: UuidSchema,
+    action: DeckSectionReviewActionSchema,
+    /** CORRECT only: the founder's own words for this section. */
+    correction: z.string().trim().min(1).max(600).nullable().optional(),
+  })
+  .strict()
+  .refine((body) => (body.action === "CORRECT") === (body.correction != null), {
+    message: "A correction carries the founder's words; nothing else does.",
+  });
+export type DeckSectionReviewRequest = z.infer<
+  typeof DeckSectionReviewRequestSchema
+>;
+export const DeckSectionReviewResultSchema = z
+  .object({
+    extractionId: UuidSchema,
+    section: DeckSectionCodeSchema,
+    state: DeckSectionStateSchema.shape.state,
+  })
+  .strict();
+export type DeckSectionReviewResult = z.infer<
+  typeof DeckSectionReviewResultSchema
+>;
+
+/** `POST` — the founder asks Q to read the current deck version again. */
+export const DECK_READ_AGAIN_PATH =
+  "/v1/documents/:documentId/deck-extractions/:extractionId/read-again" as const;
+export const DeckReadAgainResultSchema = z
+  .object({
+    requested: z.literal(true),
+    left: z.number().int().min(0).max(DECK_READ_AGAIN_MAX),
+  })
+  .strict();
+export type DeckReadAgainResult = z.infer<typeof DeckReadAgainResultSchema>;
+
 export const DeckExtractionDtoSchema = z
   .object({
     extractionId: UuidSchema,
@@ -226,6 +304,26 @@ export const DeckExtractionDtoSchema = z
     /** The founder confirmed it; only then does an investor see it. */
     confirmed: z.boolean(),
     sections: DeckSectionsSchema,
+    /**
+     * F26: which reading of this version (1 = Q's first; "Read again" and
+     * the figure check each append a new one, never overwrite).
+     */
+    readingNumber: z.number().int().min(1).optional(),
+    /**
+     * F26: the founder's review, section by section. An investor sees only
+     * CONFIRMED and CORRECTED sections; the rest read as unknown.
+     */
+    sectionStates: z.array(DeckSectionStateSchema).max(12).optional(),
+    /** OWNER only: figures the deterministic check set aside, by section. */
+    setAside: z.array(DeckSetAsideSchema).max(12).optional(),
+    /** OWNER only: "Read again" left for this version, and one is under way. */
+    readAgain: z
+      .object({
+        left: z.number().int().min(0).max(DECK_READ_AGAIN_MAX),
+        pending: z.boolean(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type DeckExtractionDto = z.infer<typeof DeckExtractionDtoSchema>;
