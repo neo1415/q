@@ -139,6 +139,9 @@ export const REFUSAL_CODES = [
   "NOT_CONNECTED_YET",
   // Live seed: chat needs both sides to have agreed to connect.
   "NOT_CONNECTED",
+  // Live seed (Ledgerline, 7 Oct): they wrote first; a cold introduction
+  // back ignores what they said.
+  "COLD_OPEN_IN_REPLY",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -173,6 +176,11 @@ export const REFUSAL_WORDS: Readonly<
   NOT_CONNECTED: {
     reason: "they haven't accepted your interest yet, so chat isn't open",
     instead: "I'll write once they accept",
+  },
+  COLD_OPEN_IN_REPLY: {
+    reason:
+      "they wrote to you first, and the message introduced you as if they hadn't",
+    instead: "I'll write a reply to what they said",
   },
   UNGROUNDED_MESSAGE: {
     reason:
@@ -863,6 +871,14 @@ function sidesWritten(
   );
 }
 
+/**
+ * How a cold introduction opens: discovery of them, or presenting oneself.
+ * Code's own check of words Q wrote; a false hit only sends the draft back
+ * for a redraft.
+ */
+const COLD_OPEN =
+  /\b(?:came across|come across|found (?:you|your|the company)|discovered (?:you|your|the company)|(?:i|we)(?:'|’)?d (?:like|love) to introduce|(?:let|allow) me to introduce)\b/iu;
+
 /** The reply code composes to their question, when it is one it may answer. */
 function templatedAnswer(
   thread: ThreadFacts | undefined,
@@ -899,6 +915,12 @@ function messageProblem(
   const replying = thread?.lastFrom === "THEM";
   if (written && !replying && context.grant.followUps === false) {
     return refuse("ALREADY_INTRODUCED");
+  }
+  // Live seed (7 Oct, Ledgerline and three others): the founder wrote first
+  // after accepting; the planner drafted "I came across the company through
+  // your Capital Q profile". A reply answers them, it never introduces.
+  if (replying && COLD_OPEN.test(body.body)) {
+    return refuse("COLD_OPEN_IN_REPLY");
   }
   if (context.material === undefined) return pass;
   const counterpartId =
@@ -1179,7 +1201,12 @@ function peopleLines(
           : introduced.has(person.relationshipId) ||
               (sent.get(person.relationshipId) ?? 0) > 0
             ? "your side has already written here: no first message"
-            : "no message from your side yet",
+            : facts.get(person.relationshipId)?.lastFrom === "THEM"
+              ? // Live seed (7 Oct): "no message from your side yet" next to
+                // "last from THEM" drew cold introductions to founders who
+                // had written first.
+                "they wrote first and your side hasn't replied: any message is a reply to them, not an introduction"
+              : "no message from your side yet",
         // A first message only inside their declared criteria.
         ((outside) =>
           outside === null
