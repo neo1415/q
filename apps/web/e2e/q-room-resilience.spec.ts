@@ -276,3 +276,80 @@ test("the deck: dropped slides offer 'try again'; a dropped upload says so and k
   );
   await expect(deck.locator("[data-q-deck-upload-retry]")).toHaveCount(0);
 });
+
+test("the deck: a dropped 'complete' resumes the same upload, never a second document (W7)", async ({
+  page,
+}) => {
+  const DOCUMENT = uuid(61);
+  const keys: string[] = [];
+  const sessions = new Map<string, string>();
+  const completes: unknown[] = [];
+  let completeDrops = 2;
+  await page.route("**/dev/q-room/deck**", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        status: "READY",
+        title: "Northstar deck",
+        type: "PITCH_DECK",
+        version: 1,
+        companyId: uuid(1),
+        progress: null,
+      },
+    }),
+  );
+  await page.route("**/dev/q-room/slides**", (route) =>
+    route.fulfill({
+      json: { slides: [svg(1), svg(2)], images: [], placeholders: [] },
+    }),
+  );
+  // As Evidence: one session per idempotency key, replayed on a repeat.
+  await page.route("**/dev/q-room/upload", async (route) => {
+    const key = (await route.request().headerValue("idempotency-key")) ?? "";
+    keys.push(key);
+    if (!sessions.has(key)) sessions.set(key, uuid(700 + sessions.size));
+    await route.fulfill({
+      json: { documentId: DOCUMENT, uploadSessionId: sessions.get(key) },
+    });
+  });
+  // The server completes the session, then the answer is lost (twice).
+  await page.route("**/dev/q-room/upload/complete", async (route) => {
+    completes.push(route.request().postDataJSON());
+    if (completeDrops > 0) {
+      completeDrops -= 1;
+      await route.abort("internetdisconnected");
+      return;
+    }
+    await route.fulfill({ json: { documentId: DOCUMENT } });
+  });
+  const answer = await harness(page, [
+    asked(1, "Show my deck"),
+    answered(1, "Here's your deck.", [
+      show("Q_DOCUMENT", DECK, "Northstar deck"),
+    ]),
+  ]);
+  await answer();
+  const deck = page.locator('[data-q-room-card="Q_DOCUMENT"]');
+  await expect(deck.locator("[data-q-deck-thumb]")).toHaveCount(2);
+  await deck.locator("[data-q-deck-file]").setInputFiles({
+    name: "notes.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n"),
+  });
+  // Dropped twice: said so, with "Try again".
+  await expect(deck.locator("[data-q-deck-notice]")).toContainText(
+    "the connection dropped",
+  );
+  await deck.locator("[data-q-deck-upload-retry]").click();
+  await expect(deck.locator("[data-q-deck-notice]")).toContainText(
+    "Added to your data room",
+  );
+  // One upload session, asked for once; every completion is of it.
+  expect(keys).toHaveLength(1);
+  expect(sessions.size).toBe(1);
+  expect(completes).toHaveLength(3);
+  expect(new Set(completes.map((c) => JSON.stringify(c))).size).toBe(1);
+  expect(completes[0]).toMatchObject({
+    uploadSessionId: [...sessions.values()][0],
+  });
+});

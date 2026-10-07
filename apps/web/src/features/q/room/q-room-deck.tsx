@@ -36,10 +36,13 @@ import {
 import { documentPosition } from "./document-room";
 import { RoomLoadFailed } from "./room-load-failed";
 import {
+  newUploadDrop,
   roomRead,
+  runUploadDrop,
   UPLOAD_DROPPED,
   uploadResuming,
   useRetryWhenOnline,
+  type UploadDrop,
 } from "./room-read";
 
 /**
@@ -63,10 +66,13 @@ export type DeckLoaders = {
   /**
    * Their file into their data room (the ordinary upload path): the new
    * document's id, null when refused; throws when the connection drops.
+   * W7: every run for one dropped file gets the same `drop`, so a retry
+   * resumes that upload rather than starting a second one.
    */
   readonly upload: (
     file: File,
     companyId: string | null,
+    drop: UploadDrop,
   ) => Promise<string | null>;
   readonly fill: (input: {
     readonly artifactId: string;
@@ -99,25 +105,35 @@ async function fetchSlides(
 async function uploadToDataRoom(
   file: File,
   companyId: string | null,
+  drop: UploadDrop,
 ): Promise<string | null> {
-  const target = await materialUploadTargetAction({
-    ...(companyId === null ? {} : { companyId }),
-    documentType: isSlidePicture(file) ? "PRODUCT" : "UNCLASSIFIED",
-    filename: file.name,
-    mimeType: file.type || "application/octet-stream",
-    sizeBytes: file.size,
-  });
-  if (!target.ok) return null;
   // R9: a dropped connection throws (the caller resumes once back
-  // online); a refused upload is null.
-  const put = await fetch(target.value.url, {
-    method: target.value.method,
-    headers: target.value.headers,
-    body: file,
+  // online); a refused upload is null. W7: resumed where it stopped.
+  return runUploadDrop(drop, {
+    target: async (idempotencyKey) => {
+      const target = await materialUploadTargetAction({
+        ...(companyId === null ? {} : { companyId }),
+        documentType: isSlidePicture(file) ? "PRODUCT" : "UNCLASSIFIED",
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        idempotencyKey,
+      });
+      return target.ok ? target.value : null;
+    },
+    put: async (target) =>
+      (
+        await fetch(target.url, {
+          method: target.method,
+          headers: target.headers,
+          body: file,
+        })
+      ).ok,
+    complete: async (uploadSessionId, key) => {
+      const done = await materialUploadCompleteAction(uploadSessionId, key);
+      return done.ok ? done.value.documentId : null;
+    },
   });
-  if (!put.ok) return null;
-  const done = await materialUploadCompleteAction(target.value.uploadSessionId);
-  return done.ok ? done.value.documentId : null;
 }
 
 export const DEFAULT_DECK_LOADERS: DeckLoaders = {
@@ -156,6 +172,7 @@ export function QRoomDeck({
   const [unsent, setUnsent] = useState<{
     readonly file: File;
     readonly slide: number | null;
+    readonly drop: UploadDrop;
   } | null>(null);
   const [manual, setManual] = useState<{
     readonly page: number;
@@ -265,13 +282,15 @@ export function QRoomDeck({
   const placeholders = useMemo(() => drawn?.placeholders ?? [], [drawn]);
 
   const place = useCallback(
-    async (file: File, slide: number | null) => {
+    async (file: File, slide: number | null, resumed?: UploadDrop) => {
       if (state?.ok !== true) return;
       setBusy(true);
       setUnsent(null);
       setNotice(`Uploading ${file.name}…`);
+      // W7: one drop per file chosen; "Try again" carries it on.
+      const drop = resumed ?? newUploadDrop();
       const documentId = await uploadResuming(
-        () => loaders.upload(file, state.companyId),
+        () => loaders.upload(file, state.companyId, drop),
         () =>
           setNotice(
             "Connection lost. The upload resumes when you're back online.",
@@ -280,7 +299,7 @@ export function QRoomDeck({
       if (documentId === UPLOAD_DROPPED) {
         // R9: never a silent hang: say so, keep the file, offer a retry.
         setNotice(`${file.name} didn't upload: the connection dropped.`);
-        setUnsent({ file, slide });
+        setUnsent({ file, slide, drop });
         setBusy(false);
         return;
       }
@@ -572,7 +591,7 @@ export function QRoomDeck({
           <button
             type="button"
             className="cq-stage-quiet min-h-11"
-            onClick={() => void place(unsent.file, unsent.slide)}
+            onClick={() => void place(unsent.file, unsent.slide, unsent.drop)}
             disabled={busy}
             data-q-deck-upload-retry
           >

@@ -30,6 +30,7 @@ import type { RoomCardResult } from "@/features/q/room/room-actions";
 import type { DeckState, FillResult } from "@/features/q/room/deck-actions";
 import { deckDrawingOf } from "@/features/q/room/deck-room";
 import type { DeckLoaders } from "@/features/q/room/q-room-deck";
+import { runUploadDrop } from "@/features/q/room/room-read";
 import { currentScreen } from "@/features/q/screen";
 
 const RECORD = "/dev/q-room/record";
@@ -100,6 +101,9 @@ async function loadCard(intent: QShowInQRoomIntent): Promise<RoomCardResult> {
   return (await response.json()) as RoomCardResult;
 }
 
+/** Targets a fixture completed in one step, by drop key. */
+const oneStep = new Map<string, string>();
+
 /**
  * Q room W5: the deck surface's reads and writes, as the test serves them
  * (`/dev/q-room/deck`, `/dev/q-room/slides`, `/dev/q-room/upload`,
@@ -122,15 +126,47 @@ const DECK_LOADERS: DeckLoaders = {
     if (!response.ok) throw new Error("Slides read failed.");
     return deckDrawingOf(await response.json());
   },
-  upload: async (file) => {
-    const response = await fetch("/dev/q-room/upload", {
-      method: "POST",
-      body: JSON.stringify({ name: file.name, type: file.type }),
-      cache: "no-store",
-    });
-    const body = (await response.json()) as { documentId: string | null };
-    return body.documentId;
-  },
+  // W7: the real path's steps, resumed per drop: the target (keyed, so a
+  // retry gets the same session back), then "complete" for that session.
+  // A fixture that answers the target without an `uploadSessionId` has
+  // completed it in one step. The bytes themselves are not modelled.
+  upload: (file, _companyId, drop) =>
+    runUploadDrop(drop, {
+      target: async (key) => {
+        const response = await fetch("/dev/q-room/upload", {
+          method: "POST",
+          headers: { "idempotency-key": key },
+          body: JSON.stringify({ name: file.name, type: file.type }),
+          cache: "no-store",
+        });
+        const body = (await response.json()) as {
+          documentId: string | null;
+          uploadSessionId?: string;
+        };
+        if (body.documentId === null) return null;
+        if (body.uploadSessionId === undefined) {
+          oneStep.set(key, body.documentId);
+        }
+        return {
+          uploadSessionId: body.uploadSessionId ?? key,
+          url: "",
+          method: "PUT",
+          headers: {},
+        };
+      },
+      put: () => Promise.resolve(true),
+      complete: async (uploadSessionId, key) => {
+        const done = oneStep.get(drop.key);
+        if (done !== undefined) return done;
+        const response = await fetch("/dev/q-room/upload/complete", {
+          method: "POST",
+          body: JSON.stringify({ uploadSessionId, key }),
+          cache: "no-store",
+        });
+        const body = (await response.json()) as { documentId: string | null };
+        return body.documentId;
+      },
+    }),
   fill: async (input) => {
     const response = await fetch("/dev/q-room/fill", {
       method: "POST",

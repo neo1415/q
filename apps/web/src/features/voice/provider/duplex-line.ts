@@ -112,6 +112,13 @@ const NARRATION_FIRST_POLL_MS = 600;
 /** R9: reconnects in a row after a dropped poll, and the first wait. */
 const NARRATION_MAX_RECONNECTS = 3;
 const NARRATION_RECONNECT_MS = 800;
+/**
+ * W7: offline, the poll waits for the connection rather than giving up;
+ * it looks again this often whether the ask_q is still running, and waits
+ * at most this long in all.
+ */
+const NARRATION_OFFLINE_LOOK_MS = 1_000;
+const NARRATION_OFFLINE_WAIT_MS = 120_000;
 /** The commit a reaction waits on; past this it is dropped. */
 const COMMIT_WAIT_MS = 400;
 /** The longest a bridge may hold Q's answer back. */
@@ -209,6 +216,10 @@ export type DuplexEnvironment = {
   readonly onDeviceChange?: ((handler: () => void) => () => void) | undefined;
   /** The tab came back to the foreground; returns the unsubscribe. */
   readonly onVisible?: ((handler: () => void) => () => void) | undefined;
+  /** W7: whether the browser has a connection; absent means it does. */
+  readonly isOnline?: (() => boolean) | undefined;
+  /** W7: the connection came back; returns the unsubscribe. */
+  readonly onOnline?: ((handler: () => void) => () => void) | undefined;
 };
 
 /**
@@ -242,6 +253,13 @@ export function browserDuplexEnvironment(): DuplexEnvironment {
       document.addEventListener("visibilitychange", listener);
       return () => {
         document.removeEventListener("visibilitychange", listener);
+      };
+    },
+    isOnline: () => navigator.onLine !== false,
+    onOnline: (handler) => {
+      window.addEventListener("online", handler);
+      return () => {
+        window.removeEventListener("online", handler);
       };
     },
     createAudio: () => {
@@ -1448,6 +1466,13 @@ export class DuplexLine {
           result = null;
         }
         if (result === null) {
+          // W7: offline is not a failure: wait for the connection (while
+          // this ask_q runs), then poll again from the last beat heard.
+          if (this.#offline()) {
+            if (!(await this.#untilOnline(live))) return;
+            failures = 0;
+            continue;
+          }
           failures += 1;
           if (failures > NARRATION_MAX_RECONNECTS) return;
           await new Promise<void>((resolve) => {
@@ -1468,6 +1493,44 @@ export class DuplexLine {
         if (result.idle) return;
       }
     })();
+  }
+
+  #offline(): boolean {
+    return this.#env.isOnline?.() === false && this.#env.onOnline !== undefined;
+  }
+
+  /**
+   * W7: resolves true once the browser is back online, false when the
+   * wait no longer matters (the ask_q finished, the line ended) or ran
+   * past NARRATION_OFFLINE_WAIT_MS.
+   */
+  #untilOnline(live: () => boolean): Promise<boolean> {
+    const subscribe = this.#env.onOnline;
+    if (subscribe === undefined) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      let handle: unknown = null;
+      let stop: () => void = () => undefined;
+      const started = this.#env.now();
+      const done = (online: boolean) => {
+        if (settled) return;
+        settled = true;
+        stop();
+        if (handle !== null) this.#env.clearTimeout(handle);
+        resolve(online);
+      };
+      stop = subscribe(() => done(true));
+      if (settled) stop();
+      const look = () => {
+        if (!live()) return done(false);
+        if (this.#env.isOnline?.() !== false) return done(true);
+        if (this.#env.now() - started >= NARRATION_OFFLINE_WAIT_MS) {
+          return done(false);
+        }
+        handle = this.#env.setTimeout(look, NARRATION_OFFLINE_LOOK_MS);
+      };
+      look();
+    });
   }
 
   /** One beat, in fixed words, out of band: nothing enters the conversation. */

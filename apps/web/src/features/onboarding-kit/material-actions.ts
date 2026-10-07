@@ -46,6 +46,12 @@ const UploadInput = z.object({
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(3).max(129),
   sizeBytes: z.number().int().min(1),
+  /**
+   * Q room W7: one key per dropped file, so a retry after a lost response
+   * gets the same upload session back (Evidence replays it) instead of a
+   * second document. Absent, each call is its own upload.
+   */
+  idempotencyKey: z.string().uuid().optional(),
 });
 
 /** What the browser needs to put the bytes somewhere it is allowed to. */
@@ -119,7 +125,7 @@ export async function materialUploadTargetAction(
         declaredMimeType: input.mimeType,
         declaredSizeBytes: input.sizeBytes,
       },
-      randomUUID(),
+      input.idempotencyKey ?? randomUUID(),
     );
     if (created.upload === null) {
       // The API declined to issue a target. Treated as a refusal, not as a
@@ -143,14 +149,21 @@ export async function materialUploadTargetAction(
 /** Step three: the server verifies what actually landed. */
 export async function materialUploadCompleteAction(
   rawUploadSessionId: string,
+  rawIdempotencyKey?: string,
 ): Promise<ActionResult<{ readonly documentId: string }>> {
   const uploadSessionId = z.string().uuid().parse(rawUploadSessionId);
+  // Q room W7: a retried completion of the same drop carries the same key;
+  // a completed session replays its document either way.
+  const idempotencyKey =
+    rawIdempotencyKey === undefined
+      ? randomUUID()
+      : z.string().uuid().parse(rawIdempotencyKey);
   return run(async (session) => {
     const completed = await completeDocumentUploadSession(
       session,
       uploadSessionId,
       {},
-      randomUUID(),
+      idempotencyKey,
     );
     return { documentId: completed.document.id };
   });

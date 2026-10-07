@@ -104,6 +104,7 @@ function harness(
     readonly usage?: () => Promise<QVoiceDuplexUsageResult | null>;
     readonly microphone?: () => Promise<MediaStream>;
     readonly narration?: DuplexRelays["narration"];
+    readonly env?: Partial<DuplexEnvironment>;
   } = {},
 ) {
   const peer = new FakePeer();
@@ -138,6 +139,7 @@ function harness(
     clearTimeout: (handle) => {
       clearTimeout(handle as ReturnType<typeof setTimeout>);
     },
+    ...options.env,
   };
   const relays = {
     tool: vi.fn<DuplexRelays["tool"]>(
@@ -518,6 +520,154 @@ describe("tool calls and usage", () => {
     expect(said("Checking the numbers")).toBe(1);
     finish();
     await settle();
+  });
+
+  it("offline, the narration poll waits for the connection instead of going quiet, and says no beat twice (W7)", async () => {
+    let finish: () => void = () => undefined;
+    const beat = (sequence: number, text: string) => ({
+      sequence,
+      beat: { kind: "STAGE_LINE" as const, text },
+    });
+    let online = true;
+    const listeners = new Set<() => void>();
+    let calls = 0;
+    const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve({
+          beats: [beat(1, "Reading the deck…")],
+          idle: false,
+        });
+      }
+      if (!online) return Promise.reject(new TypeError("Failed to fetch"));
+      return Promise.resolve({
+        beats: [beat(1, "Reading the deck…"), beat(2, "Checking the numbers…")],
+        idle: true,
+      });
+    });
+    const h = harness({
+      narration,
+      env: {
+        isOnline: () => online,
+        onOnline: (handler) => {
+          listeners.add(handler);
+          return () => {
+            listeners.delete(handler);
+          };
+        },
+      },
+      tool: () =>
+        new Promise((resolve) => {
+          finish = () => {
+            resolve({
+              output: JSON.stringify({ ok: true, say: "Done." }),
+              approvalPending: false,
+            });
+          };
+        }),
+    });
+    await h.line.open();
+    h.channel().emit({
+      type: "response.function_call_arguments.done",
+      call_id: "call_o",
+      name: "ask_q",
+      arguments: JSON.stringify({ request: "Look at the deck." }),
+    });
+    const said = (words: string) =>
+      h
+        .channel()
+        .sent.filter(
+          (event) =>
+            (event as { type?: string }).type === "response.create" &&
+            JSON.stringify(event).includes(words),
+        ).length;
+    // The first poll is answered, then the connection goes.
+    online = false;
+    await vi.advanceTimersByTimeAsync(700);
+    await settle();
+    expect(said("Reading the deck")).toBe(1);
+    const first = h
+      .channel()
+      .sent.find((event) =>
+        JSON.stringify(event).includes("Reading the deck"),
+      ) as { response: { metadata: unknown } };
+    h.channel().emit({
+      type: "response.done",
+      response: {
+        id: "resp_1",
+        status: "completed",
+        metadata: first.response.metadata,
+      },
+    });
+    // Well past the old ~5.6 s give-up: one failed poll, then it waits.
+    await vi.advanceTimersByTimeAsync(20_000);
+    await settle();
+    expect(narration).toHaveBeenCalledTimes(2);
+    expect(listeners.size).toBe(1);
+    // Back online: it polls again at once, from the last beat heard.
+    online = true;
+    for (const listener of [...listeners]) listener();
+    await vi.advanceTimersByTimeAsync(10);
+    await settle();
+    expect(narration).toHaveBeenCalledTimes(3);
+    expect(narration.mock.calls.map(([after]) => after)).toEqual([0, 1, 1]);
+    expect(listeners.size).toBe(0);
+    expect(said("Reading the deck")).toBe(1);
+    expect(said("Checking the numbers")).toBe(1);
+    finish();
+    await settle();
+  });
+
+  it("offline wait ends with the ask_q: no poll after the answer (W7)", async () => {
+    let finish: () => void = () => undefined;
+    let calls = 0;
+    const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() => {
+      calls += 1;
+      return calls === 1
+        ? Promise.reject(new TypeError("Failed to fetch"))
+        : Promise.resolve({ beats: [], idle: true });
+    });
+    const listeners = new Set<() => void>();
+    let online = false;
+    const h = harness({
+      narration,
+      env: {
+        isOnline: () => online,
+        onOnline: (handler) => {
+          listeners.add(handler);
+          return () => {
+            listeners.delete(handler);
+          };
+        },
+      },
+      tool: () =>
+        new Promise((resolve) => {
+          finish = () => {
+            resolve({
+              output: JSON.stringify({ ok: true, say: "Done." }),
+              approvalPending: false,
+            });
+          };
+        }),
+    });
+    await h.line.open();
+    h.channel().emit({
+      type: "response.function_call_arguments.done",
+      call_id: "call_p",
+      name: "ask_q",
+      arguments: JSON.stringify({ request: "Look." }),
+    });
+    await vi.advanceTimersByTimeAsync(3_000);
+    await settle();
+    expect(narration).toHaveBeenCalledTimes(1);
+    finish();
+    await settle();
+    await vi.advanceTimersByTimeAsync(2_000);
+    await settle();
+    expect(listeners.size).toBe(0);
+    online = true;
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(narration).toHaveBeenCalledTimes(1);
   });
 
   it("does not speak a tool result the person talked over", async () => {

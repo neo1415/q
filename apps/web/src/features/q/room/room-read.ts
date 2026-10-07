@@ -47,6 +47,64 @@ export function roomRead<T>(
 /** An upload the connection dropped twice: the caller says so clearly. */
 export const UPLOAD_DROPPED = Symbol("upload-dropped");
 
+/**
+ * Q room W7: one dropped file's upload, kept across every retry of it
+ * (the automatic one and "Try again"). The keys make the server replay
+ * rather than repeat; the steps already done are not run again, so a
+ * retry after a lost "complete" completes the same upload session and
+ * never creates a second document.
+ */
+export type UploadDrop = {
+  readonly key: string;
+  readonly completeKey: string;
+  target: UploadDropTarget | null;
+  sent: boolean;
+};
+
+export type UploadDropTarget = {
+  readonly uploadSessionId: string;
+  readonly url: string;
+  readonly method: string;
+  readonly headers: Readonly<Record<string, string>>;
+};
+
+export function newUploadDrop(): UploadDrop {
+  return {
+    key: crypto.randomUUID(),
+    completeKey: crypto.randomUUID(),
+    target: null,
+    sent: false,
+  };
+}
+
+/**
+ * The three steps of an upload, resumed where the last run stopped. A
+ * refusal (a step answering no) is null; a dropped connection throws and
+ * leaves the drop where it was, for the next run.
+ */
+export async function runUploadDrop(
+  drop: UploadDrop,
+  steps: {
+    readonly target: (key: string) => Promise<UploadDropTarget | null>;
+    readonly put: (target: UploadDropTarget) => Promise<boolean>;
+    readonly complete: (
+      uploadSessionId: string,
+      key: string,
+    ) => Promise<string | null>;
+  },
+): Promise<string | null> {
+  if (drop.target === null) {
+    const target = await steps.target(drop.key);
+    if (target === null) return null;
+    drop.target = target;
+  }
+  if (!drop.sent) {
+    if (!(await steps.put(drop.target))) return null;
+    drop.sent = true;
+  }
+  return steps.complete(drop.target.uploadSessionId, drop.completeKey);
+}
+
 const RESUME_WAIT_MS = 120_000;
 
 function waitUntilOnline(ms: number): Promise<boolean> {
@@ -70,8 +128,8 @@ function waitUntilOnline(ms: number): Promise<boolean> {
  * connection (a refusal resolves); offline, it waits (bounded) for the
  * connection to come back and runs once more, otherwise once more after a
  * moment. A second drop resolves UPLOAD_DROPPED, never a silent hang.
- * Each run starts a fresh upload session, so a resumed upload never
- * completes half of the first one.
+ * W7: each run resumes the same drop (`runUploadDrop`), so a retry after
+ * a lost step finishes that upload session and never starts a second.
  */
 export async function uploadResuming<T>(
   run: () => Promise<T>,
