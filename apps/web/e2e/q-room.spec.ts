@@ -189,3 +189,34 @@ test("the page tells Q what it shows as ids only, the open modal on top", async 
   await expect(wire).not.toContainText("Clearwater preview");
   await expect(wire).not.toContainText("waiting approvals");
 });
+
+test("'Q can see' follows a part hidden from Q and an unregistered window at once (W7)", async ({
+  page,
+}) => {
+  const set = await serve(page);
+  set(record([]));
+  await page.goto("/dev/q-room");
+  const line = page.locator("[data-q-can-see]").first();
+  await expect(line).toContainText("2 waiting approvals");
+  // Hidden by the page itself (no registry call): well under the old 1.5 s.
+  await page.evaluate(() => {
+    document
+      .querySelector('[data-q-section="approvals"]')
+      ?.setAttribute("data-q-hidden", "");
+  });
+  await expect(line).not.toContainText("2 waiting approvals", {
+    timeout: 500,
+  });
+  await page.evaluate(() => {
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-label", "Unregistered sheet");
+    dialog.id = "w7-dialog";
+    document.body.append(dialog);
+  });
+  await expect(line).toContainText("window: Unregistered sheet", {
+    timeout: 500,
+  });
+  await page.evaluate(() => document.getElementById("w7-dialog")?.remove());
+  await expect(line).not.toContainText("Unregistered sheet", { timeout: 500 });
+});

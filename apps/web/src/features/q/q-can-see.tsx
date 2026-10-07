@@ -7,7 +7,6 @@ import type { QScreenRoute } from "@capital-q/contracts";
 import { Eye, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { manifestVersion, seeingNow, subscribeManifest } from "./manifest";
-import { whenIdle } from "./room/room-read";
 import { screenOf } from "./screen";
 
 /**
@@ -36,8 +35,33 @@ const ROUTE_WORDS: Readonly<Record<QScreenRoute, string>> = {
   OTHER: "this page",
 };
 
-/** Open windows are found in the page itself; looked at again this often. */
-const WINDOW_LOOK_MS = 1_500;
+/**
+ * W7: what the page itself changes -- a part hidden from Q or shown again,
+ * a window opened or closed that no code registered -- is seen from the
+ * DOM's own mutations, not a timer. Only these attributes are watched.
+ */
+const WATCHED_ATTRIBUTES = [
+  "data-q-hidden",
+  "hidden",
+  "role",
+  "aria-label",
+  "aria-labelledby",
+];
+const RELEVANT = '[data-q-hidden], [role="dialog"], [role="alertdialog"]';
+
+/** Whether a DOM change can change the line (cheap: no layout read). */
+export function seeingMutation(record: MutationRecord): boolean {
+  if (record.type === "attributes") return true;
+  for (const list of [record.addedNodes, record.removedNodes]) {
+    for (const node of list) {
+      if (!(node instanceof Element)) continue;
+      if (node.matches(RELEVANT) || node.querySelector(RELEVANT) !== null) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 export function seeingLine(
   route: QScreenRoute,
@@ -59,20 +83,34 @@ let look = 0;
 
 function subscribeSeeing(onChange: () => void): () => void {
   const stop = subscribeManifest(onChange);
-  // R9: the look for windows reads the DOM, so it waits for an idle
-  // moment rather than landing in the middle of a tap or an animation.
-  let cancelIdle: (() => void) | null = null;
-  const timer = window.setInterval(() => {
-    cancelIdle?.();
-    cancelIdle = whenIdle(() => {
+  // W7: a relevant mutation is looked at once on the next frame (many
+  // mutations in one frame are one look), so a hidden part or a window
+  // shows in the line at once rather than up to 1.5 s later.
+  let frame: number | null = null;
+  const lookAgain = () => {
+    if (frame !== null) return;
+    frame = window.requestAnimationFrame(() => {
+      frame = null;
       look += 1;
       onChange();
-    }, WINDOW_LOOK_MS);
-  }, WINDOW_LOOK_MS);
+    });
+  };
+  const observer =
+    typeof MutationObserver === "function"
+      ? new MutationObserver((records) => {
+          if (records.some(seeingMutation)) lookAgain();
+        })
+      : null;
+  observer?.observe(document.body, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: WATCHED_ATTRIBUTES,
+  });
   return () => {
     stop();
-    window.clearInterval(timer);
-    cancelIdle?.();
+    observer?.disconnect();
+    if (frame !== null) window.cancelAnimationFrame(frame);
   };
 }
 
