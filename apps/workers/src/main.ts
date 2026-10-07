@@ -99,11 +99,6 @@ import {
   systemDisclosureClock,
 } from "@capital-q/permissions";
 import {
-  createEmbeddingService,
-  createLocalTeiEmbeddingProvider,
-  QWEN3_EMBEDDING_CONFIGURATION,
-} from "@capital-q/q-embeddings";
-import {
   createPostgresTaxonomyLexicalSearchRepository,
   createPostgresTaxonomyReferenceRepository,
   createTaxonomyCandidateFinder,
@@ -218,6 +213,11 @@ import { runAutoVerificationRequests } from "./verification/auto-request.js";
 // end ADMIN-4 block
 import { composeDocumentJobs } from "./documents/composition.js";
 import { composeWorkerModelGateway } from "./model-gateway.js";
+import {
+  composeRecommendationEmbedder,
+  refreshCompanyEmbeddings,
+  runCompanyEmbeddingRefresh,
+} from "./recommendations/embeddings.js";
 import { runDocumentJobTicker } from "./documents/document-jobs.js";
 
 const SERVICE_NAME = "workers";
@@ -519,11 +519,19 @@ const disclosure = createDisclosureAccessService({
   clock: systemDisclosureClock,
 });
 const embeddingConfig = loadEmbeddingConfig();
-if (embeddingConfig.missing.length > 0) {
-  // Named at startup rather than discovered per request: outside local the
-  // runtime has no default address, so semantic candidates stay off.
+// Q.02: TEI (local) or the hosted OpenAI adapter (Q_EMBEDDING_PROVIDER=openai).
+const recommendationEmbedder = composeRecommendationEmbedder({
+  config: embeddingConfig,
+  openaiApiKey: providerSecrets.openai?.reveal(),
+});
+if (recommendationEmbedder.missing.length > 0) {
+  // Named at startup rather than discovered per request: semantic
+  // candidates stay off and semantic fit stays unknown, never zero.
   logger.warn(
-    { missing: embeddingConfig.missing },
+    {
+      provider: embeddingConfig.provider,
+      missing: recommendationEmbedder.missing,
+    },
     "embedding runtime not configured: semantic retrieval disabled",
   );
 }
@@ -569,16 +577,7 @@ const recommendations = createRecommendationPipeline({
     );
     return found.filter((raise) => raise !== null);
   },
-  embedder: createEmbeddingService({
-    provider: createLocalTeiEmbeddingProvider({
-      baseUrl: embeddingConfig.baseUrl,
-      configuration: {
-        ...QWEN3_EMBEDDING_CONFIGURATION,
-        maxBatchItems: embeddingConfig.maxBatchItems,
-      },
-      timeoutMs: embeddingConfig.timeoutMs,
-    }),
-  }),
+  embedder: recommendationEmbedder.embedder,
   logger,
 });
 const refreshRequester = createRefreshRequester({
@@ -1214,16 +1213,31 @@ logger.info({ contracts: CONTRACTS_VERSION }, "worker runtime started");
 // policy or the feature schema asks for NORMAL rebuilds of the slates built
 // by the old pipeline; the feed keeps serving them until superseded. Never
 // fatal: an expiry still refreshes a slate this misses.
-void requestRebuildsForVersionDrift({
-  slates: recommendations.slates,
-  requester: refreshRequester,
-  logger,
-}).catch((error: unknown) => {
-  logger.warn(
-    { error: error instanceof Error ? error.name : "UNKNOWN" },
-    "discovery.slates.version_drift_failed",
-  );
-});
+// Q.02: company vectors first (bounded; embeds only what is missing or
+// changed), so the rebuilds below can use semantic fit.
+const COMPANY_EMBEDDING_REFRESH_LIMIT = 500;
+void (
+  recommendationEmbedder.missing.length > 0
+    ? Promise.resolve(false)
+    : refreshCompanyEmbeddings({
+        semantic: recommendations.semantic,
+        logger,
+        limit: COMPANY_EMBEDDING_REFRESH_LIMIT,
+      })
+)
+  .then(() =>
+    requestRebuildsForVersionDrift({
+      slates: recommendations.slates,
+      requester: refreshRequester,
+      logger,
+    }),
+  )
+  .catch((error: unknown) => {
+    logger.warn(
+      { error: error instanceof Error ? error.name : "UNKNOWN" },
+      "discovery.slates.version_drift_failed",
+    );
+  });
 
 // relationship-state.v2 (2026-10-02): caches folded by an older projector
 // version, or behind their history, are re-folded from history in the
@@ -1296,6 +1310,17 @@ await Promise.all([
   ...(daily === undefined
     ? []
     : [runDailyTicker({ daily, signal: shutdownController.signal, logger })]),
+  ...(recommendationEmbedder.missing.length > 0
+    ? []
+    : [
+        runCompanyEmbeddingRefresh({
+          semantic: recommendations.semantic,
+          logger,
+          limit: COMPANY_EMBEDDING_REFRESH_LIMIT,
+          intervalMs: 30 * 60 * 1000,
+          signal: shutdownController.signal,
+        }),
+      ]),
   // Q.08: a ready deck unread after 10 minutes is an error line
   // (alert DECK_READING_MISSING), only where decks can be read at all.
   ...(deckReader === undefined

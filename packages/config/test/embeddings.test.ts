@@ -105,7 +105,7 @@ describe("embedding configuration", () => {
       parseEmbeddingConfig({ ...base, Q_EMBEDDING_MAX_BATCH_ITEMS: "9999" }),
     ).toThrow(ConfigurationError);
     expect(() =>
-      parseEmbeddingConfig({ ...base, Q_EMBEDDING_PROVIDER: "openai" }),
+      parseEmbeddingConfig({ ...base, Q_EMBEDDING_PROVIDER: "cohere" }),
     ).toThrow(ConfigurationError);
   });
 });
@@ -135,5 +135,18 @@ describe("no loopback default outside local", () => {
 
   it("local keeps the laptop default", () => {
     expect(parseEmbeddingConfig(base).missing).toEqual([]);
+  });
+
+  it("openai (Q.02) needs no runtime address, outside local too", () => {
+    const config = parseEmbeddingConfig({
+      ...base,
+      CAPITAL_Q_ENV: "staging",
+      Q_EMBEDDING_PROVIDER: "openai",
+    });
+    expect(config).toMatchObject({
+      provider: "openai",
+      baseUrl: undefined,
+      missing: [],
+    });
   });
 });

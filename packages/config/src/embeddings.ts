@@ -20,7 +20,13 @@ import { ConfigurationError } from "./errors.js";
  * quiet addition here.
  */
 
-export const EMBEDDING_PROVIDERS = ["local-tei"] as const;
+/**
+ * `openai` (Q.02, 2026-10-07): the hosted adapter, because the TEI runtime
+ * does not fit the hosting plan. It reuses the reviewed OpenAI model-provider
+ * key the composition root already holds (OPENAI_API_KEY); this file still
+ * holds no secret. Selecting it is an explicit operator choice.
+ */
+export const EMBEDDING_PROVIDERS = ["local-tei", "openai"] as const;
 export type EmbeddingProviderSetting = (typeof EMBEDDING_PROVIDERS)[number];
 
 export const EMBEDDING_ENV_NAMES = [
@@ -109,6 +115,18 @@ export type EmbeddingConfig = {
 export function parseEmbeddingConfig(env: EnvironmentInput): EmbeddingConfig {
   const parsed = parseConfig("embeddings", embeddingEnvSchema, env);
   const runtime = toRuntimeConfig(parsed);
+  if (parsed.Q_EMBEDDING_PROVIDER === "openai") {
+    // Hosted: no runtime address. The key is checked by the composition
+    // root, which reports it missing by name.
+    return {
+      runtime,
+      provider: "openai",
+      baseUrl: undefined,
+      missing: [],
+      timeoutMs: parsed.Q_EMBEDDING_TIMEOUT_MS,
+      maxBatchItems: parsed.Q_EMBEDDING_MAX_BATCH_ITEMS,
+    };
+  }
   const baseUrl =
     parsed.Q_EMBEDDING_BASE_URL ??
     (runtime.deploymentEnvironment === "local" ? LOCAL_BASE_URL : undefined);
