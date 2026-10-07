@@ -31,7 +31,7 @@ import {
 } from "@capital-q/q-core";
 
 import { illustrateDeck, type StockPhotoPort } from "./deck-photos.js";
-import { clampAtWord, inCompanyVoice } from "./deck-writer.js";
+import { clampAtWord, inCompanyVoice, taglineFits } from "./deck-writer.js";
 import {
   illustrateWithGenerated,
   type IllustrationPort,
@@ -154,11 +154,16 @@ export function keepOnlyGroundedVisuals(
       !next.chart.points.every((point) => grounded(point.value))
     ) {
       const { chart: _dropped, ...rest } = next;
-      next = {
-        ...rest,
-        layout: rest.subtitle === undefined ? "STATEMENT" : "BULLETS",
-        bullets: rest.subtitle === undefined ? [rest.title] : [rest.subtitle],
-      };
+      // A chart drawn under figures or lines leaves them as they are.
+      next =
+        rest.bullets.length > 0 || rest.figures !== undefined
+          ? { ...rest, layout: "BULLETS" }
+          : {
+              ...rest,
+              layout: rest.subtitle === undefined ? "STATEMENT" : "BULLETS",
+              bullets:
+                rest.subtitle === undefined ? [rest.title] : [rest.subtitle],
+            };
     }
     if (next.figures !== undefined) {
       const kept = next.figures.filter(
@@ -477,7 +482,11 @@ export function applyPolish(
     return {
       ...slide,
       title: index > 0 && safe(change.title) ? change.title : slide.title,
-      ...(slide.subtitle !== undefined && safe(change.subtitle)
+      // The cover's subtitle is a tagline: a rewrite may improve it only
+      // within its twelve words (deck wave 8).
+      ...(slide.subtitle !== undefined &&
+      safe(change.subtitle) &&
+      (index > 0 || taglineFits(change.subtitle))
         ? { subtitle: change.subtitle }
         : {}),
       bullets,

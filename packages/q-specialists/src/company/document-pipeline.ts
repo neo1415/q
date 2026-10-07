@@ -30,6 +30,11 @@ import {
   type StudioBrand,
 } from "./document-studio.js";
 import { composeInvestmentBrief, inventsFigures } from "./investment-brief.js";
+import {
+  neverEmptySlides,
+  placeholderDetail,
+  promoteFirmFigures,
+} from "./deck-figures.js";
 import { DECK_ORDER, GAP_LABELS, SLIDE_TITLES } from "./pitch-deck.js";
 
 /**
@@ -147,10 +152,12 @@ export function addGapPlaceholders(
         at = index + 1;
       }
     });
+    // The slide says what to add, in words as well as in its marked band:
+    // a title over an empty page reads as a broken deck (live 2026-10-07).
     slides.splice(at, 0, {
       layout: "STATEMENT",
       title: SLIDE_TITLES[dimension],
-      bullets: [],
+      bullets: [placeholderDetail(SLIDE_TITLES[dimension])],
       bulletsRight: [],
       section: 0,
       placeholder: {
@@ -175,10 +182,20 @@ export function chooseLayouts(content: QArtifactContent): QArtifactContent {
   if (deck === undefined) return content;
   const slides = deck.slides.map((slide, index): QSlide => {
     if (index === 0) return slide;
-    if (slide.chart !== undefined) return { ...slide, layout: "CHART" };
+    // A chart beside headline figures or lines is drawn under them (deck
+    // wave 8); a chart alone is a chart slide.
+    if (slide.chart !== undefined) {
+      return {
+        ...slide,
+        layout:
+          slide.figures !== undefined || slide.bullets.length > 0
+            ? "BULLETS"
+            : "CHART",
+      };
+    }
     if (
       slide.placeholder?.kind === "TEXT" &&
-      slide.bullets.length === 0 &&
+      slide.bullets.length <= 1 &&
       slide.bulletsRight.length === 0
     ) {
       return { ...slide, layout: "STATEMENT" };
@@ -291,6 +308,8 @@ export type DocumentFix =
 
 /** A second opinion behind the same typed contract (e.g. a vision rubric). */
 export type DocumentCritic = {
+  /** How many times it may be asked per document (default: every round). */
+  readonly rounds?: number | undefined;
   readonly review: (input: {
     readonly content: QArtifactContent;
     readonly signal?: AbortSignal | undefined;
@@ -619,6 +638,9 @@ export async function runDocumentPipeline(
       .catch(() => null);
     if (polished !== null) next = applyPolish(next, polished, input.grounding);
   }
+  // Deck wave 8: firm numbers the polish left in sentences are shown large
+  // again, after it, so the words step cannot fold them back into prose.
+  next = promoteFirmFigures(next, input.grounding);
   next = addGapPlaceholders(next);
 
   // 2. Design: brand, the sector's direction, a layout per slide.
@@ -664,12 +686,19 @@ export async function runDocumentPipeline(
   await stage("CHECKING");
   let rounds = 0;
   let review = reviewDocument(next, input.grounding, input.kind);
-  const critique = async (): Promise<readonly DocumentFix[]> =>
-    input.critic === undefined
-      ? []
-      : await input.critic
-          .review({ content: next, signal: input.signal })
-          .catch(() => []);
+  let critiques = 0;
+  const critique = async (): Promise<readonly DocumentFix[]> => {
+    if (
+      input.critic === undefined ||
+      critiques >= (input.critic.rounds ?? FIX_ROUNDS_MAX)
+    ) {
+      return [];
+    }
+    critiques += 1;
+    return await input.critic
+      .review({ content: next, signal: input.signal })
+      .catch(() => []);
+  };
   let extra = await critique();
   const short = (r: DocumentReview) =>
     r.rubric.content < RUBRIC_PASS ||
@@ -690,6 +719,8 @@ export async function runDocumentPipeline(
     extra = rounds < FIX_ROUNDS_MAX ? await critique() : [];
   }
 
+  // Whatever the fixes took away, no slide ships empty.
+  next = neverEmptySlides(next);
   const base = auditDocument(next, input.grounding);
   const passed = base.passed && !short(review) && review.fixes.length === 0;
   const audit: QDocumentAudit = {

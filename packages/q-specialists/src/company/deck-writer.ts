@@ -37,7 +37,7 @@ const STAT_CLAUSE_MAX = 70;
 const FIGURES_MAX = 3;
 const FIGURE_VALUE_MAX = 24;
 const FIGURE_LABEL_MAX = 90;
-const HEADLINE_MAX = 60;
+export const HEADLINE_MAX = 60;
 
 /** Where the slide's subject sits, whatever its title now says. */
 export function slideTopic(content: QArtifactContent, index: number): string {
@@ -50,7 +50,7 @@ export function slideTopic(content: QArtifactContent, index: number): string {
 }
 
 /** Topics whose numbers are worth showing large even when there is one. */
-const STAT_TOPICS: ReadonlySet<string> = new Set([
+export const STAT_TOPICS: ReadonlySet<string> = new Set([
   SLIDE_TITLES.TRACTION,
   SLIDE_TITLES.FINANCIAL,
   SLIDE_TITLES.CUSTOMERS,
@@ -58,7 +58,7 @@ const STAT_TOPICS: ReadonlySet<string> = new Set([
   SLIDE_TITLES.MARKET,
 ]);
 /** Topics whose slides are never reshaped into figures. */
-const NO_FIGURES: ReadonlySet<string> = new Set([SLIDE_TITLES.TEAM]);
+export const NO_FIGURES: ReadonlySet<string> = new Set([SLIDE_TITLES.TEAM]);
 
 // --- voice ------------------------------------------------------------------
 
@@ -73,7 +73,7 @@ function plural(verb: string): string {
   return lower.endsWith("s") ? lower.slice(0, -1) : lower;
 }
 
-function capitalise(text: string): string {
+export function capitalise(text: string): string {
   const first = text.charAt(0);
   return first.length === 0 ? text : `${first.toUpperCase()}${text.slice(1)}`;
 }
@@ -240,7 +240,7 @@ function statIn(
   return null;
 }
 
-const HEDGED =
+export const HEDGED =
   /\b(?:estimat\w*|about|approximately|approx|around|roughly|nearly|almost|up to|more than|expect\w*|project\w*|forecast\w*|target\w*|plan\w*|aim\w*|goal|could|may|might|will|would|potential\w*|addressable|TAM|SAM|SOM)\b|~/i;
 
 const LEAD_WORDS =
@@ -251,8 +251,9 @@ const TRAIL_WORDS =
 /** "1,140 paying businesses" → value "1,140", label "paying businesses". */
 export function statFigure(
   clause: string,
+  options: { readonly clauseMax?: number; readonly labelMax?: number } = {},
 ): { readonly value: string; readonly label: string } | null {
-  if (clause.length > STAT_CLAUSE_MAX) return null;
+  if (clause.length > (options.clauseMax ?? STAT_CLAUSE_MAX)) return null;
   // An estimate, a plan or a target stays in words, where its hedge is
   // read with it: a number shown large reads as a fact.
   if (HEDGED.test(clause)) return null;
@@ -286,9 +287,64 @@ export function statFigure(
   }
   return {
     value: found.value,
-    label: clampAtWord(label, FIGURE_LABEL_MAX),
+    label: clampAtWord(label, options.labelMax ?? FIGURE_LABEL_MAX),
   };
 }
+
+/** The cover's tagline, in words (the polisher may improve within it). */
+export const TAGLINE_WORDS_MAX = 12;
+
+// --- the cover's tagline ------------------------------------------------------
+
+const taglineWords = (text: string): string[] =>
+  text.split(/\s+/).filter((word) => word.length > 0);
+
+const TRAILING_STOP =
+  /\s+(?:and|or|of|for|to|the|a|an|with|in|on|by|through|that|which|who|its|their|our|from|at|as)$/i;
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * A short tagline from the record's opening, cut at a clause and to at
+ * most twelve words: "Ledgerline is bookkeeping and tax software for
+ * Nigerian SMEs, sold through accountants." → "Bookkeeping and tax
+ * software for Nigerian SMEs". Only the opening's own words.
+ */
+export function taglineOf(
+  opening: string,
+  companyName: string,
+): string | undefined {
+  const first = opening
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/(?<=[.!?])\s/)[0];
+  if (first === undefined || first.length === 0) return undefined;
+  let line = inCompanyVoice(first).replace(/[.!?]+$/, "");
+  line = line.replace(
+    new RegExp(
+      `^(?:${escapeRegExp(companyName.trim())}|we)\\s+(?:is|are)\\s+(?:a|an|the)?\\s*`,
+      "i",
+    ),
+    "",
+  );
+  const clause =
+    line.split(
+      /\s+[—–]\s+|;\s+|:\s+|\s+\(|,\s+(?=(?:and|which|who|that|while|with|serving|helping|founded|based|built|used|so|sold|backed|now|since)\b)/iu,
+    )[0] ?? line;
+  let words = taglineWords(clause);
+  if (words.length > TAGLINE_WORDS_MAX) {
+    words = words.slice(0, TAGLINE_WORDS_MAX);
+  }
+  let out = words.join(" ").replace(/[\s,;:—–-]+$/u, "");
+  for (let i = 0; i < 3; i += 1) out = out.replace(TRAILING_STOP, "");
+  out = out.trim();
+  return out.length === 0 ? undefined : capitalise(out);
+}
+
+export const taglineFits = (text: string): boolean =>
+  taglineWords(text).length <= TAGLINE_WORDS_MAX;
 
 // --- the pass -----------------------------------------------------------------
 
@@ -377,14 +433,27 @@ export function writeDeckSlides(content: QArtifactContent): QArtifactContent {
   const deck = content.deck;
   if (deck === undefined) return content;
   const slides = deck.slides.map((slide, index): QSlide => {
+    // Deck wave 8: the cover's subtitle is a short tagline cut from the
+    // record's opening, not the whole sentence (a public-source deck's
+    // cover line says what it is, and stays as written).
+    const tagline =
+      index === 0 && !deck.markIsDraft && slide.subtitle !== undefined
+        ? taglineOf(slide.subtitle, slide.title)
+        : undefined;
     const voiced: QSlide = {
       ...slide,
       ...(slide.subtitle === undefined
         ? {}
-        : { subtitle: inCompanyVoice(slide.subtitle) }),
+        : { subtitle: tagline ?? inCompanyVoice(slide.subtitle) }),
     };
+    // A slide written from the founder's own records (deck wave 8: their
+    // round, their team) has no findings behind it and is already a slide.
+    const own =
+      slide.section > 0 &&
+      content.sections[slide.section]?.findings.length === 0;
     if (
       index === 0 ||
+      own ||
       slide.chart !== undefined ||
       slide.placeholder !== undefined ||
       slide.layout === "TWO_COLUMN" ||

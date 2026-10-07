@@ -11,6 +11,7 @@ import {
   auditDocument,
   brandDeck,
   illustrateWithGenerated,
+  type OwnDeckFacts,
 } from "@capital-q/q-specialists";
 import type { DocumentStudioPort } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -64,6 +65,103 @@ export async function ownCompanyOf(
     companyId: row.id,
     websiteUrl: row.website_url,
     sectorCodes: row.sectors ?? [],
+  };
+}
+
+/**
+ * Deck wave 8: the founder's own current round (or active raise objective)
+ * and current team, for their own deck. Read server-side for the company
+ * `ownCompanyOf` resolved for this actor, tenant-matched; names and
+ * business titles only (no email, no user id, no private summary).
+ */
+export async function ownDeckFactsOf(
+  sql: DatabaseExecutor,
+  actor: ActorContext,
+  companyId: string,
+): Promise<OwnDeckFacts> {
+  const rounds = await sql<
+    {
+      amount: string;
+      currency: string;
+      instrument: string | null;
+      name: string | null;
+      use_of_funds: string | null;
+    }[]
+  >`
+    with objective as (
+      select o.target_amount::text as amount, o.currency_code as currency,
+             o.instrument_code as instrument, o.use_of_funds_summary
+        from core.capital_objectives o
+       where o.tenant_id = ${actor.tenantId}
+         and o.company_id = ${companyId}
+         and o.status = 'ACTIVE'
+       order by o.started_at desc
+       limit 1),
+    round as (
+      select r.target_amount::text as amount, r.currency_code as currency,
+             r.instrument, r.name
+        from core.capital_rounds r
+       where r.tenant_id = ${actor.tenantId}
+         and r.company_id = ${companyId}
+         and r.status <> 'CLOSED'
+       order by r.is_current desc, r.created_at desc
+       limit 1)
+    select amount, currency, instrument, name, use_of_funds from (
+      select 1 as priority, amount, currency, instrument, name,
+             (select use_of_funds_summary from objective) as use_of_funds
+        from round
+      union all
+      select 2, amount, currency, instrument, null, use_of_funds_summary
+        from objective) candidates
+     order by priority
+     limit 1`;
+  const team = await sql<
+    {
+      display_name: string | null;
+      given_name: string | null;
+      family_name: string | null;
+      business_title: string | null;
+      is_founder: boolean;
+    }[]
+  >`
+    select p.display_name, p.given_name, p.family_name,
+           m.business_title, m.is_founder
+      from core.company_members m
+      join identity.user_profiles p on p.id = m.user_id
+     where m.tenant_id = ${actor.tenantId}
+       and m.company_id = ${companyId}
+       and m.is_current
+       and m.relationship_type = 'team_member'
+     order by m.is_founder desc, m.started_at asc, m.id asc
+     limit 5`;
+  const round = rounds[0];
+  return {
+    round:
+      round === undefined
+        ? null
+        : {
+            amount: round.amount,
+            currency: round.currency,
+            instrument: round.instrument,
+            name: round.name,
+            useOfFunds: round.use_of_funds,
+          },
+    team: team.flatMap((row) => {
+      const name =
+        row.display_name ??
+        [row.given_name, row.family_name]
+          .filter((part): part is string => part !== null)
+          .join(" ");
+      return name.trim().length === 0
+        ? []
+        : [
+            {
+              name: name.trim().slice(0, 80),
+              role: row.business_title,
+              founder: row.is_founder,
+            },
+          ];
+    }),
   };
 }
 

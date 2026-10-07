@@ -210,6 +210,8 @@ export {
   inCompanyVoice,
   splitStatement,
   statFigure,
+  TAGLINE_WORDS_MAX,
+  taglineOf,
   writeDeckSlides,
 } from "./company/deck-writer.js";
 export { visibleStageOf } from "./company/prepare-artifact.js";
@@ -244,6 +246,23 @@ export {
   type DocumentReview,
   type OwnPicturePort,
 } from "./company/document-pipeline.js";
+// Deck wave 8: firm figures after the polish, the founder's own raise and
+// team, and never an empty slide.
+export {
+  fillOwnSlides,
+  formatAmount,
+  neverEmptySlides,
+  placeholderDetail,
+  promoteFirmFigures,
+  type OwnDeckFacts,
+} from "./company/deck-figures.js";
+export {
+  createDeckPageRenderer,
+  createVisionDocumentCritic,
+  fixesFrom,
+  type DeckPageRenderer,
+  type DocumentCriticRun,
+} from "./company/document-critic.js";
 
 // DOCS block: generated illustrations.
 export {

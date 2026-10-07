@@ -72,6 +72,8 @@ export const PROMPT_IDS = [
   "INSTRUCTION_THREAD_READER",
   // DOCS block: the wording pass over a composed deck.
   "DOCUMENT_POLISH",
+  /** Deck wave 8: the vision check of a rendered deck. */
+  "DOCUMENT_CRITIQUE",
   // DAILY block: The Q Daily's story writer and Q's take column.
   "DAILY_STORY_WRITER",
   "DAILY_Q_TAKE",
@@ -148,6 +150,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   INSTRUCTION_THREAD_READER: "instruction-thread-reader",
   // DOCS block.
   DOCUMENT_POLISH: "document-polish",
+  DOCUMENT_CRITIQUE: "document-critique",
   // DAILY block
   DAILY_STORY_WRITER: "daily-story-writer",
   DAILY_Q_TAKE: "daily-q-take",

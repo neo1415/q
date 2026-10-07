@@ -54,6 +54,12 @@ export type CalendarProvider = {
     window: { readonly from: Date; readonly to: Date },
   ) => Promise<readonly { readonly start: Date; readonly end: Date }[]>;
   readonly timeZone: (access: MailboxAccess) => Promise<string>;
+  /**
+   * Deck wave 8 (calendar truthfulness): whether this grant can actually
+   * read the primary calendar. DENIED is Google refusing the token for the
+   * calendar (401/403); anything else (an outage) throws.
+   */
+  readonly probe: (access: MailboxAccess) => Promise<"GRANTED" | "DENIED">;
   readonly insert: (
     access: MailboxAccess,
     event: CalendarEventInput,
@@ -222,6 +228,22 @@ export function createGoogleCalendarProvider(
         EventListSchema,
       );
       return result.timeZone ?? "UTC";
+    },
+
+    // The cheapest call calendar.events allows: one event, no body kept.
+    probe: async (access) => {
+      const url = new URL(`${CALENDAR_API}/calendars/primary/events`);
+      url.searchParams.set("maxResults", "1");
+      url.searchParams.set("timeMin", new Date().toISOString());
+      const response = await send(http, url.toString(), {
+        method: "GET",
+        headers: headers(access),
+      });
+      if (response.status === 401 || response.status === 403) return "DENIED";
+      if (response.status < 200 || response.status > 299) {
+        throw errorForStatus(response.status);
+      }
+      return "GRANTED";
     },
 
     insert: async (access, event) => {

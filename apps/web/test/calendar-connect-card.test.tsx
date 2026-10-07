@@ -10,8 +10,12 @@ const connect = vi.fn((_returnTo: unknown) =>
 
 const refresh = vi.fn();
 let status = "NOT_CONNECTED";
+let calendar: "GRANTED" | "NOT_GRANTED" | undefined = undefined;
 const readConnection = vi.fn(() =>
-  Promise.resolve({ ok: true as const, value: { status } }),
+  Promise.resolve({
+    ok: true as const,
+    value: { status, ...(calendar === undefined ? {} : { calendar }) },
+  }),
 );
 
 vi.mock("next/navigation", () => ({
@@ -70,8 +74,14 @@ describe("the calendar connect card (Q room R5)", () => {
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });
     status = "NOT_CONNECTED";
+    calendar = undefined;
     refresh.mockClear();
     render(<CalendarConnectCard intent={INTENT} />);
+    // One read on arrival (is Google there without the calendar?).
+    await vi.waitFor(() => {
+      expect(readConnection).toHaveBeenCalled();
+    });
+    readConnection.mockClear();
     fireEvent.click(
       screen.getByRole("button", { name: "Connect Google Calendar" }),
     );
@@ -91,6 +101,7 @@ describe("the calendar connect card (Q room R5)", () => {
     expect(readConnection).not.toHaveBeenCalled();
     // The window finishes; the server says the calendar is connected.
     status = "CONNECTED";
+    calendar = "GRANTED";
     window.dispatchEvent(
       new MessageEvent("message", {
         origin: window.location.origin,
@@ -131,6 +142,55 @@ describe("the calendar connect card (Q room R5)", () => {
       ).toBeTruthy();
     });
     expect(screen.queryByText("Google Calendar connected")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  // Deck wave 8: a connected Google account is not a connected calendar.
+  it("Google connected without Calendar access: says so, never 'connected', and offers to reconnect", async () => {
+    const popup = { location: { href: "" }, closed: false, close: vi.fn() };
+    vi.stubGlobal(
+      "open",
+      vi.fn(() => popup),
+    );
+    status = "CONNECTED";
+    calendar = "NOT_GRANTED";
+    refresh.mockClear();
+    readConnection.mockClear();
+    render(<CalendarConnectCard intent={INTENT} />);
+    // Said on arrival, before anything is clicked.
+    await vi.waitFor(() => {
+      expect(
+        screen.getByText(
+          "Google is connected but Calendar access wasn't granted — reconnect.",
+        ),
+      ).toBeTruthy();
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reconnect Google Calendar" }),
+    );
+    await vi.waitFor(() => {
+      expect(popup.location.href).not.toBe("");
+    });
+    // Google again without the calendar: still not shown as connected.
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: window.location.origin,
+        data: { type: "cq.google.connect", outcome: "connected" },
+      }),
+    );
+    await vi.waitFor(() => {
+      expect(readConnection).toHaveBeenCalledTimes(2);
+    });
+    await vi.waitFor(() => {
+      expect(
+        screen.getByText(
+          "Google is connected but Calendar access wasn't granted — reconnect.",
+        ),
+      ).toBeTruthy();
+    });
+    expect(screen.queryByText("Google Calendar connected")).toBeNull();
+    expect(refresh).not.toHaveBeenCalled();
+    calendar = undefined;
     vi.unstubAllGlobals();
   });
 

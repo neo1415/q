@@ -276,7 +276,12 @@ describe("calendarOf", () => {
   const USER = "00000000-0000-4000-8000-0000000000b1";
   const KEY = randomBytes(32).toString("base64");
 
-  async function world(scopes: readonly string[]) {
+  async function world(
+    scopes: readonly string[],
+    responses: readonly { status: number; body?: unknown }[] = [
+      { status: 200, body: { timeZone: "Europe/London" } },
+    ],
+  ) {
     const store = createInMemoryIntegrationsStore();
     const cipher = createTokenCipher(KEY);
     await store.connectAccount({
@@ -292,9 +297,7 @@ describe("calendarOf", () => {
       keyVersion: 1,
       historyId: null,
     });
-    const http = scripted([
-      { status: 200, body: { timeZone: "Europe/London" } },
-    ]);
+    const http = scripted(responses);
     const service = createIntegrationsService({
       store,
       transactions: inlineTransactions,
@@ -340,5 +343,67 @@ describe("calendarOf", () => {
     expect(w.http.calls).toHaveLength(0);
     const narrow = await world(["openid"]);
     expect(await narrow.service.calendarState(USER)).toBe("NOT_CONNECTED");
+  });
+
+  // Deck wave 8: a connected Google account is not a connected calendar.
+  it("says Calendar access was not granted when the grant lacks the scope, without asking Google", async () => {
+    const w = await world(["openid"]);
+    expect(await w.service.status(USER)).toMatchObject({
+      status: "CONNECTED",
+      calendar: "NOT_GRANTED",
+    });
+    expect(w.http.calls).toHaveLength(0);
+  });
+
+  it("checks the calendar once with the grant, and remembers the answer", async () => {
+    const w = await world(
+      ["openid", CALENDAR_EVENTS_SCOPE],
+      [{ status: 200, body: { items: [] } }],
+    );
+    expect(await w.service.status(USER)).toMatchObject({
+      status: "CONNECTED",
+      calendar: "GRANTED",
+    });
+    await w.service.status(USER);
+    expect(w.http.calls).toHaveLength(1);
+    expect(w.http.calls[0]?.url).toContain("/calendars/primary/events");
+    expect(w.http.calls[0]?.url).toContain("maxResults=1");
+  });
+
+  it("a grant Google refuses for the calendar is NOT_GRANTED", async () => {
+    const w = await world(
+      ["openid", CALENDAR_EVENTS_SCOPE],
+      [{ status: 403, body: { error: "insufficientPermissions" } }],
+    );
+    expect(await w.service.status(USER)).toMatchObject({
+      calendar: "NOT_GRANTED",
+    });
+  });
+
+  it("an outage while checking keeps the recorded scope's answer", async () => {
+    const w = await world(["openid", CALENDAR_EVENTS_SCOPE], [{ status: 503 }]);
+    expect(await w.service.status(USER)).toMatchObject({
+      calendar: "GRANTED",
+    });
+  });
+});
+
+describe("probe", () => {
+  it("is GRANTED on 200, DENIED on 401/403, and throws on an outage", async () => {
+    expect(
+      await createGoogleCalendarProvider(
+        scripted([{ status: 200, body: { items: [] } }]),
+      ).probe(ACCESS),
+    ).toBe("GRANTED");
+    for (const status of [401, 403]) {
+      expect(
+        await createGoogleCalendarProvider(scripted([{ status }])).probe(
+          ACCESS,
+        ),
+      ).toBe("DENIED");
+    }
+    await expect(
+      createGoogleCalendarProvider(scripted([{ status: 500 }])).probe(ACCESS),
+    ).rejects.toBeInstanceOf(GoogleProviderError);
   });
 });

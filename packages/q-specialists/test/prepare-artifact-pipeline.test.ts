@@ -163,6 +163,60 @@ describe("a document made by the worker", () => {
     ]);
   });
 
+  it("the founder's own deck carries their round and its grounding; another company's deck never asks", async () => {
+    const asked: string[] = [];
+    const run = async (ownCompanyId: string) => {
+      const requested: Parameters<DocumentPipelinePort["request"]>[0][] = [];
+      const base = preparation({
+        request: (input) => {
+          requested.push(input);
+          return Promise.resolve(card("PREPARING"));
+        },
+        wait: () => Promise.resolve(null),
+      });
+      await prepareOrReviseArtifact({
+        artifacts: {
+          ...base,
+          studio: {
+            brandOf: () => Promise.resolve(null),
+            ownCompanyOf: () =>
+              Promise.resolve({ companyId: ownCompanyId, sectorCodes: [] }),
+            ownDeckFactsOf: (_actor, companyId) => {
+              asked.push(companyId);
+              return Promise.resolve({
+                round: {
+                  amount: "150000000",
+                  currency: "NGN",
+                  instrument: "SAFE",
+                  name: null,
+                  useOfFunds: "Hiring four engineers.",
+                },
+                team: [{ name: "Amaka Obi", role: "CEO", founder: true }],
+              });
+            },
+          },
+        },
+        request,
+        company: { kind: "COMPANY", companyId: COMPANY },
+        companyName: "Northstar",
+        saidVerbatim: "Draft my deck",
+        result: result("PITCH_DECK"),
+        history: [],
+      });
+      return requested[0];
+    };
+    const own = await run(COMPANY);
+    expect(asked).toEqual([COMPANY]);
+    expect(own?.job.grounding).toContain("We are raising ₦150m on a SAFE.");
+    const slides = own?.content.content.deck?.slides ?? [];
+    expect(slides.some((slide) => slide.title === "Raising ₦150m")).toBe(true);
+    const other = await run("c0000000-0000-4000-8000-0000000000ff");
+    expect(asked).toEqual([COMPANY]);
+    expect(other?.job.grounding).not.toContain(
+      "We are raising ₦150m on a SAFE.",
+    );
+  });
+
   it("still being made when the wait ends: the PREPARING card, not a failure", async () => {
     const outcome = await prepareOrReviseArtifact({
       artifacts: preparation({

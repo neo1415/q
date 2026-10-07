@@ -25,6 +25,22 @@ const NOT_CONNECTED: Readonly<Record<ConnectOutcome, string>> = {
 };
 
 /**
+ * Deck wave 8 (calendar truthfulness): Google is connected, but the grant
+ * does not reach the calendar (the box was unticked on Google's screen,
+ * or Google refuses the token for it). Said plainly, never "connected".
+ */
+const CALENDAR_NOT_GRANTED =
+  "Google is connected but Calendar access wasn't granted — reconnect.";
+
+type ConnectionRead = Awaited<ReturnType<typeof readGmailConnection>>;
+
+/** Connected means the calendar itself, not just a Google account. */
+function calendarOf(read: ConnectionRead): "GRANTED" | "NOT_GRANTED" | null {
+  if (!read.ok || read.value.status !== "CONNECTED") return null;
+  return read.value.calendar === "GRANTED" ? "GRANTED" : "NOT_GRANTED";
+}
+
+/**
  * Q room R5: the person's Google Calendar is not connected. The times Q
  * suggests (working hours in their zone, never checked against a calendar)
  * and, beside them, the connect card. Nothing is booked from this card.
@@ -44,8 +60,25 @@ export function CalendarConnectCard({
   const [message, setMessage] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [waiting, setWaiting] = useState(false);
+  const [notGranted, setNotGranted] = useState(false);
   const [pending, startTransition] = useTransition();
   const popupRef = useRef<Window | null>(null);
+
+  // Google may already be connected without the calendar: say so up front.
+  useEffect(() => {
+    let live = true;
+    void readGmailConnection()
+      .then((read) => {
+        if (live && calendarOf(read) === "NOT_GRANTED") {
+          setNotGranted(true);
+          setMessage(CALENDAR_NOT_GRANTED);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // The window's word is a hint; the connection's state is the server's.
   const settle = useCallback(
@@ -53,10 +86,14 @@ export function CalendarConnectCard({
       setWaiting(false);
       popupRef.current = null;
       const status = await readGmailConnection();
-      if (status.ok && status.value.status === "CONNECTED") {
+      const calendar = calendarOf(status);
+      if (calendar === "GRANTED") {
         setConnected(true);
         setMessage(null);
         router.refresh();
+      } else if (calendar === "NOT_GRANTED") {
+        setNotGranted(true);
+        setMessage(CALENDAR_NOT_GRANTED);
       } else {
         setMessage(NOT_CONNECTED[outcome]);
       }
@@ -117,7 +154,7 @@ export function CalendarConnectCard({
       setWaiting(true);
     });
   };
-  const expired = intent.reason === "REVOKED";
+  const expired = intent.reason === "REVOKED" || notGranted;
   if (connected) {
     return (
       <section
