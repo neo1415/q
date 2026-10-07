@@ -217,8 +217,7 @@ export function QRoomDeck({
   const drawn = drawingNow?.drawn ?? null;
   const slidesFailed = drawingNow?.failed === true;
   // Not read yet, or a read that failed while it was being made.
-  const failed =
-    readFailed && (state === null || status === "PREPARING");
+  const failed = readFailed && (state === null || status === "PREPARING");
   const retry = useCallback(() => {
     if (slidesFailed) {
       setDrawing(null);
@@ -273,7 +272,10 @@ export function QRoomDeck({
       setNotice(`Uploading ${file.name}…`);
       const documentId = await uploadResuming(
         () => loaders.upload(file, state.companyId),
-        () => setNotice("Connection lost. The upload resumes when you're back online."),
+        () =>
+          setNotice(
+            "Connection lost. The upload resumes when you're back online.",
+          ),
       );
       if (documentId === UPLOAD_DROPPED) {
         // R9: never a silent hang: say so, keep the file, offer a retry.
@@ -299,14 +301,12 @@ export function QRoomDeck({
       for (let attempt = 0; attempt < FILL_TRIES; attempt += 1) {
         const filled = await loaders
           .fill({ artifactId, version, slide: slide + 1, documentId })
-          .catch(
-            (): FillResult => ({
-              ok: false,
-              retry: false,
-              message:
-                "Your file is in your data room, but it couldn't be placed: the connection dropped. Ask Q to place it.",
-            }),
-          );
+          .catch((): FillResult => ({
+            ok: false,
+            retry: false,
+            message:
+              "Your file is in your data room, but it couldn't be placed: the connection dropped. Ask Q to place it.",
+          }));
         if (filled.ok) {
           setNotice(`Placed on slide ${String(slide + 1)}.`);
           setManual({ page: slide + 1, at: turns.length });

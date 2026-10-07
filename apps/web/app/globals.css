@@ -2212,25 +2212,128 @@
   /*
    * ADR 0062 (Q room R7): particles around the page edge while Q works.
    * Click-through and decorative; colour from Q's light token. Under
-   * reduced motion the canvas stays empty and a still edge line shows.
+   * reduced motion the strips stay hidden and a still edge line shows.
+   * R9: each side is a strip of dots slid by transform (twinkle by
+   * opacity): compositor-only, paused while off or the tab is hidden.
    */
   .cq-q-edge-flow {
     position: fixed;
     inset: 0;
-    width: 100%;
-    height: 100%;
     z-index: var(--cq-z-presence);
     pointer-events: none;
-    color: var(--cq-q-light);
     opacity: 0;
     transition: opacity var(--cq-motion-slow) var(--cq-ease);
   }
   .cq-q-edge-flow[data-q-edge-flow="on"] {
     opacity: 1;
   }
+  .cq-q-edge-side {
+    position: absolute;
+    overflow: hidden;
+    --cq-edge-at: 4px;
+  }
+  .cq-q-edge-top,
+  .cq-q-edge-bottom {
+    left: 0;
+    right: 0;
+    height: 6px;
+  }
+  .cq-q-edge-left,
+  .cq-q-edge-right {
+    top: 0;
+    bottom: 0;
+    width: 6px;
+  }
+  .cq-q-edge-top {
+    top: var(--cq-edge-at);
+  }
+  .cq-q-edge-bottom {
+    bottom: var(--cq-edge-at);
+  }
+  .cq-q-edge-left {
+    left: var(--cq-edge-at);
+  }
+  .cq-q-edge-right {
+    right: var(--cq-edge-at);
+  }
+  .cq-q-edge-run {
+    position: absolute;
+    inset: 0;
+    background-repeat: repeat;
+    will-change: transform;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-direction: normal, alternate;
+  }
+  .cq-q-edge-flow[data-q-edge-paused] .cq-q-edge-run {
+    animation-play-state: paused;
+  }
+  @keyframes cq-edge-x-fwd-240 {
+    from {
+      transform: translate3d(-240px, 0, 0);
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  @keyframes cq-edge-x-back-240 {
+    to {
+      transform: translate3d(-240px, 0, 0);
+    }
+  }
+  @keyframes cq-edge-y-fwd-240 {
+    from {
+      transform: translate3d(0, -240px, 0);
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  @keyframes cq-edge-y-back-240 {
+    to {
+      transform: translate3d(0, -240px, 0);
+    }
+  }
+  @keyframes cq-edge-x-fwd-330 {
+    from {
+      transform: translate3d(-330px, 0, 0);
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  @keyframes cq-edge-x-back-330 {
+    to {
+      transform: translate3d(-330px, 0, 0);
+    }
+  }
+  @keyframes cq-edge-y-fwd-330 {
+    from {
+      transform: translate3d(0, -330px, 0);
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  @keyframes cq-edge-y-back-330 {
+    to {
+      transform: translate3d(0, -330px, 0);
+    }
+  }
+  @keyframes cq-edge-twinkle {
+    from {
+      opacity: 0.45;
+    }
+    to {
+      opacity: 1;
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .cq-q-edge-flow {
       transition: none;
+    }
+    .cq-q-edge-side {
+      display: none;
     }
     .cq-q-edge-flow[data-q-edge-flow="on"] {
       box-shadow: inset 0 0 0 2px

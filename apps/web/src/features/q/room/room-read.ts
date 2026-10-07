@@ -94,10 +94,9 @@ export async function uploadResuming<T>(
       );
       if (!back) return UPLOAD_DROPPED;
     } else {
-      await (options.pause ??
-        ((ms: number) => new Promise((r) => setTimeout(r, ms))))(
-        ROOM_READ.baseMs,
-      );
+      await (
+        options.pause ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))
+      )(ROOM_READ.baseMs);
     }
     try {
       return await run();

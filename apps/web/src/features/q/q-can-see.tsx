@@ -6,7 +6,8 @@ import { useSyncExternalStore } from "react";
 import type { QScreenRoute } from "@capital-q/contracts";
 import { Eye, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
-import { seeingNow, subscribeManifest } from "./manifest";
+import { manifestVersion, seeingNow, subscribeManifest } from "./manifest";
+import { whenIdle } from "./room/room-read";
 import { screenOf } from "./screen";
 
 /**
@@ -53,13 +54,41 @@ export function seeingLine(
   ].join(" · ");
 }
 
+/** Moves when the page is looked at again for windows (R9: memo key). */
+let look = 0;
+
 function subscribeSeeing(onChange: () => void): () => void {
   const stop = subscribeManifest(onChange);
-  const timer = window.setInterval(onChange, WINDOW_LOOK_MS);
+  // R9: the look for windows reads the DOM, so it waits for an idle
+  // moment rather than landing in the middle of a tap or an animation.
+  let cancelIdle: (() => void) | null = null;
+  const timer = window.setInterval(() => {
+    cancelIdle?.();
+    cancelIdle = whenIdle(() => {
+      look += 1;
+      onChange();
+    }, WINDOW_LOOK_MS);
+  }, WINDOW_LOOK_MS);
   return () => {
     stop();
     window.clearInterval(timer);
+    cancelIdle?.();
   };
+}
+
+/** The line, read from the page once per change, not once per render. */
+let memo: { readonly key: string; readonly line: string } | null = null;
+
+function seeingSnapshot(pathname: string): string {
+  const key = `${String(manifestVersion())}:${String(look)}:${pathname}`;
+  if (memo?.key !== key) {
+    const now = seeingNow();
+    memo = {
+      key,
+      line: seeingLine(screenOf(pathname).route, now.parts, now.window),
+    };
+  }
+  return memo.line;
 }
 
 export function QCanSee({ className }: { readonly className?: string }) {
@@ -68,10 +97,7 @@ export function QCanSee({ className }: { readonly className?: string }) {
   // only when what Q can see has changed. Nothing on the server render.
   const line = useSyncExternalStore(
     subscribeSeeing,
-    () => {
-      const now = seeingNow();
-      return seeingLine(screenOf(pathname).route, now.parts, now.window);
-    },
+    () => seeingSnapshot(pathname),
     () => null,
   );
   if (line === null) return null;
