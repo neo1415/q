@@ -2,6 +2,14 @@ import type { ModelFailureClass } from "@capital-q/contracts";
 
 import { ModelProviderFailure } from "../errors.js";
 import type { ModelUsageRepository } from "../ports.js";
+import { IMAGE_BILLING_COOLDOWN_MS } from "./config.js";
+
+export {
+  GENERATED_IMAGES_PER_DOCUMENT_MAX,
+  IMAGE_BILLING_COOLDOWN_MS,
+  IMAGE_MODEL_CONFIG,
+  type ImageModelConfig,
+} from "./config.js";
 
 /**
  * Image generation through the Q Model Gateway (DOCS; ADR 0031 addendum).
@@ -27,6 +35,19 @@ export const IMAGE_GENERATION_TASK_CLASS = "IMAGE_GENERATION" as const;
 /** What every prompt ends with, whoever built it. */
 export const IMAGE_PROMPT_EXCLUSIONS =
   "No text, letters, numbers, logos, brand marks or trademarks of any company. No real or identifiable people and no likeness of any real person; if people appear they are anonymous, small and seen from a distance. No charts or figures.";
+
+/**
+ * A refusal that means "this key may not spend": no billing on the
+ * account, or its quota is gone (Q room W5). Classed BUDGET_EXCEEDED so
+ * the gateway stops asking instead of trying again picture by picture.
+ */
+export function isBillingRefusal(status: number, body: string): boolean {
+  if (status === 402) return true;
+  if (status !== 429 && status !== 403 && status !== 400) return false;
+  return /billing|quota|RESOURCE_EXHAUSTED|free tier|prepay|credit/iu.test(
+    body,
+  );
+}
 
 export const IMAGE_BYTES_MAX = 5 * 1024 * 1024;
 export const IMAGE_PROMPT_MAX = 1_200;
@@ -80,7 +101,16 @@ export type ImageGatewayResult =
       readonly prompt: string;
       readonly costUsd: number;
     }
-  | { readonly status: "UNAVAILABLE" | "FAILED" };
+  | {
+      readonly status: "UNAVAILABLE" | "FAILED";
+      /**
+       * BILLING: every provider that could run refused to spend (no
+       * billing, quota gone) or is paused after such a refusal. The caller
+       * falls back to a stock photo or a placeholder and does not ask
+       * again for this document.
+       */
+      readonly reason?: "BILLING" | undefined;
+    };
 
 export type ImageGateway = {
   readonly enabled: boolean;
@@ -128,17 +158,33 @@ export function createImageGateway(options: {
   readonly usage?: ModelUsageRepository | undefined;
   readonly attemptTimeoutMs?: number | undefined;
   readonly now?: (() => number) | undefined;
+  /** How long a provider that refused on billing is skipped. */
+  readonly billingCooldownMs?: number | undefined;
 }): ImageGateway {
   const timeoutMs = options.attemptTimeoutMs ?? 60_000;
   const now = options.now ?? Date.now;
+  const cooldownMs = options.billingCooldownMs ?? IMAGE_BILLING_COOLDOWN_MS;
   const enabled = options.enabled && options.providers.length > 0;
+  /**
+   * Providers that refused on billing, and until when they are skipped.
+   * Q room W5: a refused key is never retried picture after picture; the
+   * next ask within the cooldown costs no call at all.
+   */
+  const pausedUntil = new Map<string, number>();
   return {
     enabled,
     generate: async (request) => {
       if (!enabled) return { status: "UNAVAILABLE" };
       const prompt = finalImagePrompt(request.prompt);
+      const runnable = options.providers.filter(
+        (provider) => (pausedUntil.get(provider.code) ?? 0) <= now(),
+      );
+      if (runnable.length === 0) {
+        return { status: "UNAVAILABLE", reason: "BILLING" };
+      }
       let attempt = 0;
-      for (const provider of options.providers) {
+      let billing = false;
+      for (const provider of runnable) {
         attempt += 1;
         const started = now();
         const signal =
@@ -200,9 +246,15 @@ export function createImageGateway(options: {
             costUsd: provider.costPerImageUsd,
           };
         }
+        if (failure === "BUDGET_EXCEEDED") {
+          billing = true;
+          pausedUntil.set(provider.code, now() + cooldownMs);
+        }
         if (failure === "CANCELLED") break;
       }
-      return { status: "FAILED" };
+      return billing
+        ? { status: "FAILED", reason: "BILLING" }
+        : { status: "FAILED" };
     },
   };
 }
