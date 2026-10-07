@@ -260,6 +260,63 @@ export const Q_WORKFORCE_OVERVIEW_PATH = "/v1/q/workforce/overview" as const;
 
 export const WORKFORCE_TEAM_STATES = ["WORKING", "NEEDS_YOU", "IDLE"] as const;
 
+/** A standing instruction step's own status (the table's check). */
+export const WORKFORCE_INSTRUCTION_STEP_STATUSES = [
+  "DONE",
+  "ASKED",
+  "REFUSED",
+  "FAILED",
+  "NOTED",
+] as const;
+
+/**
+ * One step Q took under a standing instruction, as recorded (Zino, 7 Oct:
+ * the map read only job runs, so an instruction that had drafted four
+ * cards awaiting his yes showed every specialist "Idle"). The page maps
+ * the action to the specialist; code never invents a step.
+ */
+export const WorkforceInstructionStepDtoSchema = z
+  .object({
+    action: z.string().regex(/^[a-z][a-z0-9_.]{0,79}$/u),
+    status: z.enum(WORKFORCE_INSTRUCTION_STEP_STATUSES),
+    reasonCode: z
+      .string()
+      .regex(/^[A-Z][A-Z0-9_]{0,63}$/u)
+      .nullable(),
+    words: z.string().max(500),
+    at: UtcTimestampSchema,
+    /** ASKED: its card's approval and where it stands (EXPIRED once lapsed). */
+    approvalId: UuidSchema.nullable(),
+    approvalStatus: z
+      .enum(["PENDING", "APPROVED", "REJECTED", "EXPIRED", "REVOKED"])
+      .nullable(),
+  })
+  .strict();
+export type WorkforceInstructionStepDto = z.infer<
+  typeof WorkforceInstructionStepDtoSchema
+>;
+
+/** A live standing instruction: when it last ran and runs next, and its steps. */
+export const WorkforceInstructionDtoSchema = z
+  .object({
+    id: UuidSchema,
+    goal: z.string().max(300),
+    status: z.enum(["ACTIVE", "PAUSED"]),
+    pauseReason: z
+      .string()
+      .regex(/^[A-Z][A-Z0-9_]{0,63}$/u)
+      .nullable(),
+    lastRunAt: UtcTimestampSchema.nullable(),
+    /** The scheduler's next firing; null: due now (or paused). */
+    nextRunAt: UtcTimestampSchema.nullable(),
+    /** The last day's steps and every card still waiting, newest first. */
+    steps: z.array(WorkforceInstructionStepDtoSchema).max(60),
+  })
+  .strict();
+export type WorkforceInstructionDto = z.infer<
+  typeof WorkforceInstructionDtoSchema
+>;
+
 /**
  * The workforce at a glance (J5, J6): who is on what today, and what Q's
  * work cost this month against the person's monthly limit. Counts and
@@ -305,6 +362,8 @@ export const WorkforceOverviewDtoSchema = z
         needsYou: z.number().int().min(0),
       })
       .strict(),
+    /** Live standing instructions. Absent from an older server. */
+    instructions: z.array(WorkforceInstructionDtoSchema).max(20).optional(),
   })
   .strict();
 export type WorkforceOverviewDto = z.infer<typeof WorkforceOverviewDtoSchema>;

@@ -64,6 +64,8 @@ export type AgentNode = {
     readonly approvalId: string;
     readonly draftId: string;
   } | null;
+  /** The standing instruction's next scheduled run (ISO), when it has one. */
+  readonly nextRunAt: string | null;
   /** A draft the person can read (asking or held). */
   readonly draftId: string | null;
   /** Who it waits on, when waiting. */
@@ -163,6 +165,10 @@ function better(a: Candidate | undefined, b: Candidate): Candidate {
 function candidatesOf(
   job: WorkforceJobDetailDto,
   now: number,
+  /** Which specialist asked each instruction card, by approval id. */
+  askedBy: ReadonlyMap<string, Role>,
+  /** The server reports instructions: their schedule speaks for the lead. */
+  scheduled: boolean,
 ): readonly (readonly [Role, Candidate])[] {
   const out: (readonly [Role, Candidate])[] = [];
   const recent = (iso: string | null) =>
@@ -174,6 +180,14 @@ function candidatesOf(
     switch (run.status) {
       case "RUNNING":
         if (ended) break;
+        // A standing instruction's job keeps its lead run open between
+        // firings: that is a schedule, not work happening now.
+        if (
+          scheduled &&
+          job.job.source === "INSTRUCTION" &&
+          run.role === "LEAD"
+        )
+          break;
         out.push([
           run.role,
           {
@@ -275,7 +289,7 @@ function candidatesOf(
     ) {
       const to = draft.counterpartName;
       out.push([
-        speaker(job),
+        askedBy.get(outcome.approvalId) ?? speaker(job),
         {
           state: "asking",
           now:
@@ -304,6 +318,160 @@ function candidatesOf(
     }
   }
   return out;
+}
+
+type InstructionDto = NonNullable<WorkforceOverviewDto["instructions"]>[number];
+type InstructionStep = InstructionDto["steps"][number];
+
+/**
+ * The specialist a standing instruction's step belongs to, by the action
+ * code recorded (never by guessing from words, except a chat message that
+ * the step itself names as a reply). Null: the lead's own bookkeeping.
+ */
+export function stepRole(step: InstructionStep): Role | null {
+  const { action } = step;
+  if (action === "q.note") {
+    if (step.reasonCode === "QUESTION_FOR_YOU") return "CONVERSATION";
+    if (step.reasonCode === "NOTHING_TO_DO") return "MANDATE_WATCHER";
+    return null;
+  }
+  if (action === "q.cannot") return null;
+  if (action === "relationship.interest.express") return "MANDATE_WATCHER";
+  if (action.includes("meeting") || action.includes("schedule"))
+    return "SCHEDULER";
+  if (action.includes("document") || action.includes("data_room"))
+    return "DOCUMENTS";
+  if (action.startsWith("chat.") || action.includes("message")) {
+    return /\b(?:repl|answer)/iu.test(step.words) ? "CONVERSATION" : "OUTREACH";
+  }
+  if (action.startsWith("relationship.")) return "OUTREACH";
+  return null;
+}
+
+/** "14:03" today, "Thu 09:03" on another day, in the reader's own zone. */
+export function clockWords(iso: string, now: number): string {
+  const at = new Date(iso);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(at);
+  const day = (date: Date) => date.toDateString();
+  if (day(at) === day(new Date(now))) return time;
+  const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(
+    at,
+  );
+  return `${weekday} ${time}`;
+}
+
+/**
+ * What Q's standing instructions did in the last day, per specialist (Zino,
+ * 7 Oct: four cards waited on his yes and the map said every agent was
+ * idle). A card counts as asking only while its approval is PENDING and
+ * unexpired; the server reads expiry, code never assumes it.
+ */
+function instructionCandidates(
+  instructions: readonly InstructionDto[],
+  now: number,
+  /** Approvals a job's draft already shows, with its text to read. */
+  shown: ReadonlySet<string>,
+): readonly (readonly [Role, Candidate])[] {
+  const out: (readonly [Role, Candidate])[] = [];
+  const recent = (iso: string) => now - Date.parse(iso) < DAY_MS;
+  for (const instruction of instructions) {
+    const title = jobTitle(instruction.goal || "Your standing instruction");
+    for (const step of instruction.steps) {
+      const role = stepRole(step);
+      if (role === null) continue;
+      const words = step.words.trim();
+      if (step.status === "ASKED") {
+        if (
+          step.approvalStatus !== "PENDING" ||
+          step.approvalId === null ||
+          shown.has(step.approvalId)
+        )
+          continue;
+        out.push([
+          role,
+          {
+            state: "asking",
+            now: words || "Wants your yes on a card.",
+            job: null,
+            title,
+            since: step.at,
+          },
+        ]);
+      } else if (!recent(step.at)) {
+        continue;
+      } else if (step.status === "DONE") {
+        out.push([
+          role,
+          { state: "done", now: words, job: null, title, since: step.at },
+        ]);
+      } else if (step.status === "FAILED") {
+        out.push([
+          role,
+          {
+            state: "failed",
+            now: words || "It couldn’t finish this step.",
+            job: null,
+            title,
+            since: step.at,
+          },
+        ]);
+      } else if (step.status === "NOTED") {
+        out.push([
+          role,
+          {
+            state: step.reasonCode === "QUESTION_FOR_YOU" ? "held" : "done",
+            now: words,
+            job: null,
+            title,
+            since: step.at,
+          },
+        ]);
+      }
+    }
+  }
+  return out;
+}
+
+/** The lead's line for live instructions: when Q last ran and runs next. */
+function leadSchedule(
+  instructions: readonly InstructionDto[],
+  now: number,
+): { readonly candidate: Candidate | null; readonly nextRunAt: string | null } {
+  const active = instructions.filter((one) => one.status === "ACTIVE");
+  if (active.length === 0) return { candidate: null, nextRunAt: null };
+  const next = active
+    .map((one) => one.nextRunAt)
+    .filter((iso): iso is string => iso !== null)
+    .sort()[0];
+  const nextWords =
+    next === undefined
+      ? "Due to run now."
+      : `Next run ${clockWords(next, now)}.`;
+  const last = active
+    .map((one) => one.lastRunAt)
+    .filter((iso): iso is string => iso !== null)
+    .sort()
+    .at(-1);
+  const title =
+    active.length === 1 && active[0] !== undefined
+      ? jobTitle(active[0].goal || "Your standing instruction")
+      : `${String(active.length)} standing instructions`;
+  if (last !== undefined && now - Date.parse(last) < DAY_MS) {
+    return {
+      candidate: {
+        state: "done",
+        now: `Ran ${clockWords(last, now)}. ${nextWords}`,
+        job: null,
+        title,
+        since: last,
+      },
+      nextRunAt: next ?? null,
+    };
+  }
+  return { candidate: null, nextRunAt: next ?? null };
 }
 
 /** Live work (standing instructions, outreach) that waits or is paused. */
@@ -369,13 +537,45 @@ export function agentNodes(input: {
 }): readonly AgentNode[] {
   const { overview, jobs, now } = input;
   const best = new Map<Role, Candidate>();
+  // Cards waiting on the person, per specialist: the node says how many.
+  const asking = new Map<Role, number>();
   const offer = (role: Role, candidate: Candidate) => {
+    if (candidate.state === "asking")
+      asking.set(role, (asking.get(role) ?? 0) + 1);
     best.set(role, better(best.get(role), candidate));
   };
+  const instructions = overview.instructions ?? [];
+  const askedBy = new Map<string, Role>();
+  for (const instruction of instructions) {
+    for (const step of instruction.steps) {
+      const role = stepRole(step);
+      if (step.status === "ASKED" && step.approvalId !== null && role !== null)
+        askedBy.set(step.approvalId, role);
+    }
+  }
+  const shown = new Set<string>();
   for (const job of jobs) {
-    for (const [role, candidate] of candidatesOf(job, now))
+    for (const draft of job.drafts) {
+      if (draft.outcome?.approvalId != null)
+        shown.add(draft.outcome.approvalId);
+    }
+    for (const [role, candidate] of candidatesOf(
+      job,
+      now,
+      askedBy,
+      overview.instructions !== undefined,
+    ))
       offer(role, candidate);
   }
+  for (const [role, candidate] of instructionCandidates(
+    instructions,
+    now,
+    shown,
+  )) {
+    offer(role, candidate);
+  }
+  const schedule = leadSchedule(instructions, now);
+  if (schedule.candidate !== null) offer("LEAD", schedule.candidate);
   for (const [role, candidate] of workCandidates(input.work ?? [])) {
     offer(role, candidate);
   }
@@ -388,7 +588,18 @@ export function agentNodes(input: {
   return roles.map((role): AgentNode => {
     let candidate = best.get(role);
     const row = team.get(role);
-    if (candidate === undefined && row !== undefined && row.state !== "IDLE") {
+    // An instruction's lead run stays open between firings; with the
+    // schedule known, that open run is not "working".
+    const leadBetweenRuns =
+      role === "LEAD" &&
+      row?.state === "WORKING" &&
+      instructions.some((one) => one.status === "ACTIVE");
+    if (
+      candidate === undefined &&
+      row !== undefined &&
+      row.state !== "IDLE" &&
+      !leadBetweenRuns
+    ) {
       // The overview knows it is on something the recent jobs don't show.
       candidate = {
         state: row.state === "NEEDS_YOU" ? "held" : "working",
@@ -415,16 +626,22 @@ export function agentNodes(input: {
       lead: role === "LEAD",
       runs: row?.runs ?? 0,
       monthUsd: spend.get(role) ?? "0",
+      nextRunAt: role === "LEAD" ? schedule.nextRunAt : null,
     };
     if (candidate === undefined) {
+      const due = schedule.nextRunAt;
       return {
         ...base,
         state: "idle",
         pause: null,
         now:
-          role === "LEAD" && overview.jobs.open === 0
-            ? IDLE_LINES.LEAD
-            : IDLE_LINES[role],
+          role === "LEAD" && instructions.some((one) => one.status === "ACTIVE")
+            ? due === null
+              ? "Due to run now."
+              : `Nothing running. Next run ${clockWords(due, now)}.`
+            : role === "LEAD" && overview.jobs.open === 0
+              ? IDLE_LINES.LEAD
+              : IDLE_LINES[role],
         jobId: null,
         job: null,
         since: null,
@@ -437,7 +654,10 @@ export function agentNodes(input: {
       ...base,
       state: candidate.state,
       pause: candidate.state === "paused" ? (candidate.pause ?? "you") : null,
-      now: candidate.now,
+      now:
+        candidate.state === "asking" && (asking.get(role) ?? 0) > 1
+          ? `${String(asking.get(role))} cards wait for your yes. Newest: ${candidate.now}`
+          : candidate.now,
       jobId: candidate.job?.job.id ?? null,
       job:
         candidate.job === null

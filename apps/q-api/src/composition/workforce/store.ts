@@ -126,6 +126,28 @@ export type ApprovalRow = {
   readonly id: string;
   readonly action_id: string;
   readonly status: string;
+  /** A PENDING card past this has lapsed (absent: an older double). */
+  readonly expires_at?: Date | null | undefined;
+};
+
+/** A live standing instruction and its recent steps (the team map). */
+export type InstructionActivityRow = {
+  readonly id: string;
+  readonly goal_text: string;
+  readonly status: string;
+  readonly pause_reason: string | null;
+  readonly last_fired_at: Date | null;
+  readonly next_fire_at: Date | null;
+  readonly steps: readonly {
+    readonly action: string;
+    readonly status: string;
+    readonly reason_code: string | null;
+    readonly words: string;
+    readonly created_at: Date;
+    readonly approval_id: string | null;
+    readonly approval_status: string | null;
+    readonly approval_expires_at: Date | null;
+  }[];
 };
 
 /** One role's day (J5): counts read by code, never a model's. */
@@ -265,6 +287,16 @@ export type WorkforceStore = {
     owner: Owner,
     runIds: readonly string[],
   ) => Promise<ReadonlyMap<string, string>>;
+  /**
+   * Their live standing instructions with the steps since `since` and
+   * every card still waiting (Zino, 7 Oct). Absent: a store without them.
+   */
+  readonly instructions?:
+    | ((
+        owner: Owner,
+        since: Date,
+      ) => Promise<readonly InstructionActivityRow[]>)
+    | undefined;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -509,7 +541,7 @@ export function createPostgresWorkforceStore(
         actionIds.length === 0
           ? []
           : await sql<ApprovalRow[]>`
-              select a.id, a.action_id, a.status from q_runtime.approvals a
+              select a.id, a.action_id, a.status, a.expires_at from q_runtime.approvals a
                where a.action_id = any(${actionIds}::uuid[])
                  and a.tenant_id = ${owner.tenantId}
                  and a.requested_from_user_id = ${owner.userId}`;
@@ -572,6 +604,43 @@ export function createPostgresWorkforceStore(
          where id = any(${ids}::uuid[]) and tenant_id = ${owner.tenantId}
            and user_id = ${owner.userId}`;
       return new Map(rows.map((row) => [row.id, row.role]));
+    },
+
+    instructions: async (owner, since) => {
+      const heads = await sql<Omit<InstructionActivityRow, "steps">[]>`
+        select id, goal_text, status, pause_reason, last_fired_at, next_fire_at
+          from q_runtime.standing_instructions
+         where tenant_id = ${owner.tenantId} and user_id = ${owner.userId}
+           and status in ('ACTIVE', 'PAUSED')
+         order by created_at desc
+         limit 20`;
+      if (heads.length === 0) return [];
+      const steps = await sql<
+        (InstructionActivityRow["steps"][number] & {
+          readonly instruction_id: string;
+        })[]
+      >`
+        select t.instruction_id, t.action, t.status, t.reason_code, t.words,
+               t.created_at, p.id as approval_id, p.status as approval_status,
+               p.expires_at as approval_expires_at
+          from q_runtime.instruction_steps t
+          left join lateral (
+            select a.id, a.status, a.expires_at from q_runtime.approvals a
+             where a.action_id = t.q_action_id and a.tenant_id = t.tenant_id
+               and a.requested_from_user_id = ${owner.userId}
+             order by a.requested_at desc limit 1) p on true
+         where t.tenant_id = ${owner.tenantId} and t.user_id = ${owner.userId}
+           and t.instruction_id = any(${heads.map((one) => one.id)}::uuid[])
+           and (t.created_at >= ${since}
+                or (t.status = 'ASKED' and p.status = 'PENDING'))
+         order by t.created_at desc, t.step_index desc
+         limit 400`;
+      return heads.map((head) => ({
+        ...head,
+        steps: steps
+          .filter((step) => step.instruction_id === head.id)
+          .slice(0, 60),
+      }));
     },
   };
 }

@@ -139,6 +139,9 @@ function fakeEngine(overrides: Partial<QActionService> = {}) {
           summary: "Make your company visible to investors",
           requestedAt: VIEW.requestedAt,
           expiresAt: VIEW.expiresAt,
+          // The repository's own row carries it (Q room W4b); the public
+          // list must not: it 500ed every caller with a card (7 Oct).
+          actionType: "app.chat.message.send" as never,
         },
       ]);
     },
