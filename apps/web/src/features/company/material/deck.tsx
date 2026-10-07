@@ -24,6 +24,7 @@ import {
   Upload,
 } from "@capital-q/ui/icons";
 
+import { DeckReadingReview } from "./deck-review";
 import { DeckCarousel, DeckReadSummary } from "./deck-sections";
 import { Watermark } from "./file-viewer";
 import {
@@ -390,9 +391,10 @@ export function DeckCoach({
             data-confirm-reading
           >
             <p className="cq-body-sm flex-1 text-(--cq-text-primary)">
-              Q read version {view.extraction.versionNumber}. Investors see the
-              twelve sections only after you check them and confirm. Coaching
-              notes stay yours.
+              Q read version {view.extraction.versionNumber}. Investors see a
+              section only once you confirm it. Confirming all keeps any you
+              marked as wrong or corrected as you left them. Coaching notes
+              stay yours.
             </p>
             <button
               type="button"
@@ -400,7 +402,7 @@ export function DeckCoach({
               onClick={confirm}
               className={buttonClassName("primary", "regular")}
             >
-              Show to investors
+              Confirm all and show
             </button>
           </div>
         ) : null}
@@ -408,6 +410,14 @@ export function DeckCoach({
           <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
             {message}
           </p>
+        )}
+
+        {view.extraction === null ? null : (
+          <DeckReadingReview
+            companyId={companyId}
+            documentId={deck.documentId}
+            extraction={view.extraction}
+          />
         )}
 
         <div

@@ -417,6 +417,10 @@ export function verdictTitle(
 ): string {
   const met = lines.filter((line) => line.standing === "MEETS").length;
   if (verdict === "FITS") {
+    // F28: no published criteria means nothing was checked, not a fit.
+    if (lines.length === 0) {
+      return `${fund} has no published criteria yet; you can apply`;
+    }
     return met === lines.length
       ? `You meet all ${lines.length} of ${fund}'s rules`
       : `You can apply to ${fund}`;

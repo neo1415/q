@@ -34,6 +34,13 @@ export type ReadinessDeckSection = {
   readonly improve: string | null;
 };
 
+export type ReadinessDeckFigure = {
+  readonly section: DeckSectionCode;
+  readonly label: string;
+  readonly value: string;
+  readonly asOf: string | null;
+};
+
 export type ReadinessFollowUpInput = {
   readonly factKey: string;
   readonly reason: string;
@@ -63,6 +70,12 @@ export type ReadinessInputs = {
     readonly documentId: string;
     /** Null: Q has not read it yet (unknown, not missing). */
     readonly sections: readonly ReadinessDeckSection[] | null;
+    /**
+     * F29: figures from sections of Q's reading the founder confirmed (or
+     * wrote themselves). The deck's own claims: USER_CLAIM, SELF_REPORTED.
+     * Absent or empty: none confirmed yet.
+     */
+    readonly figures?: readonly ReadinessDeckFigure[] | undefined;
   } | null;
   /** Null: the data room could not be read. */
   readonly dataRoom: {

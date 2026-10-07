@@ -3,6 +3,7 @@ import {
   cleanup,
   fireEvent,
   render,
+  waitFor,
   screen,
   within,
 } from "@testing-library/react";
@@ -48,6 +49,12 @@ vi.mock("../src/features/company/material/material-actions", () => ({
   setLevelAction: vi.fn(() => Promise.resolve({ ok: true, value: undefined })),
   confirmReadingAction: vi.fn(() =>
     Promise.resolve({ ok: true, value: undefined }),
+  ),
+  reviewSectionAction: vi.fn(() =>
+    Promise.resolve({ ok: true, value: undefined }),
+  ),
+  readAgainAction: vi.fn(() =>
+    Promise.resolve({ ok: true, value: { left: 1 } }),
   ),
   newRequestKey: vi.fn(() => Promise.resolve("dr-key-0001")),
 }));
@@ -230,7 +237,39 @@ describe("deck coaching", () => {
     ).toBeGreaterThan(0);
     // The reading is not shown to investors until the founder confirms it.
     expect(
-      screen.getByRole("button", { name: "Show to investors" }),
+      screen.getByRole("button", { name: "Confirm all and show" }),
     ).toBeTruthy();
+  });
+
+  it("F26: one section can be marked wrong without holding back the rest, and Q can read again", async () => {
+    const view = fixtures.reviewDeck("OWNER");
+    if (view.coaching === null || view.extraction === null)
+      throw new Error("fixture");
+    render(
+      <DeckCoach
+        companyId={fixtures.REVIEW_COMPANY_ID}
+        view={view}
+        coaching={view.coaching}
+      />,
+    );
+    const first = document.querySelector("[data-review-section]");
+    expect(first).not.toBeNull();
+    const wrong = within(first as HTMLElement).getByRole("button", {
+      name: "This is wrong",
+    });
+    fireEvent.click(wrong);
+    await waitFor(() =>
+      expect(
+        within(first as HTMLElement).getByText(/Marked as wrong/),
+      ).toBeTruthy(),
+    );
+    const again = screen.getByRole("button", { name: "Ask Q to read again" });
+    await waitFor(() =>
+      expect((again as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(again);
+    await waitFor(() =>
+      expect(screen.getByText(/reading your deck again/)).toBeTruthy(),
+    );
   });
 });

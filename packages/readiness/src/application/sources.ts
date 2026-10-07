@@ -1,12 +1,13 @@
 import {
   CorrelationIdSchema,
   type CompanyDeckView,
+  type DeckSectionCode,
   type DataRoomView,
   type ReadinessQuestionAnswerRequest,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
-import type { ReadinessInputs } from "../domain/inputs.js";
+import type { ReadinessDeckFigure, ReadinessInputs } from "../domain/inputs.js";
 import type {
   ReadinessFollowUpPort,
   ReadinessFollowUpSource,
@@ -128,6 +129,55 @@ export function readinessFollowUps(
   };
 }
 
+/**
+ * F29: the figures of the founder's own deck reading that they confirmed
+ * (or corrected in their own words). Never a pending section, never one
+ * they marked as wrong, never Q's inference or a contradiction.
+ */
+export function confirmedDeckFigures(
+  extraction: CompanyDeckView["extraction"],
+): ReadinessDeckFigure[] {
+  if (extraction === null) return [];
+  const states = new Map(
+    (extraction.sectionStates ?? []).map((s) => [s.section, s.state]),
+  );
+  const confirmed = (section: DeckSectionCode) => {
+    const state = states.get(section);
+    return state === undefined
+      ? extraction.confirmed
+      : state === "CONFIRMED" || state === "CORRECTED";
+  };
+  return extraction.sections.flatMap((section) => {
+    if (!confirmed(section.section)) return [];
+    const facts = section.facts.flatMap((fact) =>
+      fact.value === null ||
+      fact.unknownReason !== null ||
+      fact.truthClass !== "USER_CLAIM"
+        ? []
+        : [
+            {
+              section: section.section,
+              label: fact.label,
+              value: fact.value,
+              asOf: fact.asOf,
+            },
+          ],
+    );
+    const own =
+      states.get(section.section) === "CORRECTED" && section.summary !== null
+        ? [
+            {
+              section: section.section,
+              label: "In your words",
+              value: section.summary,
+              asOf: null,
+            },
+          ]
+        : [];
+    return [...own, ...facts];
+  });
+}
+
 export function readinessDeckFrom(companyDeck: {
   view(actor: ActorContext, companyId: string): Promise<CompanyDeckView | null>;
 }) {
@@ -141,6 +191,7 @@ export function readinessDeckFrom(companyDeck: {
     }
     return {
       documentId: view.deck.documentId,
+      figures: confirmedDeckFigures(view.extraction),
       sections:
         view.coaching === null
           ? null

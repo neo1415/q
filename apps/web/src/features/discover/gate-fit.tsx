@@ -24,8 +24,9 @@ export function GateFit({
   return (
     <div className="flex flex-col gap-2" data-gate-fit={gate.publicId}>
       <span className="cq-label inline-flex w-fit items-center gap-1.5 rounded-full border border-(--cq-accent) px-2 py-0.5 text-(--cq-accent)">
-        Has a gate · {gate.criteria.length}{" "}
-        {gate.criteria.length === 1 ? "criterion" : "criteria"}
+        {gate.criteria.length === 0
+          ? "Has a gate · no published criteria yet"
+          : `Has a gate · ${String(gate.criteria.length)} ${gate.criteria.length === 1 ? "criterion" : "criteria"}`}
       </span>
       {gate.criteria.length === 0 ? null : (
         <ul

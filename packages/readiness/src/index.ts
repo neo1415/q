@@ -10,6 +10,7 @@ export { buildBlueprint } from "./domain/blueprint.js";
 export {
   stageRank,
   type ReadinessClaimInput,
+  type ReadinessDeckFigure,
   type ReadinessDeckSection,
   type ReadinessInputs,
 } from "./domain/inputs.js";
@@ -37,6 +38,7 @@ export {
 } from "./rules/v1.js";
 export {
   readinessDataRoomFrom,
+  confirmedDeckFigures,
   readinessDeckFrom,
   readinessFollowUps,
   readinessRaiseFrom,

@@ -128,10 +128,12 @@ export function summaryPdf(input: PackInput): Uint8Array {
     ),
     { text: "", size: 9 },
     { text: "Your gate's rules", size: 12 },
-    ...input.rules.map((rule) => ({
-      text: `${rule.standing}: ${rule.label}`,
-      size: 10,
-    })),
+    ...(input.rules.length === 0
+      ? [{ text: "No published rules yet, so nothing was checked.", size: 10 }]
+      : input.rules.map((rule) => ({
+          text: `${rule.standing}: ${rule.label}`,
+          size: 10,
+        }))),
     { text: "", size: 9 },
     ...(input.omitted.length === 0
       ? []

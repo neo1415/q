@@ -1,4 +1,11 @@
-import type { DataRoomLevel, DeckSectionReading } from "@capital-q/contracts";
+import type {
+  DataRoomLevel,
+  DeckSectionCode,
+  DeckSectionReading,
+  DeckSectionReviewAction,
+  DeckSetAside,
+} from "@capital-q/contracts";
+import { DECK_READ_AGAIN_MAX } from "@capital-q/contracts";
 import {
   jsonbParam,
   type DatabaseExecutor,
@@ -65,6 +72,18 @@ export type DeckExtractionRow = {
   readonly sections: readonly DeckSectionReading[];
   readonly createdAt: string;
   readonly confirmed: boolean;
+  /** F26: which reading of this version (1 = Q's first). */
+  readonly readingNumber: number;
+  /** F26: figures the check set aside; empty when none or not checked. */
+  readonly setAside: readonly DeckSetAside[];
+  /** F26: the newest review per section. */
+  readonly reviews: readonly {
+    readonly section: DeckSectionCode;
+    readonly action: DeckSectionReviewAction;
+    readonly correction: string | null;
+  }[];
+  /** F26: "Read again" requests for this version, and whether one waits. */
+  readonly readAgain: { readonly used: number; readonly pending: boolean };
 };
 
 const iso = (value: Date | string): string =>
@@ -465,14 +484,38 @@ export function createPostgresDataRoom() {
           sections: DeckSectionReading[];
           created_at: Date;
           confirmed: boolean;
+          reading_number: number;
+          set_aside: DeckSetAside[] | null;
+          reviews: {
+            section: DeckSectionCode;
+            action: DeckSectionReviewAction;
+            correction: string | null;
+          }[];
+          used: number;
+          pending: boolean;
         }[]
       >`
         select x.id, x.document_id, x.document_version_id, x.page_count, x.sections,
-               x.created_at, (c.extraction_id is not null) as confirmed
+               x.created_at, (c.extraction_id is not null) as confirmed,
+               x.reading_number, x.set_aside,
+               coalesce((
+                 select jsonb_agg(jsonb_build_object('section', r.section, 'action', r.action,
+                                                     'correction', r.correction))
+                   from (select distinct on (section) section, action, correction
+                           from evidence.deck_section_reviews
+                          where extraction_id = x.id
+                          order by section, created_at desc, id desc) r
+               ), '[]'::jsonb) as reviews,
+               (select count(*)::int from evidence.deck_read_again_requests q
+                 where q.document_version_id = x.document_version_id) as used,
+               exists (select 1 from evidence.deck_read_again_requests q
+                        where q.document_version_id = x.document_version_id
+                          and not exists (select 1 from evidence.deck_read_again_outcomes o
+                                           where o.request_id = q.id)) as pending
           from evidence.deck_extractions x
           left join evidence.deck_extraction_confirmations c on c.extraction_id = x.id
          where x.document_version_id = ${documentVersionId}
-         order by x.prompt_version desc, x.created_at desc
+         order by x.prompt_version desc, x.reading_number desc, x.created_at desc
          limit 1`;
       const row = rows[0];
       return row === undefined
@@ -485,6 +528,10 @@ export function createPostgresDataRoom() {
             sections: row.sections,
             createdAt: iso(row.created_at),
             confirmed: row.confirmed,
+            readingNumber: row.reading_number,
+            setAside: row.set_aside ?? [],
+            reviews: row.reviews,
+            readAgain: { used: row.used, pending: row.pending },
           };
     },
 
@@ -499,14 +546,21 @@ export function createPostgresDataRoom() {
         readonly schemaVersion: number;
         readonly pageCount: number | null;
         readonly sections: readonly DeckSectionReading[];
+        /** F26: absent: Q's first reading (1). */
+        readonly readingNumber?: number | undefined;
+        readonly origin?:
+          "FIRST_READ" | "READ_AGAIN" | "FIGURE_CHECK" | undefined;
+        readonly setAside?: readonly DeckSetAside[] | undefined;
       },
     ): Promise<boolean> => {
       const made = await executor<{ id: string }[]>`
         insert into evidence.deck_extractions
           (tenant_id, company_id, document_id, document_version_id, prompt_version,
-           schema_version, page_count, sections)
+           schema_version, page_count, reading_number, reading_origin, set_aside, sections)
         values (${input.tenantId}, ${input.companyId}, ${input.documentId}, ${input.documentVersionId},
                 ${input.promptVersion}, ${input.schemaVersion}, ${input.pageCount},
+                ${input.readingNumber ?? 1}, ${input.origin ?? "FIRST_READ"},
+                ${jsonbParam(executor, input.setAside ?? [])},
                 ${
                   // Never JSON.stringify(...)::jsonb: postgres.js encodes it
                   // again, the row holds a JSON string, and the table's
@@ -514,9 +568,125 @@ export function createPostgresDataRoom() {
                   // production (Q.08, 2026-10-07).
                   jsonbParam(executor, input.sections)
                 })
-        on conflict (document_version_id, prompt_version) do nothing
+        on conflict (document_version_id, prompt_version, reading_number) do nothing
         returning id`;
       return made.length > 0;
+    },
+
+    /** F26: the next reading number of a version under a prompt version. */
+    nextReadingNumber: async (
+      executor: DatabaseExecutor,
+      documentVersionId: string,
+      promptVersion: number,
+    ): Promise<number> => {
+      const rows = await executor<{ n: number }[]>`
+        select coalesce(max(reading_number), 0)::int + 1 as n
+          from evidence.deck_extractions
+         where document_version_id = ${documentVersionId}
+           and prompt_version = ${promptVersion}`;
+      return rows[0]?.n ?? 1;
+    },
+
+    /** F26: the founder's review of one section (append-only). */
+    reviewSection: async (
+      tx: TransactionContext,
+      input: {
+        readonly extractionId: string;
+        readonly tenantId: string;
+        readonly userId: string;
+        readonly section: DeckSectionCode;
+        readonly action: DeckSectionReviewAction;
+        readonly correction: string | null;
+      },
+    ): Promise<void> => {
+      await tx.sql`
+        insert into evidence.deck_section_reviews
+          (tenant_id, extraction_id, section, action, correction, reviewed_by_user_id)
+        values (${input.tenantId}, ${input.extractionId}, ${input.section},
+                ${input.action}, ${input.correction}, ${input.userId})`;
+    },
+
+    /**
+     * F26: "Read again". The database holds the budget (two per version);
+     * a refused third answers false, never a third model reading.
+     */
+    requestReadAgain: async (
+      tx: TransactionContext,
+      input: {
+        readonly extractionId: string;
+        readonly tenantId: string;
+        readonly documentVersionId: string;
+        readonly userId: string;
+      },
+    ): Promise<boolean> => {
+      const used = await tx.sql<{ n: number }[]>`
+        select count(*)::int as n from evidence.deck_read_again_requests
+         where document_version_id = ${input.documentVersionId}`;
+      if ((used[0]?.n ?? 0) >= DECK_READ_AGAIN_MAX) return false;
+      await tx.sql`
+        insert into evidence.deck_read_again_requests
+          (tenant_id, extraction_id, document_version_id, requested_by_user_id)
+        values (${input.tenantId}, ${input.extractionId},
+                ${input.documentVersionId}, ${input.userId})`;
+      return true;
+    },
+
+    /** F26: requests still waiting for the worker, oldest first. */
+    pendingReadAgain: async (
+      executor: DatabaseExecutor,
+      limit: number,
+    ): Promise<
+      readonly {
+        readonly requestId: string;
+        readonly tenantId: string;
+        readonly documentId: string;
+        readonly documentVersionId: string;
+      }[]
+    > => {
+      const rows = await executor<
+        {
+          id: string;
+          tenant_id: string;
+          document_id: string;
+          document_version_id: string;
+        }[]
+      >`
+        select q.id, q.tenant_id, x.document_id, q.document_version_id
+          from evidence.deck_read_again_requests q
+          join evidence.deck_extractions x on x.id = q.extraction_id
+         where not exists (select 1 from evidence.deck_read_again_outcomes o
+                            where o.request_id = q.id)
+         order by q.created_at
+         limit ${limit}`;
+      return rows.map((row) => ({
+        requestId: row.id,
+        tenantId: row.tenant_id,
+        documentId: row.document_id,
+        documentVersionId: row.document_version_id,
+      }));
+    },
+
+    /** F26: "Read again" readings made platform-wide in the last day. */
+    readAgainToday: async (executor: DatabaseExecutor): Promise<number> => {
+      const rows = await executor<{ n: number }[]>`
+        select count(*)::int as n from evidence.deck_read_again_outcomes
+         where created_at > now() - interval '1 day'`;
+      return rows[0]?.n ?? 0;
+    },
+
+    recordReadAgain: async (
+      executor: DatabaseExecutor,
+      input: {
+        readonly requestId: string;
+        readonly tenantId: string;
+        readonly outcome:
+          "READ" | "EMPTY" | "NO_TEXT" | "NOT_ELIGIBLE" | "FAILED";
+      },
+    ): Promise<void> => {
+      await executor`
+        insert into evidence.deck_read_again_outcomes (request_id, tenant_id, outcome)
+        values (${input.requestId}, ${input.tenantId}, ${input.outcome})
+        on conflict (request_id) do nothing`;
     },
 
     confirmExtraction: async (

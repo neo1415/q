@@ -11,7 +11,10 @@ import {
   createCompanyClaims,
   createPlatformCompanyPublishing,
 } from "@capital-q/companies";
-import { createApplicationMaterials } from "./gateq/application-materials.js";
+import {
+  createApplicationMaterials,
+  createApplicationRelationshipJoin,
+} from "./gateq/application-materials.js";
 import { sharedDocumentsPort } from "./gateq/inbox.js";
 import { loadApiConfig } from "@capital-q/config/api";
 import { loadDatabaseConfig } from "@capital-q/config/database";
@@ -950,6 +953,57 @@ const gateqNetwork = createNetworkService({
   outbox,
   audit,
 });
+const gateqFounders = createPostgresApplicationFounders({ sql: database.sql });
+const gateqLogger = createLogger(apiServiceIdentity(config), {
+  level: config.observability.logLevel,
+});
+// P14/F27: a founder's application joins the ONE canonical company-investor
+// relationship through Network's own command (source GATEQ), never a
+// parallel record. Discovery is the founder's own side (founder_private).
+const joinGateqRelationship = createApplicationRelationshipJoin({
+  link: (input) => gateqFounders.link(input),
+  setRelationship: (input) => gateqFounders.setRelationship(input),
+  ensureRelationship: async (command) => {
+    const ensured = await gateqNetwork.ensureRelationship({
+      actor: command.actor,
+      companyId: CompanyIdSchema.parse(command.companyId),
+      investorOrganisationId: InvestorOrganisationIdSchema.parse(
+        command.investorOrganisationId,
+      ),
+      source: { type: "GATEQ", id: command.applicationId },
+      visibilityScope: command.visibilityScope,
+      correlationId: CorrelationIdSchema.parse(`cor_${crypto.randomUUID()}`),
+    });
+    return { relationshipId: ensured.relationship.id };
+  },
+});
+// F27 backfill: applications whose share 500'd before the fix (none
+// linked) join their relationship at start. Bounded, idempotent, never
+// fatal; acts only as a founder who still holds an active membership.
+void (async () => {
+  try {
+    const pending = await gateqFounders.unlinked(100);
+    let linked = 0;
+    for (const row of pending) {
+      try {
+        if ((await joinGateqRelationship(row)) !== null) linked += 1;
+      } catch (error: unknown) {
+        gateqLogger.warn(
+          { err: error },
+          "gateq relationship backfill: one skipped",
+        );
+      }
+    }
+    if (pending.length > 0) {
+      gateqLogger.info(
+        { pending: pending.length, linked },
+        "gateq relationship backfill done",
+      );
+    }
+  } catch (error: unknown) {
+    gateqLogger.warn({ err: error }, "gateq relationship backfill failed");
+  }
+})();
 
 // P14: a founder hears a pass or a reply by email, through the same app
 // sender as team email, recorded like every app email; outcome logged with
@@ -2301,43 +2355,31 @@ const { app, logger } = createApp(config, security, {
           attach: (input) => gateqApply.intake.attachDocument(input),
           link: async ({ token, actor }) => {
             const guest = await gateqApply.intake.authorise(token);
-            const founders = createPostgresApplicationFounders({
-              sql: database.sql,
-            });
-            const pair = await founders.link({
+            await joinGateqRelationship({
               applicationId: guest.application.id,
               tenantId: guest.application.tenantId,
               actor,
             });
-            // P14: the application joins the ONE canonical company-investor
-            // relationship (Network's own command, source GATEQ; both sides
-            // know of it, so relationship_shared), never a parallel record.
-            if (pair !== null) {
-              const companyId = CompanyIdSchema.safeParse(pair.companyId);
-              const investorId = InvestorOrganisationIdSchema.safeParse(
-                pair.investorOrganisationId,
-              );
-              if (companyId.success && investorId.success) {
-                const ensured = await gateqNetwork.ensureRelationship({
-                  actor,
-                  companyId: companyId.data,
-                  investorOrganisationId: investorId.data,
-                  source: { type: "GATEQ", id: guest.application.id },
-                  visibilityScope: "relationship_shared",
-                  correlationId: CorrelationIdSchema.parse(
-                    `cor_${crypto.randomUUID()}`,
-                  ),
-                });
-                await founders.setRelationship({
-                  applicationId: guest.application.id,
-                  relationshipId: ensured.relationship.id,
-                });
-              }
-            }
+          },
+          onLinkFailed: (error) => {
+            gateqLogger.warn(
+              { err: error },
+              "gateq application relationship link failed; repaired on next read",
+            );
           },
         }),
-  gateqMyApplications: (actor) =>
-    createPostgresApplicationFounders({ sql: database.sql }).listFor(actor),
+  // F27: the founder's own unlinked applications are repaired on read.
+  gateqMyApplications: async (actor) => {
+    for (const row of await gateqFounders.unlinkedFor(actor)) {
+      await joinGateqRelationship({ ...row, actor }).catch((error: unknown) =>
+        gateqLogger.warn(
+          { err: error },
+          "gateq application relationship repair failed",
+        ),
+      );
+    }
+    return gateqFounders.listFor(actor);
+  },
   // Q.05 (2026-10-07): published gates checked for the founder's OWN
   // company, resolved here from their organisation (never the client).
   gateqInvestorGates: async (actor, investorOrganisationIds) => {

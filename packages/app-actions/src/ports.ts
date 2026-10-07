@@ -235,7 +235,11 @@ export type AppActionPorts = {
     | undefined;
   /** The pitch-deck tab (overnight A4-A6): the deck, Q's reading, coaching. */
   readonly companyDeck?:
-    Pick<CompanyDeckService, "view" | "confirm"> | undefined;
+    | Pick<
+        CompanyDeckService,
+        "view" | "confirm" | "reviewSection" | "readAgain"
+      >
+    | undefined;
   /** Post-meeting outcomes (2026-10-02): Network's outcome service. */
   readonly outcomes?:
     | Pick<

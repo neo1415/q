@@ -46,6 +46,33 @@ describe("a GateQ application joins the canonical relationship", () => {
     ).toBeNull();
   });
 
+  it("F27 backfill rebuilds the founder's own context, skipping bad rows", async () => {
+    const { sql, queries } = scripted([
+      [
+        {
+          application_id: "00000000-0000-4000-8000-0000000000a1",
+          tenant_id: "00000000-0000-4000-8000-0000000000f1",
+          user_id: "00000000-0000-4000-8000-0000000000b1",
+          membership_id: "00000000-0000-4000-8000-0000000000c1",
+          member_tenant_id: "00000000-0000-4000-8000-0000000000d1",
+          organisation_id: "00000000-0000-4000-8000-0000000000e1",
+        },
+        { application_id: "x", tenant_id: "y", user_id: "not-a-uuid" },
+      ],
+    ]);
+    const rows = await createPostgresApplicationFounders({
+      sql: sql as never,
+    }).unlinked(100);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.actor).toMatchObject({
+      userId: "00000000-0000-4000-8000-0000000000b1",
+      organisationId: "00000000-0000-4000-8000-0000000000e1",
+      actorType: "HUMAN",
+    });
+    expect(queries[0]).toContain("relationship_id is null");
+    expect(queries[0]).toContain("membership_status = 'active'");
+  });
+
   it("records the relationship once, never replacing one", async () => {
     const { sql, queries } = scripted([[]]);
     await createPostgresApplicationFounders({

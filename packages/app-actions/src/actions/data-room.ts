@@ -6,6 +6,13 @@ import {
   DATA_ROOM_REQUEST_DECISION_PATH,
   COMPANY_DATA_ROOM_REQUESTS_PATH,
   DECK_EXTRACTION_CONFIRM_PATH,
+  DECK_READ_AGAIN_PATH,
+  DECK_SECTION_LABELS,
+  DECK_SECTION_REVIEW_PATH,
+  DeckReadAgainResultSchema,
+  DeckSectionCodeSchema,
+  DeckSectionReviewActionSchema,
+  DeckSectionReviewResultSchema,
   DataRoomCodeSchema,
   DataRoomLevelResultSchema,
   DataRoomLevelSchema,
@@ -17,9 +24,14 @@ import {
   RequestDataRoomAccessRequestSchema,
   UuidSchema,
   type DataRoomLevel,
+  type DeckSectionReviewAction,
   type KnownErrorCode,
 } from "@capital-q/contracts";
-import type { DataRoomOutcome, DataRoomRefusal } from "@capital-q/permissions";
+import type {
+  CompanyDeckService,
+  DataRoomOutcome,
+  DataRoomRefusal,
+} from "@capital-q/permissions";
 
 import {
   defineAppAction,
@@ -628,9 +640,261 @@ export const CONFIRM_DECK_READING = defineAppAction<
   },
 });
 
+// --- F26: review one section; ask Q to read the deck again ---------------------
+
+/** The owner's current reading ids, resolved server side for Q's tools. */
+async function currentReading(
+  context: Parameters<
+    NonNullable<typeof CONFIRM_DECK_READING.tool>["toCanonical"]
+  >[1],
+  ports: AppActionPorts,
+) {
+  const companyId = await ports.ownCompanyId?.(context.actor).catch(() => null);
+  if (companyId === null || companyId === undefined) return null;
+  const view = await ports.companyDeck
+    ?.view(context.actor, companyId)
+    .catch(() => null);
+  if (
+    view?.deck === null ||
+    view?.deck === undefined ||
+    view.extraction === null
+  ) {
+    return null;
+  }
+  return {
+    companyId,
+    documentId: view.deck.documentId,
+    extractionId: view.extraction.extractionId,
+  };
+}
+
+const deckProblem = (
+  out:
+    | { readonly outcome: "OK" }
+    | { readonly outcome: "REFUSED"; readonly code: string },
+): { code: KnownErrorCode; detail: string } | null =>
+  out.outcome === "OK"
+    ? null
+    : out.code === "STALE"
+      ? { code: "RESOURCE_CONFLICT", detail: "That reading is out of date." }
+      : out.code === "LIMIT"
+        ? {
+            code: "RESOURCE_CONFLICT",
+            detail: "Q has already read this version again twice.",
+          }
+        : { code: "RESOURCE_NOT_FOUND", detail: "Not found." };
+
+const Review = z
+  .object({
+    companyId: UuidSchema,
+    documentId: UuidSchema,
+    extractionId: UuidSchema,
+    section: DeckSectionCodeSchema,
+    action: DeckSectionReviewActionSchema,
+    correction: z.string().trim().min(1).max(600).nullable(),
+  })
+  .strict()
+  .refine(
+    (input) => (input.action === "CORRECT") === (input.correction !== null),
+    {
+      message: "A correction carries the founder's words; nothing else does.",
+    },
+  );
+const ReviewTool = z
+  .object({
+    section: DeckSectionCodeSchema,
+    action: DeckSectionReviewActionSchema,
+    correction: z.string().trim().min(1).max(600).nullable().optional(),
+  })
+  .strict();
+type ReviewOut = Awaited<ReturnType<CompanyDeckService["reviewSection"]>>;
+
+const REVIEW_WORDS: Readonly<Record<DeckSectionReviewAction, string>> = {
+  CONFIRM: "Confirm",
+  DISMISS: "Mark as wrong",
+  CORRECT: "Correct",
+};
+
+export const REVIEW_DECK_SECTION = defineAppAction<
+  z.infer<typeof Review>,
+  ReviewOut,
+  z.infer<typeof ReviewTool>
+>({
+  name: "deck.section.review",
+  short: "review a deck section",
+  area: "documents",
+  classification: "CONSEQUENTIAL",
+  does: "Confirms, marks as wrong, or corrects in the founder's words one section of Q's reading of their pitch deck. Investors see only confirmed or corrected sections.",
+  input: Review,
+  output: z.custom<ReviewOut>(),
+  authorize: servicesDecide,
+  run: (ports, context, input) =>
+    deck(ports).reviewSection({
+      actor: context.actor,
+      companyId: input.companyId,
+      documentId: input.documentId,
+      extractionId: input.extractionId,
+      section: input.section,
+      action: input.action,
+      correction: input.correction,
+      correlationId: context.correlationId,
+    }),
+  targets: (input) => [{ kind: "DOCUMENT", documentId: input.documentId }],
+  card: (input) => ({
+    summary: `${REVIEW_WORDS[input.action]}: ${DECK_SECTION_LABELS[input.section]}`,
+    preview:
+      input.action === "CORRECT"
+        ? `Investors who can see your deck will read your words for this section: "${input.correction ?? ""}"`
+        : input.action === "DISMISS"
+          ? "Q's reading of this section is set aside; investors see it as not known."
+          : "Investors who can see your deck will also see this section as Q read it.",
+  }),
+  done: (out) =>
+    out.outcome === "OK"
+      ? "Done. That section is reviewed."
+      : "That reading is out of date; refresh to see Q's newest read.",
+  succeeded: (out) => out.outcome === "OK",
+  http: {
+    method: "POST",
+    path: DECK_SECTION_REVIEW_PATH,
+    fromRequest: (params, body) => {
+      const fields =
+        typeof body === "object" && body !== null
+          ? (body as Record<string, unknown>)
+          : {};
+      return {
+        companyId: fields["companyId"],
+        documentId: params["documentId"],
+        extractionId: params["extractionId"],
+        section: params["section"],
+        action: fields["action"],
+        correction: fields["correction"] ?? null,
+      };
+    },
+    problem: deckProblem,
+    notFound: (out) => out.outcome === "REFUSED" && out.code === "NOT_FOUND",
+    respond: (out) =>
+      out.outcome === "OK"
+        ? DeckSectionReviewResultSchema.parse(out.value)
+        : undefined,
+  },
+  tool: {
+    name: "review_deck_section",
+    description:
+      "Prepares, for the founder's approval, a review of ONE section of Q's reading of their pitch deck: CONFIRM it, DISMISS it as wrong, or CORRECT it with their own words (correction). Use when they say a section or a contradiction Q reported is wrong. Nothing changes until they approve.",
+    input: ReviewTool,
+    references: {},
+    scopes: ["COMPANY_PROFILE"],
+    purposes: ["OWN_COMPANY_QUESTION", "ACTION_PREPARATION"],
+    eval: {
+      say: [
+        "The business model section of my deck reading is wrong.",
+        "Confirm the traction section of my deck.",
+      ],
+      orSays: "no deck|hasn't read",
+    },
+    toCanonical: async (tool, context, ports) => {
+      const ids = await currentReading(context, ports);
+      if (ids === null) return refusal("Q hasn't read a deck of yours yet.");
+      const correction = tool.correction ?? null;
+      if (tool.action === "CORRECT" && correction === null) {
+        return refusal("What should that section say instead?");
+      }
+      return {
+        ...ids,
+        section: tool.section,
+        action: tool.action,
+        correction: tool.action === "CORRECT" ? correction : null,
+      };
+    },
+  },
+});
+
+const ReadAgain = z
+  .object({
+    companyId: UuidSchema,
+    documentId: UuidSchema,
+    extractionId: UuidSchema,
+  })
+  .strict();
+const ReadAgainTool = z.object({}).strict();
+type ReadAgainOut = Awaited<ReturnType<CompanyDeckService["readAgain"]>>;
+
+export const READ_DECK_AGAIN = defineAppAction<
+  z.infer<typeof ReadAgain>,
+  ReadAgainOut,
+  z.infer<typeof ReadAgainTool>
+>({
+  name: "deck.read_again",
+  short: "read my deck again",
+  area: "documents",
+  classification: "CONSEQUENTIAL",
+  does: "Asks Q to read the company's current pitch deck again, as a new reading beside the old one (at most twice per deck version).",
+  input: ReadAgain,
+  output: z.custom<ReadAgainOut>(),
+  authorize: servicesDecide,
+  run: (ports, context, input) =>
+    deck(ports).readAgain({
+      actor: context.actor,
+      companyId: input.companyId,
+      documentId: input.documentId,
+      extractionId: input.extractionId,
+      correlationId: context.correlationId,
+    }),
+  targets: (input) => [{ kind: "DOCUMENT", documentId: input.documentId }],
+  card: () => ({
+    summary: "Ask Q to read your deck again",
+    preview:
+      "Q reads this version of your deck again and you review the new reading. The current one stays until then. At most twice per version.",
+  }),
+  done: (out) =>
+    out.outcome === "OK"
+      ? "Q will read your deck again; the new reading appears in a few minutes."
+      : out.code === "LIMIT"
+        ? "Q has already read this version again twice. Upload a new version, or correct the section yourself."
+        : "That reading is out of date; refresh to see Q's newest read.",
+  succeeded: (out) => out.outcome === "OK",
+  http: {
+    method: "POST",
+    path: DECK_READ_AGAIN_PATH,
+    fromRequest: (params, body) => ({
+      companyId:
+        typeof body === "object" && body !== null
+          ? (body as Record<string, unknown>)["companyId"]
+          : undefined,
+      documentId: params["documentId"],
+      extractionId: params["extractionId"],
+    }),
+    problem: deckProblem,
+    notFound: (out) => out.outcome === "REFUSED" && out.code === "NOT_FOUND",
+    respond: (out) =>
+      out.outcome === "OK"
+        ? DeckReadAgainResultSchema.parse(out.value)
+        : undefined,
+  },
+  tool: {
+    name: "read_my_deck_again",
+    description:
+      "Prepares, for the founder's approval, asking Q to read their current pitch deck again (a new reading; at most twice per version). Use when they say Q misread their deck. Nothing changes until they approve.",
+    input: ReadAgainTool,
+    references: {},
+    scopes: ["COMPANY_PROFILE"],
+    purposes: ["OWN_COMPANY_QUESTION", "ACTION_PREPARATION"],
+    eval: {
+      say: ["Read my deck again.", "You misread my pitch deck, try again."],
+      orSays: "no deck|hasn't read|twice",
+    },
+    toCanonical: async (_tool, context, ports) =>
+      (await currentReading(context, ports)) ??
+      refusal("Q hasn't read a deck of yours yet."),
+  },
+});
+
 export const DATA_ROOM_ACTIONS: readonly AnyAppAction[] = [
   SET_DATA_ROOM_LEVEL,
   REQUEST_DATA_ROOM_ACCESS,
   DECIDE_DATA_ROOM_REQUEST,
   CONFIRM_DECK_READING,
+  REVIEW_DECK_SECTION,
+  READ_DECK_AGAIN,
 ];
