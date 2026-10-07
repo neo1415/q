@@ -13,6 +13,7 @@ import {
   getReadiness,
   getCompanyAssumptions,
   getFitCompare,
+  getDiscoveredInvestor,
   getInvestorGates,
   getThesisReading,
   discoverInvestors,
@@ -39,6 +40,13 @@ import {
   investorFitCard,
   thesisCard,
 } from "./promise-cards";
+import { loadBlueprint } from "@/features/capital/readiness-blueprint";
+
+import {
+  blueprintCard,
+  blueprintNotOnPlanCard,
+  looksForCard,
+} from "./plan-investor-cards";
 import { roomCardHref, type RoomCardView } from "./room-card-view";
 
 /**
@@ -199,6 +207,35 @@ async function read(
         };
       }
       return comparisonCard(await getFitCompare(q, ids), href);
+    }
+    // Q.04: the founder's own plan; the id must be their own company.
+    case "READINESS_BLUEPRINT": {
+      const own = await resolveOwnContext();
+      if (
+        own.kind !== "FOUNDER" ||
+        own.companyId.toLowerCase() !== id.toLowerCase()
+      ) {
+        return null;
+      }
+      const load = await loadBlueprint(own.companyId, 6);
+      if (load.kind === "NOT_ON_PLAN") return blueprintNotOnPlanCard(href);
+      return load.kind === "READY" ? blueprintCard(load.blueprint, href) : null;
+    }
+    // Q.05: one investor as a founder may see them (the page's own 404
+    // decides), with their published gate; founders only.
+    case "INVESTOR_LOOKS_FOR": {
+      const own = await resolveOwnContext();
+      if (own.kind !== "FOUNDER") return null;
+      const investor = await getDiscoveredInvestor(session, id);
+      const gates = await getInvestorGates(session, [id]).catch(() => ({
+        items: [],
+      }));
+      const gate =
+        gates.items.find(
+          (item) =>
+            item.investorOrganisationId.toLowerCase() === id.toLowerCase(),
+        ) ?? null;
+      return looksForCard(investor, gate, href);
     }
     case "INVESTOR_FIT": {
       const slate = await discoverInvestors(session);

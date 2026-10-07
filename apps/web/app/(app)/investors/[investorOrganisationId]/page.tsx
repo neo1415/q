@@ -18,6 +18,7 @@ import {
   inboundLabel,
   investorTypeLabel,
 } from "@/features/investors/investor-labels";
+import { LooksForSection } from "@/features/investors/looks-for-section";
 import { ConnectionRequest } from "@/features/network/connection-request";
 import { ProfileHero } from "@/features/profile/profile-header";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
@@ -127,6 +128,16 @@ export default async function InvestorPage({
           editable: false,
           avatarLabel: "logo",
         }}
+      />
+      {/*
+        Q.05: what they publish (public profile + gate criteria only, never
+        the private mandate) and the founder's own fit, then "Draft my
+        application" through the existing GateQ form.
+      */}
+      <LooksForSection
+        session={session}
+        investorOrganisationId={investor.investorOrganisationId}
+        investorName={investor.displayName}
       />
       <Link
         href={`/rehearsals/investor/${encodeURIComponent(investor.investorOrganisationId)}`}

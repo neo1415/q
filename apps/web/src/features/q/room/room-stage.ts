@@ -104,6 +104,14 @@ function subjectWords(intent: QShowInQRoomIntent): {
     THESIS: ["thesis", "mandate", "suggestion", "suggestions"],
     SAVED_COMPARISON: ["compare", "comparison", "saved", "side by side"],
     INVESTOR_FIT: ["investors", "investor", "gate", "gates", "criteria"],
+    READINESS_BLUEPRINT: ["plan", "month", "months", "blueprint", "roadmap"],
+    INVESTOR_LOOKS_FOR: [
+      "looks for",
+      "criteria",
+      "application",
+      "apply",
+      "draft",
+    ],
   };
   return { names, kinds: kinds[intent.object] };
 }
@@ -225,6 +233,10 @@ export function describeCard(intent: QShowInQRoomIntent): string {
       return "your saved companies side by side";
     case "INVESTOR_FIT":
       return "investors by what they publish";
+    case "READINESS_BLUEPRINT":
+      return "your 3/6/12-month plan";
+    case "INVESTOR_LOOKS_FOR":
+      return `what ${intent.title} looks for`;
   }
 }
 

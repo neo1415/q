@@ -65,6 +65,11 @@ export function roomCardHref(intent: QShowInQRoomIntent): string {
       return "/discover/saved";
     case "INVESTOR_FIT":
       return "/discover";
+    // Overdeliver: the founder's plan on Capital; one investor's page.
+    case "READINESS_BLUEPRINT":
+      return "/capital#readiness-blueprint";
+    case "INVESTOR_LOOKS_FOR":
+      return `/investors/${encodeURIComponent(id)}#looks-for`;
   }
 }
 
@@ -90,4 +95,6 @@ export const ROOM_OBJECT_WORDS: Readonly<
   THESIS: "thesis",
   SAVED_COMPARISON: "comparison",
   INVESTOR_FIT: "investors",
+  READINESS_BLUEPRINT: "plan",
+  INVESTOR_LOOKS_FOR: "investor",
 };

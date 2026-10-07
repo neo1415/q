@@ -389,6 +389,16 @@ export const Q_ROOM_OBJECTS = [
   "THESIS",
   "SAVED_COMPARISON",
   "INVESTOR_FIT",
+  /**
+   * Overdeliver (2026-10-07). READINESS_BLUEPRINT: a founder's own
+   * 3/6/12-month plan (Q.04; plan-gated, founder-private; the id is their
+   * own company's, server-resolved). INVESTOR_LOOKS_FOR: for a founder, one
+   * investor's public profile and published gate criteria with the
+   * founder's own standing on each, and "Draft my application" (Q.05; the
+   * id is the investor organisation's; never the private mandate).
+   */
+  "READINESS_BLUEPRINT",
+  "INVESTOR_LOOKS_FOR",
 ] as const;
 export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
 export type QRoomObject = z.infer<typeof QRoomObjectSchema>;

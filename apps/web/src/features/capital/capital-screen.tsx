@@ -24,7 +24,7 @@ import {
 } from "./capital-book";
 import { MandateSummary } from "./mandate-summary";
 import { RaiseTerms } from "./raise-terms";
-import { ReadinessBlueprintEntry } from "./readiness-blueprint-entry";
+import { horizonFrom, ReadinessBlueprintSection } from "./readiness-blueprint";
 import { ActionPlanBoard } from "@/features/readiness/action-plan-board";
 import { ownReadiness } from "@/features/readiness/readiness-data";
 import {
@@ -57,7 +57,12 @@ async function currentObjective(
   }
 }
 
-export async function CapitalScreen() {
+export async function CapitalScreen({
+  horizon,
+}: {
+  /** Q.04: the plan horizon from `?horizon=3|6|12`; anything else is 6. */
+  readonly horizon?: string | undefined;
+} = {}) {
   const context = await resolveOwnContext();
   const [objective, relationships, ledger, mine, readiness] = await Promise.all(
     [
@@ -215,9 +220,16 @@ export async function CapitalScreen() {
         </>
       ) : null}
 
-      {/* BILLING-2 block (ADR 0036): the Pro layer's entry point. */}
-      {context.kind === "FOUNDER" ? <ReadinessBlueprintEntry /> : null}
-      {/* end BILLING-2 block */}
+      {/*
+        BILLING-2 (ADR 0036) / Q.04: the Readiness Blueprint as "Your
+        3/6/12-month plan"; a plan without it shows the Pro entry instead.
+      */}
+      {context.kind === "FOUNDER" ? (
+        <ReadinessBlueprintSection
+          companyId={context.companyId}
+          horizon={horizonFrom(horizon)}
+        />
+      ) : null}
 
       <PageSection id="relationships" title="Relationships">
         {relationships === undefined ? (
