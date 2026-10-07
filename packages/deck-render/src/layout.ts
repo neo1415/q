@@ -77,6 +77,12 @@ export type RuleBox = {
   readonly width: number;
   readonly height: number;
   readonly colour: string;
+  /**
+   * Q room W5: this fill marks a placeholder's space (a picture to drop
+   * here, or a fact the record does not hold yet). Renderers draw it like
+   * any rule; the room reads it as a drop target.
+   */
+  readonly placeholder?: "IMAGE" | "TEXT" | undefined;
 };
 
 /** A stock photograph, full-bleed on its side of the slide. */
@@ -997,14 +1003,20 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
             : theme;
     // A photograph takes the right 40% of a title or bullet slide; the
     // words keep the left, and still never shrink below the floor.
+    const pictured = slide.layout === "TITLE" || slide.layout === "BULLETS";
     const image =
-      slide.image !== undefined &&
-      (slide.layout === "TITLE" || slide.layout === "BULLETS")
-        ? slide.image
+      slide.image !== undefined && pictured ? slide.image : undefined;
+    // Q room W5: a picture still to come keeps the picture's side free and
+    // marked, so the person sees where to drop one.
+    const imageSpace =
+      image === undefined && pictured && slide.placeholder?.kind === "IMAGE"
+        ? slide.placeholder
         : undefined;
     const imageLeft = Math.round(SLIDE_WIDTH * 0.6);
     const textWidth =
-      image === undefined ? SLIDE_WIDTH - MARGIN * 2 : imageLeft - MARGIN * 2;
+      image === undefined && imageSpace === undefined
+        ? SLIDE_WIDTH - MARGIN * 2
+        : imageLeft - MARGIN * 2;
     let laid = layOutSlide(slide, index, slideTheme, 1, textWidth);
     for (const scale of [0.9, 0.8]) {
       if (laid.dropped.length === 0) break;
@@ -1027,6 +1039,54 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
           },
         ],
       };
+    }
+    if (imageSpace !== undefined) {
+      laid = {
+        ...laid,
+        boxes: [
+          ...laid.boxes,
+          ...placeholderSpace(
+            {
+              x: imageLeft,
+              y: 0,
+              width: SLIDE_WIDTH - imageLeft,
+              height: SLIDE_HEIGHT,
+            },
+            "IMAGE",
+            imageSpace.label,
+            slideTheme,
+          ),
+        ],
+      };
+    } else if (slide.placeholder?.kind === "TEXT") {
+      // A fact still to come: a marked band under whatever the slide says,
+      // only where the slide leaves room for it (never over its words).
+      const bottom = Math.max(
+        MARGIN,
+        ...laid.boxes
+          .filter((box) => box.kind !== "RULE")
+          .map((box) => box.y + box.height),
+      );
+      const band = {
+        x: MARGIN,
+        y: SLIDE_HEIGHT - MARGIN - 64,
+        width: textWidth,
+        height: 64,
+      };
+      if (bottom + 12 <= band.y) {
+        laid = {
+          ...laid,
+          boxes: [
+            ...laid.boxes,
+            ...placeholderSpace(
+              band,
+              "TEXT",
+              slide.placeholder.label,
+              slideTheme,
+            ),
+          ],
+        };
+      }
     }
     // DOCS: the company's own logo on the cover, top left, uncropped.
     if (logo !== undefined && index === 0 && slide.layout === "TITLE") {
@@ -1055,6 +1115,55 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
         : laid;
   });
   return { theme, width: SLIDE_WIDTH, height: SLIDE_HEIGHT, slides };
+}
+
+/**
+ * Q room W5: a placeholder's space, drawn from the theme's own colours (a
+ * surface fill, an accent edge, the label in ink), so it reads as "add
+ * yours here" on every direction and never as content.
+ */
+function placeholderSpace(
+  area: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  },
+  kind: "IMAGE" | "TEXT",
+  label: string,
+  theme: DeckTheme,
+): LaidOutBox[] {
+  const size = Math.max(theme.minimumSize, theme.sizes.label);
+  // Inside the gutter on every side, like every other word on a slide.
+  const left = kind === "IMAGE" ? area.x + 32 : area.x + 16;
+  const right =
+    kind === "IMAGE" ? SLIDE_WIDTH - MARGIN : area.x + area.width - 16;
+  const words = text("LABEL", label, {
+    x: left,
+    y: 0,
+    width: right - left,
+    size,
+    colour: theme.ink,
+    bold: true,
+  });
+  const y = Math.round(area.y + (area.height - words.height) / 2);
+  return [
+    {
+      kind: "RULE",
+      ...area,
+      colour: theme.surface,
+      placeholder: kind,
+    },
+    {
+      kind: "RULE",
+      x: area.x,
+      y: kind === "IMAGE" ? MARGIN : area.y,
+      width: kind === "IMAGE" ? 4 : area.width,
+      height: kind === "IMAGE" ? SLIDE_HEIGHT - MARGIN * 2 : 3,
+      colour: theme.accent,
+    },
+    { ...words, y },
+  ];
 }
 
 /** Black or white, whichever reads better on every stop of a background. */

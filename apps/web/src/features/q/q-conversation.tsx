@@ -556,7 +556,10 @@ export function QConversationPanel({
   const stage = workingLabel(q.state);
   const documentStage =
     q.state.stage === "PREPARING_DOCUMENT" ||
-    q.state.stage === "REVISING_DOCUMENT";
+    q.state.stage === "REVISING_DOCUMENT" ||
+    q.state.stage === "DESIGNING_DOCUMENT" ||
+    q.state.stage === "FINDING_DOCUMENT_IMAGES" ||
+    q.state.stage === "CHECKING_DOCUMENT";
   // DOCS: the document-ready card watches closely while Q writes one.
   useEffect(() => {
     if (documentStage) expectDocument();

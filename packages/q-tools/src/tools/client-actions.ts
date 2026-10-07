@@ -782,7 +782,7 @@ export const SHOW = "client.q_room.show" as const;
 export const ShowInputSchema = z
   .object({
     object: QRoomObjectSchema.describe(
-      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name).",
+      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. Q_DOCUMENT: a document you made for them (their draft deck, one-pager or memo), by its id from its card or list_my_documents, or by its title; with neither, their latest. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name).",
     ),
     id: z
       .string()
@@ -821,6 +821,7 @@ export function createShowTool(
     | "investorFeed"
     | "work"
     | "appActions"
+    | "documents"
   >,
 ): AnyQToolDefinition {
   return defineQTool<
@@ -865,6 +866,32 @@ async function roomRecord(
   input: ShowInput,
 ): Promise<{ readonly id: string; readonly title: string } | null> {
   switch (input.object) {
+    case "Q_DOCUMENT": {
+      // Q room W5: one of their own documents, ready or still being made
+      // (the deck surface shows its progress). Only their own list is
+      // searched, so an id or a title can never reveal anybody else's.
+      if (ports.documents === undefined) return null;
+      const listed = await ports.documents.list(actor, 20).catch(() => null);
+      const own = (listed ?? []).filter(
+        (item) => item.status === "READY" || item.status === "PREPARING",
+      );
+      const id =
+        input.id !== undefined
+          ? (own.find(
+              (item) =>
+                item.artifactId.toLowerCase() === input.id?.toLowerCase(),
+            )?.artifactId ?? null)
+          : input.name === undefined
+            ? (own[0]?.artifactId ?? null)
+            : matchCounterpart(
+                input.name,
+                own.map((item) => ({ id: item.artifactId, name: item.title })),
+              );
+      const found = own.find((item) => item.artifactId === id);
+      return found === undefined
+        ? null
+        : { id: found.artifactId.toLowerCase(), title: found.title };
+    }
     case "WORK_PLAN":
       return ownRecord(ports, actor, "WORK_ITEM", input);
     case "CAPITAL_ROUND":

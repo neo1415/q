@@ -360,6 +360,12 @@ export const Q_ROOM_OBJECTS = [
   "CAPITAL_ROUND",
   "GATEQ_APPLICATION",
   "SOURCES",
+  /**
+   * Q room W5 (R8): a document Q made for them (a deck, one-pager or
+   * memo), by its artifact id: the deck surface with page thumbnails,
+   * placeholders marked, and the floating Upload button.
+   */
+  "Q_DOCUMENT",
 ] as const;
 export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
 export type QRoomObject = z.infer<typeof QRoomObjectSchema>;
