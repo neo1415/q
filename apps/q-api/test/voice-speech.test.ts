@@ -52,6 +52,15 @@ describe("bounded", () => {
     expect(spoken).not.toContain("sentence. This is a sent The rest");
     expect(bounded("Short.")).toBe("Short.");
   });
+
+  it("never cuts mid-sentence, even when the room is small (founder live 2026-10-07)", () => {
+    const rest =
+      "Termly and the five additional companies are not individually identified. More follows here.";
+    expect(bounded(rest, 30)).toBe("The rest is on your screen.");
+    expect(bounded(rest, 80)).toBe(
+      "Termly and the five additional companies are not individually identified. The rest is on your screen.",
+    );
+  });
 });
 
 describe("sentences", () => {

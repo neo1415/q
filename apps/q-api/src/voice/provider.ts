@@ -43,6 +43,14 @@ export type VoiceSpeaker = {
    * (the duplex line). Absent: beats are spoken in the stream.
    */
   readonly narrate?: ((beat: QSilenceBeat) => void) | undefined;
+  /**
+   * Nothing handed to `speak` is heard until it resolves (the duplex
+   * relay returns ask_q's words in one piece): the silence ladder keeps
+   * filling the wait until the whole answer is in, not just its first
+   * sentence (founder live 2026-10-07: 20-40 s of silence after a stage
+   * line nobody heard).
+   */
+  readonly deferred?: boolean | undefined;
 };
 
 export type VoiceChannelHandlers = {
