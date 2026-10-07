@@ -3105,15 +3105,17 @@ const memoryLearner = createMemoryLearner({
 // provider credit, so budgets cap it per document, per organisation per
 // day and across Capital Q per day. The image bucket is private and needs
 // the server's storage key; without it no picture is made.
+// Gemini first: the founder funds a billed Gemini account for pictures;
+// the small OpenAI top-up is only the fallback.
 const imageProviders: ImageProvider[] = [];
-if (providerSecrets.openai !== undefined) {
-  imageProviders.push(
-    createOpenAIImageProvider({ apiKey: providerSecrets.openai.reveal() }),
-  );
-}
 if (providerSecrets.google !== undefined) {
   imageProviders.push(
     createGoogleImageProvider({ apiKey: providerSecrets.google.reveal() }),
+  );
+}
+if (providerSecrets.openai !== undefined) {
+  imageProviders.push(
+    createOpenAIImageProvider({ apiKey: providerSecrets.openai.reveal() }),
   );
 }
 const documentImages = createDocumentImages({

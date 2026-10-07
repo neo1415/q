@@ -111,6 +111,12 @@ export function inCompanyVoice(line: string): string {
     ),
     "",
   );
+  // "Our stated model" / "The documented strategy" → "Our model": the
+  // qualifier is the narrator's distance from the record, not the company's.
+  next = next.replace(
+    /\b(?:our|the)\s+(?:stated|documented|reported|described|declared)\s+/gi,
+    (match: string) => (/^the/i.test(match) ? "The " : "Our "),
+  );
   return capitalise(next.trim());
 }
 

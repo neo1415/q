@@ -404,3 +404,16 @@ describe("the words step (fake gateway)", () => {
     expect(QArtifactContentSchema.parse(out.content)).toEqual(out.content);
   });
 });
+
+describe("inCompanyVoice: narrator qualifiers", () => {
+  it("drops 'stated' and 'documented' without changing the fact", () => {
+    expect(
+      inCompanyVoice(
+        "Our stated model is a monthly subscription per legal entity",
+      ),
+    ).toBe("Our model is a monthly subscription per legal entity");
+    expect(inCompanyVoice("The documented strategy combines referrals")).toBe(
+      "The strategy combines referrals",
+    );
+  });
+});

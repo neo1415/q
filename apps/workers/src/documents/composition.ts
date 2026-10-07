@@ -74,13 +74,15 @@ export function composeDocumentJobs(dependencies: {
     logger,
   });
 
+  // Gemini first: the founder funds a billed Gemini account for pictures;
+  // the small OpenAI top-up is only the fallback.
   const providers: ImageProvider[] = [];
-  const openai = dependencies.providerSecrets.openai?.reveal();
-  if (usable(openai))
-    providers.push(createOpenAIImageProvider({ apiKey: openai }));
   const google = dependencies.providerSecrets.google?.reveal();
   if (usable(google))
     providers.push(createGoogleImageProvider({ apiKey: google }));
+  const openai = dependencies.providerSecrets.openai?.reveal();
+  if (usable(openai))
+    providers.push(createOpenAIImageProvider({ apiKey: openai }));
 
   const entitlements = createEntitlementService({ sql });
   const images = createDocumentImages({
