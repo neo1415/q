@@ -143,6 +143,44 @@ const LEVEL_WORDS: Readonly<Record<string, string>> = {
   EXCEPTIONAL: "Exceptional",
 };
 
+/**
+ * F29: figures from the founder's confirmed deck reading count as what
+ * they are, the founder's own stated claims (STATED, never EVIDENCED: a
+ * deck is self-reported). They close "not shared yet" and the step then
+ * asks for a source, never for figures the deck already gives.
+ */
+function withDeckFigures(
+  claims: SignalResult,
+  inputs: ReadinessInputs,
+  section: DeckSectionCode,
+  improve: string,
+): SignalResult {
+  const figures = (inputs.deck?.figures ?? []).filter(
+    (figure) => figure.section === section,
+  );
+  if (figures.length === 0 || inputs.deck === null) return claims;
+  const documentId = inputs.deck.documentId;
+  const lines: ReadinessEvidenceLine[] = figures.map((figure) => ({
+    label: `${figure.label}: ${figure.value}`.slice(0, 200),
+    source: "DECK",
+    truthClass: "USER_CLAIM",
+    evidenceStatus: "SELF_REPORTED",
+    note:
+      figure.asOf === null
+        ? "Your deck, confirmed"
+        : `Your deck, confirmed · as of ${figure.asOf}`,
+    ref: { kind: "DOCUMENT", documentId },
+  }));
+  if (claims.state === "MISSING") {
+    return { state: "STATED", evidence: lines.slice(0, 8), improve };
+  }
+  return {
+    ...claims,
+    evidence: [...claims.evidence, ...lines].slice(0, 8),
+    ...(claims.state === "STATED" ? { improve } : {}),
+  };
+}
+
 function deckSection(
   inputs: ReadinessInputs,
   section: DeckSectionCode,
@@ -262,14 +300,24 @@ function base(
           }
         : { state: "MISSING", evidence: [] };
     case "claims.market":
-      return fromClaims(byType(["market"]));
+      return withDeckFigures(
+        fromClaims(byType(["market"])),
+        inputs,
+        "MARKET",
+        "Your confirmed deck states your market size; add the public source or report behind it.",
+      );
     case "claims.traction":
-      return fromClaims(
-        inputs.claims.filter(
-          (claim) =>
-            ["traction", "customers"].includes(claim.claimType) &&
-            !REVENUE_KEY.test(claim.claimKey),
+      return withDeckFigures(
+        fromClaims(
+          inputs.claims.filter(
+            (claim) =>
+              ["traction", "customers"].includes(claim.claimType) &&
+              !REVENUE_KEY.test(claim.claimKey),
+          ),
         ),
+        inputs,
+        "TRACTION",
+        "Your confirmed deck states these figures; add the document behind them.",
       );
     case "claims.revenue":
       return fromClaims(
