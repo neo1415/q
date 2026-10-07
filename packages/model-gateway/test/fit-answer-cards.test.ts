@@ -12,73 +12,14 @@ import {
 } from "../src/q/fit-cards.js";
 import { analystResultBlocks } from "../src/q/result-blocks.js";
 
+import { fitFixture } from "./fit-fixture.js";
+
 /**
  * Zino live 2026-10-07 (run 1d4f4c27): "List the companies… and their
  * scores against the mandate, including pros and cons" came back as
  * "Pros: … Cons: …" with no names and no cards, plus a "Q would like to
  * know" card beside the answer.
  */
-
-const PARAMETERS = [
-  "STAGE",
-  "SECTOR",
-  "GEOGRAPHY",
-  "CHEQUE_SIZE",
-  "BUSINESS_MODEL",
-  "TRACTION",
-  "TEAM",
-  "THESIS",
-  "ROUND_TERMS",
-] as const;
-
-export function fitFixture(
-  companyId: string,
-  name: string,
-  outcomes: Partial<Record<(typeof PARAMETERS)[number], string>>,
-  band: "STRONG_FIT" | "GOOD_FIT" | "PARTIAL_FIT" = "GOOD_FIT",
-): { toolName: "fit.profile"; result: { ok: true; data: unknown } } {
-  const parameters = PARAMETERS.map((parameter) => ({
-    parameter,
-    outcome: outcomes[parameter] ?? "UNKNOWN",
-    reason: `${parameter.toLowerCase().replace("_", " ")} ${
-      (outcomes[parameter] ?? "UNKNOWN") === "STRONG"
-        ? "is within your mandate"
-        : (outcomes[parameter] ?? "UNKNOWN") === "MISMATCH"
-          ? "is outside your mandate"
-          : "is not known yet"
-    }`,
-    evidenceStatus: null,
-    stale: false,
-    applicable: true,
-  }));
-  return {
-    toolName: "fit.profile",
-    result: {
-      ok: true,
-      data: {
-        status: "OK",
-        name,
-        profile: {
-          companyId,
-          configVersion: "ranking-config.v4",
-          configLabel: "v4",
-          band,
-          confidence: "MEDIUM",
-          parameters,
-          topReasons: parameters
-            .filter((p) => p.outcome === "STRONG")
-            .slice(0, 3),
-          mainMismatch:
-            parameters.find((p) => p.outcome === "MISMATCH") ?? null,
-          hardRule: null,
-          computedAt: "2026-10-07T20:24:45.000Z",
-        },
-        text: "",
-        guidance: "",
-      },
-    },
-  };
-}
 
 const PORTSIDE = fitFixture(
   "7b62eab6-39b9-4cb6-884a-878301f6928f",
@@ -103,7 +44,7 @@ const NSUO = fitFixture(
   "PARTIAL_FIT",
 );
 
-export const ZINO_FITS: readonly RunFit[] = [PORTSIDE, BARIDI, NSUO].flatMap(
+const ZINO_FITS: readonly RunFit[] = [PORTSIDE, BARIDI, NSUO].flatMap(
   (outcome) => fitsInOutcome(outcome),
 );
 
