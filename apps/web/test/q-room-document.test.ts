@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 
-import type { QResultBlock } from "@capital-q/contracts";
-
 import { performClientAction } from "../src/features/q/client-actions";
-import type { QTurn } from "../src/features/q/conversation";
+import type {
+  QTurn,
+  QTurnObjectBlock as QResultBlock,
+} from "../src/features/q/conversation";
 import {
   answerToOffer,
   citedLines,
   documentActsOf,
+  documentPosition,
   documentShouldClose,
   documentToReopen,
   offerLine,
@@ -123,6 +125,35 @@ describe("paging by asking", () => {
     setMaterialDocument({ companyId: LEDGERLINE, documentId: CERT }, 0);
     expect(currentScreen("/home")).not.toHaveProperty("documentPage");
     setMaterialDocument(null);
+  });
+});
+
+describe("where the open document is, derived from the conversation", () => {
+  const turns = [
+    q(0, "Here it is.", [opens]),
+    q(1, "Page 2.", [act({ act: "NEXT_PAGE" })]),
+    q(2, "Reading page 3.", [act({ act: "READ_ALOUD", page: 3 })]),
+  ];
+
+  it("folds every page act since it opened, once, within the document", () => {
+    expect(documentPosition(turns, { page: 1, at: 0 }, null, null, 3)).toEqual({
+      page: 3,
+      reading: true,
+    });
+    // Reopened where it was left: acts before the reopen do not count.
+    expect(documentPosition(turns, { page: 2, at: 3 }, null, null, 3)).toEqual({
+      page: 2,
+      reading: false,
+    });
+  });
+
+  it("a page chosen by hand, or Stop, wins over the acts before it", () => {
+    expect(
+      documentPosition(turns, { page: 1, at: 0 }, { page: 1, at: 3 }, 3, 3),
+    ).toEqual({ page: 1, reading: false });
+    expect(
+      documentPosition(turns, { page: 1, at: 0 }, { page: 1, at: 2 }, null, 3),
+    ).toEqual({ page: 3, reading: true });
   });
 });
 

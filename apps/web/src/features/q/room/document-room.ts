@@ -343,3 +343,37 @@ export function answerToOffer(text: string): "YES" | "NO" | null {
   }
   return null;
 }
+
+/**
+ * Where the open document is and whether Q is reading it, derived from
+ * the conversation: the page it opened at (or the page they chose by hand,
+ * and when), then every page act Q's answers carried since, in order.
+ * Derived, so a re-render never applies an act twice.
+ */
+export function documentPosition(
+  turns: readonly QTurn[],
+  start: { readonly page: number; readonly at: number },
+  manual: { readonly page: number; readonly at: number } | null,
+  stoppedAt: number | null,
+  pageCount: number | null,
+): { readonly page: number; readonly reading: boolean } {
+  let page = manual?.page ?? start.page;
+  const from = Math.max(start.at, manual?.at ?? start.at);
+  const readFrom = Math.max(start.at, stoppedAt ?? start.at);
+  let reading = false;
+  for (let index = start.at; index < turns.length; index += 1) {
+    const turn = turns[index];
+    if (turn === undefined || turn.kind !== "Q" || turn.streaming) continue;
+    for (const act of documentActsOf(turn)) {
+      if (index >= from) {
+        page = pageAfter({ page, pageCount }, act) ?? page;
+      }
+      if (index >= readFrom) {
+        if (act.act === "READ_ALOUD") reading = true;
+        if (act.act === "STOP_READING") reading = false;
+      }
+    }
+  }
+  const last = pageCount ?? Number.POSITIVE_INFINITY;
+  return { page: Math.max(1, Math.min(last, page)), reading };
+}

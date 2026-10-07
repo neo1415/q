@@ -22,9 +22,9 @@ import type { QTurn } from "./conversation";
 import {
   citedLines,
   documentActsOf,
+  documentPosition,
   documentShouldClose,
   documentToReopen,
-  pageAfter,
   type CitedLine,
 } from "./room/document-room";
 import { setRoomDocumentOpen, useRoomDocumentHost } from "./room/document-host";
@@ -36,9 +36,13 @@ type Opened = QMaterialDocumentRef & {
   /** The turn it opened at (the answer that opened it, when known). */
   readonly at: number;
   readonly path: string;
-  readonly page: number;
+  /** The page it opened at: where it was left, or the first. */
+  readonly startPage: number;
+  /** The page they chose by hand, and how many turns there were then. */
+  readonly manual: { readonly page: number; readonly at: number } | null;
+  /** When they pressed Stop on the reading, in turns. */
+  readonly stoppedAt: number | null;
   readonly pageCount: number | null;
-  readonly reading: boolean;
 };
 
 /** Where each document was left, for this tab: it reopens at that page. */
@@ -128,9 +132,10 @@ export function QMaterialViewer({
         file: null,
         at,
         path: pathRef.current,
-        page: lastPage.get(id) ?? 1,
+        startPage: lastPage.get(id) ?? 1,
+        manual: null,
+        stoppedAt: null,
         pageCount: null,
-        reading: false,
       });
       setClosed((current) =>
         current.filter((one) => one.documentId.toLowerCase() !== id),
@@ -155,9 +160,9 @@ export function QMaterialViewer({
   // Closing remembers the page and keeps it to reopen when the subject
   // comes back. Called while rendering too (the topic moved on), so it
   // reads the document it is given, never state.
-  const closeNow = useCallback((current: Opened | null) => {
+  const closeNow = useCallback((current: Opened | null, page: number) => {
     if (current === null) return;
-    lastPage.set(current.documentId.toLowerCase(), current.page);
+    lastPage.set(current.documentId.toLowerCase(), page);
     setClosed((list) => [
       ...list.filter((one) => one.documentId !== current.documentId),
       {
@@ -168,11 +173,27 @@ export function QMaterialViewer({
     ]);
     setOpened(null);
   }, []);
-  const openedRef = useRef(opened);
+  // Where the open document is, derived from the conversation (never an
+  // act applied twice), and kept for the close event below.
+  const position =
+    opened === null
+      ? null
+      : documentPosition(
+          turns,
+          { page: opened.startPage, at: opened.at },
+          opened.manual,
+          opened.stoppedAt,
+          opened.pageCount,
+        );
+  const page = position?.page ?? 1;
+  const openedRef = useRef({ opened, page });
   useEffect(() => {
-    openedRef.current = opened;
-  }, [opened]);
-  const close = useCallback(() => closeNow(openedRef.current), [closeNow]);
+    openedRef.current = { opened, page };
+  }, [opened, page]);
+  const close = useCallback(
+    () => closeNow(openedRef.current.opened, openedRef.current.page),
+    [closeNow],
+  );
 
   useEffect(() => {
     const onOpen = (event: Event) => {
@@ -202,6 +223,8 @@ export function QMaterialViewer({
     }
   }, []);
 
+  // "Download it": a side effect, once per answer. Paging, reading and
+  // closing are derived from the conversation above and below.
   useEffect(() => {
     const seen = applied.current;
     if (seen === null) return;
@@ -209,28 +232,11 @@ export function QMaterialViewer({
       if (turn.kind !== "Q" || turn.streaming || seen.has(turn.id)) continue;
       seen.add(turn.id);
       if (opened !== null && index < opened.at) continue;
-      for (const act of documentActsOf(turn)) {
-        if (act.act === "DOWNLOAD") {
-          download(opened);
-          continue;
-        }
-        if (act.act === "CLOSE") {
-          close();
-          continue;
-        }
-        setOpened((current) => {
-          if (current === null) return current;
-          const page = pageAfter(current, act);
-          return {
-            ...current,
-            ...(page === null ? {} : { page }),
-            ...(act.act === "READ_ALOUD" ? { reading: true } : {}),
-            ...(act.act === "STOP_READING" ? { reading: false } : {}),
-          };
-        });
+      if (documentActsOf(turn).some((act) => act.act === "DOWNLOAD")) {
+        download(opened);
       }
     }
-  }, [turns, opened, download, close]);
+  }, [turns, opened, download]);
 
   // The subject comes back: the document reopens where it was left.
   const lastPerson = turns.findLast(
@@ -254,10 +260,10 @@ export function QMaterialViewer({
       opened === null
         ? null
         : { companyId: opened.companyId, documentId: opened.documentId },
-      opened?.page,
+      page,
     );
     return () => setMaterialDocument(null);
-  }, [opened]);
+  }, [opened, page]);
 
   // The topic moved on, they asked to close it, or they left the page.
   const shouldClose =
@@ -269,7 +275,7 @@ export function QMaterialViewer({
         opened.title,
       ));
   // Adjusted while rendering, as React advises for state derived from props.
-  if (shouldClose) closeNow(opened);
+  if (shouldClose) closeNow(opened, page);
 
   const inRoom = host !== null && opened !== null && !shouldClose;
   useEffect(() => {
@@ -287,13 +293,16 @@ export function QMaterialViewer({
     return [];
   }, [turns, opened]);
 
-  const setPage = useCallback((page: number) => {
+  const setPage = useCallback((next: number) => {
     setOpened((current) =>
       current === null
         ? current
         : {
             ...current,
-            page: Math.max(1, Math.min(current.pageCount ?? page, page)),
+            manual: {
+              page: Math.max(1, Math.min(current.pageCount ?? next, next)),
+              at: turnsRef.current.length,
+            },
           },
     );
   }, []);
@@ -301,11 +310,7 @@ export function QMaterialViewer({
     setOpened((current) =>
       current === null || current.pageCount === pageCount
         ? current
-        : {
-            ...current,
-            pageCount,
-            page: Math.min(current.page, Math.max(1, pageCount)),
-          },
+        : { ...current, pageCount },
     );
   }, []);
 
@@ -314,15 +319,17 @@ export function QMaterialViewer({
       <QRoomDocument
         title={opened.title ?? "Document"}
         file={opened.file}
-        page={opened.page}
+        page={page}
         pageCount={opened.pageCount}
-        reading={opened.reading}
+        reading={position?.reading === true}
         summary={summary}
         onPage={setPage}
         onPageCount={setPageCount}
         onStopReading={() =>
           setOpened((current) =>
-            current === null ? current : { ...current, reading: false },
+            current === null
+              ? current
+              : { ...current, stoppedAt: turnsRef.current.length },
           )
         }
         onDownload={() => download(opened)}

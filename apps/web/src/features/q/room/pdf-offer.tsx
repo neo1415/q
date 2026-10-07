@@ -36,9 +36,8 @@ export function QRoomPdfOffer({
   readonly file?: PdfExport | undefined;
 }) {
   const offer = pdfOfferOf(turns);
-  const [state, setState] = useState<
-    Readonly<Record<string, "busy" | "done" | "declined" | string>>
-  >({});
+  // Per offered answer: "busy", "done", "declined", or what went wrong.
+  const [state, setState] = useState<Readonly<Record<string, string>>>({});
   // What was already in the conversation when the room opened.
   const [known] = useState<ReadonlySet<string>>(
     () => new Set(turns.map((turn) => turn.id)),
@@ -78,20 +77,17 @@ export function QRoomPdfOffer({
   const offerId = offer?.answerId;
   const runId = offer?.runId;
   const now = offerId === undefined ? undefined : state[offerId];
-  // Once per offer: the reply is acted on while nothing else has been.
-  const pending = answer !== null && now === undefined ? answer : null;
+  // A said "yes" files it, once; a said "no" puts the offer away.
+  const sayYes = answer === "YES" && now === undefined;
   useEffect(() => {
-    if (pending === null || offerId === undefined || runId === undefined) {
-      return;
-    }
-    if (pending === "YES") void makeRef.current(runId, offerId);
-    else setState((current) => ({ ...current, [offerId]: "declined" }));
-  }, [pending, offerId, runId]);
+    if (!sayYes || offerId === undefined || runId === undefined) return;
+    void makeRef.current(runId, offerId);
+  }, [sayYes, offerId, runId]);
 
   if (offer === null || !fresh) return null;
   // Moved on: they said something else after the offer.
   if (reply !== undefined && answer === null && now === undefined) return null;
-  if (now === "declined" || now === "done") return null;
+  if (now === "declined" || now === "done" || answer === "NO") return null;
 
   return (
     <section

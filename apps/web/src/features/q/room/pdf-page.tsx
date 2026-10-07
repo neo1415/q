@@ -130,7 +130,7 @@ export function PdfPage({
     >
       {failed ? (
         <p className="cq-body-sm p-4 text-(--cq-text-secondary)">
-          This page couldn't be drawn.
+          This page couldn&apos;t be drawn.
         </p>
       ) : (
         <canvas
