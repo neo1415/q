@@ -270,7 +270,7 @@ describe("the deck surface on screen", () => {
     const go: QResultBlock = {
       kind: "UI_INTENT",
       intent: { kind: "DOCUMENT_ACT", act: "GO_TO_PAGE", page: 3 },
-    } as QResultBlock;
+    };
     render(
       <QRoomDeck
         artifactId={ARTIFACT}

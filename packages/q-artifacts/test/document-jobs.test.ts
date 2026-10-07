@@ -221,18 +221,14 @@ describe("documents made by a job", () => {
     const detail = await svc.requestDocument(request());
     expect(detail.artifact.status).toBe("PREPARING");
     expect(detail.current).toBeUndefined();
-    expect(jobs.queued).toEqual([
-      expect.objectContaining({
-        kind: "PITCH_DECK",
-        runId: RUN,
-        userId: ACTOR.userId,
-        artifactId: detail.artifact.artifactId,
-        input: expect.objectContaining({
-          title: "Deck",
-          grounding: ["First composition."],
-        }),
-      }),
-    ]);
+    expect(jobs.queued).toHaveLength(1);
+    expect(jobs.queued[0]).toMatchObject({
+      kind: "PITCH_DECK",
+      runId: RUN,
+      userId: ACTOR.userId,
+      artifactId: detail.artifact.artifactId,
+      input: { title: "Deck", grounding: ["First composition."] },
+    });
   });
 
   it("a request the run's plan does not authorise queues nothing", async () => {

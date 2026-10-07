@@ -29,11 +29,7 @@ function slide(overrides: Partial<QSlide> = {}): QSlide {
 }
 
 function deck(slides: QSlide[]): QDeck {
-  return {
-    slides,
-    direction: "MINIMAL_INSTITUTIONAL",
-    markIsDraft: false,
-  } as QDeck;
+  return { slides, direction: "MINIMAL_INSTITUTIONAL", markIsDraft: false };
 }
 
 describe("placeholders on a slide", () => {

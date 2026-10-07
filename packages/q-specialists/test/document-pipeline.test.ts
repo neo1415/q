@@ -136,8 +136,7 @@ function base(
       tenantId: "c0000000-0000-4000-8000-000000000001",
       userId: "b0000000-0000-4000-8000-000000000001",
       qRunId: "22222222-0000-4000-8000-000000000001",
-      correlationId:
-        "33333333-0000-4000-8000-000000000001" as DocumentPipelineInput["attribution"]["correlationId"],
+      correlationId: "33333333-0000-4000-8000-000000000001",
     },
     ...overrides,
   };

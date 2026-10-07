@@ -524,7 +524,9 @@ export function createEditMyDocumentTool(
           };
         case "STALE":
           return { status: "CHANGED_SINCE" };
-        default:
+        case "NOT_FOUND":
+        case "NOT_EDITABLE":
+        case "FAILED":
           return { status: outcome.status };
       }
     },

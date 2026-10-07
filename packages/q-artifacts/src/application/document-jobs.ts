@@ -103,7 +103,7 @@ export type DocumentJobRepository = {
   readonly finish: (
     jobId: string,
     outcome: "DONE" | "FAILED",
-    failureCode?: string | undefined,
+    failureCode?: string,
   ) => Promise<void>;
   /** Back to the queue after a failed attempt that may be retried. */
   readonly release: (jobId: string) => Promise<void>;
