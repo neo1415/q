@@ -165,9 +165,15 @@ export type VoiceTurnDependencies = {
         used: ReadonlySet<string>,
       ) => Promise<QSilenceThread | null>)
     | undefined;
-  /** ADR 0062: the subject of the wait, by name, from its own service. */
+  /**
+   * ADR 0062 / W4b: the subject of the wait, by name, resolved on the
+   * server from this run's own authorised tool calls (never a browser id).
+   */
   readonly silenceFocus?:
-    | ((binding: VoiceSessionBinding) => Promise<QSilenceFocus | null>)
+    | ((
+        binding: VoiceSessionBinding,
+        runId: string,
+      ) => Promise<QSilenceFocus | null>)
     | undefined;
   readonly logger: Logger;
 };
@@ -1256,7 +1262,7 @@ export function createVoiceTurnHandler(
               focus:
                 silenceFocus === undefined
                   ? undefined
-                  : () => silenceFocus(binding),
+                  : () => silenceFocus(binding, runId),
               thread:
                 smallTalk === undefined
                   ? undefined

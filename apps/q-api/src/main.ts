@@ -507,6 +507,7 @@ import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { Q_VOICE_SPEAK_RELAY_PATH } from "./voice/routes.js";
 import { createSpeechPerformanceBoard } from "./voice/speech-performance.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
+import { createRunSubjects } from "./voice/run-subjects.js";
 import {
   createRehearsalAwareTurn,
   performRehearsalLine,
@@ -2294,6 +2295,9 @@ const appActionPorts: OwnReadPorts = {
     })),
 };
 const pushSettings = createPushSubscriptionStore(database.sql);
+// Q room W4b: what each run's own authorised tool calls named, so the
+// silence ladder can say whose deck it is reading (never a browser id).
+const runSubjects = createRunSubjects();
 const qTools = createQTools({
   ports: {
     // BILLING block
@@ -3409,7 +3413,7 @@ const qIntelligence = composeQIntelligence({
   sql: database.sql,
   transactions: database.transactions,
   repositories,
-  tools: qTools.port,
+  tools: runSubjects.observe(qTools.port),
   gateway: modelGateway,
   embeddings,
   statements: researchComposition.statements,
@@ -5068,6 +5072,9 @@ const voiceTurn = timedVoiceTurns(
     performance: speechPerformance,
     // ADR 0062: the silence ladder's one remembered thread, the person's own.
     smallTalk: memoryService.smallTalkThread,
+    // W4b: the wait's subject, from this run's own authorised tool calls.
+    silenceFocus: (binding, runId) =>
+      Promise.resolve(runSubjects.focusFor(runId, binding.actor)),
     logger,
   }),
   voiceTimings,
