@@ -28,6 +28,7 @@ import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import type { OnboardingTurn } from "../onboarding-kit/controller";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
+import { DeckOffer } from "./deck-offer";
 import { announceQGestures } from "../q-swarm/q-gestures";
 import {
   onboardingThreadAction,
@@ -1469,6 +1470,11 @@ export function QOnboardingWorkspace({
         {stage === null ? null : (
           <QLine id="reading-stage" kind="Q" text={stage} />
         )}
+        {/* Q room W5 (R8): Q offers the deck once the upload is read. */}
+        <DeckOffer
+          founder={vocabulary.subject === "founder"}
+          readingLanded={readingLanded}
+        />
         {prompt !== null && !isFinal && !askingQ && liveQuestion !== null ? (
           <QLine
             id={`prompt:${prompt.stepKey}`}

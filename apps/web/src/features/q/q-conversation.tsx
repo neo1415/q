@@ -33,6 +33,10 @@ import type { ContextScope } from "@capital-q/ui/tokens";
 import { ViewTransition } from "@/components/view-transition";
 import type { Briefing } from "@/features/home/briefing";
 import { decideBriefing } from "@/features/home/briefing-gate";
+import {
+  DECK_OFFER_QUESTION,
+  takeAcceptedDeckOffer,
+} from "@/features/onboarding-conversation/deck-offer";
 
 import {
   materialUploadCompleteAction,
@@ -625,6 +629,13 @@ export function QConversationPanel({
     },
     [rawAsk, welcomeShown, welcomeLine, welcomeLead, briefing],
   );
+  // Q room W5 (R8): a founder said yes to the onboarding deck offer;
+  // once they are here and Q is connected, ask for it, once.
+  useEffect(() => {
+    if (!connected) return;
+    if (takeAcceptedDeckOffer()) void qAsk(DECK_OFFER_QUESTION);
+  }, [connected, qAsk]);
+
   const sayOrAsk = useCallback(
     (text: string) => {
       if (lineOpen) sendText(text);
