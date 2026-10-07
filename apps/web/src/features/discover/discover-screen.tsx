@@ -2,11 +2,14 @@ import Link from "next/link";
 
 import { InvestorCards } from "@/features/investors/investor-cards";
 
+import { GateFit } from "./gate-fit";
+
 import type {
   DiscoveredCompanyDto,
   DiscoveredInvestorDto,
   DiscoveryNoteDto,
   DiscoveryReasonDto,
+  InvestorGateFitDto,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { Building2, Globe, ICON_SIZE, Info } from "@capital-q/ui/icons";
@@ -44,7 +47,7 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
   NO_DISCOVERABLE_COUNTERPARTS:
     "Nobody has made themselves discoverable yet. This fills as people choose to be found.",
   RANKED_ON_DECLARED_PROFILE_ONLY:
-    "Ordered by what each investor says publicly. An investor's mandate stays private and is never used to rank this list.",
+    "Based on what investors publish: their public profile and, where they have one, their gate, checked against your company. Their private mandates never shape this list, and Q never guesses them.",
   RECOMMENDATIONS_REFRESHING:
     "Your recommendations are being prepared. Check back in a moment.",
   SLATE_RESTARTED:
@@ -161,9 +164,12 @@ export function DiscoverCompanies({
 export function DiscoverInvestors({
   items,
   notes,
+  gates = new Map(),
 }: {
   readonly items: readonly DiscoveredInvestorDto[];
   readonly notes: readonly DiscoveryNoteDto[];
+  /** Q.05: published gates checked for the founder's own company. */
+  readonly gates?: ReadonlyMap<string, InvestorGateFitDto>;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -183,7 +189,17 @@ export function DiscoverInvestors({
         // is sent. Order is the server's; the reasons say why each is here.
         <InvestorCards
           items={items}
-          footer={(item) => <Reasons reasons={item.reasons} />}
+          footer={(item) => {
+            const gate = gates.get(item.investorOrganisationId);
+            return (
+              <div className="flex flex-col gap-3">
+                <Reasons reasons={item.reasons} />
+                {gate === undefined ? null : (
+                  <GateFit gate={gate} apply={false} />
+                )}
+              </div>
+            );
+          }}
         />
       )}
     </div>

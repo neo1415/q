@@ -99,6 +99,11 @@ function subjectWords(intent: QShowInQRoomIntent): {
     READINESS: ["readiness", "ready", "stop my raise", "pillar", "pillars"],
     ACTION_PLAN: ["action plan", "plan", "next step", "steps", "to do"],
     FOLLOW_UPS: ["question", "questions", "ask me", "still want"],
+    ASSUMPTIONS: ["assumption", "assumptions", "test", "ask the founder"],
+    EVIDENCE_BOARD: ["evidence", "evidenced", "claimed", "board"],
+    THESIS: ["thesis", "mandate", "suggestion", "suggestions"],
+    SAVED_COMPARISON: ["compare", "comparison", "saved", "side by side"],
+    INVESTOR_FIT: ["investors", "investor", "gate", "gates", "criteria"],
   };
   return { names, kinds: kinds[intent.object] };
 }
@@ -210,6 +215,16 @@ export function describeCard(intent: QShowInQRoomIntent): string {
       return "your action plan";
     case "FOLLOW_UPS":
       return "Q's questions";
+    case "ASSUMPTIONS":
+      return `the assumptions to test on ${intent.title}`;
+    case "EVIDENCE_BOARD":
+      return `the evidence board for ${intent.title}`;
+    case "THESIS":
+      return "how Q reads your thesis";
+    case "SAVED_COMPARISON":
+      return "your saved companies side by side";
+    case "INVESTOR_FIT":
+      return "investors by what they publish";
   }
 }
 

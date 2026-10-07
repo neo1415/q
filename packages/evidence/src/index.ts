@@ -271,6 +271,11 @@ export {
   MINIMUM_STANDARD_SECTIONS,
   scoreDeckSection,
 } from "./domain/deck-coaching.js";
+// Q.07: assumptions to test and the evidence board (investor readers only).
+export {
+  assumptionBoardText,
+  buildAssumptionBoard,
+} from "./domain/assumptions.js";
 export {
   createPostgresDataRoom,
   type DataRoomChecklistRow,

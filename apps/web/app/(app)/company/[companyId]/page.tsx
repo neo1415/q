@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
+  getCompanyAssumptions,
   getCompanyDataRoom,
   getCompanyDeck,
   getCompanyProfile,
@@ -18,6 +19,10 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
+import {
+  AssumptionsSection,
+  type QuestionsRoute,
+} from "@/features/assumptions/assumptions-section";
 import {
   CompanyProfileView,
   profileTabOf,
@@ -128,14 +133,25 @@ export default async function CompanyPage({
     profile.overview === null ? "elevator" : (requested ?? "overview");
   // Each tab's read is the API's, for this reader; only the open tab (and
   // the deck, whose team facts the Team tab shows) is fetched.
-  const [dataRoom, deck] = await Promise.all([
+  const [dataRoom, deck, assumptions] = await Promise.all([
     profile.overview !== null
       ? getCompanyDataRoom(session, profile.companyId).catch(() => null)
       : null,
     profile.overview !== null && (tab === "deck" || tab === "team")
       ? getCompanyDeck(session, profile.companyId).catch(() => null)
       : null,
+    // Q.07: the investor's assumptions to test, built by the API from what
+    // this investor may see (confirmed readings only); never for others.
+    investor && profile.overview !== null && tab === "overview"
+      ? getCompanyAssumptions(session, profile.companyId).catch(() => null)
+      : null,
   ]);
+  const questionsRoute: QuestionsRoute =
+    relationship === null || !isMatchedRelationshipState(relationship.state)
+      ? { kind: "NOT_CONNECTED" }
+      : inDiligence
+        ? { kind: "DILIGENCE", relationshipId: relationship.relationshipId }
+        : { kind: "CHAT", relationshipId: relationship.relationshipId };
 
   return (
     <PageContainer className="flex flex-col gap-6">
@@ -192,6 +208,15 @@ export default async function CompanyPage({
         dataRoom={dataRoom}
         deck={deck}
         previewAsInvestor={query?.as === "investor"}
+        overviewExtra={
+          assumptions === null ? null : (
+            <AssumptionsSection
+              board={assumptions}
+              companyName={profile.canonicalName}
+              route={questionsRoute}
+            />
+          )
+        }
         relationshipState={
           RelationshipStateV2Schema.safeParse(standing?.relationship?.state)
             .data ?? null

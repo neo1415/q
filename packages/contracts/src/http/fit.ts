@@ -193,6 +193,8 @@ export const FIT_CANDIDATE_SOURCES = [
   "RELATIONSHIP",
   "REQUEST",
   "FEED",
+  /** Q.10: a company the investor picked from Saved to compare. */
+  "SAVED",
 ] as const;
 export const FitCandidateSourceSchema = z.enum(FIT_CANDIDATE_SOURCES);
 export type FitCandidateSource = z.infer<typeof FitCandidateSourceSchema>;
@@ -246,6 +248,28 @@ export const FIT_Q_VIEW_PATH = "/v1/fit/companies/:companyId/q-view" as const;
 export const FIT_TOP_PATH = "/v1/fit/top" as const;
 
 export const FIT_IDS_MAX = 50;
+
+/**
+ * `GET /v1/fit/compare?ids=a,b` — Q.10: 2 to 4 companies the investor
+ * picked (from Saved), side by side, on the same fit and words as the top
+ * three. Each id is re-checked for visibility; one the reader may not see
+ * is simply absent. Their order is the fit order, never the request's.
+ */
+export const FIT_COMPARE_PATH = "/v1/fit/compare" as const;
+export const FIT_COMPARE_MIN = 2;
+export const FIT_COMPARE_MAX = 4;
+
+export const FitCompareQuerySchema = z
+  .object({
+    ids: z
+      .string()
+      .max(FIT_COMPARE_MAX * 37)
+      .transform((value) => [
+        ...new Set(value.split(",").filter((id) => id.length > 0)),
+      ])
+      .pipe(z.array(UuidSchema).min(FIT_COMPARE_MIN).max(FIT_COMPARE_MAX)),
+  })
+  .strict();
 
 export const FitCompaniesQuerySchema = z
   .object({

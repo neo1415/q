@@ -772,6 +772,17 @@ export {
   type FitServiceDependencies,
   type FitTopResult,
 } from "./fit/service.js";
+// Q.02 (2026-10-07): how Q reads an investor's thesis; suggestions apply
+// only on approval, through the ordinary mandate update.
+export {
+  THESIS_RULES,
+  countryWords,
+  readThesis,
+  stageWords,
+  thesisSuggestionPatch,
+  type ThesisDecision,
+  type ThesisMandate,
+} from "./thesis/reading.js";
 export {
   FIT_ORDER_CURRENT,
   FIT_ORDER_V1,

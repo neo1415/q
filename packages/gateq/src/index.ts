@@ -63,6 +63,10 @@ export {
   type GateQDependencies,
   type GateQService,
 } from "./application/use-cases.js";
+export {
+  createInvestorGateFits,
+  type InvestorGateFits,
+} from "./application/investor-gates.js";
 export type {
   CompanyQualificationProjectionPort,
   GatewayPolicyPort,

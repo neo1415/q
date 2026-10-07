@@ -26,6 +26,11 @@ import {
   createFitProfileTool,
   createFitTopCandidatesTool,
 } from "./tools/fit.js";
+import {
+  createCompanyAssumptionsTool,
+  createFitCompareTool,
+  createThesisReadingTool,
+} from "./tools/investor-promises.js";
 import { createFindProspectiveInvestorsTool } from "./tools/find-prospective-investors.js";
 import { createRecommendationExplanationTool } from "./tools/recommendation-explanation.js";
 import {
@@ -124,7 +129,18 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     // MATCH block (ADR 0052): fit with the investor's own mandate.
     ...(ports.fit === undefined
       ? []
-      : [createFitProfileTool(ports), createFitTopCandidatesTool(ports)]),
+      : [
+          createFitProfileTool(ports),
+          createFitTopCandidatesTool(ports),
+          // Q.10: 2-4 picked (default: their latest saved), side by side.
+          createFitCompareTool(ports),
+        ]),
+    // Q.02: how Q reads their thesis (their own mandate and decisions).
+    ...(ports.appActions === undefined ? [] : [createThesisReadingTool(ports)]),
+    // Q.07: a company's assumptions to test, as this investor may see them.
+    ...(ports.profileMaterial === undefined
+      ? []
+      : [createCompanyAssumptionsTool(ports.profileMaterial)]),
     ...(research === undefined
       ? []
       : [

@@ -31,3 +31,20 @@ export function toggleSelection(
   if (selected.length >= COMPARE_MAX) return selected;
   return [...selected, id];
 }
+
+/**
+ * Q.10: the on-screen side by side takes 2 to 4 (the fit compare route's
+ * bounds); "Compare with Q" keeps its own 2 to 5.
+ */
+export const SIDE_BY_SIDE_MAX = 4;
+
+export function canCompareSideBySide(count: number): boolean {
+  return count >= COMPARE_MIN && count <= SIDE_BY_SIDE_MAX;
+}
+
+export function sideBySideHref(ids: readonly string[]): string {
+  return `/discover/saved/compare?ids=${ids
+    .slice(0, SIDE_BY_SIDE_MAX)
+    .map(encodeURIComponent)
+    .join(",")}`;
+}

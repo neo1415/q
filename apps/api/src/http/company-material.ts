@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  AssumptionBoardDtoSchema,
   COMPANIES_PATH,
+  COMPANY_ASSUMPTIONS_SEGMENT,
   COMPANY_DATA_ROOM_OPEN_SEGMENT,
   COMPANY_DATA_ROOM_SEGMENT,
   COMPANY_DECK_OPEN_SEGMENT,
@@ -15,7 +17,10 @@ import {
   parseContract,
   type FounderPersonDto,
 } from "@capital-q/contracts";
-import { DocumentNotFoundError } from "@capital-q/evidence";
+import {
+  buildAssumptionBoard,
+  DocumentNotFoundError,
+} from "@capital-q/evidence";
 import type {
   CompanyDeckService,
   DataRoomService,
@@ -126,6 +131,25 @@ export function registerCompanyMaterialRoutes(
       if (link === null) throw new DocumentNotFoundError();
       void reply.header("Cache-Control", "no-store");
       return DataRoomOpenDtoSchema.parse(link);
+    },
+  );
+
+  // Q.07: "Assumptions to test" and the evidence board. Built in code from
+  // the deck view the deck service projected for THIS reader (only a
+  // reading the founder confirmed, only where the deck is shared with
+  // them); investors only, everyone else the same not-found.
+  app.get(
+    `${base}${COMPANY_ASSUMPTIONS_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const view = await dependencies.companyDeck.view(
+        getActorContext(request),
+        uuidParam(request, "companyId"),
+      );
+      const board = view === null ? null : buildAssumptionBoard(view);
+      if (board === null) throw new DocumentNotFoundError();
+      void reply.header("Cache-Control", "no-store");
+      return AssumptionBoardDtoSchema.parse(board);
     },
   );
 

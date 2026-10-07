@@ -375,6 +375,20 @@ export const Q_ROOM_OBJECTS = [
   "READINESS",
   "ACTION_PLAN",
   "FOLLOW_UPS",
+  /**
+   * Investor promises (2026-10-07). ASSUMPTIONS / EVIDENCE_BOARD: one
+   * company's claims as this investor may see them (Q.07), by the
+   * company's id. THESIS: the investor's own "how Q reads your thesis"
+   * (Q.02); SAVED_COMPARISON: their saved companies side by side (Q.10);
+   * INVESTOR_FIT: for a founder, investors by their published criteria
+   * and gates (Q.05). The last three are the actor's own, resolved by the
+   * server (the id is their own organisation's).
+   */
+  "ASSUMPTIONS",
+  "EVIDENCE_BOARD",
+  "THESIS",
+  "SAVED_COMPARISON",
+  "INVESTOR_FIT",
 ] as const;
 export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
 export type QRoomObject = z.infer<typeof QRoomObjectSchema>;

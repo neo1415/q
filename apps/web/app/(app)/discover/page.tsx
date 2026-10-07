@@ -7,9 +7,14 @@ import {
   authorisePitchPlayback,
   discoverCompanies,
   discoverInvestors,
+  getInvestorGates,
   listTaxonomyNodes,
   listYourCompanies,
 } from "@capital-q/api-client";
+import {
+  GATEQ_INVESTOR_GATES_MAX,
+  type InvestorGateFitDto,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -251,6 +256,21 @@ export default async function DiscoverPage({
   }
 
   const slate = await discoverInvestors(session).catch(() => null);
+  // Q.05: the gates these investors publish, checked against the founder's
+  // own company (the API resolves it). No gates read is no gate shown.
+  const gates =
+    slate === null || slate.items.length === 0
+      ? new Map<string, InvestorGateFitDto>()
+      : new Map(
+          (
+            await getInvestorGates(
+              session,
+              slate.items
+                .slice(0, GATEQ_INVESTOR_GATES_MAX)
+                .map((item) => item.investorOrganisationId),
+            ).catch(() => ({ items: [] }))
+          ).items.map((gate) => [gate.investorOrganisationId, gate]),
+        );
   return (
     <PageContainer className="flex flex-col gap-6">
       <PageHeader title="Discover" />
@@ -272,7 +292,11 @@ export default async function DiscoverPage({
             total={slate.items.length}
             label={`${String(slate.items.length)} investors`}
           />
-          <DiscoverInvestors items={slate.items} notes={slate.notes} />
+          <DiscoverInvestors
+            items={slate.items}
+            notes={slate.notes}
+            gates={gates}
+          />
         </>
       )}
     </PageContainer>

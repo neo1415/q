@@ -321,6 +321,8 @@ export type ApiModules = {
   /** F3: find and claim a company; an investor's saved startup search. */
   readonly companyClaims?: CompanyClaims | undefined;
   readonly gateqMyApplications?: GateQRoutesDependencies["myApplications"];
+  /** Q.05: published gates for the founder's own company. */
+  readonly gateqInvestorGates?: GateQRoutesDependencies["investorGates"];
   readonly startupAlerts?: StartupAlerts | undefined;
   /** F4: the inbox as the declared actions reach it (ADR 0040). */
   readonly gateqInboxActions?: AppActionPorts["gateqInbox"];
@@ -843,6 +845,7 @@ export function createApp(
       identities: security.identities,
       claims: modules.companyClaims,
       myApplications: modules.gateqMyApplications,
+      investorGates: modules.gateqInvestorGates,
       publicReplyPromise: modules.gateqPublicReplyPromise,
       entitlements: modules.billing?.entitlements,
       publicImages: modules.gateqPublicImages,

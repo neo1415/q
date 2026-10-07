@@ -40,6 +40,10 @@ import {
 import type { ArtifactService } from "@capital-q/q-artifacts";
 import { registerFitRoutes, type FitRoutesDependencies } from "./http/fit.js";
 import {
+  registerInvestorPromiseRoutes,
+  type InvestorPromiseRoutesDependencies,
+} from "./http/investor-promises.js";
+import {
   registerRecommendationExplanationRoutes,
   type RecommendationExplanationRoutesDependencies,
 } from "./http/recommendation-explanations.js";
@@ -143,6 +147,8 @@ export type QApiModules = {
     RecommendationExplanationRoutesDependencies["explanations"] | undefined;
   /** MATCH block (ADR 0052): fit with the reader's own mandate, and Q's view. */
   readonly fit?: Pick<FitRoutesDependencies, "fit" | "qViews"> | undefined;
+  /** Investor promises (2026-10-07): compare picked companies; thesis reading. */
+  readonly thesis?: InvestorPromiseRoutesDependencies["thesis"] | undefined;
   /** What Q remembers about the person, for them to read and correct. */
   readonly memory?: MemoryRoutesDependencies["memory"] | undefined;
   /** Errands: the person's own, read and stopped. */
@@ -429,6 +435,15 @@ export function createApp(
       fit: modules.fit.fit,
       qViews: modules.fit.qViews,
     });
+    // Q.10 / Q.02: the same reads as fit_compare and thesis_reading.
+    if (modules.thesis !== undefined) {
+      registerInvestorPromiseRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        fit: modules.fit.fit,
+        thesis: modules.thesis,
+      });
+    }
   }
 
   // What Q remembers about the person (ADR 0012), theirs to correct.

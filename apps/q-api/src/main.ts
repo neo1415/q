@@ -16,7 +16,13 @@
  */
 
 import { createFitComposition } from "./composition/fit.js";
+import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
 import {
+  createPostgresTaxonomyAssignmentRepository,
+  createPostgresTaxonomyReferenceRepository,
+} from "@capital-q/taxonomy";
+import {
+  createInvestorGateFits,
   createGateQService,
   createPostgresGatewayPolicyPort,
   createPostgresGatewayRepository,
@@ -356,7 +362,12 @@ import {
 } from "@capital-q/q-actions";
 import { Q_ACTION_EVENTS } from "@capital-q/q-actions/events";
 import { createContextFirewall } from "@capital-q/q-firewall";
-import { createQTools, type DocumentStudioPort } from "@capital-q/q-tools";
+import {
+  createQTools,
+  readOwnThesis,
+  type DocumentStudioPort,
+  type InvestorGatesPort,
+} from "@capital-q/q-tools";
 // BILLING block (ADR 0034)
 import {
   billingAccountOf,
@@ -2094,6 +2105,32 @@ const readinessService = createReadinessService({
     dismissFollowUp: (raw) => onboardingRevisions.runtime.dismissFollowUp(raw),
   }),
 });
+// Q.05 (2026-10-07): investors' published gates, checked against the
+// founder's OWN company (resolved here, never from the model or client),
+// for "which investors fit us?". Published gates are public by design.
+const investorGateFits = createInvestorGateFits({
+  policies: createPostgresGatewayPolicyPort({ sql: database.sql }),
+  companies: createQApiGateQCompanyProjectionPort({
+    sql: database.sql,
+    companies: createPostgresCompanyMarketplaceQueryPort({ sql: database.sql }),
+    assignments: createPostgresTaxonomyAssignmentRepository(),
+    reference: createPostgresTaxonomyReferenceRepository(),
+    capital,
+  }),
+});
+const investorGatesPort: InvestorGatesPort = {
+  forOwnCompany: async (actor, companyId, investorOrganisationIds) => {
+    const own = await runtimeDependencies.ownCompany(actor).catch(() => null);
+    if (own === null || own.toLowerCase() !== companyId.toLowerCase()) {
+      return [];
+    }
+    return investorGateFits.forOwnCompany({
+      tenantId: actor.tenantId,
+      companyId: own,
+      investorOrganisationIds,
+    });
+  },
+};
 const appActionPorts: OwnReadPorts = {
   readiness: readinessService,
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
@@ -2402,6 +2439,8 @@ const qTools = createQTools({
     recommendationExplanations: currentSlateExplanations,
     // MATCH block (ADR 0052): fit.profile and fit.top_candidates.
     fit: fitComposition.fit,
+    // Q.05: published gates for the founder's own company.
+    investorGates: investorGatesPort,
     ...(researchComposition.research === undefined
       ? {}
       : { research: researchComposition.research }),
@@ -5250,6 +5289,16 @@ const { app, logger: appLogger } = createApp(
     recommendationExplanations,
     // MATCH block (ADR 0052): /v1/fit.
     fit: fitComposition,
+    // Q.02: how Q reads the investor's thesis (the same read as the tool).
+    thesis: (actor) =>
+      readOwnThesis(
+        {
+          ownInvestorOrganisationId: appActionPorts.ownInvestorOrganisationId,
+          investors: appActionPorts.investors,
+          decisions: investorFeed.decisions,
+        },
+        actor,
+      ),
     // The profile page's "Q found" column (BIZ-002): firewall first, then
     // the own-public-presence envelope, then the cited pages.
     profileFindings: profileFindingsReader,

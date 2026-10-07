@@ -617,6 +617,19 @@ export {
   type FitTopCandidatesInput,
   type FitTopCandidatesOutput,
 } from "./tools/fit.js";
+// Investor promises (2026-10-07): assumptions, compare, thesis reading.
+export {
+  COMPANY_ASSUMPTIONS,
+  FIT_COMPARE,
+  THESIS_READING,
+  createCompanyAssumptionsTool,
+  createFitCompareTool,
+  createThesisReadingTool,
+  readOwnThesis,
+  savedCompanyIds,
+  type ThesisPorts,
+} from "./tools/investor-promises.js";
+export type { InvestorGatesPort } from "./ports.js";
 export {
   COACH_MY_DECK,
   createCoachMyDeckTool,

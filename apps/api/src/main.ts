@@ -145,6 +145,7 @@ import {
 import {
   GatewayIdSchema,
   createGateQService,
+  createInvestorGateFits,
   createPolicyExtractionService,
   createPostgresPolicyExtractionRepository,
   createPostgresGatewayPolicyPort,
@@ -552,19 +553,20 @@ const gateqIntakePolicies = createIntakeBoundPolicyPort({
   versions: gateqVersions,
 });
 
+const gateqCompanyProjection = createGateQCompanyProjectionPort({
+  sql: database.sql,
+  companies: createPostgresCompanyMarketplaceQueryPort({
+    sql: database.sql,
+  }),
+  assignments: createPostgresTaxonomyAssignmentRepository(),
+  reference: createPostgresTaxonomyReferenceRepository(),
+  capital: createPostgresCapitalObjectiveQueryPort({ sql: database.sql }),
+});
 const gateq = createGateQService({
   gateways: gateqGateways,
   versions: gateqVersions,
   policies: createPostgresGatewayPolicyPort({ sql: database.sql }),
-  companies: createGateQCompanyProjectionPort({
-    sql: database.sql,
-    companies: createPostgresCompanyMarketplaceQueryPort({
-      sql: database.sql,
-    }),
-    assignments: createPostgresTaxonomyAssignmentRepository(),
-    reference: createPostgresTaxonomyReferenceRepository(),
-    capital: createPostgresCapitalObjectiveQueryPort({ sql: database.sql }),
-  }),
+  companies: gateqCompanyProjection,
   organisations: createGateQOrganisationDisplayPort({
     investors: createPostgresInvestorOrganisationQueryPort({
       sql: database.sql,
@@ -2336,6 +2338,24 @@ const { app, logger } = createApp(config, security, {
         }),
   gateqMyApplications: (actor) =>
     createPostgresApplicationFounders({ sql: database.sql }).listFor(actor),
+  // Q.05 (2026-10-07): published gates checked for the founder's OWN
+  // company, resolved here from their organisation (never the client).
+  gateqInvestorGates: async (actor, investorOrganisationIds) => {
+    if (actor.organisationId === undefined) return [];
+    const company = await companyQuery.findOrganisationCompany?.(
+      actor.tenantId,
+      actor.organisationId,
+    );
+    if (company == null) return [];
+    return createInvestorGateFits({
+      policies: createPostgresGatewayPolicyPort({ sql: database.sql }),
+      companies: gateqCompanyProjection,
+    }).forOwnCompany({
+      tenantId: actor.tenantId,
+      companyId: company.id,
+      investorOrganisationIds,
+    });
+  },
   gateqPolicyExtraction: (() => {
     const service = createPolicyExtractionService({
       gateq,

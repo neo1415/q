@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { Button } from "@capital-q/ui/button";
+import { Button, buttonClassName } from "@capital-q/ui/button";
 import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 
 import type { PitchSummaryDto } from "@capital-q/contracts";
@@ -15,8 +15,10 @@ import { CompanyPitch } from "./company-pitch";
 
 import {
   canCompare,
+  canCompareSideBySide,
   COMPARE_MAX,
   compareQuestion,
+  sideBySideHref,
   toggleSelection,
 } from "./saved-compare";
 
@@ -58,13 +60,29 @@ export function SavedCompanies({
               ? `Tick 2 to ${String(COMPARE_MAX)} companies to compare them with Q.`
               : `${String(selected.length)} selected${full ? ` (up to ${String(COMPARE_MAX)})` : ""}.`}
           </span>
-          <Button
-            variant="secondary"
-            disabled={!canCompare(selected.length)}
-            onClick={() => askNow(compareQuestion(names))}
-          >
-            Compare with Q
-          </Button>
+          <span className="flex flex-wrap gap-2">
+            {/* Q.10: the same fit as the top three, on a screen (2 to 4). */}
+            {canCompareSideBySide(selected.length) ? (
+              <Link
+                href={sideBySideHref(selected)}
+                className={buttonClassName("primary")}
+                data-saved-compare
+              >
+                Compare {String(selected.length)} side by side
+              </Link>
+            ) : (
+              <Button variant="primary" disabled>
+                Compare side by side
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              disabled={!canCompare(selected.length)}
+              onClick={() => askNow(compareQuestion(names))}
+            >
+              Compare with Q
+            </Button>
+          </span>
         </div>
       ) : null}
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">

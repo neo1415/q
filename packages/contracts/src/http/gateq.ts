@@ -263,6 +263,73 @@ export const PublicGatewayDtoSchema = z
 export type PublicGatewayDto = z.infer<typeof PublicGatewayDtoSchema>;
 
 // ---------------------------------------------------------------------------
+// Q.05 · investors' published gates, checked for a founder's own company
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET /v1/gateq/investor-gates?ids=a,b` — for a founder: which of these
+ * investor organisations has a published gate, and how their OWN company
+ * stands on each published criterion (met, not met, not known yet).
+ *
+ * Only what the gate already publishes (the investor's labels, what kind
+ * of thing each asks about) plus the same deterministic qualification the
+ * application runs; never a threshold, never a mandate, never a score. The
+ * company is the caller's own, resolved by the server.
+ */
+export const GATEQ_INVESTOR_GATES_PATH = "/v1/gateq/investor-gates" as const;
+export const GATEQ_INVESTOR_GATES_MAX = 50;
+
+export const InvestorGatesQuerySchema = z
+  .object({
+    ids: z
+      .string()
+      .max(GATEQ_INVESTOR_GATES_MAX * 37)
+      .transform((value) => [
+        ...new Set(value.split(",").filter((id) => id.length > 0)),
+      ])
+      .pipe(z.array(UuidSchema).min(1).max(GATEQ_INVESTOR_GATES_MAX)),
+  })
+  .strict();
+
+export const GateCriterionStandingSchema = z.enum([
+  "MET",
+  "NOT_MET",
+  "UNKNOWN",
+]);
+export type GateCriterionStanding = z.infer<typeof GateCriterionStandingSchema>;
+
+export const InvestorGateFitDtoSchema = z
+  .object({
+    investorOrganisationId: UuidSchema,
+    publicId: z.string().max(64),
+    title: z.string().max(160),
+    acceptingApplications: z.boolean(),
+    criteria: z
+      .array(
+        z
+          .object({
+            label: z.string().max(120),
+            requiredness: CriterionRequirednessDtoSchema,
+            dimension: CriterionTypeDtoSchema,
+            standing: GateCriterionStandingSchema,
+          })
+          .strict(),
+      )
+      .max(64),
+  })
+  .strict();
+export type InvestorGateFitDto = z.infer<typeof InvestorGateFitDtoSchema>;
+
+export const InvestorGateFitListDtoSchema = z
+  .object({
+    items: z.array(InvestorGateFitDtoSchema).max(GATEQ_INVESTOR_GATES_MAX),
+  })
+  .strict();
+export type InvestorGateFitListDto = z.infer<
+  typeof InvestorGateFitListDtoSchema
+>;
+
+// ---------------------------------------------------------------------------
 // P7 · reading a mandate into a DRAFT gate policy
 // ---------------------------------------------------------------------------
 

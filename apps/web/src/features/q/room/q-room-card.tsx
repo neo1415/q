@@ -299,6 +299,14 @@ function cardRef(intent: QShowInQRoomIntent): QManifestRef | null {
     case "ACTION_PLAN":
     case "FOLLOW_UPS":
       return { kind: "COMPANY", id: intent.id };
+    // Investor promises: a company's claims; the actor's own otherwise.
+    case "ASSUMPTIONS":
+    case "EVIDENCE_BOARD":
+    case "INVESTOR_FIT":
+      return { kind: "COMPANY", id: intent.id };
+    case "THESIS":
+    case "SAVED_COMPARISON":
+      return { kind: "INVESTOR_ORGANISATION", id: intent.id };
   }
 }
 

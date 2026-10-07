@@ -113,6 +113,16 @@ export type GatewayPolicyPort = {
   readonly publishedPolicyByPublicId: (
     publicId: GatewayPublicId,
   ) => Promise<GatewayPolicy | null>;
+  /**
+   * Q.05: the published policy of each active gateway these investor
+   * organisations hold (newest first). Published policies are public by
+   * design (§19); nothing unpublished or disabled is ever returned.
+   */
+  readonly publishedPoliciesForInvestorOrganisations?:
+    | ((
+        investorOrganisationIds: readonly string[],
+      ) => Promise<readonly GatewayPolicy[]>)
+    | undefined;
 };
 
 /**
