@@ -14,7 +14,7 @@ import {
 describe("COMPANY_ANALYST v20", () => {
   it("is active, adds only HOW YOU TALK before ANSWER FORMAT, and v19 is kept", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(20);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(21);
     expect(COMPANY_ANALYST_V19.status).toBe("DEPRECATED");
     expect(
       COMPANY_ANALYST_V20.template.replace(`\n\n${CONVERSATION_SECTION}`, ""),

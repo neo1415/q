@@ -14,7 +14,7 @@ import {
 describe("COMPANY_ANALYST v19", () => {
   it("changes only the document types line, and v18 is kept (v20 is active)", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(20);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(21);
     expect(COMPANY_ANALYST_V18.status).toBe("DEPRECATED");
     expect(COMPANY_ANALYST_V19.template).toContain(V19_DOCUMENT_TYPES);
     expect(COMPANY_ANALYST_V19.template).not.toContain(V18_DOCUMENT_TYPES);

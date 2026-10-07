@@ -60,6 +60,8 @@ import {
   stripEmptyPromises,
   withoutRecommendationClaims,
   inFirstPerson,
+  createCaveatGuard,
+  withOneCaveat,
   type RecommendationGrounds,
   quietlyNoted,
   statesSomething,
@@ -90,10 +92,14 @@ import {
   createRunFits,
   fitAnswerCardsBlock,
   fitCardsSummary,
+  fitSweepCardsBlock,
+  fitSweepSummary,
   fitsInOutcome,
   groundedFitWords,
   hasOrphanListItems,
+  spokenBeforeCards,
 } from "./fit-cards.js";
+import { fitSweepAsk, runFitSweep, type FitSweepResult } from "./fit-sweep.js";
 import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
@@ -1701,6 +1707,31 @@ export function createModelGatewayQAnswer(
     let ownProfile: AuthorisedFact | null = null;
     let ownProfileCall: QToolCallObservation | null = null;
     const ownInvestor = ownInvestorOrganisationIn(plan);
+    // A fit question over a set they own is computed by code, side by side
+    // with the reads below, through the same tools and plan (fit-sweep.ts).
+    // Investors only (fit is against their mandate); never for a document
+    // or an action.
+    const sweepAsk =
+      ownInvestor === null ||
+      request.writingDocument === true ||
+      (request.turnKind !== undefined && request.turnKind !== "QUESTION_TO_Q")
+        ? null
+        : fitSweepAsk(latest.content);
+    const fitSweep: Promise<FitSweepResult | null> =
+      sweepAsk === null
+        ? Promise.resolve(null)
+        : runFitSweep({
+            ask: sweepAsk,
+            tools,
+            context: toolContext,
+            available: prefetchTools,
+            own:
+              standingRead === null
+                ? Promise.resolve(null)
+                : standingRead.then((outcome) =>
+                    outcome.result.ok ? outcome.result.data : null,
+                  ),
+          }).catch(() => null);
     // The reads below are independent of each other and run side by
     // side; each fills its own facts (speed sweep 2026-10-01: in turn
     // they took ~0.6 s before the model was asked anything).
@@ -2148,6 +2179,7 @@ export function createModelGatewayQAnswer(
       ownIndex,
       pitchMoment,
       onboardingFacts,
+      fitSweep,
     };
   }
   type PreparedTurn = Awaited<ReturnType<typeof prepareTurn>>;
@@ -2253,6 +2285,7 @@ export function createModelGatewayQAnswer(
         ownIndex,
         pitchMoment,
         onboardingFacts,
+        fitSweep,
         counterparty,
       } = prepared;
       // Grows only by what use_capability loads (lead 2026-10-04).
@@ -2631,8 +2664,15 @@ export function createModelGatewayQAnswer(
         });
       };
       // Backed only by a screen move a tool of this run authorised.
-      const screenClaims = createScreenClaimGuard(() =>
-        clientActionBlocks.some((block) => block.kind === "UI_INTENT"),
+      // Or by cards that will render: the model's own card set begun in
+      // its object, or two or more fits this run computed (code lays those
+      // out when the model wrote none).
+      const caveats = createCaveatGuard();
+      const screenClaims = createScreenClaimGuard(
+        () =>
+          clientActionBlocks.some((block) => block.kind === "UI_INTENT") ||
+          seenText.includes('"answerCards":{') ||
+          runFits.read(request.runId).length >= 2,
       );
       const onTextDelta = (fragment: string): void => {
         seenText += fragment;
@@ -2658,16 +2698,18 @@ export function createModelGatewayQAnswer(
             sentenceGuarded === null
               ? null
               : screenClaims.sentence(sentenceGuarded);
-          if (guarded === null || guarded.length === 0) {
+          // One boilerplate disclaimer at most (lead live replay 2026-10-07).
+          const caveated = guarded === null ? null : caveats.sentence(guarded);
+          if (caveated === null || caveated.length === 0) {
             continue;
           }
           // While code's lead list is what was last said, a sentence of
           // the model's that only repeats one of its items is not said
           // again (lead 2026-10-03; the stored answer drops it the same
           // way, afterLeadLines).
-          let said = guarded;
+          let said = caveated;
           if (leadListOpen && request.leadLines !== undefined) {
-            said = afterLeadLines(guarded, request.leadLines).trim();
+            said = afterLeadLines(caveated, request.leadLines).trim();
             // A bare item number cut off as its own sentence ("1.").
             if (said.length === 0 || /^\d+[.)]$/u.test(said)) continue;
             leadListOpen = false;
@@ -2854,6 +2896,55 @@ export function createModelGatewayQAnswer(
           return stored;
         });
       };
+      // A fit question over a set they own (lead live replay 2026-10-07:
+      // 36 s and "I can't provide mandate scores"): the fits were computed
+      // by code beside the reads above, and the answer is the cards plus a
+      // short spoken summary, both from those fits -- no model round.
+      const sweep = await fitSweep;
+      if (
+        sweep !== null &&
+        sweep.ask.fitAsked &&
+        sweep.fits.length > 0 &&
+        // Read again on the turn's own reading: the prepare may have been
+        // warmed before the turn was read.
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+      ) {
+        const block = fitSweepCardsBlock(
+          sweep.fits,
+          sweep.ask.place === null
+            ? "Fit against your mandate"
+            : `Fit against your mandate: ${sweep.ask.place}`,
+        );
+        if (block !== null) {
+          const text = fitSweepSummary({
+            block,
+            scope: sweep.ask.scope,
+            place: sweep.ask.place,
+            considered: sweep.considered,
+          });
+          const message = await persistAnswer(text, [block]);
+          logger?.info(
+            {
+              qRunId: request.runId,
+              scope: sweep.ask.scope,
+              place: sweep.ask.place !== null,
+              cards: block.cards.length,
+              considered: sweep.considered,
+              fitCalls: sweep.calls.length,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered a fit question from computed fits",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+      }
       const toolCalls: QToolCallObservation[] = [];
       // A platform lookup that found nobody. It is the whole reason the
       // research hop below exists: a company Capital Q does not hold is
@@ -3630,11 +3721,13 @@ export function createModelGatewayQAnswer(
         // Natural register (Zino live 2026-10-07): "Capital Q records
         // that you have…" is said in Q's own first person.
         const guarded = withoutRecommendationClaims(
-          inFirstPerson(
-            citeAuthorisedFacts(
-              withoutPublicSourceLabels(promises.text, publicSources),
-              facts,
-            ),
+          withOneCaveat(
+            inFirstPerson(
+              citeAuthorisedFacts(
+                withoutPublicSourceLabels(promises.text, publicSources),
+                facts,
+              ),
+            ).text,
           ).text,
           recommendationGrounds,
         );
@@ -3994,7 +4087,11 @@ export function createModelGatewayQAnswer(
           (block) => block.kind === "ANSWER_CARDS",
         )
           ? null
-          : fitAnswerCardsBlock(fitsRead, content);
+          : fitAnswerCardsBlock(fitsRead, content, {
+              // Fits code read for a plain list question: cards only for
+              // what the answer names.
+              namedOnly: sweep !== null && !sweep.ask.fitAsked,
+            });
         if (builtCards !== null) {
           logger?.info(
             { qRunId: request.runId, cards: builtCards.cards.length },
@@ -4024,15 +4121,22 @@ export function createModelGatewayQAnswer(
             [...(analystBlocks ?? []), ...clientActionBlocks].some(
               // Cards are on their screen as the answer arrives.
               (block) =>
-                block.kind === "UI_INTENT" || block.kind === "ANSWER_CARDS",
+                block.kind === "UI_INTENT" ||
+                block.kind === "ANSWER_CARDS" ||
+                block.kind === "COMPARISON_CARDS",
             ),
         );
         // The names went with the guard (orphan "Pros: …" sentences) and
         // code built the cards: say the gist, by name, and point at them.
+        const cardsShown = (analystBlocks ?? []).some(
+          (block) => block.kind === "ANSWER_CARDS",
+        );
         const answerText =
           builtCards !== null && hasOrphanListItems(screenSafe.text)
             ? fitCardsSummary(builtCards)
-            : screenSafe.text;
+            : request.spoken === true && cardsShown
+              ? spokenBeforeCards(screenSafe.text)
+              : screenSafe.text;
         if (screenSafe.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: screenSafe.removed },

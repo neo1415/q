@@ -246,7 +246,7 @@ describe("Q answer seam over the Prompt Registry", () => {
       return;
     }
     expect(outcome.promptBundleVersion).toBe(
-      "q-system.v2_company-analyst.v20_comm.v1",
+      "q-system.v2_company-analyst.v21_comm.v1",
     );
     expect(outcome.modelPolicyVersion).toBe("normal_dialogue.v1");
     expect(messages.at(-1)?.role).toBe("Q");

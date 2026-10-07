@@ -81,6 +81,7 @@ export const NATURAL_REGISTER_ISSUES = [
   "QUOTED_INTERNAL_TEXT",
   "TOO_LONG_TO_SAY",
   "LIST_READ_ALOUD",
+  "REPEATED_DISCLAIMER",
 ] as const;
 export type NaturalRegisterIssue = (typeof NATURAL_REGISTER_ISSUES)[number];
 
@@ -121,5 +122,76 @@ export function naturalRegisterIssues(
     if (words > SPOKEN_WORDS_MAX) issues.push("TOO_LONG_TO_SAY");
     if (/^\s*(?:[-*]|\d+\.)\s/mu.test(text)) issues.push("LIST_READ_ALOUD");
   }
+  if (repeatedDisclaimers(text)) issues.push("REPEATED_DISCLAIMER");
   return issues;
+}
+
+/**
+ * Boilerplate disclaimers, once at most (lead live replay 2026-10-07:
+ * "this is mandate alignment—not an investment conclusion" alongside
+ * "not an investment recommendation" and "a prioritisation for diligence
+ * rather than a decision to invest" in one answer). The appended clause
+ * form is always removed; a sentence that is only a disclaimer is kept
+ * the first time and dropped after. A caveat about the evidence itself
+ * ("round size isn't known yet") is not boilerplate and is never touched.
+ */
+const DISCLAIMER_CLAUSE =
+  /\s*(?:[—–]|\s-\s|,|;|\()\s*(?:(?:this|that|which) is (?:only |just )?(?:mandate )?alignment,?\s*(?:and\s+)?)?not (?:an?|any) (?:investment |platform |final )?(?:recommendation|conclusion|verdict|decision|advice)\)?(?=[\s.,;!?]|$)/giu;
+const ALIGNMENT_CLAUSE =
+  /\s*(?:[—–]|\s-\s)\s*(?:this|that) is (?:only |just )?mandate alignment\b/giu;
+const DISCLAIMER_SENTENCE =
+  /\b(?:not (?:an?|any) (?:investment |platform |final )?(?:recommendation|conclusion|verdict|decision|advice)|rather than a (?:decision|recommendation|verdict) to invest|not a platform verdict|is an inference from)\b/iu;
+
+function repeatedDisclaimers(text: string): boolean {
+  const found = text.match(new RegExp(DISCLAIMER_SENTENCE.source, "giu"));
+  return (found?.length ?? 0) > 1;
+}
+
+/** A per-answer guard: sentences in order, as they stream or are stored. */
+export function createCaveatGuard() {
+  let disclaimed = false;
+  let removed = 0;
+  return {
+    sentence(sentence: string): string | null {
+      const trimmed = sentence
+        .replace(DISCLAIMER_CLAUSE, "")
+        .replace(ALIGNMENT_CLAUSE, "");
+      if (trimmed !== sentence) removed += 1;
+      if (DISCLAIMER_SENTENCE.test(trimmed)) {
+        if (disclaimed) {
+          removed += 1;
+          return null;
+        }
+        disclaimed = true;
+      }
+      return trimmed;
+    },
+    removed: () => removed,
+  };
+}
+
+const CAVEAT_SENTENCE = /[^.!?\n]+(?:[.!?]+["”’)]*|\n|$)/gu;
+
+/** The finished answer with at most one boilerplate disclaimer. */
+export function withOneCaveat(text: string): {
+  readonly text: string;
+  readonly removed: number;
+} {
+  const guard = createCaveatGuard();
+  const lines = text.split("\n").map((line) => {
+    const parts = line.match(CAVEAT_SENTENCE) ?? [];
+    if (parts.length === 0) return line;
+    return parts
+      .map((part) => {
+        const lead = /^\s*/u.exec(part)?.[0] ?? "";
+        const kept = guard.sentence(part.trim());
+        return kept === null ? null : `${lead}${kept}`;
+      })
+      .filter((part): part is string => part !== null)
+      .join("")
+      .trimEnd();
+  });
+  return guard.removed() === 0
+    ? { text, removed: 0 }
+    : { text: lines.join("\n").trim(), removed: guard.removed() };
 }
