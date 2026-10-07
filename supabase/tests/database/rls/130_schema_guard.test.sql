@@ -138,6 +138,10 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('evidence', 'data_room_views',                'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'deck_extractions',               'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'deck_extraction_confirmations',  'INTERNAL_SERVER_ONLY', '{}'),
+  -- F26: per-section review and "read again", server-only; suite 810.
+  ('evidence', 'deck_section_reviews',           'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'deck_read_again_requests',       'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'deck_read_again_outcomes',       'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'document_processing_runs', 'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'claims',                   'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'verification_claims',      'INTERNAL_SERVER_ONLY', '{}'),
