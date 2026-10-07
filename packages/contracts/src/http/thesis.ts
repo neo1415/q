@@ -81,3 +81,23 @@ export type ThesisReadingDto = z.infer<typeof ThesisReadingDtoSchema>;
 
 /** `GET /v1/fit/thesis` — the investor's own reading (Q API). */
 export const FIT_THESIS_PATH = "/v1/fit/thesis" as const;
+
+/**
+ * `POST …/mandates/:mandateId/suggestions/:suggestionId/apply` — the
+ * investor approves one suggestion; it becomes the ordinary mandate
+ * update at the version they read (a changed mandate is a conflict, never
+ * a silent overwrite).
+ */
+export const MANDATE_SUGGESTION_APPLY_PATH =
+  "/v1/investors/:investorOrganisationId/mandates/:mandateId/suggestions/:suggestionId/apply" as const;
+
+export const ApplyThesisSuggestionRequestSchema = z
+  .object({ expectedVersion: z.number().int().min(1) })
+  .strict();
+export type ApplyThesisSuggestionRequest = z.infer<
+  typeof ApplyThesisSuggestionRequestSchema
+>;
+
+export const ThesisSuggestionIdSchema = z
+  .string()
+  .regex(/^(ADD_COUNTRY|DROP_STAGE):[A-Za-z0-9_]{1,64}$/);

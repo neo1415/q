@@ -135,8 +135,11 @@ export type SendDiligenceQuestionsResult = z.infer<
 export function diligenceQuestionsText(
   questions: readonly string[],
 ): { readonly title: string; readonly body: string } {
+  // A diligence checklist item: what the company is asked to provide.
   const title =
-    questions.length === 1 ? "A question" : `${String(questions.length)} questions`;
+    questions.length === 1
+      ? "An answer to one question"
+      : `Answers to ${String(questions.length)} questions`;
   return {
     title,
     body: questions

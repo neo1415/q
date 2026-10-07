@@ -301,6 +301,17 @@ describe("the action registry", () => {
       ["readiness.action.state", "mark_plan_step", "INSTANT"],
       ["readiness.question.answer", "answer_q_question", "INSTANT"],
       ["readiness.question.dismiss", "set_aside_q_question", "INSTANT"],
+      // Q.07/Q.02: questions to a company; a thesis suggestion, approved.
+      [
+        "diligence.questions.send",
+        "send_questions_to_founder",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "investor.mandate.suggestion.apply",
+        "apply_thesis_suggestion",
+        "CONSEQUENTIAL",
+      ],
     ]);
   });
 });
