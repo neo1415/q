@@ -543,6 +543,8 @@ export const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   gateway: "SETTINGS",
   // G1/G2: their company or firm as a team.
   team: "SETTINGS",
+  // Q.03/Q.04/Q.01: their readiness plan and Q's questions, beside the raise.
+  readiness: "RECORDS",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
