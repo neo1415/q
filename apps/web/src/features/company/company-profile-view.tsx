@@ -210,6 +210,7 @@ export function CompanyProfileView({
   dataRoom = null,
   deck = null,
   previewAsInvestor = false,
+  overviewExtra = null,
 }: {
   readonly profile: CompanyProfileDto;
   readonly tab: ProfileTab;
@@ -228,6 +229,8 @@ export function CompanyProfileView({
   readonly deck?: CompanyDeckView | null;
   /** The owner looking at their own deck as investors see it. */
   readonly previewAsInvestor?: boolean;
+  /** Rendered in the overview after the key facts (Q.07 assumptions). */
+  readonly overviewExtra?: ReactNode;
 }) {
   const { overview } = profile;
   const investor = profile.viewer === "INVESTOR";
@@ -482,6 +485,9 @@ export function CompanyProfileView({
                 </div>
               ))}
             </dl>
+
+            {/* Q.07: an investor's "Assumptions to test" (the page reads it). */}
+            {overviewExtra}
 
             {overview.primaryDescription === null ? null : (
               <section
