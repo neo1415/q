@@ -57,6 +57,12 @@ import {
   type ResponseValues,
 } from "@capital-q/onboarding";
 import {
+  createFinancialKnowledgePort,
+  financialClaimFor,
+  type FinancialKnowledgePort,
+} from "./financial-claims.js";
+import { FOUNDER_FINANCIAL_WRITE_TARGET } from "../definition/founder-v4.js";
+import {
   createFounderDomainServices,
   type FounderDomainDependencies,
   type FounderDomainServices,
@@ -79,6 +85,9 @@ export type FounderWriteTargetOptions = FounderDomainDependencies & {
   /** Test seam: compose the domains differently on the transaction. */
   readonly services?:
     ((tx: TransactionContext) => FounderDomainServices) | undefined;
+  /** Q.01: where a financial answer is recorded; the Write Gate by default. */
+  readonly financialKnowledge?:
+    ((tx: TransactionContext) => FinancialKnowledgePort) | undefined;
 };
 
 export type BoundCompany = {
@@ -548,6 +557,9 @@ export function createFounderWriteTargets(
   const servicesFor =
     options.services ??
     ((tx: TransactionContext) => createFounderDomainServices(tx, options));
+  const financialFor =
+    options.financialKnowledge ??
+    ((tx: TransactionContext) => createFinancialKnowledgePort(tx, options));
 
   return [
     {
@@ -693,6 +705,40 @@ export function createFounderWriteTargets(
           return;
         }
         await saveCapitalObjective(servicesFor(context.tx), context, values);
+      },
+    },
+    {
+      // Q.01 financials: the founder's own figure, as their own claim,
+      // through the Knowledge Write Gate (founder_private). A skipped step
+      // or a figure with no currency records nothing: unknown stays unknown.
+      targetKey: FOUNDER_FINANCIAL_WRITE_TARGET,
+      apply: async (context, response) => {
+        const claim = financialClaimFor(
+          response.stepKey,
+          responseValues(context.currentResponses, response),
+        );
+        if (claim === null) {
+          return;
+        }
+        const bound = await boundCompany(
+          servicesFor(context.tx),
+          context.actor,
+          context.session,
+        );
+        const result = await financialFor(context.tx).record({
+          actor: bound.context,
+          companyId: bound.companyId,
+          claim,
+          sessionId: context.session.id,
+          correlationId: context.correlationId,
+        });
+        if (result !== null && result.outcome === "REJECTED") {
+          invalid(
+            "value",
+            "financial_claim_refused",
+            "That figure could not be recorded. Try again in a moment.",
+          );
+        }
       },
     },
   ];

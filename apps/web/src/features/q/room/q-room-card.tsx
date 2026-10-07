@@ -306,7 +306,10 @@ function cardRef(intent: QShowInQRoomIntent): QManifestRef | null {
       return { kind: "COMPANY", id: intent.id };
     case "THESIS":
     case "SAVED_COMPARISON":
+    case "INVESTOR_LOOKS_FOR":
       return { kind: "INVESTOR_ORGANISATION", id: intent.id };
+    case "READINESS_BLUEPRINT":
+      return { kind: "COMPANY", id: intent.id };
   }
 }
 

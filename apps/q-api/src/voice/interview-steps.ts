@@ -370,7 +370,7 @@ export function optionsOf(
  * integer for as long as it was.
  */
 export const MONEY_STEP =
-  /cheque|target_amount|valuation|round_size|revenue|mrr|arr/i;
+  /cheque|target_amount|valuation|round_size|revenue|mrr|arr|burn|cash/i;
 
 /** The symbol for each currency the journey offers. Domain reference data. */
 const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {

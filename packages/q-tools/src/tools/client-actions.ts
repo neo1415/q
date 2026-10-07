@@ -782,7 +782,7 @@ export const SHOW = "client.q_room.show" as const;
 export const ShowInputSchema = z
   .object({
     object: QRoomObjectSchema.describe(
-      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. Q_DOCUMENT: a document you made for them (their draft deck, one-pager or memo), by its id from its card or list_my_documents, or by its title; with neither, their latest. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name). READINESS / ACTION_PLAN / FOLLOW_UPS: a founder's own readiness (what could stop their raise, each pillar in words), their action plan, or the questions Q still wants answered (no id or name). ASSUMPTIONS / EVIDENCE_BOARD: for an investor, one company's claims they may see, as assumptions to test with questions, or as evidenced / claimed / not known yet (by company id or name). THESIS: an investor's own 'how Q reads your thesis'. SAVED_COMPARISON: an investor's saved companies side by side. INVESTOR_FIT: for a founder, investors by what they publish and their gates (no id or name for these three).",
+      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. Q_DOCUMENT: a document you made for them (their draft deck, one-pager or memo), by its id from its card or list_my_documents, or by its title; with neither, their latest. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name). READINESS / ACTION_PLAN / FOLLOW_UPS: a founder's own readiness (what could stop their raise, each pillar in words), their action plan, or the questions Q still wants answered (no id or name). ASSUMPTIONS / EVIDENCE_BOARD: for an investor, one company's claims they may see, as assumptions to test with questions, or as evidenced / claimed / not known yet (by company id or name). THESIS: an investor's own 'how Q reads your thesis'. SAVED_COMPARISON: an investor's saved companies side by side. INVESTOR_FIT: for a founder, investors by what they publish and their gates (no id or name for these three). READINESS_BLUEPRINT: a founder's own 3/6/12-month plan, each step with the gap it closes (no id or name). INVESTOR_LOOKS_FOR: for a founder, what one investor looks for (their public profile and published gate criteria only, met / not met / not known yet for the founder's company) with 'Draft my application' for the founder to review and send (by investor id or name); use it for 'what does X look for' and 'draft my application to X'.",
     ),
     id: z
       .string()
@@ -833,7 +833,7 @@ export function createShowTool(
     id: SHOW,
     providerName: "show",
     description:
-      "Shows one thing in the Q room as a card while you talk, without leaving the page: a company's profile, data room or pitch deck, the chat with a company or investor, one of Q's work items with its plan, a capital round, a GateQ application, the news and web sources this answer read, a founder's own readiness, action plan or open questions, a company's assumptions to test or evidence board, an investor's thesis reading or saved comparison, or a founder's investors by published criteria. Use it when they ask to see, show, pull up or bring up something here; use open_page only when they ask to be taken to its page. The card closes by itself when the conversation moves on.",
+      "Shows one thing in the Q room as a card while you talk, without leaving the page: a company's profile, data room or pitch deck, the chat with a company or investor, one of Q's work items with its plan, a capital round, a GateQ application, the news and web sources this answer read, a founder's own readiness, action plan or open questions, a company's assumptions to test or evidence board, an investor's thesis reading or saved comparison, a founder's investors by published criteria, a founder's 3/6/12-month plan, or what one investor looks for with a draft application for the founder to review (never sent from here). Use it when they ask to see, show, pull up or bring up something here; use open_page only when they ask to be taken to its page. The card closes by itself when the conversation moves on.",
     input: ShowInputSchema,
     authorize: async (input, { actor, plan }) => {
       if (!ownConversation(actor, plan)) {
@@ -939,6 +939,39 @@ async function roomRecord(
       const title =
         named.find((item) => item.id.toLowerCase() === id)?.name ??
         "the investor";
+      return { id, title };
+    }
+    case "READINESS_BLUEPRINT": {
+      // Q.04: their own company's plan, server-resolved (founder-private).
+      const own = await ports.appActions
+        ?.ownCompanyId?.(actor)
+        .catch(() => null);
+      if (own === null || own === undefined) return null;
+      return { id: own.toLowerCase(), title: "Your 3/6/12-month plan" };
+    }
+    case "INVESTOR_LOOKS_FOR": {
+      // Q.05: for a founder only (an investor has no company here). The
+      // investor is one the founder may already name (a relationship or
+      // their Discover list); the card's own read is the investor page's,
+      // under the founder's session, which 404s anything else. Only the
+      // public profile and published gate criteria are ever shown.
+      const company = await ports.appActions
+        ?.ownCompanyId?.(actor)
+        .catch(() => null);
+      if (company === null || company === undefined) return null;
+      const named = await nameableRecords(
+        ports,
+        actor,
+        "INVESTOR_ORGANISATION",
+        input.name ?? null,
+      );
+      const id =
+        input.id?.toLowerCase() ??
+        (input.name === undefined ? null : matchCounterpart(input.name, named));
+      if (id === null) return null;
+      const title =
+        named.find((item) => item.id.toLowerCase() === id)?.name ??
+        "this investor";
       return { id, title };
     }
     case "THESIS":

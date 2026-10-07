@@ -112,6 +112,19 @@ export type DocumentProcessingHandlerOptions = {
       }
     | undefined;
   /**
+   * Q.01: the deterministic check of a founder's stated figures against
+   * their own confirmed deck. No model; it only ever records questions.
+   */
+  readonly founderFinancialCheck?:
+    | {
+        readonly onResponseCommitted: (event: {
+          readonly sessionId: string;
+          readonly stepKey: string;
+          readonly responseId: string;
+        }) => Promise<{ readonly kind: string; readonly asked: number }>;
+      }
+    | undefined;
+  /**
    * Public presence research (CQ-C2), when this deployment can reach the
    * public web. Fire-and-forget: called, never awaited, on every committed
    * response regardless of whether the founder or mandate reading above
@@ -206,6 +219,7 @@ export function createDomainEventHandler(
     registry,
     queues,
     founderReview,
+    founderFinancialCheck,
     mandateReview,
     presenceResearch,
     recommendations,
@@ -281,6 +295,14 @@ export function createDomainEventHandler(
       // Each journey's reading decides for itself whether the step is one
       // of its narrative steps; a session belongs to exactly one of them.
       const readers = [
+        ...(founderFinancialCheck === undefined
+          ? []
+          : [
+              {
+                name: "founder financial check",
+                reader: founderFinancialCheck,
+              },
+            ]),
         ...(mandateReview === undefined
           ? []
           : [{ name: "investor mandate reading", reader: mandateReview }]),

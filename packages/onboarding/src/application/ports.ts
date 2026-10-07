@@ -300,6 +300,16 @@ export type OnboardingInterviewQuestionRepository = {
     tx: TransactionContext,
     input: NewOnboardingInterviewQuestion,
   ) => Promise<OnboardingInterviewQuestion>;
+  /**
+   * Every question ever recorded for one fact in a session, any status,
+   * newest first: lets a deterministic check see that the person already
+   * settled a disagreement and not ask it again (Q.01).
+   */
+  readonly listForFact?: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    factKey: string,
+  ) => Promise<readonly OnboardingInterviewQuestion[]>;
   /** PENDING -> SUPERSEDED for the named facts; returns how many changed. */
   readonly supersedePending: (
     tx: TransactionContext,
