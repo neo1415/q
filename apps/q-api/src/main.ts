@@ -1409,6 +1409,12 @@ const workforceJobsFor = (actor: ActorContext) =>
 const workforceJobBoard = createWorkforceJobBoard({
   jobsFor: workforceJobsFor,
   withinLimit: workforceWithinLimit,
+  // Q room R5: what already waits for them, and whether their calendar is
+  // there, read as them when a job is asked for (composed further down).
+  waiting: async (actor) =>
+    await qActions.listPendingApprovals({ actor, limit: 20 }),
+  calendarConnected: async (actor) =>
+    (await schedule.calendarStatus(actor.userId)) === "CONNECTED",
 });
 // end WORKFORCE block
 const emailBoard = createEmailActionBoard({

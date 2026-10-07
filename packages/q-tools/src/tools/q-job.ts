@@ -35,6 +35,11 @@ export type QJobPlanView = {
   readonly steps: readonly { readonly who: string; readonly does: string }[];
   readonly cannot: readonly string[];
   readonly budgetUsd: string;
+  /**
+   * Q room R5: what will need the person, in plain words (their approval,
+   * a calendar to connect), decided by code from the plan, never a model.
+   */
+  readonly needsYou: readonly string[];
 };
 
 export type QJobPort = {
@@ -46,10 +51,21 @@ export type QJobPort = {
     actor: ActorContext,
     runId: string,
     goal: string,
+    /** They already heard what is waiting and said go ahead (R5). */
+    options?: { readonly proceed: boolean },
   ) => Promise<
     | {
         readonly status: "PREPARED" | "ONE_PER_TURN";
         readonly plan: QJobPlanView;
+      }
+    | {
+        /**
+         * Q room R5: like a colleague, Q checks what already exists first.
+         * Work of theirs on the same people is already waiting for them;
+         * nothing was planned. Each line is a waiting item's own summary.
+         */
+        readonly status: "ALREADY_WAITING";
+        readonly waiting: readonly string[];
       }
     | { readonly status: "NOT_PLANNED" }
     | { readonly status: "LIMIT_REACHED" }
@@ -66,6 +82,12 @@ const ProposeQJobInputSchema = z
       .describe(
         "The job in the person's own words, with the names and details they gave.",
       ),
+    proceed: z
+      .boolean()
+      .default(false)
+      .describe(
+        "True only after you told them what was already waiting (ALREADY_WAITING) and they said to go ahead anyway.",
+      ),
   })
   .strict();
 type ProposeQJobInput = z.output<typeof ProposeQJobInputSchema>;
@@ -77,6 +99,7 @@ const ProposeQJobOutputSchema = z
       "ONE_PER_TURN",
       "NOT_PLANNED",
       "LIMIT_REACHED",
+      "ALREADY_WAITING",
     ]),
     plan: z
       .object({
@@ -84,8 +107,11 @@ const ProposeQJobOutputSchema = z
         steps: z.array(z.object({ who: z.string(), does: z.string() })),
         cannot: z.array(z.string()),
         budgetUsd: z.string(),
+        needsYou: z.array(z.string()),
       })
       .nullable(),
+    /** ALREADY_WAITING: what is waiting for them already, in its own words. */
+    waiting: z.array(z.string()).max(5).optional(),
   })
   .strict();
 type ProposeQJobOutput = z.infer<typeof ProposeQJobOutputSchema>;
@@ -112,7 +138,7 @@ export function createQJobTools(port: QJobPort): readonly AnyQToolDefinition[] {
       owner: "q-tools",
       providerName: "propose_q_job",
       description:
-        "A one-off job of several steps for Q's team ('introduce me to Kestrel Heat and book a call', 'reply to everyone who wrote and set up calls'): the lead Q plans it into steps, each done by a specialist (outreach, conversation, scheduling) or a helper with only the tools its step needs, and prepares the plan as ONE card. Nothing happens until they approve that exact plan; every message is checked by the reviewer before it goes. Call it with their words; say the plan back in a sentence. For a goal that should keep running over time use propose_standing_instruction instead.",
+        "A one-off job of several steps for Q's team ('introduce me to Kestrel Heat and book a call', 'reply to everyone who wrote and set up calls'): the lead Q plans it into steps, each done by a specialist (outreach, conversation, scheduling) or a helper with only the tools its step needs, and prepares the plan as ONE card. Nothing happens until they approve that exact plan; every message is checked by the reviewer before it goes. Call it with their words; say the plan back in a sentence, then what will need them (needsYou). ALREADY_WAITING means work for the same people is already waiting for them: say what, plainly, like a colleague ('we already have two drafts waiting for Priya and Jonas'), and ask whether to go ahead; call again with proceed true only if they say yes. For a goal that should keep running over time use propose_standing_instruction instead.",
       classification: "SIDE_EFFECT",
       riskClass: "LOW_RISK_INTERNAL",
       approval: "NONE",
@@ -130,7 +156,15 @@ export function createQJobTools(port: QJobPort): readonly AnyQToolDefinition[] {
           context.actor,
           context.runId,
           input.goal,
+          { proceed: input.proceed },
         );
+        if (prepared.status === "ALREADY_WAITING") {
+          return {
+            status: prepared.status,
+            plan: null,
+            waiting: prepared.waiting.slice(0, 5),
+          };
+        }
         return {
           status: prepared.status,
           plan:
@@ -143,6 +177,7 @@ export function createQJobTools(port: QJobPort): readonly AnyQToolDefinition[] {
                   })),
                   cannot: [...prepared.plan.cannot],
                   budgetUsd: prepared.plan.budgetUsd,
+                  needsYou: [...prepared.plan.needsYou],
                 }
               : null,
         };
