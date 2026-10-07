@@ -159,22 +159,36 @@ describe("the financial write target and the Write Gate", () => {
   });
 
   it("writes a founder_private, HIGHLY_CONFIDENTIAL source, a SELF_REPORTED item and a USER_CLAIM candidate", async () => {
-    const registerEvidenceSource = vi.fn(() =>
-      Promise.resolve({ id: "55555555-5555-4555-8555-555555555555" }),
-    );
-    const createEvidenceItem = vi.fn(() =>
-      Promise.resolve({ id: "66666666-6666-4666-8666-666666666666" }),
-    );
-    const submit = vi.fn(() => Promise.resolve({ outcome: "PERSISTED" }));
+    const sources: unknown[] = [];
+    const items: unknown[] = [];
+    const submitted: unknown[] = [];
     const recorder = createFinancialKnowledgeRecorder({
-      evidence: { registerEvidenceSource, createEvidenceItem } as never,
-      gate: { submit } as never,
+      evidence: {
+        registerEvidenceSource: (command: unknown) => {
+          sources.push(command);
+          return Promise.resolve({
+            id: "55555555-5555-4555-8555-555555555555",
+          });
+        },
+        createEvidenceItem: (command: unknown) => {
+          items.push(command);
+          return Promise.resolve({
+            id: "66666666-6666-4666-8666-666666666666",
+          });
+        },
+      } as never,
+      gate: {
+        submit: (command: unknown) => {
+          submitted.push(command);
+          return Promise.resolve({ outcome: "PERSISTED" });
+        },
+      } as never,
     });
     await recorder.record({
       actor: { userId: "u" } as never,
       companyId: COMPANY as never,
       sessionId: SESSION,
-      correlationId: "cor_test_financials" as never,
+      correlationId: "cor_test_financials",
       claim: {
         stepKey: "F5.cash",
         knowledgeKey: "financial.cash_balance",
@@ -182,33 +196,23 @@ describe("the financial write target and the Write Gate", () => {
         structuredValue: { kind: "MONEY", amount: "200000", currency: "USD" },
       },
     });
-    expect(registerEvidenceSource).toHaveBeenCalledWith(
-      expect.objectContaining({
-        input: expect.objectContaining({
-          sourceType: "USER_STATEMENT",
-          visibilityScope: "founder_private",
-          sensitivityClass: "HIGHLY_CONFIDENTIAL",
-        }),
-      }),
-    );
-    expect(createEvidenceItem).toHaveBeenCalledWith(
-      expect.objectContaining({
-        input: expect.objectContaining({ evidenceStatus: "SELF_REPORTED" }),
-      }),
-    );
-    expect(submit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        candidate: expect.objectContaining({
-          truthClassProposal: "USER_CLAIM",
-          knowledgeKey: "financial.cash_balance",
-          structuredValue: {
-            kind: "MONEY",
-            amount: "200000",
-            currency: "USD",
-          },
-        }),
-      }),
-    );
+    expect(sources[0]).toMatchObject({
+      input: {
+        sourceType: "USER_STATEMENT",
+        visibilityScope: "founder_private",
+        sensitivityClass: "HIGHLY_CONFIDENTIAL",
+      },
+    });
+    expect(items[0]).toMatchObject({
+      input: { evidenceStatus: "SELF_REPORTED" },
+    });
+    expect(submitted[0]).toMatchObject({
+      candidate: {
+        truthClassProposal: "USER_CLAIM",
+        knowledgeKey: "financial.cash_balance",
+        structuredValue: { kind: "MONEY", amount: "200000", currency: "USD" },
+      },
+    });
   });
 
   it("the gate keeps a founder-private figure founder-private (never network or public)", () => {
