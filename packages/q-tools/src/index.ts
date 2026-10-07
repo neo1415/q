@@ -591,6 +591,9 @@ export {
 export {
   PROPOSE_Q_JOB,
   createQJobTools,
+  goalSubjects,
+  nameSpans,
+  type QJobNamePorts,
   type QJobPlanView,
   type QJobPort,
 } from "./tools/q-job.js";

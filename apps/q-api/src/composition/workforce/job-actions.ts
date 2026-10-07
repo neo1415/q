@@ -135,24 +135,77 @@ const COMMON_CAPITALISED: ReadonlySet<string> = new Set([
   "make",
 ]);
 
+/** One approval already waiting for the person, as the Approval Engine lists it. */
+export type WaitingItem = {
+  readonly summary: string;
+  readonly actionType?: string | undefined;
+  readonly targets?: readonly QSubjectRef[] | undefined;
+};
+
+function subjectKey(subject: QSubjectRef): string {
+  switch (subject.kind) {
+    case "COMPANY":
+      return `COMPANY:${subject.companyId}`;
+    case "INVESTOR_ORGANISATION":
+      return `INVESTOR_ORGANISATION:${subject.investorOrganisationId}`;
+    case "RELATIONSHIP":
+      return `RELATIONSHIP:${subject.relationshipId}`;
+    case "CAPITAL_OBJECTIVE":
+      return `CAPITAL_OBJECTIVE:${subject.capitalObjectiveId}`;
+    case "DOCUMENT":
+      return `DOCUMENT:${subject.documentId}`;
+    case "USER":
+      return `USER:${subject.userId}`;
+    case "ORGANISATION":
+      return `ORGANISATION:${subject.organisationId}`;
+  }
+}
+
 /**
- * Q room R5: what already waits for them about the same people as the
- * goal, by the names both mention (code, deterministic). A goal that names
- * nobody matches nothing: Q never stops work on a guess.
+ * Q room R5 / W4b: what already waits for them, like a colleague checks
+ * (code, deterministic):
+ *
+ * - the goal resolves to records (the companies, investors, relationships
+ *   its names mean, by the person's own reach): waiting work aimed at any
+ *   of them, or naming them, is about the same people;
+ * - it names people none of their records match: the names both mention;
+ * - it names nobody at all: waiting jobs of the same kind (this action
+ *   type), so two near-identical jobs are not planned side by side.
  */
 export function relatedWaiting(
   goal: string,
-  waiting: readonly { readonly summary: string }[],
-): readonly string[] {
+  waiting: readonly WaitingItem[],
+  subjects: readonly QSubjectRef[] = [],
+  actionType: string = WORKFORCE_JOB_START,
+): {
+  readonly about: "SAME_PEOPLE" | "SAME_KIND";
+  readonly waiting: readonly string[];
+} {
   const names = namesIn(goal);
-  if (names.size === 0) return [];
-  return waiting
-    .filter((item) => {
-      const theirs = namesIn(item.summary);
-      return [...names].some((name) => theirs.has(name));
-    })
-    .map((item) => item.summary.slice(0, 200))
-    .slice(0, 5);
+  const keys = new Set(
+    subjects.map((subject) => subjectKey(subject).toLowerCase()),
+  );
+  const pick = (items: readonly WaitingItem[]) =>
+    items.map((item) => item.summary.slice(0, 200)).slice(0, 5);
+  if (keys.size === 0 && names.size === 0) {
+    return {
+      about: "SAME_KIND",
+      waiting: pick(waiting.filter((item) => item.actionType === actionType)),
+    };
+  }
+  return {
+    about: "SAME_PEOPLE",
+    waiting: pick(
+      waiting.filter((item) => {
+        const aimed = (item.targets ?? []).some((target) =>
+          keys.has(subjectKey(target).toLowerCase()),
+        );
+        if (aimed) return true;
+        const theirs = namesIn(item.summary);
+        return [...names].some((name) => theirs.has(name));
+      }),
+    ),
+  };
 }
 
 /** The card's preview: the plan the person approves, step by step. */
@@ -300,10 +353,7 @@ export function createWorkforceJobBoard(dependencies: {
   readonly now?: (() => number) | undefined;
   /** R5: what already waits for their approval (the Approval Engine's list). */
   readonly waiting?:
-    | ((
-        actor: ActorContext,
-      ) => Promise<readonly { readonly summary: string }[]>)
-    | undefined;
+    ((actor: ActorContext) => Promise<readonly WaitingItem[]>) | undefined;
   /** R5: whether their own Google Calendar is connected (stored state only). */
   readonly calendarConnected?:
     ((actor: ActorContext) => Promise<boolean>) | undefined;
@@ -332,11 +382,18 @@ export function createWorkforceJobBoard(dependencies: {
         }
         // R5: like a colleague, look at what is already waiting first.
         if (options?.proceed !== true && dependencies.waiting !== undefined) {
-          const waiting = relatedWaiting(
+          const related = relatedWaiting(
             goal,
             await dependencies.waiting(actor).catch(() => []),
+            options?.subjects ?? [],
           );
-          if (waiting.length > 0) return { status: "ALREADY_WAITING", waiting };
+          if (related.waiting.length > 0) {
+            return {
+              status: "ALREADY_WAITING",
+              waiting: related.waiting,
+              about: related.about,
+            };
+          }
         }
         const owner = { tenantId: actor.tenantId, userId: actor.userId };
         if (

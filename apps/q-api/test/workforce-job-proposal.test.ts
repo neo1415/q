@@ -271,12 +271,56 @@ describe("Q as a colleague on work (Q room R5)", () => {
 
   it("finds what already waits about the same people, by name, and nothing on a guess", () => {
     expect(
-      relatedWaiting("Follow up with Priya and Jonas from the intros", waiting),
+      relatedWaiting("Follow up with Priya and Jonas from the intros", waiting)
+        .waiting,
     ).toHaveLength(2);
-    expect(relatedWaiting("follow up with everyone", waiting)).toEqual([]);
-    expect(relatedWaiting("Book a call with Kestrel Heat", waiting)).toEqual(
+    expect(relatedWaiting("follow up with everyone", waiting).waiting).toEqual(
       [],
     );
+    expect(
+      relatedWaiting("Book a call with Kestrel Heat", waiting).waiting,
+    ).toEqual([]);
+  });
+
+  const KESTREL = "6a1f0c2e-3b4d-4e5f-8a9b-0c1d2e3f4a5b";
+  const KESTREL_REL = "7b2a1d3f-4c5e-4f6a-9b0c-1d2e3f4a5b6c";
+  const OTHER = "8c3b2e4a-5d6f-4a7b-8c9d-2e3f4a5b6c7d";
+  const byIds = [
+    {
+      // Says nothing of Kestrel by name: only its target says who it is.
+      summary: "Send the intro note we drafted last week",
+      actionType: "message.send",
+      targets: [{ kind: "RELATIONSHIP" as const, relationshipId: KESTREL_REL }],
+    },
+    {
+      summary: "Share the data room",
+      actionType: "document.share",
+      targets: [{ kind: "COMPANY" as const, companyId: OTHER }],
+    },
+    {
+      summary: "Q's team: Follow up with three investors",
+      actionType: "q.workforce.job.start",
+      targets: [{ kind: "USER" as const, userId }],
+    },
+  ];
+
+  it("matches by the records the request resolves to, not only capitalised names (W4b)", () => {
+    // "kestrel" lower-case: no capitalised name, but the search resolved it.
+    const related = relatedWaiting("book a call with kestrel", byIds, [
+      { kind: "INVESTOR_ORGANISATION", investorOrganisationId: KESTREL },
+      { kind: "RELATIONSHIP", relationshipId: KESTREL_REL },
+    ]);
+    expect(related).toEqual({
+      about: "SAME_PEOPLE",
+      waiting: ["Send the intro note we drafted last week"],
+    });
+  });
+
+  it("a request naming nobody reports waiting jobs of the same kind (W4b)", () => {
+    expect(relatedWaiting("follow up with everyone who wrote", byIds)).toEqual({
+      about: "SAME_KIND",
+      waiting: ["Q's team: Follow up with three investors"],
+    });
   });
 
   it("asks before starting when work is already waiting, and plans once told to go ahead", async () => {
@@ -295,6 +339,7 @@ describe("Q as a colleague on work (Q room R5)", () => {
     expect(first).toEqual({
       status: "ALREADY_WAITING",
       waiting: [waiting[0]?.summary, waiting[1]?.summary],
+      about: "SAME_PEOPLE",
     });
     expect(base.plans()).toBe(0);
   });

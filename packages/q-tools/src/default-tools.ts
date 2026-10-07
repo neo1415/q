@@ -166,7 +166,7 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     // AUTO block (ADR 0030): "Q, handle it" -- outreach, stand-in, and
     // following, answering and stopping them, from any Q surface.
     ...(ports.work === undefined ? [] : createQWorkTools(ports.work)),
-    ...(ports.jobs === undefined ? [] : createQJobTools(ports.jobs)),
+    ...(ports.jobs === undefined ? [] : createQJobTools(ports.jobs, ports)),
     // BIZ-008: calls and reminders, prepared on the same board.
     ...(ports.schedule === undefined ||
     ports.chat === undefined ||

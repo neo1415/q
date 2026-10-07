@@ -272,6 +272,8 @@ export type QPendingApprovalRow = {
   readonly expiresAt: UtcTimestamp;
   /** Who or what the action is aimed at, as the approver may open it. */
   readonly targets?: readonly QSubjectRef[] | undefined;
+  /** W4b: the kind of action waiting, so a like request can find it. */
+  readonly actionType?: QActionType | undefined;
 };
 
 export type QActionRepositories = {
