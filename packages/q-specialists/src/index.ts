@@ -195,6 +195,7 @@ export {
   brandDeck,
   createDeckPolisher,
   designDeck,
+  fitPolish,
   keepOnlyGroundedVisuals,
   refineCharts,
   runDocumentStudio,
@@ -205,6 +206,12 @@ export {
 } from "./company/document-studio.js";
 
 // Q room W5 (R8): the document pipeline.
+export {
+  inCompanyVoice,
+  splitStatement,
+  statFigure,
+  writeDeckSlides,
+} from "./company/deck-writer.js";
 export { visibleStageOf } from "./company/prepare-artifact.js";
 export {
   applyDocumentEdit,

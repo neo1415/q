@@ -186,7 +186,7 @@ function figureIn(
   statement: string,
 ): { readonly value: string; readonly unit: string } | null {
   const match =
-    /(?:^|[\s(])(?<currency>[$£€])?\s?(?<number>\d[\d,]*(?:\.\d+)?)\s?(?<suffix>%|k|m|bn|b)?\b/i.exec(
+    /(?:^|[\s(])(?<currency>[$£€₦₹¥₵])?\s?(?<number>\d[\d,]*(?:\.\d+)?)\s?(?<suffix>%|k|m|bn|b)?\b/i.exec(
       statement,
     );
   const groups = match?.groups;
@@ -263,7 +263,7 @@ function figuresFor(
   for (const finding of findings) {
     if (figureIn(finding.statement) === null) continue;
     const written =
-      /(?:[$£€]\s?)?\d[\d,]*(?:\.\d+)?\s?(?:%|k\b|m\b|bn\b|b\b)?/i.exec(
+      /(?:[$£€₦₹¥₵]\s?)?\d[\d,]*(?:\.\d+)?\s?(?:%|k\b|m\b|bn\b|b\b)?/i.exec(
         finding.statement,
       )?.[0];
     const label = bullet(finding);

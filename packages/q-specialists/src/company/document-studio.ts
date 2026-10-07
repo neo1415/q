@@ -22,14 +22,16 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
-  DocumentPolishResultSchema,
+  DocumentPolishV2ResultSchema,
   renderPrompt,
   type DocumentPolishResult,
+  type DocumentPolishV2Result,
   type DocumentPolishVariables,
   type PromptRegistry,
 } from "@capital-q/q-core";
 
 import { illustrateDeck, type StockPhotoPort } from "./deck-photos.js";
+import { clampAtWord, inCompanyVoice } from "./deck-writer.js";
 import {
   illustrateWithGenerated,
   type IllustrationPort,
@@ -296,6 +298,73 @@ function renderSlides(deck: QDeck): string {
     .slice(0, 30_000);
 }
 
+/** The slide's own limits (contracts: QSlide), applied to the wire's text. */
+const POLISH_TITLE_MAX = 160;
+const POLISH_SUBTITLE_MAX = 240;
+const POLISH_BULLET_MAX = 180;
+const POLISH_BULLETS_MAX = 6;
+
+/**
+ * A rewrite fitted to the slide (live 2026-10-07): a field longer than
+ * the slide allows is cut at a word boundary rather than refusing the
+ * whole rewrite, and narrator phrasing is put in the company's voice.
+ * Returns the fitted result and which fields were cut (paths only, never
+ * the text), for the log.
+ */
+export function fitPolish(result: DocumentPolishV2Result): {
+  readonly result: DocumentPolishResult;
+  readonly trimmed: readonly string[];
+} {
+  const trimmed: string[] = [];
+  const fit = (
+    text: string | null,
+    max: number,
+    path: string,
+  ): string | null => {
+    if (text === null) return null;
+    const voiced = inCompanyVoice(text);
+    if (voiced.length <= max) return voiced.length === 0 ? null : voiced;
+    trimmed.push(path);
+    const cut = clampAtWord(voiced, max);
+    return cut.length === 0 ? null : cut;
+  };
+  const slides = result.slides.map((slide) => {
+    const at = `slides.${String(slide.number)}`;
+    let bullets: string[] | null = null;
+    if (slide.bullets !== null) {
+      if (slide.bullets.length > POLISH_BULLETS_MAX) {
+        trimmed.push(`${at}.bullets`);
+      }
+      const fitted = slide.bullets
+        .slice(0, POLISH_BULLETS_MAX)
+        .map((line, index) =>
+          fit(line, POLISH_BULLET_MAX, `${at}.bullets.${String(index)}`),
+        );
+      // A line that fits to nothing keeps the whole list as it was.
+      bullets = fitted.every((line): line is string => line !== null)
+        ? fitted
+        : null;
+    }
+    return {
+      number: slide.number,
+      title: fit(slide.title, POLISH_TITLE_MAX, `${at}.title`),
+      subtitle: fit(slide.subtitle, POLISH_SUBTITLE_MAX, `${at}.subtitle`),
+      bullets,
+    };
+  });
+  return { result: { slides }, trimmed: trimmed.slice(0, 24) };
+}
+
+/**
+ * The words step: one governed call, and at most one more if the answer
+ * could not be read. A refused list element (one slide's rewrite) is
+ * dropped on its own rather than refusing the others, and an over-long
+ * field is trimmed here rather than refused (DOCUMENT_POLISH v2).
+ *
+ * NORMAL_DIALOGUE: this is a short rewrite of text the deck already holds,
+ * not a synthesis of evidence, and its 4,096-token ceiling is several
+ * times what a 24-slide rewrite needs.
+ */
 export function createDeckPolisher(dependencies: {
   readonly gateway: ModelGateway;
   readonly registry?: PromptRegistry | undefined;
@@ -312,9 +381,9 @@ export function createDeckPolisher(dependencies: {
           "You are rewording slides of a deck that was just composed from the company's record. No record, no evidence and no tools are available to you, and any figure you add will be discarded.",
         variables: { document: renderSlides(input.deck) },
       });
-      try {
+      const attempt = async (): Promise<DocumentPolishV2Result | null> => {
         const executed =
-          await dependencies.gateway.execute<DocumentPolishResult>(
+          await dependencies.gateway.execute<DocumentPolishV2Result>(
             {
               taskClass: "NORMAL_DIALOGUE",
               budget: budgetForTaskClass("NORMAL_DIALOGUE"),
@@ -324,20 +393,51 @@ export function createDeckPolisher(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: DocumentPolishResultSchema,
+              schema: DocumentPolishV2ResultSchema,
+              invalidListItems: "DROP",
               ...(input.signal === undefined ? {} : { signal: input.signal }),
             },
           );
-        return executed.output.kind === "STRUCTURED"
-          ? executed.output.value
-          : null;
-      } catch (error: unknown) {
-        dependencies.logger?.warn(
-          { err: isModelGatewayError(error) ? error.failureClass : "unknown" },
-          "deck polish model call did not complete",
-        );
-        return null;
+        if (executed.output.kind !== "STRUCTURED") return null;
+        const dropped = executed.output.dropped ?? [];
+        if (dropped.length > 0) {
+          dependencies.logger?.warn(
+            { dropped },
+            "deck polish kept; refused slide rewrites were dropped",
+          );
+        }
+        return executed.output.value;
+      };
+      // Bounded: the first call, and one repair attempt only when the
+      // answer was unreadable (never for an outage, a budget or a cancel).
+      for (let round = 1; round <= 2; round += 1) {
+        try {
+          const value = await attempt();
+          if (value === null) return null;
+          const fitted = fitPolish(value);
+          if (fitted.trimmed.length > 0) {
+            dependencies.logger?.warn(
+              { trimmed: fitted.trimmed },
+              "deck polish kept; over-long fields were trimmed",
+            );
+          }
+          return fitted.result;
+        } catch (error: unknown) {
+          const failure = isModelGatewayError(error)
+            ? error.failureClass
+            : "unknown";
+          const retry =
+            round === 1 &&
+            failure === "INVALID_MODEL_OUTPUT" &&
+            input.signal?.aborted !== true;
+          dependencies.logger?.warn(
+            { err: failure, round, retry },
+            "deck polish model call did not complete",
+          );
+          if (!retry) return null;
+        }
       }
+      return null;
     },
   };
 }
@@ -356,7 +456,9 @@ export function applyPolish(
   const deck = content.deck;
   if (deck === undefined) return content;
   const known = new Set(figuresOf(grounding.join(" ")));
-  const changes = new Map(result.slides.map((slide) => [slide.number, slide]));
+  // Whatever produced the rewrite, it is fitted to the slide here too.
+  const fitted = fitPolish(result).result;
+  const changes = new Map(fitted.slides.map((slide) => [slide.number, slide]));
   const slides = deck.slides.map((slide, index): QSlide => {
     const change = changes.get(index + 1);
     if (change === undefined) return slide;

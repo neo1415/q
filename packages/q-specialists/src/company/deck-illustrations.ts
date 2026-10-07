@@ -4,6 +4,9 @@ import type {
   QSlideImage,
 } from "@capital-q/contracts";
 
+import { slideTopic } from "./deck-writer.js";
+import { SLIDE_TITLES } from "./pitch-deck.js";
+
 /**
  * Generated illustrations for a deck (DOCS; ADR 0031 addendum): where a
  * slide wants a picture and the stock library had none, or the person
@@ -29,8 +32,33 @@ export type IllustrationPort = {
   }) => Promise<QSlideImage | null>;
 };
 
-/** The team slide's own title (pitch-deck.ts): people are never drawn. */
-const NEVER_ILLUSTRATED: ReadonlySet<string> = new Set(["Team"]);
+/**
+ * People are never drawn, and the product is the person's own screenshot:
+ * the team and product slides, by their subject (pitch-deck.ts).
+ */
+const NEVER_ILLUSTRATED: ReadonlySet<string> = new Set([
+  SLIDE_TITLES.TEAM,
+  SLIDE_TITLES.PRODUCT,
+]);
+
+/**
+ * Subjects a generated picture never illustrates unasked (live
+ * 2026-10-07): numbers, customers, money and the raise are concrete, and a
+ * drawing beside them would read as evidence. Abstract ideas (what the
+ * company does, its market, where it is going, how it earns) may have one.
+ */
+const CONCRETE_TOPICS: ReadonlySet<string> = new Set([
+  SLIDE_TITLES.CUSTOMERS,
+  SLIDE_TITLES.TRACTION,
+  SLIDE_TITLES.FINANCIAL,
+  SLIDE_TITLES.CAPITAL_OBJECTIVE,
+]);
+
+/** Layouts that keep room for a picture beside the words. */
+const pictured = (layout: QSlide["layout"], cover: boolean): boolean =>
+  cover
+    ? layout === "TITLE"
+    : layout === "BULLETS" || layout === "STATEMENT" || layout === "TITLE";
 
 /**
  * Generated pictures per composed deck by default (the in-run studio); the
@@ -64,13 +92,15 @@ export function illustrationPrompt(input: {
   }${about} Minimal flat style, generous negative space, ${palette}, suitable as a background beside text.`;
 }
 
-function wanted(slide: QSlide, index: number): boolean {
+function wanted(slide: QSlide, index: number, topic: string): boolean {
   if (slide.image !== undefined) return false;
   // Q room W5: a marked space is the person's to fill.
   if (slide.placeholder !== undefined) return false;
   if (slide.visual !== undefined || slide.figures !== undefined) return false;
-  if (NEVER_ILLUSTRATED.has(slide.title)) return false;
-  return index === 0 ? slide.layout === "TITLE" : slide.layout === "BULLETS";
+  if (slide.chart !== undefined) return false;
+  if (NEVER_ILLUSTRATED.has(topic)) return false;
+  if (index > 0 && CONCRETE_TOPICS.has(topic)) return false;
+  return pictured(slide.layout, index === 0);
 }
 
 /**
@@ -93,13 +123,15 @@ export async function illustrateWithGenerated(
   const description = deck.slides[0]?.subtitle;
   const targets = deck.slides
     .map((slide, index) => ({ slide, index }))
-    .filter(({ slide, index }) =>
-      options.slides === undefined
-        ? wanted(slide, index)
+    .filter(({ slide, index }) => {
+      const topic = slideTopic(content, index);
+      return options.slides === undefined
+        ? wanted(slide, index, topic)
         : options.slides.includes(index + 1) &&
-          !NEVER_ILLUSTRATED.has(slide.title) &&
-          (slide.layout === "TITLE" || slide.layout === "BULLETS"),
-    )
+            !NEVER_ILLUSTRATED.has(topic) &&
+            !NEVER_ILLUSTRATED.has(slide.title) &&
+            pictured(slide.layout, index === 0);
+    })
     .slice(0, limit);
   if (targets.length === 0) return content;
   const chosen = new Map<number, QSlideImage>();

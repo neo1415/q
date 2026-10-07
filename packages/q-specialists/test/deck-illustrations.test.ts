@@ -37,8 +37,8 @@ function deck(): QArtifactContent {
         },
         {
           layout: "BULLETS",
-          title: "Product",
-          bullets: ["Booking app for spare truck space."],
+          title: "Market",
+          bullets: ["Shippers with spare truck space."],
           section: 0,
         },
         {
@@ -74,7 +74,7 @@ function port(answers: boolean[] = [true, true, true]) {
 }
 
 describe("generated illustrations", () => {
-  it("illustrates the cover first, then a content slide, never the team, at most two", async () => {
+  it("illustrates the cover first, then an abstract content slide, never the team, at most two", async () => {
     const { illustrations, asked } = port();
     const content = await illustrateWithGenerated(deck(), illustrations);
     expect(asked.map((entry) => entry.purpose)).toEqual(["COVER", "SLIDE"]);
