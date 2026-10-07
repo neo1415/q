@@ -29,7 +29,7 @@ export async function POST(
   context: { params: Promise<{ voiceSessionId: string }> },
 ): Promise<NextResponse> {
   const id = UuidSchema.safeParse((await context.params).voiceSessionId);
-  let raw: unknown = null;
+  let raw: unknown;
   try {
     raw = await request.json();
   } catch {

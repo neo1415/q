@@ -15,7 +15,7 @@ The founder's R7: "Never an awkward silence: while Q works, it hums, says what i
    - 4 s, then every 6 s: a progress line from the current stage, or a voiced hum; at most three.
    - Past 8 s: at most one remembered small-talk thread per wait and per voice session ("By the way, how was Lagos?").
    - Never while the person speaks, never once Q's answer has started, and never while an approval is waiting.
-   Lines are composed from stage templates with variation (opener × object × tail, never the same line twice running). No line is model text, and none names a specialist, a tool or a prompt: only the approved visible stages.
+     Lines are composed from stage templates with variation (opener × object × tail, never the same line twice running). No line is model text, and none names a specialist, a tool or a prompt: only the approved visible stages.
 2. **Both voice paths speak the same ladder.** The standard voice line speaks it through its own speaker. The duplex line receives each beat from the server (`narration` relay) and voices it as an out-of-band response with fixed text, so nothing enters the conversation.
 3. **Small-talk memory** is `memory_type = 'small_talk'` in `q_knowledge.memory_items`:
    - written only by the memory service (the Write Gate) from a `MEMORY_EXTRACTOR` v2 `SMALL_TALK` item whose quote is verified against the person's own turns; never a platform write, never about a company, and never without its follow-up question;

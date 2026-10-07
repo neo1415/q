@@ -8,10 +8,7 @@ import type {
 } from "@capital-q/database";
 import { ActorContextSchema } from "@capital-q/security";
 
-import type {
-  MemoryCandidate,
-  MemoryItem,
-} from "../src/memory/contracts.js";
+import type { MemoryCandidate, MemoryItem } from "../src/memory/contracts.js";
 import type {
   MemoryRepository,
   NewMemoryItem,
@@ -177,9 +174,7 @@ describe("small-talk memory through the Write Gate", () => {
     expect(result.outcome).toBe("REMEMBERED");
     if (result.outcome !== "REMEMBERED") return;
     expect(result.item.memoryType).toBe("small_talk");
-    expect(result.item.validTo).toBe(
-      new Date(START + 90 * DAY).toISOString(),
-    );
+    expect(result.item.validTo).toBe(new Date(START + 90 * DAY).toISOString());
   });
 
   it("refuses a quote the person never said", async () => {
