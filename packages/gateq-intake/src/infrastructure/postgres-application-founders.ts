@@ -1,6 +1,6 @@
 import type { GateqPassReason } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
-import type { ActorContext } from "@capital-q/security";
+import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 /**
  * F2: a signed-in founder's own GateQ applications. Linked when they press
@@ -77,6 +77,84 @@ export function createPostgresApplicationFounders(options: {
            set relationship_id = ${input.relationshipId}
          where application_id = ${input.applicationId}
            and relationship_id is null`;
+    },
+
+    /**
+     * F27 repair: this founder's applications that name a company but never
+     * joined a relationship (the share 500'd before the fix).
+     */
+    unlinkedFor: async (
+      actor: ActorContext,
+    ): Promise<
+      readonly { readonly applicationId: string; readonly tenantId: string }[]
+    > => {
+      const rows = await sql<{ application_id: string; tenant_id: string }[]>`
+        select application_id, tenant_id from gateq.application_founders
+         where founder_user_id = ${actor.userId}
+           and company_id is not null
+           and relationship_id is null
+         limit 20`;
+      return rows.map((row) => ({
+        applicationId: row.application_id,
+        tenantId: row.tenant_id,
+      }));
+    },
+
+    /**
+     * F27 backfill: every unlinked application, with the founder's own
+     * context rebuilt exactly as a request resolves it (their active
+     * membership in the organisation that owns the company). No active
+     * membership: skipped, never acting for someone who no longer belongs.
+     */
+    unlinked: async (
+      limit: number,
+    ): Promise<
+      readonly {
+        readonly applicationId: string;
+        readonly tenantId: string;
+        readonly actor: ActorContext;
+      }[]
+    > => {
+      const rows = await sql<
+        {
+          application_id: string;
+          tenant_id: string;
+          user_id: string;
+          membership_id: string;
+          member_tenant_id: string;
+          organisation_id: string;
+        }[]
+      >`
+        select f.application_id, f.tenant_id, f.founder_user_id as user_id,
+               m.id as membership_id, m.tenant_id as member_tenant_id,
+               m.organisation_id
+          from gateq.application_founders f
+          join core.companies c on c.id = f.company_id
+          join identity.organisation_memberships m
+            on m.user_id = f.founder_user_id
+           and m.organisation_id = c.organisation_id
+           and m.membership_status = 'active'
+         where f.relationship_id is null
+         order by f.application_id
+         limit ${limit}`;
+      return rows.flatMap((row) => {
+        const actor = ActorContextSchema.safeParse({
+          userId: row.user_id,
+          tenantId: row.member_tenant_id,
+          organisationId: row.organisation_id,
+          membershipId: row.membership_id,
+          actorType: "HUMAN",
+        });
+        return actor.success
+          ? [
+              {
+                applicationId: row.application_id,
+                tenantId: row.tenant_id,
+                actor: actor.data,
+              },
+            ]
+          : [];
+      });
     },
 
     listFor: async (
