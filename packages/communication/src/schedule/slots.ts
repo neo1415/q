@@ -169,3 +169,91 @@ export function proposeSlots(input: {
   }
   return chosen.sort((a, b) => a.start.getTime() - b.start.getTime());
 }
+
+/** Hours offered without a calendar: late morning, early afternoon, morning. */
+const UNCHECKED_PREFERRED_MINUTES = [
+  10 * 60,
+  14 * 60,
+  11 * 60,
+  15 * 60,
+  9 * 60 + 30,
+];
+
+function insideWorkingHours(start: Date, end: Date, timeZone: string): boolean {
+  const policy = SLOT_POLICY;
+  const a = localParts(start, timeZone);
+  const b = localParts(new Date(end.getTime() - 60_000), timeZone);
+  const minutes = (p: LocalParts) => p.hour * 60 + p.minute;
+  return (
+    policy.workingDays.includes(a.weekday) &&
+    a.day === b.day &&
+    minutes(a) >= policy.dayStartMinutes &&
+    minutes(b) < policy.dayEndMinutes
+  );
+}
+
+/**
+ * Q room R5: three times to suggest when the person's calendar is not
+ * connected, so nothing could be checked. Pure: inside working hours in
+ * their zone (and the other side's, when known), on three different
+ * working days from tomorrow, at varied, sociable hours. Always said to be
+ * unchecked: these are suggestions, never free times.
+ */
+export function suggestSlotsWithoutCalendar(input: {
+  readonly now: Date;
+  readonly durationMinutes: number;
+  readonly timeZone: string;
+  readonly otherTimeZone?: string | undefined;
+}): readonly Interval[] {
+  const policy = SLOT_POLICY;
+  const chosen: Interval[] = [];
+  const today = localParts(input.now, input.timeZone);
+  let cursor = localParts(
+    new Date(
+      zonedTime(today, 12 * 60, input.timeZone).getTime() + 24 * 3_600_000,
+    ),
+    input.timeZone,
+  );
+  for (
+    let dayIndex = 0;
+    dayIndex < 21 && chosen.length < policy.count;
+    dayIndex += 1
+  ) {
+    const date = { year: cursor.year, month: cursor.month, day: cursor.day };
+    if (policy.workingDays.includes(cursor.weekday)) {
+      const preferred = [
+        ...UNCHECKED_PREFERRED_MINUTES.slice(chosen.length),
+        ...UNCHECKED_PREFERRED_MINUTES.slice(0, chosen.length),
+      ];
+      // Then every half hour of the day, for a far-apart other zone.
+      for (
+        let minutes = policy.dayStartMinutes;
+        minutes < policy.dayEndMinutes;
+        minutes += policy.stepMinutes
+      ) {
+        if (!preferred.includes(minutes)) preferred.push(minutes);
+      }
+      for (const minutes of preferred) {
+        const start = zonedTime(date, minutes, input.timeZone);
+        const end = new Date(start.getTime() + input.durationMinutes * 60_000);
+        if (!insideWorkingHours(start, end, input.timeZone)) continue;
+        if (
+          input.otherTimeZone !== undefined &&
+          isKnownTimeZone(input.otherTimeZone) &&
+          !insideWorkingHours(start, end, input.otherTimeZone)
+        ) {
+          continue;
+        }
+        chosen.push({ start, end });
+        break;
+      }
+    }
+    cursor = localParts(
+      new Date(
+        zonedTime(date, 12 * 60, input.timeZone).getTime() + 24 * 3_600_000,
+      ),
+      input.timeZone,
+    );
+  }
+  return chosen;
+}

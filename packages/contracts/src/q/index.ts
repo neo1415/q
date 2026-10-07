@@ -493,6 +493,8 @@ export {
   QRoomObjectSchema,
   QSettingsSectionSchema,
   QShowInQRoomIntentSchema,
+  QShowCalendarConnectIntentSchema,
+  type QShowCalendarConnectIntent,
   type QOpenSettingsIntent,
   type QRoomObject,
   type QSettingsSection,

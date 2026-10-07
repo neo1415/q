@@ -15,6 +15,7 @@ import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { CompanyAvatar } from "../company/company-avatar";
 import { destinationPath } from "../voice/destinations";
 import { ArtifactCard } from "./artifact-card";
+import { CalendarConnectCard } from "./calendar-connect-card";
 import { ComparisonCards } from "./comparison-cards";
 import { StaticAnswerCards } from "./static-answer-cards";
 import { recordPagePath, settingsPath, setupPath } from "./client-actions";
@@ -74,6 +75,7 @@ const INTENT_ROUTES: Readonly<
       | "FOCUS_SECTION"
       | "OPEN_SETTINGS"
       | "SHOW_IN_Q_ROOM"
+      | "SHOW_CALENDAR_CONNECT"
     >,
     string | null
   >
@@ -109,7 +111,9 @@ export function intentHref(intent: QUiIntent): string | null {
     intent.kind === "SET_VOICE" ||
     intent.kind === "SIGN_OUT" ||
     // Done on the page as the answer arrives; there is nowhere to link.
-    intent.kind === "SCREEN_ACT"
+    intent.kind === "SCREEN_ACT" ||
+    // Q room R5: its own card below, not a link.
+    intent.kind === "SHOW_CALENDAR_CONNECT"
   ) {
     return null;
   }
@@ -212,6 +216,8 @@ function intentLabel(intent: QUiIntent): string {
       return "Open Settings";
     case "SHOW_IN_Q_ROOM":
       return `Open ${intent.title}`;
+    case "SHOW_CALENDAR_CONNECT":
+      return "Connect Google Calendar";
   }
 }
 
@@ -529,6 +535,10 @@ export function QResultBlocks({
             );
 
           case "UI_INTENT": {
+            // Q room R5: suggested times and the connect card, in the room.
+            if (block.intent.kind === "SHOW_CALENDAR_CONNECT") {
+              return <CalendarConnectCard key={key} intent={block.intent} />;
+            }
             // Their own website, opened in a new tab as the answer arrived;
             // the link stays for a browser that blocked the automatic open.
             const website = safeWebsite(block.intent);
