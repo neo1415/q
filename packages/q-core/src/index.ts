@@ -69,6 +69,10 @@ export {
   Q_SYSTEM_VOICE_V2,
   VOICE_V2_MANNER,
 } from "./prompts/charter/q-system-voice.v2.js";
+export {
+  Q_SYSTEM_VOICE_V3,
+  VOICE_CALL_SECTION,
+} from "./prompts/charter/q-system-voice.v3.js";
 export { Q_SYSTEM_V2, Q_VOICE_SECTION } from "./prompts/charter/q-system.v2.js";
 export {
   Q_PERSONALITIES,
@@ -710,6 +714,11 @@ export {
   V19_DOCUMENT_TYPES,
 } from "./prompts/tasks/company-analyst.v19.js";
 export {
+  COMPANY_ANALYST_V20,
+  CONVERSATION_SECTION,
+  V19_ANSWER_FORMAT_HEADING,
+} from "./prompts/tasks/company-analyst.v20.js";
+export {
   COMPANY_ANALYST_V16,
   COMPANY_ANALYST_V16_TURN,
 } from "./prompts/tasks/company-analyst.v16.js";
@@ -929,6 +938,13 @@ export {
   type GuardedAnswer,
   type RecommendationGrounds,
 } from "./communication/recommendation-guard.js";
+export {
+  inFirstPerson,
+  NATURAL_REGISTER_ISSUES,
+  naturalRegisterIssues,
+  SPOKEN_WORDS_MAX,
+  type NaturalRegisterIssue,
+} from "./communication/natural-register.js";
 export {
   citeAuthorisedFacts,
   citePublicSources,
