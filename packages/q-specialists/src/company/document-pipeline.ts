@@ -308,6 +308,8 @@ export type DocumentFix =
 
 /** A second opinion behind the same typed contract (e.g. a vision rubric). */
 export type DocumentCritic = {
+  /** How many times it may be asked per document (default: every round). */
+  readonly rounds?: number | undefined;
   readonly review: (input: {
     readonly content: QArtifactContent;
     readonly signal?: AbortSignal | undefined;
@@ -684,12 +686,19 @@ export async function runDocumentPipeline(
   await stage("CHECKING");
   let rounds = 0;
   let review = reviewDocument(next, input.grounding, input.kind);
-  const critique = async (): Promise<readonly DocumentFix[]> =>
-    input.critic === undefined
-      ? []
-      : await input.critic
-          .review({ content: next, signal: input.signal })
-          .catch(() => []);
+  let critiques = 0;
+  const critique = async (): Promise<readonly DocumentFix[]> => {
+    if (
+      input.critic === undefined ||
+      critiques >= (input.critic.rounds ?? FIX_ROUNDS_MAX)
+    ) {
+      return [];
+    }
+    critiques += 1;
+    return await input.critic
+      .review({ content: next, signal: input.signal })
+      .catch(() => []);
+  };
   let extra = await critique();
   const short = (r: DocumentReview) =>
     r.rubric.content < RUBRIC_PASS ||

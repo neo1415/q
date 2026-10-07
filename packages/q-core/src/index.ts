@@ -1123,6 +1123,19 @@ export {
   type DocumentPolishResult,
   type DocumentPolishVariables,
 } from "./prompts/schemas/document-polish.js";
+// Deck wave 8: the vision check of a rendered deck.
+export { DOCUMENT_CRITIQUE_V1 } from "./prompts/tasks/document-critique.v1.js";
+export {
+  DOCUMENT_CRITIQUE_FIX_KINDS,
+  DOCUMENT_CRITIQUE_PAGES_MAX,
+  DOCUMENT_CRITIQUE_SCHEMA_NAME,
+  DOCUMENT_CRITIQUE_SCHEMA_VERSION,
+  DOCUMENT_CRITIQUE_UNTRUSTED,
+  DocumentCritiqueResultSchema,
+  DocumentCritiqueVariablesSchema,
+  type DocumentCritiqueResult,
+  type DocumentCritiqueVariables,
+} from "./prompts/schemas/document-critique.js";
 
 // DAILY block (The Q Daily)
 export { DAILY_STORY_WRITER_V1 } from "./prompts/tasks/daily-story-writer.v1.js";

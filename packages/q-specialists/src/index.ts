@@ -256,6 +256,13 @@ export {
   promoteFirmFigures,
   type OwnDeckFacts,
 } from "./company/deck-figures.js";
+export {
+  createDeckPageRenderer,
+  createVisionDocumentCritic,
+  fixesFrom,
+  type DeckPageRenderer,
+  type DocumentCriticRun,
+} from "./company/document-critic.js";
 
 // DOCS block: generated illustrations.
 export {

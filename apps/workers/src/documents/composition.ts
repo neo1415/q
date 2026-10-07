@@ -23,10 +23,16 @@ import {
   createPostgresArtifactRepository,
   createPostgresDocumentJobRepository,
   createSupabaseDocumentImageStore,
+  jobActor,
 } from "@capital-q/q-artifacts";
-import { createDeckPolisher } from "@capital-q/q-specialists";
+import {
+  createDeckPageRenderer,
+  createDeckPolisher,
+  createVisionDocumentCritic,
+} from "@capital-q/q-specialists";
 
 import type { RunnerLogger } from "../outbox-runner.js";
+import { pdfPagesToPng } from "./page-images.js";
 import {
   createDocumentJobRunner,
   type DocumentJobRunner,
@@ -144,6 +150,30 @@ export function composeDocumentJobs(dependencies: {
     polisher: dependencies.modelsAvailable
       ? createDeckPolisher({ gateway: dependencies.gateway, logger })
       : undefined,
+    // Deck wave 8: the vision critic, off unless CQ_DOCUMENT_CRITIC=enabled
+    // (default off); its cost is logged per run.
+    criticFor:
+      dependencies.modelsAvailable && env["CQ_DOCUMENT_CRITIC"] === "enabled"
+        ? ({ job, correlationId }) => {
+            const actor = jobActor(job);
+            return createVisionDocumentCritic({
+              enabled: true,
+              gateway: dependencies.gateway,
+              renderPages: createDeckPageRenderer({
+                rasterize: (pdf, maxPages) => pdfPagesToPng(pdf, maxPages),
+                readGenerated: (imageId) => images.bytesFor(actor, imageId),
+              }),
+              sensitivity: job.input.sensitivity,
+              attribution: {
+                tenantId: job.tenantId,
+                userId: job.userId,
+                qRunId: job.runId,
+                correlationId,
+              },
+              logger,
+            });
+          }
+        : undefined,
     logger,
   });
 }

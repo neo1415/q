@@ -10,6 +10,7 @@ import {
 import {
   runDocumentPipeline,
   type DeckPolisher,
+  type DocumentCritic,
   type StockPhotoPort,
 } from "@capital-q/q-specialists";
 
@@ -46,6 +47,16 @@ export function createDocumentJobRunner(dependencies: {
   readonly photos?: StockPhotoPort | undefined;
   readonly images?: Pick<DocumentImages, "illustrationsFor"> | undefined;
   readonly polisher?: DeckPolisher | undefined;
+  /**
+   * Deck wave 8: the vision critic for this job's deck, or nothing (off
+   * unless CQ_DOCUMENT_CRITIC=enabled). One round, at most twelve pages.
+   */
+  readonly criticFor?:
+    | ((input: {
+        readonly job: ClaimedDocumentJob;
+        readonly correlationId: string;
+      }) => DocumentCritic | undefined)
+    | undefined;
   readonly logger: RunnerLogger;
 }): DocumentJobRunner {
   const { jobs, artifacts, logger } = dependencies;
@@ -73,6 +84,10 @@ export function createDocumentJobRunner(dependencies: {
             })
           : undefined,
       polisher: dependencies.polisher,
+      critic:
+        job.kind === "PITCH_DECK"
+          ? dependencies.criticFor?.({ job, correlationId })
+          : undefined,
       sensitivity: input.sensitivity,
       attribution: {
         tenantId: job.tenantId,

@@ -150,6 +150,8 @@ describe("registry", () => {
         "INSTRUCTION_THREAD_READER",
         // DOCS: the wording pass over a composed deck.
         "DOCUMENT_POLISH",
+        // Deck wave 8: the vision check of a rendered deck.
+        "DOCUMENT_CRITIQUE",
         // DAILY: The Q Daily's story writer and Q's take column.
         "DAILY_STORY_WRITER",
         "DAILY_Q_TAKE",
