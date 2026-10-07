@@ -811,8 +811,11 @@ export function validateStep(
     const lastFromUsAt = context.pace?.get(subject)?.lastFromUsAt ?? null;
     if (
       lastFromUsAt !== null &&
-      workingDaysBetween(lastFromUsAt, context.now, context.grant.workingHours) <
-        DELEGATION_LIMITS.followUpAfterWorkingDays
+      workingDaysBetween(
+        lastFromUsAt,
+        context.now,
+        context.grant.workingHours,
+      ) < DELEGATION_LIMITS.followUpAfterWorkingDays
     ) {
       const held: OutreachConsideration = {
         decision: "WAIT",
@@ -1119,15 +1122,17 @@ function messageProblem(
       : (material?.counterparts.get(counterpartId) ?? []);
   // Founder 2026-10-07: a message that woos. Code's own read of Q's draft;
   // a failing one is planned again (the rewrite), never sent as it is. An
-  // answer to their own question is about them already.
+  // answer to their own question is about them already; a first message
+  // has its own, stricter grounding check below.
   const answeringThem =
     thread?.asksQuestion === true && thread.lastFrom === "THEM";
   const woo = wooProblem({
     body: body.body,
     replying,
-    recipientTerms: answeringThem
-      ? []
-      : counterpart.flatMap((fact) => fact.anchors),
+    recipientTerms:
+      answeringThem || (!written && !replying)
+        ? []
+        : counterpart.flatMap((fact) => fact.anchors),
   });
   if (woo !== null) {
     return refuse(woo === "WOO_TOO_LONG" ? "MESSAGE_TOO_LONG" : woo);
