@@ -180,6 +180,15 @@ export {
   type ReviseOnboardingResponseCommand,
   type SubmitOnboardingResponseCommand,
 } from "./application/use-cases.js";
+export {
+  followUpQuickAnswers,
+  followUpResponse,
+  followUpTyped,
+  type FollowUpAnswer,
+  type FollowUpQuickAnswer,
+  type FollowUpTyped,
+  type OnboardingFollowUp,
+} from "./application/follow-ups.js";
 export { getOnboardingMetrics } from "./application/metrics.js";
 export {
   createOwnOnboardingSummaryReader,
