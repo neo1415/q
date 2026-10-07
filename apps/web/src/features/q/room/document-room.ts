@@ -61,7 +61,8 @@ export type CitedLine = {
   readonly pages: readonly number[];
 };
 
-const CITATION = /\((?:p|pp|page|pages)\.?\s*(\d{1,5})(?:\s*[-–]\s*(\d{1,5}))?\)/giu;
+const CITATION =
+  /\((?:p|pp|page|pages)\.?\s*(\d{1,5})(?:\s*[-–]\s*(\d{1,5}))?\)/giu;
 
 /**
  * The page-cited lines of an answer ("Revenue grew 40% (p. 3)"): the
@@ -70,7 +71,9 @@ const CITATION = /\((?:p|pp|page|pages)\.?\s*(\d{1,5})(?:\s*[-–]\s*(\d{1,5}))?
  */
 export function citedLines(text: string): readonly CitedLine[] {
   const out: CitedLine[] = [];
-  for (const raw of text.split(/\n+|(?<=[.!?])\s+(?=[A-Z0-9*•-])/u)) {
+  for (const raw of text.split(
+    /\n+|(?<=[.!?])(?<!\b(?:pp?|pages?)\.)\s+(?=[A-Z0-9*•-])/u,
+  )) {
     const line = raw.replace(/^\s*(?:[-*•]|\d+[.)])\s*/u, "").trim();
     if (line.length === 0) continue;
     const pages: number[] = [];
@@ -91,7 +94,12 @@ export function citedLines(text: string): readonly CitedLine[] {
 
 /** A page's text as sentences, for the read-aloud highlight. */
 export function sentencesOf(text: string): readonly string[] {
-  return (text.replace(/\s+/gu, " ").trim().match(/[^.!?]+[.!?]*/gu) ?? [])
+  return (
+    text
+      .replace(/\s+/gu, " ")
+      .trim()
+      .match(/[^.!?]+[.!?]*/gu) ?? []
+  )
     .map((sentence) => sentence.trim())
     .filter((sentence) => sentence.length > 0);
 }
@@ -134,8 +142,7 @@ export function speakingMs(sentence: string): number {
   return Math.max(1_200, Math.round((words.length / 2.6) * 1_000));
 }
 
-const CLOSE_WORDS =
-  /^\s*(please\s+)?(close|shut|hide|dismiss|put away)\b.*$/iu;
+const CLOSE_WORDS = /^\s*(please\s+)?(close|shut|hide|dismiss|put away)\b.*$/iu;
 
 /** Words that keep talk on the open document. */
 const ON_DOCUMENT = [
@@ -307,13 +314,19 @@ export function pdfOfferOf(turns: readonly QTurn[]): PdfOffer | null {
 
 /** "That's about 1,100 words." */
 export function offerLine(words: number): string {
-  const rounded = words >= 1_000 ? Math.round(words / 100) * 100 : Math.round(words / 50) * 50;
+  const rounded =
+    words >= 1_000
+      ? Math.round(words / 100) * 100
+      : Math.round(words / 50) * 50;
   return `That's about ${rounded.toLocaleString("en-GB")} words. Want it as a PDF?`;
 }
 
 /** The person's yes or no to the offer, said or typed; null otherwise. */
 export function answerToOffer(text: string): "YES" | "NO" | null {
-  const said = text.trim().toLowerCase().replace(/[.!]+$/u, "");
+  const said = text
+    .trim()
+    .toLowerCase()
+    .replace(/[.!]+$/u, "");
   if (
     /^(yes|yeah|yep|sure|ok|okay|please|go on|go ahead|do it|yes please|sure thing|make it a pdf|make the pdf|as a pdf|pdf please)( please)?$/u.test(
       said,
@@ -321,7 +334,11 @@ export function answerToOffer(text: string): "YES" | "NO" | null {
   ) {
     return "YES";
   }
-  if (/^(no|nope|no thanks|no thank you|not now|nah|skip it|it's fine)$/u.test(said)) {
+  if (
+    /^(no|nope|no thanks|no thank you|not now|nah|skip it|it's fine)$/u.test(
+      said,
+    )
+  ) {
     return "NO";
   }
   return null;

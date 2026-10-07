@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { FileViewer } from "@/features/company/material/file-viewer";
 import {
   openDocumentAction,
+  type MaterialResult,
   type OpenedFile,
 } from "@/features/company/material/material-actions";
 import { openDocumentViewer } from "@/features/documents/document-ready";
@@ -26,10 +27,7 @@ import {
   pageAfter,
   type CitedLine,
 } from "./room/document-room";
-import {
-  setRoomDocumentOpen,
-  useRoomDocumentHost,
-} from "./room/document-host";
+import { setRoomDocumentOpen, useRoomDocumentHost } from "./room/document-host";
 import { QRoomDocument } from "./room/q-room-document";
 import { setMaterialDocument } from "./screen";
 
@@ -89,8 +87,16 @@ function openingTurn(turns: readonly QTurn[], documentId: string): number {
  */
 export function QMaterialViewer({
   turns,
+  openFile = openDocumentAction,
 }: {
   readonly turns: readonly QTurn[];
+  /** The data room's signed read; the /dev harness serves its own. */
+  readonly openFile?:
+    | ((
+        companyId: string,
+        documentId: string,
+      ) => Promise<MaterialResult<OpenedFile>>)
+    | undefined;
 }) {
   const pathname = usePathname();
   const host = useRoomDocumentHost();
@@ -112,36 +118,39 @@ export function QMaterialViewer({
     applied.current = new Set(turns.map((turn) => turn.id));
   }
 
-  const open = useCallback((ref: QMaterialDocumentRef, at: number) => {
-    const id = ref.documentId.toLowerCase();
-    setOpened({
-      companyId: ref.companyId,
-      documentId: ref.documentId,
-      title: ref.title,
-      file: null,
-      at,
-      path: pathRef.current,
-      page: lastPage.get(id) ?? 1,
-      pageCount: null,
-      reading: false,
-    });
-    setClosed((current) =>
-      current.filter((one) => one.documentId.toLowerCase() !== id),
-    );
-    // "Open it and read it to me": the opening answer's own acts apply.
-    for (const turn of turnsRef.current.slice(at)) {
-      applied.current?.delete(turn.id);
-    }
-    void openDocumentAction(ref.companyId, ref.documentId).then((result) =>
-      setOpened((current) =>
-        current?.documentId !== ref.documentId
-          ? current
-          : result.ok
-            ? { ...current, file: result.value }
-            : null,
-      ),
-    );
-  }, []);
+  const open = useCallback(
+    (ref: QMaterialDocumentRef, at: number) => {
+      const id = ref.documentId.toLowerCase();
+      setOpened({
+        companyId: ref.companyId,
+        documentId: ref.documentId,
+        title: ref.title,
+        file: null,
+        at,
+        path: pathRef.current,
+        page: lastPage.get(id) ?? 1,
+        pageCount: null,
+        reading: false,
+      });
+      setClosed((current) =>
+        current.filter((one) => one.documentId.toLowerCase() !== id),
+      );
+      // "Open it and read it to me": the opening answer's own acts apply.
+      for (const turn of turnsRef.current.slice(at)) {
+        applied.current?.delete(turn.id);
+      }
+      void openFile(ref.companyId, ref.documentId).then((result) =>
+        setOpened((current) =>
+          current?.documentId !== ref.documentId
+            ? current
+            : result.ok
+              ? { ...current, file: result.value }
+              : null,
+        ),
+      );
+    },
+    [openFile],
+  );
 
   // Closing remembers the page and keeps it to reopen when the subject
   // comes back. Called while rendering too (the topic moved on), so it
@@ -178,23 +187,20 @@ export function QMaterialViewer({
     };
   }, [open, close]);
 
-  const download = useCallback(
-    (current: Opened | null) => {
-      if (current !== null) {
-        if (current.file?.downloadable === true) {
-          void downloadSignedFile(current.file.url, current.title ?? "Document");
-        }
-        return;
+  const download = useCallback((current: Opened | null) => {
+    if (current !== null) {
+      if (current.file?.downloadable === true) {
+        void downloadSignedFile(current.file.url, current.title ?? "Document");
       }
-      // No data-room document open: the document Q just made, if any.
-      const made = latestArtifactIn(turnsRef.current);
-      if (made !== null) {
-        openDocumentViewer(made);
-        void downloadArtifact(made);
-      }
-    },
-    [],
-  );
+      return;
+    }
+    // No data-room document open: the document Q just made, if any.
+    const made = latestArtifactIn(turnsRef.current);
+    if (made !== null) {
+      openDocumentViewer(made);
+      void downloadArtifact(made);
+    }
+  }, []);
 
   useEffect(() => {
     const seen = applied.current;
@@ -225,7 +231,6 @@ export function QMaterialViewer({
       }
     }
   }, [turns, opened, download, close]);
-
 
   // The subject comes back: the document reopens where it was left.
   const lastPerson = turns.findLast(

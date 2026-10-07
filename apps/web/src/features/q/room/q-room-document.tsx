@@ -68,7 +68,9 @@ export function QRoomDocument({
     [],
   );
   const sentences =
-    pageText !== null && pageText.page === page ? sentencesOf(pageText.text) : [];
+    pageText !== null && pageText.page === page
+      ? sentencesOf(pageText.text)
+      : [];
   const highlighted = useReadingHighlight(reading, sentences);
 
   const last = pageCount ?? null;
@@ -166,7 +168,11 @@ export function QRoomDocument({
           onClick={onClose}
           data-q-room-document-close
         >
-          <X aria-hidden="true" size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} />
+          <X
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
         </button>
       </div>
 
@@ -208,7 +214,9 @@ export function QRoomDocument({
               onText={onText}
             />
           )}
-          {file?.watermark == null ? null : <Watermark words={file.watermark} />}
+          {file?.watermark == null ? null : (
+            <Watermark words={file.watermark} />
+          )}
         </div>
         {summary.length === 0 && !(reading && sentences.length > 0) ? null : (
           <aside
@@ -319,7 +327,12 @@ function DocumentPage({
     );
   }
   return (
-    <PdfPage document={pdf.document} page={page} title={title} onText={onText} />
+    <PdfPage
+      document={pdf.document}
+      page={page}
+      title={title}
+      onText={onText}
+    />
   );
 }
 

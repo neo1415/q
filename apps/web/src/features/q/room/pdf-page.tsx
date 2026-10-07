@@ -123,7 +123,11 @@ export function PdfPage({
   }, [document, page]);
 
   return (
-    <div ref={box} className="flex w-full justify-center" data-q-pdf-page={page}>
+    <div
+      ref={box}
+      className="flex w-full justify-center"
+      data-q-pdf-page={page}
+    >
       {failed ? (
         <p className="cq-body-sm p-4 text-(--cq-text-secondary)">
           This page couldn't be drawn.

@@ -34,6 +34,24 @@ describe("spoken navigation follows Q's answer, never the words (ADR 0011, R20)"
     });
   });
 
+  it("Q room W3: an open with a document act keeps the open; the room reads the act from the answer", () => {
+    const open = {
+      kind: "OPEN_RECORD_PAGE" as const,
+      page: "DATA_ROOM_DOCUMENT" as const,
+      id: "00000000-0000-4000-8000-000000000051",
+      companyId: "00000000-0000-4000-8000-000000000001",
+    };
+    expect(
+      followOfAnswer([
+        { kind: "UI_INTENT", intent: open },
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "DOCUMENT_ACT", act: "READ_ALOUD" },
+        },
+      ]).clientAction,
+    ).toEqual(open);
+  });
+
   it("an answer without such blocks moves nothing, whatever was said", () => {
     expect(followOfAnswer(undefined)).toEqual({
       navigate: null,

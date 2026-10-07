@@ -96,7 +96,10 @@ export function setMaterialDocument(
           companyId: document.companyId.toLowerCase(),
           documentId: document.documentId.toLowerCase(),
           page:
-            page !== undefined && Number.isInteger(page) && page >= 1 && page <= 10_000
+            page !== undefined &&
+            Number.isInteger(page) &&
+            page >= 1 &&
+            page <= 10_000
               ? page
               : null,
         }

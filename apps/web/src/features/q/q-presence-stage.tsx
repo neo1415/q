@@ -25,7 +25,7 @@ import {
   registerRoomDocumentHost,
   useRoomDocumentOpen,
 } from "./room/document-host";
-import { QRoomPdfOffer } from "./room/pdf-offer";
+import { QRoomPdfOffer, type PdfExport } from "./room/pdf-offer";
 import { QRoomStage, type RoomCardLoader } from "./room/q-room-card";
 import { roomStage } from "./room/room-stage";
 import {
@@ -77,6 +77,7 @@ export function QPresenceStage({
   onBoardLanded,
   onPin,
   loadRoomCard,
+  exportAnswer,
 }: {
   /** A live voice line is open: Q's own lines drive which card is open. */
   readonly live?: boolean | undefined;
@@ -86,6 +87,8 @@ export function QPresenceStage({
   readonly onPin?: ((answerId: string) => void) | undefined;
   /** Q room R4: how a card reads its content (the dev harness serves it). */
   readonly loadRoomCard?: RoomCardLoader | undefined;
+  /** Q room W3: how an answer is filed as a PDF (the dev harness serves it). */
+  readonly exportAnswer?: PdfExport | undefined;
   /**
    * Q's presence: full size, or small and pinned at the top while an
    * object is shown (lead 2026-10-03: the presence never leaves the screen).
@@ -337,7 +340,7 @@ export function QPresenceStage({
         data-q-room-document-host
       />
 
-      <QRoomPdfOffer turns={turns} />
+      <QRoomPdfOffer turns={turns} file={exportAnswer} />
 
       {waiting}
 
