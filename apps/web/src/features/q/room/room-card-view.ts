@@ -55,6 +55,16 @@ export function roomCardHref(intent: QShowInQRoomIntent): string {
       return "/capital#action-plan";
     case "FOLLOW_UPS":
       return "/home#follow-ups";
+    // Investor promises (2026-10-07).
+    case "ASSUMPTIONS":
+    case "EVIDENCE_BOARD":
+      return `${recordPagePath("COMPANY", id)}#assumptions`;
+    case "THESIS":
+      return "/profile#thesis";
+    case "SAVED_COMPARISON":
+      return "/discover/saved";
+    case "INVESTOR_FIT":
+      return "/discover";
   }
 }
 
@@ -75,4 +85,9 @@ export const ROOM_OBJECT_WORDS: Readonly<
   READINESS: "readiness",
   ACTION_PLAN: "action plan",
   FOLLOW_UPS: "questions",
+  ASSUMPTIONS: "assumptions",
+  EVIDENCE_BOARD: "evidence board",
+  THESIS: "thesis",
+  SAVED_COMPARISON: "comparison",
+  INVESTOR_FIT: "investors",
 };

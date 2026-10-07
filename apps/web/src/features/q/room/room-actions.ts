@@ -11,11 +11,18 @@ import {
   getQWork,
   getRelationshipWithCompany,
   getReadiness,
+  getCompanyAssumptions,
+  getFitCompare,
+  getInvestorGates,
+  getThesisReading,
+  discoverInvestors,
+  listSavedCompanies,
   getRelationshipWithInvestor,
   listGateways,
   type ApiSession,
 } from "@capital-q/api-client";
 import {
+  FIT_COMPARE_MAX,
   QShowInQRoomIntentSchema,
   type QShowInQRoomIntent,
 } from "@capital-q/contracts";
@@ -26,6 +33,12 @@ import {
   resolveOwnContext,
 } from "@/features/q/context";
 
+import {
+  assumptionsCard,
+  comparisonCard,
+  investorFitCard,
+  thesisCard,
+} from "./promise-cards";
 import { roomCardHref, type RoomCardView } from "./room-card-view";
 
 /**
@@ -155,6 +168,51 @@ async function read(
         href,
         open: "Answer on Home",
       };
+    }
+    // Investor promises (2026-10-07): each read is the page's own route
+    // under the person's session; the API decides what they may see.
+    case "ASSUMPTIONS":
+    case "EVIDENCE_BOARD":
+      return assumptionsCard(
+        await getCompanyAssumptions(session, id),
+        intent.object,
+        href,
+      );
+    case "THESIS": {
+      const q = await qApiSession();
+      return q === null ? null : thesisCard(await getThesisReading(q), href);
+    }
+    case "SAVED_COMPARISON": {
+      const q = await qApiSession();
+      if (q === null) return null;
+      const saved = await listSavedCompanies(session);
+      const ids = saved.companyIds.slice(0, FIT_COMPARE_MAX);
+      if (ids.length < 2) {
+        return {
+          heading: "Your saved companies, side by side",
+          lead: "Save at least two companies to compare them.",
+          facts: [],
+          items: [],
+          more: 0,
+          href,
+          open: "Open Saved",
+        };
+      }
+      return comparisonCard(await getFitCompare(q, ids), href);
+    }
+    case "INVESTOR_FIT": {
+      const slate = await discoverInvestors(session);
+      const top = slate.items.slice(0, ITEMS_MAX);
+      const gates =
+        top.length === 0
+          ? []
+          : (
+              await getInvestorGates(
+                session,
+                top.map((item) => item.investorOrganisationId),
+              ).catch(() => ({ items: [] }))
+            ).items;
+      return investorFitCard(top, gates, href);
     }
     case "COMPANY_PROFILE": {
       const profile = await getCompanyProfile(session, id);
