@@ -125,8 +125,18 @@ export function QSwarm({
     const note = (key: "qFigure" | "qRenderer", value: string) => {
       canvas.dataset[key] = value;
     };
+    // The Q moment's first-landing letter, once per page load: the Q
+    // page's presence remounts as cards come and go, and must not greet
+    // the person again each time. Asked at the first eligible frame, so a
+    // mount torn down before it draws (Strict Mode) spends nothing.
+    const landing = () => {
+      if (qLanded) return false;
+      qLanded = true;
+      return true;
+    };
     const start = {
       pixels,
+      landing,
       dpr: surfaceDpr(window.devicePixelRatio),
       cores: navigator.hardwareConcurrency,
       allow3d,
@@ -184,7 +194,10 @@ export function QSwarm({
     };
     document.addEventListener("visibilitychange", onHidden);
     canvas.addEventListener("cq:redraw", redraw);
+    // The dev harness asks for the Q moment, to screenshot it.
+    canvas.addEventListener("cq:q-moment", loop.formQ);
     return () => {
+      canvas.removeEventListener("cq:q-moment", loop.formQ);
       window.removeEventListener("pointermove", onPointer);
       window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("pointerup", onPointerGone);
@@ -215,6 +228,9 @@ export function QSwarm({
     />
   );
 }
+
+/** Whether the Q moment has greeted the person on this page load. */
+let qLanded = false;
 
 function clampLevel(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;

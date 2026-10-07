@@ -23,6 +23,7 @@ export const metadata: Metadata = {
  * once the page is up (and again every few seconds, for screenshots).
  * `?face=1` lets the stage show Q's speaking face (as the Q page does);
  * `?play=shapes` or `?play=face` cycles the states for a screen recording.
+ * `?face=1&q=1` forms the Q moment (the letter Q) every few seconds.
  */
 export default async function PresencePage({
   searchParams,
@@ -51,6 +52,7 @@ export default async function PresencePage({
         initialGesture={one(params["gesture"]) ?? null}
         initialFace={one(params["face"]) === "1"}
         play={one(params["play"]) ?? null}
+        qMoment={one(params["q"]) === "1"}
       />
     </PageContainer>
   );

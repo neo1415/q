@@ -43,6 +43,7 @@ export const FIGURE_KINDS: readonly FigureKind[] = [
   "WAVE",
   "SPIRAL",
   "CONSTELLATION",
+  "LETTER_Q",
   "RIBBON",
   "FACE",
   "QUESTION",
@@ -552,6 +553,62 @@ function chartPoints(count: number, random: () => number): RawPoint[] {
   ];
 }
 
+/**
+ * The letter Q, the brand mark (founder direction 2026-10-07; the Q moment,
+ * presence-q-moment.ts): a bold geometric Q as the mark draws it -- a thick
+ * ring and a short, square-ended tail out to the lower right -- filled
+ * evenly with light and a little brighter along its edges, so both its
+ * outline and its weight read. Laid out once, like every figure.
+ */
+const LETTER_OUTER = 0.66;
+const LETTER_INNER = 0.42;
+const LETTER_TAIL: readonly [number, number, number, number] = [
+  0.2, 0.2, 0.62, 0.62,
+];
+const LETTER_TAIL_HALF = 0.125;
+
+function letterQPoints(count: number, random: () => number): RawPoint[] {
+  const out: RawPoint[] = [];
+  const [x0, y0, x1, y1] = LETTER_TAIL;
+  const length = Math.hypot(x1 - x0, y1 - y0);
+  const ux = (x1 - x0) / length;
+  const uy = (y1 - y0) / length;
+  // By area: the ring is about four fifths of the letter, the tail the rest.
+  const tail = Math.floor(count * 0.2);
+  const band = LETTER_OUTER - LETTER_INNER;
+  for (let i = 0; i < count - tail; i += 1) {
+    const a = random() * TAU;
+    // Uniform over the annulus's area.
+    const r = Math.sqrt(
+      LETTER_INNER ** 2 + random() * (LETTER_OUTER ** 2 - LETTER_INNER ** 2),
+    );
+    const edge = 1 - Math.min(r - LETTER_INNER, LETTER_OUTER - r) / (band / 2);
+    out.push({
+      // The letter sits a hair up and left, so the tail balances it.
+      x: Math.cos(a) * r - 0.05,
+      y: Math.sin(a) * r - 0.05,
+      z: 0,
+      part: P.LINE,
+      u: a / TAU,
+      b: 0.72 + 0.26 * edge ** 2,
+    });
+  }
+  for (let i = 0; i < tail; i += 1) {
+    const along = random() * length;
+    const across = (random() * 2 - 1) * LETTER_TAIL_HALF;
+    const edge = Math.abs(across) / LETTER_TAIL_HALF;
+    out.push({
+      x: x0 + ux * along - uy * across - 0.05,
+      y: y0 + uy * along + ux * across - 0.05,
+      z: 0,
+      part: P.LINE,
+      u: along / length,
+      b: 0.72 + 0.26 * edge ** 2,
+    });
+  }
+  return out;
+}
+
 /** Two hands meeting and parting: Q applauding. */
 function clapFigure(count: number): Figure {
   const random = seeded(311);
@@ -639,6 +696,8 @@ export function buildFigure(kind: FigureKind, count: number): Figure {
       return glyphFigure(kind, buildingPoints(count, random), count);
     case "CHART_UP":
       return glyphFigure(kind, chartPoints(count, random), count);
+    case "LETTER_Q":
+      return glyphFigure(kind, letterQPoints(count, random), count);
     case "CLAP":
       return clapFigure(count);
     case "HANDS":

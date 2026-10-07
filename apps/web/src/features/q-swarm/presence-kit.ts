@@ -12,6 +12,7 @@ export type FigureKind =
   | "WAVE"
   | "SPIRAL"
   | "CONSTELLATION"
+  | "LETTER_Q"
   | "RIBBON"
   | "FACE"
   | "QUESTION"

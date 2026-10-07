@@ -3,6 +3,7 @@ import type { QMotion } from "../q-aperture/aperture-frame";
 import { FINE_FIGURES } from "./presence-figures";
 import { figureForState, presenceFor, SMALL_PIXELS } from "./presence-machine";
 import { createPresenceSim, MAX_DT } from "./presence-dynamics";
+import { createQMoment } from "./presence-q-moment";
 import {
   budgetSettings,
   createBudget,
@@ -78,6 +79,12 @@ export type PresenceLoopHost = {
    * the page's own start. Returns a cancel. Absent: at once.
    */
   readonly begin?: ((start: () => void) => () => void) | undefined;
+  /**
+   * The Q moment (presence-q-moment.ts): whether this presence may form the
+   * letter on first landing, asked once at its first eligible frame.
+   * Absent: no landing moment.
+   */
+  readonly landing?: (() => boolean) | undefined;
 };
 
 export type PresenceLoop = {
@@ -85,6 +92,8 @@ export type PresenceLoop = {
   readonly setColour: (colour: Rgb, dark: boolean) => void;
   readonly setOnScreen: (onScreen: boolean) => void;
   readonly redraw: () => void;
+  /** Form the letter Q at the next eligible frame (the dev harness). */
+  readonly formQ: () => void;
   readonly dispose: () => void;
 };
 
@@ -138,6 +147,7 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
   let clock = 0;
   let core = 1;
   let stepped = 0;
+  const moment = createQMoment({ landing: host.landing ?? (() => false) });
 
   const frame = (now: number) => {
     raf = 0;
@@ -156,8 +166,19 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
       showing: inputs.showing,
     });
     const interval = last === 0 ? 0 : now - last;
+    // The Q moment lays the letter over a resting presence now and then;
+    // the state's own figure is untouched and flows back in after it.
+    const shown = moment.at(
+      clock,
+      inputs.state,
+      inputs.showsFace,
+      inputs.showing,
+      inputs.motion,
+    )
+      ? "LETTER_Q"
+      : view.figure;
     if (moving) {
-      sim.setFigure(view.figure);
+      sim.setFigure(shown);
       // The swarm's own clock advances by the step it integrates, so a
       // slow device sees the same swarm, slower -- never one whose
       // particles trail a figure that runs on ahead in real time.
@@ -173,11 +194,11 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
       eased.output += (raw.output - eased.output) * k(eased.output, raw.output);
       const aim = host.leanTarget();
       stepLean(lean, aim.x, aim.y, dt);
-    } else if (sim.figure() !== view.figure || figure === "") {
+    } else if (sim.figure() !== shown || figure === "") {
       // Reduced motion: each figure drawn still, no flow between.
-      sim.settle(view.figure, clock, { input: 0, output: 0 });
+      sim.settle(shown, clock, { input: 0, output: 0 });
     }
-    note(view.figure);
+    note(shown);
     const target = presenceUniforms({
       state: inputs.state,
       figure: sim.figure(),
@@ -297,6 +318,7 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
       if (next) redraw();
     },
     redraw,
+    formQ: moment.ask,
     dispose: () => {
       disposed = true;
       cancelBegin();
