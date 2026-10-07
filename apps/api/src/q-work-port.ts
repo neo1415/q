@@ -7,17 +7,10 @@ import {
   occurredNow,
   type MaterialActionAuditWriter,
 } from "@capital-q/audit";
-import type {
-  DatabaseExecutor,
-  TransactionManager,
-} from "@capital-q/database";
+import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 
-const DELEGATION_ENABLED = AuditActionTypeSchema.parse(
-  "q.delegation.enabled",
-);
-const DELEGATION_REVOKED = AuditActionTypeSchema.parse(
-  "q.delegation.revoked",
-);
+const DELEGATION_ENABLED = AuditActionTypeSchema.parse("q.delegation.enabled");
+const DELEGATION_REVOKED = AuditActionTypeSchema.parse("q.delegation.revoked");
 const DELEGATION_RESOURCE = AuditResourceTypeSchema.parse(
   "instruction_delegation",
 );

@@ -470,7 +470,8 @@ function instructionWorkDto(row: InstructionRow): QWorkDto | null {
       ? null
       : {
           id: row.delegation_id ?? null,
-          enabled: row.delegation_id !== null && row.delegation_id !== undefined,
+          enabled:
+            row.delegation_id !== null && row.delegation_id !== undefined,
           scope: "RELATIONSHIP_ROUTINE",
           words: INSTRUCTION_DELEGATION_WORDS,
           enabledAt: row.delegation_enabled_at?.toISOString() ?? null,

@@ -679,7 +679,9 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
      * Scoped delegation: the live delegation on an instruction (the engine's
      * read; the instruction is already the one firing).
      */
-    delegationOf: async (instructionId: string): Promise<DelegationRow | null> =>
+    delegationOf: async (
+      instructionId: string,
+    ): Promise<DelegationRow | null> =>
       (
         await sql<DelegationRow[]>`
           select id, scope, enabled_at from q_runtime.instruction_delegations
