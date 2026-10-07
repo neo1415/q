@@ -86,6 +86,14 @@ import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
 import { createRunCompanies, withCardSubjects } from "./card-subjects.js";
 import {
+  createRunFits,
+  fitAnswerCardsBlock,
+  fitCardsSummary,
+  fitsInOutcome,
+  groundedFitWords,
+  hasOrphanListItems,
+} from "./fit-cards.js";
+import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
 } from "./screen-claims.js";
@@ -103,6 +111,7 @@ import { speculationGate } from "./speculation.js";
 export type { QOwnIndex } from "./own-standing.js";
 // Q room W4b: the silence ladder names the company the same way a card does.
 export { companiesInOutcome } from "./card-subjects.js";
+export { fitAnswerCardsBlock, fitsInOutcome } from "./fit-cards.js";
 export { readinessLeadLines } from "./own-readiness.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { onScreenCompanyFact } from "./company-fact.js";
@@ -1476,6 +1485,9 @@ export function createModelGatewayQAnswer(
   // R0: the companies each run's tools returned, so an answer card can
   // carry the record its name means (never an id the model wrote).
   const runCompanies = createRunCompanies();
+  // The fits each run's tools returned, for cards code builds when the
+  // model wrote none (Zino live 2026-10-07).
+  const runFits = createRunFits();
   const available = baseTools.available;
   const tools: QToolPort = {
     offer: (toolContext) => baseTools.offer(toolContext),
@@ -1483,6 +1495,7 @@ export function createModelGatewayQAnswer(
     execute: async (proposal, toolContext) => {
       const outcome = await baseTools.execute(proposal, toolContext);
       runCompanies.note(toolContext.runId, outcome);
+      runFits.note(toolContext.runId, outcome);
       return outcome;
     },
   };
@@ -2921,7 +2934,25 @@ export function createModelGatewayQAnswer(
           .map((factor) => factor.dimension)
           .filter((d): d is string => typeof d === "string" && d.length > 0);
         if (dimensions.length === 0) return;
-        recommendationGrounds = { dimensions };
+        recommendationGrounds = {
+          ...(recommendationGrounds ?? {}),
+          dimensions,
+        };
+      };
+      // ADR 0059: a score out of 10 or a band the fit tool computed this
+      // turn may be repeated; it is Capital Q's number, not the model's.
+      const noteFitGrounds = (outcome: QToolCallOutcome): void => {
+        const computed = groundedFitWords(fitsInOutcome(outcome));
+        if (computed.length === 0) return;
+        recommendationGrounds = {
+          dimensions: recommendationGrounds?.dimensions ?? [],
+          computed: [
+            ...new Set([
+              ...(recommendationGrounds?.computed ?? []),
+              ...computed,
+            ]),
+          ],
+        };
       };
 
       const collectSources = (outcome: QToolCallOutcome): void => {
@@ -3330,6 +3361,7 @@ export function createModelGatewayQAnswer(
               collectDocument(outcome);
               notePlatformLookup(outcome);
               noteRecommendationGrounds(outcome);
+              noteFitGrounds(outcome);
               if (call.name === APPROVE_PENDING_TOOL && outcome.result.ok) {
                 approvalLine =
                   approvalStatusLine(outcome.result.data) ?? approvalLine;
@@ -3886,7 +3918,7 @@ export function createModelGatewayQAnswer(
                   return null;
                 });
         const companiesRead = runCompanies.take(request.runId);
-        const analystBlocks = analystResultBlocks({
+        const modelBlocks = analystResultBlocks({
           result: analyst,
           // The run's own authorised subjects, never anything the model
           // named: a reference is caused by what the server allowed this
@@ -3898,6 +3930,26 @@ export function createModelGatewayQAnswer(
             ? withCardSubjects(block, companiesRead)
             : block,
         );
+        // Zino live 2026-10-07: a list with scores came back with no cards.
+        // When the model wrote none and this run's tools computed two or
+        // more fits, code lays them out from those fits (deterministic,
+        // the platform's own scores and reasons).
+        const fitsRead = runFits.take(request.runId);
+        const builtCards = (modelBlocks ?? []).some(
+          (block) => block.kind === "ANSWER_CARDS",
+        )
+          ? null
+          : fitAnswerCardsBlock(fitsRead, content);
+        if (builtCards !== null) {
+          logger?.info(
+            { qRunId: request.runId, cards: builtCards.cards.length },
+            "answer cards built from this run's fits",
+          );
+        }
+        const analystBlocks =
+          builtCards === null
+            ? modelBlocks
+            : [...(modelBlocks ?? []), builtCards];
         // An answer that was nothing but talk about acting leaves Capital
         // Q's own lines — the revision below, the action's own narration —
         // to say what happened. Alone, it is acknowledged and no more.
@@ -3915,9 +3967,17 @@ export function createModelGatewayQAnswer(
           content,
           openedOnScreen ||
             [...(analystBlocks ?? []), ...clientActionBlocks].some(
-              (block) => block.kind === "UI_INTENT",
+              // Cards are on their screen as the answer arrives.
+              (block) =>
+                block.kind === "UI_INTENT" || block.kind === "ANSWER_CARDS",
             ),
         );
+        // The names went with the guard (orphan "Pros: …" sentences) and
+        // code built the cards: say the gist, by name, and point at them.
+        const answerText =
+          builtCards !== null && hasOrphanListItems(screenSafe.text)
+            ? fitCardsSummary(builtCards)
+            : screenSafe.text;
         if (screenSafe.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: screenSafe.removed },
@@ -3926,8 +3986,8 @@ export function createModelGatewayQAnswer(
         }
         const reply =
           revisedArtifact === null
-            ? screenSafe.text.length > 0
-              ? screenSafe.text
+            ? answerText.length > 0
+              ? answerText
               : openedOnScreen
                 ? CLIENT_ACTION_DONE_LINE
                 : "Understood."

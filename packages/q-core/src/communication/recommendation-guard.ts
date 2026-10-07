@@ -127,7 +127,31 @@ const SHOWN_TO_YOU_PATTERNS: readonly RegExp[] = [
  */
 export type RecommendationGrounds = {
   readonly dimensions: readonly string[];
+  /**
+   * Scores and bands Capital Q itself computed this turn ("7.5/10", "good
+   * fit"), lower case (ADR 0059). A sentence repeating one is not an
+   * invented quantity: the fit tool asks the model to say exactly that,
+   * and removing it took the company's name with it (Zino live
+   * 2026-10-07: pros and cons with no names). Any other number is still
+   * removed.
+   */
+  readonly computed?: readonly string[] | undefined;
 };
+
+const REGEXP_SPECIALS = /[.*+?^${}()|[\]\\]/g;
+
+function withoutComputed(
+  sentence: string,
+  grounds: RecommendationGrounds | null | undefined,
+): string {
+  let rest = sentence;
+  for (const words of grounds?.computed ?? []) {
+    if (words.length === 0) continue;
+    const escaped = words.replace(REGEXP_SPECIALS, "\\$&");
+    rest = rest.replace(new RegExp(`(?<![\\d.])${escaped}`, "giu"), " ");
+  }
+  return rest;
+}
 
 function grounded(grounds: RecommendationGrounds | null | undefined): boolean {
   return (
@@ -147,7 +171,8 @@ export function claimsRecommendationExplanation(
   sentence: string,
   grounds?: RecommendationGrounds | null,
 ): boolean {
-  if (UNGROUNDABLE_CLAIM_PATTERNS.some((pattern) => pattern.test(sentence))) {
+  const claimed = withoutComputed(sentence, grounds);
+  if (UNGROUNDABLE_CLAIM_PATTERNS.some((pattern) => pattern.test(claimed))) {
     return true;
   }
   if (grounded(grounds)) {
