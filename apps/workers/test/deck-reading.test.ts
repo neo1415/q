@@ -150,6 +150,8 @@ function harness(
           stored.push(input);
           return Promise.resolve(true);
         },
+        // These tests read each deck once; a re-read would number the next.
+        nextReadingNumber: () => Promise.resolve(2),
       },
       logger,
     },
@@ -180,6 +182,7 @@ function harness(
         stored.push(input);
         return Promise.resolve(true);
       },
+      nextReadingNumber: () => Promise.resolve(2),
     },
     logger,
   };

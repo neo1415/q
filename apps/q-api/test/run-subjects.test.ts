@@ -4,6 +4,11 @@ import type {
   QToolPort,
   QToolProposal,
 } from "@capital-q/q-runtime";
+import {
+  ActorContextSchema,
+  TenantIdSchema,
+  UserIdSchema,
+} from "@capital-q/security";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { withSilenceLadder } from "../src/voice/narration.js";
@@ -12,12 +17,13 @@ import { createRunSubjects } from "../src/voice/run-subjects.js";
 const REACHABLE = "1b6f3a52-6c1e-4a59-9d1b-2f2b0c6a7e10";
 const UNREACHABLE = "9c2d4e61-7a3b-4c8d-8e2f-3a4b5c6d7e8f";
 const RUN = "run-1";
-const actor = {
+const TENANT_A = "a0000000-0000-4000-8000-00000000000a";
+const actor = ActorContextSchema.parse({
   actorType: "HUMAN",
-  tenantId: "tenant-a",
-  userId: "user-a",
-  organisationId: "org-a",
-};
+  tenantId: TENANT_A,
+  userId: "b0000000-0000-4000-8000-00000000000a",
+  organisationId: "c0000000-0000-4000-8000-00000000000a",
+});
 
 function contextFor(
   subjects: readonly { kind: "COMPANY"; companyId: string }[] = [],
@@ -132,7 +138,10 @@ describe("the wait's subject, from the run's own authorised tool calls (W4b)", (
       .observe(port)
       .execute(call("get_company", { companyId: REACHABLE }), contextFor());
     expect(
-      subjects.focusFor(RUN, { tenantId: "tenant-a", userId: "user-b" }),
+      subjects.focusFor(RUN, {
+        tenantId: TenantIdSchema.parse(TENANT_A),
+        userId: UserIdSchema.parse("b0000000-0000-4000-8000-00000000000b"),
+      }),
     ).toBeNull();
     expect(subjects.focusFor("another-run", actor)).toBeNull();
   });

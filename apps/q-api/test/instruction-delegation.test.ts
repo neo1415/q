@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { AnyAppAction } from "@capital-q/app-actions";
+import type { TransactionContext } from "@capital-q/database";
 import {
   DELEGATION_LIMITS,
   handleEverythingGrant,
@@ -690,7 +691,9 @@ describe("the switch is the person's own, on their own instruction", () => {
     };
     const qWork = createQWorkPagePort((() => Promise.resolve([])) as never, {
       transactions: {
-        run: (work: (context: typeof tx) => Promise<unknown>) => work(tx),
+        // The port only issues tagged-template queries, which the fake answers.
+        run: <T>(work: (context: TransactionContext) => Promise<T>) =>
+          work({ sql: tx.sql as never }),
       },
       audit: {
         record: (

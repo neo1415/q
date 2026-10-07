@@ -147,6 +147,13 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
       Promise.resolve({ written: true }),
     ),
     listInterviewTurns: record("listInterviewTurns", () => Promise.resolve([])),
+    listFollowUps: record("listFollowUps", () => Promise.resolve([])),
+    answerFollowUp: record("answerFollowUp", () =>
+      Promise.resolve("ANSWERED" as const),
+    ),
+    dismissFollowUp: record("dismissFollowUp", () =>
+      Promise.resolve("DISMISSED" as const),
+    ),
     ...overrides,
   };
   return { runtime, calls };

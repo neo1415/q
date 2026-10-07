@@ -1573,6 +1573,7 @@ describe("live QA (instruction 76d6f281): code decides from the conversation", (
                   mentionsTermsOrMoney: false,
                   declined: false,
                   tone: "POSITIVE" as const,
+                  questionAbout: [],
                 }
               : null,
           costUsd: 0,

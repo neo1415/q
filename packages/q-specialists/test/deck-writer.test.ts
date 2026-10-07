@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   QArtifactContentSchema,
   type CorrelationId,
+  type ModelGatewayResultMetadata,
   type QArtifactContent,
   type QSlideImage,
 } from "@capital-q/contracts";
@@ -137,6 +138,36 @@ function base(
   };
 }
 
+const FAKE_RESULT_METADATA: ModelGatewayResultMetadata = {
+  providerCode: "fake",
+  modelCode: "fake-model",
+  taskClass: "NORMAL_DIALOGUE",
+  routingPolicyCode: "fake.v1",
+  usage: { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0 },
+  latencyMs: 0,
+  finish: "COMPLETE",
+  cost: { currency: "USD", amount: 0, basis: "UNPRICED" },
+  attempts: [
+    {
+      attempt: 1,
+      providerCode: "fake",
+      modelCode: "fake-model",
+      outcome: "SUCCESS",
+      latencyMs: 0,
+      candidateIndex: 0,
+    },
+  ],
+  fallbackUsed: false,
+  route: {
+    routingPolicyCode: "fake.v1",
+    routingPolicyVersion: 1,
+    candidates: [],
+    selectedCandidateIndex: 0,
+    fallbackUsed: false,
+  },
+  completedAt: "2026-10-07T00:00:00.000Z",
+};
+
 /**
  * A gateway that answers with fixed provider text, accepted exactly as the
  * real one accepts it (decode, then the caller's Zod schema), and that
@@ -164,8 +195,10 @@ function fakeGateway(answers: readonly string[]) {
         );
       }
       return Promise.resolve({
+        ...FAKE_RESULT_METADATA,
+        taskClass: request.taskClass,
         output: { kind: "STRUCTURED", value: accepted.value },
-      } as unknown as Awaited<ReturnType<ModelGateway["execute"]>>);
+      });
     },
   };
   return { gateway, calls };
