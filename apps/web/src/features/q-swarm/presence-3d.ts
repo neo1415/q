@@ -1,11 +1,6 @@
 import type { PresenceSim } from "./presence-dynamics";
 import { DEPTH_UNITS } from "./presence-kit";
-import {
-  drawingCanvas,
-  presenceCounters,
-  type DrawingCanvas,
-  type Rgb,
-} from "./presence-gl";
+import { presenceCounters, type Rgb } from "./presence-gl";
 import type { PresenceUniforms } from "./presence-uniforms";
 
 /**
@@ -80,7 +75,7 @@ void main(){
 }`;
 
 type Gl = {
-  readonly canvas: DrawingCanvas;
+  readonly canvas: HTMLCanvasElement;
   readonly gl: WebGL2RenderingContext;
   readonly points: WebGLBuffer;
   readonly seeds: WebGLBuffer;
@@ -128,17 +123,18 @@ function compile(
 function context(): Gl | null {
   if (shared !== undefined) return shared;
   shared = null;
-  if (lost) return null;
-  // W7: in the presence worker there is no document: an OffscreenCanvas.
-  const canvas = drawingCanvas();
-  if (canvas === null) return null;
+  if (lost || typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
   const gl = canvas.getContext("webgl2", {
     alpha: true,
     premultipliedAlpha: true,
     antialias: false,
     depth: false,
     stencil: false,
-    preserveDrawingBuffer: true,
+    // W7: the frame is copied onto the surface in the same task it is
+    // drawn in, so the buffer need not outlive it (and is not kept, which
+    // spares the browser a copy each frame).
+    preserveDrawingBuffer: false,
     powerPreference: "low-power",
   });
   if (gl === null) return null;

@@ -14,11 +14,10 @@ import { drawPresence, type Rgb } from "./presence-gl";
 import { presenceUniforms, stepLean, type Lean } from "./presence-uniforms";
 
 /**
- * Q room W7: the presence's frame loop, apart from React and the DOM, so
- * the same loop runs on the main thread or in a worker over an
- * OffscreenCanvas (presence-worker.ts). Nothing here reads the page: the
- * host hands in what the page knows (state, colour, levels, the cursor's
- * lean target) and hears back what a test reads (figure, renderer).
+ * Q room W7: the presence's frame loop, apart from React. Nothing here
+ * reads the page: the host hands in what the page knows (state, colour,
+ * levels, the cursor's lean target) and hears back what a test reads
+ * (figure, renderer), so the loop is tested on its own.
  *
  * W7 cost: the loop draws at most PRESENCE_FPS frames a second -- the
  * swarm's integration step is capped at 1/30 s, so more frames than that
@@ -43,10 +42,8 @@ export type PresenceRenderer = "pending" | "3d" | "2d";
 
 type Draw3d = typeof import("./presence-3d").drawPresence3d;
 
-/** A canvas the loop draws into: on the page, or an OffscreenCanvas. */
-type Surface = {
-  width: number;
-  height: number;
+/** The canvas the loop draws into (a test passes a stand-in). */
+type Surface = Pick<HTMLCanvasElement, "width" | "height"> & {
   getContext(kind: "2d"): unknown;
 };
 

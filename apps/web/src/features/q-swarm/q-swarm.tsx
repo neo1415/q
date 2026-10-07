@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import { useQMotion } from "../q-aperture/q-motion";
 import type { QApertureState } from "../q-aperture/aperture-state";
@@ -8,10 +8,6 @@ import { faceAllowed } from "./presence-machine";
 import { surfaceDpr } from "./presence-budget";
 import { resolveColour, type Rgb } from "./presence-gl";
 import { startPresenceLoop, type PresenceInputs } from "./presence-loop";
-import type {
-  PresenceWorkerMessage,
-  PresenceWorkerNote,
-} from "./presence-worker";
 
 export { particleCount } from "./presence-budget";
 
@@ -38,40 +34,8 @@ export { particleCount } from "./presence-budget";
  * other surface has no face. Below 72 px only the cloud, the listening
  * lean, the spiral and the ring are drawn. Reduced motion draws each
  * figure still, in one turned pose. Off screen or in a hidden tab,
- * nothing runs.
+ * nothing runs. Q room W7: at most 30 frames a second (presence-loop.ts).
  */
-
-/** What the component says to the loop, wherever the loop runs. */
-type PresenceChannel = {
-  readonly set: (inputs: PresenceInputs) => void;
-  readonly setColour: (colour: Rgb, dark: boolean) => void;
-  readonly visible: (onScreen: boolean, hidden: boolean) => void;
-  readonly levels: (input: number, output: number) => void;
-  readonly lean: (x: number, y: number) => void;
-  readonly dispose: () => void;
-};
-
-/** W7: can this browser draw the presence in a worker? */
-export function presenceOffThreadAvailable(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof Worker === "function" &&
-    typeof OffscreenCanvas === "function" &&
-    typeof HTMLCanvasElement.prototype.transferControlToOffscreen ===
-      "function"
-  );
-}
-
-function presenceWorker(): Worker | null {
-  try {
-    return new Worker(new URL("./presence-worker.ts", import.meta.url), {
-      type: "module",
-      name: "q-presence",
-    });
-  } catch {
-    return null;
-  }
-}
 
 export function QSwarm({
   state,
@@ -97,9 +61,6 @@ export function QSwarm({
   // light work (Save-Data, low memory, forced colours) keeps to 2D.
   const allow3d = environment.gpu || motion === "off";
   const showsFace = faceAllowed({ face, pixels });
-  // W7: the worker is tried once per surface; a failed worker leaves a
-  // fresh canvas drawn on the main thread (`key` below).
-  const [offThread, setOffThread] = useState(presenceOffThreadAvailable);
   const live = useRef({
     state,
     inputLevel,
@@ -172,112 +133,34 @@ export function QSwarm({
       ...readColour(),
     };
 
-    // W7: off the main thread where the browser can hand a canvas to a
-    // worker; here otherwise (and in tests). Once handed over, the canvas
-    // belongs to the worker; if the worker fails, a fresh canvas is drawn
-    // here instead.
-    const worker = offThread ? presenceWorker() : null;
-    let port: PresenceChannel;
-    if (worker !== null) {
-      const offscreen = canvas.transferControlToOffscreen();
-      canvas.dataset["qWorker"] = "1";
-      worker.onmessage = (event: MessageEvent<PresenceWorkerNote>) => {
-        if (event.data.type === "note") note(event.data.key, event.data.value);
-      };
-      worker.onerror = () => {
-        worker.terminate();
-        setOffThread(false);
-      };
-      const post = (message: PresenceWorkerMessage) => {
-        worker.postMessage(message);
-      };
-      post({ type: "start", canvas: offscreen, ...start });
-      port = {
-        set: (next) => post({ type: "inputs", inputs: next }),
-        setColour: (colour, dark) => post({ type: "colour", colour, dark }),
-        visible: (onScreen, hidden) =>
-          post({ type: "visible", onScreen, hidden }),
-        levels: (input, output) => post({ type: "levels", input, output }),
-        lean: (x, y) => post({ type: "lean", x, y }),
-        dispose: () => {
-          post({ type: "stop" });
-          worker.terminate();
-        },
-      };
-    } else {
-      const loop = startPresenceLoop({
-        canvas,
-        ...start,
-        levels,
-        leanTarget,
-        hidden: () => document.hidden,
-        note,
-        load3d: () => import("./presence-3d"),
-        requestFrame: (callback) => requestAnimationFrame(callback),
-        cancelFrame: (handle) => cancelAnimationFrame(handle),
-        now: () => performance.now(),
-      });
-      if (loop === null) return;
-      port = {
-        set: loop.set,
-        setColour: loop.setColour,
-        visible: (onScreen, hidden) => loop.setOnScreen(onScreen && !hidden),
-        levels: () => undefined,
-        lean: () => undefined,
-        dispose: loop.dispose,
-      };
-    }
-
-    // In the worker the levels and the lean are sent, at most once a
-    // frame, and only while there is something to send.
-    let relay = 0;
-    let onScreen = true;
-    const relayFrame = () => {
-      relay = 0;
-      if (worker === null || !onScreen || document.hidden) return;
-      const current = live.current;
-      const voiced =
-        current.inputLevel !== undefined || current.outputLevel !== undefined;
-      if (voiced) {
-        const raw = levels();
-        port.levels(raw.input, raw.output);
-      }
-      if (voiced && current.motion === "full") {
-        relay = requestAnimationFrame(relayFrame);
-      }
-    };
-    const relayLean = () => {
-      if (worker === null) return;
-      const aim = leanTarget();
-      port.lean(aim.x, aim.y);
-    };
-    let leanFrame = 0;
+    const loop = startPresenceLoop({
+      canvas,
+      ...start,
+      levels,
+      leanTarget,
+      hidden: () => document.hidden,
+      note,
+      load3d: () => import("./presence-3d"),
+      requestFrame: (callback) => requestAnimationFrame(callback),
+      cancelFrame: (handle) => cancelAnimationFrame(handle),
+      now: () => performance.now(),
+    });
+    if (loop === null) return;
     const onPointer = (event: PointerEvent) => {
       pointer = { x: event.clientX, y: event.clientY };
-      if (worker !== null && leanFrame === 0) {
-        leanFrame = requestAnimationFrame(() => {
-          leanFrame = 0;
-          relayLean();
-        });
-      }
     };
     const onPointerGone = (event: PointerEvent) => {
       // Touch has no hover: a lifted finger lets Q settle back.
       if (event.type === "pointerup" && event.pointerType === "mouse") return;
       if (event.type === "pointerout" && event.relatedTarget !== null) return;
       pointer = null;
-      relayLean();
     };
-    const redraw = () => {
-      port.set(inputs());
-      if (worker !== null && relay === 0) {
-        relay = requestAnimationFrame(relayFrame);
-      }
-    };
+    let onScreen = true;
+    const redraw = () => loop.set(inputs());
 
     const themeWatch = new MutationObserver(() => {
       const next = readColour();
-      port.setColour(next.colour, next.dark);
+      loop.setColour(next.colour, next.dark);
     });
     themeWatch.observe(document.documentElement, {
       attributes: true,
@@ -290,13 +173,11 @@ export function QSwarm({
     document.addEventListener("pointerout", onPointerGone, { passive: true });
     const visibility = new IntersectionObserver((entries) => {
       onScreen = entries.some((entry) => entry.isIntersecting);
-      port.visible(onScreen, document.hidden);
-      if (onScreen) redraw();
+      loop.setOnScreen(onScreen && !document.hidden);
     });
     visibility.observe(canvas);
     const onHidden = () => {
-      port.visible(onScreen, document.hidden);
-      if (!document.hidden) redraw();
+      loop.setOnScreen(onScreen && !document.hidden);
     };
     document.addEventListener("visibilitychange", onHidden);
     canvas.addEventListener("cq:redraw", redraw);
@@ -307,14 +188,12 @@ export function QSwarm({
       window.removeEventListener("pointercancel", onPointerGone);
       document.removeEventListener("pointerout", onPointerGone);
       canvas.removeEventListener("cq:redraw", redraw);
-      cancelAnimationFrame(relay);
-      cancelAnimationFrame(leanFrame);
       themeWatch.disconnect();
       visibility.disconnect();
       document.removeEventListener("visibilitychange", onHidden);
-      port.dispose();
+      loop.dispose();
     };
-  }, [pixels, allow3d, offThread]);
+  }, [pixels, allow3d]);
 
   // A state, face, cards or motion change restarts a stopped loop (reduced
   // motion, or after a hidden tab): with no timers, this is the only way a
@@ -325,7 +204,6 @@ export function QSwarm({
 
   return (
     <canvas
-      key={offThread ? "worker" : "page"}
       ref={canvasRef}
       aria-hidden="true"
       style={{ width: pixels, height: pixels }}
