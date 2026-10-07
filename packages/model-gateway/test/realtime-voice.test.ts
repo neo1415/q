@@ -280,7 +280,7 @@ describe("openai realtime adapter", () => {
       name: "ask_q",
     });
     expect(body.session.audio.input.turn_detection.interrupt_response).toBe(
-      true,
+      false,
     );
     expect(body.session.audio.output.voice).toBe("cedar");
     // Without listening behaviour: the eager detector and no transcriber.

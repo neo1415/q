@@ -10,6 +10,8 @@ import type {
 } from "@capital-q/contracts";
 
 import {
+  BARGE_CONFIRM_MS,
+  BARGE_DUCK_GAIN,
   DuplexLine,
   usageReportOf,
   type DuplexEnvironment,
@@ -288,7 +290,7 @@ describe("barge-in", () => {
     vi.useRealTimers();
   });
 
-  it("silences Q at once, cancels the response and truncates to what was heard", async () => {
+  it("silences Q once speech over it lasts, cancels the response and truncates to what was heard", async () => {
     const h = harness();
     await h.line.open();
     const channel = h.channel();
@@ -298,8 +300,12 @@ describe("barge-in", () => {
       item: { id: "item_1", type: "message" },
     });
     channel.emit({ type: "output_audio_buffer.started" });
-    vi.advanceTimersByTime(1_250);
+    vi.advanceTimersByTime(800);
     channel.emit({ type: "input_audio_buffer.speech_started" });
+    // Listening first: Q dips, nothing is cancelled yet.
+    expect(h.audio.volume).toBeCloseTo(BARGE_DUCK_GAIN);
+    expect(channel.sent).toEqual([]);
+    vi.advanceTimersByTime(BARGE_CONFIRM_MS);
 
     expect(h.audio.volume).toBe(0);
     expect(h.events.onInterrupted).toHaveBeenCalledTimes(1);
@@ -316,6 +322,29 @@ describe("barge-in", () => {
     // Q's next reply is heard again.
     channel.emit({ type: "response.created", response: { id: "resp_2" } });
     expect(h.audio.volume).toBe(1);
+  });
+
+  it("rides through a blip over Q: no cut, volume back, and the blip is never answered (founder live 2026-10-07)", async () => {
+    const h = harness();
+    await h.line.open();
+    const channel = h.channel();
+    channel.emit({ type: "response.created", response: { id: "resp_1" } });
+    channel.emit({
+      type: "response.output_item.added",
+      item: { id: "item_1", type: "message" },
+    });
+    channel.emit({ type: "output_audio_buffer.started" });
+    vi.advanceTimersByTime(600);
+    channel.emit({ type: "input_audio_buffer.speech_started" });
+    vi.advanceTimersByTime(200);
+    channel.emit({ type: "input_audio_buffer.speech_stopped" });
+    channel.emit({ type: "input_audio_buffer.committed", item_id: "blip_1" });
+    vi.advanceTimersByTime(BARGE_CONFIRM_MS * 2);
+
+    expect(h.events.onInterrupted).not.toHaveBeenCalled();
+    expect(h.audio.volume).toBe(1);
+    expect(channel.types()).toEqual(["conversation.item.delete"]);
+    expect(channel.sent[0]).toMatchObject({ item_id: "blip_1" });
   });
 
   it("is only listening when the person speaks while Q is quiet", async () => {
