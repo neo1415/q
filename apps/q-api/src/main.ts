@@ -226,6 +226,7 @@ import {
 } from "./composition/profile-answer-action.js";
 import {
   CorrelationIdSchema,
+  QApprovalIdSchema,
   QRunIdSchema,
   createEventRegistry,
   type ModelDataPosture,
@@ -4107,6 +4108,14 @@ instructionEngine.current = createInstructionEngine({
   principalName: (actor) => workforceDisplayName(actor.userId),
   store: instructionStore,
   awaitingAnswer: (id) => instructionStore.awaitingAnswer(id),
+  // F24: a stale waiting card is superseded by the Approval Engine itself.
+  supersedeCard: async (actor, input) =>
+    (await qActions.supersedeStale?.({
+      actor,
+      approvalId: QApprovalIdSchema.parse(input.approvalId),
+      correlationId: CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+      reason: input.reason,
+    })) ?? false,
   autoEnabled: instructionsAuto,
   actions: APP_ACTIONS,
   ports: appActionPorts,

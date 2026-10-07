@@ -52,6 +52,8 @@ export type ThreadPace = {
   /** The person's side's messages since the other side last wrote. */
   readonly unansweredFromUs: number;
   readonly theyHaveWritten: boolean;
+  /** When the other side last wrote (F24: a draft older than it is stale). */
+  readonly lastFromThemAt?: Date | null | undefined;
 };
 
 export function threadPace(
@@ -61,12 +63,15 @@ export function threadPace(
   }[],
 ): ThreadPace {
   let lastFromUsAt: Date | null = null;
+  let lastFromThemAt: Date | null = null;
   let unansweredFromUs = 0;
   let theyHaveWritten = false;
   for (const message of messages) {
     if (message.from === "OTHER_SIDE") {
       theyHaveWritten = true;
       unansweredFromUs = 0;
+      const at = new Date(message.sentAt);
+      if (!Number.isNaN(at.getTime())) lastFromThemAt = at;
       continue;
     }
     unansweredFromUs += 1;
@@ -80,6 +85,7 @@ export function threadPace(
     lastFromUsAt,
     unansweredFromUs,
     theyHaveWritten,
+    lastFromThemAt,
   };
 }
 

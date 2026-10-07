@@ -222,6 +222,20 @@ export type QActionService = {
   readonly reject: (
     command: DecideQApprovalCommand,
   ) => Promise<DecideQApprovalResult>;
+  /**
+   * F24 (Zino, 7 Oct): the person's own waiting card that went stale
+   * before they decided (the conversation moved on) is superseded with a
+   * reason code: approval REVOKED, action WITHDRAWN, run completed, audit
+   * kept; never deleted. False when it was no longer waiting. Optional on
+   * the type so older doubles still compose.
+   */
+  readonly supersedeStale?: (command: {
+    readonly actor: ActorContext;
+    readonly approvalId: QApprovalId;
+    readonly correlationId: CorrelationId;
+    /** A code, e.g. NEWER_MESSAGE_FROM_THEM. */
+    readonly reason: string;
+  }) => Promise<boolean>;
   /** Replace a pending proposal's payload; voids the old approval (BIZ-007). */
   readonly revise: (
     command: ReviseQApprovalCommand,
@@ -716,6 +730,10 @@ export function createQActionService(
    * approved -- its run ends, and the history and an audit entry record
    * which card replaced it. Nothing is deleted. False when it was decided
    * meanwhile (the newer card stands either way).
+   *
+   * `by` is a reason code instead of a card when the card went stale with
+   * no newer one yet (F24: the conversation moved on under a standing
+   * instruction's draft); the redraft follows as its own proposal.
    */
   async function supersede(
     tx: TransactionContext,
@@ -723,11 +741,13 @@ export function createQActionService(
       readonly action: QActionRecord;
       readonly approval: QApprovalRecord;
     },
-    by: QActionRecord,
+    by: QActionRecord | { readonly staleReason: string },
     actor: ActorContext,
     now: Date,
     correlationId: CorrelationId,
   ): Promise<boolean> {
+    const newer = "staleReason" in by ? null : by;
+    const staleReason = "staleReason" in by ? by.staleReason : null;
     const approval = await repositories.approvals.decide(tx, {
       tenantId: older.approval.tenantId,
       approvalId: older.approval.id,
@@ -772,7 +792,8 @@ export function createQActionService(
       outcome: "SUCCEEDED",
       metadata: auditMetadata(action, {
         approvalId: older.approval.id,
-        supersededBy: by.id,
+        supersededBy: newer?.id ?? null,
+        staleReason,
       }),
       correlationId,
     });
@@ -780,11 +801,14 @@ export function createQActionService(
       {
         actionId: older.action.id,
         approvalId: older.approval.id,
-        supersededBy: by.id,
-        actionType: by.actionType,
+        supersededBy: newer?.id ?? null,
+        staleReason,
+        actionType: older.action.actionType,
         correlationId,
       },
-      "q action superseded by a newer card for the same target",
+      newer === null
+        ? "q action superseded: the card went stale"
+        : "q action superseded by a newer card for the same target",
     );
     return true;
   }
@@ -2078,6 +2102,38 @@ export function createQActionService(
     });
   };
 
+  const supersedeStale: NonNullable<QActionService["supersedeStale"]> = async (
+    command,
+  ) =>
+    transactions.run(async (tx) => {
+      const now = clock.now();
+      const { approval, action } = await loadForActor(
+        tx.sql,
+        command.actor,
+        command.approvalId,
+        command.correlationId,
+        tx,
+      );
+      // Only the person's own card, still waiting: anything decided,
+      // lapsed or someone else's proposal stays exactly as it is.
+      if (
+        approval.status !== "PENDING" ||
+        action.status !== "AWAITING_APPROVAL" ||
+        action.proposedByUserId !== command.actor.userId ||
+        Date.parse(approval.expiresAt) <= now.getTime()
+      ) {
+        return false;
+      }
+      return supersede(
+        tx,
+        { action, approval },
+        { staleReason: command.reason },
+        command.actor,
+        now,
+        command.correlationId,
+      );
+    });
+
   const readProposal: QActionService["readProposal"] = async (query) => {
     const { approval, action } = await loadForActor(
       sql,
@@ -2115,6 +2171,7 @@ export function createQActionService(
   return {
     propose,
     revise,
+    supersedeStale,
     readProposal,
     currentRevision,
     getApproval,
