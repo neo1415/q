@@ -359,10 +359,6 @@ export const Q_ROOM_OBJECTS = [
   "CAPITAL_ROUND",
   "GATEQ_APPLICATION",
   "SOURCES",
-  // Q room W3 (R6): "That's about 1,100 words. Want it as a PDF?" after a
-  // long web or news answer. Put there by the answer path's own code,
-  // never by a model's show; no id.
-  "PDF_OFFER",
 ] as const;
 export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
 export type QRoomObject = z.infer<typeof QRoomObjectSchema>;

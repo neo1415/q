@@ -342,6 +342,13 @@ export const NAVIGATION_LINE =
   "- You CAN navigate and work the page: open_page takes them to any Capital Q screen and control_screen scrolls, goes back, shows a section or works the page they are on. Never say you cannot navigate, open pages or scroll; call the tool.";
 
 /**
+ * Q room W3 (R3, R6): the document open in the Q room is worked by asking,
+ * and a long web answer's PDF offer is answered on the screen.
+ */
+export const DOCUMENT_LINE =
+  "- A document open in the Q room: control_document pages it (next, previous, go to page N), reads it aloud (READ_ALOUD, then read that page from read_document_pages: its plain gist, word for word only if asked), summarises it (SUMMARISE, then short lines each ending (p. N), from its pages only), downloads it if allowed, or closes it. After a long web or news answer the screen offers it as a PDF; when they say yes to that, the screen makes it: say in a few words that it is on its way, never write it out again.";
+
+/**
  * Founder 2026-10-06: "what are you doing?" answered in prose and no cards
  * appeared. Code reads the question (never the model): Capital Q opens
  * their Work page, where the cards waiting for their approval are, and Q
@@ -424,6 +431,9 @@ export function capabilityNote(
     )
   ) {
     lines.push(NAVIGATION_LINE);
+  }
+  if (offeredTools.some((tool) => tool.name === "control_document")) {
+    lines.push(DOCUMENT_LINE);
   }
   if (reads.length > 0) {
     lines.push(`- Read and look things up with these tools: ${named(reads)}.`);

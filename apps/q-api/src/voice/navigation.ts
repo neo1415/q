@@ -33,6 +33,9 @@ export function followOfAnswer(blocks: readonly QResultBlock[] | undefined): {
       navigate = intent.destination;
       continue;
     }
+    // Q room W3: the room's document viewer reads its acts from the
+    // stored answer, so "open it and read it to me" keeps the open here.
+    if (intent.kind === "DOCUMENT_ACT") continue;
     const action = QClientActionIntentSchema.safeParse(intent);
     if (action.success) clientAction = action.data;
   }

@@ -21,6 +21,11 @@ import { firstWords } from "./board-timeline";
 import { useAnswerPlayback } from "./use-answer-playback";
 import { plainFromMarkdown } from "./markdown";
 import { QResultBlocks } from "./q-result-blocks";
+import {
+  registerRoomDocumentHost,
+  useRoomDocumentOpen,
+} from "./room/document-host";
+import { QRoomPdfOffer } from "./room/pdf-offer";
 import { QRoomStage, type RoomCardLoader } from "./room/q-room-card";
 import { roomStage } from "./room/room-stage";
 import {
@@ -203,7 +208,9 @@ export function QPresenceStage({
     return () => window.removeEventListener(SHOW_ON_STAGE, onShow);
   }, [answers]);
 
-  const showing = shown !== null || roomOpen !== null;
+  // Q room W3: a data-room document open in the room's centre panel.
+  const documentOpen = useRoomDocumentOpen();
+  const showing = shown !== null || roomOpen !== null || documentOpen;
   useEffect(() => {
     onShowingChange?.(showing);
   }, [showing, onShowingChange]);
@@ -322,6 +329,15 @@ export function QPresenceStage({
         }
         load={loadRoomCard}
       />
+
+      {/* Q room W3: the document Q opened shows here (material-viewer). */}
+      <div
+        ref={registerRoomDocumentHost}
+        className="w-full empty:hidden"
+        data-q-room-document-host
+      />
+
+      <QRoomPdfOffer turns={turns} />
 
       {waiting}
 

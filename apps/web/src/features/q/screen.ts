@@ -80,10 +80,13 @@ export function setOpenDocument(documentId: string | null): void {
 let materialDocument: {
   readonly companyId: string;
   readonly documentId: string;
+  /** Q room W3: the page open in the room's viewer. */
+  readonly page: number | null;
 } | null = null;
 
 export function setMaterialDocument(
   document: { readonly companyId: string; readonly documentId: string } | null,
+  page?: number,
 ): void {
   materialDocument =
     document !== null &&
@@ -92,6 +95,10 @@ export function setMaterialDocument(
       ? {
           companyId: document.companyId.toLowerCase(),
           documentId: document.documentId.toLowerCase(),
+          page:
+            page !== undefined && Number.isInteger(page) && page >= 1 && page <= 10_000
+              ? page
+              : null,
         }
       : null;
 }
@@ -159,6 +166,9 @@ export function currentScreen(
       ...screen,
       companyId: materialDocument.companyId,
       documentId: materialDocument.documentId,
+      ...(materialDocument.page === null
+        ? {}
+        : { documentPage: materialDocument.page }),
     };
   }
   const zone = deviceTimeZone();

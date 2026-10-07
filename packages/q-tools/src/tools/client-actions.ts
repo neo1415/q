@@ -781,8 +781,7 @@ export const SHOW = "client.q_room.show" as const;
 
 export const ShowInputSchema = z
   .object({
-    // PDF_OFFER is the answer path's own card, never a model's show.
-    object: QRoomObjectSchema.exclude(["PDF_OFFER"]).describe(
+    object: QRoomObjectSchema.describe(
       "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name).",
     ),
     id: z

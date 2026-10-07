@@ -74,6 +74,7 @@ const INTENT_ROUTES: Readonly<
       | "FOCUS_SECTION"
       | "OPEN_SETTINGS"
       | "SHOW_IN_Q_ROOM"
+      | "DOCUMENT_ACT"
     >,
     string | null
   >
@@ -109,7 +110,8 @@ export function intentHref(intent: QUiIntent): string | null {
     intent.kind === "SET_VOICE" ||
     intent.kind === "SIGN_OUT" ||
     // Done on the page as the answer arrives; there is nowhere to link.
-    intent.kind === "SCREEN_ACT"
+    intent.kind === "SCREEN_ACT" ||
+    intent.kind === "DOCUMENT_ACT"
   ) {
     return null;
   }
@@ -212,6 +214,8 @@ function intentLabel(intent: QUiIntent): string {
       return "Open Settings";
     case "SHOW_IN_Q_ROOM":
       return `Open ${intent.title}`;
+    case "DOCUMENT_ACT":
+      return "The open document";
   }
 }
 

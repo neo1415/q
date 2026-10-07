@@ -343,5 +343,9 @@ export function performClientAction(
     // (it is part of the conversation); nothing moves the person.
     case "SHOW_IN_Q_ROOM":
       return true;
+    // Q room W3: the open document's viewer reads its acts from the answer
+    // itself (each answer once), so a voice and a typed turn page alike.
+    case "DOCUMENT_ACT":
+      return true;
   }
 }
