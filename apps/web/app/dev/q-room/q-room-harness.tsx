@@ -5,12 +5,11 @@ import "@/features/q/answer-canvas.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { createQStreamState } from "@capital-q/api-client";
-import {
-  QConversationDetailSchema,
-  type QArtifactSummary,
-  type QConversationDetail,
-  type QMessage,
-  type QShowInQRoomIntent,
+import type {
+  QArtifactSummary,
+  QConversationDetail,
+  QMessage,
+  QShowInQRoomIntent,
 } from "@capital-q/contracts";
 
 import type {
@@ -28,7 +27,6 @@ import { QPresenceStage } from "@/features/q/q-presence-stage";
 import { QSection, useQDialog } from "@/features/q/q-section";
 import type { RoomCardResult } from "@/features/q/room/room-actions";
 import type { DeckState, FillResult } from "@/features/q/room/deck-actions";
-import { deckDrawingOf } from "@/features/q/room/deck-room";
 import type { DeckLoaders } from "@/features/q/room/q-room-deck";
 import { runUploadDrop } from "@/features/q/room/room-read";
 import { currentScreen } from "@/features/q/screen";
@@ -85,7 +83,13 @@ async function fetchRecord(): Promise<QConversationDetail | null> {
   try {
     const response = await fetch(RECORD, { cache: "no-store" });
     if (!response.ok) return null;
-    const detail = QConversationDetailSchema.safeParse(await response.json());
+    // W7: validated as before, with the contracts loaded off the first
+    // paint (as the Q page's own reads do).
+    const [body, { QConversationDetailSchema }] = await Promise.all([
+      response.json(),
+      import("@capital-q/contracts"),
+    ]);
+    const detail = QConversationDetailSchema.safeParse(body);
     return detail.success ? detail.data : null;
   } catch {
     return null;
@@ -124,7 +128,11 @@ const DECK_LOADERS: DeckLoaders = {
     if (response.status === 409) return null;
     // As the real read: a failed read throws, so the room retries it.
     if (!response.ok) throw new Error("Slides read failed.");
-    return deckDrawingOf(await response.json());
+    const [body, { deckDrawingOf }] = await Promise.all([
+      response.json(),
+      import("@/features/q/room/deck-room"),
+    ]);
+    return deckDrawingOf(body);
   },
   // W7: the real path's steps, resumed per drop: the target (keyed, so a
   // retry gets the same session back), then "complete" for that session.

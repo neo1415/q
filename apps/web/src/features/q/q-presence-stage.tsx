@@ -1,7 +1,8 @@
 "use client";
 
-import { LazyMotion, domAnimation, m, useReducedMotion } from "motion/react";
 import {
+  lazy,
+  Suspense,
   useEffect,
   useId,
   useMemo,
@@ -14,19 +15,16 @@ import type { QAnswerCardsBlock } from "@capital-q/contracts";
 
 import { History, ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
 
-import { AnswerCanvas, flyToBoard } from "./answer-canvas";
 import { answerCardsOf, topicMovedOn } from "./answer-canvas-logic";
 import type { QTurn } from "./conversation";
 import { firstWords } from "./board-timeline";
-import { useAnswerPlayback } from "./use-answer-playback";
 import { plainFromMarkdown } from "./markdown";
-import { QResultBlocks } from "./q-result-blocks";
 import {
   registerRoomDocumentHost,
   useRoomDocumentOpen,
 } from "./room/document-host";
-import { QRoomPdfOffer, type PdfExport } from "./room/pdf-offer";
-import { QRoomStage, type RoomCardLoader } from "./room/q-room-card";
+import type { PdfExport } from "./room/pdf-offer";
+import type { RoomCardLoader } from "./room/q-room-card";
 import type { DeckLoaders } from "./room/q-room-deck";
 import { roomStage } from "./room/room-stage";
 import {
@@ -38,6 +36,39 @@ import {
 } from "./shown";
 
 const SHOW_ON_STAGE = "cq:q-show-answer";
+
+/*
+ * Q room W7: what the stage shows only once Q has shown something -- the
+ * answer cards, an object, a room card, the PDF offer -- is loaded when it
+ * is first needed, never with the page's first paint. Each shows nothing
+ * until its code is in (a fraction of a second), and the room around it
+ * stays usable meanwhile.
+ */
+const AnswerCanvas = lazy(() =>
+  import("./answer-canvas").then((module) => ({
+    default: module.AnswerCanvas,
+  })),
+);
+const StageCanvas = lazy(() =>
+  import("./stage-canvas").then((module) => ({
+    default: module.StageCanvas,
+  })),
+);
+const QResultBlocks = lazy(() =>
+  import("./q-result-blocks").then((module) => ({
+    default: module.QResultBlocks,
+  })),
+);
+const QRoomStage = lazy(() =>
+  import("./room/q-room-card").then((module) => ({
+    default: module.QRoomStage,
+  })),
+);
+const QRoomPdfOffer = lazy(() =>
+  import("./room/pdf-offer").then((module) => ({
+    default: module.QRoomPdfOffer,
+  })),
+);
 
 /** Put an answer Q showed earlier back on the stage (from the Board). */
 export function showOnStage(answerId: string): void {
@@ -188,11 +219,13 @@ export function QPresenceStage({
   useEffect(() => {
     if (leaving === null) return;
     let done = false;
-    void flyToBoard(leavingRef.current).then(() => {
-      if (done) return;
-      setLeaving(null);
-      onBoardLanded?.();
-    });
+    void import("./answer-canvas")
+      .then((module) => module.flyToBoard(leavingRef.current))
+      .then(() => {
+        if (done) return;
+        setLeaving(null);
+        onBoardLanded?.();
+      });
     return () => {
       done = true;
     };
@@ -221,35 +254,29 @@ export function QPresenceStage({
   useEffect(() => {
     onShowingChange?.(showing);
   }, [showing, onShowingChange]);
-  const reduced = useReducedMotion() === true;
+  // W7: the room card stays mounted once shown, so its exit still plays.
+  const [roomShown, setRoomShown] = useState(false);
+  if (!roomShown && (roomOpen !== null || room.note !== null)) {
+    setRoomShown(true);
+  }
+  const answered = latestQ !== undefined;
 
   return (
     <div
       className="flex w-full flex-col items-center gap-4"
       data-q-presence-stage={showing ? "object" : "presence"}
     >
-      <LazyMotion features={domAnimation} strict>
-        {/* The presence stays on screen: small while an object is shown,
-            full again once it is dismissed (reduced motion: no scale). */}
-        {canvas !== null || leaving !== null ? null : (
-          <m.div
-            key={showing ? "compact" : "full"}
-            className="flex w-full flex-col items-center"
-            data-q-presence-size={showing ? "compact" : "full"}
-            initial={
-              reduced ? false : { opacity: 0.4, scale: showing ? 1.2 : 0.8 }
-            }
-            animate={{ opacity: 1, scale: 1 }}
-            transition={
-              reduced
-                ? { duration: 0 }
-                : { duration: 0.24, ease: [0.2, 0, 0, 1] }
-            }
-          >
-            {presence(showing)}
-          </m.div>
-        )}
-      </LazyMotion>
+      {/* The presence stays on screen: small while an object is shown,
+          full again once it is dismissed (reduced motion: no scale). */}
+      {canvas !== null || leaving !== null ? null : (
+        <div
+          key={showing ? "compact" : "full"}
+          className="cq-presence-in flex w-full flex-col items-center"
+          data-q-presence-size={showing ? "compact" : "full"}
+        >
+          {presence(showing)}
+        </div>
+      )}
 
       {/* Q's words for a screen reader, never as text on the page. */}
       <p className="sr-only" aria-live="polite" data-q-said>
@@ -262,29 +289,35 @@ export function QPresenceStage({
 
       {leaving === null ? null : (
         <div ref={leavingRef} className="w-full" data-q-canvas-leaving>
-          <AnswerCanvas
-            block={leaving.block}
-            focus={-1}
-            said=""
-            presence={presence(true, true)}
-            showFollowUps={false}
-          />
+          <Suspense fallback={null}>
+            <AnswerCanvas
+              block={leaving.block}
+              focus={-1}
+              said=""
+              presence={presence(true, true)}
+              showFollowUps={false}
+            />
+          </Suspense>
         </div>
       )}
 
       {canvas === null || leaving !== null ? null : (
-        <StageCanvas
-          key={canvas.item.id}
-          answerId={canvas.item.id}
-          block={canvas.block}
-          asked={askedBefore(turns, canvas.item.id)}
-          closing={closingLine(canvas.turn)}
-          live={live}
-          presence={presence(true, true)}
-          onCloseAll={() => dismiss(canvas.item)}
-          onAsk={onAsk}
-          onPin={onPin === undefined ? undefined : () => onPin(canvas.item.id)}
-        />
+        <Suspense fallback={presence(true)}>
+          <StageCanvas
+            key={canvas.item.id}
+            answerId={canvas.item.id}
+            block={canvas.block}
+            asked={askedBefore(turns, canvas.item.id)}
+            closing={closingLine(canvas.turn)}
+            live={live}
+            presence={presence(true, true)}
+            onCloseAll={() => dismiss(canvas.item)}
+            onAsk={onAsk}
+            onPin={
+              onPin === undefined ? undefined : () => onPin(canvas.item.id)
+            }
+          />
+        </Suspense>
       )}
 
       {shown === null || canvas !== null ? null : (
@@ -319,25 +352,31 @@ export function QPresenceStage({
             </button>
           </div>
           <div className="min-h-0 overflow-y-auto p-4" data-q-shown-body>
-            <QResultBlocks
-              blocks={shown.blocks}
-              onAsk={onAsk}
-              onOpenArtifact={onOpenArtifact}
-            />
+            <Suspense fallback={null}>
+              <QResultBlocks
+                blocks={shown.blocks}
+                onAsk={onAsk}
+                onOpenArtifact={onOpenArtifact}
+              />
+            </Suspense>
           </div>
         </section>
       )}
 
-      <QRoomStage
-        open={roomOpen}
-        note={room.note}
-        onClose={(card) =>
-          setClosedByHand({ key: card.key, at: card.openedAt })
-        }
-        load={loadRoomCard}
-        turns={turns}
-        deckLoaders={deckLoaders}
-      />
+      {roomShown ? (
+        <Suspense fallback={null}>
+          <QRoomStage
+            open={roomOpen}
+            note={room.note}
+            onClose={(card) =>
+              setClosedByHand({ key: card.key, at: card.openedAt })
+            }
+            load={loadRoomCard}
+            turns={turns}
+            deckLoaders={deckLoaders}
+          />
+        </Suspense>
+      ) : null}
 
       {/* Q room W3: the document Q opened shows here (material-viewer). */}
       <div
@@ -346,7 +385,11 @@ export function QPresenceStage({
         data-q-room-document-host
       />
 
-      <QRoomPdfOffer turns={turns} file={exportAnswer} />
+      {answered ? (
+        <Suspense fallback={null}>
+          <QRoomPdfOffer turns={turns} file={exportAnswer} />
+        </Suspense>
+      ) : null}
 
       {waiting}
 
@@ -416,54 +459,4 @@ function closingLine(turn: QTurn | undefined): string {
   const plain = plainFromMarkdown(turn.text).replace(/\s+/gu, " ").trim();
   const sentences = plain.match(/[^.!?]+[.!?]+/gu) ?? [plain];
   return (sentences.at(-1) ?? firstWords(plain) ?? "").trim();
-}
-
-/** The answer on the stage, walked through card by card (C1-C3). */
-function StageCanvas({
-  answerId,
-  block,
-  asked,
-  closing,
-  live,
-  presence,
-  onCloseAll,
-  onAsk,
-  onPin,
-}: {
-  readonly answerId: string;
-  readonly block: QAnswerCardsBlock;
-  readonly asked: string | undefined;
-  readonly closing: string;
-  readonly live: boolean;
-  readonly presence: ReactNode;
-  readonly onCloseAll: () => void;
-  readonly onAsk?: ((question: string) => void) | undefined;
-  readonly onPin?: (() => void) | undefined;
-}) {
-  const playback = useAnswerPlayback(block, answerId, closing, live);
-  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set());
-  const closeCard = (key: string) => {
-    const next = new Set([...closed, key]);
-    // The last card closed closes the answer.
-    if (block.cards.every((card) => next.has(card.key))) onCloseAll();
-    else setClosed(next);
-  };
-  return (
-    <div className="w-full" data-q-canvas={answerId}>
-      <AnswerCanvas
-        block={block}
-        asked={asked}
-        said={playback.said}
-        focus={playback.focus}
-        presence={presence}
-        dismissed={closed}
-        onFocus={playback.choose}
-        onCloseCard={closeCard}
-        onCloseAll={onCloseAll}
-        onFollowUp={onAsk}
-        onAsk={onAsk}
-        onPin={onPin === undefined ? undefined : () => onPin()}
-      />
-    </div>
-  );
 }

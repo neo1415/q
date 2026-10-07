@@ -23,11 +23,10 @@ import {
   type VoiceState,
   type VoiceTranscriptLine,
 } from "../session";
-import {
-  browserDuplexEnvironment,
+import type {
+  DuplexEnvironment,
   DuplexLine,
-  type DuplexEnvironment,
-  type DuplexRelays,
+  DuplexRelays,
 } from "./duplex-line";
 
 /**
@@ -68,6 +67,8 @@ export function useDuplexVoiceSession(
     optionsRef.current = options;
   }, [options]);
   const lineRef = useRef<DuplexLine | null>(null);
+  /** W7: moves on each start and end, so a start that loaded late stops. */
+  const startsRef = useRef(0);
   const lastLineRef = useRef<VoiceTranscriptLine | null>(null);
 
   const addLine = useCallback((role: "user" | "q", text: string) => {
@@ -114,6 +115,17 @@ export function useDuplexVoiceSession(
       const previous = lineRef.current;
       lineRef.current = null;
       previous?.close();
+      // W7: the line's code loads when a call starts, not with the page.
+      const startedAt = (startsRef.current += 1);
+      let lineModule: typeof import("./duplex-line");
+      try {
+        lineModule = await import("./duplex-line");
+      } catch {
+        return false;
+      }
+      // Ended, or started again, while it loaded: this start is over.
+      if (startsRef.current !== startedAt) return false;
+      const { DuplexLine: Line, browserDuplexEnvironment } = lineModule;
       setTranscript([]);
       lastLineRef.current = null;
       const id = credential.voiceSessionId;
@@ -124,7 +136,7 @@ export function useDuplexVoiceSession(
         rejoin: (cause) => rejoinDuplexAction(id, cause),
         narration: (after) => pollNarration(id, after),
       };
-      const line = new DuplexLine({
+      const line = new Line({
         credential: duplex,
         // BACKCHANNEL: this device's toggle or the person's remembered
         // level, whichever they set last.
@@ -189,6 +201,7 @@ export function useDuplexVoiceSession(
   );
 
   const end = useCallback(async () => {
+    startsRef.current += 1;
     const line = lineRef.current;
     lineRef.current = null;
     setConnected(false);

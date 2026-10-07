@@ -16,8 +16,8 @@ import {
   type VoiceTranscriptLine,
 } from "../session";
 import { announceQSaid } from "../../q-swarm/q-said";
-import { AgentSocket } from "./agent-socket";
-import { PcmPlayer } from "./pcm-player";
+import type { AgentSocket } from "./agent-socket";
+import type { PcmPlayer } from "./pcm-player";
 
 /**
  * The Deepgram Voice Agent as the browser's transport (CQ-Q-VOICE-001
@@ -231,9 +231,20 @@ export function useDeepgramVoiceSession(
       // P9: the SDK loads when a call starts, not with every page; it was
       // part of the shell's largest chunk. Awaited before teardown so the
       // rest of the start stays synchronous as before.
+      // W7: the socket and the speaker load with it (off the first paint).
       let AgentMicrophone: typeof AgentMicrophoneClass;
+      let AgentSocketClass: typeof AgentSocket;
+      let PcmPlayerClass: typeof PcmPlayer;
       try {
-        ({ AgentMicrophone } = await import("@deepgram/agents"));
+        [
+          { AgentMicrophone },
+          { AgentSocket: AgentSocketClass },
+          { PcmPlayer: PcmPlayerClass },
+        ] = await Promise.all([
+          import("@deepgram/agents"),
+          import("./agent-socket"),
+          import("./pcm-player"),
+        ]);
       } catch {
         setState("ERROR");
         eventsRef.current.onError?.(PLAIN_ERRORS.generic);
@@ -248,13 +259,13 @@ export function useDeepgramVoiceSession(
       discardUntilRef.current = 0;
 
       const token = credential.token;
-      const session = new AgentSocket({
+      const session = new AgentSocketClass({
         token,
         agent: settings.agent,
         input: { encoding: "linear16", sampleRate: INPUT_SAMPLE_RATE },
         output: { encoding: "linear16", sampleRate: OUTPUT_SAMPLE_RATE },
       });
-      const player = new PcmPlayer({ sampleRate: OUTPUT_SAMPLE_RATE });
+      const player = new PcmPlayerClass({ sampleRate: OUTPUT_SAMPLE_RATE });
       /**
        * Where the audio stops, if it stops.
        *

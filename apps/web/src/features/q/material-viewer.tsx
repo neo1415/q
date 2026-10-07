@@ -1,10 +1,17 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 
-import { FileViewer } from "@/features/company/material/file-viewer";
 import {
   openDocumentAction,
   type MaterialResult,
@@ -12,7 +19,6 @@ import {
 } from "@/features/company/material/material-actions";
 import { openDocumentViewer } from "@/features/documents/document-ready";
 
-import { downloadArtifact, downloadSignedFile } from "./artifact-download";
 import {
   Q_MATERIAL_CLOSE_EVENT,
   Q_MATERIAL_OPEN_EVENT,
@@ -30,7 +36,6 @@ import {
 } from "./room/document-room";
 import { setRoomDocumentOpen, useRoomDocumentHost } from "./room/document-host";
 import { preloadPdfjs } from "./room/pdf-page";
-import { QRoomDocument } from "./room/q-room-document";
 import { roomRead, useRetryWhenOnline, whenIdle } from "./room/room-read";
 import { setMaterialDocument } from "./screen";
 
@@ -49,6 +54,23 @@ type Opened = QMaterialDocumentRef & {
   /** R9: the signed read failed twice; the panel offers "try again". */
   readonly failed: boolean;
 };
+
+/*
+ * Q room W7: the viewers themselves (the room's document panel with its
+ * pages, the full-screen sheet) load when a document is first opened, not
+ * with the page. PDF.js is warmed as before, so the first page is not
+ * later for it.
+ */
+const QRoomDocument = lazy(() =>
+  import("./room/q-room-document").then((module) => ({
+    default: module.QRoomDocument,
+  })),
+);
+const FileViewer = lazy(() =>
+  import("@/features/company/material/file-viewer").then((module) => ({
+    default: module.FileViewer,
+  })),
+);
 
 /** R9: how long after an answer naming a document PDF.js is warmed. */
 const WARM_AFTER_MS = 2_500;
@@ -243,7 +265,10 @@ export function QMaterialViewer({
   const download = useCallback((current: Opened | null) => {
     if (current !== null) {
       if (current.file?.downloadable === true) {
-        void downloadSignedFile(current.file.url, current.title ?? "Document");
+        const { url } = current.file;
+        void import("./artifact-download").then((module) =>
+          module.downloadSignedFile(url, current.title ?? "Document"),
+        );
       }
       return;
     }
@@ -251,7 +276,9 @@ export function QMaterialViewer({
     const made = latestArtifactIn(turnsRef.current);
     if (made !== null) {
       openDocumentViewer(made);
-      void downloadArtifact(made);
+      void import("./artifact-download").then((module) =>
+        module.downloadArtifact(made),
+      );
     }
   }, []);
 
@@ -332,6 +359,9 @@ export function QMaterialViewer({
   if (shouldClose) closeNow(opened, page);
 
   const inRoom = host !== null && opened !== null && !shouldClose;
+  // W7: the full-screen sheet is loaded the first time it is needed.
+  const [sheetUsed, setSheetUsed] = useState(false);
+  if (!sheetUsed && host === null && opened !== null) setSheetUsed(true);
   useEffect(() => {
     setRoomDocumentOpen(inRoom);
     return () => setRoomDocumentOpen(false);
@@ -370,36 +400,42 @@ export function QMaterialViewer({
 
   if (inRoom) {
     return createPortal(
-      <QRoomDocument
-        title={opened.title ?? "Document"}
-        file={opened.file}
-        failed={opened.failed}
-        onRetry={retryRead}
-        page={page}
-        pageCount={opened.pageCount}
-        reading={position?.reading === true}
-        summary={summary}
-        onPage={setPage}
-        onPageCount={setPageCount}
-        onStopReading={() =>
-          setOpened((current) =>
-            current === null
-              ? current
-              : { ...current, stoppedAt: turnsRef.current.length },
-          )
-        }
-        onDownload={() => download(opened)}
-        onClose={close}
-      />,
+      <Suspense fallback={null}>
+        <QRoomDocument
+          title={opened.title ?? "Document"}
+          file={opened.file}
+          failed={opened.failed}
+          onRetry={retryRead}
+          page={page}
+          pageCount={opened.pageCount}
+          reading={position?.reading === true}
+          summary={summary}
+          onPage={setPage}
+          onPageCount={setPageCount}
+          onStopReading={() =>
+            setOpened((current) =>
+              current === null
+                ? current
+                : { ...current, stoppedAt: turnsRef.current.length },
+            )
+          }
+          onDownload={() => download(opened)}
+          onClose={close}
+        />
+      </Suspense>,
       host,
     );
   }
 
+  // The sheet stays mounted once used, so its close still animates.
+  if (!sheetUsed) return null;
   return (
-    <FileViewer
-      title={opened?.title ?? "Document"}
-      file={shouldClose || host !== null ? null : (opened?.file ?? null)}
-      onClose={close}
-    />
+    <Suspense fallback={null}>
+      <FileViewer
+        title={opened?.title ?? "Document"}
+        file={shouldClose || host !== null ? null : (opened?.file ?? null)}
+        onClose={close}
+      />
+    </Suspense>
   );
 }
