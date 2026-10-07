@@ -1,26 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useQMotion } from "../q-aperture/q-motion";
 import type { QApertureState } from "../q-aperture/aperture-state";
-import { FINE_FIGURES } from "./presence-figures";
-import {
-  faceAllowed,
-  figureForState,
-  presenceFor,
-  SMALL_PIXELS,
-} from "./presence-machine";
-import { createPresenceSim, MAX_DT } from "./presence-dynamics";
-import {
-  budgetSettings,
-  createBudget,
-  scaledParticleCount,
-  stepBudget,
-  surfaceDpr,
-} from "./presence-budget";
-import { drawPresence, resolveColour, type Rgb } from "./presence-gl";
-import { presenceUniforms, stepLean, type Lean } from "./presence-uniforms";
+import { faceAllowed } from "./presence-machine";
+import { surfaceDpr } from "./presence-budget";
+import { resolveColour, type Rgb } from "./presence-gl";
+import { startPresenceLoop, type PresenceInputs } from "./presence-loop";
+import type {
+  PresenceWorkerMessage,
+  PresenceWorkerNote,
+} from "./presence-worker";
 
 export { particleCount } from "./presence-budget";
 
@@ -50,8 +41,37 @@ export { particleCount } from "./presence-budget";
  * nothing runs.
  */
 
-type Renderer = "pending" | "3d" | "2d";
-type Draw3d = typeof import("./presence-3d").drawPresence3d;
+/** What the component says to the loop, wherever the loop runs. */
+type PresenceChannel = {
+  readonly set: (inputs: PresenceInputs) => void;
+  readonly setColour: (colour: Rgb, dark: boolean) => void;
+  readonly visible: (onScreen: boolean, hidden: boolean) => void;
+  readonly levels: (input: number, output: number) => void;
+  readonly lean: (x: number, y: number) => void;
+  readonly dispose: () => void;
+};
+
+/** W7: can this browser draw the presence in a worker? */
+export function presenceOffThreadAvailable(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof Worker === "function" &&
+    typeof OffscreenCanvas === "function" &&
+    typeof HTMLCanvasElement.prototype.transferControlToOffscreen ===
+      "function"
+  );
+}
+
+function presenceWorker(): Worker | null {
+  try {
+    return new Worker(new URL("./presence-worker.ts", import.meta.url), {
+      type: "module",
+      name: "q-presence",
+    });
+  } catch {
+    return null;
+  }
+}
 
 export function QSwarm({
   state,
@@ -77,6 +97,9 @@ export function QSwarm({
   // light work (Save-Data, low memory, forced colours) keeps to 2D.
   const allow3d = environment.gpu || motion === "off";
   const showsFace = faceAllowed({ face, pixels });
+  // W7: the worker is tried once per surface; a failed worker leaves a
+  // fresh canvas drawn on the main thread (`key` below).
+  const [offThread, setOffThread] = useState(presenceOffThreadAvailable);
   const live = useRef({
     state,
     inputLevel,
@@ -101,67 +124,28 @@ export function QSwarm({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
-    const context = canvas.getContext("2d");
-    if (context === null) return;
-    const baseDpr = surfaceDpr(window.devicePixelRatio);
-    let device = 0;
-    const fit = (dprScale: number) => {
-      // The canvas's CSS size never changes: a lower DPR is no layout shift.
-      device = Math.max(1, Math.round(pixels * baseDpr * dprScale));
-      canvas.width = device;
-      canvas.height = device;
-    };
-    fit(1);
-    const small = pixels < SMALL_PIXELS;
-    const sim = createPresenceSim({
-      count: scaledParticleCount(pixels, navigator.hardwareConcurrency),
-      // A surface opens already in its state's shape: no flourish on mount.
-      initial: figureForState(
-        live.current.state,
-        small,
-        live.current.showsFace,
-      ),
-      seed: pixels * 7 + 3,
-    });
-
-    let renderer: Renderer = allow3d ? "pending" : "2d";
-    let draw3d: Draw3d | null = null;
-    let disposed = false;
-    const setRenderer = (next: Renderer) => {
-      renderer = next;
-      canvas.dataset["qRenderer"] = next;
-    };
-    setRenderer(renderer);
-
     // Q's own colour: the accent, unless Q's patience is running out
     // (founder direction 2026-09-30): orange when impatient, red when
     // stern, set on the document as data-q-mood.
-    let colour: Rgb = [0.42, 0.66, 1];
-    let dark = true;
-    const readColour = () => {
+    const readColour = (): { colour: Rgb; dark: boolean } => {
       const style = getComputedStyle(canvas);
       const mood = style.getPropertyValue("--cq-q-colour").trim();
       const value =
         mood.length > 0 ? mood : style.getPropertyValue("--cq-accent").trim();
-      colour = resolveColour(value.length > 0 ? value : "#6aa8ff");
-      dark = surfaceIsDark(canvas);
+      return {
+        colour: resolveColour(value.length > 0 ? value : "#6aa8ff"),
+        dark: surfaceIsDark(canvas),
+      };
     };
-    readColour();
-
-    const eased = { input: 0, output: 0 };
-    const levels = () => ({
-      input: clampLevel(live.current.inputLevel?.() ?? 0),
-      output: clampLevel(live.current.outputLevel?.() ?? 0),
+    const inputs = (): PresenceInputs => ({
+      state: live.current.state,
+      showsFace: live.current.showsFace,
+      showing: live.current.showing,
+      motion: live.current.motion,
+      bloom: live.current.bloom,
     });
-    let figure = "";
-    const note = (next: string) => {
-      if (next === figure) return;
-      figure = next;
-      canvas.dataset["qFigure"] = next;
-    };
 
-    // The cursor lean: where the pointer is, relative to Q, on a spring.
-    const lean: Lean = { x: 0, y: 0, vx: 0, vy: 0 };
+    // The cursor lean: where the pointer is, relative to Q.
     let pointer: { x: number; y: number } | null = null;
     const leanTarget = () => {
       if (pointer === null) return { x: 0, y: 0 };
@@ -172,137 +156,133 @@ export function QSwarm({
         y: clampUnit((pointer.y - (rect.top + rect.height / 2)) / reach),
       };
     };
-
-    let budget = createBudget();
-    let raf = 0;
-    let onScreen = true;
-    let last = 0;
-    let clock = 0;
-    let core = 1;
-    let stepped = 0;
-    const frame = (now: number) => {
-      const began = performance.now();
-      const current = live.current;
-      const view = presenceFor({
-        state: current.state,
-        small,
-        face: current.showsFace,
-        showing: current.showing,
-      });
-      const moving = current.motion === "full";
-      const interval = last === 0 ? 0 : now - last;
-      if (moving) {
-        sim.setFigure(view.figure);
-        // The swarm's own clock advances by the step it integrates, so a
-        // slow device sees the same swarm, slower -- never one whose
-        // particles trail a figure that runs on ahead in real time.
-        const dt = Math.min(MAX_DT, last === 0 ? 1 / 60 : interval / 1000);
-        last = now;
-        clock += dt;
-        stepped = dt;
-        const raw = levels();
-        sim.step(clock, dt, raw);
-        const k = (was: number, next: number) =>
-          1 - Math.exp(-Math.min(dt, 1 / 30) * (next > was ? 26 : 8));
-        eased.input += (raw.input - eased.input) * k(eased.input, raw.input);
-        eased.output +=
-          (raw.output - eased.output) * k(eased.output, raw.output);
-        const aim = leanTarget();
-        stepLean(lean, aim.x, aim.y, dt);
-      } else if (sim.figure() !== view.figure || figure === "") {
-        // Reduced motion: each figure drawn still, no flow between.
-        sim.settle(view.figure, clock, { input: 0, output: 0 });
-      }
-      note(view.figure);
-      const target = presenceUniforms({
-        state: current.state,
-        figure: sim.figure(),
-        input: moving ? eased.input : 0,
-        output: moving ? eased.output : 0,
-        leanX: lean.x,
-        leanY: lean.y,
-        t: clock,
-        motion: current.motion,
-        dim: view.dim,
-        keep: budgetSettings(budget).keep,
-      });
-      // The white core follows the particles, not the figure's name: it
-      // fades in as a glyph flows back into the cloud, never ahead of it.
-      core = moving
-        ? core + (target.core - core) * (1 - Math.exp(-stepped * 1.8))
-        : target.core;
-      const uniforms = { ...target, core };
-      if (renderer === "3d" && draw3d !== null) {
-        const drawn = draw3d(context, sim, {
-          pixels: device,
-          colour,
-          dark,
-          bloom: current.bloom,
-          uniforms,
-        });
-        // A lost context: the 2D swarm from here on.
-        if (!drawn) setRenderer("2d");
-      }
-      if (renderer === "2d") {
-        drawPresence(context, sim, {
-          pixels: device,
-          colour,
-          dim: view.dim,
-          fine: FINE_FIGURES.has(sim.figure()),
-        });
-      }
-      if (moving && renderer !== "pending") {
-        const before = budget.level;
-        budget = stepBudget(budget, interval, performance.now() - began);
-        if (budget.level !== before) fit(budgetSettings(budget).dprScale);
-      }
-      if (moving && onScreen && !document.hidden) {
-        raf = requestAnimationFrame(frame);
-      } else {
-        last = 0;
-      }
+    const levels = () => ({
+      input: clampLevel(live.current.inputLevel?.() ?? 0),
+      output: clampLevel(live.current.outputLevel?.() ?? 0),
+    });
+    const note = (key: "qFigure" | "qRenderer", value: string) => {
+      canvas.dataset[key] = value;
     };
-    const redraw = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(frame);
+    const start = {
+      pixels,
+      dpr: surfaceDpr(window.devicePixelRatio),
+      cores: navigator.hardwareConcurrency,
+      allow3d,
+      inputs: inputs(),
+      ...readColour(),
     };
 
-    if (renderer === "pending") {
-      import("./presence-3d")
-        .then((module) => {
-          if (disposed) return;
-          if (module.presence3dAvailable()) {
-            draw3d = module.drawPresence3d;
-            setRenderer("3d");
-          } else {
-            setRenderer("2d");
-          }
-          redraw();
-        })
-        .catch(() => {
-          if (disposed) return;
-          setRenderer("2d");
-          redraw();
-        });
+    // W7: off the main thread where the browser can hand a canvas to a
+    // worker; here otherwise (and in tests). Once handed over, the canvas
+    // belongs to the worker; if the worker fails, a fresh canvas is drawn
+    // here instead.
+    const worker = offThread ? presenceWorker() : null;
+    let port: PresenceChannel;
+    if (worker !== null) {
+      const offscreen = canvas.transferControlToOffscreen();
+      canvas.dataset["qWorker"] = "1";
+      worker.onmessage = (event: MessageEvent<PresenceWorkerNote>) => {
+        if (event.data.type === "note") note(event.data.key, event.data.value);
+      };
+      worker.onerror = () => {
+        worker.terminate();
+        setOffThread(false);
+      };
+      const post = (message: PresenceWorkerMessage) => {
+        worker.postMessage(message);
+      };
+      post({ type: "start", canvas: offscreen, ...start });
+      port = {
+        set: (next) => post({ type: "inputs", inputs: next }),
+        setColour: (colour, dark) => post({ type: "colour", colour, dark }),
+        visible: (onScreen, hidden) =>
+          post({ type: "visible", onScreen, hidden }),
+        levels: (input, output) => post({ type: "levels", input, output }),
+        lean: (x, y) => post({ type: "lean", x, y }),
+        dispose: () => {
+          post({ type: "stop" });
+          worker.terminate();
+        },
+      };
+    } else {
+      const loop = startPresenceLoop({
+        canvas,
+        ...start,
+        levels,
+        leanTarget,
+        hidden: () => document.hidden,
+        note,
+        load3d: () => import("./presence-3d"),
+        requestFrame: (callback) => requestAnimationFrame(callback),
+        cancelFrame: (handle) => cancelAnimationFrame(handle),
+        now: () => performance.now(),
+      });
+      if (loop === null) return;
+      port = {
+        set: loop.set,
+        setColour: loop.setColour,
+        visible: (onScreen, hidden) => loop.setOnScreen(onScreen && !hidden),
+        levels: () => undefined,
+        lean: () => undefined,
+        dispose: loop.dispose,
+      };
     }
 
-    const themeWatch = new MutationObserver(() => {
-      readColour();
-      redraw();
-    });
-    themeWatch.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme", "data-q-mood"],
-    });
+    // In the worker the levels and the lean are sent, at most once a
+    // frame, and only while there is something to send.
+    let relay = 0;
+    let onScreen = true;
+    const relayFrame = () => {
+      relay = 0;
+      if (worker === null || !onScreen || document.hidden) return;
+      const current = live.current;
+      const voiced =
+        current.inputLevel !== undefined || current.outputLevel !== undefined;
+      if (voiced) {
+        const raw = levels();
+        port.levels(raw.input, raw.output);
+      }
+      if (voiced && current.motion === "full") {
+        relay = requestAnimationFrame(relayFrame);
+      }
+    };
+    const relayLean = () => {
+      if (worker === null) return;
+      const aim = leanTarget();
+      port.lean(aim.x, aim.y);
+    };
+    let leanFrame = 0;
     const onPointer = (event: PointerEvent) => {
       pointer = { x: event.clientX, y: event.clientY };
+      if (worker !== null && leanFrame === 0) {
+        leanFrame = requestAnimationFrame(() => {
+          leanFrame = 0;
+          relayLean();
+        });
+      }
     };
     const onPointerGone = (event: PointerEvent) => {
       // Touch has no hover: a lifted finger lets Q settle back.
       if (event.type === "pointerup" && event.pointerType === "mouse") return;
       if (event.type === "pointerout" && event.relatedTarget !== null) return;
       pointer = null;
+      relayLean();
     };
+    const redraw = () => {
+      port.set(inputs());
+      if (worker !== null && relay === 0) {
+        relay = requestAnimationFrame(relayFrame);
+      }
+    };
+
+    const themeWatch = new MutationObserver(() => {
+      const next = readColour();
+      port.setColour(next.colour, next.dark);
+    });
+    themeWatch.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme", "data-q-mood"],
+    });
     window.addEventListener("pointermove", onPointer, { passive: true });
     window.addEventListener("pointerdown", onPointer, { passive: true });
     window.addEventListener("pointerup", onPointerGone, { passive: true });
@@ -310,29 +290,31 @@ export function QSwarm({
     document.addEventListener("pointerout", onPointerGone, { passive: true });
     const visibility = new IntersectionObserver((entries) => {
       onScreen = entries.some((entry) => entry.isIntersecting);
+      port.visible(onScreen, document.hidden);
       if (onScreen) redraw();
     });
     visibility.observe(canvas);
     const onHidden = () => {
+      port.visible(onScreen, document.hidden);
       if (!document.hidden) redraw();
     };
     document.addEventListener("visibilitychange", onHidden);
     canvas.addEventListener("cq:redraw", redraw);
-    redraw();
     return () => {
-      disposed = true;
       window.removeEventListener("pointermove", onPointer);
       window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("pointerup", onPointerGone);
       window.removeEventListener("pointercancel", onPointerGone);
       document.removeEventListener("pointerout", onPointerGone);
       canvas.removeEventListener("cq:redraw", redraw);
-      cancelAnimationFrame(raf);
+      cancelAnimationFrame(relay);
+      cancelAnimationFrame(leanFrame);
       themeWatch.disconnect();
       visibility.disconnect();
       document.removeEventListener("visibilitychange", onHidden);
+      port.dispose();
     };
-  }, [pixels, allow3d]);
+  }, [pixels, allow3d, offThread]);
 
   // A state, face, cards or motion change restarts a stopped loop (reduced
   // motion, or after a hidden tab): with no timers, this is the only way a
@@ -343,6 +325,7 @@ export function QSwarm({
 
   return (
     <canvas
+      key={offThread ? "worker" : "page"}
       ref={canvasRef}
       aria-hidden="true"
       style={{ width: pixels, height: pixels }}

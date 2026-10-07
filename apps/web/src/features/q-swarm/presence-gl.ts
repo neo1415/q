@@ -32,6 +32,26 @@ export function presenceStats(): {
 
 export type Rgb = readonly [number, number, number];
 
+/** A canvas to draw into off screen: on the page, or in the presence worker. */
+export type DrawingCanvas = HTMLCanvasElement | OffscreenCanvas;
+
+/**
+ * W7: a scratch canvas. The page makes an element; the presence worker,
+ * which has no document, an OffscreenCanvas. Null where neither exists.
+ */
+export function drawingCanvas(width = 1, height = 1): DrawingCanvas | null {
+  if (typeof document !== "undefined") {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  }
+  if (typeof OffscreenCanvas === "function") {
+    return new OffscreenCanvas(width, height);
+  }
+  return null;
+}
+
 /** Any CSS colour (oklch, hex, rgb...) as 0..1 RGB, resolved by the browser. */
 export function resolveColour(colour: string): Rgb {
   if (typeof document === "undefined") return [0.42, 0.66, 1];
@@ -91,16 +111,15 @@ export function layoutPoints(
   return points;
 }
 
-const sprites = new Map<string, HTMLCanvasElement>();
+const sprites = new Map<string, DrawingCanvas>();
 
-function spriteFor(colour: Rgb): HTMLCanvasElement {
+function spriteFor(colour: Rgb): DrawingCanvas | null {
   const key = colour.join(",");
   const cached = sprites.get(key);
   if (cached !== undefined) return cached;
-  const sprite = document.createElement("canvas");
-  sprite.width = 32;
-  sprite.height = 32;
-  const g = sprite.getContext("2d");
+  const sprite = drawingCanvas(32, 32);
+  if (sprite === null) return null;
+  const g = sprite.getContext("2d") as CanvasRenderingContext2D | null;
   if (g !== null) {
     const rgb = `${String(Math.round(colour[0] * 255))},${String(Math.round(colour[1] * 255))},${String(Math.round(colour[2] * 255))}`;
     const gradient = g.createRadialGradient(16, 16, 0, 16, 16, 16);
@@ -125,6 +144,7 @@ export function drawPresence(
   target.setTransform(1, 0, 0, 1, 0, 0);
   target.clearRect(0, 0, size, size);
   const sprite = spriteFor(options.colour);
+  if (sprite === null) return;
   for (let i = 0; i < sim.count; i += 1) {
     const d = data[i * 4 + 2] ?? 2;
     target.globalAlpha = data[i * 4 + 3] ?? 0.5;
