@@ -87,6 +87,14 @@ import {
 } from "@capital-q/capital";
 import { createResultsReader } from "@capital-q/results";
 import {
+  createPostgresReadinessStore,
+  createReadinessService,
+  readinessDataRoomFrom,
+  readinessDeckFrom,
+  readinessFollowUps,
+  readinessRaiseFrom,
+} from "@capital-q/readiness";
+import {
   CompanyIdSchema,
   createCompanyService,
   createPostgresCompanyMarketplaceQueryPort,
@@ -1594,6 +1602,36 @@ const profileMaterial = createProfileMaterial({
       priority: input.priority,
     }),
 });
+// Q.03/Q.04/Q.01: the founder's own readiness, action plan and Q's
+// follow-up questions. Founder-private (Context Firewall): the company is
+// the actor's own, from the server-resolved context; every input is read
+// through its own service as the founder, and nothing investor-facing
+// reads the result.
+const readiness = createReadinessService({
+  store: createPostgresReadinessStore({ sql: database.sql }),
+  ownCompanyId: async (actor) => {
+    if (actor.organisationId === undefined) return null;
+    const company = await companyQuery.findOrganisationCompany?.(
+      actor.tenantId,
+      actor.organisationId,
+    );
+    return company == null ? null : company.id;
+  },
+  deck: readinessDeckFrom(profileMaterial.companyDeck),
+  dataRoom: readinessDataRoomFrom(profileMaterial.dataRoom),
+  raise: readinessRaiseFrom(async (actor, companyId) => {
+    try {
+      return await capital.getCurrentCapitalObjective({
+        actor,
+        companyId: CompanyIdSchema.parse(companyId),
+      });
+    } catch (error: unknown) {
+      if (error instanceof CapitalObjectiveNotFoundError) return null;
+      throw error;
+    }
+  }),
+  followUps: readinessFollowUps(onboarding.runtime),
+});
 const visibility = createVisibilityCentre({
   access: permissions.access,
   inspect: permissions.inspectResourceDisclosure,
@@ -2120,6 +2158,7 @@ const { app, logger } = createApp(config, security, {
     transactions: database.transactions,
   }),
   results,
+  readiness,
   adminFreshTokens: createSupabaseAccessTokenAuthenticator(supabaseAuth),
   adminVerificationDecider: createDecideByOperator({
     transactions: database.transactions,

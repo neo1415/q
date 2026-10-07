@@ -137,6 +137,9 @@ importers:
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../../packages/q-runtime
+      '@capital-q/readiness':
+        specifier: workspace:*
+        version: link:../../packages/readiness
       '@capital-q/results':
         specifier: workspace:*
         version: link:../../packages/results
@@ -291,6 +294,9 @@ importers:
       '@capital-q/q-tools':
         specifier: workspace:*
         version: link:../../packages/q-tools
+      '@capital-q/readiness':
+        specifier: workspace:*
+        version: link:../../packages/readiness
       '@capital-q/results':
         specifier: workspace:*
         version: link:../../packages/results
@@ -607,6 +613,9 @@ importers:
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../q-runtime
+      '@capital-q/readiness':
+        specifier: workspace:*
+        version: link:../readiness
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security

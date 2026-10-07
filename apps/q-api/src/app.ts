@@ -172,6 +172,9 @@ export type QApiModules = {
   // BILLING-2 block (ADR 0036): the Readiness Blueprint's plan-gated stub.
   readonly readinessBlueprint?:
     ReadinessBlueprintRoutesDependencies["entitlements"] | undefined;
+  /** The Blueprint v1 generator (the founder's own readiness, sequenced). */
+  readonly readinessBlueprints?:
+    ReadinessBlueprintRoutesDependencies["blueprints"] | undefined;
   // end BILLING-2 block
   /** Q's standing with each person: personality and patience. */
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
@@ -506,6 +509,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       entitlements: modules.readinessBlueprint,
+      blueprints: modules.readinessBlueprints,
     });
   }
   // end BILLING-2 block

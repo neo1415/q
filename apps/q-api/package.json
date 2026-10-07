@@ -55,6 +55,7 @@
     "@capital-q/q-runtime": "workspace:*",
     "@capital-q/q-specialists": "workspace:*",
     "@capital-q/q-tools": "workspace:*",
+    "@capital-q/readiness": "workspace:*",
     "@capital-q/results": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@capital-q/taxonomy": "workspace:*",

@@ -366,6 +366,15 @@ export const Q_ROOM_OBJECTS = [
    * placeholders marked, and the floating Upload button.
    */
   "Q_DOCUMENT",
+  /**
+   * Q.03/Q.04/Q.01 (2026-10-07): a founder's own readiness (what could
+   * stop the raise, pillars in words), their action plan, and the
+   * questions Q still wants answered. Founder-private; the id is their own
+   * company's, resolved by the server, never the model.
+   */
+  "READINESS",
+  "ACTION_PLAN",
+  "FOLLOW_UPS",
 ] as const;
 export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
 export type QRoomObject = z.infer<typeof QRoomObjectSchema>;
@@ -621,6 +630,12 @@ export const Q_INSTANT_ACTION_TOOLS = [
   // meet-47: "Q, join this call" -- their word is the click; Q joins as
   // the same note-taker, with the same consent line, for both sides.
   "join_call",
+  // Q.04/Q.01: ticking their own plan step (evidence still decides the
+  // pillar), and answering or setting aside Q's question about their own
+  // company through the interview's own commit.
+  "mark_plan_step",
+  "answer_q_question",
+  "set_aside_q_question",
 ] as const;
 
 /**

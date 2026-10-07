@@ -782,7 +782,7 @@ export const SHOW = "client.q_room.show" as const;
 export const ShowInputSchema = z
   .object({
     object: QRoomObjectSchema.describe(
-      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. Q_DOCUMENT: a document you made for them (their draft deck, one-pager or memo), by its id from its card or list_my_documents, or by its title; with neither, their latest. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name).",
+      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. Q_DOCUMENT: a document you made for them (their draft deck, one-pager or memo), by its id from its card or list_my_documents, or by its title; with neither, their latest. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name). READINESS / ACTION_PLAN / FOLLOW_UPS: a founder's own readiness (what could stop their raise, each pillar in words), their action plan, or the questions Q still wants answered (no id or name).",
     ),
     id: z
       .string()
@@ -833,7 +833,7 @@ export function createShowTool(
     id: SHOW,
     providerName: "show",
     description:
-      "Shows one thing in the Q room as a card while you talk, without leaving the page: a company's profile, data room or pitch deck, the chat with a company or investor, one of Q's work items with its plan, a capital round, a GateQ application, or the news and web sources this answer read. Use it when they ask to see, show, pull up or bring up something here; use open_page only when they ask to be taken to its page. The card closes by itself when the conversation moves on.",
+      "Shows one thing in the Q room as a card while you talk, without leaving the page: a company's profile, data room or pitch deck, the chat with a company or investor, one of Q's work items with its plan, a capital round, a GateQ application, the news and web sources this answer read, or a founder's own readiness, action plan or open questions. Use it when they ask to see, show, pull up or bring up something here; use open_page only when they ask to be taken to its page. The card closes by itself when the conversation moves on.",
     input: ShowInputSchema,
     authorize: async (input, { actor, plan }) => {
       if (!ownConversation(actor, plan)) {
@@ -900,6 +900,26 @@ async function roomRecord(
       return ownRecord(ports, actor, "GATEQ_APPLICATION", input);
     case "SOURCES":
       return null;
+    case "READINESS":
+    case "ACTION_PLAN":
+    case "FOLLOW_UPS": {
+      // Their own company only, from the server-resolved context: a name
+      // or an id from the model never widens it (founder-private).
+      const own =
+        ports.appActions?.ownCompanyId === undefined
+          ? null
+          : await ports.appActions.ownCompanyId(actor).catch(() => null);
+      if (own === null) return null;
+      return {
+        id: own.toLowerCase(),
+        title:
+          input.object === "READINESS"
+            ? "What could stop your raise"
+            : input.object === "ACTION_PLAN"
+              ? "Your action plan"
+              : "Q still wants to know",
+      };
+    }
     case "CHAT_WITH_INVESTOR": {
       if (ports.relationships === undefined) return null;
       const named = await nameableRecords(

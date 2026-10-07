@@ -52,6 +52,7 @@ import type {
 } from "./actions/gateq-find.js";
 import type { QWorkPagePort } from "./actions/work.js";
 import type { EtiquetteGuidePort } from "./actions/etiquette.js";
+import type { ReadinessService } from "@capital-q/readiness";
 import type { TeamPort } from "./actions/team.js";
 
 /**
@@ -156,6 +157,8 @@ export type AppActionPorts = {
     | undefined;
   /** ADR 0050: their own business etiquette guide (How Q speaks for you). */
   readonly etiquetteGuides?: EtiquetteGuidePort | undefined;
+  /** Q.03/Q.04: their own company's readiness, plan and follow-ups (founder-private). */
+  readonly readiness?: ReadinessService | undefined;
   /** G1/G2: the person's company or firm as a team (invitations, roles). */
   readonly team?: TeamPort | undefined;
   /** Settings: their notification switches, and whether push can work here. */

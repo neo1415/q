@@ -26,6 +26,7 @@ import { GATEQ_ACTIONS } from "./actions/gateq.js";
 import { TEAM_ACTIONS, TEAM_PERSON_ACTIONS } from "./actions/team.js";
 import { GATEQ_INBOX_ACTIONS } from "./actions/gateq-inbox.js";
 import { GATEQ_FIND_ACTIONS } from "./actions/gateq-find.js";
+import { READINESS_ACTIONS } from "./actions/readiness.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -59,6 +60,8 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...TEAM_ACTIONS,
   ...GATEQ_INBOX_ACTIONS,
   ...GATEQ_FIND_ACTIONS,
+  // Q.03/Q.04/Q.01: the founder's plan steps and Q's follow-up questions.
+  ...READINESS_ACTIONS,
 ]);
 
 /**

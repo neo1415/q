@@ -32,6 +32,8 @@ import {
   registerResultsRoutes,
   type ResultsRoutesDependencies,
 } from "./http/results.js";
+import { registerReadinessRoutes } from "./http/readiness.js";
+import type { ReadinessService } from "@capital-q/readiness";
 import {
   registerCommitmentRoutes,
   type CommitmentRoutesDependencies,
@@ -280,6 +282,8 @@ export type ApiModules = {
   // end ADMIN-3 block
   readonly results?: ResultsRoutesDependencies["results"] | undefined;
   // end ADMIN block
+  /** Q.03/Q.04/Q.01: the founder's own readiness, plan and follow-ups. */
+  readonly readiness?: ReadinessService | undefined;
   /** Diligence (2026-10-02). Absent: those routes do not register. */
   readonly diligence?:
     NetworkInterestRoutesDependencies["diligence"] | undefined;
@@ -597,6 +601,9 @@ export function createApp(
         ? {}
         : { diligence: modules.diligence }),
       ...(modules.dataRoom === undefined ? {} : { dataRoom: modules.dataRoom }),
+      ...(modules.readiness === undefined
+        ? {}
+        : { readiness: modules.readiness }),
       ...(modules.companyDeck === undefined
         ? {}
         : { companyDeck: modules.companyDeck }),
@@ -747,6 +754,14 @@ export function createApp(
     });
   }
   // end ADMIN block
+
+  if (modules.readiness !== undefined) {
+    registerReadinessRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      readiness: modules.readiness,
+    });
+  }
 
   if (modules.commitments !== undefined) {
     registerCommitmentRoutes(app, {
