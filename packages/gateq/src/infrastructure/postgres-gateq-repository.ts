@@ -377,5 +377,24 @@ export function createPostgresGatewayPolicyPort(options: {
       assemble(await gateways.findById(gatewayId)),
     publishedPolicyByPublicId: async (publicId: GatewayPublicId) =>
       assemble(await gateways.findByPublicId(publicId)),
+    // Q.05: bounded by the caller (at most 50 organisations); the same
+    // assembly as the public read, so only a published version of an
+    // ACTIVE gateway can come back.
+    publishedPoliciesForInvestorOrganisations: async (ids) => {
+      if (ids.length === 0) return [];
+      const rows = await sql`
+        select * from gateq.gateways
+         where investor_organisation_id = any(${[...ids]}::uuid[])
+           and status = 'ACTIVE'
+         order by created_at desc
+         limit 100`;
+      const assembled = await Promise.all(
+        rows.map((row) => assemble(toGateway(row))),
+      );
+      return assembled.filter(
+        (policy): policy is GatewayPolicy =>
+          policy !== null && policy.version.status === "PUBLISHED",
+      );
+    },
   };
 }

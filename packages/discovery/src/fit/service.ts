@@ -3,6 +3,7 @@ import {
   FIT_CONFIDENCE_LABELS,
   FIT_OUTCOME_LABELS,
   FIT_PARAMETER_LABELS,
+  FIT_COMPARISON_MAX,
   FIT_PARAMETERS,
   fitScoreOutOf10,
   FitComparisonDtoSchema,
@@ -109,6 +110,15 @@ export type FitService = {
     companyIds: readonly string[],
   ) => Promise<FitProfilesResult>;
   readonly top: (actor: ActorContext, limit: number) => Promise<FitTopResult>;
+  /**
+   * Q.10: the companies the investor picked (2-4, from Saved), side by
+   * side on the same fit as the top three. Each is re-checked for VIEW
+   * eligibility first; one they may not see is absent, never named.
+   */
+  readonly compare: (
+    actor: ActorContext,
+    companyIds: readonly string[],
+  ) => Promise<FitTopResult>;
 };
 
 /** The reader may not see the company at all: it is absent, not "poor". */
@@ -199,6 +209,28 @@ export function createFitService(
 
   return {
     profiles,
+    compare: async (actor, companyIds) => {
+      const ids = [...new Set(companyIds)].slice(0, FIT_COMPARISON_MAX);
+      const result = await profiles(actor, ids);
+      if (result.kind !== "OK") return result;
+      const sources = new Map<string, ReadonlySet<FitCandidateSource>>(
+        result.items.map((item) => [
+          item.assessment.profile.companyId,
+          new Set<FitCandidateSource>(["SAVED"]),
+        ]),
+      );
+      return {
+        kind: "OK",
+        comparison: buildFitComparison({
+          items: result.items,
+          sources,
+          limit: ids.length,
+          config,
+          computedAt: clock().toISOString(),
+          keepAll: true,
+        }),
+      };
+    },
     top: async (actor, limit) => {
       const listed = await dependencies.candidates(actor);
       const sources = new Map<string, Set<FitCandidateSource>>();
@@ -242,6 +274,11 @@ export function buildFitComparison(input: {
   readonly limit: number;
   readonly config: FitConfig;
   readonly computedAt: string;
+  /**
+   * Q.10: the investor picked these, so none is left out for being outside
+   * the mandate or thin; each still shows its band in words.
+   */
+  readonly keepAll?: boolean | undefined;
 }): FitComparisonDto {
   const outside = input.items.filter(
     (i) => i.assessment.profile.band === "OUTSIDE_MANDATE",
@@ -252,8 +289,9 @@ export function buildFitComparison(input: {
   const ranked = input.items
     .filter(
       (i) =>
-        i.assessment.profile.band !== "OUTSIDE_MANDATE" &&
-        i.assessment.profile.band !== "NOT_ENOUGH_INFORMATION",
+        input.keepAll === true ||
+        (i.assessment.profile.band !== "OUTSIDE_MANDATE" &&
+          i.assessment.profile.band !== "NOT_ENOUGH_INFORMATION"),
     )
     // The same comparator as the Discover feed (fit-order.v1): a higher
     // score out of 10 is never listed below a lower one.
@@ -300,7 +338,10 @@ export function buildFitComparison(input: {
       bestOn: bestOn(index),
     })),
     considered: input.items.length,
-    leftOut: { outsideMandate: outside, notEnoughInformation: thin },
+    leftOut:
+      input.keepAll === true
+        ? { outsideMandate: 0, notEnoughInformation: 0 }
+        : { outsideMandate: outside, notEnoughInformation: thin },
     computedAt: input.computedAt,
   });
 }

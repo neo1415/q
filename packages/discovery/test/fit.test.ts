@@ -729,6 +729,33 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     expect(result.kind === "OK" && result.comparison.entries).toEqual([]);
     expect(w.read).toEqual([]);
   });
+
+  it("compare (Q.10): the picked companies only, each re-checked; one the reader may not see is absent", async () => {
+    const w = world({
+      reasons: { [ID(3)]: ["COMPANY_NOT_DISCOVERABLE_BY_INVESTOR"] },
+    });
+    const result = await w.service.compare(actor, [ID(1), ID(2), ID(3)]);
+    expect(result.kind).toBe("OK");
+    if (result.kind !== "OK") return;
+    expect(w.evaluated).toEqual([[ID(1), ID(2), ID(3)]]);
+    expect(w.read).toEqual([[ID(1), ID(2)]]);
+    expect(result.comparison.entries.map((e) => e.companyId).sort()).toEqual([
+      ID(1),
+      ID(2),
+    ]);
+    expect(result.comparison.entries.every((e) => e.sources[0] === "SAVED")).toBe(
+      true,
+    );
+    expect(JSON.stringify(result)).not.toContain(ID(3));
+  });
+
+  it("compare refuses a non-investor before reading anything", async () => {
+    const w = world({ investor: false });
+    expect(await w.service.compare(actor, [ID(1), ID(2)])).toEqual({
+      kind: "NOT_INVESTOR",
+    });
+    expect(w.evaluated).toEqual([]);
+  });
 });
 
 describe("fit inputs from the investor's own mandate and what the reader may see", () => {
