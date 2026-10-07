@@ -105,6 +105,7 @@ import {
   createDocumentStudioPort,
   createDocumentsModule,
   ownCompanyOf,
+  ownDeckFactsOf,
 } from "./composition/documents.js";
 import { createMeetingFollowUpCards } from "./composition/meeting-follow-up-cards.js";
 import {
@@ -3219,6 +3220,8 @@ const qArtifacts = createQArtifacts({
           };
     },
     ownCompanyOf: (actor) => ownCompanyOf(database.sql, actor),
+    ownDeckFactsOf: (actor, companyId) =>
+      ownDeckFactsOf(database.sql, actor, companyId),
     illustrationsFor: (request) =>
       documentImages.illustrationsFor({
         actor: request.actor,

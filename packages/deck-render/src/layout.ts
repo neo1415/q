@@ -821,6 +821,41 @@ function layOutSlide(
     cursor += tallest + 36;
   }
 
+  if (slide.chart !== undefined && slide.layout !== "CHART") {
+    // Deck wave 8: a small chart under the headline figures (a movement
+    // such as 590 → 1,140), leaving room for a line or two after it.
+    // The lines after it keep their room; a chart that would crowd them
+    // out is reported dropped, and the fixer says less (never smaller type).
+    const lines = slide.bullets.reduce(
+      (total, line) =>
+        total +
+        text("BULLET", line, {
+          x: MARGIN,
+          y: 0,
+          width,
+          size: size(theme.sizes.bullet),
+          colour: theme.ink,
+        }).height +
+        BULLET_GAP,
+      0,
+    );
+    const available = bottom - cursor - lines - (lines > 0 ? 24 : 0);
+    const height = Math.min(available, 240);
+    if (height >= 120) {
+      boxes.push(
+        ...layOutChartForm(slide.chart, theme, {
+          x: MARGIN,
+          y: cursor,
+          width: Math.min(width, 520),
+          height,
+        }),
+      );
+      cursor += height + 24;
+    } else {
+      dropped.push(slide.chart.measure);
+    }
+  }
+
   if (
     slide.visual === "FLOW" &&
     slide.bullets.length >= 2 &&

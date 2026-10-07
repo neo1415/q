@@ -254,3 +254,40 @@ describe("QX-004 §7 · every renderer reads the same geometry", () => {
     }
   });
 });
+
+describe("a small chart under headline figures (deck wave 8)", () => {
+  it("draws the figures, then the chart, then the lines, with nothing dropped", () => {
+    const laid = layOutDeck(
+      deck({
+        slides: [
+          deck().slides[0] as QSlide,
+          slide({
+            title: "1,140 paying businesses",
+            bullets: ["Sold through accountant partners"],
+            figures: [
+              { value: "1,140", label: "Paying businesses" },
+              { value: "₦38m", label: "MRR" },
+            ],
+            chart: {
+              kind: "COLUMN",
+              measure: "Paying businesses",
+              unit: "count",
+              points: [
+                { label: "Start", value: "590" },
+                { label: "After twelve months", value: "1140" },
+              ],
+              grounding: "Read from the slide: grew from 590 to 1,140",
+              source: "the company's record on Capital Q",
+            },
+          }),
+        ],
+      }),
+    );
+    const numbers = laid.slides[1];
+    expect(numbers?.dropped).toEqual([]);
+    const kinds = new Set(numbers?.boxes.map((box) => box.kind));
+    expect(kinds.has("CHART")).toBe(true);
+    expect(inspectDeck(laid)).toEqual([]);
+    expect(deckToSvg(laid)[1]).toContain("1,140");
+  });
+});

@@ -25,6 +25,7 @@ import {
 } from "./document-studio.js";
 import type { IllustrationPort } from "./deck-illustrations.js";
 import { composePitchDeck } from "./pitch-deck.js";
+import { fillOwnSlides, type OwnDeckFacts } from "./deck-figures.js";
 import {
   composeGeneralDocument,
   runDocumentPipeline,
@@ -95,6 +96,16 @@ export type ArtifactPreparation = {
           readonly sectorCodes: readonly string[];
         } | null>;
         readonly polisher?: DeckPolisher | undefined;
+        /**
+         * Deck wave 8: the actor's own company's current round and team,
+         * read as the actor; asked only for a deck about their own company.
+         */
+        readonly ownDeckFactsOf?:
+          | ((
+              actor: QAnswerRequest["actor"],
+              companyId: string,
+            ) => Promise<OwnDeckFacts | null>)
+          | undefined;
         /** Generated pictures, for this run (budgets are the port's). */
         readonly illustrationsFor?:
           | ((request: QAnswerRequest) => IllustrationPort | undefined)
@@ -361,6 +372,26 @@ export async function prepareOrReviseArtifact(input: {
         ? null
         : await studio.brandOf(request.actor).catch(() => null);
     const sectorCodes = isOwn ? own.sectorCodes : [];
+    // Deck wave 8: the founder's own raise and team fill those slides on
+    // their own deck (never on a deck about somebody else's company), and
+    // what fills them joins the grounding the checks read.
+    let composed = base;
+    let grounding: readonly string[] = findingStatements;
+    if (
+      ask.artifactType === "PITCH_DECK" &&
+      isOwn &&
+      own !== null &&
+      studio?.ownDeckFactsOf !== undefined
+    ) {
+      const facts = await studio
+        .ownDeckFactsOf(request.actor, own.companyId)
+        .catch(() => null);
+      if (facts !== null) {
+        const filled = fillOwnSlides(base.content, facts);
+        composed = { ...base, content: filled.content };
+        grounding = [...findingStatements, ...filled.grounding];
+      }
+    }
     const kind =
       ask.artifactType === "PITCH_DECK" ||
       ask.artifactType === "ONE_PAGER" ||
@@ -382,9 +413,9 @@ export async function prepareOrReviseArtifact(input: {
         ...(company === undefined ? {} : { subject: company }),
         artifactType: ask.artifactType,
         kind,
-        content: base,
+        content: composed,
         job: {
-          grounding: findingStatements,
+          grounding,
           sectorCodes,
           directionChosen: ask.visualDirection !== null,
           brand,
@@ -402,9 +433,9 @@ export async function prepareOrReviseArtifact(input: {
       return { kind: "PREPARED", summary: settled ?? requested };
     }
     if (kind !== null && pipeline?.mode === "IN_RUN") {
-      const made = await runDocumentPipeline(base.content, {
+      const made = await runDocumentPipeline(composed.content, {
         kind,
-        grounding: findingStatements,
+        grounding,
         sectorCodes,
         directionChosen: ask.visualDirection !== null,
         brand,
@@ -432,14 +463,14 @@ export async function prepareOrReviseArtifact(input: {
           qRunId: request.runId,
           ...(company === undefined ? {} : { subject: company }),
           artifactType: ask.artifactType,
-          content: { ...base, content: made.content },
+          content: { ...composed, content: made.content },
         }),
       };
     }
     const content =
       ask.artifactType === "PITCH_DECK"
-        ? await runDocumentStudio(base.content, {
-            grounding: findingStatements,
+        ? await runDocumentStudio(composed.content, {
+            grounding,
             sectorCodes,
             directionChosen: ask.visualDirection !== null,
             brand,
@@ -455,7 +486,7 @@ export async function prepareOrReviseArtifact(input: {
             },
             signal: request.signal,
           })
-        : brandDeck(base.content, brand);
+        : brandDeck(composed.content, brand);
     return {
       kind: "PREPARED",
       summary: await artifacts.port.prepare({
@@ -464,7 +495,7 @@ export async function prepareOrReviseArtifact(input: {
         qRunId: request.runId,
         ...(company === undefined ? {} : { subject: company }),
         artifactType: ask.artifactType,
-        content: { ...base, content },
+        content: { ...composed, content },
       }),
     };
   } catch (error: unknown) {

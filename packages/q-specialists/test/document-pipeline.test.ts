@@ -168,7 +168,10 @@ describe("the document pipeline", () => {
       kind: "TEXT",
       label: "Revenue, users or growth: add yours",
     });
-    expect(traction?.bullets).toEqual([]);
+    // Never an empty slide: it says, in words, what to add (deck wave 8).
+    expect(traction?.bullets).toEqual([
+      "Not on record yet. Add revenue, paying customers or usage, and how it has grown.",
+    ]);
     // Placeholders sit in reading order: traction after the market.
     const titles = slides.map((slide) => slide.title);
     expect(titles.indexOf("Traction")).toBeGreaterThan(
