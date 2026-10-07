@@ -69,4 +69,25 @@ export {
   type FounderReviewSkipReason,
 } from "./integration/review-service.js";
 export * from "./intelligence/index.js";
+export {
+  canonicalDecimal,
+  createFinancialKnowledgePort,
+  createFinancialKnowledgeRecorder,
+  FINANCIAL_KNOWLEDGE_KEYS,
+  financialClaimFor,
+  financialCurrency,
+  type FinancialClaim,
+  type FinancialKnowledgePort,
+} from "./integration/financial-claims.js";
+export {
+  createFounderFinancialCheck,
+  deckFinancialFigures,
+  FINANCIAL_CHECK_STEPS,
+  financialContradictions,
+  parseDeckNumber,
+  type DeckReading,
+  type FinancialQuestion,
+  type FounderFinancialCheck,
+  type FounderFinancialCheckDependencies,
+} from "./integration/financial-check.js";
 export { FOUNDER_INTERVIEW_CUES } from "./definition/interview-cues.js";

@@ -23,12 +23,20 @@ const browser = await chromium.launch(
   process.argv[2] === undefined ? {} : { executablePath: process.argv[2] },
 );
 const sizes = { phone: [390, 844], desktop: [1280, 820] };
-for (const screen of ["interview", "contradiction", "plan", "investor", "room"]) {
+for (const screen of [
+  "interview",
+  "contradiction",
+  "plan",
+  "investor",
+  "room",
+]) {
   for (const device of ["phone", "desktop"]) {
     for (const theme of ["light", "dark"]) {
       const [width, height] = sizes[device];
       const tab = await browser.newPage({ viewport: { width, height } });
-      await tab.goto(`${page}?screen=${screen}&device=${device}&theme=${theme}`);
+      await tab.goto(
+        `${page}?screen=${screen}&device=${device}&theme=${theme}`,
+      );
       await tab.screenshot({
         path: `${out}/${screen}-${device}-${theme}.png`,
         fullPage: true,

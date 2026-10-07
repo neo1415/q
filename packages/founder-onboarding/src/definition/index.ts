@@ -19,7 +19,6 @@ export {
   FOUNDER_ROLE_TITLES,
   FOUNDER_STEP_CONTEXTS,
   FOUNDER_STEPS,
-  FOUNDER_REVISABLE_STEPS,
   FOUNDER_WRITE_TARGETS,
   FULL_TIME_OPTIONS,
   FUNCTION_OPTIONS,
@@ -54,12 +53,20 @@ export {
   FOUNDER_DEFINITION_V3_VERSION,
   SIGNAL_OPTIONS_V3,
 } from "./founder-v3.js";
+export {
+  FOUNDER_DEFINITION_V4,
+  FOUNDER_DEFINITION_V4_VERSION,
+  FOUNDER_FINANCIAL_STEPS,
+  FOUNDER_FINANCIAL_WRITE_TARGET,
+  FOUNDER_REVISABLE_STEPS,
+  REVENUE_TREND_OPTIONS,
+} from "./founder-v4.js";
 /**
  * The version new founder sessions pin to, for code that reads the journey
- * (labels, step order, the interview). It is a superset of v2, so a v2
- * session reads correctly through it.
+ * (labels, step order, the interview). It is a superset of v2 and v3, so an
+ * older session reads correctly through it.
  */
-export { FOUNDER_DEFINITION_V3 as FOUNDER_DEFINITION_CURRENT } from "./founder-v3.js";
+export { FOUNDER_DEFINITION_V4 as FOUNDER_DEFINITION_CURRENT } from "./founder-v4.js";
 export {
   FounderRaiseContextSchema,
   FounderReviewContextSchema,

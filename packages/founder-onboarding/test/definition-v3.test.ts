@@ -56,8 +56,12 @@ describe("founder definition v3", () => {
     }
   });
 
-  it("is the current definition", () => {
-    expect(FOUNDER_DEFINITION_CURRENT).toBe(FOUNDER_DEFINITION_V3);
+  it("is superseded by v4 for new sessions, which keeps every v3 step", () => {
+    const current = FOUNDER_DEFINITION_CURRENT.steps.map((s) => s.stepKey);
+    for (const step of FOUNDER_DEFINITION_V3.steps) {
+      expect(current).toContain(step.stepKey);
+    }
+    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(4);
   });
 
   it("is committed exactly as rendered, publishing v3 for new sessions", () => {

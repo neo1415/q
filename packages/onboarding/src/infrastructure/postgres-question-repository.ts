@@ -85,6 +85,14 @@ export function createPostgresOnboardingInterviewQuestionRepository(): Onboardin
          order by q.created_at, q.id`;
       return rows.map(toQuestion);
     },
+    listForFact: async (executor, sessionId, factKey) => {
+      const rows = await executor`
+        ${questionSelect(executor)}
+         where q.session_id = ${sessionId} and q.fact_key = ${factKey}
+         order by q.created_at desc, q.id
+         limit 50`;
+      return rows.map(toQuestion);
+    },
     findById: async (executor, sessionId, questionId) => {
       const rows = await executor`
         ${questionSelect(executor)} where q.id = ${questionId} and q.session_id = ${sessionId}`;

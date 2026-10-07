@@ -1,6 +1,7 @@
 import type { OnboardingUtteranceAliases } from "@capital-q/onboarding";
 
 import { FOUNDER_STEPS } from "./founder-v1.js";
+import { FOUNDER_FINANCIAL_STEPS } from "./founder-v4.js";
 
 /**
  * Plain-language names a founder uses for the options Founder Definition v2
@@ -162,6 +163,23 @@ export const FOUNDER_UTTERANCE_ALIASES: OnboardingUtteranceAliases = {
     aed: ["dirham", "aed"],
     inr: ["rupee", "rupees", "inr"],
     sgd: ["singapore dollar", "sgd"],
+  },
+  [FOUNDER_FINANCIAL_STEPS.currency]: {
+    usd: ["dollars", "usd", "us dollar", "$"],
+    eur: ["euro", "euros", "eur"],
+    gbp: ["pounds", "sterling", "gbp", "£"],
+    ngn: ["naira", "ngn"],
+    kes: ["shillings", "kenyan shilling", "kes"],
+    zar: ["rand", "zar"],
+    aed: ["dirham", "aed"],
+    inr: ["rupee", "rupees", "inr"],
+    sgd: ["singapore dollar", "sgd"],
+  },
+  [FOUNDER_FINANCIAL_STEPS.revenueTrend]: {
+    growing: ["growing", "going up", "up every month", "increasing"],
+    flat: ["flat", "steady", "about the same", "stable"],
+    declining: ["declining", "going down", "dropping", "down"],
+    lumpy: ["lumpy", "it varies", "up and down", "depends on the month"],
   },
   [FOUNDER_STEPS.instrument]: {
     priced: ["priced", "equity round", "priced equity", "priced round"],

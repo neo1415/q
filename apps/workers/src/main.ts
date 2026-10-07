@@ -75,6 +75,7 @@ import {
 import {
   createFounderDocumentReview,
   createFounderExtraction,
+  createFounderFinancialCheck,
 } from "@capital-q/founder-onboarding";
 import {
   createMandateReview,
@@ -120,6 +121,7 @@ import {
 } from "@capital-q/model-gateway/q";
 import {
   createOnboardingService,
+  createPostgresOnboardingInterviewQuestionRepository,
   createPostgresOnboardingResponseRepository,
   createPostgresOnboardingSessionRepository,
   createPostgresOnboardingSuggestionRepository,
@@ -293,6 +295,35 @@ const onboarding = createOnboardingService({
   sql: database.sql,
   transactions: database.transactions,
   outbox: createOutboxWriter({ registry }),
+  logger,
+});
+
+/**
+ * Q.01: a founder's stated figure against their own confirmed deck. Pure
+ * code, no model, so it is composed whether or not a model is: a
+ * disagreement becomes one CONTRADICTION question, both readings kept.
+ */
+const deckRoom = createPostgresDataRoom();
+const founderFinancialCheck = createFounderFinancialCheck({
+  sql: database.sql,
+  sessions: createPostgresOnboardingSessionRepository(),
+  responses: createPostgresOnboardingResponseRepository(),
+  questions: createPostgresOnboardingInterviewQuestionRepository(),
+  deckReading: async (executor, companyId) => {
+    const deck = await deckRoom.currentDeck(executor, companyId);
+    if (deck === null) return null;
+    const reading = await deckRoom.extractionFor(executor, deck.versionId);
+    return reading === null
+      ? null
+      : {
+          documentId: reading.documentId,
+          sections: reading.sections,
+          confirmed: reading.confirmed,
+          reviews: reading.reviews,
+        };
+  },
+  recordQuestions: (command) =>
+    onboarding.internal.recordInterviewQuestions(command as never),
   logger,
 });
 
@@ -836,6 +867,7 @@ const documentEvents = createQueueRunner({
                         },
                       },
                       ...(founderReview === undefined ? {} : { founderReview }),
+                      founderFinancialCheck,
                       ...(mandateReview === undefined ? {} : { mandateReview }),
                       ...(presenceResearch === undefined
                         ? {}
