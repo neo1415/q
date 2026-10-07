@@ -59,7 +59,11 @@ export function createInvestorGateFits(dependencies: {
           companyId: query.companyId,
         }),
       ]);
-      if (projection === null) return [];
+      // The founder's own tenant only: a projection port that reads by
+      // company id alone must still never answer for another tenant.
+      if (projection === null || projection.subject.tenantId !== query.tenantId) {
+        return [];
+      }
       const evaluatedAt = clock().toISOString();
       // One gate per organisation: the newest published one.
       const seen = new Set<string>();

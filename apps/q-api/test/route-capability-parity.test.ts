@@ -146,6 +146,18 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     DOWNLOAD,
   "api/http/company-material.ts GET `${base}${COMPANY_FOUNDER_SEGMENT}`":
     cap("tool.get_company"),
+  // Investor promises (2026-10-07): each screen read is a Q tool too.
+  "api/http/company-material.ts GET `${base}${COMPANY_ASSUMPTIONS_SEGMENT}`":
+    cap("tool.company_assumptions"),
+  "api/http/gateq.ts GET GATEQ_INVESTOR_GATES_PATH": cap(
+    "tool.find_prospective_investors",
+  ),
+  "q-api/http/investor-promises.ts GET FIT_COMPARE_PATH": cap(
+    "tool.fit_compare",
+  ),
+  "q-api/http/investor-promises.ts GET FIT_THESIS_PATH": cap(
+    "tool.thesis_reading",
+  ),
 
   "api/http/company-team.ts GET `${base}${COMPANY_TEAM_ME_SUFFIX}`": cap(
     "tool.read_my_record",

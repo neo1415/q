@@ -7,6 +7,10 @@ import {
   GATEQ_APPLY_MATERIALS_PATH,
   COMPANY_CLAIMABLE_PATH,
   FounderApplicationListDtoSchema,
+  GATEQ_INVESTOR_GATES_PATH,
+  InvestorGateFitListDtoSchema,
+  InvestorGatesQuerySchema,
+  type InvestorGateFitDto,
   GATEQ_MY_APPLICATIONS_PATH,
   ClaimableCompanyListDtoSchema,
   COMPANY_CLAIM_CONFIRM_PATH,
@@ -144,6 +148,16 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
   readonly materials?: ApplicationMaterials | undefined;
   /** Submitted applications, read after GateQ authorises the gateway. */
   readonly inbox?: SubmissionInbox | undefined;
+  /**
+   * Q.05: published gates checked for the caller's OWN company (resolved
+   * on the server). Answers an empty list for anyone without a company.
+   */
+  readonly investorGates?:
+    | ((
+        actor: ReturnType<typeof getActorContext>,
+        investorOrganisationIds: readonly string[],
+      ) => Promise<readonly InvestorGateFitDto[]>)
+    | undefined;
   // BILLING block (ADR 0034): how many gateways the account's plan allows.
   // Absent: no plan control (tests of the GateQ domain alone).
   readonly entitlements?: Pick<EntitlementService, "check"> | undefined;
@@ -304,6 +318,23 @@ export function registerGateQRoutes(
       return { gateways: gateways.map(gatewayDto) };
     },
   );
+
+  const investorGates = dependencies.investorGates;
+  if (investorGates !== undefined) {
+    app.get(
+      GATEQ_INVESTOR_GATES_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const query = InvestorGatesQuerySchema.safeParse(request.query ?? {});
+        void reply.header("Cache-Control", "no-store");
+        return InvestorGateFitListDtoSchema.parse({
+          items: query.success
+            ? await investorGates(getActorContext(request), query.data.ids)
+            : [],
+        });
+      },
+    );
+  }
 
   const myApplications = dependencies.myApplications;
   if (myApplications !== undefined) {
