@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import {
+  InstructionDelegationRequestSchema,
+  Q_WORK_DELEGATION_PATH,
   Q_WORK_PAUSE_PATH,
   Q_WORK_RESUME_PATH,
   Q_WORK_SUGGESTION_DISMISSALS_PATH,
@@ -30,6 +32,15 @@ export type QWorkPagePort = {
   readonly resume: (actor: ActorContext, id: string) => Promise<boolean>;
   /** Additive and idempotent per person and suggestion. */
   readonly dismiss: (actor: ActorContext, key: string) => Promise<void>;
+  /**
+   * Scoped delegation: switch routine relationship moves on or off for
+   * their own live instruction, audited. Switching off is at once;
+   * switching on again is a new delegation. False: not theirs, not live,
+   * or already as asked.
+   */
+  readonly setDelegation?:
+    | ((actor: ActorContext, id: string, enabled: boolean) => Promise<boolean>)
+    | undefined;
 };
 
 const port = (ports: AppActionPorts) => ports.qWork ?? portMissing("qWork");
@@ -92,6 +103,64 @@ const RESUME = defineAppAction<z.infer<typeof ById>, z.infer<typeof Acted>>({
   legacyTool: "stop_q_work",
 });
 
+const DelegationSwitch = z
+  .object({
+    delegationId: UuidSchema,
+    enabled: InstructionDelegationRequestSchema.shape.enabled,
+  })
+  .strict();
+
+/**
+ * Scoped delegation (founder 2026-10-07, CLAUDE.md Authority "unless
+ * explicit scoped delegation exists"): the person's own switch on their own
+ * instruction. It is the person's act, offered as Work's toggle, never one
+ * Q takes for them (`offer.work_delegation`): Q never grants itself
+ * authority.
+ */
+const DELEGATION = defineAppAction<
+  z.infer<typeof DelegationSwitch>,
+  z.infer<typeof Acted>
+>({
+  name: "q.work.delegation.set",
+  short: "let Q handle routine replies",
+  area: "work",
+  classification: "INSTANT",
+  does: "Switches, on one of their own standing instructions, whether Q may reply, follow up and set meetings without asking (it still asks first for money, terms and anything new), as Work's toggle does.",
+  input: DelegationSwitch,
+  output: Acted,
+  authorize: ownRows,
+  run: async (ports, context, input) => {
+    const set = port(ports).setDelegation;
+    if (set === undefined) return portMissing("qWork");
+    return {
+      acted: await set(context.actor, input.delegationId, input.enabled),
+    };
+  },
+  targets: () => [],
+  card: () => ({ summary: "Q handles routine replies", preview: "" }),
+  done: (out, input) =>
+    !out.acted
+      ? "Nothing to change there."
+      : input.enabled
+        ? "Q now handles routine replies, follow-ups and meetings there."
+        : "Q asks you first again there.",
+  succeeded: (out) => out.acted,
+  http: {
+    method: "POST",
+    path: Q_WORK_DELEGATION_PATH,
+    fromRequest: (params, body) => ({
+      delegationId: params["delegationId"],
+      enabled:
+        typeof body === "object" && body !== null && "enabled" in body
+          ? body.enabled
+          : undefined,
+    }),
+    notFound: (out) => !out.acted,
+    respond: () => QWorkAcceptedDtoSchema.parse({ accepted: true }),
+  },
+  qCapability: "offer.work_delegation",
+});
+
 const Dismiss = z.object({ key: QWorkSuggestionKeySchema }).strict();
 
 const DISMISS = defineAppAction<z.infer<typeof Dismiss>, null>({
@@ -120,4 +189,9 @@ const DISMISS = defineAppAction<z.infer<typeof Dismiss>, null>({
   qCapability: "offer.work_suggestions",
 });
 
-export const WORK_ACTIONS: readonly AnyAppAction[] = [PAUSE, RESUME, DISMISS];
+export const WORK_ACTIONS: readonly AnyAppAction[] = [
+  PAUSE,
+  RESUME,
+  DISMISS,
+  DELEGATION,
+];

@@ -263,6 +263,8 @@ describe("the action registry", () => {
       ["q.work.pause", "legacy:stop_q_work", "INSTANT"],
       ["q.work.resume", "legacy:stop_q_work", "INSTANT"],
       ["q.work.suggestion.dismiss", "offer.work_suggestions", "INSTANT"],
+      // Scoped delegation: the person's own switch, never Q's.
+      ["q.work.delegation.set", "offer.work_delegation", "INSTANT"],
       // P7: GateQ rules drafted from a mandate, confirmed on the Gateway page.
       ["gateway.policy.read_mandate", "offer.gateway_mandate", "INSTANT"],
       // Overnight A3/A5: the data room and Q's reading of the deck.

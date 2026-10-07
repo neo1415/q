@@ -40,6 +40,7 @@
     "document-polish/v1": "c50f9529a88a478bf37050a3ad8760008857f93a010899f9645f4d86d26d82d5",
     "document-polish/v2": "daae58f57bed1e3bb3ae7a4347edf2c2de4425a3b84816c5a117e6b8dff36bdf",
     "draft-redraft/v1": "068410c61554978781015b6ffdb43d2430c71c9231879389bfebd5b79a7d5173",
+    "draft-redraft/v2": "0b8be91dc8c0009d0c57f202090453119b79ef005f0e1f4ca6e0dab09af564f6",
     "draft-review/v1": "3cd31cb7716095a5cb6fb7d239521dae89526498f6856e76971af0dd4b51b112",
     "errand-reply/v1": "02d0f83f8b554adf58e13e7e9a110529f2708c7fe95693655ddeeab2df90665d",
     "fit-explanation/v1": "3d552b0e5bdb9497ae2259ea56d21acdbf9df2920ea3f64481b633ec2006cc85",
@@ -54,6 +55,7 @@
     "instruction-plan/v4": "0e4096dd7ec13240897db0290a3ee46c9533ed0eee55ebe2f9bb81c25cce6109",
     "instruction-plan/v5": "c048351f251be9b557a7cf5ad825cb91c36254452603f692f3311fc0df8b5289",
     "instruction-plan/v6": "d1ede2fa5cec9a1bb65d0318cae93e07a4e11235705d56b1f41c59c97044a48d",
+    "instruction-plan/v7": "1f8fd4ce99a90a213d0372e6cc0cd28e275062c4a183692346cea2caae37f93d",
     "instruction-thread-reader/v1": "ee011b9cfb2377aec51dc183239e9c13deaf1d049679c70085fcde0270e9f99d",
     "instruction-thread-reader/v2": "9bd365b8d6a93d253a34e7df45285c87017c7963a4c2d99ad3eedddc27b5e7ce",
     "instruction-thread-reader/v3": "e212ee2797e2aa685bf7b6cd049d2d086ffda4051dab4614b502637b84ca5700",
@@ -175,11 +177,13 @@
     "welcome-conductor/v1": "1bee2c687f0b73949090001e0ae6064eaf95344ff4addea78ab9d611eb712810",
     "welcome-conductor/v2": "69de6b5c226ab19f4ef3e8f1e5f4445c99309186747b8f2a5cd33236d8013aac",
     "work-converse/v1": "7af8d5a1ce811886549c76921373bc91266669913f973bce9758a1f615c31bf1",
+    "work-converse/v2": "b9550dd40a581435f04433761c1dbf1cae61868681d83733b92449e227f68541",
     "work-interview-report/v1": "614a85ca8dff1f14f2a40e92ca4fdc4036d225bc400c16885a6263edcf59a7c1",
     "work-interview-turn/v1": "7366247a58e5db9f03d2d5c0e68c8b3e538fdfcc894ea19a9c0bc9337ab8d60b",
     "work-shortlist/v1": "901f1389ffedbd8c702574097b87e51f926cc594305d8d43c8b3b4c65c2d10e3",
     "work-slot-reader/v1": "9cc7753d25abaeab63e9a2082567b701e9d370fdcf1583447030b6453f14b3fc",
-    "work-stand-in-reply/v1": "4d100697d1b9a8c359cb49cc9fc70cc8e17613dd667efc128ee3ea9a51a96be0"
+    "work-stand-in-reply/v1": "4d100697d1b9a8c359cb49cc9fc70cc8e17613dd667efc128ee3ea9a51a96be0",
+    "work-stand-in-reply/v2": "b9888e4f6ae15e90894bbdd1acdc16390f74d862ec6064922fe397eafc8aa3df"
   },
   "generatedBy": "CQ-Q-006"
 }

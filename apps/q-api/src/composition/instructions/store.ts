@@ -42,6 +42,9 @@ export type InstructionRow = {
   /** WORK-58: the last thing Q did on it (list reads only). */
   last_step_words?: string | null;
   last_step_at?: Date | null;
+  /** Scoped delegation: the live one, when switched on (list and own reads). */
+  delegation_id?: string | null;
+  delegation_enabled_at?: Date | null;
   created_at: Date;
   updated_at: Date;
   grant_payload: unknown;
@@ -58,7 +61,16 @@ export type InstructionStepRow = {
   words: string;
   reason_code: string | null;
   q_action_id: string | null;
+  /** The message Q sent on its own under a delegation (steps read only). */
+  message_id?: string | null;
   created_at: Date;
+};
+
+/** A live delegation on an instruction. */
+export type DelegationRow = {
+  readonly id: string;
+  readonly scope: string;
+  readonly enabled_at: Date;
 };
 
 const DAY_MS = 24 * 3_600_000;
@@ -82,10 +94,13 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
     const rows = await sql<InstructionRow[]>`
       select i.*, g.grant_payload,
              (case when i.budget_month < date_trunc('month', now())::date
-                   then 0 else i.spent_usd_month end)::text as spent_this_month
+                   then 0 else i.spent_usd_month end)::text as spent_this_month,
+             d.id as delegation_id, d.enabled_at as delegation_enabled_at
         from q_runtime.standing_instructions i
         left join q_runtime.instruction_grants g
           on g.instruction_id = i.id and g.version = i.grant_version
+        left join q_runtime.instruction_delegations d
+          on d.instruction_id = i.id and d.revoked_at is null
        where i.id = ${id} and i.user_id = ${owner.userId}
          and i.tenant_id = ${owner.tenantId}`;
     return rows[0] ?? null;
@@ -189,10 +204,13 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
         select i.*, g.grant_payload,
              (case when i.budget_month < date_trunc('month', now())::date
                    then 0 else i.spent_usd_month end)::text as spent_this_month,
-             last.words as last_step_words, last.created_at as last_step_at
+             last.words as last_step_words, last.created_at as last_step_at,
+             d.id as delegation_id, d.enabled_at as delegation_enabled_at
           from q_runtime.standing_instructions i
           left join q_runtime.instruction_grants g
             on g.instruction_id = i.id and g.version = i.grant_version
+          left join q_runtime.instruction_delegations d
+            on d.instruction_id = i.id and d.revoked_at is null
           left join lateral (
             select s.words, s.created_at
               from q_runtime.instruction_steps s
@@ -638,22 +656,47 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       readonly reasonCode: string | null;
       readonly qActionId: string | null;
       readonly idempotencyKey: string;
+      /** The message Q sent on its own under a delegation. */
+      readonly messageId?: string | null | undefined;
     }): Promise<boolean> => {
       const rows = await sql<{ id: string }[]>`
         insert into q_runtime.instruction_steps
           (tenant_id, user_id, instruction_id, grant_version, run_key, step_index,
            action, mode, status, relationship_id, words, reason_code, q_action_id,
-           idempotency_key)
+           idempotency_key, message_id)
         values (${step.instruction.tenant_id}, ${step.instruction.user_id},
                 ${step.instruction.id}, ${step.instruction.grant_version ?? 1},
                 ${step.runKey}, ${step.stepIndex}, ${step.action.slice(0, 80)},
                 ${step.mode}, ${step.status}, ${step.relationshipId},
                 ${step.words.slice(0, 500)}, ${step.reasonCode}, ${step.qActionId},
-                ${step.idempotencyKey})
+                ${step.idempotencyKey}, ${step.messageId ?? null})
         on conflict (idempotency_key) do nothing
         returning id`;
       return rows.length > 0;
     },
+
+    /**
+     * Scoped delegation: the live delegation on an instruction (the engine's
+     * read; the instruction is already the one firing).
+     */
+    delegationOf: async (instructionId: string): Promise<DelegationRow | null> =>
+      (
+        await sql<DelegationRow[]>`
+          select id, scope, enabled_at from q_runtime.instruction_delegations
+           where instruction_id = ${instructionId} and revoked_at is null`
+      )[0] ?? null,
+
+    /** Steps Q did on its own under any delegation of this instruction since. */
+    delegatedSince: async (
+      instructionId: string,
+      since: Date,
+    ): Promise<number> =>
+      (
+        await sql<{ done: number }[]>`
+          select count(*)::int as done from q_runtime.instruction_steps
+           where instruction_id = ${instructionId} and status = 'DONE'
+             and reason_code = 'DELEGATED' and created_at >= ${since}`
+      )[0]?.done ?? 0,
 
     /** Whether this step already ran (a replayed firing skips it). */
     stepDone: async (idempotencyKey: string): Promise<boolean> =>
@@ -745,7 +788,8 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
     ): Promise<readonly InstructionStepRow[]> =>
       sql<InstructionStepRow[]>`
         select s.run_key, s.step_index, s.action, s.mode, s.status,
-               s.relationship_id, s.words, s.reason_code, s.q_action_id, s.created_at
+               s.relationship_id, s.words, s.reason_code, s.q_action_id,
+               s.message_id, s.created_at
           from q_runtime.instruction_steps s
          where s.instruction_id = ${id} and s.user_id = ${owner.userId}
            and s.tenant_id = ${owner.tenantId}

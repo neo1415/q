@@ -9,6 +9,9 @@ import {
 } from "@capital-q/app-actions";
 import {
   CorrelationIdSchema,
+  DELEGATED_ROUTINE_ACTIONS,
+  DELEGATION_LIMITS,
+  INSTRUCTION_DELEGATION_WORDS,
   InstructionGrantSchema,
   isMatchedRelationshipState,
   Q_INSTRUCTION_GRANT,
@@ -17,9 +20,11 @@ import {
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
+  COLD_OPEN,
   considerationReason,
   considerOutreach,
   ENGINE_ABILITIES,
+  wooProblem,
   type InstructionQuestionKind,
   type InstructionThreadFacts,
   type OutreachConsideration,
@@ -95,6 +100,11 @@ export type StepVerdict =
       readonly relationshipId: string | null;
       /** Why an AUTO-granted step is asked instead; null when as granted. */
       readonly code: string | null;
+      /**
+       * Scoped delegation: the delegation this AUTO step runs under because
+       * the grant alone would have asked. Absent when the grant allowed it.
+       */
+      readonly delegationId?: string | undefined;
     }
   | {
       readonly verdict: "REFUSED";
@@ -142,6 +152,10 @@ export const REFUSAL_CODES = [
   // Live seed (Ledgerline, 7 Oct): they wrote first; a cold introduction
   // back ignores what they said.
   "COLD_OPEN_IN_REPLY",
+  // Founder 2026-10-07: messages that woo (q-core wooProblem).
+  "OPENS_WITH_DEMAND",
+  "NOTHING_SPECIFIC",
+  "PUSHY",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -181,6 +195,19 @@ export const REFUSAL_WORDS: Readonly<
     reason:
       "they wrote to you first, and the message introduced you as if they hadn't",
     instead: "I'll write a reply to what they said",
+  },
+  OPENS_WITH_DEMAND: {
+    reason: "the message opened by asking for something",
+    instead:
+      "I'll open with something specific about them and ask gently at the end",
+  },
+  NOTHING_SPECIFIC: {
+    reason: "the message said nothing specific about them",
+    instead: "I'll write it again around what they do and what they said",
+  },
+  PUSHY: {
+    reason: "the message pressed them",
+    instead: "I'll write it again without pressure",
   },
   UNGROUNDED_MESSAGE: {
     reason:
@@ -286,6 +313,10 @@ export const ASK_WORDS: Readonly<Record<string, string>> = {
   UNANSWERED:
     "they haven't answered two messages; another would feel like pressure",
   THEY_SOUND_UNHAPPY: "they sounded unhappy, so you should see the reply first",
+  // Scoped delegation (founder 2026-10-07).
+  DELEGATION_DAILY_CAP:
+    "I've sent as many messages on my own today as your delegation allows",
+  NOT_REVIEWED: "the reviewer couldn't read it first",
 };
 
 // ---------------------------------------------------------------------------
@@ -409,7 +440,61 @@ export type ValidationContext = {
    * them waits too, so runs do not stack seven cards for one company.
    */
   readonly awaiting?: ReadonlySet<string> | undefined;
+  /**
+   * Scoped delegation (founder 2026-10-07): the person's live delegation
+   * on this instruction. Present, routine moves in a conversation that
+   * already exists -- a reply, a follow-up after silence, proposing or
+   * accepting a time -- go without a card, inside every check below.
+   */
+  readonly delegation?: { readonly id: string } | null | undefined;
+  /** Steps done under the delegation today (updated as steps pass). */
+  readonly delegatedToday?: { count: number } | undefined;
 };
+
+/**
+ * Whole working days (the grant's own days, in its zone) after `from`'s
+ * day up to and including `to`'s day. Code's own count for the follow-up
+ * cadence under delegation; an unknown zone counts nothing.
+ */
+export function workingDaysBetween(
+  from: Date,
+  to: Date,
+  hours: InstructionWorkingHours,
+): number {
+  try {
+    const start = local(from, hours.timeZone).date;
+    const end = local(to, hours.timeZone).date;
+    let count = 0;
+    for (let day = 1; day <= 62; day += 1) {
+      const here = local(
+        new Date(from.getTime() + day * 86_400_000),
+        hours.timeZone,
+      );
+      if (here.date > end) break;
+      if (here.date > start && hours.days.includes(here.day)) count += 1;
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+/** Whether delegation, not the grant, is what lets this step go alone. */
+function delegatedStep(
+  action: AnyAppAction,
+  subject: string | null,
+  context: ValidationContext,
+): boolean {
+  return (
+    context.delegation !== null &&
+    context.delegation !== undefined &&
+    (DELEGATED_ROUTINE_ACTIONS as readonly string[]).includes(action.name) &&
+    // Only a conversation that already exists: both sides agreed to
+    // connect. First contact with anyone else always asks (and chat is
+    // refused before this anyway).
+    connectedFor(context.people, subject)
+  );
+}
 
 const Args = z.record(z.string(), z.unknown());
 
@@ -652,7 +737,9 @@ export function validateStep(
     // Replying to what they wrote (Spheros wrote first, after accepting):
     // their message is the conversation, so this is never a cold open.
     context.facts?.get(subject)?.lastFrom === "THEM";
-  if (granted.mode === "ASK" && !routineReply) {
+  const delegated =
+    granted.mode === "ASK" && delegatedStep(action, subject, context);
+  if (granted.mode === "ASK" && !routineReply && !delegated) {
     return {
       verdict: "ASK",
       action,
@@ -712,6 +799,37 @@ export function validateStep(
     }
     if (subject !== null) context.sent.set(subject, sent + 1);
   }
+  if (
+    delegated &&
+    action.name === "chat.message.send" &&
+    subject !== null &&
+    context.facts?.get(subject)?.lastFrom !== "THEM"
+  ) {
+    // A follow-up after silence: at most one per three of their working
+    // days (the pacing above already holds five calendar days and stops
+    // after two unanswered in a row).
+    const lastFromUsAt = context.pace?.get(subject)?.lastFromUsAt ?? null;
+    if (
+      lastFromUsAt !== null &&
+      workingDaysBetween(lastFromUsAt, context.now, context.grant.workingHours) <
+        DELEGATION_LIMITS.followUpAfterWorkingDays
+    ) {
+      const held: OutreachConsideration = {
+        decision: "WAIT",
+        code: "TOO_SOON_TO_FOLLOW_UP",
+        until: null,
+      };
+      return {
+        verdict: "HOLD",
+        code: held.code,
+        relationshipId: subject,
+        reason: considerationReason(held, {
+          lastFromUsAt,
+          timeZone: context.grant.workingHours.timeZone,
+        }),
+      };
+    }
+  }
   if (action.name === "schedule.meeting.book") {
     const meeting = (
       parsed.data as {
@@ -731,6 +849,24 @@ export function validateStep(
     ) {
       return ask("MEETING_OUTSIDE_HOURS");
     }
+  }
+  if (delegated && context.delegation != null) {
+    // The house daily cap on what Q does alone under delegation.
+    const today = context.delegatedToday;
+    if (today !== undefined) {
+      if (today.count >= DELEGATION_LIMITS.sendsPerDay) {
+        return ask("DELEGATION_DAILY_CAP");
+      }
+      today.count += 1;
+    }
+    return {
+      verdict: "AUTO",
+      action,
+      input: parsed.data,
+      relationshipId: subject,
+      code: null,
+      delegationId: context.delegation.id,
+    };
   }
   return {
     verdict: "AUTO",
@@ -871,14 +1007,6 @@ function sidesWritten(
   );
 }
 
-/**
- * How a cold introduction opens: discovery of them, or presenting oneself.
- * Code's own check of words Q wrote; a false hit only sends the draft back
- * for a redraft.
- */
-const COLD_OPEN =
-  /\b(?:came across|come across|found (?:you|your|the company)|discovered (?:you|your|the company)|(?:i|we)(?:'|’)?d (?:like|love) to introduce|(?:let|allow) me to introduce)\b/iu;
-
 export type StaleReason = "NEWER_MESSAGE_FROM_THEM" | "COLD_OPEN_IN_REPLY";
 
 /**
@@ -979,7 +1107,6 @@ function messageProblem(
   if (replying && COLD_OPEN.test(body.body)) {
     return refuse("COLD_OPEN_IN_REPLY");
   }
-  if (context.material === undefined) return pass;
   const counterpartId =
     subject === null
       ? undefined
@@ -990,6 +1117,22 @@ function messageProblem(
     counterpartId === undefined
       ? []
       : (material?.counterparts.get(counterpartId) ?? []);
+  // Founder 2026-10-07: a message that woos. Code's own read of Q's draft;
+  // a failing one is planned again (the rewrite), never sent as it is. An
+  // answer to their own question is about them already.
+  const answeringThem =
+    thread?.asksQuestion === true && thread.lastFrom === "THEM";
+  const woo = wooProblem({
+    body: body.body,
+    replying,
+    recipientTerms: answeringThem
+      ? []
+      : counterpart.flatMap((fact) => fact.anchors),
+  });
+  if (woo !== null) {
+    return refuse(woo === "WOO_TOO_LONG" ? "MESSAGE_TOO_LONG" : woo);
+  }
+  if (context.material === undefined) return pass;
   const first = !written && !replying;
   // A first message only inside the sender's declared hard criteria.
   if (
@@ -1015,10 +1158,14 @@ function messageProblem(
     first,
     counterpart,
     sender: material?.sender.facts ?? [],
-    bookingAuto: context.grant.actions.some(
-      (entry) =>
-        entry.action === "schedule.meeting.book" && entry.mode === "AUTO",
-    ),
+    // Under delegation, proposing a time in a live conversation is one of
+    // the routine moves the person handed over.
+    bookingAuto:
+      context.grant.actions.some(
+        (entry) =>
+          entry.action === "schedule.meeting.book" && entry.mode === "AUTO",
+      ) ||
+      (context.delegation != null && connectedFor(context.people, subject)),
     answering,
     asks: step.message?.asks,
     side: material?.sender.side,
@@ -1074,7 +1221,10 @@ export type InstructionEngineDependencies = {
     | "notify"
   > &
     // Optional: a store without it (older doubles) waits on nothing.
-    Partial<Pick<InstructionStore, "waitingCards">>;
+    // Without the delegation reads, nothing runs under a delegation.
+    Partial<
+      Pick<InstructionStore, "waitingCards" | "delegationOf" | "delegatedSince">
+    >;
   readonly actions: readonly AnyAppAction[];
   readonly ports: AppActionPorts;
   /**
@@ -1149,6 +1299,23 @@ export type InstructionEngineDependencies = {
    */
   readonly review?: OutwardReview | undefined;
   /**
+   * Scoped delegation: the audit record of a step Q took on its own under
+   * the person's delegation ("executed under delegation <id> by instruction
+   * <id>"). Absent, nothing runs under a delegation: an unaudited
+   * delegated step never happens.
+   */
+  readonly auditDelegated?:
+    | ((entry: {
+        readonly actor: ActorContext;
+        readonly delegationId: string;
+        readonly instructionId: string;
+        readonly action: string;
+        readonly relationshipId: string | null;
+        readonly idempotencyKey: string;
+        readonly messageId: string | null;
+      }) => Promise<void>)
+    | undefined;
+  /**
    * Founder brief J5: a standing instruction is one of Q's jobs. Each
    * firing that plans keeps its job on the workforce page (one job per
    * instruction, never a parallel record of the work).
@@ -1162,6 +1329,21 @@ export type InstructionEngineDependencies = {
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
+
+/** The id of the chat message a send produced, when it produced one. */
+function sentMessageId(out: unknown): string | null {
+  if (typeof out !== "object" || out === null || !("message" in out)) {
+    return null;
+  }
+  const message = out.message;
+  return typeof message === "object" &&
+    message !== null &&
+    "id" in message &&
+    typeof message.id === "string" &&
+    /^[0-9a-f-]{36}$/iu.test(message.id)
+    ? message.id
+    : null;
+}
 
 /** A chat message step's text body, when it has one. */
 function textBody(input: unknown): string | null {
@@ -1193,8 +1375,16 @@ function withTextBody(input: unknown, body: string): unknown {
     : input;
 }
 
-function grantLines(grant: InstructionGrant): string {
+function grantLines(
+  grant: InstructionGrant,
+  delegation: { readonly id: string } | null = null,
+): string {
   return [
+    ...(delegation === null
+      ? []
+      : [
+          `Delegation: on -- ${INSTRUCTION_DELEGATION_WORDS}. In a conversation where they have accepted, replies, gentle follow-ups after silence (at most one every ${String(DELEGATION_LIMITS.followUpAfterWorkingDays)} working days, never more than ${String(DELEGATION_LIMITS.followUpsInARow)} unanswered in a row), thanks, asking for a deck they offered, and proposing or accepting a time in working hours go without asking. Money, terms, commitments, attachments, data rooms, private data and anyone not yet connected still ask.`,
+        ]),
     ...grant.actions.map((entry) => `- ${entry.action}: ${entry.mode}`),
     `Working hours: days ${grant.workingHours.days.join(",")} ${grant.workingHours.start}-${grant.workingHours.end} ${grant.workingHours.timeZone}`,
     `Tone: ${grant.tone}`,
@@ -1471,6 +1661,24 @@ export function createInstructionEngine(
       }
       const people = await dependencies.people(actor).catch(() => []);
       const sentBefore = await store.messagesSent(row.id);
+      // Scoped delegation: read once per firing. Without an audit sink, or
+      // when the read fails, nothing runs under it (every step asks).
+      const delegation =
+        dependencies.auditDelegated === undefined
+          ? null
+          : await Promise.resolve()
+              .then(() => store.delegationOf?.(row.id) ?? null)
+              .catch(() => null);
+      const startOfDay = new Date(at.getTime() - 24 * 3_600_000);
+      const delegatedToday = {
+        count:
+          delegation === null
+            ? 0
+            : await Promise.resolve()
+                .then(() => store.delegatedSince?.(row.id, startOfDay) ?? 0)
+                // Unreadable: treat the day's cap as used up.
+                .catch(() => Number.MAX_SAFE_INTEGER),
+      };
       // Unreadable is not "nothing waiting": no hold is added, as before.
       // Both narrowed below when a stale card is superseded (F24).
       let awaiting = await dependencies
@@ -1681,7 +1889,7 @@ export function createInstructionEngine(
               (await dependencies.principalName?.(actor).catch(() => null)) ??
               "the person",
             goal: row.goal_text,
-            grant: grantLines(grant.data),
+            grant: grantLines(grant.data, delegation),
             sender: senderLines(material?.sender ?? null),
             actions: actionLines(grant.data, dependencies.actions),
             now: `${at.toISOString()} (their zone ${grant.data.workingHours.timeZone})`,
@@ -1726,6 +1934,8 @@ export function createInstructionEngine(
         if (plan === null) return empty("PLANNER_UNAVAILABLE");
         const sent = new Map(sentBefore);
         const sitting = new Map<string, number>();
+        // Each plan's count starts from what was done before this firing.
+        const delegatedNow = { count: delegatedToday.count };
         const current = plan;
         verdicts = current.steps.map((step, index) =>
           validateStep(step, {
@@ -1742,6 +1952,8 @@ export function createInstructionEngine(
             pace: paces,
             sitting,
             awaiting,
+            delegation,
+            delegatedToday: delegatedNow,
           }),
         );
         const refused = verdicts
@@ -1800,6 +2012,7 @@ export function createInstructionEngine(
           introduced,
           pace: paces,
           awaiting,
+          delegation,
         };
         const reviewedPlan = plan;
         verdicts = await Promise.all(
@@ -1969,6 +2182,7 @@ export function createInstructionEngine(
           readonly words: string;
           readonly reasonCode: string | null;
           readonly qActionId: string | null;
+          readonly messageId?: string | null | undefined;
         }) =>
           store.recordStep({
             instruction: row,
@@ -2019,7 +2233,18 @@ export function createInstructionEngine(
             "instruction AUTO step asked: autonomy is off",
           );
         }
-        if (verdict.verdict === "AUTO" && dependencies.autoEnabled) {
+        // A delegated message goes only once the reviewer passed it: with no
+        // grade (no reviewer, or not read), it is the person's card instead.
+        const unreviewed =
+          verdict.verdict === "AUTO" &&
+          verdict.delegationId !== undefined &&
+          verdict.action.name === "chat.message.send" &&
+          graded.get(index)?.verdict !== "PASSED";
+        if (
+          verdict.verdict === "AUTO" &&
+          dependencies.autoEnabled &&
+          !unreviewed
+        ) {
           const context = {
             actor,
             idempotencyKey: key,
@@ -2045,12 +2270,51 @@ export function createInstructionEngine(
               });
               return;
             }
-            await verdict.action.run(
+            const out = await verdict.action.run(
               dependencies.ports,
               context,
               verdict.input,
             );
             done += 1;
+            const delegationId = verdict.delegationId;
+            if (delegationId !== undefined) {
+              // Done for you: recorded, audited and (a message) unsendable
+              // from Work for a short while.
+              const messageId = sentMessageId(out);
+              await record({
+                status: "DONE",
+                mode: "AUTO",
+                words: `Done for you: ${step.words}`,
+                reasonCode: "DELEGATED",
+                qActionId: null,
+                messageId,
+              });
+              await dependencies
+                .auditDelegated?.({
+                  actor,
+                  delegationId,
+                  instructionId: row.id,
+                  action: step.action,
+                  relationshipId: verdict.relationshipId,
+                  idempotencyKey: key,
+                  messageId,
+                })
+                .catch((error: unknown) => {
+                  logger?.warn(
+                    { err: error, instructionId: row.id, delegationId },
+                    "delegated step audit not written",
+                  );
+                });
+              const sentDraft = graded.get(index);
+              if (sentDraft !== undefined) {
+                await review?.settle(
+                  { tenantId: row.tenant_id, userId: row.user_id },
+                  sentDraft,
+                  "SENT",
+                );
+              }
+              return;
+            }
             const sentDraft = graded.get(index);
             if (sentDraft !== undefined) {
               await review?.settle(
@@ -2126,7 +2390,12 @@ export function createInstructionEngine(
             card.qActionId,
           );
         }
-        const code = verdict.verdict === "AUTO" ? "AUTONOMY_OFF" : verdict.code;
+        const code =
+          verdict.verdict === "AUTO"
+            ? unreviewed
+              ? "NOT_REVIEWED"
+              : "AUTONOMY_OFF"
+            : verdict.code;
         const why = code === null ? null : (ASK_WORDS[code] ?? null);
         await record({
           status: "ASKED",

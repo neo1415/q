@@ -4,6 +4,8 @@ import { APP_ACTIONS, settleGrant } from "@capital-q/app-actions";
 import {
   InstructionGrantPayloadSchema,
   InstructionGrantSchema,
+  DELEGATION_LIMITS,
+  INSTRUCTION_DELEGATION_WORDS,
   Q_INSTRUCTION_GRANT,
   Q_WORK_OUTREACH_START,
   Q_WORK_STANDIN_START,
@@ -12,7 +14,9 @@ import {
   QWorkStandInStartPayloadSchema,
   UuidSchema,
   type QSubjectRef,
+  type QWorkDetailDto,
   type QWorkDto,
+  type QWorkStepDto,
   type QWorkOutreachStartPayload,
   type QWorkStandInStartPayload,
 } from "@capital-q/contracts";
@@ -28,6 +32,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import type {
   InstructionRow,
+  InstructionStepRow,
   InstructionStore,
 } from "../instructions/store.js";
 import { TERMINAL_STAGES, type LaneRow, type WorkStore } from "./store.js";
@@ -452,12 +457,58 @@ function instructionWorkDto(row: InstructionRow): QWorkDto | null {
         : {
             words: row.last_step_words.slice(0, 500),
             at: row.last_step_at.toISOString(),
+            doneForYou: row.last_step_words.startsWith("Done for you:"),
+            undo: null,
           },
     // Money stays a decimal string end to end (never a float on the wire).
     spend: {
       spentUsdMonth: cents(row.spent_this_month),
       budgetUsdMonth: cents(row.budget_usd_month),
     },
+    // Scoped delegation: shown, with its toggle, while the work is live.
+    delegation: !live
+      ? null
+      : {
+          id: row.delegation_id ?? null,
+          enabled: row.delegation_id !== null && row.delegation_id !== undefined,
+          scope: "RELATIONSHIP_ROUTINE",
+          words: INSTRUCTION_DELEGATION_WORDS,
+          enabledAt: row.delegation_enabled_at?.toISOString() ?? null,
+        },
+  };
+}
+
+/**
+ * A step on an instruction's page: "Done for you" when Q took it on its
+ * own under the person's delegation, and, for a message sent so, the
+ * chat's own unsend while it is still fresh.
+ */
+export function instructionStepDto(
+  step: Pick<
+    InstructionStepRow,
+    "words" | "created_at" | "reason_code" | "relationship_id" | "message_id"
+  >,
+  now: Date = new Date(),
+): QWorkStepDto {
+  const doneForYou = step.reason_code === "DELEGATED";
+  const until = new Date(
+    step.created_at.getTime() + DELEGATION_LIMITS.unsendMinutes * 60_000,
+  );
+  return {
+    words: step.words,
+    at: step.created_at.toISOString(),
+    doneForYou,
+    undo:
+      doneForYou &&
+      step.message_id != null &&
+      step.relationship_id !== null &&
+      until.getTime() > now.getTime()
+        ? {
+            relationshipId: step.relationship_id,
+            messageId: step.message_id,
+            until: until.toISOString(),
+          }
+        : null,
   };
 }
 
@@ -498,6 +549,8 @@ export function latestLaneStep(
       latest = {
         words: `${lane.counterpartName}: ${lane.lastStep}`.slice(0, 500),
         at: lane.updatedAt,
+        doneForYou: false,
+        undo: null,
       };
     }
   }
@@ -548,7 +601,7 @@ export function createWorkPort(dependencies: {
     delegationId: string,
   ) => Promise<{
     work: QWorkDto;
-    steps: { words: string; at: string }[];
+    steps: QWorkDetailDto["steps"];
   } | null>;
   readonly report: (
     actor: ActorContext,
@@ -577,6 +630,7 @@ export function createWorkPort(dependencies: {
       run: delegationRun(row.status, lanes),
       lastStep: latestLaneStep(lanes),
       spend: null,
+      delegation: null,
     };
   };
   return {
@@ -671,12 +725,10 @@ export function createWorkPort(dependencies: {
           actor,
           delegationId,
         );
+        const now = new Date();
         return {
           work,
-          steps: steps.map((step) => ({
-            words: step.words,
-            at: step.created_at.toISOString(),
-          })),
+          steps: steps.map((step) => instructionStepDto(step, now)),
         };
       }
       const steps = await store.steps(actor, delegationId);
@@ -685,6 +737,8 @@ export function createWorkPort(dependencies: {
         steps: steps.map((step) => ({
           words: step.words,
           at: step.created_at.toISOString(),
+          doneForYou: false,
+          undo: null,
         })),
       };
     },

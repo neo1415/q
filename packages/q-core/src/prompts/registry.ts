@@ -5,6 +5,7 @@ import {
   INSTRUCTION_PLAN_V4,
   INSTRUCTION_PLAN_V5,
   INSTRUCTION_PLAN_V6,
+  INSTRUCTION_PLAN_V7,
   INSTRUCTION_THREAD_READER_V1,
   INSTRUCTION_THREAD_READER_V2,
   INSTRUCTION_THREAD_READER_V3,
@@ -105,6 +106,7 @@ import { MEETING_NOTES_V3 } from "./tasks/meeting-notes.v3.js";
 import { ERRAND_REPLY_V1 } from "./tasks/errand-reply.v1.js";
 import {
   DRAFT_REDRAFT_V1,
+  DRAFT_REDRAFT_V2,
   DRAFT_REVIEW_V1,
   JOB_PLAN_V1,
   REPLY_READER_V1,
@@ -114,10 +116,12 @@ import { DECK_EXTRACTION_V1 } from "./tasks/deck-extraction.v1.js";
 // AUTO block (ADR 0030)
 import {
   WORK_CONVERSE_V1,
+  WORK_CONVERSE_V2,
   WORK_INTERVIEW_REPORT_V1,
   WORK_INTERVIEW_TURN_V1,
   WORK_SHORTLIST_V1,
   WORK_STAND_IN_REPLY_V1,
+  WORK_STAND_IN_REPLY_V2,
   WORK_SLOT_READER_V1,
 } from "./tasks/q-work.v1.js";
 import { INVESTOR_PERSONA_V1 } from "./tasks/investor-persona.v1.js";
@@ -435,6 +439,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     ERRAND_REPLY_V1,
     DRAFT_REVIEW_V1,
     DRAFT_REDRAFT_V1,
+    DRAFT_REDRAFT_V2,
     REPLY_READER_V1,
     JOB_PLAN_V1,
     ONBOARDING_MOVE_READER_V1,
@@ -477,9 +482,11 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     // AUTO block (ADR 0030)
     WORK_SHORTLIST_V1,
     WORK_CONVERSE_V1,
+    WORK_CONVERSE_V2,
     WORK_INTERVIEW_TURN_V1,
     WORK_INTERVIEW_REPORT_V1,
     WORK_STAND_IN_REPLY_V1,
+    WORK_STAND_IN_REPLY_V2,
     WORK_SLOT_READER_V1,
     // ADR 0043: standing instructions.
     INSTRUCTION_PLAN_V1,
@@ -488,6 +495,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INSTRUCTION_PLAN_V4,
     INSTRUCTION_PLAN_V5,
     INSTRUCTION_PLAN_V6,
+    INSTRUCTION_PLAN_V7,
     INSTRUCTION_THREAD_READER_V1,
     INSTRUCTION_THREAD_READER_V2,
     INSTRUCTION_THREAD_READER_V3,

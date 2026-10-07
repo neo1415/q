@@ -974,6 +974,18 @@ export {
   type OutreachKind,
   type OutreachMoment,
 } from "./etiquette/pacing.js";
+// Founder 2026-10-07: messages that woo, and code's check of them.
+export {
+  COLD_OPEN,
+  WOO_FEEDBACK,
+  WOO_GUIDANCE,
+  WOO_PROBLEMS,
+  WOO_WORDS_MAX,
+  WOO_WORDS_TARGET,
+  wooProblem,
+  type WooInput,
+  type WooProblem,
+} from "./etiquette/woo.js";
 // end ETIQUETTE block
 
 export {
@@ -1041,10 +1053,12 @@ export {
 // AUTO block: Q's delegated work prompts (ADR 0030).
 export {
   WORK_CONVERSE_V1,
+  WORK_CONVERSE_V2,
   WORK_INTERVIEW_REPORT_V1,
   WORK_INTERVIEW_TURN_V1,
   WORK_SHORTLIST_V1,
   WORK_STAND_IN_REPLY_V1,
+  WORK_STAND_IN_REPLY_V2,
   WORK_SLOT_READER_V1,
 } from "./prompts/tasks/q-work.v1.js";
 export {
@@ -1076,6 +1090,7 @@ export {
   INSTRUCTION_PLAN_V4,
   INSTRUCTION_PLAN_V5,
   INSTRUCTION_PLAN_V6,
+  INSTRUCTION_PLAN_V7,
   INSTRUCTION_THREAD_READER_V1,
   INSTRUCTION_THREAD_READER_V2,
   INSTRUCTION_THREAD_READER_V3,
@@ -1199,6 +1214,7 @@ export {
 // Founder brief J1-J9 (2026-10-06): Q's workforce of agents.
 export {
   DRAFT_REDRAFT_V1,
+  DRAFT_REDRAFT_V2,
   DRAFT_REVIEW_V1,
   JOB_PLAN_V1,
   REPLY_READER_V1,

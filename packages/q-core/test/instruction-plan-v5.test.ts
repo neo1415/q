@@ -17,7 +17,7 @@ describe("INSTRUCTION_PLAN v5", () => {
 
   // v6 (ADR 0050) is v5 plus the consider step: v5's rules all hold.
   it("is carried by the active version, with each new rule", () => {
-    expect(active.definition.version).toBe(6);
+    expect(active.definition.version).toBe(7);
     const template = active.definition.template;
     for (const rule of [
       "message: for every chat message, its kind and what its final sentence asks",
@@ -27,7 +27,7 @@ describe("INSTRUCTION_PLAN v5", () => {
       "outside your declared mandate, write no first message",
       "never a request for time",
       "write it word for word",
-      "(v6, with request, each cannot's needs and each step's message)",
+      "(v7, with request, each cannot's needs and each step's message)",
     ]) {
       expect(template, rule).toContain(rule);
     }

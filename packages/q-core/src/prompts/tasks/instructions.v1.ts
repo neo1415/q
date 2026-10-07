@@ -1,3 +1,4 @@
+import { WOO_GUIDANCE } from "../../etiquette/woo.js";
 import type { PromptDefinition } from "../definition.js";
 import {
   INSTRUCTION_THREAD_READER_SCHEMA_NAME,
@@ -283,7 +284,7 @@ export const INSTRUCTION_PLAN_V6: PromptDefinition<
   InstructionPlanV4Variables,
   InstructionPlanV5Result
 > = {
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -303,6 +304,58 @@ export const INSTRUCTION_PLAN_V6: PromptDefinition<
     schema: InstructionPlanV5ResultSchema,
   },
   template: PLAN_V6,
+};
+
+/**
+ * v7 (founder 2026-10-07: "they don't know how to woo an investor"; scoped
+ * delegation). Messages on both sides are relationship-first: open with
+ * something genuine and specific about the other side, connect it to
+ * evidence, one soft ask, 60-120 words, no hard sell. Code checks each
+ * draft (wooProblem) and sends a failing one back to be written again. A
+ * meeting may be proposed where booking is AUTO or the person's
+ * delegation is on (the grant lines say so).
+ */
+const PLAN_V7_SOURCE = PLAN_V6.replace(
+  "  - At most 60 words, in their tone.",
+  "  - 60-120 words, in their tone; never more than 160.",
+)
+  .replace(
+    "  - Propose a call or a meeting (asks MEETING) only when schedule.meeting.book is AUTO in what they allowed. Otherwise end with a substantive question about their company -- their customers, product, traction or plans -- never a request for time.",
+    "  - Propose a call or a meeting (asks MEETING) only when schedule.meeting.book is AUTO in what they allowed, or WHAT THEY ALLOWED says their delegation is on and they have written back. Otherwise end with a substantive question about their company -- their customers, product, traction or plans -- never a request for time.",
+  )
+  .replace(
+    "\nBEFORE YOU WRITE (consider the moment, as a thoughtful colleague would)\n",
+    `\n${WOO_GUIDANCE}\n\nBEFORE YOU WRITE (consider the moment, as a thoughtful colleague would)\n`,
+  )
+  .replace(
+    "(v6, with request, each cannot's needs and each step's message)",
+    "(v7, with request, each cannot's needs and each step's message)",
+  );
+
+export const INSTRUCTION_PLAN_V7: PromptDefinition<
+  InstructionPlanV4Variables,
+  InstructionPlanV5Result
+> = {
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  effectiveFrom: "2026-10-07",
+  id: "INSTRUCTION_PLAN",
+  version: 7,
+  changeDescription:
+    "Founder 2026-10-07: messages were too direct. Both sides now write relationship-first (specific opening about the other side, evidence, one soft ask, 60-120 words, no hard sell; founders lead with why this investor and one traction proof point). Code rejects a draft that opens with a demand, says nothing specific, runs past 160 words, pushes, or opens cold in a reply, and the plan is written again. Meetings may be proposed under the person's delegation. Same variables and output as v6.",
+  variables: {
+    schema: InstructionPlanV4VariablesSchema,
+    untrusted: [...INSTRUCTION_PLAN_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: INSTRUCTION_PLAN_SCHEMA_NAME,
+    schemaVersion: INSTRUCTION_PLAN_V5_SCHEMA_VERSION,
+    schema: InstructionPlanV5ResultSchema,
+  },
+  template: PLAN_V7_SOURCE,
 };
 
 const THREAD_READER = `TASK: INSTRUCTION_THREAD_READER

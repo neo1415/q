@@ -2423,7 +2423,11 @@ const { app, logger } = createApp(config, security, {
   profileImages,
   namedPhotos,
   // WORK-58: the Work page's own writes (pause, resume, Not now).
-  qWork: createQWorkPagePort(database.sql),
+  // Scoped delegation: the switch writes its audit in the same transaction.
+  qWork: createQWorkPagePort(database.sql, {
+    transactions: database.transactions,
+    audit,
+  }),
   inboundEmail: {
     inboundEmail,
     webhookSecret: inboundEmailConfig.inbound?.webhookSecret.reveal(),
