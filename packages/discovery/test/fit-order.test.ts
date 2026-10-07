@@ -201,5 +201,31 @@ describe("fit order (fit-order.v1)", () => {
     expect(first?.score).not.toBeNull();
     expect(second?.score).not.toBeNull();
     expect(first?.score ?? 0).toBeGreaterThan(second?.score ?? 0);
+
+    // Equal fits (same score, value and confidence) keep the base order,
+    // whatever their ids: a UUID never decides the feed (step 3).
+    const tied = await createFitOrdering({
+      inputs: {
+        read: () =>
+          Promise.resolve(
+            new Map([
+              [ID(1), company("1500000")],
+              [ID(2), company("1500000")],
+            ]),
+          ),
+      },
+      clock: () => new Date(AT),
+    }).order({
+      actor: ACTOR,
+      investorOrganisationId: ID(10),
+      mandateId: ID(11),
+      candidates: [
+        { companyId: ID(2), baseRank: 1, eligibilityReasons: [] },
+        { companyId: ID(1), baseRank: 2, eligibilityReasons: [] },
+      ],
+    });
+    expect(tied.map((o) => o.companyId)).toEqual([ID(2), ID(1)]);
+    expect(tied[0]?.score).not.toBeNull();
+    expect(tied[0]?.score).toBe(tied[1]?.score);
   });
 });

@@ -201,6 +201,25 @@ const CONFIDENCE_ORDER: Readonly<Record<FitConfidence, number>> = {
  * sort after everything a person could act on.
  */
 export function compareAssessments(a: FitAssessment, b: FitAssessment): number {
+  const merit = compareAssessmentMerit(a, b);
+  if (merit !== 0) return merit;
+  return a.profile.companyId < b.profile.companyId
+    ? -1
+    : a.profile.companyId > b.profile.companyId
+      ? 1
+      : 0;
+}
+
+/**
+ * The tie-break without the final company-id fallback: 0 when two
+ * assessments are equally good. The slate's fit order needs this so its
+ * next key (the base rank) is reachable; an id is an arbitrary UUID and
+ * would otherwise decide equal fits at random per seed.
+ */
+export function compareAssessmentMerit(
+  a: FitAssessment,
+  b: FitAssessment,
+): number {
   const outA = a.profile.band === "OUTSIDE_MANDATE" ? 1 : 0;
   const outB = b.profile.band === "OUTSIDE_MANDATE" ? 1 : 0;
   if (outA !== outB) return outA - outB;
@@ -209,10 +228,5 @@ export function compareAssessments(a: FitAssessment, b: FitAssessment): number {
   if (va !== vb) return vb - va;
   const ca = CONFIDENCE_ORDER[a.profile.confidence];
   const cb = CONFIDENCE_ORDER[b.profile.confidence];
-  if (ca !== cb) return cb - ca;
-  return a.profile.companyId < b.profile.companyId
-    ? -1
-    : a.profile.companyId > b.profile.companyId
-      ? 1
-      : 0;
+  return cb - ca;
 }

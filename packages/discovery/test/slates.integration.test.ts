@@ -22,6 +22,7 @@ import {
   createPostgresRefreshRequestStore,
   createPostgresSlateRepository,
 } from "../src/infrastructure/postgres-slate-repository.js";
+import { FIT_ORDER_CURRENT } from "../src/fit/order.js";
 import { RANKING_CONFIG_CURRENT } from "../src/ranking/config.js";
 import { RANKER_VERSION } from "../src/ranking/contracts.js";
 import { SEMANTIC_GENERATOR_VERSION } from "../src/semantic/contracts.js";
@@ -646,9 +647,9 @@ describe("@capital-q/discovery slate builder over the live local pipeline", () =
         SEMANTIC_GENERATOR_VERSION,
       );
       expect(first.slate.rankerVersion).toBe(RANKER_VERSION);
-      expect(first.slate.rankingConfigVersion).toBe(
-        RANKING_CONFIG_CURRENT.version,
-      );
+      // 5481eb6c (Q.06): the live pipeline orders by the fit out of 10 and
+      // the slate records that order's version, not REC-005's config.
+      expect(first.slate.rankingConfigVersion).toBe(FIT_ORDER_CURRENT.version);
       expect(first.slate.taxonomyVersion).not.toBeNull();
       const items = await w.pipeline.slates.pageItems({
         slateId: first.slate.id,
