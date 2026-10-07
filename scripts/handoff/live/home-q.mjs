@@ -1,6 +1,9 @@
 const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE ??
-    new URL("../../../node_modules/.pnpm/playwright@1.62.1/node_modules/playwright/index.mjs", import.meta.url).href,
+    new URL(
+      "../../../node_modules/.pnpm/playwright@1.62.1/node_modules/playwright/index.mjs",
+      import.meta.url,
+    ).href
 );
 const WEB = "https://capital-qweb-production.up.railway.app";
 const browser = await chromium.launch({

@@ -1,217 +1,777 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Test Founder Answers</title>
-<style>
-  :root {
-    --bg: #f7f6f2; --surface: #ffffff; --text: #17181a; --muted: #5d6066;
-    --line: #e3e1da; --accent: #1d5fd1; --soft: #eaf1fd; --warn-bg: #fff6e0; --warn: #7a5600;
-    --tag: #f0efea;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #101114; --surface: #17191d; --text: #ecedef; --muted: #a2a6ad;
-      --line: #2a2d33; --accent: #7aa7ff; --soft: #18243a; --warn-bg: #2b2414; --warn: #f0c96a;
-      --tag: #22252a;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 80px; }
-  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
-  h2 { font-size: 22px; margin: 44px 0 12px; }
-  h3 { font-size: 16px; margin: 26px 0 8px; color: var(--muted); font-weight: 600; }
-  p { margin: 0 0 12px; }
-  .lede { color: var(--muted); margin-bottom: 24px; }
-  nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 8px; }
-  nav a { text-decoration: none; color: var(--accent); background: var(--soft);
-    padding: 8px 14px; border-radius: 999px; font-size: 14px; min-height: 36px; display: inline-flex; align-items: center; }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 12px 0; }
-  .note { background: var(--warn-bg); color: var(--text); border-radius: 12px; padding: 14px 16px; margin: 14px 0; }
-  .note strong { color: var(--warn); }
-  table { width: 100%; border-collapse: collapse; font-size: 15px; }
-  th, td { text-align: left; vertical-align: top; padding: 10px 8px; border-top: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 600; font-size: 13px; }
-  td:first-child { width: 36%; color: var(--muted); }
-  td b { color: var(--text); }
-  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--tag); color: var(--muted); margin-left: 6px; white-space: nowrap; }
-  .tag.pub { background: var(--soft); color: var(--accent); }
-  ol, ul { padding-left: 22px; margin: 0 0 12px; }
-  li { margin: 4px 0; }
-  .say { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 10px 0; }
-  code { background: var(--tag); padding: 1px 6px; border-radius: 6px; font-size: 14px; }
-  a { color: var(--accent); }
-  @media (max-width: 560px) { td:first-child { width: 42%; } h1 { font-size: 25px; } }
-</style>
-</head>
-<body>
-<main>
-  <h1>Test founders: Spheros and Mai Soli Foundation</h1>
-  <p class="lede">Everything Q will ask during founder onboarding, with an answer for each and where it came from. Also the steps to make both companies show up in Zino's Discover, and some curveballs to try.</p>
-  <nav>
-    <a href="#before">Before you start</a>
-    <a href="#spheros">Spheros</a>
-    <a href="#maisoli">Mai Soli</a>
-    <a href="#discover">Getting into Discover</a>
-    <a href="#curveballs">Curveballs</a>
-    <a href="#sources">Sources</a>
-  </nav>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Test Founder Answers</title>
+    <style>
+      :root {
+        --bg: #f7f6f2;
+        --surface: #ffffff;
+        --text: #17181a;
+        --muted: #5d6066;
+        --line: #e3e1da;
+        --accent: #1d5fd1;
+        --soft: #eaf1fd;
+        --warn-bg: #fff6e0;
+        --warn: #7a5600;
+        --tag: #f0efea;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #101114;
+          --surface: #17191d;
+          --text: #ecedef;
+          --muted: #a2a6ad;
+          --line: #2a2d33;
+          --accent: #7aa7ff;
+          --soft: #18243a;
+          --warn-bg: #2b2414;
+          --warn: #f0c96a;
+          --tag: #22252a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          16px/1.55 system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+      }
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 32px 16px 80px;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.2;
+        margin: 0 0 8px;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-size: 22px;
+        margin: 44px 0 12px;
+      }
+      h3 {
+        font-size: 16px;
+        margin: 26px 0 8px;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      p {
+        margin: 0 0 12px;
+      }
+      .lede {
+        color: var(--muted);
+        margin-bottom: 24px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 20px 0 8px;
+      }
+      nav a {
+        text-decoration: none;
+        color: var(--accent);
+        background: var(--soft);
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-size: 14px;
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin: 12px 0;
+      }
+      .note {
+        background: var(--warn-bg);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin: 14px 0;
+      }
+      .note strong {
+        color: var(--warn);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 15px;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        padding: 10px 8px;
+        border-top: 1px solid var(--line);
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 13px;
+      }
+      td:first-child {
+        width: 36%;
+        color: var(--muted);
+      }
+      td b {
+        color: var(--text);
+      }
+      .tag {
+        display: inline-block;
+        font-size: 12px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--tag);
+        color: var(--muted);
+        margin-left: 6px;
+        white-space: nowrap;
+      }
+      .tag.pub {
+        background: var(--soft);
+        color: var(--accent);
+      }
+      ol,
+      ul {
+        padding-left: 22px;
+        margin: 0 0 12px;
+      }
+      li {
+        margin: 4px 0;
+      }
+      .say {
+        border-left: 3px solid var(--accent);
+        padding: 4px 0 4px 14px;
+        margin: 10px 0;
+      }
+      code {
+        background: var(--tag);
+        padding: 1px 6px;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      a {
+        color: var(--accent);
+      }
+      @media (max-width: 560px) {
+        td:first-child {
+          width: 42%;
+        }
+        h1 {
+          font-size: 25px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Test founders: Spheros and Mai Soli Foundation</h1>
+      <p class="lede">
+        Everything Q will ask during founder onboarding, with an answer for each
+        and where it came from. Also the steps to make both companies show up in
+        Zino's Discover, and some curveballs to try.
+      </p>
+      <nav>
+        <a href="#before">Before you start</a>
+        <a href="#spheros">Spheros</a>
+        <a href="#maisoli">Mai Soli</a>
+        <a href="#discover">Getting into Discover</a>
+        <a href="#curveballs">Curveballs</a>
+        <a href="#sources">Sources</a>
+      </nav>
 
-  <p><span class="tag pub">public</span> means the fact is on the company's own site, a Harvard page or the pitch video, so Q's web research should find and agree with it. <span class="tag">test value</span> means it isn't public: it's a sensible value to type in so onboarding can finish.</p>
+      <p>
+        <span class="tag pub">public</span> means the fact is on the company's
+        own site, a Harvard page or the pitch video, so Q's web research should
+        find and agree with it. <span class="tag">test value</span> means it
+        isn't public: it's a sensible value to type in so onboarding can finish.
+      </p>
 
-  <h2 id="before">Before you start</h2>
-  <div class="note"><strong>These are real people and real companies.</strong> Keep it a private test:
-    <ul>
-      <li>Sign up with <b>your own email aliases</b>, never theirs. For example <code>adedaniel502+spheros@gmail.com</code> and <code>adedaniel502+maisoli@gmail.com</code> (Gmail delivers "+" addresses to your inbox).</li>
-      <li>Don't send messages, emails or meeting invites to the real founders. Recap emails go only to the accounts on the call, so that's safe as long as every account is yours.</li>
-      <li>The two clips carry other people's branding (The Feedback Loop, Harvard Innovation Labs). They're fine for an internal demo, but don't make them public.</li>
-    </ul>
-  </div>
-  <div class="card">
-    <b>Do they fit Zino? Yes, both of them, without changing Zino's mandate.</b>
-    <ul>
-      <li>Zino's mandate has one <b>must</b>: stage Pre-seed, Seed or Series A. Spheros is <b>Seed</b> and Mai Soli is <b>Pre-seed</b>.</li>
-      <li>No sector or country limit. The cheque range is €50K to €100M (typical €3M), so $2M and $500K are both inside it.</li>
-      <li>Zino "strongly prefers" regulated businesses. Spheros is tagged <i>Regulated Financial Services</i> and <i>Data-Protection Sensitive</i>, so it ranks higher. Mai Soli doesn't get that boost, but it's a preference, not a rule, so Mai Soli still shows.</li>
-      <li>The only hard exclusion is adult content. Gambling is "avoid". Neither applies.</li>
-    </ul>
-  </div>
+      <h2 id="before">Before you start</h2>
+      <div class="note">
+        <strong>These are real people and real companies.</strong> Keep it a
+        private test:
+        <ul>
+          <li>
+            Sign up with <b>your own email aliases</b>, never theirs. For
+            example <code>adedaniel502+spheros@gmail.com</code> and
+            <code>adedaniel502+maisoli@gmail.com</code> (Gmail delivers "+"
+            addresses to your inbox).
+          </li>
+          <li>
+            Don't send messages, emails or meeting invites to the real founders.
+            Recap emails go only to the accounts on the call, so that's safe as
+            long as every account is yours.
+          </li>
+          <li>
+            The two clips carry other people's branding (The Feedback Loop,
+            Harvard Innovation Labs). They're fine for an internal demo, but
+            don't make them public.
+          </li>
+        </ul>
+      </div>
+      <div class="card">
+        <b
+          >Do they fit Zino? Yes, both of them, without changing Zino's
+          mandate.</b
+        >
+        <ul>
+          <li>
+            Zino's mandate has one <b>must</b>: stage Pre-seed, Seed or Series
+            A. Spheros is <b>Seed</b> and Mai Soli is <b>Pre-seed</b>.
+          </li>
+          <li>
+            No sector or country limit. The cheque range is €50K to €100M
+            (typical €3M), so $2M and $500K are both inside it.
+          </li>
+          <li>
+            Zino "strongly prefers" regulated businesses. Spheros is tagged
+            <i>Regulated Financial Services</i> and
+            <i>Data-Protection Sensitive</i>, so it ranks higher. Mai Soli
+            doesn't get that boost, but it's a preference, not a rule, so Mai
+            Soli still shows.
+          </li>
+          <li>
+            The only hard exclusion is adult content. Gambling is "avoid".
+            Neither applies.
+          </li>
+        </ul>
+      </div>
 
-  <!-- ============================================================ -->
-  <h2 id="spheros">1 · Spheros</h2>
-  <p><b>Who you are playing:</b> Kathryn Outlaw, co-founder and COO. She's the one in the video.</p>
-  <div class="say">One line to say or paste when Q asks what the company does: "Spheros is a data wallet for businesses. A company uploads its data once, encrypted, and shares it instantly with any bank or institution. Banks pay a subscription; their clients use it free."</div>
+      <!-- ============================================================ -->
+      <h2 id="spheros">1 · Spheros</h2>
+      <p>
+        <b>Who you are playing:</b> Kathryn Outlaw, co-founder and COO. She's
+        the one in the video.
+      </p>
+      <div class="say">
+        One line to say or paste when Q asks what the company does: "Spheros is
+        a data wallet for businesses. A company uploads its data once,
+        encrypted, and shares it instantly with any bank or institution. Banks
+        pay a subscription; their clients use it free."
+      </div>
 
-  <h3>Company basics (step F1)</h3>
-  <table>
-    <tr><th>Q asks</th><th>Answer</th></tr>
-    <tr><td>Company name</td><td><b>Spheros</b> <span class="tag pub">public</span></td></tr>
-    <tr><td>Website</td><td><b>spheros.io</b> <span class="tag pub">public</span>. Q's "read my website" should work on it.</td></tr>
-    <tr><td>What it does</td><td><b>The data wallet for smarter sharing:</b> a secure, encrypted online hub where businesses upload their data once and share it instantly with any institution, like a trusted data wallet <span class="tag pub">public</span></td></tr>
-    <tr><td>Stage</td><td><b>Seed</b> <span class="tag">test value</span> (fits: ten clients, two paying, raising $2M)</td></tr>
-    <tr><td>Country</td><td><b>United States</b> (New York) <span class="tag pub">public</span></td></tr>
-    <tr><td>Categories</td><td><b>Fintech · Data Infrastructure · B2B SaaS · Identity Verification</b>; customer type <b>Financial Institution</b>; regulatory <b>Regulated Financial Services, Data-Protection Sensitive</b></td></tr>
-  </table>
+      <h3>Company basics (step F1)</h3>
+      <table>
+        <tr>
+          <th>Q asks</th>
+          <th>Answer</th>
+        </tr>
+        <tr>
+          <td>Company name</td>
+          <td><b>Spheros</b> <span class="tag pub">public</span></td>
+        </tr>
+        <tr>
+          <td>Website</td>
+          <td>
+            <b>spheros.io</b> <span class="tag pub">public</span>. Q's "read my
+            website" should work on it.
+          </td>
+        </tr>
+        <tr>
+          <td>What it does</td>
+          <td>
+            <b>The data wallet for smarter sharing:</b> a secure, encrypted
+            online hub where businesses upload their data once and share it
+            instantly with any institution, like a trusted data wallet
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Stage</td>
+          <td>
+            <b>Seed</b> <span class="tag">test value</span> (fits: ten clients,
+            two paying, raising $2M)
+          </td>
+        </tr>
+        <tr>
+          <td>Country</td>
+          <td>
+            <b>United States</b> (New York) <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Categories</td>
+          <td>
+            <b
+              >Fintech · Data Infrastructure · B2B SaaS · Identity
+              Verification</b
+            >; customer type <b>Financial Institution</b>; regulatory
+            <b>Regulated Financial Services, Data-Protection Sensitive</b>
+          </td>
+        </tr>
+      </table>
 
-  <h3>Materials (step F2)</h3>
-  <p>Upload the pitch video. Q will ask for a deck; "Nothing yet" is a valid answer, and Q then works from the website and the video.</p>
+      <h3>Materials (step F2)</h3>
+      <p>
+        Upload the pitch video. Q will ask for a deck; "Nothing yet" is a valid
+        answer, and Q then works from the website and the video.
+      </p>
 
-  <h3>Team (step F4)</h3>
-  <table>
-    <tr><td>How many founders</td><td><b>3</b>. In the video she says "my co-founders and I". Public pages name two: <b>Derrick Walton</b> (CEO and co-founder) and <b>Kathryn Outlaw</b> (COO and co-founder). If you'd rather stay strictly public, say 2 and let Q flag the gap. <span class="tag pub">public</span></td></tr>
-    <tr><td>Your role</td><td><b>COO</b> <span class="tag pub">public</span></td></tr>
-    <tr><td>Full-time?</td><td><b>All founders are full-time</b> <span class="tag">test value</span></td></tr>
-    <tr><td>Functions covered</td><td><b>Product, Engineering, Deep industry expertise</b>. Sales is what the raise pays for, so leave it out. <span class="tag">test value</span></td></tr>
-    <tr><td>Team size</td><td><b>6 full-time</b> <span class="tag">test value</span></td></tr>
-    <tr><td>Background (Q may ask)</td><td>Kathryn: at Bank of America she saw businesses struggle to share data with banks through fragmented, manual processes. At Circle she spent <b>25% of her time</b> sending identical information to <b>50+ banks</b>. Derrick: Head of Emerging Payments &amp; Innovation at Bank of America, 2019–2023. <span class="tag pub">public</span></td></tr>
-  </table>
+      <h3>Team (step F4)</h3>
+      <table>
+        <tr>
+          <td>How many founders</td>
+          <td>
+            <b>3</b>. In the video she says "my co-founders and I". Public pages
+            name two: <b>Derrick Walton</b> (CEO and co-founder) and
+            <b>Kathryn Outlaw</b> (COO and co-founder). If you'd rather stay
+            strictly public, say 2 and let Q flag the gap.
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Your role</td>
+          <td><b>COO</b> <span class="tag pub">public</span></td>
+        </tr>
+        <tr>
+          <td>Full-time?</td>
+          <td>
+            <b>All founders are full-time</b>
+            <span class="tag">test value</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Functions covered</td>
+          <td>
+            <b>Product, Engineering, Deep industry expertise</b>. Sales is what
+            the raise pays for, so leave it out.
+            <span class="tag">test value</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Team size</td>
+          <td><b>6 full-time</b> <span class="tag">test value</span></td>
+        </tr>
+        <tr>
+          <td>Background (Q may ask)</td>
+          <td>
+            Kathryn: at Bank of America she saw businesses struggle to share
+            data with banks through fragmented, manual processes. At Circle she
+            spent <b>25% of her time</b> sending identical information to
+            <b>50+ banks</b>. Derrick: Head of Emerging Payments &amp;
+            Innovation at Bank of America, 2019–2023.
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+      </table>
 
-  <h3>Traction (step F5)</h3>
-  <table>
-    <tr><td>Customers</td><td><b>10 clients secured, 2 paying.</b> Pilot discussions with <b>4 of the 20 largest U.S. banks</b> <span class="tag pub">public</span> (video)</td></tr>
-    <tr><td>Revenue?</td><td><b>Yes: first revenue only</b> (2 paying clients) <span class="tag">test value</span> for the label</td></tr>
-    <tr><td>Signal</td><td><b>Pilots running</b></td></tr>
-    <tr><td>Business model</td><td><b>Banks pay a subscription fee; their clients use it free.</b> Public tiers: Free (5 users), Core $99/month by connection count, Enterprise custom (white-label, API) <span class="tag pub">public</span></td></tr>
-    <tr><td>Why it matters</td><td>McKinsey: client onboarding takes <b>up to 100 days</b> and costs about <b>$25,000 per client</b>. Spheros claims <b>80% faster onboarding</b> <span class="tag pub">public</span></td></tr>
-    <tr><td>Trust and security</td><td><b>SOC 2 Type II</b>, end-to-end encryption, audit trails, revocable access. Certified Women Business Enterprise (WBE) <span class="tag pub">public</span></td></tr>
-    <tr><td>Growth (last 12 months)</td><td><b>More than doubled</b> <span class="tag">test value</span></td></tr>
-  </table>
+      <h3>Traction (step F5)</h3>
+      <table>
+        <tr>
+          <td>Customers</td>
+          <td>
+            <b>10 clients secured, 2 paying.</b> Pilot discussions with
+            <b>4 of the 20 largest U.S. banks</b>
+            <span class="tag pub">public</span> (video)
+          </td>
+        </tr>
+        <tr>
+          <td>Revenue?</td>
+          <td>
+            <b>Yes: first revenue only</b> (2 paying clients)
+            <span class="tag">test value</span> for the label
+          </td>
+        </tr>
+        <tr>
+          <td>Signal</td>
+          <td><b>Pilots running</b></td>
+        </tr>
+        <tr>
+          <td>Business model</td>
+          <td>
+            <b>Banks pay a subscription fee; their clients use it free.</b>
+            Public tiers: Free (5 users), Core $99/month by connection count,
+            Enterprise custom (white-label, API)
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Why it matters</td>
+          <td>
+            McKinsey: client onboarding takes <b>up to 100 days</b> and costs
+            about <b>$25,000 per client</b>. Spheros claims
+            <b>80% faster onboarding</b> <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Trust and security</td>
+          <td>
+            <b>SOC 2 Type II</b>, end-to-end encryption, audit trails, revocable
+            access. Certified Women Business Enterprise (WBE)
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Growth (last 12 months)</td>
+          <td><b>More than doubled</b> <span class="tag">test value</span></td>
+        </tr>
+      </table>
 
-  <h3>The raise (step F6)</h3>
-  <table>
-    <tr><td>Raising now?</td><td><b>Yes, actively</b> <span class="tag pub">public</span></td></tr>
-    <tr><td>How much</td><td><b>$2,000,000</b>, US dollar <span class="tag pub">public</span></td></tr>
-    <tr><td>Instrument</td><td><b>SAFE</b> <span class="tag">test value</span></td></tr>
-    <tr><td>Timeframe</td><td><b>Within 3 months</b> <span class="tag">test value</span></td></tr>
-    <tr><td>Use of funds</td><td><b>Hire a sales team and onboard 10,000 clients in the next 18 months</b> <span class="tag pub">public</span></td></tr>
-  </table>
+      <h3>The raise (step F6)</h3>
+      <table>
+        <tr>
+          <td>Raising now?</td>
+          <td><b>Yes, actively</b> <span class="tag pub">public</span></td>
+        </tr>
+        <tr>
+          <td>How much</td>
+          <td>
+            <b>$2,000,000</b>, US dollar <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Instrument</td>
+          <td><b>SAFE</b> <span class="tag">test value</span></td>
+        </tr>
+        <tr>
+          <td>Timeframe</td>
+          <td><b>Within 3 months</b> <span class="tag">test value</span></td>
+        </tr>
+        <tr>
+          <td>Use of funds</td>
+          <td>
+            <b
+              >Hire a sales team and onboard 10,000 clients in the next 18
+              months</b
+            >
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+      </table>
 
-  <!-- ============================================================ -->
-  <h2 id="maisoli">2 · Mai Soli Foundation</h2>
-  <p><b>Who you are playing:</b> Aria Mustary, president and co-founder. The video's captions misspell her name as "Aria MI".</p>
-  <div class="note"><strong>Heads-up:</strong> Mai Soli is a registered US nonprofit (EIN 83-2705618), so it can't sell equity or a SAFE. To test the flow, onboard it as a <b>Pre-seed</b> organisation raising a round, and choose <b>"Not sure yet"</b> as the instrument. If Q points out that a nonprofit can't issue equity, that's Q doing its job, and it makes a good demo moment.</div>
-  <div class="say">One line: "Mai Soli Foundation breaks the cycle of child marriage in Bangladesh by teaching high-risk girls entrepreneurship, financial literacy, leadership and confidence, so their families see them as financial agents, not financial burdens."</div>
+      <!-- ============================================================ -->
+      <h2 id="maisoli">2 · Mai Soli Foundation</h2>
+      <p>
+        <b>Who you are playing:</b> Aria Mustary, president and co-founder. The
+        video's captions misspell her name as "Aria MI".
+      </p>
+      <div class="note">
+        <strong>Heads-up:</strong> Mai Soli is a registered US nonprofit (EIN
+        83-2705618), so it can't sell equity or a SAFE. To test the flow,
+        onboard it as a <b>Pre-seed</b> organisation raising a round, and choose
+        <b>"Not sure yet"</b> as the instrument. If Q points out that a
+        nonprofit can't issue equity, that's Q doing its job, and it makes a
+        good demo moment.
+      </div>
+      <div class="say">
+        One line: "Mai Soli Foundation breaks the cycle of child marriage in
+        Bangladesh by teaching high-risk girls entrepreneurship, financial
+        literacy, leadership and confidence, so their families see them as
+        financial agents, not financial burdens."
+      </div>
 
-  <h3>Company basics (step F1)</h3>
-  <table>
-    <tr><th>Q asks</th><th>Answer</th></tr>
-    <tr><td>Company name</td><td><b>Mai Soli Foundation</b> <span class="tag pub">public</span></td></tr>
-    <tr><td>Website</td><td>Not confirmed. Leave it blank and let Q's research find it. Public pages that exist: Harvard Innovation Labs venture page, GuideStar profile, a GoFundMe <span class="tag pub">public</span></td></tr>
-    <tr><td>What it does</td><td>A mentorship programme for girls under 18 at high risk of child marriage. Local university students and young businesswomen mentor them through partner schools <span class="tag pub">public</span></td></tr>
-    <tr><td>Stage</td><td><b>Pre-seed</b> <span class="tag">test value</span></td></tr>
-    <tr><td>Country</td><td>Registered in the <b>United States</b>; programmes run in <b>Bangladesh</b> (Dhaka, Chittagong). Pick United States <span class="tag pub">public</span></td></tr>
-    <tr><td>Categories</td><td><b>Edtech · Education</b>; impact theme <b>Financial Inclusion</b>; customer type <b>Nonprofit &amp; NGO</b></td></tr>
-  </table>
+      <h3>Company basics (step F1)</h3>
+      <table>
+        <tr>
+          <th>Q asks</th>
+          <th>Answer</th>
+        </tr>
+        <tr>
+          <td>Company name</td>
+          <td>
+            <b>Mai Soli Foundation</b> <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Website</td>
+          <td>
+            Not confirmed. Leave it blank and let Q's research find it. Public
+            pages that exist: Harvard Innovation Labs venture page, GuideStar
+            profile, a GoFundMe <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>What it does</td>
+          <td>
+            A mentorship programme for girls under 18 at high risk of child
+            marriage. Local university students and young businesswomen mentor
+            them through partner schools <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Stage</td>
+          <td><b>Pre-seed</b> <span class="tag">test value</span></td>
+        </tr>
+        <tr>
+          <td>Country</td>
+          <td>
+            Registered in the <b>United States</b>; programmes run in
+            <b>Bangladesh</b> (Dhaka, Chittagong). Pick United States
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Categories</td>
+          <td>
+            <b>Edtech · Education</b>; impact theme <b>Financial Inclusion</b>;
+            customer type <b>Nonprofit &amp; NGO</b>
+          </td>
+        </tr>
+      </table>
 
-  <h3>Team (step F4)</h3>
-  <table>
-    <tr><td>How many founders</td><td><b>2</b>: <b>Aria Mustary</b> (President and co-founder) and <b>Aaron Wendell</b> (co-founder) <span class="tag pub">public</span></td></tr>
-    <tr><td>Your role</td><td><b>CEO</b> (her title is President; choose "Something else" and type <i>President</i> if you want it exact)</td></tr>
-    <tr><td>Full-time?</td><td><b>Some founders are full-time</b> <span class="tag">test value</span></td></tr>
-    <tr><td>Functions covered</td><td><b>Operations, Deep industry expertise</b> <span class="tag">test value</span></td></tr>
-    <tr><td>Team size</td><td><b>3 full-time</b>, plus volunteer mentors in Bangladesh <span class="tag">test value</span></td></tr>
-    <tr><td>Background (Q may ask)</td><td>Aria: Ed.M. 2024, Harvard Graduate School of Education. Born in New York to a family from Bangladesh. At 12, her father tried to arrange her marriage and her mother stopped it; her mother had been married at 16. The foundation started after a March 2019 trip to Dhaka and Chittagong. "Mai soli" means "never alone" <span class="tag pub">public</span></td></tr>
-  </table>
+      <h3>Team (step F4)</h3>
+      <table>
+        <tr>
+          <td>How many founders</td>
+          <td>
+            <b>2</b>: <b>Aria Mustary</b> (President and co-founder) and
+            <b>Aaron Wendell</b> (co-founder)
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Your role</td>
+          <td>
+            <b>CEO</b> (her title is President; choose "Something else" and type
+            <i>President</i> if you want it exact)
+          </td>
+        </tr>
+        <tr>
+          <td>Full-time?</td>
+          <td>
+            <b>Some founders are full-time</b>
+            <span class="tag">test value</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Functions covered</td>
+          <td>
+            <b>Operations, Deep industry expertise</b>
+            <span class="tag">test value</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Team size</td>
+          <td>
+            <b>3 full-time</b>, plus volunteer mentors in Bangladesh
+            <span class="tag">test value</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Background (Q may ask)</td>
+          <td>
+            Aria: Ed.M. 2024, Harvard Graduate School of Education. Born in New
+            York to a family from Bangladesh. At 12, her father tried to arrange
+            her marriage and her mother stopped it; her mother had been married
+            at 16. The foundation started after a March 2019 trip to Dhaka and
+            Chittagong. "Mai soli" means "never alone"
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+      </table>
 
-  <h3>Traction (step F5)</h3>
-  <table>
-    <tr><td>Customers / reach</td><td><b>7 partner schools in Bangladesh, 183 programme graduates</b> (2023), with a new cohort in spring 2024 <span class="tag pub">public</span></td></tr>
-    <tr><td>Revenue?</td><td><b>No.</b> It's grant and donation funded (the honest answer, and a curveball for Q) <span class="tag pub">public</span></td></tr>
-    <tr><td>Signal</td><td><b>Active users, not yet paying</b> (girls enrolled)</td></tr>
-    <tr><td>Recognition</td><td>Harvard Innovation Labs venture. Finalist in the Harvard President's Innovation Challenge (25 finalists sharing $517,000 in funding from the Bertarelli Foundation) <span class="tag pub">public</span></td></tr>
-    <tr><td>Why it matters</td><td>12 million girls a year become child brides (UNICEF). In Bangladesh about 59% of girls marry before 18 and 22% before 15 <span class="tag pub">public</span></td></tr>
-  </table>
+      <h3>Traction (step F5)</h3>
+      <table>
+        <tr>
+          <td>Customers / reach</td>
+          <td>
+            <b>7 partner schools in Bangladesh, 183 programme graduates</b>
+            (2023), with a new cohort in spring 2024
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Revenue?</td>
+          <td>
+            <b>No.</b> It's grant and donation funded (the honest answer, and a
+            curveball for Q) <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Signal</td>
+          <td><b>Active users, not yet paying</b> (girls enrolled)</td>
+        </tr>
+        <tr>
+          <td>Recognition</td>
+          <td>
+            Harvard Innovation Labs venture. Finalist in the Harvard President's
+            Innovation Challenge (25 finalists sharing $517,000 in funding from
+            the Bertarelli Foundation) <span class="tag pub">public</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Why it matters</td>
+          <td>
+            12 million girls a year become child brides (UNICEF). In Bangladesh
+            about 59% of girls marry before 18 and 22% before 15
+            <span class="tag pub">public</span>
+          </td>
+        </tr>
+      </table>
 
-  <h3>The raise (step F6)</h3>
-  <table>
-    <tr><td>Raising now?</td><td><b>Yes, actively</b> <span class="tag">test value</span></td></tr>
-    <tr><td>How much</td><td><b>$500,000</b>, US dollar <span class="tag">test value</span></td></tr>
-    <tr><td>Instrument</td><td><b>Not sure yet</b>. It's a nonprofit, so grants and programme-related investment, not equity</td></tr>
-    <tr><td>Timeframe</td><td><b>6–12 months</b> <span class="tag">test value</span></td></tr>
-    <tr><td>Use of funds</td><td><b>Expand from 7 to 25 partner schools and train more local mentors</b> <span class="tag">test value</span></td></tr>
-  </table>
+      <h3>The raise (step F6)</h3>
+      <table>
+        <tr>
+          <td>Raising now?</td>
+          <td><b>Yes, actively</b> <span class="tag">test value</span></td>
+        </tr>
+        <tr>
+          <td>How much</td>
+          <td>
+            <b>$500,000</b>, US dollar <span class="tag">test value</span>
+          </td>
+        </tr>
+        <tr>
+          <td>Instrument</td>
+          <td>
+            <b>Not sure yet</b>. It's a nonprofit, so grants and
+            programme-related investment, not equity
+          </td>
+        </tr>
+        <tr>
+          <td>Timeframe</td>
+          <td><b>6–12 months</b> <span class="tag">test value</span></td>
+        </tr>
+        <tr>
+          <td>Use of funds</td>
+          <td>
+            <b
+              >Expand from 7 to 25 partner schools and train more local
+              mentors</b
+            >
+            <span class="tag">test value</span>
+          </td>
+        </tr>
+      </table>
 
-  <!-- ============================================================ -->
-  <h2 id="discover">Getting both into Zino's Discover</h2>
-  <div class="card">
-    <p>Discover only shows a company once it is "marketplace ready". That needs <b>all</b> of these:</p>
-    <ol>
-      <li><b>Profile essentials:</b> a description, a stage and a country. The onboarding answers above cover all three.</li>
-      <li><b>Visible to investors:</b> each founder account turns this on itself. Q never turns it on for them.</li>
-      <li><b>Founder identity verified</b> and <b>organisation verified:</b> each founder requests verification. You approve both in <b>Admin → Verification</b>, signed in as Zino.</li>
-      <li><b>A published pitch:</b> upload each clip on <b>Pitch &amp; media</b> and publish it. Captions are generated automatically within about 90 seconds.</li>
-      <li><b>Company is active</b> (the default).</li>
-    </ol>
-    <p>The feed updates as soon as verification or a pitch publish completes. Then open <b>Discover</b> as Zino: Spheros should rank above Mai Soli because of Zino's regulated-business preference. If either one doesn't appear, tell me which and I'll check its readiness on the live database.</p>
-  </div>
+      <!-- ============================================================ -->
+      <h2 id="discover">Getting both into Zino's Discover</h2>
+      <div class="card">
+        <p>
+          Discover only shows a company once it is "marketplace ready". That
+          needs <b>all</b> of these:
+        </p>
+        <ol>
+          <li>
+            <b>Profile essentials:</b> a description, a stage and a country. The
+            onboarding answers above cover all three.
+          </li>
+          <li>
+            <b>Visible to investors:</b> each founder account turns this on
+            itself. Q never turns it on for them.
+          </li>
+          <li>
+            <b>Founder identity verified</b> and
+            <b>organisation verified:</b> each founder requests verification.
+            You approve both in <b>Admin → Verification</b>, signed in as Zino.
+          </li>
+          <li>
+            <b>A published pitch:</b> upload each clip on
+            <b>Pitch &amp; media</b> and publish it. Captions are generated
+            automatically within about 90 seconds.
+          </li>
+          <li><b>Company is active</b> (the default).</li>
+        </ol>
+        <p>
+          The feed updates as soon as verification or a pitch publish completes.
+          Then open <b>Discover</b> as Zino: Spheros should rank above Mai Soli
+          because of Zino's regulated-business preference. If either one doesn't
+          appear, tell me which and I'll check its readiness on the live
+          database.
+        </p>
+      </div>
 
-  <!-- ============================================================ -->
-  <h2 id="curveballs">Curveballs worth throwing</h2>
-  <ul>
-    <li><b>Contradict yourself.</b> Say "10 clients" in onboarding and later tell Q "we have 14 clients". Q should keep both figures and ask which is right, never silently pick one.</li>
-    <li><b>Skip a question.</b> Skip the team size. It should stay "unknown", never become zero, and Q should not mark the company down for it.</li>
-    <li><b>Nonprofit and equity.</b> As Mai Soli, ask Q to "set this up as a SAFE round". It should flag that a 501(c)(3) can't issue equity.</li>
-    <li><b>Founder-private info.</b> As Spheros, tell Q "our runway is 5 months, keep that private". Then, as Zino, ask Q about Spheros's runway. Q must not reveal it.</li>
-    <li><b>Website check.</b> As Spheros, say "read my website spheros.io". Q should come back with Vault, Connections, Links, Workspaces and SOC 2 Type II.</li>
-    <li><b>Unverifiable claim.</b> As Spheros, say "we're live with Bank of America". The pitch says pilot discussions with 4 of the top-20 banks, so Q should treat this as your claim, not a verified fact.</li>
-    <li><b>Investor side.</b> As Zino, ask "why is Spheros in my feed?" The answer should cite the stage fit and the regulated preference, never "because you watched it".</li>
-  </ul>
+      <!-- ============================================================ -->
+      <h2 id="curveballs">Curveballs worth throwing</h2>
+      <ul>
+        <li>
+          <b>Contradict yourself.</b> Say "10 clients" in onboarding and later
+          tell Q "we have 14 clients". Q should keep both figures and ask which
+          is right, never silently pick one.
+        </li>
+        <li>
+          <b>Skip a question.</b> Skip the team size. It should stay "unknown",
+          never become zero, and Q should not mark the company down for it.
+        </li>
+        <li>
+          <b>Nonprofit and equity.</b> As Mai Soli, ask Q to "set this up as a
+          SAFE round". It should flag that a 501(c)(3) can't issue equity.
+        </li>
+        <li>
+          <b>Founder-private info.</b> As Spheros, tell Q "our runway is 5
+          months, keep that private". Then, as Zino, ask Q about Spheros's
+          runway. Q must not reveal it.
+        </li>
+        <li>
+          <b>Website check.</b> As Spheros, say "read my website spheros.io". Q
+          should come back with Vault, Connections, Links, Workspaces and SOC 2
+          Type II.
+        </li>
+        <li>
+          <b>Unverifiable claim.</b> As Spheros, say "we're live with Bank of
+          America". The pitch says pilot discussions with 4 of the top-20 banks,
+          so Q should treat this as your claim, not a verified fact.
+        </li>
+        <li>
+          <b>Investor side.</b> As Zino, ask "why is Spheros in my feed?" The
+          answer should cite the stage fit and the regulated preference, never
+          "because you watched it".
+        </li>
+      </ul>
 
-  <h2 id="sources">Sources</h2>
-  <ul>
-    <li>The two pitch videos you sent (captions read frame by frame)</li>
-    <li><a href="https://www.spheros.io/">Spheros: The Data Wallet for Smarter Sharing</a></li>
-    <li><a href="https://tracxn.com/d/companies/spheros/__XxjfX7VFVhKFKEZfYAqIpKiZZlnjmJUGh2_FdyC6KMg">Spheros, Tracxn profile</a></li>
-    <li><a href="https://contactout.com/Derrick-Walton-2296582">Derrick Walton, CEO / Co-Founder at Spheros</a></li>
-    <li><a href="https://www.gse.harvard.edu/ideas/news/24/06/breaking-cycle">Harvard GSE: Breaking the cycle (Aria Mustary)</a></li>
-    <li><a href="https://innovationlabs.harvard.edu/venture/mai-soli-foundation">Harvard Innovation Labs: Mai Soli Foundation</a></li>
-    <li><a href="https://innovationlabs.harvard.edu/articles/maisolifoundation-pic2026">Harvard Innovation Labs: Aria Mustary's fight for girls' futures</a></li>
-    <li><a href="https://www.guidestar.org/profile/83-2705618">GuideStar: Mai Soli Foundation</a></li>
-    <li><a href="https://news.yahoo.com/12-she-escaped-becoming-child-204542593.html">Yahoo News: at 12 she escaped becoming a child bride</a></li>
-  </ul>
-</main>
-</body>
+      <h2 id="sources">Sources</h2>
+      <ul>
+        <li>The two pitch videos you sent (captions read frame by frame)</li>
+        <li>
+          <a href="https://www.spheros.io/"
+            >Spheros: The Data Wallet for Smarter Sharing</a
+          >
+        </li>
+        <li>
+          <a
+            href="https://tracxn.com/d/companies/spheros/__XxjfX7VFVhKFKEZfYAqIpKiZZlnjmJUGh2_FdyC6KMg"
+            >Spheros, Tracxn profile</a
+          >
+        </li>
+        <li>
+          <a href="https://contactout.com/Derrick-Walton-2296582"
+            >Derrick Walton, CEO / Co-Founder at Spheros</a
+          >
+        </li>
+        <li>
+          <a href="https://www.gse.harvard.edu/ideas/news/24/06/breaking-cycle"
+            >Harvard GSE: Breaking the cycle (Aria Mustary)</a
+          >
+        </li>
+        <li>
+          <a
+            href="https://innovationlabs.harvard.edu/venture/mai-soli-foundation"
+            >Harvard Innovation Labs: Mai Soli Foundation</a
+          >
+        </li>
+        <li>
+          <a
+            href="https://innovationlabs.harvard.edu/articles/maisolifoundation-pic2026"
+            >Harvard Innovation Labs: Aria Mustary's fight for girls' futures</a
+          >
+        </li>
+        <li>
+          <a href="https://www.guidestar.org/profile/83-2705618"
+            >GuideStar: Mai Soli Foundation</a
+          >
+        </li>
+        <li>
+          <a
+            href="https://news.yahoo.com/12-she-escaped-becoming-child-204542593.html"
+            >Yahoo News: at 12 she escaped becoming a child bride</a
+          >
+        </li>
+      </ul>
+    </main>
+  </body>
 </html>

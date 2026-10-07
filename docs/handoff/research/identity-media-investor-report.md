@@ -7,6 +7,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 ## 1. Digital business cards and identity pages
 
 **What the market looks like**
+
 - **Read.cv** was acquired by Perplexity. It began winding down on 17 Jan 2025 and fully shut on 16 May 2025. Users could export their data, and `.cv` sites moved to Hello.cv. https://www.neowin.net/news/readcv-announces-acquisition-by-perplexity-as-it-begins-winding-down-operations/ · https://theaiinsider.tech/2025/01/24/ai-search-engine-perplexity-acquires-read-cv-in-strategic-expansion/
 - **Bento.me** was bought by Linktree in 2023 and shut on 13 Feb 2026. Its links now redirect to Linktree. Linktree did the same with Koji in Jan 2024. https://alternativeto.net/news/2025/12/bento-to-shut-down-in-2026-as-linktree-takes-over-and-offers-migration-path/
   - The lesson for Capital Q: profile URLs outlive products. Own the domain and keep redirects.
@@ -21,6 +22,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
   - Web apps cannot trigger NameDrop. The nearest a web page can get is a `.vcf` download, or "Add to Wallet" (below).
 
 **Features that matter, with the technical specifics**
+
 - **vCard:** RFC 6350 (v4.0) embeds photos as `data:` URIs. v3.0 (RFC 2426) uses `ENCODING=b;TYPE=JPEG`. Device support for 4.0 is uneven, so **serve 3.0 for compatibility**. https://datatracker.ietf.org/doc/html/rfc6350 · https://alessandrorossini.org/the-sad-story-of-the-vcard-format-and-its-lack-of-interoperability/ · https://en.wikipedia.org/wiki/VCard
 - **Dynamic QR:** encode a short redirect URL on your own domain (under about 30 characters, so the code stays small and scannable) and change the target on the server. The redirect hop is also where scan analytics get captured. https://en.wikipedia.org/wiki/Dynamic_QR_code · https://missinglinkz.io/blog/utm-qr-code-tracking-developer/
 - **NFC:** NTAG215 has 504 bytes and holds an NDEF URL of about 480 characters. Write a short HTTPS redirect onto rewritable tags, never a static vCard. https://www.wakdev.com/en/knowledge-base/nfc-chips/nxp-ntag215.html · https://shopnfc.com/en/content/41-how-to-encode-a-digital-business-card-on-an-nfc-tag
@@ -38,6 +40,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 - **Structured data:** a `ProfilePage` with `mainEntity` set to a Person or Organization, in JSON-LD. https://developers.google.com/search/docs/appearance/structured-data/profile-page · https://schema.org/ProfilePage
 
 **Handle, squatting and impersonation policies**
+
 - **GitHub:**
   - The old name redirects until someone else claims it. Once claimed, the redirect for a same-named repo breaks.
   - Popular namespaces are **permanently retired**: more than 100 clones or Actions uses in the week before the rename, or container images with more than 5,000 downloads.
@@ -55,6 +58,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
   - https://help.twitter.com/en/rules-and-policies/x-impersonation-and-deceptive-identities-policy · https://www.socialmediatoday.com/news/x-formerly-twitter-launches-parody-account-labels/737124/
 
 **Privacy notes**
+
 - Public profiles get scraped. Default to `noindex`, rate-limit profile and vCard routes, and never put email or phone in the HTML unless the owner opts in.
 - Keep scan analytics first-party, with no third-party pixels. That matches the product's "no engagement optimisation" rule.
 
@@ -86,9 +90,10 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
   - a palette with roles (primary, accent, neutrals)
   - type pairs (heading and body)
   - tone of voice
-  - It gets captured by *extraction from a website or PDF, followed by user confirmation*. That fits the "upload what you already have, Q works first" onboarding.
+  - It gets captured by _extraction from a website or PDF, followed by user confirmation_. That fits the "upload what you already have, Q works first" onboarding.
 
 **Generating documents server-side in Node**
+
 - **pptxgenjs** produces real OOXML (text, tables, shapes, images, **native editable charts**). It runs in Node, the browser and serverless. https://gitbrent.github.io/PptxGenJS/ · https://www.npmjs.com/package/pptxgenjs
 - **pptx-automizer** fills existing `.pptx` templates, which suits brand templates. https://www.npmjs.com/package/pptx-automizer
 - **Chromium print-to-PDF (Playwright):** supports `tagged: true` (accessible, tagged PDF) and `outline: true` (bookmarks). These map to Chromium's `generateTaggedPDF` and `generateDocumentOutline`. Puppeteer now tags by default. Of the options here, this gives the highest layout fidelity, since it prints the same HTML and CSS the app uses. https://blog.chromium.org/2020/07/using-chrome-to-generate-more.html · https://github.com/puppeteer/puppeteer/commit/4fc14026e9bfffeedf317e9b61c7cda8509091ba · https://github.com/gotenberg/gotenberg/issues/1043
@@ -103,6 +108,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 ## 3. Image generation and editing APIs (as of Sep 2026)
 
 **OpenAI**
+
 - **Models:**
   - gpt-image-1, gpt-image-1-mini, gpt-image-1.5 and gpt-image-2 exist.
   - OpenAI's data-controls page also lists `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare` (snapshots dated 2026-09-08).
@@ -121,17 +127,20 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
   - https://openai.com/policies/usage-policies/ · https://musically.com/2025/03/26/public-figures-must-opt-out-of-openais-new-image-generator/
 
 **Google (Gemini API)**
+
 - **Current image models:** Gemini 3.1 Flash Image ("Nano Banana 2", $0.045–0.151 depending on 0.5K–4K), Gemini 3.1 Flash Lite Image ($0.0336 per 1K), and Gemini 3 Pro Image ("Nano Banana Pro", $0.134 at 1K/2K, $0.24 at 4K). Gemini 2.5 Flash Image is **deprecated**.
 - **Data policy:** on the **free tier, content is used to improve Google's products**. The paid tier does not. So free keys must never see private data. https://ai.google.dev/gemini-api/docs/pricing
 - **Imagen 4:** Fast $0.02, Standard $0.04, Ultra $0.06 (secondary). It always carries SynthID and cannot be turned off. https://developers.googleblog.com/imagen-4-now-available-in-the-gemini-api-and-google-ai-studio/ · https://magichour.ai/blog/imagen-4-pricing-and-api
 - Nano Banana Pro launched on 20 Nov 2025. https://techcrunch.com/2025/11/20/google-releases-nano-banana-pro-its-latest-image-generation-model/
 
 **Specialists**
+
 - **Black Forest Labs FLUX:** Kontext Pro $0.04, Kontext Max $0.08. FLUX.2 is priced per megapixel, with [klein] from $0.014. 1 credit = $0.01. https://bfl.ai/pricing · https://docs.bfl.ai/quick_start/pricing
 - **Ideogram 3.0** (best-in-class text in images): Turbo $0.0375, Default $0.075, Quality $0.1125 (secondary). https://ideogram.ai/pricing · https://apiframe.ai/guides/ideogram-api-guide
 - **Recraft V4** produces **true SVG**, with style or brand consistency. Vector output costs about $0.05 per image plus $0.005 for style creation. Pro Vector costs $0.12. https://www.recraft.ai/api · https://openrouter.ai/recraft/recraft-v4-styles-vector
 
 **Which tool for which job**
+
 - **Deck backgrounds and illustrative visuals:** gpt-image or Nano Banana (edits, keeping style consistent).
 - **Text-heavy graphics:** Ideogram.
 - **Logo variations and icon sets:** Recraft (SVG), starting from the user's real logo.
@@ -139,6 +148,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 - **Real people and real company logos:** do not synthesise them. Use uploaded assets.
 
 **Provenance law**
+
 - The EU AI Act Art. 50 transparency duties apply from **2 Aug 2026**.
   - Providers must mark output in a machine-readable, detectable way.
   - Deployers must label deepfakes and AI text on matters of public interest.
@@ -156,6 +166,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 ## 4. Research-first investor onboarding
 
 **Commercial data sources**
+
 - **Crunchbase:**
   - No free API tier in 2026 (secondary). Full API access needs an Enterprise or Applications licence.
   - The licence **forbids redistributing raw data to third parties**. Only analysis and aggregate statistics may be shared.
@@ -172,6 +183,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 - **OpenVC** (about 16k investors, free) and **Signal by NFX** (100k+ users): I found no official APIs. The Apify scrapers for them would breach their terms, so don't use them. https://www.openvc.app/investor-database
 
 **Free public-record sources (the best fit for "evidence before opinion")**
+
 - **SEC EDGAR:**
   - `data.sec.gov/submissions/CIK##########.json`, with the CIK zero-padded to 10 digits.
   - Fair access: **10 requests per second** across all SEC hosts, and a **declared User-Agent** in the form "Company admin@email". Breaking either gets a 403 or 429 and a temporary IP block.
@@ -189,14 +201,16 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 - Mandatory Companies House identity verification for directors and PSCs started 18 Nov 2025, with a 12-month transition. https://www.hilldickinson.com/our-view/articles/mandatory-identity-verification-for-directors-llp-members-and-pscs-from-18-november-2025/
 
 **LinkedIn: avoid**
+
 - **hiQ v. LinkedIn:** the Nov 2022 ruling found LinkedIn's anti-scraping and fake-profile terms **enforceable in contract**. The case ended in a consent judgment: $500k against hiQ plus a permanent injunction. https://www.zwillgen.com/alternative-data/hiq-v-linkedin-wrapped-up-web-scraping-lessons-learned/ · https://www.proskauer.com/blog/hiq-and-linkedin-reach-proposed-settlement-in-landmark-scraping-case
 - **Proxycurl (Nubela):**
   - LinkedIn sued in Jan 2025 over fake accounts and scraping.
   - The service shut on 4 Jul 2025 and judgment followed on 25 Jul. It had to delete all LinkedIn data.
   - https://nubela.co/blog/goodbye-proxycurl/ · https://linkedapi.io/guides/proxycurl-alternatives
-- **Use instead:** LinkedIn sign-in (OIDC) for self-declared identity, and let users paste their own URL as a *declared* link.
+- **Use instead:** LinkedIn sign-in (OIDC) for self-declared identity, and let users paste their own URL as a _declared_ link.
 
 **Web research APIs for agents**
+
 - **Exa:** $7 per 1k searches (10 results included), $1 per 1k pages of contents, $12–15 per 1k for research calls. https://exa.ai/pricing · https://exa.ai/docs/reference/pricing
 - **Tavily:** basic search is 1 credit, advanced is 2. Pay-as-you-go $0.008 per credit. 1,000 free credits. https://docs.tavily.com/documentation/api-credits
 - **Firecrawl:** Free 1k credits, Hobby $19, Standard $99. 1 credit per scraped page, 2 credits per 10 search results. https://www.firecrawl.dev/pricing · https://docs.firecrawl.dev/billing
@@ -205,6 +219,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 - **Brave Search API:** the free tier was removed in Feb 2026. It now gives $5 of monthly credit and bills about $5 per 1k after that. https://www.implicator.ai/brave-drops-free-search-api-tier-puts-all-developers-on-metered-billing/ · https://api-dashboard.search.brave.com/documentation/pricing
 
 **GDPR when profiling people from public data**
+
 - **Art. 14:** when data is not collected from the person, you must tell them within a reasonable period (**at most one month**), or at first communication. https://gdpr-info.eu/art-14-gdpr/
 - **Bisnode (Poland):**
   - The Polish regulator fined Bisnode for relying on a website notice after scraping about 7.5M records from public registers. It rejected the "disproportionate effort" argument, because the cost of contacting people is part of the cost of using the data.
@@ -213,7 +228,8 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 - **Legitimate interest:** EDPB Guidelines 1/2024 require an interest that is lawful, clearly stated and real and present, plus a necessity and balancing test. https://www.edpb.europa.eu/our-work-tools/documents/public-consultations/2024/guidelines-12024-processing-personal-data-based_en
 
 **UX pattern: "We found this about you — confirm"**
-- Research runs *when the person starts onboarding*, so they are the data subject and receive the notice in context.
+
+- Research runs _when the person starts onboarding_, so they are the data subject and receive the notice in context.
 - Each field shows its source link, its date, and whether it is a found fact or Q's inference.
 - The person can confirm, correct or reject each field. Nothing becomes authoritative until confirmed, which is already a Capital Q rule.
 - Data brokers such as Apollo stress that data can be "found" without being "verified", and use confidence tiers. https://docs.apollo.io/docs/enrich-people-data
@@ -259,7 +275,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 
 - **Core principle ("agent-native"):** anything the UI can do, the agent can do, and the reverse must be visible and controllable in the UI. Duplicated implementations drift apart. https://every.to/guides/agent-native · https://www.builder.io/blog/agent-native-architecture
 - **Shopify Sidekick app extensions** (live 17 Jun 2026):
-  - *Data* extensions and *action* extensions.
+  - _Data_ extensions and _action_ extensions.
   - Actions **stage changes for merchant confirmation**.
   - Needs API version 2026-04 or later.
   - https://shopify.dev/docs/apps/build/sidekick · https://shopify.dev/docs/apps/build/sidekick/build-app-actions
@@ -351,6 +367,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 ## Accounts and keys needed
 
 **Demo-critical**
+
 - OpenAI API key, with ZDR requested for the organisation.
 - Google AI Studio / Gemini **paid** key.
 - An SEC-compliant User-Agent string. No key is needed; use a real contact email.
@@ -358,6 +375,7 @@ Research date: 2026-09-25. I made no changes to the repo. Some prices come from 
 - One web-research key: Exa, Parallel, Firecrawl or Tavily.
 
 **Optional or later**
+
 - Apple Developer Program ($99/yr), Pass Type ID certificate, APNs key.
 - Google Wallet Issuer account and service account (Demo Mode until approved).
 - Stripe Identity (the existing Stripe account works).

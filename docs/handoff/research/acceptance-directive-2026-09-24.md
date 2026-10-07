@@ -17,6 +17,7 @@ J. VOICE PROACTIVITY + BARGE-IN — after explicit voice activation Q speaks fir
 K. UI — Q Home is the living swarm/voice experience. Chat history secondary/collapsible. Typing, research, artifact generation, artifact preview/download and conversation all happen within the same Q experience; no switching to a ChatGPT-style page for Q work.
 
 ACC adversarial cases (exact):
+
 - "What do you know about me so far?" → natural synthesis, not a field count.
 - "Pick three exclusions you think fit me and go with those." → Q reasons, recommends and records because explicit authorization was given.
 - "Adult content." → persists once, no repeat loop.
@@ -30,6 +31,7 @@ ACC adversarial cases (exact):
 Also observed in the fixture: Home Q told an onboarded investor "I cannot determine who you are from the authorised profile" (no profile context reached Home Q); "What do you have on me so far?" answered as "19 of 33 answered, 14 to go…" field dump.
 
 Ownership (lead-assigned):
+
 - E3: B (interview/response composer side), C, F, G, H (onboarding + "what do you know about me" synthesis + session communication prefs in the interview).
 - E4: D (Home Q action planning/tool chaining, deck → PDF artifact), H for Home Q action requests ("just give me the PDF").
 - E5: E (fit ≠ interest), Home Q knowing the person's own authorised profile ("who am I"), I (run-scoped investigation/progress state).

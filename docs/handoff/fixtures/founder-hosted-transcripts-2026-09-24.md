@@ -3,6 +3,7 @@
 ## Interview turns
 
 ### session 6296e171-6332-4d28-bef0-9b25190468a6
+
 [19:47:33] Q/TEXT (I6.custom_criteria): Anything else you look for?
 [19:47:48] Q/VOICE (I6.custom_criteria): Welcome back. Anything else you look for? If it's easier, you can tap Type and write it instead.
 [19:47:51] Q/VOICE (I6.custom_criteria): Welcome back. Anything else you look for?
@@ -46,9 +47,11 @@
 ## Q conversations
 
 ### conversation 47c156aa-1d16-4ba0-ab8c-57e064fda9ba
+
 [19:26:49] USER: Hello. Can you hear
 
 ### conversation 4d31d38d-1257-43d8-9eb5-6098e157ca18
+
 [19:43:19] USER: Okay. Can you search... tell me the difference between... okay. Tell me what different investors' specific names that would like to invest in Zino Aviation. It can be from public sources or from KeotaKube, Jeba
 [19:43:36] Q: I could not identify any investor publicly linked to Zino Aviation, and the Capital Q search returned no matching company record. The public search found Zino Aviation’s own website, but it does not name investors or disclose fundraising. It also found general aviation-investor directories and firms, but those sources do not mention Zino Aviation, so they are not evidence that those investors would invest in the company.
 
@@ -97,6 +100,7 @@ This is a conditional prospect list, not evidence that any of these parties woul
 The public Zino Aviation website describes pilot training, mentorship, ground-school classes, flight-training partnerships and aviation consultancy, and names Captain Zino Mario as founder and CEO (Zino Aviation: Pilot Training, Aviation Management & Consultancy Services, zinoaviation.com, undated, retrieved 24 September 2026). IAE’s investor page states that it is exploring aviation-training investment opportunities and supporting aviation infrastructure and innovative startups (Investors, iae.aero, undated, retrieved 24 September 2026). Aviation Investor Club describes a network for aviation investors, entrepreneurs and fund managers, but its stated membership and investment figures are self-provided and unverified (Aviation Investor Club, aviationinvestor.club, undated, retrieved 24 September 2026).
 
 ### conversation 64aab371-ec43-4422-afdd-32b1d8ff3e55
+
 [19:26:49] USER: Hello. Can you hear me?
 [19:26:56] Q: Yes, I can hear you. How can I help?
 [19:27:08] USER: Okay. So what am I doing? What is missing? Just what what do I need to do right now? Why am I here?
@@ -152,6 +156,7 @@ The strongest sources are Zino Aviation’s website, “Zino Aviation: Pilot Tra
 [19:38:39] Q: Understood. We can leave it there for now.
 
 ### conversation eaf79246-30fd-464d-af7f-2477f063a31e
+
 [19:39:59] USER: I asked you to generate a pitch deck for me based on whatever it is that you can find online for Zino Aviation. Can you do that?
 [19:40:14] Q: Yes. I can prepare a preliminary pitch deck for Zino Aviation using publicly available information, clearly separating sourced statements from unverified or unavailable information. The deck should be treated as a working draft rather than an investment-ready presentation because the available context does not establish the company’s legal identity, financials, traction, team, funding requirement or milestones. I would structure it around the business description, services, market context, operating model, public-source evidence, and a clearly labelled list of information still required from the company.
 [19:40:17] USER: Okay. So just go ahead and do it. Yeah. I started to talk too much. Just go ahead and do it.
@@ -165,13 +170,14 @@ The strongest sources are Zino Aviation’s website, “Zino Aviation: Pilot Tra
 [19:41:25] Q: A preliminary PDF pitch deck for Zino Aviation is requested, using publicly available information and clearly labelling unresolved or unavailable information.
 
 ## Second hosted transcript (user-pasted 2026-09-25): exclusions → Insurance → mandate-ready loop
+
 Q: I can't choose exclusions on your behalf. You've already said adult content, and if there are no others, we can leave this open; otherwise name the sectors you want excluded.
 You: Oh my god. Okay. Insurance.
 Q: Sectors to exclude outright: Insurance. Is that right?
 You: Stop asking me silly questions.
 Q: You did tell me, and I didn't get it down. I heard you, and I'm still missing sectors to exclude outright.
 Q: Sectors to exclude outright: Insurance. Is that right?
-Q: Sectors to exclude outright: Insurance. Is that right?   <- duplicate emission
+Q: Sectors to exclude outright: Insurance. Is that right? <- duplicate emission
 You: Yes.
 Q: Understood. Is there anything else you want to add before we review the mandate?
 You: No.

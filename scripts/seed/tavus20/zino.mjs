@@ -5,7 +5,10 @@
 //   node zino.mjs Ledgerline the event trail and messages for one company
 import * as lib from "./lib.mjs";
 
-const names = lib.companies().map((c) => `'${c.company.replace(/'/g, "''")}'`).join(",");
+const names = lib
+  .companies()
+  .map((c) => `'${c.company.replace(/'/g, "''")}'`)
+  .join(",");
 const one = process.argv[2];
 const rows = await lib.sql(`
   select c.canonical_name company, r.id rel, r.current_state state, r.state_updated_at,
@@ -18,4 +21,5 @@ const rows = await lib.sql(`
    where o.display_name = 'Zino Aviation' and c.canonical_name in (${names})
      ${one ? `and c.canonical_name = '${one.replace(/'/g, "''")}'` : ""}
    order by r.state_updated_at desc`);
-for (const r of rows) console.log(`${r.company} [${r.state}] ${r.rel}\n  ${r.events}`);
+for (const r of rows)
+  console.log(`${r.company} [${r.state}] ${r.rel}\n  ${r.events}`);

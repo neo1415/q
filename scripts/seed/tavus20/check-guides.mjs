@@ -4,7 +4,9 @@ import * as lib from "./lib.mjs";
 
 const out = [];
 for (const c of lib.companies()) {
-  const t = await lib.accessToken(lib.emailFor(c.founderPerson.name, c.company));
+  const t = await lib.accessToken(
+    lib.emailFor(c.founderPerson.name, c.company),
+  );
   const r = await lib.call(lib.API, t, "GET", "/v1/me/etiquette-guide");
   const text = JSON.stringify(r.body ?? "");
   out.push(

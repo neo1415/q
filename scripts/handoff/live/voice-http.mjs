@@ -16,7 +16,8 @@
 
 import { writeFileSync } from "node:fs";
 
-const QAPI = process.env.QAPI ?? "https://capital-qq-api-production.up.railway.app";
+const QAPI =
+  process.env.QAPI ?? "https://capital-qq-api-production.up.railway.app";
 const EMAIL = process.env.EMAIL ?? "";
 if (!EMAIL.endsWith("@fictional.capitalq.local")) {
   console.error("fictional accounts only");
@@ -24,11 +25,20 @@ if (!EMAIL.endsWith("@fictional.capitalq.local")) {
 }
 const TTS = Math.min(Number(process.env.TTS ?? "0"), 6);
 
-const signIn = await fetch(`${process.env.SB_URL}/auth/v1/token?grant_type=password`, {
-  method: "POST",
-  headers: { apikey: process.env.SB_PUBLISHABLE, "content-type": "application/json" },
-  body: JSON.stringify({ email: EMAIL, password: process.env.CQ_SEED_ACCOUNT_PASSWORD }),
-});
+const signIn = await fetch(
+  `${process.env.SB_URL}/auth/v1/token?grant_type=password`,
+  {
+    method: "POST",
+    headers: {
+      apikey: process.env.SB_PUBLISHABLE,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      email: EMAIL,
+      password: process.env.CQ_SEED_ACCOUNT_PASSWORD,
+    }),
+  },
+);
 if (!signIn.ok) {
   console.error(`sign-in failed: HTTP ${signIn.status}`);
   process.exit(1);
@@ -43,7 +53,9 @@ const authed = (extra = {}) => ({
 // ---- a rehearsal to speak in, when asked --------------------------------
 let rehearsal;
 if (process.env.REHEARSE === "1") {
-  const partners = await (await fetch(`${QAPI}/v1/q/rehearsals/partners`, { headers: authed() })).json();
+  const partners = await (
+    await fetch(`${QAPI}/v1/q/rehearsals/partners`, { headers: authed() })
+  ).json();
   const first = (partners.partners ?? partners.items ?? [])[0];
   const investorOrganisationId = first?.investorOrganisationId ?? first?.id;
   const started = await fetch(`${QAPI}/v1/q/rehearsals`, {
@@ -53,7 +65,9 @@ if (process.env.REHEARSE === "1") {
   });
   const body = await started.json();
   rehearsal = body.rehearsalId ?? body.rehearsal?.rehearsalId ?? body.id;
-  console.log(`rehearsal ${started.status} ${rehearsal ?? JSON.stringify(body).slice(0, 200)}`);
+  console.log(
+    `rehearsal ${started.status} ${rehearsal ?? JSON.stringify(body).slice(0, 200)}`,
+  );
 }
 
 // ---- the voice session -----------------------------------------------------
@@ -63,13 +77,17 @@ const session = await fetch(`${QAPI}/v1/q/voice/sessions`, {
   headers: authed(),
   body: JSON.stringify({
     voice: "FEMALE",
-    ...(rehearsal === undefined ? {} : { rehearsal: { rehearsalId: rehearsal } }),
+    ...(rehearsal === undefined
+      ? {}
+      : { rehearsal: { rehearsalId: rehearsal } }),
     ...(process.env.LOCALE === undefined ? {} : { locale: process.env.LOCALE }),
   }),
 });
 const opened = await session.json();
 if (!session.ok) {
-  console.error(`session ${session.status}: ${JSON.stringify(opened).slice(0, 300)}`);
+  console.error(
+    `session ${session.status}: ${JSON.stringify(opened).slice(0, 300)}`,
+  );
   process.exit(1);
 }
 const agent = opened.deepgram?.agent ?? {};
@@ -84,7 +102,10 @@ if (think === undefined) {
 }
 
 const TAG = /\[[a-z][a-z ]{1,30}\]|<break[^>]*>/gi;
-const history = opened.firstMessage === undefined ? [] : [{ role: "assistant", content: opened.firstMessage }];
+const history =
+  opened.firstMessage === undefined
+    ? []
+    : [{ role: "assistant", content: opened.firstMessage }];
 let ttsLeft = TTS;
 let failures = 0;
 
@@ -101,7 +122,11 @@ for (const raw of process.argv.slice(2)) {
     const response = await fetch(think.url, {
       method: "POST",
       headers: { ...think.headers, "content-type": "application/json" },
-      body: JSON.stringify({ model: "capital-q", stream: true, messages: history }),
+      body: JSON.stringify({
+        model: "capital-q",
+        stream: true,
+        messages: history,
+      }),
       signal: controller.signal,
     });
     status = response.status;
@@ -142,9 +167,13 @@ for (const raw of process.argv.slice(2)) {
   const total = Date.now() - started;
   // What Q got out before being talked over stays in the history, as the
   // speech provider keeps it.
-  if (text.trim().length > 0) history.push({ role: "assistant", content: text.trim() });
+  if (text.trim().length > 0)
+    history.push({ role: "assistant", content: text.trim() });
   const tags = text.match(TAG) ?? [];
-  const state = await fetch(`${QAPI}/v1/q/voice/sessions/${opened.voiceSessionId}/turn`, { headers: authed() })
+  const state = await fetch(
+    `${QAPI}/v1/q/voice/sessions/${opened.voiceSessionId}/turn`,
+    { headers: authed() },
+  )
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
   console.log(
@@ -174,7 +203,9 @@ for (const raw of process.argv.slice(2)) {
       }
     }
     const bytes = chunks.reduce((n, c) => n + c.length, 0);
-    console.log(`  TTS ${audio.status} ${audio.headers.get("content-type")} first byte ${firstByte ?? "-"} ms, ${bytes} bytes, said: ${sentence.slice(0, 120)}`);
+    console.log(
+      `  TTS ${audio.status} ${audio.headers.get("content-type")} first byte ${firstByte ?? "-"} ms, ${bytes} bytes, said: ${sentence.slice(0, 120)}`,
+    );
     if (process.env.OUT !== undefined && bytes > 0) {
       const file = `${process.env.OUT}/tts-${TTS - ttsLeft}.mp3`;
       writeFileSync(file, Buffer.concat(chunks.map((c) => Buffer.from(c))));
@@ -190,7 +221,13 @@ if (rehearsal !== undefined) {
     headers: authed({ "idempotency-key": crypto.randomUUID() }),
     body: JSON.stringify({}),
   });
-  console.log(`rehearsal finish ${finished.status}: ${(await finished.text()).slice(0, 300)}`);
+  console.log(
+    `rehearsal finish ${finished.status}: ${(await finished.text()).slice(0, 300)}`,
+  );
 }
-console.log(failures === 0 ? "voice http: all turns answered" : `voice http: ${failures} failure(s)`);
+console.log(
+  failures === 0
+    ? "voice http: all turns answered"
+    : `voice http: ${failures} failure(s)`,
+);
 process.exit(failures === 0 ? 0 : 1);

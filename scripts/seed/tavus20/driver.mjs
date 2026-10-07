@@ -44,7 +44,9 @@ async function fresh() {
   page.on("response", (r) => {
     const u = r.url();
     if (r.status() >= 400 && /railway\.app|supabase/.test(u))
-      failed.push(`${r.status()} ${r.request().method()} ${u.replace(/\?.*/, "")}`);
+      failed.push(
+        `${r.status()} ${r.request().method()} ${u.replace(/\?.*/, "")}`,
+      );
   });
 }
 await fresh();
@@ -52,7 +54,10 @@ const h = {
   consoleErrors,
   failed,
   snap: async (sel = "body", max = 6000) =>
-    (await page.locator(sel).first().ariaSnapshot({ timeout: 15000 })).slice(0, max),
+    (await page.locator(sel).first().ariaSnapshot({ timeout: 15000 })).slice(
+      0,
+      max,
+    ),
   shot: async (name) => {
     const p = `${SHOTS}/${name}.png`;
     await page.screenshot({ path: p, fullPage: false });
@@ -95,8 +100,12 @@ const server = http.createServer(async (req, res) => {
       );
       const out = await fn(page, ctx, lib, h);
       const extra =
-        (failed.length ? `\n[http>=400] ${[...new Set(failed)].join(" | ")}` : "") +
-        (consoleErrors.length ? `\n[console] ${consoleErrors.slice(0, 5).join(" | ")}` : "");
+        (failed.length
+          ? `\n[http>=400] ${[...new Set(failed)].join(" | ")}`
+          : "") +
+        (consoleErrors.length
+          ? `\n[console] ${consoleErrors.slice(0, 5).join(" | ")}`
+          : "");
       return send(
         200,
         (typeof out === "string" ? out : JSON.stringify(out, null, 1)) + extra,
@@ -106,7 +115,10 @@ const server = http.createServer(async (req, res) => {
       return send(
         200,
         `${page.url()}\n` +
-          (await h.snap(url.searchParams.get("sel") ?? "body", Number(url.searchParams.get("max") ?? 6000))),
+          (await h.snap(
+            url.searchParams.get("sel") ?? "body",
+            Number(url.searchParams.get("max") ?? 6000),
+          )),
       );
     }
     if (url.pathname === "/shot") {

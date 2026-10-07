@@ -20,8 +20,11 @@ for (const c of lib.companies()) {
       (select string_agg(i.kind, '+' order by i.kind) from core.profile_images i where i.subject_id=c.id and i.status='READY' and i.ended_at is null) company_images,
       (select count(*) from core.profile_images i where i.subject_type='PERSON' and i.subject_id in (select m.user_id from identity.organisation_memberships m where m.organisation_id=c.organisation_id) and i.status='READY' and i.ended_at is null) person_images
     from core.companies c where c.id='${id}'`);
-  const t = await lib.accessToken(lib.emailFor(c.founderPerson.name, c.company));
-  const p = (await lib.call(lib.API, t, "GET", `/v1/companies/${id}/pitch`)).body?.pitch;
+  const t = await lib.accessToken(
+    lib.emailFor(c.founderPerson.name, c.company),
+  );
+  const p = (await lib.call(lib.API, t, "GET", `/v1/companies/${id}/pitch`))
+    .body?.pitch;
   rows.push(
     `${c.n} ${c.company}: ${r.v}/${r.r} docs=${r.docs} filed=${r.filed} members=${r.members} verified=${r.verified} images=${r.company_images}/${r.person_images} pitch=${p ? `${p.status}/${p.audience}/dl=${p.downloadable}` : "none"} steps=${Object.keys(s.done ?? {}).join(",")}`,
   );

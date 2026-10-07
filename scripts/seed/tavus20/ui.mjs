@@ -30,27 +30,36 @@ export async function setField(page, regionName, label, value) {
   const r = await openRegion(page, regionName);
   const lower = label.charAt(0).toLowerCase() + label.slice(1);
   const opener = r
-    .getByRole("button", { name: new RegExp(`^(Add|Edit) (${escape(label)}|${escape(lower)})$`, "i") })
+    .getByRole("button", {
+      name: new RegExp(`^(Add|Edit) (${escape(label)}|${escape(lower)})$`, "i"),
+    })
     .first();
   if (!(await opener.isVisible().catch(() => false)))
     return `no opener for ${label}`;
   await opener.click();
   await page.waitForTimeout(600);
-  const box = r.getByRole("textbox", { name: new RegExp(`^${escape(label)}$`, "i") }).first();
-  const combo = r.getByRole("combobox", { name: new RegExp(`^${escape(label)}$`, "i") }).first();
+  const box = r
+    .getByRole("textbox", { name: new RegExp(`^${escape(label)}$`, "i") })
+    .first();
+  const combo = r
+    .getByRole("combobox", { name: new RegExp(`^${escape(label)}$`, "i") })
+    .first();
   if (await box.isVisible().catch(() => false)) {
     await box.fill(String(value));
   } else if (await combo.isVisible().catch(() => false)) {
-    await combo.selectOption({ label: String(value) }).catch(async () =>
-      combo.selectOption(String(value)),
-    );
+    await combo
+      .selectOption({ label: String(value) })
+      .catch(async () => combo.selectOption(String(value)));
   } else {
     const dateBox = r.locator("input").first();
     await dateBox.fill(String(value));
   }
   await r.getByRole("button", { name: "Save", exact: true }).first().click();
   await page.waitForTimeout(2500);
-  const err = await r.getByRole("alert").allInnerTexts().catch(() => []);
+  const err = await r
+    .getByRole("alert")
+    .allInnerTexts()
+    .catch(() => []);
   return err.filter((t) => t.trim()).join(" ") || "saved";
 }
 
@@ -59,7 +68,9 @@ export async function addSectorCategories(page, names) {
   const d = page.getByRole("dialog");
   const out = [];
   for (const name of names) {
-    const already = d.getByRole("button", { name: new RegExp(`^Remove ${escape(name)}$`, "i") });
+    const already = d.getByRole("button", {
+      name: new RegExp(`^Remove ${escape(name)}$`, "i"),
+    });
     if (await already.isVisible().catch(() => false)) {
       out.push(`${name}: present`);
       continue;
@@ -84,7 +95,9 @@ export async function addSectorCategories(page, names) {
 
 /** Profile image: pick the file, accept the crop dialog, return the toast text. */
 export async function uploadImage(page, buttonName, file) {
-  const chooser = page.waitForEvent("filechooser", { timeout: 15000 }).catch(() => null);
+  const chooser = page
+    .waitForEvent("filechooser", { timeout: 15000 })
+    .catch(() => null);
   await page.getByRole("button", { name: buttonName }).click();
   // An image already set opens "Upload new / Remove" instead: keep it.
   const menu = page.getByRole("button", { name: "Upload new" });
@@ -102,7 +115,9 @@ export async function uploadImage(page, buttonName, file) {
   let text = "";
   for (let i = 0; i < 20; i += 1) {
     await page.waitForTimeout(2000);
-    text = (await page.getByRole("status").allInnerTexts()).filter(Boolean).join(" | ");
+    text = (await page.getByRole("status").allInnerTexts())
+      .filter(Boolean)
+      .join(" | ");
     if (/updated/i.test(text) && !/Saving/i.test(text)) break;
   }
   return text;

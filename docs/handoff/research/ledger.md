@@ -159,26 +159,28 @@ Canonical Wave 7 (doc 25 §106–116) vs merged:
 Source check (docx text extracted): PADL #64 LOCKED "with the explicit consent of all participants, Q may attend meetings as a SILENT institutional meeting assistant ... separate debriefs for founders and investors ... automatically update the Investment Relationship CRM". Founder now wants Q ALWAYS present and ALLOWED TO SPEAK → needs a PADL amendment (ADR 0027): consent captured once at booking (invite + join notice, any participant may remove Q), Q speaks only when addressed. Spec 6.6.12 post-meeting execution; 6.6.14 commitment ladder (Interested → Active → Diligence → Soft → Confirmed → Invested; money said in a call is a signal needing human confirmation); 6.6.15 fundraising display (Confirmed / Soft / Pipeline). PADL #65 continuous monitoring of followed companies (material changes only). GateQ spec §1 embeddable white-label gateway (link, QR, website embed), §19/§7 API + export. Pricing/commission explicitly out of spec scope → founder's facilitation-fee need = attribution record (who introduced, meetings held, commitments, timestamps).
 
 P0 (before demo)
+
 1. Live verify on founder account: Find a time (events.list fix, deploy pending), book + Meet link + invite emails, reminder email via Brevo (SMTP_API_KEY), Gmail draft/send, Q meeting assistant on a real call (Recall EU, sparing).
 2. Meetings as the system of record: Q auto-joins every Capital Q-booked call (ADR 0027), full transcript kept (both parties per access), structured record (attendees, agreements, amounts as claims → commitment ladder with confirmation), debriefs for BOTH sides, relationship events (meeting held / commitment signal) = attribution trail for facilitation fees; speak-when-addressed via Recall output media.
 3. Chat page = WhatsApp: full-height thread, composer pinned bottom, header (avatar, name, state), everything else in an info drawer.
 4. Navigation speed (2–5 s clicks): measure TTFB per route, add route-level loading states, Suspense around slow reads, prefetch, cache API reads.
 5. Discover: swipe right = interested, left = pass; search results as plain name rows.
 6. Flow audit: every page/action shows the obvious next step as a control, not a sentence (Find a time → pick → confirm → done in one surface).
-P1
+   P1
 7. "Wow": Q delegations — standing multi-step instructions ("express interest; when they accept, chat, answer their questions, book a call, send me the link, notify me") executed on events under scoped delegated authority (delegation-reader prompt exists; PADL authority rules: approval per consequential step unless scoped delegation).
 8. Business layer: fundraising ledger (Confirmed/Soft/Pipeline), investor deal log + portfolio, exportable reports (PDF/CSV), attribution ledger for Capital Q fees.
 9. GateQ in the wild: public gateway page per organisation, embed snippet (script→iframe), share link + QR, applications inbox (API exists: apps/api gateq routes; no web UI yet).
 10. Multi-party meetings (several people per side, teammates), reminders to all attendees.
 11. Investor alerts: PADL #65 monitoring of followed companies + new companies that fit.
-P2
+    P2
 12. Capital Q admin console: vetting queue, verification, disputes, attribution/fee ledger, usage & model cost.
 13. Company vetting: KYB/KYC provider, document verification, sanctions screening.
 14. Learning pipeline: consent flag, de-identified corpus (turns, corrections, outcomes), eval sets, export for future own-model training.
-WOW candidates: live shared meeting notes for both sides; IC rehearsal (Q plays a tough partner, scores the pitch); raise autopilot with approvals; warm-intro graph; weekly voice brief; term-sheet + e-signature with commitment ladder.
-Onboarding status: founder/investor interviews live; presence read (Q looks the company/person up during onboarding) exists and stays silent when nothing is found (turn.ts proactive → no line) — verify it only mentions finds tied to the next question.
+    WOW candidates: live shared meeting notes for both sides; IC rehearsal (Q plays a tough partner, scores the pitch); raise autopilot with approvals; warm-intro graph; weekly voice brief; term-sheet + e-signature with commitment ladder.
+    Onboarding status: founder/investor interviews live; presence read (Q looks the company/person up during onboarding) exists and stays silent when nothing is found (turn.ts proactive → no line) — verify it only mentions finds tied to the next question.
 
 ### 2026-09-29 late — progress on the priority list
+
 - DONE #2 meeting record (52bee2f, migration 20261027090000 applied): Q auto-enlists every booked call with a Meet link ≤30 min before start; consent line in invite; transcript + attendees + agreements + money-mentioned (firmness + quote, "not a commitment until confirmed") + flags + next steps, readable by BOTH sides; `meeting_held` relationship event (attribution trail). Speaking in calls: not built (ADR 0027 §3).
 - DONE #3 chat = WhatsApp, #5 swipe + plain search rows (earlier commits).
 - #4 nav speed re-measured on prod: loader ~80 ms, page 0.47–1.71 s (was 2–5 s). Relationships slowest.
@@ -190,18 +192,22 @@ Onboarding status: founder/investor interviews live; presence read (Q looks the 
 - LATER: admin console (#12), KYB vetting (#13), learning pipeline (#14), Q speaking in calls, other side's debrief, Q tools for commitments/gateway, "Record this" from meeting money-mentioned.
 
 ## 2026-09-30 — FOUNDER DIRECTION: build all of it (order)
+
 A (trust): 1 Q mandatory in Capital Q meetings (declining recording = logged event, meeting still counts); 2 Q auto-detects money in calls/chats → DETECTED commitment both sides confirm/correct, never deletable; 3 attribution ledger (intro source, meetings held/declined, detected+confirmed money).
 B (unfinished): 4 Q speaks when addressed in calls; 5 other side's debrief; 6 live checks (Brevo, Gmail, Recall); 7 admin console; 8 KYB/KYC vetting; 9 learning pipeline (consent, de-identified corpus, evals); 10 minimalism/backgrounds/scroll; 11 Q tools for commitments/gateway.
 C (wow): 12 Investor Twin rehearsal (persona from mandate + public presence + platform comments + engagement with THIS founder; never the investor's private Q chats; voice, interruptions, scoring — cf. kuuza.ai); 13 live shared notes; 14 raise autopilot; 15 warm-intro graph; 16 weekly voice brief; 17 term sheet + e-sign; 18 The Q Daily (agent newspaper with real photos, dashboard + email); 19 diligence room; 20 comps & valuation desk.
 Runtime: LangGraph.js for long-running agents, model calls through the Q Model Gateway adapter (ADR needed: amends "no agent orchestration").
+
 - DONE A1+A2 (c59fa5d1): declining Q = logged event; Q-detected money in calls → DETECTED commitments both sides adopt/dispute.
 - DONE Talk-with-Q button (946a3ed6); in-app nav without reload, mic survives, control_screen tool (53ac145e); fuzzy company names (498d3820); admin console /admin live (53b5541c); Discover voice next/pass/save + mandate id fix (c296c703); turn reader v16 named records (f8b76a69).
 - DONE open_page by spoken name (14dd1e54): "open my chat with young field agro" matches their own relationships only; unknown-screen readings fall through to the tool-using answer.
 - NEXT: live-verify named chat + Discover voice + mandate edit; C12 Investor Twin (persona prompt ready), C18 Q Daily.
 
 ## 2026-09-30 — FOUNDER URGENT: onboarding is broken + Q must be far better (verbatim intent, nothing to drop)
+
 Live repro (new founder "Priya"): sign-in landed on Discover, not Q; the "Talk to Q" button then opened Q; Q answered "I'm here to raise capital" as a generic analyst ("no authorised information… provide company name"), only later said "Are you here to raise capital, or to invest it?". Onboarding interview did not run.
 MUST:
+
 1. New user always lands on Q first (not Discover). Q asks why they're here (raise vs invest) and routes on the same Q page; then runs the spec interview to completion. Hide the sidebar until onboarding is done (consider).
 2. Founder: asks spec questions; asks for a pitch deck; reads the upload; proposes facts to other profile parts, confirms before saving. A parallel background agent researches the founder/company online and surfaces a finding ONLY when it answers a question Q will ask; Q confirms it without losing its place.
 3. Investor: same — background builds the online profile, Q confirms findings, keeps asking the remaining interview questions until complete unless told to skip.
@@ -213,7 +219,8 @@ MUST:
 9. Pitch deck: if the founder has none, Q offers to create one (questions, or read an uploaded document); brand colours, logo, fonts (ask, or find & download); Pexels + Gemini/OpenAI images, illustrations, graphs; multiple agents (audit/optimise, industry design research, imagery, words/anti-AI-look). Q opens and shows the deck, user edits by voice or typing; saves when satisfied. Never loses its place in the interview; the deck can be moved to the end or later. BUG: deck edits don't change colours; a new document needs a refresh to appear.
 10. Q's abilities stay with Q everywhere, not just onboarding; limit tool calls around the app during onboarding to what onboarding needs.
 11. Emails: Capital Q branding; they land in spam (fix deliverability: SPF/DKIM/DMARC, sender).
-Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality/presence → then back to the earlier list.
+    Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality/presence → then back to the earlier list.
+
 - DONE onboarding (2026-09-30, live-verified with fresh fictional accounts founder.onboard1-4 / investor.onboard1 @fictional.capitalq.local):
   - dd6e023b arrival: / and PWA start at /welcome; unfinished setup → /onboarding/<journey>?talk=1; /home gated; welcome in (onboarding) group (no sidebar), Skip removed; shell shows only "Continue with Q" until done; founder done → /profile, investor → /discover.
   - a0e5b2e0 + 72ede4ea INTERVIEW_AGENT v11/v12: personality (Settings: Auto/Warm/Witty/Sharp/Calm, tooltips), varied openings, laughter/teasing, sarcasm/hurt read, answered-is-answered, deck offer that keeps its place. voice/conduct.ts: small-talk policy (2 turns; Q-started 4 steering by 3rd; 3rd round → warn + /discover strike; later visit 1 round; orange ≥3 strikes, red + pause at 5, operators notified in-app + email; /paused page; admin reinstate). Migration 20261101100000 q_runtime.person_standing.
@@ -225,6 +232,7 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - NEXT: personality in Home Q too; document look (page background/ink for all documents, slide background for decks) + revision v3; particles tied to speech (head turn, hands); deck creation in onboarding (brand colours/logo/fonts, multi-agent); then earlier list (C18 Q Daily, B-items).
 
 ### 2026-09-30 evening — founder live test (Priya/Nixo) root causes, fixed (3ac18a12, 667aa144)
+
 - Number words rejected by the write check ("say 1") → spoken figures read in the validator (ADR 0011 §4).
 - Confirmations only via confirm_and_finish → a confirmation is recorded on the reading's agreement; once required answers are in, one yes finishes.
 - Company name typed at sign-up asked again; research findings (description, US) held PENDING and never said; website/description/sectors/deck never asked → code-composed turn notes (sign-up name, unsaid findings, unasked optional steps); research starts on the sign-up name and offers the company's own site.
@@ -236,11 +244,13 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - Turn latency after overlap: ~4.5-6 s span of model calls (luna ~2 s/round); further gains need a faster dialogue model route.
 
 ### 2026-09-30 late — smart interview + real-entity bench (see HANDOVER.md §3, §5)
+
 - Founder direction: prefill from sign-up/research and read it out; monologues; keep off-list answers in their words; test with real entities; keep the handover current.
 - Shipped d8d1dd1e..42c9a4a4: ownWords (off-list kept, country→ISO, role as title); DELEGATION_READER v4 (asked step); sign-up name recorded and said back; earlier-stated memory (figures/text recorded, choices held as recommendations); given-earlier note; "four and a half", "a thousand"; never ask for digits or set words; completion closes; composer typed-words fix (web); batch isolation; family-aware stated; sibling-option hint; lenient research readers (founder + investor); Home Q offers unconfirmed findings; presence read for typed onboarding.
 - Bench results: Nixo, Flutterwave, Chowdeck, Ventures Platform COMPLETE; Soyombo through the mandate. Handover lists what is still open.
 
 ## 2026-10-01 — lead resumed (this account)
+
 - Synced to d7b26a2c (deployed web 98693221, api/workers 91e1a455, q-api 42c9a4a4). Master plan docs/specs/2026-10/MASTER-PLAN.md. Agents started: HARDEN (Discover preload first, then HANDOVER §5 open items, end-of-turn next steps, memory, eval harness), REHEARSE (Meet-style rehearsal + personas), AUTO (LangGraph autonomy, Q-to-Q, stand-in, notifications/Web Push), DOCS (documents/design, pop-up cards, Q_REPORT). Queued: DAILY, ADMIN, end-to-end bench.
 - 2026-10-01: DEPLOYED 566593c5 (Discover preload; Cloudflare Stream signing key created and set on api), 1a46bdb3 (HARDEN pass 1: interview retries, next-step offers, 477-check capability harness, smoke.mjs), 508571c4 (REHEARSE Meet-style room + personas + reviews, ADR 0029, TURN_READER v19, hosted 20261111000000; HARDEN-2: root tsc 0, flash-lite reader 20261110000000, write_reply one-round, presence trigger waits for org, extraction DROP, no re-ask loop). Hosted 96/96. VAPID keys set (api public+subject; workers all). AUTO built (porting onto head), DOCS built (ports after AUTO), DAILY + ADMIN running. Decisions: skip typed SSE; own-record questions to fast path; founder definition v3 with 'Paying customers'.
 - 2026-10-01: DEPLOYED 978aff38: AUTO (LangGraph delegated work, ADR 0030, investor outreach/interview report/booking, founder stand-in, Q-to-Q, notification centre + Web Push), HARDEN-3 (founder definition v3 'Paying customers', own-record fast path, firewall plan reuse), jsonbParam fix (meeting notes + GateQ writes stored JSON strings; readers decode). Hosted 99/99 (20261110010000, 20261112000000, 20261112010000). DOCS porting; DAILY after; ADMIN running.
@@ -248,6 +258,7 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - 2026-10-01 ~09:20-09:45 OUTAGE: every Q model call failed (catalog Zod rejected IMAGE_GENERATION model rows from 20261113010000). HOTFIX 2f04a9a0 (MODEL_TYPES + drift test 18ae9ace). Verified: 146/153 model calls succeeded in the 30 min after. DEPLOYED 76a00564: The Q Daily (ADR 0032, /daily, TURN_READER v21, kill switch, hosted 20261114000000; hosted 104/104). Running: HARDEN-5, QA-2 (founder reports a-e), REHEARSE-3 deep audit (emotion voice, kuuza gap list, live), PRESENCE (speech-tied particles), BILLING (spec-vs-code + entitlements + Stripe adapter).
 
 ## 2026-10-01 ~11:20 UTC — lead: rehearsal hotfix + merge of REHEARSE-3, QA-2, PRESENCE, BILLING, HARDEN-5
+
 - 129f3b1a hotfix: persona schemas accepted longer lists/lines (live: 6/6 persona builds refused `too_big`). Deployed 10:27; all STRUCTURED_EXTRACTION calls since succeeded.
 - Merged build/rehearse-3 (persona v3 supersedes the hotfix), build/qa-2, build/presence, build/billing, build/harden-5.
 - Merge fix 5083b74c: HARDEN-5's schema-enforced first round returned STRUCTURED and skipped QA-2's said-instead-of-done round. The check now runs on both paths; the gateway takes `lenientFields` and returns `dropped` on STRUCTURED output (contracts).
@@ -256,29 +267,34 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - Open decisions for the founder (BILLING): prices, which features are paid and their limits, the facilitation fee (needs a PADL amendment and legal advice), and Stripe keys.
 
 ## 2026-10-01 afternoon: lead merges after founder's "test everything, behave like a human"
+
 - Merged and deployed: AUTO-3 (wake on acceptance; live 2.9 s, previously 48 s), AUTO-4 (booking without Google via in-chat slots plus .ics; founder-side notices; migration 20261112020000 applied, hosted 107/107), QA-2 (typed approval via DECISION_READER, card carried on reload, TURN_READER v22 hand-over route, one-tap "Let Q handle this", relative times), HARDEN-6 (own-standing prefetch, likely-intent and expressive notes, v15 proposalStatus, OpenAI account-exhausted skip, Gemini mid-conversation note fix, reader 2.5 s, parallel and early reads per ADR 0035, fewer lifecycle transactions), REHEARSE (raise hand yields, device locale).
 - 13:25 UTC: OpenAI credit_balance_exhausted. Live testing paused; Q runs on Gemini fallback (2/2 live turns pass). OpenAI over the last 24 h: ~2,270 calls, ~$2.77 logged. The founder must top up.
 - Waiting on credit: QA live re-checks (hand-over card, decline case, choice question), AUTO slot negotiation on lagoon's errands, HARDEN 30-turn sweep, rehearsal voice turns, speed measurement.
 - Needs the founder's real browser and mic: laugh audio, barge-in, "Zino Aviation" STT, FR/Yoruba voice.
 
 ## 2026-10-01 evening — lead
+
 - Merged and deployed 6d9a7500: REHEARSE (persona v5, rebuild of stale readings, emotion state with v3 delivery, angry goodbye plus Meet sounds, review grades only the user's role, leverage), HARDEN (open-mic pause, addressedness marks with migration 20261110030000, profile name only, named-company prefetch, Daily screen, partials collapse, Hide from Q), QA (ALREADY_ACTIVE, v23/v24 hand-over, mobile More sheet, Results destination, named-relationship plan), AUTO (Meet-link re-read, outreach picks founders itself), ADMIN (human reviews + manual KYB, migration 20261115010000), BILLING (Readiness Blueprint groundwork, ADR 0036 draft, recommendation volume; migration 20261116020000). Hosted 110/110; test:db 1627/1627.
 - pgTAP 140/260/540 now count their own fixtures (no more failures from shared rows).
-- Removed bench.nixo, nixo2 and nixo3 (fictional duplicates). There are 10 more fictional "Zino Aviation" investor orgs (qx004-*, rw-*@example.com) to clear later.
+- Removed bench.nixo, nixo2 and nixo3 (fictional duplicates). There are 10 more fictional "Zino Aviation" investor orgs (qx004-_, rw-_@example.com) to clear later.
 - REAL-ACCOUNT RUN (founder-approved): made Nixo network_visible via its visibility page. Zino asked Q on Nixo's page "get me a meeting with this person" → card → Approve → interest 18:07:26 → Nixo accepted 18:08:17 → booked 18:08:39 with Meet https://meet.google.com/xke-cckh-szx, Fri 2 Oct 12:30 UTC. Notices sent to both sides, rehearsal suggested, prep brief ready.
 - Defect found: after a reload the dock starts a new conversation, so a typed "yes" misses the pending card. Sent to QA.
 
 ## 2026-10-01 night — lead
+
 - Deployed 5eb4fef2 (all 4 SUCCESS 20:41): rehearsal never fails to start (field-by-field readings, minimal persona fallback, holding line, provisional review with retries, "rehearsal degraded" log); gateway enumFallbacks + label normalisation; camera presence (opt-in) + look-on-demand; time-zone order (no silent UTC); approved-action sweep; dock resume + cross-conversation typed approval; branded emails (packages/email) + per-person meeting emails with Meet link/.ics; meet-host (Recall output audio + ElevenLabs; greet, intros, roster, no-show/one-side paths, injection refusals; ADR 0037 Proposed). Hosted migrations 112/112.
 - Real Zino↔Nixo call Fri 2 Oct 12:30 UTC (cfccb9a9): bot joins T-3; someone must Admit "Q (Capital Q notes)".
 - Pending founder: load supabase/templates into hosted Auth (magic_link shows {{ .Token }}); ADR 0037 accept; billing decisions; hide overheard lines / retire "Neo" memory.
 
 ## 2026-10-02 afternoon — lead
+
 - Deployed 27505fb5: Discover "Your companies" (/discover/yours; connected/interested/saved pitches, list uses the player's own mayPlayPitch predicate, only the first item signed on load, phone entry over the stage); pitch audience+playback as one choice; HARDEN WHAT EXISTS fact (ownIndex port, wired by QA's ADR 0040 registry next), q.parity_gap log, turn reader v29 (PASSED).
 - Live as Zino: Nixo first in Your companies; Ajopot, Ledgerfold listed; out-of-mandate INVESTORS pitches no longer listed.
 - Founder decision: keep the disclosure rule (INVESTORS pitch plays only for mandate-eligible companies; connection/interest does not unlock it).
 
 ## 2026-10-03 early — lead
+
 - Deployed through 11a41c9a: Discover "Your companies"; company profile from Discover (ADR 0041 deck audience + team); post-meeting journey (relationship-state v2, Pass/Pause/Resume with private reasons, "how did it go?", other-side debrief, diligence area); ADR 0040 registry migration complete (151 → 92 hand-written mutation routes; errands/Q Daily/approvals/brand kit exempt); tool focus (≤40 tools/turn, ~29 avg, from 80); reader v37; approval safety (only a reply decides a card, typed and voice; one card per change; denial reasons spoken).
 - Hosted migrations 120/120. Relationship states auto-rebuilt at worker start (16 changed, 2 historic anomalies = duplicate requests on connected pairs, producer fixed).
 - Parity eval on 11a41c9a: 13/17 grader, ~16/17 behaviour; remaining are fixture artifacts. Eval spend this span ≈ $0.80 total.
@@ -286,17 +302,20 @@ Order: finish rehearsal → onboarding fix (deployed, perfect) → Q personality
 - Incidents: two VM OOM restarts (full vitest + workers); now vitest --maxWorkers=2, web alone, builds --concurrency=1.
 
 ## 2026-10-03 05:30 — lead
+
 - Deployed through 4d6455dc. Approval safety hardened end to end: only a reply decides a card (typed + voice, cross-conversation needs explicit approval naming the counterpart); one card per identical change; setter cards supersede older opposite ones (old card refused, 409); denial reasons spoken; never a status-only answer; one status line per card; reminder for other waiting cards when a new card is prepared.
 - Structural action reach: app actions eligible by area in focus; named counterparts bring Relationships; dedicated APP_ACTION_ROUTER (FAST, closed list, ~1.1–1.7 s, only when the reader names no declared action).
 - Parity eval on 4d6455dc: 17/17 plus reminder sequence; route/reminder log lines visible. Eval spend tonight ≈ $1.2 total.
 
 ## 2026-10-03 17:00 — lead
+
 - Deployed through a736bfc2 (harden-39, integ-40, harden-40). Declared actions served by hand-written proposers are router candidates ("Express interest in X" prepares, typed and voice); no could-not after a question; cross-conversation cards never capture a new request; "prepare" grants are ASK-only (planner INSTRUCTION_PLAN v2, ASKED_TO_PREPARE); rehearsal temperament: gaps cost, dodges need an open question, two warnings in any register.
 - Integration suite green again (84 files / 652 tests): stale expectations after intended migrations; q-daily fixture leak; real billing fix (entitlement plan check at ms precision). get_capital_objective offer to investors confirmed not a firewall leak (execution DENIED / NOT_AVAILABLE, indistinguishable from unknown).
 - Live QA (fictional accounts only): voice 6/6, rehearsal 8/8 checks, instructions 8/8; approved "prepare intros, except Nixo" grant fired 5 named ASK cards (none Nixo); all cards rejected, instruction stopped. CQ_INSTRUCTIONS_AUTO still off.
 - Eval spend this span ≈ $0.11 (117 calls). Open: rehearsal weak-answer regression, founder-ended outcome, planner false can't-lines, reminder refusal → harden-41.
 
 ## 2026-10-04 morning — lead
+
 - Deployed through fc60f331 (hosted migrations 134/134): harden-44..46 (reminder city→zone + durable awaiting action, persona-driven rehearsal temperament, scout relevance gate, React #418), design-48 (redesign of /work, approvals, notifications, relationship, usage, plan, meeting record, admin queue, diligence, Q Daily, documents, company profile; AA status tokens ADR 0046; shell call queue), instr-50/51 (grounded first messages with code validator, chat wakes instructions, chat notices, no duplicate first messages, no meeting asks without booking, mandate as hard gate, templated fact answers, deterministic "any hour"), meet-47 (Q hears calls: lobby admission notices; join-on-demand schedule.meeting.join; 1-min collector, retries, every failure visible; after-call cards; in-call brevity/barge-in), email-in-46 (Postmark inbound, per-person Q address, quarantine reader, reply via propose_email), dock-52.
 - CQ_INSTRUCTIONS_AUTO=on (q-api) since 2026-10-03 evening, after a supervised run: AUTO interest executed once, notices once, stop verified (stopped instructions did not fire past their next_fire_at).
 - Postmark inbound hook set on the founder's server (founder approved 2026-10-04); POSTMARK_INBOUND_ADDRESS + INBOUND_EMAIL_WEBHOOK_SECRET on api and q-api. Outbound stays Brevo SMTP.

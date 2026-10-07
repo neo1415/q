@@ -393,8 +393,8 @@ export function DeckCoach({
             <p className="cq-body-sm flex-1 text-(--cq-text-primary)">
               Q read version {view.extraction.versionNumber}. Investors see a
               section only once you confirm it. Confirming all keeps any you
-              marked as wrong or corrected as you left them. Coaching notes
-              stay yours.
+              marked as wrong or corrected as you left them. Coaching notes stay
+              yours.
             </p>
             <button
               type="button"

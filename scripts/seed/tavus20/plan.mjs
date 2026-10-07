@@ -24,7 +24,11 @@ export const LEVEL = {
 export function checklistItem(folderCode, title) {
   const t = title.toLowerCase();
   const rules = [
-    ["corporate", /certificate of incorporation/, "certificate_of_incorporation"],
+    [
+      "corporate",
+      /certificate of incorporation/,
+      "certificate_of_incorporation",
+    ],
     ["corporate", /board minutes|^board/, "board_minutes"],
     ["corporate", /good standing/, "good_standing"],
     ["cap_table", /cap table/, "cap_table_full"],
@@ -33,10 +37,18 @@ export function checklistItem(folderCode, title) {
     ["financials", /management accounts/, "management_accounts"],
     ["financials", /unit economics|cohort|retention/, "unit_economics"],
     ["financials", /business plan|capex|model/, "financial_model"],
-    ["tax", /clearance|compliance (certificate|status)|good standing|régularité|tax status/, "tax_clearance"],
+    [
+      "tax",
+      /clearance|compliance (certificate|status)|good standing|régularité|tax status/,
+      "tax_clearance",
+    ],
     ["tax", /return|filing|ct600|position|finalisation/, "tax_returns"],
     ["legal_ip", /ip assignment/, "ip_assignment_founders"],
-    ["legal_ip", /iso 27001|soc 2|penetration|security|hipaa|toolkit/, "security_overview"],
+    [
+      "legal_ip",
+      /iso 27001|soc 2|penetration|security|hipaa|toolkit/,
+      "security_overview",
+    ],
     ["legal_ip", /insurance/, "insurance"],
     ["commercial", /reference/, "customer_references"],
     ["commercial", /contract|agreement/, "customer_contracts"],
@@ -52,18 +64,35 @@ export function checklistItem(folderCode, title) {
 export function instrumentOf(text) {
   const t = text.toLowerCase();
   if (t.includes("safe")) return { onboarding: "SAFE", round: "SAFE" };
-  if (t.includes("convertible")) return { onboarding: "Convertible note", round: "Convertible" };
+  if (t.includes("convertible"))
+    return { onboarding: "Convertible note", round: "Convertible" };
   return { onboarding: "Priced equity round", round: "Equity" };
 }
 
-export const STAGE_LABEL = { pre_seed: "Pre-seed", seed: "Seed", series_a: "Series A" };
+export const STAGE_LABEL = {
+  pre_seed: "Pre-seed",
+  seed: "Seed",
+  series_a: "Series A",
+};
 export const COUNTRY_LABEL = {
-  NG: "Nigeria", KE: "Kenya", ZA: "South Africa", GH: "Ghana", EG: "Egypt",
-  GB: "United Kingdom", US: "United States", DE: "Germany", FR: "France",
-  IN: "India", BR: "Brazil",
+  NG: "Nigeria",
+  KE: "Kenya",
+  ZA: "South Africa",
+  GH: "Ghana",
+  EG: "Egypt",
+  GB: "United Kingdom",
+  US: "United States",
+  DE: "Germany",
+  FR: "France",
+  IN: "India",
+  BR: "Brazil",
 };
 export const PERSONALITY_LABEL = {
-  WARM: "Warm", WITTY: "Witty", DIRECT: "Direct", FORMAL: "Formal", AUTO: "Auto",
+  WARM: "Warm",
+  WITTY: "Witty",
+  DIRECT: "Direct",
+  FORMAL: "Formal",
+  AUTO: "Auto",
 };
 
 /** Founders: the founder plus team members whose title says co-founder. */
@@ -73,10 +102,14 @@ export function founderCount(c) {
 
 /** Founding-team strengths from titles (checkbox labels in onboarding). */
 export function strengthsOf(c) {
-  const titles = [c.founderPerson.role, ...c.team.map((p) => p.title)].join(" ").toLowerCase();
+  const titles = [c.founderPerson.role, ...c.team.map((p) => p.title)]
+    .join(" ")
+    .toLowerCase();
   const s = new Set(["Product"]);
-  if (/cto|engineer|technolog|machine learning|cryptograph/.test(titles)) s.add("Engineering");
-  if (/sales|revenue|partnership|commercial/.test(titles)) s.add("Sales and partnerships");
+  if (/cto|engineer|technolog|machine learning|cryptograph/.test(titles))
+    s.add("Engineering");
+  if (/sales|revenue|partnership|commercial/.test(titles))
+    s.add("Sales and partnerships");
   if (/coo|operations/.test(titles)) s.add("Operations");
   if (/cfo|finance|treasury|credit/.test(titles)) s.add("Finance");
   s.add("Deep industry expertise");
@@ -85,12 +118,23 @@ export function strengthsOf(c) {
 
 /** Onboarding "Main use of funds" checkboxes from the use-of-funds lines. */
 export function useOfFundsBoxes(c) {
-  const lines = c.capital.useOfFunds.map((u) => u.line.toLowerCase()).join(" | ");
+  const lines = c.capital.useOfFunds
+    .map((u) => u.line.toLowerCase())
+    .join(" | ");
   const s = new Set();
-  if (/engineer|product|platform|r&d|research|integration|technolog|model/.test(lines)) s.add("Product and engineering");
+  if (
+    /engineer|product|platform|r&d|research|integration|technolog|model/.test(
+      lines,
+    )
+  )
+    s.add("Product and engineering");
   if (/hire|hiring|team|people|talent/.test(lines)) s.add("Key hires");
-  if (/sales|go-to-market|marketing|growth|channel|partner|customer/.test(lines)) s.add("Sales and go-to-market");
-  if (/working capital|reserve|operations|runway|general/.test(lines)) s.add("Runway and operations");
+  if (
+    /sales|go-to-market|marketing|growth|channel|partner|customer/.test(lines)
+  )
+    s.add("Sales and go-to-market");
+  if (/working capital|reserve|operations|runway|general/.test(lines))
+    s.add("Runway and operations");
   if (/expan|market|countr|launch|new /.test(lines)) s.add("New markets");
   if (s.size === 0) s.add("Product and engineering");
   return [...s];
@@ -107,8 +151,13 @@ export function closeWindow(dateText, today = new Date("2026-10-06")) {
 
 /** Registration number from the certificate summary, e.g. "RC 6894215". */
 export function registrationNumber(c) {
-  const cert = c.dataRoom.find((d) => /certificate of incorporation/i.test(d.title));
-  const line = cert?.summary.find((s) => /registration number|company number|number/i.test(s)) ?? "";
+  const cert = c.dataRoom.find((d) =>
+    /certificate of incorporation/i.test(d.title),
+  );
+  const line =
+    cert?.summary.find((s) =>
+      /registration number|company number|number/i.test(s),
+    ) ?? "";
   const m = /Registration number (?:Company number )?([^;]+);/i.exec(line);
   return m ? m[1].trim() : null;
 }

@@ -36,7 +36,10 @@ const browser = await chromium.launch({
 const summary = [];
 for (const c of lib.companies()) {
   if (only && !only.includes(c.n)) continue;
-  const ctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1360, height: 900 } });
+  const ctx = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    viewport: { width: 1360, height: 900 },
+  });
   await ctx.addInitScript(() => {
     try {
       sessionStorage.setItem("cq.splash.seen", "1");
@@ -50,16 +53,22 @@ for (const c of lib.companies()) {
     try {
       await step(page, c);
     } catch (error) {
-      const msg = String(error?.message ?? error).split("\n")[0].slice(0, 300);
+      const msg = String(error?.message ?? error)
+        .split("\n")[0]
+        .slice(0, 300);
       console.log(`[${c.n} ${c.company}] ${step.name} FAILED: ${msg}`);
       await page
-        .screenshot({ path: `/tmp/claude-0/-home-user-q/5e7a5c77-f947-52b0-88c5-5afccae36a31/scratchpad/shots/fail-${c.n}-${step.name}.png` })
+        .screenshot({
+          path: `/tmp/claude-0/-home-user-q/5e7a5c77-f947-52b0-88c5-5afccae36a31/scratchpad/shots/fail-${c.n}-${step.name}.png`,
+        })
         .catch(() => {});
       failed.push(step.name);
       if (step.name === "stepOnboarding") break;
     }
   }
-  summary.push(`${c.n} ${c.company}: ${failed.length ? `FAILED ${failed.join(",")}` : "ok"}`);
+  summary.push(
+    `${c.n} ${c.company}: ${failed.length ? `FAILED ${failed.join(",")}` : "ok"}`,
+  );
   await ctx.close();
 }
 console.log("\nSUMMARY\n" + summary.join("\n"));

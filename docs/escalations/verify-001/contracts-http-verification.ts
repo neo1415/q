@@ -37,9 +37,7 @@ export const VERIFICATION_SUBJECT_TYPES = [
   "ORGANISATION",
   "DOMAIN",
 ] as const;
-export const VerificationSubjectTypeSchema = z.enum(
-  VERIFICATION_SUBJECT_TYPES,
-);
+export const VerificationSubjectTypeSchema = z.enum(VERIFICATION_SUBJECT_TYPES);
 export type VerificationSubjectType = z.infer<
   typeof VerificationSubjectTypeSchema
 >;

@@ -39,3 +39,8 @@ docs/handoff/vault
 
 # Generated email HTML (packages/email, kept in step by its test).
 supabase/templates
+
+# Local tooling output and agent configuration, not application code:
+# the code-map cache (gitignored), builder worktrees and vendored skills.
+graphify-out
+.claude

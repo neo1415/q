@@ -47,7 +47,8 @@ export async function supabaseKeys() {
   const list = await r.json();
   const pick = (type) => list.find((k) => k.type === type)?.api_key;
   keys = {
-    secret: pick("secret") ?? list.find((k) => k.name === "service_role")?.api_key,
+    secret:
+      pick("secret") ?? list.find((k) => k.name === "service_role")?.api_key,
     publishable:
       pick("publishable") ?? list.find((k) => k.name === "anon")?.api_key,
   };
@@ -69,7 +70,8 @@ export async function sql(query) {
     },
   );
   const j = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(`sql: HTTP ${r.status} ${JSON.stringify(j).slice(0, 300)}`);
+  if (!r.ok)
+    throw new Error(`sql: HTTP ${r.status} ${JSON.stringify(j).slice(0, 300)}`);
   return j;
 }
 
@@ -94,7 +96,8 @@ export const assetSlug = (s) =>
     .replace(/đ/g, "d")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-export const personSlug = (name) => assetSlug(name.replace(/^(Dr|Prof)\.?\s+/i, ""));
+export const personSlug = (name) =>
+  assetSlug(name.replace(/^(Dr|Prof)\.?\s+/i, ""));
 
 // Email slug: kept exactly as first used (accents became hyphens, e.g.
 // "ine-s"), because the accounts already exist under those addresses.
@@ -131,7 +134,9 @@ export async function ensureAccount({ email, displayName, seedKey }) {
       email,
       // The founder's shared seed password (env only, never printed), so
       // they can sign in as any fictional person; random when unset.
-      password: process.env.CQ_SEED_ACCOUNT_PASSWORD || randomBytes(24).toString("base64url"),
+      password:
+        process.env.CQ_SEED_ACCOUNT_PASSWORD ||
+        randomBytes(24).toString("base64url"),
       email_confirm: true,
       user_metadata: {
         display_name: displayName,
@@ -144,7 +149,10 @@ export async function ensureAccount({ email, displayName, seedKey }) {
     }),
   });
   const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(`create ${email}: HTTP ${r.status} ${body.msg ?? body.error_code ?? ""}`);
+  if (!r.ok)
+    throw new Error(
+      `create ${email}: HTTP ${r.status} ${body.msg ?? body.error_code ?? ""}`,
+    );
   return { id: body.id, created: true };
 }
 
@@ -180,7 +188,9 @@ export async function call(base, token, method, path, body, idem) {
     headers: {
       authorization: `Bearer ${token}`,
       ...(body === undefined ? {} : { "content-type": "application/json" }),
-      ...(method === "GET" ? {} : { "idempotency-key": idem ?? crypto.randomUUID() }),
+      ...(method === "GET"
+        ? {}
+        : { "idempotency-key": idem ?? crypto.randomUUID() }),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
@@ -205,7 +215,9 @@ export const assetDir = (c) =>
 export const videoFile = (c) => {
   const nn = String(c.n).padStart(2, "0");
   const hit = existsSync(VIDEOS)
-    ? readdirSync(VIDEOS).find((f) => f.startsWith(`${nn}-`) && f.endsWith("-9x16.mp4"))
+    ? readdirSync(VIDEOS).find(
+        (f) => f.startsWith(`${nn}-`) && f.endsWith("-9x16.mp4"),
+      )
     : undefined;
   return join(VIDEOS, hit ?? `${nn}-${slugOf(c.company)}-9x16.mp4`);
 };

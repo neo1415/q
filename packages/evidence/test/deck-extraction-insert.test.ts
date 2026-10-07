@@ -42,7 +42,11 @@ describe("deck extraction insert", () => {
       pageCount: 7,
       sections,
     });
-    expect(params.some((value) => typeof value === "string" && value.startsWith("["))).toBe(false);
+    expect(
+      params.some(
+        (value) => typeof value === "string" && value.startsWith("["),
+      ),
+    ).toBe(false);
     // F26: set_aside is a json parameter too (empty here), before sections.
     const json = params.filter(
       (value): value is Record<symbol, unknown> =>

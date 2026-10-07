@@ -3,6 +3,7 @@ I finished the read-only survey. The repo root is `C:\Users\DELL\Desktop\q` and 
 ## A. Web routes (`C:\Users\DELL\Desktop\q\apps\web\app`)
 
 **Pages**
+
 - **Root:** `page.tsx` has no landing page and sends people to Home.
 - **Auth:** `auth\sign-in`, `auth\sign-up`, `auth\check-email`, `auth\forgot-password` and `auth\update-password` each have a `page.tsx`.
 - **Onboarding:**
@@ -25,12 +26,14 @@ I finished the read-only survey. The repo root is `C:\Users\DELL\Desktop\q` and 
 - **Missing:** no settings route, no admin/operator route, no public profile route by handle or slug, and no public GateQ page (the API has `/v1/gateq/public/:publicId`, but no web page uses it).
 
 **API route handlers**
+
 - `api\q-artifact\[artifactId]\[format]\route.ts`: GET only, format is `slides`, `pptx` or `pdf`, forwarded to the Q API with the session token.
 - `api\q-speech\route.ts`: POST text-to-speech, forwarded to `/v1/q/voice/speech`.
 - `api\q-stream\v1\q\runs\[runId]\events\route.ts`: SSE relay for Q runs.
 - `auth\callback\route.ts`: Supabase OAuth callback.
 
 **Profile page (`C:\Users\DELL\Desktop\q\apps\web\app\(app)\profile\page.tsx`)**
+
 - It is a server component that only displays values. It has no inputs, no form and no edit component.
 - It shows account email, display name, organisation context, `ThemeToggle`, `QMotionToggle`, a "Manage visibility" link to `/company/visibility`, and sign-out.
 - This is why typing or clicking there does nothing: there is nothing to edit. There is no disabled, readOnly or overlay bug.
@@ -41,10 +44,12 @@ I finished the read-only survey. The repo root is `C:\Users\DELL\Desktop\q` and 
   - The company deeper view (`src\features\company\company-deeper-view.tsx`) has an "Edit with Q" draft affordance.
 
 **Admin, operator and verification UI**
+
 - There is no admin or operator UI.
 - Verification UI is founder-facing only: `src\features\verification\verification-standings.tsx` and `verification-actions.ts`.
 
 **Other API servers**
+
 - `apps\api\src\http\*` covers companies, company-team, capital-objectives, discovery, documents, gateq and gateq-apply, investor-mandates, investors, me, media and media-webhooks, network-interests, onboarding, organisations, recommendation-interactions, taxonomy and verification.
 - `apps\q-api\src\http\*` covers `/v1/q/runs`, conversations, events (SSE), approvals, artifacts, recommendation-explanations and `/v1/mcp`. `apps\q-api\src\voice\routes.ts` covers `/v1/q/voice/sessions|speech|think|ws|speak` and `/v1/q/interview`.
 
@@ -54,23 +59,24 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
 
 **Read tools (SAFE_READ)**
 
-| Tool | What it does |
-|---|---|
-| `get_company` | Canonical company profile |
-| `get_capital_objective` | Company's current capital objective |
-| `get_investor_mandate` | Investor organisation's declared mandate |
-| `search_companies` | Network-visible companies by name, stage, country |
-| `discovery_slate` | The person's current discovery slate (if discovery is composed) |
-| `find_prospective_investors` | Investors from their declared public profiles |
-| `recommendation_explanation` | Why a company was recommended |
-| `research_public_web` | Tavily-backed search (only if a research provider is configured) |
-| `extract_public_web` | Reads pages that `research_public_web` already found |
-| `lookup_public_profile` | Public LinkedIn person/company lookup via a provider (Bright Data) |
-| `get_relationship` | State of the relationship with one counterparty |
-| `list_incoming_interest` | Investor interest in the founder's company |
-| `get_onboarding_state` | The person's onboarding as it stands |
+| Tool                         | What it does                                                       |
+| ---------------------------- | ------------------------------------------------------------------ |
+| `get_company`                | Canonical company profile                                          |
+| `get_capital_objective`      | Company's current capital objective                                |
+| `get_investor_mandate`       | Investor organisation's declared mandate                           |
+| `search_companies`           | Network-visible companies by name, stage, country                  |
+| `discovery_slate`            | The person's current discovery slate (if discovery is composed)    |
+| `find_prospective_investors` | Investors from their declared public profiles                      |
+| `recommendation_explanation` | Why a company was recommended                                      |
+| `research_public_web`        | Tavily-backed search (only if a research provider is configured)   |
+| `extract_public_web`         | Reads pages that `research_public_web` already found               |
+| `lookup_public_profile`      | Public LinkedIn person/company lookup via a provider (Bright Data) |
+| `get_relationship`           | State of the relationship with one counterparty                    |
+| `list_incoming_interest`     | Investor interest in the founder's company                         |
+| `get_onboarding_state`       | The person's onboarding as it stands                               |
 
 **Write tools (LOW_RISK_INTERNAL)**
+
 - `propose_express_interest` and `propose_interest_answer` (in `relationships.ts`) do not write. They call `relationships.prepareForApproval(...)` and return `WAITING_FOR_APPROVAL`. The action types are `relationship.interest.express` and `relationship.interest.respond`.
 - The onboarding tools write onboarding state directly, with no approval: `record_answers`, `recommend`, `accept_recommendation`, `correct_answer`, `confirm_and_finish`.
 - `note_preference` saves communication preferences to memory.
@@ -78,17 +84,18 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
 
 **Q actions** (registry in `C:\Users\DELL\Desktop\q\apps\q-api\src\main.ts` around lines 700–750; definitions in `apps\q-api\src\composition\`)
 
-| Action type | What it changes |
-|---|---|
-| `company.profile.update` | Company profile, via `companyService` with a `company.edit` check and a version check |
-| `company.visibility.set` | `organisation_private` or `network_visible` only |
-| `relationship.interest.express` | Express interest (CQ-NET-010) |
-| `relationship.interest.respond` | Accept or decline (CQ-NET-011) |
-| `person.profile.update` | Display name only |
+| Action type                     | What it changes                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------- |
+| `company.profile.update`        | Company profile, via `companyService` with a `company.edit` check and a version check |
+| `company.visibility.set`        | `organisation_private` or `network_visible` only                                      |
+| `relationship.interest.express` | Express interest (CQ-NET-010)                                                         |
+| `relationship.interest.respond` | Accept or decline (CQ-NET-011)                                                        |
+| `person.profile.update`         | Display name only                                                                     |
 
 - A comment in `main.ts` confirms there is no email, calendar, messaging, data room, connector or MCP executor.
 
 **How approval binds to the payload** (`C:\Users\DELL\Desktop\q\packages\q-actions\src\domain\binding.ts`)
+
 - SHA-256 over canonical JSON of an envelope: tenant, organisation, run, action id, type, version, risk class, targets and payload. The result is stored as `sha256:<hex>` and compared in constant time.
 - Authorisation is checked again at execution time.
 - Lifecycle is in `domain\lifecycle.ts`:
@@ -96,17 +103,20 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
   - Approvals: PENDING → APPROVED, REJECTED, EXPIRED or REVOKED, and they have an expiry time.
 
 **Idempotency**
+
 - The key is `q_action:<runId>:<actionId>` (`application\service.ts:208`). It has a unique constraint, and there is a unique index allowing one pending approval per action (migration `20260908090000_q_actions_approvals.sql`).
 - The network interest tables add their own idempotency tables (`interest_requests`, `interest_response_requests`) keyed on idempotency-key and request hashes.
 
 ## C. Artifacts and deck rendering
 
 **Kinds and storage**
+
 - Two kinds: `Q_ARTIFACT_TYPES = ["INVESTMENT_BRIEF", "PITCH_DECK"]` in `C:\Users\DELL\Desktop\q\packages\contracts\src\q\artifact.ts`. There is no memo or report type.
 - Stored in `artifacts.artifacts` and `artifacts.artifact_versions` (migration `20261005090000_q_artifacts.sql`), with status PREPARING, READY or FAILED, a visibility scope, and versioned revisions.
 - Service code: `C:\Users\DELL\Desktop\q\packages\q-artifacts\src\*`. Composition: `apps\q-api\src\composition\artifacts.ts`. Preparation: `packages\q-specialists\src\company\prepare-artifact.ts`, `pitch-deck.ts` and `investment-brief.ts`.
 
 **Rendering** (`C:\Users\DELL\Desktop\q\packages\deck-render\src\`)
+
 - There is no Chromium or Playwright. It uses one layout (`layout.ts`) and three outputs:
   - SVG slides for the viewer (`svg.ts`)
   - PPTX via `pptxgenjs` 4.0.1 (`pptx.ts`, `write({outputType:"nodebuffer"})`)
@@ -114,6 +124,7 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
 - Three themes in `theme.ts`: MINIMAL_INSTITUTIONAL, DARK_TECHNICAL and WARM_GROWTH.
 
 **Download routes**
+
 - Q API (`C:\Users\DELL\Desktop\q\apps\q-api\src\http\q-artifacts.ts`):
   - `GET /v1/q/artifacts`, `/:id`, `/:id/versions/:v`
   - `/:id/slides`
@@ -122,6 +133,7 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
 - UI links: `apps\web\src\features\q\artifact-viewer.tsx:312-320` and `q-result-blocks.tsx:378`.
 
 **Why PDF/PPTX could fail on the hosted stack**
+
 - Only `PITCH_DECK` can be exported. An `INVESTMENT_BRIEF` returns 409, which the web shows as "That document has no slides." The PDF link only appears on deck cards.
 - If `CQ_Q_API_URL` is not set for web, the route returns 503 "Q isn't connected on this build yet." Railway sets it in `C:\Users\DELL\Desktop\q\.railway\railway.ts:252`.
 - Any upstream error other than 401, 403, 404 or 409 becomes 502 "I couldn't prepare that file."
@@ -133,12 +145,14 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
 ## D. Connectors, MCP and LangChain
 
 **`C:\Users\DELL\Desktop\q\packages\q-connectors\src\`**
+
 - `mcp\source.ts` and `mcp\remote-tool.ts`: Q as an MCP client (`createMcpToolSource`, `defineMcpTool`). They are defined, but nothing outside the package's tests uses them. No remote server is registered.
 - `mcp\server.ts`: Q as an MCP server. It is mounted at `POST /v1/mcp` by `apps\q-api\src\http\q-mcp.ts` only when `config.connectors.mcpServer` is set (`Q_MCP_SERVER=enabled`). It is off by default.
 - `langchain\tools.ts`: `toLangChainTools`, a LangChain view of the tool registry.
 - Dependencies: `@modelcontextprotocol/sdk` 1.30.0 and `@langchain/core` 1.2.9.
 
 **Elsewhere**
+
 - LangGraph: `packages\q-orchestrator` (`StateGraph`, postgres checkpointer); migration `20260906150000_q_orchestration_checkpoints.sql`.
 - There are no email, calendar or messaging connectors anywhere (no Resend/SMTP/Gmail/Calendar code).
 - The only "web" connectors are the research providers in `packages\q-research\src\providers\`: Tavily, SerpAPI, Bright Data, cached, fallback, fake.
@@ -175,6 +189,7 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
 - **founder-onboarding:** Definitions v1 and v2 (F0–F8). Writes to Organisation, Company (with website normalisation), team facts, Capital Objective and Taxonomy. Includes document review, extraction, planner and suggestions.
 
 **Cross-cutting**
+
 - **Handles/slugs:** `identity.organisations.slug` and `core.companies.slug` exist, unique per tenant (`packages\companies\src\domain\slug.ts`, `packages\organisations\src\domain\slug.ts`). No route resolves them, and there are no person handles.
 - **Public profile URLs:** none. `/company/[companyId]` needs a session and uses the UUID.
 - **Visibility:**
@@ -185,22 +200,22 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
 
 ## F. Relevant migrations (`C:\Users\DELL\Desktop\q\supabase\migrations\`)
 
-| Area | Migrations |
-|---|---|
-| Profiles / identity | `20260902144606_identity_organisation_foundation.sql` (user_profiles, organisations with slug, memberships), `20260903120000_canonical_company.sql` (company slug, marketplace_visibility), `20260903150000_founder_team_domain.sql` (founder_profiles), `20260903180000_investor_organisation_domain.sql`, `20260903210000_investor_mandate_domain.sql` |
-| Handles | Slug columns in the two migrations above; opaque public ids in `20261001090000_gateq_core.sql` and `20261002090000_gateq_applications.sql` |
-| Visibility | `20260904150000_disclosure_visibility_foundation.sql`, `20260923090000_investor_visibility.sql` |
-| Verification | `20261007090000_verification_claims.sql` |
-| Relationships / interest / connection | `20260904120000_relationship_foundation.sql`, `20261009140000_network_interests.sql`, `20261009160000_network_interest_responses.sql` (includes matches), `20261009170000_network_relationship_projection.sql`, `20260930090000_recommendation_interactions.sql` |
-| Meetings | None |
-| Messages / conversations | Q chat only: `20260906120000_q_runtime_foundation.sql` (q_runtime.conversations, conversation_messages), `20260925090000_q_conversations_listing.sql`, `20261004090000_q_message_result_blocks.sql`, `20260925091000_q_memory_items.sql` |
-| Notifications / reminders | None; only `20260902190411_events_outbox_foundation.sql` (events.outbox) |
-| Artifacts | `20261005090000_q_artifacts.sql` |
-| Approvals | `20260908090000_q_actions_approvals.sql` |
-| Media / documents | `20260906090000_media_domain.sql`, `20260905180000_document_upload.sql`, `20260905210000_document_processing.sql`, `20260905150000_evidence_foundation.sql` |
-| Brand | None |
-| Audit | `20260902213959_audit_infrastructure.sql` (audit.material_actions, audit.security_events) |
-| Roles | `20260902144826_identity_permissions_rls.sql`. Only `organisation_admin` and `organisation_member` roles exist; there is no platform operator or admin role |
+| Area                                  | Migrations                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Profiles / identity                   | `20260902144606_identity_organisation_foundation.sql` (user_profiles, organisations with slug, memberships), `20260903120000_canonical_company.sql` (company slug, marketplace_visibility), `20260903150000_founder_team_domain.sql` (founder_profiles), `20260903180000_investor_organisation_domain.sql`, `20260903210000_investor_mandate_domain.sql` |
+| Handles                               | Slug columns in the two migrations above; opaque public ids in `20261001090000_gateq_core.sql` and `20261002090000_gateq_applications.sql`                                                                                                                                                                                                               |
+| Visibility                            | `20260904150000_disclosure_visibility_foundation.sql`, `20260923090000_investor_visibility.sql`                                                                                                                                                                                                                                                          |
+| Verification                          | `20261007090000_verification_claims.sql`                                                                                                                                                                                                                                                                                                                 |
+| Relationships / interest / connection | `20260904120000_relationship_foundation.sql`, `20261009140000_network_interests.sql`, `20261009160000_network_interest_responses.sql` (includes matches), `20261009170000_network_relationship_projection.sql`, `20260930090000_recommendation_interactions.sql`                                                                                         |
+| Meetings                              | None                                                                                                                                                                                                                                                                                                                                                     |
+| Messages / conversations              | Q chat only: `20260906120000_q_runtime_foundation.sql` (q_runtime.conversations, conversation_messages), `20260925090000_q_conversations_listing.sql`, `20261004090000_q_message_result_blocks.sql`, `20260925091000_q_memory_items.sql`                                                                                                                 |
+| Notifications / reminders             | None; only `20260902190411_events_outbox_foundation.sql` (events.outbox)                                                                                                                                                                                                                                                                                 |
+| Artifacts                             | `20261005090000_q_artifacts.sql`                                                                                                                                                                                                                                                                                                                         |
+| Approvals                             | `20260908090000_q_actions_approvals.sql`                                                                                                                                                                                                                                                                                                                 |
+| Media / documents                     | `20260906090000_media_domain.sql`, `20260905180000_document_upload.sql`, `20260905210000_document_processing.sql`, `20260905150000_evidence_foundation.sql`                                                                                                                                                                                              |
+| Brand                                 | None                                                                                                                                                                                                                                                                                                                                                     |
+| Audit                                 | `20260902213959_audit_infrastructure.sql` (audit.material_actions, audit.security_events)                                                                                                                                                                                                                                                                |
+| Roles                                 | `20260902144826_identity_permissions_rls.sql`. Only `organisation_admin` and `organisation_member` roles exist; there is no platform operator or admin role                                                                                                                                                                                              |
 
 ## G. Model Gateway (`C:\Users\DELL\Desktop\q\packages\model-gateway\src\`)
 
@@ -222,6 +237,7 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
 ## I. Ledgers
 
 **`C:\Users\DELL\Desktop\q\docs\execution\implementation-ledger.md`**
+
 - **Verified:**
   - Waves 0–3 (FOUND, CON, SEC, DATA, AUTH, WEB-010/011, ORG, COMP, INV, CAP, NET-001, PERM, TAX, ONB, EVD, MEDIA-001)
   - Wave 4–5: CQ-Q-001..010, RAG-001..004, KNW-001..003, Q-020
@@ -238,6 +254,7 @@ Every tool has `approval: "NONE"` and `idempotency: "SAFE_TO_REPEAT"` (`C:\Users
 - **Stale:** git history shows QX-003/004 (artifacts, decks), VERIFY-001, MEDIA-011/012, NET-010/011/012, QACT-001/002, QX-005/007/008, Q-030, WEB-023/024 and UX-02/07 are committed. None of these has a ledger row.
 
 **`C:\Users\DELL\Desktop\q\docs\acceptance\walkthrough-ledger.md`** (CQ-ACCEPT-001)
+
 - Contains investor, founder, adversarial, feed and voice rounds, plus the C7 canonical checkpoint (feed → video → Save/Pass → company → Back), which PASSED.
 - **Failures recorded:**
   - Interview commit issues on investor passes: J3, J8–J14, J18 (geography mismatch)

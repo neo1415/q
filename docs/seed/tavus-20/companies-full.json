@@ -24,26 +24,11 @@
     "shortDescription": "Ledgerline checks every invoice at creation and files VAT returns for Nigerian SMEs, ready for FIRS e-invoicing.",
     "primaryDescription": "Ledgerline is VAT compliance software for Nigerian small and medium businesses. It connects to the invoicing and accounting tools a business already uses, validates each invoice as it is created, and prepares and files the monthly VAT return. The FIRS e-invoicing rollout means invoice data must be correct at source, which is where most SME penalties start today. Ledgerline charges a monthly subscription per legal entity and serves 1,140 paying businesses at about ₦38m in monthly recurring revenue. Six-month logo retention is 96%.",
     "tags": {
-      "industry": [
-        "fintech",
-        "enterprise_software"
-      ],
-      "business_model": [
-        "b2b_saas"
-      ],
-      "customer_type": [
-        "small_business",
-        "business_customer"
-      ],
-      "geography": [
-        "nigeria",
-        "west_africa",
-        "africa"
-      ],
-      "other": [
-        "regulated_financial_services",
-        "workflow_automation"
-      ]
+      "industry": ["fintech", "enterprise_software"],
+      "business_model": ["b2b_saas"],
+      "customer_type": ["small_business", "business_customer"],
+      "geography": ["nigeria", "west_africa", "africa"],
+      "other": ["regulated_financial_services", "workflow_automation"]
     },
     "keywords": [
       "VAT compliance",
@@ -100,11 +85,7 @@
       "headline": "Co-founder & CEO, Ledgerline | Ex-Big Four tax manager | Making VAT boring again for Nigerian SMEs",
       "professionalSummary": "Chartered accountant who spent seven years in a Big Four tax practice in Lagos, filing VAT returns by hand for mid-sized and small clients. Built Ledgerline's first validation rules from the errors he corrected by hand.",
       "backgroundSummary": "Grew up in Enugu, moved to Lagos for national service and stayed. Started Ledgerline after realising most VAT penalties he handled traced back to invoices that were wrong when they were issued.",
-      "languages": [
-        "English",
-        "Igbo",
-        "Nigerian Pidgin"
-      ]
+      "languages": ["English", "Igbo", "Nigerian Pidgin"]
     },
     "team": [
       {
@@ -592,27 +573,11 @@
     "shortDescription": "Termly lets Lagos parents spread school fees across the term while the school is paid in full on day one.",
     "primaryDescription": "Termly is a school-fee instalment service for Nigerian families. Schools sign up and offer Termly at enrolment; parents spread the fee across the term, and the school receives the full amount on the first day. The instalments are funded through a credit line from a partner microfinance bank, with Termly running underwriting and collections. 212 partner schools and about 9,400 families are on plans, with a 1.6% default rate. Schools pay a platform fee and parents pay a small instalment fee.",
     "tags": {
-      "industry": [
-        "fintech",
-        "education"
-      ],
-      "business_model": [
-        "transaction_fee"
-      ],
-      "customer_type": [
-        "consumer",
-        "business_customer"
-      ],
-      "geography": [
-        "nigeria",
-        "west_africa",
-        "africa"
-      ],
-      "other": [
-        "digital_lending",
-        "embedded_finance",
-        "financial_inclusion"
-      ]
+      "industry": ["fintech", "education"],
+      "business_model": ["transaction_fee"],
+      "customer_type": ["consumer", "business_customer"],
+      "geography": ["nigeria", "west_africa", "africa"],
+      "other": ["digital_lending", "embedded_finance", "financial_inclusion"]
     },
     "keywords": [
       "school fees",
@@ -641,9 +606,7 @@
       "nationality": "Nigerian",
       "gender": "female",
       "city": "Lagos",
-      "education": [
-        "BSc Economics, University of Lagos (2018)"
-      ],
+      "education": ["BSc Economics, University of Lagos (2018)"],
       "previousRoles": [
         {
           "title": "Collections Officer",
@@ -661,12 +624,7 @@
       "headline": "Founder & CEO, Termly | School fees in instalments, schools paid on day one",
       "professionalSummary": "Five years in microfinance collections in Lagos, ending as team lead for a 14-person collections desk. Knows what makes repayment work and what makes it fail.",
       "backgroundSummary": "Watched her older sister borrow from three people every September to pay school fees. Started Termly in 2024 to give families a plan instead of a scramble.",
-      "languages": [
-        "English",
-        "Igbo",
-        "Yoruba",
-        "Nigerian Pidgin"
-      ]
+      "languages": ["English", "Igbo", "Yoruba", "Nigerian Pidgin"]
     },
     "team": [
       {
@@ -932,15 +890,11 @@
       },
       {
         "section": "competition",
-        "content": [
-          "Loan apps and family borrowing."
-        ]
+        "content": ["Loan apps and family borrowing."]
       },
       {
         "section": "financials",
-        "content": [
-          "We expect to be profitable once we pass 1,000 schools."
-        ]
+        "content": ["We expect to be profitable once we pass 1,000 schools."]
       },
       {
         "section": "the_ask",
@@ -1132,27 +1086,11 @@
     "shortDescription": "Continuous, independent validation of UK banks' credit and AI models, with the evidence supervisors ask for.",
     "primaryDescription": "Clearwater Assurance gives banks and building societies continuous, independent validation of their production models. It tests each model against its own documentation, monitors drift, and produces evidence packs aligned to supervisory expectations for model risk management. Seven UK banks and building societies use it on annual enterprise licences, giving £2.4m ARR and 132% net revenue retention. The founding team combines bank model validation and supervisory review experience.",
     "tags": {
-      "industry": [
-        "enterprise_software",
-        "fintech"
-      ],
-      "business_model": [
-        "b2b_saas",
-        "licensing"
-      ],
-      "customer_type": [
-        "financial_institution",
-        "enterprise"
-      ],
-      "geography": [
-        "united_kingdom",
-        "europe"
-      ],
-      "other": [
-        "banking",
-        "regulated_financial_services",
-        "machine_learning"
-      ]
+      "industry": ["enterprise_software", "fintech"],
+      "business_model": ["b2b_saas", "licensing"],
+      "customer_type": ["financial_institution", "enterprise"],
+      "geography": ["united_kingdom", "europe"],
+      "other": ["banking", "regulated_financial_services", "machine_learning"]
     },
     "keywords": [
       "model risk management",
@@ -1209,10 +1147,7 @@
       "headline": "Co-founder & CEO, Clearwater Assurance | Model risk for the AI era | Former bank validator and supervisor",
       "professionalSummary": "Twelve years validating credit models inside a FTSE 100 bank, then two years reviewing banks' models for the regulator. Founded Clearwater to make validation continuous instead of annual.",
       "backgroundSummary": "Statistician by training. Saw from both sides of the table how manual validation lags the number of models banks now run.",
-      "languages": [
-        "English",
-        "French (working)"
-      ]
+      "languages": ["English", "French (working)"]
     },
     "team": [
       {
@@ -1697,22 +1632,10 @@
     "shortDescription": "A gateway that runs LLM inference inside hardware enclaves and attests every request, so regulated firms can use AI on sensitive data.",
     "primaryDescription": "Tensorgate is a confidential-computing gateway for large language models. Prompts are decrypted only inside a hardware enclave, the model runs there, and every request gets a cryptographic attestation of the code that touched the data. Batched attestation and pinned memory keep enclave overhead to about 40 milliseconds per request. Four design partners in banking and healthcare use it, two on paid $180k annual contracts, and it has served 31 million requests. Pricing is usage-based with an enterprise floor.",
     "tags": {
-      "industry": [
-        "cybersecurity",
-        "enterprise_software"
-      ],
-      "business_model": [
-        "usage_based",
-        "b2b_saas"
-      ],
-      "customer_type": [
-        "enterprise",
-        "financial_institution"
-      ],
-      "geography": [
-        "united_states",
-        "north_america"
-      ],
+      "industry": ["cybersecurity", "enterprise_software"],
+      "business_model": ["usage_based", "b2b_saas"],
+      "customer_type": ["enterprise", "financial_institution"],
+      "geography": ["united_states", "north_america"],
       "other": [
         "artificial_intelligence",
         "cloud_infrastructure",
@@ -1774,10 +1697,7 @@
       "headline": "Co-founder & CTO, Tensorgate | Enclaves, attestation, side channels | Making 'prove where the data went' a default",
       "professionalSummary": "Built secure-enclave infrastructure at a hyperscaler and published research on side-channel attacks. Leads Tensorgate's enclave runtime and attestation pipeline.",
       "backgroundSummary": "Grew up in Houston. Got into security by breaking things in grad school and decided he preferred building the locks.",
-      "languages": [
-        "English",
-        "Korean (conversational)"
-      ]
+      "languages": ["English", "Korean (conversational)"]
     },
     "team": [
       {
@@ -2265,20 +2185,10 @@
     "shortDescription": "Retinal cameras in neighbourhood pharmacies; AI reads the image in under a minute and refers at-risk diabetics the same day.",
     "primaryDescription": "Drishti Health screens people with diabetes for diabetic retinopathy where they already go every month: the neighbourhood pharmacy. A pharmacist takes a photo with a low-cost retinal camera, Drishti's AI grades it in under a minute, and anyone at risk is referred to an eye specialist the same day. The service runs in 380 pharmacies, has completed over 210,000 screenings, and has referred about 6,900 people early. Pharmacy chains and insurers' wellness programmes pay a per-screen fee.",
     "tags": {
-      "industry": [
-        "healthcare"
-      ],
-      "business_model": [
-        "transaction_fee"
-      ],
-      "customer_type": [
-        "business_customer",
-        "insurance_company"
-      ],
-      "geography": [
-        "india",
-        "asia"
-      ],
+      "industry": ["healthcare"],
+      "business_model": ["transaction_fee"],
+      "customer_type": ["business_customer", "insurance_company"],
+      "geography": ["india", "asia"],
       "other": [
         "digital_health",
         "computer_vision",
@@ -2341,12 +2251,7 @@
       "headline": "Founder & CEO, Drishti Health | Ophthalmologist | Diabetic eye screening where people already go",
       "professionalSummary": "Ophthalmologist who ran rural eye camps for a decade, seeing late-stage diabetic retinopathy that a simple photo would have caught years earlier. Founded Drishti to move screening into pharmacies.",
       "backgroundSummary": "Trained in Chennai, practised mostly in rural Maharashtra. Started Drishti in Pune in 2022 with a borrowed camera and three pharmacies.",
-      "languages": [
-        "Tamil",
-        "English",
-        "Marathi",
-        "Hindi"
-      ]
+      "languages": ["Tamil", "English", "Marathi", "Hindi"]
     },
     "team": [
       {
@@ -2843,23 +2748,10 @@
     "shortDescription": "Silo Credit certifies warehouses and issues digital receipts that let Kano grain traders borrow against stored grain and sell later.",
     "primaryDescription": "Silo Credit runs warehouse-receipt finance for grain traders and farmers in Northern Nigeria. It certifies warehouses, grades and insures grain on arrival, and issues a digital receipt the trader can borrow against immediately; when the grain is sold, the loan is repaid automatically. That lets sellers wait out the harvest price low instead of selling at the bottom. Silo works with 14 certified warehouses, has financed about ₦2.1bn, and has a loss rate under 0.5%. It earns a lending spread plus warehouse management fees.",
     "tags": {
-      "industry": [
-        "fintech",
-        "agriculture"
-      ],
-      "business_model": [
-        "transaction_fee",
-        "services"
-      ],
-      "customer_type": [
-        "small_business",
-        "consumer"
-      ],
-      "geography": [
-        "nigeria",
-        "west_africa",
-        "africa"
-      ],
+      "industry": ["fintech", "agriculture"],
+      "business_model": ["transaction_fee", "services"],
+      "customer_type": ["small_business", "consumer"],
+      "geography": ["nigeria", "west_africa", "africa"],
       "other": [
         "digital_lending",
         "agritech",
@@ -2922,11 +2814,7 @@
       "headline": "Co-founder & CEO, Silo Credit | Grain is the collateral | Former agricultural lending officer",
       "professionalSummary": "Eleven years lending to farmers and agro-dealers at a development bank, after growing up in her family's grain business in Dawanau market. Designed Silo's grading and loan-to-value rules.",
       "backgroundSummary": "Grew up between the family stall in Dawanau and school in Kano. Watched sellers take harvest-time prices every year because they could not wait.",
-      "languages": [
-        "Hausa",
-        "English",
-        "Arabic (reading)"
-      ]
+      "languages": ["Hausa", "English", "Arabic (reading)"]
     },
     "team": [
       {
@@ -3452,27 +3340,11 @@
     "shortDescription": "The software Lagos clearing agents run customs clearance on, from documents to duty payments to sign-offs.",
     "primaryDescription": "Portside is customs-clearance software for Nigerian clearing agents working at Apapa and Tin Can ports. Every document, duty payment and agency sign-off sits in one place, and the system alerts agents before a delay happens. 63 clearing agencies use it, 41,000 containers have been processed, and average clearance has fallen from 19 days to 8. Portside charges a per-container fee plus seat licences.",
     "tags": {
-      "industry": [
-        "logistics",
-        "enterprise_software"
-      ],
-      "business_model": [
-        "b2b_saas",
-        "transaction_fee"
-      ],
-      "customer_type": [
-        "small_business",
-        "business_customer"
-      ],
-      "geography": [
-        "nigeria",
-        "west_africa",
-        "africa"
-      ],
-      "other": [
-        "supply_chain",
-        "workflow_automation"
-      ]
+      "industry": ["logistics", "enterprise_software"],
+      "business_model": ["b2b_saas", "transaction_fee"],
+      "customer_type": ["small_business", "business_customer"],
+      "geography": ["nigeria", "west_africa", "africa"],
+      "other": ["supply_chain", "workflow_automation"]
     },
     "keywords": [
       "customs clearance",
@@ -3502,9 +3374,7 @@
       "nationality": "Nigerian (Lebanese-Nigerian, born in Lagos)",
       "gender": "male",
       "city": "Lagos",
-      "education": [
-        "BBA, American University of Beirut (2012)"
-      ],
+      "education": ["BBA, American University of Beirut (2012)"],
       "previousRoles": [
         {
           "title": "Clearing and Forwarding Officer",
@@ -4006,28 +3876,11 @@
     "shortDescription": "MedTrail serialises medicine packs at Nigerian distributors and tracks each one, so a recall finds every pack in hours, not weeks.",
     "primaryDescription": "MedTrail is drug traceability and recall software for Nigerian pharmaceutical distributors. It serialises each pack at the distributor and records every movement, so when a batch is recalled the system knows exactly who holds it. 27 distributors use MedTrail, 18 million packs have been serialised, and its first NAFDAC-recognised recall ran end to end in four hours. Distributors pay a per-warehouse subscription plus a per-scan fee.",
     "tags": {
-      "industry": [
-        "healthcare",
-        "enterprise_software"
-      ],
-      "business_model": [
-        "b2b_saas",
-        "transaction_fee"
-      ],
-      "customer_type": [
-        "business_customer",
-        "enterprise"
-      ],
-      "geography": [
-        "nigeria",
-        "west_africa",
-        "africa"
-      ],
-      "other": [
-        "supply_chain",
-        "regulated_healthcare",
-        "health_access"
-      ]
+      "industry": ["healthcare", "enterprise_software"],
+      "business_model": ["b2b_saas", "transaction_fee"],
+      "customer_type": ["business_customer", "enterprise"],
+      "geography": ["nigeria", "west_africa", "africa"],
+      "other": ["supply_chain", "regulated_healthcare", "health_access"]
     },
     "keywords": [
       "drug traceability",
@@ -4078,12 +3931,7 @@
       "headline": "Co-founder & CEO, MedTrail | 15 years in Nigerian pharma distribution | Every pack, accounted for",
       "professionalSummary": "Fifteen years running operations at his family's pharmaceutical distribution company, which has been in the business since the 1970s. Knows recalls from the distributor's side.",
       "backgroundSummary": "Born and raised in Lagos. Started MedTrail after a recall where his own company could not say where half a batch had gone.",
-      "languages": [
-        "English",
-        "Hindi",
-        "Sindhi",
-        "Yoruba (conversational)"
-      ]
+      "languages": ["English", "Hindi", "Sindhi", "Yoruba (conversational)"]
     },
     "team": [
       {
@@ -4571,23 +4419,10 @@
     "shortDescription": "Solar cold rooms at Lake Victoria landing beaches; fish traders pay per crate per day on mobile money.",
     "primaryDescription": "Baridi builds and runs solar-powered cold rooms at fish landing beaches around Lake Victoria. Traders, most of them women who buy fish the same morning, pay per crate per day through mobile money rather than buying equipment. Baridi runs 46 cold rooms used by about 3,800 traders, and spoilage among users has fallen from about 30% to around 6%. It is raising equity alongside asset finance for its next hundred rooms.",
     "tags": {
-      "industry": [
-        "energy",
-        "agriculture"
-      ],
-      "business_model": [
-        "transaction_fee",
-        "services"
-      ],
-      "customer_type": [
-        "small_business",
-        "consumer"
-      ],
-      "geography": [
-        "kenya",
-        "east_africa",
-        "africa"
-      ],
+      "industry": ["energy", "agriculture"],
+      "business_model": ["transaction_fee", "services"],
+      "customer_type": ["small_business", "consumer"],
+      "geography": ["kenya", "east_africa", "africa"],
       "other": [
         "energy_access",
         "clean_energy",
@@ -4645,12 +4480,7 @@
       "headline": "Co-founder & CEO, Baridi | Solar cold rooms at Lake Victoria | Field operations, not slideware",
       "professionalSummary": "Engineer who led field operations for a solar home-system company across Kenya, Uganda and Tanzania. Moved back to Kisumu in 2022 and co-founded Baridi.",
       "backgroundSummary": "Kenyan-born, from a Kisumu family. Grew up near the lake, left for university and work in Nairobi, and came back to build cold storage at the beaches.",
-      "languages": [
-        "English",
-        "Swahili",
-        "Gujarati",
-        "Dholuo (basic)"
-      ]
+      "languages": ["English", "Swahili", "Gujarati", "Dholuo (basic)"]
     },
     "team": [
       {
@@ -4957,9 +4787,7 @@
       },
       {
         "section": "team",
-        "content": [
-          "Small, committed team in Kisumu."
-        ]
+        "content": ["Small, committed team in Kisumu."]
       }
     ],
     "deckGaps": [
@@ -5130,26 +4958,11 @@
     "shortDescription": "Prumo turns site photos and WhatsApp updates into budget tracking, warning Brazilian builders weeks before a line overruns.",
     "primaryDescription": "Prumo is cost-control software for Brazilian construction sites. Site teams keep sending photos and updates the way they already do; Prumo reads them, tracks progress against the budget, and warns managers when a budget line is drifting. It runs on 410 active sites with R$11m in annual recurring revenue, sold as a per-project subscription. Clients cut budget overruns by 38% on average. Prumo is raising a $12m Series A.",
     "tags": {
-      "industry": [
-        "real_estate",
-        "enterprise_software"
-      ],
-      "business_model": [
-        "b2b_saas"
-      ],
-      "customer_type": [
-        "mid_market",
-        "business_customer"
-      ],
-      "geography": [
-        "brazil",
-        "latin_america"
-      ],
-      "other": [
-        "proptech",
-        "computer_vision",
-        "artificial_intelligence"
-      ]
+      "industry": ["real_estate", "enterprise_software"],
+      "business_model": ["b2b_saas"],
+      "customer_type": ["mid_market", "business_customer"],
+      "geography": ["brazil", "latin_america"],
+      "other": ["proptech", "computer_vision", "artificial_intelligence"]
     },
     "keywords": [
       "construction tech",
@@ -5200,11 +5013,7 @@
       "headline": "Co-founder & CEO, Prumo | Civil engineer | Connecting the budget spreadsheet to the site",
       "professionalSummary": "Civil engineer who ran residential projects for a São Paulo developer for nine years, from site engineer to construction manager. Built Prumo from the reports he wished he had.",
       "backgroundSummary": "Grew up in Campinas, son of a mestre de obras. Spent nine years explaining delays and overruns to clients before deciding to fix the cause.",
-      "languages": [
-        "Portuguese",
-        "English",
-        "Spanish"
-      ]
+      "languages": ["Portuguese", "English", "Spanish"]
     },
     "team": [
       {
@@ -5677,27 +5486,11 @@
     "shortDescription": "Sodium-ion cells for stationary storage, made in Europe without lithium, cobalt or nickel; validated past 4,000 cycles.",
     "primaryDescription": "Ferrolith makes sodium-ion battery cells designed for stationary storage, where cost, safety and cycle life matter more than weight. Its cells use abundant materials, contain no lithium, cobalt or nickel, and are much harder to set on fire than lithium-ion cells. Cells have been validated past 4,000 cycles; a pilot line in Munich produces 40 MWh a year, and storage integrators have signed letters of intent for 1.2 GWh. Ferrolith sells cells and licenses its process to storage integrators, and is raising €25m to build its first production line.",
     "tags": {
-      "industry": [
-        "energy",
-        "manufacturing"
-      ],
-      "business_model": [
-        "hardware_sales",
-        "licensing"
-      ],
-      "customer_type": [
-        "enterprise",
-        "business_customer"
-      ],
-      "geography": [
-        "germany",
-        "europe"
-      ],
-      "other": [
-        "clean_energy",
-        "climate",
-        "hardware"
-      ]
+      "industry": ["energy", "manufacturing"],
+      "business_model": ["hardware_sales", "licensing"],
+      "customer_type": ["enterprise", "business_customer"],
+      "geography": ["germany", "europe"],
+      "other": ["clean_energy", "climate", "hardware"]
     },
     "keywords": [
       "sodium-ion",
@@ -5755,10 +5548,7 @@
       "headline": "Co-founder & CEO, Ferrolith | Electrochemist | Storage that Europe can make itself",
       "professionalSummary": "Electrochemist with twenty years in battery R&D, most recently head of cell development at a European automotive supplier. Leads Ferrolith's chemistry choices and its manufacturing plan.",
       "backgroundSummary": "Grew up in Augsburg. Spent his career on lithium-ion for cars and concluded that stationary storage needs a different chemistry.",
-      "languages": [
-        "German",
-        "English"
-      ]
+      "languages": ["German", "English"]
     },
     "team": [
       {
@@ -6277,26 +6067,11 @@
     "shortDescription": "Scheduling, EVV, payroll and billing for US home-care agencies in one system, built by a former agency owner.",
     "primaryDescription": "Shiftwell is one system for US home-care agencies to schedule caregivers, run electronic visit verification, pay staff and bill Medicaid and other payers. When a caregiver clocks in at a client's home, payroll and billing update automatically instead of being reconciled by hand. 290 agencies use it, about 38,000 caregivers are paid through the platform, and ARR is $4.1m on a per-caregiver monthly price. The founder ran a 400-caregiver agency in Ohio for eight years.",
     "tags": {
-      "industry": [
-        "healthcare",
-        "enterprise_software"
-      ],
-      "business_model": [
-        "b2b_saas"
-      ],
-      "customer_type": [
-        "small_business",
-        "mid_market"
-      ],
-      "geography": [
-        "united_states",
-        "north_america"
-      ],
-      "other": [
-        "hr_technology",
-        "workflow_automation",
-        "regulated_healthcare"
-      ]
+      "industry": ["healthcare", "enterprise_software"],
+      "business_model": ["b2b_saas"],
+      "customer_type": ["small_business", "mid_market"],
+      "geography": ["united_states", "north_america"],
+      "other": ["hr_technology", "workflow_automation", "regulated_healthcare"]
     },
     "keywords": [
       "home care",
@@ -6352,9 +6127,7 @@
       "headline": "Founder & CEO, Shiftwell | Ran a 400-caregiver home-care agency for 8 years | Pay caregivers right, and on time",
       "professionalSummary": "Ran a home-care agency with 400 caregivers in Ohio for eight years, using five systems that did not talk to each other. Sold the agency and built Shiftwell.",
       "backgroundSummary": "Started as a scheduler at 22 and bought into the agency she later ran. Knows payroll Fridays and Medicaid audits from the inside.",
-      "languages": [
-        "English"
-      ]
+      "languages": ["English"]
     },
     "team": [
       {
@@ -6838,25 +6611,11 @@
     "shortDescription": "Halyard rolls out phishing-resistant passkeys across NHS trusts and councils, including shared workstations and lost devices.",
     "primaryDescription": "Halyard Security handles passkey rollout for NHS trusts and UK councils: enrolment, shared workstations, lost devices and the support that comes with tens of thousands of staff. Passkeys cannot be phished, but deploying them to nurses, porters and admin staff on shared computers is the hard part. Eleven NHS trusts and councils use Halyard, 64,000 staff are enrolled, and no enrolled account has been taken over by phishing. It is sold as a per-user annual licence.",
     "tags": {
-      "industry": [
-        "cybersecurity",
-        "enterprise_software"
-      ],
-      "business_model": [
-        "b2b_saas"
-      ],
-      "customer_type": [
-        "government",
-        "enterprise"
-      ],
-      "geography": [
-        "united_kingdom",
-        "europe"
-      ],
-      "other": [
-        "identity_security",
-        "data_protection_sensitive"
-      ]
+      "industry": ["cybersecurity", "enterprise_software"],
+      "business_model": ["b2b_saas"],
+      "customer_type": ["government", "enterprise"],
+      "geography": ["united_kingdom", "europe"],
+      "other": ["identity_security", "data_protection_sensitive"]
     },
     "keywords": [
       "passkeys",
@@ -6886,9 +6645,7 @@
       "nationality": "British (Scottish)",
       "gender": "male",
       "city": "Edinburgh",
-      "education": [
-        "BSc (Hons) Ethical Hacking, Abertay University (2015)"
-      ],
+      "education": ["BSc (Hons) Ethical Hacking, Abertay University (2015)"],
       "previousRoles": [
         {
           "title": "Security Operations Analyst",
@@ -6912,9 +6669,7 @@
       "headline": "Co-founder & CEO, Halyard Security | Former incident responder | Passwords had a good run",
       "professionalSummary": "Former incident responder at the national cyber security centre who led the response to two ransomware attacks on public bodies. Both started with a phished password.",
       "backgroundSummary": "From Dundee. Has spent the nights after hospital ransomware attacks in the room, and decided to work on stopping the first step.",
-      "languages": [
-        "English"
-      ]
+      "languages": ["English"]
     },
     "team": [
       {
@@ -6985,10 +6740,7 @@
           "lead": "Leith Shore Angels"
         }
       ],
-      "existingInvestors": [
-        "Leith Shore Angels",
-        "Scottish founder angels"
-      ],
+      "existingInvestors": ["Leith Shore Angels", "Scottish founder angels"],
       "cashPosition": {
         "amount": 480000,
         "currency": "GBP",
@@ -7393,24 +7145,11 @@
     "shortDescription": "Hui runs Vietnam's traditional hụi savings groups in an app, with the pot held by a partner bank so nobody can run off with it.",
     "primaryDescription": "Hui is a digital version of the hụi, the rotating savings group many Vietnamese market traders and informal workers already use. Members contribute on a schedule and take turns receiving the pot, but the money is held by a partner bank instead of the group organiser's notebook. 52,000 members run more than 7,300 active groups, and members have saved ₫190bn through the app. Hui earns a small fee per completed cycle and a share of the partner bank's interest.",
     "tags": {
-      "industry": [
-        "fintech"
-      ],
-      "business_model": [
-        "transaction_fee"
-      ],
-      "customer_type": [
-        "consumer"
-      ],
-      "geography": [
-        "vietnam",
-        "asia"
-      ],
-      "other": [
-        "digital_banking",
-        "financial_inclusion",
-        "mobile_technology"
-      ]
+      "industry": ["fintech"],
+      "business_model": ["transaction_fee"],
+      "customer_type": ["consumer"],
+      "geography": ["vietnam", "asia"],
+      "other": ["digital_banking", "financial_inclusion", "mobile_technology"]
     },
     "keywords": [
       "hụi",
@@ -7460,10 +7199,7 @@
       "headline": "Co-founder & CEO, Hui | Former e-wallet product manager | Making the hụi safe",
       "professionalSummary": "Product manager at a Vietnamese e-wallet for three years, working on savings and bill-pay features. Co-founded Hui in 2024.",
       "backgroundSummary": "His mother sold fruit at a Saigon market for twenty years and ran a hụi that paid for his schooling. He saw what happened when an organiser disappeared.",
-      "languages": [
-        "Vietnamese",
-        "English"
-      ]
+      "languages": ["Vietnamese", "English"]
     },
     "team": [
       {
@@ -7542,10 +7278,7 @@
           "lead": "Saigon product angels"
         }
       ],
-      "existingInvestors": [
-        "Saigon product angels",
-        "Mekong Seed Circle"
-      ],
+      "existingInvestors": ["Saigon product angels", "Mekong Seed Circle"],
       "cashPosition": {
         "amount": 140000,
         "currency": "USD",
@@ -7716,9 +7449,7 @@
       },
       {
         "section": "business_model",
-        "content": [
-          "We charge a small fee and share interest with the bank."
-        ]
+        "content": ["We charge a small fee and share interest with the bank."]
       },
       {
         "section": "traction",
@@ -7738,9 +7469,7 @@
       },
       {
         "section": "financials",
-        "content": [
-          "This round gives us about two years."
-        ]
+        "content": ["This round gives us about two years."]
       },
       {
         "section": "the_ask",
@@ -7933,26 +7662,11 @@
     "shortDescription": "Low-cost soil sensors that tell avocado growers when and how much to irrigate, block by block, on their phone.",
     "primaryDescription": "Cosecha Labs puts low-cost soil-moisture sensors in avocado orchards and tells growers exactly when and how much to irrigate, block by block, on their phone. Most growers irrigate on a fixed weekly schedule whatever the soil needs, while aquifers in Michoacán fall every year. Across 9,200 hectares, Cosecha growers use about 31% less water and yields hold steady; 140 growers pay an annual per-hectare subscription. The hardware is included in the subscription.",
     "tags": {
-      "industry": [
-        "agriculture"
-      ],
-      "business_model": [
-        "b2b_saas",
-        "hardware_sales"
-      ],
-      "customer_type": [
-        "small_business",
-        "business_customer"
-      ],
-      "geography": [
-        "mexico",
-        "latin_america"
-      ],
-      "other": [
-        "agritech",
-        "internet_of_things",
-        "climate"
-      ]
+      "industry": ["agriculture"],
+      "business_model": ["b2b_saas", "hardware_sales"],
+      "customer_type": ["small_business", "business_customer"],
+      "geography": ["mexico", "latin_america"],
+      "other": ["agritech", "internet_of_things", "climate"]
     },
     "keywords": [
       "avocado",
@@ -8002,10 +7716,7 @@
       "headline": "Co-founder & CEO, Cosecha Labs | Agronomist from a Michoacán farming family | Farming smarter with less water",
       "professionalSummary": "Agronomist who worked for an avocado packer, then built IoT products at a Guadalajara hardware startup. Co-founded Cosecha to bring both together.",
       "backgroundSummary": "His family farms avocados in Michoacán. He has watched wells go deeper every year.",
-      "languages": [
-        "Spanish",
-        "English"
-      ]
+      "languages": ["Spanish", "English"]
     },
     "team": [
       {
@@ -8238,9 +7949,7 @@
       },
       {
         "section": "go_to_market",
-        "content": [
-          "Word of mouth among growers."
-        ]
+        "content": ["Word of mouth among growers."]
       },
       {
         "section": "business_model",
@@ -8465,23 +8174,10 @@
     "shortDescription": "An API that lets Egyptian banks and fintechs offer Shariah-compliant SME financing: structuring, Shariah review, documents and repayments.",
     "primaryDescription": "Mizan is infrastructure for Shariah-compliant small-business financing. Banks and fintechs connect to its API, and Mizan handles contract structuring, the Shariah review workflow, documentation and repayment collection. Many Egyptian business owners will not take a conventional loan for reasons of faith; Mizan lets lenders offer products they can say yes to. Three banks are live, EGP 640m has been originated, and the non-performing rate is 0.9%. Mizan charges a fee per financing and is raising to launch in Morocco and Saudi Arabia.",
     "tags": {
-      "industry": [
-        "fintech"
-      ],
-      "business_model": [
-        "transaction_fee",
-        "usage_based"
-      ],
-      "customer_type": [
-        "financial_institution",
-        "small_business"
-      ],
-      "geography": [
-        "egypt",
-        "north_africa",
-        "africa",
-        "middle_east"
-      ],
+      "industry": ["fintech"],
+      "business_model": ["transaction_fee", "usage_based"],
+      "customer_type": ["financial_institution", "small_business"],
+      "geography": ["egypt", "north_africa", "africa", "middle_east"],
       "other": [
         "lending_platform",
         "developer_api",
@@ -8544,11 +8240,7 @@
       "headline": "Co-founder & CEO, Mizan | Former SME product lead | Financing small businesses can say yes to",
       "professionalSummary": "Nine years in an Egyptian bank's SME division, ending as product lead, where he designed the bank's first digital murabaha product. Co-founded Mizan to give every lender that capability.",
       "backgroundSummary": "Grew up in Shubra; his father ran a printing shop that never borrowed because the only loans on offer were conventional.",
-      "languages": [
-        "Arabic",
-        "English",
-        "French (basic)"
-      ]
+      "languages": ["Arabic", "English", "French (basic)"]
     },
     "team": [
       {
@@ -9038,23 +8730,10 @@
     "shortDescription": "Treasury software for South African mid-market companies: see FX exposures automatically, set a hedging policy, execute with any bank.",
     "primaryDescription": "Rand Treasury gives South African mid-market companies the FX risk tools large corporates have. It connects to the accounting system, identifies currency exposures automatically, recommends a hedging policy, and lets the company execute with any bank. 160 companies use it, with R14bn of exposure under management and R48m in annual recurring revenue. Revenue is a subscription plus an execution fee.",
     "tags": {
-      "industry": [
-        "fintech",
-        "enterprise_software"
-      ],
-      "business_model": [
-        "b2b_saas",
-        "transaction_fee"
-      ],
-      "customer_type": [
-        "mid_market",
-        "business_customer"
-      ],
-      "geography": [
-        "south_africa",
-        "southern_africa",
-        "africa"
-      ],
+      "industry": ["fintech", "enterprise_software"],
+      "business_model": ["b2b_saas", "transaction_fee"],
+      "customer_type": ["mid_market", "business_customer"],
+      "geography": ["south_africa", "southern_africa", "africa"],
       "other": [
         "capital_markets",
         "regulated_financial_services",
@@ -9117,10 +8796,7 @@
       "headline": "Co-founder & CEO, Rand Treasury | CA(SA) | 15 years selling FX hedging to South African companies",
       "professionalSummary": "Chartered accountant who spent fifteen years in corporate FX at a South African bank, the last ten as head of corporate FX sales. Saw most mid-sized clients either unprotected or overpaying.",
       "backgroundSummary": "Grew up in Paarl. Left the bank in 2020 to build the tools she had wanted to give her mid-market clients.",
-      "languages": [
-        "Afrikaans",
-        "English"
-      ]
+      "languages": ["Afrikaans", "English"]
     },
     "team": [
       {
@@ -9606,21 +9282,10 @@
     "shortDescription": "Software that ranks the genomic variants most likely to explain a child's rare disease, with evidence, for hospital geneticists.",
     "primaryDescription": "Orphéa Genomics helps hospital genetics teams diagnose rare diseases in children faster. Its software does the heavy part of whole-genome analysis, ranking the variants most likely to explain a child's symptoms and showing the evidence for each. Nine university hospitals use it; it has analysed 2,300 cases with a diagnostic yield of 41%, against about 25% before. Hospital genetics departments pay a fee per case.",
     "tags": {
-      "industry": [
-        "healthcare"
-      ],
-      "business_model": [
-        "transaction_fee",
-        "b2b_saas"
-      ],
-      "customer_type": [
-        "enterprise",
-        "government"
-      ],
-      "geography": [
-        "france",
-        "europe"
-      ],
+      "industry": ["healthcare"],
+      "business_model": ["transaction_fee", "b2b_saas"],
+      "customer_type": ["enterprise", "government"],
+      "geography": ["france", "europe"],
       "other": [
         "digital_health",
         "machine_learning",
@@ -9684,11 +9349,7 @@
       "headline": "Co-founder & CEO, Orphéa Genomics | Clinical geneticist, PhD bioinformatics | An answer changes everything",
       "professionalSummary": "Clinical geneticist at a Paris children's hospital with a PhD in bioinformatics. Still holds a part-time clinical post alongside running Orphéa.",
       "backgroundSummary": "Has sat with many families during the average five-year search for a diagnosis. Started Orphéa when her PhD tools began finding answers her department had missed.",
-      "languages": [
-        "French",
-        "English",
-        "Spanish"
-      ]
+      "languages": ["French", "English", "Spanish"]
     },
     "team": [
       {
@@ -10183,19 +9844,10 @@
     "shortDescription": "A child reads into a phone in Kannada, Hindi or English; in seconds the teacher sees exactly which sounds and words they find hard.",
     "primaryDescription": "Akshar is a voice-based reading assessment for government primary schools in India. A child reads a short passage aloud into a phone in Kannada, Hindi or English, and within seconds the teacher sees which sounds and words the child is stuck on. It runs in 1,900 schools across two states, and over 410,000 children have been assessed. State education departments pay a per-student annual fee.",
     "tags": {
-      "industry": [
-        "education"
-      ],
-      "business_model": [
-        "b2b_saas"
-      ],
-      "customer_type": [
-        "government"
-      ],
-      "geography": [
-        "india",
-        "asia"
-      ],
+      "industry": ["education"],
+      "business_model": ["b2b_saas"],
+      "customer_type": ["government"],
+      "geography": ["india", "asia"],
       "other": [
         "edtech",
         "natural_language_processing",
@@ -10251,12 +9903,7 @@
       "headline": "Co-founder & CEO, Akshar | Former government school teacher | Speech AI for Indian classrooms",
       "professionalSummary": "Taught a class of 52 children in a government school through a teaching fellowship, then researched speech recognition for Indian languages. Co-founded Akshar to let teachers hear every child read.",
       "backgroundSummary": "Grew up in Mysuru. The fellowship showed her that teachers could not hear each child read more than once a term.",
-      "languages": [
-        "Kannada",
-        "Tamil",
-        "English",
-        "Hindi"
-      ]
+      "languages": ["Kannada", "Tamil", "English", "Hindi"]
     },
     "team": [
       {
@@ -10520,9 +10167,7 @@
       },
       {
         "section": "go_to_market",
-        "content": [
-          "We work with state education departments."
-        ]
+        "content": ["We work with state education departments."]
       },
       {
         "section": "business_model",
@@ -10542,9 +10187,7 @@
       },
       {
         "section": "competition",
-        "content": [
-          "Paper-based assessments are what most schools use today."
-        ]
+        "content": ["Paper-based assessments are what most schools use today."]
       },
       {
         "section": "financials",
@@ -10744,26 +10387,11 @@
     "shortDescription": "Autonomous drones inspect freight rail yards every night; models flag cracks and wear on rails, ties and switches before they fail.",
     "primaryDescription": "Railhead Robotics flies autonomous drones over freight rail yards every night, capturing every rail, tie and switch. Its models flag cracks and wear long before they become failures, alongside the human inspectors who walk the line. Railhead works with two Class I railroads across 17 yards and has found more than 1,100 track defects before failure. It sells robotics-as-a-service on per-yard annual contracts.",
     "tags": {
-      "industry": [
-        "logistics",
-        "manufacturing"
-      ],
-      "business_model": [
-        "services",
-        "b2b_saas"
-      ],
-      "customer_type": [
-        "enterprise"
-      ],
-      "geography": [
-        "united_states",
-        "north_america"
-      ],
-      "other": [
-        "robotics",
-        "computer_vision",
-        "mobility"
-      ]
+      "industry": ["logistics", "manufacturing"],
+      "business_model": ["services", "b2b_saas"],
+      "customer_type": ["enterprise"],
+      "geography": ["united_states", "north_america"],
+      "other": ["robotics", "computer_vision", "mobility"]
     },
     "keywords": [
       "rail inspection",
@@ -10793,9 +10421,7 @@
       "nationality": "American",
       "gender": "male",
       "city": "Seattle",
-      "education": [
-        "BS Civil Engineering, University of Washington (2000)"
-      ],
+      "education": ["BS Civil Engineering, University of Washington (2000)"],
       "previousRoles": [
         {
           "title": "Track Inspector to Roadmaster",
@@ -10819,10 +10445,7 @@
       "headline": "Co-founder & CEO, Railhead Robotics | 20 years keeping freight trains on the track",
       "professionalSummary": "Twenty years in rail operations, from walking track as an inspector to director of track maintenance for a western freight railroad. Leads Railhead's railroad relationships and safety case.",
       "backgroundSummary": "Grew up in Tacoma, son of a longshoreman. Has walked a lot of track with a flashlight and respects the people who still do.",
-      "languages": [
-        "English",
-        "Japanese (conversational)"
-      ]
+      "languages": ["English", "Japanese (conversational)"]
     },
     "team": [
       {
