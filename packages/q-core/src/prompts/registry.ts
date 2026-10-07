@@ -7,6 +7,7 @@ import {
   INSTRUCTION_PLAN_V6,
   INSTRUCTION_THREAD_READER_V1,
   INSTRUCTION_THREAD_READER_V2,
+  INSTRUCTION_THREAD_READER_V3,
 } from "./tasks/instructions.v1.js";
 import {
   promptContentHash,
@@ -487,6 +488,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INSTRUCTION_PLAN_V6,
     INSTRUCTION_THREAD_READER_V1,
     INSTRUCTION_THREAD_READER_V2,
+    INSTRUCTION_THREAD_READER_V3,
     // DAILY block
     DAILY_STORY_WRITER_V1,
     DAILY_Q_TAKE_V1,

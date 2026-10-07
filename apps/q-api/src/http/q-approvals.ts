@@ -166,20 +166,25 @@ export function registerQApprovalRoutes(
       return reply.header("Cache-Control", "no-store").send(
         QPendingApprovalListSchema.parse({
           contractVersion: Q_CONTRACT_VERSION,
-          items: rows.map(({ targets: _targets, ...row }, index) => {
-            const subject = named[index] ?? null;
-            return {
-              ...row,
-              named:
-                subject === null
-                  ? null
-                  : {
-                      kind: subject.subjectType,
-                      id: subject.subjectId,
-                      photoUrl: photo(subject),
-                    },
-            };
-          }),
+          // `actionType` is the engine's own (Q room W4b's like-request
+          // check); the strict public contract refused it, and every
+          // caller with a waiting card got a 500 (Zino, 7 Oct).
+          items: rows.map(
+            ({ targets: _targets, actionType: _type, ...row }, index) => {
+              const subject = named[index] ?? null;
+              return {
+                ...row,
+                named:
+                  subject === null
+                    ? null
+                    : {
+                        kind: subject.subjectType,
+                        id: subject.subjectId,
+                        photoUrl: photo(subject),
+                      },
+              };
+            },
+          ),
         }),
       );
     },

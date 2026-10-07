@@ -183,3 +183,109 @@ describe("the workforce overview and approval link (J5, J6)", () => {
     ).toBe(true);
   });
 });
+
+describe("what the team map reads (Zino, 7 Oct: every agent read Idle)", () => {
+  const NOW = new Date("2026-10-07T10:50:00Z");
+
+  it("a pending card past its expiry reads EXPIRED, never asking", async () => {
+    const { store, job, approvalId } = await seeded();
+    const card = store.rows.approvals.find((one) => one.id === approvalId);
+    if (card === undefined) throw new Error("seeded card missing");
+    store.rows.approvals.splice(store.rows.approvals.indexOf(card), 1, {
+      ...card,
+      expires_at: new Date(NOW.getTime() - 60_000),
+    });
+    const page = createWorkforcePage({ store, now: () => NOW });
+    const detail = WorkforceJobDetailDtoSchema.parse(
+      await page.detail(OWNER, job.id),
+    );
+    expect(detail.drafts[0]?.outcome?.approvalStatus).toBe("EXPIRED");
+  });
+
+  it("reports live standing instructions: schedule, steps and where each card stands", async () => {
+    const { store } = await seeded();
+    const live = randomUUID();
+    const lapsed = randomUUID();
+    let since: Date | null = null;
+    const step = (extra: Record<string, unknown>) => ({
+      action: "chat.message.send",
+      status: "ASKED",
+      reason_code: null,
+      words: "Waiting for your yes: Introduce Ledgerline",
+      created_at: new Date("2026-10-07T08:03:57Z"),
+      approval_id: null,
+      approval_status: null,
+      approval_expires_at: null,
+      ...extra,
+    });
+    const page = createWorkforcePage({
+      now: () => NOW,
+      store: {
+        ...store,
+        instructions: (_owner, from) => {
+          since = from;
+          return Promise.resolve([
+            {
+              id: randomUUID(),
+              goal_text: "  Express interest when a company fits  ",
+              status: "ACTIVE",
+              pause_reason: null,
+              last_fired_at: new Date("2026-10-07T08:03:29Z"),
+              next_fire_at: new Date("2026-10-07T12:03:29Z"),
+              steps: [
+                step({
+                  approval_id: live,
+                  approval_status: "PENDING",
+                  approval_expires_at: new Date("2026-10-08T08:03:57Z"),
+                }),
+                step({
+                  words: "Waiting for your yes: Introduce Spheros",
+                  approval_id: lapsed,
+                  approval_status: "PENDING",
+                  approval_expires_at: new Date("2026-10-06T15:05:12Z"),
+                }),
+                step({
+                  action: "q.note",
+                  status: "NOTED",
+                  reason_code: "QUESTION_FOR_YOU",
+                  words: "Passed Tensorgate's question to you",
+                }),
+              ],
+            },
+          ]);
+        },
+      },
+    });
+    const overview = WorkforceOverviewDtoSchema.parse(
+      await page.overview(OWNER),
+    );
+    expect(since).toEqual(new Date(NOW.getTime() - 24 * 60 * 60 * 1000));
+    const [one] = overview.instructions ?? [];
+    expect(one).toMatchObject({
+      goal: "Express interest when a company fits",
+      status: "ACTIVE",
+      lastRunAt: "2026-10-07T08:03:29.000Z",
+      nextRunAt: "2026-10-07T12:03:29.000Z",
+    });
+    expect(one?.steps.map((s) => s.approvalStatus)).toEqual([
+      "PENDING",
+      "EXPIRED",
+      null,
+    ]);
+  });
+
+  it("an unreadable instruction list shows none rather than failing the page", async () => {
+    const { store } = await seeded();
+    const page = createWorkforcePage({
+      now: () => NOW,
+      store: {
+        ...store,
+        instructions: () => Promise.reject(new Error("down")),
+      },
+    });
+    const overview = WorkforceOverviewDtoSchema.parse(
+      await page.overview(OWNER),
+    );
+    expect(overview.instructions).toEqual([]);
+  });
+});

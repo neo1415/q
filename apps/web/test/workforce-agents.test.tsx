@@ -133,7 +133,8 @@ function draft(
 }
 
 function overview(
-  extra: Partial<WorkforceOverviewDto> = {},
+  // Parsed below: raw fixtures (status strings) are validated, not cast.
+  extra: Readonly<Record<string, unknown>> = {},
 ): WorkforceOverviewDto {
   return WorkforceOverviewDtoSchema.parse({
     month: "2026-10",
@@ -295,6 +296,147 @@ describe("agent states from what the server recorded (P7)", () => {
     ];
     const nodes = byRole(agentNodes({ overview: overview(), jobs, now: NOW }));
     expect(nodes.get("RESEARCH")?.state).toBe("idle");
+  });
+
+  describe("standing instructions (Zino, 7 Oct: every agent read Idle)", () => {
+    const step = (extra: Record<string, unknown>) => ({
+      action: "chat.message.send",
+      status: "ASKED",
+      reasonCode: null,
+      words: "Waiting for your yes: Introduce Ledgerline specifically",
+      at: at(60),
+      approvalId: null,
+      approvalStatus: null,
+      ...extra,
+    });
+    const instruction = (
+      steps: readonly Record<string, unknown>[],
+      extra: Record<string, unknown> = {},
+    ) => ({
+      id: uid(900),
+      goal: "Express interest in companies that match my mandate",
+      status: "ACTIVE",
+      pauseReason: null,
+      lastRunAt: at(60),
+      nextRunAt: new Date(NOW + 3 * 60 * 60_000).toISOString(),
+      steps,
+      ...extra,
+    });
+    // The instruction's job: its lead run stays open between firings.
+    const instructionJob = (
+      drafts: readonly Record<string, unknown>[] = [],
+    ) => {
+      const one = job(
+        5,
+        "RUNNING",
+        [
+          { role: "LEAD", status: "RUNNING", minutesAgo: 60 * 26 },
+          { role: "WRITER", status: "DONE", minutesAgo: 60 },
+        ],
+        drafts,
+      );
+      return { ...one, job: { ...one.job, source: "INSTRUCTION" as const } };
+    };
+
+    it("cards waiting on the person ask from the specialist that drafted them, with a count", () => {
+      const ov = overview({
+        team: [
+          {
+            role: "LEAD",
+            state: "WORKING",
+            runs: 1,
+            drafts: 0,
+            sentBack: 0,
+            latest: null,
+          },
+        ],
+        instructions: [
+          instruction([
+            step({ approvalId: uid(1), approvalStatus: "PENDING" }),
+            step({ approvalId: uid(2), approvalStatus: "PENDING", at: at(61) }),
+            step({ approvalId: uid(3), approvalStatus: "EXPIRED", at: at(62) }),
+            step({
+              action: "q.note",
+              status: "NOTED",
+              reasonCode: "QUESTION_FOR_YOU",
+              words: "Passed Tensorgate's question to you",
+            }),
+            step({
+              action: "relationship.interest.express",
+              status: "DONE",
+              words: "Expressed interest in Baridi",
+            }),
+          ]),
+        ],
+      });
+      const nodes = byRole(
+        agentNodes({ overview: ov, jobs: [instructionJob()], now: NOW }),
+      );
+      expect(nodes.get("OUTREACH")?.state).toBe("asking");
+      expect(nodes.get("OUTREACH")?.now).toMatch(/^2 cards wait for your yes/u);
+      expect(nodes.get("CONVERSATION")?.state).toBe("held");
+      expect(nodes.get("MANDATE_WATCHER")?.state).toBe("done");
+      // The open lead run is a schedule, not work: it says when it runs next.
+      expect(nodes.get("LEAD")?.state).toBe("done");
+      expect(nodes.get("LEAD")?.now).toMatch(/^Ran \d\d:\d\d\. Next run /u);
+      expect(nodes.get("LEAD")?.nextRunAt).not.toBeNull();
+      // No invented activity elsewhere.
+      expect(nodes.get("SCHEDULER")?.state).toBe("idle");
+    });
+
+    it("a card the job already shows keeps its text and approval, under the drafting specialist", () => {
+      const ov = overview({
+        instructions: [
+          instruction([
+            step({ approvalId: uid(13), approvalStatus: "PENDING" }),
+          ]),
+        ],
+      });
+      const jobs = [
+        instructionJob([
+          draft(11, {
+            outcome: "OFFERED",
+            reason: null,
+            qActionId: uid(12),
+            approvalId: uid(13),
+            approvalStatus: "PENDING",
+          }),
+        ]),
+      ];
+      const nodes = byRole(agentNodes({ overview: ov, jobs, now: NOW }));
+      expect(nodes.get("OUTREACH")?.state).toBe("asking");
+      expect(nodes.get("OUTREACH")?.approval?.approvalId).toBe(uid(13));
+      expect(nodes.get("OUTREACH")?.now).not.toMatch(/cards wait/u);
+      expect(nodes.get("LEAD")?.state).not.toBe("asking");
+    });
+
+    it("an expired card never asks, and a quiet instruction is idle with its next run", () => {
+      const ov = overview({
+        instructions: [
+          instruction(
+            [step({ approvalId: uid(1), approvalStatus: "EXPIRED" })],
+            { lastRunAt: at(60 * 30) },
+          ),
+        ],
+      });
+      const nodes = byRole(agentNodes({ overview: ov, jobs: [], now: NOW }));
+      expect(nodes.get("OUTREACH")?.state).toBe("idle");
+      expect(nodes.get("LEAD")?.state).toBe("idle");
+      expect(nodes.get("LEAD")?.now).toMatch(
+        /^Nothing running\. Next run (?:[A-Z][a-z]{2} )?\d\d:\d\d\.$/u,
+      );
+    });
+
+    it("an older server (no instructions) keeps the job-only reading", () => {
+      const nodes = byRole(
+        agentNodes({
+          overview: overview(),
+          jobs: [instructionJob()],
+          now: NOW,
+        }),
+      );
+      expect(nodes.get("LEAD")?.state).toBe("working");
+    });
   });
 
   it("reads pause reasons in the person's words", () => {

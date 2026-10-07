@@ -145,6 +145,7 @@ describe("the conversation's pace, by code", () => {
       lastFromUsAt: null,
       unansweredFromUs: 0,
       theyHaveWritten: false,
+      lastFromThemAt: null,
     });
     expect(
       threadPace([
@@ -158,6 +159,8 @@ describe("the conversation's pace, by code", () => {
       lastFromUsAt: daysAgo(2),
       unansweredFromUs: 2,
       theyHaveWritten: true,
+      // F24: when they last wrote, so a draft older than it reads stale.
+      lastFromThemAt: daysAgo(8),
     });
   });
 });

@@ -21,6 +21,7 @@ import {
   inScope,
   MAX_REPLANS,
   meetingWithinWorkingHours,
+  staleCards,
   validateStep,
   withinWorkingHours,
   type InstructionPerson,
@@ -38,6 +39,7 @@ import type { ThreadRead } from "../src/composition/instructions/quarantine.js";
 import type {
   InstructionRow,
   InstructionStore,
+  WaitingCard,
 } from "../src/composition/instructions/store.js";
 
 /**
@@ -532,9 +534,7 @@ const MATERIAL_OVERRIDE: { value: InstructionMaterial | null } = {
 };
 /** QA run 8a1d57b9: what the quarantined reader returns, when a case sets it. */
 const THREAD_OVERRIDE: { value: ThreadRead | null } = { value: null };
-const WAITING_OVERRIDE: {
-  value: { action: string; relationship_id: string | null; words: string }[];
-} = { value: [] };
+const WAITING_OVERRIDE: { value: WaitingCard[] } = { value: [] };
 
 function world(
   plans: readonly (Omit<InstructionPlanResult, "cannot"> & {
@@ -1946,6 +1946,153 @@ describe("a card still waiting is never drafted again (founder, 13:34 and 13:54)
       // Autonomy off: both would be cards; only Beta's is new.
       expect(asked).toHaveLength(1);
     } finally {
+      WAITING_OVERRIDE.value = [];
+    }
+  });
+});
+
+describe("F24 follow-up: a waiting draft the conversation moved past is superseded, then redrafted (Zino, 7 Oct)", () => {
+  const DRAFTED = new Date("2026-10-07T08:03:57Z");
+  const APPROVAL = randomUUID();
+  // The live card to Ledgerline (action 8c6b06ef), drafted before the fix.
+  const COLD =
+    "Hello Ledgerline team — checking every invoice at creation and filing VAT returns for Nigerian SMEs brings compliance into the workflow. I came across the company through your Capital Q profile. How are SMEs responding to the product?";
+  const card = (body: string | null = COLD): WaitingCard => ({
+    action: "chat.message.send",
+    relationship_id: REL,
+    words: "Waiting for your yes: Introduce Ledgerline specifically",
+    created_at: DRAFTED,
+    approval_id: APPROVAL,
+    body,
+  });
+  const pace = (lastFromThemAt: Date, lastFrom: "THEM" | "US" = "THEM") => ({
+    lastFrom,
+    lastFromUsAt: null,
+    unansweredFromUs: 0,
+    theyHaveWritten: true,
+    lastFromThemAt,
+  });
+  const theyWroteFirst = new Date("2026-10-06T17:27:45Z");
+
+  it("code decides: a newer message from them, or a cold open while they wrote last; an unread thread never", () => {
+    const later = new Date(DRAFTED.getTime() + 60_000);
+    expect(
+      staleCards(
+        [card("Thanks Tobenna, yes please send the deck.")],
+        new Map([[REL, pace(later)]]),
+      ).map((one) => one.reason),
+    ).toEqual(["NEWER_MESSAGE_FROM_THEM"]);
+    expect(
+      staleCards([card()], new Map([[REL, pace(theyWroteFirst)]])).map(
+        (one) => one.reason,
+      ),
+    ).toEqual(["COLD_OPEN_IN_REPLY"]);
+    // A reply drafted after their message, and before any new one, stands.
+    expect(
+      staleCards(
+        [card("Thanks Tobenna, yes please send the deck.")],
+        new Map([[REL, pace(theyWroteFirst)]]),
+      ),
+    ).toEqual([]);
+    // Unknown is never "moved on"; a card with no open approval is left be.
+    expect(staleCards([card()], new Map())).toEqual([]);
+    expect(
+      staleCards(
+        [{ ...card(), approval_id: null }],
+        new Map([[REL, pace(theyWroteFirst)]]),
+      ),
+    ).toEqual([]);
+    // Other kinds of card are not chat drafts.
+    expect(
+      staleCards(
+        [{ ...card(), action: "meeting.schedule" }],
+        new Map([[REL, pace(later)]]),
+      ),
+    ).toEqual([]);
+  });
+
+  const thread: ThreadRead = {
+    facts: {
+      lastFrom: "THEM",
+      asksQuestion: true,
+      wantsToMeet: true,
+      proposedTime: null,
+      topicNumbers: [1],
+      mentionsTermsOrMoney: false,
+      declined: false,
+      tone: "POSITIVE",
+      questionAbout: ["OTHER"],
+    },
+    costUsd: 0,
+    pace: pace(theyWroteFirst),
+  };
+  const reply = chat(
+    "Thanks Tobenna. 1,140 SMEs filing through Ledgerline is real pull; yes, please share the deck.",
+    { words: "Reply to Ledgerline's offer of the deck." },
+  );
+
+  it("a firing supersedes the stale card through the Approval Engine, notes it, and drafts the reply in its place", async () => {
+    const superseded: { approvalId: string; reason: string }[] = [];
+    THREAD_OVERRIDE.value = thread;
+    WAITING_OVERRIDE.value = [card()];
+    try {
+      const { engine, row, asked, steps } = world(
+        [{ steps: [reply], cannot: [] }],
+        false,
+        IN_HOURS,
+        "0",
+        {
+          awaitingAnswer: () => Promise.resolve(new Set([REL])),
+          supersedeCard: (_actor, input) => {
+            superseded.push(input);
+            return Promise.resolve(true);
+          },
+        },
+      );
+      await engine.fire(row.id, "run-f24a");
+      expect(superseded).toEqual([
+        { approvalId: APPROVAL, reason: "COLD_OPEN_IN_REPLY" },
+      ]);
+      const note = [...steps.values()].find(
+        (step) => step.reasonCode === "DRAFT_SUPERSEDED",
+      );
+      expect(note?.status).toBe("NOTED");
+      expect(note?.words).toMatch(
+        /^Replaced my waiting draft to .+: it introduced you as if they hadn't written to you first\./u,
+      );
+      // No longer waiting: the reply is drafted as a new card.
+      expect(asked.map((one) => one.actionType)).toEqual([
+        "app.chat.message.send",
+      ]);
+    } finally {
+      THREAD_OVERRIDE.value = null;
+      WAITING_OVERRIDE.value = [];
+    }
+  });
+
+  it("when the engine cannot supersede it (decided meanwhile), the card still counts as waiting: no second card", async () => {
+    THREAD_OVERRIDE.value = thread;
+    WAITING_OVERRIDE.value = [card()];
+    try {
+      const { engine, row, asked, steps } = world(
+        [{ steps: [reply], cannot: [] }],
+        false,
+        IN_HOURS,
+        "0",
+        {
+          awaitingAnswer: () => Promise.resolve(new Set([REL])),
+          supersedeCard: () => Promise.resolve(false),
+        },
+      );
+      await engine.fire(row.id, "run-f24b");
+      expect(asked).toEqual([]);
+      expect(
+        [...steps.values()].some(
+          (step) => step.reasonCode === "DRAFT_SUPERSEDED",
+        ),
+      ).toBe(false);
+    } finally {
+      THREAD_OVERRIDE.value = null;
       WAITING_OVERRIDE.value = [];
     }
   });

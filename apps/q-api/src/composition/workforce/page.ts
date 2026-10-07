@@ -1,5 +1,6 @@
 import {
   WORKFORCE_AGENT_ROLES,
+  WORKFORCE_INSTRUCTION_STEP_STATUSES,
   WORKFORCE_TEAM_STATES,
   WORKFORCE_JOB_STATUSES,
   WORKFORCE_RUN_STATUSES,
@@ -55,6 +56,27 @@ const APPROVAL_STATUSES = [
   "EXPIRED",
   "REVOKED",
 ] as const;
+
+/**
+ * Where a card stands now: a PENDING one past its expiry has lapsed, even
+ * before a sweep writes EXPIRED (14 of Zino's 39 "pending" had, 7 Oct).
+ */
+function cardStatus(
+  status: string,
+  expiresAt: Date | null | undefined,
+  at: Date,
+): (typeof APPROVAL_STATUSES)[number] {
+  const known = oneOf(APPROVAL_STATUSES, status, "PENDING");
+  return known === "PENDING" &&
+    expiresAt !== null &&
+    expiresAt !== undefined &&
+    expiresAt.getTime() <= at.getTime()
+    ? "EXPIRED"
+    : known;
+}
+
+const CODE = /^[A-Z][A-Z0-9_]{0,63}$/u;
+const ACTION = /^[a-z][a-z0-9_.]{0,79}$/u;
 
 /** A stored code read back into its closed set (the table's check holds it). */
 function oneOf<T extends string>(
@@ -210,6 +232,7 @@ export function createWorkforcePage(dependencies: {
     ): Promise<WorkforceJobDetailDto | null> => {
       const detail: JobDetail | null = await store.job(owner, jobId);
       if (detail === null) return null;
+      const at = dependencies.now?.() ?? new Date();
       const { byJob, byRun } = await costsOf(
         owner,
         [detail.job],
@@ -263,7 +286,7 @@ export function createWorkforcePage(dependencies: {
                     approvalStatus:
                       card === undefined
                         ? null
-                        : oneOf(APPROVAL_STATUSES, card.status, "PENDING"),
+                        : cardStatus(card.status, card.expires_at, at),
                   };
                 })(),
           feedback: detail.feedback
@@ -409,7 +432,7 @@ export function createWorkforcePage(dependencies: {
       const today = new Date(
         Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()),
       );
-      const [month, limit, team, jobs] = await Promise.all([
+      const [month, limit, team, jobs, instructions] = await Promise.all([
         (dependencies.monthCosts?.(owner, at) ?? Promise.resolve([])).catch(
           () => [],
         ),
@@ -418,6 +441,11 @@ export function createWorkforcePage(dependencies: {
         ),
         store.team(owner, today),
         store.openJobs(owner),
+        // A failed read shows no instructions rather than failing the page.
+        (
+          store.instructions?.(owner, new Date(at.getTime() - DAY_MS)) ??
+          Promise.resolve([])
+        ).catch(() => []),
       ]);
       const roles = await store.runRoles(
         owner,
@@ -465,9 +493,51 @@ export function createWorkforcePage(dependencies: {
           latest: row.latest?.slice(0, 500) ?? null,
         })),
         jobs,
+        instructions: instructions.map((one) => ({
+          id: one.id,
+          goal: one.goal_text.trim().slice(0, 300),
+          status: one.status === "PAUSED" ? "PAUSED" : "ACTIVE",
+          pauseReason:
+            one.pause_reason !== null && CODE.test(one.pause_reason)
+              ? one.pause_reason
+              : null,
+          lastRunAt: one.last_fired_at?.toISOString() ?? null,
+          nextRunAt:
+            one.status === "ACTIVE"
+              ? (one.next_fire_at?.toISOString() ?? null)
+              : null,
+          steps: one.steps
+            .filter((step) => ACTION.test(step.action))
+            .slice(0, 60)
+            .map((step) => ({
+              action: step.action,
+              status: oneOf(
+                WORKFORCE_INSTRUCTION_STEP_STATUSES,
+                step.status,
+                "NOTED",
+              ),
+              reasonCode:
+                step.reason_code !== null && CODE.test(step.reason_code)
+                  ? step.reason_code
+                  : null,
+              words: step.words.trim().slice(0, 500),
+              at: step.created_at.toISOString(),
+              approvalId: step.approval_id,
+              approvalStatus:
+                step.approval_status === null
+                  ? null
+                  : cardStatus(
+                      step.approval_status,
+                      step.approval_expires_at,
+                      at,
+                    ),
+            })),
+        })),
       };
     },
   };
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type WorkforcePage = ReturnType<typeof createWorkforcePage>;

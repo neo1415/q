@@ -879,6 +879,63 @@ function sidesWritten(
 const COLD_OPEN =
   /\b(?:came across|come across|found (?:you|your|the company)|discovered (?:you|your|the company)|(?:i|we)(?:'|’)?d (?:like|love) to introduce|(?:let|allow) me to introduce)\b/iu;
 
+export type StaleReason = "NEWER_MESSAGE_FROM_THEM" | "COLD_OPEN_IN_REPLY";
+
+/**
+ * F24 follow-up (Zino, 7 Oct): a chat card still waiting on the person is
+ * stale when the conversation moved on under it -- they wrote after it was
+ * drafted -- or when it opens cold although they wrote last (the four
+ * drafts written before the reply-awareness fix). Code's own read of the
+ * thread's sides and times and of Q's own words; never a model's.
+ */
+export function staleCards<
+  Card extends {
+    readonly action: string;
+    readonly relationship_id: string | null;
+    readonly created_at?: Date | undefined;
+    readonly approval_id?: string | null | undefined;
+    readonly body?: string | null | undefined;
+  },
+>(
+  cards: readonly Card[],
+  paces: ReadonlyMap<string, ThreadPace>,
+): readonly { readonly card: Card; readonly reason: StaleReason }[] {
+  const out: { card: Card; reason: StaleReason }[] = [];
+  for (const card of cards) {
+    if (
+      card.action !== "chat.message.send" ||
+      card.relationship_id === null ||
+      card.approval_id == null
+    ) {
+      continue;
+    }
+    // Unread thread: unknown is never "moved on".
+    const pace = paces.get(card.relationship_id);
+    if (pace === undefined) continue;
+    const theirs = pace.lastFromThemAt ?? null;
+    if (
+      theirs !== null &&
+      card.created_at !== undefined &&
+      theirs.getTime() > card.created_at.getTime()
+    ) {
+      out.push({ card, reason: "NEWER_MESSAGE_FROM_THEM" });
+    } else if (
+      pace.lastFrom === "THEM" &&
+      typeof card.body === "string" &&
+      COLD_OPEN.test(card.body)
+    ) {
+      out.push({ card, reason: "COLD_OPEN_IN_REPLY" });
+    }
+  }
+  return out;
+}
+
+const STALE_WORDS: Readonly<Record<StaleReason, string>> = {
+  NEWER_MESSAGE_FROM_THEM: "they wrote again after I drafted it",
+  COLD_OPEN_IN_REPLY:
+    "it introduced you as if they hadn't written to you first",
+};
+
 /** The reply code composes to their question, when it is one it may answer. */
 function templatedAnswer(
   thread: ThreadFacts | undefined,
@@ -1020,6 +1077,17 @@ export type InstructionEngineDependencies = {
     Partial<Pick<InstructionStore, "waitingCards">>;
   readonly actions: readonly AnyAppAction[];
   readonly ports: AppActionPorts;
+  /**
+   * F24: supersede the person's own stale waiting card (the Approval
+   * Engine's: approval REVOKED, action WITHDRAWN, history and audit kept).
+   * Absent, stale cards simply keep waiting, as before.
+   */
+  readonly supersedeCard?:
+    | ((
+        actor: ActorContext,
+        input: { readonly approvalId: string; readonly reason: StaleReason },
+      ) => Promise<boolean>)
+    | undefined;
   /** Relationships with a card still waiting on the person (store read). */
   readonly awaitingAnswer?:
     ((instructionId: string) => Promise<ReadonlySet<string>>) | undefined;
@@ -1404,13 +1472,14 @@ export function createInstructionEngine(
       const people = await dependencies.people(actor).catch(() => []);
       const sentBefore = await store.messagesSent(row.id);
       // Unreadable is not "nothing waiting": no hold is added, as before.
-      const awaiting = await dependencies
+      // Both narrowed below when a stale card is superseded (F24).
+      let awaiting = await dependencies
         .awaitingAnswer?.(row.id)
         .catch(() => undefined);
       const history = await store.history(row.id);
       // Cards still waiting on the person: never drafted again. A store
       // without the read (older doubles) waits on nothing.
-      const cardsWaiting = await Promise.resolve()
+      let cardsWaiting = await Promise.resolve()
         .then(() => store.waitingCards?.(row.id) ?? [])
         .catch(() => []);
       const isWaiting = (
@@ -1446,9 +1515,15 @@ export function createInstructionEngine(
         { readonly messageId: string; readonly text: string }
       >();
       if (dependencies.readThread !== undefined) {
+        // Conversations with a card still waiting are read first (F24: a
+        // stale draft is only seen as stale once its thread is read).
+        const carded = new Set(
+          cardsWaiting.map((card) => card.relationship_id),
+        );
         const threads = inScope(grant.data, people)
           .map((person) => person.relationshipId)
           .filter((id): id is string => id !== null)
+          .sort((a, b) => Number(carded.has(b)) - Number(carded.has(a)))
           .slice(0, THREADS_PER_FIRING);
         for (const relationshipId of threads) {
           const spare = left - micros(PLAN_MAX_COST_USD);
@@ -1469,6 +1544,50 @@ export function createInstructionEngine(
           if (read.question !== undefined) {
             questions.set(relationshipId, read.question);
           }
+        }
+      }
+
+      // F24 follow-up (Zino, 7 Oct): a waiting card the conversation has
+      // moved past is superseded -- through the Approval Engine, with its
+      // history -- and stops counting as waiting, so this firing's planner
+      // may draft the reply in its place.
+      if (dependencies.supersedeCard !== undefined) {
+        for (const { card, reason } of staleCards(cardsWaiting, paces)) {
+          const approvalId = card.approval_id;
+          const relationshipId = card.relationship_id;
+          if (approvalId == null || relationshipId === null) continue;
+          const replaced = await dependencies
+            .supersedeCard(actor, { approvalId, reason })
+            .catch(() => false);
+          if (!replaced) continue;
+          cardsWaiting = cardsWaiting.filter((one) => one !== card);
+          if (
+            awaiting !== undefined &&
+            !cardsWaiting.some((one) => one.relationship_id === relationshipId)
+          ) {
+            awaiting = new Set(
+              [...awaiting].filter((id) => id !== relationshipId),
+            );
+          }
+          const name = (
+            people.find((person) => person.relationshipId === relationshipId)
+              ?.name ?? "them"
+          ).slice(0, 80);
+          await store
+            .recordStep({
+              instruction: row,
+              runKey,
+              stepIndex: 140,
+              action: "q.note",
+              mode: "ASK",
+              status: "NOTED",
+              relationshipId,
+              words: `Replaced my waiting draft to ${name}: ${STALE_WORDS[reason]}. I'll draft a reply to what they said.`,
+              reasonCode: "DRAFT_SUPERSEDED",
+              qActionId: null,
+              idempotencyKey: `instr:${row.id}:superseded:${approvalId}`,
+            })
+            .catch(() => false);
         }
       }
 

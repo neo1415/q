@@ -716,17 +716,16 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
      */
     waitingCards: async (
       instructionId: string,
-    ): Promise<
-      readonly {
-        action: string;
-        relationship_id: string | null;
-        words: string;
-      }[]
-    > =>
-      sql<{ action: string; relationship_id: string | null; words: string }[]>`
-        select t.action, t.relationship_id, t.words
+    ): Promise<readonly WaitingCard[]> =>
+      sql<WaitingCard[]>`
+        select t.action, t.relationship_id, t.words, t.created_at,
+               p.id as approval_id,
+               a.proposed_payload #>> '{input,body}' as body
           from q_runtime.instruction_steps t
           join q_runtime.actions a on a.id = t.q_action_id
+          left join q_runtime.approvals p
+            on p.action_id = a.id and p.tenant_id = a.tenant_id
+           and p.status = 'PENDING'
          where t.instruction_id = ${instructionId} and t.status = 'ASKED'
            and a.status in ('PROPOSED', 'AWAITING_APPROVAL')
          limit 100`,
@@ -754,6 +753,20 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
          limit ${limit}`,
   };
 }
+
+/**
+ * A card Q asked under an instruction that still waits on the person, with
+ * what F24's stale check reads: when it was drafted, its open approval and
+ * its message text (a chat card; null for any other action).
+ */
+export type WaitingCard = {
+  readonly action: string;
+  readonly relationship_id: string | null;
+  readonly words: string;
+  readonly created_at?: Date | undefined;
+  readonly approval_id?: string | null | undefined;
+  readonly body?: string | null | undefined;
+};
 
 export type InstructionStore = ReturnType<
   typeof createPostgresInstructionStore
