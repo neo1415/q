@@ -428,6 +428,9 @@ importers:
       '@capital-q/audit':
         specifier: workspace:*
         version: link:../../packages/audit
+      '@capital-q/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../../packages/capital
@@ -491,6 +494,9 @@ importers:
       '@capital-q/platform-admin':
         specifier: workspace:*
         version: link:../../packages/platform-admin
+      '@capital-q/q-artifacts':
+        specifier: workspace:*
+        version: link:../../packages/q-artifacts
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../../packages/q-core
@@ -509,6 +515,9 @@ importers:
       '@capital-q/q-research':
         specifier: workspace:*
         version: link:../../packages/q-research
+      '@capital-q/q-specialists':
+        specifier: workspace:*
+        version: link:../../packages/q-specialists
       '@capital-q/security':
         specifier: workspace:*
         version: link:../../packages/security

@@ -192,7 +192,7 @@ const EXTRA = {
   sectorCodes: [],
   directionChosen: false,
   brand: null,
-  sensitivity: "INTERNAL",
+  sensitivity: "INTERNAL" as const,
 };
 
 function request(overrides: Record<string, unknown> = {}) {

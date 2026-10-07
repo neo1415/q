@@ -1,4 +1,5 @@
 import {
+  ModelSensitivitySchema,
   QArtifactContentSchema,
   QBrandPaletteSchema,
   QDocumentPipelineStageSchema,
@@ -43,7 +44,7 @@ export const DocumentJobInputSchema = z
       })
       .strict()
       .nullable(),
-    sensitivity: z.string().max(32),
+    sensitivity: ModelSensitivitySchema,
   })
   .strict();
 export type DocumentJobInput = z.infer<typeof DocumentJobInputSchema>;
