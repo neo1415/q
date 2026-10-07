@@ -31,16 +31,22 @@ export type PdfExport = (input: {
 export function QRoomPdfOffer({
   turns,
   file = exportAnswerAction,
+  opened,
 }: {
   readonly turns: readonly QTurn[];
   readonly file?: PdfExport | undefined;
+  /**
+   * W7: what was in the conversation when the room opened, from the room
+   * itself: this offer's code loads only once Q has answered.
+   */
+  readonly opened?: ReadonlySet<string> | undefined;
 }) {
   const offer = pdfOfferOf(turns);
   // Per offered answer: "busy", "done", "declined", or what went wrong.
   const [state, setState] = useState<Readonly<Record<string, string>>>({});
   // What was already in the conversation when the room opened.
   const [known] = useState<ReadonlySet<string>>(
-    () => new Set(turns.map((turn) => turn.id)),
+    () => opened ?? new Set(turns.map((turn) => turn.id)),
   );
   const fresh = offer !== null && !known.has(offer.answerId);
 

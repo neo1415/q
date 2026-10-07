@@ -271,6 +271,11 @@ export function QPresenceStage({
     setRoomShown(true);
   }
   const answered = latestQ !== undefined;
+  // What was in the conversation when the room opened (the PDF offer
+  // offers only answers that arrive after; its code loads later).
+  const [openedWith] = useState<ReadonlySet<string>>(
+    () => new Set(turns.map((turn) => turn.id)),
+  );
 
   // W7: once the page has settled, what Q is likely to show first (a room
   // card, an answer's cards) is fetched quietly, so the first one shown
@@ -415,7 +420,11 @@ export function QPresenceStage({
 
       {answered ? (
         <Suspense fallback={null}>
-          <QRoomPdfOffer turns={turns} file={exportAnswer} />
+          <QRoomPdfOffer
+            turns={turns}
+            file={exportAnswer}
+            opened={openedWith}
+          />
         </Suspense>
       ) : null}
 
