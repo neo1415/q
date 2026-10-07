@@ -8,6 +8,7 @@ import type {
   ProfileFindingSubjectType,
   ProfileImageSubjectType,
 } from "@capital-q/contracts";
+import { getThesisReading } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { getSessionUser } from "@/auth/session";
@@ -41,7 +42,12 @@ import { ProfileHero } from "@/features/profile/profile-header";
 import { ProfileImageEditor } from "@/features/profile/profile-image-editor";
 import { QCardSection } from "@/features/q-card/q-card-section";
 import { ProfileTeamSection } from "@/features/team/profile-team";
-import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { ThesisSection } from "@/features/investor/thesis-section";
+import {
+  apiSession,
+  qApiSession,
+  resolveOwnContext,
+} from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
 
 export const metadata: Metadata = { title: "Profile" };
@@ -356,6 +362,10 @@ export default async function ProfilePage() {
                   "thesis",
                 ]}
               />
+              {/* Q.02: declared vs what they did vs Q's reading, apart. */}
+              <Suspense fallback={null}>
+                <ThesisSlot investorOrganisationId={investor.id} />
+              </Suspense>
             </>
           ) : context.kind === "NONE" && context.unavailable !== true ? (
             <ProfileSectionShell
@@ -804,5 +814,28 @@ function Unavailable({ what }: { readonly what: string }) {
       Couldn&apos;t load {what} just now. Nothing is wrong with your account;
       reload in a moment.
     </p>
+  );
+}
+
+/**
+ * Q.02: the investor's own thesis reading, from the Q API (the same read
+ * as Q's thesis_reading). Nothing shows when it cannot be read: the rules
+ * above stay the source of truth either way.
+ */
+async function ThesisSlot({
+  investorOrganisationId,
+}: {
+  readonly investorOrganisationId: string;
+}) {
+  const session = await qApiSession();
+  const reading =
+    session === null
+      ? null
+      : await getThesisReading(session).catch(() => null);
+  return reading === null ? null : (
+    <ThesisSection
+      reading={reading}
+      investorOrganisationId={investorOrganisationId}
+    />
   );
 }

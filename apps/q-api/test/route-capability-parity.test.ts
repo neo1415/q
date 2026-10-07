@@ -885,6 +885,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // ADR 0023: investors for a founder, founders' requests for an investor.
   "/investors": cap("offer.connection_request"),
   "/investors/top": cap("tool.fit_top_candidates"),
+  // Q.10: 2-4 picked from Saved, side by side.
+  "/discover/saved/compare": cap("tool.fit_compare"),
   // Founder design 2026-09-28: a Q Card by its whole @handle.
   "/find": exempt("the old address of Search; it only redirects"),
   "/search": exempt(
