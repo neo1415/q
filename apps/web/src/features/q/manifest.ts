@@ -48,9 +48,22 @@ let focus: QManifestRef | null = null;
 let seq = 0;
 const listeners = new Set<() => void>();
 
+let notifying = false;
+
+/**
+ * R9: a page mounting registers its sections one by one in a single
+ * commit; listeners hear once per batch (a microtask later), not once per
+ * section, so "Q can see" reads the page once instead of N times. The
+ * sequence moves at once, so what travels with a turn is never stale.
+ */
 function changed(): void {
   seq += 1;
-  for (const listener of listeners) listener();
+  if (notifying) return;
+  notifying = true;
+  queueMicrotask(() => {
+    notifying = false;
+    for (const listener of listeners) listener();
+  });
 }
 
 export function subscribeManifest(listener: () => void): () => void {

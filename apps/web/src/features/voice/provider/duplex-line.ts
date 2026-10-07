@@ -109,6 +109,9 @@ export const BRIDGE_MAX_OUTPUT_TOKENS = 90;
 /** ADR 0062: long polls for one ask_q's beats, at most. */
 const NARRATION_MAX_POLLS = 12;
 const NARRATION_FIRST_POLL_MS = 600;
+/** R9: reconnects in a row after a dropped poll, and the first wait. */
+const NARRATION_MAX_RECONNECTS = 3;
+const NARRATION_RECONNECT_MS = 800;
 /** The commit a reaction waits on; past this it is dropped. */
 const COMMIT_WAIT_MS = 400;
 /** The longest a bridge may hold Q's answer back. */
@@ -1432,17 +1435,34 @@ export class DuplexLine {
         this.#env.setTimeout(resolve, NARRATION_FIRST_POLL_MS);
       });
       // Bounded: each poll is held at most a few seconds by the server.
-      for (let polls = 0; polls < NARRATION_MAX_POLLS; polls += 1) {
+      // R9: a dropped poll (null or a throw) reconnects after a backoff,
+      // at most a few times in a row, from the last beat heard: `after`
+      // only moves forward and a beat at or below it is never said twice.
+      let failures = 0;
+      for (let polls = 0; polls < NARRATION_MAX_POLLS;) {
         if (!live()) return;
         let result: QVoiceDuplexNarrationResult | null;
         try {
           result = await poll(after);
         } catch {
-          return;
+          result = null;
         }
-        if (result === null) return;
+        if (result === null) {
+          failures += 1;
+          if (failures > NARRATION_MAX_RECONNECTS) return;
+          await new Promise<void>((resolve) => {
+            this.#env.setTimeout(
+              resolve,
+              NARRATION_RECONNECT_MS * 2 ** (failures - 1),
+            );
+          });
+          continue;
+        }
+        failures = 0;
+        polls += 1;
         for (const { sequence, beat } of result.beats) {
-          after = Math.max(after, sequence);
+          if (sequence <= after) continue;
+          after = sequence;
           if (live()) this.#sayBeat(beat);
         }
         if (result.idle) return;

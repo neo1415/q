@@ -26,6 +26,48 @@ export function edgeFlowing(state: QApertureState): boolean {
   return state === "THINKING" || state === "WORKING";
 }
 
+/**
+ * R9: the edge as the compositor draws it. Each side is a strip of dots
+ * that repeats every `tilePx`, slid one tile by a transform animation
+ * (transform and opacity only: no main-thread frame work while Q works).
+ */
+export const EDGE_STRIP = {
+  thicknessPx: 6,
+  /** Two layers per side, at different tiles and paces. */
+  layers: [
+    { tilePx: 240, dots: 7, seconds: 6.5, salt: 11 },
+    { tilePx: 330, dots: 6, seconds: 5, salt: 23 },
+  ],
+} as const;
+
+/**
+ * One tile of dots as a CSS background-image (radial gradients in Q's
+ * light token), along `axis`. Deterministic, like the particles.
+ */
+export function edgeDots(
+  axis: "x" | "y",
+  tilePx: number,
+  dots: number,
+  salt: number,
+): string {
+  const F = EDGE_FLOW;
+  const middle = EDGE_STRIP.thicknessPx / 2;
+  return Array.from({ length: dots }, (_, i) => {
+    const along = Math.round(((i + unit(i, salt)) / dots) * tilePx * 10) / 10;
+    const radius =
+      Math.round(
+        (F.minRadiusPx + unit(i, salt + 1) * (F.maxRadiusPx - F.minRadiusPx)) *
+          10,
+      ) / 10;
+    const alpha = Math.round(35 + 45 * unit(i, salt + 2));
+    const at =
+      axis === "x"
+        ? `${String(along)}px ${String(middle)}px`
+        : `${String(middle)}px ${String(along)}px`;
+    return `radial-gradient(circle ${String(radius)}px at ${at}, color-mix(in oklab, var(--cq-q-light) ${String(alpha)}%, transparent) 98%, transparent)`;
+  }).join(", ");
+}
+
 /** A fixed pseudo-random number in [0, 1) for an index and a salt. */
 function unit(index: number, salt: number): number {
   let x = Math.imul(index + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);

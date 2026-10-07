@@ -8,7 +8,7 @@ import {
   useReducedMotion,
 } from "motion/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { QManifestRef, QShowInQRoomIntent } from "@capital-q/contracts";
 import { ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
@@ -19,6 +19,8 @@ import { useQSection } from "../q-section";
 import { QRoomDeck, type DeckLoaders } from "./q-room-deck";
 import { loadRoomCardAction, type RoomCardResult } from "./room-actions";
 import type { RoomCardView } from "./room-card-view";
+import { RoomLoadFailed } from "./room-load-failed";
+import { roomRead, useRetryWhenOnline } from "./room-read";
 import type { RoomCard, RoomNote } from "./room-stage";
 
 /**
@@ -37,14 +39,25 @@ export type RoomCardLoader = (
   intent: QShowInQRoomIntent,
 ) => Promise<RoomCardResult>;
 
+type CardRead =
+  | { readonly kind: "loading" }
+  | { readonly kind: "read"; readonly result: RoomCardResult }
+  | { readonly kind: "failed" };
+
+/**
+ * The card's content, read once per card. R9: one retry, then "Couldn't
+ * load — try again"; coming back online retries by itself. A refusal is
+ * an answer, shown as such and never retried.
+ */
 function useCardView(
   card: RoomCard,
   load: RoomCardLoader,
-): RoomCardResult | null {
+): { readonly read: CardRead; readonly retry: () => void } {
   const [read, setRead] = useState<{
     readonly key: string;
-    readonly result: RoomCardResult;
+    readonly read: CardRead;
   } | null>(null);
+  const [tries, setTries] = useState(0);
   const cached = loaded.get(card.key);
   useEffect(() => {
     if (
@@ -55,20 +68,33 @@ function useCardView(
       return;
     }
     let live = true;
-    void load(card.intent)
-      .catch((): RoomCardResult => ({
-        ok: false,
-        message: "This couldn't load. Ask again in a moment.",
-      }))
-      .then((next) => {
+    roomRead(() => load(card.intent)).then(
+      (next) => {
         if (next.ok) loaded.set(card.key, next);
-        if (live) setRead({ key: card.key, result: next });
-      });
+        if (live) {
+          setRead({ key: card.key, read: { kind: "read", result: next } });
+        }
+      },
+      () => {
+        if (live) setRead({ key: card.key, read: { kind: "failed" } });
+      },
+    );
     return () => {
       live = false;
     };
-  }, [card.key, card.intent, load]);
-  return cached ?? (read?.key === card.key ? read.result : null);
+  }, [card.key, card.intent, load, tries]);
+  const now: CardRead =
+    cached !== undefined
+      ? { kind: "read", result: cached }
+      : read?.key === card.key
+        ? read.read
+        : { kind: "loading" };
+  const retry = useCallback(() => {
+    setRead(null);
+    setTries((n) => n + 1);
+  }, []);
+  useRetryWhenOnline(now.kind === "failed", retry);
+  return { read: now, retry };
 }
 
 export function QRoomStage({
@@ -165,7 +191,8 @@ function RoomCardBody({
   readonly onClose: () => void;
 }) {
   const deck = card.intent.object === "Q_DOCUMENT";
-  const result = useCardView(card, load);
+  const { read, retry } = useCardView(card, load);
+  const result = read.kind === "read" ? read.result : null;
   const title =
     card.intent.object === "SOURCES"
       ? "Sources"
@@ -220,9 +247,13 @@ function RoomCardBody({
             openedAt={card.openedAt}
             {...(deckLoaders === undefined ? {} : { loaders: deckLoaders })}
           />
+        ) : read.kind === "failed" ? (
+          <RoomLoadFailed onRetry={retry} className="min-h-40" />
         ) : result === null ? (
+          // R9: the skeleton holds about the card's own height, so the
+          // content landing does not push the page below it.
           <div
-            className="flex flex-col gap-2"
+            className="flex min-h-40 flex-col gap-2"
             aria-busy="true"
             data-q-room-loading
           >

@@ -442,6 +442,84 @@ describe("tool calls and usage", () => {
     await settle();
   });
 
+  it("reconnects the narration poll after a dropped connection, never saying a beat twice (R9)", async () => {
+    let finish: () => void = () => undefined;
+    const beat = (sequence: number, text: string) => ({
+      sequence,
+      beat: { kind: "STAGE_LINE" as const, text },
+    });
+    let calls = 0;
+    const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve({
+          beats: [beat(1, "Reading the deck…")],
+          idle: false,
+        });
+      }
+      // The network drops: once as nothing, once as a throw.
+      if (calls === 2) return Promise.resolve(null);
+      if (calls === 3) return Promise.reject(new TypeError("Failed to fetch"));
+      // Back: the server repeats the beat already said, then a new one.
+      return Promise.resolve({
+        beats: [beat(1, "Reading the deck…"), beat(2, "Checking the numbers…")],
+        idle: true,
+      });
+    });
+    const h = harness({
+      narration,
+      tool: () =>
+        new Promise((resolve) => {
+          finish = () => {
+            resolve({
+              output: JSON.stringify({ ok: true, say: "Done." }),
+              approvalPending: false,
+            });
+          };
+        }),
+    });
+    await h.line.open();
+    h.channel().emit({
+      type: "response.function_call_arguments.done",
+      call_id: "call_r",
+      name: "ask_q",
+      arguments: JSON.stringify({ request: "Look at the deck." }),
+    });
+    const said = (words: string) =>
+      h
+        .channel()
+        .sent.filter(
+          (event) =>
+            (event as { type?: string }).type === "response.create" &&
+            JSON.stringify(event).includes(words),
+        ).length;
+    await vi.advanceTimersByTimeAsync(700);
+    await settle();
+    expect(said("Reading the deck")).toBe(1);
+    // Each beat is out of band; let the first finish so the next may speak.
+    const first = h
+      .channel()
+      .sent.find((event) =>
+        JSON.stringify(event).includes("Reading the deck"),
+      ) as { response: { metadata: unknown } };
+    h.channel().emit({
+      type: "response.done",
+      response: {
+        id: "resp_1",
+        status: "completed",
+        metadata: first.response.metadata,
+      },
+    });
+    await vi.advanceTimersByTimeAsync(5_000);
+    await settle();
+    expect(narration).toHaveBeenCalledTimes(4);
+    expect(narration.mock.calls.map(([after]) => after)).toEqual([0, 1, 1, 1]);
+    expect(said("Reading the deck")).toBe(1);
+    expect(said("Checking the numbers")).toBe(1);
+    finish();
+    await settle();
+  });
+
   it("does not speak a tool result the person talked over", async () => {
     let finish: (value: QVoiceDuplexToolResult) => void = () => undefined;
     const h = harness({

@@ -55,6 +55,32 @@ export function documentActsOf(turn: QTurn): readonly QDocumentActIntent[] {
   return out;
 }
 
+/** Words that name a document in an answer ("the certificate", "PDF"). */
+const DOCUMENT_WORDS =
+  /\b(?:documents?|pdfs?|certificates?|statements?|agreements?|articles|cap table|contracts?|memorandum|filings?|data room)\b/iu;
+
+/**
+ * R9: whether an answer names a document the person may open next: it
+ * opens one, shows a data room, acts on a document, or says so in words.
+ * Only a hint to warm the viewer early; it never opens anything.
+ */
+export function answerNamesDocument(turn: QTurn): boolean {
+  if (turn.kind !== "Q") return false;
+  for (const block of turn.blocks) {
+    if (block.kind !== "UI_INTENT") continue;
+    const intent = block.intent;
+    if (
+      (intent.kind === "OPEN_RECORD_PAGE" &&
+        intent.page === "DATA_ROOM_DOCUMENT") ||
+      (intent.kind === "SHOW_IN_Q_ROOM" && intent.object === "DATA_ROOM") ||
+      intent.kind === "DOCUMENT_ACT"
+    ) {
+      return true;
+    }
+  }
+  return DOCUMENT_WORDS.test(turn.text);
+}
+
 export type CitedLine = {
   readonly text: string;
   /** The pages the line cites, in its own order. */
