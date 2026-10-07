@@ -42,6 +42,33 @@ export {
 
 export { createPostgresArtifactRepository } from "./infrastructure/postgres-artifact-repository.js";
 
+// Q room W5 (R8): documents made by a job; pictures for documents.
+export {
+  DOCUMENT_JOB_ATTEMPTS_MAX,
+  DOCUMENT_JOB_KINDS,
+  DocumentJobInputSchema,
+  DocumentJobKindSchema,
+  jobActor,
+  type ClaimedDocumentJob,
+  type DocumentJobInput,
+  type DocumentJobKind,
+  type DocumentJobProgress,
+  type DocumentJobRepository,
+  type DocumentJobStatus,
+} from "./application/document-jobs.js";
+export { createPostgresDocumentJobRepository } from "./infrastructure/postgres-document-jobs.js";
+export {
+  AI_IMAGES_FEATURE,
+  createDocumentImages,
+  createSupabaseDocumentImageStore,
+  DOCUMENT_IMAGE_BUCKET,
+  type DocumentIllustrationPort,
+  type DocumentImageBudgets,
+  type DocumentImageGateway,
+  type DocumentImages,
+  type DocumentImageStore,
+} from "./infrastructure/document-images.js";
+
 // DOCS block: brand kit.
 export {
   BrandKitAlreadyAnsweredError,

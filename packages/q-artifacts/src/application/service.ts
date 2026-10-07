@@ -17,8 +17,18 @@ import {
   toDetail,
   toSummary,
   type StoredArtifact,
+  type StoredArtifactVersion,
 } from "../domain/artifact.js";
 import type { ArtifactRepository, ComposedArtifact } from "./ports.js";
+import {
+  DocumentJobInputSchema,
+  jobActor,
+  type ClaimedDocumentJob,
+  type DocumentJobInput,
+  type DocumentJobKind,
+  type DocumentJobProgress,
+  type DocumentJobRepository,
+} from "./document-jobs.js";
 
 /**
  * Preparing, reading and revising what Q composed (QX-003C-F; ADR 0013).
@@ -162,6 +172,61 @@ export type ArtifactService = {
     actor: ActorContext,
     artifactId: string,
   ) => Promise<QArtifactSummary>;
+
+  // --- Q room W5 (R8): documents made by a job, and edits -----------------
+
+  /**
+   * Start a document and queue its job, in one transaction: the artifact
+   * is PREPARING (no version yet) until the worker files the first one.
+   * Authorised exactly as preparing one is, under the run's own plan.
+   */
+  readonly requestDocument: (
+    input: PrepareArtifactInput & {
+      readonly kind: DocumentJobKind;
+      readonly job: Omit<DocumentJobInput, "title" | "summary" | "content">;
+    },
+  ) => Promise<QArtifactDetail>;
+  /** Where the person's document job has got to; null: none, or not theirs. */
+  readonly documentProgress: (
+    actor: ActorContext,
+    artifactId: string,
+  ) => Promise<DocumentJobProgress | null>;
+  /**
+   * The worker files a job's first version, as the person who asked
+   * (Q acting for them), into exactly the artifact the job names, and
+   * only while it is still PREPARING with no version.
+   */
+  readonly completeDocumentJob: (
+    job: ClaimedDocumentJob,
+    composed: ComposedArtifact,
+  ) => Promise<QArtifactDetail>;
+  /** The job could not finish: the artifact rests at FAILED, visibly. */
+  readonly failDocumentJob: (job: ClaimedDocumentJob) => Promise<void>;
+  /**
+   * An edit of one of their own documents (Q room W5): a new version
+   * composed from the version they were looking at. Append-only, never an
+   * overwrite. Idempotent: the same edit of the same base version returns
+   * the version it already made (replayed), and an edit of a version that
+   * is no longer current is refused (STALE) rather than silently applied
+   * to a document they have not seen.
+   */
+  readonly editOwnDocument: (input: {
+    readonly actorContext: ActorContext;
+    readonly artifactId: string;
+    readonly baseVersion: number;
+    /** Canonical, from the typed edit: what the history shows. */
+    readonly instruction: string;
+    readonly runId: string | null;
+    readonly compose: (
+      current: StoredArtifactVersion,
+    ) => Promise<ComposedArtifact | null> | ComposedArtifact | null;
+  }) => Promise<
+    | {
+        readonly status: "EDITED" | "REPLAYED";
+        readonly detail: QArtifactDetail;
+      }
+    | { readonly status: "STALE" | "NOT_EDITABLE" }
+  >;
 };
 
 /** How many times a losing race is retried before giving up. */
@@ -174,6 +239,8 @@ function sameSubject(a: QSubjectRef, b: QSubjectRef): boolean {
 export function createArtifactService(dependencies: {
   readonly repository: ArtifactRepository;
   readonly transactions: TransactionManager;
+  /** Q room W5: document jobs; absent, documents cannot be requested. */
+  readonly jobs?: DocumentJobRepository | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 }): ArtifactService {
@@ -255,7 +322,7 @@ export function createArtifactService(dependencies: {
     readonly artifact: StoredArtifact;
     readonly composed: ComposedArtifact;
     readonly instruction: string | null;
-    readonly runId: string;
+    readonly runId: string | null;
   }) => {
     let current = input.artifact.currentVersion;
     for (let attempt = 0; attempt < APPEND_ATTEMPTS; attempt += 1) {
@@ -420,6 +487,115 @@ export function createArtifactService(dependencies: {
         throw new ArtifactNotFoundError();
       }
       return detailOf(input.actorContext, settled);
+    },
+
+    requestDocument: async (input) => {
+      const jobs = dependencies.jobs;
+      if (jobs === undefined) throw new ArtifactCompositionFailedError();
+      const organisationId = authorise(input);
+      const subject = input.subject;
+      const jobInput = DocumentJobInputSchema.parse({
+        ...input.job,
+        title: input.content.title,
+        summary: input.content.summary,
+        content: parseContent(input.content.content),
+      });
+      const artifact = await transactions.run(async (tx) => {
+        const created = await repository.create(tx, {
+          tenantId: input.actorContext.tenantId,
+          organisationId,
+          type: input.artifactType,
+          companyId: subject?.kind === "COMPANY" ? subject.companyId : null,
+          investorOrganisationId:
+            subject?.kind === "INVESTOR_ORGANISATION"
+              ? subject.investorOrganisationId
+              : null,
+          createdByUserId: input.actorContext.userId,
+        });
+        await jobs.enqueue(tx, {
+          tenantId: input.actorContext.tenantId,
+          organisationId,
+          artifactId: created.id,
+          userId: input.actorContext.userId,
+          runId: input.qRunId,
+          kind: input.kind,
+          input: jobInput,
+        });
+        return created;
+      });
+      return detailOf(input.actorContext, artifact);
+    },
+
+    documentProgress: async (actor, artifactId) =>
+      dependencies.jobs === undefined
+        ? null
+        : dependencies.jobs.progress(actor, artifactId),
+
+    completeDocumentJob: async (job, composed) => {
+      const actor = jobActor(job);
+      const artifact = await repository.findById(actor, job.artifactId);
+      if (artifact === null) throw new ArtifactNotFoundError();
+      if (artifact.status !== "PREPARING" || artifact.currentVersion !== 0) {
+        throw new ArtifactNotRevisableError();
+      }
+      await append({
+        actor,
+        artifact,
+        composed,
+        instruction: null,
+        runId: job.runId,
+      });
+      const settled = await repository.findById(actor, job.artifactId);
+      if (settled === null) throw new ArtifactNotFoundError();
+      return detailOf(actor, settled);
+    },
+
+    failDocumentJob: async (job) => {
+      const artifact = await repository.findById(jobActor(job), job.artifactId);
+      if (artifact === null || artifact.status !== "PREPARING") return;
+      await transactions.run((tx) =>
+        repository.setStatus(tx, artifact.id, "FAILED"),
+      );
+    },
+
+    editOwnDocument: async (input) => {
+      const actor = input.actorContext;
+      if (actor.organisationId === undefined) {
+        throw new ArtifactAuthorityError();
+      }
+      const artifact = await repository.findById(actor, input.artifactId);
+      if (artifact === null) throw new ArtifactNotFoundError();
+      if (!canRevise(artifact)) return { status: "NOT_EDITABLE" };
+      if (artifact.currentVersion !== input.baseVersion) {
+        // The same edit of the same base, already made: hand it back.
+        const history = await repository.history(actor, artifact.id);
+        const made = history.find(
+          (entry) =>
+            entry.version === input.baseVersion + 1 &&
+            entry.instruction === input.instruction,
+        );
+        return made === undefined
+          ? { status: "STALE" }
+          : { status: "REPLAYED", detail: await detailOf(actor, artifact) };
+      }
+      const current = await repository.findVersion(
+        actor,
+        artifact.id,
+        artifact.currentVersion,
+      );
+      if (current === null) return { status: "NOT_EDITABLE" };
+      const composed = await input.compose(current);
+      if (composed === null) return { status: "NOT_EDITABLE" };
+      await append({
+        actor,
+        artifact,
+        composed,
+        instruction: input.instruction,
+        runId: input.runId,
+      });
+      const settled = await repository.findById(actor, input.artifactId);
+      if (settled === null) throw new ArtifactNotFoundError();
+      return { status: "EDITED", detail: await detailOf(actor, settled) };
     },
 
     read: async (actor, artifactId) => {
