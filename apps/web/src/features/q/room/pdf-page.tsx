@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { isNetworkFailure } from "@/pwa/resilient";
+
+import { roomRead, useRetryWhenOnline } from "./room-read";
 
 /**
  * One page of a PDF, drawn on a canvas (Q room W3). The bytes come from
  * the short-lived signed URL the data room issued for this person: browser
  * <-> storage, never through the app. PDF.js loads only when a document
- * opens, on this thread ("fake worker", as the etiquette reader does), and
+ * opens or an answer names one (R9), on this thread ("fake worker", as the etiquette reader does), and
  * never evaluates code from the file. The page's own text comes back for
  * the read-aloud highlight. A file PDF.js cannot read falls back to the
  * browser's viewer at the same page.
@@ -18,49 +22,115 @@ type PdfDocument = Awaited<ReturnType<PdfModule["getDocument"]>["promise"]>;
 // The legacy build: the modern one draws with Map.getOrInsertComputed,
 // which current Chrome and Safari releases do not have yet (a page loaded
 // but never drew, Q room W3 e2e on Chromium 141).
-async function pdfjs(): Promise<PdfModule> {
-  await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs");
-  return import("pdfjs-dist/legacy/build/pdf.mjs");
+// R9: one load per tab, started as early as a document is in view (an
+// answer naming one, or the signed read starting) and shared by every
+// viewer; a failed load (a dropped connection) is forgotten, so the next
+// open tries again instead of reusing the failure.
+let loading: Promise<PdfModule> | null = null;
+
+function pdfjs(): Promise<PdfModule> {
+  loading ??= import("pdfjs-dist/legacy/build/pdf.worker.min.mjs")
+    .then(() => import("pdfjs-dist/legacy/build/pdf.mjs"))
+    .catch((error: unknown) => {
+      loading = null;
+      throw error;
+    });
+  return loading;
+}
+
+/** Warm PDF.js and its worker module ahead of a document opening. */
+export function preloadPdfjs(): void {
+  void pdfjs().catch(() => undefined);
 }
 
 export type PdfState =
   | { readonly kind: "loading" }
   | { readonly kind: "ready"; readonly document: PdfDocument }
-  | { readonly kind: "failed" };
+  /** The file is there but PDF.js can't read it: the browser's viewer. */
+  | { readonly kind: "failed" }
+  /** R9: the network failed twice: "Couldn't load — try again". */
+  | { readonly kind: "unreachable" };
 
-/** The document behind a signed URL, loaded once per URL. */
-export function usePdfDocument(url: string): PdfState {
+/** pdf.js names for "the file never arrived", as against "unreadable". */
+const UNREACHED = new Set([
+  "ResponseException",
+  "UnexpectedResponseException",
+  "MissingPDFException",
+  "ReadTimeoutError",
+]);
+
+function unreachable(error: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return true;
+  }
+  if (!(error instanceof Error)) return false;
+  return UNREACHED.has(error.name) || isNetworkFailure(error);
+}
+
+/**
+ * The document behind a signed URL, loaded once per URL. Only the bytes
+ * the first page needs are fetched before it draws (range reads, no
+ * auto-fetch of the rest). R9: one retry; a network failure ends in
+ * "unreachable" with `retry`, a file PDF.js can't read in "failed".
+ */
+export function usePdfDocument(url: string): {
+  readonly state: PdfState;
+  readonly retry: () => void;
+} {
   const [state, setState] = useState<{
     readonly url: string;
+    readonly tries: number;
     readonly state: PdfState;
-  }>({ url, state: { kind: "loading" } });
+  }>({ url, tries: 0, state: { kind: "loading" } });
+  const [tries, setTries] = useState(0);
   useEffect(() => {
     let live = true;
     let destroy: (() => Promise<void>) | null = null;
-    void pdfjs()
-      .then((lib) => {
+    roomRead(
+      async () => {
+        const lib = await pdfjs();
+        await destroy?.();
         const task = lib.getDocument({
           url,
           enableXfa: false,
           verbosity: 0,
           // The signed URL is the whole authorisation; nothing else rides.
           withCredentials: false,
+          // First page first: read ranges as pages need them.
+          disableAutoFetch: true,
+          rangeChunkSize: 65_536,
         });
         destroy = () => task.destroy();
         return task.promise;
-      })
-      .then((document) => {
-        if (live) setState({ url, state: { kind: "ready", document } });
-      })
-      .catch(() => {
-        if (live) setState({ url, state: { kind: "failed" } });
-      });
+      },
+      { timeoutMs: 45_000 },
+    ).then(
+      (document) => {
+        if (live) {
+          setState({ url, tries, state: { kind: "ready", document } });
+        }
+      },
+      (error: unknown) => {
+        if (!live) return;
+        setState({
+          url,
+          tries,
+          state: { kind: unreachable(error) ? "unreachable" : "failed" },
+        });
+      },
+    );
     return () => {
       live = false;
       void destroy?.();
     };
-  }, [url]);
-  return state.url === url ? state.state : { kind: "loading" };
+  }, [url, tries]);
+  const retry = useCallback(() => setTries((n) => n + 1), []);
+  const now: PdfState =
+    state.url === url && state.tries === tries
+      ? state.state
+      : { kind: "loading" };
+  useRetryWhenOnline(now.kind === "unreachable", retry);
+  return { state: now, retry };
 }
 
 export function PdfPage({

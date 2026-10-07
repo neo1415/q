@@ -25,6 +25,7 @@ import {
   type CitedLine,
 } from "./document-room";
 import { PdfPage, usePdfDocument } from "./pdf-page";
+import { RoomLoadFailed } from "./room-load-failed";
 
 /**
  * Q room W3 (R3, design scene 2): the data-room document Q opened, in the
@@ -37,6 +38,8 @@ import { PdfPage, usePdfDocument } from "./pdf-page";
 export function QRoomDocument({
   title,
   file,
+  failed = false,
+  onRetry = () => undefined,
   page,
   pageCount,
   reading,
@@ -49,6 +52,9 @@ export function QRoomDocument({
 }: {
   readonly title: string;
   readonly file: OpenedFile | null;
+  /** R9: the signed read failed twice; offer "try again". */
+  readonly failed?: boolean | undefined;
+  readonly onRetry?: (() => void) | undefined;
   readonly page: number;
   readonly pageCount: number | null;
   readonly reading: boolean;
@@ -199,7 +205,11 @@ export function QRoomDocument({
 
       <div className="flex min-h-0 flex-col max-sm:flex-col-reverse sm:flex-row">
         <div className="relative max-h-[62dvh] min-h-[40dvh] min-w-0 flex-1 overflow-auto bg-(--cq-surface-subtle) p-3">
-          {file === null ? (
+          {file === null && failed ? (
+            <div className="mx-auto flex h-[50dvh] w-full max-w-[36rem] items-center justify-center rounded bg-(--cq-surface)">
+              <RoomLoadFailed onRetry={onRetry} className="items-center" />
+            </div>
+          ) : file === null ? (
             <div
               className="mx-auto h-[50dvh] w-full max-w-[36rem] rounded bg-(--cq-surface)"
               aria-busy="true"
@@ -298,11 +308,18 @@ function DocumentPage({
   readonly onPageCount: (count: number) => void;
   readonly onText: (page: number, text: string) => void;
 }) {
-  const pdf = usePdfDocument(file.url);
+  const { state: pdf, retry } = usePdfDocument(file.url);
   const count = pdf.kind === "ready" ? pdf.document.numPages : null;
   useEffect(() => {
     if (count !== null) onPageCount(count);
   }, [count, onPageCount]);
+  if (pdf.kind === "unreachable") {
+    return (
+      <div className="mx-auto flex h-[50dvh] w-full max-w-[36rem] items-center justify-center rounded bg-(--cq-surface)">
+        <RoomLoadFailed onRetry={retry} className="items-center" />
+      </div>
+    );
+  }
   if (pdf.kind === "loading") {
     return (
       <div

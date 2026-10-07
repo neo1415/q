@@ -117,7 +117,10 @@ const DECK_LOADERS: DeckLoaders = {
       `/dev/q-room/slides?id=${artifactId}&version=${String(version)}`,
       { cache: "no-store" },
     );
-    return response.ok ? deckDrawingOf(await response.json()) : null;
+    if (response.status === 409) return null;
+    // As the real read: a failed read throws, so the room retries it.
+    if (!response.ok) throw new Error("Slides read failed.");
+    return deckDrawingOf(await response.json());
   },
   upload: async (file) => {
     const response = await fetch("/dev/q-room/upload", {

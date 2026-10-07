@@ -20,6 +20,7 @@ import {
 } from "./client-actions";
 import type { QTurn } from "./conversation";
 import {
+  answerNamesDocument,
   citedLines,
   documentActsOf,
   documentPosition,
@@ -28,7 +29,9 @@ import {
   type CitedLine,
 } from "./room/document-room";
 import { setRoomDocumentOpen, useRoomDocumentHost } from "./room/document-host";
+import { preloadPdfjs } from "./room/pdf-page";
 import { QRoomDocument } from "./room/q-room-document";
+import { roomRead, useRetryWhenOnline, whenIdle } from "./room/room-read";
 import { setMaterialDocument } from "./screen";
 
 type Opened = QMaterialDocumentRef & {
@@ -43,6 +46,8 @@ type Opened = QMaterialDocumentRef & {
   /** When they pressed Stop on the reading, in turns. */
   readonly stoppedAt: number | null;
   readonly pageCount: number | null;
+  /** R9: the signed read failed twice; the panel offers "try again". */
+  readonly failed: boolean;
 };
 
 /** Where each document was left, for this tab: it reopens at that page. */
@@ -122,6 +127,30 @@ export function QMaterialViewer({
     applied.current = new Set(turns.map((turn) => turn.id));
   }
 
+  // The signed read (R9: one retry, then "Couldn't load — try again"), with
+  // PDF.js fetched alongside it rather than after it.
+  const read = useCallback(
+    (ref: QMaterialDocumentRef) => {
+      if (host !== null) preloadPdfjs();
+      roomRead(() => openFile(ref.companyId, ref.documentId)).then(
+        (result) =>
+          setOpened((current) =>
+            current?.documentId !== ref.documentId
+              ? current
+              : result.ok
+                ? { ...current, file: result.value, failed: false }
+                : null,
+          ),
+        () =>
+          setOpened((current) =>
+            current?.documentId !== ref.documentId
+              ? current
+              : { ...current, failed: true },
+          ),
+      );
+    },
+    [openFile, host],
+  );
   const open = useCallback(
     (ref: QMaterialDocumentRef, at: number) => {
       const id = ref.documentId.toLowerCase();
@@ -136,6 +165,7 @@ export function QMaterialViewer({
         manual: null,
         stoppedAt: null,
         pageCount: null,
+        failed: false,
       });
       setClosed((current) =>
         current.filter((one) => one.documentId.toLowerCase() !== id),
@@ -144,17 +174,9 @@ export function QMaterialViewer({
       for (const turn of turnsRef.current.slice(at)) {
         applied.current?.delete(turn.id);
       }
-      void openFile(ref.companyId, ref.documentId).then((result) =>
-        setOpened((current) =>
-          current?.documentId !== ref.documentId
-            ? current
-            : result.ok
-              ? { ...current, file: result.value }
-              : null,
-        ),
-      );
+      read(ref);
     },
-    [openFile],
+    [read],
   );
 
   // Closing remembers the page and keeps it to reopen when the subject
@@ -194,6 +216,13 @@ export function QMaterialViewer({
     () => closeNow(openedRef.current.opened, openedRef.current.page),
     [closeNow],
   );
+  const retryRead = useCallback(() => {
+    const current = openedRef.current.opened;
+    if (current === null) return;
+    setOpened({ ...current, failed: false });
+    read(current);
+  }, [read]);
+  useRetryWhenOnline(opened?.failed === true, retryRead);
 
   useEffect(() => {
     const onOpen = (event: Event) => {
@@ -237,6 +266,18 @@ export function QMaterialViewer({
       }
     }
   }, [turns, opened, download]);
+
+  // R9: an answer that names a document warms PDF.js while the room is
+  // idle, so opening it next draws the first page without that wait.
+  const latestQ = turns.findLast((turn) => turn.kind === "Q");
+  const namesDocument =
+    host !== null &&
+    latestQ !== undefined &&
+    !latestQ.streaming &&
+    answerNamesDocument(latestQ);
+  useEffect(() => {
+    if (namesDocument) return whenIdle(preloadPdfjs);
+  }, [namesDocument]);
 
   // The subject comes back: the document reopens where it was left.
   const lastPerson = turns.findLast(
@@ -319,6 +360,8 @@ export function QMaterialViewer({
       <QRoomDocument
         title={opened.title ?? "Document"}
         file={opened.file}
+        failed={opened.failed}
+        onRetry={retryRead}
         page={page}
         pageCount={opened.pageCount}
         reading={position?.reading === true}

@@ -34,6 +34,13 @@ import {
   type DeckPlaceholder,
 } from "./deck-room";
 import { documentPosition } from "./document-room";
+import { RoomLoadFailed } from "./room-load-failed";
+import {
+  roomRead,
+  UPLOAD_DROPPED,
+  uploadResuming,
+  useRetryWhenOnline,
+} from "./room-read";
 
 /**
  * Q room W5 (R8): a document Q made, as a DECK surface in the room.
@@ -53,7 +60,10 @@ export type DeckLoaders = {
     artifactId: string,
     version: number,
   ) => Promise<DeckDrawing | null>;
-  /** Their file into their data room (the ordinary upload path). */
+  /**
+   * Their file into their data room (the ordinary upload path): the new
+   * document's id, null when refused; throws when the connection drops.
+   */
   readonly upload: (
     file: File,
     companyId: string | null,
@@ -66,20 +76,24 @@ export type DeckLoaders = {
   }) => Promise<FillResult>;
 };
 
+/**
+ * The deck's drawing; null when the document has no slides (an answer).
+ * R9: anything else that goes wrong throws, so the room retries once and
+ * then offers "try again" instead of calling the deck slide-less.
+ */
 async function fetchSlides(
   artifactId: string,
   version: number,
 ): Promise<DeckDrawing | null> {
-  try {
-    const response = await fetch(
-      `/api/q-artifact/${encodeURIComponent(artifactId)}/slides?version=${String(version)}`,
-      { cache: "no-store" },
-    );
-    if (!response.ok) return null;
-    return deckDrawingOf(await response.json());
-  } catch {
-    return null;
+  const response = await fetch(
+    `/api/q-artifact/${encodeURIComponent(artifactId)}/slides?version=${String(version)}`,
+    { cache: "no-store" },
+  );
+  if (response.status === 409 || response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Slides read failed (${String(response.status)}).`);
   }
+  return deckDrawingOf(await response.json());
 }
 
 async function uploadToDataRoom(
@@ -94,12 +108,14 @@ async function uploadToDataRoom(
     sizeBytes: file.size,
   });
   if (!target.ok) return null;
+  // R9: a dropped connection throws (the caller resumes once back
+  // online); a refused upload is null.
   const put = await fetch(target.value.url, {
     method: target.value.method,
     headers: target.value.headers,
     body: file,
-  }).catch(() => null);
-  if (put === null || !put.ok) return null;
+  });
+  if (!put.ok) return null;
   const done = await materialUploadCompleteAction(target.value.uploadSessionId);
   return done.ok ? done.value.documentId : null;
 }
@@ -132,6 +148,14 @@ export function QRoomDeck({
   const [drawing, setDrawing] = useState<{
     readonly version: number;
     readonly drawn: DeckDrawing | null;
+    readonly failed: boolean;
+  } | null>(null);
+  const [readFailed, setReadFailed] = useState(false);
+  const [slideTries, setSlideTries] = useState(0);
+  /** R9: a file whose upload the connection dropped, to try again. */
+  const [unsent, setUnsent] = useState<{
+    readonly file: File;
+    readonly slide: number | null;
   } | null>(null);
   const [manual, setManual] = useState<{
     readonly page: number;
@@ -150,11 +174,19 @@ export function QRoomDeck({
 
   // Read the document: on open, when the conversation filed a version of
   // it, after a drop, and every few seconds while it is being made.
+  // R9: each read retries once, then the surface offers "try again".
   useEffect(() => {
     let live = true;
-    void loaders.read(artifactId).then((next) => {
-      if (live) setState(next);
-    });
+    roomRead(() => loaders.read(artifactId)).then(
+      (next) => {
+        if (!live) return;
+        setReadFailed(false);
+        setState(next);
+      },
+      () => {
+        if (live) setReadFailed(true);
+      },
+    );
     return () => {
       live = false;
     };
@@ -167,16 +199,45 @@ export function QRoomDeck({
   useEffect(() => {
     if (version === null) return;
     let live = true;
-    void loaders.slides(artifactId, version).then((drawn) => {
-      if (live) setDrawing({ version, drawn });
-    });
+    roomRead(() => loaders.slides(artifactId, version)).then(
+      (drawn) => {
+        if (live) setDrawing({ version, drawn, failed: false });
+      },
+      () => {
+        if (live) setDrawing({ version, drawn: null, failed: true });
+      },
+    );
     return () => {
       live = false;
     };
-  }, [artifactId, version, loaders]);
+  }, [artifactId, version, loaders, slideTries]);
 
-  const drawn =
-    drawing !== null && drawing.version === version ? drawing.drawn : null;
+  const drawingNow =
+    drawing !== null && drawing.version === version ? drawing : null;
+  const drawn = drawingNow?.drawn ?? null;
+  const slidesFailed = drawingNow?.failed === true;
+  // Not read yet, or a read that failed while it was being made.
+  const failed =
+    readFailed && (state === null || status === "PREPARING");
+  const retry = useCallback(() => {
+    if (slidesFailed) {
+      setDrawing(null);
+      setSlideTries((n) => n + 1);
+    }
+    if (readFailed) {
+      setReadFailed(false);
+      setReads((n) => n + 1);
+    }
+  }, [slidesFailed, readFailed]);
+  useRetryWhenOnline(failed || slidesFailed, retry);
+  // Each slide drawn once as an image URL, not on every render (R9).
+  const pictures = useMemo(
+    () =>
+      (drawn?.slides ?? []).map(
+        (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+      ),
+    [drawn],
+  );
   const count = drawn?.slides.length ?? 0;
   const position = documentPosition(
     turns,
@@ -208,8 +269,19 @@ export function QRoomDeck({
     async (file: File, slide: number | null) => {
       if (state?.ok !== true) return;
       setBusy(true);
+      setUnsent(null);
       setNotice(`Uploading ${file.name}…`);
-      const documentId = await loaders.upload(file, state.companyId);
+      const documentId = await uploadResuming(
+        () => loaders.upload(file, state.companyId),
+        () => setNotice("Connection lost. The upload resumes when you're back online."),
+      );
+      if (documentId === UPLOAD_DROPPED) {
+        // R9: never a silent hang: say so, keep the file, offer a retry.
+        setNotice(`${file.name} didn't upload: the connection dropped.`);
+        setUnsent({ file, slide });
+        setBusy(false);
+        return;
+      }
       if (documentId === null) {
         setNotice("That file couldn't be uploaded. Try again.");
         setBusy(false);
@@ -225,12 +297,16 @@ export function QRoomDeck({
         return;
       }
       for (let attempt = 0; attempt < FILL_TRIES; attempt += 1) {
-        const filled = await loaders.fill({
-          artifactId,
-          version,
-          slide: slide + 1,
-          documentId,
-        });
+        const filled = await loaders
+          .fill({ artifactId, version, slide: slide + 1, documentId })
+          .catch(
+            (): FillResult => ({
+              ok: false,
+              retry: false,
+              message:
+                "Your file is in your data room, but it couldn't be placed: the connection dropped. Ask Q to place it.",
+            }),
+          );
         if (filled.ok) {
           setNotice(`Placed on slide ${String(slide + 1)}.`);
           setManual({ page: slide + 1, at: turns.length });
@@ -252,6 +328,13 @@ export function QRoomDeck({
     input.current?.click();
   };
 
+  if (failed) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-(--cq-radius-md) bg-(--cq-surface-subtle)">
+        <RoomLoadFailed onRetry={retry} className="items-center" />
+      </div>
+    );
+  }
   if (state === null) {
     return (
       <div className="flex flex-col gap-2" aria-busy="true" data-q-room-loading>
@@ -286,7 +369,23 @@ export function QRoomDeck({
     );
   }
 
-  const slideSvg = drawn?.slides[index];
+  if (slidesFailed) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-(--cq-radius-md) bg-(--cq-surface-subtle)">
+        <RoomLoadFailed onRetry={retry} className="items-center" />
+      </div>
+    );
+  }
+  // Read, being drawn: the slide's shape holds until its picture lands.
+  if (drawingNow === null && version !== null) {
+    return (
+      <div className="flex flex-col gap-2" aria-busy="true" data-q-room-loading>
+        <div className="aspect-video w-full rounded-(--cq-radius-md) bg-(--cq-surface-subtle)" />
+      </div>
+    );
+  }
+
+  const slidePicture = pictures[index];
   const here = placeholders.filter((box) => box.slide === index);
   const target = uploadTarget(placeholders, index);
   const isDeck = state.type === "PITCH_DECK" || count > 0;
@@ -374,11 +473,14 @@ export function QRoomDeck({
             className="relative aspect-video w-full overflow-hidden rounded-(--cq-radius-md) border border-(--cq-border-subtle)"
             data-q-deck-slide={page}
           >
-            {slideSvg === undefined ? null : (
+            {slidePicture === undefined ? null : (
               // eslint-disable-next-line @next/next/no-img-element -- an SVG the Q API drew; an optimiser would proxy it
               <img
-                src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(slideSvg)}`}
+                src={slidePicture}
                 alt={`Slide ${String(page)} of ${title}`}
+                width={960}
+                height={540}
+                decoding="async"
                 className="size-full"
               />
             )}
@@ -417,7 +519,7 @@ export function QRoomDeck({
             aria-label="Slides"
             data-q-deck-thumbs
           >
-            {(drawn?.slides ?? []).map((svg, at) => {
+            {pictures.map((picture, at) => {
               const toFill = placeholders.some((box) => box.slide === at);
               return (
                 <li key={`thumb-${String(at)}`}>
@@ -434,10 +536,16 @@ export function QRoomDeck({
                     data-q-deck-thumb={at + 1}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element -- an SVG the Q API drew */}
+                    {/* R9: tile-sized, decoded off the critical path, and
+                        the ones scrolled out of the strip only when near. */}
                     <img
-                      src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
+                      src={picture}
                       alt=""
-                      className="block aspect-video w-full"
+                      width={160}
+                      height={90}
+                      decoding="async"
+                      loading={at < 4 ? "eager" : "lazy"}
+                      className="block aspect-video h-auto w-full"
                     />
                     {toFill ? (
                       <span className="cq-caption absolute top-1 right-1 rounded-sm bg-(--cq-surface-raised) px-1 text-(--cq-text-primary)">
@@ -460,6 +568,17 @@ export function QRoomDeck({
         >
           {notice ?? ""}
         </p>
+        {unsent === null ? null : (
+          <button
+            type="button"
+            className="cq-stage-quiet min-h-11"
+            onClick={() => void place(unsent.file, unsent.slide)}
+            disabled={busy}
+            data-q-deck-upload-retry
+          >
+            Try again
+          </button>
+        )}
         <button
           type="button"
           className="cq-stage-primary min-h-12 w-full justify-center rounded-full px-5 shadow-(--cq-shadow-overlay) md:w-auto"
