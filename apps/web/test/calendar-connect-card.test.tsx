@@ -8,11 +8,19 @@ const connect = vi.fn((_returnTo: unknown) =>
   Promise.resolve({ ok: true as const, value: "https://accounts.example/o" }),
 );
 
+const refresh = vi.fn();
+let status = "NOT_CONNECTED";
+const readConnection = vi.fn(() =>
+  Promise.resolve({ ok: true as const, value: { status } }),
+);
+
 vi.mock("next/navigation", () => ({
   usePathname: () => "/home",
+  useRouter: () => ({ refresh }),
 }));
 vi.mock("../src/features/integrations/integration-actions", () => ({
   connectGoogleCalendar: (returnTo: unknown) => connect(returnTo),
+  readGmailConnection: () => readConnection(),
 }));
 
 const { CalendarConnectCard } =
@@ -35,7 +43,11 @@ const INTENT = {
 afterEach(cleanup);
 
 describe("the calendar connect card (Q room R5)", () => {
-  it("shows the suggested times as not checked, and connects back to this page", async () => {
+  it("shows the suggested times as not checked; a blocked window falls back to this tab, back to this page", async () => {
+    vi.stubGlobal(
+      "open",
+      vi.fn(() => null),
+    );
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });
     render(<CalendarConnectCard intent={INTENT} />);
@@ -48,6 +60,77 @@ describe("the calendar connect card (Q room R5)", () => {
       expect(assign).toHaveBeenCalledWith("https://accounts.example/o");
     });
     expect(connect).toHaveBeenCalledWith("/home");
+    vi.unstubAllGlobals();
+  });
+
+  it("opens Google in a small window, the room stays, and shows the calendar connected when it finishes (W4b)", async () => {
+    const popup = { location: { href: "" }, closed: false, close: vi.fn() };
+    const open = vi.fn(() => popup);
+    vi.stubGlobal("open", open);
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    status = "NOT_CONNECTED";
+    refresh.mockClear();
+    render(<CalendarConnectCard intent={INTENT} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Connect Google Calendar" }),
+    );
+    await vi.waitFor(() => {
+      expect(popup.location.href).toBe("https://accounts.example/o");
+    });
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(connect).toHaveBeenLastCalledWith("/connected/google");
+    expect(assign).not.toHaveBeenCalled();
+    // A message from anywhere else is not the window's.
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: "https://elsewhere.example",
+        data: { type: "cq.google.connect", outcome: "connected" },
+      }),
+    );
+    expect(readConnection).not.toHaveBeenCalled();
+    // The window finishes; the server says the calendar is connected.
+    status = "CONNECTED";
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: window.location.origin,
+        data: { type: "cq.google.connect", outcome: "connected" },
+      }),
+    );
+    await vi.waitFor(() => {
+      expect(screen.getByText("Google Calendar connected")).toBeTruthy();
+    });
+    expect(refresh).toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("believes the server, not the window: a 'connected' word without a connection is not shown as connected", async () => {
+    const popup = { location: { href: "" }, closed: false, close: vi.fn() };
+    vi.stubGlobal(
+      "open",
+      vi.fn(() => popup),
+    );
+    status = "NOT_CONNECTED";
+    render(<CalendarConnectCard intent={INTENT} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Connect Google Calendar" }),
+    );
+    await vi.waitFor(() => {
+      expect(popup.location.href).not.toBe("");
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: window.location.origin,
+        data: { type: "cq.google.connect", outcome: "connected" },
+      }),
+    );
+    await vi.waitFor(() => {
+      expect(
+        screen.getByText("Google Calendar isn't connected yet. Try again."),
+      ).toBeTruthy();
+    });
+    expect(screen.queryByText("Google Calendar connected")).toBeNull();
     vi.unstubAllGlobals();
   });
 
