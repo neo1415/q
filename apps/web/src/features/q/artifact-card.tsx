@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
-import { qArtifactExportFormats } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
   CircleAlert,
@@ -18,6 +17,7 @@ import { QSwarm } from "@/features/q-swarm/q-swarm";
 import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactDownloads } from "./artifact-download";
 import type { QTurnObjectBlock } from "./conversation";
+import { qArtifactExportFormats } from "./wire-constants";
 
 /**
  * Something Q composed, as a card (QX-003E; R36).

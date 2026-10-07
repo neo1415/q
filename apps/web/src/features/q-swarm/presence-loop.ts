@@ -29,6 +29,11 @@ import { presenceUniforms, stepLean, type Lean } from "./presence-uniforms";
 export const PRESENCE_FPS = 30;
 /** A frame comes at most this often (a little under 1/30 s, for jitter). */
 export const PRESENCE_FRAME_MS = 1000 / PRESENCE_FPS - 2;
+/**
+ * Work per frame read as a 60 fps interval for the budget: past about
+ * 8.4 ms of work (18.4 ms, the budget's slow line) a frame counts as slow.
+ */
+const WORK_TO_INTERVAL = 2.2;
 
 export type PresenceInputs = {
   readonly state: QApertureState;
@@ -208,11 +213,18 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
       const before = budget.level;
       // The budget reads intervals against a 60 fps frame; at the cap a
       // frame is due every 1/PRESENCE_FPS s, so the interval is scaled to
-      // match: only a frame later than the cap counts as slow.
+      // match: a frame later than the cap counts as slow. So does a frame
+      // whose own work is more than a quarter of the cap's frame (about
+      // 8 ms): the cap keeps such a device on time, but the swarm would
+      // still take a quarter of its main thread, so it steps down too.
+      const work = host.now() - began;
       budget = stepBudget(
         budget,
-        interval * ((FRAME_BUDGET_MS * PRESENCE_FPS) / 1000),
-        host.now() - began,
+        Math.max(
+          interval * ((FRAME_BUDGET_MS * PRESENCE_FPS) / 1000),
+          work * WORK_TO_INTERVAL,
+        ),
+        work,
       );
       if (budget.level !== before) fit(budgetSettings(budget).dprScale);
     }

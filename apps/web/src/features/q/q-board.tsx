@@ -11,7 +11,7 @@ import { ViewTransition } from "@/components/view-transition";
 
 import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactCard } from "./artifact-card";
-import { slideSource } from "./artifact-viewer";
+import { slideSource } from "./slide-source";
 import { arrangeBoard, boardObjects, type BoardObject } from "./board";
 import type { QTurn } from "./conversation";
 import { plainFromMarkdown } from "./markdown";

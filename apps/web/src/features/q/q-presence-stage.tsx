@@ -26,8 +26,12 @@ import {
 import type { PdfExport } from "./room/pdf-offer";
 import type { RoomCardLoader } from "./room/q-room-card";
 import type { DeckLoaders } from "./room/q-room-deck";
+import { whenIdle } from "./room/room-read";
 import { roomStage } from "./room/room-stage";
-import { useWire } from "./wire";
+import { useWire } from "./use-wire";
+
+/** W7: how long after the stage mounts its likely next code is fetched. */
+const PREFETCH_AFTER_MS = 2_500;
 import {
   answersIn,
   onStage,
@@ -267,6 +271,23 @@ export function QPresenceStage({
     setRoomShown(true);
   }
   const answered = latestQ !== undefined;
+
+  // W7: once the page has settled, what Q is likely to show first (a room
+  // card, an answer's cards) is fetched quietly, so the first one shown
+  // does not wait for its code. Never during the first paint.
+  useEffect(() => {
+    let cancel: (() => void) | null = null;
+    const timer = window.setTimeout(() => {
+      cancel = whenIdle(() => {
+        void import("./room/q-room-card");
+        void import("./stage-canvas");
+      }, 5_000);
+    }, PREFETCH_AFTER_MS);
+    return () => {
+      window.clearTimeout(timer);
+      cancel?.();
+    };
+  }, []);
 
   return (
     <div

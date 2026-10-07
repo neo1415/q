@@ -38,7 +38,7 @@ import { setRoomDocumentOpen, useRoomDocumentHost } from "./room/document-host";
 import { preloadPdfjs } from "./room/pdf-page";
 import { roomRead, useRetryWhenOnline, whenIdle } from "./room/room-read";
 import { setMaterialDocument } from "./screen";
-import { useWire } from "./wire";
+import { useWire } from "./use-wire";
 
 type Opened = QMaterialDocumentRef & {
   readonly file: OpenedFile | null;

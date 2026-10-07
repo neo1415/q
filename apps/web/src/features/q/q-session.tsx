@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { useWire } from "./wire";
+import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
 
 import { apertureStateFor, type QApertureState } from "../q-aperture";

@@ -6,10 +6,33 @@
  * a change there fails the suite rather than drifting.
  */
 
-import type { QConversationId } from "@capital-q/contracts";
+import type {
+  QArtifactExportFormat,
+  QConfidenceLevel,
+  QConversationId,
+} from "@capital-q/contracts";
 
 /** GOOGLE_RECONNECT_PATH (http/integrations). */
 export const GOOGLE_RECONNECT_PATH = "/settings/reconnect/google" as const;
+
+/** Q_SPEECH_MAX_CHARS (q/voice): the most of an answer read aloud. */
+export const Q_SPEECH_MAX_CHARS = 600;
+
+/** Q_CONFIDENCE_LABELS (q/confidence): a finding's confidence, in words. */
+export const Q_CONFIDENCE_LABELS: Readonly<Record<QConfidenceLevel, string>> = {
+  HIGH: "High confidence",
+  MODERATE: "Moderate confidence",
+  LOW: "Low confidence",
+  INSUFFICIENT_EVIDENCE: "Insufficient evidence",
+  CONFLICTING_EVIDENCE: "Conflicting evidence",
+};
+
+/** qArtifactExportFormats (q/artifact): what a card offers for a type. */
+export function qArtifactExportFormats(
+  type: string,
+): readonly QArtifactExportFormat[] {
+  return type === "PITCH_DECK" ? ["pdf", "pptx"] : ["pdf"];
+}
 
 /** The page manifest's bounds (q/screen-manifest). */
 export const Q_MANIFEST_SECTIONS_MAX = 12;

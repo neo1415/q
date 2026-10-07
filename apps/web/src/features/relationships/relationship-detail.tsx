@@ -24,7 +24,7 @@ import {
 
 import { PageContainer } from "@/components/app-shell/page-container";
 import { RelationshipMail } from "@/features/integrations/relationship-mail";
-import { DockAvoidZone } from "@/features/q-dock";
+import { DockAvoidZone } from "@/features/q-dock/dock-avoid-zone";
 import { EntityAvatar, EntityCover } from "@/features/entity/entity-avatar";
 import { JoinCallForm } from "@/features/schedule/join-call-form";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";

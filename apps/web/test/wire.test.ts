@@ -13,10 +13,13 @@ import {
   conversationIdOf,
   GOOGLE_RECONNECT_PATH,
   isUuid,
+  qArtifactExportFormats,
+  Q_CONFIDENCE_LABELS,
   Q_MANIFEST_DIALOGS_MAX,
   Q_MANIFEST_DIALOG_REFS_MAX,
   Q_MANIFEST_SECTIONS_MAX,
   Q_MANIFEST_SECTION_REFS_MAX,
+  Q_SPEECH_MAX_CHARS,
   Q_VOICE_LISTENING_DEFAULT,
   Q_VOICE_LISTENING_LEVELS,
 } from "../src/features/q/wire-constants";
@@ -95,6 +98,13 @@ describe("the wire's contracts, off the first paint (W7)", () => {
 
   it("keeps each copied value equal to its contract", () => {
     expect(GOOGLE_RECONNECT_PATH).toBe(contracts.GOOGLE_RECONNECT_PATH);
+    expect(Q_SPEECH_MAX_CHARS).toBe(contracts.Q_SPEECH_MAX_CHARS);
+    expect(Q_CONFIDENCE_LABELS).toEqual(contracts.Q_CONFIDENCE_LABELS);
+    for (const type of [...contracts.Q_ARTIFACT_TYPES, "UNKNOWN_TYPE"]) {
+      expect(qArtifactExportFormats(type), type).toEqual(
+        contracts.qArtifactExportFormats(type),
+      );
+    }
     expect(Q_MANIFEST_SECTIONS_MAX).toBe(contracts.Q_MANIFEST_SECTIONS_MAX);
     expect(Q_MANIFEST_SECTION_REFS_MAX).toBe(
       contracts.Q_MANIFEST_SECTION_REFS_MAX,

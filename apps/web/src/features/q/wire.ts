@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from "react";
-
 /**
  * Q room W7: the wire's contracts (wire-contracts.ts) off the critical
  * path. Zod and the schemas were a quarter of the room's first-load
@@ -11,6 +9,7 @@ import { useSyncExternalStore } from "react";
  * where it is not and fails closed while it is null -- a card not shown
  * yet, an action not taken yet -- with `useWire()` re-rendering once the
  * contracts are in, so nothing is lost, only checked a moment later.
+ * (The hook is in use-wire.ts: this module is also read on the server.)
  */
 
 export type WireContracts = typeof import("./wire-contracts");
@@ -40,16 +39,12 @@ export function wireNow(): WireContracts | null {
   return loaded;
 }
 
-function subscribe(listener: () => void): () => void {
+/** For useWire (use-wire.ts): told once the contracts are in. */
+export function subscribeWire(listener: () => void): () => void {
   // A component that checks Q's data is on screen: load them when idle.
   warmWire();
   listeners.add(listener);
   return () => listeners.delete(listener);
-}
-
-/** The contracts in a component: null at first, then re-rendered with them. */
-export function useWire(): WireContracts | null {
-  return useSyncExternalStore(subscribe, wireNow, () => null);
 }
 
 /** Starts the load once the page is idle (in a browser only). */

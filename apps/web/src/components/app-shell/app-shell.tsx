@@ -5,8 +5,8 @@ import { buttonClassName } from "@capital-q/ui/button";
 import type { MyOrganisationDto } from "@capital-q/contracts";
 import type { ContextScope } from "@capital-q/ui/tokens";
 
-import { DocumentReadyCenter } from "@/features/documents/document-ready-center";
-import { QDock } from "@/features/q-dock";
+import { DocumentReadyCenterAfterPaint as DocumentReadyCenter } from "@/features/documents/document-ready-center-lazy";
+import { QDockOffQPage } from "@/features/q-dock/q-dock-lazy";
 import { NO_SUBJECT, type QSubject } from "@/features/q/q-subject";
 
 import { VerifyNudgeLink } from "@/features/verification/verify-nudge";
@@ -90,7 +90,11 @@ export function AppShell({
     );
   }
   return (
-    <GlobalQProvider subject={subject} connected={qConnected} dock={<QDock />}>
+    <GlobalQProvider
+      subject={subject}
+      connected={qConnected}
+      dock={<QDockOffQPage />}
+    >
       <div className="cq-shell">
         <a
           href="#main"

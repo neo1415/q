@@ -29,6 +29,7 @@ import { artifactTypeLabel } from "./artifact-type";
 import { readQArtifactAction, readQArtifactVersionAction } from "./actions";
 import { ArtifactDownloads, artifactFileUrl } from "./artifact-download";
 import { formatDayTime } from "@/components/date-format";
+import { slideSource } from "./slide-source";
 
 /**
  * Reading what Q composed (QX-003E).
@@ -155,9 +156,7 @@ export function documentLookStyle(
   };
 }
 
-export function slideSource(svg: string): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
+export { slideSource };
 
 export function ArtifactViewer({
   artifactId,

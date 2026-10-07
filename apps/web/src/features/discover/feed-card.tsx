@@ -26,7 +26,7 @@ import { CompanyAvatar, CompanyAvatarLink } from "../company/company-avatar";
 import { moneyText } from "../company/money-text";
 import { countryLabel, stageLabel } from "../company/declared-labels";
 import { ExpressInterest } from "../network/express-interest";
-import { useDockAvoid } from "../q-dock";
+import { useDockAvoid } from "../q-dock/dock-avoid";
 
 import type { FeedPreloadPolicy } from "./feed/feed-state";
 import { actionPlaybackSource } from "./feed/action-feed-transport";

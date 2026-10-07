@@ -81,6 +81,26 @@ describe("the presence loop (W7)", () => {
     expect(fake.queue.size).toBe(0);
   });
 
+  it("steps down on a device where each frame's work is heavy, though frames stay on time", () => {
+    let clock = 0;
+    const fake = fakeHost({
+      // Each read of the clock moves it 10 ms: 10 ms of work a frame.
+      now: () => (clock += 10),
+    });
+    startPresenceLoop(fake.host);
+    expect(fake.host.canvas.width).toBe(96);
+    fake.run(1000, 4000);
+    expect(fake.host.canvas.width).toBeLessThan(96);
+  });
+
+  it("keeps full detail where a frame's work is light", () => {
+    let clock = 0;
+    const fake = fakeHost({ now: () => (clock += 2) });
+    startPresenceLoop(fake.host);
+    fake.run(1000, 4000);
+    expect(fake.host.canvas.width).toBe(96);
+  });
+
   it("asks for no frames off screen or in a hidden tab", () => {
     let hidden = false;
     const fake = fakeHost({ hidden: () => hidden });

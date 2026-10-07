@@ -17,6 +17,9 @@ import {
 import type { ApiSession } from "./request.js";
 import { createSseParser } from "./sse.js";
 
+// W7: kept in its own module (no Zod), re-exported here as before.
+export { describeQStreamTransport } from "./q-stream-status.js";
+
 /**
  * The Q run stream client (CQ-Q-009 §73-§80).
  *
@@ -296,22 +299,6 @@ export async function streamQRunEvents(
     );
     // Full jitter: somewhere between half the base and the base.
     return Math.round(base / 2 + (base / 2) * jitter());
-  }
-}
-
-/** Plain English for a transport state (§121-§123); never a run status. */
-export function describeQStreamTransport(
-  status: QStreamTransportStatus,
-): string {
-  switch (status) {
-    case "CONNECTING":
-      return "Connecting to Q…";
-    case "CONNECTED":
-      return "Connected to Q.";
-    case "RECONNECTING":
-      return "I lost the connection to Q. Reconnecting…";
-    case "CLOSED":
-      return "Disconnected from Q.";
   }
 }
 
