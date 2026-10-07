@@ -33,7 +33,7 @@ describe("readiness firewall", () => {
     for (const pkg of readdirSync(join(ROOT, "packages"))) {
       if (ALLOWED.has(pkg)) continue;
       const src = join(ROOT, "packages", pkg, "src");
-      let files: string[] = [];
+      let files: string[];
       try {
         files = sources(src);
       } catch {

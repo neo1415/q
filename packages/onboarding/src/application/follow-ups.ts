@@ -71,7 +71,14 @@ export function followUpTyped(
     case "long_text":
     case "voice_text":
       return "TEXT";
-    default:
+    // Choices are answered from the quick answers; files, confirmations
+    // and references are not something a typed answer can place.
+    case "single_select":
+    case "multi_select":
+    case "document_upload":
+    case "confirmation":
+    case "reference_select":
+    case undefined:
       return "NONE";
   }
 }

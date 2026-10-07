@@ -245,40 +245,40 @@ describe("readiness service", () => {
     actorType: "HUMAN",
   } as never;
 
-  function memoryStore(): ReadinessStore & {
-    rows: string[];
-    events: string[];
-  } {
+  function memoryStore(): ReadinessStore & { rows: string[] } {
     const rows: string[] = [];
     const events: { key: string; done: boolean }[] = [];
     return {
       rows,
-      events: [] as string[],
-      profileFacts: async () => ({
-        tenantId: "88888888-8888-4888-8888-888888888888",
-        stageCode: EMPTY.stageCode,
-        profile: EMPTY.profile,
-        team: EMPTY.team,
-        verification: EMPTY.verification,
-        claims: [],
-      }),
-      latest: async () => null,
-      record: async (input) => {
+      profileFacts: () =>
+        Promise.resolve({
+          tenantId: "88888888-8888-4888-8888-888888888888",
+          stageCode: EMPTY.stageCode,
+          profile: EMPTY.profile,
+          team: EMPTY.team,
+          verification: EMPTY.verification,
+          claims: [],
+        }),
+      latest: () => Promise.resolve(null),
+      record: (input) => {
         if (rows.at(-1) !== input.basisHash) rows.push(input.basisHash);
-        return {
+        return Promise.resolve({
           revision: rows.length,
           assessedAt: "2026-10-07T00:00:00.000Z",
-        };
+        });
       },
-      marks: async () =>
-        new Map(
-          events.map((event) => [
-            event.key,
-            { done: event.done, at: "2026-10-07T00:00:00.000Z" },
-          ]),
+      marks: () =>
+        Promise.resolve(
+          new Map(
+            events.map((event) => [
+              event.key,
+              { done: event.done, at: "2026-10-07T00:00:00.000Z" },
+            ]),
+          ),
         ),
-      mark: async (input) => {
+      mark: (input) => {
         events.push({ key: input.actionKey, done: input.done });
+        return Promise.resolve();
       },
     };
   }
@@ -286,7 +286,7 @@ describe("readiness service", () => {
   it("is null for anyone without their own company (investors included)", async () => {
     const service = createReadinessService({
       store: memoryStore(),
-      ownCompanyId: async () => null,
+      ownCompanyId: () => Promise.resolve(null),
     });
     expect(await service.read(actor)).toBeNull();
     expect(await service.blueprint(actor, COMPANY, 6)).toBeNull();
@@ -296,7 +296,7 @@ describe("readiness service", () => {
     const store = memoryStore();
     const service = createReadinessService({
       store,
-      ownCompanyId: async () => COMPANY,
+      ownCompanyId: () => Promise.resolve(COMPANY),
     });
     const first = await service.read(actor);
     expect(ReadinessDtoSchema.parse(first)).toBeTruthy();
@@ -307,7 +307,7 @@ describe("readiness service", () => {
   it("refuses a Blueprint for a company that is not the actor's own", async () => {
     const service = createReadinessService({
       store: memoryStore(),
-      ownCompanyId: async () => COMPANY,
+      ownCompanyId: () => Promise.resolve(COMPANY),
     });
     expect(
       await service.blueprint(actor, "99999999-9999-4999-8999-999999999999", 6),
@@ -322,7 +322,7 @@ describe("readiness service", () => {
   it("marks and reopens an action, and never ticks one closed by evidence", async () => {
     const service = createReadinessService({
       store: memoryStore(),
-      ownCompanyId: async () => COMPANY,
+      ownCompanyId: () => Promise.resolve(COMPANY),
     });
     expect(
       await service.setActionState(actor, "upload-deck", { done: true }),
