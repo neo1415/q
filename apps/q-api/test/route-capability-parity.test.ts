@@ -152,9 +152,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq.ts GET GATEQ_INVESTOR_GATES_PATH": cap(
     "tool.find_prospective_investors",
   ),
-  "q-api/http/investor-promises.ts GET FIT_COMPARE_PATH": cap(
-    "tool.fit_compare",
-  ),
+  "q-api/http/investor-promises.ts GET FIT_COMPARE_PATH":
+    cap("tool.fit_compare"),
   "q-api/http/investor-promises.ts GET FIT_THESIS_PATH": cap(
     "tool.thesis_reading",
   ),

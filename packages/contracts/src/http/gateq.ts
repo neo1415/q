@@ -296,9 +296,7 @@ export const GateCriterionStandingSchema = z.enum([
   "NOT_MET",
   "UNKNOWN",
 ]);
-export type GateCriterionStanding = z.infer<
-  typeof GateCriterionStandingSchema
->;
+export type GateCriterionStanding = z.infer<typeof GateCriterionStandingSchema>;
 
 export const InvestorGateFitDtoSchema = z
   .object({
@@ -323,7 +321,9 @@ export const InvestorGateFitDtoSchema = z
 export type InvestorGateFitDto = z.infer<typeof InvestorGateFitDtoSchema>;
 
 export const InvestorGateFitListDtoSchema = z
-  .object({ items: z.array(InvestorGateFitDtoSchema).max(GATEQ_INVESTOR_GATES_MAX) })
+  .object({
+    items: z.array(InvestorGateFitDtoSchema).max(GATEQ_INVESTOR_GATES_MAX),
+  })
   .strict();
 export type InvestorGateFitListDto = z.infer<
   typeof InvestorGateFitListDtoSchema

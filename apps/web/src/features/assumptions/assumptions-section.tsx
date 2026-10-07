@@ -234,7 +234,10 @@ export function AssumptionsSection({
               </Button>
             </div>
             {result === null || !open ? null : (
-              <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
+              <p
+                className="cq-body-sm text-(--cq-text-secondary)"
+                role="status"
+              >
                 {result}
               </p>
             )}

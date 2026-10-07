@@ -1,10 +1,13 @@
 <!doctype html>
 <html lang="en" data-theme="dark">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Investor promises (design)</title>
-<!--
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Investor promises (design)</title>
+    <!--
   Investor promises: design screens for Q.07 "Investors interview the opportunity",
   Q.05 "Finds the right investors", Q.02 "Learns how each investor thinks" and
   Q.10 "Compares opportunities" (audit: docs/strategy/q-promises-2026-10-07.md).
@@ -31,569 +34,2469 @@
   neutral and reads "Not known yet"; no percentages or invented confidence; Q's inference is
   labelled as Q's; every send is Prepare -> Approve -> Execute; Pass stays neutral.
 -->
-<style>
-:root{
-  --cq-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --cq-font-editorial: Georgia, "Times New Roman", serif;
-  --cq-radius-sm:8px; --cq-radius-md:12px; --cq-radius-lg:16px;
-}
-[data-theme=light]{
-  --cq-canvas:#f6f4ef;--cq-surface:#fbfaf7;--cq-surface-raised:#fff;--cq-surface-subtle:#f1ede4;
-  --cq-text-primary:#16140f;--cq-text-secondary:#4f4a40;--cq-text-tertiary:#655e51;
-  --cq-border-subtle:#e7e1d5;--cq-border:#d9d1c1;--cq-border-strong:#8f8673;
-  --cq-accent:#8a6a12;--cq-accent-soft:#f3ead2;--cq-on-accent:#fff;
-  --cq-positive:#2f6b3f;--cq-positive-soft:#e3efe2;
-  --cq-developing:#6b5a1c;--cq-developing-soft:#f3ead2;
-  --cq-gap:#8a4a12;--cq-gap-soft:#f6e6d6;
-  --cq-unknown:#5d584e;--cq-unknown-soft:#ece8df;
-  --cq-chrome:#16140f;--cq-chrome-text:#f4efe2;--cq-chrome-muted:#bfb6a2;--cq-chrome-border:#2f2b22;--cq-chrome-accent:#e2b858;
-  --cq-q-light:#a8841c;--cq-q-bloom:#c9a22740;
-}
-[data-theme=dark]{
-  --cq-canvas:#0f0e0b;--cq-surface:#17150f;--cq-surface-raised:#1d1a13;--cq-surface-subtle:#24211a;
-  --cq-text-primary:#f4efe2;--cq-text-secondary:#c9c0ab;--cq-text-tertiary:#a59c87;
-  --cq-border-subtle:#2a261c;--cq-border:#3a3427;--cq-border-strong:#7a715c;
-  --cq-accent:#c9a227;--cq-accent-soft:#2e2714;--cq-on-accent:#16140f;
-  --cq-positive:#8fcf9c;--cq-positive-soft:#1d2a1f;
-  --cq-developing:#e2c46a;--cq-developing-soft:#2e2714;
-  --cq-gap:#f0a865;--cq-gap-soft:#33230f;
-  --cq-unknown:#b7af9c;--cq-unknown-soft:#24211a;
-  --cq-chrome:#0b0a08;--cq-chrome-text:#f4efe2;--cq-chrome-muted:#bfb6a2;--cq-chrome-border:#2a261c;--cq-chrome-accent:#e2b858;
-  --cq-q-light:#e2b858;--cq-q-bloom:#e2b85855;
-}
-*{box-sizing:border-box}
-html,body{margin:0;background:var(--cq-canvas);color:var(--cq-text-primary);font:15px/1.45 var(--cq-font-sans);-webkit-font-smoothing:antialiased}
-button{font:inherit;color:inherit}
-.gallery{display:flex;flex-wrap:wrap;gap:40px;padding:32px;align-items:flex-start}
-.gallery-title{width:100%;margin:0 0 4px;font:600 13px/1 var(--cq-font-sans);color:var(--cq-text-tertiary)}
-.frame{border:1px solid var(--cq-border);border-radius:28px;overflow:hidden;background:var(--cq-canvas);flex:none}
-.frame.phone{width:390px;min-height:844px}
-.frame.desktop{width:1280px;min-height:820px;border-radius:14px}
-body.solo .gallery{padding:0;gap:0}
-body.solo .frame{border:0;border-radius:0}
-body.solo .gallery-title{display:none}
+    <style>
+      :root {
+        --cq-font-sans:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue",
+          Arial, sans-serif;
+        --cq-font-editorial: Georgia, "Times New Roman", serif;
+        --cq-radius-sm: 8px;
+        --cq-radius-md: 12px;
+        --cq-radius-lg: 16px;
+      }
+      [data-theme="light"] {
+        --cq-canvas: #f6f4ef;
+        --cq-surface: #fbfaf7;
+        --cq-surface-raised: #fff;
+        --cq-surface-subtle: #f1ede4;
+        --cq-text-primary: #16140f;
+        --cq-text-secondary: #4f4a40;
+        --cq-text-tertiary: #655e51;
+        --cq-border-subtle: #e7e1d5;
+        --cq-border: #d9d1c1;
+        --cq-border-strong: #8f8673;
+        --cq-accent: #8a6a12;
+        --cq-accent-soft: #f3ead2;
+        --cq-on-accent: #fff;
+        --cq-positive: #2f6b3f;
+        --cq-positive-soft: #e3efe2;
+        --cq-developing: #6b5a1c;
+        --cq-developing-soft: #f3ead2;
+        --cq-gap: #8a4a12;
+        --cq-gap-soft: #f6e6d6;
+        --cq-unknown: #5d584e;
+        --cq-unknown-soft: #ece8df;
+        --cq-chrome: #16140f;
+        --cq-chrome-text: #f4efe2;
+        --cq-chrome-muted: #bfb6a2;
+        --cq-chrome-border: #2f2b22;
+        --cq-chrome-accent: #e2b858;
+        --cq-q-light: #a8841c;
+        --cq-q-bloom: #c9a22740;
+      }
+      [data-theme="dark"] {
+        --cq-canvas: #0f0e0b;
+        --cq-surface: #17150f;
+        --cq-surface-raised: #1d1a13;
+        --cq-surface-subtle: #24211a;
+        --cq-text-primary: #f4efe2;
+        --cq-text-secondary: #c9c0ab;
+        --cq-text-tertiary: #a59c87;
+        --cq-border-subtle: #2a261c;
+        --cq-border: #3a3427;
+        --cq-border-strong: #7a715c;
+        --cq-accent: #c9a227;
+        --cq-accent-soft: #2e2714;
+        --cq-on-accent: #16140f;
+        --cq-positive: #8fcf9c;
+        --cq-positive-soft: #1d2a1f;
+        --cq-developing: #e2c46a;
+        --cq-developing-soft: #2e2714;
+        --cq-gap: #f0a865;
+        --cq-gap-soft: #33230f;
+        --cq-unknown: #b7af9c;
+        --cq-unknown-soft: #24211a;
+        --cq-chrome: #0b0a08;
+        --cq-chrome-text: #f4efe2;
+        --cq-chrome-muted: #bfb6a2;
+        --cq-chrome-border: #2a261c;
+        --cq-chrome-accent: #e2b858;
+        --cq-q-light: #e2b858;
+        --cq-q-bloom: #e2b85855;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: var(--cq-canvas);
+        color: var(--cq-text-primary);
+        font: 15px/1.45 var(--cq-font-sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+      }
+      .gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 40px;
+        padding: 32px;
+        align-items: flex-start;
+      }
+      .gallery-title {
+        width: 100%;
+        margin: 0 0 4px;
+        font: 600 13px/1 var(--cq-font-sans);
+        color: var(--cq-text-tertiary);
+      }
+      .frame {
+        border: 1px solid var(--cq-border);
+        border-radius: 28px;
+        overflow: hidden;
+        background: var(--cq-canvas);
+        flex: none;
+      }
+      .frame.phone {
+        width: 390px;
+        min-height: 844px;
+      }
+      .frame.desktop {
+        width: 1280px;
+        min-height: 820px;
+        border-radius: 14px;
+      }
+      body.solo .gallery {
+        padding: 0;
+        gap: 0;
+      }
+      body.solo .frame {
+        border: 0;
+        border-radius: 0;
+      }
+      body.solo .gallery-title {
+        display: none;
+      }
 
-/* App chrome */
-.app{display:grid;grid-template-columns:232px 1fr;min-height:820px}
-.phone .app{display:block;min-height:844px}
-.side{background:var(--cq-chrome);color:var(--cq-chrome-text);padding:20px 14px;border-right:1px solid var(--cq-chrome-border);display:flex;flex-direction:column;gap:2px}
-.phone .side{display:none}
-.brand{display:flex;align-items:center;gap:10px;font-weight:650;margin:0 6px 18px}
-.mark{width:22px;height:22px;border-radius:50%;border:2.5px solid var(--cq-chrome-accent);position:relative}
-.mark:after{content:"";position:absolute;right:-5px;bottom:-4px;width:8px;height:2.5px;background:var(--cq-chrome-accent);transform:rotate(45deg)}
-.nav{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;color:var(--cq-chrome-muted);font-size:14px;min-height:40px}
-.nav.on{background:#ffffff12;color:var(--cq-chrome-text)}
-.nav i{width:16px;height:16px;border:1.5px solid currentColor;border-radius:4px;display:inline-block;opacity:.8}
-.side .foot{margin-top:auto;font-size:12px;color:var(--cq-chrome-muted);padding:8px 10px}
-.main{padding:28px 36px 48px;max-width:1048px}
-.phone .main{padding:12px 16px 96px}
-.topbar{display:none}
-.phone .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;background:var(--cq-canvas)}
-.phone .topbar .brand{margin:0;color:var(--cq-text-primary)}
-.phone .topbar .mark{border-color:var(--cq-accent)}
-.phone .topbar .mark:after{background:var(--cq-accent)}
-.avatar{width:32px;height:32px;border-radius:50%;background:var(--cq-surface-subtle);display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--cq-text-secondary)}
-.tabbar{display:none}
-.phone .tabbar{display:flex;position:sticky;bottom:0;justify-content:space-around;border-top:1px solid var(--cq-border-subtle);background:var(--cq-surface);padding:8px 4px 22px}
-.tabbar span{font-size:11px;color:var(--cq-text-tertiary);display:flex;flex-direction:column;align-items:center;gap:4px;min-width:56px;min-height:44px;justify-content:center}
-.tabbar span i{width:18px;height:18px;border:1.5px solid currentColor;border-radius:5px}
-.tabbar span.on{color:var(--cq-text-primary)}
-.phone .tabbar{position:absolute;left:0;right:0}
-.phone{position:relative}
+      /* App chrome */
+      .app {
+        display: grid;
+        grid-template-columns: 232px 1fr;
+        min-height: 820px;
+      }
+      .phone .app {
+        display: block;
+        min-height: 844px;
+      }
+      .side {
+        background: var(--cq-chrome);
+        color: var(--cq-chrome-text);
+        padding: 20px 14px;
+        border-right: 1px solid var(--cq-chrome-border);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .phone .side {
+        display: none;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 650;
+        margin: 0 6px 18px;
+      }
+      .mark {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2.5px solid var(--cq-chrome-accent);
+        position: relative;
+      }
+      .mark:after {
+        content: "";
+        position: absolute;
+        right: -5px;
+        bottom: -4px;
+        width: 8px;
+        height: 2.5px;
+        background: var(--cq-chrome-accent);
+        transform: rotate(45deg);
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 9px;
+        color: var(--cq-chrome-muted);
+        font-size: 14px;
+        min-height: 40px;
+      }
+      .nav.on {
+        background: #ffffff12;
+        color: var(--cq-chrome-text);
+      }
+      .nav i {
+        width: 16px;
+        height: 16px;
+        border: 1.5px solid currentColor;
+        border-radius: 4px;
+        display: inline-block;
+        opacity: 0.8;
+      }
+      .side .foot {
+        margin-top: auto;
+        font-size: 12px;
+        color: var(--cq-chrome-muted);
+        padding: 8px 10px;
+      }
+      .main {
+        padding: 28px 36px 48px;
+        max-width: 1048px;
+      }
+      .phone .main {
+        padding: 12px 16px 96px;
+      }
+      .topbar {
+        display: none;
+      }
+      .phone .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px 6px;
+        background: var(--cq-canvas);
+      }
+      .phone .topbar .brand {
+        margin: 0;
+        color: var(--cq-text-primary);
+      }
+      .phone .topbar .mark {
+        border-color: var(--cq-accent);
+      }
+      .phone .topbar .mark:after {
+        background: var(--cq-accent);
+      }
+      .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--cq-surface-subtle);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--cq-text-secondary);
+      }
+      .tabbar {
+        display: none;
+      }
+      .phone .tabbar {
+        display: flex;
+        position: sticky;
+        bottom: 0;
+        justify-content: space-around;
+        border-top: 1px solid var(--cq-border-subtle);
+        background: var(--cq-surface);
+        padding: 8px 4px 22px;
+      }
+      .tabbar span {
+        font-size: 11px;
+        color: var(--cq-text-tertiary);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        min-width: 56px;
+        min-height: 44px;
+        justify-content: center;
+      }
+      .tabbar span i {
+        width: 18px;
+        height: 18px;
+        border: 1.5px solid currentColor;
+        border-radius: 5px;
+      }
+      .tabbar span.on {
+        color: var(--cq-text-primary);
+      }
+      .phone .tabbar {
+        position: absolute;
+        left: 0;
+        right: 0;
+      }
+      .phone {
+        position: relative;
+      }
 
-h1{font:600 26px/1.2 var(--cq-font-sans);letter-spacing:-.01em;margin:0 0 4px}
-.phone h1{font-size:22px}
-h2{font:600 17px/1.3 var(--cq-font-sans);margin:0}
-h3{font:600 15px/1.35 var(--cq-font-sans);margin:0}
-.sub{color:var(--cq-text-secondary);margin:0}
-.muted{color:var(--cq-text-tertiary);font-size:13px}
-.private{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--cq-text-tertiary)}
-.private:before{content:"";width:9px;height:11px;border:1.5px solid currentColor;border-radius:2px 2px 3px 3px;box-shadow:inset 0 -5px 0 -3px currentColor}
-.section{margin-top:28px}
-.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
-.link{color:var(--cq-accent);font-size:14px;font-weight:550;text-decoration:none;white-space:nowrap}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--cq-border);background:var(--cq-surface-raised);font-weight:550;font-size:14px;cursor:pointer}
-.btn.primary{background:var(--cq-accent);border-color:var(--cq-accent);color:var(--cq-on-accent)}
-.btn.quiet{background:transparent;border-color:transparent;color:var(--cq-text-secondary)}
-.btn.sm{min-height:36px;padding:0 12px;font-size:13px}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+      h1 {
+        font: 600 26px/1.2 var(--cq-font-sans);
+        letter-spacing: -0.01em;
+        margin: 0 0 4px;
+      }
+      .phone h1 {
+        font-size: 22px;
+      }
+      h2 {
+        font: 600 17px/1.3 var(--cq-font-sans);
+        margin: 0;
+      }
+      h3 {
+        font: 600 15px/1.35 var(--cq-font-sans);
+        margin: 0;
+      }
+      .sub {
+        color: var(--cq-text-secondary);
+        margin: 0;
+      }
+      .muted {
+        color: var(--cq-text-tertiary);
+        font-size: 13px;
+      }
+      .private {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+      }
+      .private:before {
+        content: "";
+        width: 9px;
+        height: 11px;
+        border: 1.5px solid currentColor;
+        border-radius: 2px 2px 3px 3px;
+        box-shadow: inset 0 -5px 0 -3px currentColor;
+      }
+      .section {
+        margin-top: 28px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .link {
+        color: var(--cq-accent);
+        font-size: 14px;
+        font-weight: 550;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: 10px;
+        border: 1px solid var(--cq-border);
+        background: var(--cq-surface-raised);
+        font-weight: 550;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--cq-accent);
+        border-color: var(--cq-accent);
+        color: var(--cq-on-accent);
+      }
+      .btn.quiet {
+        background: transparent;
+        border-color: transparent;
+        color: var(--cq-text-secondary);
+      }
+      .btn.sm {
+        min-height: 36px;
+        padding: 0 12px;
+        font-size: 13px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
 
-/* Q line */
-.qline{display:flex;gap:14px;align-items:flex-start}
-.qmark{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 50% 50%,var(--cq-q-bloom),transparent 70%)}
-.qmark b{width:22px;height:22px;border-radius:50%;border:3px solid var(--cq-q-light);position:relative;display:block}
-.qmark b:after{content:"";position:absolute;right:-6px;bottom:-5px;width:9px;height:3px;background:var(--cq-q-light);transform:rotate(45deg);border-radius:2px}
-.qsays{font:400 19px/1.45 var(--cq-font-editorial)}
-.phone .qsays{font-size:17px}
+      /* Q line */
+      .qline {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+      }
+      .qmark {
+        flex: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(
+          circle at 50% 50%,
+          var(--cq-q-bloom),
+          transparent 70%
+        );
+      }
+      .qmark b {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 3px solid var(--cq-q-light);
+        position: relative;
+        display: block;
+      }
+      .qmark b:after {
+        content: "";
+        position: absolute;
+        right: -6px;
+        bottom: -5px;
+        width: 9px;
+        height: 3px;
+        background: var(--cq-q-light);
+        transform: rotate(45deg);
+        border-radius: 2px;
+      }
+      .qsays {
+        font: 400 19px/1.45 var(--cq-font-editorial);
+      }
+      .phone .qsays {
+        font-size: 17px;
+      }
 
-/* Next card */
-.next{margin-top:18px;border:1px solid var(--cq-border);background:var(--cq-surface);border-radius:var(--cq-radius-lg);padding:20px 22px}
-.next .kicker{font-size:12px;font-weight:600;color:var(--cq-accent);margin-bottom:6px}
-.next p{margin:6px 0 0}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-.chip{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--cq-border);background:var(--cq-surface-raised);display:inline-flex;align-items:center;font-size:14px}
-.answer{display:flex;gap:8px;margin-top:12px}
-.answer input{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--cq-border);background:var(--cq-canvas);color:var(--cq-text-primary);padding:0 12px;font:inherit}
+      /* Next card */
+      .next {
+        margin-top: 18px;
+        border: 1px solid var(--cq-border);
+        background: var(--cq-surface);
+        border-radius: var(--cq-radius-lg);
+        padding: 20px 22px;
+      }
+      .next .kicker {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--cq-accent);
+        margin-bottom: 6px;
+      }
+      .next p {
+        margin: 6px 0 0;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .chip {
+        min-height: 40px;
+        padding: 0 14px;
+        border-radius: 999px;
+        border: 1px solid var(--cq-border);
+        background: var(--cq-surface-raised);
+        display: inline-flex;
+        align-items: center;
+        font-size: 14px;
+      }
+      .answer {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .answer input {
+        flex: 1;
+        min-height: 44px;
+        border-radius: 10px;
+        border: 1px solid var(--cq-border);
+        background: var(--cq-canvas);
+        color: var(--cq-text-primary);
+        padding: 0 12px;
+        font: inherit;
+      }
 
-/* Lists */
-.list{border:1px solid var(--cq-border-subtle);border-radius:var(--cq-radius-lg);background:var(--cq-surface);overflow:hidden}
-.item{display:grid;grid-template-columns:28px 1fr auto;gap:12px;padding:14px 18px;border-top:1px solid var(--cq-border-subtle);align-items:start}
-.item:first-child{border-top:0}
-.num{width:24px;height:24px;border-radius:50%;border:1px solid var(--cq-border-strong);display:grid;place-items:center;font-size:12px;color:var(--cq-text-secondary);margin-top:1px}
-.item p{margin:2px 0 0;color:var(--cq-text-secondary);font-size:14px}
-.owner{font-size:12px;color:var(--cq-text-tertiary);white-space:nowrap;margin-top:2px}
-.phone .item{grid-template-columns:28px 1fr}
-.phone .item .owner{grid-column:2;margin-top:0}
-.phone .queue .item{grid-template-columns:1fr auto}
+      /* Lists */
+      .list {
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-lg);
+        background: var(--cq-surface);
+        overflow: hidden;
+      }
+      .item {
+        display: grid;
+        grid-template-columns: 28px 1fr auto;
+        gap: 12px;
+        padding: 14px 18px;
+        border-top: 1px solid var(--cq-border-subtle);
+        align-items: start;
+      }
+      .item:first-child {
+        border-top: 0;
+      }
+      .num {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 1px solid var(--cq-border-strong);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+        margin-top: 1px;
+      }
+      .item p {
+        margin: 2px 0 0;
+        color: var(--cq-text-secondary);
+        font-size: 14px;
+      }
+      .owner {
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+        white-space: nowrap;
+        margin-top: 2px;
+      }
+      .phone .item {
+        grid-template-columns: 28px 1fr;
+      }
+      .phone .item .owner {
+        grid-column: 2;
+        margin-top: 0;
+      }
+      .phone .queue .item {
+        grid-template-columns: 1fr auto;
+      }
 
-/* Status words with shapes: never colour alone */
-.st{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;white-space:nowrap;padding:3px 10px 3px 8px;border-radius:999px}
-.st:before{content:"";width:12px;height:12px;border-radius:50%;flex:none;box-sizing:border-box}
-.st.strong{color:var(--cq-positive);background:var(--cq-positive-soft)}
-.st.strong:before{background:currentColor}
-.st.developing{color:var(--cq-developing);background:var(--cq-developing-soft)}
-.st.developing:before{border:2px solid currentColor;background:linear-gradient(90deg,currentColor 50%,transparent 50%)}
-.st.gap{color:var(--cq-gap);background:var(--cq-gap-soft)}
-.st.gap:before{border:2px solid currentColor;border-radius:2px;transform:rotate(45deg) scale(.85)}
-.st.unknown{color:var(--cq-unknown);background:var(--cq-unknown-soft);font-weight:550}
-.st.unknown:before{border:1.5px dashed currentColor}
+      /* Status words with shapes: never colour alone */
+      .st {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+        padding: 3px 10px 3px 8px;
+        border-radius: 999px;
+      }
+      .st:before {
+        content: "";
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex: none;
+        box-sizing: border-box;
+      }
+      .st.strong {
+        color: var(--cq-positive);
+        background: var(--cq-positive-soft);
+      }
+      .st.strong:before {
+        background: currentColor;
+      }
+      .st.developing {
+        color: var(--cq-developing);
+        background: var(--cq-developing-soft);
+      }
+      .st.developing:before {
+        border: 2px solid currentColor;
+        background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+      }
+      .st.gap {
+        color: var(--cq-gap);
+        background: var(--cq-gap-soft);
+      }
+      .st.gap:before {
+        border: 2px solid currentColor;
+        border-radius: 2px;
+        transform: rotate(45deg) scale(0.85);
+      }
+      .st.unknown {
+        color: var(--cq-unknown);
+        background: var(--cq-unknown-soft);
+        font-weight: 550;
+      }
+      .st.unknown:before {
+        border: 1.5px dashed currentColor;
+      }
 
-/* Readiness */
-.summary{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-top:20px}
-.phone .summary{grid-template-columns:1fr}
-.panel{border:1px solid var(--cq-border-subtle);border-radius:var(--cq-radius-lg);background:var(--cq-surface);padding:18px 20px}
-.tally{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.blockers{counter-reset:b;margin:10px 0 0;padding:0;list-style:none}
-.blockers li{counter-increment:b;display:grid;grid-template-columns:24px 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--cq-border-subtle)}
-.blockers li:first-child{border-top:0}
-.blockers li:before{content:counter(b);width:22px;height:22px;border-radius:50%;background:var(--cq-gap-soft);color:var(--cq-gap);display:grid;place-items:center;font-size:12px;font-weight:700}
-.blockers b{font-weight:600}
-.blockers span{display:block;color:var(--cq-text-secondary);font-size:13.5px}
-.pillars{margin-top:20px}
-.pillar{display:grid;grid-template-columns:180px 132px 1fr auto;gap:16px;align-items:center;padding:14px 18px;border-top:1px solid var(--cq-border-subtle)}
-.pillar:first-child{border-top:0}
-.phone .pillar{grid-template-columns:1fr auto;gap:6px 12px}
-.phone .pillar .why{grid-column:1/-1}
-.phone .pillar .ev{display:none}
-.pillar .why{color:var(--cq-text-secondary);font-size:14px}
-.ev{font-size:12.5px;color:var(--cq-text-tertiary);white-space:nowrap}
-.pillar.open{background:var(--cq-surface-raised)}
-.drill{grid-column:1/-1;margin-top:6px;border-top:1px dashed var(--cq-border);padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.phone .drill{grid-template-columns:1fr}
-.drill h4{margin:0 0 8px;font-size:12.5px;font-weight:600;color:var(--cq-text-tertiary)}
-.evi{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--cq-border-subtle);font-size:13.5px}
-.evi:first-of-type{border-top:0}
-.tag{font-size:11.5px;color:var(--cq-text-secondary);border:1px solid var(--cq-border);border-radius:6px;padding:1px 6px;white-space:nowrap}
-.drill ul{margin:0;padding-left:18px;color:var(--cq-text-secondary);font-size:13.5px}
-.drill li{margin:4px 0}
+      /* Readiness */
+      .summary {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .phone .summary {
+        grid-template-columns: 1fr;
+      }
+      .panel {
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-lg);
+        background: var(--cq-surface);
+        padding: 18px 20px;
+      }
+      .tally {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .blockers {
+        counter-reset: b;
+        margin: 10px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .blockers li {
+        counter-increment: b;
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        gap: 10px;
+        padding: 10px 0;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      .blockers li:first-child {
+        border-top: 0;
+      }
+      .blockers li:before {
+        content: counter(b);
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--cq-gap-soft);
+        color: var(--cq-gap);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .blockers b {
+        font-weight: 600;
+      }
+      .blockers span {
+        display: block;
+        color: var(--cq-text-secondary);
+        font-size: 13.5px;
+      }
+      .pillars {
+        margin-top: 20px;
+      }
+      .pillar {
+        display: grid;
+        grid-template-columns: 180px 132px 1fr auto;
+        gap: 16px;
+        align-items: center;
+        padding: 14px 18px;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      .pillar:first-child {
+        border-top: 0;
+      }
+      .phone .pillar {
+        grid-template-columns: 1fr auto;
+        gap: 6px 12px;
+      }
+      .phone .pillar .why {
+        grid-column: 1/-1;
+      }
+      .phone .pillar .ev {
+        display: none;
+      }
+      .pillar .why {
+        color: var(--cq-text-secondary);
+        font-size: 14px;
+      }
+      .ev {
+        font-size: 12.5px;
+        color: var(--cq-text-tertiary);
+        white-space: nowrap;
+      }
+      .pillar.open {
+        background: var(--cq-surface-raised);
+      }
+      .drill {
+        grid-column: 1/-1;
+        margin-top: 6px;
+        border-top: 1px dashed var(--cq-border);
+        padding-top: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .phone .drill {
+        grid-template-columns: 1fr;
+      }
+      .drill h4 {
+        margin: 0 0 8px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--cq-text-tertiary);
+      }
+      .evi {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 7px 0;
+        border-top: 1px solid var(--cq-border-subtle);
+        font-size: 13.5px;
+      }
+      .evi:first-of-type {
+        border-top: 0;
+      }
+      .tag {
+        font-size: 11.5px;
+        color: var(--cq-text-secondary);
+        border: 1px solid var(--cq-border);
+        border-radius: 6px;
+        padding: 1px 6px;
+        white-space: nowrap;
+      }
+      .drill ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--cq-text-secondary);
+        font-size: 13.5px;
+      }
+      .drill li {
+        margin: 4px 0;
+      }
 
-/* Questions stack */
-.stack{position:relative;margin-top:22px;padding-bottom:22px}
-.qcard{position:relative;z-index:2;border:1px solid var(--cq-border);background:var(--cq-surface);border-radius:var(--cq-radius-lg);padding:22px}
-.ghost{position:absolute;left:14px;right:14px;height:40px;bottom:10px;border:1px solid var(--cq-border-subtle);background:var(--cq-surface);border-radius:var(--cq-radius-lg);z-index:1;opacity:.8}
-.ghost.g2{left:28px;right:28px;bottom:0;opacity:.5}
-.qcard .count{font-size:12.5px;color:var(--cq-text-tertiary);display:flex;justify-content:space-between}
-.qcard h2{margin-top:10px;font:500 21px/1.35 var(--cq-font-editorial)}
-.whyq{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--cq-surface-subtle);font-size:13.5px;color:var(--cq-text-secondary)}
-.whyq b{color:var(--cq-text-primary);font-weight:600}
-.readings{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-.reading{border:1px solid var(--cq-border);border-radius:10px;padding:10px 12px;font-size:13.5px}
-.reading small{display:block;color:var(--cq-text-tertiary);font-size:12px}
-.queue{margin-top:8px}
-.queue .item{grid-template-columns:1fr auto}
+      /* Questions stack */
+      .stack {
+        position: relative;
+        margin-top: 22px;
+        padding-bottom: 22px;
+      }
+      .qcard {
+        position: relative;
+        z-index: 2;
+        border: 1px solid var(--cq-border);
+        background: var(--cq-surface);
+        border-radius: var(--cq-radius-lg);
+        padding: 22px;
+      }
+      .ghost {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        height: 40px;
+        bottom: 10px;
+        border: 1px solid var(--cq-border-subtle);
+        background: var(--cq-surface);
+        border-radius: var(--cq-radius-lg);
+        z-index: 1;
+        opacity: 0.8;
+      }
+      .ghost.g2 {
+        left: 28px;
+        right: 28px;
+        bottom: 0;
+        opacity: 0.5;
+      }
+      .qcard .count {
+        font-size: 12.5px;
+        color: var(--cq-text-tertiary);
+        display: flex;
+        justify-content: space-between;
+      }
+      .qcard h2 {
+        margin-top: 10px;
+        font: 500 21px/1.35 var(--cq-font-editorial);
+      }
+      .whyq {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: var(--cq-surface-subtle);
+        font-size: 13.5px;
+        color: var(--cq-text-secondary);
+      }
+      .whyq b {
+        color: var(--cq-text-primary);
+        font-weight: 600;
+      }
+      .readings {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .reading {
+        border: 1px solid var(--cq-border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 13.5px;
+      }
+      .reading small {
+        display: block;
+        color: var(--cq-text-tertiary);
+        font-size: 12px;
+      }
+      .queue {
+        margin-top: 8px;
+      }
+      .queue .item {
+        grid-template-columns: 1fr auto;
+      }
 
-/* Board */
-.board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}
-.col{background:var(--cq-surface-subtle);border-radius:var(--cq-radius-lg);padding:12px;min-height:420px}
-.col-head{display:flex;justify-content:space-between;align-items:center;padding:4px 6px 10px;font-weight:600;font-size:14px}
-.col-head span{font-weight:500;color:var(--cq-text-tertiary);font-size:13px}
-.card{background:var(--cq-surface-raised);border:1px solid var(--cq-border-subtle);border-radius:var(--cq-radius-md);padding:14px;margin-bottom:10px}
-.card h3{font-size:14.5px}
-.card .meta{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}
-.pill{font-size:11.5px;color:var(--cq-text-secondary);border:1px solid var(--cq-border);border-radius:999px;padding:1px 8px}
-.card dl{margin:10px 0 0;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13px}
-.card dt{color:var(--cq-text-tertiary)}
-.card dd{margin:0;color:var(--cq-text-secondary)}
-.card .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-.check{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--cq-text-secondary);min-height:36px}
-.check:before{content:"";width:18px;height:18px;border:1.5px solid var(--cq-border-strong);border-radius:5px}
-.card.done{opacity:.85}
-.card.done h3{text-decoration:line-through;text-decoration-color:var(--cq-text-tertiary)}
-.check.on:before{background:var(--cq-positive);border-color:var(--cq-positive);box-shadow:inset 0 0 0 3px var(--cq-surface-raised)}
-.byq{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--cq-text-secondary);border-top:1px dashed var(--cq-border);margin-top:12px;padding-top:10px}
-.byq .qmark{width:22px;height:22px}
-.byq .qmark b{width:12px;height:12px;border-width:2px}
-.byq .qmark b:after{width:5px;height:2px;right:-4px;bottom:-3px}
-.seg{display:none}
-.phone .board{grid-template-columns:1fr}
-.phone .col{min-height:0;background:transparent;padding:0}
-.phone .col.hide{display:none}
-.phone .col-head{display:none}
-.phone .seg{display:flex;margin-top:16px;border:1px solid var(--cq-border);border-radius:10px;padding:3px;gap:3px}
-.seg span{flex:1;text-align:center;font-size:14px;padding:8px 0;border-radius:8px;color:var(--cq-text-secondary);min-height:40px}
-.seg span.on{background:var(--cq-surface-raised);color:var(--cq-text-primary);font-weight:600;box-shadow:0 0 0 1px var(--cq-border)}
+      /* Board */
+      .board {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 20px;
+      }
+      .col {
+        background: var(--cq-surface-subtle);
+        border-radius: var(--cq-radius-lg);
+        padding: 12px;
+        min-height: 420px;
+      }
+      .col-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 6px 10px;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .col-head span {
+        font-weight: 500;
+        color: var(--cq-text-tertiary);
+        font-size: 13px;
+      }
+      .card {
+        background: var(--cq-surface-raised);
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-md);
+        padding: 14px;
+        margin-bottom: 10px;
+      }
+      .card h3 {
+        font-size: 14.5px;
+      }
+      .card .meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .pill {
+        font-size: 11.5px;
+        color: var(--cq-text-secondary);
+        border: 1px solid var(--cq-border);
+        border-radius: 999px;
+        padding: 1px 8px;
+      }
+      .card dl {
+        margin: 10px 0 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 10px;
+        font-size: 13px;
+      }
+      .card dt {
+        color: var(--cq-text-tertiary);
+      }
+      .card dd {
+        margin: 0;
+        color: var(--cq-text-secondary);
+      }
+      .card .acts {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .check {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        min-height: 36px;
+      }
+      .check:before {
+        content: "";
+        width: 18px;
+        height: 18px;
+        border: 1.5px solid var(--cq-border-strong);
+        border-radius: 5px;
+      }
+      .card.done {
+        opacity: 0.85;
+      }
+      .card.done h3 {
+        text-decoration: line-through;
+        text-decoration-color: var(--cq-text-tertiary);
+      }
+      .check.on:before {
+        background: var(--cq-positive);
+        border-color: var(--cq-positive);
+        box-shadow: inset 0 0 0 3px var(--cq-surface-raised);
+      }
+      .byq {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12.5px;
+        color: var(--cq-text-secondary);
+        border-top: 1px dashed var(--cq-border);
+        margin-top: 12px;
+        padding-top: 10px;
+      }
+      .byq .qmark {
+        width: 22px;
+        height: 22px;
+      }
+      .byq .qmark b {
+        width: 12px;
+        height: 12px;
+        border-width: 2px;
+      }
+      .byq .qmark b:after {
+        width: 5px;
+        height: 2px;
+        right: -4px;
+        bottom: -3px;
+      }
+      .seg {
+        display: none;
+      }
+      .phone .board {
+        grid-template-columns: 1fr;
+      }
+      .phone .col {
+        min-height: 0;
+        background: transparent;
+        padding: 0;
+      }
+      .phone .col.hide {
+        display: none;
+      }
+      .phone .col-head {
+        display: none;
+      }
+      .phone .seg {
+        display: flex;
+        margin-top: 16px;
+        border: 1px solid var(--cq-border);
+        border-radius: 10px;
+        padding: 3px;
+        gap: 3px;
+      }
+      .seg span {
+        flex: 1;
+        text-align: center;
+        font-size: 14px;
+        padding: 8px 0;
+        border-radius: 8px;
+        color: var(--cq-text-secondary);
+        min-height: 40px;
+      }
+      .seg span.on {
+        background: var(--cq-surface-raised);
+        color: var(--cq-text-primary);
+        font-weight: 600;
+        box-shadow: 0 0 0 1px var(--cq-border);
+      }
 
-/* Room */
-.thread{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px;padding-top:12px}
-.me{align-self:flex-end;background:var(--cq-surface-subtle);border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:80%}
-.qreply{align-self:flex-start;max-width:100%;width:100%}
-.qreply .who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--cq-text-tertiary);margin-bottom:6px}
-.qreply .who .qmark{width:26px;height:26px}
-.qreply .who .qmark b{width:14px;height:14px;border-width:2.5px}
-.qreply .who .qmark b:after{width:6px;height:2.5px;right:-4px;bottom:-3px}
-.answer-card{border:1px solid var(--cq-border);border-radius:var(--cq-radius-lg);background:var(--cq-surface);padding:16px 18px;margin-top:10px}
-.answer-card .h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
-.mini{display:grid;grid-template-columns:1fr auto;gap:8px 12px;font-size:14px;padding:6px 0;border-top:1px solid var(--cq-border-subtle)}
-.mini:first-of-type{border-top:0}
-.composer{position:sticky;bottom:0;margin-top:24px;display:flex;gap:8px;align-items:center;border:1px solid var(--cq-border);background:var(--cq-surface);border-radius:999px;padding:6px 6px 6px 18px;max-width:760px;margin-left:auto;margin-right:auto}
-.composer span{flex:1;color:var(--cq-text-tertiary)}
-.mic{width:40px;height:40px;border-radius:50%;background:var(--cq-accent);display:grid;place-items:center}
-.mic:before{content:"";width:8px;height:14px;border-radius:5px;background:var(--cq-on-accent)}
-.approval{margin-top:10px;border:1px solid var(--cq-accent);border-radius:var(--cq-radius-md);padding:12px 14px;background:var(--cq-accent-soft)}
-.approval p{margin:4px 0 10px;font-size:13.5px;color:var(--cq-text-secondary)}
+      /* Room */
+      .thread {
+        max-width: 760px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding-top: 12px;
+      }
+      .me {
+        align-self: flex-end;
+        background: var(--cq-surface-subtle);
+        border-radius: 16px 16px 4px 16px;
+        padding: 10px 14px;
+        max-width: 80%;
+      }
+      .qreply {
+        align-self: flex-start;
+        max-width: 100%;
+        width: 100%;
+      }
+      .qreply .who {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--cq-text-tertiary);
+        margin-bottom: 6px;
+      }
+      .qreply .who .qmark {
+        width: 26px;
+        height: 26px;
+      }
+      .qreply .who .qmark b {
+        width: 14px;
+        height: 14px;
+        border-width: 2.5px;
+      }
+      .qreply .who .qmark b:after {
+        width: 6px;
+        height: 2.5px;
+        right: -4px;
+        bottom: -3px;
+      }
+      .answer-card {
+        border: 1px solid var(--cq-border);
+        border-radius: var(--cq-radius-lg);
+        background: var(--cq-surface);
+        padding: 16px 18px;
+        margin-top: 10px;
+      }
+      .answer-card .h {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+      .mini {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px 12px;
+        font-size: 14px;
+        padding: 6px 0;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      .mini:first-of-type {
+        border-top: 0;
+      }
+      .composer {
+        position: sticky;
+        bottom: 0;
+        margin-top: 24px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        border: 1px solid var(--cq-border);
+        background: var(--cq-surface);
+        border-radius: 999px;
+        padding: 6px 6px 6px 18px;
+        max-width: 760px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .composer span {
+        flex: 1;
+        color: var(--cq-text-tertiary);
+      }
+      .mic {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--cq-accent);
+        display: grid;
+        place-items: center;
+      }
+      .mic:before {
+        content: "";
+        width: 8px;
+        height: 14px;
+        border-radius: 5px;
+        background: var(--cq-on-accent);
+      }
+      .approval {
+        margin-top: 10px;
+        border: 1px solid var(--cq-accent);
+        border-radius: var(--cq-radius-md);
+        padding: 12px 14px;
+        background: var(--cq-accent-soft);
+      }
+      .approval p {
+        margin: 4px 0 10px;
+        font-size: 13.5px;
+        color: var(--cq-text-secondary);
+      }
 
-/* Investor promises */
-.crumb{font-size:13px;color:var(--cq-text-tertiary);margin-bottom:10px}
-.co{display:flex;gap:14px;align-items:flex-start}
-.logo{width:56px;height:56px;border-radius:14px;background:var(--cq-surface-subtle);border:1px solid var(--cq-border);display:grid;place-items:center;font-weight:650;color:var(--cq-text-secondary);flex:none}
-.phone .logo{width:48px;height:48px}
-.tabs{display:flex;gap:20px;border-bottom:1px solid var(--cq-border-subtle);margin-top:18px;overflow:hidden}
-.tabs span{padding:10px 2px;font-size:14px;color:var(--cq-text-secondary);border-bottom:2px solid transparent;white-space:nowrap}
-.tabs span.on{color:var(--cq-text-primary);border-color:var(--cq-text-primary)}
-.split{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:32px}
-.phone .split{grid-template-columns:1fr}
-.aside{border:1px solid var(--cq-border-subtle);border-radius:var(--cq-radius-lg);background:var(--cq-surface);padding:16px 18px;align-self:start}
-.phone .aside{display:none}
-.lbl{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--cq-text-secondary);border:1px solid var(--cq-border);border-radius:6px;padding:1px 7px;white-space:nowrap}
-.lbl.q{border-style:dashed}
-.lbl.q:before{content:"";width:8px;height:8px;border-radius:50%;border:1.5px solid var(--cq-q-light)}
-.st.ev{color:var(--cq-positive);background:var(--cq-positive-soft)}
-.st.ev:before{background:currentColor}
-.st.cl{color:var(--cq-developing);background:var(--cq-developing-soft)}
-.st.cl:before{border:2px solid currentColor;background:linear-gradient(90deg,currentColor 50%,transparent 50%)}
-.st.sm{font-size:12px;padding:2px 8px 2px 7px}
-.st.sm:before{width:10px;height:10px}
-.asm{padding:16px 18px;border-top:1px solid var(--cq-border-subtle)}
-.asm:first-child{border-top:0}
-.asm .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-.phone .asm .top{flex-direction:column;gap:6px}
-.asm .claim{font-weight:600;font-size:15px}
-.asm .labels{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.asm .dep{margin-top:10px;font-size:13.5px;color:var(--cq-text-secondary)}
-.asm .dep b{font-weight:600;color:var(--cq-text-tertiary);font-size:12.5px;display:block;margin-bottom:2px}
-.qs{margin-top:6px;display:flex;flex-direction:column}
-.qs .check{font-size:14px;color:var(--cq-text-primary);align-items:flex-start;min-height:44px;padding-top:10px}
-.qs .check:before{flex:none;margin-top:1px}
-.qs .check.on:before{background:var(--cq-accent);border-color:var(--cq-accent);box-shadow:inset 0 0 0 3px var(--cq-surface)}
-.sendbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--cq-border);background:var(--cq-surface-raised)}
-.phone .sendbar{flex-direction:column;align-items:stretch}
-.sendbar p{margin:0;font-size:13px;color:var(--cq-text-secondary)}
-.scrim{position:absolute;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;z-index:5}
-.phone .scrim{align-items:flex-end}
-.frame{position:relative}
-.sheet{width:560px;max-width:100%;background:var(--cq-surface);border:1px solid var(--cq-border);border-radius:var(--cq-radius-lg);padding:22px}
-.phone .sheet{border-radius:20px 20px 0 0;padding:20px 16px 28px}
-.payload{margin-top:14px;border:1px solid var(--cq-border-subtle);background:var(--cq-canvas);border-radius:var(--cq-radius-md);padding:14px 16px;font-size:14px}
-.payload ol{margin:8px 0 0;padding-left:20px}
-.payload li{margin:6px 0}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;margin:12px 0 0}
-.kv dt{color:var(--cq-text-tertiary)}
-.kv dd{margin:0}
-.ebw{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
-.phone .ebw{grid-template-columns:1fr}
-.ebc{border:1px solid var(--cq-border-subtle);border-radius:var(--cq-radius-md);padding:10px 12px;background:var(--cq-surface-raised)}
-.ebc h4{margin:0 0 6px;display:flex;justify-content:space-between;align-items:center;font-size:13px}
-.ebc div{font-size:13.5px;padding:6px 0;border-top:1px solid var(--cq-border-subtle)}
-.ebc div:first-of-type{border-top:0}
-.ebc small{display:block;color:var(--cq-text-tertiary);font-size:12px}
-.inv{border:1px solid var(--cq-border-subtle);border-radius:var(--cq-radius-lg);background:var(--cq-surface);padding:16px 18px;display:grid;grid-template-columns:48px 1fr auto;gap:14px;align-items:start}
-.phone .inv{grid-template-columns:40px 1fr}
-.phone .inv .acts{grid-column:1/-1}
-.inv + .inv{margin-top:12px}
-.inv .logo{width:44px;height:44px;border-radius:12px;font-size:13px}
-.phone .inv .logo{width:40px;height:40px}
-.gatebadge{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;font-weight:600;color:var(--cq-accent);border:1px solid var(--cq-accent);border-radius:999px;padding:1px 9px;white-space:nowrap}
-.gatebadge:before{content:"";width:10px;height:8px;border:1.5px solid currentColor;border-bottom:0;border-radius:5px 5px 0 0}
-.crit{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:13.5px;color:var(--cq-text-secondary)}
-.crit span{display:inline-flex;gap:6px;align-items:center}
-.mk{width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;font-weight:700;flex:none}
-.mk.y{background:var(--cq-positive-soft);color:var(--cq-positive)}
-.mk.y:before{content:"✓"}
-.mk.n{background:var(--cq-gap-soft);color:var(--cq-gap);border-radius:3px}
-.mk.n:before{content:"✕"}
-.mk.u{border:1.5px dashed var(--cq-unknown);color:var(--cq-unknown)}
-.mk.u:before{content:"?";font-size:10px}
-.note{margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--cq-surface-subtle);font-size:13.5px;color:var(--cq-text-secondary)}
-.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:18px}
-.phone .cols3{grid-template-columns:1fr}
-.colh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-.colh small{font-size:12px;color:var(--cq-text-tertiary)}
-.rule{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--cq-border-subtle);font-size:14px}
-.rule:first-of-type{border-top:0}
-.rule span:last-child{color:var(--cq-text-tertiary);font-size:12.5px;white-space:nowrap}
-.bar{display:grid;grid-template-columns:110px 1fr 24px;gap:8px;align-items:center;color:var(--cq-text-secondary);font-size:13px;padding:4px 0}
-.bar i{height:8px;border-radius:4px;background:var(--cq-surface-subtle);position:relative;overflow:hidden}
-.bar i b{position:absolute;inset:0 auto 0 0;background:var(--cq-border-strong);border-radius:4px}
-.sugg{margin-top:12px;border:1px solid var(--cq-accent);background:var(--cq-accent-soft);border-radius:var(--cq-radius-md);padding:14px 16px}
-.sugg p{margin:4px 0 10px;font-size:13.5px;color:var(--cq-text-secondary)}
-.cmp{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;margin-top:16px;background:var(--cq-surface);border:1px solid var(--cq-border-subtle);border-radius:var(--cq-radius-lg)}
-.cmp th,.cmp td{text-align:left;padding:10px 14px;border-top:1px solid var(--cq-border-subtle);vertical-align:top}
-.cmp thead th{border-top:0;font-weight:600}
-.cmp tbody th{font-weight:500;color:var(--cq-text-tertiary);width:150px}
-.cmp td small{display:block;color:var(--cq-text-tertiary);font-size:12px}
-.best{font-size:11.5px;font-weight:600;color:var(--cq-accent);border:1px solid var(--cq-accent);border-radius:6px;padding:0 6px;margin-left:6px;white-space:nowrap}
-.saved{border:1px solid var(--cq-border-subtle);border-radius:var(--cq-radius-lg);background:var(--cq-surface);overflow:hidden}
-.srow{display:grid;grid-template-columns:24px 40px 1fr auto;gap:12px;align-items:center;padding:10px 16px;border-top:1px solid var(--cq-border-subtle);min-height:56px}
-.srow:first-child{border-top:0}
-.srow .logo{width:40px;height:40px;border-radius:10px;font-size:12px}
-.box{width:20px;height:20px;border:1.5px solid var(--cq-border-strong);border-radius:5px}
-.box.on{background:var(--cq-accent);border-color:var(--cq-accent);box-shadow:inset 0 0 0 3px var(--cq-surface)}
-.cmpcards{display:none}
-.phone .cmp{display:none}
-.phone .cmpcards{display:flex;flex-direction:column;gap:12px;margin-top:14px}
-.ccard{border:1px solid var(--cq-border-subtle);border-radius:var(--cq-radius-lg);background:var(--cq-surface);padding:14px 16px}
-.ccard .mini{font-size:13.5px}
-.composer .mic{flex:none}
-.phone .desk-only{display:none}
-</style>
-</head>
-<body>
-<div class="gallery" id="gallery"></div>
+      /* Investor promises */
+      .crumb {
+        font-size: 13px;
+        color: var(--cq-text-tertiary);
+        margin-bottom: 10px;
+      }
+      .co {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+      }
+      .logo {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: var(--cq-surface-subtle);
+        border: 1px solid var(--cq-border);
+        display: grid;
+        place-items: center;
+        font-weight: 650;
+        color: var(--cq-text-secondary);
+        flex: none;
+      }
+      .phone .logo {
+        width: 48px;
+        height: 48px;
+      }
+      .tabs {
+        display: flex;
+        gap: 20px;
+        border-bottom: 1px solid var(--cq-border-subtle);
+        margin-top: 18px;
+        overflow: hidden;
+      }
+      .tabs span {
+        padding: 10px 2px;
+        font-size: 14px;
+        color: var(--cq-text-secondary);
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+      }
+      .tabs span.on {
+        color: var(--cq-text-primary);
+        border-color: var(--cq-text-primary);
+      }
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 32px;
+      }
+      .phone .split {
+        grid-template-columns: 1fr;
+      }
+      .aside {
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-lg);
+        background: var(--cq-surface);
+        padding: 16px 18px;
+        align-self: start;
+      }
+      .phone .aside {
+        display: none;
+      }
+      .lbl {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+        border: 1px solid var(--cq-border);
+        border-radius: 6px;
+        padding: 1px 7px;
+        white-space: nowrap;
+      }
+      .lbl.q {
+        border-style: dashed;
+      }
+      .lbl.q:before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        border: 1.5px solid var(--cq-q-light);
+      }
+      .st.ev {
+        color: var(--cq-positive);
+        background: var(--cq-positive-soft);
+      }
+      .st.ev:before {
+        background: currentColor;
+      }
+      .st.cl {
+        color: var(--cq-developing);
+        background: var(--cq-developing-soft);
+      }
+      .st.cl:before {
+        border: 2px solid currentColor;
+        background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+      }
+      .st.sm {
+        font-size: 12px;
+        padding: 2px 8px 2px 7px;
+      }
+      .st.sm:before {
+        width: 10px;
+        height: 10px;
+      }
+      .asm {
+        padding: 16px 18px;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      .asm:first-child {
+        border-top: 0;
+      }
+      .asm .top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .phone .asm .top {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .asm .claim {
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .asm .labels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .asm .dep {
+        margin-top: 10px;
+        font-size: 13.5px;
+        color: var(--cq-text-secondary);
+      }
+      .asm .dep b {
+        font-weight: 600;
+        color: var(--cq-text-tertiary);
+        font-size: 12.5px;
+        display: block;
+        margin-bottom: 2px;
+      }
+      .qs {
+        margin-top: 6px;
+        display: flex;
+        flex-direction: column;
+      }
+      .qs .check {
+        font-size: 14px;
+        color: var(--cq-text-primary);
+        align-items: flex-start;
+        min-height: 44px;
+        padding-top: 10px;
+      }
+      .qs .check:before {
+        flex: none;
+        margin-top: 1px;
+      }
+      .qs .check.on:before {
+        background: var(--cq-accent);
+        border-color: var(--cq-accent);
+        box-shadow: inset 0 0 0 3px var(--cq-surface);
+      }
+      .sendbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 18px;
+        border-top: 1px solid var(--cq-border);
+        background: var(--cq-surface-raised);
+      }
+      .phone .sendbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .sendbar p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+      }
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: #0009;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 5;
+      }
+      .phone .scrim {
+        align-items: flex-end;
+      }
+      .frame {
+        position: relative;
+      }
+      .sheet {
+        width: 560px;
+        max-width: 100%;
+        background: var(--cq-surface);
+        border: 1px solid var(--cq-border);
+        border-radius: var(--cq-radius-lg);
+        padding: 22px;
+      }
+      .phone .sheet {
+        border-radius: 20px 20px 0 0;
+        padding: 20px 16px 28px;
+      }
+      .payload {
+        margin-top: 14px;
+        border: 1px solid var(--cq-border-subtle);
+        background: var(--cq-canvas);
+        border-radius: var(--cq-radius-md);
+        padding: 14px 16px;
+        font-size: 14px;
+      }
+      .payload ol {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+      .payload li {
+        margin: 6px 0;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 6px 14px;
+        font-size: 13.5px;
+        margin: 12px 0 0;
+      }
+      .kv dt {
+        color: var(--cq-text-tertiary);
+      }
+      .kv dd {
+        margin: 0;
+      }
+      .ebw {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 10px;
+      }
+      .phone .ebw {
+        grid-template-columns: 1fr;
+      }
+      .ebc {
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-md);
+        padding: 10px 12px;
+        background: var(--cq-surface-raised);
+      }
+      .ebc h4 {
+        margin: 0 0 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+      }
+      .ebc div {
+        font-size: 13.5px;
+        padding: 6px 0;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      .ebc div:first-of-type {
+        border-top: 0;
+      }
+      .ebc small {
+        display: block;
+        color: var(--cq-text-tertiary);
+        font-size: 12px;
+      }
+      .inv {
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-lg);
+        background: var(--cq-surface);
+        padding: 16px 18px;
+        display: grid;
+        grid-template-columns: 48px 1fr auto;
+        gap: 14px;
+        align-items: start;
+      }
+      .phone .inv {
+        grid-template-columns: 40px 1fr;
+      }
+      .phone .inv .acts {
+        grid-column: 1/-1;
+      }
+      .inv + .inv {
+        margin-top: 12px;
+      }
+      .inv .logo {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        font-size: 13px;
+      }
+      .phone .inv .logo {
+        width: 40px;
+        height: 40px;
+      }
+      .gatebadge {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--cq-accent);
+        border: 1px solid var(--cq-accent);
+        border-radius: 999px;
+        padding: 1px 9px;
+        white-space: nowrap;
+      }
+      .gatebadge:before {
+        content: "";
+        width: 10px;
+        height: 8px;
+        border: 1.5px solid currentColor;
+        border-bottom: 0;
+        border-radius: 5px 5px 0 0;
+      }
+      .crit {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+        margin-top: 8px;
+        font-size: 13.5px;
+        color: var(--cq-text-secondary);
+      }
+      .crit span {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .mk {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        display: inline-grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        flex: none;
+      }
+      .mk.y {
+        background: var(--cq-positive-soft);
+        color: var(--cq-positive);
+      }
+      .mk.y:before {
+        content: "✓";
+      }
+      .mk.n {
+        background: var(--cq-gap-soft);
+        color: var(--cq-gap);
+        border-radius: 3px;
+      }
+      .mk.n:before {
+        content: "✕";
+      }
+      .mk.u {
+        border: 1.5px dashed var(--cq-unknown);
+        color: var(--cq-unknown);
+      }
+      .mk.u:before {
+        content: "?";
+        font-size: 10px;
+      }
+      .note {
+        margin-top: 14px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: var(--cq-surface-subtle);
+        font-size: 13.5px;
+        color: var(--cq-text-secondary);
+      }
+      .cols3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 18px;
+      }
+      .phone .cols3 {
+        grid-template-columns: 1fr;
+      }
+      .colh {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .colh small {
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+      }
+      .rule {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 0;
+        border-top: 1px solid var(--cq-border-subtle);
+        font-size: 14px;
+      }
+      .rule:first-of-type {
+        border-top: 0;
+      }
+      .rule span:last-child {
+        color: var(--cq-text-tertiary);
+        font-size: 12.5px;
+        white-space: nowrap;
+      }
+      .bar {
+        display: grid;
+        grid-template-columns: 110px 1fr 24px;
+        gap: 8px;
+        align-items: center;
+        color: var(--cq-text-secondary);
+        font-size: 13px;
+        padding: 4px 0;
+      }
+      .bar i {
+        height: 8px;
+        border-radius: 4px;
+        background: var(--cq-surface-subtle);
+        position: relative;
+        overflow: hidden;
+      }
+      .bar i b {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: var(--cq-border-strong);
+        border-radius: 4px;
+      }
+      .sugg {
+        margin-top: 12px;
+        border: 1px solid var(--cq-accent);
+        background: var(--cq-accent-soft);
+        border-radius: var(--cq-radius-md);
+        padding: 14px 16px;
+      }
+      .sugg p {
+        margin: 4px 0 10px;
+        font-size: 13.5px;
+        color: var(--cq-text-secondary);
+      }
+      .cmp {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 14px;
+        margin-top: 16px;
+        background: var(--cq-surface);
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-lg);
+      }
+      .cmp th,
+      .cmp td {
+        text-align: left;
+        padding: 10px 14px;
+        border-top: 1px solid var(--cq-border-subtle);
+        vertical-align: top;
+      }
+      .cmp thead th {
+        border-top: 0;
+        font-weight: 600;
+      }
+      .cmp tbody th {
+        font-weight: 500;
+        color: var(--cq-text-tertiary);
+        width: 150px;
+      }
+      .cmp td small {
+        display: block;
+        color: var(--cq-text-tertiary);
+        font-size: 12px;
+      }
+      .best {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--cq-accent);
+        border: 1px solid var(--cq-accent);
+        border-radius: 6px;
+        padding: 0 6px;
+        margin-left: 6px;
+        white-space: nowrap;
+      }
+      .saved {
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-lg);
+        background: var(--cq-surface);
+        overflow: hidden;
+      }
+      .srow {
+        display: grid;
+        grid-template-columns: 24px 40px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 16px;
+        border-top: 1px solid var(--cq-border-subtle);
+        min-height: 56px;
+      }
+      .srow:first-child {
+        border-top: 0;
+      }
+      .srow .logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        font-size: 12px;
+      }
+      .box {
+        width: 20px;
+        height: 20px;
+        border: 1.5px solid var(--cq-border-strong);
+        border-radius: 5px;
+      }
+      .box.on {
+        background: var(--cq-accent);
+        border-color: var(--cq-accent);
+        box-shadow: inset 0 0 0 3px var(--cq-surface);
+      }
+      .cmpcards {
+        display: none;
+      }
+      .phone .cmp {
+        display: none;
+      }
+      .phone .cmpcards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .ccard {
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-lg);
+        background: var(--cq-surface);
+        padding: 14px 16px;
+      }
+      .ccard .mini {
+        font-size: 13.5px;
+      }
+      .composer .mic {
+        flex: none;
+      }
+      .phone .desk-only {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="gallery" id="gallery"></div>
 
-<!-- Investor sidebar (Amara, Harbour Seed) -->
-<template id="side-inv">
-  <aside class="side"><div class="brand"><span class="mark"></span>Capital Q</div>
-    <span class="nav" data-n="q"><i></i>Q</span><span class="nav" data-n="discover"><i></i>Discover</span><span class="nav" data-n="saved"><i></i>Saved</span><span class="nav"><i></i>Relationships</span><span class="nav"><i></i>GateQ</span><span class="nav" data-n="profile"><i></i>Profile</span>
-    <span class="foot">Light · Device · <b>Dark</b></span></aside>
-</template>
-<template id="side-fdr">
-  <aside class="side"><div class="brand"><span class="mark"></span>Capital Q</div>
-    <span class="nav"><i></i>Q</span><span class="nav"><i></i>Company</span><span class="nav"><i></i>Capital</span><span class="nav" data-n="discover"><i></i>Discover</span><span class="nav" data-n="gateq"><i></i>GateQ</span><span class="nav"><i></i>Documents</span>
-    <span class="foot">Light · Device · <b>Dark</b></span></aside>
-</template>
+    <!-- Investor sidebar (Amara, Harbour Seed) -->
+    <template id="side-inv">
+      <aside class="side">
+        <div class="brand"><span class="mark"></span>Capital Q</div>
+        <span class="nav" data-n="q"><i></i>Q</span
+        ><span class="nav" data-n="discover"><i></i>Discover</span
+        ><span class="nav" data-n="saved"><i></i>Saved</span
+        ><span class="nav"><i></i>Relationships</span
+        ><span class="nav"><i></i>GateQ</span
+        ><span class="nav" data-n="profile"><i></i>Profile</span>
+        <span class="foot">Light · Device · <b>Dark</b></span>
+      </aside>
+    </template>
+    <template id="side-fdr">
+      <aside class="side">
+        <div class="brand"><span class="mark"></span>Capital Q</div>
+        <span class="nav"><i></i>Q</span><span class="nav"><i></i>Company</span
+        ><span class="nav"><i></i>Capital</span
+        ><span class="nav" data-n="discover"><i></i>Discover</span
+        ><span class="nav" data-n="gateq"><i></i>GateQ</span
+        ><span class="nav"><i></i>Documents</span>
+        <span class="foot">Light · Device · <b>Dark</b></span>
+      </aside>
+    </template>
 
-<!-- 1. Assumptions to test, on the company profile (investor) -->
-<template id="t-assume">
-  <div class="topbar"><div class="brand"><span class="mark"></span>Ledgerline</div><span class="avatar">AO</span></div>
-  <div class="app" data-side="inv" data-on="discover">
-    <main class="main">
-      <div class="crumb">← Back to Discover</div>
-      <div class="co"><span class="logo">LL</span><div><h1>Ledgerline</h1><p class="sub">Reconciliation for SME ledgers, from bank feed to books.</p><p class="muted">Seed · Lagos, Nigeria · Fintech</p></div></div>
-      <div class="tabs"><span class="on">Overview</span><span>Elevator</span><span>Data room</span><span>Pitch deck</span><span>Team</span></div>
-      <div class="split" style="margin-top:20px">
-        <section>
-          <div class="section-head"><div><h2>Assumptions to test</h2><p class="muted" style="margin:4px 0 0">What Ledgerline says, what each claim rests on, and what is not known yet. From their confirmed deck reading and their profile.</p></div></div>
-          <div class="tally" style="margin:0 0 12px"><span class="st ev">Evidenced 2</span><span class="st cl">Claimed 4</span><span class="st unknown">Not known yet 3</span></div>
-          <div class="list">
-            <div class="asm"><div class="top"><div><div class="claim">Revenue: ₦38m a year, recurring</div>
-              <div class="labels"><span class="lbl">Founder's claim</span><span class="lbl">Document supported</span><span class="lbl">Deck, slide 9</span></div></div><span class="st ev sm">Evidenced</span></div>
-              <div class="dep"><b>Rests on</b>12 paying customers renewing · price holding at ₦3.2m a year</div>
-              <div class="qs"><span class="check on">Can you share the billing export behind the ₦38m?</span><span class="check">How many of the 12 customers have renewed at least once?</span></div></div>
-            <div class="asm"><div class="top"><div><div class="claim">Growth: 18% a month for six months</div>
-              <div class="labels"><span class="lbl">Founder's claim</span><span class="lbl">Self-reported</span><span class="lbl">Deck, slide 10</span></div></div><span class="st cl sm">Claimed</span></div>
-              <div class="dep"><b>Rests on</b>Sales cycle staying under 30 days · the two largest customers not skewing it</div>
-              <div class="qs"><span class="check on">What is monthly growth without your two largest customers?</span></div></div>
-            <div class="asm"><div class="top"><div><div class="claim">Monthly burn and runway</div>
-              <div class="labels"><span class="lbl">Not in the deck</span></div></div><span class="st unknown sm">Not known yet</span></div>
-              <div class="dep"><b>Why it matters</b>Unknown is not a weakness. It is the first thing to ask.</div>
-              <div class="qs"><span class="check on">What is your monthly burn, and your runway after this round?</span></div></div>
-            <div class="asm"><div class="top"><div><div class="claim">Market: 41,000 SMEs in Lagos keep digital ledgers</div>
-              <div class="labels"><span class="lbl q">Q's reading of the deck</span><span class="lbl">No source cited</span></div></div><span class="st cl sm">Claimed</span></div>
-              <div class="dep"><b>Rests on</b>A source for the 41,000 · the share that would pay</div>
-              <div class="qs"><span class="check">Where does the 41,000 come from?</span></div></div>
-            <div class="sendbar"><p>3 questions selected. You approve the exact wording before anything is sent.</p><button class="btn primary">Send 3 questions to Ledgerline</button></div>
+    <!-- 1. Assumptions to test, on the company profile (investor) -->
+    <template id="t-assume">
+      <div class="topbar">
+        <div class="brand"><span class="mark"></span>Ledgerline</div>
+        <span class="avatar">AO</span>
+      </div>
+      <div class="app" data-side="inv" data-on="discover">
+        <main class="main">
+          <div class="crumb">← Back to Discover</div>
+          <div class="co">
+            <span class="logo">LL</span>
+            <div>
+              <h1>Ledgerline</h1>
+              <p class="sub">
+                Reconciliation for SME ledgers, from bank feed to books.
+              </p>
+              <p class="muted">Seed · Lagos, Nigeria · Fintech</p>
+            </div>
           </div>
-        </section>
-        <aside class="aside"><h3>Fit with your mandate</h3><p class="qsays" style="font-size:22px;margin:6px 0 2px">7.5/10 · Good fit</p><p class="muted">Stage, sector and geography match. Cheque size: not known yet.</p>
-          <div class="note">Q only uses what Ledgerline shares with you. Their private numbers never reach this card.</div></aside>
-      </div>
-    </main>
-  </div>
-  <nav class="tabbar"><span><i></i>Q</span><span class="on"><i></i>Discover</span><span><i></i>Saved</span><span><i></i>Deals</span><span><i></i>More</span></nav>
-</template>
-
-<!-- 2. Approve the exact request (Prepare -> Approve -> Execute) -->
-<template id="t-send">
-  <div class="topbar"><div class="brand"><span class="mark"></span>Ledgerline</div><span class="avatar">AO</span></div>
-  <div class="app" data-side="inv" data-on="discover">
-    <main class="main"><div class="crumb">← Back to Discover</div><div class="co"><span class="logo">LL</span><div><h1>Ledgerline</h1><p class="muted">Seed · Lagos, Nigeria · Fintech</p></div></div>
-      <div class="tabs"><span class="on">Overview</span><span>Elevator</span><span>Data room</span></div></main>
-  </div>
-  <div class="scrim"><div class="sheet" role="dialog" aria-label="Send questions to Ledgerline">
-    <div class="qline"><span class="qmark"><b></b></span><div><h2>Send 3 questions to Ledgerline</h2><p class="muted" style="margin:4px 0 0">Q prepared this from the assumptions you picked. Nothing is sent until you approve.</p></div></div>
-    <dl class="kv"><dt>How</dt><dd>A diligence request on your relationship (in diligence since 2 Oct)</dd><dt>They see</dt><dd>It on their diligence checklist, from Harbour Seed</dd></dl>
-    <div class="payload"><b>Questions from Harbour Seed (3)</b>
-      <ol><li>Can you share the billing export behind the ₦38m?</li><li>What is monthly growth without your two largest customers?</li><li>What is your monthly burn, and your runway after this round?</li></ol></div>
-    <p class="muted" style="margin-top:10px">Not in diligence yet? It goes as one chat message once you are connected. Sending twice sends it once.</p>
-    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn quiet">Cancel</button><button class="btn">Edit</button><button class="btn primary">Approve and send</button></div>
-  </div></div>
-</template>
-
-<!-- 3. Ask Q: the evidence board in the Q room -->
-<template id="t-evidence">
-  <div class="topbar"><div class="brand"><span class="mark"></span>Q</div><span class="avatar">AO</span></div>
-  <div class="app" data-side="inv" data-on="q">
-    <main class="main"><div class="thread">
-      <div class="me">What assumptions should I test on Ledgerline?</div>
-      <div class="qreply"><div class="who"><span class="qmark"><b></b></span>Q</div>
-        <div>Four things carry Ledgerline's story: revenue, growth, the market size and runway. Revenue has a document behind it; growth and the market are their word; burn and runway are not in anything they shared with you.</div>
-        <div class="answer-card"><div class="h"><h3>Evidence board · Ledgerline</h3><a class="link" href="#">Open profile</a></div>
-          <div class="ebw">
-            <div class="ebc"><h4><span class="st ev sm">Evidenced</span><span class="muted">2</span></h4>
-              <div>₦38m recurring revenue<small>Founder's claim · Document supported · slide 9</small></div>
-              <div>Organisation verified<small>Verified by Capital Q</small></div></div>
-            <div class="ebc"><h4><span class="st cl sm">Claimed</span><span class="muted">4</span></h4>
-              <div>18% monthly growth<small>Founder's claim · Self-reported</small></div>
-              <div>12 paying customers<small>Founder's claim · Self-reported</small></div>
-              <div>41,000 SMEs in Lagos<small>Q's reading · no source cited</small></div></div>
-            <div class="ebc"><h4><span class="st unknown sm">Not known yet</span><span class="muted">3</span></h4>
-              <div>Monthly burn<small>Not in the deck</small></div>
-              <div>Runway after the round<small>Not in the deck</small></div>
-              <div>Customer churn<small>Not shared with you</small></div></div>
+          <div class="tabs">
+            <span class="on">Overview</span><span>Elevator</span
+            ><span>Data room</span><span>Pitch deck</span><span>Team</span>
           </div>
-          <div class="approval"><b>Send 3 questions to Ledgerline?</b><p>As a diligence request. You see the exact wording first.</p><div class="row"><button class="btn primary sm">Review and send</button><button class="btn quiet sm">Not now</button></div></div>
-        </div></div>
-    </div>
-    <div class="composer"><span>Ask Q about Ledgerline</span><span class="mic"></span></div></main>
-  </div>
-  <nav class="tabbar"><span class="on"><i></i>Q</span><span><i></i>Discover</span><span><i></i>Saved</span><span><i></i>Deals</span><span><i></i>More</span></nav>
-</template>
+          <div class="split" style="margin-top: 20px">
+            <section>
+              <div class="section-head">
+                <div>
+                  <h2>Assumptions to test</h2>
+                  <p class="muted" style="margin: 4px 0 0">
+                    What Ledgerline says, what each claim rests on, and what is
+                    not known yet. From their confirmed deck reading and their
+                    profile.
+                  </p>
+                </div>
+              </div>
+              <div class="tally" style="margin: 0 0 12px">
+                <span class="st ev">Evidenced 2</span
+                ><span class="st cl">Claimed 4</span
+                ><span class="st unknown">Not known yet 3</span>
+              </div>
+              <div class="list">
+                <div class="asm">
+                  <div class="top">
+                    <div>
+                      <div class="claim">Revenue: ₦38m a year, recurring</div>
+                      <div class="labels">
+                        <span class="lbl">Founder's claim</span
+                        ><span class="lbl">Document supported</span
+                        ><span class="lbl">Deck, slide 9</span>
+                      </div>
+                    </div>
+                    <span class="st ev sm">Evidenced</span>
+                  </div>
+                  <div class="dep">
+                    <b>Rests on</b>12 paying customers renewing · price holding
+                    at ₦3.2m a year
+                  </div>
+                  <div class="qs">
+                    <span class="check on"
+                      >Can you share the billing export behind the ₦38m?</span
+                    ><span class="check"
+                      >How many of the 12 customers have renewed at least
+                      once?</span
+                    >
+                  </div>
+                </div>
+                <div class="asm">
+                  <div class="top">
+                    <div>
+                      <div class="claim">
+                        Growth: 18% a month for six months
+                      </div>
+                      <div class="labels">
+                        <span class="lbl">Founder's claim</span
+                        ><span class="lbl">Self-reported</span
+                        ><span class="lbl">Deck, slide 10</span>
+                      </div>
+                    </div>
+                    <span class="st cl sm">Claimed</span>
+                  </div>
+                  <div class="dep">
+                    <b>Rests on</b>Sales cycle staying under 30 days · the two
+                    largest customers not skewing it
+                  </div>
+                  <div class="qs">
+                    <span class="check on"
+                      >What is monthly growth without your two largest
+                      customers?</span
+                    >
+                  </div>
+                </div>
+                <div class="asm">
+                  <div class="top">
+                    <div>
+                      <div class="claim">Monthly burn and runway</div>
+                      <div class="labels">
+                        <span class="lbl">Not in the deck</span>
+                      </div>
+                    </div>
+                    <span class="st unknown sm">Not known yet</span>
+                  </div>
+                  <div class="dep">
+                    <b>Why it matters</b>Unknown is not a weakness. It is the
+                    first thing to ask.
+                  </div>
+                  <div class="qs">
+                    <span class="check on"
+                      >What is your monthly burn, and your runway after this
+                      round?</span
+                    >
+                  </div>
+                </div>
+                <div class="asm">
+                  <div class="top">
+                    <div>
+                      <div class="claim">
+                        Market: 41,000 SMEs in Lagos keep digital ledgers
+                      </div>
+                      <div class="labels">
+                        <span class="lbl q">Q's reading of the deck</span
+                        ><span class="lbl">No source cited</span>
+                      </div>
+                    </div>
+                    <span class="st cl sm">Claimed</span>
+                  </div>
+                  <div class="dep">
+                    <b>Rests on</b>A source for the 41,000 · the share that
+                    would pay
+                  </div>
+                  <div class="qs">
+                    <span class="check">Where does the 41,000 come from?</span>
+                  </div>
+                </div>
+                <div class="sendbar">
+                  <p>
+                    3 questions selected. You approve the exact wording before
+                    anything is sent.
+                  </p>
+                  <button class="btn primary">
+                    Send 3 questions to Ledgerline
+                  </button>
+                </div>
+              </div>
+            </section>
+            <aside class="aside">
+              <h3>Fit with your mandate</h3>
+              <p class="qsays" style="font-size: 22px; margin: 6px 0 2px">
+                7.5/10 · Good fit
+              </p>
+              <p class="muted">
+                Stage, sector and geography match. Cheque size: not known yet.
+              </p>
+              <div class="note">
+                Q only uses what Ledgerline shares with you. Their private
+                numbers never reach this card.
+              </div>
+            </aside>
+          </div>
+        </main>
+      </div>
+      <nav class="tabbar">
+        <span><i></i>Q</span><span class="on"><i></i>Discover</span
+        ><span><i></i>Saved</span><span><i></i>Deals</span
+        ><span><i></i>More</span>
+      </nav>
+    </template>
 
-<!-- 4. Founder Discover: investors, in words, from what they publish -->
-<template id="t-investors">
-  <div class="topbar"><div class="brand"><span class="mark"></span>Discover</div><span class="avatar">TB</span></div>
-  <div class="app" data-side="fdr" data-on="discover">
-    <main class="main">
-      <h1>Discover</h1>
-      <div class="tabs" style="margin-top:8px"><span class="on">Investors</span><span>Founders</span></div>
-      <p class="sub" style="margin-top:14px">Based on what investors publish: their gate and their public profile. Their private mandates never shape this list, and Q never guesses them.</p>
-      <div style="margin-top:16px">
-        <div class="inv"><span class="logo">HS</span><div><div class="row" style="gap:8px"><h3>Harbour Seed</h3><span class="gatebadge">Has a gate · 4 criteria</span></div>
-          <p class="muted" style="margin:2px 0 0">Seed fund · Lagos · Actively investing</p>
-          <div class="crit"><span><i class="mk y"></i>Seed or pre-seed</span><span><i class="mk y"></i>Fintech</span><span><i class="mk y"></i>Nigeria or Ghana</span><span><i class="mk u"></i>$500k to $3M raise: not known yet</span></div>
-          <p class="muted" style="margin:8px 0 0">Meets 3 of their 4 published criteria; one Q can't check until you share your raise.</p></div>
-          <div class="acts row"><button class="btn primary sm">Check and apply</button><button class="btn sm">Request connection</button></div></div>
-        <div class="inv"><span class="logo">KV</span><div><div class="row" style="gap:8px"><h3>Kanu Ventures</h3><span class="gatebadge">Has a gate · 3 criteria</span></div>
-          <p class="muted" style="margin:2px 0 0">VC · Nairobi · Investing selectively</p>
-          <div class="crit"><span><i class="mk y"></i>Seed to Series A</span><span><i class="mk n"></i>East Africa only</span><span><i class="mk u"></i>Climate or agritech: not known yet</span></div>
-          <p class="muted" style="margin:8px 0 0">Doesn't meet one required criterion: East Africa only.</p></div>
-          <div class="acts row"><button class="btn sm">See their gate</button></div></div>
-        <div class="inv"><span class="logo">OA</span><div><h3>Oduya Angels</h3>
-          <p class="muted" style="margin:2px 0 0">Angel network · Accra · Actively investing</p>
-          <p style="margin:8px 0 0;font-size:13.5px;color:var(--cq-text-secondary)">No gate published. They describe themselves as "pre-seed B2B software in West Africa". Q can't check criteria they haven't published.</p></div>
-          <div class="acts row"><button class="btn sm">Request connection</button></div></div>
+    <!-- 2. Approve the exact request (Prepare -> Approve -> Execute) -->
+    <template id="t-send">
+      <div class="topbar">
+        <div class="brand"><span class="mark"></span>Ledgerline</div>
+        <span class="avatar">AO</span>
       </div>
-    </main>
-  </div>
-  <nav class="tabbar"><span><i></i>Q</span><span><i></i>Company</span><span><i></i>Capital</span><span class="on"><i></i>Discover</span><span><i></i>More</span></nav>
-</template>
+      <div class="app" data-side="inv" data-on="discover">
+        <main class="main">
+          <div class="crumb">← Back to Discover</div>
+          <div class="co">
+            <span class="logo">LL</span>
+            <div>
+              <h1>Ledgerline</h1>
+              <p class="muted">Seed · Lagos, Nigeria · Fintech</p>
+            </div>
+          </div>
+          <div class="tabs">
+            <span class="on">Overview</span><span>Elevator</span
+            ><span>Data room</span>
+          </div>
+        </main>
+      </div>
+      <div class="scrim">
+        <div
+          class="sheet"
+          role="dialog"
+          aria-label="Send questions to Ledgerline"
+        >
+          <div class="qline">
+            <span class="qmark"><b></b></span>
+            <div>
+              <h2>Send 3 questions to Ledgerline</h2>
+              <p class="muted" style="margin: 4px 0 0">
+                Q prepared this from the assumptions you picked. Nothing is sent
+                until you approve.
+              </p>
+            </div>
+          </div>
+          <dl class="kv">
+            <dt>How</dt>
+            <dd>
+              A diligence request on your relationship (in diligence since 2
+              Oct)
+            </dd>
+            <dt>They see</dt>
+            <dd>It on their diligence checklist, from Harbour Seed</dd>
+          </dl>
+          <div class="payload">
+            <b>Questions from Harbour Seed (3)</b>
+            <ol>
+              <li>Can you share the billing export behind the ₦38m?</li>
+              <li>
+                What is monthly growth without your two largest customers?
+              </li>
+              <li>
+                What is your monthly burn, and your runway after this round?
+              </li>
+            </ol>
+          </div>
+          <p class="muted" style="margin-top: 10px">
+            Not in diligence yet? It goes as one chat message once you are
+            connected. Sending twice sends it once.
+          </p>
+          <div class="row" style="margin-top: 14px; justify-content: flex-end">
+            <button class="btn quiet">Cancel</button
+            ><button class="btn">Edit</button
+            ><button class="btn primary">Approve and send</button>
+          </div>
+        </div>
+      </div>
+    </template>
 
-<!-- 5. GateQ: the founder's check per criterion, and the investor's criteria -->
-<template id="t-gate">
-  <div class="topbar"><div class="brand"><span class="mark"></span>GateQ</div><span class="avatar">TB</span></div>
-  <div class="app" data-side="fdr" data-on="gateq">
-    <main class="main">
-      <div class="crumb">← Discover</div>
-      <h1>Harbour Seed's gate</h1>
-      <p class="sub">Their published criteria, checked against what Ledgerline has shared. Unknown is not a no.</p>
-      <div class="split" style="margin-top:18px">
-        <section class="list">
-          <div class="item"><span class="mk y" style="margin-top:3px"></span><div><h3>Seed or pre-seed</h3><p>Required · You're at seed</p></div><span class="st ev sm">Met</span></div>
-          <div class="item"><span class="mk y" style="margin-top:3px"></span><div><h3>Fintech</h3><p>Required · Your sector is fintech</p></div><span class="st ev sm">Met</span></div>
-          <div class="item"><span class="mk y" style="margin-top:3px"></span><div><h3>Nigeria or Ghana</h3><p>Preferred · You're in Lagos</p></div><span class="st ev sm">Met</span></div>
-          <div class="item"><span class="mk u" style="margin-top:3px"></span><div><h3>$500k to $3M raise</h3><p>Required · You haven't shared your raise</p></div><span class="st unknown sm">Not known yet</span></div>
-          <div class="sendbar"><p>One answer away. Q asks only what this gate needs.</p><button class="btn primary">Answer 1 question and apply</button></div>
-        </section>
-        <aside class="aside"><h3>For investors: your gate</h3><p class="muted">Founders see each criterion by the words you choose, never your mandate.</p>
-          <div class="chips"><span class="chip">+ Stage</span><span class="chip">+ Sector</span><span class="chip">+ Country</span><span class="chip">+ Raise size</span><span class="chip">+ Cheque</span><span class="chip">+ Exclude a sector</span></div>
-          <div class="note">Or let Q read your mandate into a draft gate. You publish it.</div></aside>
+    <!-- 3. Ask Q: the evidence board in the Q room -->
+    <template id="t-evidence">
+      <div class="topbar">
+        <div class="brand"><span class="mark"></span>Q</div>
+        <span class="avatar">AO</span>
       </div>
-    </main>
-  </div>
-  <nav class="tabbar"><span><i></i>Q</span><span><i></i>Company</span><span><i></i>Capital</span><span class="on"><i></i>Discover</span><span><i></i>More</span></nav>
-</template>
+      <div class="app" data-side="inv" data-on="q">
+        <main class="main">
+          <div class="thread">
+            <div class="me">What assumptions should I test on Ledgerline?</div>
+            <div class="qreply">
+              <div class="who">
+                <span class="qmark"><b></b></span>Q
+              </div>
+              <div>
+                Four things carry Ledgerline's story: revenue, growth, the
+                market size and runway. Revenue has a document behind it; growth
+                and the market are their word; burn and runway are not in
+                anything they shared with you.
+              </div>
+              <div class="answer-card">
+                <div class="h">
+                  <h3>Evidence board · Ledgerline</h3>
+                  <a class="link" href="#">Open profile</a>
+                </div>
+                <div class="ebw">
+                  <div class="ebc">
+                    <h4>
+                      <span class="st ev sm">Evidenced</span
+                      ><span class="muted">2</span>
+                    </h4>
+                    <div>
+                      ₦38m recurring revenue<small
+                        >Founder's claim · Document supported · slide 9</small
+                      >
+                    </div>
+                    <div>
+                      Organisation verified<small>Verified by Capital Q</small>
+                    </div>
+                  </div>
+                  <div class="ebc">
+                    <h4>
+                      <span class="st cl sm">Claimed</span
+                      ><span class="muted">4</span>
+                    </h4>
+                    <div>
+                      18% monthly growth<small
+                        >Founder's claim · Self-reported</small
+                      >
+                    </div>
+                    <div>
+                      12 paying customers<small
+                        >Founder's claim · Self-reported</small
+                      >
+                    </div>
+                    <div>
+                      41,000 SMEs in Lagos<small
+                        >Q's reading · no source cited</small
+                      >
+                    </div>
+                  </div>
+                  <div class="ebc">
+                    <h4>
+                      <span class="st unknown sm">Not known yet</span
+                      ><span class="muted">3</span>
+                    </h4>
+                    <div>Monthly burn<small>Not in the deck</small></div>
+                    <div>
+                      Runway after the round<small>Not in the deck</small>
+                    </div>
+                    <div>Customer churn<small>Not shared with you</small></div>
+                  </div>
+                </div>
+                <div class="approval">
+                  <b>Send 3 questions to Ledgerline?</b>
+                  <p>
+                    As a diligence request. You see the exact wording first.
+                  </p>
+                  <div class="row">
+                    <button class="btn primary sm">Review and send</button
+                    ><button class="btn quiet sm">Not now</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="composer">
+            <span>Ask Q about Ledgerline</span><span class="mic"></span>
+          </div>
+        </main>
+      </div>
+      <nav class="tabbar">
+        <span class="on"><i></i>Q</span><span><i></i>Discover</span
+        ><span><i></i>Saved</span><span><i></i>Deals</span
+        ><span><i></i>More</span>
+      </nav>
+    </template>
 
-<!-- 6. How Q reads your thesis (investor mandate) -->
-<template id="t-thesis">
-  <div class="topbar"><div class="brand"><span class="mark"></span>Profile</div><span class="avatar">AO</span></div>
-  <div class="app" data-side="inv" data-on="profile">
-    <main class="main">
-      <h1>How Q reads your thesis</h1>
-      <p class="sub">What you declared decides your feed. What you did and what Q reads from it are shown apart, and never change your rules unless you approve. <span class="private">Only Harbour Seed sees this</span></p>
-      <div class="cols3">
-        <div class="panel"><div class="colh"><h3>What you declared</h3><small>Your rules</small></div>
-          <div class="rule"><span>Stage</span><span>Pre-seed to seed</span></div>
-          <div class="rule"><span>Countries</span><span>Nigeria, Kenya</span></div>
-          <div class="rule"><span>Sectors</span><span>Fintech, logistics</span></div>
-          <div class="rule"><span>Cheque</span><span>$100k to $500k</span></div>
-          <div class="rule"><span>Never</span><span>Gambling</span></div></div>
-        <div class="panel"><div class="colh"><h3>What you did</h3><small>Last 90 days</small></div>
-          <p class="muted" style="margin:0 0 6px">Saved 9 · Passed 14</p>
-          <div class="bar"><span>Saved · Ghana</span><i><b style="width:33%"></b></i><span>3</span></div>
-          <div class="bar"><span>Saved · Nigeria</span><i><b style="width:55%"></b></i><span>5</span></div>
-          <div class="bar"><span>Passed · pre-seed</span><i><b style="width:70%"></b></i><span>8</span></div>
-          <div class="bar"><span>Passed · seed</span><i><b style="width:45%"></b></i><span>6</span></div>
-          <p class="muted" style="margin-top:8px">Saving isn't interest, and viewing counts for nothing here.</p></div>
-        <div class="panel"><div class="colh"><h3>What Q reads from it</h3><span class="lbl q">Q's inference</span></div>
-          <p style="margin:0;font-size:14px">You save Ghanaian companies though Ghana isn't in your countries. You pass on most pre-seed companies.</p>
-          <p class="muted">A reading of 23 decisions, not a fact about your thesis.</p></div>
+    <!-- 4. Founder Discover: investors, in words, from what they publish -->
+    <template id="t-investors">
+      <div class="topbar">
+        <div class="brand"><span class="mark"></span>Discover</div>
+        <span class="avatar">TB</span>
       </div>
-      <div class="section"><div class="section-head"><h2>Q suggests</h2><span class="muted">2 · each needs your approval</span></div>
-        <div class="sugg"><b>Add Ghana to your countries?</b><p>You saved 3 companies in Ghana in 90 days. Your feed would start including Ghanaian companies.</p><div class="row"><button class="btn primary sm">Add Ghana</button><button class="btn quiet sm">Not now</button></div></div>
-        <div class="sugg"><b>Start your stages at seed?</b><p>You passed 8 of 9 pre-seed companies. Pre-seed companies would leave your feed.</p><div class="row"><button class="btn primary sm">Change to seed only</button><button class="btn quiet sm">Keep pre-seed</button></div></div>
+      <div class="app" data-side="fdr" data-on="discover">
+        <main class="main">
+          <h1>Discover</h1>
+          <div class="tabs" style="margin-top: 8px">
+            <span class="on">Investors</span><span>Founders</span>
+          </div>
+          <p class="sub" style="margin-top: 14px">
+            Based on what investors publish: their gate and their public
+            profile. Their private mandates never shape this list, and Q never
+            guesses them.
+          </p>
+          <div style="margin-top: 16px">
+            <div class="inv">
+              <span class="logo">HS</span>
+              <div>
+                <div class="row" style="gap: 8px">
+                  <h3>Harbour Seed</h3>
+                  <span class="gatebadge">Has a gate · 4 criteria</span>
+                </div>
+                <p class="muted" style="margin: 2px 0 0">
+                  Seed fund · Lagos · Actively investing
+                </p>
+                <div class="crit">
+                  <span><i class="mk y"></i>Seed or pre-seed</span
+                  ><span><i class="mk y"></i>Fintech</span
+                  ><span><i class="mk y"></i>Nigeria or Ghana</span
+                  ><span
+                    ><i class="mk u"></i>$500k to $3M raise: not known yet</span
+                  >
+                </div>
+                <p class="muted" style="margin: 8px 0 0">
+                  Meets 3 of their 4 published criteria; one Q can't check until
+                  you share your raise.
+                </p>
+              </div>
+              <div class="acts row">
+                <button class="btn primary sm">Check and apply</button
+                ><button class="btn sm">Request connection</button>
+              </div>
+            </div>
+            <div class="inv">
+              <span class="logo">KV</span>
+              <div>
+                <div class="row" style="gap: 8px">
+                  <h3>Kanu Ventures</h3>
+                  <span class="gatebadge">Has a gate · 3 criteria</span>
+                </div>
+                <p class="muted" style="margin: 2px 0 0">
+                  VC · Nairobi · Investing selectively
+                </p>
+                <div class="crit">
+                  <span><i class="mk y"></i>Seed to Series A</span
+                  ><span><i class="mk n"></i>East Africa only</span
+                  ><span
+                    ><i class="mk u"></i>Climate or agritech: not known
+                    yet</span
+                  >
+                </div>
+                <p class="muted" style="margin: 8px 0 0">
+                  Doesn't meet one required criterion: East Africa only.
+                </p>
+              </div>
+              <div class="acts row">
+                <button class="btn sm">See their gate</button>
+              </div>
+            </div>
+            <div class="inv">
+              <span class="logo">OA</span>
+              <div>
+                <h3>Oduya Angels</h3>
+                <p class="muted" style="margin: 2px 0 0">
+                  Angel network · Accra · Actively investing
+                </p>
+                <p
+                  style="
+                    margin: 8px 0 0;
+                    font-size: 13.5px;
+                    color: var(--cq-text-secondary);
+                  "
+                >
+                  No gate published. They describe themselves as "pre-seed B2B
+                  software in West Africa". Q can't check criteria they haven't
+                  published.
+                </p>
+              </div>
+              <div class="acts row">
+                <button class="btn sm">Request connection</button>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
-    </main>
-  </div>
-  <nav class="tabbar"><span><i></i>Q</span><span><i></i>Discover</span><span><i></i>Saved</span><span><i></i>Deals</span><span class="on"><i></i>More</span></nav>
-</template>
+      <nav class="tabbar">
+        <span><i></i>Q</span><span><i></i>Company</span
+        ><span><i></i>Capital</span><span class="on"><i></i>Discover</span
+        ><span><i></i>More</span>
+      </nav>
+    </template>
 
-<!-- 7. Compare from Saved -->
-<template id="t-compare">
-  <div class="topbar"><div class="brand"><span class="mark"></span>Saved</div><span class="avatar">AO</span></div>
-  <div class="app" data-side="inv" data-on="saved">
-    <main class="main">
-      <h1>Saved</h1><p class="sub">Saving isn't interest. The company isn't told.</p>
-      <div class="saved" style="margin-top:16px">
-        <div class="srow"><span class="box on"></span><span class="logo">LL</span><div><b>Ledgerline</b><div class="muted">Seed · Nigeria · Fintech</div></div><span class="muted">Saved 2 Oct</span></div>
-        <div class="srow"><span class="box on"></span><span class="logo">KF</span><div><b>Kola Freight</b><div class="muted">Seed · Nigeria · Logistics</div></div><span class="muted">Saved 29 Sep</span></div>
-        <div class="srow"><span class="box on"></span><span class="logo">PB</span><div><b>Paybridge</b><div class="muted">Pre-seed · Kenya · Fintech</div></div><span class="muted">Saved 24 Sep</span></div>
-        <div class="srow desk-only"><span class="box"></span><span class="logo">AJ</span><div><b>Ajopot</b><div class="muted">Seed · Ghana · Savings</div></div><span class="muted">Saved 20 Sep</span></div>
-        <div class="sendbar"><p>3 selected · compare 2 to 4</p><button class="btn primary">Compare 3</button></div>
+    <!-- 5. GateQ: the founder's check per criterion, and the investor's criteria -->
+    <template id="t-gate">
+      <div class="topbar">
+        <div class="brand"><span class="mark"></span>GateQ</div>
+        <span class="avatar">TB</span>
       </div>
-      <table class="cmp"><thead><tr><th></th><th>Ledgerline</th><th>Kola Freight</th><th>Paybridge</th></tr></thead><tbody>
-        <tr><th>Fit</th><td>7.5/10 · Good fit<span class="best">Best of these</span></td><td>6.5/10 · Good fit</td><td>Not enough information</td></tr>
-        <tr><th>Stage</th><td>Matches<small>Seed</small></td><td>Matches<small>Seed</small></td><td>Matches<small>Pre-seed</small></td></tr>
-        <tr><th>Geography</th><td>Matches<small>Nigeria</small></td><td>Matches<small>Nigeria</small></td><td>Matches<small>Kenya</small></td></tr>
-        <tr><th>Cheque size</th><td>Not known yet</td><td>Partly<small>Raise above your range</small></td><td>Not known yet</td></tr>
-        <tr><th>Traction</th><td>Claimed<small>₦38m revenue, document supported</small></td><td>Claimed<small>1,200 deliveries a month</small></td><td>Not known yet</td></tr>
-        <tr><th>Evidence</th><td>2 evidenced · 4 claimed · 3 not known</td><td>1 evidenced · 5 claimed · 4 not known</td><td>0 evidenced · 2 claimed · 8 not known</td></tr>
-      </tbody></table>
-      <div class="cmpcards">
-        <div class="ccard"><div class="row" style="justify-content:space-between"><b>Ledgerline</b><span class="best">Best of these</span></div><div class="mini"><span>Fit</span><span>7.5/10 · Good fit</span></div><div class="mini"><span>Cheque size</span><span>Not known yet</span></div><div class="mini"><span>Evidence</span><span>2 · 4 · 3 not known</span></div></div>
-        <div class="ccard"><b>Kola Freight</b><div class="mini"><span>Fit</span><span>6.5/10 · Good fit</span></div><div class="mini"><span>Cheque size</span><span>Partly</span></div><div class="mini"><span>Evidence</span><span>1 · 5 · 4 not known</span></div></div>
+      <div class="app" data-side="fdr" data-on="gateq">
+        <main class="main">
+          <div class="crumb">← Discover</div>
+          <h1>Harbour Seed's gate</h1>
+          <p class="sub">
+            Their published criteria, checked against what Ledgerline has
+            shared. Unknown is not a no.
+          </p>
+          <div class="split" style="margin-top: 18px">
+            <section class="list">
+              <div class="item">
+                <span class="mk y" style="margin-top: 3px"></span>
+                <div>
+                  <h3>Seed or pre-seed</h3>
+                  <p>Required · You're at seed</p>
+                </div>
+                <span class="st ev sm">Met</span>
+              </div>
+              <div class="item">
+                <span class="mk y" style="margin-top: 3px"></span>
+                <div>
+                  <h3>Fintech</h3>
+                  <p>Required · Your sector is fintech</p>
+                </div>
+                <span class="st ev sm">Met</span>
+              </div>
+              <div class="item">
+                <span class="mk y" style="margin-top: 3px"></span>
+                <div>
+                  <h3>Nigeria or Ghana</h3>
+                  <p>Preferred · You're in Lagos</p>
+                </div>
+                <span class="st ev sm">Met</span>
+              </div>
+              <div class="item">
+                <span class="mk u" style="margin-top: 3px"></span>
+                <div>
+                  <h3>$500k to $3M raise</h3>
+                  <p>Required · You haven't shared your raise</p>
+                </div>
+                <span class="st unknown sm">Not known yet</span>
+              </div>
+              <div class="sendbar">
+                <p>One answer away. Q asks only what this gate needs.</p>
+                <button class="btn primary">Answer 1 question and apply</button>
+              </div>
+            </section>
+            <aside class="aside">
+              <h3>For investors: your gate</h3>
+              <p class="muted">
+                Founders see each criterion by the words you choose, never your
+                mandate.
+              </p>
+              <div class="chips">
+                <span class="chip">+ Stage</span
+                ><span class="chip">+ Sector</span
+                ><span class="chip">+ Country</span
+                ><span class="chip">+ Raise size</span
+                ><span class="chip">+ Cheque</span
+                ><span class="chip">+ Exclude a sector</span>
+              </div>
+              <div class="note">
+                Or let Q read your mandate into a draft gate. You publish it.
+              </div>
+            </aside>
+          </div>
+        </main>
       </div>
-      <p class="muted" style="margin-top:12px">The same fit and evidence as your top three. The order is Capital Q's fit model (ranking-config.v4), never paid.</p>
-    </main>
-  </div>
-  <nav class="tabbar"><span><i></i>Q</span><span><i></i>Discover</span><span class="on"><i></i>Saved</span><span><i></i>Deals</span><span><i></i>More</span></nav>
-</template>
+      <nav class="tabbar">
+        <span><i></i>Q</span><span><i></i>Company</span
+        ><span><i></i>Capital</span><span class="on"><i></i>Discover</span
+        ><span><i></i>More</span>
+      </nav>
+    </template>
 
-<script>
-const p=new URLSearchParams(location.search);
-const all=['assume','send','evidence','investors','gate','thesis','compare'];
-const screens=p.get('screen')?[p.get('screen')]:all;
-const devices=p.get('device')?[p.get('device')]:['phone','desktop'];
-document.documentElement.dataset.theme=p.get('theme')||'dark';
-if(p.get('screen')&&p.get('device'))document.body.classList.add('solo');
-const g=document.getElementById('gallery');
-for(const s of screens){for(const d of devices){
-  const t=document.createElement('div');t.className='gallery-title';t.textContent=s+' · '+d;g.appendChild(t);
-  const f=document.createElement('div');f.className='frame '+d;f.appendChild(document.getElementById('t-'+s).content.cloneNode(true));
-  const app=f.querySelector('.app');
-  if(app&&app.dataset.side){const side=document.getElementById('side-'+app.dataset.side).content.cloneNode(true);
-    const on=side.querySelector('[data-n="'+app.dataset.on+'"]');if(on)on.classList.add('on');app.prepend(side);}
-  g.appendChild(f);
-}}
-</script>
-</body>
+    <!-- 6. How Q reads your thesis (investor mandate) -->
+    <template id="t-thesis">
+      <div class="topbar">
+        <div class="brand"><span class="mark"></span>Profile</div>
+        <span class="avatar">AO</span>
+      </div>
+      <div class="app" data-side="inv" data-on="profile">
+        <main class="main">
+          <h1>How Q reads your thesis</h1>
+          <p class="sub">
+            What you declared decides your feed. What you did and what Q reads
+            from it are shown apart, and never change your rules unless you
+            approve. <span class="private">Only Harbour Seed sees this</span>
+          </p>
+          <div class="cols3">
+            <div class="panel">
+              <div class="colh">
+                <h3>What you declared</h3>
+                <small>Your rules</small>
+              </div>
+              <div class="rule">
+                <span>Stage</span><span>Pre-seed to seed</span>
+              </div>
+              <div class="rule">
+                <span>Countries</span><span>Nigeria, Kenya</span>
+              </div>
+              <div class="rule">
+                <span>Sectors</span><span>Fintech, logistics</span>
+              </div>
+              <div class="rule">
+                <span>Cheque</span><span>$100k to $500k</span>
+              </div>
+              <div class="rule"><span>Never</span><span>Gambling</span></div>
+            </div>
+            <div class="panel">
+              <div class="colh">
+                <h3>What you did</h3>
+                <small>Last 90 days</small>
+              </div>
+              <p class="muted" style="margin: 0 0 6px">Saved 9 · Passed 14</p>
+              <div class="bar">
+                <span>Saved · Ghana</span><i><b style="width: 33%"></b></i
+                ><span>3</span>
+              </div>
+              <div class="bar">
+                <span>Saved · Nigeria</span><i><b style="width: 55%"></b></i
+                ><span>5</span>
+              </div>
+              <div class="bar">
+                <span>Passed · pre-seed</span><i><b style="width: 70%"></b></i
+                ><span>8</span>
+              </div>
+              <div class="bar">
+                <span>Passed · seed</span><i><b style="width: 45%"></b></i
+                ><span>6</span>
+              </div>
+              <p class="muted" style="margin-top: 8px">
+                Saving isn't interest, and viewing counts for nothing here.
+              </p>
+            </div>
+            <div class="panel">
+              <div class="colh">
+                <h3>What Q reads from it</h3>
+                <span class="lbl q">Q's inference</span>
+              </div>
+              <p style="margin: 0; font-size: 14px">
+                You save Ghanaian companies though Ghana isn't in your
+                countries. You pass on most pre-seed companies.
+              </p>
+              <p class="muted">
+                A reading of 23 decisions, not a fact about your thesis.
+              </p>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-head">
+              <h2>Q suggests</h2>
+              <span class="muted">2 · each needs your approval</span>
+            </div>
+            <div class="sugg">
+              <b>Add Ghana to your countries?</b>
+              <p>
+                You saved 3 companies in Ghana in 90 days. Your feed would start
+                including Ghanaian companies.
+              </p>
+              <div class="row">
+                <button class="btn primary sm">Add Ghana</button
+                ><button class="btn quiet sm">Not now</button>
+              </div>
+            </div>
+            <div class="sugg">
+              <b>Start your stages at seed?</b>
+              <p>
+                You passed 8 of 9 pre-seed companies. Pre-seed companies would
+                leave your feed.
+              </p>
+              <div class="row">
+                <button class="btn primary sm">Change to seed only</button
+                ><button class="btn quiet sm">Keep pre-seed</button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+      <nav class="tabbar">
+        <span><i></i>Q</span><span><i></i>Discover</span
+        ><span><i></i>Saved</span><span><i></i>Deals</span
+        ><span class="on"><i></i>More</span>
+      </nav>
+    </template>
+
+    <!-- 7. Compare from Saved -->
+    <template id="t-compare">
+      <div class="topbar">
+        <div class="brand"><span class="mark"></span>Saved</div>
+        <span class="avatar">AO</span>
+      </div>
+      <div class="app" data-side="inv" data-on="saved">
+        <main class="main">
+          <h1>Saved</h1>
+          <p class="sub">Saving isn't interest. The company isn't told.</p>
+          <div class="saved" style="margin-top: 16px">
+            <div class="srow">
+              <span class="box on"></span><span class="logo">LL</span>
+              <div>
+                <b>Ledgerline</b>
+                <div class="muted">Seed · Nigeria · Fintech</div>
+              </div>
+              <span class="muted">Saved 2 Oct</span>
+            </div>
+            <div class="srow">
+              <span class="box on"></span><span class="logo">KF</span>
+              <div>
+                <b>Kola Freight</b>
+                <div class="muted">Seed · Nigeria · Logistics</div>
+              </div>
+              <span class="muted">Saved 29 Sep</span>
+            </div>
+            <div class="srow">
+              <span class="box on"></span><span class="logo">PB</span>
+              <div>
+                <b>Paybridge</b>
+                <div class="muted">Pre-seed · Kenya · Fintech</div>
+              </div>
+              <span class="muted">Saved 24 Sep</span>
+            </div>
+            <div class="srow desk-only">
+              <span class="box"></span><span class="logo">AJ</span>
+              <div>
+                <b>Ajopot</b>
+                <div class="muted">Seed · Ghana · Savings</div>
+              </div>
+              <span class="muted">Saved 20 Sep</span>
+            </div>
+            <div class="sendbar">
+              <p>3 selected · compare 2 to 4</p>
+              <button class="btn primary">Compare 3</button>
+            </div>
+          </div>
+          <table class="cmp">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Ledgerline</th>
+                <th>Kola Freight</th>
+                <th>Paybridge</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th>Fit</th>
+                <td>
+                  7.5/10 · Good fit<span class="best">Best of these</span>
+                </td>
+                <td>6.5/10 · Good fit</td>
+                <td>Not enough information</td>
+              </tr>
+              <tr>
+                <th>Stage</th>
+                <td>Matches<small>Seed</small></td>
+                <td>Matches<small>Seed</small></td>
+                <td>Matches<small>Pre-seed</small></td>
+              </tr>
+              <tr>
+                <th>Geography</th>
+                <td>Matches<small>Nigeria</small></td>
+                <td>Matches<small>Nigeria</small></td>
+                <td>Matches<small>Kenya</small></td>
+              </tr>
+              <tr>
+                <th>Cheque size</th>
+                <td>Not known yet</td>
+                <td>Partly<small>Raise above your range</small></td>
+                <td>Not known yet</td>
+              </tr>
+              <tr>
+                <th>Traction</th>
+                <td>Claimed<small>₦38m revenue, document supported</small></td>
+                <td>Claimed<small>1,200 deliveries a month</small></td>
+                <td>Not known yet</td>
+              </tr>
+              <tr>
+                <th>Evidence</th>
+                <td>2 evidenced · 4 claimed · 3 not known</td>
+                <td>1 evidenced · 5 claimed · 4 not known</td>
+                <td>0 evidenced · 2 claimed · 8 not known</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="cmpcards">
+            <div class="ccard">
+              <div class="row" style="justify-content: space-between">
+                <b>Ledgerline</b><span class="best">Best of these</span>
+              </div>
+              <div class="mini">
+                <span>Fit</span><span>7.5/10 · Good fit</span>
+              </div>
+              <div class="mini">
+                <span>Cheque size</span><span>Not known yet</span>
+              </div>
+              <div class="mini">
+                <span>Evidence</span><span>2 · 4 · 3 not known</span>
+              </div>
+            </div>
+            <div class="ccard">
+              <b>Kola Freight</b>
+              <div class="mini">
+                <span>Fit</span><span>6.5/10 · Good fit</span>
+              </div>
+              <div class="mini">
+                <span>Cheque size</span><span>Partly</span>
+              </div>
+              <div class="mini">
+                <span>Evidence</span><span>1 · 5 · 4 not known</span>
+              </div>
+            </div>
+          </div>
+          <p class="muted" style="margin-top: 12px">
+            The same fit and evidence as your top three. The order is Capital
+            Q's fit model (ranking-config.v4), never paid.
+          </p>
+        </main>
+      </div>
+      <nav class="tabbar">
+        <span><i></i>Q</span><span><i></i>Discover</span
+        ><span class="on"><i></i>Saved</span><span><i></i>Deals</span
+        ><span><i></i>More</span>
+      </nav>
+    </template>
+
+    <script>
+      const p = new URLSearchParams(location.search);
+      const all = [
+        "assume",
+        "send",
+        "evidence",
+        "investors",
+        "gate",
+        "thesis",
+        "compare",
+      ];
+      const screens = p.get("screen") ? [p.get("screen")] : all;
+      const devices = p.get("device")
+        ? [p.get("device")]
+        : ["phone", "desktop"];
+      document.documentElement.dataset.theme = p.get("theme") || "dark";
+      if (p.get("screen") && p.get("device"))
+        document.body.classList.add("solo");
+      const g = document.getElementById("gallery");
+      for (const s of screens) {
+        for (const d of devices) {
+          const t = document.createElement("div");
+          t.className = "gallery-title";
+          t.textContent = s + " · " + d;
+          g.appendChild(t);
+          const f = document.createElement("div");
+          f.className = "frame " + d;
+          f.appendChild(
+            document.getElementById("t-" + s).content.cloneNode(true),
+          );
+          const app = f.querySelector(".app");
+          if (app && app.dataset.side) {
+            const side = document
+              .getElementById("side-" + app.dataset.side)
+              .content.cloneNode(true);
+            const on = side.querySelector('[data-n="' + app.dataset.on + '"]');
+            if (on) on.classList.add("on");
+            app.prepend(side);
+          }
+          g.appendChild(f);
+        }
+      }
+    </script>
+  </body>
 </html>

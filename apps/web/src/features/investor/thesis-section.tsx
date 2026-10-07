@@ -27,9 +27,7 @@ export function ThesisSection({
   const [hidden, setHidden] = useState<readonly string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const suggestions = reading.suggestions.filter(
-    (s) => !hidden.includes(s.id),
-  );
+  const suggestions = reading.suggestions.filter((s) => !hidden.includes(s.id));
   const savedCounts = reading.observed.counts.filter(
     (c) => c.decision === "SAVED",
   );
@@ -125,7 +123,9 @@ export function ThesisSection({
                   >
                     <span
                       className="block h-full rounded-full bg-(--cq-border-strong)"
-                      style={{ width: `${String((count.count / widest) * 100)}%` }}
+                      style={{
+                        width: `${String((count.count / widest) * 100)}%`,
+                      }}
                     />
                   </span>
                   <span className="text-end">{String(count.count)}</span>

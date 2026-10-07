@@ -146,7 +146,8 @@ function factAssumption(
     standing,
     truthClass: fact.value === null ? null : fact.truthClass,
     evidenceStatus: fact.value === null ? null : fact.evidenceStatus,
-    unknownReason: fact.value === null ? (fact.unknownReason ?? "UNCLEAR") : null,
+    unknownReason:
+      fact.value === null ? (fact.unknownReason ?? "UNCLEAR") : null,
     source: sourceOf(fact.pages),
     restsOn: [...RESTS_ON[section.section]],
     question: clip(questionFor(fact, standing), ASSUMPTION_QUESTION_MAX_LENGTH),

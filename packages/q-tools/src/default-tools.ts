@@ -136,9 +136,7 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
           createFitCompareTool(ports),
         ]),
     // Q.02: how Q reads their thesis (their own mandate and decisions).
-    ...(ports.appActions === undefined
-      ? []
-      : [createThesisReadingTool(ports)]),
+    ...(ports.appActions === undefined ? [] : [createThesisReadingTool(ports)]),
     // Q.07: a company's assumptions to test, as this investor may see them.
     ...(ports.profileMaterial === undefined
       ? []

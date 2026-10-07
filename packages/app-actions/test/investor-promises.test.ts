@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { CorrelationId } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import { APP_ACTIONS } from "../src/registry.js";
@@ -19,7 +18,7 @@ const MESSAGE = "30000000-0000-4000-8000-000000000002";
 const context: AppActionContext = {
   actor,
   idempotencyKey: "questions-key-0001",
-  correlationId: "corr-1" as CorrelationId,
+  correlationId: "corr-1",
   surface: "SCREEN",
 };
 

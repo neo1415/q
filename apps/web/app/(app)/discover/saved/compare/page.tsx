@@ -68,7 +68,10 @@ export default async function SavedComparePage({
           title="Pick 2 to 4 companies to compare."
           description="Tick them in Saved, then compare them side by side."
           action={
-            <Link href="/discover/saved" className={buttonClassName("secondary")}>
+            <Link
+              href="/discover/saved"
+              className={buttonClassName("secondary")}
+            >
               Go to Saved
             </Link>
           }

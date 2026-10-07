@@ -168,7 +168,8 @@ const SEND_QUESTIONS = defineAppAction<
   card: (input, names) => {
     const { body } = diligenceQuestionsText(input.input.questions);
     const count = input.input.questions.length;
-    const what = count === 1 ? "this question" : `these ${String(count)} questions`;
+    const what =
+      count === 1 ? "this question" : `these ${String(count)} questions`;
     return {
       summary:
         names?.counterpart == null
@@ -193,8 +194,7 @@ const SEND_QUESTIONS = defineAppAction<
       input: body,
     }),
     status: 201,
-    problem: (out) =>
-      out.outcome === "OK" ? null : SEND_REFUSALS[out.code],
+    problem: (out) => (out.outcome === "OK" ? null : SEND_REFUSALS[out.code]),
     notFound: (out) => out.outcome === "REFUSED" && out.code === "NOT_FOUND",
     respond: (out) =>
       out.outcome === "OK"

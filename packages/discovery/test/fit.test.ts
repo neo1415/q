@@ -743,9 +743,9 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
       ID(1),
       ID(2),
     ]);
-    expect(result.comparison.entries.every((e) => e.sources[0] === "SAVED")).toBe(
-      true,
-    );
+    expect(
+      result.comparison.entries.every((e) => e.sources[0] === "SAVED"),
+    ).toBe(true);
     expect(JSON.stringify(result)).not.toContain(ID(3));
   });
 

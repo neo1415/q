@@ -21,7 +21,11 @@ import {
  * is a standing of its own and never a negative.
  */
 
-export const ASSUMPTION_STANDINGS = ["EVIDENCED", "CLAIMED", "UNKNOWN"] as const;
+export const ASSUMPTION_STANDINGS = [
+  "EVIDENCED",
+  "CLAIMED",
+  "UNKNOWN",
+] as const;
 export const AssumptionStandingSchema = z.enum(ASSUMPTION_STANDINGS);
 export type AssumptionStanding = z.infer<typeof AssumptionStandingSchema>;
 
@@ -109,9 +113,7 @@ export const DILIGENCE_QUESTIONS_PATH =
 export const SendDiligenceQuestionsRequestSchema = z
   .object({
     questions: z
-      .array(
-        z.string().trim().min(3).max(ASSUMPTION_QUESTION_MAX_LENGTH),
-      )
+      .array(z.string().trim().min(3).max(ASSUMPTION_QUESTION_MAX_LENGTH))
       .min(1)
       .max(ASSUMPTION_QUESTIONS_SEND_MAX),
   })
@@ -132,9 +134,10 @@ export type SendDiligenceQuestionsResult = z.infer<
 >;
 
 /** The exact text the founder receives; one rendering, screen and Q alike. */
-export function diligenceQuestionsText(
-  questions: readonly string[],
-): { readonly title: string; readonly body: string } {
+export function diligenceQuestionsText(questions: readonly string[]): {
+  readonly title: string;
+  readonly body: string;
+} {
   // A diligence checklist item: what the company is asked to provide.
   const title =
     questions.length === 1

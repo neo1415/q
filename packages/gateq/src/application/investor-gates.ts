@@ -49,7 +49,8 @@ export function createInvestorGateFits(dependencies: {
   const clock = dependencies.clock ?? (() => new Date());
   return {
     forOwnCompany: async (query) => {
-      const read = dependencies.policies.publishedPoliciesForInvestorOrganisations;
+      const read =
+        dependencies.policies.publishedPoliciesForInvestorOrganisations;
       const ids = [...new Set(query.investorOrganisationIds)].slice(0, 50);
       if (read === undefined || ids.length === 0) return [];
       const [policies, projection] = await Promise.all([
@@ -61,7 +62,10 @@ export function createInvestorGateFits(dependencies: {
       ]);
       // The founder's own tenant only: a projection port that reads by
       // company id alone must still never answer for another tenant.
-      if (projection === null || projection.subject.tenantId !== query.tenantId) {
+      if (
+        projection === null ||
+        projection.subject.tenantId !== query.tenantId
+      ) {
         return [];
       }
       const evaluatedAt = clock().toISOString();

@@ -28,7 +28,10 @@ export function GateFit({
         {gate.criteria.length === 1 ? "criterion" : "criteria"}
       </span>
       {gate.criteria.length === 0 ? null : (
-        <ul className="flex flex-col gap-1.5" aria-label="Their published criteria">
+        <ul
+          className="flex flex-col gap-1.5"
+          aria-label="Their published criteria"
+        >
           {gate.criteria.map((criterion) => (
             <li
               key={criterion.label}
@@ -39,7 +42,9 @@ export function GateFit({
                 {criterion.label}
               </span>
               <span className="cq-caption text-(--cq-text-tertiary)">
-                {criterion.requiredness === "REQUIRED" ? "Required" : "Preferred"}
+                {criterion.requiredness === "REQUIRED"
+                  ? "Required"
+                  : "Preferred"}
               </span>
             </li>
           ))}

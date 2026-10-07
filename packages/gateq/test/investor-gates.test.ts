@@ -154,12 +154,16 @@ describe("investor gates for a founder's own company (Q.05)", () => {
   });
 
   it("ignores drafts and investors without a gate", async () => {
-    const draft = policyOf(INVESTOR_B, [
-      {
-        label: "Fintech",
-        config: { type: "STAGE", allowedStageCodes: ["seed"] },
-      },
-    ], "DRAFT");
+    const draft = policyOf(
+      INVESTOR_B,
+      [
+        {
+          label: "Fintech",
+          config: { type: "STAGE", allowedStageCodes: ["seed"] },
+        },
+      ],
+      "DRAFT",
+    );
     const { fits } = world([draft]);
     expect(
       await fits.forOwnCompany({

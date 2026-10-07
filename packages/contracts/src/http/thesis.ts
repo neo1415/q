@@ -41,9 +41,7 @@ export type ThesisObservedCount = z.infer<typeof ThesisObservedCountSchema>;
 export const ThesisSuggestionSchema = z
   .object({
     /** Stable for the same evidence: `ADD_COUNTRY:GH`, `DROP_STAGE:pre_seed`. */
-    id: z
-      .string()
-      .regex(/^(ADD_COUNTRY|DROP_STAGE):[A-Za-z0-9_]{1,64}$/),
+    id: z.string().regex(/^(ADD_COUNTRY|DROP_STAGE):[A-Za-z0-9_]{1,64}$/),
     kind: z.enum(["ADD_COUNTRY", "DROP_STAGE"]),
     /** The code added or dropped. */
     value: z.string().min(1).max(64),

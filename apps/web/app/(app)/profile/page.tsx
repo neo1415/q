@@ -829,9 +829,7 @@ async function ThesisSlot({
 }) {
   const session = await qApiSession();
   const reading =
-    session === null
-      ? null
-      : await getThesisReading(session).catch(() => null);
+    session === null ? null : await getThesisReading(session).catch(() => null);
   return reading === null ? null : (
     <ThesisSection
       reading={reading}

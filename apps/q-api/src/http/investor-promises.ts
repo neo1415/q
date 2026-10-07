@@ -50,7 +50,10 @@ export function registerInvestorPromiseRoutes(
       const query = FitCompareQuerySchema.safeParse(request.query ?? {});
       void reply.header("Cache-Control", "no-store");
       const result = query.success
-        ? await dependencies.fit.compare(getActorContext(request), query.data.ids)
+        ? await dependencies.fit.compare(
+            getActorContext(request),
+            query.data.ids,
+          )
         : null;
       return FitComparisonDtoSchema.parse(
         result?.kind === "OK"
@@ -68,17 +71,24 @@ export function registerInvestorPromiseRoutes(
     },
   );
 
-  app.get(FIT_THESIS_PATH, { onRequest: withContext }, async (request, reply) => {
-    const reading = await dependencies.thesis(getActorContext(request));
-    void reply.header("Cache-Control", "no-store");
-    if (reading === null) {
-      const problem = createProblemDetails({
-        code: "RESOURCE_NOT_FOUND",
-        requestId: request.id,
-        detail: "How Q reads a thesis is for an investor's own mandate.",
-      });
-      return reply.status(problem.status).type(PROBLEM_CONTENT_TYPE).send(problem);
-    }
-    return ThesisReadingDtoSchema.parse(reading);
-  });
+  app.get(
+    FIT_THESIS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const reading = await dependencies.thesis(getActorContext(request));
+      void reply.header("Cache-Control", "no-store");
+      if (reading === null) {
+        const problem = createProblemDetails({
+          code: "RESOURCE_NOT_FOUND",
+          requestId: request.id,
+          detail: "How Q reads a thesis is for an investor's own mandate.",
+        });
+        return reply
+          .status(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
+      return ThesisReadingDtoSchema.parse(reading);
+    },
+  );
 }

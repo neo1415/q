@@ -142,7 +142,10 @@ function declaredRules(mandate: ThesisMandate): ThesisReadingDto["declared"] {
     rules.push({ label: "Sectors", value: listWords(sectors.slice(0, 6)) });
   }
   const cheque = mandate.chequeRange;
-  if (cheque !== null && (cheque.min !== undefined || cheque.max !== undefined)) {
+  if (
+    cheque !== null &&
+    (cheque.min !== undefined || cheque.max !== undefined)
+  ) {
     rules.push({
       label: "Cheque",
       value:

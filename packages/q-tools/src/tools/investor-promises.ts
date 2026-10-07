@@ -148,7 +148,13 @@ type CompareInput = z.infer<typeof CompareInputSchema>;
 
 const CompareOutputSchema = z
   .object({
-    status: z.enum(["OK", "NOT_INVESTOR", "NO_MANDATE", "TOO_FEW", "NOT_AVAILABLE"]),
+    status: z.enum([
+      "OK",
+      "NOT_INVESTOR",
+      "NO_MANDATE",
+      "TOO_FEW",
+      "NOT_AVAILABLE",
+    ]),
     comparison: FitComparisonDtoSchema.nullable(),
     text: z.string(),
   })
@@ -242,8 +248,7 @@ export function createFitCompareTool(ports: QToolPorts): AnyQToolDefinition {
 
 export type ThesisPorts = {
   readonly ownInvestorOrganisationId?:
-    | ((actor: ActorContext) => Promise<string | null>)
-    | undefined;
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
   readonly investors?:
     | Pick<InvestorService, "listInvestorMandates" | "getInvestorMandate">
     | undefined;
@@ -267,7 +272,11 @@ export async function readOwnThesis(
   }
   const organisation = InvestorOrganisationIdSchema.parse(own);
   const page = await ports.investors
-    .listInvestorMandates({ actor, investorOrganisationId: organisation, limit: 20 })
+    .listInvestorMandates({
+      actor,
+      investorOrganisationId: organisation,
+      limit: 20,
+    })
     .catch(() => null);
   const active = page?.items.find((item) => item.status === "ACTIVE");
   let mandate: InvestorMandateDto | null = null;
@@ -310,9 +319,7 @@ type ThesisOutput = z.infer<typeof ThesisOutputSchema>;
 const THESIS_GUIDANCE =
   "Keep the three apart: what they declared (their rules, which decide their feed), what they did (saves and passes, counted; viewing counts for nothing), and what you read from it (your inference, said as yours). Never say their mandate changed. Offer each suggestion as a question; apply one only through apply_thesis_suggestion, which they approve. Show it with show(THESIS).";
 
-export function createThesisReadingTool(
-  ports: QToolPorts,
-): AnyQToolDefinition {
+export function createThesisReadingTool(ports: QToolPorts): AnyQToolDefinition {
   return defineQTool<Record<string, never>, ThesisOutput, string>({
     ...SHARED,
     id: THESIS_READING,
@@ -344,7 +351,8 @@ export function createThesisReadingTool(
     execute: async (_input, context) => ({
       reading: await readOwnThesis(
         {
-          ownInvestorOrganisationId: ports.appActions?.ownInvestorOrganisationId,
+          ownInvestorOrganisationId:
+            ports.appActions?.ownInvestorOrganisationId,
           investors: ports.appActions?.investors,
           decisions: ports.investorFeed?.decisions,
         },

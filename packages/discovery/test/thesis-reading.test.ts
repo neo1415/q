@@ -54,15 +54,18 @@ describe("how Q reads a thesis (Q.02)", () => {
       "ADD_COUNTRY:GH",
       "DROP_STAGE:pre_seed",
     ]);
-    expect(reading.suggestions.every((s) => s.truthClass === "Q_INFERENCE")).toBe(
-      true,
-    );
+    expect(
+      reading.suggestions.every((s) => s.truthClass === "Q_INFERENCE"),
+    ).toBe(true);
   });
 
   it("never suggests from thin behaviour, and never without a mandate", () => {
     const thin = readThesis({
       mandate,
-      decisions: [...d("SAVED", "seed", "GH"), ...d("PASSED", "pre_seed", "NG", 3)],
+      decisions: [
+        ...d("SAVED", "seed", "GH"),
+        ...d("PASSED", "pre_seed", "NG", 3),
+      ],
       now: NOW,
     });
     expect(thin.suggestions).toEqual([]);
@@ -87,7 +90,9 @@ describe("how Q reads a thesis (Q.02)", () => {
       ],
     };
     const reading = readThesis({ mandate: excluded, decisions, now: NOW });
-    expect(reading.suggestions.some((s) => s.kind === "ADD_COUNTRY")).toBe(false);
+    expect(reading.suggestions.some((s) => s.kind === "ADD_COUNTRY")).toBe(
+      false,
+    );
   });
 
   it("an approved suggestion is the ordinary mandate update at the version read", () => {

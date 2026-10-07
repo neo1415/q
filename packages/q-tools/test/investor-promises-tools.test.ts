@@ -106,11 +106,17 @@ function material(view: CompanyDeckView | null) {
 }
 
 const executor = (ports: ReturnType<typeof fakePorts>) =>
-  createQToolExecutor({ registry: createQToolRegistry(createDefaultQTools(ports)) });
+  createQToolExecutor({
+    registry: createQToolRegistry(createDefaultQTools(ports)),
+  });
 
 const investorPlan = planFor(actorB, "COUNTERPARTY_COMPANY_QUESTION", [
   { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
-  { kind: "COMPANY_PROFILE", sensitivity: "CONFIDENTIAL", companyId: COMPANY_A },
+  {
+    kind: "COMPANY_PROFILE",
+    sensitivity: "CONFIDENTIAL",
+    companyId: COMPANY_A,
+  },
 ]);
 
 describe("company_assumptions (Q.07)", () => {
@@ -144,9 +150,12 @@ describe("company_assumptions (Q.07)", () => {
     const { port } = material(deckView("OWNER", false, PRIVATE_FIGURE));
     const out = await executor(fakePorts({ profileMaterial: port })).execute(
       call("company_assumptions", { companyId: COMPANY_A }),
-      contextFor(actorA, planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
-        { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
-      ])),
+      contextFor(
+        actorA,
+        planFor(actorA, "COUNTERPARTY_COMPANY_QUESTION", [
+          { kind: "NETWORK_VISIBLE_DATA", sensitivity: "NETWORK_VISIBLE" },
+        ]),
+      ),
     );
     expect(out.result.ok).toBe(false);
     expect(JSON.stringify(out)).not.toContain(PRIVATE_FIGURE);
@@ -252,7 +261,8 @@ describe("thesis_reading (Q.02)", () => {
         items: [{ id: MANDATE_B, status: "ACTIVE", version: 2 }],
         nextCursor: null,
       }),
-    getInvestorMandate: () => Promise.reject(new Error("not read in this test")),
+    getInvestorMandate: () =>
+      Promise.reject(new Error("not read in this test")),
   };
   const appActions = {
     ownInvestorOrganisationId: (actor: ActorContext) =>

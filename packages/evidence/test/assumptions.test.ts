@@ -69,7 +69,9 @@ const view = (overrides: Partial<CompanyDeckView>): CompanyDeckView => ({
           evidenceStatus: "DOCUMENT_SUPPORTED",
         }),
       ],
-      PROBLEM: [fact({ kind: "TEXT", label: "Ledgers are reconciled by hand" })],
+      PROBLEM: [
+        fact({ kind: "TEXT", label: "Ledgers are reconciled by hand" }),
+      ],
     }),
   },
   coaching: null,
@@ -122,9 +124,9 @@ describe("assumption board (Q.07)", () => {
     const board = buildAssumptionBoard(unconfirmed);
     expect(board?.basis).toBe("NOTHING_SHARED");
     expect(board?.assumptions.every((a) => a.value === null)).toBe(true);
-    expect(board?.assumptions.every((a) => a.unknownReason === "NOT_SHARED")).toBe(
-      true,
-    );
+    expect(
+      board?.assumptions.every((a) => a.unknownReason === "NOT_SHARED"),
+    ).toBe(true);
     expect(JSON.stringify(board)).not.toContain("₦38m");
   });
 
@@ -133,8 +135,6 @@ describe("assumption board (Q.07)", () => {
     if (board === null) throw new Error("expected a board");
     expect(board.basis).toBe("NOTHING_SHARED");
     expect(board.counts).toEqual({ evidenced: 0, claimed: 0, unknown: 5 });
-    expect(assumptionBoardText("Ledgerline", board)).toContain(
-      "not known yet",
-    );
+    expect(assumptionBoardText("Ledgerline", board)).toContain("not known yet");
   });
 });

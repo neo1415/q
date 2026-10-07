@@ -949,9 +949,9 @@ async function roomRecord(
       const own =
         input.object === "INVESTOR_FIT"
           ? await ports.appActions?.ownCompanyId?.(actor).catch(() => null)
-          : await ports.appActions?.ownInvestorOrganisationId?.(actor).catch(
-              () => null,
-            );
+          : await ports.appActions
+              ?.ownInvestorOrganisationId?.(actor)
+              .catch(() => null);
       if (own === null || own === undefined) return null;
       return {
         id: own.toLowerCase(),
