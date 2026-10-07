@@ -4,6 +4,7 @@ import { createCorrelationId, type Logger } from "@capital-q/observability";
 import {
   createArtifactService,
   createPostgresArtifactRepository,
+  createPostgresDocumentJobRepository,
   type ArtifactService,
 } from "@capital-q/q-artifacts";
 import {
@@ -12,8 +13,10 @@ import {
   latestArtifactIn,
   type ArtifactPreparation,
   type ArtifactPreparationPort,
+  type DocumentPipelinePort,
   type StockPhotoPort,
 } from "@capital-q/q-specialists";
+import type { QDocumentPipelineStage } from "@capital-q/contracts";
 import type { QArtifactReviser } from "@capital-q/model-gateway/q";
 import type { DocumentRevisionPort } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -64,9 +67,23 @@ export function createQArtifacts(dependencies: {
   /** DOCS: the confirmed brand kit and the actor's own company, as the actor. */
   readonly studio?:
     Omit<NonNullable<ArtifactPreparation["studio"]>, "polisher"> | undefined;
+  /**
+   * Q room W5 (R8): how decks, one-pagers and memos are made. JOB (the
+   * default in a deployment): the worker makes them and the run follows
+   * the job for `waitMs`; IN_RUN: the run makes them itself (a stack with
+   * no worker); STUDIO: the earlier in-run studio.
+   */
+  readonly documentPipeline?:
+    | {
+        readonly mode: "JOB" | "IN_RUN" | "STUDIO";
+        readonly waitMs?: number | undefined;
+        readonly pollMs?: number | undefined;
+      }
+    | undefined;
 }): QArtifactsComposition {
   const service = createArtifactService({
     repository: createPostgresArtifactRepository({ sql: dependencies.sql }),
+    jobs: createPostgresDocumentJobRepository({ sql: dependencies.sql }),
     transactions: dependencies.transactions,
     ...(dependencies.logger === undefined
       ? {}
@@ -172,6 +189,12 @@ export function createQArtifacts(dependencies: {
     return { status: "REVISED" as const, artifact: written.artifact };
   };
 
+  const pipelinePort = createDocumentPipelinePort(service, {
+    waitMs: dependencies.documentPipeline?.waitMs ?? 45_000,
+    pollMs: dependencies.documentPipeline?.pollMs ?? 1_000,
+  });
+  const mode = dependencies.documentPipeline?.mode ?? "STUDIO";
+
   return {
     service,
     documentRevision: {
@@ -218,6 +241,11 @@ export function createQArtifacts(dependencies: {
       port,
       reviser,
       photos: dependencies.photos,
+      ...(mode === "JOB"
+        ? { pipeline: { mode: "JOB" as const, port: pipelinePort } }
+        : mode === "IN_RUN"
+          ? { pipeline: { mode: "IN_RUN" as const } }
+          : {}),
       // DOCS block: the document studio's steps for new decks.
       ...(dependencies.studio === undefined
         ? {}
@@ -232,6 +260,77 @@ export function createQArtifacts(dependencies: {
               }),
             },
           }),
+    },
+  };
+}
+
+/**
+ * Q room W5 (R8): the document pipeline port over the artifact service.
+ * `request` starts the document and queues its job under the run's plan;
+ * `wait` follows the job's stage as the person (their own job only) for a
+ * bounded time and hands back the filed card, or null when it is still
+ * being made (the room keeps following it).
+ */
+export function createDocumentPipelinePort(
+  service: ArtifactService,
+  options: {
+    readonly waitMs: number;
+    readonly pollMs: number;
+    readonly sleep?: ((ms: number) => Promise<void>) | undefined;
+    readonly now?: (() => number) | undefined;
+  },
+): DocumentPipelinePort {
+  const sleep =
+    options.sleep ??
+    ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
+  const now = options.now ?? Date.now;
+  return {
+    request: async (input) =>
+      (
+        await service.requestDocument({
+          actorContext: input.actorContext,
+          permittedContextPlan: input.permittedContextPlan,
+          qRunId: input.qRunId,
+          ...(input.subject === undefined ? {} : { subject: input.subject }),
+          artifactType: input.artifactType,
+          content: input.content,
+          kind: input.kind,
+          job: {
+            grounding: [...input.job.grounding],
+            sectorCodes: [...input.job.sectorCodes],
+            directionChosen: input.job.directionChosen,
+            brand:
+              input.job.brand === null
+                ? null
+                : {
+                    kitVersion: input.job.brand.kitVersion,
+                    palette: input.job.brand.palette,
+                    ...(input.job.brand.pairing === undefined
+                      ? {}
+                      : { pairing: input.job.brand.pairing }),
+                  },
+            sensitivity: input.job.sensitivity,
+          },
+        })
+      ).artifact,
+    wait: async (input) => {
+      const until = now() + options.waitMs;
+      let said: QDocumentPipelineStage | null = null;
+      while (now() < until && input.signal?.aborted !== true) {
+        const progress = await service
+          .documentProgress(input.actor, input.artifactId)
+          .catch(() => null);
+        if (progress === null) return null;
+        if (progress.stage !== said) {
+          said = progress.stage;
+          await input.onStage(progress.stage).catch(() => undefined);
+        }
+        if (progress.status === "DONE" || progress.status === "FAILED") {
+          return (await service.read(input.actor, input.artifactId)).artifact;
+        }
+        await sleep(options.pollMs);
+      }
+      return null;
     },
   };
 }

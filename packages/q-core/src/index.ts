@@ -705,6 +705,11 @@ export {
   V18_NO_SCORE,
 } from "./prompts/tasks/company-analyst.v18.js";
 export {
+  COMPANY_ANALYST_V19,
+  V18_DOCUMENT_TYPES,
+  V19_DOCUMENT_TYPES,
+} from "./prompts/tasks/company-analyst.v19.js";
+export {
   COMPANY_ANALYST_V16,
   COMPANY_ANALYST_V16_TURN,
 } from "./prompts/tasks/company-analyst.v16.js";
@@ -786,6 +791,11 @@ export {
   CompanyAnalystV14ResultSchema,
   CompanyAnalystV15ResultSchema,
   CompanyAnalystV17ResultSchema,
+  CompanyAnalystV19ResultSchema,
+  ArtifactRequestV3Schema,
+  ARTIFACT_REQUEST_TYPES_V3,
+  type CompanyAnalystV19Result,
+  type ArtifactRequestV3,
   COMPANY_ANALYST_V17_SCHEMA_VERSION,
   ANSWER_CARDS_GUIDANCE,
   ModelAnswerCardsSchema,

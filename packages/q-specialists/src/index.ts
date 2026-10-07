@@ -205,6 +205,8 @@ export {
 } from "./company/document-studio.js";
 
 // Q room W5 (R8): the document pipeline.
+export { visibleStageOf } from "./company/prepare-artifact.js";
+export type { DocumentPipelinePort } from "./company/artifact-port.js";
 export {
   addGapPlaceholders,
   applyFixes,

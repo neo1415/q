@@ -3162,6 +3162,17 @@ const qArtifacts = createQArtifacts({
   photos: createPexelsPhotos(
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
   ),
+  // Q room W5 (R8): decks, one-pagers and memos are made by the worker
+  // (CQ_DOCUMENT_PIPELINE=in-run for a stack without one; studio for the
+  // earlier in-run studio).
+  documentPipeline: {
+    mode:
+      process.env.CQ_DOCUMENT_PIPELINE === "in-run"
+        ? "IN_RUN"
+        : process.env.CQ_DOCUMENT_PIPELINE === "studio"
+          ? "STUDIO"
+          : "JOB",
+  },
   // DOCS: decks about the actor's own company take their confirmed brand
   // and their sector's design; read as the actor, never from model output.
   studio: {

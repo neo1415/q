@@ -21,9 +21,9 @@ import {
 describe("COMPANY_ANALYST v18: fit out of 10 and sharper advice", () => {
   const registry = createDefaultPromptRegistry();
 
-  it("is the active analyst, on v17's schema, with the three lines", () => {
+  it("was the active analyst until v19, on v17's schema, with the three lines", () => {
     const active = registry.getActive("COMPANY_ANALYST").definition;
-    expect(active.version).toBe(18);
+    expect(active.version).toBe(19);
     expect(COMPANY_ANALYST_V18.output).toBe(COMPANY_ANALYST_V17.output);
     const template = COMPANY_ANALYST_V18.template;
     expect(template).toContain(V18_NO_SCORE);

@@ -18,6 +18,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
   type CompanyAnalystV8Result,
+  type CompanyAnalystV19Result,
   type CompanyAnalystV5Variables,
   NOTHING_REMEMBERED,
   type CompanyIntelligenceDimension,
@@ -26,7 +27,7 @@ import {
   citePublicSources,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV17ResultSchema,
+  CompanyAnalystV19ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -753,10 +754,10 @@ export function createCompanyIntelligenceSpecialist(
         promptCharacters: rendered.characters,
       };
 
-      let analyst: CompanyAnalystV8Result | undefined;
+      let analyst: CompanyAnalystV19Result | undefined;
       let blocked: QSpecialistBlockedReason | null = null;
       try {
-        const result = await gateway.execute<CompanyAnalystV8Result>(
+        const result = await gateway.execute<CompanyAnalystV19Result>(
           {
             taskClass: "EVIDENCE_SYNTHESIS",
             budget: budgetForTaskClass("EVIDENCE_SYNTHESIS"),
@@ -785,7 +786,7 @@ export function createCompanyIntelligenceSpecialist(
             // refused every answer that filled it (live 2026-09-30).
             // Kept at the active version: v14's gestures and v15's
             // proposalStatus were refused the same way by v12's schema.
-            schema: CompanyAnalystV17ResultSchema,
+            schema: CompanyAnalystV19ResultSchema,
             // Independent readings: one malformed statement must not throw
             // away the change beside it (CQ-QX-007 A5).
             invalidListItems: "DROP",
