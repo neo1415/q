@@ -18,6 +18,9 @@ const TYPE_LABEL: Record<MemoryItem["memoryType"], string> = {
   correction: "Correction",
   fact: "They said",
   episodic: "Earlier",
+  // Never rendered: recall leaves small talk out (ADR 0062), and the
+  // order below does not list it either.
+  small_talk: "In passing",
 };
 
 function line(item: MemoryItem): string {

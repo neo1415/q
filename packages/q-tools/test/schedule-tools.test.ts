@@ -72,6 +72,7 @@ function world(
     calendarRevoked?: boolean;
     counterpartCanHost?: boolean;
     profileZone?: string | null;
+    findSlots?: ScheduleIntelligencePort["findSlots"];
   } = {},
 ) {
   const prepared: { actionType: string; payload: unknown }[] = [];
@@ -88,17 +89,19 @@ function world(
     },
   };
   const schedule: ScheduleIntelligencePort = {
-    findSlots: () =>
-      Promise.resolve({
-        status: "OK",
-        timeZone: "Europe/London",
-        slots: [
-          {
-            start: new Date("2026-10-06T08:00:00Z"),
-            end: new Date("2026-10-06T08:30:00Z"),
-          },
-        ],
-      }),
+    findSlots:
+      options.findSlots ??
+      (() =>
+        Promise.resolve({
+          status: "OK",
+          timeZone: "Europe/London",
+          slots: [
+            {
+              start: new Date("2026-10-06T08:00:00Z"),
+              end: new Date("2026-10-06T08:30:00Z"),
+            },
+          ],
+        })),
     upcoming: () =>
       Promise.resolve({
         meetings: [
@@ -183,6 +186,62 @@ describe("schedule tools", () => {
         ],
       },
     });
+  });
+
+  it("with no calendar, says so, still suggests three unchecked times and carries the connect card (Q room R5)", async () => {
+    const { executor } = world({
+      calendarConnected: false,
+      findSlots: () =>
+        Promise.resolve({
+          status: "CALENDAR_NOT_CONNECTED",
+          suggested: {
+            timeZone: "Europe/London",
+            slots: [
+              {
+                start: new Date("2026-10-13T09:00:00Z"),
+                end: new Date("2026-10-13T09:30:00Z"),
+              },
+              {
+                start: new Date("2026-10-14T13:00:00Z"),
+                end: new Date("2026-10-14T13:30:00Z"),
+              },
+              {
+                start: new Date("2026-10-15T10:00:00Z"),
+                end: new Date("2026-10-15T10:30:00Z"),
+              },
+            ],
+          },
+        }),
+    });
+    const outcome = await executor.execute(
+      {
+        callId: "s1c",
+        name: "find_meeting_times",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "CALENDAR_NOT_CONNECTED",
+        checked: false,
+        timeZone: "Europe/London",
+        slots: [
+          { local: "Tue 13 Oct, 10:00" },
+          { local: "Wed 14 Oct, 14:00" },
+          { local: "Thu 15 Oct, 11:00" },
+        ],
+        clientAction: {
+          kind: "SHOW_CALENDAR_CONNECT",
+          reason: "NOT_CONNECTED",
+          counterpartName: "Apex",
+          timeZone: "Europe/London",
+        },
+      },
+    });
+    const data = (outcome.result as { data: { says: string } }).data;
+    expect(data.says).toContain("Your Google Calendar isn't connected");
   });
 
   it("gives a non-party nothing", async () => {

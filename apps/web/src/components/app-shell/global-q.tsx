@@ -34,6 +34,7 @@ import {
   type QSubject,
 } from "@/features/q/q-subject";
 import { QSounds } from "@/features/q-sound/q-sounds";
+import { QEdgeFlow } from "@/features/q-swarm/q-edge-flow";
 import { WakeWord } from "@/features/wake/wake-word";
 
 /**
@@ -274,6 +275,8 @@ export function GlobalQProvider({
           <GlobalQRunner />
           <AnswerChip />
           <QSounds />
+          {/* ADR 0062: particles around the page edge while Q works. */}
+          <QEdgeFlow />
           {/* D1: "Hey Q"; off by default, and nothing loads while off. */}
           <WakeWord openQ={openQ} />
           {dock}

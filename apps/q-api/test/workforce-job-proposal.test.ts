@@ -10,7 +10,9 @@ import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 import {
   createWorkforceJobActions,
   createWorkforceJobBoard,
+  needsYouFor,
   plannedFrom,
+  relatedWaiting,
 } from "../src/composition/workforce/job-actions.js";
 import {
   createWorkforceJobs,
@@ -254,5 +256,81 @@ describe("a job the lead Q proposes (J1, J4)", () => {
       expect(store.rows.jobs[0]?.status).toBe("HELD");
     });
     expect(expressed).toEqual([]);
+  });
+});
+
+describe("Q as a colleague on work (Q room R5)", () => {
+  const waiting = [
+    { summary: "Send Priya Raman at Fernhill: Would a 30-minute call work?" },
+    {
+      summary:
+        "Send Jonas Weber at Clearwater Pay: Could you share the statements?",
+    },
+    { summary: "Update your round size to two million." },
+  ];
+
+  it("finds what already waits about the same people, by name, and nothing on a guess", () => {
+    expect(
+      relatedWaiting("Follow up with Priya and Jonas from the intros", waiting),
+    ).toHaveLength(2);
+    expect(relatedWaiting("follow up with everyone", waiting)).toEqual([]);
+    expect(relatedWaiting("Book a call with Kestrel Heat", waiting)).toEqual(
+      [],
+    );
+  });
+
+  it("asks before starting when work is already waiting, and plans once told to go ahead", async () => {
+    const base = world();
+    const board = createWorkforceJobBoard({
+      jobsFor: () => {
+        throw new Error("must not plan before asking");
+      },
+      waiting: () => Promise.resolve(waiting),
+    });
+    const first = await board.port.prepare(
+      actor,
+      "run-w1",
+      "Follow up with Priya and Jonas",
+    );
+    expect(first).toEqual({
+      status: "ALREADY_WAITING",
+      waiting: [waiting[0]?.summary, waiting[1]?.summary],
+    });
+    expect(base.plans()).toBe(0);
+  });
+
+  it("says what will need them, with the calendar when it is not connected", async () => {
+    const { board } = world();
+    const prepared = await board.port.prepare(actor, "run-n1", "Find me fits");
+    if (prepared.status !== "PREPARED") throw new Error("not prepared");
+    // Its steps send nothing outward (email is not a job tool).
+    expect(prepared.plan.needsYou).toEqual([
+      "Your approval of this plan before anything starts",
+    ]);
+    const payload = WorkforceJobStartPayloadSchema.parse({
+      ownerUserId: userId,
+      goal: "Book a call with Kestrel Heat",
+      summary: "Book a call",
+      steps: [
+        {
+          key: "call",
+          role: "SCHEDULER",
+          agentName: "Scheduler",
+          goal: "Find a time and book it",
+          tools: ["find_meeting_times", "schedule.meeting.book"],
+          dependsOn: [],
+          budgetUsd: "0.1",
+          spawned: false,
+        },
+      ],
+      permitted: ["find_meeting_times", "schedule.meeting.book"],
+      budgetUsd: "0.5",
+      cannot: [],
+    });
+    expect(needsYouFor(payload, false)).toEqual([
+      "Your approval of this plan before anything starts",
+      "Connect your Google Calendar, or I'll suggest times I can't check against it",
+    ]);
+    expect(needsYouFor(payload, true)).toHaveLength(1);
   });
 });

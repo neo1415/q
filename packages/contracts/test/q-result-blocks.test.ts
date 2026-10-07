@@ -266,6 +266,19 @@ describe("QUiIntent", () => {
       id: "00000000-0000-4000-8000-000000000001",
       title: "Ledgerline",
     },
+    SHOW_CALENDAR_CONNECT: {
+      kind: "SHOW_CALENDAR_CONNECT",
+      reason: "NOT_CONNECTED",
+      counterpartName: "Clearwater Pay",
+      timeZone: "Europe/London",
+      suggested: [
+        {
+          startsAt: "2026-10-13T09:00:00.000Z",
+          endsAt: "2026-10-13T09:30:00.000Z",
+          local: "Tue 13 Oct, 10:00",
+        },
+      ],
+    },
   };
 
   it("parses every supported intent", () => {

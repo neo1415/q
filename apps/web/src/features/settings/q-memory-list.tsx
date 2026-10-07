@@ -18,6 +18,8 @@ const KIND_WORDS: Readonly<Record<string, string>> = {
   correction: "Corrections you made",
   pronunciation: "Names and how they're said",
   fact: "Things you told Q",
+  // ADR 0062: only for Q's own chat with you, and gone after 90 days.
+  small_talk: "Mentioned in passing (kept 90 days)",
 };
 
 export function QMemoryList({

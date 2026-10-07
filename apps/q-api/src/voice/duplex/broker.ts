@@ -4,7 +4,9 @@ import {
   CorrelationIdSchema,
   Q_VOICE_LISTENING_DEFAULT,
   QRunIdSchema,
+  type QSilenceBeat,
   type QVoiceDuplexListening,
+  type QVoiceDuplexNarrationResult,
   type QVoiceDuplexCredential,
   type QVoiceDuplexLineStats,
   type QVoiceDuplexRejoin,
@@ -154,7 +156,21 @@ type DuplexLine = {
    * their context.
    */
   readonly history: VoiceTranscriptTurn[];
+  /**
+   * ADR 0062: the silence ladder's beats while an ask_q works, numbered,
+   * for the browser to voice out of band; the newest few only.
+   */
+  readonly narration: { sequence: number; beat: QSilenceBeat }[];
+  narrationSequence: number;
+  /** ask_q calls working now; the narration poll ends when none are. */
+  asking: number;
+  /** Wakes a waiting narration poll. */
+  readonly listeners: Set<() => void>;
 };
+
+/** How long a narration poll is held open when nothing is said. */
+const NARRATION_HOLD_MS = 12_000;
+const NARRATION_KEPT = 8;
 
 /** The turns of a line the next ask_q carries. */
 const LINE_HISTORY_MAX = 12;
@@ -196,6 +212,16 @@ export type DuplexBroker = {
     readonly cause?: string | undefined;
     readonly stats?: QVoiceDuplexLineStats | undefined;
   }) => boolean;
+  /**
+   * ADR 0062: beats after `after`, waiting up to a hold for the next one
+   * while an ask_q works. Null when there is no such line for this person.
+   */
+  readonly narration: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly after: number;
+    readonly signal?: AbortSignal | undefined;
+  }) => Promise<QVoiceDuplexNarrationResult | null>;
   /** Open lines, for tests and the startup log. */
   readonly size: () => number;
 };
@@ -214,7 +240,10 @@ export type DuplexBrokerDependencies = {
 };
 
 /** A speaker that keeps what Q would have said, for the model to say. */
-function collectingSpeaker(id: string): VoiceSpeaker & {
+function collectingSpeaker(
+  id: string,
+  narrate?: (beat: QSilenceBeat) => void,
+): VoiceSpeaker & {
   readonly said: () => string;
 } {
   let text = "";
@@ -235,6 +264,8 @@ function collectingSpeaker(id: string): VoiceSpeaker & {
       for await (const part of response) add(part);
     },
     close: () => undefined,
+    // ADR 0062: the ladder's beats go to the browser, never into `said`.
+    narrate,
     said: () => text.slice(0, SPOKEN_MAX),
   };
 }
@@ -449,6 +480,10 @@ export function createDuplexBroker(
         listening: listens,
         kinds: {},
         history: [],
+        narration: [],
+        narrationSequence: 0,
+        asking: 0,
+        listeners: new Set(),
       });
       logger.info(
         {
@@ -487,7 +522,22 @@ export function createDuplexBroker(
         }
         // One spoken turn on the standard handler: the same seam, the
         // same Q run, the same tools, approvals and conduct.
-        const speaker = collectingSpeaker(`rt_${voiceSessionId}`);
+        const wake = () => {
+          for (const listener of line.listeners) listener();
+        };
+        const speaker = collectingSpeaker(`rt_${voiceSessionId}`, (beat) => {
+          if (beat.kind === "TONE") return;
+          line.narrationSequence += 1;
+          line.narration.push({ sequence: line.narrationSequence, beat });
+          line.narration.splice(
+            0,
+            Math.max(0, line.narration.length - NARRATION_KEPT),
+          );
+          wake();
+        });
+        // Each ask_q's beats start fresh; the numbering carries on.
+        line.narration.length = 0;
+        line.asking += 1;
         try {
           const asked: VoiceTranscriptTurn = {
             role: "user",
@@ -531,6 +581,9 @@ export function createDuplexBroker(
             ok: false,
             error: "That didn't go through on my side.",
           });
+        } finally {
+          line.asking -= 1;
+          wake();
         }
       }
 
@@ -641,6 +694,29 @@ export function createDuplexBroker(
         return { continue: false, notice: DUPLEX_CAP_NOTICE };
       }
       return { continue: true };
+    },
+
+    narration: async ({ actor, voiceSessionId, after, signal }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return null;
+      const ready = () => line.narration.filter((n) => n.sequence > after);
+      if (ready().length === 0 && line.asking > 0 && signal?.aborted !== true) {
+        await new Promise<void>((resolve) => {
+          const done = () => {
+            clearTimeout(timer);
+            line.listeners.delete(done);
+            signal?.removeEventListener("abort", done);
+            resolve();
+          };
+          const timer = setTimeout(done, NARRATION_HOLD_MS);
+          line.listeners.add(done);
+          signal?.addEventListener("abort", done, { once: true });
+        });
+      }
+      return {
+        beats: ready().map(({ sequence, beat }) => ({ sequence, beat })),
+        idle: line.asking === 0,
+      };
     },
 
     rejoin: async ({ actor, voiceSessionId, cause }) => {

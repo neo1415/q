@@ -40,6 +40,11 @@ export const MEMORY_TYPES = [
   "correction",
   "fact",
   "episodic",
+  // ADR 0062 (Q room R7): what the person mentioned in passing, kept 90
+  // days, recalled only in Q's own conversation with them (the silence
+  // ladder's remembered thread); never in an assessment, never for anyone
+  // else. Personal-private and quoted, which the table also enforces.
+  "small_talk",
 ] as const;
 export const MemoryTypeSchema = z.enum(MEMORY_TYPES);
 export type MemoryType = z.infer<typeof MemoryTypeSchema>;
@@ -55,6 +60,19 @@ export const MEMORY_STATUSES = [
 ] as const;
 export const MemoryStatusSchema = z.enum(MEMORY_STATUSES);
 export type MemoryStatus = z.infer<typeof MemoryStatusSchema>;
+
+/** How long small talk is kept (ADR 0062): it lapses, it is not kept forever. */
+export const SMALL_TALK_RETENTION_DAYS = 90;
+
+/**
+ * One remembered thread for the silence ladder: an id (so it is used once)
+ * and the question Q may ask about it, from the person's own words.
+ */
+export type SmallTalkThread = {
+  readonly memoryItemId: string;
+  /** "how was Lagos?": a short question, already in Q's voice. */
+  readonly followUp: string;
+};
 
 /** The statuses a recall reads. A candidate is proposed, not remembered. */
 export const LIVE_MEMORY_STATUSES = ["active", "confirmed"] as const;

@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 
-import type { QVoiceChoice } from "@capital-q/contracts";
+import type { QSilenceBeat, QVoiceChoice } from "@capital-q/contracts";
 
 /**
  * The realtime voice provider boundary (doc 11 §17.2 Path B, doc 12
@@ -38,6 +38,11 @@ export type VoiceSpeaker = {
   readonly isOpen: boolean;
   speak(response: string | AsyncIterable<string>): Promise<void>;
   close(): void;
+  /**
+   * ADR 0062: a line that voices the silence ladder itself, out of band
+   * (the duplex line). Absent: beats are spoken in the stream.
+   */
+  readonly narrate?: ((beat: QSilenceBeat) => void) | undefined;
 };
 
 export type VoiceChannelHandlers = {

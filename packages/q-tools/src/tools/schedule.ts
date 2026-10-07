@@ -4,6 +4,7 @@ import {
   calendarBlockedLine,
   isCalendarBlock,
   Q_TASK_CLASSES,
+  QShowCalendarConnectIntentSchema,
   UtcTimestampSchema,
   UuidSchema,
   type CalendarBlockReason,
@@ -104,7 +105,22 @@ export type ScheduleIntelligencePort = {
         readonly timeZone: string;
         readonly slots: readonly { readonly start: Date; readonly end: Date }[];
       }
-    | { readonly status: Refusal }
+    | {
+        readonly status: Refusal;
+        /**
+         * Q room R5: with their calendar not connected, times from working
+         * hours in their zone, never checked against any calendar.
+         */
+        readonly suggested?:
+          | {
+              readonly timeZone: string;
+              readonly slots: readonly {
+                readonly start: Date;
+                readonly end: Date;
+              }[];
+            }
+          | undefined;
+      }
   >;
   /** Their own upcoming calls and open reminders. */
   readonly upcoming: (actor: ActorContext) => Promise<{
@@ -274,6 +290,13 @@ export const FindMeetingTimesOutputSchema = z
     guidance: z.string(),
     /** CALENDAR_*: Capital Q's own words, said as they are. */
     says: z.string().max(600).optional(),
+    /**
+     * Q room R5: false when `slots` are suggestions from working hours,
+     * not checked against a calendar (theirs is not connected).
+     */
+    checked: z.boolean().optional(),
+    /** Q room R5: the connect card, shown in the room with the answer. */
+    clientAction: QShowCalendarConnectIntentSchema.optional(),
   })
   .strict();
 export type FindMeetingTimesOutput = z.infer<
@@ -395,17 +418,41 @@ function createFindMeetingTimesTool(
           found.status === "NOT_CONNECTED" || isCalendarBlock(found.status)
             ? found.status
             : "UNAVAILABLE";
+        if (isCalendarBlock(status)) {
+          // Q room R5: say so, still suggest times, offer the connect card.
+          const suggested = "suggested" in found ? found.suggested : undefined;
+          const slots = (suggested?.slots ?? []).slice(0, 3).map((slot) => ({
+            startsAt: slot.start.toISOString(),
+            endsAt: slot.end.toISOString(),
+            local: localLabel(slot.start, suggested?.timeZone ?? "UTC"),
+          }));
+          return {
+            status,
+            counterpartName: grant.counterpartName,
+            timeZone: suggested?.timeZone ?? null,
+            slots,
+            checked: false,
+            guidance:
+              slots.length > 0
+                ? `${GUIDANCE[status] ?? ""} Offer these three times as suggestions from their working hours, plainly not checked against their calendar; the connect card is on screen with them.`
+                : (GUIDANCE[status] ?? ""),
+            says: await blockedSays(schedule, context.actor, status, grant),
+            clientAction: {
+              kind: "SHOW_CALENDAR_CONNECT",
+              reason:
+                status === "CALENDAR_REVOKED" ? "REVOKED" : "NOT_CONNECTED",
+              counterpartName: grant.counterpartName.slice(0, 120),
+              timeZone: suggested?.timeZone ?? null,
+              suggested: slots,
+            },
+          };
+        }
         return {
           status,
           counterpartName: grant.counterpartName,
           timeZone: null,
           slots: [],
           guidance: GUIDANCE[status] ?? "",
-          ...(isCalendarBlock(status)
-            ? {
-                says: await blockedSays(schedule, context.actor, status, grant),
-              }
-            : {}),
         };
       }
       return {

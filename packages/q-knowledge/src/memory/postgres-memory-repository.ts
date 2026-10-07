@@ -135,6 +135,8 @@ export type NewMemoryItem = {
   readonly sourceRunId: string | null;
   readonly writeMode: MemoryWriteMode;
   readonly status: "candidate" | "confirmed" | "active";
+  /** When it lapses (small talk, ADR 0062); absent keeps it until replaced or forgotten. */
+  readonly validTo?: string | null | undefined;
 };
 
 export type MemoryRepository = {
@@ -195,6 +197,8 @@ export function createPostgresMemoryRepository(): MemoryRepository {
            and m.owner_context_type = ${owner.ownerContextType}
            and m.owner_context_id = ${owner.ownerContextId}
            and m.status = any(${live}::text[])
+           -- Lapsed small talk (past its 90 days, ADR 0062) is not recalled.
+           and (m.valid_to is null or m.valid_to > now())
          order by m.updated_at desc, m.id desc
          limit ${limit}`;
       return rows.map(toItem);
@@ -227,13 +231,13 @@ export function createPostgresMemoryRepository(): MemoryRepository {
         insert into q_knowledge.memory_items
           (tenant_id, owner_context_type, owner_context_id, subject_type, subject_id,
            memory_type, memory_key, content, structured_value, quote, content_sha256,
-           source_conversation_id, source_run_id, write_mode, status)
+           source_conversation_id, source_run_id, write_mode, status, valid_to)
         values (${input.tenantId}, ${input.owner.ownerContextType}, ${input.owner.ownerContextId},
                 ${input.subject?.subjectType ?? null}, ${input.subject?.subjectId ?? null},
                 ${input.memoryType}, ${input.memoryKey}, ${input.content},
                 ${JSON.stringify(input.structuredValue)}::text::jsonb, ${input.quote},
                 ${input.contentSha256}, ${input.sourceConversationId}, ${input.sourceRunId},
-                ${input.writeMode}, ${input.status})
+                ${input.writeMode}, ${input.status}, ${input.validTo ?? null})
         returning id`;
       const { id } = z.object({ id: z.string().uuid() }).parse(rows[0]);
       const created =

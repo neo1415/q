@@ -14,6 +14,7 @@ import {
   storeListeningPreference,
 } from "../listening-preference";
 import { resolveListeningLevel } from "./backchannel";
+import { pollNarration } from "./narration-poll";
 import {
   transcriptLineFor,
   type VoiceSessionClient,
@@ -121,6 +122,7 @@ export function useDuplexVoiceSession(
         usage: (report) => reportDuplexUsageAction(id, report),
         end: (reason, detail) => endDuplexAction(id, reason, detail),
         rejoin: (cause) => rejoinDuplexAction(id, cause),
+        narration: (after) => pollNarration(id, after),
       };
       const line = new DuplexLine({
         credential: duplex,

@@ -112,6 +112,19 @@ export const SOUND_RECIPES: Readonly<
   ],
   // Sent: one light tick up from E5, quieter than anything Q says back.
   sent: [tone(659.25, { f2: 880, length: 0.14, wave: "sine", peak: -28 })],
+  // ADR 0062: Q is on it. One low, soft E4 with a breath of attack; the
+  // quietest sound Q makes, so a wait starts without dead air.
+  working: [
+    tone(329.63, {
+      length: 0.5,
+      attack: 0.08,
+      peak: -32,
+      partials: [
+        [1, 1],
+        [2, 0.12],
+      ],
+    }),
+  ],
 };
 
 /** The hum's level and its partials: a low, warm A2 and E3 that breathes. */

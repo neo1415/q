@@ -103,6 +103,7 @@ function harness(
     readonly tool?: () => Promise<QVoiceDuplexToolResult | null>;
     readonly usage?: () => Promise<QVoiceDuplexUsageResult | null>;
     readonly microphone?: () => Promise<MediaStream>;
+    readonly narration?: DuplexRelays["narration"];
   } = {},
 ) {
   const peer = new FakePeer();
@@ -154,6 +155,9 @@ function harness(
       options.usage ?? (() => Promise.resolve({ continue: true })),
     ),
     end: vi.fn<DuplexRelays["end"]>(() => Promise.resolve()),
+    ...(options.narration === undefined
+      ? {}
+      : { narration: options.narration }),
   };
   const events = {
     onState: vi.fn<DuplexLineEvents["onState"]>(),
@@ -355,6 +359,64 @@ describe("tool calls and usage", () => {
     expect(h.channel().sent[0]).toMatchObject({
       item: { type: "function_call_output", call_id: "call_1" },
     });
+  });
+
+  it("voices the silence ladder's beats out of band while ask_q works (ADR 0062)", async () => {
+    let finish: () => void = () => undefined;
+    const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>((after) =>
+      Promise.resolve(
+        after === 0
+          ? {
+              beats: [
+                { sequence: 1, beat: { kind: "TONE" } },
+                {
+                  sequence: 2,
+                  beat: { kind: "STAGE_LINE", text: "Looking at the deck…" },
+                },
+              ],
+              idle: false,
+            }
+          : { beats: [], idle: true },
+      ),
+    );
+    const h = harness({
+      narration,
+      tool: () =>
+        new Promise((resolve) => {
+          finish = () => {
+            resolve({
+              output: JSON.stringify({ ok: true, say: "Done." }),
+              approvalPending: false,
+            });
+          };
+        }),
+    });
+    await h.line.open();
+    h.channel().emit({
+      type: "response.function_call_arguments.done",
+      call_id: "call_n",
+      name: "ask_q",
+      arguments: JSON.stringify({ request: "Look at the deck." }),
+    });
+    await settle();
+    expect(narration).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(700);
+    await settle();
+    expect(narration).toHaveBeenCalledWith(0);
+    const spoken = h
+      .channel()
+      .sent.filter(
+        (event) =>
+          (event as { type?: string }).type === "response.create" &&
+          JSON.stringify(event).includes("Looking at the deck"),
+      );
+    expect(spoken).toHaveLength(1);
+    // Out of band, no tools: nothing it says enters the conversation.
+    expect(spoken[0]).toMatchObject({
+      response: { conversation: "none", tools: [], tool_choice: "none" },
+    });
+    finish();
+    await settle();
   });
 
   it("does not speak a tool result the person talked over", async () => {

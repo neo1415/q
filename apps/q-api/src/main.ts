@@ -1409,6 +1409,12 @@ const workforceJobsFor = (actor: ActorContext) =>
 const workforceJobBoard = createWorkforceJobBoard({
   jobsFor: workforceJobsFor,
   withinLimit: workforceWithinLimit,
+  // Q room R5: what already waits for them, and whether their calendar is
+  // there, read as them when a job is asked for (composed further down).
+  waiting: async (actor) =>
+    await qActions.listPendingApprovals({ actor, limit: 20 }),
+  calendarConnected: async (actor) =>
+    (await schedule.calendarStatus(actor.userId)) === "CONNECTED",
 });
 // end WORKFORCE block
 const emailBoard = createEmailActionBoard({
@@ -5060,6 +5066,8 @@ const voiceTurn = timedVoiceTurns(
         }),
     // How each reply should sound, for the speak relay (CQ-VOICE-010).
     performance: speechPerformance,
+    // ADR 0062: the silence ladder's one remembered thread, the person's own.
+    smallTalk: memoryService.smallTalkThread,
     logger,
   }),
   voiceTimings,

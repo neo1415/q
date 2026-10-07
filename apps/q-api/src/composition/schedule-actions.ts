@@ -15,9 +15,11 @@ import {
   type CalendarBlockReason,
   type QSubjectRef,
 } from "@capital-q/contracts";
-import type {
-  ScheduleOutcome,
-  ScheduleService,
+import {
+  isKnownTimeZone,
+  suggestSlotsWithoutCalendar,
+  type ScheduleOutcome,
+  type ScheduleService,
 } from "@capital-q/communication";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
@@ -560,8 +562,28 @@ export function createScheduleIntelligencePort(
       if (found.outcome === "OK") {
         return { status: "OK", timeZone: found.timeZone, slots: found.slots };
       }
+      const status = found.outcome === "REFUSED" ? found.code : "UNAVAILABLE";
+      if (!isCalendarBlock(status)) return { status };
+      // Q room R5: no calendar to check, so times from working hours in
+      // their own zone (the one they asked in, else their profile's). No
+      // zone known: nothing is suggested, and Q asks.
+      const zone =
+        (input.timeZone !== undefined && isKnownTimeZone(input.timeZone)
+          ? input.timeZone
+          : null) ??
+        (await profileTimeZoneOf?.(actor).catch(() => null)) ??
+        null;
+      if (zone === null || !isKnownTimeZone(zone)) return { status };
       return {
-        status: found.outcome === "REFUSED" ? found.code : "UNAVAILABLE",
+        status,
+        suggested: {
+          timeZone: zone,
+          slots: suggestSlotsWithoutCalendar({
+            now: new Date(),
+            durationMinutes: input.durationMinutes,
+            timeZone: zone,
+          }),
+        },
       };
     },
     upcoming: async (actor) => ({

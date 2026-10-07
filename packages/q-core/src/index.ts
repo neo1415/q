@@ -379,7 +379,14 @@ export {
   type DecisionReaderVariables,
 } from "./prompts/schemas/decision-reader.js";
 export { MEMORY_EXTRACTOR_V1 } from "./prompts/tasks/memory-extractor.v1.js";
+export { MEMORY_EXTRACTOR_V2 } from "./prompts/tasks/memory-extractor.v2.js";
 export {
+  MEMORY_EXTRACT_TYPES_V2,
+  MEMORY_EXTRACTOR_V2_SCHEMA_VERSION,
+  MemoryExtractItemV2Schema,
+  MemoryExtractorResultV2Schema,
+  type MemoryExtractItemV2,
+  type MemoryExtractorResultV2,
   MEMORY_EXTRACT_TYPES,
   MEMORY_EXTRACTOR_SCHEMA_NAME,
   MEMORY_EXTRACTOR_SCHEMA_VERSION,

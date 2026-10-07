@@ -8,7 +8,9 @@ import { endHum, humPlaying, playSound, startHum } from "./sound-engine";
 import { useSoundPreference } from "./sound-preference";
 import {
   cueForTransition,
+  isWorkingState,
   soundAllowed,
+  WORKING_TONE_AFTER_MS,
   type QSound,
   type SoundContext,
 } from "./sound-rules";
@@ -30,6 +32,7 @@ export function QSounds() {
     (turn) => turn.kind === "PERSON" && turn.unconfirmed,
   )?.id;
 
+  const working = isWorkingState(state);
   const previous = useRef<typeof state | null>(null);
   const lastAt = useRef<number | null>(null);
   const sent = useRef<string | undefined>(undefined);
@@ -70,6 +73,32 @@ export function QSounds() {
     if (sending !== undefined && sending !== sent.current) play("sent");
     sent.current = sending;
   }, [state, pathname, mode, sending]);
+
+  // ADR 0062, the silence ladder's first rung: Q has been working 0.7 s
+  // and is still at it, so one soft tone, under the same rules as every
+  // other sound (Off, Quiet, speaking, the swipe path).
+  useEffect(() => {
+    if (!working) return;
+    const timer = window.setTimeout(() => {
+      const now = performance.now();
+      const allowed = soundAllowed("working", {
+        mode,
+        speaking: false,
+        pathname,
+        reducedMotion: false,
+        reducedTransparency: false,
+        now,
+        lastAt: lastAt.current,
+      });
+      if (!allowed) return;
+      lastAt.current = now;
+      playSound("working");
+    }, WORKING_TONE_AFTER_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+    // Once per wait: a move between thinking and working is the same wait.
+  }, [working, mode, pathname]);
 
   // Leaving the signed-in app (or this provider) ends the hum.
   useEffect(() => endHum, []);

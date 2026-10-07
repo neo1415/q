@@ -55,7 +55,46 @@ function who(step: { readonly role: string; readonly agentName: string }) {
   return isAgentRole(step.role) ? AGENT_REGISTRY[step.role].title : "Q";
 }
 
-export function planView(payload: WorkforceJobStartPayload): QJobPlanView {
+/** Tools whose step books or proposes a call, so a calendar matters. */
+const CALENDAR_TOOLS: ReadonlySet<string> = new Set([
+  "find_meeting_times",
+  "schedule.meeting.book",
+]);
+const OUTWARD_TOOLS: ReadonlySet<string> = new Set([
+  "chat.message.send",
+  "email.send",
+]);
+
+/**
+ * Q room R5: what will need the person, from the plan itself (code, never
+ * a model). `calendarConnected` false adds the calendar, honestly: without
+ * it Q offers times it could not check.
+ */
+export function needsYouFor(
+  payload: WorkforceJobStartPayload,
+  calendarConnected: boolean | null = null,
+): readonly string[] {
+  const tools = new Set(payload.steps.flatMap((step) => step.tools));
+  const needs = [
+    [...tools].some((tool) => OUTWARD_TOOLS.has(tool))
+      ? "Your approval of this plan before anything is sent"
+      : "Your approval of this plan before anything starts",
+  ];
+  if (
+    calendarConnected === false &&
+    [...tools].some((tool) => CALENDAR_TOOLS.has(tool))
+  ) {
+    needs.push(
+      "Connect your Google Calendar, or I'll suggest times I can't check against it",
+    );
+  }
+  return needs;
+}
+
+export function planView(
+  payload: WorkforceJobStartPayload,
+  calendarConnected: boolean | null = null,
+): QJobPlanView {
   return {
     summary: payload.summary,
     steps: payload.steps.map((step) => ({
@@ -64,7 +103,56 @@ export function planView(payload: WorkforceJobStartPayload): QJobPlanView {
     })),
     cannot: payload.cannot,
     budgetUsd: payload.budgetUsd,
+    needsYou: needsYouFor(payload, calendarConnected),
   };
+}
+
+/** Names in a goal: capitalised words of three letters or more. */
+function namesIn(text: string): ReadonlySet<string> {
+  return new Set(
+    (text.match(/\b\p{Lu}[\p{L}'-]{2,}/gu) ?? [])
+      .map((word) => word.toLowerCase())
+      .filter((word) => !COMMON_CAPITALISED.has(word)),
+  );
+}
+const COMMON_CAPITALISED: ReadonlySet<string> = new Set([
+  "the",
+  "and",
+  "can",
+  "could",
+  "please",
+  "follow",
+  "send",
+  "draft",
+  "book",
+  "set",
+  "introduce",
+  "reply",
+  "write",
+  "ask",
+  "find",
+  "get",
+  "make",
+]);
+
+/**
+ * Q room R5: what already waits for them about the same people as the
+ * goal, by the names both mention (code, deterministic). A goal that names
+ * nobody matches nothing: Q never stops work on a guess.
+ */
+export function relatedWaiting(
+  goal: string,
+  waiting: readonly { readonly summary: string }[],
+): readonly string[] {
+  const names = namesIn(goal);
+  if (names.size === 0) return [];
+  return waiting
+    .filter((item) => {
+      const theirs = namesIn(item.summary);
+      return [...names].some((name) => theirs.has(name));
+    })
+    .map((item) => item.summary.slice(0, 200))
+    .slice(0, 5);
 }
 
 /** The card's preview: the plan the person approves, step by step. */
@@ -76,6 +164,7 @@ function preview(payload: WorkforceJobStartPayload): string {
   lines.push(
     "Every message to the other side is checked by the reviewer before it goes.",
   );
+  lines.push(`What will need you: ${needsYouFor(payload).join("; ")}.`);
   if (payload.cannot.length > 0) {
     lines.push(`Q can't: ${payload.cannot.join("; ")}.`);
   }
@@ -209,6 +298,15 @@ export function createWorkforceJobBoard(dependencies: {
   readonly withinLimit?: ((owner: Owner) => Promise<boolean>) | undefined;
   readonly budgetUsd?: number | undefined;
   readonly now?: (() => number) | undefined;
+  /** R5: what already waits for their approval (the Approval Engine's list). */
+  readonly waiting?:
+    | ((
+        actor: ActorContext,
+      ) => Promise<readonly { readonly summary: string }[]>)
+    | undefined;
+  /** R5: whether their own Google Calendar is connected (stored state only). */
+  readonly calendarConnected?:
+    ((actor: ActorContext) => Promise<boolean>) | undefined;
 }): { readonly port: QJobPort; readonly proposer: QActionProposer } {
   const now = dependencies.now ?? (() => Date.now());
   const budget = dependencies.budgetUsd ?? DEFAULT_JOB_BUDGET_USD;
@@ -223,7 +321,7 @@ export function createWorkforceJobBoard(dependencies: {
   >();
   return {
     port: {
-      prepare: async (actor, runId, goal) => {
+      prepare: async (actor, runId, goal, options) => {
         const cutoff = now() - READING_TTL_MS;
         for (const [key, value] of prepared) {
           if (value.at < cutoff) prepared.delete(key);
@@ -231,6 +329,14 @@ export function createWorkforceJobBoard(dependencies: {
         const existing = prepared.get(runId);
         if (existing !== undefined) {
           return { status: "ONE_PER_TURN", plan: planView(existing.payload) };
+        }
+        // R5: like a colleague, look at what is already waiting first.
+        if (options?.proceed !== true && dependencies.waiting !== undefined) {
+          const waiting = relatedWaiting(
+            goal,
+            await dependencies.waiting(actor).catch(() => []),
+          );
+          if (waiting.length > 0) return { status: "ALREADY_WAITING", waiting };
         }
         const owner = { tenantId: actor.tenantId, userId: actor.userId };
         if (
@@ -279,7 +385,14 @@ export function createWorkforceJobBoard(dependencies: {
           payload: parsed.data,
           at: now(),
         });
-        return { status: "PREPARED", plan: planView(parsed.data) };
+        const calendarConnected =
+          dependencies.calendarConnected === undefined
+            ? null
+            : await dependencies.calendarConnected(actor).catch(() => null);
+        return {
+          status: "PREPARED",
+          plan: planView(parsed.data, calendarConnected),
+        };
       },
     },
     proposer: {

@@ -2,6 +2,7 @@ import type {
   QVoiceDuplexCredential,
   QVoiceDuplexEnd,
   QVoiceDuplexLineStats,
+  QVoiceDuplexNarrationResult,
   QVoiceDuplexRejoin,
   QVoiceDuplexRejoinResult,
   QVoiceDuplexToolCall,
@@ -9,6 +10,7 @@ import type {
   QVoiceDuplexUsageReport,
   QVoiceDuplexUsageResult,
   QVoiceListeningLevel,
+  QSilenceBeat,
 } from "@capital-q/contracts";
 
 import type { VoiceState } from "../session";
@@ -104,6 +106,9 @@ export const BACKCHANNEL_GAIN = 0.6;
 /** Output caps: a reaction is under a second, a bridge a short clause. */
 export const BACKCHANNEL_MAX_OUTPUT_TOKENS = 40;
 export const BRIDGE_MAX_OUTPUT_TOKENS = 90;
+/** ADR 0062: long polls for one ask_q's beats, at most. */
+const NARRATION_MAX_POLLS = 12;
+const NARRATION_FIRST_POLL_MS = 600;
 /** The commit a reaction waits on; past this it is dropped. */
 const COMMIT_WAIT_MS = 400;
 /** The longest a bridge may hold Q's answer back. */
@@ -175,6 +180,13 @@ export type DuplexRelays = {
    */
   readonly rejoin?:
     | ((cause: RejoinCause) => Promise<QVoiceDuplexRejoinResult | null>)
+    | undefined;
+  /**
+   * ADR 0062: the silence ladder's beats while ask_q works (a long poll).
+   * Present: they replace the model's bridging line.
+   */
+  readonly narration?:
+    | ((after: number) => Promise<QVoiceDuplexNarrationResult | null>)
     | undefined;
 };
 
@@ -1197,8 +1209,11 @@ export class DuplexLine {
         const words = text(asked, "request");
         if (words !== undefined) {
           this.#events.onLine("user", words);
-          // A slow answer gets a bridging line; a fast one gets silence.
-          if (this.#bridgesAllowed()) {
+          // ADR 0062: the server's silence ladder fills a slow answer,
+          // in fixed words from Q's real stage; a fast one gets silence.
+          if (this.#relays.narration !== undefined) {
+            this.#narrate(generation);
+          } else if (this.#bridgesAllowed()) {
             bridge = this.#env.setTimeout(
               () => {
                 if (generation === this.#generation) this.#fireBridge(words);
@@ -1401,6 +1416,55 @@ export class DuplexLine {
         ...this.#turnItems.map((id) => ({ type: "item_reference", id })),
       ],
     });
+  }
+
+  /** ADR 0062: voice the ladder's beats while this ask_q works. */
+  #narrate(generation: number): void {
+    const poll = this.#relays.narration;
+    if (poll === undefined) return;
+    const live = () =>
+      !this.#over && generation === this.#generation && this.#toolsInFlight > 0;
+    void (async () => {
+      let after = 0;
+      // The relay starts after this call: let it reach the server first
+      // (the first spoken beat is not due before 1.5 s anyway).
+      await new Promise<void>((resolve) => {
+        this.#env.setTimeout(resolve, NARRATION_FIRST_POLL_MS);
+      });
+      // Bounded: each poll is held at most a few seconds by the server.
+      for (let polls = 0; polls < NARRATION_MAX_POLLS; polls += 1) {
+        if (!live()) return;
+        let result: QVoiceDuplexNarrationResult | null;
+        try {
+          result = await poll(after);
+        } catch {
+          return;
+        }
+        if (result === null) return;
+        for (const { sequence, beat } of result.beats) {
+          after = Math.max(after, sequence);
+          if (live()) this.#sayBeat(beat);
+        }
+        if (result.idle) return;
+      }
+    })();
+  }
+
+  /** One beat, in fixed words, out of band: nothing enters the conversation. */
+  #sayBeat(beat: QSilenceBeat): void {
+    if (beat.kind === "TONE") return;
+    if (this.#over || this.#speaking || this.#responseActive) return;
+    const oob = this.#newOutOfBand("BRIDGE");
+    const words = beat.text.replace(/"/g, "'");
+    this.#sendOutOfBand(oob, {
+      instructions:
+        beat.kind === "HUM"
+          ? `Hum softly and briefly, like someone thinking while they work ("${words}"). No words.`
+          : `Say exactly this, warmly and quietly, and nothing else: "${words}"`,
+      maxOutputTokens: BRIDGE_MAX_OUTPUT_TOKENS,
+      input: [],
+    });
+    this.#updateBusy();
   }
 
   /** The answer is slow: one short line, from their own request. */

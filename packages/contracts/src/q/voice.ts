@@ -6,6 +6,7 @@ import { QLocaleSchema } from "./context.js";
 import { QConversationIdSchema } from "./ids.js";
 import { QVoicePresenceSchema } from "./presence.js";
 import { QScreenContextSchema, QViewingMomentSchema } from "./request.js";
+import { QSilenceBeatSchema } from "./silence-ladder.js";
 import { QSubjectRefsSchema } from "./subject.js";
 import { QClientActionIntentSchema } from "./ui-intent.js";
 
@@ -361,6 +362,41 @@ export const Q_VOICE_DUPLEX_REJOIN_PATH =
   "/v1/q/voice/sessions/:voiceSessionId/duplex/rejoin" as const;
 export const qVoiceDuplexRejoinPath = (voiceSessionId: string) =>
   `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/rejoin`;
+
+/**
+ * POST (long poll): the silence ladder's beats on a duplex line while an
+ * ask_q is working (ADR 0062). The browser voices each out of band, with
+ * fixed text, so none enters the conversation. Owner only.
+ */
+export const Q_VOICE_DUPLEX_NARRATION_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/narration" as const;
+export const qVoiceDuplexNarrationPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/narration`;
+export const QVoiceDuplexNarrationRequestSchema = z
+  .object({ after: z.number().int().min(0) })
+  .strict();
+export type QVoiceDuplexNarrationRequest = z.infer<
+  typeof QVoiceDuplexNarrationRequestSchema
+>;
+export const QVoiceDuplexNarrationResultSchema = z
+  .object({
+    beats: z
+      .array(
+        z
+          .object({
+            sequence: z.number().int().min(1),
+            beat: QSilenceBeatSchema,
+          })
+          .strict(),
+      )
+      .max(8),
+    /** No ask_q is working on the line: stop asking. */
+    idle: z.boolean(),
+  })
+  .strict();
+export type QVoiceDuplexNarrationResult = z.infer<
+  typeof QVoiceDuplexNarrationResultSchema
+>;
 
 /** A model's proposal: untrusted input, validated again by the tool pipeline. */
 export const QVoiceDuplexToolCallSchema = z

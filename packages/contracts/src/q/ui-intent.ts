@@ -41,6 +41,7 @@ export const Q_UI_INTENT_KINDS = [
   "OPEN_SETUP",
   "OPEN_SETTINGS",
   "SHOW_IN_Q_ROOM",
+  "SHOW_CALENDAR_CONNECT",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -378,6 +379,37 @@ export const QShowInQRoomIntentSchema = z
 export type QShowInQRoomIntent = z.infer<typeof QShowInQRoomIntentSchema>;
 
 /**
+ * Q room R5: their Google Calendar is not connected, so Q says so, still
+ * suggests times (from working hours in their zone, never checked against
+ * any calendar), and offers the connect card right in the room. The card
+ * runs the existing Google connect flow and comes back to the same page.
+ * Display only: the times are suggestions; nothing is booked from here.
+ */
+export const QShowCalendarConnectIntentSchema = z
+  .object({
+    kind: z.literal("SHOW_CALENDAR_CONNECT"),
+    reason: z.enum(["NOT_CONNECTED", "REVOKED"]),
+    /** Who the call is with, as the relationship's own service named them. */
+    counterpartName: z.string().trim().min(1).max(120).optional(),
+    timeZone: z.string().max(64).nullable(),
+    suggested: z
+      .array(
+        z
+          .object({
+            startsAt: z.string().max(40),
+            endsAt: z.string().max(40),
+            local: z.string().max(80),
+          })
+          .strict(),
+      )
+      .max(3),
+  })
+  .strict();
+export type QShowCalendarConnectIntent = z.infer<
+  typeof QShowCalendarConnectIntentSchema
+>;
+
+/**
  * Discover filters, set by asking ("show me only fintech in Nigeria";
  * lead-owned contract change, ux/discover-filters). Replaces the reader's
  * filters on their own screen, exactly as the filter sheet does. Sectors
@@ -466,6 +498,7 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QOpenSetupIntentSchema,
   QOpenSettingsIntentSchema,
   QShowInQRoomIntentSchema,
+  QShowCalendarConnectIntentSchema,
 ]);
 export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
 
@@ -573,6 +606,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QScreenActIntentSchema,
   QOpenSettingsIntentSchema,
   QShowInQRoomIntentSchema,
+  QShowCalendarConnectIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

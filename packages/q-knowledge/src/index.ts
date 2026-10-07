@@ -253,6 +253,8 @@ export {
   type MemoryWriteMode,
   type MemoryWriteReason,
   type MemoryWriteResult,
+  SMALL_TALK_RETENTION_DAYS,
+  type SmallTalkThread,
 } from "./memory/contracts.js";
 export {
   createPostgresMemoryRepository,
@@ -264,6 +266,7 @@ export {
   looksLikeSecret,
   memoryContentHash,
   personOwner,
+  smallTalkFollowUp,
   type ForgetCommand,
   type MemoryConversationDigestPort,
   type MemoryService,

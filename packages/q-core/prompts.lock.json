@@ -109,6 +109,7 @@
     "meeting-outcome-reader/v1": "1328d148563f75006f3df38f7b8919d63cc318c689e814813478d1e1c79d6aa7",
     "meeting-screen-note/v1": "b34cf6bbd0f0ccabc057998c5d364d79369d42d4739865e1438517cd58369dad",
     "memory-extractor/v1": "9a8cb14a00f114b12ed1f4c57144ba6cfc58f942e30354da21e923da9bdf2929",
+    "memory-extractor/v2": "03f459f9f9a6f7f199354fc59571d4d25b419e69ae9c88832f45841a187a0145",
     "onboarding-move-reader/v1": "9617f6a4c1a2f2ad9cddb4a1896766b5f37bdc8057a45cb4324a0f7ab1fcf44a",
     "preference-polarity/v1": "9d254c9abbfd0bffd8b2d794a22c053cc1e20f5039b8fe34779fb0c7f5a4e113",
     "presence-reader/v1": "1c0fb1e776609bd3471b53479068632dc9dbf0f25921061d97634f8f253ccdfd",

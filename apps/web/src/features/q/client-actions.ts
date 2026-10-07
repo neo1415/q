@@ -343,5 +343,9 @@ export function performClientAction(
     // (it is part of the conversation); nothing moves the person.
     case "SHOW_IN_Q_ROOM":
       return true;
+    // Q room R5: the answer carries the connect card itself; the person
+    // starts the connect flow from it, never the answer on its own.
+    case "SHOW_CALENDAR_CONNECT":
+      return true;
   }
 }

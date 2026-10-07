@@ -60,6 +60,7 @@ function fakeBroker(
     tool: () => Promise.resolve(null),
     usage: () => Promise.resolve(null),
     rejoin: () => Promise.resolve(null),
+    narration: () => Promise.resolve(null),
     end: () => false,
     size: () => 0,
   };

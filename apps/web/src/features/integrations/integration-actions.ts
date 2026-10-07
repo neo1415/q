@@ -14,10 +14,11 @@ import {
   type ApiSession,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
-import type {
-  EmailDraftDto,
-  GoogleConnectionDto,
-  InboundEmailAddressDto,
+import {
+  StartGoogleConnectRequestSchema,
+  type EmailDraftDto,
+  type GoogleConnectionDto,
+  type InboundEmailAddressDto,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -82,6 +83,24 @@ export async function connectGmail(): Promise<IntegrationResult<string>> {
   return run(
     "api",
     async (s) => (await startGoogleConnect(s, "/settings")).authorizationUrl,
+  );
+}
+
+/**
+ * Q room R5: the connect card in the Q room starts the same Google connect
+ * flow, and Google brings the person back to the page they were on. The
+ * return path is input: only a same-origin path the contract allows.
+ */
+export async function connectGoogleCalendar(
+  rawReturnTo: unknown,
+): Promise<IntegrationResult<string>> {
+  const returnTo = StartGoogleConnectRequestSchema.shape.returnTo.safeParse(
+    typeof rawReturnTo === "string" ? rawReturnTo : undefined,
+  );
+  const path = returnTo.success ? (returnTo.data ?? "/home") : "/home";
+  return run(
+    "api",
+    async (s) => (await startGoogleConnect(s, path)).authorizationUrl,
   );
 }
 

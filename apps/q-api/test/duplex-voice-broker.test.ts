@@ -518,6 +518,65 @@ describe("relaying the model's tool calls", () => {
     expect(result?.approvalPending).toBe(false);
   });
 
+  it("relays the silence ladder's beats out of band, never into what Q says (ADR 0062)", async () => {
+    let release: () => void = () => undefined;
+    const h = await opened({
+      turn: async (_b, _t, _s, speaker) => {
+        speaker.narrate?.({ kind: "TONE" });
+        speaker.narrate?.({ kind: "STAGE_LINE", text: "Looking at the deck…" });
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        await speaker.speak("Here is what I found.");
+        return { kind: "SPOKEN", path: "Q" };
+      },
+    });
+    const asked = h.broker.tool({
+      actor: ACTOR,
+      voiceSessionId: id,
+      call: {
+        callId: "call_n",
+        name: "ask_q",
+        arguments: JSON.stringify({ request: "Look at the deck." }),
+      },
+    });
+    await Promise.resolve();
+    const first = await h.broker.narration({
+      actor: ACTOR,
+      voiceSessionId: id,
+      after: 0,
+    });
+    expect(first).toEqual({
+      beats: [
+        {
+          sequence: 1,
+          beat: { kind: "STAGE_LINE", text: "Looking at the deck…" },
+        },
+      ],
+      idle: false,
+    });
+    // Someone else's poll on this line gets nothing.
+    expect(
+      await h.broker.narration({
+        actor: STRANGER,
+        voiceSessionId: id,
+        after: 0,
+      }),
+    ).toBeNull();
+    const waiting = h.broker.narration({
+      actor: ACTOR,
+      voiceSessionId: id,
+      after: 1,
+    });
+    release();
+    const result = await asked;
+    expect(await waiting).toEqual({ beats: [], idle: true });
+    expect(JSON.parse(result?.output ?? "{}")).toEqual({
+      ok: true,
+      say: "Here is what I found.",
+    });
+  });
+
   it("each ask_q is its own utterance, after what Q said on the line (voiceq-63)", async () => {
     const h = await opened();
     const ask = (request: string, callId: string) =>

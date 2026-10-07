@@ -90,3 +90,41 @@ export const MemoryExtractorResultSchema = z
   })
   .strict();
 export type MemoryExtractorResult = z.infer<typeof MemoryExtractorResultSchema>;
+
+/**
+ * v2 (ADR 0062, Q room R7): one more kind, SMALL_TALK -- something the
+ * person mentioned in passing about their life ("I'm off to Lagos on
+ * Friday"), with the one short question Q may ask about it later ("how
+ * was Lagos?"). Kept 90 days, personal-private, recalled only for Q's own
+ * conversation with them; the Write Gate verifies its quote like any other.
+ */
+export const MEMORY_EXTRACTOR_V2_SCHEMA_VERSION = 2;
+
+export const MEMORY_EXTRACT_TYPES_V2 = [
+  ...MEMORY_EXTRACT_TYPES,
+  "SMALL_TALK",
+] as const;
+export type MemoryExtractTypeV2 = (typeof MEMORY_EXTRACT_TYPES_V2)[number];
+
+export const MemoryExtractItemV2Schema = z
+  .object({
+    type: z.enum(MEMORY_EXTRACT_TYPES_V2),
+    key: z.string().regex(MEMORY_KEY_PATTERN).max(96),
+    content: z.string().trim().min(3).max(400),
+    quote: z.string().trim().min(3).max(400),
+    /** SMALL_TALK only: the short question Q may ask about it later. */
+    followUp: z.string().trim().min(3).max(120).nullable().default(null),
+  })
+  .strict();
+export type MemoryExtractItemV2 = z.infer<typeof MemoryExtractItemV2Schema>;
+
+export const MemoryExtractorResultV2Schema = z
+  .object({
+    title: z.string().trim().min(1).max(60),
+    summary: z.string().trim().max(1_200),
+    items: z.array(MemoryExtractItemV2Schema).max(12).default([]),
+  })
+  .strict();
+export type MemoryExtractorResultV2 = z.infer<
+  typeof MemoryExtractorResultV2Schema
+>;

@@ -75,6 +75,7 @@ export {
 export {
   isKnownTimeZone,
   proposeSlots,
+  suggestSlotsWithoutCalendar,
   SLOT_POLICY,
   type Interval,
 } from "./schedule/slots.js";

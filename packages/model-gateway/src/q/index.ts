@@ -7,6 +7,7 @@ import {
   isCalendarBlock,
   MODEL_TOOL_RESULT_MAX_CHARS,
   QClientActionToolResultSchema,
+  QShowCalendarConnectIntentSchema,
   QDocumentToolResultSchema,
   QMessageIdSchema,
   type ModelBudget,
@@ -211,6 +212,11 @@ export {
   type QOnboardingNudge,
   type QOnboardingNudgePort,
 } from "./onboarding-nudge.js";
+
+/** Q room R5: any tool result that carries the calendar connect card. */
+const CalendarConnectCarrierSchema = z
+  .object({ clientAction: QShowCalendarConnectIntentSchema })
+  .passthrough();
 
 /**
  * The Q answer seam over the Prompt Registry, the Tool Registry and the
@@ -2685,11 +2691,18 @@ export function createModelGatewayQAnswer(
         const read = QClientActionToolResultSchema.safeParse(
           outcome.result.data,
         );
-        if (!read.success) return;
-        const block: QResultBlock = {
-          kind: "UI_INTENT",
-          intent: read.data.clientAction,
-        };
+        // Q room R5: a calendar answer carries its connect card (display
+        // only; the person starts the connect flow from it).
+        const card = read.success
+          ? null
+          : CalendarConnectCarrierSchema.safeParse(outcome.result.data);
+        const intent = read.success
+          ? read.data.clientAction
+          : card?.success === true
+            ? card.data.clientAction
+            : null;
+        if (intent === null) return;
+        const block: QResultBlock = { kind: "UI_INTENT", intent };
         if (
           !clientActionBlocks.some(
             (known) => JSON.stringify(known) === JSON.stringify(block),

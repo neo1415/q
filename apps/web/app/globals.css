@@ -2209,6 +2209,34 @@
     z-index: var(--cq-z-presence);
     pointer-events: none;
   }
+  /*
+   * ADR 0062 (Q room R7): particles around the page edge while Q works.
+   * Click-through and decorative; colour from Q's light token. Under
+   * reduced motion the canvas stays empty and a still edge line shows.
+   */
+  .cq-q-edge-flow {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: var(--cq-z-presence);
+    pointer-events: none;
+    color: var(--cq-q-light);
+    opacity: 0;
+    transition: opacity var(--cq-motion-slow) var(--cq-ease);
+  }
+  .cq-q-edge-flow[data-q-edge-flow="on"] {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-q-edge-flow {
+      transition: none;
+    }
+    .cq-q-edge-flow[data-q-edge-flow="on"] {
+      box-shadow: inset 0 0 0 2px
+        color-mix(in oklab, var(--cq-q-light) 60%, transparent);
+    }
+  }
   .cq-q-dock {
     position: absolute;
     top: 0;
