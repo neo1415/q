@@ -50,12 +50,28 @@ import { TAXONOMY_EVENTS } from "@capital-q/taxonomy/events";
 import {
   createFounderDomainServices,
   createFounderOnboardingIntegration,
+  FOUNDER_FINANCIAL_STEPS,
   FOUNDER_STEPS,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
   FounderSnapshotContextSchema,
   resolveFounderContext,
 } from "../src/index.js";
+
+/** v4's financials are optional: these journeys skip whatever of them is asked. */
+const FINANCIAL_KEYS: ReadonlySet<string> = new Set(
+  Object.values(FOUNDER_FINANCIAL_STEPS),
+);
+async function skipFinancials(journey: {
+  readonly view: () => OnboardingSessionView;
+  readonly skip: (stepKey: string) => Promise<OnboardingSessionView>;
+}): Promise<void> {
+  for (let guard = 0; guard < 12; guard += 1) {
+    const key = journey.view().currentStep?.stepKey;
+    if (key === undefined || !FINANCIAL_KEYS.has(key)) return;
+    await journey.skip(key);
+  }
+}
 
 /**
  * The real Founder journey F0 → F8 over the onboarding runtime against the
@@ -385,9 +401,9 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       const journey = await startFounder(world, newcomer);
       expect(journey.view().session.subject).toBeNull();
       expect(journey.view().currentStep?.stepKey).toBe(FOUNDER_STEPS.intent);
-      // v3 is the published journey (20261110010000): v2 (CQ-Q-021, F2
-      // gathers documents) plus two F5.signal options.
-      expect(journey.view().session.definitionVersion).toBe(3);
+      // v4 is the published journey (20261218100000): v3 plus the optional
+      // financials block (Q.01).
+      expect(journey.view().session.definitionVersion).toBe(4);
 
       await journey.submit(FOUNDER_STEPS.intent, single("raising_now"));
       expect(journey.view().currentStep?.stepKey).toBe(
@@ -412,7 +428,12 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
          where m.user_id = ${newcomer.userId}
          group by m.organisation_id`;
       expect(membership?.organisation_id).toBe(company?.organisation_id);
-      expect(membership?.role_codes).toEqual(["organisation_admin"]);
+      // The founder who creates the workspace is its admin and its owner
+      // (organisations, G: one owner per organisation).
+      expect(membership?.role_codes).toEqual([
+        "organisation_admin",
+        "organisation_owner",
+      ]);
       const [founderRow] = await tx.sql<
         { is_founder: boolean; relationship_type: string }[]
       >`select is_founder, relationship_type from core.company_members
@@ -532,6 +553,7 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       await journey.submit(FOUNDER_STEPS.instrument, single("safe"));
       await journey.skip(FOUNDER_STEPS.timeframe);
       await journey.submit(FOUNDER_STEPS.useOfFunds, multi(["product", "gtm"]));
+      await skipFinancials(journey);
       const raiseStep = journey.view();
       expect(raiseStep.currentStep?.stepKey).toBe(FOUNDER_STEPS.raiseConfirm);
       const raiseContext = FounderRaiseContextSchema.parse(
@@ -609,6 +631,7 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
         FOUNDER_STEPS.followUp,
         text(`Board wants a bridge first. ${FOLLOW_UP_MARKER}`),
       );
+      await skipFinancials(journey);
       const snapshotStep = journey.view();
       expect(snapshotStep.currentStep?.stepKey).toBe(FOUNDER_STEPS.snapshot);
       const snapshot = FounderSnapshotContextSchema.parse(
@@ -857,6 +880,7 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
         journey.view().progress.eligibleSteps.map((s) => s.stepKey),
       ).not.toContain(FOUNDER_STEPS.raiseConfirm);
       await journey.skip(FOUNDER_STEPS.followUp);
+      await skipFinancials(journey);
       const snapshot = FounderSnapshotContextSchema.parse(
         journey.view().currentStep?.context,
       );
