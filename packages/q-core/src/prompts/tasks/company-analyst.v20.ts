@@ -50,7 +50,8 @@ export const COMPANY_ANALYST_V20: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V19,
   version: 20,
-  status: "ACTIVE",
+  // Deprecated by v21 (no boilerplate disclaimers, 2026-10-07).
+  status: "DEPRECATED",
   changeDescription:
     "Natural conversation (Zino live 2026-10-07): HOW YOU TALK -- answer first in first person, names in every list item, lists and scores in answerCards with a short spoken gist, one brief caveat, the person's register, no reflex acknowledgements, never internal text, ask back only when Q cannot answer. Schema unchanged from v19.",
   effectiveFrom: "2026-10-07",

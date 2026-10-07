@@ -719,6 +719,11 @@ export {
   V19_ANSWER_FORMAT_HEADING,
 } from "./prompts/tasks/company-analyst.v20.js";
 export {
+  COMPANY_ANALYST_V21,
+  V20_CAVEAT_LINE,
+  V21_NO_DISCLAIMER_LINE,
+} from "./prompts/tasks/company-analyst.v21.js";
+export {
   COMPANY_ANALYST_V16,
   COMPANY_ANALYST_V16_TURN,
 } from "./prompts/tasks/company-analyst.v16.js";
@@ -939,7 +944,9 @@ export {
   type RecommendationGrounds,
 } from "./communication/recommendation-guard.js";
 export {
+  createCaveatGuard,
   inFirstPerson,
+  withOneCaveat,
   NATURAL_REGISTER_ISSUES,
   naturalRegisterIssues,
   SPOKEN_WORDS_MAX,

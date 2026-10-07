@@ -32,10 +32,27 @@ const CLAIMS: readonly RegExp[] = [
 
 const APPROVAL = /\bapprov/iu;
 
+/**
+ * "They're on screen", "listed on screen", "the rest are in the cards":
+ * a list said to be shown (lead live replay 2026-10-07: "the other
+ * contacted companies are listed on screen" with no card on screen).
+ * Unbacked, such a sentence is simply dropped -- nothing was asked to
+ * open, so there is nothing to apologise for.
+ */
+const LIST_CLAIM =
+  /\b(?:(?:listed |shown |laid out )?on(?:-| )screen|in the cards?|(?:are|is) (?:listed|shown) (?:below|above|here))\b/iu;
+
+export function claimsListOnScreen(sentence: string): boolean {
+  if (APPROVAL.test(sentence)) return false;
+  return LIST_CLAIM.test(sentence);
+}
+
 /** True when the sentence tells the person something is on their screen. */
 export function claimsOnScreen(sentence: string): boolean {
   if (APPROVAL.test(sentence)) return false;
-  return CLAIMS.some((claim) => claim.test(sentence));
+  return (
+    CLAIMS.some((claim) => claim.test(sentence)) || LIST_CLAIM.test(sentence)
+  );
 }
 
 /**
@@ -51,6 +68,12 @@ export function createScreenClaimGuard(backed: () => boolean) {
     sentence(sentence: string): string | null {
       if (backed() || !claimsOnScreen(sentence)) return sentence;
       removed += 1;
+      if (
+        claimsListOnScreen(sentence) &&
+        !CLAIMS.some((claim) => claim.test(sentence))
+      ) {
+        return null;
+      }
       if (corrected) return null;
       corrected = true;
       return NOT_ON_SCREEN_LINE;

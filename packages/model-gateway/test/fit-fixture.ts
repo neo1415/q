@@ -16,17 +16,22 @@ export function fitFixture(
   name: string,
   outcomes: Partial<Record<(typeof PARAMETERS)[number], string>>,
   band: "STRONG_FIT" | "GOOD_FIT" | "PARTIAL_FIT" = "GOOD_FIT",
+  /** Where the company is based, as the geography reason says it. */
+  place?: string,
 ): { toolName: "fit.profile"; result: { ok: true; data: unknown } } {
   const parameters = PARAMETERS.map((parameter) => ({
     parameter,
     outcome: outcomes[parameter] ?? "UNKNOWN",
-    reason: `${parameter.toLowerCase().replace("_", " ")} ${
-      (outcomes[parameter] ?? "UNKNOWN") === "STRONG"
-        ? "is within your mandate"
-        : (outcomes[parameter] ?? "UNKNOWN") === "MISMATCH"
-          ? "is outside your mandate"
-          : "is not known yet"
-    }`,
+    reason:
+      parameter === "GEOGRAPHY" && place !== undefined
+        ? `Based in ${place}; you invest there.`
+        : `${parameter.toLowerCase().replace("_", " ")} ${
+            (outcomes[parameter] ?? "UNKNOWN") === "STRONG"
+              ? "is within your mandate"
+              : (outcomes[parameter] ?? "UNKNOWN") === "MISMATCH"
+                ? "is outside your mandate"
+                : "is not known yet"
+          }`,
     evidenceStatus: null,
     stale: false,
     applicable: true,

@@ -198,14 +198,41 @@ function cardOf(fit: RunFit): Omit<QAnswerCard, "key" | "hue"> {
 export function fitAnswerCardsBlock(
   fits: readonly RunFit[],
   answer: string,
+  options: {
+    /**
+     * Only the companies the answer names (fits code read for a plain
+     * list question, not ones the model asked for).
+     */
+    readonly namedOnly?: boolean | undefined;
+  } = {},
 ): QAnswerCardsBlock | null {
   const said = nameKey(answer);
   const named = fits.filter((fit) => {
     const key = nameKey(fit.name);
     return key.length > 0 && said.includes(key);
   });
-  const chosen = named.length >= 2 ? named : fits;
+  const chosen =
+    named.length >= 2 ? named : options.namedOnly === true ? [] : fits;
   if (chosen.length < 2) return null;
+  return rankedBlock(chosen, "Fit against your mandate");
+}
+
+/**
+ * The cards for a fit sweep (fit-sweep.ts): every company in the set the
+ * question was about, ranked by the computed score; one card is enough
+ * when a filter left one company.
+ */
+export function fitSweepCardsBlock(
+  fits: readonly RunFit[],
+  title: string,
+): QAnswerCardsBlock | null {
+  return fits.length === 0 ? null : rankedBlock(fits, title);
+}
+
+function rankedBlock(
+  chosen: readonly RunFit[],
+  title: string,
+): QAnswerCardsBlock | null {
   const scored = chosen
     .map((fit, index) => ({ fit, index, card: cardOf(fit) }))
     .sort(
@@ -224,11 +251,58 @@ export function fitAnswerCardsBlock(
   const parsed = QAnswerCardsBlockSchema.safeParse({
     kind: "ANSWER_CARDS",
     shape: "RANKED",
-    title: "Fit against your mandate",
+    title: title.slice(0, 120),
     cards,
     followUps: [],
   });
   return parsed.success ? parsed.data : null;
+}
+
+function scoreWords(score: number): string {
+  return `${String(score).replace(/\.0$/u, "")} out of 10`;
+}
+
+/**
+ * What Q says for a fit sweep, in at most three sentences before the
+ * pointer to the cards: how many, the best one or two by name with their
+ * scores, one caveat when some could not be scored (natural conversation:
+ * answer first, the detail on the cards).
+ */
+export function fitSweepSummary(input: {
+  readonly block: QAnswerCardsBlock;
+  readonly scope: "RELATIONSHIPS" | "SAVED" | "CANDIDATES";
+  readonly place: string | null;
+  readonly considered: number;
+}): string {
+  const { block, place } = input;
+  const scored = block.cards.filter((card) => card.fit !== null);
+  const unscored = block.cards.length - scored.length;
+  const where = place === null ? "" : ` in ${place}`;
+  const plural = (n: number) => (n === 1 ? "company" : "companies");
+  const set =
+    input.scope === "RELATIONSHIPS"
+      ? `the ${String(input.considered)} ${plural(input.considered)} you've reached out to`
+      : input.scope === "SAVED"
+        ? `your ${String(input.considered)} saved ${plural(input.considered)}`
+        : `your top ${String(block.cards.length)} ${plural(block.cards.length)}`;
+  const lead =
+    place !== null
+      ? block.cards.length === 1
+        ? `${block.cards[0]?.name ?? ""} is the one${where} I can score against your mandate`
+        : `I've scored ${String(block.cards.length)} companies${where} against your mandate`
+      : `I've scored ${set} against your mandate`;
+  const [first, second] = scored;
+  const best =
+    first === undefined
+      ? "None has enough information for a score yet."
+      : second === undefined
+        ? `${first.name} fits best, at ${scoreWords(first.fit?.score ?? 0)}.`
+        : `${first.name} fits best, at ${scoreWords(first.fit?.score ?? 0)}, then ${second.name} at ${scoreWords(second.fit?.score ?? 0)}.`;
+  const caveat =
+    first !== undefined && unscored > 0
+      ? ` ${String(unscored)} ${unscored === 1 ? "doesn't" : "don't"} have enough information for a score yet.`
+      : "";
+  return `${lead}. ${best}${caveat} Pros and cons for each are on screen.`;
 }
 
 /**
@@ -269,4 +343,25 @@ export function fitCardsSummary(block: QAnswerCardsBlock): string {
 /** Sentences that read as a list item whose name was lost. */
 export function hasOrphanListItems(text: string): boolean {
   return /(?:^|[.!?]\s+)(?:Pros?|Cons?)\s*:/u.test(text);
+}
+
+const SPOKEN_SENTENCE = /[^.!?\n]+[.!?]+["”’)]*/gu;
+const ON_SCREEN = /\bon (?:your |the )?screen\b|\bin the cards?\b/iu;
+
+/**
+ * A spoken answer that comes with cards: at most three sentences, then
+ * the pointer to the cards (lead live replay 2026-10-07; research note
+ * §3.1: never read a list aloud). Markdown structure is dropped.
+ */
+export function spokenBeforeCards(text: string): string {
+  const flat = text
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)])\s+/u, "").trim())
+    .filter((line) => line.length > 0 && !line.startsWith("|"))
+    .join(" ");
+  const sentences = (flat.match(SPOKEN_SENTENCE) ?? [])
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0 && !ON_SCREEN.test(sentence));
+  if (sentences.length === 0) return text;
+  return `${sentences.slice(0, 3).join(" ")} The details are on screen.`;
 }
