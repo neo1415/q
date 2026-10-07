@@ -13,6 +13,7 @@ import type { CompanyIntelligenceDimension } from "@capital-q/q-core";
 
 import type { CompanyIntelligenceResult } from "./contracts.js";
 import { illustrateDeck, type StockPhotoPort } from "./deck-photos.js";
+import { slideTopic, writeDeckSlides } from "./deck-writer.js";
 import {
   illustrateWithGenerated,
   type IllustrationPort,
@@ -126,16 +127,22 @@ export function addGapPlaceholders(
     );
   if (missing.length === 0) return content;
   const slides: QSlide[] = [...deck.slides];
+  // A slide's subject is its section's heading (titles may have become
+  // headlines by now); a slide without a section of its own, its title.
+  const topicOf = (slide: QSlide): string =>
+    slide.section > 0
+      ? (content.sections[slide.section]?.heading ?? slide.title)
+      : slide.title;
   for (const dimension of missing) {
     if (slides.length >= 24) break;
-    if (slides.some((slide) => slide.title === SLIDE_TITLES[dimension])) {
+    if (slides.some((slide) => topicOf(slide) === SLIDE_TITLES[dimension])) {
       continue;
     }
     const order = DECK_ORDER.indexOf(dimension);
     // After the last slide that reads before it; the cover stays first.
     let at = 1;
     slides.forEach((slide, index) => {
-      const own = dimensionOfTitle(slide.title);
+      const own = dimensionOfTitle(topicOf(slide));
       if (index > 0 && own !== null && DECK_ORDER.indexOf(own) < order) {
         at = index + 1;
       }
@@ -218,8 +225,8 @@ export function markOwnPictureSpaces(
 ): QArtifactContent {
   const deck = content.deck;
   if (deck === undefined) return content;
-  const slides = deck.slides.map((slide): QSlide => {
-    const ask = OWN_PICTURE_ASKS[slide.title];
+  const slides = deck.slides.map((slide, index): QSlide => {
+    const ask = OWN_PICTURE_ASKS[slideTopic(content, index)];
     if (
       ask === undefined ||
       slide.image !== undefined ||
@@ -249,16 +256,14 @@ async function ownPictures(
   const deck = content.deck;
   if (deck === undefined) return content;
   const slides: QSlide[] = [];
-  for (const slide of deck.slides) {
-    if (
-      slide.image !== undefined ||
-      OWN_PICTURE_ASKS[slide.title] === undefined
-    ) {
+  for (const [index, slide] of deck.slides.entries()) {
+    const topic = slideTopic(content, index);
+    if (slide.image !== undefined || OWN_PICTURE_ASKS[topic] === undefined) {
       slides.push(slide);
       continue;
     }
     const picture = await port
-      .pictureFor({ slideTitle: slide.title, signal })
+      .pictureFor({ slideTitle: topic, signal })
       .catch(() => null);
     if (picture === null) {
       slides.push(slide);
@@ -600,6 +605,9 @@ export async function runDocumentPipeline(
   // 1. Write: grounded visuals only, the words step, marked gaps.
   await stage("WRITING");
   let next = keepOnlyGroundedVisuals(composed, input.grounding);
+  // Real slides before any model touches them (and whether or not one
+  // does): the company's voice, short bullets, numbers shown large.
+  next = writeDeckSlides(next);
   if (input.polisher !== undefined && next.deck !== undefined) {
     const polished = await input.polisher
       .polish({
@@ -636,6 +644,7 @@ export async function runDocumentPipeline(
     next = markOwnPictureSpaces(next);
     if (input.photos !== undefined) {
       next = await illustrateDeck(next, input.photos, {
+        sectorCodes: input.sectorCodes,
         signal: input.signal,
       }).catch(() => next);
     }

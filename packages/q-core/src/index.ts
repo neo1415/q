@@ -1108,9 +1108,15 @@ export {
 
 // DOCS block: the wording pass over a composed deck.
 export { DOCUMENT_POLISH_V1 } from "./prompts/tasks/document-polish.v1.js";
+export { DOCUMENT_POLISH_V2 } from "./prompts/tasks/document-polish.v2.js";
 export {
   DOCUMENT_POLISH_SCHEMA_NAME,
   DOCUMENT_POLISH_SCHEMA_VERSION,
+  DOCUMENT_POLISH_V2_BULLETS_MAX,
+  DOCUMENT_POLISH_V2_SCHEMA_VERSION,
+  DOCUMENT_POLISH_V2_TEXT_MAX,
+  DocumentPolishV2ResultSchema,
+  type DocumentPolishV2Result,
   DOCUMENT_POLISH_UNTRUSTED,
   DocumentPolishResultSchema,
   DocumentPolishVariablesSchema,

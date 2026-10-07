@@ -43,7 +43,7 @@ export const DOCUMENT_POLISH_V1: PromptDefinition<
 > = {
   id: "DOCUMENT_POLISH",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "NORMAL_DIALOGUE",
   owner: "q-core",

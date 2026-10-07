@@ -22,8 +22,8 @@ const content = {
       },
       {
         layout: "BULLETS",
-        title: "Product",
-        bullets: ["Yam flour."],
+        title: "Market",
+        bullets: ["Bakeries buying yam flour."],
         bulletsRight: [],
         section: 0,
       },
@@ -47,7 +47,7 @@ const photo = (n: number) => ({
 });
 
 describe("illustrateDeck", () => {
-  it("puts distinct photos on the cover and bullet slides only, from the deck's own words", async () => {
+  it("puts distinct photos on the cover and content slides, never on a chart, from the deck's own words", async () => {
     const queries: string[] = [];
     let n = 0;
     const photos: StockPhotoPort = {
@@ -63,7 +63,7 @@ describe("illustrateDeck", () => {
     expect(slides[1]?.image?.url).not.toBe(photo(1).url);
     expect(slides[2]?.image).toBeUndefined();
     expect(queries[0]).toContain("Yamfield");
-    expect(queries[1]).toContain("Product");
+    expect(queries[1]).toContain("Market");
   });
 
   it("returns the deck unchanged when search fails", async () => {

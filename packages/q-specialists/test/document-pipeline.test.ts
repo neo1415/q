@@ -332,7 +332,15 @@ describe("the document pipeline", () => {
           }),
           slides: slides.map((slide) =>
             slide.title === "Market"
-              ? { ...slide, bullets: [long, long, long] }
+              ? {
+                  ...slide,
+                  // Three different lines: the writer folds repeats.
+                  bullets: [
+                    long,
+                    long.replace("Nigeria", "Ghana"),
+                    long.replace("Nigeria", "Kenya"),
+                  ],
+                }
               : slide,
           ),
         },

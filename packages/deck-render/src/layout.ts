@@ -1001,9 +1001,13 @@ export function layOutDeck(deck: QDeck, brand?: BrandInput): LaidOutDeck {
           : deck.ink !== undefined
             ? { ...theme, ink: deck.ink }
             : theme;
-    // A photograph takes the right 40% of a title or bullet slide; the
-    // words keep the left, and still never shrink below the floor.
-    const pictured = slide.layout === "TITLE" || slide.layout === "BULLETS";
+    // A photograph takes the right 40% of a title, bullet or statement
+    // slide (live 2026-10-07: a market or vision statement sets a scene
+    // too); the words keep the left, and still never shrink below the floor.
+    const pictured =
+      slide.layout === "TITLE" ||
+      slide.layout === "BULLETS" ||
+      slide.layout === "STATEMENT";
     const image =
       slide.image !== undefined && pictured ? slide.image : undefined;
     // Q room W5: a picture still to come keeps the picture's side free and
