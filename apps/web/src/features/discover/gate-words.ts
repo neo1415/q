@@ -51,6 +51,10 @@ export function gateSummary(gate: InvestorGateFitDto): string {
   if (!gate.acceptingApplications) {
     return "Their gate isn't taking applications right now.";
   }
+  // F28: zero criteria checks nothing; never "meets all 0".
+  if (total === 0) {
+    return "Open to applications · no published criteria yet.";
+  }
   if (requiredMissed.length > 0) {
     return `Doesn't meet ${requiredMissed.length === 1 ? "one required criterion" : `${String(requiredMissed.length)} required criteria`}: ${requiredMissed.map((c) => c.label).join(", ")}.`;
   }

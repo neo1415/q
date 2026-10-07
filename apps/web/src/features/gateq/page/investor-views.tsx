@@ -374,10 +374,18 @@ export function GateView({
           </Button>
         </div>
         {rules.length === 0 ? (
-          <p className="cq-body gq-t2">
-            No rules yet: every founder can send. Give Q your mandate and it
-            drafts them.
-          </p>
+          <div className="flex flex-col items-start gap-3">
+            <p className="cq-body gq-t2">
+              No published criteria yet, so nothing is checked: founders see no
+              judgement either way. Give Q your mandate and it drafts the
+              criteria; you confirm each one.
+            </p>
+            {canDecide && editor !== undefined && !editing ? (
+              <Button variant="primary" onClick={() => setEditing(true)}>
+                Draft criteria from your mandate
+              </Button>
+            ) : null}
+          </div>
         ) : (
           <ul className="gq-hair">
             {rules.map((rule) => (

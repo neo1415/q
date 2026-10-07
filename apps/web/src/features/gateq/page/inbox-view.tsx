@@ -65,8 +65,8 @@ import {
   chipsFor,
   draftPass,
   draftReply,
-  FIT_GLYPH,
-  FIT_WORDS,
+  fitGlyphFor,
+  fitWordsFor,
   matchesSearch,
   PASS_REASONS,
   qView,
@@ -1023,8 +1023,8 @@ function Row({
         )}
         <span className="gq-tags">
           <span className="gq-mini">
-            <FitGlyph kind={FIT_GLYPH[item.fit]} size={12} />
-            {FIT_WORDS[item.fit]}
+            <FitGlyph kind={fitGlyphFor(item)} size={12} />
+            {fitWordsFor(item)}
           </span>
           <span className="gq-mini">{rulesWords(item.rules)}</span>
           {item.labels.map((label) => (
@@ -1239,7 +1239,9 @@ function Detail({
               <h3 className="cq-title-sm">Your gate&apos;s rules</h3>
               <div>
                 {detail.rules.length === 0 ? (
-                  <p className="cq-body-sm gq-t2">No published rules.</p>
+                  <p className="cq-body-sm gq-t2">
+                    No published rules yet, so nothing was checked.
+                  </p>
                 ) : (
                   detail.rules.map((rule) => (
                     <div
@@ -1674,11 +1676,13 @@ function TriageSheet({
             <li key={item.applicationId} className="flex flex-col gap-0.5 py-3">
               <b className="font-medium">{item.companyName}</b>
               <span className="cq-body-sm">
-                {item.fit === "NOT_A_FIT"
-                  ? "Prepare a pass"
-                  : item.fit === "PARTIAL" || item.rules.unknown > 0
-                    ? "Ask for more"
-                    : "Look at first"}
+                {item.rules.total === 0
+                  ? "Look at it yourself"
+                  : item.fit === "NOT_A_FIT"
+                    ? "Prepare a pass"
+                    : item.fit === "PARTIAL" || item.rules.unknown > 0
+                      ? "Ask for more"
+                      : "Look at first"}
                 <span className="gq-t2"> · {view.why}</span>
               </span>
             </li>

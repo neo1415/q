@@ -41,8 +41,30 @@ export const FIT_GLYPH: Readonly<Record<GateqFitBand, "fit" | "part" | "no">> =
     NOT_A_FIT: "no",
   };
 
+/**
+ * F28: a gate with no published rules checked nothing, so nothing "fits":
+ * a vacuous pass is never shown as a positive judgement.
+ */
+export function noRulesChecked(
+  item: Pick<GateqInboxItemDto, "rules">,
+): boolean {
+  return item.rules.total === 0;
+}
+
+export function fitWordsFor(
+  item: Pick<GateqInboxItemDto, "fit" | "rules">,
+): string {
+  return noRulesChecked(item) ? "No rules yet" : FIT_WORDS[item.fit];
+}
+
+export function fitGlyphFor(
+  item: Pick<GateqInboxItemDto, "fit" | "rules">,
+): "fit" | "part" | "no" | "unk" {
+  return noRulesChecked(item) ? "unk" : FIT_GLYPH[item.fit];
+}
+
 export function rulesWords(rules: GateqInboxItemDto["rules"]): string {
-  if (rules.total === 0) return "No rules";
+  if (rules.total === 0) return "Nothing checked";
   const base = `${rules.met} of ${rules.total} rules`;
   return rules.unknown === 0 ? base : `${base}, ${rules.unknown} unanswered`;
 }
@@ -102,6 +124,12 @@ export function qView(item: GateqInboxItemDto): {
   readonly lead: string;
   readonly why: string;
 } {
+  if (noRulesChecked(item)) {
+    return {
+      lead: "Nothing checked yet",
+      why: "Your gate has no published rules, so nothing was checked. Draft criteria from your mandate to sort what arrives.",
+    };
+  }
   if (item.fit === "NOT_A_FIT") {
     return {
       lead: "Outside your rules",

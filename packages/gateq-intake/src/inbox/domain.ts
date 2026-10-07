@@ -337,7 +337,10 @@ export function replyPromise(input: {
 // ---------------------------------------------------------------------------
 
 export function inView(
-  item: Pick<GateqInboxItemDto, "folder" | "starred" | "fit" | "assignee">,
+  item: Pick<
+    GateqInboxItemDto,
+    "folder" | "starred" | "fit" | "assignee" | "rules"
+  >,
   view: GateqInboxView,
   viewerUserId: string,
 ): boolean {
@@ -349,7 +352,10 @@ export function inView(
     case "ASSIGNED_TO_ME":
       return item.folder === "INBOX" && item.assignee?.userId === viewerUserId;
     case "FITS":
-      return item.folder === "INBOX" && item.fit === "FITS";
+      // F28: zero rules checked is a neutral bucket, never "fits".
+      return (
+        item.folder === "INBOX" && item.fit === "FITS" && item.rules.total > 0
+      );
     case "PARTIAL":
       return item.folder === "INBOX" && item.fit === "PARTIAL";
     case "NOT_A_FIT":
@@ -471,6 +477,17 @@ export function triage(
   return items
     .filter((item) => item.folder === "INBOX")
     .map((item) => {
+      // F28: a gate with no published rules checked nothing; never "meets
+      // every rule".
+      if (item.rules.total === 0) {
+        return {
+          applicationId: item.applicationId,
+          companyName: item.companyName,
+          propose: "REVIEW_FIRST" as const,
+          why: "Your gate has no published rules yet, so nothing was checked.",
+          suggestedReason: null,
+        };
+      }
       if (item.fit === "NOT_A_FIT") {
         return {
           applicationId: item.applicationId,

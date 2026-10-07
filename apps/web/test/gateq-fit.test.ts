@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
 
+import { gateSummary } from "../src/features/discover/gate-words";
 import { criterionLines, mayShare, verdictOf } from "../src/features/gateq/fit";
+import { verdictTitle } from "../src/features/gateq/form/form-model";
+
+describe("a gate with no published criteria (F28)", () => {
+  it("reads as neutral, never 'meets all 0'", () => {
+    const summary = gateSummary({
+      investorOrganisationId: "00000000-0000-4000-8000-0000000000a1",
+      publicId: "zino",
+      title: "Zino",
+      acceptingApplications: true,
+      criteria: [],
+    });
+    expect(summary).toBe("Open to applications · no published criteria yet.");
+    expect(summary).not.toMatch(/Meets all/);
+    expect(verdictTitle("FITS", "Zino", [])).toBe(
+      "Zino has no published criteria yet; you can apply",
+    );
+  });
+});
 
 const gateway = {
   criteria: [

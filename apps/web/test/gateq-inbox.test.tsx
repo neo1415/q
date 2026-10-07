@@ -170,6 +170,17 @@ describe("the inbox's words (pure)", () => {
       ).why,
     ).toMatch(/Unanswered isn't a no/);
   });
+
+  it("F28: a gate with no rules is never 'Fits your rules'", () => {
+    const none = item(1, { rules: { met: 0, total: 0, unknown: 0 } });
+    expect(model.fitWordsFor(none)).toBe("No rules yet");
+    expect(model.fitGlyphFor(none)).toBe("unk");
+    expect(model.rulesWords(none.rules)).toBe("Nothing checked");
+    expect(model.qView(none).lead).toBe("Nothing checked yet");
+    expect(model.qView(none).why).not.toMatch(/Meets every rule/);
+    expect(model.qView(none).why).toMatch(/Draft criteria from your mandate/);
+    expect(model.fitWordsFor(item(2, {}))).toBe("Fits your rules");
+  });
 });
 
 describe("the inbox, driven like an investor", () => {

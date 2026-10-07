@@ -605,7 +605,8 @@ function GateCard({
           ) : null}
           {lines.length === 0 ? (
             <p className="cq-body-sm gq-t2">
-              No published rules: every founder can share with them.
+              No published criteria yet: nothing is checked, and every founder
+              can share with them.
             </p>
           ) : (
             <ul className="gq-crit">
@@ -1200,7 +1201,10 @@ function CheckStep({
   return (
     <div className="gq-card gq-result">
       <div className="flex items-center gap-3">
-        <FitGlyph kind={verdict === "FITS" ? "fit" : "unk"} size={28} />
+        <FitGlyph
+          kind={verdict === "FITS" && lines.length > 0 ? "fit" : "unk"}
+          size={28}
+        />
         <h1 ref={headingRef} tabIndex={-1} className="cq-title-md">
           {verdict === null ? "Checking…" : verdictTitle(verdict, fund, lines)}
         </h1>
