@@ -852,6 +852,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           expect.objectContaining({ destination: "SETTINGS" }),
           // Set aside one of Q's suggestions on Work ("Not now").
           expect.objectContaining({ destination: "WORK" }),
+          // Delegation on a standing instruction (switch on/off).
+          expect.objectContaining({ destination: "WORK" }),
           // Profile photo and cover (cropped on the profile).
           expect.objectContaining({ destination: "PROFILE" }),
           expect.objectContaining({ destination: "HOME" }),
