@@ -50,10 +50,10 @@ describe("web app manifest", () => {
     expect(m.start_url).toBe("/?source=pwa");
   });
 
-  it("takes its theme colour from the tokens and launches on the splash's navy", () => {
+  it("takes its theme colour from the tokens and launches on the splash's black", () => {
     expect(m.theme_color).toBe(THEME_COLORS.light.canvas);
     // The OS launch screen matches the particle splash that follows it.
-    expect(m.background_color).toBe("#030916");
+    expect(m.background_color).toBe("#0b0a08");
   });
 
   it("ships 192 and 512 PNG icons and a maskable one, all present on disk", () => {

@@ -2907,19 +2907,28 @@
 }
 
 /*
- * The cold-start splash (founder handoff revision 3, 2026-09-29): deep
- * directional navy with curved silk highlights in dark, pale silver-blue
- * in light. Its own palette, scoped to the splash, from the handoff.
+ * The cold-start splash (founder handoff revision 3, 2026-09-29; recoloured
+ * to the brand's black and gold 2026-10-07): stage black with gold silk in
+ * dark, ivory paper with bronze in light. Its own palette, scoped to the
+ * splash, from the black-and-gold preset (brand-presets.ts).
  */
 @layer components {
   .cq-splash {
-    --cq-splash-bg: #030916;
-    --cq-splash-ink: #dceaff;
-    --cq-splash-muted: #91a9cc;
-    --cq-splash-blue: #5088ed;
-    --cq-splash-haze: rgba(19, 69, 148, 0.32);
-    --cq-splash-silk: rgba(54, 106, 201, 0.1);
-    --cq-splash-edge: rgba(102, 156, 246, 0.12);
+    /* Black and gold (founder, 2026-10-07): the brand preset's stage
+       black, ivory type, gold mark. The canvas particles read
+       --cq-splash-particle-* and --cq-splash-glow (splash-engine.ts). */
+    --cq-splash-bg: #0b0a08;
+    --cq-splash-ink: #f4efe2;
+    --cq-splash-muted: #bfb6a2;
+    --cq-splash-accent: #e2b858;
+    --cq-splash-haze: rgba(201, 162, 39, 0.16);
+    --cq-splash-silk: rgba(226, 184, 88, 0.07);
+    --cq-splash-edge: rgba(226, 184, 88, 0.12);
+    --cq-splash-particle-1: #8a6a12;
+    --cq-splash-particle-2: #c9a227;
+    --cq-splash-particle-3: #f1d690;
+    --cq-splash-particle-4: #e2b858;
+    --cq-splash-glow: 241, 214, 144;
     position: fixed;
     inset: 0;
     z-index: var(--cq-z-splash);
@@ -2956,23 +2965,33 @@
     }
   }
   .cq-splash[data-theme="light"] {
-    --cq-splash-bg: #edf2f9;
-    --cq-splash-ink: #112c54;
-    --cq-splash-muted: #526988;
-    --cq-splash-blue: #285ebb;
-    --cq-splash-haze: rgba(73, 117, 192, 0.14);
+    --cq-splash-bg: #f6f4ef;
+    --cq-splash-ink: #16140f;
+    --cq-splash-muted: #6b6457;
+    --cq-splash-accent: #8a6a12;
+    --cq-splash-haze: rgba(201, 162, 39, 0.14);
     --cq-splash-silk: rgba(255, 255, 255, 0.65);
-    --cq-splash-edge: rgba(62, 103, 164, 0.12);
+    --cq-splash-edge: rgba(138, 106, 18, 0.12);
+    --cq-splash-particle-1: #4f3d0a;
+    --cq-splash-particle-2: #6e5410;
+    --cq-splash-particle-3: #a8851c;
+    --cq-splash-particle-4: #8a6a12;
+    --cq-splash-glow: 138, 106, 18;
   }
   @media (prefers-color-scheme: light) {
     .cq-splash[data-theme="system"] {
-      --cq-splash-bg: #edf2f9;
-      --cq-splash-ink: #112c54;
-      --cq-splash-muted: #526988;
-      --cq-splash-blue: #285ebb;
-      --cq-splash-haze: rgba(73, 117, 192, 0.14);
+      --cq-splash-bg: #f6f4ef;
+      --cq-splash-ink: #16140f;
+      --cq-splash-muted: #6b6457;
+      --cq-splash-accent: #8a6a12;
+      --cq-splash-haze: rgba(201, 162, 39, 0.14);
       --cq-splash-silk: rgba(255, 255, 255, 0.65);
-      --cq-splash-edge: rgba(62, 103, 164, 0.12);
+      --cq-splash-edge: rgba(138, 106, 18, 0.12);
+      --cq-splash-particle-1: #4f3d0a;
+      --cq-splash-particle-2: #6e5410;
+      --cq-splash-particle-3: #a8851c;
+      --cq-splash-particle-4: #8a6a12;
+      --cq-splash-glow: 138, 106, 18;
     }
   }
   .cq-splash-atmosphere {
@@ -3046,7 +3065,7 @@
     flex: none;
     display: block;
     overflow: visible;
-    color: var(--cq-splash-blue);
+    color: var(--cq-splash-accent);
   }
   .cq-splash[data-canvas="true"] .cq-splash-mark {
     opacity: 0;
@@ -3097,7 +3116,7 @@
   .cq-splash-foot i {
     height: 3px;
     width: 3px;
-    background: var(--cq-splash-blue);
+    background: var(--cq-splash-accent);
     border-radius: 50%;
   }
   @container (max-width: 540px) {

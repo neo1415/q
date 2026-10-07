@@ -26,7 +26,10 @@
 
 /* global Request, Response */
 
-const VERSION = "cq-shell-v3";
+// v4 (2026-10-07): the icons are gold on black now. Icons are served
+// cache-first, so without a new version every installed worker would keep
+// the old blue ones for good.
+const VERSION = "cq-shell-v4";
 const OFFLINE_URL = "/offline.html";
 const ALLOWED_PREFIXES = ["/_next/static/", "/icons/", "/fonts/"];
 const ALLOWED_EXACT = ["/manifest.webmanifest", "/icon.svg", OFFLINE_URL];

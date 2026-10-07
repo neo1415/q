@@ -59,7 +59,9 @@
     ";color:" +
     paper +
     ";font-size:15px;font-weight:600;letter-spacing:0;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.18)}" +
-    ".launch:focus-visible,.close:focus-visible{outline:3px solid #6aa8ff;outline-offset:2px}" +
+    ".launch:focus-visible,.close:focus-visible{outline:3px solid " +
+    (dark ? "#c9a227" : "#8a6a12") +
+    ";outline-offset:2px}" +
     ".mark{width:24px;height:24px;flex:none}" +
     ".panel{position:fixed;bottom:84px;" +
     side +
