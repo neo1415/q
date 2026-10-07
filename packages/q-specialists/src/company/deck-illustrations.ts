@@ -32,7 +32,10 @@ export type IllustrationPort = {
 /** The team slide's own title (pitch-deck.ts): people are never drawn. */
 const NEVER_ILLUSTRATED: ReadonlySet<string> = new Set(["Team"]);
 
-/** At most this many generated pictures per composed deck. */
+/**
+ * Generated pictures per composed deck by default (the in-run studio); the
+ * document pipeline asks for up to six (Q room W5), within the budgets.
+ */
 export const ILLUSTRATIONS_PER_DECK = 2;
 
 function oneLine(text: string, max: number): string {
@@ -63,6 +66,8 @@ export function illustrationPrompt(input: {
 
 function wanted(slide: QSlide, index: number): boolean {
   if (slide.image !== undefined) return false;
+  // Q room W5: a marked space is the person's to fill.
+  if (slide.placeholder !== undefined) return false;
   if (slide.visual !== undefined || slide.figures !== undefined) return false;
   if (NEVER_ILLUSTRATED.has(slide.title)) return false;
   return index === 0 ? slide.layout === "TITLE" : slide.layout === "BULLETS";

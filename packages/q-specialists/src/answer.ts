@@ -3153,9 +3153,7 @@ ${line}`;
  * Deliberately narrow: the whole message must be the command, optionally
  * with "Q", "please" or "the page", so a question never matches.
  */
-export function screenActOf(
-  text: string,
-): {
+export function screenActOf(text: string): {
   readonly act:
     "PAGE_DOWN" | "PAGE_UP" | "SCROLL_TOP" | "SCROLL_BOTTOM" | "GO_BACK";
   readonly said: string;

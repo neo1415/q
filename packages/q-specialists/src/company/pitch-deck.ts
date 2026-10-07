@@ -41,7 +41,9 @@ import { inventsFigures, recordOpening } from "./investment-brief.js";
  */
 
 /** What each dimension is called on a slide, and the order a deck reads in. */
-const SLIDE_TITLES: Readonly<Record<CompanyIntelligenceDimension, string>> = {
+export const SLIDE_TITLES: Readonly<
+  Record<CompanyIntelligenceDimension, string>
+> = {
   DESCRIPTION: "What we do",
   PRODUCT: "Product",
   MARKET: "Market",
@@ -59,7 +61,7 @@ const SLIDE_TITLES: Readonly<Record<CompanyIntelligenceDimension, string>> = {
  * analyst reads a brief in: the problem and what the company does come
  * first, the ask comes last, and the evidence sits in the middle.
  */
-const DECK_ORDER: readonly CompanyIntelligenceDimension[] = [
+export const DECK_ORDER: readonly CompanyIntelligenceDimension[] = [
   "DESCRIPTION",
   "PRODUCT",
   "MARKET",
@@ -73,7 +75,9 @@ const DECK_ORDER: readonly CompanyIntelligenceDimension[] = [
 ];
 
 /** What a gap is called when the record says nothing about a dimension. */
-const GAP_LABELS: Readonly<Record<CompanyIntelligenceDimension, string>> = {
+export const GAP_LABELS: Readonly<
+  Record<CompanyIntelligenceDimension, string>
+> = {
   DESCRIPTION: "What the company does",
   PRODUCT: "Product detail",
   MARKET: "Market and where it sits",

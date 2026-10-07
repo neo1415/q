@@ -79,6 +79,9 @@ const KIND_NAMES: Readonly<Record<string, string>> = {
   INVESTMENT_BRIEF: "Investment brief",
   PITCH_DECK: "Investor deck",
   Q_REPORT: "Report",
+  // Q room W5: general documents from the same pipeline.
+  ONE_PAGER: "One-pager",
+  MEMO: "Investment memo",
 };
 
 export function artifactKindName(type: string): string {

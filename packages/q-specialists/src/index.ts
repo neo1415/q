@@ -204,6 +204,29 @@ export {
   type StudioBrand,
 } from "./company/document-studio.js";
 
+// Q room W5 (R8): the document pipeline.
+export {
+  addGapPlaceholders,
+  applyFixes,
+  chooseLayouts,
+  composeGeneralDocument,
+  creditInNotes,
+  DOCUMENT_KINDS,
+  FIX_ROUNDS_MAX,
+  GENERATED_IMAGES_MAX,
+  markOwnPictureSpaces,
+  reviewDocument,
+  runDocumentPipeline,
+  SLIDE_BODY_WORDS_MAX,
+  type DocumentCritic,
+  type DocumentFix,
+  type DocumentKind,
+  type DocumentPipelineInput,
+  type DocumentPipelineResult,
+  type DocumentReview,
+  type OwnPicturePort,
+} from "./company/document-pipeline.js";
+
 // DOCS block: generated illustrations.
 export {
   illustrateWithGenerated,
