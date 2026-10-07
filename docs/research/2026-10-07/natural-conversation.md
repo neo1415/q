@@ -148,7 +148,7 @@ AI", "Great question", "Certainly!", a turn opening with "Sure," or "Got it", "I
 | Simple answer, first answer words                             | < 2-3 s                                        |
 | Analytical answer                                             | < 8 s typical. The cards come with the answer. |
 
-### 3.5 Eval rubric (deterministic, `q-evals` natural-conversation fixtures)
+### 3.5 Eval rubric (deterministic, `packages/model-gateway/test/natural-conversation-eval.test.ts`)
 
 For each founder question replayed as a fixture:
 
