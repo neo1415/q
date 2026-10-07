@@ -69,6 +69,9 @@ export const LEAN_SHIFT = 0.07;
 
 const CLOUD_FIGURES: ReadonlySet<FigureKind> = new Set(["CLOUD", "ATTENTIVE"]);
 
+/** The letter Q (the Q moment) turns least of all, so it reads as the mark. */
+const MARK_FIGURES: ReadonlySet<FigureKind> = new Set(["LETTER_Q"]);
+
 const WORKING: ReadonlySet<QApertureState> = new Set(["THINKING", "WORKING"]);
 
 export function presenceUniforms(input: UniformInput): PresenceUniforms {
@@ -90,7 +93,7 @@ export function presenceUniforms(input: UniformInput): PresenceUniforms {
   const cloud = CLOUD_FIGURES.has(input.figure);
   const face = FACE_FIGURES.has(input.figure);
   const fine = FINE_FIGURES.has(input.figure);
-  const turn = cloud ? 1 : face ? 0.3 : 0.55;
+  const turn = cloud ? 1 : face || MARK_FIGURES.has(input.figure) ? 0.3 : 0.55;
   return {
     yaw: (STILL_YAW + swayYaw) * turn + leanX * LEAN_YAW * (face ? 0.6 : 1),
     // Listening tips the top towards the person.

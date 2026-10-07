@@ -98,11 +98,14 @@ export function PresencePlayground({
   initialGesture,
   initialFace,
   play,
+  qMoment = false,
 }: {
   readonly initialState: string | null;
   readonly initialGesture: string | null;
   readonly initialFace: boolean;
   readonly play: string | null;
+  /** `?q=1`: the Q moment, again every few seconds, for screenshots. */
+  readonly qMoment?: boolean;
 }) {
   const [state, setState] = useState<QApertureState>(
     isState(initialState) ? initialState : "IDLE",
@@ -158,6 +161,23 @@ export function PresencePlayground({
       window.clearInterval(again);
     };
   }, [initialGesture, gesture]);
+
+  // The Q moment (the letter Q) on the stage's presence. It forms only
+  // where the Q page's presence would: face on, resting, motion full.
+  const formQ = useCallback(() => {
+    stageRef.current
+      ?.querySelector("canvas")
+      ?.dispatchEvent(new Event("cq:q-moment"));
+  }, []);
+  useEffect(() => {
+    if (!qMoment) return;
+    const first = window.setTimeout(formQ, 1_500);
+    const again = window.setInterval(formQ, 6_500);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(again);
+    };
+  }, [qMoment, formQ]);
 
   // What the stage is forming, and whether WebGL2 draws it.
   useEffect(() => {
@@ -244,6 +264,9 @@ export function PresencePlayground({
                 onClick={() => setFace((on) => !on)}
               >
                 Face while speaking (Q page)
+              </Button>
+              <Button onClick={formQ} disabled={!face} data-q-moment>
+                Form the Q (Q page, resting)
               </Button>
             </div>
           </fieldset>
