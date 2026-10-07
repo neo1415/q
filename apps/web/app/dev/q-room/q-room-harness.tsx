@@ -30,7 +30,7 @@ import type { DeckState, FillResult } from "@/features/q/room/deck-actions";
 import type { DeckLoaders } from "@/features/q/room/q-room-deck";
 import { runUploadDrop } from "@/features/q/room/room-read";
 import { currentScreen } from "@/features/q/screen";
-import { loadWire, wireWarmed } from "@/features/q/wire";
+import { loadWire, wireWarmed, type WireContracts } from "@/features/q/wire";
 
 const RECORD = "/dev/q-room/record";
 const CARD = "/dev/q-room/card";
@@ -80,7 +80,9 @@ function follow(messages: readonly QMessage[], seen: Set<string>): void {
   }
 }
 
-async function fetchRecord(): Promise<QConversationDetail | null> {
+async function fetchRecord(
+  contracts: () => Promise<WireContracts> = loadWire,
+): Promise<QConversationDetail | null> {
   try {
     const response = await fetch(RECORD, { cache: "no-store" });
     if (!response.ok) return null;
@@ -88,7 +90,7 @@ async function fetchRecord(): Promise<QConversationDetail | null> {
     // paint (as the Q page's own reads do).
     const [body, { QConversationDetailSchema }] = await Promise.all([
       response.json(),
-      loadWire(),
+      contracts(),
     ]);
     const detail = QConversationDetailSchema.safeParse(body);
     return detail.success ? detail.data : null;
@@ -200,30 +202,33 @@ export function QRoomHarness() {
   // R9: Q "working", so the edge particles run while a test measures.
   const [working, setWorking] = useState(false);
   const seen = useRef(new Set<string>());
+  // W7: a read applies only if no later read started (the first read's
+  // check now waits for the contracts, so a "Next answer" can overtake it).
+  const reads = useRef(0);
   const read = useCallback(async () => {
+    const mine = (reads.current += 1);
     const detail = await fetchRecord();
-    if (detail !== null) {
+    if (detail !== null && mine === reads.current) {
       setMessages(detail.messages);
       // After the turns render, as the Q page's follow runs.
       window.setTimeout(() => follow(detail.messages, seen.current), 0);
     }
   }, []);
-  // The conversation is read once as the page opens. W7: once the wire's
-  // contracts are warm: this read checks the fixture against them in the
-  // browser, which the Q page's own first read (a server action) does not
-  // do, so it waits for them as the Q page's checks do.
+  // The conversation is read once as the page opens. W7: checked once the
+  // wire's contracts are warm: this read checks the fixture against them
+  // in the browser, which the Q page's own first read (a server action)
+  // does not do, so the check waits for them as the Q page's checks do.
   useEffect(() => {
     let live = true;
-    void wireWarmed()
-      .then(() => fetchRecord())
-      .then((detail) => {
-        if (live && detail !== null) {
-          setMessages(detail.messages);
-          for (const message of detail.messages) {
-            seen.current.add(message.messageId);
-          }
+    const mine = (reads.current += 1);
+    void fetchRecord(wireWarmed).then((detail) => {
+      if (live && detail !== null && mine === reads.current) {
+        setMessages(detail.messages);
+        for (const message of detail.messages) {
+          seen.current.add(message.messageId);
         }
-      });
+      }
+    });
     return () => {
       live = false;
     };

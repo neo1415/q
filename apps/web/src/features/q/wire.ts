@@ -52,7 +52,7 @@ export function subscribeWire(listener: () => void): () => void {
  * it (WARM_AFTER_MS), in an idle period, unless something asks for them
  * sooner (loadWire).
  */
-const WARM_AFTER_MS = 2_000;
+const WARM_AFTER_MS = 500;
 let warming: Promise<WireContracts> | null = null;
 
 /** Starts the load once the page has settled (in a browser only). */
