@@ -56,6 +56,12 @@ export const GoogleConnectionDtoSchema = z
     replyTracking: z.enum(["PUSH_AND_POLL", "POLL"]).optional(),
     /** REVOKED only: when Google ended it. */
     revokedAt: UtcTimestampSchema.optional(),
+    /**
+     * CONNECTED only: whether Google Calendar access was actually granted
+     * (the scope is on the grant and Google accepts it for the calendar).
+     * A connected Google account is not a connected calendar.
+     */
+    calendar: z.enum(["GRANTED", "NOT_GRANTED"]).optional(),
   })
   .strict();
 export type GoogleConnectionDto = z.infer<typeof GoogleConnectionDtoSchema>;

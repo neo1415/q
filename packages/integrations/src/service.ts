@@ -214,6 +214,44 @@ export function createIntegrationsService(
   const now = dependencies.now ?? (() => new Date());
   const accessCache = new Map<string, { token: SecretToken; until: number }>();
 
+  /**
+   * Deck wave 8 (calendar truthfulness): a connected Google account is a
+   * connected calendar only when the grant carries calendar.events AND
+   * Google accepts it for the calendar (one cheap events read, remembered
+   * for ten minutes per connection). An outage keeps the recorded scope's
+   * answer rather than claiming access was refused.
+   */
+  const calendarProbeCache = new Map<
+    string,
+    { grant: "GRANTED" | "NOT_GRANTED"; until: number }
+  >();
+  async function calendarGrantOf(
+    account: GoogleAccountRecord,
+  ): Promise<"GRANTED" | "NOT_GRANTED"> {
+    if (!account.scopes.includes(CALENDAR_EVENTS_SCOPE)) return "NOT_GRANTED";
+    const calendar = google?.calendar;
+    if (calendar === undefined) return "GRANTED";
+    const cached = calendarProbeCache.get(account.id);
+    if (cached !== undefined && cached.until > now().getTime()) {
+      return cached.grant;
+    }
+    try {
+      const probed = await calendar.probe(await accessFor(account));
+      const grant = probed === "GRANTED" ? "GRANTED" : "NOT_GRANTED";
+      calendarProbeCache.set(account.id, {
+        grant,
+        until: now().getTime() + 10 * 60 * 1000,
+      });
+      return grant;
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, googleAccountId: account.id },
+        "google calendar access could not be checked",
+      );
+      return "GRANTED";
+    }
+  }
+
   function requireGoogle() {
     if (google === undefined) throw new IntegrationUnavailableError();
     return google;
@@ -416,6 +454,7 @@ export function createIntegrationsService(
         connectedAt: account.connectedAt.toISOString(),
         replyTracking:
           google.pushTopic === undefined ? "POLL" : "PUSH_AND_POLL",
+        calendar: await calendarGrantOf(account),
       };
     },
 
