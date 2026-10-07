@@ -7,6 +7,13 @@ import {
   performClientAction,
   type ClientActionEffects,
 } from "../src/features/q/client-actions";
+import {
+  currentManifest,
+  registerQSection,
+  resetManifest,
+  setQFilters,
+  setQFocus,
+} from "../src/features/q/manifest";
 import { roomStage } from "../src/features/q/room/room-stage";
 import { loadWire, wireNow } from "../src/features/q/wire";
 import {
@@ -17,6 +24,7 @@ import {
   Q_CONFIDENCE_LABELS,
   Q_MANIFEST_DIALOGS_MAX,
   Q_MANIFEST_DIALOG_REFS_MAX,
+  Q_MANIFEST_FILTER_KEYS,
   Q_MANIFEST_SECTIONS_MAX,
   Q_MANIFEST_SECTION_REFS_MAX,
   Q_SPEECH_MAX_CHARS,
@@ -72,6 +80,36 @@ const SHOWN = {
 
 describe("the wire's contracts, off the first paint (W7)", () => {
   // Order matters: these run before anything loads the contracts.
+  it("before they are in, the page's manifest is still sent, checked by hand as the contract would", () => {
+    expect(wireNow()).toBeNull();
+    const part = document.createElement("div");
+    part.innerHTML = '<div data-q-section="feed"></div>';
+    document.body.append(part);
+    registerQSection({
+      id: "feed",
+      kind: "COMPANY_FEED",
+      refs: [
+        { kind: "COMPANY", id: "00000000-0000-4000-8000-0000000000AB" },
+        { kind: "COMPANY", id: "not-an-id" },
+      ],
+      total: 2,
+    });
+    setQFilters({ sector: "fintech", stage: "seed round!", nope: "x" });
+    setQFocus({ kind: "COMPANY", id: "also-not-an-id" });
+    const manifest = currentManifest();
+    expect(manifest).toBeDefined();
+    expect(contracts.QPageManifestSchema.safeParse(manifest).success).toBe(
+      true,
+    );
+    expect(manifest?.sections[0]?.refs).toEqual([
+      { kind: "COMPANY", id: "00000000-0000-4000-8000-0000000000ab" },
+    ]);
+    expect(manifest?.filters).toEqual({ sector: "fintech" });
+    expect(manifest?.focus).toBeUndefined();
+    resetManifest();
+    part.remove();
+  });
+
   it("before they are in: no card is shown, and an action waits, unchecked and undone", async () => {
     expect(wireNow()).toBeNull();
     expect(roomStage([SHOWN as never]).open).toBeNull();
@@ -99,6 +137,9 @@ describe("the wire's contracts, off the first paint (W7)", () => {
   it("keeps each copied value equal to its contract", () => {
     expect(GOOGLE_RECONNECT_PATH).toBe(contracts.GOOGLE_RECONNECT_PATH);
     expect(Q_SPEECH_MAX_CHARS).toBe(contracts.Q_SPEECH_MAX_CHARS);
+    expect([...Q_MANIFEST_FILTER_KEYS]).toEqual([
+      ...contracts.Q_MANIFEST_FILTER_KEYS,
+    ]);
     expect(Q_CONFIDENCE_LABELS).toEqual(contracts.Q_CONFIDENCE_LABELS);
     for (const type of [...contracts.Q_ARTIFACT_TYPES, "UNKNOWN_TYPE"]) {
       expect(qArtifactExportFormats(type), type).toEqual(

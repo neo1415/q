@@ -31,7 +31,7 @@ import { roomStage } from "./room/room-stage";
 import { useWire } from "./use-wire";
 
 /** W7: how long after the stage mounts its likely next code is fetched. */
-const PREFETCH_AFTER_MS = 2_500;
+const PREFETCH_AFTER_MS = 800;
 import {
   answersIn,
   onStage,
@@ -284,7 +284,11 @@ export function QPresenceStage({
     let cancel: (() => void) | null = null;
     const timer = window.setTimeout(() => {
       cancel = whenIdle(() => {
-        void import("./room/q-room-card");
+        // Mounted once in, so the first card enters as it always has.
+        void import("./room/q-room-card").then(
+          () => setRoomShown(true),
+          () => undefined,
+        );
         void import("./stage-canvas");
       }, 5_000);
     }, PREFETCH_AFTER_MS);

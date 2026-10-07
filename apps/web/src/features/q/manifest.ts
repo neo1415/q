@@ -8,10 +8,14 @@ import type {
 
 import { wireNow, type WireContracts } from "./wire";
 import {
+  isUuid,
+  MANIFEST_FILTER_VALUE,
   Q_MANIFEST_DIALOGS_MAX,
   Q_MANIFEST_DIALOG_REFS_MAX,
+  Q_MANIFEST_FILTER_KEYS,
   Q_MANIFEST_SECTIONS_MAX,
   Q_MANIFEST_SECTION_REFS_MAX,
+  type QManifestFilterKey,
 } from "./wire-constants";
 
 /**
@@ -186,7 +190,7 @@ function domDialogs(): { readonly label: string | null }[] {
 }
 
 function bounded(
-  wire: WireContracts,
+  wire: WireContracts | null,
   refs: readonly QManifestRef[],
   max: number,
 ): QManifestRef[] {
@@ -194,7 +198,13 @@ function bounded(
   const out: QManifestRef[] = [];
   for (const ref of refs) {
     // One malformed id (a raw URL segment) drops that ref, not the page.
-    if (!wire.QManifestRefSchema.safeParse(ref).success) continue;
+    // W7: before the contracts are in, the id is checked as they would
+    // (the kind is the page's own, typed in code).
+    const valid =
+      wire === null
+        ? isUuid(ref.id)
+        : wire.QManifestRefSchema.safeParse(ref).success;
+    if (!valid) continue;
     const key = `${ref.kind}:${ref.id.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -219,13 +229,15 @@ function dialogStack(): QDialogEntry[] {
 /**
  * What travels with a turn: ids and closed kinds only, bounded, and
  * validated against the contract; undefined when the page registered
- * nothing and no window is open. W7: undefined too in the moment before
- * the wire's contracts are in -- a turn then goes without a manifest
- * rather than with an unchecked one.
+ * nothing and no window is open.
+ *
+ * W7: in the moment before the wire's contracts are in, the manifest is
+ * built with the same checks by hand on what the page itself does not
+ * type -- ids, filter keys and values -- and checked in full once they
+ * are; the server checks it in full either way.
  */
 export function currentManifest(): QPageManifest | undefined {
   const wire = wireNow();
-  if (wire === null) return undefined;
   const shown = [...sections.values()].filter((entry) => !hidden(entry.id));
   const stack = dialogStack();
   if (
@@ -241,7 +253,9 @@ export function currentManifest(): QPageManifest | undefined {
     v: 2 as const,
     seq,
     ...(tab === null ? {} : { tab }),
-    ...(Object.keys(filters).length === 0 ? {} : { filters }),
+    ...(Object.keys(filters).length === 0
+      ? {}
+      : { filters: wire === null ? manifestFilters(filters) : filters }),
     inView: kept.filter((entry) => inViewport(entry.id)).map((e) => e.id),
     sections: kept.map((entry) => ({
       id: entry.id,
@@ -254,10 +268,27 @@ export function currentManifest(): QPageManifest | undefined {
       kind: dialog.kind,
       refs: bounded(wire, dialog.refs, Q_MANIFEST_DIALOG_REFS_MAX),
     })),
-    ...(focus === null ? {} : { focus }),
+    ...(focus === null || (wire === null && !isUuid(focus.id))
+      ? {}
+      : { focus }),
   };
+  if (wire === null) return manifest;
   const parsed = wire.QPageManifestSchema.safeParse(manifest);
   return parsed.success ? parsed.data : undefined;
+}
+
+/** The filters the contract allows, before the contracts are in (W7). */
+function manifestFilters(
+  all: Partial<Record<string, string>>,
+): Partial<Record<QManifestFilterKey, string>> {
+  const out: Partial<Record<QManifestFilterKey, string>> = {};
+  for (const key of Q_MANIFEST_FILTER_KEYS) {
+    const value = all[key];
+    if (value !== undefined && MANIFEST_FILTER_VALUE.test(value)) {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 /**

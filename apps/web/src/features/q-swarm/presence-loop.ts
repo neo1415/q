@@ -72,6 +72,12 @@ export type PresenceLoopHost = {
   readonly requestFrame: (callback: (now: number) => void) => number;
   readonly cancelFrame: (handle: number) => void;
   readonly now: () => number;
+  /**
+   * W7: when the first frame (and the 3D renderer's load) may start; the
+   * page passes "once it is idle", so the presence never competes with
+   * the page's own start. Returns a cancel. Absent: at once.
+   */
+  readonly begin?: ((start: () => void) => () => void) | undefined;
 };
 
 export type PresenceLoop = {
@@ -236,13 +242,18 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
     }
   };
   const redraw = () => {
-    if (disposed) return;
+    if (disposed || !started) return;
     if (raf !== 0) host.cancelFrame(raf);
     lastDrawn = 0;
     raf = host.requestFrame(frame);
   };
 
-  if (renderer === "pending") {
+  const start = () => {
+    if (disposed) return;
+    if (renderer === "pending") load3d();
+    redraw();
+  };
+  const load3d = () => {
     host
       .load3d()
       .then((module) => {
@@ -260,8 +271,16 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
         setRenderer("2d");
         redraw();
       });
-  }
-  redraw();
+  };
+  // Nothing is drawn before the start; a change of state before then is
+  // drawn by the start itself.
+  let started = false;
+  const cancelBegin = (
+    host.begin ?? ((run: () => void) => (run(), () => undefined))
+  )(() => {
+    started = true;
+    start();
+  });
 
   return {
     set: (next) => {
@@ -280,6 +299,7 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
     redraw,
     dispose: () => {
       disposed = true;
+      cancelBegin();
       if (raf !== 0) host.cancelFrame(raf);
       raf = 0;
     },

@@ -170,11 +170,16 @@ export async function uploadResuming<T>(
  * landing. Returns a cancel.
  */
 export function whenIdle(work: () => void, timeoutMs = 2_000): () => void {
-  if (typeof window.requestIdleCallback === "function") {
+  if (
+    typeof window.requestIdleCallback === "function" &&
+    typeof window.cancelIdleCallback === "function"
+  ) {
     const handle = window.requestIdleCallback(() => work(), {
       timeout: timeoutMs,
     });
-    return () => window.cancelIdleCallback(handle);
+    // The cancel is the one in place when this was scheduled.
+    const cancel = window.cancelIdleCallback.bind(window);
+    return () => cancel(handle);
   }
   const timer = window.setTimeout(work, 200);
   return () => window.clearTimeout(timer);

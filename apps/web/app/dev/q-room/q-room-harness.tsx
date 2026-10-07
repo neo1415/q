@@ -30,7 +30,7 @@ import type { DeckState, FillResult } from "@/features/q/room/deck-actions";
 import type { DeckLoaders } from "@/features/q/room/q-room-deck";
 import { runUploadDrop } from "@/features/q/room/room-read";
 import { currentScreen } from "@/features/q/screen";
-import { loadWire } from "@/features/q/wire";
+import { loadWire, wireWarmed } from "@/features/q/wire";
 
 const RECORD = "/dev/q-room/record";
 const CARD = "/dev/q-room/card";
@@ -208,17 +208,22 @@ export function QRoomHarness() {
       window.setTimeout(() => follow(detail.messages, seen.current), 0);
     }
   }, []);
-  // The conversation is read once as the page opens.
+  // The conversation is read once as the page opens. W7: once the wire's
+  // contracts are warm: this read checks the fixture against them in the
+  // browser, which the Q page's own first read (a server action) does not
+  // do, so it waits for them as the Q page's checks do.
   useEffect(() => {
     let live = true;
-    void fetchRecord().then((detail) => {
-      if (live && detail !== null) {
-        setMessages(detail.messages);
-        for (const message of detail.messages) {
-          seen.current.add(message.messageId);
+    void wireWarmed()
+      .then(() => fetchRecord())
+      .then((detail) => {
+        if (live && detail !== null) {
+          setMessages(detail.messages);
+          for (const message of detail.messages) {
+            seen.current.add(message.messageId);
+          }
         }
-      }
-    });
+      });
     return () => {
       live = false;
     };

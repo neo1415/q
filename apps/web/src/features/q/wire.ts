@@ -47,17 +47,37 @@ export function subscribeWire(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-/** Starts the load once the page is idle (in a browser only). */
+/**
+ * The page's start comes first: the contracts are warmed a moment after
+ * it (WARM_AFTER_MS), in an idle period, unless something asks for them
+ * sooner (loadWire).
+ */
+const WARM_AFTER_MS = 2_000;
+let warming: Promise<WireContracts> | null = null;
+
+/** Starts the load once the page has settled (in a browser only). */
 export function warmWire(): void {
-  if (loaded !== null || loading !== null || typeof window === "undefined") {
-    return;
-  }
-  const start = () => {
-    void loadWire().catch(() => undefined);
-  };
-  if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(start, { timeout: 1_500 });
-  } else {
-    window.setTimeout(start, 200);
-  }
+  void wireWarmed().catch(() => undefined);
+}
+
+/** The contracts, warmed as above: resolves once they are in. */
+export function wireWarmed(): Promise<WireContracts> {
+  if (loading !== null) return loading;
+  if (warming !== null) return warming;
+  if (typeof window === "undefined") return loadWire();
+  const warm = new Promise<void>((resolve) => {
+    window.setTimeout(() => {
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(() => resolve(), { timeout: 1_500 });
+      } else {
+        resolve();
+      }
+    }, WARM_AFTER_MS);
+  }).then(() => loadWire());
+  warming = warm;
+  // A failed warm is tried again by the next caller.
+  warm.catch(() => {
+    if (warming === warm) warming = null;
+  });
+  return warm;
 }

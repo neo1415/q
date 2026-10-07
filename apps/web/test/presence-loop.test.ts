@@ -101,6 +101,24 @@ describe("the presence loop (W7)", () => {
     expect(fake.host.canvas.width).toBe(96);
   });
 
+  it("draws nothing before the page lets it begin, then starts", () => {
+    const starts: (() => void)[] = [];
+    const fake = fakeHost({
+      begin: (run) => {
+        starts.push(run);
+        return () => undefined;
+      },
+    });
+    const loop = startPresenceLoop(fake.host);
+    loop?.set({ ...INPUTS, state: "LISTENING" });
+    fake.run(1000, 200);
+    expect(fake.levels).not.toHaveBeenCalled();
+    expect(fake.queue.size).toBe(0);
+    starts[0]?.();
+    fake.run(1200, 200);
+    expect(fake.levels).toHaveBeenCalled();
+  });
+
   it("asks for no frames off screen or in a hidden tab", () => {
     let hidden = false;
     const fake = fakeHost({ hidden: () => hidden });

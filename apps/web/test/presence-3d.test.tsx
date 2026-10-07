@@ -220,6 +220,12 @@ describe("the component: fallback and pause", () => {
     vi.stubGlobal("cancelAnimationFrame", (id: number) => {
       frames.delete(id);
     });
+    // W7: the presence starts once the page is idle; here, at once.
+    vi.stubGlobal("requestIdleCallback", (callback: IdleRequestCallback) => {
+      callback({ didTimeout: false, timeRemaining: () => 50 });
+      return 0;
+    });
+    vi.stubGlobal("cancelIdleCallback", vi.fn());
     vi.stubGlobal(
       "IntersectionObserver",
       class {

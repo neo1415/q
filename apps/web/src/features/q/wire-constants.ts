@@ -40,6 +40,19 @@ export const Q_MANIFEST_SECTION_REFS_MAX = 12;
 export const Q_MANIFEST_DIALOGS_MAX = 3;
 export const Q_MANIFEST_DIALOG_REFS_MAX = 4;
 
+/** The manifest's filter keys, and the shape of a value (q/screen-manifest). */
+export const Q_MANIFEST_FILTER_KEYS = [
+  "sector",
+  "stage",
+  "country",
+  "raise",
+  "verified",
+  "pitch",
+  "view",
+] as const;
+export type QManifestFilterKey = (typeof Q_MANIFEST_FILTER_KEYS)[number];
+export const MANIFEST_FILTER_VALUE = /^[A-Za-z0-9_.,:-]{1,64}$/u;
+
 /** Q_VOICE_LISTENING_LEVELS and its default (q/voice). */
 export const Q_VOICE_LISTENING_LEVELS = ["OFF", "SUBTLE", "NATURAL"] as const;
 export const Q_VOICE_LISTENING_DEFAULT = "SUBTLE" as const;

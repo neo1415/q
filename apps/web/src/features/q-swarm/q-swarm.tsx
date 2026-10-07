@@ -7,6 +7,7 @@ import type { QApertureState } from "../q-aperture/aperture-state";
 import { faceAllowed } from "./presence-machine";
 import { surfaceDpr } from "./presence-budget";
 import { resolveColour, type Rgb } from "./presence-gl";
+import { whenIdle } from "../q/room/room-read";
 import { startPresenceLoop, type PresenceInputs } from "./presence-loop";
 
 export { particleCount } from "./presence-budget";
@@ -144,6 +145,8 @@ export function QSwarm({
       requestFrame: (callback) => requestAnimationFrame(callback),
       cancelFrame: (handle) => cancelAnimationFrame(handle),
       now: () => performance.now(),
+      // W7: the first frame once the page is idle (at most 600 ms on).
+      begin: (run) => whenIdle(run, 600),
     });
     if (loop === null) return;
     const onPointer = (event: PointerEvent) => {
