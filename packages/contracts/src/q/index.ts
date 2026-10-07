@@ -324,6 +324,7 @@ export {
   silenceStageLine,
   silenceThingForRoute,
   silenceThreadLine,
+  stripSilenceBeats,
   type QHumStyle,
   type QSilenceBeat,
   type QSilenceBeatKind,

@@ -415,6 +415,29 @@ describe("tool calls and usage", () => {
     expect(spoken[0]).toMatchObject({
       response: { conversation: "none", tools: [], tool_choice: "none" },
     });
+    // W4b: what the beat said comes back as a transcript; it is never a
+    // line of the visible (or saved) conversation.
+    const metadata = (spoken[0] as { response: { metadata: unknown } }).response
+      .metadata;
+    h.channel().emit({
+      type: "response.created",
+      response: { id: "resp_beat", metadata },
+    });
+    h.channel().emit({
+      type: "response.output_audio_transcript.done",
+      response_id: "resp_beat",
+      transcript: "Looking at the deck…",
+    });
+    h.channel().emit({
+      type: "response.done",
+      response: { id: "resp_beat", status: "completed", metadata },
+    });
+    await settle();
+    expect(
+      h.events.onLine.mock.calls.some(
+        ([role, said]) => role === "q" && said.includes("Looking at the deck"),
+      ),
+    ).toBe(false);
     finish();
     await settle();
   });

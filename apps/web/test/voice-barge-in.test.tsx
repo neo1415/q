@@ -437,6 +437,40 @@ describe("one utterance one row, one reply one row (live test 2026-09-27, failur
       ["q", "Because it is yours."],
     ]);
   });
+
+  it("never shows the silence ladder's beats as Q's line, nor saves them (W4b)", async () => {
+    const { hook, session, onLine } = await started();
+    act(() => {
+      session.emit("conversation-text", {
+        role: "user",
+        content: "Look at Ledgerline's deck.",
+      });
+      session.emit("conversation-text", {
+        role: "assistant",
+        content: "Looking at Ledgerline's deck…",
+      });
+      session.emit("conversation-text", {
+        role: "assistant",
+        content: "Bear with me, still reading Ledgerline's deck… Mm-hm-hmm…",
+      });
+      session.emit("conversation-text", {
+        role: "assistant",
+        content: "Mmm… The deck asks for $2M.",
+      });
+    });
+    expect(
+      hook.result.current.transcript.map((line) => [line.role, line.text]),
+    ).toEqual([
+      ["user", "Look at Ledgerline's deck."],
+      ["q", "The deck asks for $2M."],
+    ]);
+    // What the saved transcript is built from never carried a beat either.
+    expect(
+      onLine.mock.calls.some(([line]) =>
+        (line as VoiceTranscriptLine).text.includes("Ledgerline's deck…"),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("no silent dead starts", () => {
