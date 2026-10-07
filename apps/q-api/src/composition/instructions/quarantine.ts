@@ -89,6 +89,84 @@ export function threadPace(
   };
 }
 
+/**
+ * Seed F25 (Zino, 7 Oct): code's own read of what they last wrote, before
+ * and around the model's. Tensorgate's "Raising a $4m seed. Want the deck,
+ * or 20 minutes this week?" was read as terms or money; Ledgerline's
+ * same-shaped "we are raising a $1.8m seed. Happy to share the deck or
+ * find 20 minutes" was not. A company stating its own raise or traction
+ * while offering a deck, a document, a call or a meeting is an OFFER, never
+ * terms. TERMS is the investor-directed vocabulary (valuation, an
+ * allocation or cheque from us, instrument terms, signing): it always keeps
+ * the model's own (cautious) reading, so code only ever clears a terms flag
+ * where nothing like terms was said.
+ */
+export type TheirMessageKind = "OFFER" | "TERMS";
+
+const TERMS_WORDS =
+  /\b(?:valuations?|pre[- ]money|post[- ]money|term ?sheets?|terms|convertible|cap table|discount|allocations?|tickets?|cheques?|check size|commit(?:s|ted|ment|ments)?|pro[- ]rata|side letter|sign(?:ing|ed)?|price per share|equity|stake|dilution|invest(?:ing|ment)? (?:of )?(?:\$|£|€|USD|GBP|EUR|NGN|₦|\d)|take (?:a |an )?(?:\$|£|€|₦|\d)|put in (?:\$|£|€|₦|\d)|how much (?:would|could|can|will) you)\b/iu;
+// Case-sensitive: "SAFE" the instrument, never "safe" the adjective.
+const SAFE_NOTE = /\bSAFEs?\b/u;
+const OFFERED_THING =
+  /\b(?:deck|one[- ]pager|memo|data ?room|methodology|materials?|call|calls|meeting|meet|demo|walkthrough|\d{1,2}\s?(?:-\s?)?min(?:ute)?s?)\b/iu;
+const OFFER_VERB =
+  /\b(?:share|send|happy to|glad to|would you like|want|keen to|find|hop on|grab|set up|arrange|book|schedule)\b/iu;
+const MEETING_OFFER =
+  /\b(?:call|calls|meeting|meet|demo|walkthrough|\d{1,2}\s?(?:-\s?)?min(?:ute)?s?)\b/iu;
+
+export function classifyTheirMessage(text: string): TheirMessageKind | null {
+  if (TERMS_WORDS.test(text) || SAFE_NOTE.test(text)) return "TERMS";
+  if (!OFFERED_THING.test(text) || !OFFER_VERB.test(text)) return null;
+  // Every question they ask must itself be the offer ("Want the deck, or 20
+  // minutes?"); another question keeps the model's reading.
+  const questions = text
+    .split(/(?<=[.!?])\s+/u)
+    .filter((sentence) => sentence.includes("?"));
+  return questions.every((sentence) => OFFERED_THING.test(sentence))
+    ? "OFFER"
+    : null;
+}
+
+/**
+ * The model's facts with code's read applied: an offer is not terms, is no
+ * question that needs the person's facts, and a call or meeting offered is
+ * wanting to meet; where terms words appear, the model's reading stands. Their latest unanswered
+ * messages only.
+ */
+export function withCodeRead(
+  facts: InstructionThreadFactsV2,
+  theirLatest: string,
+): InstructionThreadFactsV2 {
+  const kind = classifyTheirMessage(theirLatest);
+  if (kind === "TERMS") return facts;
+  if (kind === "OFFER") {
+    return {
+      ...facts,
+      mentionsTermsOrMoney: false,
+      asksQuestion: false,
+      questionAbout: [],
+      wantsToMeet: facts.wantsToMeet || MEETING_OFFER.test(theirLatest),
+    };
+  }
+  return facts;
+}
+
+/** Their messages since the person's side last wrote, oldest first. */
+function theirUnanswered(
+  messages: readonly {
+    readonly from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE";
+    readonly text: string | null;
+  }[],
+): string {
+  const out: string[] = [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message === undefined || message.from !== "OTHER_SIDE") break;
+    if (message.text !== null) out.unshift(message.text);
+  }
+  return out.join("\n");
+}
+
 export type ThreadRead = {
   readonly facts: InstructionThreadFactsV2 | null;
   readonly costUsd: number;
@@ -211,13 +289,17 @@ export function createQuarantinedThreadReader(dependencies: {
         response.output.value,
       );
       if (!parsed.success) return { facts: null, costUsd, ...paced };
-      // Topic numbers outside the approved list are dropped, not trusted.
-      const facts: InstructionThreadFactsV2 = {
-        ...parsed.data,
-        topicNumbers: parsed.data.topicNumbers.filter(
-          (number) => number <= input.topics.length,
-        ),
-      };
+      // Topic numbers outside the approved list are dropped, not trusted;
+      // code's own read of an offer applies over the model's (F25).
+      const facts: InstructionThreadFactsV2 = withCodeRead(
+        {
+          ...parsed.data,
+          topicNumbers: parsed.data.topicNumbers.filter(
+            (number) => number <= input.topics.length,
+          ),
+        },
+        theirUnanswered(messages),
+      );
       // Their latest words, for code to quote to the person; read from the
       // thread itself, never from the model.
       const theirs =

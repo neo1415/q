@@ -375,7 +375,7 @@ export const INSTRUCTION_THREAD_READER_V2: PromptDefinition<
   InstructionThreadReaderVariables,
   InstructionThreadFactsV2
 > = {
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -395,4 +395,36 @@ export const INSTRUCTION_THREAD_READER_V2: PromptDefinition<
     schema: InstructionThreadFactsV2Schema,
   },
   template: THREAD_READER_V2,
+};
+
+const THREAD_READER_V3 = THREAD_READER_V2.replace(
+  "- mentionsTermsOrMoney: true when they raise terms, valuation, an amount for this company, commitments or signing. A general question about someone's typical cheque size or whether they lead is questionAbout, not terms.",
+  `- mentionsTermsOrMoney: true when they raise the terms of an investment from us: valuation or price, an amount they ask of us or offer us, the instrument and its terms (SAFE, cap, discount, equity), conditions, commitments or signing. A general question about someone's typical cheque size or whether they lead is questionAbout, not terms.
+- A company describing itself is not terms: its own round size or raise target ("raising a $4m seed"), revenue, traction or contract values, said while offering a deck, a document, a call or a meeting, is mentionsTermsOrMoney false; report the offer as wantsToMeet (a call or meeting) instead.`,
+);
+
+export const INSTRUCTION_THREAD_READER_V3: PromptDefinition<
+  InstructionThreadReaderVariables,
+  InstructionThreadFactsV2
+> = {
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  effectiveFrom: "2026-10-07",
+  id: "INSTRUCTION_THREAD_READER",
+  version: 3,
+  changeDescription:
+    "Seed F25 (Zino, 7 Oct): Tensorgate's \"Raising a $4m seed. Want the deck, or 20 minutes?\" was read as terms or money and Ledgerline's same-shaped offer was not. Terms are now the terms of an investment from the reader's side; a company stating its own raise or traction while offering a deck or call is not terms. Code also pre-classifies such offers deterministically (q-api quarantine).",
+  variables: {
+    schema: InstructionThreadReaderVariablesSchema,
+    untrusted: [...INSTRUCTION_THREAD_READER_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: INSTRUCTION_THREAD_READER_SCHEMA_NAME,
+    schemaVersion: INSTRUCTION_THREAD_READER_V2_SCHEMA_VERSION,
+    schema: InstructionThreadFactsV2Schema,
+  },
+  template: THREAD_READER_V3,
 };
