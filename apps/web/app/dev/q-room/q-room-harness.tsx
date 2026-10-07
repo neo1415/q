@@ -30,6 +30,7 @@ import type { DeckState, FillResult } from "@/features/q/room/deck-actions";
 import type { DeckLoaders } from "@/features/q/room/q-room-deck";
 import { runUploadDrop } from "@/features/q/room/room-read";
 import { currentScreen } from "@/features/q/screen";
+import { loadWire } from "@/features/q/wire";
 
 const RECORD = "/dev/q-room/record";
 const CARD = "/dev/q-room/card";
@@ -87,7 +88,7 @@ async function fetchRecord(): Promise<QConversationDetail | null> {
     // paint (as the Q page's own reads do).
     const [body, { QConversationDetailSchema }] = await Promise.all([
       response.json(),
-      import("@capital-q/contracts"),
+      loadWire(),
     ]);
     const detail = QConversationDetailSchema.safeParse(body);
     return detail.success ? detail.data : null;

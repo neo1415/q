@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/home" }));
 
@@ -21,6 +21,13 @@ import {
 } from "../src/features/q/room/deck-room";
 import { roomStage } from "../src/features/q/room/room-stage";
 import { currentScreen } from "../src/features/q/screen";
+import { loadWire } from "../src/features/q/wire";
+
+// W7: the wire's contracts load after the first paint in the browser;
+// here they are in before any test reads Q's data.
+beforeAll(async () => {
+  await loadWire();
+});
 
 /**
  * Q room W5 (R8): the deck surface. Slides and thumbnails from the Q

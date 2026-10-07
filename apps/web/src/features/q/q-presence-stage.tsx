@@ -27,6 +27,7 @@ import type { PdfExport } from "./room/pdf-offer";
 import type { RoomCardLoader } from "./room/q-room-card";
 import type { DeckLoaders } from "./room/q-room-deck";
 import { roomStage } from "./room/room-stage";
+import { useWire } from "./wire";
 import {
   answersIn,
   onStage,
@@ -162,7 +163,13 @@ export function QPresenceStage({
   const recent = shownRecently(items);
   // Q room R4: the card Q brought into the room, open while the
   // conversation stays on its subject (room-stage), or until closed here.
-  const room = useMemo(() => roomStage(turns), [turns]);
+  // W7: the room's cards are checked against the wire's contracts, and
+  // read again once they are in.
+  const wire = useWire();
+  const room = useMemo(
+    () => (wire === null ? roomStage([]) : roomStage(turns)),
+    [turns, wire],
+  );
   const [closedByHand, setClosedByHand] = useState<{
     readonly key: string;
     readonly at: number;

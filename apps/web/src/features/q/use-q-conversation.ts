@@ -5,15 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createQStreamState,
   reduceQStream,
-  streamQRunEvents,
   type QStreamState,
   type QStreamTransportStatus,
 } from "@capital-q/api-client";
-import {
-  isTerminalQStreamEvent,
-  type QMessage,
-  type QViewingMoment,
-} from "@capital-q/contracts";
+import type { QMessage, QViewingMoment } from "@capital-q/contracts";
 
 import {
   approveQApprovalAction,
@@ -213,21 +208,26 @@ export function useQConversation(
     const controller = new AbortController();
     abort.current = controller;
     setStreaming(true);
-    void streamQRunEvents({ baseUrl: STREAM_BASE_URL, accessToken: "" }, run, {
-      signal: controller.signal,
-      onStatus: (status) => {
-        setTransport(status);
-      },
-      onEvent: (event) => {
-        setRunState((current) => reduceQStream(current, event));
-        if (isTerminalQStreamEvent(event)) {
-          finished.current = true;
-          // A finished run may have named the conversation for the
-          // first time; the list is read again either way.
-          announceConversationsChanged();
-        }
-      },
-    })
+    // W7: the stream (and the contracts it checks events against) loads
+    // with the first run followed, not with the page.
+    void import("./q-stream-transport")
+      .then(({ streamQRunEvents, isTerminalQStreamEvent }) =>
+        streamQRunEvents({ baseUrl: STREAM_BASE_URL, accessToken: "" }, run, {
+          signal: controller.signal,
+          onStatus: (status) => {
+            setTransport(status);
+          },
+          onEvent: (event) => {
+            setRunState((current) => reduceQStream(current, event));
+            if (isTerminalQStreamEvent(event)) {
+              finished.current = true;
+              // A finished run may have named the conversation for the
+              // first time; the list is read again either way.
+              announceConversationsChanged();
+            }
+          },
+        }),
+      )
       .catch(() => {
         // A refusal on the stream is not a failed run — the run may still
         // be recorded and answered. Say so plainly; do not claim it failed.

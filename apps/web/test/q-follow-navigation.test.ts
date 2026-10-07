@@ -1,8 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import type { QTurn } from "../src/features/q/conversation";
 import { navigationToFollow } from "../src/features/q/follow-navigation";
 import { destinationPath } from "../src/features/voice/destinations";
+import { loadWire } from "../src/features/q/wire";
+
+// W7: the wire's contracts load after the first paint in the browser;
+// here they are in before any test reads Q's data.
+beforeAll(async () => {
+  await loadWire();
+});
 
 /**
  * A typed "take me to Discover" moves the screen (CQ-QACT-001, F8): the

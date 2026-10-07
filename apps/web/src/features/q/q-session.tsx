@@ -12,7 +12,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { QConversationIdSchema } from "@capital-q/contracts";
+import { useWire } from "./wire";
+import { conversationIdOf } from "./wire-constants";
 
 import { apertureStateFor, type QApertureState } from "../q-aperture";
 import { destinationPath } from "../voice/destinations";
@@ -135,8 +136,7 @@ function initialConversation(): string | null {
     const named = new URLSearchParams(window.location.search).get(
       Q_CONVERSATION_PARAM,
     );
-    const parsed = QConversationIdSchema.safeParse(named);
-    return parsed.success ? parsed.data : null;
+    return conversationIdOf(named) ?? null;
   }
   return readActiveConversation("home");
 }
@@ -277,9 +277,7 @@ export function QSessionProvider({
 
   const talk = useCallback(
     async (options?: { readonly greeting?: string }) => {
-      const named = QConversationIdSchema.safeParse(
-        q.conversationId ?? undefined,
-      ).data;
+      const named = conversationIdOf(q.conversationId);
       const greeting = options?.greeting;
       await voice.talk({
         ...(greeting === undefined ? {} : { resume: true }),
@@ -370,6 +368,9 @@ export function QSessionProvider({
    * when the conversation opened is never followed.
    */
   const followedTurns = useRef<Set<string> | null>(null);
+  // W7: the answer's actions are checked against the wire's contracts;
+  // this effect looks again once they are in.
+  const wire = useWire();
   // A dropped line makes no moves; the typed answer's are made here.
   const voiceActive = voice.active && isLineLive(voice.client);
   useEffect(() => {
@@ -383,6 +384,7 @@ export function QSessionProvider({
       );
       return;
     }
+    if (wire === null) return;
     const followed = followOfTurns(turns, followedTurns.current);
     // While the line is open, a spoken answer's moves are the voice
     // board's to make, after Q has said them; making them here too would
@@ -395,7 +397,7 @@ export function QSessionProvider({
       act();
       router.push(path);
     }
-  }, [turns, q.loading, act, router, voiceActive]);
+  }, [turns, q.loading, act, router, voiceActive, wire]);
 
   const [artifactId, setArtifactId] = useState<string | null>(null);
   // R21: the document open in the viewer is part of what is on screen,

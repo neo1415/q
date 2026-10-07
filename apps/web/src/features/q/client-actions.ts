@@ -1,20 +1,18 @@
-import {
-  QClientActionIntentSchema,
-  QWebsiteUrlSchema,
-  type QClientActionIntent,
-  type QScreenActIntent,
-  type QRecordPage,
-  type QSetDiscoverFiltersIntent,
-  type QSubjectRef,
-  type QSettingsSection,
+import type {
+  QClientActionIntent,
+  QScreenActIntent,
+  QRecordPage,
+  QSetDiscoverFiltersIntent,
+  QSubjectRef,
+  QSettingsSection,
 } from "@capital-q/contracts";
 
 import { applyTheme, storeTheme } from "@/features/appearance/theme";
-import { queueDiscoverFiltersIntent } from "@/features/discover/filters/discover-filters";
 import { storeQMotion } from "@/features/q-aperture/q-motion";
 import { storeVoicePreference } from "@/features/voice/voice-preference";
 
 import { forgetActiveConversations } from "./active-conversation";
+import { loadWire, wireNow, type WireContracts } from "./wire";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -275,11 +273,16 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
     );
   },
   setDiscoverFilters: (intent) => {
-    queueDiscoverFiltersIntent(intent);
-    // Elsewhere, Discover takes the queued intent when it opens.
-    if (window.location.pathname !== DISCOVER_PATH) {
-      BROWSER_EFFECTS.goTo(DISCOVER_PATH);
-    }
+    // W7: the filters' code loads with the first such action, not the page.
+    void import("@/features/discover/filters/discover-filters").then(
+      ({ queueDiscoverFiltersIntent }) => {
+        queueDiscoverFiltersIntent(intent);
+        // Elsewhere, Discover takes the queued intent when it opens.
+        if (window.location.pathname !== DISCOVER_PATH) {
+          BROWSER_EFFECTS.goTo(DISCOVER_PATH);
+        }
+      },
+    );
   },
   signOut: () => {
     forgetActiveConversations();
@@ -287,12 +290,35 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   },
 };
 
-/** Performs one client action; false when it was refused or blocked. */
+/**
+ * Performs one client action; false when it was refused or blocked.
+ *
+ * W7: the shape is checked against the wire's contracts, which load just
+ * after the first paint. An action that arrives before they are in is
+ * checked and performed the moment they are (true: taken, not refused);
+ * nothing is performed unchecked.
+ */
 export function performClientAction(
   raw: unknown,
   effects: ClientActionEffects = BROWSER_EFFECTS,
 ): boolean {
-  const parsed = QClientActionIntentSchema.safeParse(raw);
+  const wire = wireNow();
+  if (wire === null) {
+    void loadWire().then(
+      (loaded) => performChecked(loaded, raw, effects),
+      () => undefined,
+    );
+    return true;
+  }
+  return performChecked(wire, raw, effects);
+}
+
+function performChecked(
+  wire: WireContracts,
+  raw: unknown,
+  effects: ClientActionEffects,
+): boolean {
+  const parsed = wire.QClientActionIntentSchema.safeParse(raw);
   if (!parsed.success) return false;
   const action: QClientActionIntent = parsed.data;
   switch (action.kind) {
@@ -303,7 +329,7 @@ export function performClientAction(
       effects.reload();
       return true;
     case "OPEN_WEBSITE": {
-      const url = QWebsiteUrlSchema.safeParse(action.url);
+      const url = wire.QWebsiteUrlSchema.safeParse(action.url);
       return url.success ? effects.openTab(url.data) : false;
     }
     case "SET_Q_MOTION":

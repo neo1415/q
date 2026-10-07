@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { beforeAll, afterEach, describe, expect, it } from "vitest";
 
 import {
   QPageManifestSchema,
@@ -26,6 +26,13 @@ import { seeingLine } from "../src/features/q/q-can-see";
 import { currentScreen } from "../src/features/q/screen";
 import { roomCardHref } from "../src/features/q/room/room-card-view";
 import { asksToClose, roomStage } from "../src/features/q/room/room-stage";
+import { loadWire } from "../src/features/q/wire";
+
+// W7: the wire's contracts load after the first paint in the browser;
+// here they are in before any test reads Q's data.
+beforeAll(async () => {
+  await loadWire();
+});
 
 /**
  * Q room W2: the page manifest (R1), deep links (R2), and cards that close

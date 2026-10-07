@@ -2,10 +2,8 @@
 
 import type { AgentMicrophone as AgentMicrophoneClass } from "@deepgram/agents";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Q_VOICE_THINKING_BEATS,
-  stripSilenceBeats,
-} from "@capital-q/contracts";
+
+import { loadWire, type WireContracts } from "../../q/wire";
 
 import {
   transcriptLineFor,
@@ -235,15 +233,18 @@ export function useDeepgramVoiceSession(
       let AgentMicrophone: typeof AgentMicrophoneClass;
       let AgentSocketClass: typeof AgentSocket;
       let PcmPlayerClass: typeof PcmPlayer;
+      let wire: WireContracts;
       try {
         [
           { AgentMicrophone },
           { AgentSocket: AgentSocketClass },
           { PcmPlayer: PcmPlayerClass },
+          wire,
         ] = await Promise.all([
           import("@deepgram/agents"),
           import("./agent-socket"),
           import("./pcm-player"),
+          loadWire(),
         ]);
       } catch {
         setState("ERROR");
@@ -419,14 +420,15 @@ export function useDeepgramVoiceSession(
           }
         }
         // A thinking "hm" is a sound, not a line of the conversation.
-        if (role === "q" && Q_VOICE_THINKING_BEATS.has(content.trim())) {
+        // The silence ladder's tables come with the wire's contracts (W7).
+        if (role === "q" && wire.Q_VOICE_THINKING_BEATS.has(content.trim())) {
           expectSpeech();
           return;
         }
         // W4b: the silence ladder's beats are voiced while Q works, never a
         // line of the conversation (nor of the saved transcript).
         if (role === "q") {
-          content = stripSilenceBeats(content);
+          content = wire.stripSilenceBeats(content);
           if (content.length === 0) {
             expectSpeech();
             return;

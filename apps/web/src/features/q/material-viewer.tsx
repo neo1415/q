@@ -38,6 +38,7 @@ import { setRoomDocumentOpen, useRoomDocumentHost } from "./room/document-host";
 import { preloadPdfjs } from "./room/pdf-page";
 import { roomRead, useRetryWhenOnline, whenIdle } from "./room/room-read";
 import { setMaterialDocument } from "./screen";
+import { useWire } from "./wire";
 
 type Opened = QMaterialDocumentRef & {
   readonly file: OpenedFile | null;
@@ -284,9 +285,12 @@ export function QMaterialViewer({
 
   // "Download it": a side effect, once per answer. Paging, reading and
   // closing are derived from the conversation above and below.
+  // W7: acts are read from the wire's contracts; none is marked read
+  // before they are in, and this looks again once they are.
+  const wire = useWire();
   useEffect(() => {
     const seen = applied.current;
-    if (seen === null) return;
+    if (seen === null || wire === null) return;
     for (const [index, turn] of turns.entries()) {
       if (turn.kind !== "Q" || turn.streaming || seen.has(turn.id)) continue;
       seen.add(turn.id);
@@ -295,7 +299,7 @@ export function QMaterialViewer({
         download(opened);
       }
     }
-  }, [turns, opened, download]);
+  }, [turns, opened, download, wire]);
 
   // R9: an answer that names a document warms PDF.js while the room is
   // idle, so opening it next draws the first page without that wait. Not

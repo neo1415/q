@@ -2,11 +2,17 @@
 
 import { useSyncExternalStore } from "react";
 
+import type { QVoiceListeningLevel } from "@capital-q/contracts";
+
 import {
   Q_VOICE_LISTENING_DEFAULT,
-  QVoiceListeningLevelSchema,
-  type QVoiceListeningLevel,
-} from "@capital-q/contracts";
+  Q_VOICE_LISTENING_LEVELS,
+} from "../q/wire-constants";
+
+/** QVoiceListeningLevelSchema's check, without loading the contracts (W7). */
+function listeningLevelOf(value: unknown): QVoiceListeningLevel | null {
+  return Q_VOICE_LISTENING_LEVELS.find((level) => level === value) ?? null;
+}
 
 /**
  * BACKCHANNEL: this device's listening-sounds toggle (Settings → Voice).
@@ -44,16 +50,16 @@ export function readListeningPreference(): DeviceListening | null {
   if (raw === null) return null;
   try {
     const value: unknown = JSON.parse(raw);
-    const level = QVoiceListeningLevelSchema.safeParse(
+    const level = listeningLevelOf(
       (value as { level?: unknown } | null)?.level,
     );
     const setAt = (value as { setAt?: unknown } | null)?.setAt;
     if (
-      level.success &&
+      level !== null &&
       typeof setAt === "string" &&
       !Number.isNaN(Date.parse(setAt))
     ) {
-      cached = { level: level.data, setAt };
+      cached = { level, setAt };
     }
   } catch {
     cached = null;

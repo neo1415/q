@@ -1,9 +1,7 @@
-import {
-  QShowInQRoomIntentSchema,
-  type QShowInQRoomIntent,
-} from "@capital-q/contracts";
+import type { QShowInQRoomIntent } from "@capital-q/contracts";
 
 import type { QTurn, QTurnPublicSource } from "../conversation";
+import { wireNow } from "../wire";
 
 /**
  * Q room R4: which card is open in the room, decided by code from the
@@ -155,6 +153,9 @@ const ROOM_DOCUMENT_TYPES: ReadonlySet<string> = new Set([
 
 function showsOf(turn: Extract<QTurn, { kind: "Q" }>): QShowInQRoomIntent[] {
   const out: QShowInQRoomIntent[] = [];
+  // W7: checked against the wire's contracts; none until they are in.
+  const QShowInQRoomIntentSchema = wireNow()?.QShowInQRoomIntentSchema;
+  if (QShowInQRoomIntentSchema === undefined) return out;
   for (const block of turn.blocks) {
     // Q room W5: a deck, one-pager or memo Q made or changed in this
     // answer opens in the room (its card on the answer is the record).

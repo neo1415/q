@@ -57,8 +57,9 @@ describe("the answer canvas on the stage", () => {
     const landed = vi.fn();
     const { rerender, queryByTestId } = render(stage(first, landed));
     // W7: the cards' code loads when they first come on the stage.
-    await waitFor(() =>
-      expect(document.querySelector('[data-q-canvas="a1"]')).not.toBeNull(),
+    await waitFor(
+      () =>
+        expect(document.querySelector('[data-q-canvas="a1"]')).not.toBeNull(),
       { timeout: 10_000 },
     );
     expect(queryByTestId("mini")).not.toBeNull();
@@ -89,8 +90,9 @@ describe("the answer canvas on the stage", () => {
       turn("a2", "Atlas Ledger's revenue is only a claim."),
     ];
     render(stage(turns));
-    await waitFor(() =>
-      expect(document.querySelector('[data-q-canvas="a1"]')).not.toBeNull(),
+    await waitFor(
+      () =>
+        expect(document.querySelector('[data-q-canvas="a1"]')).not.toBeNull(),
       { timeout: 10_000 },
     );
   });
