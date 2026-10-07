@@ -270,6 +270,9 @@ describe("the action registry", () => {
       ["data_room.access.request", "request_data_room_access", "CONSEQUENTIAL"],
       ["data_room.request.decide", "answer_data_room_request", "CONSEQUENTIAL"],
       ["deck.extraction.confirm", "confirm_deck_reading", "CONSEQUENTIAL"],
+      // F26: one section at a time, and "Read again".
+      ["deck.section.review", "review_deck_section", "CONSEQUENTIAL"],
+      ["deck.read_again", "read_my_deck_again", "CONSEQUENTIAL"],
       // G1/G2: the team. Q invites and changes roles on a card; the rest
       // is the person's own decision on the Team page.
       ["team.invite", "invite_colleague", "CONSEQUENTIAL"],

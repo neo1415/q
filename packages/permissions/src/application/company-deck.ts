@@ -422,7 +422,10 @@ export function createCompanyDeckService(dependencies: {
             readonly confirmed: true;
           };
         }
-      | { readonly outcome: "REFUSED"; readonly code: CompanyDeckRefusal }
+      | {
+          readonly outcome: "REFUSED";
+          readonly code: Exclude<CompanyDeckRefusal, "LIMIT">;
+        }
     > => {
       const reader = await readerOf(command.actor, command.companyId);
       if (reader === null || reader.viewer !== "OWNER")
@@ -490,7 +493,10 @@ export function createCompanyDeckService(dependencies: {
             readonly state: DeckSectionState["state"];
           };
         }
-      | { readonly outcome: "REFUSED"; readonly code: CompanyDeckRefusal }
+      | {
+          readonly outcome: "REFUSED";
+          readonly code: Exclude<CompanyDeckRefusal, "LIMIT">;
+        }
     > => {
       const located = await ownReading(command);
       if ("code" in located) return { outcome: "REFUSED", code: located.code };
@@ -626,7 +632,7 @@ export function createCompanyDeckService(dependencies: {
     readonly extractionId: string;
   }): Promise<
     | { readonly deck: CompanyDeckRecord; readonly reading: CompanyDeckReading }
-    | { readonly code: CompanyDeckRefusal }
+    | { readonly code: Exclude<CompanyDeckRefusal, "LIMIT"> }
   > {
     const reader = await readerOf(command.actor, command.companyId);
     if (reader === null || reader.viewer !== "OWNER")
