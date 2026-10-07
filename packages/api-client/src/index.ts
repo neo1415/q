@@ -453,6 +453,8 @@ export * from "./fit.js";
 export {
   confirmDeckReading,
   decideDataRoomRequest,
+  readDeckAgain,
+  reviewDeckSection,
   getCompanyDataRoom,
   getCompanyDeck,
   getCompanyFounder,

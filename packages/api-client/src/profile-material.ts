@@ -8,14 +8,20 @@ import {
   DATA_ROOM_DOCUMENT_LEVEL_PATH,
   DATA_ROOM_REQUEST_DECISION_PATH,
   DECK_EXTRACTION_CONFIRM_PATH,
+  DECK_READ_AGAIN_PATH,
+  DECK_SECTION_REVIEW_PATH,
   DataRoomLevelResultSchema,
   DataRoomOpenDtoSchema,
   DataRoomRequestResultSchema,
   DataRoomViewSchema,
   DeckExtractionConfirmResultSchema,
+  DeckReadAgainResultSchema,
+  DeckSectionReviewResultSchema,
   FounderPersonDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
   type DecideDataRoomRequest,
+  type DeckSectionCode,
+  type DeckSectionReviewAction,
   type RequestDataRoomAccessRequest,
   type SetDataRoomLevelRequest,
 } from "@capital-q/contracts";
@@ -151,6 +157,57 @@ export function confirmDeckReading(
       encodeURIComponent(documentId),
     ).replace(":extractionId", encodeURIComponent(extractionId)),
     DeckExtractionConfirmResultSchema,
+    { body: { companyId } },
+  );
+}
+
+/** F26: the founder reviews one section of the reading on screen. */
+export function reviewDeckSection(
+  session: ApiSession,
+  input: {
+    readonly companyId: string;
+    readonly documentId: string;
+    readonly extractionId: string;
+    readonly section: DeckSectionCode;
+    readonly action: DeckSectionReviewAction;
+    readonly correction: string | null;
+  },
+) {
+  return call(
+    session,
+    "POST",
+    DECK_SECTION_REVIEW_PATH.replace(
+      ":documentId",
+      encodeURIComponent(input.documentId),
+    )
+      .replace(":extractionId", encodeURIComponent(input.extractionId))
+      .replace(":section", encodeURIComponent(input.section)),
+    DeckSectionReviewResultSchema,
+    {
+      body: {
+        companyId: input.companyId,
+        action: input.action,
+        correction: input.correction,
+      },
+    },
+  );
+}
+
+/** F26: the founder asks Q to read the current deck version again. */
+export function readDeckAgain(
+  session: ApiSession,
+  companyId: string,
+  documentId: string,
+  extractionId: string,
+) {
+  return call(
+    session,
+    "POST",
+    DECK_READ_AGAIN_PATH.replace(
+      ":documentId",
+      encodeURIComponent(documentId),
+    ).replace(":extractionId", encodeURIComponent(extractionId)),
+    DeckReadAgainResultSchema,
     { body: { companyId } },
   );
 }

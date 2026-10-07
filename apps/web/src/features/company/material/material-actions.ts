@@ -10,13 +10,17 @@ import {
   decideDataRoomRequest,
   openCompanyDeck,
   openDataRoomDocument,
+  readDeckAgain,
   requestDataRoomAccess,
+  reviewDeckSection,
   setDataRoomLevel,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   DATA_ROOM_GRANT_DAYS,
   DataRoomLevelSchema,
+  DeckSectionCodeSchema,
+  DeckSectionReviewActionSchema,
   SetDataRoomLevelRequestSchema,
 } from "@capital-q/contracts";
 
@@ -226,6 +230,77 @@ export async function confirmReadingAction(input: {
   } catch {
     return failed(
       "That reading is out of date. Refresh to see Q's newest read.",
+    );
+  }
+}
+
+/** F26: confirm, mark as wrong, or correct one section of Q's read. */
+export async function reviewSectionAction(input: {
+  readonly companyId: string;
+  readonly documentId: string;
+  readonly extractionId: string;
+  readonly section: string;
+  readonly action: string;
+  readonly correction: string | null;
+}): Promise<MaterialResult> {
+  const ids = z
+    .tuple([Id, Id, Id])
+    .safeParse([input.companyId, input.documentId, input.extractionId]);
+  const section = DeckSectionCodeSchema.safeParse(input.section);
+  const action = DeckSectionReviewActionSchema.safeParse(input.action);
+  const correction =
+    input.correction === null ? null : input.correction.trim().slice(0, 600);
+  const api = await session();
+  if (
+    !ids.success ||
+    !section.success ||
+    !action.success ||
+    api === null ||
+    (action.data === "CORRECT") !== (correction !== null && correction !== "")
+  )
+    return failed("That didn't go through. Try again.");
+  try {
+    await reviewDeckSection(api, {
+      companyId: ids.data[0],
+      documentId: ids.data[1],
+      extractionId: ids.data[2],
+      section: section.data,
+      action: action.data,
+      correction: action.data === "CORRECT" ? correction : null,
+    });
+    revalidatePath(`/company/${ids.data[0]}`);
+    return { ok: true, value: undefined };
+  } catch {
+    return failed(
+      "That reading is out of date. Refresh to see Q's newest read.",
+    );
+  }
+}
+
+/** F26: ask Q to read the current deck version again (twice at most). */
+export async function readAgainAction(input: {
+  readonly companyId: string;
+  readonly documentId: string;
+  readonly extractionId: string;
+}): Promise<MaterialResult<{ readonly left: number }>> {
+  const ids = z
+    .tuple([Id, Id, Id])
+    .safeParse([input.companyId, input.documentId, input.extractionId]);
+  const api = await session();
+  if (!ids.success || api === null)
+    return failed("That didn't go through. Try again.");
+  try {
+    const result = await readDeckAgain(
+      api,
+      ids.data[0],
+      ids.data[1],
+      ids.data[2],
+    );
+    revalidatePath(`/company/${ids.data[0]}`);
+    return { ok: true, value: { left: result.left } };
+  } catch {
+    return failed(
+      "Q has already read this version again twice, or the reading changed. Refresh, or correct the section yourself.",
     );
   }
 }
