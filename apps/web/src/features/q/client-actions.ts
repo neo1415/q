@@ -372,6 +372,7 @@ function performChecked(
     // Q room R5: the answer carries the connect card itself; the person
     // starts the connect flow from it, never the answer on its own.
     case "SHOW_CALENDAR_CONNECT":
+      return true;
     // Q room W3: the open document's viewer reads its acts from the answer
     // itself (each answer once), so a voice and a typed turn page alike.
     case "DOCUMENT_ACT":

@@ -56,6 +56,9 @@ export function replyParts(blocks: readonly QTurnObjectBlock[]): {
         // What the answer produced or needs from the person: in view.
         inline.push(block);
         break;
+      case "ANSWER_CARDS":
+        // Laid out on the stage over the presence, not repeated inline.
+        break;
     }
   }
   return { inline, companies, investors };

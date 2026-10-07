@@ -60,6 +60,9 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
       case "INVESTOR_REFERENCE":
       case "COMPARISON":
       case "CLARIFICATION_REQUEST":
+      case "ANSWER_CARDS":
+        // Answer cards are laid out on the stage; here they stay behind
+        // Sources, as before.
         evidence.push(block);
         break;
       default:
