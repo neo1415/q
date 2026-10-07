@@ -470,6 +470,13 @@ describe("@capital-q/billing against local Postgres", () => {
   it("fees: confirmed INVESTED only, RATE_NOT_SET until a rate, exact numeric, void when superseded", async () => {
     await scenario(async (w, tx) => {
       const { fees } = services(tx);
+      // The fee schedule is global and append-only: on a shared local DB a
+      // rate set earlier (admin console, another run) is the latest version
+      // and would make this start ACCRUED. Establish "no rate yet" as the
+      // newest version inside this rolled-back transaction.
+      await tx.sql`insert into billing.fee_schedules (version, rate_bps, accrue_levels, payer_side, reason)
+        select coalesce(max(version), 0) + 1, null, array['INVESTED'], 'COMPANY', 'Fixture: no rate yet'
+          from billing.fee_schedules`;
       const commitment = randomUUID();
       await tx.sql`insert into network.commitments
           (id, tenant_id, relationship_id, amount, currency_code, level, status, stated_by_side,

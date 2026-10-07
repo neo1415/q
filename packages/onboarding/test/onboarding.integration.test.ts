@@ -695,7 +695,8 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
         ["come back to this later", "SKIP"],
       ]);
       const service = world.build({
-        moveReader: async ({ utterance }) => readings.get(utterance) ?? "NONE",
+        moveReader: ({ utterance }) =>
+          Promise.resolve(readings.get(utterance) ?? "NONE"),
       });
       const { view } = await start(world, adminA);
       const id = view.session.id;

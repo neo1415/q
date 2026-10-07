@@ -21,11 +21,7 @@ import type { EligibilityService } from "../eligibility/service.js";
 import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
 
 import { FIT_CONFIG_CURRENT, type FitConfig } from "./config.js";
-import {
-  assessFit,
-  compareAssessments,
-  type FitAssessment,
-} from "./model.js";
+import { assessFit, compareAssessments, type FitAssessment } from "./model.js";
 import { compareFitOrder, fitOrderScore } from "./order.js";
 import { observeFit, type DeclaredFitFacts } from "./observe.js";
 
