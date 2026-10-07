@@ -12,12 +12,15 @@ import { useEffect, useRef, useState } from "react";
  * browser's viewer at the same page.
  */
 
-type PdfModule = typeof import("pdfjs-dist");
+type PdfModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
 type PdfDocument = Awaited<ReturnType<PdfModule["getDocument"]>["promise"]>;
 
+// The legacy build: the modern one draws with Map.getOrInsertComputed,
+// which current Chrome and Safari releases do not have yet (a page loaded
+// but never drew, Q room W3 e2e on Chromium 141).
 async function pdfjs(): Promise<PdfModule> {
-  await import("pdfjs-dist/build/pdf.worker.min.mjs");
-  return import("pdfjs-dist");
+  await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs");
+  return import("pdfjs-dist/legacy/build/pdf.mjs");
 }
 
 export type PdfState =

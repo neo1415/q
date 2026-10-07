@@ -53,6 +53,13 @@ function threePagePdf(): Buffer {
   return Buffer.from(body, "latin1");
 }
 
+/** The harness has read its (empty) conversation: what follows is new. */
+async function opened(page: Page) {
+  const first = page.waitForResponse("**/dev/q-room/record");
+  await page.goto("/dev/q-room");
+  await first;
+}
+
 const asked = (n: number, text: string) => ({
   messageId: uuid(1000 + n),
   runId: uuid(2000 + n),
@@ -185,7 +192,7 @@ test("a document opens in the room, pages, summarises with pages, reads aloud, c
   page,
 }) => {
   const { set } = await serve(page);
-  await page.goto("/dev/q-room");
+  await opened(page);
   set(record(T1));
   await page.getByRole("button", { name: "Next answer" }).click();
 
@@ -235,7 +242,7 @@ test("a view-only document shows no download and carries the reader's name", asy
   page,
 }) => {
   const { set } = await serve(page, false);
-  await page.goto("/dev/q-room");
+  await opened(page);
   set(record(T1));
   await page.getByRole("button", { name: "Next answer" }).click();
   const viewer = page.locator("[data-q-room-document]");
@@ -252,8 +259,8 @@ test("a long web answer offers a PDF; yes files exactly that answer", async ({
   page,
 }) => {
   const { set, exported } = await serve(page);
-  await page.goto("/dev/q-room");
-  const long = Array.from({ length: 120 }, () => "Fintech news today.").join(
+  await opened(page);
+  const long = Array.from({ length: 150 }, () => "Fintech news today.").join(
     " ",
   );
   set(
