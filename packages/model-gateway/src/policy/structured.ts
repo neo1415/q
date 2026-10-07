@@ -84,6 +84,16 @@ function containingElement(
   return found;
 }
 
+/** The value at a path, or undefined where the path leaves the object. */
+function valueAt(root: unknown, path: readonly PropertyKey[]): unknown {
+  let node: unknown = root;
+  for (const key of path) {
+    if (node === null || typeof node !== "object") return undefined;
+    node = (node as Record<PropertyKey, unknown>)[key];
+  }
+  return node;
+}
+
 // Which field names were unexpected, when that is the refusal: a field
 // name, bounded, never a value the model wrote (live 2026-09-30: every
 // ASSESS answer refused as "(root):unrecognized_keys", with no way to see
@@ -139,7 +149,70 @@ export function acceptStructuredOutput<T>(
     typeof decoded === "object" &&
     !Array.isArray(decoded)
   ) {
-    const first = schema.safeParse(decoded);
+    let first = schema.safeParse(decoded);
+    if (!first.success) {
+      // Inside an auxiliary field, one malformed element costs that
+      // element, not the field (Zino live 2026-10-07: one card's `reasons`
+      // written as a string lost all eight answer cards). A lone string
+      // where a list of strings belongs is read as that one-item list;
+      // any other refused element is dropped. Bounded, reported, and only
+      // ever inside a lenient field.
+      const working = structuredClone(decoded) as Record<string, unknown>;
+      let touched = false;
+      for (let pass = 0; pass < DROP_PASSES_MAX && !first.success; pass += 1) {
+        const removals = new Map<unknown[], Set<number>>();
+        let changed = false;
+        // A string refused as a list is also refused for its length
+        // against the list's bounds; once read as a list, those go too.
+        const listed = new Set<string>();
+        const typeFirst = [...first.error.issues].sort(
+          (a, b) =>
+            (a.code === "invalid_type" ? 0 : 1) -
+            (b.code === "invalid_type" ? 0 : 1),
+        );
+        for (const issue of typeFirst) {
+          const field = issue.path[0];
+          if (typeof field !== "string" || !lenient.includes(field)) continue;
+          if (listed.has(issue.path.map(String).join("."))) continue;
+          const parent = valueAt(working, issue.path.slice(0, -1));
+          const key = issue.path.at(-1);
+          const value =
+            parent !== null && typeof parent === "object" && key !== undefined
+              ? (parent as Record<PropertyKey, unknown>)[key]
+              : undefined;
+          if (
+            issue.code === "invalid_type" &&
+            (issue as { readonly expected?: unknown }).expected === "array" &&
+            typeof value === "string" &&
+            value.trim().length > 0 &&
+            key !== undefined
+          ) {
+            (parent as Record<PropertyKey, unknown>)[key] = [value];
+            listed.add(issue.path.map(String).join("."));
+            lenientDropped.push(`${describe(issue)}:as_list`);
+            changed = true;
+            continue;
+          }
+          const element = containingElement(working, issue.path);
+          if (element === null || issue.path.length < 3) continue;
+          const [array, index] = element;
+          const set = removals.get(array) ?? new Set<number>();
+          set.add(index);
+          removals.set(array, set);
+        }
+        for (const [array, indexes] of removals) {
+          for (const index of [...indexes].sort((a, b) => b - a)) {
+            array.splice(index, 1);
+            changed = true;
+            lenientDropped.push("lenient:element_dropped");
+          }
+        }
+        if (!changed) break;
+        touched = true;
+        first = schema.safeParse(working);
+      }
+      if (touched) decoded = working;
+    }
     if (!first.success) {
       const record = { ...(decoded as Record<string, unknown>) };
       for (const issue of first.error.issues) {

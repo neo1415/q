@@ -100,8 +100,6 @@ export function createOpenAIRealtimeProvider(options: {
               })),
               audio: {
                 input: {
-                  // The person speaking cancels Q's response at once; the
-                  // browser also stops playback and truncates (barge-in).
                   // AUTO waits a little longer on a turn that sounds
                   // unfinished, which is where Q's reactions go.
                   turn_detection: {
@@ -109,7 +107,11 @@ export function createOpenAIRealtimeProvider(options: {
                     eagerness:
                       request.turnEagerness === "AUTO" ? "auto" : "high",
                     create_response: true,
-                    interrupt_response: true,
+                    // Not the provider: the browser confirms a barge-in after
+                    // sustained speech (BARGE_CONFIRM_MS) and then cancels and
+                    // truncates itself, so a cough or echo never cuts Q
+                    // mid-sentence (founder live 2026-10-07).
+                    interrupt_response: false,
                   },
                   ...(request.transcribeInput === true
                     ? {

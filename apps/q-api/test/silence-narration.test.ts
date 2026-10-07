@@ -165,4 +165,38 @@ describe("the silence ladder on a voice turn (ADR 0062)", () => {
     await done;
     expect(narrated).toEqual([]);
   });
+  it("keeps narrating until the whole answer is in on a deferred line (duplex: nothing is heard until ask_q returns)", async () => {
+    let release: () => void = () => undefined;
+    const second = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    async function* source(): AsyncGenerator<string> {
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      yield "First sentence.";
+      await second;
+      yield "Second sentence.";
+    }
+    const heard: string[] = [];
+    const narrated: QSilenceBeat[] = [];
+    const done = collect(
+      withSilenceLadder(source(), {
+        live: { stage: "COMPARING_OPPORTUNITIES", approvalWaiting: false },
+        narrate: (beat) => narrated.push(beat),
+        untilDone: true,
+        seed: 5,
+        now: () => Date.now(),
+      }),
+      heard,
+    );
+    await vi.advanceTimersByTimeAsync(12_000);
+    release();
+    await vi.advanceTimersByTimeAsync(10);
+    await done;
+    expect(heard).toEqual(["First sentence.", "Second sentence."]);
+    // The stage line at 1.5 s and progress past 4 s, although the first
+    // sentence arrived at 1 s.
+    expect(
+      narrated.filter((beat) => beat.kind !== "TONE").length,
+    ).toBeGreaterThanOrEqual(2);
+  });
 });

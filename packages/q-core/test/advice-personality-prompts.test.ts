@@ -23,7 +23,7 @@ describe("COMPANY_ANALYST v18: fit out of 10 and sharper advice", () => {
 
   it("was the active analyst until v19, on v17's schema, with the three lines", () => {
     const active = registry.getActive("COMPANY_ANALYST").definition;
-    expect(active.version).toBe(19);
+    expect(active.version).toBe(20);
     expect(COMPANY_ANALYST_V18.output).toBe(COMPANY_ANALYST_V17.output);
     const template = COMPANY_ANALYST_V18.template;
     expect(template).toContain(V18_NO_SCORE);
@@ -51,9 +51,9 @@ describe("COMPANY_ANALYST v18: fit out of 10 and sharper advice", () => {
 describe("Q_SYSTEM v2 / Q_SYSTEM_VOICE v2: one personality in text and voice", () => {
   const registry = createDefaultPromptRegistry();
 
-  it("are the active charters and carry Q's manner", () => {
+  it("carry Q's manner (Q_SYSTEM v2 active; the voice charter is v3, which keeps it)", () => {
     expect(registry.getActive("Q_SYSTEM").definition.version).toBe(2);
-    expect(registry.getActive("Q_SYSTEM_VOICE").definition.version).toBe(2);
+    expect(registry.getActive("Q_SYSTEM_VOICE").definition.version).toBe(3);
     expect(Q_SYSTEM_V2.template).toContain(Q_VOICE_SECTION);
     expect(Q_SYSTEM_VOICE_V2.template).toContain(VOICE_V2_MANNER);
     // The person's chosen personality sets the register, not the substance.

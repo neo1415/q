@@ -269,6 +269,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * an ordinary answer.
    */
   readonly speculation?: QAnswerSpeculation | undefined;
+  /**
+   * The turn was spoken and its answer is said aloud (the utterance came
+   * from a voice line). The answer is shaped for the ear: short, answer
+   * first, lists on screen (natural conversation, 2026-10-07). Absent:
+   * a typed turn.
+   */
+  readonly spoken?: boolean | undefined;
 };
 
 export type QAnswerSpeculation = {

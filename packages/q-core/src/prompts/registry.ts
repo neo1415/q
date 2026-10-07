@@ -20,6 +20,7 @@ import {
 } from "./definition.js";
 import { Q_SYSTEM_VOICE_V1 } from "./charter/q-system-voice.v1.js";
 import { Q_SYSTEM_VOICE_V2 } from "./charter/q-system-voice.v2.js";
+import { Q_SYSTEM_VOICE_V3 } from "./charter/q-system-voice.v3.js";
 import { Q_SYSTEM_V1 } from "./charter/q-system.v1.js";
 import { Q_SYSTEM_V2 } from "./charter/q-system.v2.js";
 import { CLAIM_EXTRACTION_V1 } from "./tasks/claim-extraction.v1.js";
@@ -42,6 +43,7 @@ import { COMPANY_ANALYST_V16 } from "./tasks/company-analyst.v16.js";
 import { COMPANY_ANALYST_V17 } from "./tasks/company-analyst.v17.js";
 import { COMPANY_ANALYST_V18 } from "./tasks/company-analyst.v18.js";
 import { COMPANY_ANALYST_V19 } from "./tasks/company-analyst.v19.js";
+import { COMPANY_ANALYST_V20 } from "./tasks/company-analyst.v20.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -320,6 +322,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     Q_SYSTEM_V2,
     Q_SYSTEM_VOICE_V1,
     Q_SYSTEM_VOICE_V2,
+    Q_SYSTEM_VOICE_V3,
     FOUNDER_ONBOARDING_EXTRACTION_V1,
     FOUNDER_ONBOARDING_EXTRACTION_V2,
     INTERVIEW_CONDUCTOR_V1,
@@ -379,6 +382,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     COMPANY_ANALYST_V17,
     COMPANY_ANALYST_V18,
     COMPANY_ANALYST_V19,
+    COMPANY_ANALYST_V20,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
     ARTIFACT_REVISION_V3,

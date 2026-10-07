@@ -275,7 +275,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v19_comm.v1",
+      "q-system.v2_company-analyst.v20_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -384,7 +384,10 @@ describe("renderer", () => {
     // 2026-10-06, founder approved): ~200 tokens -- how Q sounds, fit as
     // the computed score out of 10, and advice that leads with a
     // recommendation. All in the cached prefix; no extra call.
-    expect(rendered.characters / 4).toBeLessThan(4_050);
+    // 4,500 since company-analyst/v20 (natural conversation, Zino live
+    // 2026-10-07): ~370 tokens of HOW YOU TALK -- answer first, first
+    // person, names in lists, one caveat. In the cached prefix.
+    expect(rendered.characters / 4).toBeLessThan(4_500);
   });
 });
 

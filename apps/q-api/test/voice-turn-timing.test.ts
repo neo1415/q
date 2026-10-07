@@ -284,4 +284,27 @@ describe("speculation on the voice turn timing line (latency2)", () => {
       speculationDecidedMs: null,
     });
   });
+  it("forwards narrate and deferred, so a duplex line voices the silence ladder (founder live 2026-10-07)", async () => {
+    const timings = createVoiceTurnTimings({
+      logger: { info: () => undefined } as never,
+      graceMs: 5_000,
+    });
+    const beats: unknown[] = [];
+    const seen: { narrate: boolean; deferred: boolean }[] = [];
+    const turn = timedVoiceTurns((_b, _t, _s, out) => {
+      seen.push({
+        narrate: out.narrate !== undefined,
+        deferred: out.deferred === true,
+      });
+      out.narrate?.({ kind: "STAGE_LINE", text: "Looking into that…" });
+      return Promise.resolve({ kind: "SPOKEN", path: "Q" } as const);
+    }, timings);
+    await turn(binding, [], new AbortController().signal, {
+      ...speaker([]),
+      narrate: (beat) => beats.push(beat),
+      deferred: true,
+    });
+    expect(seen).toEqual([{ narrate: true, deferred: true }]);
+    expect(beats).toEqual([{ kind: "STAGE_LINE", text: "Looking into that…" }]);
+  });
 });

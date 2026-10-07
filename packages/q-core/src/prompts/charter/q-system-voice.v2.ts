@@ -20,7 +20,8 @@ if (Q_SYSTEM_VOICE_V1.template.split(VOICE_V1_WHO_LINE).length !== 2) {
 export const Q_SYSTEM_VOICE_V2: PromptDefinition<QSystemVariables, never> = {
   ...Q_SYSTEM_VOICE_V1,
   version: 2,
-  status: "ACTIVE",
+  // Deprecated by v3 (how Q talks on a call, 2026-10-07).
+  status: "DEPRECATED",
   changeDescription:
     "Autopilot P3 (2026-10-06): Q's manner as in Q_SYSTEM v2 -- warm, sharp, human, one voice across text and speech; the chosen personality sets the register, never the substance.",
   effectiveFrom: "2026-10-06",

@@ -65,6 +65,9 @@ export type AnalystResultLike = {
     | undefined;
   readonly missingEvidence?: readonly string[] | undefined;
   readonly contradictions?: readonly string[] | undefined;
+  /** The answer's words; a holding line is no answer (clarification). */
+  readonly answer?: string | undefined;
+  readonly insufficientEvidence?: boolean | undefined;
   readonly clarifyingQuestions?:
     readonly { readonly question: string }[] | undefined;
   /** v17: things to see together, already schema-checked (ADR 0053). */
@@ -300,6 +303,19 @@ export function askedSubjects(
   );
 }
 
+/** Below this many characters an answer is a holding line, not an answer. */
+const SUBSTANTIVE_ANSWER_CHARS = 160;
+
+/**
+ * Whether the reading is one where Q could not answer: it said the
+ * evidence was insufficient, or wrote no more than a holding line.
+ */
+export function couldNotAnswer(result: AnalystResultLike): boolean {
+  if (result.insufficientEvidence === true) return true;
+  const answer = result.answer?.trim() ?? "";
+  return answer.length < SUBSTANTIVE_ANSWER_CHARS;
+}
+
 export function analystResultBlocks(input: {
   readonly result: AnalystResultLike;
   readonly subjects: readonly QSubjectRef[];
@@ -389,10 +405,16 @@ export function analystResultBlocks(input: {
     });
   }
 
-  for (const clarification of input.result.clarifyingQuestions ?? []) {
-    const question = clarification.question.trim();
-    if (question.length === 0) continue;
-    blocks.push({ kind: "CLARIFICATION_REQUEST", question });
+  // A question back is a card only when Q genuinely could not answer
+  // (Zino live 2026-10-07: "I'm asking you something but you're giving me
+  // a card asking me another question"). Beside an answer, the question
+  // is already in the words, said once, in voice or text.
+  if (couldNotAnswer(input.result)) {
+    for (const clarification of input.result.clarifyingQuestions ?? []) {
+      const question = clarification.question.trim();
+      if (question.length === 0) continue;
+      blocks.push({ kind: "CLARIFICATION_REQUEST", question });
+    }
   }
 
   blocks.push(...subjectBlocks(input.subjects));

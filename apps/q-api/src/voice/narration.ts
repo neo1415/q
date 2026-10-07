@@ -46,6 +46,11 @@ export type SilenceLadderOptions = {
   readonly now?: (() => number) | undefined;
   /** False: this turn gets no ladder (a look-up, an interview step). */
   readonly enabled?: boolean | undefined;
+  /**
+   * The answer's text is not heard as it streams (a deferred speaker):
+   * the ladder runs until the source ends, not until its first part.
+   */
+  readonly untilDone?: boolean | undefined;
 };
 
 const TIMEOUT = Symbol("timeout");
@@ -142,8 +147,9 @@ export async function* withSilenceLadder(
     if (timer !== undefined) clearTimeout(timer);
     if (outcome === TIMEOUT) continue;
     if (outcome.done === true) return;
-    // The answer has started: the ladder is done for this turn.
-    ladder = false;
+    // The answer has started: the ladder is done for this turn -- unless
+    // nothing is heard until the whole answer is in.
+    if (options.untilDone !== true) ladder = false;
     yield outcome.value;
     pending = iterator.next();
   }

@@ -387,6 +387,12 @@ export function timedVoiceTurns(
       close: () => {
         speaker.close();
       },
+      // Forwarded as they are: the duplex line voices the silence ladder
+      // out of band through `narrate`. Dropped here, the beats fell into
+      // the answer text instead and the line stayed silent while ask_q
+      // worked (founder live 2026-10-07, narration polls held 12 s empty).
+      ...(speaker.narrate === undefined ? {} : { narrate: speaker.narrate }),
+      ...(speaker.deferred === undefined ? {} : { deferred: speaker.deferred }),
     };
     try {
       const outcome = await timings.run(timing, () =>

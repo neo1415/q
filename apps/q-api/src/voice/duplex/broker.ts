@@ -266,6 +266,8 @@ function collectingSpeaker(
     close: () => undefined,
     // ADR 0062: the ladder's beats go to the browser, never into `said`.
     narrate,
+    // Nothing collected here is heard until ask_q returns.
+    deferred: true,
     said: () => text.slice(0, SPOKEN_MAX),
   };
 }

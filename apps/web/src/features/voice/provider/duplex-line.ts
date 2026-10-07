@@ -121,6 +121,14 @@ const NARRATION_OFFLINE_LOOK_MS = 1_000;
 const NARRATION_OFFLINE_WAIT_MS = 120_000;
 /** The commit a reaction waits on; past this it is dropped. */
 const COMMIT_WAIT_MS = 400;
+/**
+ * Speech over Q must last this long to stop Q (founder live 2026-10-07:
+ * the voice cut on blips). Shorter than Hume's 800 ms default: an analyst
+ * on a call yields quickly to a real interjection.
+ */
+export const BARGE_CONFIRM_MS = 450;
+/** Q's volume while it checks whether the sound is a real interruption. */
+export const BARGE_DUCK_GAIN = 0.3;
 /** The longest a bridge may hold Q's answer back. */
 const BRIDGE_HOLD_MS = 2_500;
 const TURN_ITEMS_MAX = 3;
@@ -378,6 +386,10 @@ export class DuplexLine {
   #speaking = false;
   /** The response being produced, if any (to cancel it). */
   #responseActive = false;
+  /** Speech started over Q; a barge-in once it lasts (BARGE_CONFIRM_MS). */
+  #bargePending: { readonly timer: unknown } | null = null;
+  /** The next committed input was a blip over Q: delete it, never answer it. */
+  #dropNextCommit = false;
   /** The audio item Q is saying and when its playback started. */
   #item: { id: string; startedAt: number } | null = null;
   /** Bumped by every barge-in: a tool result from before it is stale. */
@@ -945,7 +957,9 @@ export class DuplexLine {
               type: "semantic_vad",
               eagerness: level === "OFF" ? "high" : "auto",
               create_response: true,
-              interrupt_response: true,
+              // The browser decides a barge-in (BARGE_CONFIRM_MS), so a blip
+              // never cuts Q; it cancels and truncates itself.
+              interrupt_response: false,
             },
           },
         },
@@ -1065,8 +1079,45 @@ export class DuplexLine {
     }, this.#credential.idleMs);
   }
 
+  /**
+   * The person may be talking over Q. Founder live 2026-10-07: "sometimes
+   * the voice just cuts (not a dropped connection)" -- any VAD start (a
+   * cough, a door, Q's own echo) cut Q mid-sentence at once. Now Q's
+   * volume dips while it listens; only speech that lasts
+   * BARGE_CONFIRM_MS is a barge-in (Hume EVI's min_interruption_ms is the
+   * same idea, default 800 ms). A blip that stops sooner restores Q.
+   */
+  #maybeBargeIn(): void {
+    if (this.#bargePending !== null) return;
+    if (this.#audio !== null && !this.#speakingSilenced) {
+      this.#audio.volume = this.#volume * BARGE_DUCK_GAIN;
+    }
+    const timer = this.#env.setTimeout(() => {
+      if (this.#bargePending?.timer !== timer) return;
+      this.#bargePending = null;
+      this.#bargeIn();
+    }, BARGE_CONFIRM_MS);
+    this.#bargePending = { timer };
+  }
+
+  /** The sound stopped before it was a turn: Q is heard again. */
+  #blipEnded(): void {
+    const pending = this.#bargePending;
+    if (pending === null) return;
+    this.#env.clearTimeout(pending.timer);
+    this.#bargePending = null;
+    this.#dropNextCommit = true;
+    if (this.#audio !== null && !this.#speakingSilenced) {
+      this.#audio.volume = this.#volume;
+    }
+  }
+
   /** Q's audio stops now: the person is speaking. */
   #bargeIn(): void {
+    if (this.#bargePending !== null) {
+      this.#env.clearTimeout(this.#bargePending.timer);
+      this.#bargePending = null;
+    }
     this.#generation += 1;
     const item = this.#item;
     if (this.#audio !== null) {
@@ -1116,12 +1167,19 @@ export class DuplexLine {
         // The person talking cancels any reaction or bridge at once.
         this.#cutOutOfBand(null);
         if (this.#policy.turnStarted(this.#env.now())) this.#turnItems = [];
-        if (this.#speaking || this.#responseActive) this.#bargeIn();
+        if (this.#speaking) this.#maybeBargeIn();
+        else if (this.#responseActive) this.#bargeIn();
         else this.#events.onState("USER_SPEAKING");
         this.#updateBusy();
         break;
       }
       case "input_audio_buffer.speech_stopped":
+        if (this.#bargePending !== null) {
+          // A blip, not a turn: Q carries on, and the blip's audio
+          // never becomes something Q answers.
+          this.#blipEnded();
+          break;
+        }
         this.#touch();
         this.#turnEndedAt = this.#env.now();
         this.#policy.turnEnded(this.#env.now());
@@ -1129,6 +1187,13 @@ export class DuplexLine {
         break;
       case "input_audio_buffer.committed": {
         const itemId = text(event, "item_id");
+        if (this.#dropNextCommit && this.#awaitingCommit === null) {
+          this.#dropNextCommit = false;
+          if (itemId !== undefined) {
+            this.#send({ type: "conversation.item.delete", item_id: itemId });
+          }
+          break;
+        }
         if (itemId !== undefined) {
           this.#turnItems.push(itemId);
           if (this.#turnItems.length > TURN_ITEMS_MAX) this.#turnItems.shift();
@@ -1181,6 +1246,19 @@ export class DuplexLine {
       case "output_audio_buffer.stopped":
       case "output_audio_buffer.cleared":
         this.#speaking = false;
+        if (this.#bargePending !== null) {
+          // Q finished while they started: their speech is simply their
+          // turn now, nothing to interrupt.
+          this.#env.clearTimeout(this.#bargePending.timer);
+          this.#bargePending = null;
+          if (this.#audio !== null && !this.#speakingSilenced) {
+            this.#audio.volume = this.#volume;
+          }
+          this.#events.onState("USER_SPEAKING");
+          this.#touch();
+          this.#updateBusy();
+          break;
+        }
         this.#events.onState("LISTENING");
         this.#touch();
         this.#updateBusy();
@@ -1816,6 +1894,10 @@ export class DuplexLine {
   #finish(): void {
     this.#over = true;
     this.#connected = false;
+    if (this.#bargePending !== null) {
+      this.#env.clearTimeout(this.#bargePending.timer);
+      this.#bargePending = null;
+    }
     if (this.#idleTimer !== null) this.#env.clearTimeout(this.#idleTimer);
     if (this.#maxTimer !== null) this.#env.clearTimeout(this.#maxTimer);
     if (this.#meterTimer !== null) this.#env.clearTimeout(this.#meterTimer);

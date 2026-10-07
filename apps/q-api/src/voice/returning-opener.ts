@@ -125,13 +125,20 @@ export function createOpenerFacts(dependencies: {
     // Their standing instruction's last day, from its own steps; what waits
     // on them, from its unread NEEDS_YOU notices. Absent tables (before the
     // migration) read as nothing.
+    // What was done is read by kind (the step's action), so Q says what it
+    // did in its own words -- never the goal's text (Zino live 2026-10-07).
     const instruction = await sql<
-      { goal_text: string; done: number; needs_you: number }[]
+      {
+        done: { action: string; n: number }[] | null;
+        needs_you: number;
+      }[]
     >`
-      select i.goal_text,
-             (select count(*)::int from q_runtime.instruction_steps s
-               where s.instruction_id = i.id and s.status = 'DONE'
-                 and s.created_at > ${new Date(current.getTime() - 24 * 3_600_000)}) as done,
+      select (select coalesce(json_agg(json_build_object('action', d.action, 'n', d.n)), '[]'::json)
+                from (select s.action, count(*)::int as n
+                        from q_runtime.instruction_steps s
+                       where s.instruction_id = i.id and s.status = 'DONE'
+                         and s.created_at > ${new Date(current.getTime() - 24 * 3_600_000)}
+                       group by s.action) d) as done,
              (select count(*)::int from communication.notifications n
                where n.user_id = ${actor.userId} and n.read_at is null
                  and n.priority = 'NEEDS_YOU'
@@ -147,8 +154,7 @@ export function createOpenerFacts(dependencies: {
         latest === undefined
           ? null
           : narrationOf({
-              goal: latest.goal_text,
-              done: latest.done,
+              done: latest.done ?? [],
               needsYou: latest.needs_you,
             }),
       nextCall:

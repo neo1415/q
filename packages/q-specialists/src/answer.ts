@@ -2088,6 +2088,7 @@ export function createSpecialistQAnswer(
           research: Promise.resolve(speculativeResearch),
           capabilities: manifestOf(capabilities),
           turnKind: SPECULATIVE_READING.kind,
+          spoken: true,
           // What a plain question's focus is (toolFocusOf): the purpose's
           // list with the public-web tools leading, so the speculation
           // holds the web exactly as the turn's own answer would.
@@ -2794,6 +2795,8 @@ export function createSpecialistQAnswer(
       research,
       capabilities: manifestOf(capabilities),
       ...(turnUnread ? { turnUnread: true } : {}),
+      // Said aloud: the answer is shaped for the ear (2026-10-07).
+      ...(spoken ? { spoken: true } : {}),
       ...(read === null ? {} : { turnKind: read.kind }),
       ...(read?.question?.kind === undefined
         ? {}

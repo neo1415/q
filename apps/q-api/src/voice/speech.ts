@@ -309,13 +309,19 @@ export function bounded(text: string, max = SPOKEN_MAX_CHARS): string {
   if (text.length <= max) {
     return text;
   }
-  const cut = text.slice(0, max);
+  // Whole sentences only (founder live 2026-10-07: "the voice just cuts").
+  // A small room used to return the first `max` characters mid-word; now
+  // it is the sentences that fit, or none, and the screen has the rest.
+  const cut = text.slice(0, max + 1);
   const end = Math.max(
     cut.lastIndexOf(". "),
     cut.lastIndexOf("? "),
     cut.lastIndexOf("! "),
   );
-  return `${(end > max / 2 ? cut.slice(0, end + 1) : cut).trim()} The rest is on your screen.`;
+  const kept = end > 0 ? cut.slice(0, end + 1).trim() : "";
+  return kept.length === 0
+    ? "The rest is on your screen."
+    : `${kept} The rest is on your screen.`;
 }
 
 /**

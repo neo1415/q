@@ -1269,6 +1269,8 @@ export function createVoiceTurnHandler(
                   : () => smallTalk(binding.actor, used),
               onThread: (id) => used.add(id),
               narrate: speaker.narrate,
+              untilDone:
+                speaker.deferred === true && speaker.narrate !== undefined,
               seed: Math.floor(Math.random() * 0x7fffffff),
               signal,
             },

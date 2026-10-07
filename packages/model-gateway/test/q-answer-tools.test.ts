@@ -534,6 +534,49 @@ describe("answer seam tool loop", () => {
     ]);
   });
 
+  it("runs a round of reads side by side and hands results back in the order proposed (Zino live 2026-10-07)", async () => {
+    let inFlight = 0;
+    let most = 0;
+    const executed: string[] = [];
+    const tools: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY]),
+      execute: async (proposal) => {
+        executed.push(proposal.callId);
+        inFlight += 1;
+        most = Math.max(most, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return succeeded(proposal, { canonicalName: `Co ${proposal.callId}` });
+      },
+    };
+    const { seam, alpha, request } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: ["a", "b", "c"].map((id) => ({
+            callId: id,
+            name: "get_company",
+            arguments: { companyId: id },
+          })),
+        },
+        { kind: "TEXT", text: JSON.stringify(analystResult("Three.")) },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(most).toBe(3);
+    expect(executed).toEqual(["a", "b", "c"]);
+    const turns = (alpha.calls[1]?.request.messages ?? []).filter(
+      (m) => m.role === "TOOL",
+    );
+    expect(turns.map((m) => /Co (\w)/u.exec(m.content)?.[1])).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+
   it.each([
     ["a list", ["I need to retrieve your companies first."]],
     // The shape a model actually wrote live: one string, not a list.

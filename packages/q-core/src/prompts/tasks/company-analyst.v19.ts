@@ -34,7 +34,7 @@ export const COMPANY_ANALYST_V19: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V18,
   version: 19,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Q room W5 (R8, 2026-10-07): a founder may ask for a one-pager or a memo as well as a brief or a deck (artifactType ONE_PAGER / MEMO); the same pipeline writes each from their record with a document layout.",
   effectiveFrom: "2026-10-07",

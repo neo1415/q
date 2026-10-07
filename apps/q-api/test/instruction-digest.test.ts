@@ -57,27 +57,57 @@ describe("the digest, from recorded steps only", () => {
     ).toBe('1 thing needs your yes for "g"');
   });
 
-  it("what Q says when they come back", () => {
-    expect(narrationOf({ goal: "g", done: 0, needsYou: 0 })).toBeNull();
-    expect(narrationOf({ goal: "g", done: 3, needsYou: 2 })).toBe(
-      'While you were away, I did 3 things for "g", and 2 things need your yes. Want to go through them?',
+  it("what Q says when they come back, from what it did, never the goal's text (Zino live 2026-10-07)", () => {
+    expect(narrationOf({ done: [], needsYou: 0 })).toBeNull();
+    expect(
+      narrationOf({
+        done: [
+          { action: "relationship.interest.express", n: 3 },
+          { action: "chat.message.send", n: 1 },
+        ],
+        needsYou: 2,
+      }),
+    ).toBe(
+      "While you were away, I expressed interest in 3 companies and sent 1 message, and 2 things are waiting for your yes. Want to go through them?",
     );
     expect(
-      composeReturningOpener(
-        "Ada",
-        {
-          nextCall: null,
-          remindersDue: 0,
-          firstReminder: null,
-          notesReady: 1,
-          unreadNotices: 4,
-          instructionNews: narrationOf({ goal: "g", done: 1, needsYou: 0 }),
-        },
-        new Date(),
-      ),
-    ).toBe(
-      'Hi Ada. While you were away, I did 1 thing for "g". Want the rundown?',
+      narrationOf({
+        done: [{ action: "q.delegation.step_executed", n: 2 }],
+        needsYou: 0,
+      }),
+    ).toBe("While you were away, I took care of 2 things. Want the rundown?");
+    expect(narrationOf({ done: [], needsYou: 1 })).toBe(
+      "1 thing is waiting for your yes. Want to go through it?",
     );
+    const opener = composeReturningOpener(
+      "Zino",
+      {
+        nextCall: null,
+        remindersDue: 0,
+        firstReminder: null,
+        notesReady: 1,
+        unreadNotices: 4,
+        instructionNews: narrationOf({
+          done: [{ action: "chat.message.send", n: 4 }],
+          needsYou: 0,
+        }),
+      },
+      new Date(),
+    );
+    expect(opener).toBe(
+      "Hi Zino. While you were away, I sent 4 messages. Want the rundown?",
+    );
+    expect(opener).not.toMatch(/standing instruction|"/u);
+  });
+
+  it("a notice's title names the goal without its framing", () => {
+    expect(
+      needsYouNotice({
+        goal: 'Please set this up as a standing instruction for me: "Reply to founders"',
+        asked: ["Ask Acme."],
+        overBudget: false,
+      })?.title,
+    ).toBe('1 thing needs your yes for "Reply to founders"');
   });
 });
 
