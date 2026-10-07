@@ -932,6 +932,15 @@ export {
   type InstructionGrantPayload,
   type InstructionWorkingHours,
   type StandingInstructionStatus,
+  DELEGATED_ROUTINE_ACTIONS,
+  DELEGATION_LIMITS,
+  INSTRUCTION_DELEGATION_SCOPES,
+  INSTRUCTION_DELEGATION_WORDS,
+  InstructionDelegationDtoSchema,
+  InstructionDelegationRequestSchema,
+  type InstructionDelegationDto,
+  type InstructionDelegationRequest,
+  type InstructionDelegationScope,
 } from "./instructions.js";
 // AUTO block: Q's delegated work (ADR 0030).
 export {
@@ -996,6 +1005,8 @@ export {
   Q_WORK_DONE_PATH,
   Q_WORK_PAUSE_PATH,
   Q_WORK_RESUME_PATH,
+  Q_WORK_DELEGATION_PATH,
+  qWorkDelegationPath,
   Q_WORK_SUGGESTION_DISMISSALS_PATH,
   Q_WORK_SUGGESTION_KINDS,
   Q_WORK_SUGGESTIONS_MAX,
