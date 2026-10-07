@@ -339,6 +339,14 @@ export function FeedCard({
             {sinceYouLastSawLine(company.sinceYouLastSaw.change)}
           </p>
         )}
+        {exploringLine(company.reasonCodes) === null ? null : (
+          // Q.06: placed by the bounded exploration/diversity policy, not by
+          // fit, so its fit out of 10 may be lower than the card below it.
+          // Said in words, never a badge or a colour.
+          <p className="cq-caption cq-feed-muted" data-exploring>
+            {exploringLine(company.reasonCodes)}
+          </p>
+        )}
         <div className="cq-feed-company">
           {/* On a desktop the panel names the company with its mark; the
               rail's avatar is the way into the profile on both. */}
@@ -708,6 +716,21 @@ export function FeedCard({
 }
 
 const NO_LABELS: ReadonlyMap<string, string> = new Map();
+
+/**
+ * Discover is ordered by fit (fit-order.v1): a higher fit out of 10 is
+ * never below a lower one, except where the exploration and diversity
+ * policy placed a company. Those say so.
+ */
+const EXPLORING_CODES: ReadonlySet<string> = new Set([
+  "EXPLORATION_SLOT",
+  "DIVERSITY_ADJUSTMENT",
+]);
+export function exploringLine(reasonCodes: readonly string[]): string | null {
+  return reasonCodes.some((code) => EXPLORING_CODES.has(code))
+    ? "Exploring: placed here to widen your view, not by fit."
+    : null;
+}
 
 /** The line on a passed company offered again (doc 19 §67). */
 export function sinceYouLastSawLine(change: "NEW_PITCH" | null): string {

@@ -12,6 +12,7 @@ import type { FeatureSnapshotStore } from "../features/ports.js";
 import type { HybridCandidateService } from "../hybrid/service.js";
 import { RANKER_VERSION, RankingInputError } from "../ranking/contracts.js";
 import type { RankingService } from "../ranking/service.js";
+import type { FitOrdering } from "../fit/order.js";
 import { RerankInputError } from "../rerank/contracts.js";
 import type { RerankService } from "../rerank/service.js";
 import { SEMANTIC_GENERATOR_VERSION } from "../semantic/contracts.js";
@@ -107,6 +108,12 @@ export type SlateBuilderDependencies = {
   readonly ranking: RankingService;
   /** REC-009. Required: a build that silently skipped it would serve a different order. */
   readonly rerank: RerankService;
+  /**
+   * Q.06 fit order (fit-order.v1): when present, the slate is ordered by
+   * the fit an investor reads out of 10 before REC-009 reorders it, and
+   * the slate records this order's version. Absent: REC-005's order.
+   */
+  readonly fitOrdering?: FitOrdering | undefined;
   readonly snapshots: FeatureSnapshotStore;
   readonly slates: SlateRepository;
   readonly transactions: TransactionManager;
@@ -198,6 +205,7 @@ export function createSlateBuilder(
     hybrid,
     ranking,
     rerank,
+    fitOrdering,
     snapshots,
     slates,
     transactions,
@@ -271,6 +279,35 @@ export function createSlateBuilder(
           return { kind: "NO_ACTIVE_MANDATE" };
         }
         const ranked = rankedResult.ranked;
+        // Q.06: the order an investor reads agrees with the fit they read.
+        const eligibilityById = new Map(
+          eligible.map(
+            (c) => [c.companyId, c.eligibility.reasonCodes] as const,
+          ),
+        );
+        const fitOrdered =
+          fitOrdering === undefined
+            ? null
+            : await fitOrdering.order({
+                actor: query.actor,
+                investorOrganisationId: subject.investorOrganisationId,
+                mandateId: mandate.mandateId,
+                candidates: ranked.map((r) => ({
+                  companyId: r.companyId,
+                  baseRank: r.rank,
+                  eligibilityReasons: eligibilityById.get(r.companyId) ?? [],
+                })),
+              });
+        const baseOrder =
+          fitOrdered ??
+          ranked.map((r) => ({
+            companyId: r.companyId,
+            rank: r.rank,
+            internalScore: r.internalScore,
+          }));
+        const internalScoreById = new Map(
+          baseOrder.map((o) => [o.companyId, o.internalScore] as const),
+        );
 
         // REC-009. The build's own instant is what recency is measured
         // against, so the slate and the question "had they just seen it"
@@ -282,10 +319,10 @@ export function createSlateBuilder(
           mandateId: key.mandateId,
           mandateVersion: mandate.version,
           mode: key.mode,
-          ranked: ranked.map((r) => ({
-            companyId: r.companyId,
-            rank: r.rank,
-            internalScore: r.internalScore,
+          ranked: baseOrder.map((o) => ({
+            companyId: o.companyId,
+            rank: o.rank,
+            internalScore: o.internalScore,
           })),
           pool: eligible,
           evaluatedAt: generatedAt.toISOString(),
@@ -333,11 +370,15 @@ export function createSlateBuilder(
             return NewRecommendationItemSchema.parse({
               companyId: rc.companyId,
               companyTenantId: ref.companyTenantId,
-              // REC-009's position; REC-005's score, unchanged beside it. The
-              // base rank is not stored because it is recoverable exactly
-              // from the stored scores under REC-005's own tie-break.
+              // REC-009's position; the base order's score beside it (the
+              // fit score / 10 under fit-order.v1, else REC-005's). The base
+              // rank is not stored: it is recoverable from the stored scores
+              // under that order's own tie-break.
               rank: rc.rank,
-              internalScore: r.internalScore,
+              internalScore:
+                fitOrdered === null
+                  ? r.internalScore
+                  : (internalScoreById.get(rc.companyId) ?? null),
               // Reordering codes first: they are the few, and a pool with an
               // unusually wide set of scoring codes must not push out the
               // record of why an item moved.
@@ -363,7 +404,9 @@ export function createSlateBuilder(
               : null,
           featureSchemaVersion: FEATURE_SCHEMA_VERSION,
           rankerVersion: RANKER_VERSION,
-          rankingConfigVersion: rankedResult.diagnostics.rankingConfigVersion,
+          rankingConfigVersion:
+            fitOrdering?.version ??
+            rankedResult.diagnostics.rankingConfigVersion,
           taxonomyVersion: pool.context.taxonomyVersion,
         });
         const fingerprint = slateFingerprint({

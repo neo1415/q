@@ -773,6 +773,18 @@ export {
   type FitTopResult,
 } from "./fit/service.js";
 export {
+  FIT_ORDER_CURRENT,
+  FIT_ORDER_V1,
+  compareFitOrder,
+  createFitOrdering,
+  fitOrderScore,
+  orderByFit,
+  type FitOrderEntry,
+  type FitOrderKey,
+  type FitOrderedCandidate,
+  type FitOrdering,
+} from "./fit/order.js";
+export {
   createFitInputSource,
   stageLabel,
   type FitInputSourceDependencies,

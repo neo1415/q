@@ -12,7 +12,10 @@ import {
   type RelationshipQueryPort,
 } from "@capital-q/network";
 import type { Logger } from "@capital-q/observability";
-import type { DisclosureAccessService } from "@capital-q/permissions";
+import {
+  organisationPrincipal,
+  type DisclosureAccessService,
+} from "@capital-q/permissions";
 import {
   createPostgresTaxonomyAssignmentRepository,
   createPostgresTaxonomyReferenceRepository,
@@ -64,6 +67,9 @@ import {
   type SemanticCandidateService,
 } from "../semantic/service.js";
 import { createSlateBuilder, type SlateBuilder } from "../slates/builder.js";
+import type { FilterMoney } from "../slates/filters.js";
+import { createFitOrdering } from "../fit/order.js";
+import { createFitInputSource } from "./fit-inputs.js";
 import type { SlatePolicy } from "../slates/contracts.js";
 import type { RefreshRequestStore, SlateRepository } from "../slates/ports.js";
 import {
@@ -116,6 +122,23 @@ export type RecommendationPipelineDependencies = {
   readonly policy?: SlatePolicy | undefined;
   /** Re-approach after a post-meeting pass (doc 19 §67). Absent: it stays closed. */
   readonly materialChanges?: MaterialChangePort | undefined;
+  /**
+   * Each company's current ACTIVE raise (capital objective), unfiltered.
+   * The pipeline asks disclosure, as the investor ORGANISATION, before a
+   * raise can inform the fit order's cheque comparison: a founder_private
+   * raise never moves a company in an investor's feed (Context Firewall).
+   * Absent: cheque fit is unknown in the order, never a mismatch.
+   */
+  readonly currentRaises?:
+    | ((companyIds: readonly string[]) => Promise<
+        readonly {
+          readonly objectiveId: string;
+          readonly companyId: string;
+          readonly amount: string;
+          readonly currency: string;
+        }[]
+      >)
+    | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -385,12 +408,61 @@ export function createRecommendationPipeline(
   // REC-009R: the same state, asked at serving time. Demotion to the tail
   // orders a slate; only this keeps a passed company out of a page.
   const suppression = createProactiveSuppression({ signals });
+  const currentRaises = dependencies.currentRaises;
+  const fitOrdering = createFitOrdering({
+    clock,
+    inputs: createFitInputSource({
+      sql,
+      eligibilityPorts,
+      // Names are not an ordering input; eligibility already admitted ids.
+      identities: (companyIds) =>
+        Promise.resolve(
+          new Map(
+            companyIds.map((id) => [id, { name: id, shortDescription: null }]),
+          ),
+        ),
+      ...(currentRaises === undefined
+        ? {}
+        : {
+            raises: async (actor, companyIds) => {
+              const out = new Map<string, FilterMoney>();
+              if (actor.organisationId === undefined) return out;
+              const raises = await currentRaises(companyIds);
+              if (raises.length === 0) return out;
+              const principal = organisationPrincipal({
+                tenantId: actor.tenantId,
+                organisationId: actor.organisationId,
+              });
+              const decisions = await disclosure.evaluateMany(
+                raises.map((raise) => ({
+                  principal,
+                  resource: {
+                    type: "capital_objective" as const,
+                    id: raise.objectiveId,
+                  },
+                  requestedAccess: "view" as const,
+                })),
+              );
+              raises.forEach((raise, index) => {
+                if (decisions[index]?.outcome === "ALLOW") {
+                  out.set(raise.companyId, {
+                    amount: raise.amount,
+                    currency: raise.currency,
+                  });
+                }
+              });
+              return out;
+            },
+          }),
+    }),
+  });
   const builder = createSlateBuilder({
     ports: eligibilityPorts,
     pool: createPostgresDiscoverablePoolPort({ sql }),
     hybrid,
     ranking,
     rerank,
+    fitOrdering,
     snapshots,
     slates,
     transactions,

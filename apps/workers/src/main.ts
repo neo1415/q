@@ -25,6 +25,7 @@ import {
   createPostgresCapitalObjectiveTimes,
 } from "@capital-q/capital";
 import {
+  CompanyIdSchema,
   createCompanyService,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
@@ -541,6 +542,33 @@ const recommendations = createRecommendationPipeline({
       sql: database.sql,
     }).latestCreatedAt,
   }),
+  // Q.02/Q.06: the raise behind the fit order's cheque comparison. The
+  // pipeline asks disclosure as the investor organisation before using it.
+  currentRaises: async (companyIds) => {
+    const found = await Promise.all(
+      companyIds.map(async (raw) => {
+        const id = CompanyIdSchema.safeParse(raw);
+        if (!id.success) return null;
+        const company = await disclosurePorts.companies.findCanonicalCompany(
+          id.data,
+        );
+        if (company === null) return null;
+        const objective = await disclosurePorts.capital.getCurrentForCompany(
+          company.tenantId,
+          company.id,
+        );
+        return objective === null || objective.status !== "ACTIVE"
+          ? null
+          : {
+              objectiveId: objective.id,
+              companyId: objective.companyId,
+              amount: objective.target.amount,
+              currency: objective.target.currency,
+            };
+      }),
+    );
+    return found.filter((raise) => raise !== null);
+  },
   embedder: createEmbeddingService({
     provider: createLocalTeiEmbeddingProvider({
       baseUrl: embeddingConfig.baseUrl,
