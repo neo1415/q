@@ -217,6 +217,20 @@
     background-color: var(--cq-surface-subtle);
   }
 
+  /* A navigation group opening (2026-10-07): its items settle in. Opacity
+     and a few pixels only, so nothing outside the group moves twice. */
+  @media (prefers-reduced-motion: no-preference) {
+    .cq-nav-group-list:not([hidden]) {
+      animation: cq-nav-group-in var(--cq-motion-fast) var(--cq-ease);
+    }
+  }
+  @keyframes cq-nav-group-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
   .cq-shell-body {
     display: flex;
     min-width: 0;

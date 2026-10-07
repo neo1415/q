@@ -35,6 +35,8 @@ import {
   WORK_NAVIGATION,
   type NavigationItem,
 } from "./navigation";
+import { useNavGroups } from "./nav-group-state";
+import { NavGroupToggle } from "./nav-group-toggle";
 
 const TAB_CLASS =
   "relative flex h-full min-h-11 w-full flex-col items-center justify-center gap-1 px-0.5 text-[11px] leading-tight tracking-tight transition-colors duration-(--cq-motion-fast)";
@@ -156,6 +158,8 @@ function MoreSheet({
   const needsYou = (notices.items ?? []).filter(
     (item) => item.priority === "NEEDS_YOU" && !item.read,
   ).length;
+  // The same remembered groups as the desktop sidebar, closed by default.
+  const disclosure = useNavGroups(groups, pathname);
   const close = () => {
     setOpen(false);
   };
@@ -220,39 +224,61 @@ function MoreSheet({
               className="text-(--cq-text-tertiary)"
             />
           </Link>
-          {groups.map((group) => (
-            <div
-              key={group.label ?? "main"}
-              role="group"
-              aria-label={group.label ?? "Sections"}
-              className="mt-3"
-            >
-              {group.label === null ? null : (
-                <p
-                  aria-hidden="true"
-                  className="px-3 pb-1 cq-caption font-medium text-(--cq-text-tertiary)"
+          {groups.map((group) => {
+            const label = group.label;
+            const listId =
+              label === null ? undefined : `cq-more-group-${label}`;
+            const open = label === null || disclosure.isOpen(label);
+            const waiting = group.items.some(
+              (item) => item.href === WORK_NAVIGATION.href,
+            )
+              ? needsYou
+              : 0;
+            return (
+              <div
+                key={label ?? "main"}
+                role="group"
+                aria-label={label ?? "Sections"}
+                className="mt-3"
+              >
+                {label === null || listId === undefined ? null : (
+                  <NavGroupToggle
+                    label={label}
+                    open={open}
+                    controls={listId}
+                    waiting={waiting}
+                    size="large"
+                    onToggle={() => {
+                      disclosure.toggle(label);
+                    }}
+                  />
+                )}
+                <ul
+                  id={listId}
+                  hidden={!open}
+                  className={cx(
+                    "flex flex-col",
+                    label === null ? null : "cq-nav-group-list",
+                  )}
                 >
-                  {group.label}
-                </p>
-              )}
-              <ul className="flex flex-col">
-                {group.items.map((item) => (
-                  <li key={item.href}>
-                    <MoreLink
-                      item={item}
-                      active={isActiveRoute(pathname, item.href)}
-                      count={
-                        item.href === WORK_NAVIGATION.href
-                          ? needsYou
-                          : undefined
-                      }
-                      onNavigate={close}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+                  {group.items.map((item) => (
+                    <li key={item.href}>
+                      <MoreLink
+                        item={item}
+                        active={isActiveRoute(pathname, item.href)}
+                        count={
+                          item.href === WORK_NAVIGATION.href
+                            ? needsYou
+                            : undefined
+                        }
+                        onNavigate={close}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </nav>
         {verifyNudge === null ? null : (
           <div className="mt-3 border-t border-(--cq-border-subtle) pt-3">
