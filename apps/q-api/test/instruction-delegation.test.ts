@@ -691,7 +691,7 @@ describe("the switch is the person's own, on their own instruction", () => {
     const qWork = createQWorkPagePort((() => Promise.resolve([])) as never, {
       transactions: {
         run: (work: (context: typeof tx) => Promise<unknown>) => work(tx),
-      } as never,
+      },
       audit: {
         record: (
           _tx: unknown,
@@ -700,7 +700,7 @@ describe("the switch is the person's own, on their own instruction", () => {
           audited.push(input);
           return Promise.resolve(input.actionType as never);
         },
-      } as never,
+      },
     });
     return { qWork, audited, queries };
   }

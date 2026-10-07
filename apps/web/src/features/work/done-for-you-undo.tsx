@@ -8,8 +8,9 @@ import { unsendDoneForYouAction } from "./work-page-actions";
 
 /**
  * Scoped delegation: a message Q sent on its own can be unsent from Work
- * for a short while (the chat's own unsend, as the person). After that,
- * or once unsent, the button is gone and the words say why.
+ * for a short while (the chat's own unsend, as the person). The server
+ * offers it only inside that window (`until`, read when the page loads);
+ * once unsent, the words say so.
  */
 export function DoneForYouUndo({
   relationshipId,
@@ -30,7 +31,6 @@ export function DoneForYouUndo({
       </span>
     );
   }
-  if (Date.parse(until) <= Date.now()) return null;
   return (
     <span className="flex flex-wrap items-center gap-2">
       <Button
@@ -51,6 +51,17 @@ export function DoneForYouUndo({
       >
         Unsend
       </Button>
+      <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+        until{" "}
+        <time dateTime={until}>
+          {new Intl.DateTimeFormat("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "UTC",
+            timeZoneName: "short",
+          }).format(new Date(until))}
+        </time>
+      </span>
       {message === null ? null : (
         <span className="cq-caption text-(--cq-text-secondary)" role="status">
           {message}
