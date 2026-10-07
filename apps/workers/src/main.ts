@@ -160,10 +160,8 @@ import { withCommitmentNotices } from "./network/commitment-notice-handler.js";
 import { newlyReadyCompanyOf } from "./network/newly-ready-company.js";
 import { createStartupAlertWatcher } from "./network/startup-alert-watcher.js";
 import { withDiligenceSummaries } from "./network/diligence-summary-handler.js";
-import {
-  runUnreadDeckAlerts,
-  withDeckReadings,
-} from "./evidence/deck-reading-handler.js";
+import { withDeckReadings } from "./evidence/deck-reading-handler.js";
+import { runDeckReadingHeal } from "./evidence/deck-reading-backfill.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
@@ -1326,10 +1324,28 @@ await Promise.all([
   ...(deckReader === undefined
     ? []
     : [
-        runUnreadDeckAlerts({
+        // …and re-reads up to 10 of them per sweep (each once per process,
+        // at most $0.25 a sweep), so a missed reading heals itself.
+        runDeckReadingHeal({
           sql: database.sql,
           logger,
+          reading: {
+            sql: database.sql,
+            reader: deckReader,
+            store: createPostgresDataRoom(),
+            chunks: {
+              listActiveByVersion: (executor, tenantId, documentVersionId) =>
+                createPostgresChunkRepository().listActiveByVersion(
+                  executor,
+                  tenantId as never,
+                  documentVersionId as never,
+                ),
+            },
+            logger,
+          },
           intervalMs: 15 * 60 * 1000,
+          perSweep: 10,
+          maxUsdPerSweep: 0.25,
           signal: shutdownController.signal,
         }),
       ]),

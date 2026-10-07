@@ -10,7 +10,10 @@ import {
 import type { DatabaseExecutor } from "@capital-q/database";
 import { EVIDENCE_EVENTS } from "@capital-q/evidence/events";
 
-import { backfillDeckReadings } from "../src/evidence/deck-reading-backfill.js";
+import {
+  backfillDeckReadings,
+  runDeckReadingHeal,
+} from "../src/evidence/deck-reading-backfill.js";
 import {
   checkUnreadDecks,
   readyDocumentOf,
@@ -313,6 +316,43 @@ describe("deck readings", () => {
     });
     expect(result.stoppedForBudget).toBe(true);
     expect(result.outcomes[0]?.outcome).toBe("SKIPPED_BUDGET");
+    expect(h.asked).toHaveLength(0);
+  });
+
+  it("heal: re-reads an unread deck once per process, however many sweeps", async () => {
+    const h = harness(true);
+    const controller = new AbortController();
+    const run = runDeckReadingHeal({
+      reading: h.reading,
+      sql: h.sql,
+      logger: h.logger,
+      intervalMs: 5,
+      perSweep: 10,
+      maxUsdPerSweep: 0.25,
+      signal: controller.signal,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    controller.abort();
+    await run;
+    expect(h.asked).toHaveLength(1);
+    expect(h.stored).toHaveLength(1);
+  });
+
+  it("heal: reads nothing once the sweep's dollar cap is spent", async () => {
+    const h = harness(true, { spentUsd: 1.5 });
+    const controller = new AbortController();
+    const run = runDeckReadingHeal({
+      reading: h.reading,
+      sql: h.sql,
+      logger: h.logger,
+      intervalMs: 5,
+      perSweep: 10,
+      maxUsdPerSweep: 0.25,
+      signal: controller.signal,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    controller.abort();
+    await run;
     expect(h.asked).toHaveLength(0);
   });
 });

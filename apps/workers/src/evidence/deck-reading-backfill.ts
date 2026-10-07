@@ -1,7 +1,8 @@
 import type { DatabaseExecutor } from "@capital-q/database";
 
-import type { RunnerLogger } from "../outbox-runner.js";
+import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
 import {
+  checkUnreadDecks,
   listUnreadDecks,
   readDeckDocument,
   type DeckReadingOptions,
@@ -96,4 +97,74 @@ export async function backfillDeckReadings(options: {
     spentUsd: await spent(),
     stoppedForBudget,
   };
+}
+
+/**
+ * Q.08 self-heal: every sweep alerts on unread decks, then re-reads a few
+ * of them through the live path. A deck is tried at most once per process,
+ * so a deck that can never be read (no text, empty answer) is not paid for
+ * again on every sweep; the alert keeps naming it.
+ */
+export async function runDeckReadingHeal(options: {
+  readonly reading: DeckReadingOptions;
+  readonly sql: DatabaseExecutor;
+  readonly logger: RunnerLogger;
+  readonly intervalMs: number;
+  readonly perSweep: number;
+  readonly maxUsdPerSweep: number;
+  readonly signal: AbortSignal;
+}): Promise<void> {
+  const tried = new Set<string>();
+  let sweep = 0;
+  while (!options.signal.aborted) {
+    try {
+      await checkUnreadDecks(options.sql, options.logger);
+      const unread = await listUnreadDecks(options.sql, {
+        uploadedMinutesAgo: 0,
+        limit: DECK_BACKFILL_HARD_MAX,
+      });
+      const fresh = unread
+        .filter((deck) => !tried.has(deck.documentVersionId))
+        .slice(0, options.perSweep);
+      sweep += 1;
+      const prefix = `cor_deckheal_${String(Date.now())}_${String(sweep)}_`;
+      const spent = async (): Promise<number> => {
+        const rows = await options.sql<{ usd: string | null }[]>`
+          select sum(cost_usd)::text as usd from ai_ops.model_usage
+           where correlation_id like ${`${prefix}%`}`;
+        return Number(rows[0]?.usd ?? 0);
+      };
+      for (const [index, deck] of fresh.entries()) {
+        if (options.signal.aborted) break;
+        if ((await spent()) >= options.maxUsdPerSweep) break;
+        tried.add(deck.documentVersionId);
+        try {
+          const outcome = await readDeckDocument(
+            options.reading,
+            deck.documentId,
+            `${prefix}${String(index)}`,
+          );
+          options.logger.info(
+            {
+              documentVersionId: deck.documentVersionId,
+              outcome: outcome.kind,
+            },
+            "unread deck re-read",
+          );
+        } catch (error: unknown) {
+          options.logger.error(
+            {
+              documentVersionId: deck.documentVersionId,
+              err: error,
+              alert: "DECK_READING_FAILED",
+            },
+            "unread deck could not be re-read",
+          );
+        }
+      }
+    } catch (error: unknown) {
+      options.logger.warn({ err: error }, "deck reading heal sweep failed");
+    }
+    await abortableSleep(options.intervalMs, options.signal);
+  }
 }
