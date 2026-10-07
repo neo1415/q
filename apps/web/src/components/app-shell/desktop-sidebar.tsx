@@ -26,6 +26,8 @@ import {
   PRIMARY_NAVIGATION,
   WORK_NAVIGATION,
 } from "./navigation";
+import { useNavGroups } from "./nav-group-state";
+import { NavGroupToggle } from "./nav-group-toggle";
 import { sidebarCollapsed, type SidebarOverride } from "./sidebar-state";
 
 /**
@@ -57,6 +59,8 @@ export function DesktopSidebar({
   const groups = navigationGroupsFor(context.scope, { admin: context.admin });
   // What waits on them, from the shell's one notice read (no extra call).
   const needsYou = useNeedsYouCount();
+  // Workspace, You and Admin fold away, closed until opened (2026-10-07).
+  const disclosure = useNavGroups(groups, pathname);
 
   return (
     <aside
@@ -124,43 +128,64 @@ export function DesktopSidebar({
         )}
         data-sidebar-nav
       >
-        {groups.map((group) => (
-          <div
-            key={group.label ?? "main"}
-            role={group.label === null ? undefined : "group"}
-            aria-label={group.label ?? undefined}
-          >
-            {group.label === null || collapsed ? null : (
-              <p
-                aria-hidden="true"
-                className="px-3 pb-1 cq-caption font-medium text-(--cq-text-tertiary)"
-              >
-                {group.label}
-              </p>
-            )}
-            <ul
-              className={cx(
-                "flex flex-col gap-0.5",
-                collapsed ? "items-center" : null,
-              )}
+        {groups.map((group) => {
+          const label = group.label;
+          const listId =
+            label === null ? undefined : `cq-sidebar-group-${label}`;
+          const open = label === null || disclosure.isOpen(label);
+          const waiting = group.items.some(
+            (item) => item.href === WORK_NAVIGATION.href,
+          )
+            ? needsYou
+            : 0;
+          return (
+            <div
+              key={label ?? "main"}
+              role={label === null ? undefined : "group"}
+              aria-label={label ?? undefined}
+              className={collapsed ? "flex flex-col items-center" : undefined}
             >
-              {group.items.map((item) => (
-                <li key={item.href}>
-                  <SidebarLink
-                    href={item.href === "/home" ? home : item.href}
-                    label={item.label}
-                    Icon={item.icon}
-                    active={isActiveRoute(pathname, item.href)}
-                    compact={collapsed}
-                    count={
-                      item.href === WORK_NAVIGATION.href ? needsYou : undefined
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+              {label === null || listId === undefined ? null : (
+                <NavGroupToggle
+                  label={label}
+                  open={open}
+                  controls={listId}
+                  waiting={waiting}
+                  compact={collapsed}
+                  onToggle={() => {
+                    disclosure.toggle(label);
+                  }}
+                />
+              )}
+              <ul
+                id={listId}
+                hidden={!open}
+                className={cx(
+                  "flex flex-col gap-0.5",
+                  label === null ? null : "cq-nav-group-list",
+                  collapsed ? "items-center" : null,
+                )}
+              >
+                {group.items.map((item) => (
+                  <li key={item.href}>
+                    <SidebarLink
+                      href={item.href === "/home" ? home : item.href}
+                      label={item.label}
+                      Icon={item.icon}
+                      active={isActiveRoute(pathname, item.href)}
+                      compact={collapsed}
+                      count={
+                        item.href === WORK_NAVIGATION.href
+                          ? needsYou
+                          : undefined
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
       {/* The footer never widens the rail: folded, its icons stack in one

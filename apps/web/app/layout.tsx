@@ -48,9 +48,16 @@ const METADATA: Metadata = {
     title: "Capital Q",
     statusBarStyle: "default",
   },
+  // Gold on black, from one mark (scripts/brand/icons.mjs). The .ico is
+  // for agents that only ask for /favicon.ico; browsers prefer the SVG.
+  // `?v=gold` changes the URL so browsers' favicon caches, which outlive
+  // a deploy, fetch the new mark instead of the old blue one.
   icons: {
-    icon: "/icon.svg",
-    apple: "/icons/apple-touch-icon.png",
+    icon: [
+      { url: "/favicon.ico?v=gold", sizes: "16x16 32x32 48x48" },
+      { url: "/icon.svg?v=gold", type: "image/svg+xml" },
+    ],
+    apple: "/icons/apple-touch-icon.png?v=gold",
   },
   formatDetection: { telephone: false },
   // Next renders the standard `mobile-web-app-capable`; older iOS versions

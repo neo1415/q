@@ -46,6 +46,14 @@ export const SPLASH_DURATION_MS = 4_800;
 export { SPLASH_FORMATION_MS };
 const SPEED = SPLASH_DURATION_MS / SPLASH_FORMATION_MS;
 const TAU = Math.PI * 2;
+// Mirrors globals.css's dark --cq-splash-particle-* and --cq-splash-glow.
+const FALLBACK_PARTICLES: readonly string[] = [
+  "#8a6a12",
+  "#c9a227",
+  "#f1d690",
+  "#e2b858",
+];
+const FALLBACK_GLOW = "241, 214, 144";
 
 export function createCapitalQSplash(
   root: HTMLElement,
@@ -87,9 +95,16 @@ export function createCapitalQSplash(
     return seed / 4_294_967_296;
   };
 
-  const sprites = new Map<boolean, HTMLCanvasElement>();
+  // The splash's colours are its --cq-splash-* tokens (globals.css, black
+  // and gold since 2026-10-07), read from the element, never hard-coded
+  // here; the fallbacks are the dark palette, for a sheet that has not
+  // loaded.
+  let colors: readonly string[] = FALLBACK_PARTICLES;
+  let glow = FALLBACK_GLOW;
+  const sprites = new Map<string, HTMLCanvasElement>();
   function sprite(isLight: boolean): HTMLCanvasElement {
-    const cached = sprites.get(isLight);
+    const key = `${String(isLight)}:${glow}`;
+    const cached = sprites.get(key);
     if (cached !== undefined) return cached;
     const c = document.createElement("canvas");
     c.width = 48;
@@ -97,23 +112,15 @@ export function createCapitalQSplash(
     const g = c.getContext("2d");
     if (g !== null) {
       const grad = g.createRadialGradient(24, 24, 0, 24, 24, 24);
-      grad.addColorStop(
-        0,
-        isLight ? "rgba(33,94,207,.8)" : "rgba(193,226,255,1)",
-      );
-      grad.addColorStop(
-        0.13,
-        isLight ? "rgba(43,106,214,.5)" : "rgba(108,176,255,.65)",
-      );
-      grad.addColorStop(
-        0.42,
-        isLight ? "rgba(53,116,231,.13)" : "rgba(52,122,251,.18)",
-      );
-      grad.addColorStop(1, "rgba(40,103,235,0)");
+      const rgba = (alpha: number) => `rgba(${glow},${String(alpha)})`;
+      grad.addColorStop(0, rgba(isLight ? 0.8 : 1));
+      grad.addColorStop(0.13, rgba(isLight ? 0.5 : 0.65));
+      grad.addColorStop(0.42, rgba(isLight ? 0.13 : 0.18));
+      grad.addColorStop(1, rgba(0));
       g.fillStyle = grad;
       g.fillRect(0, 0, 48, 48);
     }
-    sprites.set(isLight, c);
+    sprites.set(key, c);
     return c;
   }
 
@@ -121,6 +128,14 @@ export function createCapitalQSplash(
     light =
       root.dataset["theme"] === "light" ||
       (root.dataset["theme"] === "system" && appearance.matches);
+    const style = getComputedStyle(root);
+    const read = (name: string) => style.getPropertyValue(name).trim();
+    const particles = [1, 2, 3, 4].map((i) =>
+      read(`--cq-splash-particle-${String(i)}`),
+    );
+    colors = particles.every((c) => c !== "") ? particles : FALLBACK_PARTICLES;
+    const g = read("--cq-splash-glow");
+    glow = /^\d{1,3},\s*\d{1,3},\s*\d{1,3}$/.test(g) ? g : FALLBACK_GLOW;
   }
 
   function measure() {
@@ -179,9 +194,6 @@ export function createCapitalQSplash(
       tagline.style.opacity = String(sub);
       tagline.style.transform = `translateY(${String((1 - sub) * 6)}px)`;
     }
-    const colors = light
-      ? ["#20457e", "#2c61ae", "#4081d4", "#3262a5"]
-      : ["#4872b5", "#78a9ec", "#b7d9ff", "#4e8ae0"];
     const glowSprite = sprite(light);
     const intro = smooth(ms / 550);
     const settle = smooth((ms - 3_200) / 1_100);
@@ -204,7 +216,7 @@ export function createCapitalQSplash(
       const pulse = reduced
         ? 0
         : Math.max(0, Math.sin((ms / p.period) * TAU + p.phase)) ** 12 * settle;
-      const colour = colors[p.tint] ?? "#78a9ec";
+      const colour = colors[p.tint] ?? "#c9a227";
       ctx.globalAlpha =
         intro *
         ((light ? 0.68 : 0.48) + p.tint * (light ? 0.08 : 0.13) + pulse * 0.12);

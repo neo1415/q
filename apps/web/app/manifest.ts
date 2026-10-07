@@ -29,9 +29,10 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    // The OS launch screen, in the splash's own navy, so an installed
-    // launch hands straight over to the particle splash (2026-09-29).
-    background_color: "#030916",
+    // The OS launch screen, in the splash's own stage black (the brand's
+    // black and gold, 2026-10-07), so an installed launch hands straight
+    // over to the particle splash: globals.css --cq-splash-bg.
+    background_color: "#0b0a08",
     theme_color: THEME_COLORS.light.canvas,
     categories: ["business", "finance", "productivity"],
     icons: [

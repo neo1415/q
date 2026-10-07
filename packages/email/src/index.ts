@@ -35,7 +35,9 @@ export const EMAIL_COLOURS = {
     secondary: "#4c5057", // --cq-text-secondary (8.1:1)
     tertiary: "#686c72", // --cq-text-tertiary (5.3:1, AA)
     border: "#dfe1e5", // --cq-border-subtle
-    accent: "#1767d1", // --cq-accent (5.3:1 on white; white on it 5.3:1)
+    // The brand's bronze, not the old blue (black and gold, 2026-10-07):
+    // the black_gold preset's light --cq-accent, 5.1:1 either way on white.
+    accent: "#8a6a12",
     onAccent: "#ffffff",
   },
   dark: {
@@ -46,7 +48,7 @@ export const EMAIL_COLOURS = {
     secondary: "#abaeb3", // --cq-text-secondary (dark, 8.0:1)
     tertiary: "#9a9da2", // lifted from #86898e to keep AA on #171b20
     border: "#26292e", // --cq-border-subtle (dark)
-    accent: "#66a5ff", // --cq-accent (dark)
+    accent: "#c9a227", // the black_gold preset's dark --cq-accent (gold)
     onAccent: "#0b0d12",
   },
 } as const;
