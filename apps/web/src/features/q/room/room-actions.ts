@@ -10,6 +10,7 @@ import {
   getGateqInboxItem,
   getQWork,
   getRelationshipWithCompany,
+  getReadiness,
   getRelationshipWithInvestor,
   listGateways,
   type ApiSession,
@@ -78,6 +79,83 @@ async function read(
     // Q room W5: the deck surface reads its own document (deck-actions).
     case "Q_DOCUMENT":
       return null;
+    // Q.03/Q.04/Q.01: the founder's own readiness, plan and questions,
+    // read through the same route as Capital and Home (founder-private).
+    case "READINESS":
+    case "ACTION_PLAN":
+    case "FOLLOW_UPS": {
+      const readiness = await getReadiness(session);
+      if (readiness.companyId.toLowerCase() !== id.toLowerCase()) return null;
+      if (intent.object === "READINESS") {
+        const words = {
+          STRONG: "Strong",
+          DEVELOPING: "Developing",
+          GAP: "Gap",
+          UNKNOWN: "Not shared yet",
+        } as const;
+        return {
+          heading: "What could stop your raise",
+          lead:
+            readiness.blockers.length === 0
+              ? "Nothing investors at your stage usually ask for first is missing."
+              : null,
+          facts: readiness.pillars.map((pillar) => ({
+            label: pillar.label,
+            value: words[pillar.status],
+          })),
+          items: readiness.blockers.map((blocker) => ({
+            id: blocker.id,
+            title: blocker.title,
+            meta: blocker.why,
+          })),
+          more: 0,
+          href,
+          open: "Open readiness",
+        };
+      }
+      if (intent.object === "ACTION_PLAN") {
+        const open = readiness.actions.filter(
+          (action) => action.state === "OPEN",
+        );
+        return {
+          heading: "Your action plan",
+          lead: null,
+          facts: [
+            { label: "To do", value: String(open.length) },
+            {
+              label: "Done",
+              value: String(readiness.actions.length - open.length),
+            },
+          ],
+          items: open.slice(0, ITEMS_MAX).map((action) => ({
+            id: action.key,
+            title: action.title,
+            meta: `${action.ownerLabel} · ${action.why}`,
+          })),
+          more: Math.max(0, open.length - ITEMS_MAX),
+          href,
+          open: "Open the plan",
+        };
+      }
+      const waiting = readiness.followUps.filter((item) => item.answerable);
+      return {
+        heading: "Q still wants to know",
+        lead:
+          waiting.length === 0 ? "Q has nothing left to ask right now." : null,
+        facts: [],
+        items: waiting.slice(0, ITEMS_MAX).map((item) => ({
+          id: item.questionId,
+          title: item.question,
+          meta:
+            item.quickAnswers.length === 0
+              ? null
+              : item.quickAnswers.join(" · "),
+        })),
+        more: Math.max(0, waiting.length - ITEMS_MAX),
+        href,
+        open: "Answer on Home",
+      };
+    }
     case "COMPANY_PROFILE": {
       const profile = await getCompanyProfile(session, id);
       const overview = profile.overview;

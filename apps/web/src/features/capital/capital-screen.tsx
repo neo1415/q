@@ -25,6 +25,12 @@ import {
 import { MandateSummary } from "./mandate-summary";
 import { RaiseTerms } from "./raise-terms";
 import { ReadinessBlueprintEntry } from "./readiness-blueprint-entry";
+import { ActionPlanBoard } from "@/features/readiness/action-plan-board";
+import { ownReadiness } from "@/features/readiness/readiness-data";
+import {
+  PrivateNote,
+  ReadinessSection,
+} from "@/features/readiness/readiness-section";
 
 /**
  * Capital (founder direction 2026-10-04: "is capital divided into
@@ -53,16 +59,22 @@ async function currentObjective(
 
 export async function CapitalScreen() {
   const context = await resolveOwnContext();
-  const [objective, relationships, ledger, mine] = await Promise.all([
-    context.kind === "FOUNDER"
-      ? currentObjective(context.companyId)
-      : Promise.resolve(null),
-    ownRelationships(context),
-    context.kind === "FOUNDER"
-      ? founderLedger(context.companyId)
-      : Promise.resolve(null),
-    context.kind === "INVESTOR" ? investorCommitments() : Promise.resolve(null),
-  ]);
+  const [objective, relationships, ledger, mine, readiness] = await Promise.all(
+    [
+      context.kind === "FOUNDER"
+        ? currentObjective(context.companyId)
+        : Promise.resolve(null),
+      ownRelationships(context),
+      context.kind === "FOUNDER"
+        ? founderLedger(context.companyId)
+        : Promise.resolve(null),
+      context.kind === "INVESTOR"
+        ? investorCommitments()
+        : Promise.resolve(null),
+      // Q.03/Q.04: founder-private; never read for an investor.
+      context.kind === "FOUNDER" ? ownReadiness() : Promise.resolve(null),
+    ],
+  );
 
   const asks =
     context.kind === "INVESTOR"
@@ -169,7 +181,41 @@ export async function CapitalScreen() {
         </PageSection>
       )}
 
-      {/* BILLING-2 block (ADR 0036): the Pro layer's entry point, not built yet. */}
+      {/*
+        Q.03/Q.04: the founder's readiness and action plan, founder-private
+        (design: docs/design/2026-10-07/founder-readiness).
+      */}
+      {context.kind === "FOUNDER" ? (
+        <>
+          <PageSection
+            id="readiness"
+            title="Readiness"
+            description="How ready your company looks to an investor today, from what you have shared. Each pillar in words, with the evidence behind it."
+          >
+            <div className="flex flex-col gap-4">
+              <PrivateNote />
+              {readiness === null ? (
+                <QuietEmpty sentence="Your readiness couldn't load." retry />
+              ) : (
+                <ReadinessSection readiness={readiness} />
+              )}
+            </div>
+          </PageSection>
+          <PageSection
+            id="action-plan"
+            title="Action plan"
+            description="Built from your readiness gaps. Steps close themselves when Q sees the evidence."
+          >
+            {readiness === null ? (
+              <QuietEmpty sentence="Your action plan couldn't load." retry />
+            ) : (
+              <ActionPlanBoard readiness={readiness} />
+            )}
+          </PageSection>
+        </>
+      ) : null}
+
+      {/* BILLING-2 block (ADR 0036): the Pro layer's entry point. */}
       {context.kind === "FOUNDER" ? <ReadinessBlueprintEntry /> : null}
       {/* end BILLING-2 block */}
 
