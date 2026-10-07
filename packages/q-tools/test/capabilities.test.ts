@@ -58,6 +58,7 @@ const EVERY_PORT: QToolPorts = {
   humanReviews: STUB,
   documents: { list: STUB, read: STUB },
   documentRevision: STUB,
+  documentEdit: STUB,
   // DOCS block.
   documentStudio: STUB,
   recordChanges: STUB,

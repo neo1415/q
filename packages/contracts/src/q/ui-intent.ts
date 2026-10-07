@@ -595,6 +595,8 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "set_onboarding_reminders",
   // A new version of their own private document; the earlier one is kept.
   "revise_my_document",
+  // Q room W5: a typed edit of their own private draft, a new version.
+  "edit_my_document",
   // AUTO block (ADR 0030): inside an approved delegation, the person's own
   // word -- stop, a time they chose, away/back -- acts at once.
   "stop_q_work",

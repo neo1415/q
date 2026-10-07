@@ -236,6 +236,13 @@ export const QDocumentToolResultSchema = z
         currentVersion: z.number().int().min(1),
       })
       .strict(),
+    /**
+     * Q room W5: the slide `edit_my_document` changed (1-based), so the
+     * room's viewer goes to it; and whether this was the same edit again
+     * (the version it already made, nothing new written).
+     */
+    slide: z.number().int().min(1).max(24).optional(),
+    replayed: z.boolean().optional(),
   })
   .strict();
 export type QDocumentToolResult = z.infer<typeof QDocumentToolResultSchema>;

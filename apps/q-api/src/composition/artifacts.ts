@@ -8,17 +8,22 @@ import {
   type ArtifactService,
 } from "@capital-q/q-artifacts";
 import {
+  applyDocumentEdit,
   createBriefReviser,
   createDeckPolisher,
+  editInstruction,
   latestArtifactIn,
   type ArtifactPreparation,
   type ArtifactPreparationPort,
   type DocumentPipelinePort,
   type StockPhotoPort,
 } from "@capital-q/q-specialists";
-import type { QDocumentPipelineStage } from "@capital-q/contracts";
+import type { QDocumentPipelineStage, QSlideImage } from "@capital-q/contracts";
 import type { QArtifactReviser } from "@capital-q/model-gateway/q";
-import type { DocumentRevisionPort } from "@capital-q/q-tools";
+import type {
+  DocumentEditPort,
+  DocumentRevisionPort,
+} from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 import type { PermittedContextPlan } from "@capital-q/contracts";
 
@@ -55,6 +60,8 @@ export type QArtifactsComposition = {
    * the documents list; the service still reads it as the actor.
    */
   readonly documentRevision: DocumentRevisionPort;
+  /** Q room W5: typed edits (`edit_my_document`), append-only. */
+  readonly documentEdit: DocumentEditPort;
 };
 
 export function createQArtifacts(dependencies: {
@@ -73,6 +80,33 @@ export function createQArtifacts(dependencies: {
    * the job for `waitMs`; IN_RUN: the run makes them itself (a stack with
    * no worker); STUDIO: the earlier in-run studio.
    */
+  /**
+   * Q room W5: their own uploaded picture, read as them, and filed for a
+   * document (`edit_my_document` USE_PICTURE). Absent: not offered.
+   */
+  readonly ownPictures?:
+    | {
+        readonly read: (
+          actor: ActorContext,
+          documentId: string,
+        ) => Promise<
+          | {
+              readonly bytes: Uint8Array;
+              readonly contentType: "image/png" | "image/jpeg";
+              readonly title: string;
+            }
+          | "NOT_READY"
+          | null
+        >;
+        readonly file: (input: {
+          readonly actor: ActorContext;
+          readonly bytes: Uint8Array;
+          readonly contentType: "image/png" | "image/jpeg";
+          readonly sourceDocumentId: string;
+          readonly alt: string;
+        }) => Promise<QSlideImage | null>;
+      }
+    | undefined;
   readonly documentPipeline?:
     | {
         readonly mode: "JOB" | "IN_RUN" | "STUDIO";
@@ -195,8 +229,102 @@ export function createQArtifacts(dependencies: {
   });
   const mode = dependencies.documentPipeline?.mode ?? "STUDIO";
 
+  const documentEdit: DocumentEditPort = {
+    edit: async (input) => {
+      try {
+        const detail = await service
+          .read(input.actor, input.artifactId)
+          .catch(() => null);
+        if (detail === null) return { status: "NOT_FOUND" };
+        const current = detail.current;
+        if (current === undefined || current === null) {
+          return { status: "NOT_EDITABLE" };
+        }
+        let refused: string | null = null;
+        const outcome = await service.editOwnDocument({
+          actorContext: input.actor,
+          artifactId: input.artifactId,
+          baseVersion: input.version ?? current.version,
+          instruction: editInstruction(input.edit),
+          runId: input.runId,
+          compose: async (base) => {
+            const edited = await applyDocumentEdit(
+              {
+                title: base.title,
+                summary: base.summary,
+                content: base.content,
+                type: detail.artifact.type,
+              },
+              input.edit,
+              {
+                photos: dependencies.photos,
+                ...(dependencies.ownPictures === undefined
+                  ? {}
+                  : {
+                      ownPicture: async (documentId: string) => {
+                        const pictures = dependencies.ownPictures;
+                        if (pictures === undefined) return null;
+                        const upload = await pictures.read(
+                          input.actor,
+                          documentId,
+                        );
+                        if (upload === null || upload === "NOT_READY") {
+                          return upload;
+                        }
+                        return pictures.file({
+                          actor: input.actor,
+                          bytes: upload.bytes,
+                          contentType: upload.contentType,
+                          sourceDocumentId: documentId,
+                          alt: upload.title,
+                        });
+                      },
+                    }),
+                ...(input.signal === undefined ? {} : { signal: input.signal }),
+              },
+            );
+            if (edited.status === "NOT_APPLICABLE") {
+              refused = edited.reason;
+              return null;
+            }
+            return edited.composed;
+          },
+        });
+        if (outcome.status !== "EDITED" && outcome.status !== "REPLAYED") {
+          if (outcome.status === "STALE") return { status: "STALE" };
+          const reason: string | null = refused;
+          return reason === null
+            ? { status: "NOT_EDITABLE" }
+            : { status: "NOT_APPLICABLE", reason };
+        }
+        return {
+          status: outcome.status,
+          artifactId: outcome.detail.artifact.artifactId,
+          type: outcome.detail.artifact.type,
+          artifactStatus: outcome.detail.artifact.status,
+          title: outcome.detail.artifact.title,
+          version: outcome.detail.artifact.currentVersion,
+          slide:
+            input.edit.kind === "MOVE_SLIDE"
+              ? input.edit.to
+              : input.edit.kind === "REMOVE_SLIDE"
+                ? Math.max(1, input.edit.slide - 1)
+                : input.edit.slide,
+        };
+      } catch (error: unknown) {
+        if (input.signal?.aborted === true) throw error;
+        dependencies.logger?.warn(
+          { err: error, qRunId: input.runId },
+          "edit_my_document did not complete",
+        );
+        return { status: "FAILED" };
+      }
+    },
+  };
+
   return {
     service,
+    documentEdit,
     documentRevision: {
       revise: async (input) => {
         try {

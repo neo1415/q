@@ -2733,6 +2733,25 @@ export function createModelGatewayQAnswer(
         // The latest revision's card replaces an earlier one in this answer.
         if (at >= 0) clientActionBlocks.splice(at, 1, block);
         else clientActionBlocks.push(block);
+        // Q room W5: an edit by slide takes the room's viewer to that slide.
+        if (read.data.slide !== undefined) {
+          const go: QResultBlock = {
+            kind: "UI_INTENT",
+            intent: {
+              kind: "DOCUMENT_ACT",
+              act: "GO_TO_PAGE",
+              page: read.data.slide,
+            },
+          };
+          const seen = clientActionBlocks.findIndex(
+            (known) =>
+              known.kind === "UI_INTENT" &&
+              known.intent.kind === "DOCUMENT_ACT" &&
+              known.intent.act === "GO_TO_PAGE",
+          );
+          if (seen >= 0) clientActionBlocks.splice(seen, 1, go);
+          else clientActionBlocks.push(go);
+        }
       };
       // Public sources this run read, attached to the answer as structured
       // sources (CQ-Q-VOICE-001 R3; R23). Public fields only.

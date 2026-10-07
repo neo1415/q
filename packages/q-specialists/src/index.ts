@@ -206,6 +206,15 @@ export {
 
 // Q room W5 (R8): the document pipeline.
 export { visibleStageOf } from "./company/prepare-artifact.js";
+export {
+  applyDocumentEdit,
+  editInstruction,
+  fillInstruction,
+  fillPlaceholder,
+  groundingOf,
+  type ComposedDocument,
+  type DocumentEditOutcome,
+} from "./company/document-edits.js";
 export type { DocumentPipelinePort } from "./company/artifact-port.js";
 export {
   addGapPlaceholders,

@@ -66,6 +66,8 @@ const CORE = [
   "list_my_relationships",
   // Founder directive 2026-09-28: "change my deck" can come mid-anything.
   "revise_my_document",
+  // Q room W5: "make slide 3 shorter" can come mid-anything too.
+  "edit_my_document",
   // AUTO (ADR 0030): "what are you working on" and "stop" from any turn.
   "list_q_work",
   "stop_q_work",

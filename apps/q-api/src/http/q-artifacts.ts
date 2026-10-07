@@ -1,10 +1,16 @@
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
+  FillQArtifactPlaceholderRequestSchema,
   ListQArtifactsQuerySchema,
   ListQArtifactsResponseSchema,
   parseContract,
   generatedImageId,
+  Q_ARTIFACT_PLACEHOLDERS_SUFFIX,
+  Q_ARTIFACT_PROGRESS_SUFFIX,
+  Q_DOCUMENT_PIPELINE_STAGE_LINES,
+  QDocumentPipelineProgressSchema,
+  type QSlideImage,
   Q_ARTIFACT_EXPORT_SUFFIX,
   Q_ARTIFACT_VERSIONS_SUFFIX,
   Q_ARTIFACTS_PATH,
@@ -20,6 +26,7 @@ import {
   deckToSvg,
   layOutDeck,
   slideImageBoxes,
+  slidePlaceholderBoxes,
   renderArtifactFile,
   type ArtifactFile,
   type BrandInput,
@@ -30,6 +37,7 @@ import {
   ArtifactNotFoundError,
   type ArtifactService,
 } from "@capital-q/q-artifacts";
+import { fillInstruction, fillPlaceholder } from "@capital-q/q-specialists";
 
 import {
   getActorContext,
@@ -93,6 +101,35 @@ export type QArtifactRoutesDependencies = ActorContextDependencies & {
     | undefined;
   /** As on the run routes: a person with no organisation yet still has a session. */
   readonly identity?: ApplicationIdentityLookup | undefined;
+  /**
+   * Q room W5 (R8): a picture dropped on a placeholder. `read` reads the
+   * person's own upload as them (their organisation's document, a PNG or
+   * JPEG that has been through the malware step); `file` copies it into
+   * the document's private image store. Absent: no dropping.
+   */
+  readonly ownPictures?:
+    | {
+        readonly read: (
+          actor: ActorContext,
+          documentId: string,
+        ) => Promise<
+          | {
+              readonly bytes: Uint8Array;
+              readonly contentType: "image/png" | "image/jpeg";
+              readonly title: string;
+            }
+          | "NOT_READY"
+          | null
+        >;
+        readonly file: (input: {
+          readonly actor: ActorContext;
+          readonly bytes: Uint8Array;
+          readonly contentType: "image/png" | "image/jpeg";
+          readonly sourceDocumentId: string;
+          readonly alt: string;
+        }) => Promise<QSlideImage | null>;
+      }
+    | undefined;
 };
 
 function artifactIdParam(request: FastifyRequest): string {
@@ -347,10 +384,16 @@ export function registerQArtifactRoutes(
           }),
         )
       ).filter((box) => box !== null);
+      // Q room W5: where each placeholder is drawn, with its label, for
+      // the room's drop targets.
+      const placeholders = slidePlaceholderBoxes(laid).map((box) => ({
+        ...box,
+        label: deck.slides[box.slide]?.placeholder?.label ?? "",
+      }));
       return reply
         .code(200)
         .header("cache-control", "no-store")
-        .send({ slides: [...deckToSvg(laid)], images });
+        .send({ slides: [...deckToSvg(laid)], images, placeholders });
     },
   );
 
@@ -419,6 +462,132 @@ export function registerQArtifactRoutes(
           `attachment; filename="${fileNameFor(found.version.title, file.extension)}"`,
         )
         .send(Buffer.from(file.bytes));
+    },
+  );
+
+  /**
+   * Q room W5 (R8): where a document Q is making has got to, for the
+   * room's progress line. Their organisation's job only; 404 otherwise.
+   */
+  app.get(
+    `${artifactPath}${Q_ARTIFACT_PROGRESS_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const progress = await artifacts.documentProgress(
+        getActorContext(request),
+        artifactIdParam(request),
+      );
+      if (progress === null) return reply.code(404).send(notFound());
+      return reply
+        .code(200)
+        .header("cache-control", "no-store")
+        .send(
+          QDocumentPipelineProgressSchema.parse({
+            artifactId: progress.artifactId,
+            stage: progress.stage,
+            line: Q_DOCUMENT_PIPELINE_STAGE_LINES[progress.stage],
+            updatedAt: progress.updatedAt,
+          }),
+        );
+    },
+  );
+
+  /**
+   * Q room W5 (R8): a picture the person dropped on a placeholder. The
+   * file went through the ordinary upload path (into their data room,
+   * with its visibility); this copies it into the document's private
+   * image store and writes a new version of the version they were
+   * looking at. Idempotent: the same slide of the same version replays.
+   */
+  app.post(
+    `${artifactPath}${Q_ARTIFACT_PLACEHOLDERS_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const pictures = dependencies.ownPictures;
+      if (pictures === undefined) return reply.code(404).send(notFound());
+      const body = parseContract(
+        FillQArtifactPlaceholderRequestSchema,
+        request.body ?? {},
+        "The placeholder request is not valid.",
+      );
+      const actor = getActorContext(request);
+      const artifactId = artifactIdParam(request);
+      const upload = await pictures.read(actor, body.documentId);
+      if (upload === "NOT_READY") {
+        return reply.code(409).send({
+          type: "about:blank",
+          title: "Not ready",
+          status: 409,
+          code: "UPLOAD_NOT_READY",
+          detail: "The picture is still being checked. Try again in a moment.",
+        });
+      }
+      if (upload === null) {
+        return reply.code(422).send({
+          type: "about:blank",
+          title: "Not a picture",
+          status: 422,
+          code: "NOT_A_PICTURE",
+          detail: "Only your own PNG or JPEG pictures can go on a slide.",
+        });
+      }
+      let refused: string | null = null;
+      let outcome: Awaited<ReturnType<ArtifactService["editOwnDocument"]>>;
+      try {
+        const type = (await artifacts.read(actor, artifactId)).artifact.type;
+        outcome = await artifacts.editOwnDocument({
+          actorContext: actor,
+          artifactId,
+          baseVersion: body.version,
+          instruction: fillInstruction(body.slide),
+          runId: null,
+          compose: async (current) => {
+            const picture = await pictures.file({
+              actor,
+              bytes: upload.bytes,
+              contentType: upload.contentType,
+              sourceDocumentId: body.documentId,
+              alt: upload.title,
+            });
+            if (picture === null) {
+              refused = "The picture could not be stored.";
+              return null;
+            }
+            const filled = fillPlaceholder(
+              { ...current, type },
+              body.slide,
+              picture,
+            );
+            if (filled.status === "NOT_APPLICABLE") {
+              refused = filled.reason;
+              return null;
+            }
+            return filled.composed;
+          },
+        });
+      } catch (error) {
+        if (error instanceof ArtifactNotFoundError) {
+          return reply.code(404).send(notFound());
+        }
+        throw error;
+      }
+      if (outcome.status === "EDITED" || outcome.status === "REPLAYED") {
+        return reply.code(200).send({
+          status: outcome.status === "EDITED" ? "FILLED" : "REPLAYED",
+          version: outcome.detail.artifact.currentVersion,
+        });
+      }
+      const reason: string | null = refused;
+      return reply.code(409).send({
+        type: "about:blank",
+        title: "Not filled",
+        status: 409,
+        code: outcome.status === "STALE" ? "CHANGED_SINCE" : "NOT_FILLABLE",
+        detail:
+          outcome.status === "STALE"
+            ? "The document changed since you opened it. Open it again and drop the picture there."
+            : (reason ?? "That document cannot take a picture there."),
+      });
     },
   );
 

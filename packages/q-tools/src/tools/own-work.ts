@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   Q_TASK_CLASSES,
   QArtifactIdSchema,
+  QDocumentEditSchema,
   QArtifactStatusSchema,
   QArtifactTypeSchema,
   type PermittedContextPlan,
@@ -18,6 +19,7 @@ import {
 import { actorWideScope } from "../plan.js";
 import type {
   ApprovalInboxPort,
+  DocumentEditPort,
   DocumentRevisionPort,
   OwnDocumentsPort,
 } from "../ports.js";
@@ -34,6 +36,7 @@ export const LIST_PENDING_APPROVALS = "approvals.pending.list" as const;
 export const LIST_MY_DOCUMENTS = "documents.own.list" as const;
 export const READ_MY_DOCUMENT = "documents.own.read" as const;
 export const REVISE_MY_DOCUMENT = "documents.own.revise" as const;
+export const EDIT_MY_DOCUMENT = "documents.own.edit" as const;
 
 /** A person, in their own Q conversation. */
 function ownConversation(
@@ -411,10 +414,128 @@ export function createReviseMyDocumentTool(
   });
 }
 
+// --- Q room W5: a typed edit of one of their documents ---------------------
+
+export const EditMyDocumentInputSchema = z
+  .object({
+    artifactId: QArtifactIdSchema.describe(
+      "The document: its id from its card, the Q room, or list_my_documents.",
+    ),
+    version: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        "The version on their screen, when known (the room says it); the edit applies to that version.",
+      ),
+    edit: QDocumentEditSchema.describe(
+      "One change. slide counts from 1 as they do (the page open in the room when they say 'this slide'). SHORTEN: fewer words. CHANGE_TITLE: the new title in their words (slide 1 is the cover and the document's name). SWAP_IMAGE: a different picture. REMOVE_IMAGE. REMOVE_SLIDE. MOVE_SLIDE: to the position in `to`.",
+    ),
+  })
+  .strict();
+export type EditMyDocumentInput = z.infer<typeof EditMyDocumentInputSchema>;
+
+export const EditMyDocumentOutputSchema = z.discriminatedUnion("status", [
+  // The same shape as revise_my_document's, so the answer carries the
+  // document's card (and the room goes to the slide).
+  z
+    .object({
+      status: z.literal("DOCUMENT_UPDATED"),
+      document: RevisedDocumentSchema,
+      slide: z.number().int().min(1).max(24),
+      replayed: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("NOT_APPLICABLE"),
+      reason: z.string().trim().min(1).max(200),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.enum(["CHANGED_SINCE", "NOT_FOUND", "NOT_EDITABLE", "FAILED"]),
+    })
+    .strict(),
+]);
+export type EditMyDocumentOutput = z.infer<typeof EditMyDocumentOutputSchema>;
+
+/**
+ * Q room W5 (R8): endless edits by voice or text, typed. Each writes a
+ * new version of the person's own private draft (append-only; the old
+ * version stays), so it is INSTANT like revising one: ADR 0013 puts the
+ * consequential boundary at share and send, where approval binds to the
+ * exact payload. The artifact service finds the document as the actor
+ * and the same edit of the same version replays rather than repeats.
+ */
+export function createEditMyDocumentTool(
+  port: DocumentEditPort,
+): AnyQToolDefinition {
+  return defineQTool<EditMyDocumentInput, EditMyDocumentOutput, null>({
+    ...OWN,
+    id: EDIT_MY_DOCUMENT,
+    core: true,
+    providerName: "edit_my_document",
+    description:
+      "Makes one specific change to a document Q made for them, by slide: 'make slide 3 shorter', 'swap this image', 'change the title to ...', 'remove slide 5', 'move the team slide to the end', 'use my team photo on slide 4' (USE_PICTURE with the photo's document id from their data room). Writes a new version (the old one is kept) and the room goes to that slide. For a change that is not one of these (rewrite, restyle, add content), use revise_my_document. replayed: it was already done. CHANGED_SINCE: the document changed after the version named; read it again. NOT_APPLICABLE: say the reason.",
+    classification: "SIDE_EFFECT",
+    riskClass: "LOW_RISK_INTERNAL",
+    visibleStage: "REVISING_DOCUMENT",
+    input: EditMyDocumentInputSchema,
+    output: EditMyDocumentOutputSchema,
+    authorize: (_input, { actor, plan }) =>
+      Promise.resolve(
+        ownConversation(actor, plan)
+          ? allow<null>("CONFIDENTIAL", null)
+          : deny<null>("NOT_AVAILABLE"),
+      ),
+    execute: async (input, context) => {
+      const outcome = await port.edit({
+        actor: context.actor,
+        plan: context.plan,
+        runId: context.runId,
+        artifactId: input.artifactId,
+        ...(input.version === undefined ? {} : { version: input.version }),
+        edit: input.edit,
+        ...(context.signal === undefined ? {} : { signal: context.signal }),
+      });
+      switch (outcome.status) {
+        case "EDITED":
+        case "REPLAYED": {
+          const parsed = EditMyDocumentOutputSchema.safeParse({
+            status: "DOCUMENT_UPDATED",
+            document: {
+              artifactId: outcome.artifactId,
+              type: outcome.type,
+              status: outcome.artifactStatus,
+              title: outcome.title.slice(0, 160),
+              currentVersion: outcome.version,
+            },
+            slide: outcome.slide,
+            replayed: outcome.status === "REPLAYED",
+          });
+          return parsed.success ? parsed.data : { status: "FAILED" };
+        }
+        case "NOT_APPLICABLE":
+          return {
+            status: "NOT_APPLICABLE",
+            reason: outcome.reason.slice(0, 200),
+          };
+        case "STALE":
+          return { status: "CHANGED_SINCE" };
+        default:
+          return { status: outcome.status };
+      }
+    },
+  });
+}
+
 export function createOwnWorkTools(ports: {
   readonly approvalInbox?: ApprovalInboxPort | undefined;
   readonly documents?: OwnDocumentsPort | undefined;
   readonly documentRevision?: DocumentRevisionPort | undefined;
+  readonly documentEdit?: DocumentEditPort | undefined;
 }): readonly AnyQToolDefinition[] {
   return [
     ...(ports.approvalInbox === undefined
@@ -431,5 +552,8 @@ export function createOwnWorkTools(ports: {
     ...(ports.documentRevision === undefined
       ? []
       : [createReviseMyDocumentTool(ports.documentRevision)]),
+    ...(ports.documentEdit === undefined
+      ? []
+      : [createEditMyDocumentTool(ports.documentEdit)]),
   ];
 }

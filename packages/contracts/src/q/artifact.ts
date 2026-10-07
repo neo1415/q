@@ -813,6 +813,93 @@ export type ReviseQArtifactRequest = z.infer<
   typeof ReviseQArtifactRequestSchema
 >;
 
+// --- Q room W5 (R8): typed edits ---------------------------------------------
+
+/**
+ * One edit of a document Q made, typed: "make slide 3 shorter", "swap this
+ * image", "change the title". Slides are counted from 1 as a person
+ * counts them (for a document without slides, its sections). Each edit
+ * writes a new version from the version the person was looking at; none
+ * adds a figure the document does not already carry.
+ */
+export const Q_DOCUMENT_EDIT_KINDS = [
+  "SHORTEN",
+  "CHANGE_TITLE",
+  "SWAP_IMAGE",
+  "REMOVE_IMAGE",
+  "REMOVE_SLIDE",
+  "MOVE_SLIDE",
+  "USE_PICTURE",
+] as const;
+const EditSlideSchema = z.number().int().min(1).max(Q_ARTIFACT_SECTIONS_MAX);
+export const QDocumentEditSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("SHORTEN"), slide: EditSlideSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("CHANGE_TITLE"),
+      slide: EditSlideSchema,
+      title: z.string().trim().min(1).max(Q_ARTIFACT_TITLE_MAX),
+    })
+    .strict(),
+  z.object({ kind: z.literal("SWAP_IMAGE"), slide: EditSlideSchema }).strict(),
+  z
+    .object({ kind: z.literal("REMOVE_IMAGE"), slide: EditSlideSchema })
+    .strict(),
+  z
+    .object({ kind: z.literal("REMOVE_SLIDE"), slide: EditSlideSchema })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("MOVE_SLIDE"),
+      slide: EditSlideSchema,
+      to: EditSlideSchema,
+    })
+    .strict(),
+  /**
+   * One of their own uploaded pictures (a data-room document) on a slide:
+   * what a drop on a placeholder does, and what Q does when asked to "use
+   * my team photo on slide 4".
+   */
+  z
+    .object({
+      kind: z.literal("USE_PICTURE"),
+      slide: EditSlideSchema,
+      documentId: UuidSchema,
+    })
+    .strict(),
+]);
+export type QDocumentEdit = z.infer<typeof QDocumentEditSchema>;
+
+/**
+ * PUBLIC. A picture dropped on a slide's placeholder in the Q room: the
+ * person's own upload (already in their data room through the ordinary
+ * upload path), placed on the version they were looking at.
+ */
+export const FillQArtifactPlaceholderRequestSchema = z
+  .object({
+    version: z.number().int().min(1),
+    slide: EditSlideSchema,
+    documentId: UuidSchema,
+  })
+  .strict();
+export type FillQArtifactPlaceholderRequest = z.infer<
+  typeof FillQArtifactPlaceholderRequestSchema
+>;
+
+export const FillQArtifactPlaceholderResponseSchema = z
+  .object({
+    status: z.enum(["FILLED", "REPLAYED"]),
+    version: z.number().int().min(1),
+  })
+  .strict();
+export type FillQArtifactPlaceholderResponse = z.infer<
+  typeof FillQArtifactPlaceholderResponseSchema
+>;
+
+/** PUBLIC. Where a document Q is making has got to (the room polls it). */
+export const Q_ARTIFACT_PROGRESS_SUFFIX = "/progress" as const;
+export const Q_ARTIFACT_PLACEHOLDERS_SUFFIX = "/placeholders" as const;
+
 export const ListQArtifactsResponseSchema = z
   .object({
     items: z.array(QArtifactSummarySchema).max(100),

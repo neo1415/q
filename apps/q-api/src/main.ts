@@ -80,6 +80,10 @@ import {
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
+import {
+  createOwnPictureReader,
+  createSupabaseObjectReader,
+} from "./composition/own-pictures.js";
 import { accountPausedEmail, callInviteEmail } from "./composition/emails.js";
 import {
   createDocumentImages,
@@ -2522,6 +2526,10 @@ const qTools = createQTools({
     // Revising one of their documents into a new version (founder
     // directive 2026-09-28). A closure: the artifact composition is built
     // further down, and only called once a run is under way.
+    // Q room W5: typed edits of their own document.
+    documentEdit: {
+      edit: (input) => qArtifacts.documentEdit.edit(input),
+    },
     documentRevision: {
       revise: (input) => qArtifacts.documentRevision.revise(input),
     },
@@ -3154,7 +3162,25 @@ const documentStudio = createDocumentsModule({
  * the preparation port: a person who asks Q for a brief gets one written
  * inside their own run, under that run's own authorised plan.
  */
+// Q room W5 (R8): a picture of their own on a slide (dropped on a
+// placeholder, or "use my team photo on slide 4"): their upload, read as
+// them, copied into the document's private image store.
+const ownPictures =
+  config.secrets.supabaseSecretKey === undefined ||
+  config.supabaseAuth === undefined
+    ? undefined
+    : {
+        read: createOwnPictureReader({
+          sql: database.sql,
+          storage: createSupabaseObjectReader({
+            supabaseUrl: config.supabaseAuth.url,
+            secretKey: config.secrets.supabaseSecretKey,
+          }),
+        }),
+        file: documentImages.fileOwnPicture,
+      };
 const qArtifacts = createQArtifacts({
+  ...(ownPictures === undefined ? {} : { ownPictures }),
   sql: database.sql,
   transactions: database.transactions,
   gateway: modelGateway,
@@ -5161,6 +5187,9 @@ const { app, logger: appLogger } = createApp(
     qRuntime,
     artifacts: qArtifacts.service,
     documentStudio,
+    // Q room W5 (R8): a picture dropped on a placeholder (their own
+    // upload, read as them, copied into the document's image store).
+    ...(ownPictures === undefined ? {} : { ownPictures }),
     recommendationExplanations,
     // MATCH block (ADR 0052): /v1/fit.
     fit: fitComposition,
