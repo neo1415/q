@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { z } from "zod";
 
 import {
@@ -9,7 +11,9 @@ import {
   listPendingQApprovals,
   listQWorkDone,
   listQWorkSuggestions,
+  setQWorkDelegation,
   setQWorkPaused,
+  unsendChatMessage,
   type ApiSession,
 } from "@capital-q/api-client";
 import {
@@ -98,6 +102,54 @@ export async function setPausedAction(
       return null;
     },
     paused ? "Q couldn't pause that. Try again." : "Q couldn't resume that.",
+  );
+}
+
+/**
+ * Scoped delegation: the person's own switch. On, Q replies, follows up
+ * and sets meetings there without asking; off, it asks first again.
+ */
+export async function setDelegationAction(
+  delegationId: string,
+  enabled: boolean,
+): Promise<PageResult<null>> {
+  const id = Id.safeParse(delegationId);
+  if (!id.success) return NOT_FOUND;
+  return run(
+    await apiSession(),
+    async (session) => {
+      await setQWorkDelegation(session, id.data, enabled === true);
+      return null;
+    },
+    enabled
+      ? "That didn't switch on. Try again."
+      : "That didn't switch off. Try again.",
+  );
+}
+
+/**
+ * Undo a message Q sent on its own: the chat's own unsend, as the person
+ * (the API refuses anything not theirs).
+ */
+export async function unsendDoneForYouAction(
+  relationshipId: string,
+  messageId: string,
+): Promise<PageResult<null>> {
+  const relationship = Id.safeParse(relationshipId);
+  const message = Id.safeParse(messageId);
+  if (!relationship.success || !message.success) return NOT_FOUND;
+  return run(
+    await apiSession(),
+    async (session) => {
+      await unsendChatMessage(
+        session,
+        relationship.data,
+        message.data,
+        `web:unsend:${randomUUID()}`,
+      );
+      return null;
+    },
+    "That message couldn't be unsent.",
   );
 }
 
