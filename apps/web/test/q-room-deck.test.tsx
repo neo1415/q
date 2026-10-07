@@ -19,6 +19,7 @@ import {
   uploadTarget,
   type DeckDrawing,
 } from "../src/features/q/room/deck-room";
+import { roomStage } from "../src/features/q/room/room-stage";
 import { currentScreen } from "../src/features/q/screen";
 
 /**
@@ -313,5 +314,44 @@ describe("the deck surface on screen", () => {
     expect(
       screen.getByText("Finding pictures and drawing charts from your numbers"),
     ).toBeTruthy();
+  });
+});
+
+describe("a document Q made opens in the room", () => {
+  const ref = (type: string): QResultBlock =>
+    ({
+      kind: "ARTIFACT_REFERENCE",
+      artifactId: ARTIFACT,
+      type,
+      status: "PREPARING",
+      title: "Northstar deck",
+    }) as QResultBlock;
+  const person = (n: number, text: string) =>
+    ({ kind: "PERSON", id: `p${String(n)}`, text }) as unknown as QTurn;
+
+  it("a deck's card opens the deck surface; a brief's does not", () => {
+    expect(
+      roomStage([person(0, "Draft my deck"), q(1, [ref("PITCH_DECK")])]).open
+        ?.intent,
+    ).toEqual({
+      kind: "SHOW_IN_Q_ROOM",
+      object: "Q_DOCUMENT",
+      id: ARTIFACT,
+      title: "Northstar deck",
+    });
+    expect(
+      roomStage([person(0, "Write a brief"), q(1, [ref("INVESTMENT_BRIEF")])])
+        .open,
+    ).toBeNull();
+  });
+
+  it("a new version keeps the surface where it is (it is not reopened)", () => {
+    const stage = roomStage([
+      person(0, "Draft my deck"),
+      q(1, [ref("PITCH_DECK")]),
+      person(2, "Make slide 3 shorter"),
+      q(3, [ref("PITCH_DECK")]),
+    ]);
+    expect(stage.open?.openedAt).toBe(1);
   });
 });
