@@ -17,6 +17,7 @@ import type {
   RelationshipStatusDto,
   RelationshipSummaryDto,
   VisibilityStateDto,
+  QDocumentEdit,
 } from "@capital-q/contracts";
 import type { DisclosureAccessService } from "@capital-q/permissions";
 import type {
@@ -421,6 +422,8 @@ export type QToolPorts = {
   readonly documents?: OwnDocumentsPort | undefined;
   /** Revising one of their own documents into a new version. */
   readonly documentRevision?: DocumentRevisionPort | undefined;
+  /** Q room W5: a typed edit of one of their own documents. */
+  readonly documentEdit?: DocumentEditPort | undefined;
   /** DOCS: brand kit, a document's audit, their brand applied. */
   readonly documentStudio?: DocumentStudioPort | undefined;
   /** R33: changes to their own records, for approval. */
@@ -952,6 +955,41 @@ export type DocumentRevisionPort = {
         readonly currentVersion: number;
       }
     | { readonly status: "NOT_FOUND" | "NOT_REVISABLE" | "FAILED" }
+  >;
+};
+
+/**
+ * Q room W5 (R8): one typed edit ("make slide 3 shorter", "swap this
+ * image", "change the title") of the person's own document, from the
+ * version they were looking at, written as a new version through the
+ * artifact service (append-only). The same edit of the same version
+ * replays the version it already made; a version that is no longer
+ * current is STALE, never silently edited.
+ */
+export type DocumentEditPort = {
+  readonly edit: (input: {
+    readonly actor: ActorContext;
+    readonly plan: PermittedContextPlan;
+    readonly runId: string;
+    readonly artifactId: string;
+    /** The version they were looking at; absent: whatever is current. */
+    readonly version?: number | undefined;
+    readonly edit: QDocumentEdit;
+    readonly signal?: AbortSignal | undefined;
+  }) => Promise<
+    | {
+        readonly status: "EDITED" | "REPLAYED";
+        readonly artifactId: string;
+        readonly type: string;
+        readonly artifactStatus: string;
+        readonly title: string;
+        readonly version: number;
+        readonly slide: number;
+      }
+    | { readonly status: "NOT_APPLICABLE"; readonly reason: string }
+    | {
+        readonly status: "STALE" | "NOT_FOUND" | "NOT_EDITABLE" | "FAILED";
+      }
   >;
 };
 

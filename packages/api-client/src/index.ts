@@ -154,6 +154,8 @@ export {
   createQRun,
   getQConversation,
   getQArtifact,
+  getQArtifactProgress,
+  fillQArtifactPlaceholder,
   getQArtifactVersion,
   getProfileFindings,
   listQArtifacts,

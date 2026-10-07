@@ -497,6 +497,31 @@ export type CompanyAnalystV17Result = z.infer<
 >;
 export const COMPANY_ANALYST_V17_SCHEMA_VERSION = 17;
 
+/**
+ * v19 (Q room W5, R8): one-pagers and memos as well as briefs and decks.
+ * A separate request schema, as v6's was, so v17/v18 runs stay explained
+ * by the closed set they ran under.
+ */
+export const ARTIFACT_REQUEST_TYPES_V3 = [
+  "INVESTMENT_BRIEF",
+  "PITCH_DECK",
+  "ONE_PAGER",
+  "MEMO",
+] as const;
+export const ArtifactRequestV3Schema = ArtifactRequestV2Schema.extend({
+  artifactType: z.enum(ARTIFACT_REQUEST_TYPES_V3),
+}).strict();
+export type ArtifactRequestV3 = z.infer<typeof ArtifactRequestV3Schema>;
+
+export const CompanyAnalystV19ResultSchema =
+  CompanyAnalystV17ResultSchema.extend({
+    artifactRequest: ArtifactRequestV3Schema.nullable().default(null),
+  }).strict();
+export type CompanyAnalystV19Result = z.infer<
+  typeof CompanyAnalystV19ResultSchema
+>;
+export const COMPANY_ANALYST_V19_SCHEMA_VERSION = 19;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

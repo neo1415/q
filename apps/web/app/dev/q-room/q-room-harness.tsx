@@ -26,6 +26,9 @@ import { QCanSee } from "@/features/q/q-can-see";
 import { QPresenceStage } from "@/features/q/q-presence-stage";
 import { QSection, useQDialog } from "@/features/q/q-section";
 import type { RoomCardResult } from "@/features/q/room/room-actions";
+import type { DeckState, FillResult } from "@/features/q/room/deck-actions";
+import { deckDrawingOf } from "@/features/q/room/deck-room";
+import type { DeckLoaders } from "@/features/q/room/q-room-deck";
 import { currentScreen } from "@/features/q/screen";
 
 const RECORD = "/dev/q-room/record";
@@ -95,6 +98,44 @@ async function loadCard(intent: QShowInQRoomIntent): Promise<RoomCardResult> {
   );
   return (await response.json()) as RoomCardResult;
 }
+
+/**
+ * Q room W5: the deck surface's reads and writes, as the test serves them
+ * (`/dev/q-room/deck`, `/dev/q-room/slides`, `/dev/q-room/upload`,
+ * `/dev/q-room/fill`), in place of the Q API and the upload path.
+ */
+const DECK_LOADERS: DeckLoaders = {
+  read: async (artifactId) => {
+    const response = await fetch(`/dev/q-room/deck?id=${artifactId}`, {
+      cache: "no-store",
+    });
+    return (await response.json()) as DeckState;
+  },
+  slides: async (artifactId, version) => {
+    const response = await fetch(
+      `/dev/q-room/slides?id=${artifactId}&version=${String(version)}`,
+      { cache: "no-store" },
+    );
+    return response.ok ? deckDrawingOf(await response.json()) : null;
+  },
+  upload: async (file) => {
+    const response = await fetch("/dev/q-room/upload", {
+      method: "POST",
+      body: JSON.stringify({ name: file.name, type: file.type }),
+      cache: "no-store",
+    });
+    const body = (await response.json()) as { documentId: string | null };
+    return body.documentId;
+  },
+  fill: async (input) => {
+    const response = await fetch("/dev/q-room/fill", {
+      method: "POST",
+      body: JSON.stringify(input),
+      cache: "no-store",
+    });
+    return (await response.json()) as FillResult;
+  },
+};
 
 const PREVIEW_ID = "00000000-0000-4000-8000-000000000002";
 
@@ -171,6 +212,7 @@ export function QRoomHarness() {
           captions={false}
           caption={null}
           loadRoomCard={loadCard}
+          deckLoaders={DECK_LOADERS}
           exportAnswer={exportAnswer}
           presence={(compact, mini) => (
             <QAperture

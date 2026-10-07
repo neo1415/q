@@ -270,7 +270,9 @@ export function screenLines(
     ...(screen.artifactId === undefined
       ? []
       : [
-          `the document Q made for them ${screen.artifactId}, open (its text is under ON THEIR SCREEN when it could be read; otherwise read it with read_my_document)`,
+          screen.artifactSlide === undefined
+            ? `the document Q made for them ${screen.artifactId}, open (its text is under ON THEIR SCREEN when it could be read; otherwise read it with read_my_document)`
+            : `the document Q made for them ${screen.artifactId}, open in the Q room on slide ${String(screen.artifactSlide)}${screen.artifactVersion === undefined ? "" : `, version ${String(screen.artifactVersion)}`} (this slide means slide ${String(screen.artifactSlide)}; change it with edit_my_document${screen.artifactVersion === undefined ? "" : ` naming version ${String(screen.artifactVersion)}`}, page it with control_document; read it with read_my_document)`,
         ]),
   ];
   return [

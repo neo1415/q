@@ -57,6 +57,11 @@ import {
   type ConfirmQBrandKitRequest,
   type CreateQAnswerExportRequest,
   type SetQBrandKitRequest,
+  FillQArtifactPlaceholderResponseSchema,
+  QDocumentPipelineProgressSchema,
+  Q_ARTIFACT_PLACEHOLDERS_SUFFIX,
+  Q_ARTIFACT_PROGRESS_SUFFIX,
+  type FillQArtifactPlaceholderRequest,
 } from "@capital-q/contracts";
 
 import { readProblemResponse } from "./problem.js";
@@ -441,6 +446,39 @@ export function listQArtifacts(
 /** `GET /v1/q/artifacts/:artifactId` — the current version and the history. */
 export function getQArtifact(session: ApiSession, artifactId: string) {
   return call(session, "GET", artifactPath(artifactId), QArtifactDetailSchema);
+}
+
+/**
+ * `GET /v1/q/artifacts/:artifactId/progress` — Q room W5: where a document
+ * Q is making has got to (their organisation's job only).
+ */
+export function getQArtifactProgress(session: ApiSession, artifactId: string) {
+  return call(
+    session,
+    "GET",
+    `${artifactPath(artifactId)}${Q_ARTIFACT_PROGRESS_SUFFIX}`,
+    QDocumentPipelineProgressSchema,
+  );
+}
+
+/**
+ * `POST /v1/q/artifacts/:artifactId/placeholders` — Q room W5: their own
+ * uploaded picture on a slide's placeholder, as a new version of the
+ * version they were looking at (idempotent: the same slide of the same
+ * version replays).
+ */
+export function fillQArtifactPlaceholder(
+  session: ApiSession,
+  artifactId: string,
+  input: FillQArtifactPlaceholderRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${artifactPath(artifactId)}${Q_ARTIFACT_PLACEHOLDERS_SUFFIX}`,
+    FillQArtifactPlaceholderResponseSchema,
+    { body: input },
+  );
 }
 
 /** `GET /v1/q/artifacts/:artifactId/versions/:version` — one earlier version. */

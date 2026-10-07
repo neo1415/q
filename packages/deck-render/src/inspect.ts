@@ -101,6 +101,8 @@ function inspectSlide(
   for (const box of slide.boxes) {
     // A photo is full-bleed on its side by design; a logo is not.
     if (box.kind === "IMAGE" && box.fit !== "contain") continue;
+    // So is the space a picture is still to fill (Q room W5).
+    if (box.kind === "RULE" && box.placeholder === "IMAGE") continue;
     if (
       box.x < MARGIN - 1 ||
       box.y < MARGIN - 1 ||

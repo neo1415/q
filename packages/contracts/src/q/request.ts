@@ -106,6 +106,14 @@ export const QScreenContextSchema = z
      */
     artifactId: UuidSchema.optional(),
     /**
+     * Q room W5 (R8): the slide of artifactId open in the Q room's deck
+     * surface (1-based) and the version it shows, so "this slide" means
+     * that slide and an edit applies to the version on screen. A
+     * position, never authority.
+     */
+    artifactSlide: z.number().int().min(1).max(24).optional(),
+    artifactVersion: z.number().int().min(1).max(10_000).optional(),
+    /**
      * The device's IANA time zone as the person asks (live test 2026-09-28
      * #2): "tomorrow at 2 PM" is resolved by code in this zone, never in
      * UTC by accident. A request like the rest: a zone the runtime does not

@@ -360,6 +360,12 @@ export const Q_ROOM_OBJECTS = [
   "CAPITAL_ROUND",
   "GATEQ_APPLICATION",
   "SOURCES",
+  /**
+   * Q room W5 (R8): a document Q made for them (a deck, one-pager or
+   * memo), by its artifact id: the deck surface with page thumbnails,
+   * placeholders marked, and the floating Upload button.
+   */
+  "Q_DOCUMENT",
 ] as const;
 export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
 export type QRoomObject = z.infer<typeof QRoomObjectSchema>;
@@ -589,6 +595,8 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "set_onboarding_reminders",
   // A new version of their own private document; the earlier one is kept.
   "revise_my_document",
+  // Q room W5: a typed edit of their own private draft, a new version.
+  "edit_my_document",
   // AUTO block (ADR 0030): inside an approved delegation, the person's own
   // word -- stop, a time they chose, away/back -- acts at once.
   "stop_q_work",

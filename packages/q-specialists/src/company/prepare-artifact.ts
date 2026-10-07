@@ -1,5 +1,6 @@
 import type {
   QArtifactSummary,
+  QDocumentPipelineStage,
   QResultBlock,
   QVisibleStage,
   QSubjectRef,
@@ -7,7 +8,10 @@ import type {
 import type { Logger } from "@capital-q/observability";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 
-import type { ArtifactPreparationPort } from "./artifact-port.js";
+import type {
+  ArtifactPreparationPort,
+  DocumentPipelinePort,
+} from "./artifact-port.js";
 import type { BriefReviser } from "./brief-reviser.js";
 import type { CompanyIntelligenceResult } from "./contracts.js";
 import { composeInvestmentBrief } from "./investment-brief.js";
@@ -21,6 +25,31 @@ import {
 } from "./document-studio.js";
 import type { IllustrationPort } from "./deck-illustrations.js";
 import { composePitchDeck } from "./pitch-deck.js";
+import {
+  composeGeneralDocument,
+  runDocumentPipeline,
+} from "./document-pipeline.js";
+
+/** Q room W5: the pipeline's stages as the run's visible stages. */
+export function visibleStageOf(
+  stage: QDocumentPipelineStage,
+): QVisibleStage | null {
+  switch (stage) {
+    case "QUEUED":
+    case "WRITING":
+      return "PREPARING_DOCUMENT";
+    case "DESIGNING":
+      return "DESIGNING_DOCUMENT";
+    case "FINDING_ASSETS":
+      return "FINDING_DOCUMENT_IMAGES";
+    case "CHECKING":
+    case "FIXING":
+      return "CHECKING_DOCUMENT";
+    case "READY":
+    case "FAILED":
+      return null;
+  }
+}
 
 /**
  * Preparing the document somebody asked for (QX-003D/F; ADR 0013).
@@ -71,6 +100,15 @@ export type ArtifactPreparation = {
           | ((request: QAnswerRequest) => IllustrationPort | undefined)
           | undefined;
       }
+    | undefined;
+  /**
+   * Q room W5 (R8): the document pipeline. JOB: the worker makes it (the
+   * run waits a bounded time, saying each stage); IN_RUN: the run makes
+   * it here. Absent: the studio as before.
+   */
+  readonly pipeline?:
+    | { readonly mode: "JOB"; readonly port: DocumentPipelinePort }
+    | { readonly mode: "IN_RUN" }
     | undefined;
 };
 
@@ -288,7 +326,13 @@ export async function prepareOrReviseArtifact(input: {
             ? {}
             : { direction: ask.visualDirection }),
         })
-      : composeInvestmentBrief({ companyName, result });
+      : ask.artifactType === "ONE_PAGER" || ask.artifactType === "MEMO"
+        ? composeGeneralDocument({
+            kind: ask.artifactType,
+            companyName,
+            result,
+          })
+        : composeInvestmentBrief({ companyName, result });
   if (base === null) {
     // Nothing on record but gaps. A document saying only "unknown" is
     // worse than being told the record is too thin to write one from.
@@ -317,6 +361,81 @@ export async function prepareOrReviseArtifact(input: {
         ? null
         : await studio.brandOf(request.actor).catch(() => null);
     const sectorCodes = isOwn ? own.sectorCodes : [];
+    const kind =
+      ask.artifactType === "PITCH_DECK" ||
+      ask.artifactType === "ONE_PAGER" ||
+      ask.artifactType === "MEMO"
+        ? ask.artifactType
+        : null;
+    const pipeline = artifacts.pipeline;
+    const said = async (stage: QDocumentPipelineStage) => {
+      const visible = visibleStageOf(stage);
+      if (visible !== null) await input.showStage?.(visible);
+    };
+    if (kind !== null && pipeline?.mode === "JOB") {
+      // Q room W5: the worker makes it; the run follows its stages for a
+      // bounded time so the person hears what is happening.
+      const requested = await pipeline.port.request({
+        actorContext: request.actor,
+        permittedContextPlan: request.plan,
+        qRunId: request.runId,
+        ...(company === undefined ? {} : { subject: company }),
+        artifactType: ask.artifactType,
+        kind,
+        content: base,
+        job: {
+          grounding: findingStatements,
+          sectorCodes,
+          directionChosen: ask.visualDirection !== null,
+          brand,
+          sensitivity: request.plan.maxSensitivity,
+        },
+      });
+      const settled = await pipeline.port
+        .wait({
+          actor: request.actor,
+          artifactId: requested.artifactId,
+          onStage: said,
+          ...(request.signal === undefined ? {} : { signal: request.signal }),
+        })
+        .catch(() => null);
+      return { kind: "PREPARED", summary: settled ?? requested };
+    }
+    if (kind !== null && pipeline?.mode === "IN_RUN") {
+      const made = await runDocumentPipeline(base.content, {
+        kind,
+        grounding: findingStatements,
+        sectorCodes,
+        directionChosen: ask.visualDirection !== null,
+        brand,
+        photos: artifacts.photos,
+        illustrations:
+          kind === "PITCH_DECK"
+            ? studio?.illustrationsFor?.(request)
+            : undefined,
+        polisher: studio?.polisher,
+        sensitivity: request.plan.maxSensitivity,
+        attribution: {
+          tenantId: request.actor.tenantId,
+          userId: request.actor.userId,
+          qRunId: request.runId,
+          correlationId: request.correlationId,
+        },
+        onStage: said,
+        signal: request.signal,
+      });
+      return {
+        kind: "PREPARED",
+        summary: await artifacts.port.prepare({
+          actorContext: request.actor,
+          permittedContextPlan: request.plan,
+          qRunId: request.runId,
+          ...(company === undefined ? {} : { subject: company }),
+          artifactType: ask.artifactType,
+          content: { ...base, content: made.content },
+        }),
+      };
+    }
     const content =
       ask.artifactType === "PITCH_DECK"
         ? await runDocumentStudio(base.content, {

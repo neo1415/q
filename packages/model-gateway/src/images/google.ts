@@ -1,12 +1,19 @@
 import { ModelProviderFailure } from "../errors.js";
-import type { GeneratedImage, ImageProvider } from "./index.js";
+import { IMAGE_MODEL_CONFIG } from "./config.js";
+import {
+  isBillingRefusal,
+  type GeneratedImage,
+  type ImageProvider,
+} from "./index.js";
 
 /**
  * Gemini's image model behind the image adapter (DOCS): the fallback when
  * OpenAI is not configured or fails. The key travels in a header, never
- * in the URL, so it cannot land in an access log.
+ * in the URL, so it cannot land in an access log. The model is config
+ * (images/config.ts), not a constant here.
  */
-export const GOOGLE_IMAGE_MODEL = "gemini-2.5-flash-image";
+export const GOOGLE_IMAGE_MODEL = IMAGE_MODEL_CONFIG.google.modelCode;
+
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 export function createGoogleImageProvider(options: {
@@ -19,9 +26,9 @@ export function createGoogleImageProvider(options: {
   return {
     code: "google",
     modelCode,
-    providerId: "a1000000-0000-4000-8000-000000000001",
-    modelId: "a2000000-0000-4000-8000-000000000021",
-    costPerImageUsd: 0.04,
+    providerId: IMAGE_MODEL_CONFIG.google.providerId,
+    modelId: IMAGE_MODEL_CONFIG.google.modelId,
+    costPerImageUsd: IMAGE_MODEL_CONFIG.google.costPerImageUsd,
     generate: async (request, context): Promise<GeneratedImage> => {
       let response: Response;
       try {
@@ -53,9 +60,11 @@ export function createGoogleImageProvider(options: {
         });
       }
       if (!response.ok) {
+        const detail = await response.text().catch(() => "");
         throw new ModelProviderFailure("google image request refused", {
-          failureClass:
-            response.status === 429
+          failureClass: isBillingRefusal(response.status, detail)
+            ? "BUDGET_EXCEEDED"
+            : response.status === 429
               ? "RATE_LIMIT"
               : response.status === 401 || response.status === 403
                 ? "AUTHENTICATION"

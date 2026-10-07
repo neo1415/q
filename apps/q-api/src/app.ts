@@ -201,6 +201,8 @@ export type QApiModules = {
         readonly images?: QArtifactRoutesDependencies["generatedImages"];
       })
     | undefined;
+  /** Q room W5: pictures dropped on a document's placeholders. */
+  readonly ownPictures?: QArtifactRoutesDependencies["ownPictures"];
   /** The orchestration boundary; absent means runs are only persisted. */
   readonly orchestration?: QRunRoutesDependencies["orchestration"];
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
@@ -373,6 +375,9 @@ export function createApp(
       resolver: security.resolver,
       identity: security.identity,
       artifacts: modules.artifacts,
+      ...(modules.ownPictures === undefined
+        ? {}
+        : { ownPictures: modules.ownPictures }),
       ...(modules.documentStudio === undefined
         ? {}
         : {

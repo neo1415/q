@@ -55,6 +55,8 @@ export async function illustrateDeck(
     .filter(
       ({ slide, index }) =>
         slide.image === undefined &&
+        // Q room W5: a marked space is the person's to fill.
+        slide.placeholder === undefined &&
         slide.visual === undefined &&
         slide.figures === undefined &&
         (index === 0 ? slide.layout === "TITLE" : slide.layout === "BULLETS"),

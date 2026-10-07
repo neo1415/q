@@ -128,6 +128,36 @@ export function deckToSvg(deck: LaidOutDeck): readonly string[] {
  * from the library's CDN, a generated image by a short-lived signed URL
  * straight from storage.
  */
+/**
+ * Q room W5: where each slide's placeholder is drawn, for the room to put
+ * a drop target over it (same layout as the drawing, so they line up).
+ */
+export function slidePlaceholderBoxes(deck: LaidOutDeck): readonly {
+  readonly slide: number;
+  readonly kind: "IMAGE" | "TEXT";
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}[] {
+  return deck.slides.flatMap((slide) =>
+    slide.boxes.flatMap((box) =>
+      box.kind === "RULE" && box.placeholder !== undefined
+        ? [
+            {
+              slide: slide.index,
+              kind: box.placeholder,
+              x: box.x,
+              y: box.y,
+              width: box.width,
+              height: box.height,
+            },
+          ]
+        : [],
+    ),
+  );
+}
+
 export function slideImageBoxes(deck: LaidOutDeck): readonly {
   readonly slide: number;
   readonly x: number;

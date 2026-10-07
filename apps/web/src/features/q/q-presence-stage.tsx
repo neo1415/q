@@ -27,6 +27,7 @@ import {
 } from "./room/document-host";
 import { QRoomPdfOffer, type PdfExport } from "./room/pdf-offer";
 import { QRoomStage, type RoomCardLoader } from "./room/q-room-card";
+import type { DeckLoaders } from "./room/q-room-deck";
 import { roomStage } from "./room/room-stage";
 import {
   answersIn,
@@ -77,6 +78,7 @@ export function QPresenceStage({
   onBoardLanded,
   onPin,
   loadRoomCard,
+  deckLoaders,
   exportAnswer,
 }: {
   /** A live voice line is open: Q's own lines drive which card is open. */
@@ -87,6 +89,8 @@ export function QPresenceStage({
   readonly onPin?: ((answerId: string) => void) | undefined;
   /** Q room R4: how a card reads its content (the dev harness serves it). */
   readonly loadRoomCard?: RoomCardLoader | undefined;
+  /** Q room W5: the deck surface's reads (a harness serves fixtures). */
+  readonly deckLoaders?: DeckLoaders | undefined;
   /** Q room W3: how an answer is filed as a PDF (the dev harness serves it). */
   readonly exportAnswer?: PdfExport | undefined;
   /**
@@ -331,6 +335,8 @@ export function QPresenceStage({
           setClosedByHand({ key: card.key, at: card.openedAt })
         }
         load={loadRoomCard}
+        turns={turns}
+        deckLoaders={deckLoaders}
       />
 
       {/* Q room W3: the document Q opened shows here (material-viewer). */}

@@ -38,7 +38,13 @@ import { QSubjectRefSchema } from "./subject.js";
  * one rather than fail validation. `PITCH_DECK` is named here as the
  * extension point QX-004 fills; nothing in this packet generates one.
  */
-export const Q_ARTIFACT_TYPES = ["INVESTMENT_BRIEF", "PITCH_DECK"] as const;
+export const Q_ARTIFACT_TYPES = [
+  "INVESTMENT_BRIEF",
+  "PITCH_DECK",
+  // Q room W5 (R8): general documents through the same pipeline.
+  "ONE_PAGER",
+  "MEMO",
+] as const;
 export type QArtifactType = (typeof Q_ARTIFACT_TYPES)[number];
 export const QArtifactTypeSchema = z
   .string()
@@ -235,16 +241,35 @@ export const QSlideImageSchema = z
      * (the only kind before generated images); AI_GENERATED is always
      * said in the credit as well, so a reader of the file sees it.
      */
-    provenance: z.enum(["STOCK", "AI_GENERATED"]).optional(),
+    /**
+     * Q room W5: OWN_UPLOAD is the person's own picture, dropped on a
+     * placeholder and copied into the document's private image store
+     * (so it is served like a generated one, by a `cq-image:` id, to the
+     * owning organisation only).
+     */
+    provenance: z.enum(["STOCK", "AI_GENERATED", "OWN_UPLOAD"]).optional(),
   })
   .strict()
   .refine(
     (image) =>
       (generatedImageId(image.url) !== null) ===
-      (image.provenance === "AI_GENERATED"),
-    { message: "a generated image says so, and only a generated image does" },
+      (image.provenance === "AI_GENERATED" ||
+        image.provenance === "OWN_UPLOAD"),
+    {
+      message:
+        "a stored image says where it came from, and only a stored image does",
+    },
   );
 export type QSlideImage = z.infer<typeof QSlideImageSchema>;
+
+export const Q_SLIDE_PLACEHOLDER_KINDS = ["IMAGE", "TEXT"] as const;
+export const QSlidePlaceholderSchema = z
+  .object({
+    kind: z.enum(Q_SLIDE_PLACEHOLDER_KINDS),
+    label: z.string().trim().min(1).max(90),
+  })
+  .strict();
+export type QSlidePlaceholder = z.infer<typeof QSlidePlaceholderSchema>;
 
 /** One slide. Its grounding lives in the matching section; this is its shape. */
 export const QSlideSchema = z
@@ -283,6 +308,13 @@ export const QSlideSchema = z
       .max(Q_ARTIFACT_SECTIONS_MAX - 1),
     /** A photograph beside the words, when the deck has one for it. */
     image: QSlideImageSchema.optional(),
+    /**
+     * Q room W5 (R8): what is missing here, said plainly and drawn as a
+     * marked space ("Team photo: add yours"). IMAGE is a picture the
+     * person can drop on it; TEXT is a fact the record does not hold yet
+     * (unknown stays unknown, never an invented number).
+     */
+    placeholder: QSlidePlaceholderSchema.optional(),
     /**
      * Drawn rather than listed (founder direction 2026-09-29): FLOW sets
      * the bullets out as numbered steps joined in order. The words are the
@@ -447,6 +479,16 @@ export const Q_DOCUMENT_AUDIT_CHECKS = [
   "CHARTS_SOURCED",
   "IMAGES_CREDITED",
 ] as const;
+export const QDocumentRubricSchema = z
+  .object({
+    content: z.number().int().min(1).max(5),
+    design: z.number().int().min(1).max(5),
+    coherence: z.number().int().min(1).max(5),
+    rounds: z.number().int().min(0).max(2),
+  })
+  .strict();
+export type QDocumentRubric = z.infer<typeof QDocumentRubricSchema>;
+
 export const QDocumentAuditSchema = z
   .object({
     passed: z.boolean(),
@@ -466,9 +508,62 @@ export const QDocumentAuditSchema = z
       .max(24),
     /** At most three things the person could add; never Q filling them in. */
     suggestions: z.array(z.string().trim().min(1).max(200)).max(3).default([]),
+    /**
+     * Q room W5 (R8): the checker's typed rubric (PPTEval-style), 1 to 5
+     * on each axis, and how many fix rounds ran (at most two). A document
+     * that is still short after them ships with its notes shown.
+     */
+    rubric: QDocumentRubricSchema.optional(),
   })
   .strict();
 export type QDocumentAudit = z.infer<typeof QDocumentAuditSchema>;
+
+// --- Q room W5: the document pipeline ---------------------------------------
+
+/**
+ * Where a document Q is making has got to. The stages are the pipeline's
+ * own, in plain words; no specialist is ever named to the person.
+ */
+export const Q_DOCUMENT_PIPELINE_STAGES = [
+  "QUEUED",
+  "WRITING",
+  "DESIGNING",
+  "FINDING_ASSETS",
+  "CHECKING",
+  "FIXING",
+  "READY",
+  "FAILED",
+] as const;
+export const QDocumentPipelineStageSchema = z.enum(Q_DOCUMENT_PIPELINE_STAGES);
+export type QDocumentPipelineStage = z.infer<
+  typeof QDocumentPipelineStageSchema
+>;
+
+/** What the room says while a document is being made. */
+export const Q_DOCUMENT_PIPELINE_STAGE_LINES: Readonly<
+  Record<QDocumentPipelineStage, string>
+> = {
+  QUEUED: "Starting on it",
+  WRITING: "Writing it from your record",
+  DESIGNING: "Laying out each page",
+  FINDING_ASSETS: "Finding pictures and drawing charts from your numbers",
+  CHECKING: "Checking every page",
+  FIXING: "Tightening what did not pass",
+  READY: "Ready",
+  FAILED: "It could not be finished",
+};
+
+export const QDocumentPipelineProgressSchema = z
+  .object({
+    artifactId: UuidSchema,
+    stage: QDocumentPipelineStageSchema,
+    line: z.string().trim().min(1).max(120),
+    updatedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type QDocumentPipelineProgress = z.infer<
+  typeof QDocumentPipelineProgressSchema
+>;
 
 // --- end DOCS block ----------------------------------------------------------
 
@@ -717,6 +812,93 @@ export const ReviseQArtifactRequestSchema = z
 export type ReviseQArtifactRequest = z.infer<
   typeof ReviseQArtifactRequestSchema
 >;
+
+// --- Q room W5 (R8): typed edits ---------------------------------------------
+
+/**
+ * One edit of a document Q made, typed: "make slide 3 shorter", "swap this
+ * image", "change the title". Slides are counted from 1 as a person
+ * counts them (for a document without slides, its sections). Each edit
+ * writes a new version from the version the person was looking at; none
+ * adds a figure the document does not already carry.
+ */
+export const Q_DOCUMENT_EDIT_KINDS = [
+  "SHORTEN",
+  "CHANGE_TITLE",
+  "SWAP_IMAGE",
+  "REMOVE_IMAGE",
+  "REMOVE_SLIDE",
+  "MOVE_SLIDE",
+  "USE_PICTURE",
+] as const;
+const EditSlideSchema = z.number().int().min(1).max(Q_ARTIFACT_SECTIONS_MAX);
+export const QDocumentEditSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("SHORTEN"), slide: EditSlideSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("CHANGE_TITLE"),
+      slide: EditSlideSchema,
+      title: z.string().trim().min(1).max(Q_ARTIFACT_TITLE_MAX),
+    })
+    .strict(),
+  z.object({ kind: z.literal("SWAP_IMAGE"), slide: EditSlideSchema }).strict(),
+  z
+    .object({ kind: z.literal("REMOVE_IMAGE"), slide: EditSlideSchema })
+    .strict(),
+  z
+    .object({ kind: z.literal("REMOVE_SLIDE"), slide: EditSlideSchema })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("MOVE_SLIDE"),
+      slide: EditSlideSchema,
+      to: EditSlideSchema,
+    })
+    .strict(),
+  /**
+   * One of their own uploaded pictures (a data-room document) on a slide:
+   * what a drop on a placeholder does, and what Q does when asked to "use
+   * my team photo on slide 4".
+   */
+  z
+    .object({
+      kind: z.literal("USE_PICTURE"),
+      slide: EditSlideSchema,
+      documentId: UuidSchema,
+    })
+    .strict(),
+]);
+export type QDocumentEdit = z.infer<typeof QDocumentEditSchema>;
+
+/**
+ * PUBLIC. A picture dropped on a slide's placeholder in the Q room: the
+ * person's own upload (already in their data room through the ordinary
+ * upload path), placed on the version they were looking at.
+ */
+export const FillQArtifactPlaceholderRequestSchema = z
+  .object({
+    version: z.number().int().min(1),
+    slide: EditSlideSchema,
+    documentId: UuidSchema,
+  })
+  .strict();
+export type FillQArtifactPlaceholderRequest = z.infer<
+  typeof FillQArtifactPlaceholderRequestSchema
+>;
+
+export const FillQArtifactPlaceholderResponseSchema = z
+  .object({
+    status: z.enum(["FILLED", "REPLAYED"]),
+    version: z.number().int().min(1),
+  })
+  .strict();
+export type FillQArtifactPlaceholderResponse = z.infer<
+  typeof FillQArtifactPlaceholderResponseSchema
+>;
+
+/** PUBLIC. Where a document Q is making has got to (the room polls it). */
+export const Q_ARTIFACT_PROGRESS_SUFFIX = "/progress" as const;
+export const Q_ARTIFACT_PLACEHOLDERS_SUFFIX = "/placeholders" as const;
 
 export const ListQArtifactsResponseSchema = z
   .object({

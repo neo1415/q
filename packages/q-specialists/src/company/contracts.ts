@@ -208,7 +208,8 @@ export type CompanyIntelligenceResult = {
    */
   readonly artifactRequest: {
     readonly kind: "PREPARE" | "REVISE";
-    readonly artifactType: "INVESTMENT_BRIEF" | "PITCH_DECK";
+    readonly artifactType:
+      "INVESTMENT_BRIEF" | "PITCH_DECK" | "ONE_PAGER" | "MEMO";
     readonly instruction: string;
     /** How they said it should look, when they said. Null is the common case. */
     readonly visualDirection:

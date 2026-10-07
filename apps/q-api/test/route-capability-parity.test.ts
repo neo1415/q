@@ -688,6 +688,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     DOWNLOAD,
   "q-api/http/q-artifacts.ts GET `${artifactPath}${Q_ARTIFACT_VERSIONS_SUFFIX}/:version`":
     DOWNLOAD,
+  // Q room W5 (R8): the room's own progress line while Q makes a document;
+  // Q hears the same stages on its own run (the silence ladder).
+  "q-api/http/q-artifacts.ts GET `${artifactPath}${Q_ARTIFACT_PROGRESS_SUFFIX}`":
+    cap("tool.read_my_document"),
+  // The drop target writes the same edit as edit_my_document USE_PICTURE.
+  "q-api/http/q-artifacts.ts POST `${artifactPath}${Q_ARTIFACT_PLACEHOLDERS_SUFFIX}`":
+    cap("tool.edit_my_document"),
   // DOCS block: the document studio.
   "q-api/http/q-documents.ts GET Q_BRAND_KIT_PATH": cap("tool.get_brand_kit"),
   "q-api/http/q-documents.ts POST Q_BRAND_KIT_PATH": cap("offer.confirm_brand"),
@@ -738,7 +745,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // I1 (2026-10-05): a dropped line rejoins on a fresh call, same voice.
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_REJOIN_PATH": Q_TRANSPORT,
   // Q room R7: the line's waiting lines (silence ladder), read by its owner.
-  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_NARRATION_PATH": Q_TRANSPORT,
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_NARRATION_PATH":
+    Q_TRANSPORT,
   "q-api/voice/think.ts POST dependencies.path": Q_TRANSPORT,
   "q-api/voice/think.ts POST `${dependencies.path}/chat/completions`":
     Q_TRANSPORT,
@@ -968,6 +976,19 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
 const LEGACY_MUTATION_ROUTES_MAX = 77;
 
 /**
+ * Q room W5 (R8): a picture dropped on a document's placeholder in the Q
+ * room. The artifact context lives in q-api, where the action registry's
+ * generated routes (apps/api) cannot reach it; the drop writes exactly the
+ * edit `edit_my_document` USE_PICTURE writes (same instruction, so they
+ * replay each other), so Q and the page already have one capability.
+ * Named here rather than lifting the legacy ceiling; pending the lead's
+ * decision on declaring q-api artifact actions in the registry.
+ */
+const Q_ROOM_DOCUMENT_DROPS: ReadonlySet<string> = new Set([
+  "q-api/http/q-artifacts.ts POST `${artifactPath}${Q_ARTIFACT_PLACEHOLDERS_SUFFIX}`",
+]);
+
+/**
  * DUPLEX (flag CQ_VOICE_REALTIME): the full-duplex line's own transport —
  * a relay of the model's tool calls into the Tool Registry, its usage
  * reports for the spend cap, and its end. Q transport, exempt under ADR
@@ -1045,6 +1066,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         / (POST|PUT|PATCH|DELETE) /.test(key) &&
         !Q_TRANSPORT_NOT_ACTIONS.has(key) &&
         !GATEQ_GUEST_NOT_ACTIONS.has(key) &&
+        !Q_ROOM_DOCUMENT_DROPS.has(key) &&
         // ADR 0040: the operations console stays exempt (never Q's to act
         // on), so its writes are not legacy waiting to migrate.
         ROUTE_COVERAGE[key] !== OPERATIONS_CONSOLE,

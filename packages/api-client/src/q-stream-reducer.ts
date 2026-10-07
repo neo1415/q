@@ -237,6 +237,12 @@ export function describeQStage(stage: QVisibleStage | null): string | null {
       return "Writing your document. This takes a moment.";
     case "REVISING_DOCUMENT":
       return "Making your changes to the document. One moment.";
+    case "DESIGNING_DOCUMENT":
+      return "Laying out each page";
+    case "FINDING_DOCUMENT_IMAGES":
+      return "Finding pictures and drawing your charts";
+    case "CHECKING_DOCUMENT":
+      return "Checking every page";
     case "WAITING_FOR_REPLY":
       return "Q needs a little more information before continuing.";
     case "WAITING_FOR_APPROVAL":

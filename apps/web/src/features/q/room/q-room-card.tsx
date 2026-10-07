@@ -13,9 +13,10 @@ import { useEffect, useState } from "react";
 import type { QManifestRef, QShowInQRoomIntent } from "@capital-q/contracts";
 import { ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
 
-import type { QTurnPublicSource } from "../conversation";
+import type { QTurn, QTurnPublicSource } from "../conversation";
 import { useQSection } from "../q-section";
 
+import { QRoomDeck, type DeckLoaders } from "./q-room-deck";
 import { loadRoomCardAction, type RoomCardResult } from "./room-actions";
 import type { RoomCardView } from "./room-card-view";
 import type { RoomCard, RoomNote } from "./room-stage";
@@ -46,7 +47,13 @@ function useCardView(
   } | null>(null);
   const cached = loaded.get(card.key);
   useEffect(() => {
-    if (card.intent.object === "SOURCES" || loaded.has(card.key)) return;
+    if (
+      card.intent.object === "SOURCES" ||
+      card.intent.object === "Q_DOCUMENT" ||
+      loaded.has(card.key)
+    ) {
+      return;
+    }
     let live = true;
     void load(card.intent)
       .catch((): RoomCardResult => ({
@@ -69,11 +76,16 @@ export function QRoomStage({
   note,
   onClose,
   load = loadRoomCardAction,
+  turns = [],
+  deckLoaders,
 }: {
   readonly open: RoomCard | null;
   readonly note: RoomNote | null;
   readonly onClose: (card: RoomCard) => void;
   readonly load?: RoomCardLoader | undefined;
+  /** Q room W5: the conversation, for the deck surface's paging. */
+  readonly turns?: readonly QTurn[] | undefined;
+  readonly deckLoaders?: DeckLoaders | undefined;
 }) {
   const reduced = useReducedMotion() === true;
   // The note shows once per moving on, for a few seconds.
@@ -103,6 +115,8 @@ export function QRoomStage({
             <RoomCardBody
               card={open}
               load={load}
+              turns={turns}
+              deckLoaders={deckLoaders}
               onClose={() => onClose(open)}
             />
           </m.section>
@@ -140,12 +154,17 @@ export function QRoomStage({
 function RoomCardBody({
   card,
   load,
+  turns,
+  deckLoaders,
   onClose,
 }: {
   readonly card: RoomCard;
   readonly load: RoomCardLoader;
+  readonly turns: readonly QTurn[];
+  readonly deckLoaders?: DeckLoaders | undefined;
   readonly onClose: () => void;
 }) {
+  const deck = card.intent.object === "Q_DOCUMENT";
   const result = useCardView(card, load);
   const title =
     card.intent.object === "SOURCES"
@@ -164,7 +183,9 @@ function RoomCardBody({
   );
   return (
     <div
-      className="flex max-h-[60dvh] w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
+      className={`flex w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) ${
+        deck ? "max-h-[85dvh]" : "max-h-[60dvh]"
+      }`}
       data-q-room-card={card.intent.object}
       data-q-section="q-room-card"
       aria-label={title}
@@ -191,6 +212,14 @@ function RoomCardBody({
       <div className="min-h-0 overflow-y-auto p-4" data-q-room-body>
         {card.intent.object === "SOURCES" ? (
           <SourceCards sources={card.sources} />
+        ) : deck && card.intent.id !== undefined ? (
+          <QRoomDeck
+            artifactId={card.intent.id}
+            title={card.intent.title}
+            turns={turns}
+            openedAt={card.openedAt}
+            {...(deckLoaders === undefined ? {} : { loaders: deckLoaders })}
+          />
         ) : result === null ? (
           <div
             className="flex flex-col gap-2"
@@ -232,6 +261,8 @@ function cardRef(intent: QShowInQRoomIntent): QManifestRef | null {
       return { kind: "GATEQ_APPLICATION", id: intent.id };
     case "SOURCES":
       return null;
+    case "Q_DOCUMENT":
+      return { kind: "ARTIFACT", id: intent.id };
   }
 }
 

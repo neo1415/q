@@ -1,12 +1,17 @@
 import { ModelProviderFailure } from "../errors.js";
-import type { GeneratedImage, ImageProvider } from "./index.js";
+import { IMAGE_MODEL_CONFIG } from "./config.js";
+import {
+  isBillingRefusal,
+  type GeneratedImage,
+  type ImageProvider,
+} from "./index.js";
 
 /**
  * OpenAI's image endpoint behind the image adapter (DOCS). One model,
  * medium quality, one image per call: the account is the founder's and an
  * accidental high-quality batch would spend it silently.
  */
-export const OPENAI_IMAGE_MODEL = "gpt-image-1";
+export const OPENAI_IMAGE_MODEL = IMAGE_MODEL_CONFIG.openai.modelCode;
 const ENDPOINT = "https://api.openai.com/v1/images/generations";
 
 export function createOpenAIImageProvider(options: {
@@ -18,10 +23,9 @@ export function createOpenAIImageProvider(options: {
   return {
     code: "openai",
     modelCode: options.modelCode ?? OPENAI_IMAGE_MODEL,
-    providerId: "a1000000-0000-4000-8000-000000000003",
-    modelId: "a2000000-0000-4000-8000-000000000020",
-    // Medium quality, 1536x1024: about four US cents an image.
-    costPerImageUsd: 0.04,
+    providerId: IMAGE_MODEL_CONFIG.openai.providerId,
+    modelId: IMAGE_MODEL_CONFIG.openai.modelId,
+    costPerImageUsd: IMAGE_MODEL_CONFIG.openai.costPerImageUsd,
     generate: async (request, context): Promise<GeneratedImage> => {
       let response: Response;
       try {
@@ -49,9 +53,11 @@ export function createOpenAIImageProvider(options: {
         });
       }
       if (!response.ok) {
+        const detail = await response.text().catch(() => "");
         throw new ModelProviderFailure("openai image request refused", {
-          failureClass:
-            response.status === 429
+          failureClass: isBillingRefusal(response.status, detail)
+            ? "BUDGET_EXCEEDED"
+            : response.status === 429
               ? "RATE_LIMIT"
               : response.status === 401 || response.status === 403
                 ? "AUTHENTICATION"

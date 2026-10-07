@@ -1,6 +1,8 @@
 import type {
+  ModelSensitivity,
   PermittedContextPlan,
   QArtifactContent,
+  QDocumentPipelineStage,
   QArtifactSummary,
   QArtifactVersion,
   QSubjectRef,
@@ -66,4 +68,49 @@ export type ArtifactPreparationPort = {
     actor: ActorContext,
     artifactId: string,
   ) => Promise<QArtifactVersion | null>;
+};
+
+/**
+ * Q room W5 (R8): a document made by the worker. The run writes the first
+ * draft and queues it with what it resolved as the person; the worker
+ * designs, illustrates and checks it. `wait` follows the job's stages for
+ * a bounded time (so the silence ladder can say them) and returns the
+ * filed card, or null when it is still being made when the wait ends.
+ */
+export type DocumentPipelinePort = {
+  readonly request: (input: {
+    readonly actorContext: ActorContext;
+    readonly permittedContextPlan: PermittedContextPlan;
+    readonly qRunId: string;
+    readonly subject?: QSubjectRef | undefined;
+    readonly artifactType: string;
+    readonly kind: "PITCH_DECK" | "ONE_PAGER" | "MEMO";
+    readonly content: {
+      readonly title: string;
+      readonly summary: string;
+      readonly content: QArtifactContent;
+    };
+    readonly job: {
+      readonly grounding: readonly string[];
+      readonly sectorCodes: readonly string[];
+      readonly directionChosen: boolean;
+      readonly brand: {
+        readonly kitVersion: number;
+        readonly palette: {
+          readonly primary: string;
+          readonly secondary?: string | undefined;
+          readonly background?: string | undefined;
+          readonly ink?: string | undefined;
+        };
+        readonly pairing?: string | undefined;
+      } | null;
+      readonly sensitivity: ModelSensitivity;
+    };
+  }) => Promise<QArtifactSummary>;
+  readonly wait: (input: {
+    readonly actor: ActorContext;
+    readonly artifactId: string;
+    readonly onStage: (stage: QDocumentPipelineStage) => Promise<void>;
+    readonly signal?: AbortSignal | undefined;
+  }) => Promise<QArtifactSummary | null>;
 };

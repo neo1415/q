@@ -225,6 +225,8 @@ import {
 } from "@capital-q/verification";
 import { runAutoVerificationRequests } from "./verification/auto-request.js";
 // end ADMIN-4 block
+import { composeDocumentJobs } from "./documents/composition.js";
+import { runDocumentJobTicker } from "./documents/document-jobs.js";
 
 const SERVICE_NAME = "workers";
 
@@ -1224,6 +1226,19 @@ const daily =
       });
 // end DAILY block
 
+// Q room W5 (R8): documents Q is making (decks, one-pagers, memos).
+const documentJobs = composeDocumentJobs({
+  sql: database.sql,
+  transactions: database.transactions,
+  gateway: modelGateway,
+  modelsAvailable: modelProviders.length > 0,
+  providerSecrets,
+  supabaseUrl: config.public.supabaseUrl,
+  supabaseSecretKey: config.secrets.supabaseSecretKey,
+  env: process.env,
+  logger,
+});
+
 const shutdownController = new AbortController();
 
 function shutdown(signal: NodeJS.Signals): void {
@@ -1310,6 +1325,11 @@ await Promise.all([
   }),
   runNoticeDeliveryTicker({
     delivery: noticeDelivery,
+    signal: shutdownController.signal,
+    logger,
+  }),
+  runDocumentJobTicker({
+    runner: documentJobs,
     signal: shutdownController.signal,
     logger,
   }),

@@ -102,6 +102,7 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     humanReviews: port(),
     documents: port(),
     documentRevision: port(),
+    documentEdit: port(),
     // DOCS block.
     documentStudio: port(),
     recordChanges: port(),

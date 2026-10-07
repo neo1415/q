@@ -41,6 +41,10 @@
       "types": "./dist/images/google.d.ts",
       "default": "./dist/images/google.js"
     },
+    "./images/stock": {
+      "types": "./dist/images/stock.d.ts",
+      "default": "./dist/images/stock.js"
+    },
     "./realtime": {
       "types": "./dist/realtime/index.d.ts",
       "default": "./dist/realtime/index.js"

@@ -84,6 +84,20 @@ function subjectWords(intent: QShowInQRoomIntent): {
     CAPITAL_ROUND: ["round", "raise"],
     GATEQ_APPLICATION: ["application", "applicant"],
     SOURCES: ["sources", "news", "articles", "links"],
+    // The deck stays while they work on it: slides, pictures, edits.
+    Q_DOCUMENT: [
+      "deck",
+      "slide",
+      "slides",
+      "document",
+      "picture",
+      "photo",
+      "image",
+      "upload",
+      "title",
+      "one pager",
+      "memo",
+    ],
   };
   return { names, kinds: kinds[intent.object] };
 }
@@ -132,9 +146,31 @@ function pointsBack(text: string): boolean {
   return POINTING.some((word) => has(text, word));
 }
 
+/** Q room W5: the documents Q makes that open in the room as a deck surface. */
+const ROOM_DOCUMENT_TYPES: ReadonlySet<string> = new Set([
+  "PITCH_DECK",
+  "ONE_PAGER",
+  "MEMO",
+]);
+
 function showsOf(turn: Extract<QTurn, { kind: "Q" }>): QShowInQRoomIntent[] {
   const out: QShowInQRoomIntent[] = [];
   for (const block of turn.blocks) {
+    // Q room W5: a deck, one-pager or memo Q made or changed in this
+    // answer opens in the room (its card on the answer is the record).
+    if (
+      block.kind === "ARTIFACT_REFERENCE" &&
+      ROOM_DOCUMENT_TYPES.has(block.type)
+    ) {
+      const parsed = QShowInQRoomIntentSchema.safeParse({
+        kind: "SHOW_IN_Q_ROOM",
+        object: "Q_DOCUMENT",
+        id: block.artifactId,
+        title: block.title.slice(0, 120),
+      });
+      if (parsed.success) out.push(parsed.data);
+      continue;
+    }
     if (block.kind !== "UI_INTENT") continue;
     const parsed = QShowInQRoomIntentSchema.safeParse(block.intent);
     if (parsed.success) out.push(parsed.data);
@@ -162,6 +198,8 @@ export function describeCard(intent: QShowInQRoomIntent): string {
       return `${intent.title}'s application`;
     case "SOURCES":
       return "the sources";
+    case "Q_DOCUMENT":
+      return intent.title;
   }
 }
 
@@ -204,6 +242,12 @@ export function roomStage(turns: readonly QTurn[]): RoomStage {
     const shows = showsOf(turn);
     const shown = shows.at(-1);
     if (shown !== undefined) {
+      // The same document again (a new version of the deck on screen):
+      // it stays where it is, on its slide.
+      if (open !== null && open.key === keyOf(shown)) {
+        asked = null;
+        continue;
+      }
       const card: RoomCard = {
         key: keyOf(shown),
         intent: shown,

@@ -51,7 +51,8 @@ export const COMPANY_ANALYST_V18: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V17,
   version: 18,
-  status: "ACTIVE",
+  // Deprecated by v19 (one-pagers and memos, Q room W5, 2026-10-07).
+  status: "DEPRECATED",
   changeDescription:
     "Autopilot P2 (2026-10-06): fit as Capital Q's computed score out of 10 beside its words when ranking, comparing or assessing companies (ADR 0059; never the model's number, never %); advice opens with an explicit recommendation, the reasons that matter, the biggest risk and the next step.",
   effectiveFrom: "2026-10-06",

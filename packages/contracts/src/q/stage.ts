@@ -26,6 +26,11 @@ export const Q_VISIBLE_STAGES = [
   "PREPARING_ANALYSIS",
   "PREPARING_DOCUMENT",
   "REVISING_DOCUMENT",
+  // Q room W5 (R8): the document pipeline's own stages, so the silence
+  // ladder can say what is happening while a deck is made.
+  "DESIGNING_DOCUMENT",
+  "FINDING_DOCUMENT_IMAGES",
+  "CHECKING_DOCUMENT",
   "WAITING_FOR_REPLY",
   "WAITING_FOR_APPROVAL",
   "COMPLETING_APPROVED_ACTION",
@@ -52,6 +57,9 @@ export const Q_VISIBLE_STAGE_LABELS: Readonly<Record<QVisibleStage, string>> = {
   // Founder live 2026-09-29: a document takes a while; say so and to wait.
   PREPARING_DOCUMENT: "Writing your document. This takes a moment.",
   REVISING_DOCUMENT: "Making your changes to the document. One moment.",
+  DESIGNING_DOCUMENT: "Laying out each page",
+  FINDING_DOCUMENT_IMAGES: "Finding pictures and drawing your charts",
+  CHECKING_DOCUMENT: "Checking every page",
   WAITING_FOR_REPLY: "Waiting for your reply",
   WAITING_FOR_APPROVAL: "Waiting for your approval",
   COMPLETING_APPROVED_ACTION: "Completing the approved action",

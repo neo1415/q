@@ -756,6 +756,13 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Edits a document Q prepared for them (a deck, brief, one-pager or mandate) with the changes they ask for, as a new version: the earlier version is kept and the new card has fresh PDF and PowerPoint downloads.",
     { acts: true },
   ),
+  // Q room W5 (R8): one typed change by slide.
+  tool(
+    "edit_my_document",
+    "DOCUMENT",
+    "Makes one change to a document Q made for them, by slide (shorter, a new title, a different picture, a slide removed or moved), as a new version; the room stays on that slide.",
+    { acts: true },
+  ),
   tool(
     "use_capability",
     "NAVIGATION",

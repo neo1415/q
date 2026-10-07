@@ -236,6 +236,25 @@ function phraseFor(
         verbs: ["making the changes to", "working your edits into", "updating"],
         object: "the document",
       };
+    case "DESIGNING_DOCUMENT":
+      return {
+        verbs: ["laying out", "designing", "arranging"],
+        object: "the pages",
+      };
+    case "FINDING_DOCUMENT_IMAGES":
+      return {
+        verbs: [
+          "finding pictures for",
+          "drawing the charts for",
+          "picking images for",
+        ],
+        object: name === undefined ? "your document" : theirs("document"),
+      };
+    case "CHECKING_DOCUMENT":
+      return {
+        verbs: ["checking", "going over", "proofing"],
+        object: "every page",
+      };
     case "COMPLETING_APPROVED_ACTION":
       return {
         verbs: ["finishing", "wrapping up", "completing"],

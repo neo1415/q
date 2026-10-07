@@ -122,6 +122,42 @@ export function setViewerDocument(artifactId: string | null): void {
 }
 
 /**
+ * Q room W5 (R8): the deck open in the Q room, its slide and the version
+ * on screen. Wins over the other viewers while the room shows it.
+ */
+let roomDeck: {
+  readonly artifactId: string;
+  readonly slide: number;
+  readonly version: number | null;
+} | null = null;
+
+export function setRoomDeck(
+  deck: {
+    readonly artifactId: string;
+    readonly slide: number;
+    readonly version: number | null;
+  } | null,
+): void {
+  roomDeck =
+    deck !== null &&
+    UUID.test(deck.artifactId) &&
+    Number.isInteger(deck.slide) &&
+    deck.slide >= 1 &&
+    deck.slide <= 24
+      ? {
+          artifactId: deck.artifactId.toLowerCase(),
+          slide: deck.slide,
+          version:
+            deck.version !== null &&
+            Number.isInteger(deck.version) &&
+            deck.version >= 1
+              ? deck.version
+              : null,
+        }
+      : null;
+}
+
+/**
  * What the page says is in front of the person (R18/R21): the Discover
  * card's company, and its pitch and position when one is playing or
  * paused. Registered by the page (through the global Q moment source) and
@@ -179,7 +215,16 @@ export function currentScreen(
   // What Q's viewers show are documents Q made for them (artifacts): they
   // ride as artifactId, read on the server through read_my_document.
   const open = openDocumentId ?? viewerDocumentId;
-  if (open !== null) screen = { ...screen, artifactId: open };
+  if (roomDeck !== null) {
+    screen = {
+      ...screen,
+      artifactId: roomDeck.artifactId,
+      artifactSlide: roomDeck.slide,
+      ...(roomDeck.version === null
+        ? {}
+        : { artifactVersion: roomDeck.version }),
+    };
+  } else if (open !== null) screen = { ...screen, artifactId: open };
   // Q room R1: the whole page, as ids and closed kinds only.
   const manifest = currentManifest();
   return manifest === undefined ? screen : { ...screen, manifest };

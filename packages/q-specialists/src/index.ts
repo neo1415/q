@@ -204,6 +204,40 @@ export {
   type StudioBrand,
 } from "./company/document-studio.js";
 
+// Q room W5 (R8): the document pipeline.
+export { visibleStageOf } from "./company/prepare-artifact.js";
+export {
+  applyDocumentEdit,
+  editInstruction,
+  fillInstruction,
+  fillPlaceholder,
+  groundingOf,
+  type ComposedDocument,
+  type DocumentEditOutcome,
+} from "./company/document-edits.js";
+export type { DocumentPipelinePort } from "./company/artifact-port.js";
+export {
+  addGapPlaceholders,
+  applyFixes,
+  chooseLayouts,
+  composeGeneralDocument,
+  creditInNotes,
+  DOCUMENT_KINDS,
+  FIX_ROUNDS_MAX,
+  GENERATED_IMAGES_MAX,
+  markOwnPictureSpaces,
+  reviewDocument,
+  runDocumentPipeline,
+  SLIDE_BODY_WORDS_MAX,
+  type DocumentCritic,
+  type DocumentFix,
+  type DocumentKind,
+  type DocumentPipelineInput,
+  type DocumentPipelineResult,
+  type DocumentReview,
+  type OwnPicturePort,
+} from "./company/document-pipeline.js";
+
 // DOCS block: generated illustrations.
 export {
   illustrateWithGenerated,
