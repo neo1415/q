@@ -20,7 +20,8 @@ import type { EligibilityService } from "../eligibility/service.js";
 import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
 
 import { FIT_CONFIG_CURRENT, type FitConfig } from "./config.js";
-import { assessFit, compareAssessments, type FitAssessment } from "./model.js";
+import { assessFit, type FitAssessment } from "./model.js";
+import { compareFitOrder, fitOrderScore } from "./order.js";
 import { observeFit, type DeclaredFitFacts } from "./observe.js";
 
 /**
@@ -254,7 +255,14 @@ export function buildFitComparison(input: {
         i.assessment.profile.band !== "OUTSIDE_MANDATE" &&
         i.assessment.profile.band !== "NOT_ENOUGH_INFORMATION",
     )
-    .sort((a, b) => compareAssessments(a.assessment, b.assessment))
+    // The same comparator as the Discover feed (fit-order.v1): a higher
+    // score out of 10 is never listed below a lower one.
+    .sort((a, b) =>
+      compareFitOrder(
+        { assessment: a.assessment, score: fitOrderScore(a.assessment) },
+        { assessment: b.assessment, score: fitOrderScore(b.assessment) },
+      ),
+    )
     .slice(0, input.limit);
 
   const bestOn = (index: number): FitParameter[] =>

@@ -24,7 +24,11 @@ import { z } from "zod";
  * Inference server on a private network; a hosted provider would be another
  * code behind the same port, added only by an explicit decision.
  */
-export const EMBEDDING_PROVIDER_CODES = ["local-tei", "fake"] as const;
+export const EMBEDDING_PROVIDER_CODES = [
+  "local-tei",
+  "openai",
+  "fake",
+] as const;
 export const EmbeddingProviderCodeSchema = z.enum(EMBEDDING_PROVIDER_CODES);
 export type EmbeddingProviderCode = z.infer<typeof EmbeddingProviderCodeSchema>;
 
@@ -32,6 +36,8 @@ export type EmbeddingProviderCode = z.infer<typeof EmbeddingProviderCodeSchema>;
 export const EMBEDDING_RUNTIME_KINDS = [
   "LOCAL_HTTP",
   "PRIVATE_NETWORK_HTTP",
+  /** A reviewed hosted provider over HTTPS (Q.02: OpenAI). */
+  "HOSTED_API",
   "IN_PROCESS_FAKE",
 ] as const;
 export const EmbeddingRuntimeKindSchema = z.enum(EMBEDDING_RUNTIME_KINDS);

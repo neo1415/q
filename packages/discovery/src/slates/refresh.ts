@@ -13,7 +13,7 @@ import { STRUCTURED_GENERATOR_VERSION } from "../candidates/contracts.js";
 import { ELIGIBILITY_POLICY_VERSION } from "../eligibility/contracts.js";
 import { DISCOVERABLE_VISIBILITIES } from "../eligibility/policy.js";
 import { FEATURE_SCHEMA_VERSION } from "../features/contracts.js";
-import { RANKING_CONFIG_CURRENT } from "../ranking/config.js";
+import { FIT_ORDER_CURRENT } from "../fit/order.js";
 import { RANKER_VERSION } from "../ranking/contracts.js";
 import { SEMANTIC_GENERATOR_VERSION } from "../semantic/contracts.js";
 import {
@@ -612,7 +612,8 @@ export const DEPLOYED_SLATE_VERSIONS: DeployedSlateVersions = Object.freeze({
   semanticGeneratorVersion: SEMANTIC_GENERATOR_VERSION,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
   rankerVersion: RANKER_VERSION,
-  rankingConfigVersion: RANKING_CONFIG_CURRENT.version,
+  // The production pipeline always orders by fit (Q.06, fit-order.v1).
+  rankingConfigVersion: FIT_ORDER_CURRENT.version,
 });
 
 /**

@@ -34,7 +34,7 @@ import {
   type DeployedSlateVersions,
   type RefreshQueue,
 } from "../src/slates/refresh.js";
-import { RANKING_CONFIG_CURRENT } from "../src/ranking/config.js";
+import { FIT_ORDER_CURRENT } from "../src/fit/order.js";
 import { memorySlates } from "./support/memory-slates.js";
 
 /**
@@ -739,8 +739,9 @@ describe("a deploy with newer pipeline versions rebuilds the slates the old one 
   const same: DeployedSlateVersions = recorded;
 
   it("the deployed versions are the ones the builder writes", () => {
+    // Q.06: the production pipeline orders by fit, and records it.
     expect(DEPLOYED_SLATE_VERSIONS.rankingConfigVersion).toBe(
-      RANKING_CONFIG_CURRENT.version,
+      FIT_ORDER_CURRENT.version,
     );
     expect(DEPLOYED_SLATE_VERSIONS.rankerVersion).toBe(RANKER_VERSION);
     expect(versionDrift(recorded, same)).toEqual([]);

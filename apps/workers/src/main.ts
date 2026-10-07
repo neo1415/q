@@ -25,6 +25,7 @@ import {
   createPostgresCapitalObjectiveTimes,
 } from "@capital-q/capital";
 import {
+  CompanyIdSchema,
   createCompanyService,
   createPostgresCompanyQueryPort,
 } from "@capital-q/companies";
@@ -46,7 +47,6 @@ import {
   Q_INSTRUCTION_WAKE_CHANNEL,
   Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
   Q_WORK_WAKE_CHANNEL,
-  type ModelDataPosture,
 } from "@capital-q/contracts";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import {
@@ -99,11 +99,6 @@ import {
   systemDisclosureClock,
 } from "@capital-q/permissions";
 import {
-  createEmbeddingService,
-  createLocalTeiEmbeddingProvider,
-  QWEN3_EMBEDDING_CONFIGURATION,
-} from "@capital-q/q-embeddings";
-import {
   createPostgresTaxonomyLexicalSearchRepository,
   createPostgresTaxonomyReferenceRepository,
   createTaxonomyCandidateFinder,
@@ -117,18 +112,6 @@ import {
   createVerificationClaimsReadinessPort,
 } from "@capital-q/verification";
 import { modelProviderConfigStatus } from "@capital-q/config/model-providers";
-import {
-  createModelGateway,
-  createModelProviderRegistry,
-  createSyntheticDemoRoutingAllowance,
-  createPostgresModelCatalog,
-  createPostgresModelUsageRepository,
-  createProcessLocalProviderHealth,
-  type ModelProvider,
-} from "@capital-q/model-gateway";
-import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
-import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
-import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import {
   createWordsReaders,
   budgetForTaskClass,
@@ -177,7 +160,10 @@ import { withCommitmentNotices } from "./network/commitment-notice-handler.js";
 import { newlyReadyCompanyOf } from "./network/newly-ready-company.js";
 import { createStartupAlertWatcher } from "./network/startup-alert-watcher.js";
 import { withDiligenceSummaries } from "./network/diligence-summary-handler.js";
-import { withDeckReadings } from "./evidence/deck-reading-handler.js";
+import {
+  runUnreadDeckAlerts,
+  withDeckReadings,
+} from "./evidence/deck-reading-handler.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
@@ -226,6 +212,12 @@ import {
 import { runAutoVerificationRequests } from "./verification/auto-request.js";
 // end ADMIN-4 block
 import { composeDocumentJobs } from "./documents/composition.js";
+import { composeWorkerModelGateway } from "./model-gateway.js";
+import {
+  composeRecommendationEmbedder,
+  refreshCompanyEmbeddings,
+  runCompanyEmbeddingRefresh,
+} from "./recommendations/embeddings.js";
 import { runDocumentJobTicker } from "./documents/document-jobs.js";
 
 const SERVICE_NAME = "workers";
@@ -280,75 +272,15 @@ const runner = createOutboxPublisherRunner({
  * without a review rather than stalling on one.
  */
 const providerSecrets = config.secrets.modelProviders;
-const modelProviders: ModelProvider[] = [];
-if (providerSecrets.google !== undefined) {
-  modelProviders.push(
-    createGoogleModelProvider({ apiKey: providerSecrets.google.reveal() }),
-  );
-}
-if (providerSecrets.groq !== undefined) {
-  modelProviders.push(
-    createGroqModelProvider({
-      apiKey: providerSecrets.groq.reveal(),
-      additionalApiKeys: providerSecrets.groqKeys
-        .slice(1)
-        .map((key) => key.reveal()),
-    }),
-  );
-}
-// The routing policies name gpt-5.6-luna first for every task class
-// (20261008130000). A provider the catalogue routes to but nobody
-// registered is PROVIDER_UNCONFIGURED on every call, so every request
-// silently fell to the Gemini fallbacks and failed with them.
-if (providerSecrets.openai !== undefined) {
-  modelProviders.push(
-    createOpenAIModelProvider({ apiKey: providerSecrets.openai.reveal() }),
-  );
-}
-
-/**
- * Doc 15 §62: free/shared inference may be used aggressively for synthetic
- * data and development, while confidential customer information still
- * requires an approved provider. This is the attestation that this
- * deployment holds the former — an operator opt-in, checked again against
- * the environment and the database before it counts for anything. Null
- * everywhere a real customer is served, which is what makes a
- * SYNTHETIC_DEMO posture inert there.
- */
-const syntheticDemo = createSyntheticDemoRoutingAllowance({
-  operatorEnabled: providerSecrets.syntheticDemoRouting,
-  environment: config.runtime.deploymentEnvironment,
-  databaseUrl: databaseConfig.secrets.url,
-  // Hosted staging attests the same way q-api does (QX-004 §0.3): without
-  // these the opt-in throws at startup on Railway, so the worker could only
-  // ever run REAL_CUSTOMER there while q-api ran the synthetic posture.
-  hostedAttested: providerSecrets.syntheticDemoAttested,
-  ...(providerSecrets.syntheticDemoProjectRef === undefined
-    ? {}
-    : { syntheticProjectRef: providerSecrets.syntheticDemoProjectRef }),
-  supabaseUrl: config.public.supabaseUrl,
-});
-/**
- * What kind of material this worker handles (CQ-REC-008 entry gate).
- *
- * REC-007 gave the gateway an attestation and the Q answer path a posture,
- * and left every worker request declaring nothing — which means
- * REAL_CUSTOMER, which means a demo full of invented founders was still
- * pushing document extraction through the reviewed provider and its free
- * tier. The attestation already proves the whole deployment is synthetic:
- * an operator opted in, the environment is local or test, and the database
- * is loopback. Nothing about an individual job decides this, because
- * nothing about an individual job could be trusted to.
- */
-const demoDataPosture: ModelDataPosture =
-  syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO";
-
-const modelGateway = createModelGateway({
-  catalog: createPostgresModelCatalog({ sql: database.sql }),
-  registry: createModelProviderRegistry(modelProviders),
-  usage: createPostgresModelUsageRepository({ sql: database.sql }),
-  health: createProcessLocalProviderHealth(),
+const {
+  providers: modelProviders,
   syntheticDemo,
+  dataPosture: demoDataPosture,
+  gateway: modelGateway,
+} = composeWorkerModelGateway({
+  config,
+  databaseUrl: databaseConfig.secrets.url,
+  sql: database.sql,
   logger,
 });
 
@@ -587,11 +519,19 @@ const disclosure = createDisclosureAccessService({
   clock: systemDisclosureClock,
 });
 const embeddingConfig = loadEmbeddingConfig();
-if (embeddingConfig.missing.length > 0) {
-  // Named at startup rather than discovered per request: outside local the
-  // runtime has no default address, so semantic candidates stay off.
+// Q.02: TEI (local) or the hosted OpenAI adapter (Q_EMBEDDING_PROVIDER=openai).
+const recommendationEmbedder = composeRecommendationEmbedder({
+  config: embeddingConfig,
+  openaiApiKey: providerSecrets.openai?.reveal(),
+});
+if (recommendationEmbedder.missing.length > 0) {
+  // Named at startup rather than discovered per request: semantic
+  // candidates stay off and semantic fit stays unknown, never zero.
   logger.warn(
-    { missing: embeddingConfig.missing },
+    {
+      provider: embeddingConfig.provider,
+      missing: recommendationEmbedder.missing,
+    },
     "embedding runtime not configured: semantic retrieval disabled",
   );
 }
@@ -610,16 +550,34 @@ const recommendations = createRecommendationPipeline({
       sql: database.sql,
     }).latestCreatedAt,
   }),
-  embedder: createEmbeddingService({
-    provider: createLocalTeiEmbeddingProvider({
-      baseUrl: embeddingConfig.baseUrl,
-      configuration: {
-        ...QWEN3_EMBEDDING_CONFIGURATION,
-        maxBatchItems: embeddingConfig.maxBatchItems,
-      },
-      timeoutMs: embeddingConfig.timeoutMs,
-    }),
-  }),
+  // Q.02/Q.06: the raise behind the fit order's cheque comparison. The
+  // pipeline asks disclosure as the investor organisation before using it.
+  currentRaises: async (companyIds) => {
+    const found = await Promise.all(
+      companyIds.map(async (raw) => {
+        const id = CompanyIdSchema.safeParse(raw);
+        if (!id.success) return null;
+        const company = await disclosurePorts.companies.findCanonicalCompany(
+          id.data,
+        );
+        if (company === null) return null;
+        const objective = await disclosurePorts.capital.getCurrentForCompany(
+          company.tenantId,
+          company.id,
+        );
+        return objective === null || objective.status !== "ACTIVE"
+          ? null
+          : {
+              objectiveId: objective.id,
+              companyId: objective.companyId,
+              amount: objective.target.amount,
+              currency: objective.target.currency,
+            };
+      }),
+    );
+    return found.filter((raise) => raise !== null);
+  },
+  embedder: recommendationEmbedder.embedder,
   logger,
 });
 const refreshRequester = createRefreshRequester({
@@ -1255,16 +1213,31 @@ logger.info({ contracts: CONTRACTS_VERSION }, "worker runtime started");
 // policy or the feature schema asks for NORMAL rebuilds of the slates built
 // by the old pipeline; the feed keeps serving them until superseded. Never
 // fatal: an expiry still refreshes a slate this misses.
-void requestRebuildsForVersionDrift({
-  slates: recommendations.slates,
-  requester: refreshRequester,
-  logger,
-}).catch((error: unknown) => {
-  logger.warn(
-    { error: error instanceof Error ? error.name : "UNKNOWN" },
-    "discovery.slates.version_drift_failed",
-  );
-});
+// Q.02: company vectors first (bounded; embeds only what is missing or
+// changed), so the rebuilds below can use semantic fit.
+const COMPANY_EMBEDDING_REFRESH_LIMIT = 500;
+void (
+  recommendationEmbedder.missing.length > 0
+    ? Promise.resolve(false)
+    : refreshCompanyEmbeddings({
+        semantic: recommendations.semantic,
+        logger,
+        limit: COMPANY_EMBEDDING_REFRESH_LIMIT,
+      })
+)
+  .then(() =>
+    requestRebuildsForVersionDrift({
+      slates: recommendations.slates,
+      requester: refreshRequester,
+      logger,
+    }),
+  )
+  .catch((error: unknown) => {
+    logger.warn(
+      { error: error instanceof Error ? error.name : "UNKNOWN" },
+      "discovery.slates.version_drift_failed",
+    );
+  });
 
 // relationship-state.v2 (2026-10-02): caches folded by an older projector
 // version, or behind their history, are re-folded from history in the
@@ -1337,6 +1310,29 @@ await Promise.all([
   ...(daily === undefined
     ? []
     : [runDailyTicker({ daily, signal: shutdownController.signal, logger })]),
+  ...(recommendationEmbedder.missing.length > 0
+    ? []
+    : [
+        runCompanyEmbeddingRefresh({
+          semantic: recommendations.semantic,
+          logger,
+          limit: COMPANY_EMBEDDING_REFRESH_LIMIT,
+          intervalMs: 30 * 60 * 1000,
+          signal: shutdownController.signal,
+        }),
+      ]),
+  // Q.08: a ready deck unread after 10 minutes is an error line
+  // (alert DECK_READING_MISSING), only where decks can be read at all.
+  ...(deckReader === undefined
+    ? []
+    : [
+        runUnreadDeckAlerts({
+          sql: database.sql,
+          logger,
+          intervalMs: 15 * 60 * 1000,
+          signal: shutdownController.signal,
+        }),
+      ]),
   // ADMIN-4 block
   runAutoVerificationRequests({
     sweep: autoVerificationSweep,
