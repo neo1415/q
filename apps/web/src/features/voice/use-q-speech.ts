@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Q_SPEECH_MAX_CHARS, type QVoiceChoice } from "@capital-q/contracts";
+import type { QVoiceChoice } from "@capital-q/contracts";
+
+import { Q_SPEECH_MAX_CHARS } from "../q/wire-constants";
 
 /**
  * Hearing Q, without talking to it (Q-FIRST-RUN-TTS-001).

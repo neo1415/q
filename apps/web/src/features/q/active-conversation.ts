@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-import { QConversationIdSchema } from "@capital-q/contracts";
+import { conversationIdOf } from "./wire-constants";
 
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 
@@ -40,8 +40,8 @@ function readAll(): Record<string, string> {
     const out: Record<string, string> = {};
     for (const [surface, value] of Object.entries(parsed)) {
       // Whatever is in storage is input, not a fact.
-      const id = QConversationIdSchema.safeParse(value);
-      if (id.success) out[surface] = id.data;
+      const id = conversationIdOf(value);
+      if (id !== undefined) out[surface] = id;
     }
     return out;
   } catch {
@@ -65,7 +65,7 @@ export function rememberActiveConversation(
     delete all[surface];
   } else {
     if (all[surface] === conversationId) return;
-    if (!QConversationIdSchema.safeParse(conversationId).success) return;
+    if (conversationIdOf(conversationId) === undefined) return;
     all[surface] = conversationId;
   }
   try {

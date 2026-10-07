@@ -6,29 +6,33 @@
  * a date is returned as it came rather than shown as "Invalid Date".
  */
 
-const DAY = new Intl.DateTimeFormat("en-GB", {
+/**
+ * Each formatter is made the first time it is used (Q room W7): building
+ * four at once was a measurable part of every page's start-up script on a
+ * slow phone, and most pages format no date before the first paint.
+ */
+function lazy(options: Intl.DateTimeFormatOptions): () => Intl.DateTimeFormat {
+  let made: Intl.DateTimeFormat | null = null;
+  return () => (made ??= new Intl.DateTimeFormat("en-GB", options));
+}
+
+const DAY = lazy({
   day: "numeric",
   month: "short",
   year: "numeric",
   timeZone: "UTC",
 });
 
-const LONG_DAY = new Intl.DateTimeFormat("en-GB", {
+const LONG_DAY = lazy({
   day: "numeric",
   month: "long",
   year: "numeric",
   timeZone: "UTC",
 });
 
-const DAY_NO_YEAR = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-});
+const DAY_NO_YEAR = lazy({ day: "numeric", month: "short" });
 
-const TIME = new Intl.DateTimeFormat("en-GB", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
+const TIME = lazy({ hour: "2-digit", minute: "2-digit" });
 
 function parse(value: string): Date | null {
   const at = /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -40,13 +44,13 @@ function parse(value: string): Date | null {
 /** "27 Sept 2026". */
 export function formatDay(value: string): string {
   const at = parse(value);
-  return at === null ? value : DAY.format(at);
+  return at === null ? value : DAY().format(at);
 }
 
 /** "27 September 2026", for a single fact given room (a founding date). */
 export function formatLongDay(value: string): string {
   const at = parse(value);
-  return at === null ? value : LONG_DAY.format(at);
+  return at === null ? value : LONG_DAY().format(at);
 }
 
 /** "27 Sept 2026, 06:54": an instant, in the reader's own time. */
@@ -58,7 +62,7 @@ export function formatDayTime(value: string): string {
     month: "short",
     year: "numeric",
   }).format(at);
-  return `${day}, ${TIME.format(at)}`;
+  return `${day}, ${TIME().format(at)}`;
 }
 
 /** A list's compact stamp: the time today, "27 Sept" otherwise. */
@@ -66,6 +70,6 @@ export function formatStamp(value: string, now: Date = new Date()): string {
   const at = parse(value);
   if (at === null) return value;
   return at.toDateString() === now.toDateString()
-    ? TIME.format(at)
-    : DAY_NO_YEAR.format(at);
+    ? TIME().format(at)
+    : DAY_NO_YEAR().format(at);
 }

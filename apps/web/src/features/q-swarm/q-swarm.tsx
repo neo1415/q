@@ -4,23 +4,11 @@ import { useEffect, useRef } from "react";
 
 import { useQMotion } from "../q-aperture/q-motion";
 import type { QApertureState } from "../q-aperture/aperture-state";
-import { FINE_FIGURES } from "./presence-figures";
-import {
-  faceAllowed,
-  figureForState,
-  presenceFor,
-  SMALL_PIXELS,
-} from "./presence-machine";
-import { createPresenceSim, MAX_DT } from "./presence-dynamics";
-import {
-  budgetSettings,
-  createBudget,
-  scaledParticleCount,
-  stepBudget,
-  surfaceDpr,
-} from "./presence-budget";
-import { drawPresence, resolveColour, type Rgb } from "./presence-gl";
-import { presenceUniforms, stepLean, type Lean } from "./presence-uniforms";
+import { faceAllowed } from "./presence-machine";
+import { surfaceDpr } from "./presence-budget";
+import { resolveColour, type Rgb } from "./presence-gl";
+import { whenIdle } from "../q/room/room-read";
+import { startPresenceLoop, type PresenceInputs } from "./presence-loop";
 
 export { particleCount } from "./presence-budget";
 
@@ -47,11 +35,8 @@ export { particleCount } from "./presence-budget";
  * other surface has no face. Below 72 px only the cloud, the listening
  * lean, the spiral and the ring are drawn. Reduced motion draws each
  * figure still, in one turned pose. Off screen or in a hidden tab,
- * nothing runs.
+ * nothing runs. Q room W7: at most 30 frames a second (presence-loop.ts).
  */
-
-type Renderer = "pending" | "3d" | "2d";
-type Draw3d = typeof import("./presence-3d").drawPresence3d;
 
 export function QSwarm({
   state,
@@ -101,67 +86,28 @@ export function QSwarm({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
-    const context = canvas.getContext("2d");
-    if (context === null) return;
-    const baseDpr = surfaceDpr(window.devicePixelRatio);
-    let device = 0;
-    const fit = (dprScale: number) => {
-      // The canvas's CSS size never changes: a lower DPR is no layout shift.
-      device = Math.max(1, Math.round(pixels * baseDpr * dprScale));
-      canvas.width = device;
-      canvas.height = device;
-    };
-    fit(1);
-    const small = pixels < SMALL_PIXELS;
-    const sim = createPresenceSim({
-      count: scaledParticleCount(pixels, navigator.hardwareConcurrency),
-      // A surface opens already in its state's shape: no flourish on mount.
-      initial: figureForState(
-        live.current.state,
-        small,
-        live.current.showsFace,
-      ),
-      seed: pixels * 7 + 3,
-    });
-
-    let renderer: Renderer = allow3d ? "pending" : "2d";
-    let draw3d: Draw3d | null = null;
-    let disposed = false;
-    const setRenderer = (next: Renderer) => {
-      renderer = next;
-      canvas.dataset["qRenderer"] = next;
-    };
-    setRenderer(renderer);
-
     // Q's own colour: the accent, unless Q's patience is running out
     // (founder direction 2026-09-30): orange when impatient, red when
     // stern, set on the document as data-q-mood.
-    let colour: Rgb = [0.42, 0.66, 1];
-    let dark = true;
-    const readColour = () => {
+    const readColour = (): { colour: Rgb; dark: boolean } => {
       const style = getComputedStyle(canvas);
       const mood = style.getPropertyValue("--cq-q-colour").trim();
       const value =
         mood.length > 0 ? mood : style.getPropertyValue("--cq-accent").trim();
-      colour = resolveColour(value.length > 0 ? value : "#6aa8ff");
-      dark = surfaceIsDark(canvas);
+      return {
+        colour: resolveColour(value.length > 0 ? value : "#6aa8ff"),
+        dark: surfaceIsDark(canvas),
+      };
     };
-    readColour();
-
-    const eased = { input: 0, output: 0 };
-    const levels = () => ({
-      input: clampLevel(live.current.inputLevel?.() ?? 0),
-      output: clampLevel(live.current.outputLevel?.() ?? 0),
+    const inputs = (): PresenceInputs => ({
+      state: live.current.state,
+      showsFace: live.current.showsFace,
+      showing: live.current.showing,
+      motion: live.current.motion,
+      bloom: live.current.bloom,
     });
-    let figure = "";
-    const note = (next: string) => {
-      if (next === figure) return;
-      figure = next;
-      canvas.dataset["qFigure"] = next;
-    };
 
-    // The cursor lean: where the pointer is, relative to Q, on a spring.
-    const lean: Lean = { x: 0, y: 0, vx: 0, vy: 0 };
+    // The cursor lean: where the pointer is, relative to Q.
     let pointer: { x: number; y: number } | null = null;
     const leanTarget = () => {
       if (pointer === null) return { x: 0, y: 0 };
@@ -172,128 +118,37 @@ export function QSwarm({
         y: clampUnit((pointer.y - (rect.top + rect.height / 2)) / reach),
       };
     };
-
-    let budget = createBudget();
-    let raf = 0;
-    let onScreen = true;
-    let last = 0;
-    let clock = 0;
-    let core = 1;
-    let stepped = 0;
-    const frame = (now: number) => {
-      const began = performance.now();
-      const current = live.current;
-      const view = presenceFor({
-        state: current.state,
-        small,
-        face: current.showsFace,
-        showing: current.showing,
-      });
-      const moving = current.motion === "full";
-      const interval = last === 0 ? 0 : now - last;
-      if (moving) {
-        sim.setFigure(view.figure);
-        // The swarm's own clock advances by the step it integrates, so a
-        // slow device sees the same swarm, slower -- never one whose
-        // particles trail a figure that runs on ahead in real time.
-        const dt = Math.min(MAX_DT, last === 0 ? 1 / 60 : interval / 1000);
-        last = now;
-        clock += dt;
-        stepped = dt;
-        const raw = levels();
-        sim.step(clock, dt, raw);
-        const k = (was: number, next: number) =>
-          1 - Math.exp(-Math.min(dt, 1 / 30) * (next > was ? 26 : 8));
-        eased.input += (raw.input - eased.input) * k(eased.input, raw.input);
-        eased.output +=
-          (raw.output - eased.output) * k(eased.output, raw.output);
-        const aim = leanTarget();
-        stepLean(lean, aim.x, aim.y, dt);
-      } else if (sim.figure() !== view.figure || figure === "") {
-        // Reduced motion: each figure drawn still, no flow between.
-        sim.settle(view.figure, clock, { input: 0, output: 0 });
-      }
-      note(view.figure);
-      const target = presenceUniforms({
-        state: current.state,
-        figure: sim.figure(),
-        input: moving ? eased.input : 0,
-        output: moving ? eased.output : 0,
-        leanX: lean.x,
-        leanY: lean.y,
-        t: clock,
-        motion: current.motion,
-        dim: view.dim,
-        keep: budgetSettings(budget).keep,
-      });
-      // The white core follows the particles, not the figure's name: it
-      // fades in as a glyph flows back into the cloud, never ahead of it.
-      core = moving
-        ? core + (target.core - core) * (1 - Math.exp(-stepped * 1.8))
-        : target.core;
-      const uniforms = { ...target, core };
-      if (renderer === "3d" && draw3d !== null) {
-        const drawn = draw3d(context, sim, {
-          pixels: device,
-          colour,
-          dark,
-          bloom: current.bloom,
-          uniforms,
-        });
-        // A lost context: the 2D swarm from here on.
-        if (!drawn) setRenderer("2d");
-      }
-      if (renderer === "2d") {
-        drawPresence(context, sim, {
-          pixels: device,
-          colour,
-          dim: view.dim,
-          fine: FINE_FIGURES.has(sim.figure()),
-        });
-      }
-      if (moving && renderer !== "pending") {
-        const before = budget.level;
-        budget = stepBudget(budget, interval, performance.now() - began);
-        if (budget.level !== before) fit(budgetSettings(budget).dprScale);
-      }
-      if (moving && onScreen && !document.hidden) {
-        raf = requestAnimationFrame(frame);
-      } else {
-        last = 0;
-      }
+    const levels = () => ({
+      input: clampLevel(live.current.inputLevel?.() ?? 0),
+      output: clampLevel(live.current.outputLevel?.() ?? 0),
+    });
+    const note = (key: "qFigure" | "qRenderer", value: string) => {
+      canvas.dataset[key] = value;
     };
-    const redraw = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(frame);
+    const start = {
+      pixels,
+      dpr: surfaceDpr(window.devicePixelRatio),
+      cores: navigator.hardwareConcurrency,
+      allow3d,
+      inputs: inputs(),
+      ...readColour(),
     };
 
-    if (renderer === "pending") {
-      import("./presence-3d")
-        .then((module) => {
-          if (disposed) return;
-          if (module.presence3dAvailable()) {
-            draw3d = module.drawPresence3d;
-            setRenderer("3d");
-          } else {
-            setRenderer("2d");
-          }
-          redraw();
-        })
-        .catch(() => {
-          if (disposed) return;
-          setRenderer("2d");
-          redraw();
-        });
-    }
-
-    const themeWatch = new MutationObserver(() => {
-      readColour();
-      redraw();
+    const loop = startPresenceLoop({
+      canvas,
+      ...start,
+      levels,
+      leanTarget,
+      hidden: () => document.hidden,
+      note,
+      load3d: () => import("./presence-3d"),
+      requestFrame: (callback) => requestAnimationFrame(callback),
+      cancelFrame: (handle) => cancelAnimationFrame(handle),
+      now: () => performance.now(),
+      // W7: the first frame once the page is idle (at most 600 ms on).
+      begin: (run) => whenIdle(run, 600),
     });
-    themeWatch.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme", "data-q-mood"],
-    });
+    if (loop === null) return;
     const onPointer = (event: PointerEvent) => {
       pointer = { x: event.clientX, y: event.clientY };
     };
@@ -303,6 +158,17 @@ export function QSwarm({
       if (event.type === "pointerout" && event.relatedTarget !== null) return;
       pointer = null;
     };
+    let onScreen = true;
+    const redraw = () => loop.set(inputs());
+
+    const themeWatch = new MutationObserver(() => {
+      const next = readColour();
+      loop.setColour(next.colour, next.dark);
+    });
+    themeWatch.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme", "data-q-mood"],
+    });
     window.addEventListener("pointermove", onPointer, { passive: true });
     window.addEventListener("pointerdown", onPointer, { passive: true });
     window.addEventListener("pointerup", onPointerGone, { passive: true });
@@ -310,27 +176,25 @@ export function QSwarm({
     document.addEventListener("pointerout", onPointerGone, { passive: true });
     const visibility = new IntersectionObserver((entries) => {
       onScreen = entries.some((entry) => entry.isIntersecting);
-      if (onScreen) redraw();
+      loop.setOnScreen(onScreen && !document.hidden);
     });
     visibility.observe(canvas);
     const onHidden = () => {
-      if (!document.hidden) redraw();
+      loop.setOnScreen(onScreen && !document.hidden);
     };
     document.addEventListener("visibilitychange", onHidden);
     canvas.addEventListener("cq:redraw", redraw);
-    redraw();
     return () => {
-      disposed = true;
       window.removeEventListener("pointermove", onPointer);
       window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("pointerup", onPointerGone);
       window.removeEventListener("pointercancel", onPointerGone);
       document.removeEventListener("pointerout", onPointerGone);
       canvas.removeEventListener("cq:redraw", redraw);
-      cancelAnimationFrame(raf);
       themeWatch.disconnect();
       visibility.disconnect();
       document.removeEventListener("visibilitychange", onHidden);
+      loop.dispose();
     };
   }, [pixels, allow3d]);
 

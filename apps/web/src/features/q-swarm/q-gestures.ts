@@ -1,7 +1,6 @@
-import {
-  QSentenceGesturesSchema,
-  type QSentenceGesture,
-} from "@capital-q/contracts";
+import type { QSentenceGesture } from "@capital-q/contracts";
+
+import { wireNow } from "../q/wire";
 
 /**
  * "Q's answer asks its particles for these": one browser event every Q
@@ -44,7 +43,11 @@ export function gesturesDetail(event: Event): QGesturesDetail | null {
   const detail: unknown = event.detail;
   if (typeof detail !== "object" || detail === null) return null;
   const record = detail as Record<string, unknown>;
-  const gestures = QSentenceGesturesSchema.safeParse(record["gestures"]);
+  // W7: checked against the wire's contracts; before they are in (a
+  // moment after the first paint) the particles simply keep their shape.
+  const schema = wireNow()?.QSentenceGesturesSchema;
+  if (schema === undefined) return null;
+  const gestures = schema.safeParse(record["gestures"]);
   if (!gestures.success || typeof record["answerId"] !== "string") return null;
   return {
     answerId: record["answerId"],

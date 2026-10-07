@@ -11,7 +11,9 @@ import {
 import { answerNamesDocument } from "../src/features/q/room/document-room";
 import type { RoomCardResult } from "../src/features/q/room/room-actions";
 import {
+  newUploadDrop,
   roomRead,
+  runUploadDrop,
   UPLOAD_DROPPED,
   uploadResuming,
 } from "../src/features/q/room/room-read";
@@ -113,6 +115,111 @@ describe("uploadResuming", () => {
     const run = vi.fn(() => Promise.resolve(null));
     await expect(uploadResuming(run, () => undefined)).resolves.toBeNull();
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a dropped upload resumes the same upload session (W7)", () => {
+  const TARGET = {
+    uploadSessionId: "00000000-0000-4000-8000-000000000070",
+    url: "https://storage.test/put",
+    method: "PUT",
+    headers: {},
+  };
+  /** A server that keys sessions by idempotency key, as Evidence does. */
+  function server(drops: { target?: number; put?: number; complete?: number }) {
+    const sessions = new Map<string, string>();
+    const documents = new Set<string>();
+    const calls = { target: [] as string[], put: 0, complete: [] as string[] };
+    const left = { target: 0, put: 0, complete: 0, ...drops };
+    return {
+      calls,
+      documents,
+      steps: {
+        target: (key: string) => {
+          calls.target.push(key);
+          // The server acts, then the response is lost.
+          if (!sessions.has(key)) sessions.set(key, TARGET.uploadSessionId);
+          if (left.target-- > 0) return Promise.reject(new Error("dropped"));
+          return Promise.resolve(TARGET);
+        },
+        put: () => {
+          calls.put += 1;
+          if (left.put-- > 0) return Promise.reject(new Error("dropped"));
+          return Promise.resolve(true);
+        },
+        complete: (uploadSessionId: string, key: string) => {
+          calls.complete.push(`${uploadSessionId}:${key}`);
+          documents.add(`document-of-${uploadSessionId}`);
+          if (left.complete-- > 0) return Promise.reject(new Error("dropped"));
+          return Promise.resolve(`document-of-${uploadSessionId}`);
+        },
+      },
+    };
+  }
+
+  it("a lost 'complete' completes the same session on retry: one document", async () => {
+    const s = server({ complete: 1 });
+    const drop = newUploadDrop();
+    const result = await uploadResuming(
+      () => runUploadDrop(drop, s.steps),
+      () => undefined,
+      { pause: noSleep },
+    );
+    expect(result).toBe(`document-of-${TARGET.uploadSessionId}`);
+    expect(s.calls.target).toHaveLength(1);
+    expect(s.calls.put).toBe(1);
+    expect(s.calls.complete).toEqual([
+      `${TARGET.uploadSessionId}:${drop.completeKey}`,
+      `${TARGET.uploadSessionId}:${drop.completeKey}`,
+    ]);
+    expect(s.documents.size).toBe(1);
+  });
+
+  it("'Try again' after two drops carries the same drop: still one document", async () => {
+    const s = server({ complete: 2 });
+    const drop = newUploadDrop();
+    const run = () => runUploadDrop(drop, s.steps);
+    await expect(
+      uploadResuming(run, () => undefined, { pause: noSleep }),
+    ).resolves.toBe(UPLOAD_DROPPED);
+    // The person presses "Try again": the same drop, resumed.
+    await expect(
+      uploadResuming(run, () => undefined, { pause: noSleep }),
+    ).resolves.toBe(`document-of-${TARGET.uploadSessionId}`);
+    expect(s.calls.target).toHaveLength(1);
+    expect(s.calls.put).toBe(1);
+    expect(s.documents.size).toBe(1);
+  });
+
+  it("a lost target answer asks again with the same key; a lost PUT re-sends only the bytes", async () => {
+    const s = server({ target: 1, put: 1 });
+    const drop = newUploadDrop();
+    const run = () => runUploadDrop(drop, s.steps);
+    await expect(run()).rejects.toThrow("dropped");
+    await expect(run()).rejects.toThrow("dropped");
+    await expect(run()).resolves.toBe(`document-of-${TARGET.uploadSessionId}`);
+    expect(s.calls.target).toEqual([drop.key, drop.key]);
+    expect(s.calls.put).toBe(2);
+    expect(s.calls.complete).toHaveLength(1);
+  });
+
+  it("each file chosen is its own drop, with its own keys", () => {
+    const a = newUploadDrop();
+    const b = newUploadDrop();
+    expect(a.key).not.toBe(b.key);
+    expect(a.completeKey).not.toBe(a.key);
+  });
+
+  it("a refused step is an answer, and the drop stays where it was", async () => {
+    const drop = newUploadDrop();
+    await expect(
+      runUploadDrop(drop, {
+        target: () => Promise.resolve(null),
+        put: () => Promise.resolve(true),
+        complete: () => Promise.resolve("never"),
+      }),
+    ).resolves.toBeNull();
+    expect(drop.target).toBeNull();
   });
 });
 

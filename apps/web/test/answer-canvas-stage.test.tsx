@@ -56,7 +56,12 @@ describe("the answer canvas on the stage", () => {
     ];
     const landed = vi.fn();
     const { rerender, queryByTestId } = render(stage(first, landed));
-    expect(document.querySelector('[data-q-canvas="a1"]')).not.toBeNull();
+    // W7: the cards' code loads when they first come on the stage.
+    await waitFor(
+      () =>
+        expect(document.querySelector('[data-q-canvas="a1"]')).not.toBeNull(),
+      { timeout: 10_000 },
+    );
     expect(queryByTestId("mini")).not.toBeNull();
     expect(queryByTestId("full")).toBeNull();
     expect(document.querySelector(".cq-ac-asked")?.textContent).toBe(
@@ -78,13 +83,17 @@ describe("the answer canvas on the stage", () => {
     expect(queryByTestId("full")).not.toBeNull();
   });
 
-  it("keeps the cards for a follow-up about one of them", () => {
+  it("keeps the cards for a follow-up about one of them", async () => {
     const turns = [
       turn("a1", "Three stand out.", true),
       person("p2", "Why is Atlas third?"),
       turn("a2", "Atlas Ledger's revenue is only a claim."),
     ];
     render(stage(turns));
-    expect(document.querySelector('[data-q-canvas="a1"]')).not.toBeNull();
+    await waitFor(
+      () =>
+        expect(document.querySelector('[data-q-canvas="a1"]')).not.toBeNull(),
+      { timeout: 10_000 },
+    );
   });
 });

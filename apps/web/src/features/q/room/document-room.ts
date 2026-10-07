@@ -1,9 +1,7 @@
-import {
-  QDocumentActIntentSchema,
-  type QDocumentActIntent,
-} from "@capital-q/contracts";
+import type { QDocumentActIntent } from "@capital-q/contracts";
 
 import type { QTurn } from "../conversation";
+import { wireNow } from "../wire";
 
 /**
  * Q room W3 (R3, R6): the document open in the Q room, worked by asking.
@@ -47,9 +45,12 @@ export function pageAfter(
 export function documentActsOf(turn: QTurn): readonly QDocumentActIntent[] {
   if (turn.kind !== "Q") return [];
   const out: QDocumentActIntent[] = [];
+  // W7: checked against the wire's contracts; none until they are in.
+  const schema = wireNow()?.QDocumentActIntentSchema;
+  if (schema === undefined) return out;
   for (const block of turn.blocks) {
     if (block.kind !== "UI_INTENT") continue;
-    const parsed = QDocumentActIntentSchema.safeParse(block.intent);
+    const parsed = schema.safeParse(block.intent);
     if (parsed.success) out.push(parsed.data);
   }
   return out;

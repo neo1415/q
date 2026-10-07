@@ -5,12 +5,11 @@ import "@/features/q/answer-canvas.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { createQStreamState } from "@capital-q/api-client";
-import {
-  QConversationDetailSchema,
-  type QArtifactSummary,
-  type QConversationDetail,
-  type QMessage,
-  type QShowInQRoomIntent,
+import type {
+  QArtifactSummary,
+  QConversationDetail,
+  QMessage,
+  QShowInQRoomIntent,
 } from "@capital-q/contracts";
 
 import type {
@@ -28,9 +27,10 @@ import { QPresenceStage } from "@/features/q/q-presence-stage";
 import { QSection, useQDialog } from "@/features/q/q-section";
 import type { RoomCardResult } from "@/features/q/room/room-actions";
 import type { DeckState, FillResult } from "@/features/q/room/deck-actions";
-import { deckDrawingOf } from "@/features/q/room/deck-room";
 import type { DeckLoaders } from "@/features/q/room/q-room-deck";
+import { runUploadDrop } from "@/features/q/room/room-read";
 import { currentScreen } from "@/features/q/screen";
+import { loadWire, wireWarmed, type WireContracts } from "@/features/q/wire";
 
 const RECORD = "/dev/q-room/record";
 const CARD = "/dev/q-room/card";
@@ -80,11 +80,19 @@ function follow(messages: readonly QMessage[], seen: Set<string>): void {
   }
 }
 
-async function fetchRecord(): Promise<QConversationDetail | null> {
+async function fetchRecord(
+  contracts: () => Promise<WireContracts> = loadWire,
+): Promise<QConversationDetail | null> {
   try {
     const response = await fetch(RECORD, { cache: "no-store" });
     if (!response.ok) return null;
-    const detail = QConversationDetailSchema.safeParse(await response.json());
+    // W7: validated as before, with the contracts loaded off the first
+    // paint (as the Q page's own reads do).
+    const [body, { QConversationDetailSchema }] = await Promise.all([
+      response.json() as Promise<unknown>,
+      contracts(),
+    ]);
+    const detail = QConversationDetailSchema.safeParse(body);
     return detail.success ? detail.data : null;
   } catch {
     return null;
@@ -99,6 +107,9 @@ async function loadCard(intent: QShowInQRoomIntent): Promise<RoomCardResult> {
   );
   return (await response.json()) as RoomCardResult;
 }
+
+/** Targets a fixture completed in one step, by drop key. */
+const oneStep = new Map<string, string>();
 
 /**
  * Q room W5: the deck surface's reads and writes, as the test serves them
@@ -120,17 +131,53 @@ const DECK_LOADERS: DeckLoaders = {
     if (response.status === 409) return null;
     // As the real read: a failed read throws, so the room retries it.
     if (!response.ok) throw new Error("Slides read failed.");
-    return deckDrawingOf(await response.json());
+    const [body, { deckDrawingOf }] = await Promise.all([
+      response.json() as Promise<unknown>,
+      import("@/features/q/room/deck-room"),
+    ]);
+    return deckDrawingOf(body);
   },
-  upload: async (file) => {
-    const response = await fetch("/dev/q-room/upload", {
-      method: "POST",
-      body: JSON.stringify({ name: file.name, type: file.type }),
-      cache: "no-store",
-    });
-    const body = (await response.json()) as { documentId: string | null };
-    return body.documentId;
-  },
+  // W7: the real path's steps, resumed per drop: the target (keyed, so a
+  // retry gets the same session back), then "complete" for that session.
+  // A fixture that answers the target without an `uploadSessionId` has
+  // completed it in one step. The bytes themselves are not modelled.
+  upload: (file, _companyId, drop) =>
+    runUploadDrop(drop, {
+      target: async (key) => {
+        const response = await fetch("/dev/q-room/upload", {
+          method: "POST",
+          headers: { "idempotency-key": key },
+          body: JSON.stringify({ name: file.name, type: file.type }),
+          cache: "no-store",
+        });
+        const body = (await response.json()) as {
+          documentId: string | null;
+          uploadSessionId?: string;
+        };
+        if (body.documentId === null) return null;
+        if (body.uploadSessionId === undefined) {
+          oneStep.set(key, body.documentId);
+        }
+        return {
+          uploadSessionId: body.uploadSessionId ?? key,
+          url: "",
+          method: "PUT",
+          headers: {},
+        };
+      },
+      put: () => Promise.resolve(true),
+      complete: async (uploadSessionId, key) => {
+        const done = oneStep.get(drop.key);
+        if (done !== undefined) return done;
+        const response = await fetch("/dev/q-room/upload/complete", {
+          method: "POST",
+          body: JSON.stringify({ uploadSessionId, key }),
+          cache: "no-store",
+        });
+        const body = (await response.json()) as { documentId: string | null };
+        return body.documentId;
+      },
+    }),
   fill: async (input) => {
     const response = await fetch("/dev/q-room/fill", {
       method: "POST",
@@ -155,19 +202,27 @@ export function QRoomHarness() {
   // R9: Q "working", so the edge particles run while a test measures.
   const [working, setWorking] = useState(false);
   const seen = useRef(new Set<string>());
+  // W7: a read applies only if no later read started (the first read's
+  // check now waits for the contracts, so a "Next answer" can overtake it).
+  const reads = useRef(0);
   const read = useCallback(async () => {
+    const mine = (reads.current += 1);
     const detail = await fetchRecord();
-    if (detail !== null) {
+    if (detail !== null && mine === reads.current) {
       setMessages(detail.messages);
       // After the turns render, as the Q page's follow runs.
       window.setTimeout(() => follow(detail.messages, seen.current), 0);
     }
   }, []);
-  // The conversation is read once as the page opens.
+  // The conversation is read once as the page opens. W7: checked once the
+  // wire's contracts are warm: this read checks the fixture against them
+  // in the browser, which the Q page's own first read (a server action)
+  // does not do, so the check waits for them as the Q page's checks do.
   useEffect(() => {
     let live = true;
-    void fetchRecord().then((detail) => {
-      if (live && detail !== null) {
+    const mine = (reads.current += 1);
+    void fetchRecord(wireWarmed).then((detail) => {
+      if (live && detail !== null && mine === reads.current) {
         setMessages(detail.messages);
         for (const message of detail.messages) {
           seen.current.add(message.messageId);

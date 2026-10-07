@@ -131,7 +131,10 @@ function context(): Gl | null {
     antialias: false,
     depth: false,
     stencil: false,
-    preserveDrawingBuffer: true,
+    // W7: the frame is copied onto the surface in the same task it is
+    // drawn in, so the buffer need not outlive it (and is not kept, which
+    // spares the browser a copy each frame).
+    preserveDrawingBuffer: false,
     powerPreference: "low-power",
   });
   if (gl === null) return null;

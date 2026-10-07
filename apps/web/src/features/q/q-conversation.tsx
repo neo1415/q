@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -11,7 +13,6 @@ import {
 } from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
-import { Q_SPEECH_MAX_CHARS } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import {
   Captions,
@@ -45,7 +46,6 @@ import {
 import { QAperture, QLumen } from "../q-aperture";
 import { useQSpeech } from "../voice/use-q-speech";
 import { VoiceMenu } from "../voice/voice-menu";
-import { ArtifactViewer } from "./artifact-viewer";
 import { expectDocument } from "@/features/documents/document-ready";
 import {
   failureMessage,
@@ -63,7 +63,6 @@ import { QAnswer } from "./q-answer";
 import { boardTimeline } from "./board-timeline";
 import { QBoardTimeline } from "./q-board-timeline";
 import { useBoardMarks } from "./q-board";
-import { QHistorySheet } from "./q-history-sheet";
 import { QNow } from "./q-now";
 import { QCanSee } from "./q-can-see";
 import { QPresenceStage, showOnStage } from "./q-presence-stage";
@@ -71,6 +70,22 @@ import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
 import { useFollowNewest } from "./follow-newest";
 import { threadInOrder, type SpokenLine } from "./spoken";
+import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
+
+/*
+ * Q room W7: what opens on request -- a document Q made, the previous
+ * conversations -- loads when first opened, not with the Q page.
+ */
+const ArtifactViewer = lazy(() =>
+  import("./artifact-viewer").then((module) => ({
+    default: module.ArtifactViewer,
+  })),
+);
+const QHistorySheet = lazy(() =>
+  import("./q-history-sheet").then((module) => ({
+    default: module.QHistorySheet,
+  })),
+);
 
 /**
  * The Q page: talking with Q (founder direction, 2026-09-25 and
@@ -587,6 +602,9 @@ export function QConversationPanel({
       (connected && lines.length === 0 ? "Ready when you are" : "Q"));
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  // W7: the sheet's code loads the first time it is opened, then stays.
+  const [historyUsed, setHistoryUsed] = useState(false);
+  if (historyOpen && !historyUsed) setHistoryUsed(true);
   const download =
     turns.length === 0 && spoken.length === 0
       ? undefined
@@ -855,11 +873,15 @@ export function QConversationPanel({
               )}
             </div>
           </div>
-          <QHistorySheet
-            open={historyOpen}
-            onOpenChange={setHistoryOpen}
-            active={q.conversationId}
-          />
+          {historyUsed ? (
+            <Suspense fallback={null}>
+              <QHistorySheet
+                open={historyOpen}
+                onOpenChange={setHistoryOpen}
+                active={q.conversationId}
+              />
+            </Suspense>
+          ) : null}
 
           {/* The stage. The one part that grows, so it is the part that
               scrolls, between the top line and controls that never leave
@@ -1368,29 +1390,31 @@ export function QConversationPanel({
               title="Document"
               onSwipeDismiss={closeArtifact}
             >
-              <ArtifactViewer
-                artifactId={openArtifact}
-                onClose={closeArtifact}
-                onEditWithQ={(title) => {
-                  // Back to the conversation, where the revision is asked
-                  // for and written like any other answer (CQ-QACT-001).
-                  closeArtifact();
-                  sayOrAsk(
-                    `Edit "${title}" with me — what would you change first?`,
-                  );
-                }}
-                revision={
-                  turns.findLast(
-                    (turn) =>
-                      turn.kind === "Q" &&
-                      turn.blocks.some(
-                        (block) =>
-                          block.kind === "ARTIFACT_REFERENCE" &&
-                          block.artifactId === openArtifact,
-                      ),
-                  )?.id
-                }
-              />
+              <Suspense fallback={null}>
+                <ArtifactViewer
+                  artifactId={openArtifact}
+                  onClose={closeArtifact}
+                  onEditWithQ={(title) => {
+                    // Back to the conversation, where the revision is asked
+                    // for and written like any other answer (CQ-QACT-001).
+                    closeArtifact();
+                    sayOrAsk(
+                      `Edit "${title}" with me — what would you change first?`,
+                    );
+                  }}
+                  revision={
+                    turns.findLast(
+                      (turn) =>
+                        turn.kind === "Q" &&
+                        turn.blocks.some(
+                          (block) =>
+                            block.kind === "ARTIFACT_REFERENCE" &&
+                            block.artifactId === openArtifact,
+                        ),
+                    )?.id
+                  }
+                />
+              </Suspense>
             </DialogViewerContent>
           )}
         </DialogRoot>

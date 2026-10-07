@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   createQStreamState,
@@ -16,6 +16,13 @@ import {
   turnsFrom,
   workingLabel,
 } from "../src/features/q/conversation";
+import { loadWire } from "../src/features/q/wire";
+
+// W7: the wire's contracts load after the first paint in the browser;
+// here they are in before any test reads Q's data.
+beforeAll(async () => {
+  await loadWire();
+});
 
 /**
  * What a person sees while Q answers (CQ-C5-R1 §14, §17-§19).

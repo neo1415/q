@@ -1,12 +1,13 @@
-import {
-  Q_VISIBLE_STAGE_LABELS,
-  type QConfidenceLevel,
-  type QFindingType,
-  type QMessage,
-  type QResultBlock,
-  type QSentenceGesture,
+import type {
+  QConfidenceLevel,
+  QFindingType,
+  QMessage,
+  QResultBlock,
+  QSentenceGesture,
 } from "@capital-q/contracts";
 import type { QStreamState } from "@capital-q/api-client";
+
+import { wireNow } from "./wire";
 
 /**
  * From Q stream state to what a person sees (CQ-C5-R1 §14, §17, §18).
@@ -360,7 +361,12 @@ export function turnsFrom(
  * reviewed is not.
  */
 export function workingLabel(state: QStreamState): string | undefined {
-  return state.stage === null ? undefined : Q_VISIBLE_STAGE_LABELS[state.stage];
+  // W7: the labels come with the wire's contracts; until those are in
+  // (a moment after the first paint), nothing is said rather than a guess.
+  const labels = wireNow()?.Q_VISIBLE_STAGE_LABELS;
+  return state.stage === null || labels === undefined
+    ? undefined
+    : labels[state.stage];
 }
 
 /**

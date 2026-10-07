@@ -2,10 +2,8 @@
 
 import type { AgentMicrophone as AgentMicrophoneClass } from "@deepgram/agents";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Q_VOICE_THINKING_BEATS,
-  stripSilenceBeats,
-} from "@capital-q/contracts";
+
+import { loadWire, type WireContracts } from "../../q/wire";
 
 import {
   transcriptLineFor,
@@ -16,8 +14,8 @@ import {
   type VoiceTranscriptLine,
 } from "../session";
 import { announceQSaid } from "../../q-swarm/q-said";
-import { AgentSocket } from "./agent-socket";
-import { PcmPlayer } from "./pcm-player";
+import type { AgentSocket } from "./agent-socket";
+import type { PcmPlayer } from "./pcm-player";
 
 /**
  * The Deepgram Voice Agent as the browser's transport (CQ-Q-VOICE-001
@@ -231,9 +229,23 @@ export function useDeepgramVoiceSession(
       // P9: the SDK loads when a call starts, not with every page; it was
       // part of the shell's largest chunk. Awaited before teardown so the
       // rest of the start stays synchronous as before.
+      // W7: the socket and the speaker load with it (off the first paint).
       let AgentMicrophone: typeof AgentMicrophoneClass;
+      let AgentSocketClass: typeof AgentSocket;
+      let PcmPlayerClass: typeof PcmPlayer;
+      let wire: WireContracts;
       try {
-        ({ AgentMicrophone } = await import("@deepgram/agents"));
+        [
+          { AgentMicrophone },
+          { AgentSocket: AgentSocketClass },
+          { PcmPlayer: PcmPlayerClass },
+          wire,
+        ] = await Promise.all([
+          import("@deepgram/agents"),
+          import("./agent-socket"),
+          import("./pcm-player"),
+          loadWire(),
+        ]);
       } catch {
         setState("ERROR");
         eventsRef.current.onError?.(PLAIN_ERRORS.generic);
@@ -248,13 +260,13 @@ export function useDeepgramVoiceSession(
       discardUntilRef.current = 0;
 
       const token = credential.token;
-      const session = new AgentSocket({
+      const session = new AgentSocketClass({
         token,
         agent: settings.agent,
         input: { encoding: "linear16", sampleRate: INPUT_SAMPLE_RATE },
         output: { encoding: "linear16", sampleRate: OUTPUT_SAMPLE_RATE },
       });
-      const player = new PcmPlayer({ sampleRate: OUTPUT_SAMPLE_RATE });
+      const player = new PcmPlayerClass({ sampleRate: OUTPUT_SAMPLE_RATE });
       /**
        * Where the audio stops, if it stops.
        *
@@ -408,14 +420,15 @@ export function useDeepgramVoiceSession(
           }
         }
         // A thinking "hm" is a sound, not a line of the conversation.
-        if (role === "q" && Q_VOICE_THINKING_BEATS.has(content.trim())) {
+        // The silence ladder's tables come with the wire's contracts (W7).
+        if (role === "q" && wire.Q_VOICE_THINKING_BEATS.has(content.trim())) {
           expectSpeech();
           return;
         }
         // W4b: the silence ladder's beats are voiced while Q works, never a
         // line of the conversation (nor of the saved transcript).
         if (role === "q") {
-          content = stripSilenceBeats(content);
+          content = wire.stripSilenceBeats(content);
           if (content.length === 0) {
             expectSpeech();
             return;

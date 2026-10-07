@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { Q_APERTURE_STATES } from "../src/features/q-aperture/aperture-state";
 import {
@@ -34,6 +34,13 @@ import {
   gesturesDetail,
   Q_GESTURES_EVENT,
 } from "../src/features/q-swarm/q-gestures";
+import { loadWire } from "../src/features/q/wire";
+
+// W7: the wire's contracts load after the first paint in the browser;
+// here they are in before any test reads Q's data.
+beforeAll(async () => {
+  await loadWire();
+});
 
 /**
  * PRESENCE (founder 2026-10-01): what the particles form follows what is

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { VoiceConversation } from "@elevenlabs/react";
 
-import { stripSilenceBeats } from "@capital-q/contracts";
+import { loadWire } from "../../q/wire";
 
 import {
   transcriptLineFor,
@@ -114,7 +114,11 @@ export function useElevenLabsVoiceSession(
         // P9: the SDK (and its WebRTC stack) loads when a call starts, not
         // with every page; it was the shell's largest chunk. A failed load
         // lands in the same plain error as a failed connect below.
-        const { Conversation } = await import("@elevenlabs/react");
+        // W7: the silence ladder's tables come with the wire's contracts.
+        const [{ Conversation }, { stripSilenceBeats }] = await Promise.all([
+          import("@elevenlabs/react"),
+          loadWire(),
+        ]);
         const conversation = await Conversation.startSession({
           conversationToken: credential.token,
           connectionType: "webrtc",

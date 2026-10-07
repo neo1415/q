@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@capital-q/ui/button";
 
-import { useDockAvoid } from "@/features/q-dock";
+import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 
 import {
   installOffer,

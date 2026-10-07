@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 
-import { GOOGLE_RECONNECT_PATH } from "@capital-q/contracts";
+import { GOOGLE_RECONNECT_PATH } from "./wire-constants";
 import { cx } from "@capital-q/ui";
 import {
   AlertTriangle,

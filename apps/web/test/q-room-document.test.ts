@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { performClientAction } from "../src/features/q/client-actions";
 import type {
@@ -20,6 +20,13 @@ import {
   sentencesOf,
 } from "../src/features/q/room/document-room";
 import { currentScreen, setMaterialDocument } from "../src/features/q/screen";
+import { loadWire } from "../src/features/q/wire";
+
+// W7: the wire's contracts load after the first paint in the browser;
+// here they are in before any test reads Q's data.
+beforeAll(async () => {
+  await loadWire();
+});
 
 /**
  * Q room W3 (R3, R6): the document open in the Q room, worked by asking;

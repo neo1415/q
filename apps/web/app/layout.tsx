@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { GeistMono } from "geist/font/mono";
+import localFont from "next/font/local";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 import { THEME_COLORS } from "@capital-q/ui/tokens";
@@ -10,6 +10,31 @@ import { SplashOverlay } from "@/features/splash/splash-overlay";
 import { SPLASH_BOOT_SCRIPT } from "@/features/splash/splash-policy";
 import { DeploySkewGuard } from "@/pwa/deploy-skew-guard";
 import { ServiceWorkerRegistration } from "@/pwa/service-worker-registration";
+
+/**
+ * Geist Mono, as `geist/font/mono` declares it, but not preloaded (Q room
+ * W7): it sets only code and a few labels, and its 70 KB preload competed
+ * with the first paint's script on a slow connection. It loads when a
+ * page first uses it, with the monospace fallback meanwhile.
+ */
+const GeistMono = localFont({
+  src: "../node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2",
+  variable: "--font-geist-mono",
+  adjustFontFallback: false,
+  preload: false,
+  fallback: [
+    "ui-monospace",
+    "SFMono-Regular",
+    "Roboto Mono",
+    "Menlo",
+    "Monaco",
+    "Liberation Mono",
+    "DejaVu Sans Mono",
+    "Courier New",
+    "monospace",
+  ],
+  weight: "100 900",
+});
 
 import "./globals.css";
 

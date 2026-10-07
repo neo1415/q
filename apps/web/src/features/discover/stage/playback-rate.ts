@@ -47,7 +47,9 @@ export function stepPlaybackRate(
 ): PlaybackRate {
   const at = PLAYBACK_RATES.indexOf(rate);
   const next =
-    PLAYBACK_RATES[Math.min(PLAYBACK_RATES.length - 1, Math.max(0, at + direction))];
+    PLAYBACK_RATES[
+      Math.min(PLAYBACK_RATES.length - 1, Math.max(0, at + direction))
+    ];
   return next ?? rate;
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { QTurn } from "../src/features/q/conversation";
 import {
@@ -11,6 +11,13 @@ import { intentHref } from "../src/features/q/q-result-blocks";
 import { materialShouldClose } from "../src/features/q/material-viewer-logic";
 import { followOfTurns } from "../src/features/q/follow-navigation";
 import { currentScreen, setOpenDocument } from "../src/features/q/screen";
+import { loadWire } from "../src/features/q/wire";
+
+// W7: the wire's contracts load after the first paint in the browser;
+// here they are in before any test reads Q's data.
+beforeAll(async () => {
+  await loadWire();
+});
 
 /**
  * Client actions (R20/R33; founder live test 2026-09-27 #4) and the open

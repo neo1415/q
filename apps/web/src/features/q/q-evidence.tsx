@@ -1,11 +1,12 @@
 "use client";
 
-import { Q_CONFIDENCE_LABELS, type QFindingType } from "@capital-q/contracts";
+import type { QFindingType } from "@capital-q/contracts";
 
 import { formatDay } from "@/components/date-format";
 
 import type { QTurn, QTurnObjectBlock } from "./conversation";
 import { QResultBlocks } from "./q-result-blocks";
+import { Q_CONFIDENCE_LABELS } from "./wire-constants";
 
 /**
  * What an answer rests on, behind one "Sources" disclosure (founder

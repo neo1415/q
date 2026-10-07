@@ -1,10 +1,10 @@
-import {
-  QClientActionIntentSchema,
-  type QClientActionIntent,
-  type QNavigateDestination,
+import type {
+  QClientActionIntent,
+  QNavigateDestination,
 } from "@capital-q/contracts";
 
 import type { QTurn } from "./conversation";
+import { wireNow } from "./wire";
 
 /**
  * Which navigation a typed conversation should follow now (CQ-QACT-001).
@@ -40,6 +40,10 @@ export function followOfTurns(
 } {
   let navigate: QNavigateDestination | null = null;
   const actions: QClientActionIntent[] = [];
+  // W7: nothing is followed, or marked followed, before the wire's
+  // contracts are in; the caller looks again once they are (useWire).
+  const schema = wireNow()?.QClientActionIntentSchema;
+  if (schema === undefined) return { navigate, actions };
   for (const turn of turns) {
     if (turn.kind !== "Q" || turn.streaming || seen.has(turn.id)) continue;
     seen.add(turn.id);
@@ -51,7 +55,7 @@ export function followOfTurns(
         navigate = block.intent.destination;
         continue;
       }
-      const action = QClientActionIntentSchema.safeParse(block.intent);
+      const action = schema.safeParse(block.intent);
       if (action.success) actions.push(action.data);
     }
   }

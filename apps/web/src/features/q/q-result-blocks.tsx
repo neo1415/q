@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 
-import {
-  QWebsiteUrlSchema,
-  type QSubjectRef,
-  type QUiCompanySection,
-  type QUiIntent,
+import type {
+  QSubjectRef,
+  QUiCompanySection,
+  QUiIntent,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
@@ -21,6 +20,8 @@ import { StaticAnswerCards } from "./static-answer-cards";
 import { recordPagePath, settingsPath, setupPath } from "./client-actions";
 import { roomCardHref } from "./room/room-card-view";
 import type { QTurnObjectBlock } from "./conversation";
+import { useWire } from "./use-wire";
+import { wireNow } from "./wire";
 
 /**
  * What Q attached to an answer, as things you can act on (QX-001 §8-§10).
@@ -159,10 +160,15 @@ export function intentHref(intent: QUiIntent): string | null {
   }
 }
 
-/** A website intent's URL, re-validated here: http(s) only, or null. */
+/**
+ * A website intent's URL, re-validated here: http(s) only, or null. W7:
+ * against the wire's contracts; null (no link yet) until they are in.
+ */
 function safeWebsite(intent: QUiIntent): string | null {
   if (intent.kind !== "OPEN_WEBSITE") return null;
-  const url = QWebsiteUrlSchema.safeParse(intent.url);
+  const schema = wireNow()?.QWebsiteUrlSchema;
+  if (schema === undefined) return null;
+  const url = schema.safeParse(intent.url);
   return url.success ? url.data : null;
 }
 
@@ -337,6 +343,8 @@ export function QResultBlocks({
   onAsk,
   onOpenArtifact,
 }: QResultBlocksProps) {
+  // W7: drawn again once the wire's contracts are in (safeWebsite).
+  useWire();
   // Prose, findings, uncertainties and the source count are the answer's
   // own; an evidence identifier never reaches this component at all. What
   // arrives here is the part a person can act on.

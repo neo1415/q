@@ -1,7 +1,6 @@
-import {
-  QVoiceDuplexNarrationResultSchema,
-  type QVoiceDuplexNarrationResult,
-} from "@capital-q/contracts";
+import type { QVoiceDuplexNarrationResult } from "@capital-q/contracts";
+
+import { loadWire } from "../../q/wire";
 
 /**
  * ADR 0062: one long poll for the silence ladder's beats on a duplex line.
@@ -25,9 +24,12 @@ export async function pollNarration(
       },
     );
     if (!response.ok) return null;
-    const parsed = QVoiceDuplexNarrationResultSchema.safeParse(
-      await response.json(),
-    );
+    // W7: the wire's contracts, loaded off the first paint.
+    const [body, { QVoiceDuplexNarrationResultSchema }] = await Promise.all([
+      response.json() as Promise<unknown>,
+      loadWire(),
+    ]);
+    const parsed = QVoiceDuplexNarrationResultSchema.safeParse(body);
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
