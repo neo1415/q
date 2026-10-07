@@ -148,5 +148,59 @@ export function createMaterialDocumentReads(dependencies: {
         truncated: text.length > TEXT_CHARS,
       };
     },
+    /**
+     * Q room W3 (R3): pages of the current version's latest paged
+     * extraction, re-authorised exactly as documentText. pageCount 0 means
+     * no page text (a scan, or not paged); never a guess.
+     */
+    documentPages: async (
+      actor: ActorContext,
+      companyId: string,
+      documentId: string,
+      range: { readonly from: number; readonly to: number },
+    ): Promise<{
+      readonly pageCount: number;
+      readonly pages: readonly {
+        readonly page: number;
+        readonly text: string;
+      }[];
+    } | null> => {
+      const room = await view(actor, companyId);
+      if (room === null) return null;
+      const id = documentId.toLowerCase();
+      const entry = listed(room).find((e) => e.documentId === id);
+      if (
+        entry === undefined ||
+        (entry.access !== "OPEN" && entry.access !== "OWNER")
+      ) {
+        return null;
+      }
+      const rows = await sql<
+        { page_number: number; text: string | null; page_count: number }[]
+      >`
+        with latest as (
+          select p.extraction_id
+            from evidence.documents d
+            join evidence.document_pages p
+              on p.document_id = d.id
+             and p.document_version_id = d.current_version_id
+            join evidence.document_extractions x on x.id = p.extraction_id
+           where d.company_id = ${companyId} and d.id = ${id}
+           order by x.created_at desc, x.id desc
+           limit 1)
+        select p.page_number,
+               case when p.page_number between ${range.from} and ${range.to}
+                    then p.text end as text,
+               (count(*) over ())::int as page_count
+          from evidence.document_pages p
+          join latest l on l.extraction_id = p.extraction_id
+         order by p.page_number`;
+      return {
+        pageCount: rows[0]?.page_count ?? 0,
+        pages: rows
+          .filter((row) => row.text !== null)
+          .map((row) => ({ page: row.page_number, text: row.text ?? "" })),
+      };
+    },
   };
 }

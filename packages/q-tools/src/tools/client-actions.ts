@@ -8,6 +8,8 @@ import {
   QMotionChoiceSchema,
   Q_RECORD_PAGES,
   QRoomObjectSchema,
+  QDocumentActSchema,
+  Q_DOCUMENT_PAGE_MAX,
   QSettingsSectionSchema,
   QScreenActSchema,
   QScreenSectionSchema,
@@ -972,6 +974,61 @@ export function createControlScreenTool(): AnyQToolDefinition {
   });
 }
 
+export const CONTROL_DOCUMENT = "client.q_room.document.control" as const;
+
+export const ControlDocumentInputSchema = z
+  .object({
+    act: QDocumentActSchema.describe(
+      "NEXT_PAGE / PREVIOUS_PAGE / GO_TO_PAGE (name it in page): page through it. READ_ALOUD: they asked you to read it (or a page) to them; the screen follows your reading line by line. STOP_READING: stop. SUMMARISE: open the summary column beside it, which shows the page-cited lines of THIS answer. DOWNLOAD: download the open document (or the document you just made), if it may be downloaded. CLOSE: put it away.",
+    ),
+    page: z
+      .number()
+      .int()
+      .min(1)
+      .max(Q_DOCUMENT_PAGE_MAX)
+      .optional()
+      .describe("GO_TO_PAGE (required) or READ_ALOUD: the 1-based page."),
+  })
+  .strict();
+export type ControlDocumentInput = z.infer<typeof ControlDocumentInputSchema>;
+
+/**
+ * Q room W3 (R3): the document open in the Q room, worked by asking. The
+ * act names one of the viewer's own controls; the viewer pages, reads,
+ * summarises, downloads or closes the document that is open on their
+ * screen, under the same signed, permission-checked read the Data room
+ * tab uses (a view-only document never downloads). Nothing is read or
+ * written here.
+ */
+export function createControlDocumentTool(): AnyQToolDefinition {
+  return defineQTool<
+    ControlDocumentInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
+    ...COMMON,
+    id: CONTROL_DOCUMENT,
+    providerName: "control_document",
+    description:
+      "Works the document open in the Q room, at once: 'next page', 'previous page', 'go to page 3', 'read it to me' (READ_ALOUD, then read that page's text aloud from read_document_pages, word for word only if they ask, otherwise its plain gist), 'stop reading', 'summarise it' (SUMMARISE, then answer in short lines each ending with its page as (p. N), from read_document_pages only), 'download it' (the open document, or the PDF you just made), 'close it'. Only for a document that is open on their screen.",
+    input: ControlDocumentInputSchema,
+    authorize: (input, { actor, plan }) =>
+      Promise.resolve(
+        ownConversation(actor, plan) &&
+          (input.act !== "GO_TO_PAGE" || input.page !== undefined)
+          ? allowed({
+              kind: "DOCUMENT_ACT",
+              act: input.act,
+              ...(input.page === undefined ||
+              (input.act !== "GO_TO_PAGE" && input.act !== "READ_ALOUD")
+                ? {}
+                : { page: input.page }),
+            })
+          : deny<QClientActionToolResult>("NOT_AVAILABLE"),
+      ),
+  });
+}
+
 export const SetDiscoverFiltersInputSchema = z
   .object({
     sectors: z
@@ -1110,6 +1167,7 @@ export function createClientActionTools(
     createSignOutTool(),
     createOpenPageTool(ports),
     createControlScreenTool(),
+    createControlDocumentTool(),
     createSetDiscoverFiltersTool(),
     createShowTool(ports),
   ];

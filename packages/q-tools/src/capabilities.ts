@@ -176,6 +176,7 @@ const SHORTS: Readonly<Record<string, string>> = {
   set_pitch_sharing: "who may play their pitch",
   reload_page: "reloads the page",
   control_screen: "scrolls or moves the screen",
+  control_document: "pages, reads or closes the open document",
 };
 
 const TRAILING: ReadonlySet<string> = new Set([
@@ -777,6 +778,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "control_screen",
     "NAVIGATION",
     "Scrolls the page they are on, goes back, shows a section, or opens its book-a-call or reminder dialog.",
+    { acts: true },
+  ),
+  tool(
+    "control_document",
+    "NAVIGATION",
+    "Works the document open in the Q room: next or previous page, go to page N, read it aloud with the line highlighted, show the page-cited summary, download it (if they may), close it.",
     { acts: true },
   ),
   tool(

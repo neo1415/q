@@ -108,6 +108,47 @@ function saveFile(blob: Blob, name: string): void {
 }
 
 /**
+ * Q room W3: "download it", said or typed, for a document Q made. The
+ * same request the Download control makes; null when it downloaded,
+ * otherwise what to say.
+ */
+export async function downloadArtifact(
+  artifactId: string,
+  format: QArtifactExportFormat = "pdf",
+): Promise<string | null> {
+  try {
+    const response = await fetch(artifactFileUrl(artifactId, format, null));
+    if (!response.ok) return await failureMessage(response);
+    saveFile(await response.blob(), fileNameFrom(response, format));
+    return null;
+  } catch {
+    return "I lost the connection to Q. Try again.";
+  }
+}
+
+/**
+ * Q room W3: a data-room file the data room allows them to download, from
+ * its signed URL (browser <-> storage). A cross-origin link would only
+ * open it, so the bytes are saved under its title.
+ */
+export async function downloadSignedFile(
+  url: string,
+  title: string,
+): Promise<boolean> {
+  try {
+    const response = await fetch(url, { credentials: "omit" });
+    if (!response.ok) return false;
+    const blob = await response.blob();
+    const extension = blob.type === "application/pdf" ? ".pdf" : "";
+    const base = title.replace(/[\\/:*?"<>|]+/gu, " ").trim() || "document";
+    saveFile(blob, base.endsWith(extension) ? base : `${base}${extension}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * One file: one button that says which file. Several: one Download menu,
  * so a card carries a single download control however many formats exist.
  */

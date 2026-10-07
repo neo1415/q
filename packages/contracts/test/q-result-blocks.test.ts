@@ -279,6 +279,7 @@ describe("QUiIntent", () => {
         },
       ],
     },
+    DOCUMENT_ACT: { kind: "DOCUMENT_ACT", act: "GO_TO_PAGE", page: 3 },
   };
 
   it("parses every supported intent", () => {
@@ -288,6 +289,24 @@ describe("QUiIntent", () => {
     for (const [kind, fixture] of Object.entries(INTENT_FIXTURES)) {
       expect(QUiIntentSchema.safeParse(fixture).success, kind).toBe(true);
     }
+  });
+
+  it("a document act to a page names the page", () => {
+    expect(
+      QUiIntentSchema.safeParse({ kind: "DOCUMENT_ACT", act: "GO_TO_PAGE" })
+        .success,
+    ).toBe(false);
+    expect(
+      QUiIntentSchema.safeParse({ kind: "DOCUMENT_ACT", act: "NEXT_PAGE" })
+        .success,
+    ).toBe(true);
+    expect(
+      QUiIntentSchema.safeParse({
+        kind: "DOCUMENT_ACT",
+        act: "GO_TO_PAGE",
+        page: 0,
+      }).success,
+    ).toBe(false);
   });
 
   it("has no intent that could run code or reach an arbitrary destination", () => {

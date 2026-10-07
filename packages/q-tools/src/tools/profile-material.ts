@@ -74,6 +74,27 @@ export type ProfileMaterialPort = {
         readonly truncated: boolean;
       } | null>)
     | undefined;
+  /**
+   * Q room W3 (R3): pages `from`..`to` (1-based, inclusive) of one
+   * document's text, for a person who may open it now (re-authorised the
+   * same way as documentText). `pageCount` is how many pages have text;
+   * 0 for a document with no page text (scanned, or not paged). Null when
+   * they may not open it.
+   */
+  readonly documentPages?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+        documentId: string,
+        range: { readonly from: number; readonly to: number },
+      ) => Promise<{
+        readonly pageCount: number;
+        readonly pages: readonly {
+          readonly page: number;
+          readonly text: string;
+        }[];
+      } | null>)
+    | undefined;
 };
 
 /** One data-room document as Q may find it (R0). */

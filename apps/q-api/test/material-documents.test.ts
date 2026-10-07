@@ -88,3 +88,43 @@ describe("data-room documents for Q", () => {
     expect(asked).toEqual([]);
   });
 });
+
+describe("documentPages (Q room W3)", () => {
+  function pages(view: DataRoomView | null) {
+    const asked: unknown[][] = [];
+    const fake = (_strings: TemplateStringsArray, ...values: unknown[]) => {
+      asked.push(values);
+      return Promise.resolve([
+        { page_number: 1, text: null, page_count: 3 },
+        { page_number: 2, text: "Page two", page_count: 3 },
+        { page_number: 3, text: null, page_count: 3 },
+      ]);
+    };
+    return {
+      asked,
+      port: createMaterialDocumentReads({
+        sql: fake as unknown as DatabaseExecutor,
+        view: () => Promise.resolve(view),
+      }),
+    };
+  }
+
+  it("reads the asked pages of a document they may open, with the count", async () => {
+    const { port } = pages(room);
+    expect(
+      await port.documentPages(actor, COMPANY, CERT, { from: 2, to: 2 }),
+    ).toEqual({ pageCount: 3, pages: [{ page: 2, text: "Page two" }] });
+  });
+
+  it("never looks up an on-request document, or any without a view", async () => {
+    const { port, asked } = pages(room);
+    expect(
+      await port.documentPages(actor, COMPANY, TAX, { from: 1, to: 1 }),
+    ).toBeNull();
+    const none = pages(null);
+    expect(
+      await none.port.documentPages(actor, COMPANY, CERT, { from: 1, to: 1 }),
+    ).toBeNull();
+    expect([...asked, ...none.asked]).toEqual([]);
+  });
+});

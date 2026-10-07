@@ -2,18 +2,26 @@
 
 import "@/features/q/answer-canvas.css";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { createQStreamState } from "@capital-q/api-client";
 import {
   QConversationDetailSchema,
+  type QArtifactSummary,
   type QConversationDetail,
   type QMessage,
   type QShowInQRoomIntent,
 } from "@capital-q/contracts";
 
+import type {
+  MaterialResult,
+  OpenedFile,
+} from "@/features/company/material/material-actions";
+import type { DocumentActionResult } from "@/features/documents/actions";
 import { QAperture } from "@/features/q-aperture";
+import { performClientAction } from "@/features/q/client-actions";
 import { turnsFrom } from "@/features/q/conversation";
+import { QMaterialViewer } from "@/features/q/material-viewer";
 import { QCanSee } from "@/features/q/q-can-see";
 import { QPresenceStage } from "@/features/q/q-presence-stage";
 import { QSection, useQDialog } from "@/features/q/q-section";
@@ -22,6 +30,51 @@ import { currentScreen } from "@/features/q/screen";
 
 const RECORD = "/dev/q-room/record";
 const CARD = "/dev/q-room/card";
+const DOCUMENT = "/dev/q-room/document";
+const EXPORT = "/dev/q-room/export";
+
+/** Q room W3: the data room's signed read, as the test serves it. */
+async function openFile(
+  companyId: string,
+  documentId: string,
+): Promise<MaterialResult<OpenedFile>> {
+  const response = await fetch(
+    `${DOCUMENT}?company=${companyId}&document=${documentId}`,
+    { cache: "no-store" },
+  );
+  return (await response.json()) as MaterialResult<OpenedFile>;
+}
+
+/** Q room W3: an answer filed as a PDF, as the test serves it. */
+async function exportAnswer(input: {
+  readonly runId: string;
+  readonly messageId: string;
+}): Promise<DocumentActionResult<QArtifactSummary>> {
+  const response = await fetch(EXPORT, {
+    method: "POST",
+    body: JSON.stringify(input),
+    cache: "no-store",
+  });
+  return (await response.json()) as DocumentActionResult<QArtifactSummary>;
+}
+
+/** The screen follows each new answer's data-room open, as the Q page does. */
+function follow(messages: readonly QMessage[], seen: Set<string>): void {
+  for (const message of messages) {
+    if (seen.has(message.messageId)) continue;
+    seen.add(message.messageId);
+    if (message.role !== "Q") continue;
+    for (const block of message.blocks ?? []) {
+      if (
+        block.kind === "UI_INTENT" &&
+        block.intent.kind === "OPEN_RECORD_PAGE" &&
+        block.intent.page === "DATA_ROOM_DOCUMENT"
+      ) {
+        performClientAction(block.intent);
+      }
+    }
+  }
+}
 
 async function fetchRecord(): Promise<QConversationDetail | null> {
   try {
@@ -54,15 +107,25 @@ export function QRoomHarness() {
   const [messages, setMessages] = useState<readonly QMessage[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [wire, setWire] = useState("");
+  const seen = useRef(new Set<string>());
   const read = useCallback(async () => {
     const detail = await fetchRecord();
-    if (detail !== null) setMessages(detail.messages);
+    if (detail !== null) {
+      setMessages(detail.messages);
+      // After the turns render, as the Q page's follow runs.
+      window.setTimeout(() => follow(detail.messages, seen.current), 0);
+    }
   }, []);
   // The conversation is read once as the page opens.
   useEffect(() => {
     let live = true;
     void fetchRecord().then((detail) => {
-      if (live && detail !== null) setMessages(detail.messages);
+      if (live && detail !== null) {
+        setMessages(detail.messages);
+        for (const message of detail.messages) {
+          seen.current.add(message.messageId);
+        }
+      }
     });
     return () => {
       live = false;
@@ -108,6 +171,7 @@ export function QRoomHarness() {
           captions={false}
           caption={null}
           loadRoomCard={loadCard}
+          exportAnswer={exportAnswer}
           presence={(compact, mini) => (
             <QAperture
               state="IDLE"
@@ -135,6 +199,7 @@ export function QRoomHarness() {
           {wire}
         </pre>
       </main>
+      <QMaterialViewer turns={turns} openFile={openFile} />
       {previewOpen ? (
         <div
           role="dialog"

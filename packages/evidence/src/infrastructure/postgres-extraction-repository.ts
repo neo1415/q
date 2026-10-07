@@ -147,6 +147,38 @@ export function createPostgresDocumentExtractionRepository(): DocumentExtraction
       return created;
     },
     findByVersionAndPipeline,
+    insertPages: async (tx, extraction, pages) => {
+      if (pages.length === 0) return 0;
+      const numbers = pages.map((page) => page.pageNumber);
+      const texts = pages.map((page) => page.text);
+      const starts = pages.map((page) => page.charStart);
+      const ends = pages.map((page) => page.charEnd);
+      // Immutable rows: a redelivered write finds them already there.
+      const rows = await tx.sql`
+        insert into evidence.document_pages
+          (tenant_id, owner_organisation_id, document_id, document_version_id,
+           extraction_id, page_number, text, char_start, char_end,
+           visibility_scope, sensitivity_class)
+        select ${extraction.tenantId}, ${extraction.ownerOrganisationId},
+               ${extraction.documentId}, ${extraction.documentVersionId},
+               ${extraction.id}, p.page_number, p.text, p.char_start, p.char_end,
+               ${extraction.visibilityScope}, ${extraction.sensitivityClass}
+          from unnest(${numbers}::int[], ${texts}::text[], ${starts}::int[], ${ends}::int[])
+               as p (page_number, text, char_start, char_end)
+        on conflict (extraction_id, page_number) do nothing
+        returning id`;
+      return rows.length;
+    },
+    listWithoutPages: async (executor, limit) => {
+      const rows = await executor`
+        ${selectExtractions(executor)}
+         where (coalesce(e.page_count, 0) > 0 or coalesce(e.slide_count, 0) > 0)
+           and not exists (
+             select 1 from evidence.document_pages p where p.extraction_id = e.id)
+         order by e.created_at, e.id
+         limit ${limit}`;
+      return rows.map(toExtraction);
+    },
     listByVersion: async (executor, tenantId, documentVersionId) => {
       const rows = await executor`
         ${selectExtractions(executor)}
