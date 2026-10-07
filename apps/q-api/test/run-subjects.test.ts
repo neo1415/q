@@ -88,8 +88,11 @@ const port: QToolPort = {
   },
 };
 
-const call = (name: string, args: Record<string, unknown>): QToolProposal =>
-  ({ callId: `c-${name}`, name, arguments: args }) as unknown as QToolProposal;
+const call = (name: string, args: Record<string, unknown>): QToolProposal => ({
+  callId: `c-${name}`,
+  name,
+  arguments: args,
+});
 
 describe("the wait's subject, from the run's own authorised tool calls (W4b)", () => {
   it("names a company a tool of this run read for this actor, and its deck", async () => {
