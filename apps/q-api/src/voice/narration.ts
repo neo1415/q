@@ -49,16 +49,24 @@ export type SilenceLadderOptions = {
 };
 
 const TIMEOUT = Symbol("timeout");
+/** How long one beat waits for the subject before using generic words. */
+const FOCUS_WAIT_MS = 30;
 
-function settled<T>(promise: Promise<T>): { value: () => T | undefined } {
+type Settled<T> = { value: () => T | undefined; done: () => boolean };
+
+function settled<T>(promise: Promise<T>): Settled<T> {
   let value: T | undefined;
+  let done = false;
   void promise.then(
     (resolved) => {
       value = resolved;
+      done = true;
     },
-    () => undefined,
+    () => {
+      done = true;
+    },
   );
-  return { value: () => value };
+  return { value: () => value, done: () => done };
 }
 
 export async function* withSilenceLadder(
@@ -69,8 +77,8 @@ export async function* withSilenceLadder(
   const iterator = source[Symbol.asyncIterator]();
   const started = now();
   let state: QSilenceState = Q_SILENCE_START;
-  let focus: { value: () => QSilenceFocus | null | undefined } | null = null;
-  let thread: { value: () => QSilenceThread | null | undefined } | null = null;
+  let focus: Settled<QSilenceFocus | null> | null = null;
+  let thread: Settled<QSilenceThread | null> | null = null;
   let ladder = options.enabled !== false;
   let pending = iterator.next();
   for (;;) {
@@ -83,8 +91,21 @@ export async function* withSilenceLadder(
     }
     const elapsed = now() - started;
     // Reads begin only once the wait is real: a quick answer costs nothing.
-    if (focus === null && elapsed >= Q_SILENCE_LADDER.toneAtMs) {
-      focus = settled(options.focus?.() ?? Promise.resolve(null));
+    // The subject is asked again while unknown: the run's tools may name
+    // it only after the first beat (W4b: read from the run's own calls).
+    if (
+      elapsed >= Q_SILENCE_LADDER.toneAtMs &&
+      (focus === null || (focus.done() && (focus.value() ?? null) === null))
+    ) {
+      const asked = options.focus?.() ?? Promise.resolve(null);
+      focus = settled(asked);
+      // A ready answer is used for this beat; a slow one waits for the next.
+      await Promise.race([
+        asked.catch(() => null),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, FOCUS_WAIT_MS);
+        }),
+      ]);
     }
     if (thread === null && elapsed >= Q_SILENCE_LADDER.progressAtMs) {
       thread = settled(options.thread?.() ?? Promise.resolve(null));

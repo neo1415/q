@@ -819,6 +819,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/paused": exempt(
     "what an account Q paused sees until an operator reinstates it; nothing to do there",
   ),
+  "/connected/google": exempt(
+    "where Google returns the connect window: it tells the room how it went and closes (Q offers the connect card)",
+  ),
   "/home": cap("navigate.HOME"),
   "/profile": cap("navigate.PROFILE"),
   "/capital": cap("navigate.CAPITAL"),

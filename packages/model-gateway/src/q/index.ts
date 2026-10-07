@@ -101,6 +101,8 @@ import { afterLeadLines, ownReadinessFact } from "./own-readiness.js";
 import { speculationGate } from "./speculation.js";
 
 export type { QOwnIndex } from "./own-standing.js";
+// Q room W4b: the silence ladder names the company the same way a card does.
+export { companiesInOutcome } from "./card-subjects.js";
 export { readinessLeadLines } from "./own-readiness.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { onScreenCompanyFact } from "./company-fact.js";

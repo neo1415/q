@@ -113,6 +113,35 @@ describe("the silence ladder on a voice turn (ADR 0062)", () => {
     expect(narrated.length).toBeLessThanOrEqual(4);
   });
 
+  it("never records a beat as the answer: what is remembered is the answer's own sentences (W4b)", async () => {
+    const answer = slowAnswer(["The deck asks for $2M.", "Burn is unstated."]);
+    const heard: string[] = [];
+    const recorded: string[] = [];
+    // As the voice turn composes it: the record is taken inside the ladder.
+    async function* tap(source: AsyncIterable<string>) {
+      for await (const part of source) {
+        recorded.push(part);
+        yield part;
+      }
+    }
+    const done = collect(
+      withSilenceLadder(tap(answer.source), {
+        live: { stage: "REVIEWING_COMPANY", approvalWaiting: false },
+        focus: () => Promise.resolve({ name: "Ledgerline", thing: "deck" }),
+        seed: 9,
+        now: () => Date.now(),
+      }),
+      heard,
+    );
+    await vi.advanceTimersByTimeAsync(9_000);
+    answer.release();
+    await vi.advanceTimersByTimeAsync(10);
+    await done;
+    expect(heard.length).toBeGreaterThan(2);
+    expect(heard.slice(0, -2).every((line) => /…$/u.test(line))).toBe(true);
+    expect(recorded).toEqual(["The deck asks for $2M.", "Burn is unstated."]);
+  });
+
   it("stays silent while an approval is waiting", async () => {
     const answer = slowAnswer(["Approved."]);
     const narrated: QSilenceBeat[] = [];

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { QVisibleStage } from "./stage.js";
+import { Q_VISIBLE_STAGES, type QVisibleStage } from "./stage.js";
 
 /**
  * The silence ladder (ADR 0062; Q room R7: "never an awkward silence").
@@ -461,4 +461,89 @@ export function silenceThingForRoute(route: string): QSilenceThing | undefined {
     default:
       return undefined;
   }
+}
+
+// --- recognising a beat -------------------------------------------------------
+
+const NAME_MARK = "\u0000";
+const escapeRegex = (text: string) =>
+  text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+/** A template with the name placeholder, as a pattern. */
+const templated = (text: string) =>
+  escapeRegex(text).split(NAME_MARK).join(".{1,80}?");
+const alternation = (items: Iterable<string>) =>
+  `(?:${[...new Set(items)].join("|")})`;
+
+function beatPatterns(): { readonly beat: RegExp; readonly thread: RegExp } {
+  const verbs = new Set<string>();
+  const objects = new Set<string>();
+  const focuses: (QSilenceFocus | null)[] = [
+    null,
+    { name: NAME_MARK },
+    ...Q_SILENCE_THINGS.map((thing) => ({ name: NAME_MARK, thing })),
+  ];
+  for (const stage of [null, ...Q_VISIBLE_STAGES]) {
+    for (const focus of focuses) {
+      const phrase = phraseFor(stage, focus);
+      if (phrase === null) continue;
+      for (const verb of phrase.verbs) verbs.add(escapeRegex(verb));
+      objects.add(templated(phrase.object));
+    }
+  }
+  const verb = alternation(verbs);
+  const object = alternation(objects);
+  const openers = alternation(
+    STAGE_OPENERS.filter((opener) => opener.length > 0).map(escapeRegex),
+  );
+  const tails = alternation(STAGE_TAILS.map(escapeRegex));
+  const stage = `${openers}?${verb} ${object}${tails}`;
+  const progress = alternation(
+    PROGRESS_SHAPES.map((shape) =>
+      escapeRegex(shape("\u0001", "\u0002"))
+        .replace("\u0001", verb)
+        .replace("\u0002", object),
+    ),
+  );
+  const hums = alternation([...HUMS.FLAT, ...HUMS.SING_SONG].map(escapeRegex));
+  const end = "(?=\\s|$|\\p{Lu})";
+  const threadOpeners = alternation(THREAD_OPENERS.map(escapeRegex));
+  return {
+    // Case-insensitive: the ladder capitalises whatever comes first.
+    beat: new RegExp(`^\\s*(?:${stage}|${progress}|${hums})${end}`, "iu"),
+    thread: new RegExp(`^\\s*${threadOpeners}[^?\\n]{1,200}\\?${end}`, "u"),
+  };
+}
+
+let patterns: ReturnType<typeof beatPatterns> | null = null;
+
+/**
+ * What Q said, less the silence ladder's beats in front of it (W4b).
+ *
+ * A beat is voiced while Q works; it is not part of the conversation, so a
+ * transcript line never shows it and it is never saved as Q's answer. The
+ * ladder only ever speaks before the answer's first sentence, so only a
+ * leading run of beats is removed, and only in the ladder's own exact
+ * phrasing (built from the same tables that wrote it). A remembered thread
+ * counts only after another beat: a line that merely opens "By the way,
+ * ...?" is kept. Returns "" when the whole text was beats.
+ */
+export function stripSilenceBeats(text: string): string {
+  patterns ??= beatPatterns();
+  let rest = text;
+  let stripped = false;
+  for (let index = 0; index < 8; index += 1) {
+    const beat = patterns.beat.exec(rest);
+    if (beat !== null) {
+      rest = rest.slice(beat[0].length);
+      stripped = true;
+      continue;
+    }
+    const thread = stripped ? patterns.thread.exec(rest) : null;
+    if (thread !== null) {
+      rest = rest.slice(thread[0].length);
+      continue;
+    }
+    break;
+  }
+  return stripped ? rest.trim() : text;
 }

@@ -2,7 +2,10 @@
 
 import type { AgentMicrophone as AgentMicrophoneClass } from "@deepgram/agents";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Q_VOICE_THINKING_BEATS } from "@capital-q/contracts";
+import {
+  Q_VOICE_THINKING_BEATS,
+  stripSilenceBeats,
+} from "@capital-q/contracts";
 
 import {
   transcriptLineFor,
@@ -408,6 +411,15 @@ export function useDeepgramVoiceSession(
         if (role === "q" && Q_VOICE_THINKING_BEATS.has(content.trim())) {
           expectSpeech();
           return;
+        }
+        // W4b: the silence ladder's beats are voiced while Q works, never a
+        // line of the conversation (nor of the saved transcript).
+        if (role === "q") {
+          content = stripSilenceBeats(content);
+          if (content.length === 0) {
+            expectSpeech();
+            return;
+          }
         }
         addLine(role, content);
         // The swarm and the page pointer follow what Q says, as it says it.

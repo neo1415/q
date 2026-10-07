@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { VoiceConversation } from "@elevenlabs/react";
 
+import { stripSilenceBeats } from "@capital-q/contracts";
+
 import {
   transcriptLineFor,
   type VoiceSessionClient,
@@ -154,7 +156,12 @@ export function useElevenLabsVoiceSession(
             setState(mode === "speaking" ? "Q_SPEAKING" : "LISTENING");
           },
           onMessage: ({ message, source }) => {
-            addLine(source === "user" ? "user" : "q", message);
+            // W4b: the silence ladder's beats are voiced while Q works,
+            // never a line of the conversation (nor of the saved transcript).
+            addLine(
+              source === "user" ? "user" : "q",
+              source === "user" ? message : stripSilenceBeats(message),
+            );
             if (source === "user") {
               setState("THINKING");
             }

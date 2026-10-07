@@ -1,19 +1,38 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import type { QShowCalendarConnectIntent } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
-import { connectGoogleCalendar } from "../integrations/integration-actions";
+import {
+  CONNECT_POPUP_CHANNEL,
+  CONNECT_POPUP_PATH,
+  openConnectWindow,
+  readConnectMessage,
+  type ConnectOutcome,
+} from "../integrations/connect-popup";
+import {
+  connectGoogleCalendar,
+  readGmailConnection,
+} from "../integrations/integration-actions";
+
+const NOT_CONNECTED: Readonly<Record<ConnectOutcome, string>> = {
+  connected: "Google Calendar isn't connected yet. Try again.",
+  denied: "Google Calendar wasn't connected: access wasn't granted.",
+  failed: "Google Calendar couldn't be connected. Try again.",
+};
 
 /**
  * Q room R5: the person's Google Calendar is not connected. The times Q
  * suggests (working hours in their zone, never checked against a calendar)
- * and, beside them, the connect card. Connecting runs the existing Google
- * connect flow and brings them back to this same page, where Q picks up.
- * Nothing is booked from this card.
+ * and, beside them, the connect card. Nothing is booked from this card.
+ *
+ * W4b: connecting opens Google in a small window and the room stays; when
+ * the window finishes, the room asks the server whether the calendar is
+ * now connected and shows it, without a reload. A blocked window falls
+ * back to the same-tab flow, which returns to this page.
  */
 export function CalendarConnectCard({
   intent,
@@ -21,16 +40,104 @@ export function CalendarConnectCard({
   readonly intent: QShowCalendarConnectIntent;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [waiting, setWaiting] = useState(false);
   const [pending, startTransition] = useTransition();
+  const popupRef = useRef<Window | null>(null);
+
+  // The window's word is a hint; the connection's state is the server's.
+  const settle = useCallback(
+    async (outcome: ConnectOutcome) => {
+      setWaiting(false);
+      popupRef.current = null;
+      const status = await readGmailConnection();
+      if (status.ok && status.value.status === "CONNECTED") {
+        setConnected(true);
+        setMessage(null);
+        router.refresh();
+      } else {
+        setMessage(NOT_CONNECTED[outcome]);
+      }
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    if (!waiting) return;
+    const heard = (data: unknown) => {
+      const outcome = readConnectMessage(data);
+      if (outcome !== null) void settle(outcome);
+    };
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin === window.location.origin) heard(event.data);
+    };
+    window.addEventListener("message", onMessage);
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel(CONNECT_POPUP_CHANNEL);
+      channel.onmessage = (event: MessageEvent) => {
+        heard(event.data);
+      };
+    } catch {
+      channel = null;
+    }
+    // Closed without a word (or the word was lost): check once anyway.
+    const watch = window.setInterval(() => {
+      if (popupRef.current?.closed === true) void settle("failed");
+    }, 1_000);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      channel?.close();
+      window.clearInterval(watch);
+    };
+  }, [waiting, settle]);
+
   const connect = () => {
+    setMessage(null);
+    // Opened on the click itself, so a popup blocker lets it through.
+    const popup = openConnectWindow();
     startTransition(async () => {
-      const result = await connectGoogleCalendar(pathname);
-      if (result.ok) window.location.assign(result.value);
-      else setMessage(result.message);
+      const result = await connectGoogleCalendar(
+        popup === null ? pathname : CONNECT_POPUP_PATH,
+      );
+      if (!result.ok) {
+        popup?.close();
+        setMessage(result.message);
+        return;
+      }
+      if (popup === null) {
+        // Blocked: the same-tab flow, back to this page.
+        window.location.assign(result.value);
+        return;
+      }
+      popup.location.href = result.value;
+      popupRef.current = popup;
+      setWaiting(true);
     });
   };
   const expired = intent.reason === "REVOKED";
+  if (connected) {
+    return (
+      <section
+        aria-label="Google Calendar"
+        className="flex flex-col gap-1 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+        data-q-calendar-connect="connected"
+      >
+        <p
+          role="status"
+          className="cq-body font-medium text-(--cq-text-primary)"
+        >
+          Google Calendar connected
+        </p>
+        <p className="cq-caption text-(--cq-text-secondary)">
+          I can check when you&rsquo;re free now. Ask me again and I&rsquo;ll
+          pick times from your calendar.
+        </p>
+      </section>
+    );
+  }
   return (
     <div className="flex flex-col gap-3" data-q-calendar-connect>
       {intent.suggested.length === 0 ? null : (
@@ -92,6 +199,11 @@ export function CalendarConnectCard({
                 : "Connect Google Calendar"}
           </button>
         </div>
+        {waiting ? (
+          <p role="status" className="cq-caption text-(--cq-text-secondary)">
+            Finish in the Google window; I&rsquo;ll pick up here.
+          </p>
+        ) : null}
         {message === null ? null : (
           <p role="status" className="cq-caption text-(--cq-text-secondary)">
             {message}
