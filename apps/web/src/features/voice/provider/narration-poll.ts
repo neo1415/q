@@ -26,7 +26,7 @@ export async function pollNarration(
     if (!response.ok) return null;
     // W7: the wire's contracts, loaded off the first paint.
     const [body, { QVoiceDuplexNarrationResultSchema }] = await Promise.all([
-      response.json(),
+      response.json() as Promise<unknown>,
       loadWire(),
     ]);
     const parsed = QVoiceDuplexNarrationResultSchema.safeParse(body);

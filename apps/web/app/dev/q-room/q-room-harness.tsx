@@ -89,7 +89,7 @@ async function fetchRecord(
     // W7: validated as before, with the contracts loaded off the first
     // paint (as the Q page's own reads do).
     const [body, { QConversationDetailSchema }] = await Promise.all([
-      response.json(),
+      response.json() as Promise<unknown>,
       contracts(),
     ]);
     const detail = QConversationDetailSchema.safeParse(body);
@@ -132,7 +132,7 @@ const DECK_LOADERS: DeckLoaders = {
     // As the real read: a failed read throws, so the room retries it.
     if (!response.ok) throw new Error("Slides read failed.");
     const [body, { deckDrawingOf }] = await Promise.all([
-      response.json(),
+      response.json() as Promise<unknown>,
       import("@/features/q/room/deck-room"),
     ]);
     return deckDrawingOf(body);

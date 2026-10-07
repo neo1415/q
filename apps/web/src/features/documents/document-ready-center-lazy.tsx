@@ -1,6 +1,6 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useSyncExternalStore } from "react";
 
 /**
  * Q room W7: the documents-ready stack and its viewer show nothing until
@@ -13,15 +13,19 @@ const DocumentReadyCenter = lazy(() =>
   })),
 );
 
+const subscribeNothing = () => () => undefined;
+
 export function DocumentReadyCenterAfterPaint({
   connected,
 }: {
   readonly connected: boolean;
 }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Nothing on the server render or at hydration; the browser after.
+  const mounted = useSyncExternalStore(
+    subscribeNothing,
+    () => true,
+    () => false,
+  );
   if (!mounted) return null;
   return (
     <Suspense fallback={null}>
