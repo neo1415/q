@@ -906,6 +906,16 @@ export {
   type GatewayVersionDto,
   type PublicGatewayDto,
   type QualificationResultDto,
+  // Q.05 (2026-10-07): published gates checked for a founder's own company.
+  GATEQ_INVESTOR_GATES_PATH,
+  GATEQ_INVESTOR_GATES_MAX,
+  InvestorGatesQuerySchema,
+  GateCriterionStandingSchema,
+  InvestorGateFitDtoSchema,
+  InvestorGateFitListDtoSchema,
+  type GateCriterionStanding,
+  type InvestorGateFitDto,
+  type InvestorGateFitListDto,
 } from "./gateq.js";
 
 // CQ-GATE-002 -- the public applicant surface: anonymous, credential-scoped.
@@ -1327,6 +1337,9 @@ export * from "./fit.js";
 export * from "./data-room.js";
 export * from "./deck.js";
 export * from "./founder-person.js";
+// Q.07 / Q.02 (2026-10-07): assumptions to test, and how Q reads a thesis.
+export * from "./assumptions.js";
+export * from "./thesis.js";
 // end PROFILE block
 
 // Explore (E1-E5, ADR 0055).
