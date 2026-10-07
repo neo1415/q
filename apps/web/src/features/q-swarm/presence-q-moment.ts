@@ -100,9 +100,12 @@ export function createQMoment(options: {
     }
     if (finished) pending = t + Q_ANSWER_DELAY;
     if (asked) {
+      // Asked mid-moment: the letter is already there.
       asked = false;
-      pending = t;
-      lastStart = Number.NEGATIVE_INFINITY;
+      if (current < 0) {
+        pending = t;
+        lastStart = Number.NEGATIVE_INFINITY;
+      }
     }
     if (current >= 0) {
       if (t - current < Q_MOMENT_SECONDS) return true;

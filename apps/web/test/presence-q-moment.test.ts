@@ -151,6 +151,18 @@ describe("the Q moment's schedule", () => {
     }
   });
 
+  it("an ask (the harness) forms it now, and is ignored mid-moment", () => {
+    const moment = createQMoment({ landing: () => false });
+    drive(moment, resting, 0, 5);
+    moment.ask();
+    const first = drive(moment, resting, 5, 1);
+    expect(first[0]).toBeCloseTo(5, 5);
+    moment.ask();
+    const on = starts(drive(moment, resting, 6, 10));
+    // Still the first moment's hold; no second one queued behind it.
+    expect(on).toEqual([6]);
+  });
+
   it("lets go at once when Q starts listening mid-moment", () => {
     const moment = createQMoment({ landing: () => true });
     const on = drive(moment, resting, 0, Q_LANDING_DELAY + 0.5);
