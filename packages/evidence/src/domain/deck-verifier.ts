@@ -42,7 +42,7 @@ const SCALE: Readonly<Record<string, number>> = {
 };
 
 const NUMBER =
-  /(?<![\d.,])(\d{1,3}(?:[,   ]\d{3})+|\d+)(?:\.(\d+))?\s?(%|percent|per cent|trillion|billion|million|thousand|tn|bn|mn|mm|k|m|b|t)?(?![a-z\d])/giu;
+  /(?<![\d.,])(\d{1,3}(?:[,\u00a0\u202f\u2009]\d{3})+|\d+)(?:\.(\d+))?\s?(%|percent|per cent|trillion|billion|million|thousand|tn|bn|mn|mm|k|m|b|t)?(?![a-z\d])/giu;
 
 function normalise(text: string): string {
   return text.normalize("NFKC").toLowerCase();
@@ -61,7 +61,7 @@ type Token = Figure & {
 function tokens(text: string): Token[] {
   const out: Token[] = [];
   for (const match of normalise(text).matchAll(NUMBER)) {
-    const whole = (match[1] ?? "").replace(/[,   ]/gu, "");
+    const whole = (match[1] ?? "").replace(/[,\u00a0\u202f\u2009]/gu, "");
     const raw = Number(
       `${whole}${match[2] === undefined ? "" : `.${match[2]}`}`,
     );

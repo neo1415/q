@@ -158,7 +158,7 @@ function world() {
         return Promise.resolve();
       },
     } as never,
-    newCorrelationId: () => "cor" as never,
+    newCorrelationId: () => "cor",
   });
   return {
     service,

@@ -43,11 +43,16 @@ describe("deck extraction insert", () => {
       sections,
     });
     expect(params.some((value) => typeof value === "string" && value.startsWith("["))).toBe(false);
-    const json = params.find(
+    // F26: set_aside is a json parameter too (empty here), before sections.
+    const json = params.filter(
       (value): value is Record<symbol, unknown> =>
         typeof value === "object" && value !== null && JSON_PARAM in value,
     );
-    expect(Array.isArray(json?.[JSON_PARAM])).toBe(true);
-    expect((json?.[JSON_PARAM] as unknown[]).length).toBe(12);
+    expect(json.map((value) => Array.isArray(value[JSON_PARAM]))).toEqual([
+      true,
+      true,
+    ]);
+    expect((json[0]?.[JSON_PARAM] as unknown[]).length).toBe(0);
+    expect((json[1]?.[JSON_PARAM] as unknown[]).length).toBe(12);
   });
 });

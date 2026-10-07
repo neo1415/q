@@ -91,7 +91,7 @@ function world() {
 describe("deck readings are checked before they are stored (F26)", () => {
   it("Mizan's 4% never reaches the founder as a contradiction", async () => {
     const { reading, stored } = world();
-    await readDeckDocument(reading as never, DOC, "cor_x");
+    await readDeckDocument(reading, DOC, "cor_x");
     const model = stored[0]?.sections.find(
       (s) => s.section === "BUSINESS_MODEL",
     );
@@ -122,7 +122,7 @@ describe("deck readings are checked before they are stored (F26)", () => {
       },
     };
     await processReadAgain({
-      reading: reading as never,
+      reading: reading,
       queue,
       perSweep: 1,
       dailyMax: 20,
@@ -133,7 +133,7 @@ describe("deck readings are checked before they are stored (F26)", () => {
     // The day's budget is spent: no model reading at all.
     const before = reads();
     await processReadAgain({
-      reading: reading as never,
+      reading: reading,
       queue: { ...queue, readAgainToday: () => Promise.resolve(20) },
       perSweep: 1,
       dailyMax: 20,
@@ -163,8 +163,8 @@ describe("deck readings are checked before they are stored (F26)", () => {
       )) as unknown as DatabaseExecutor;
     const healed = await checkStoredDeckReadings({
       sql,
-      chunks: reading.chunks as never,
-      store: reading.store as never,
+      chunks: reading.chunks,
+      store: reading.store,
       logger: reading.logger,
       limit: 10,
     });
