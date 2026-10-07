@@ -84,6 +84,20 @@ function subjectWords(intent: QShowInQRoomIntent): {
     CAPITAL_ROUND: ["round", "raise"],
     GATEQ_APPLICATION: ["application", "applicant"],
     SOURCES: ["sources", "news", "articles", "links"],
+    // The deck stays while they work on it: slides, pictures, edits.
+    Q_DOCUMENT: [
+      "deck",
+      "slide",
+      "slides",
+      "document",
+      "picture",
+      "photo",
+      "image",
+      "upload",
+      "title",
+      "one pager",
+      "memo",
+    ],
   };
   return { names, kinds: kinds[intent.object] };
 }
@@ -162,6 +176,8 @@ export function describeCard(intent: QShowInQRoomIntent): string {
       return `${intent.title}'s application`;
     case "SOURCES":
       return "the sources";
+    case "Q_DOCUMENT":
+      return intent.title;
   }
 }
 

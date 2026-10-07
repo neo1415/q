@@ -75,6 +75,9 @@ async function read(
 ): Promise<RoomCardView | null> {
   const href = roomCardHref(intent);
   switch (intent.object) {
+    // Q room W5: the deck surface reads its own document (deck-actions).
+    case "Q_DOCUMENT":
+      return null;
     case "COMPANY_PROFILE": {
       const profile = await getCompanyProfile(session, id);
       const overview = profile.overview;

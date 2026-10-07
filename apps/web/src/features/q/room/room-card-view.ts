@@ -46,6 +46,8 @@ export function roomCardHref(intent: QShowInQRoomIntent): string {
       return recordPagePath("GATEQ_APPLICATION", id);
     case "SOURCES":
       return "/home";
+    case "Q_DOCUMENT":
+      return "/documents";
   }
 }
 
@@ -62,4 +64,5 @@ export const ROOM_OBJECT_WORDS: Readonly<
   CAPITAL_ROUND: "round",
   GATEQ_APPLICATION: "application",
   SOURCES: "sources",
+  Q_DOCUMENT: "document",
 };

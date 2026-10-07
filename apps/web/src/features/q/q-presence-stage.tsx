@@ -331,6 +331,7 @@ export function QPresenceStage({
           setClosedByHand({ key: card.key, at: card.openedAt })
         }
         load={loadRoomCard}
+        turns={turns}
       />
 
       {/* Q room W3: the document Q opened shows here (material-viewer). */}

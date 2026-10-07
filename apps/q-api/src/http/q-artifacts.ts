@@ -1,6 +1,7 @@
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
+  PROBLEM_CONTENT_TYPE,
   FillQArtifactPlaceholderRequestSchema,
   ListQArtifactsQuerySchema,
   ListQArtifactsResponseSchema,
@@ -131,6 +132,27 @@ export type QArtifactRoutesDependencies = ActorContextDependencies & {
       }
     | undefined;
 };
+
+/** Q room W5: a problem document the API client reads by its code. */
+function problem(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  status: number,
+  code: string,
+  detail: string,
+) {
+  return reply
+    .code(status)
+    .type(PROBLEM_CONTENT_TYPE)
+    .send({
+      type: "about:blank",
+      title: status === 422 ? "Not a picture" : "Not placed",
+      status,
+      detail,
+      code,
+      requestId: request.id,
+    });
+}
 
 function artifactIdParam(request: FastifyRequest): string {
   const params = request.params as Record<string, unknown>;
@@ -514,22 +536,22 @@ export function registerQArtifactRoutes(
       const artifactId = artifactIdParam(request);
       const upload = await pictures.read(actor, body.documentId);
       if (upload === "NOT_READY") {
-        return reply.code(409).send({
-          type: "about:blank",
-          title: "Not ready",
-          status: 409,
-          code: "UPLOAD_NOT_READY",
-          detail: "The picture is still being checked. Try again in a moment.",
-        });
+        return problem(
+          request,
+          reply,
+          409,
+          "UPLOAD_NOT_READY",
+          "The picture is still being checked. Try again in a moment.",
+        );
       }
       if (upload === null) {
-        return reply.code(422).send({
-          type: "about:blank",
-          title: "Not a picture",
-          status: 422,
-          code: "NOT_A_PICTURE",
-          detail: "Only your own PNG or JPEG pictures can go on a slide.",
-        });
+        return problem(
+          request,
+          reply,
+          422,
+          "NOT_A_PICTURE",
+          "Only your own PNG or JPEG pictures can go on a slide.",
+        );
       }
       let refused: string | null = null;
       let outcome: Awaited<ReturnType<ArtifactService["editOwnDocument"]>>;
@@ -578,16 +600,15 @@ export function registerQArtifactRoutes(
         });
       }
       const reason: string | null = refused;
-      return reply.code(409).send({
-        type: "about:blank",
-        title: "Not filled",
-        status: 409,
-        code: outcome.status === "STALE" ? "CHANGED_SINCE" : "NOT_FILLABLE",
-        detail:
-          outcome.status === "STALE"
-            ? "The document changed since you opened it. Open it again and drop the picture there."
-            : (reason ?? "That document cannot take a picture there."),
-      });
+      return problem(
+        request,
+        reply,
+        409,
+        outcome.status === "STALE" ? "CHANGED_SINCE" : "NOT_FILLABLE",
+        outcome.status === "STALE"
+          ? "The document changed since you opened it. Open it again and drop the picture there."
+          : (reason ?? "That document cannot take a picture there."),
+      );
     },
   );
 
