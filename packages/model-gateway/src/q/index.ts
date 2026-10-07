@@ -3332,7 +3332,34 @@ export function createModelGatewayQAnswer(
               toolCalls: [...proposals],
             };
             const results: ModelMessage[] = [];
-            for (const call of proposals) {
+            // Reads run side by side (Zino live 2026-10-07: eight fit.profile
+            // reads in a row, one after another). Only when every call in
+            // the round is READ_ONLY and none changes what is offered; any
+            // other round keeps its order, one at a time, as before. The
+            // outcomes are still handled below in the order proposed.
+            const together =
+              proposals.length > 1 &&
+              proposals.every(
+                (call) =>
+                  call.name !== USE_CAPABILITY_TOOL &&
+                  classificationOf(call.name) === "READ_ONLY",
+              );
+            const early = together
+              ? proposals.map((call) =>
+                  callTool(
+                    {
+                      callId: call.callId,
+                      name: call.name,
+                      arguments: call.arguments,
+                    },
+                    toolContext,
+                  ).then(
+                    (outcome) => ({ ok: true as const, outcome }),
+                    (error: unknown) => ({ ok: false as const, error }),
+                  ),
+                )
+              : null;
+            for (const [index, call] of proposals.entries()) {
               calls += 1;
               const tool = offeredByName.get(call.name);
               if (
@@ -3341,14 +3368,19 @@ export function createModelGatewayQAnswer(
               ) {
                 await stageShown(tool.visibleStage);
               }
-              const outcome = await callTool(
-                {
-                  callId: call.callId,
-                  name: call.name,
-                  arguments: call.arguments,
-                },
-                toolContext,
-              );
+              const settled = await early?.[index];
+              if (settled !== undefined && !settled.ok) throw settled.error;
+              const outcome =
+                settled !== undefined
+                  ? settled.outcome
+                  : await callTool(
+                      {
+                        callId: call.callId,
+                        name: call.name,
+                        arguments: call.arguments,
+                      },
+                      toolContext,
+                    );
               toolCalls.push({
                 toolName: outcome.toolName,
                 providerName: call.name,
