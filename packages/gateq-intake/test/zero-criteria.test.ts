@@ -15,6 +15,8 @@ const base = {
   folder: "INBOX" as const,
   starred: false,
   assignee: null,
+  // No published rules: nothing was read against any criterion.
+  read: { outcome: "INSUFFICIENT_INFORMATION" as const, criteria: [] },
 };
 
 describe("zero published criteria (F28)", () => {

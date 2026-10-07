@@ -370,6 +370,7 @@ function setup(options: { messages?: () => string } = {}) {
           askedToSee: false,
           wantsToEnd: false,
           onlyNoise: false,
+          screenNote: views.screen === null ? null : looks.screenNote,
         });
       }
       return Promise.resolve({

@@ -574,6 +574,7 @@ describe("the document studio's Q tools port", () => {
           });
         },
       }),
+      fileOwnPicture: () => Promise.resolve(null),
       bytesFor: () => Promise.resolve(null),
       signedUrlFor: () => Promise.resolve(null),
     };

@@ -65,6 +65,9 @@ function fakeRuntime() {
     answerInterviewQuestion: unused,
     dismissInterviewQuestion: unused,
     say: unused,
+    listFollowUps: unused,
+    answerFollowUp: unused,
+    dismissFollowUp: unused,
     appendInterviewTurns: (call: AppendCall) => {
       appends.push(call);
       if (call.sessionId !== SESSION_ID) {

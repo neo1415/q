@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { QArtifactContent, QDeck, QSlide } from "@capital-q/contracts";
+import type { DocumentPolishResult } from "@capital-q/q-core";
 
 import {
   composePitchDeck,
@@ -125,31 +126,36 @@ function collapsingPolisher(): DeckPolisher {
   return {
     polish: ({ deck: shown }: { deck: QDeck }) =>
       Promise.resolve({
-        slides: shown.slides.flatMap((slide: QSlide, index: number) => {
-          if (/customer/i.test(slide.title) || slide.title.includes("1,140")) {
-            return [
-              {
-                number: index + 1,
-                title:
-                  "Customers: We serve 1,140 paying businesses through accountant partners",
-                subtitle: null,
-                bullets: slide.bullets.length === 0 ? null : slide.bullets,
-              },
-            ];
-          }
-          if (index === 0) {
-            return [
-              {
-                number: 1,
-                title: null,
-                subtitle:
-                  "The bookkeeping and tax-compliance platform that Nigerian small businesses and their accountants rely on every single month",
-                bullets: null,
-              },
-            ];
-          }
-          return [];
-        }),
+        slides: shown.slides.flatMap(
+          (slide: QSlide, index: number): DocumentPolishResult["slides"] => {
+            if (
+              /customer/i.test(slide.title) ||
+              slide.title.includes("1,140")
+            ) {
+              return [
+                {
+                  number: index + 1,
+                  title:
+                    "Customers: We serve 1,140 paying businesses through accountant partners",
+                  subtitle: null,
+                  bullets: slide.bullets.length === 0 ? null : slide.bullets,
+                },
+              ];
+            }
+            if (index === 0) {
+              return [
+                {
+                  number: 1,
+                  title: null,
+                  subtitle:
+                    "The bookkeeping and tax-compliance platform that Nigerian small businesses and their accountants rely on every single month",
+                  bullets: null,
+                },
+              ];
+            }
+            return [];
+          },
+        ),
       }),
   };
 }

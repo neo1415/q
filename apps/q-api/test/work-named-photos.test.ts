@@ -66,6 +66,7 @@ const WORK: QWorkDto = {
   run: null,
   lastStep: null,
   spend: null,
+  delegation: null,
 };
 
 function build() {

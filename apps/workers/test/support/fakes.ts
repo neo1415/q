@@ -259,6 +259,10 @@ export function createFakeEvidence(options: {
   const findDocumentExtraction: DocumentProcessingService["findDocumentExtraction"] =
     () => Promise.resolve(null);
 
+  // The pipeline under test never backfills pages; nothing is missing.
+  const backfillDocumentPages: DocumentProcessingService["backfillDocumentPages"] =
+    () => Promise.resolve({ examined: 0, pagesWritten: 0, failed: 0 });
+
   return {
     service: {
       resolveProcessingTarget,
@@ -268,6 +272,7 @@ export function createFakeEvidence(options: {
       completeDocumentProcessing,
       recordDocumentExtraction,
       findDocumentExtraction,
+      backfillDocumentPages,
     },
     calls,
     status: () => requireRun().status,
