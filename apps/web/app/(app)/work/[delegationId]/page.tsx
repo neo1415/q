@@ -11,6 +11,7 @@ import {
   PageSection,
 } from "@/components/app-shell/page-container";
 import { qApiSession } from "@/features/q/context";
+import { DoneForYouUndo } from "@/features/work/done-for-you-undo";
 
 export const metadata: Metadata = { title: "What Q did" };
 
@@ -118,6 +119,13 @@ export default async function WorkDetailPage({
                       timeZoneName: "short",
                     }).format(new Date(step.at))}
                   </time>
+                  {step.undo === null ? null : (
+                    <DoneForYouUndo
+                      relationshipId={step.undo.relationshipId}
+                      messageId={step.undo.messageId}
+                      until={step.undo.until}
+                    />
+                  )}
                 </li>
               ))}
             </ol>

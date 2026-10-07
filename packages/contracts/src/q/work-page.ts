@@ -24,6 +24,18 @@ export const Q_WORK_PAUSE_PATH = "/v1/q/work/:delegationId/pause" as const;
 export const Q_WORK_RESUME_PATH = "/v1/q/work/:delegationId/resume" as const;
 export const Q_WORK_DONE_PATH = "/v1/q/work/done" as const;
 
+/**
+ * Scoped delegation (founder 2026-10-07): the person switches routine
+ * relationship moves on or off for one of their own instructions.
+ */
+export const Q_WORK_DELEGATION_PATH =
+  "/v1/q/work/:delegationId/delegation" as const;
+export const qWorkDelegationPath = (delegationId: string) =>
+  Q_WORK_DELEGATION_PATH.replace(
+    ":delegationId",
+    encodeURIComponent(delegationId),
+  );
+
 export const qWorkPausePath = (delegationId: string) =>
   Q_WORK_PAUSE_PATH.replace(":delegationId", encodeURIComponent(delegationId));
 export const qWorkResumePath = (delegationId: string) =>

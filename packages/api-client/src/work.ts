@@ -25,6 +25,7 @@ import {
   Q_WORK_SUGGESTIONS_PATH,
   QWorkDonePageDtoSchema,
   QWorkSuggestionListDtoSchema,
+  qWorkDelegationPath,
   qWorkPausePath,
   qWorkResumePath,
   Q_WORKFORCE_JOBS_PATH,
@@ -248,6 +249,24 @@ export function setQWorkPaused(
     paused ? qWorkPausePath(delegationId) : qWorkResumePath(delegationId),
     QWorkAcceptedDtoSchema,
     { body: {} },
+  );
+}
+
+/**
+ * `POST /v1/q/work/:id/delegation` (API): the person's own switch for
+ * scoped delegation on one of their instructions.
+ */
+export function setQWorkDelegation(
+  session: ApiSession,
+  delegationId: string,
+  enabled: boolean,
+) {
+  return call(
+    session,
+    "POST",
+    qWorkDelegationPath(delegationId),
+    QWorkAcceptedDtoSchema,
+    { body: { enabled } },
   );
 }
 

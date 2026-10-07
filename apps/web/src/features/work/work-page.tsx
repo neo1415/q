@@ -75,6 +75,7 @@ import {
   dismissSuggestionAction,
   listDoneAction,
   preparedAction,
+  setDelegationAction,
   setPausedAction,
   type Prepared,
 } from "./work-page-actions";
@@ -1608,6 +1609,21 @@ function RunningRow({
           </MenuContent>
         </MenuRoot>
       </div>
+      {instruction && item.delegation !== null ? (
+        <DelegationSwitch
+          id={item.id}
+          delegation={item.delegation}
+          onChanged={(enabled) =>
+            onChanged({
+              ...item,
+              delegation:
+                item.delegation === null
+                  ? null
+                  : { ...item.delegation, enabled },
+            })
+          }
+        />
+      ) : null}
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <span className="cq-body-sm text-(--cq-text-secondary)">
@@ -1636,6 +1652,80 @@ function RunningRow({
           {message}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Scoped delegation (founder 2026-10-07): the instruction says, in plain
+ * words, what Q may do without asking, with the person's own switch. The
+ * state is a word as well as the switch's position, never colour alone.
+ */
+function DelegationSwitch({
+  id,
+  delegation,
+  onChanged,
+}: {
+  readonly id: string;
+  readonly delegation: NonNullable<QWorkDto["delegation"]>;
+  readonly onChanged: (enabled: boolean) => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+  const on = delegation.enabled;
+  const labelId = `delegation-${id}`;
+  const flip = () =>
+    startTransition(async () => {
+      setMessage(null);
+      const result = await setDelegationAction(id, !on).catch(() => null);
+      if (result?.ok !== true) {
+        setMessage(result?.message ?? "That didn't go through.");
+        return;
+      }
+      onChanged(!on);
+    });
+  return (
+    <div className="flex min-h-11 items-start gap-3 pt-1">
+      <p
+        id={labelId}
+        className="min-w-0 flex-1 cq-label font-normal text-(--cq-text-secondary)"
+      >
+        {delegation.words}.{" "}
+        <span className="font-medium text-(--cq-text-primary)">
+          {on ? "On" : "Off"}
+        </span>
+        {message === null ? null : (
+          <span className="block" role="status">
+            {message}
+          </span>
+        )}
+      </p>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-labelledby={labelId}
+        disabled={pending}
+        onClick={flip}
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-full disabled:opacity-60"
+      >
+        <span
+          aria-hidden="true"
+          className={cx(
+            "relative inline-flex h-6 w-10 items-center rounded-full border transition-colors",
+            on
+              ? "border-(--cq-text-primary) bg-(--cq-text-primary)"
+              : "border-(--cq-border-strong) bg-(--cq-surface-strong)",
+          )}
+        >
+          <span
+            className={cx(
+              "absolute size-4 rounded-full bg-(--cq-surface) transition-transform",
+              on ? "translate-x-5" : "translate-x-1",
+            )}
+          />
+        </span>
+      </button>
     </div>
   );
 }

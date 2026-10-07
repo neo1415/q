@@ -180,6 +180,7 @@ import {
   type InstructionEngine,
 } from "./composition/instructions/engine.js";
 import { createInstructionTriggers } from "./composition/instructions/triggers.js";
+import { createDelegationAudit } from "./composition/instructions/delegation-audit.js";
 import { createOwnUsage } from "./composition/usage.js";
 import { createInstructionPlanner } from "./composition/instructions/planner.js";
 import {
@@ -4195,6 +4196,12 @@ instructionEngine.current = createInstructionEngine({
       reason: input.reason,
     })) ?? false,
   autoEnabled: instructionsAuto,
+  // Scoped delegation: each step Q takes on its own under the person's
+  // delegation is audited (actor Q, authority the person).
+  auditDelegated: createDelegationAudit({
+    transactions: database.transactions,
+    audit: createPostgresMaterialActionAuditWriter(),
+  }),
   actions: APP_ACTIONS,
   ports: appActionPorts,
   actorFor: createInstructionActor({

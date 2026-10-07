@@ -9,6 +9,8 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
+  WOO_FEEDBACK,
+  wooProblem,
   WorkConverseResultSchema,
   WorkInterviewReportResultSchema,
   WorkInterviewTurnResultSchema,
@@ -173,6 +175,37 @@ export function createWorkComposers(dependencies: {
   const CHAT_NOTE =
     "Your reply is posted in a relationship chat on Capital Q, marked as sent by Q.";
 
+  /**
+   * Founder 2026-10-07 (messages that woo): code checks a reply Q wrote to
+   * the other side; one that opens with a demand, pushes, runs long or
+   * opens cold is written once more with what to change. Still failing, no
+   * reply goes (what they learned and what is for the person are kept).
+   */
+  async function wooed<O extends { readonly reply: string | null }>(
+    write: (note: string) => Promise<O | null>,
+    task: string,
+  ): Promise<O | null> {
+    const first = await write(CHAT_NOTE);
+    const problem =
+      first?.reply == null
+        ? null
+        : wooProblem({ body: first.reply, replying: true, recipientTerms: [] });
+    if (first === null || problem === null) return first;
+    const again = await write(
+      `${CHAT_NOTE}\nYour last draft was sent back: ${WOO_FEEDBACK[problem]}`,
+    );
+    const still =
+      again?.reply == null
+        ? null
+        : wooProblem({ body: again.reply, replying: true, recipientTerms: [] });
+    if (again !== null && still === null) return again;
+    dependencies.logger?.info(
+      { task, problem: still ?? problem },
+      "q work reply held: it still read as a hard sell",
+    );
+    return { ...(again ?? first), reply: null };
+  }
+
   return {
     shortlist: (who: Who, variables: TaskVariables["WORK_SHORTLIST"]) =>
       call<"WORK_SHORTLIST", WorkShortlistResult>(
@@ -188,15 +221,19 @@ export function createWorkComposers(dependencies: {
       variables: TaskVariables["WORK_CONVERSE"],
       correlationId: string | null = null,
     ) =>
-      call<"WORK_CONVERSE", WorkConverseResult>(
+      wooed(
+        (note) =>
+          call<"WORK_CONVERSE", WorkConverseResult>(
+            "WORK_CONVERSE",
+            who,
+            variables,
+            WorkConverseResultSchema,
+            SMALL,
+            note,
+            "SPEAK_FOR",
+            correlationId,
+          ),
         "WORK_CONVERSE",
-        who,
-        variables,
-        WorkConverseResultSchema,
-        SMALL,
-        CHAT_NOTE,
-        "SPEAK_FOR",
-        correlationId,
       ),
     interviewTurn: (
       who: Who,
@@ -235,15 +272,19 @@ export function createWorkComposers(dependencies: {
       variables: TaskVariables["WORK_STAND_IN_REPLY"],
       correlationId: string | null = null,
     ) =>
-      call<"WORK_STAND_IN_REPLY", WorkStandInReplyResult>(
+      wooed(
+        (note) =>
+          call<"WORK_STAND_IN_REPLY", WorkStandInReplyResult>(
+            "WORK_STAND_IN_REPLY",
+            who,
+            variables,
+            WorkStandInReplyResultSchema,
+            SMALL,
+            note,
+            "SPEAK_FOR",
+            correlationId,
+          ),
         "WORK_STAND_IN_REPLY",
-        who,
-        variables,
-        WorkStandInReplyResultSchema,
-        SMALL,
-        CHAT_NOTE,
-        "SPEAK_FOR",
-        correlationId,
       ),
   };
 }

@@ -46,6 +46,7 @@ function work(
     run: null,
     lastStep: null,
     spend: null,
+    delegation: null,
   } satisfies QWorkDto;
 }
 

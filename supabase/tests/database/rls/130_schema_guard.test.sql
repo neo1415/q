@@ -174,6 +174,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'standing_instructions',    'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'instruction_grants',       'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'instruction_steps',        'RLS_REQUIRED',         '{SELECT}'),
+  ('q_runtime', 'instruction_delegations',  'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'daily_preferences',        'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'etiquette_guide_versions', 'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'workforce_jobs', 'RLS_REQUIRED', '{SELECT}'),

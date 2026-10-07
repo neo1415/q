@@ -1,3 +1,4 @@
+import { WOO_GUIDANCE } from "../../etiquette/woo.js";
 import type { PromptDefinition } from "../definition.js";
 import {
   DRAFT_REDRAFT_SCHEMA_NAME,
@@ -134,7 +135,7 @@ export const DRAFT_REDRAFT_V1: PromptDefinition<
 > = {
   id: "DRAFT_REDRAFT",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -152,6 +153,30 @@ export const DRAFT_REDRAFT_V1: PromptDefinition<
     schema: DraftRedraftResultSchema,
   },
   template: REDRAFT_TEMPLATE,
+};
+
+/**
+ * v2 (founder 2026-10-07: "they don't know how to woo"). The redraft
+ * carries the same relationship-first wording guidance as the writers;
+ * code's woo check runs on every redraft (the review's recheck).
+ */
+const REDRAFT_TEMPLATE_V2 = REDRAFT_TEMPLATE.replace(
+  "- Warm and specific; one clear ask at most, at the end. A FIRST message never asks for a meeting, a call, a deck, money or a decision.",
+  `- Warm and specific; one clear ask at most, at the end. A FIRST message never asks for a meeting, a call, a deck, money or a decision.
+${WOO_GUIDANCE}`,
+);
+
+export const DRAFT_REDRAFT_V2: PromptDefinition<
+  DraftRedraftVariables,
+  DraftRedraftResult
+> = {
+  ...DRAFT_REDRAFT_V1,
+  version: 2,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-07",
+  changeDescription:
+    "Founder 2026-10-07: messages were too direct. The redraft writes relationship-first: a specific opening about the other side, evidence, one soft ask, 60-120 words, no hard sell.",
+  template: REDRAFT_TEMPLATE_V2,
 };
 
 const REPLY_READER_TEMPLATE = `TASK: REPLY_READER

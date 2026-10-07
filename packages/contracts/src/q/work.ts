@@ -3,7 +3,10 @@ import { z } from "zod";
 import { UuidSchema } from "../common/ids.js";
 import { NamedPictureSchema } from "../common/named-picture.js";
 import { UtcTimestampSchema } from "../common/time.js";
-import { StandingInstructionDtoSchema } from "./instructions.js";
+import {
+  InstructionDelegationDtoSchema,
+  StandingInstructionDtoSchema,
+} from "./instructions.js";
 
 /**
  * Q's delegated work (AUTO, ADR 0030): an investor's outreach and a
@@ -136,6 +139,25 @@ export const QWorkStepDtoSchema = z
   .object({
     words: z.string().max(500),
     at: UtcTimestampSchema,
+    /**
+     * Scoped delegation: done by Q on its own, under the person's
+     * delegation, without a card ("Done for you"). Defaulted for an older
+     * server.
+     */
+    doneForYou: z.boolean().default(false),
+    /**
+     * The message Q sent on its own, while it can still be unsent from
+     * Work (the chat's own unsend, the person's act). Null otherwise.
+     */
+    undo: z
+      .object({
+        relationshipId: UuidSchema,
+        messageId: UuidSchema,
+        until: UtcTimestampSchema,
+      })
+      .strict()
+      .nullable()
+      .default(null),
   })
   .strict();
 export type QWorkStepDto = z.infer<typeof QWorkStepDtoSchema>;
@@ -189,6 +211,8 @@ export const QWorkDtoSchema = z
     lastStep: QWorkStepDtoSchema.nullable().default(null),
     /** This month's spend against its budget (standing instructions only). */
     spend: QWorkSpendSchema.nullable().default(null),
+    /** Scoped delegation on a standing instruction; null for other work. */
+    delegation: InstructionDelegationDtoSchema.nullable().default(null),
   })
   .strict();
 export type QWorkDto = z.infer<typeof QWorkDtoSchema>;

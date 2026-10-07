@@ -380,6 +380,7 @@ export {
   listQWorkDone,
   dismissQWorkSuggestion,
   setQWorkPaused,
+  setQWorkDelegation,
   subscribePush,
   unsubscribePush,
   listWorkforceJobs,

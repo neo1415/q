@@ -306,3 +306,72 @@ export const StandingInstructionDtoSchema = z
 export type StandingInstructionDto = z.infer<
   typeof StandingInstructionDtoSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Scoped delegation (founder 2026-10-07: "the agents don't need approval for
+// everything"). CLAUDE.md Authority: consequential actions follow
+// Prepare -> Recommend -> Human Approval -> Execute "unless explicit scoped
+// delegation exists". This is that scope: explicit (the person switches it
+// on for one instruction), per account (their own instruction only),
+// revocable at once (one tap; revoking needs no approval) and audited
+// (switching it on or off, and every step done under it).
+// ---------------------------------------------------------------------------
+
+/**
+ * The one delegation scope: routine relationship moves in a conversation
+ * that already exists (both sides agreed to connect). Q may reply, follow
+ * up within a bounded cadence, thank or acknowledge, ask for a deck they
+ * already offered, and propose or accept meeting times inside working
+ * hours -- without a card per message. Everything else still asks first,
+ * whatever this says: terms, valuation, money, commitments, term sheets,
+ * legal, data-room access, sharing private data, first contact with anyone
+ * not yet connected, attachments, and anything the reviewer holds.
+ */
+export const INSTRUCTION_DELEGATION_SCOPES = ["RELATIONSHIP_ROUTINE"] as const;
+export type InstructionDelegationScope =
+  (typeof INSTRUCTION_DELEGATION_SCOPES)[number];
+
+/** The declared actions the routine scope covers; nothing else ever. */
+export const DELEGATED_ROUTINE_ACTIONS = [
+  "chat.message.send",
+  "schedule.meeting.book",
+] as const;
+
+/** The scope in the person's own words, as the toggle shows it. */
+export const INSTRUCTION_DELEGATION_WORDS =
+  "Q may reply, follow up and set meetings without asking; asks first for money, terms and anything new" as const;
+
+/** The house caps on what Q does under delegation, fixed in code. */
+export const DELEGATION_LIMITS = {
+  /** Messages Q sends on its own under one instruction per day, all people. */
+  sendsPerDay: 10,
+  /** A follow-up after silence waits at least this many of their working days. */
+  followUpAfterWorkingDays: 3,
+  /** Follow-ups in a row with no answer before Q stops and asks. */
+  followUpsInARow: 2,
+  /** How long a message Q sent on its own can be unsent from Work. */
+  unsendMinutes: 10,
+} as const;
+
+/** One delegation as its owner sees it. */
+export const InstructionDelegationDtoSchema = z
+  .object({
+    /** Null when it is off. */
+    id: UuidSchema.nullable(),
+    enabled: z.boolean(),
+    scope: z.enum(INSTRUCTION_DELEGATION_SCOPES),
+    words: z.string().min(1).max(300),
+    enabledAt: UtcTimestampSchema.nullable(),
+  })
+  .strict();
+export type InstructionDelegationDto = z.infer<
+  typeof InstructionDelegationDtoSchema
+>;
+
+/** The toggle: the person's own act on their own instruction. */
+export const InstructionDelegationRequestSchema = z
+  .object({ enabled: z.boolean() })
+  .strict();
+export type InstructionDelegationRequest = z.infer<
+  typeof InstructionDelegationRequestSchema
+>;

@@ -381,6 +381,13 @@ const OFFERS: readonly QCapability[] = [
     "A card set aside is the page's own preference: the person taps Not now on it; Q prepares what a card suggests through its propose tools.",
   ),
   offer(
+    "work_delegation",
+    "RELATIONSHIP",
+    "Let Q reply, follow up and set meetings on one of their instructions without asking each time, or switch that off",
+    "WORK",
+    "Handing Q authority is the person's own act: they switch it on or off on the instruction in Work; Q never grants itself a delegation. It always still asks first for money, terms and anything new.",
+  ),
+  offer(
     "pitch_video_upload",
     "MEDIA",
     "Upload several pitch videos, name, replace or remove each, and choose who can watch each one (investors only, or everyone on Capital Q)",
