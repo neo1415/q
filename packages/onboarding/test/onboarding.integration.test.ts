@@ -45,6 +45,8 @@ import {
   type OnboardingWriteTargetHandler,
   type InterviewCues,
   type OnboardingTaxonomyResolver,
+  type OnboardingRuntimeDependencies,
+  type UtteranceMove,
 } from "../src/index.js";
 import {
   SYNTHETIC_FOUNDER_MANIFEST,
@@ -106,6 +108,7 @@ type World = {
     readonly writeTargets?: readonly OnboardingWriteTargetHandler[];
     readonly interviewCues?: InterviewCues;
     readonly taxonomy?: OnboardingTaxonomyResolver;
+    readonly moveReader?: OnboardingRuntimeDependencies["moveReader"];
   }) => OnboardingService;
 };
 
@@ -263,6 +266,7 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
         readonly writeTargets?: readonly OnboardingWriteTargetHandler[];
         readonly interviewCues?: InterviewCues;
         readonly taxonomy?: OnboardingTaxonomyResolver;
+        readonly moveReader?: OnboardingRuntimeDependencies["moveReader"];
       } = {},
     ) =>
       createOnboardingService({
@@ -271,6 +275,7 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
         outbox: createOutboxWriter({ registry }),
         interviewCues: options.interviewCues,
         taxonomy: options.taxonomy,
+        moveReader: options.moveReader,
         subjectResolvers: [
           createCompanyOnboardingSubjectResolver(
             createPostgresCompanyQueryPort({ sql: tx.sql }),
@@ -677,9 +682,39 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
 
   it("the conversational interview places what a person says through the same paths, or records it for Q (CQ-PRE-REC-001 §16-§21)", async () => {
     await withWorld(async (world) => {
-      const { service, adminA } = world;
+      const { adminA } = world;
+      // edc28e38 (founder brief J7, "no fixed phrase lists"): conversational
+      // moves are read by meaning through the Model Gateway
+      // (ONBOARDING_MOVE_READER), injected as `moveReader`. Tests make no
+      // model calls, so this stand-in returns what that reader returns for
+      // these replies; the reader's own prompt is covered in
+      // packages/model-gateway/test/words-readers.test.ts. Everything the
+      // reader does not mark as a move must still be placed or read as before.
+      const readings = new Map<string, UtteranceMove>([
+        ["Why do you need this?", "WHY"],
+        ["come back to this later", "SKIP"],
+      ]);
+      const service = world.build({
+        moveReader: ({ utterance }) =>
+          Promise.resolve(readings.get(utterance) ?? "NONE"),
+      });
       const { view } = await start(world, adminA);
       const id = view.session.id;
+
+      // With no reader (or a failing one) a move is never guessed from
+      // fixed phrases: nothing is written and nothing is skipped.
+      const unread = await world.service.runtime.say({
+        actor: adminA,
+        sessionId: id as OnboardingSessionId,
+        text: "come back to this later",
+        expectedSessionVersion: 1,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      expect(unread.understood.kind).not.toBe("SKIP");
+      expect(unread.view.session.version).toBe(1);
+      expect(unread.view.session.currentStepKey).toBe("intent");
+
       const say = (text: string, version: number, key = randomUUID()) =>
         service.runtime.say({
           actor: adminA,

@@ -5,7 +5,11 @@ import type { EligibilityReasonCode } from "../eligibility/contracts.js";
 import { RANKING_CONFIG_CURRENT } from "../ranking/config.js";
 
 import { FIT_CONFIG_CURRENT, type FitConfig } from "./config.js";
-import { assessFit, compareAssessments, type FitAssessment } from "./model.js";
+import {
+  assessFit,
+  compareAssessmentMerit,
+  type FitAssessment,
+} from "./model.js";
 import { observeFit } from "./observe.js";
 import type { FitInputSource } from "./service.js";
 
@@ -78,14 +82,17 @@ export function fitOrderScore(assessment: FitAssessment | null): number | null {
 
 /**
  * The one comparator for "better fit first": score shown, then the fit
- * config's tie-break. Used by the slate order and Q's side-by-side top N.
+ * config's tie-break on merit (value, confidence). Equal fits compare 0 so
+ * the slate's next key, the base rank, decides them (step 3); callers
+ * that need a total order without a base rank add their own fallback.
+ * Used by the slate order and Q's side-by-side top N.
  */
 export function compareFitOrder(a: FitOrderKey, b: FitOrderKey): number {
   const sa = a.score ?? -1;
   const sb = b.score ?? -1;
   if (sa !== sb) return sb - sa;
   if (a.assessment !== null && b.assessment !== null) {
-    return compareAssessments(a.assessment, b.assessment);
+    return compareAssessmentMerit(a.assessment, b.assessment);
   }
   return (a.assessment === null ? 1 : 0) - (b.assessment === null ? 1 : 0);
 }
