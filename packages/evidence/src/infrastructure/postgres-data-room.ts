@@ -1,5 +1,9 @@
 import type { DataRoomLevel, DeckSectionReading } from "@capital-q/contracts";
-import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
+import {
+  jsonbParam,
+  type DatabaseExecutor,
+  type TransactionContext,
+} from "@capital-q/database";
 
 /**
  * The data room's and the deck reading's own tables (migrations
@@ -503,7 +507,13 @@ export function createPostgresDataRoom() {
            schema_version, page_count, sections)
         values (${input.tenantId}, ${input.companyId}, ${input.documentId}, ${input.documentVersionId},
                 ${input.promptVersion}, ${input.schemaVersion}, ${input.pageCount},
-                ${JSON.stringify(input.sections)}::jsonb)
+                ${
+                  // Never JSON.stringify(...)::jsonb: postgres.js encodes it
+                  // again, the row holds a JSON string, and the table's
+                  // jsonb_typeof = 'array' check rejected every reading in
+                  // production (Q.08, 2026-10-07).
+                  jsonbParam(executor, input.sections)
+                })
         on conflict (document_version_id, prompt_version) do nothing
         returning id`;
       return made.length > 0;
