@@ -50,6 +50,9 @@ type Opened = QMaterialDocumentRef & {
   readonly failed: boolean;
 };
 
+/** R9: how long after an answer naming a document PDF.js is warmed. */
+const WARM_AFTER_MS = 2_500;
+
 /** Where each document was left, for this tab: it reopens at that page. */
 const lastPage = new Map<string, number>();
 
@@ -268,7 +271,9 @@ export function QMaterialViewer({
   }, [turns, opened, download]);
 
   // R9: an answer that names a document warms PDF.js while the room is
-  // idle, so opening it next draws the first page without that wait.
+  // idle, so opening it next draws the first page without that wait. Not
+  // at once: the answer's own card reads and draws first (measured: an
+  // immediate warm-up put ~1.7 s on the card under Slow 4G + 4x CPU).
   const latestQ = turns.findLast((turn) => turn.kind === "Q");
   const namesDocument =
     host !== null &&
@@ -276,7 +281,15 @@ export function QMaterialViewer({
     !latestQ.streaming &&
     answerNamesDocument(latestQ);
   useEffect(() => {
-    if (namesDocument) return whenIdle(preloadPdfjs);
+    if (!namesDocument) return;
+    let cancelIdle: (() => void) | null = null;
+    const timer = window.setTimeout(() => {
+      cancelIdle = whenIdle(preloadPdfjs);
+    }, WARM_AFTER_MS);
+    return () => {
+      window.clearTimeout(timer);
+      cancelIdle?.();
+    };
   }, [namesDocument]);
 
   // The subject comes back: the document reopens where it was left.
