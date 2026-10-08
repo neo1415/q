@@ -563,6 +563,8 @@ export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   // A malformed card set loses the cards, never the answer (ADR 0053).
   "answerCards",
   "comparisonCards",
+  // COMPANY_ANALYST v22 (E's request): an unknown visual loses the visual.
+  "visual",
 ];
 
 /**

@@ -31,7 +31,7 @@ export const COMPANY_ANALYST_V21: PromptDefinition<
 > = {
   ...COMPANY_ANALYST_V20,
   version: 21,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Lead live replay 2026-10-07: no boilerplate disclaimers ('not an investment conclusion', 'this is mandate alignment'); one line after v20's caveat rule. Schema unchanged.",
   effectiveFrom: "2026-10-07",
