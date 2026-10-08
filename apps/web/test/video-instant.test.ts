@@ -39,7 +39,7 @@ import {
 } from "../src/features/discover/feed/feed-state";
 
 /**
- * Video that is already there (ADR 0063): the preload window, the pitch
+ * Video that is already there (ADR 0064): the preload window, the pitch
  * media cache and its eviction, the cache in front of hls.js, and the one
  * sound policy for Discover and Explore.
  */

@@ -167,7 +167,7 @@ describe("moving through the feed", () => {
 });
 
 describe("the prefetch window", () => {
-  it("gives one card ACTIVE, buffers the next two, posters the one after (ADR 0063)", () => {
+  it("gives one card ACTIVE, buffers the next two, posters the one after (ADR 0064)", () => {
     const state = run(
       [{ type: "ADVANCED" }, { type: "ADVANCED" }],
       loaded([1, 2, 3, 4, 5, 6, 7]),

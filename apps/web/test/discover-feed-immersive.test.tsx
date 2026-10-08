@@ -227,7 +227,7 @@ function policies(container: HTMLElement): Record<string, string> {
   return out;
 }
 
-describe("the four-player ring (ADR 0063)", () => {
+describe("the four-player ring (ADR 0064)", () => {
   it("never holds more than four video elements, however far the reader goes", async () => {
     const { container } = await renderFeed();
     for (let step = 0; step < 4; step += 1) {
