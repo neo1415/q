@@ -1,0 +1,207 @@
+# 08 — Q tool registry and integrations
+
+Investigator D · read-only · HEAD `520bd123` · 2026-10-08. Defect ids refer to `_findings/D.md`.
+
+---
+
+## 1. How the registry works
+
+**Definition shape.** `packages/q-tools/src/definition.ts:93-151`. Each tool has:
+
+- `id` (dotted) and `version`; `status` ACTIVE / DISABLED / DEPRECATED
+- `providerName` (the name the model sees)
+- `classification` and `riskClass`
+- `requiredCapabilities`, `supportedPurposes` (task classes), `requiredScopeKinds`
+- `core` (always offered) and `eligibleWhenNamed` (declared app actions)
+- `approval: "NONE"`, `idempotency: "SAFE_TO_REPEAT"`
+- Zod `input` and `output`
+- an async `authorize(input, ctx)` that returns ALLOW (with sensitivity) or DENY (with a code), and `execute(input, ctx, grant)`
+
+**Two lanes only.** `registry.ts:191-210` throws at composition unless a tool is either SAFE_READ/READ_ONLY or LOW_RISK_INTERNAL/SIDE_EFFECT. Anything that needs approval is an Approval Engine action, never a tool. Proposal tools therefore never act: they put a card on the run's board (`prepareForApproval`).
+
+**Offer.** `registry.eligible(context)` returns, in order:
+
+1. the core tools
+2. the tools the turn named
+3. declared app actions whose area is in focus
+4. purpose-matched tools
+
+The result is capped at `Q_TURN_TOOLS_MAX = MODEL_TOOLS_MAX - 1 = 127` (`registry.ts:22-31`; `contracts/src/model/index.ts:340`). `use_capability` (`q.capability.use`, core) loads anything else mid-turn.
+
+**Executor.** `executor.ts`:
+
+- Validates the input against the schema, checks the actor against the plan, runs `authorize`, then `execute`, then validates the output.
+- Results larger than `MODEL_TOOL_RESULT_MAX_CHARS = 32 000` give RESULT_TOO_LARGE (`executor.ts:350-358`).
+- Cancellation comes through the run's `AbortSignal`, giving CANCELLED (`:209-216,241,301-308`).
+- **There is no per-tool timeout and no retry in the executor.** Time limits live in the providers (research 20–70 s, below) and in the model gateway's per-request budget.
+
+**Plan gating (BILLING).** `default-tools.ts:96-116` wraps the following:
+
+- `propose_errand`, `propose_q_outreach`, `propose_stand_in`, `propose_standing_instruction` and `propose_q_job` are gated on feature `q.delegations` (CHECK).
+- `research_public_web` is gated on `q.research` (CONSUME).
+- `get_my_plan` is added.
+
+**Composition.** `apps/q-api/src/main.ts:2472-2700` calls `createQTools({ports})`. It composes nearly every optional port: work, jobs, results, daily, discovery, fit, research (if keys exist), profiles (if Bright Data exists), relationships, email, chat, schedule, profileChanges, visibility, humanReviews, pendingProposals, qCards, explore, pitchMoments, and `clientActions: true`. Only the q-api composes a registry. `apps/api` composes none.
+
+---
+
+## 2. Tool catalogue
+
+Columns:
+
+- **Class**: R = SAFE_READ/READ_ONLY; W = LOW_RISK_INTERNAL/SIDE_EFFECT. A W "propose_*" tool only prepares an approval card; a W "client.*" tool only returns `SCREEN_WILL_DO_IT` for the browser; other W tools write the caller's own record or settings.
+- **Core**: offered on every turn.
+- **Cond.**: only composed when the named port exists.
+- **Surfaces**:
+  - T = text conversation (the q-api orchestrated run)
+  - V = standard voice line (`/v1/q/voice/think`, the same answer pipeline)
+  - D = duplex realtime line, which reaches tools **only through `ask_q`**. `ask_q` goes to the same VoiceTurnHandler as V (`apps/q-api/src/voice/duplex/broker.ts:497-534,928-944`).
+  - Work agents (instruction engine, jobs, errands, delegations) reach **no registry tool**. See §3.
+- All tools are version 1 except `q.workforce.job.propose` (v2, `q-job.ts:268`). All are ACTIVE.
+- Every tool has an `authorize` step. The typical check is `ownConversation(actor, plan)`, or a scope bound such as `boundScopeFor(plan, "COMPANY_PROFILE", …)` (`get-company.ts:110-130`) or `actorWideScope(plan, "PUBLIC_EXTERNAL_DATA")` (`research-public-web.ts:239-243`). Descriptions below are paraphrased from each tool's `description` and its code.
+
+### 2.1 Reads (R)
+
+| id | providerName | File:line | What it returns | Core / Cond. |
+|---|---|---|---|---|
+| company.get | get_company | tools/get-company.ts:86 | Canonical company profile within the plan's scope | — |
+| capital_objective.get | get_capital_objective | get-capital-objective.ts:111 | The company's raise / capital objective snapshot | — |
+| investor_mandate.get | get_investor_mandate | get-investor-mandate.ts:180 | Mandate snapshot (versioned) | — |
+| company.search | search_companies | search-companies.ts:104 | Search companies the actor may see | — |
+| discovery.slate | discovery_slate | discovery-slate.ts:144 | The deterministic Discover slate | Cond. discovery |
+| investor.prospects | find_prospective_investors | find-prospective-investors.ts:165 | Investors who fit a founder's company | Cond. discovery |
+| recommendation.explanation | recommendation_explanation | recommendation-explanation.ts:108 | Why a company is on the slate | Cond. |
+| fit.profile / fit.top_candidates / fit.compare | fit_profile / fit_top_candidates / fit_compare | fit.ts:163,202; investor-promises.ts:193 | Mandate fit (ADR 0052) | Cond. fit |
+| investor.thesis_reading | thesis_reading | investor-promises.ts:333 | How Q reads the investor's thesis | Cond. appActions |
+| company.assumptions | company_assumptions | investor-promises.ts:101 | Assumptions to test, as this investor may see them | Cond. profileMaterial |
+| public_web.search | research_public_web | research-public-web.ts:216 | Public web research with sources (evidence recorded) | Cond. research (provider keys); plan-gated |
+| public_web.extract | extract_public_web | extract-public-web.ts:82 | Reads a public page | Cond. research |
+| public_profile.lookup | lookup_public_profile | lookup-public-profile.ts:94 | LinkedIn-style public profile | Cond. Bright Data |
+| relationship.get | get_relationship | relationships.ts:264 | One relationship view (status, diligence) | Cond. relationships |
+| relationship.own.list | list_my_relationships | relationships.ts:940 | Own relationships plus lastMessage (fix today) | **core**; Cond. |
+| relationship.incoming_interest.list | list_incoming_interest | relationships.ts:459 | Pending interest | Cond. |
+| relationship.messages.list | list_messages | chat.ts:332 | Read a relationship chat | Cond. chat |
+| relationship.meeting.find_times | find_meeting_times | schedule.ts:375 | Free slots | Cond. schedule |
+| schedule.list | list_schedule | schedule.ts:1027 | Own meetings and reminders | Cond. |
+| inbound_email.own.list / .read | list_my_inbound_emails / read_my_inbound_email | inbound-email.ts:136,215 | Mail that arrived at their Q address | Cond. |
+| relationship.email.read | read_relationship_email | own-records.ts:331 | Relationship email (connected Gmail metadata) | — |
+| records.own.read | read_my_record | own-records.ts:133 | Their own records | — |
+| documents.uploaded.list | list_uploaded_documents | own-records.ts:253 | Uploaded files | — |
+| approvals.pending.list | list_pending_approvals | own-work.ts:99 | What waits for their yes | **core** |
+| documents.own.list / .read | list_my_documents / read_my_document | own-work.ts:169,262 | Q-made documents | — |
+| company.deck.read / company.data_room.read / deck.coaching.read | read_company_deck / read_company_data_room / coach_my_deck | profile-material.ts:182,256,360 | Deck, data room (with disclosure levels), deck coaching | Cond. |
+| company.data_room.document.read | read_company_document | company-documents.ts:432 | A data-room document by meaning | **core** |
+| company.data_room.document.pages.read | read_document_pages | company-documents.ts:571 | Pages of an open document | **core** |
+| pitch.moment.get / company.pitches.read | get_pitch_moment / read_company_pitches | pitch-moment.ts:121; pitch-transcripts.ts:137 | Pitch transcript evidence | Cond. pitchMoments |
+| explore.pitches_like / explore.search_network | explore_pitches_like / search_network | explore.ts:167,214 | Explore (ADR 0055) | Cond. |
+| disclosure.state.get | get_disclosure_state | visibility.ts:185 | Who can see what | Cond. |
+| q_card.get | get_q_card | q-card.ts:125 | Is my Q card saved | Cond. |
+| daily.own.get | get_q_daily | daily.ts:103 | The Q Daily | Cond. |
+| results.own.summary / .report | get_my_results / get_my_results_report | results.ts:222,271 | Raise / pipeline results | — |
+| documents.brand.get / documents.own.audit | get_brand_kit / audit_my_document | documents.ts:159,250 | Brand kit; document audit | — |
+| onboarding.state.get | get_onboarding_state | onboarding.ts:456 | Onboarding state (interview surfaces) | separate onboarding registry |
+| q.work.list | list_q_work | q-work.ts:823 | Their delegations, instructions, errands | **core** |
+| plan.get_mine | get_my_plan | plan.ts:186 | Billing plan | added when entitlements are composed |
+| app.own.read | read_my | app-actions.ts:377 | Generic read of own app records | **core** |
+| q.capability.use | use_capability | use-capability.ts:147 | Loads a tool not offered this turn | **core** |
+| app.<READ action> | e.g. relationship_deal_status, gateq_inbox_triage | app-actions.ts:196 | Declared READ app actions | eligibleWhenNamed |
+
+### 2.2 Proposals and own writes (W)
+
+| id | providerName | File:line | Effect | Notes |
+|---|---|---|---|---|
+| relationship.messages.propose | propose_chat_message | chat.ts:524 | Card: Q action `chat.message.send` | Cond. chat |
+| relationship.meeting.propose / .change / relationship.reminder.propose | propose_meeting / propose_meeting_change / propose_reminder | schedule.ts:773,880,938 | Card: `meeting.schedule`, `meeting.reschedule`, `meeting.cancel`, `reminder.create` | Cond. schedule |
+| schedule.reminder.dismiss | dismiss_reminder | schedule.ts:1112 | Own reminder dismissed | — |
+| relationship.email.propose | propose_email | email.ts:148 | Card: `email.send` (Gmail) | Returns `MAILBOX_NOT_CONNECTED` without Google (`email.ts:296`) |
+| relationship.errand.propose | propose_errand | errands.ts:166 | Card: `q.errand.start` | plan-gated |
+| q.work.outreach.propose / q.work.standin.propose / q.instruction.propose | propose_q_outreach / propose_stand_in / propose_standing_instruction | q-work.ts:584,639,679 | Cards for delegated work and grants | plan-gated |
+| q.workforce.job.propose (v2) | propose_q_job | q-job.ts:265 | Lead Q plans; card `q.workforce.job.start` | plan-gated; see D-02 |
+| q.work.stop / q.work.answer / q.work.away | stop_q_work / answer_q_work / set_away | q-work.ts:869,920,964 | Own work controls | stop is **core** |
+| relationship.interest.express.propose / relationship.interest.answer.propose | propose_express_interest / propose_interest_answer | relationships.ts:557,758 | Cards | Cond. |
+| relationship.connection_request.send (tool id identical to the app-action name) / relationship.connection_request.answer.propose | propose_connection_request / propose_connection_request_answer | connection-request-send.ts:73; connection-requests.ts:245 | Cards | — |
+| review.request.propose | propose_human_review | human-review.ts:93 | Card | Cond. |
+| profile.answer.propose | propose_profile_answer_change | record-changes.ts:159 | Card | Cond. |
+| profile.gaps.fill | fill_profile_gaps | profile-gaps.ts:215 | Researches, then prepares profile cards | Cond. research + profileChanges |
+| company.readiness.reassess | reassess_marketplace_readiness | own-records.ts:186 | Own readiness re-run | — |
+| proposal.pending.approve / .decline | approve_pending_proposal / decline_pending_proposal | pending-proposal.ts:163,331 | Approve or decline the one waiting card by conversation | **core** |
+| documents.own.revise / .edit | revise_my_document / edit_my_document | own-work.ts:375,477 | Own Q documents | **core** |
+| documents.brand.suggest / documents.own.brand / documents.own.illustrate | suggest_brand_kit / apply_my_brand / illustrate_my_document | documents.ts:201,312,389 | Docs studio | — |
+| memory.preference.note | note_preference | note-preference.ts:123 | Through the Write Gate | — |
+| settings.notifications.set / settings.q_personality.set | set_notification_settings / set_q_personality | own-settings.ts:107,161 | Own settings | — |
+| daily.preferences.set / daily.edition.request | set_q_daily_preferences / request_q_daily | daily.ts:220,285 | The Q Daily | Cond. |
+| onboarding.reminders.set / client.setup.open | set_onboarding_reminders / continue_onboarding | onboarding-reminders.ts:90,141 | **core** | — |
+| onboarding.* (record, recommend, accept, correct, set_aside, confirm_as_stated, finish) | record_answers … confirm_and_finish | onboarding.ts:481-637 | Onboarding interview registry | Interview surfaces |
+| client.theme.set, client.page.reload, client.website.open, client.q_motion.set, client.voice.set, client.session.sign_out, client.page.open, client.q_room.show, client.screen.control, client.q_room.document.control, client.discover_filters.set | set_theme, reload_page, open_website, set_q_motion, set_voice, sign_out, open_page, show, control_screen, control_document, set_discover_filters | client-actions.ts:80-1224 | Returns `SCREEN_WILL_DO_IT`; the browser acts | **core**; only with `clientActions: true` |
+| client.company_document.open | open_company_document | company-documents.ts:364 | Opens a document on screen | **core** |
+| app.<CONSEQUENTIAL action with a `tool`> | e.g. change_my_raise, set_data_room_level, answer_data_room_request, share_document_with_investor, invite_colleague, update_company_profile, relationship_outcome, send_questions_to_founder … | app-actions.ts:196-345 | `prepareForApproval` card `app.<name>` | eligibleWhenNamed; dropped when no approvals port (`:192-194`) |
+| app.<INSTANT action with a `tool`> | e.g. set_my_speaking_guide, mark_plan_step, answer_q_question, gateq_inbox_* | app-actions.ts:336-342 | **Runs directly** (`action.run`) | INSTANT actions are executed by the tool without a card |
+| onboarding.research.links | research_public_links | apps/q-api/src/voice/investor-research-tool.ts:117 | Voice interview only | Not in the main registry |
+
+**Real / mocked / disabled.**
+
+- Every tool calls real domain ports. There are no mock tools in production composition. `packages/q-research/src/providers/fake.ts` is used by tests only, and grep finds no app import of it.
+- "Disabled" happens through absence. Research tools do not exist without Bright Data zones, Tavily or SerpApi keys (`apps/q-api/src/composition/research.ts:261-305`). Profile lookup needs Bright Data. Email proposals return MAILBOX_NOT_CONNECTED without Google.
+- **Remote MCP** (`packages/q-connectors`, `apps/q-api/src/http/q-mcp.ts`) is off unless `Q_MCP_SERVER=enabled`. Not inspected further.
+
+---
+
+## 3. Who can reach what: inconsistencies between surfaces
+
+| Capability | Text / standard voice (T, V) | Duplex (D) | Instruction engine (Work) | Workforce jobs (Work) | Errands / delegations | App buttons |
+|---|---|---|---|---|---|---|
+| Send chat message | Card `chat.message.send` (Q action) via propose_chat_message | Via ask_q (same) | `app.chat.message.send` app action: AUTO **or** card. AUTO send is **not marked viaQ** (D-07). | `services.sendChat`, **not viaQ** (`main.ts:1451-1457`) | `chat.send` **with `qDelegationId`** (viaQ) | Chat screen |
+| Book meeting | Card `meeting.schedule` | ask_q | `app.schedule.meeting.book` | `schedule.schedule` with the **first free slot**, no confirmation (`jobs.ts:244-257`) | Negotiation in chat (errands) | Schedule UI |
+| Email | Card `email.send` (Gmail) | ask_q | **Unreachable.** `email.send` is a Q action, not in `APP_ACTIONS`, so a plan naming it gets UNKNOWN_ACTION (`engine.ts:611-618`). | Listed for SCHEDULER and in `OUTWARD_TOOLS` (`registry.ts:32-36,104-110`) but **not in `EXECUTABLE_JOB_TOOLS`** (`jobs.ts:362-371`), so it can never be permitted | — | Email card |
+| Public web research | research_public_web / extract_public_web | ask_q | **None.** The planner has no read tools. | RESEARCH role advertised (`registry.ts:125-130`) but **no executor**, and the tool is not executable | — | — |
+| Documents / data room share | app tools (share_document_with_investor, …) cards | ask_q | Possible if the action is in the grant (as ASK; not auto-eligible) | DOCUMENTS role advertised, **no executor** | — | Data room UI |
+| Read their records, relationships, approvals | Yes (core) | Via ask_q only. The broker computes up to 6 "direct" read tools (`broker.ts:697-699,1002-1012`) but **offers none to the model** (`duplexTools([], …)`, `:733-739`), so the direct-execution branch is unreachable dead code. | Engine reads through its own ports (people, material, quarantined reader), never registry tools | WorkforcePorts | own ports | — |
+| decide_card (approve, edit, skip a focused card by voice) | — | Answered in the browser; the server returns "No card is in focus" (`broker.ts:992-998`) | — | — | — | Work queue |
+
+Further inconsistencies:
+
+1. **Two action types for the same chat send.** Conversations prepare `chat.message.send` (Q action, `tools/schedule.ts:822`; `chat.ts`). Instructions and meeting follow-ups prepare `app.chat.message.send` (`engine.ts:2690,2978`; `meeting-follow-up-cards.ts:158`). The Work queue renders a message card only for the first (`decision-queue.tsx:441-444`; `decisions.ts:287`). (D-15.)
+2. **The job roster advertises tools no executor uses.** The lead Q is told roles have tools such as `research_public_web`, `diligence.document.share` and `email.send`. `boundPlan` refuses them as NO_PERMITTED_TOOL because `EXECUTABLE_JOB_TOOLS` excludes them. Even the permitted tool names are labels only: executors call `WorkforcePorts`, never the registry.
+3. **Writer brief.** The errand and delegation writers get the approved brief. The job CONVERSATION writer gets `brief: ""` (`main.ts:1464`) and relies on the reviewer's material to block ungrounded text.
+4. **Thread consistency** is enforced for instructions and errands (they pass `theirLatest`), but not for job replies (`jobs.ts:265-283` omits it).
+5. **Near-miss cards** are offered only by the instruction path (`nearMiss: true`, `engine.ts:2381`). In errands, jobs and delegations a 65–74 draft is simply held.
+
+---
+
+## 4. Integrations
+
+Configuration names are listed from `.env.example` and `packages/config/src/*` (names only; no values were inspected).
+
+| Integration | Implementation | Composition / gating | Status | Evidence |
+|---|---|---|---|---|
+| **Email: Gmail (send on the person's behalf, relationship mail metadata)** | `packages/integrations/src/google/gmail.ts` (`gmail/v1/users/me`), OAuth scopes `gmail.send` and `gmail.metadata` (`google/oauth.ts:195-196`), tokens encrypted (`crypto.ts`) | `GOOGLE_WORKSPACE_CLIENT_ID/SECRET/REDIRECT_URI`, `GOOGLE_TOKEN_ENCRYPTION_KEY`, Pub/Sub push `GOOGLE_PUBSUB_*`; poller `apps/workers/src/integrations/gmail-poller.ts`; action `email.send` (`apps/q-api/src/composition/email-action.ts:28-45`) | IMPLEMENTED; per-person connect | — |
+| **Inbound email (Q address)** | `packages/integrations/src/inbound-email.ts`; `apps/q-api/src/composition/inbound-email.ts` | `POSTMARK_INBOUND_ADDRESS`, `INBOUND_EMAIL_WEBHOOK_SECRET` | IMPLEMENTED (not deeply inspected) | — |
+| **App email (notices, invites)** | SMTP or Brevo API senders (`integrations/src/smtp.ts:105,156`) | `SMTP_HOST/PORT/USER/PASS/SENDER`; q-api `main.ts:1528-1538,2071-2143` | IMPLEMENTED | — |
+| **Calendar: Google** | `integrations/src/google/calendar.ts` (`calendar/v3`) | Same Google Workspace OAuth | IMPLEMENTED. Without Google, errands negotiate in chat and email an invite (`errands.ts:704-709`). | — |
+| **Meetings: Recall.ai bots (Q in a meeting)** | `apps/q-api/src/composition/recall-bots.ts:278`, meeting host runtime | `RECALL_API_KEY` (or `RECALL_API`), `RECALL_REGION`, `RECALL_TRANSCRIBER`, `RECALL_SCREEN_VISION`, `RECALL_CAMERA_VISION`, `RECALL_WEBHOOK_SECRET` (`main.ts:3886-3911,5551-5552`) | CONFIGURED when the key is present; vision off by default | — |
+| **Video: Cloudflare Stream** | `packages/media/src/infrastructure/cloudflare-stream-video-provider.ts`, webhook | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_STREAM_API_TOKEN`, `CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN`, `CLOUDFLARE_STREAM_SIGNING_KEY_ID/PEM`, `CLOUDFLARE_STREAM_WEBHOOK_SECRET`; without them `createUnconfiguredVideoProvider` refuses every upload and playback (`apps/api/src/main.ts:850-870`) | IMPLEMENTED or explicit-unconfigured | — |
+| **Video: Tavus** | **No runtime code.** "tavus" appears only as the seed dataset name `docs/seed/tavus-20/*` and in an engine comment (`engine.ts:443`) | — | NOT IMPLEMENTED (name only) | grep over `apps`, `packages` |
+| **Search / web research** | `packages/q-research`: Bright Data (SERP plus unlocker; profiles), Tavily, SerpApi; run in parallel, merged by canonical URL, cached (`composition/research.ts:254-305`) | `BRIGHT_DATA_API_KEY`, `BRIGHT_DATA_SERP_ZONE`, `BRIGHT_DATA_UNLOCKER_ZONE`, `TAVILY_API_KEY`, `SERP_API_KEY`. Timeouts: Bright Data 25 s / profile 70 s (`brightdata.ts:37-38`), SerpApi 20 s (`serpapi.ts:30`), Tavily 20 s (`tavily.ts:66`), fallback search deadline `RESEARCH_BOUNDS.searchTimeoutMs` (`fallback.ts:35`) | IMPLEMENTED when keys are present; otherwise the tools are absent | — |
+| **Chat** | `packages/communication/src/service.ts` (internal; viaQ when `qActionId` or `qDelegationId` is set, `:171-172`) | Built-in | IMPLEMENTED | — |
+| **Documents / data room** | App actions (`app-actions/src/actions/data-room.ts`, `founder-documents.ts`, `diligence.ts`); read tools in `profile-material.ts` and `company-documents.ts` | Built-in, with disclosure levels | IMPLEMENTED (not deeply inspected here) | — |
+| **Notifications: in-app** | `communication.notifications` (insert with dedupe) | Built-in; web polls every 60 s | IMPLEMENTED | `instructions/store.ts:565-586`; `notice-store.ts:23` |
+| **Push (Web Push)** | `packages/communication/src/push/web-push.ts`, `delivery.ts` | `WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_SUBJECT`; without them `unavailableWebPushSender` (`apps/workers/src/main.ts:1142-1165`) | CONFIGURED when VAPID is set; email fallback for NEEDS_YOU unread more than 10 min (`delivery.ts:24-26`) | — |
+| **Speech / realtime** (context only) | Deepgram, ElevenLabs, OpenAI realtime | `DEEPGRAM_API_KEY`, `ELEVENLABS_*` | See the voice investigator | — |
+
+---
+
+## 5. Timeouts and retries (summary)
+
+| Layer | Timeout | Retries |
+|---|---|---|
+| Tool executor | None of its own (run abort signal only) | None |
+| Model gateway per call | `budget.attemptTimeoutMs` | `budget.maxAttempts` (gateway `gateway.ts:777-1037`) |
+| Instruction planner | 60 s | 1 attempt; replan ≤2 (+1 nudge) |
+| Thread reader | 30 s | 1 |
+| Reviewer / redraft | 30 s | 2 attempts each; 1 redraft round |
+| Reply reader | 10 s | 2 |
+| Job plan | 60 s | 1 |
+| Research providers | 20–70 s per provider | Parallel fallback across indexes |
+| Instruction firing failure | — | Next claim after `cadence_minutes` (240) unless woken (D-05) |
+| Approved-but-not-executed actions | — | Sweep every 2 min (`main.ts:3816`) |
+| Approval card | TTL 24 h (`q-actions/src/ports.ts:300`) | No re-offer; lapsed cards hold the instruction (D-01) |

@@ -1,0 +1,160 @@
+# 12 — Database and Persistence
+
+Investigator A. Read-only. Sources: `supabase/migrations/*.sql` (178 files), repository code, and **live aggregate counts and catalog metadata only** from the hosted project through `scripts/handoff/live/hosted-read.mjs` (`evidence/architecture/live-db-aggregates.md`, `evidence/architecture/live-table-counts.md`). No row contents were read.
+
+## 1. Migrations
+
+- 178 files, `20260902144606_identity_organisation_foundation.sql` … `20261220170000_network_deal_close.sql`. **All 178 are applied on the hosted project** (count of matching versions = 178 = total; first/last versions identical).
+- The timestamps run to **2026-12-20**, more than two months past today's date (2026-10-08): 115 of the 178 files carry a date after 2026-10-08 (5 more are dated 2026-10-08). The newest ones were authored today (e.g. `20261220150000_q_voice_line_transcripts.sql`, per its header "founder live 2026-10-08"). Five migrations dated `20261008090000`-`20261008130000` sort *before* ~120 files that already existed. `scripts/db-push.mjs:87-96` runs plain `supabase db push` without `--include-all`. The Supabase CLI normally refuses to apply a local migration whose version is older than the remote's latest, unless `--include-all` is given. Everything is applied today, so either another path or the flag was used. This is a fragile convention: a correctly-dated new migration (`20261009…`) would sort into the middle of history. **UNVERIFIED** how today's `20261008*` files were applied.
+- Generated types: `packages/database/src/generated/database.types.ts` via `pnpm db:types` (the root `package.json` `db:types` script lists 16 schemas: `identity,permissions,events,audit,core,network,taxonomy,onboarding,evidence,media,q_runtime,ai_ops,q_knowledge,recommendation,gateq,artifacts`). `billing`, `communication`, `integrations` and `platform_ops` are not in that list. Repositories use raw `postgres.js` tagged SQL throughout.
+
+## 2. Schemas, access model and RLS posture
+
+21 schemas are created in migrations: `ai_ops, artifacts, audit, billing, communication, core, events, evidence, gateq, identity, integrations, media, network, onboarding, permissions, platform_ops, private, q_knowledge, q_runtime, recommendation, taxonomy` (plus `pgmq` queues `domain-events`, `documents(-dead)`, `recommendation-refresh(-dead)`, and Supabase `storage`, 4 buckets). 262 application tables.
+
+Live RLS posture (catalog):
+
+| Schema | Tables | RLS on | Forced | Policies | `authenticated` SELECT on | Live rows (sum) notes |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| ai_ops | 5 | 5 | 0 | 0 | 0 | model_usage 13,172 |
+| artifacts | 5 | 5 | 0 | 0 | 0 | |
+| audit | 2 | 2 | 0 | 0 | 0 | material_actions 4,315 |
+| billing | 12 | 12 | 0 | 0 | 0 | 7 of 12 tables empty |
+| communication | 20 | 20 | 0 | 19 | 16 | |
+| core | 30 | 30 | 0 | 20 | 20 | |
+| events | 1 | 1 | 0 | 0 | 0 | outbox 6,312 |
+| evidence | 26 | 26 | 0 | 0 | 0 | |
+| gateq | 20 | 20 | 0 | 0 | 0 | inbox_* all empty |
+| identity | 12 | 12 | 0 | 9 | 9 | |
+| integrations | 5 | 5 | 0 | 4 | 3 | |
+| media | 3 | 3 | 0 | 0 | 0 | |
+| network | 21 | 21 | 0 | 9 | 7 | |
+| onboarding | 13 | 13 | 0 | 0 | 0 | |
+| permissions | 5 | 5 | 0 | 3 | 3 | grants empty |
+| platform_ops | 14 | 14 | 0 | 0 | 0 | |
+| q_knowledge | 12 | 12 | 1 | 0 | 0 | embeddings empty |
+| q_runtime | 38 | 38 | 8 | 22 | 22 | |
+| recommendation | 10 | 10 | 0 | 0 | 0 | |
+| taxonomy | 8 | 8 | 0 | 0 | 0 | |
+
+No browser role has any write grant on any of these tables, and `anon` has no SELECT on any.
+
+**How the application actually reaches the data (key finding):**
+
+- Every service uses one `postgres.js` pool per process (`packages/database/src/client.ts:24-41`). There is no `SET ROLE`, no `set_config`/GUC for tenant or user, and no JWT claims (`grep` for `set local role|set_config(` across `packages/*/src` finds only an unrelated `update … set role =` in `packages/platform-admin/src/team.ts:97`).
+- RLS policies are written for the PostgREST role `authenticated` using `auth.uid()` / `private.current_app_user_id()` (`supabase/migrations/20260902144826_identity_permissions_rls.sql:145-275`). The web app never queries PostgREST: no `.from(`/`.rpc(`/`.schema(` call exists in `apps/web` (grep).
+- Migrations grant the application role explicitly as `postgres`, e.g. `grant select, insert on q_runtime.voice_line_turns to postgres, service_role` (`supabase/migrations/20261220150000_q_voice_line_transcripts.sql:61-64`), with the comment "the Q API is the boundary, and it passes every read and write through the actor".
+- Live: the only pooled client connections are role `postgres` via Supavisor (8), and `postgres` has `rolbypassrls = true` (evidence/architecture/live-db-aggregates.md).
+
+**Conclusion (high-confidence inference; the `DATABASE_URL` secret itself was not read):** application traffic runs as `postgres` and **bypasses RLS entirely, including the 9 FORCE-RLS tables** (BYPASSRLS overrides FORCE). Tenant isolation for every API, Q and worker query depends solely on hand-written `where tenant_id = ${actor.tenantId}` clauses in repository SQL. RLS protects only the unused PostgREST surface. CLAUDE.md requires "Enforce server-side *and* with RLS" and lists "RLS" and "tenant isolation" under Forbidden Shortcuts. The architecture as built does not meet the RLS half for service traffic. Code DB access is still explicit-context (every repository call takes the actor; see §4), which mitigates but does not replace the database layer.
+
+**Append-only enforcement.** Only `q_runtime.run_events` (`run_events_append_only`), `q_knowledge.revisions` (`revisions_append_only`), `ai_ops.model_usage` (`model_usage_append_only`) and the evidence claim revisions carry DB triggers that reject mutation (live `pg_trigger`). `network.relationship_events`, `audit.material_actions` and `q_runtime.conversation_messages` have **no trigger guard**: their migrations only revoke client grants ("No policies and no client grants", `20260904120000_relationship_foundation.sql:136`; `20260902213959_audit_infrastructure.sql:18`). Because the application connects as the owner role, append-only for relationship history and the audit log is a code convention, not a database guarantee.
+
+## 3. Schema-only vs live
+
+63 of 262 tables have **0 rows** live (`evidence/architecture/live-table-counts.md`):
+
+- billing: `credit_entries, customers, fee_entries, limit_overrides, plan_assignments, provider_events, subscriptions`. Payments are schema-only; metering is live (`usage_events` 89).
+- gateq: `gateway_criteria, inbox_*` (8 tables), `policy_extractions, startup_alerts`. The GateQ inbox has never been used.
+- network: `deal_close_checklist, deal_closes, deal_terms, diligence_document_summaries, diligence_document_views, diligence_question_answers, diligence_questions, diligence_request_declines, relationship_reports` (deal close was added today).
+- q_runtime: `delegations, delegation_lanes, delegation_steps, work_suggestion_dismissals` (ADR 0030 LangGraph delegations are unused).
+- q_knowledge: `embeddings, contradiction_sets, contradiction_members, lineage`. **No embeddings at all**, so semantic retrieval does not run. **No contradiction sets**, so the "contradictions coexist" mechanism has never recorded one.
+- permissions: `grants` (role templates only; no explicit grants).
+- platform_ops: `account_suspensions, break_glass_*, feature_flag_events, etiquette_guide_*, brand_themes, report_reviews, admin_role_events`.
+- Others: `communication.blocks/reports/meeting_private_observations`, `core.founder_background_entries/founder_person_facts/human_reviews/shareable_identity_scans`, `evidence.data_room_request_decisions/data_room_settings/deck_read_again_*/deck_section_reviews`, `identity.organisation_ownership_offers`, `integrations.email_messages/inbound_emails`, `onboarding.nudge_states/utterances`, `taxonomy.classification_candidates/classification_runs`.
+
+## 4. Entities: tables, key columns, RLS and CRUD paths
+
+Column lists come from live `information_schema.columns` (metadata only). "Rows" are live exact counts. Every repository below takes an explicit actor/tenant (no ambient tenant). With RLS bypassed (§2), those `tenant_id` predicates are the isolation boundary.
+
+### 4.1 Users / profiles — `identity.user_profiles` (164 rows)
+- Columns: `id, auth_user_id, display_name, given_name, family_name, headline, avatar_storage_key, primary_locale, timezone, country_code, status, created_at, updated_at, version`.
+- **Create:** the DB trigger `on_auth_user_created` → `private.handle_new_auth_user()` (SECURITY DEFINER, executable only by `supabase_auth_admin`) inserts `(auth_user_id)` when Supabase Auth creates a user (`supabase/migrations/20260902144606_identity_organisation_foundation.sql:105-129`). No application insert exists.
+- **Read:** `packages/security/src/postgres/application-identity.ts` (auth user → app user), `person-profile-store.ts`. **Update:** `packages/security/src/postgres/person-profile-store.ts` (`person.name.set`, `person.profile.edit` app actions). **Delete:** none in application code (only `packages/q-evals` fixtures).
+- RLS: `user_profiles_select_own to authenticated using (auth_user_id = auth.uid())` (`20260902144826_identity_permissions_rls.sql:239-241`). Not used by services.
+
+### 4.2 Organisations and memberships — `identity.tenants` (95), `identity.organisations` (94), `identity.organisation_memberships` (151), `identity.membership_roles`, `identity.user_active_contexts`, `identity.tenant_organisations`, `permissions.{roles,capabilities,role_capabilities,grants(0)}`
+- `organisations`: `id, tenant_id, organisation_type, legal_name, display_name, slug, website_url, country_code, jurisdiction_code, status, version`. `organisation_memberships`: `id, tenant_id, organisation_id, user_id, membership_status, joined_at, left_at, invited_by_user_id, primary_business_title, metadata`. `membership_roles`: `membership_id, role_id, valid_from, valid_until`.
+- Create/update: `packages/organisations/src/infrastructure/postgres-repositories.ts` (workspace bootstrap, `POST /v1/organisations`, activate) and `postgres-team-store.ts` (invitations, join requests, role set, remove, leave, ownership offers; `team.*` app actions).
+- Actor resolution reads memberships and roles: `packages/security/src/postgres/actor-context-resolver.ts`.
+- Invariant Person ≠ Organisation ≠ Membership is kept as separate tables.
+
+### 4.3 Companies and investor organisations — `core.companies` (62), `core.investor_organisations` (32)
+- `companies`: `id, tenant_id, organisation_id, canonical_name, legal_name, slug, website_url, founded_date, headquarters_country/city, company_status, marketplace_visibility, marketplace_readiness_state, primary_description, short_description, logo_storage_key, current_stage_code, version`.
+- `investor_organisations`: `id, tenant_id, organisation_id, investor_type, display_name, website_url, hq_country, public_description, verification_state, deployment_state, marketplace_visibility, inbound_preference, version`.
+- Create/update: `packages/companies/src/infrastructure/postgres-company-repository.ts` (via onboarding commit and `POST /v1/companies`, `company.profile.update`), `packages/investors/src/infrastructure/postgres-repositories.ts` (`POST /v1/investors`, `investor.profile.update`). Creation requests are idempotent through `core.company_creation_requests` and `core.investor_creation_requests`. No delete path.
+- Related live tables: `capital_objectives`, `capital_rounds`, `investor_mandates` (+constraints), `company_team_facts`, `founder_profiles`, `handles`, `profile_images`, `company_claim_requests`, `kyb_submissions`, `identity_submissions`.
+
+### 4.4 Relationships — `network.relationships` (46), `network.relationship_events` (202)
+- `relationships`: `id, tenant_id, company_id, investor_organisation_id, current_state, state_updated_at, first_discovered_at, last_event_sequence, projected_sequence, projector_version, projected_at`, with **`unique (company_id, investor_organisation_id)`** (`20260904120000_relationship_foundation.sql:54`).
+- `relationship_events`: `id, tenant_id, relationship_id, sequence, event_type, occurred_at, actor_type, actor_id, source_type, source_id, visibility_scope, payload, correlation_id`.
+- Create: `packages/network/src/application/ensure-relationship.ts` → `infrastructure/postgres-repositories.ts`. Append: `application/append-event.ts`. State is projected deterministically by `domain/state-projector.ts` (`RELATIONSHIP_PROJECTOR_VERSION`, `:71-79`) in the workers' `network/relationship-projection-handler.ts` and rebuilt at start (`relationship-rebuild-at-start.ts`). That matches the "derived projection, never an LLM" invariant.
+- Satellites: `interests` (46), `interest_responses`, `matches` (23; "the formal bilateral connection on the one canonical relationship … the connection_accepted history event is the authority", `20261009160000_network_interest_responses.sql:65-90`), `relationship_passes`, `commitments`, `diligence_*`, `deal_*` (empty).
+- Append-only is **not** DB-enforced (§2).
+
+### 4.5 Q runtime — conversations and messages
+| Table | Rows | Key columns | Writer |
+| --- | ---: | --- | --- |
+| `q_runtime.conversations` | 665 (ORGANISATION 640, PERSONAL 25) | `id, tenant_id, user_id, organisation_id, context_type, subject_refs, title, summary, summary_through, last_message_at, awaiting_action, archived_at` | `packages/q-runtime/src/infrastructure/postgres-q-runtime-repositories.ts`; `apps/q-api` also updates conversations directly |
+| `q_runtime.conversation_messages` | 4,584 | `id, tenant_id, conversation_id, run_id, role, content, content_type, provider_message_ref, result_blocks` | q-runtime repositories (run creation stores the user turn; completion stores Q's answer and `result_blocks` cards); `recordSpokenExchange` mirrors duplex model-only turns (`apps/q-api/src/main.ts:5481`) |
+| `q_runtime.conversation_message_marks` | 12 | `conversation_id, message_id, mark, marked_by, run_id`, `unique (message_id, mark)` | q-runtime (hide, `POST …/messages/:messageId/hide`) |
+| `q_runtime.message_creation_requests` / `run_creation_requests` | 2 / … | idempotency | q-runtime |
+- Read: `GET /v1/q/conversations`, `GET /v1/q/conversations/:id`; archive via `POST …/archive`. History feeds the answer specialist (`packages/q-specialists/src/answer.ts:248,654,962,1267` take `history: QConversationMessage[]`).
+
+### 4.6 Q runtime — runs, events, actions, approvals
+| Table | Rows | Key columns | Writer |
+| --- | ---: | --- | --- |
+| `q_runtime.runs` | 2,822 (COMPLETED 1,517; **CANCELLED 1,225**; FAILED 54; EXPIRED 24; AWAITING_APPROVAL 2) | `actor_user_id, actor_organisation_id, conversation_id (never null live), objective, capability, consequence_class, status, subject_refs, orchestration_version, prompt_bundle_version, model_policy_version, correlation_id, failure_code, viewing, screen, last_event_sequence` | q-runtime repositories; orphan sweep (`apps/q-api/src/main.ts:3844-3860`) |
+| `q_runtime.run_events` | 13,195 | `run_id, sequence, event_type, visible_stage, payload, occurred_at` — **append-only trigger** | q-runtime; NOTIFY to SSE readers |
+| `q_runtime.actions` | 321 (REJECTED 198, EXECUTED 62, AWAITING_APPROVAL 37, WITHDRAWN 17, FAILED 7) | `run_id, proposed_by_user_id, action_type, action_version, risk_class, target_refs, proposed_payload, proposed_payload_hash, status, idempotency_key, execution_result, failure_code, retry_permitted, execution_attempts` | `packages/q-actions/src/infrastructure/postgres-repositories.ts` |
+| `q_runtime.approvals` | 321 (REJECTED 198, APPROVED 69, PENDING 37, REVOKED 17) | `action_id, requested_from_user_id, status, expires_at, approved_*, rejected_*, revoked_*, approval_payload_hash` | q-actions; approve/reject routes `apps/q-api/src/http/q-approvals.ts:204,270` |
+- The approval binds to `proposed_payload_hash` / `approval_payload_hash` (payload-bound approval, as required).
+- 43% of runs end CANCELLED. Voice turns cancel superseded runs (`apps/q-api/src/voice/turn.ts:670-700` `stopRun`), so a high cancel share is expected on voice, but it also means much paid model work is discarded. Cost per cancelled run was not measured.
+- 62% of proposed actions were rejected. Root cause not investigated by A (Q-quality area).
+- Their domain events never leave the outbox (§6, DEF-A1).
+
+### 4.7 Q runtime — standing instructions, workforce, delegations
+| Table | Rows | Key columns | Owner code |
+| --- | ---: | --- | --- |
+| `standing_instructions` | 26 (ACTIVE 5, STOPPED 21) | `goal_text, goal, status, grant_version, budget_usd_month, spent_usd_month, pause_reason, conversation_id, next_fire_at, last_fired_at, cadence_minutes, last_digest_at` | `apps/q-api/src/composition/instructions/store.ts` **and** `apps/api/src/q-work-port.ts:75-118` (raw SQL updates from the other app) |
+| `instruction_grants` (26), `instruction_delegations`, `instruction_steps` (174) | | `instruction_steps: run_key, step_index, action, mode, status, relationship_id, words, reason_code, q_action_id, idempotency_key, message_id` | instructions/store.ts |
+| `workforce_jobs` (5), `workforce_agent_runs` (101), `workforce_drafts` (60), `workforce_grades` (59), `workforce_draft_outcomes` (48), `workforce_handoffs` (33), `workforce_feedback` (3) | | `grades: score, passed, threshold, max_redrafts, rubric_version, prompt_version, criteria, integrity, feedback` | `apps/q-api/src/composition/workforce/store.ts` (in-memory variant at `store.ts:690` "for tests and for a Q API composed without a database") |
+| `delegations`, `delegation_lanes`, `delegation_steps` | **0** | `thread_id, graph_version, grant_plan` | ADR 0030. Unused |
+| `errands` (6) | | `plan, status, stage, proposed_slots, meeting_id, replies_sent` | `apps/q-api/src/composition/errands.ts` |
+| `checkpoints` (16,665; 2,490 threads), `checkpoint_writes` (93,909), `checkpoint_blobs` (110,183) | | LangGraph `PostgresSaver` (`packages/q-orchestrator/src/checkpoint-store.ts:2,65`), thread = run (`thread.ts:18`) | **No pruning anywhere** (no delete outside q-evals/dev smoke). About 90 MB of the 202 MB database |
+- The whole "agent workforce" and "standing instructions" domain lives in `apps/q-api/src/composition/*` with direct SQL, not in a bounded-context package. CLAUDE.md: "Apps are composition/runtime boundaries, not homes for domain logic".
+
+### 4.8 Voice, rehearsals, presence, standing
+| Table | Rows | Notes |
+| --- | ---: | --- |
+| `q_runtime.voice_line_turns` | 21 (4 without conversation) | Created today (`20261220150000`). Duplex only; writer `apps/q-api/src/voice/duplex/transcript.ts`. `routed ∈ {ask_q, smalltalk, model_only}`. Insert+select only (no update) |
+| `q_runtime.rehearsals` (19), `persona_profiles` (9) | | `apps/q-api/src/composition/rehearsals.ts`. Turns stored as jsonb `turns`; camera/screen frames held in memory only (`rehearsals.ts:847,1316`) |
+| `q_runtime.presence` (11) | | `user_id, last_seen_at, away`; writer `apps/q-api/src/composition/work/store.ts` (`PUT /v1/q/presence`) |
+| `q_runtime.person_standing` | | `personality, streak, strikes, suspended_*`; writer `apps/q-api/src/voice/standing.ts`, updated by `packages/platform-admin` |
+
+### 4.9 Memory and knowledge — `q_knowledge.*`
+- `memory_items` (62: active 57, superseded 4, forgotten 1): `owner_context_type/id, subject_type/id, memory_type, memory_key, content, structured_value, quote, source_conversation_id, source_run_id, knowledge_object_id, write_mode, visibility_scope, sensitivity_class, valid_from/to, status, superseded_by, use_count`. Writer `packages/q-knowledge/src/memory/postgres-memory-repository.ts`, fed by `apps/q-api/src/composition/memory-learner.ts` through the memory write gate (`memory-learner.ts:43,153`). User-facing: `GET /v1/q/memory`, `POST /v1/q/memory/:id/forget`.
+- `objects` (292): `truth_class, evidence_status, confidence_class, reliability_class, statement, structured_value, visibility_scope, sensitivity_class, status, current_revision_*`. The three ADR-001 axes are separate columns. Writer `packages/q-knowledge/src/infrastructure/postgres-knowledge-repository.ts` via `createKnowledgeWriteGate`. `revisions` are append-only by trigger.
+- `chunks` (295) with `content_tsv` (lexical FTS); `embeddings` **0**, so hybrid retrieval is lexical only in production. `contradiction_*` 0; `lineage` 0; `presence_builds` (public presence).
+
+### 4.10 Evidence documents — `evidence.*`
+- `documents` (238): `company_id, owner_organisation_id, document_type, title, visibility_scope, sensitivity_class, current_version_id, status, download_audience`. `document_versions` (235): `storage_bucket, storage_key, sha256, mime_type, size_bytes, processing_status, malware_scan_status, text_extraction_status, supersedes_version_id`.
+- Writer `packages/evidence/src/infrastructure/postgres-repositories.ts`; upload via `POST /v1/documents/upload-sessions` → Storage signed upload → `…/complete`; processing in workers (`documents/pipeline.ts`, parser child process) gated by `CQ_MALWARE_POLICY=REQUIRE_CLEAN` on staging (held, not parsed, until a scanner exists, `railway.ts:189-208`). Data room: `data_room_*`; deck readings: `deck_extractions`, `document_pages`, `document_extractions`.
+
+### 4.11 Notifications — `communication.notifications` (304)
+- Columns: `user_id, kind, title, body, link_path, reminder_id, meeting_id, dedupe_key, read_at, priority, pushed_at, emailed_at`.
+- **19 separate code sites insert notifications directly**: `apps/q-api/src/composition/{instructions/store,waiting,meeting-host-follow-through,approved-action-sweep,workforce/ports,work/store,schedule-actions,scout,errands}.ts`, `apps/q-api/src/main.ts`, `apps/workers/src/network/startup-alert-watcher.ts`, `packages/communication/src/{counterpart-notices,schedule/postgres,meeting-assistant/service}.ts`, `packages/integrations/src/{inbound-email,postgres}.ts`, `packages/platform-admin/src/reviews.ts`, `packages/verification/src/application/{kyb,auto-request}.ts`. There is no single notification owner or contract. Dedupe relies on each writer supplying a `dedupe_key`.
+- Read: `GET /v1/notifications`, `POST /v1/notifications/read` (api). Delivery: workers `notice-delivery-ticker.ts` (push/email, setting `pushed_at`/`emailed_at`).
+
+### 4.12 Schedule and bookings — `communication.*`
+- `meetings` (8): `relationship_id, organiser_user_id, purpose, starts_at, ends_at, time_zone, status, google_event_id, meet_link, q_action_id, idempotency_key, origin`. `reminders` (16), `meeting_participants`, `meeting_roster_entries` (16), `meeting_briefs`, `meeting_assistants`, `meeting_host_notes`, `meeting_emails`.
+- Writer `packages/communication/src/schedule/postgres.ts` (book/cancel/join/reminders app actions; Q schedule actions via `apps/q-api/src/composition/schedule-actions.ts`; errands propose slots in `q_runtime.errands.proposed_slots`). Ticker: workers `integrations/schedule-ticker.ts`. Calendar: `packages/integrations/src/google/calendar.ts`.
+
+### 4.13 Model usage — `ai_ops.*`
+- `model_usage` (13,172; 6,786 in 7 days): `tenant_id, user_id, q_run_id, task_class, provider_id, model_id, routing_policy_id, attempt, input_tokens, cached_input_tokens, output_tokens, latency_ms, cost_usd, cost_basis, success, error_code, correlation_id, purpose` — **append-only trigger**. Writer `packages/model-gateway/src/infrastructure/postgres-usage.ts`.
+- `routing_policies` (7): `task_class, sensitivity_class, quality_floor, latency_target_ms, cost_ceiling_usd, preferred_models, fallback_models, allow_free_router, hedge_after_ms, status, version`. Changed by 5 migrations, including the 2026-10-08 OpenAI-primary change. `models` (10), `providers` (3), `model_prices` (9).
+
+### 4.14 Billing — `billing.*`
+- Live: `plans`, `features`, `plan_features`, `fee_schedules`, `usage_events` (89; `account_key, feature_key, period_start, quantity, idempotency_key, surface, voided_at`). Consumption goes through SQL function `billing.consume(…)` (`packages/billing/src/entitlements.ts:355`).
+- Schema-only: `customers, subscriptions, plan_assignments, provider_events, credit_entries, fee_entries, limit_overrides` (all 0). Stripe is CONFIGURED-UNUSED.
+
