@@ -122,7 +122,10 @@ describe("QX-004 §7 · the files are real", () => {
       slide.boxes.flatMap((box) => (box.kind === "TEXT" ? box.lines : [])),
     );
     expect(lines).toContain("Northstar Logistics");
-    expect(lines).toContain("A mobile app for booking freight capacity.");
+    // Set large, the sentence wraps: it is there, in the layout's lines.
+    expect(lines.join(" ")).toContain(
+      "A mobile app for booking freight capacity.",
+    );
     const [pptx, pdf] = await Promise.all([
       deckToPptx(laid, { title: "t" }),
       deckToPdf(laid, { title: "t" }),

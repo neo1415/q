@@ -176,7 +176,7 @@ describe("brand (DOCS)", () => {
     ).toMatchObject({ headingFont: "Inter", bodyFont: "Inter" });
     expect(
       themeFor("MINIMAL_INSTITUTIONAL", undefined, "NOT_A_PAIRING"),
-    ).toMatchObject({ headingFont: "Georgia", bodyFont: "Helvetica" });
+    ).toMatchObject({ headingFont: "Source Serif 4", bodyFont: "Inter" });
     const laid = layOutDeck(
       chartDeck(chart("COLUMN"), {
         brand: { pairing: "PLEX_SANS_PLEX_SERIF" },
@@ -195,6 +195,8 @@ describe("brand (DOCS)", () => {
       laid,
     );
     expect(svg).toContain("IBM Plex Serif, Helvetica");
+    // Deck quality: and the PDF is drawn in that face, not Noto.
+    expect(laid.theme.faces.heading).toBe("PLEX_SERIF");
   });
 
   it("starts a sector's deck from its direction, by taxonomy code", () => {

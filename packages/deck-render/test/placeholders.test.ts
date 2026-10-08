@@ -46,7 +46,7 @@ describe("placeholders on a slide", () => {
       expect.objectContaining({
         slide: 0,
         kind: "IMAGE",
-        x: Math.round(SLIDE_WIDTH * 0.6),
+        x: SLIDE_WIDTH / 2,
       }),
     ]);
     const svg = deckToSvg(laid)[0] ?? "";
@@ -54,9 +54,7 @@ describe("placeholders on a slide", () => {
     // The words keep the left: nothing of the slide's text crosses into it.
     for (const box of laid.slides[0]?.boxes ?? []) {
       if (box.kind === "TEXT" && box.role !== "LABEL") {
-        expect(box.x + box.width).toBeLessThanOrEqual(
-          Math.round(SLIDE_WIDTH * 0.6),
-        );
+        expect(box.x + box.width).toBeLessThanOrEqual(SLIDE_WIDTH / 2);
       }
     }
     expect(inspectDeck(laid)).toEqual([]);

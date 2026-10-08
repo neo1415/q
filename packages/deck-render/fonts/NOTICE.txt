@@ -1,0 +1,18 @@
+Every face in this directory is licensed under the SIL Open Font License 1.1
+(full text: OFL.txt). None declares a Reserved Font Name in the distribution
+it was taken from.
+
+Noto Sans (Regular, Bold), subset: Copyright 2022 The Noto Project Authors
+  (https://github.com/notofonts/latin-greek-cyrillic)
+Inter (Regular, SemiBold, Display SemiBold), instanced and subset:
+  Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
+Source Serif 4 (Display SemiBold), instanced and subset: Copyright 2014 The
+  Source Serif 4 Project Authors (https://github.com/adobe-fonts/source-serif),
+  from the google/fonts distribution, whose OFL declares no Reserved Font Name
+Fraunces (SemiBold), instanced and subset: Copyright 2018 The Fraunces
+  Project Authors (https://github.com/undercasetype/Fraunces)
+IBM Plex Serif (SemiBold): Copyright 2017 IBM Corp. Shipped unmodified, as
+  distributed in google/fonts (IBM Plex reserves the name "Plex", so it is
+  never subset or altered here).
+
+Instanced/subset with fontTools: docs/design/2026-10-08/deck-quality/fonts/.
