@@ -322,6 +322,16 @@ export const QSlideSchema = z
      */
     visual: z.enum(["FLOW"]).optional(),
     /**
+     * Deck quality (2026-10-08): the slide's topic ("Traction"), set small
+     * above a title that is the slide's one-sentence takeaway.
+     */
+    kicker: z.string().trim().min(1).max(40).optional(),
+    /**
+     * A caveat read up close ("Company-reported figures"), set as a
+     * footnote rather than as a point the slide makes.
+     */
+    footnote: z.string().trim().min(1).max(140).optional(),
+    /**
      * Headline figures shown large, each read from a statement on record
      * and carrying the same grounding as the section it rests on. Never a
      * number the record does not hold.

@@ -436,8 +436,9 @@ function header(
   const { theme } = ctx;
   const x = options.x ?? MARGIN;
   let y = MARGIN;
-  if (options.kicker !== undefined) {
-    const kicker = text("LABEL", options.kicker, {
+  const eyebrow = options.kicker ?? slide.kicker;
+  if (eyebrow !== undefined) {
+    const kicker = text("LABEL", eyebrow, {
       x,
       y,
       width,
@@ -501,7 +502,7 @@ function footer(
       text("FOOTER", company, {
         x: MARGIN,
         y,
-        width: 300,
+        width: right - MARGIN - 80,
         size,
         colour: theme.muted,
         face: theme.faces.bodyStrong,
@@ -1085,7 +1086,7 @@ function layOutDonut(
   }
   const total = values.reduce((sum, value) => sum + value, 0);
   const labelSize = Math.max(theme.sizes.label, theme.minimumSize);
-  const diameter = Math.round(Math.min(frame.height, frame.width * 0.46, 250));
+  const diameter = Math.round(Math.min(frame.height, frame.width * 0.4, 230));
   const thickness = Math.round(diameter * 0.2);
   const top = Math.round(frame.y + (frame.height - diameter) / 2);
   const boxes: LaidOutBox[] = [];
@@ -1106,16 +1107,35 @@ function layOutDonut(
     });
     angle += sweep;
   });
-  // The legend: swatch, part, value and share.
-  const legendX = Math.round(frame.x + diameter + 40);
+  // The legend: swatch, part, value and share; a long part takes two
+  // lines rather than losing its words.
+  const legendX = Math.round(frame.x + diameter + 36);
   const legendWidth = Math.round(frame.x + frame.width - legendX);
-  const rowHeight = Math.round(labelSize * LINE_SPACING) + 14;
-  const legendTop = Math.round(
-    frame.y + (frame.height - rowHeight * values.length) / 2,
-  );
-  chart.points.forEach((point, index) => {
-    const y = legendTop + index * rowHeight;
+  const entries = chart.points.map((point, index) => {
     const share = Math.round(((values[index] ?? 0) / total) * 100);
+    return text(
+      "LABEL",
+      // Parts already given in per cent are their own share.
+      chart.unit === "%"
+        ? `${point.label}: ${formatValue(point.value)}%`
+        : `${point.label}: ${formatted(chart, point.value)} (${String(share)}%)`,
+      {
+        x: legendX + 22,
+        y: 0,
+        width: legendWidth - 22,
+        size: labelSize,
+        colour: theme.ink,
+        face: theme.faces.body,
+        maxLines: 2,
+      },
+    );
+  });
+  const gapBetween = 12;
+  const legendHeight =
+    entries.reduce((sum, entry) => sum + entry.height, 0) +
+    gapBetween * (entries.length - 1);
+  let y = Math.round(frame.y + (frame.height - legendHeight) / 2);
+  entries.forEach((entry, index) => {
     boxes.push({
       kind: "RULE",
       x: legendX,
@@ -1125,24 +1145,8 @@ function layOutDonut(
       colour: tint(theme, index),
       radius: 2,
     });
-    boxes.push(
-      text(
-        "LABEL",
-        // Parts already given in per cent are their own share.
-        chart.unit === "%"
-          ? `${point.label}: ${formatValue(point.value)}%`
-          : `${point.label}: ${formatted(chart, point.value)} (${String(share)}%)`,
-        {
-          x: legendX + 22,
-          y,
-          width: legendWidth - 22,
-          size: labelSize,
-          colour: theme.ink,
-          face: theme.faces.body,
-          maxLines: 1,
-        },
-      ),
-    );
+    boxes.push({ ...entry, y });
+    y += entry.height + gapBetween;
   });
   return boxes;
 }
@@ -1362,17 +1366,18 @@ export function designFor(slide: QSlide, index: number): SlideDesign {
   ) {
     return "TIMELINE";
   }
-  if (figures.length >= 2 && MARKET.test(slide.title)) return "MARKET";
+  const topic = `${slide.kicker ?? ""} ${slide.title}`;
+  if (figures.length >= 2 && MARKET.test(topic)) return "MARKET";
   if (figures.length > 0) return "KPI";
   if (slide.layout === "TWO_COLUMN") return "TWO_COLUMN";
   if (
-    TEAM.test(slide.title) &&
+    TEAM.test(topic) &&
     (people(slide) !== null || slide.placeholder?.kind === "TEXT")
   ) {
     return "TEAM";
   }
   if (
-    PRODUCT.test(`${slide.title} ${slide.placeholder?.label ?? ""}`) &&
+    PRODUCT.test(`${topic} ${slide.placeholder?.label ?? ""}`) &&
     (slide.placeholder?.kind === "IMAGE" ||
       slide.image?.provenance === "OWN_UPLOAD")
   ) {
@@ -1547,7 +1552,7 @@ function layOutSlide(
       );
     }
   }
-  footer(ctx, input.company, index + 1, right);
+  footer(ctx, slide.footnote ?? input.company, index + 1, right);
   return finish();
 }
 
@@ -1723,7 +1728,7 @@ function statementSlide(ctx: Context, slide: QSlide, width: number): void {
     header(ctx, slide, width);
     return;
   }
-  const kicker = text("LABEL", slide.title, {
+  const kicker = text("LABEL", slide.kicker ?? slide.title, {
     x: MARGIN,
     y: MARGIN,
     width,

@@ -73,6 +73,14 @@ function plural(verb: string): string {
   return lower.endsWith("s") ? lower.slice(0, -1) : lower;
 }
 
+/** "VAT-filing businesses" stays; "Paying businesses" → "paying businesses". */
+export function lowerFirst(text: string): string {
+  const [first = "", second = ""] = [...text];
+  return /\p{Lu}/u.test(second)
+    ? text
+    : `${first.toLowerCase()}${text.slice(first.length)}`;
+}
+
 export function capitalise(text: string): string {
   const first = text.charAt(0);
   return first.length === 0 ? text : `${first.toUpperCase()}${text.slice(1)}`;
@@ -248,6 +256,55 @@ const LEAD_WORDS =
 const TRAIL_WORDS =
   /\s+(?:of|at|is|are|was|were|has|have|had|reached|reaching|with|and|to|by|hit|grew to|stands at|totals?)$/i;
 
+/**
+ * Deck quality (lead review 2026-10-08): what a figure counts, as a
+ * complete noun phrase of at most `maxWords` words, cut by code at the
+ * first word that starts a new clause — never a sentence clipped at a
+ * character count ("Paying businesses and identify accountant and" →
+ * "Paying businesses"; "Digitally invoicing businesses in Lagos, Abuja
+ * and Port" → "Digitally invoicing businesses"). A short period that
+ * belongs to the figure stays ("Logo retention over six months").
+ */
+const CLAUSE_START =
+  /^(?:and|or|but|which|who|whom|that|while|with|as|at|from|across|by|for|to|is|are|was|were|has|have|had|will|can|identify|identifies|allocate|allocates|including|where|when|because|after|before|under|of)$/i;
+const PERIOD =
+  /^(?:over|in|during|within|since|after)\s+(?:(?:the\s+)?(?:last|past)\s+)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|eighteen|twenty-four)\s+(?:months?|years?|weeks?|quarters?)\b|^by\s+(?:19|20)\d{2}\b|^(?:in|since)\s+(?:Q[1-4]\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)?\s*(?:19|20)\d{2}\b/i;
+const TRAILING = /\s+(?:of|in|at|on|for|to|by|with|and|or|the|a|an|per)$/i;
+
+export function nounPhrase(text: string, maxWords = 6): string {
+  const flat = text
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,;:—–-]+/, "")
+    .replace(/^(?:the|a|an|our|we have|we)\s+/i, "")
+    .trim();
+  const words = flat.split(" ").filter((word) => word.length > 0);
+  const kept: string[] = [];
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i] ?? "";
+    // Trailing punctuation goes; a closing bracket stays with its opener.
+    const bare = word.replace(/[,;:.]+$/g, "");
+    if (
+      i > 0 &&
+      (CLAUSE_START.test(bare) ||
+        /^(?:in|over|during|within|since|after)$/i.test(bare))
+    ) {
+      // A period that belongs to the figure stays, if it fits.
+      const period = PERIOD.exec(words.slice(i).join(" "));
+      if (period !== null) {
+        const extra = period[0].trim().split(" ");
+        if (kept.length + extra.length <= maxWords) kept.push(...extra);
+      }
+      break;
+    }
+    kept.push(bare);
+    // A comma, colon or semicolon ends the phrase.
+    if (/[,;:]$/.test(word) || kept.length >= maxWords) break;
+  }
+  let phrase = kept.join(" ");
+  for (let i = 0; i < 3; i += 1) phrase = phrase.replace(TRAILING, "");
+  return phrase.replace(/[.,;:]+$/, "").trim();
+}
+
 /** "1,140 paying businesses" → value "1,140", label "paying businesses". */
 export function statFigure(
   clause: string,
@@ -285,9 +342,11 @@ export function statFigure(
   if (label.length === 0 || /\d/.test(label.replace(/\d{4}/g, ""))) {
     return null;
   }
+  const phrase = nounPhrase(label);
+  if (phrase.length === 0) return null;
   return {
     value: found.value,
-    label: clampAtWord(label, options.labelMax ?? FIGURE_LABEL_MAX),
+    label: clampAtWord(phrase, options.labelMax ?? FIGURE_LABEL_MAX),
   };
 }
 

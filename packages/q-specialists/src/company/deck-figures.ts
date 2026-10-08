@@ -9,6 +9,7 @@ import {
   capitalise,
   clampAtWord,
   HEADLINE_MAX,
+  nounPhrase,
   HEDGED,
   inCompanyVoice,
   NO_FIGURES,
@@ -124,6 +125,26 @@ function growthIn(clause: string): Growth | null {
   return { from, to, label: subject, period, clause };
 }
 
+const VALUATION =
+  /\b(?:valuation|pre-money|post-money|cap table|valuation cap|(?:priced|valued)\s+at)\b|\bcap\b/i;
+const FRAGMENT = /^(?:and|or|but|with|which|plus|while|as well as)\b/i;
+
+/** The first column of a two-point movement, named by its period. */
+function periodStart(period: string | null): string {
+  if (period === null) return "Earlier";
+  const match =
+    /\b(?:over|in|during|within)\s+(?:the\s+)?(?:last|past)?\s*([\w-]+)\s+(months?|years?|quarters?|weeks?)\b/i.exec(
+      period,
+    );
+  if (match === null) return "Earlier";
+  const amount = (match[1] ?? "").toLowerCase();
+  const unit = (match[2] ?? "").toLowerCase();
+  if ((amount === "twelve" || amount === "12") && unit.startsWith("month")) {
+    return "A year earlier";
+  }
+  return capitalise(`${amount} ${unit} earlier`);
+}
+
 type Promoted =
   | {
       readonly figure: { readonly value: string; readonly label: string };
@@ -142,6 +163,9 @@ function promote(
 ): Promoted | null {
   const grounded = (text: string) =>
     figuresOf(text).every((figure) => known.has(figure));
+  // A cap or a valuation is a term of the round, never its headline
+  // (lead review 2026-10-08): it stays in the words.
+  if (VALUATION.test(clause)) return null;
   const growth = growthIn(clause);
   if (growth !== null && grounded(`${growth.from} ${growth.to}`)) {
     const from = chartValue(growth.from);
@@ -152,15 +176,13 @@ function promote(
           kind: "COLUMN",
           measure: clampAtWord(capitalise(growth.label), 80),
           unit: from.unit,
+          // Deck quality: the columns are named by when they were, as far
+          // as the sentence says ("A year earlier", "Latest"), never
+          // "Start" and "After twelve months".
           points: [
-            { label: "Start", value: from.value },
+            { label: periodStart(growth.period), value: from.value },
             {
-              label: clampAtWord(
-                growth.period === null
-                  ? "Now"
-                  : capitalise(growth.period.replace(/^over\s+/i, "after ")),
-                60,
-              ),
+              label: "Latest",
               value: to.value,
             },
           ],
@@ -169,9 +191,11 @@ function promote(
       };
     }
     const label = clampAtWord(
-      growth.period === null
-        ? growth.label
-        : `${growth.label} ${growth.period}`,
+      nounPhrase(
+        growth.period === null
+          ? growth.label
+          : `${growth.label} ${growth.period}`,
+      ),
       FIRM_LABEL_MAX,
     );
     const value = `${growth.from}→${growth.to}`;
@@ -218,6 +242,9 @@ export function promoteFirmFigures(
     if (index === 0) return slide;
     const topic = slideTopic(content, index);
     if (
+      // Deck quality: a slide built from the founder's own records (it
+      // carries its topic as the eyebrow) already shows what it should.
+      slide.kicker !== undefined ||
       slide.placeholder?.kind === "TEXT" ||
       NO_FIGURES.has(topic) ||
       slide.visual === "FLOW" ||
@@ -255,8 +282,12 @@ export function promoteFirmFigures(
       const rest = kept.join("; ");
       // What is left of a line once its figure is shown large: kept when it
       // still says something, dropped when it was only the number.
+      // A leftover that opens with a conjunction is a fragment, not a
+      // point ("And customer success"): it goes.
       if (kept.length === clausesOf(bullet).length) bullets.push(bullet);
-      else if (wordsOf(rest).length >= 3) bullets.push(capitalise(rest));
+      else if (wordsOf(rest).length >= 3 && !FRAGMENT.test(rest)) {
+        bullets.push(capitalise(rest));
+      }
     }
     if (!changed) return withConsistentTitle(slide, topic);
     const next: QSlide = {
@@ -316,12 +347,35 @@ export type OwnDeckFacts = {
     readonly instrument: string | null;
     readonly name: string | null;
     readonly useOfFunds: string | null;
+    /** Deck quality: the target close, as stored (ISO date or words). */
+    readonly targetClose?: string | null | undefined;
+    /** A cap or valuation: a secondary fact, never the headline. */
+    readonly valuationCap?:
+      { readonly amount: string; readonly currency: string } | null | undefined;
   } | null;
   readonly team: readonly {
     readonly name: string;
     readonly role: string | null;
     readonly founder: boolean;
   }[];
+  /** Deck quality: the team's size and founders, from the team facts. */
+  readonly teamSize?: number | null | undefined;
+  readonly founderCount?: number | null | undefined;
+  /** The company's own recorded website, for the closing slide. */
+  readonly website?: string | null | undefined;
+  /**
+   * The labelled figures of the founder's own deck, as its confirmed
+   * reading holds them (section code, label, value as written, as-of).
+   */
+  readonly figures?: readonly OwnDeckFigure[] | undefined;
+};
+
+/** One labelled figure from the confirmed reading of the founder's deck. */
+export type OwnDeckFigure = {
+  readonly section: string;
+  readonly label: string;
+  readonly value: string | null;
+  readonly asOf: string | null;
 };
 
 const CURRENCY_SYMBOL: Readonly<Record<string, string>> = {
@@ -359,7 +413,7 @@ const INSTRUMENT_LABEL: Readonly<Record<string, string>> = {
   CONVERTIBLE: "convertible note",
 };
 
-function instrumentLabel(code: string | null): string | null {
+export function instrumentLabel(code: string | null): string | null {
   if (code === null) return null;
   const known = INSTRUMENT_LABEL[code.toUpperCase()];
   if (known !== undefined) return known;
