@@ -225,7 +225,10 @@ function DocumentAccess({
     words: string,
   ) => {
     setBusy(true);
-    const out = await work();
+    const out = await work().catch(() => ({
+      ok: false,
+      message: "That didn't go through. Try again.",
+    }));
     setBusy(false);
     say(out.ok ? words : (out.message ?? "That didn't go through."));
     await reload();
@@ -354,7 +357,10 @@ function FolderAccess({
     words: string,
   ) => {
     setBusy(true);
-    const out = await work();
+    const out = await work().catch(() => ({
+      ok: false,
+      message: "That didn't go through. Try again.",
+    }));
     setBusy(false);
     say(out.ok ? words : (out.message ?? "That didn't go through."));
     await reload();

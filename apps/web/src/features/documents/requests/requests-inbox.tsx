@@ -63,8 +63,40 @@ const FILTERS: readonly (readonly [InboxFilter, string])[] = [
 const selectClass =
   "cq-body-sm min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)";
 
+/**
+ * A server action that throws (a lost connection, an ended session) reads
+ * as a refusal in words; the card never stays busy.
+ */
+async function settled<T>(
+  work: Promise<
+    | { readonly ok: true; readonly value: T }
+    | { readonly ok: false; readonly message: string }
+  >,
+  words: string,
+): Promise<
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly message: string }
+> {
+  try {
+    return await work;
+  } catch {
+    return { ok: false, message: words };
+  }
+}
+
 /** Upload one file through the documents screen's own three steps. */
 async function uploadFile(
+  companyId: string,
+  file: File,
+): Promise<{ readonly documentId: string } | { readonly error: string }> {
+  try {
+    return await uploadSteps(companyId, file);
+  } catch {
+    return { error: "The upload stopped. Try again." };
+  }
+}
+
+async function uploadSteps(
   companyId: string,
   file: File,
 ): Promise<{ readonly documentId: string } | { readonly error: string }> {
@@ -164,13 +196,16 @@ function DocumentRequestCard({
 
   const share = async (documentId: string) => {
     setBusy("Sharing…");
-    const out = await fulfilRequestAction(item.requestId, {
-      source: item.source,
-      documentId,
-      folderCode: folder,
-      accessLevel: level,
-      days,
-    });
+    const out = await settled(
+      fulfilRequestAction(item.requestId, {
+        source: item.source,
+        documentId,
+        folderCode: folder,
+        accessLevel: level,
+        days,
+      }),
+      "That wasn't shared. Try again.",
+    );
     setBusy(null);
     if (out.ok) onChanged(`Shared with ${who}. They've been told.`);
     else setError(out.message);
@@ -190,10 +225,13 @@ function DocumentRequestCard({
 
   const decline = async () => {
     setBusy("Declining…");
-    const out = await declineRequestAction(item.requestId, {
-      source: item.source,
-      note: note.trim() === "" ? null : note.trim(),
-    });
+    const out = await settled(
+      declineRequestAction(item.requestId, {
+        source: item.source,
+        note: note.trim() === "" ? null : note.trim(),
+      }),
+      "That didn't go through. Try again.",
+    );
     setBusy(null);
     if (out.ok) onChanged(`Declined. ${who} has been told.`);
     else setError(out.message);
@@ -437,13 +475,16 @@ function QuestionRow({
   const send = async () => {
     setError(null);
     setBusy("Sending…");
-    const out = await answerQuestionAction(
-      question.questionId,
-      {
-        answer: text.trim(),
-        documentIds: attached.map((document) => document.documentId),
-      },
-      await newAnswerKey(),
+    const out = await settled(
+      answerQuestionAction(
+        question.questionId,
+        {
+          answer: text.trim(),
+          documentIds: attached.map((document) => document.documentId),
+        },
+        await newAnswerKey(),
+      ),
+      "Your answer wasn't sent. Try again.",
     );
     setBusy(null);
     if (out.ok) onChanged(`Answer sent. ${investor} has been told.`);
