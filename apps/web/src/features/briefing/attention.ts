@@ -1,9 +1,10 @@
-import type {
-  NotificationDto,
-  QAttentionItem,
-  QAttentionReport,
-  QAttentionSource,
-  WorkforceJobDetailDto,
+import {
+  QAttentionReportSchema,
+  type NotificationDto,
+  type QAttentionItem,
+  type QAttentionReport,
+  type QAttentionSource,
+  type WorkforceJobDetailDto,
 } from "@capital-q/contracts";
 
 import type { ArrivalCard } from "./arrival";
@@ -27,6 +28,40 @@ import type { ArrivalCard } from "./arrival";
 export type AttentionReader = (
   since: string,
 ) => Promise<QAttentionReport | null>;
+
+/** Workstream B's read (q-api `GET /v1/q/attention`; path pending the lead). */
+export const Q_ATTENTION_READ_PATH = "/v1/q/attention";
+
+/**
+ * RECOVERY-2026-10 B1: the attention report from the Q API -- the same
+ * reader Q's own "what needs me" answer uses, every source, unread sources
+ * named. Null when it could not be read (the arrival then uses the bridge
+ * below); never an empty report standing in for a failure. The session is
+ * the caller's (server-side); nothing here reads cookies, so the module
+ * stays safe to import from the arrival's client components.
+ */
+export function createQApiAttentionReader(
+  session: { readonly baseUrl: string; readonly accessToken: string } | null,
+  fetchImpl: typeof fetch = fetch,
+): AttentionReader {
+  return async (since) => {
+    if (session === null) return null;
+    try {
+      const url = new URL(Q_ATTENTION_READ_PATH, session.baseUrl);
+      url.searchParams.set("since", since);
+      const response = await fetchImpl(url, {
+        headers: { authorization: `Bearer ${session.accessToken}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(6_000),
+      });
+      if (!response.ok) return null;
+      const read = QAttentionReportSchema.safeParse(await response.json());
+      return read.success ? read.data : null;
+    } catch {
+      return null;
+    }
+  };
+}
 
 /** Which attention source a NEEDS_YOU notice is, by its kind. */
 const NOTICE_SOURCE: Partial<

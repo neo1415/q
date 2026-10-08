@@ -255,6 +255,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly leadLines?: string | undefined;
   /**
+   * RECOVERY-2026-10 B6: what the turn's words point at ("the second one",
+   * "compare those two", "him"), bound by code to records the person
+   * already saw (their page, Q's lists, the conversation's focus), as one
+   * trusted note with ids. Never the person's words; grants nothing.
+   */
+  readonly references?: string | undefined;
+  /**
    * The declared action the reader read them as asking for, by its name
    * (TURN_READER v30, ADR 0040), offered here or not. Absent: none named.
    */

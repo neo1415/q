@@ -85,7 +85,9 @@ export {
   type ResearchDirective,
 } from "./general-turn.js";
 export {
+  isSpokenUnclearPrompt,
   isUnclearTurn,
+  spokenUnclearReply,
   unclearTurnReply,
   type UnclearTurnReply,
 } from "./unclear.js";

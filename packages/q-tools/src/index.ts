@@ -336,6 +336,24 @@ export {
   type SearchCompaniesOutput,
 } from "./tools/search-companies.js";
 export { createDefaultQTools, createQTools } from "./default-tools.js";
+export {
+  ATTENTION_ITEMS_PER_SOURCE,
+  ATTENTION_SOURCE_DEADLINE_MS,
+  attentionSourcesFromPorts,
+  createAttentionReader,
+  createReadAttentionTool,
+  Q_ATTENTION_PATH,
+  READ_ATTENTION,
+  READ_ATTENTION_PROVIDER_NAME,
+  ReadAttentionInputSchema,
+  readAttention,
+  type AttentionPort,
+  type AttentionReadContext,
+  type AttentionReader,
+  type AttentionSourceReader,
+  type AttentionSources,
+  type ReadAttentionInput,
+} from "./tools/attention.js";
 
 export {
   createDiscoverySlateTool,

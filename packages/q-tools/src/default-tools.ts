@@ -38,6 +38,11 @@ import {
   createDeclinePendingProposalTool,
 } from "./tools/pending-proposal.js";
 import { createOwnWorkTools } from "./tools/own-work.js";
+import {
+  createAttentionReader,
+  createReadAttentionTool,
+  type AttentionReader,
+} from "./tools/attention.js";
 import { createAppActionTools } from "./tools/app-actions.js";
 import { createOwnSettingsTools } from "./tools/own-settings.js";
 import { createResultsTools } from "./tools/results.js";
@@ -247,6 +252,17 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
         : [createSetOnboardingRemindersTool(ports.onboardingReminders)]),
     // R33: their approvals inbox, their documents, Save / Unsave / Pass.
     ...createOwnWorkTools(ports),
+    // RECOVERY-2026-10 B1: everything waiting on them, every source, with
+    // what could not be read said as unread (never as nothing).
+    // Composed when any of its sources is; with none, there is nothing it
+    // could honestly report beyond "unread".
+    ...(ports.relationships?.ownRelationships === undefined &&
+    ports.approvalInbox === undefined &&
+    ports.schedule === undefined &&
+    ports.work === undefined &&
+    ports.attention === undefined
+      ? []
+      : [createReadAttentionTool(createAttentionReader(ports))]),
     // ADR 0040: the app's declared actions and read_my, generated.
     ...createAppActionTools(ports),
     // Action parity (2026-10-02): Settings switches, by asking.
@@ -275,6 +291,12 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
 export type QToolsComposition = {
   readonly registry: QToolRegistry;
   readonly port: QToolPort;
+  /**
+   * B1: the same "what needs you" reader the tool uses, for the app's own
+   * routes (the arrival briefing, the Work page), so every surface reads
+   * one source.
+   */
+  readonly attention: AttentionReader;
 };
 
 /** Registry plus executor over the default catalogue; what apps compose. */
@@ -289,5 +311,6 @@ export function createQTools(options: {
   return {
     registry,
     port: createQToolExecutor({ registry, logger: options.logger }),
+    attention: createAttentionReader(options.ports),
   };
 }

@@ -736,6 +736,10 @@ export {
   V21_NO_DISCLAIMER_LINE,
 } from "./prompts/tasks/company-analyst.v21.js";
 export {
+  COMPANY_ANALYST_V22,
+  V22_VISUAL_LINE,
+} from "./prompts/tasks/company-analyst.v22.js";
+export {
   COMPANY_ANALYST_V16,
   COMPANY_ANALYST_V16_TURN,
 } from "./prompts/tasks/company-analyst.v16.js";
@@ -818,6 +822,9 @@ export {
   CompanyAnalystV15ResultSchema,
   CompanyAnalystV17ResultSchema,
   CompanyAnalystV19ResultSchema,
+  CompanyAnalystV22ResultSchema,
+  ANALYST_VISUALS,
+  type CompanyAnalystV22Result,
   ArtifactRequestV3Schema,
   ARTIFACT_REQUEST_TYPES_V3,
   type CompanyAnalystV19Result,

@@ -323,6 +323,40 @@ function sectionText(
  * The whole page as facts, within the budget; null for an empty manifest.
  * Two facts at most, because one fact's statement is bounded.
  */
+/** Bound on the controls line (a page registers at most 48 controls). */
+const CONTROLS_CHARS = 1_400;
+
+/**
+ * The page's controls as one line: id, kind, state, and a list's count.
+ * Null when the page registered none.
+ */
+export function controlsLine(
+  controls: NonNullable<QPageManifest["controls"]>,
+): string | null {
+  if (controls.length === 0) return null;
+  const described = controls.map((control) => {
+    const extra = [
+      control.kind,
+      ...(control.state === undefined ? [] : [control.state]),
+      ...(control.count === undefined
+        ? []
+        : [`${String(control.count)} item${control.count === 1 ? "" : "s"}`]),
+    ].join(", ");
+    return `${control.id} (${extra})`;
+  });
+  let line =
+    "- Controls on this page, for operate_screen by id (a tab is selected with SELECT_TAB, a section shown with SCROLL_TO, the nth item of a list opened with SELECT_ITEM and its index): ";
+  for (const [index, one] of described.entries()) {
+    const next = `${index === 0 ? "" : "; "}${one}`;
+    if (line.length + next.length > CONTROLS_CHARS) {
+      line += `; and ${String(described.length - index)} more`;
+      break;
+    }
+    line += next;
+  }
+  return `${line}.`;
+}
+
 export function manifestFacts(
   manifest: QPageManifest,
   results: ManifestReadResults,
@@ -351,6 +385,11 @@ export function manifestFacts(
       `- Filters set: ${filters.map(([key, value]) => `${key} ${String(value)}`).join(", ")}.`,
     );
   }
+  // RECOVERY-2026-10 (C's request): the controls the page registered, so
+  // "open the readiness tab" and "the second one" resolve to an id that
+  // operate_screen accepts. Semantic ids and closed kinds only.
+  const controls = controlsLine(manifest.controls ?? []);
+  if (controls !== null) parts.push(controls);
   const inView = new Set(manifest.inView);
   const ordered = [
     ...manifest.sections.filter((section) => inView.has(section.id)),

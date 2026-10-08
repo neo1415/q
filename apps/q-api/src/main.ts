@@ -16,6 +16,7 @@
  */
 
 import { createFitComposition } from "./composition/fit.js";
+import { createAttentionSources } from "./composition/attention-sources.js";
 import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
 import {
   createPostgresTaxonomyAssignmentRepository,
@@ -540,7 +541,11 @@ import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
 import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenlabs-pronunciation.js";
 import { createVoiceTurnBoard } from "./voice/turn-board.js";
 import { createQRoomFeed } from "./room/feed.js";
-import { createUiActReceiptLedger } from "./http/ui-act-receipts.js";
+import {
+  createUiActReceiptLedger,
+  receiptFacts,
+  recentUiActReceipts,
+} from "./http/ui-act-receipts.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
@@ -2527,6 +2532,9 @@ const qTools = createQTools({
     work: workPort,
     // WORKFORCE block (J1, J4): a job the lead Q plans, one approval.
     jobs: workforceJobBoard.port,
+    // RECOVERY B1: held drafts, stopped jobs, notices, data-room requests,
+    // new matches and Q's activity, for "what needs me".
+    attention: createAttentionSources({ sql: database.sql }),
     // ADMIN block
     results: {
       read: (actor, query) => ownResults.read(actor, resultsWindow(query)),
@@ -3601,6 +3609,10 @@ const qReceipts: QReceiptPort = {
   },
 };
 const qIntelligence = composeQIntelligence({
+  // RECOVERY (C's request): what came of Q's recent screen acts, from the
+  // receipts ledger (composed further down; read only once turns run).
+  uiActReceipts: (actor) =>
+    receiptFacts(recentUiActReceipts(uiActReceipts, actor)),
   // Voice speculation (latency2): each spoken answer's adoption or
   // cancellation lands on its "voice turn timed" line and the metric.
   speculation: { observe: (event) => voiceTimings.speculated(event) },
@@ -5736,6 +5748,8 @@ const { app, logger: appLogger } = createApp(
     readinessBlueprints: readinessService,
     // end BILLING-2 block
     standing: standingStore,
+    // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
+    attention: qTools.attention,
     // DAILY block
     daily: dailyReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },

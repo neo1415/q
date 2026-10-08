@@ -42,3 +42,58 @@ export function unclearTurnReply(
     ? { kind: "PROMPT", line: "Go on." }
     : { kind: "PROMPT", line: "Sorry, say that again?" };
 }
+
+/**
+ * RECOVERY-2026-10 (live T1, 2026-10-08 11:13): a spoken turn addressed
+ * to Q that could not be made out is never answered with silence. Silence
+ * let the realtime voice improvise for Q ("could you give me more
+ * detail…") and lost the turn. Speech meant for someone else is decided
+ * earlier (the reader's addressedToQ) and is the only silent case; here Q
+ * always says something short, varied so it never repeats itself, and
+ * offers typing once it has failed twice.
+ */
+export function spokenUnclearReply(
+  reading: Reading,
+  unclearBefore: number,
+): { readonly kind: "PROMPT"; readonly line: string } {
+  if (
+    reading.transcript === "FRAGMENT" &&
+    reading.kind !== "UNCLEAR_TRANSCRIPT"
+  ) {
+    return {
+      kind: "PROMPT",
+      line:
+        unclearBefore === 0 ? SPOKEN_UNCLEAR.goOn : SPOKEN_UNCLEAR.goOnAgain,
+    };
+  }
+  if (unclearBefore === 0)
+    return { kind: "PROMPT", line: SPOKEN_UNCLEAR.first };
+  if (unclearBefore === 1)
+    return { kind: "PROMPT", line: SPOKEN_UNCLEAR.second };
+  return { kind: "PROMPT", line: SPOKEN_UNCLEAR.more };
+}
+
+/** The spoken prompts for words Q could not make out (transport copy). */
+const SPOKEN_UNCLEAR = {
+  goOn: "Go on.",
+  goOnAgain: "Go on, I'm listening.",
+  first: "Sorry, I didn't catch that. Say it again?",
+  second:
+    "I still couldn't make that out. Could you put it another way, or type it?",
+  more: "I'm not catching it, sorry. Typing it in the box works too.",
+} as const;
+const SPOKEN_UNCLEAR_LINES: ReadonlySet<string> = new Set([
+  ...Object.values(SPOKEN_UNCLEAR),
+  // The typed prompt, which a spoken turn can also receive.
+  "Sorry, say that again?",
+]);
+
+/**
+ * RECOVERY-2026-10 (workstream A request): why a voice turn was not
+ * answered with content. True: the words could not be made out and Q asked
+ * again (disposition CLARIFIED, failure SPEECH_RECOGNITION). Q's silence
+ * is reserved for speech not meant for it (IGNORED).
+ */
+export function isSpokenUnclearPrompt(said: string): boolean {
+  return SPOKEN_UNCLEAR_LINES.has(said.trim());
+}

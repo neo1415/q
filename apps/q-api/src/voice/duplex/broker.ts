@@ -35,7 +35,11 @@ import type {
 } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 
-import { factsForVoice, type SpokenFacts } from "@capital-q/q-core";
+import {
+  factsForVoice,
+  isSpokenUnclearPrompt,
+  type SpokenFacts,
+} from "@capital-q/q-core";
 
 import type { VoiceSessionBinding } from "../bindings.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
@@ -730,6 +734,17 @@ export function createDuplexBroker(
           ...output({ ok: true, say: "" }, false),
           silent: true,
           disposition: "IGNORED",
+        };
+      }
+      // RECOVERY B (A's request): words Q could not make out are answered
+      // with Q's own short prompt, and the turn says why -- never silence,
+      // which stays for speech not meant for Q (IGNORED above).
+      if (isSpokenUnclearPrompt(say)) {
+        line.awaitingApproval = false;
+        return {
+          ...output({ ok: true, say }, false),
+          disposition: "CLARIFIED",
+          failure: "SPEECH_RECOGNITION",
         };
       }
       const approvalPending = said.endsWith(APPROVAL_QUESTION);

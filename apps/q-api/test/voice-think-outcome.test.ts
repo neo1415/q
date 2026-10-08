@@ -110,6 +110,21 @@ describe("the standard line's turn dispositions", () => {
     expect(state.outcome?.disposition).toBe("ANSWERED");
   });
 
+  // RECOVERY B (A's request): words Q could not make out are asked again
+  // in Q's own words and say why; silence (IGNORED) is only for speech not
+  // meant for Q.
+  it("CLARIFIED/SPEECH_RECOGNITION when Q could not make the words out", async () => {
+    const state = await think(async (_b, _t, _s, speaker) => {
+      await speaker.speak("Sorry, I didn't catch that. Say it again?");
+      return { kind: "SPOKEN", path: "Q" };
+    }, "Fidiani inanituma attention");
+    expect(state.outcome).toMatchObject({
+      disposition: "CLARIFIED",
+      failure: "SPEECH_RECOGNITION",
+    });
+    expect(QVoiceTurnStateSchema.safeParse(state).success).toBe(true);
+  });
+
   it("FAILED/TOOL_FAILED when the turn threw (and Q said so)", async () => {
     const state = await think(
       () => Promise.reject(new Error("boom")),

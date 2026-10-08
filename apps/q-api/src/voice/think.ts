@@ -11,6 +11,7 @@ import {
   type QTurnDisposition,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
+import { isSpokenUnclearPrompt } from "@capital-q/q-core";
 
 import type { VoiceSessionBindings } from "./bindings.js";
 import { voiceTokenFingerprint } from "./session-token.js";
@@ -318,6 +319,9 @@ export function registerVoiceThinkRoute(
     });
     const isOpen = () => live.sink.open && !controller.signal.aborted;
     let wroteContent = false;
+    // RECOVERY B (A's request): what was said, to tell an "I didn't catch
+    // that" prompt (CLARIFIED, SPEECH_RECOGNITION) from an answer.
+    let writtenText = "";
     let timedOut = false;
     /**
      * Write to the stream. `force` is for the deadline's own sentence.
@@ -334,6 +338,7 @@ export function registerVoiceThinkRoute(
       if (!isOpen()) return;
       if (timedOut && !force) return;
       wroteContent = true;
+      if (writtenText.length < 400) writtenText += text;
       live.sink.raw.write(chunk(live.sink.id, { content: text }, null));
     };
     // A long turn (research, a document being read) must not look like a
@@ -428,9 +433,12 @@ export function registerVoiceThinkRoute(
           : controller.signal.aborted || outcome.kind === "INTERRUPTED"
             ? "CANCELLED"
             : wroteContent
-              ? "ANSWERED"
+              ? isSpokenUnclearPrompt(writtenText)
+                ? "CLARIFIED"
+                : "ANSWERED"
               : "IGNORED";
         if (timedOut) failure = "TIMEOUT";
+        else if (disposition === "CLARIFIED") failure = "SPEECH_RECOGNITION";
       }
     } catch (error: unknown) {
       disposition = "FAILED";
