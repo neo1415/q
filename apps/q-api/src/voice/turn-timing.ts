@@ -412,7 +412,16 @@ export function timedVoiceTurns(
       const outcome = await timings.run(timing, () =>
         turn(binding, transcript, signal, timedSpeaker),
       );
-      timing.end(signal.aborted ? "INTERRUPTED" : outcome.kind);
+      // INC-1: a deferred speaker (the duplex voice) only holds the text;
+      // it is HANDED, never SPOKEN, until the client confirms `said`
+      // ("duplex voice turn spoken").
+      timing.end(
+        signal.aborted
+          ? "INTERRUPTED"
+          : outcome.kind === "SPOKEN" && speaker.deferred === true
+            ? "HANDED"
+            : outcome.kind,
+      );
       return outcome;
     } catch (error: unknown) {
       timing.end("FAILED");

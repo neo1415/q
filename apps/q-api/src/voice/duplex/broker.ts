@@ -252,6 +252,10 @@ type DuplexLine = {
    * has said its reply. `asked`: Q's pipeline answered it.
    */
   turn: {
+    /** INC-1: the browser's id for the turn (its `said` echoes it). */
+    turnId?: string | undefined;
+    /** When Q's answer was handed to the voice (not yet confirmed). */
+    handedAt?: number | undefined;
     readonly routed: DuplexRoutedAs;
     readonly words: string;
     asked: boolean;
@@ -442,6 +446,8 @@ function collectingSpeaker(
   readonly said: () => string;
   /** The facts of a code-built answer, for the voice to say itself. */
   readonly heldFacts: () => SpokenFacts | null;
+  /** INC-1: Q's answer (words or facts) is in. */
+  readonly answered: () => boolean;
 } {
   let text = "";
   let held: SpokenFacts | null = null;
@@ -473,6 +479,7 @@ function collectingSpeaker(
     },
     said: () => text.slice(0, SPOKEN_MAX),
     heldFacts: () => held,
+    answered: () => held !== null || text.length > 0,
   };
 }
 
@@ -638,8 +645,15 @@ export function createDuplexBroker(
     const wake = () => {
       for (const listener of line.listeners) listener();
     };
+    // INC-1 (live 2026-10-08, "top three"): three bridge lines, two after
+    // the answer was ready. One bridge per ask_q at most, and none once Q
+    // has its answer (the facts or the words are in).
+    let bridged = false;
+    let ready = false;
     const speaker = collectingSpeaker(`rt_${voiceSessionId}`, (beat) => {
       if (beat.kind === "TONE") return;
+      if (bridged || ready || speaker.answered()) return;
+      bridged = true;
       line.narrationSequence += 1;
       line.narration.push({ sequence: line.narrationSequence, beat });
       line.narration.splice(
@@ -778,6 +792,9 @@ export function createDuplexBroker(
     } finally {
       clearTimeout(timer);
       abort.removeEventListener("abort", onAbort);
+      // INC-1: nothing queued for this ask_q is said after its answer.
+      ready = true;
+      line.narration.length = 0;
       line.asking -= 1;
       wake();
     }
@@ -1072,6 +1089,7 @@ export function createDuplexBroker(
           heard.typed === true,
           heard.itemId,
         );
+        if (line.turn !== null) line.turn.turnId = heard.turnId;
       }
       if (route !== "ASK_Q") return { route };
       if (line.turn !== null) line.turn.asked = true;
@@ -1081,6 +1099,7 @@ export function createDuplexBroker(
         words,
         signal ?? new AbortController().signal,
       );
+      if (line.turn !== null) line.turn.handedAt = now();
       const callId = `cq_${randomUUID().replace(/-/g, "")}`;
       const args = JSON.stringify({ request: words });
       // A8 SIDEBAND: the answer goes on the call from here, at once; the
@@ -1118,6 +1137,30 @@ export function createDuplexBroker(
       const text = said.text.trim();
       if (text.length === 0) return true;
       const current = line.turn;
+      // INC-1: a turn is SPOKEN only when the client confirms its answer
+      // was said, for that turn id. A reply for a turn that is no longer
+      // current is never kept as said (a stale "give me a moment", 40 s
+      // late, was the only thing recorded, live 2026-10-08).
+      if (said.turnId !== undefined) {
+        if (current?.turnId !== said.turnId) {
+          logger.warn(
+            { qVoiceSessionId: voiceSessionId },
+            "duplex said for a turn that is no longer current: not kept",
+          );
+          return true;
+        }
+        logger.info(
+          {
+            qVoiceSessionId: voiceSessionId,
+            turnId: said.turnId,
+            outcome: "SPOKEN",
+            ...(current.handedAt === undefined
+              ? {}
+              : { confirmedMs: now() - current.handedAt }),
+          },
+          "duplex voice turn spoken",
+        );
+      }
       const routed: DuplexRoutedAs =
         current === null
           ? "model_only"

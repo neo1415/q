@@ -473,6 +473,11 @@ export const QVoiceDuplexHeardSchema = z
     typed: z.boolean().optional(),
     /** A decision card is in focus on their screen (decide_card). */
     cardInFocus: z.boolean().optional(),
+    /** INC-1: the browser's id for this turn, echoed by its `said`. */
+    turnId: z
+      .string()
+      .regex(/^turn_[A-Za-z0-9_-]{8,64}$/)
+      .optional(),
   })
   .strict();
 export type QVoiceDuplexHeard = z.infer<typeof QVoiceDuplexHeardSchema>;
@@ -520,6 +525,15 @@ export const QVoiceDuplexSaidSchema = z
   .object({
     responseId: z.string().min(1).max(128),
     text: z.string().min(1).max(4_000),
+    /**
+     * INC-1: the turn whose answer this was, when it was: the client's
+     * confirmation that the answer was said. Absent: speech that answers
+     * no turn (the opener, a note), never a turn's confirmation.
+     */
+    turnId: z
+      .string()
+      .regex(/^turn_[A-Za-z0-9_-]{8,64}$/)
+      .optional(),
   })
   .strict();
 export type QVoiceDuplexSaid = z.infer<typeof QVoiceDuplexSaidSchema>;
@@ -542,6 +556,12 @@ export const QVoiceDuplexTurnReportSchema = z
     firstAudioMs: TurnMsSchema.optional(),
     /** The heard relay's round trip. */
     relayMs: TurnMsSchema.optional(),
+    /**
+     * INC-1: bridge lines said while Q worked (at most one). Background
+     * speech, reported apart from the turn's answer and never counted
+     * as it.
+     */
+    bridges: z.number().int().min(0).max(10).optional(),
   })
   .strict();
 export type QVoiceDuplexTurnReport = z.infer<

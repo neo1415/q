@@ -9,6 +9,7 @@ import type {
 
 import {
   ANSWER_AUDIO_WATCHDOG_MS,
+  ANSWER_NOT_SPOKEN_NOTICE,
   BARGE_CONFIRM_MS,
   DELIVERY_REPAIR,
   DuplexLine,
@@ -219,13 +220,27 @@ function say(h: H, itemId: string, transcript: string | null) {
 }
 
 /** Q's answer is created and starts being heard. */
-function qSpeaks(h: H, responseId = "resp_a") {
+/** Q's answer is created and its audio starts (not yet confirmed said). */
+function qStarts(h: H, responseId = "resp_a") {
   h.channel().emit({ type: "response.created", response: { id: responseId } });
   h.channel().emit({
     type: "response.output_item.added",
     item: { id: `item_${responseId}`, type: "message" },
   });
-  h.channel().emit({ type: "output_audio_buffer.started" });
+  h.channel().emit({
+    type: "output_audio_buffer.started",
+    response_id: responseId,
+  });
+}
+
+/** ...and its transcript confirms it was said (INC-1). */
+function qSpeaks(h: H, responseId = "resp_a", words = "Three investors fit.") {
+  qStarts(h, responseId);
+  h.channel().emit({
+    type: "response.output_audio_transcript.done",
+    response_id: responseId,
+    transcript: words,
+  });
 }
 
 beforeEach(() => {
@@ -246,7 +261,15 @@ describe("A4: every accepted turn ends in one disposition", () => {
     await settle();
     expect(h.outcomes).toEqual([]);
     vi.advanceTimersByTime(300);
-    qSpeaks(h);
+    qStarts(h);
+    // INC-1: audio alone is not "said"; the transcript confirms it.
+    expect(h.outcomes).toEqual([]);
+    vi.advanceTimersByTime(2_000);
+    h.channel().emit({
+      type: "response.output_audio_transcript.done",
+      response_id: "resp_a",
+      transcript: "Three investors fit.",
+    });
     expect(h.outcomes).toHaveLength(1);
     expect(h.outcomes[0]).toMatchObject({ disposition: "ANSWERED" });
     expect(h.outcomes[0]?.turnId).toMatch(/^turn_[A-Za-z0-9_-]{8,64}$/);
@@ -397,16 +420,28 @@ describe("A4: every accepted turn ends in one disposition", () => {
     expect(h.events.onState).toHaveBeenLastCalledWith("LISTENING");
   });
 
-  it("an answer handed over but never heard ends FAILED/TIMEOUT", async () => {
+  it("an answer handed over but never said ends with ONE line: the code-built answer itself (INC-1)", async () => {
     const h = harness();
     await h.line.open();
     say(h, "item_1", "Who fits?");
     await settle();
     vi.advanceTimersByTime(ANSWER_AUDIO_WATCHDOG_MS + 1);
-    expect(h.outcomes.at(-1)).toMatchObject({
-      disposition: "FAILED",
-      failure: "TIMEOUT",
-    });
+    expect(h.outcomes).toEqual([
+      expect.objectContaining({
+        disposition: "FAILED",
+        failure: "RESULT_DELIVERY",
+        notice: ANSWER_NOT_SPOKEN_NOTICE,
+      }),
+    ]);
+    const fallback = h
+      .channel()
+      .creates()
+      .filter((e) => JSON.stringify(e).includes("Three investors fit."));
+    expect(fallback).toHaveLength(1);
+    expect(fallback[0]).toMatchObject({ response: { conversation: "none" } });
+    // Nothing loops: no further line, however long.
+    vi.advanceTimersByTime(120_000);
+    expect(h.outcomes).toHaveLength(1);
   });
 
   it("SUPERSEDED: a newer turn replaces one still working, and the older answer is not said", async () => {
