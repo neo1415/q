@@ -88,10 +88,24 @@ export type FitServiceDependencies = {
   readonly candidates: (
     actor: ActorContext,
   ) => Promise<readonly FitCandidate[]>;
+  /**
+   * F5 (2026-10-08): of these companies, the unclaimed public profiles: a
+   * real company shared with the network (network_visible / public_external)
+   * that nobody has joined yet. PADL marketplace activation keeps them out
+   * of Discover (readiness `not_assessed`), but an investor who finds one
+   * through search may read its fit, computed from its public facts only
+   * (it holds no founder-private material). Absent: none are.
+   */
+  readonly unclaimedPublic?:
+    | ((companyIds: readonly string[]) => Promise<ReadonlySet<string>>)
+    | undefined;
   readonly config?: FitConfig | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
+
+/** F5: how the fit line names an unclaimed public profile. */
+export const UNCLAIMED_PUBLIC_PROFILE_LABEL = "Unclaimed public profile";
 
 export type FitProfileItem = {
   readonly assessment: FitAssessment;
@@ -166,8 +180,29 @@ export function createFitService(
       viewpoint: "ACTOR",
       companyIds: ids,
     });
+    // F5: only marketplace participation stood in the way, and the company
+    // is an unclaimed public profile: its fit is readable from public facts.
+    const onlyNotReady = evaluation.results
+      .filter(
+        (r) =>
+          r.reasonCodes.includes("COMPANY_NOT_MARKETPLACE_ELIGIBLE") &&
+          r.reasonCodes.every(
+            (code) =>
+              code === "COMPANY_NOT_MARKETPLACE_ELIGIBLE" ||
+              !NOT_VISIBLE.has(code),
+          ),
+      )
+      .map((r) => r.companyId);
+    const unclaimed =
+      onlyNotReady.length === 0 || dependencies.unclaimedPublic === undefined
+        ? new Set<string>()
+        : await dependencies
+            .unclaimedPublic(onlyNotReady)
+            .catch(() => new Set<string>());
     const admitted = evaluation.results.filter(
-      (r) => !r.reasonCodes.some((code) => NOT_VISIBLE.has(code)),
+      (r) =>
+        unclaimed.has(r.companyId) ||
+        !r.reasonCodes.some((code) => NOT_VISIBLE.has(code)),
     );
     if (
       admitted.length > 0 &&
@@ -197,18 +232,28 @@ export function createFitService(
     for (const result of admitted) {
       const input = inputs.get(result.companyId);
       if (input === undefined) continue;
+      const isUnclaimed = unclaimed.has(result.companyId);
       const observed = observeFit({
         companyId: result.companyId,
         snapshot: input.snapshot,
         declared: input.declared,
-        eligibilityReasons: result.reasonCodes,
+        // Not being in Discover is not a declared rule of this investor.
+        eligibilityReasons: isUnclaimed
+          ? result.reasonCodes.filter(
+              (code) => code !== "COMPANY_NOT_MARKETPLACE_ELIGIBLE",
+            )
+          : result.reasonCodes,
         config,
         now,
       });
       items.push({
         assessment: assessFit(observed, config, computedAt),
         name: input.name,
-        line: input.line,
+        line: isUnclaimed
+          ? [input.line, UNCLAIMED_PUBLIC_PROFILE_LABEL]
+              .filter((part): part is string => part !== null && part !== "")
+              .join(" · ")
+          : input.line,
         about: input.about ?? null,
         raise: input.raise ?? null,
       });

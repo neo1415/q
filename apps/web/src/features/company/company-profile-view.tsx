@@ -105,6 +105,11 @@ export function teamRoleLine(member: CompanyProfileTeamMember): string {
         ? "Founder"
         : RELATIONSHIP_LABELS[member.relationshipType],
     member.businessTitle,
+    // F9: named by public sources on a company nobody has joined yet;
+    // a claim, never a verified fact (ADR-001 truth class USER_CLAIM).
+    member.source === "PUBLIC_SOURCE"
+      ? "From public sources, unconfirmed"
+      : null,
   ]
     .filter((part): part is string => part !== null && part !== "")
     .join(" · ");
@@ -274,7 +279,10 @@ export function CompanyProfileView({
           [firstMember.name, firstMember.businessTitle]
             .filter((part) => part !== null && part !== "")
             .join(", "),
-        ].join(" · ");
+          firstMember.source === "PUBLIC_SOURCE" ? "from public sources" : null,
+        ]
+          .filter((part) => part !== null)
+          .join(" · ");
   const foundedYear = /^\d{4}/.exec(overview?.foundedDate ?? "")?.[0] ?? null;
   const unknowns =
     overview === null
