@@ -141,11 +141,11 @@ launch() {
       export CQ_VOICE_REALTIME=on
       export CQ_VOICE_REALTIME_DAILY_CAP_USD="$CQ_LIVE_BUDGET_USD"
       export CQ_VOICE_REALTIME_MAX_SESSION_SECONDS=120
-      export CQ_SYNTHETIC_DEMO_ROUTING=on
+      export CQ_SYNTHETIC_DEMO_ROUTING=true
     else
       unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy ALL_PROXY all_proxy
       # Synthetic world only, as the 2026-10-08 incident tenant was.
-      export CQ_VOICE_REALTIME=on CQ_FAKE_VOICE_VENDORS=1 CQ_SYNTHETIC_DEMO_ROUTING=on
+      export CQ_VOICE_REALTIME=on CQ_FAKE_VOICE_VENDORS=1 CQ_SYNTHETIC_DEMO_ROUTING=true
     fi
     unset CQ_LIVE_OPENAI_API_KEY CQ_LIVE_DEEPGRAM_API_KEY
     export NODE_OPTIONS="--import=$HARNESS/scripts/recovery/vendor-redirect.mjs --import=$HARNESS/scripts/recovery/egress-guard.mjs ${NODE_OPTIONS:-}"

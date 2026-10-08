@@ -78,11 +78,15 @@ export async function installDuplexFake(
       iceConnectionState: RTCIceConnectionState = "new";
       onconnectionstatechange: (() => void) | null = null;
       ontrack: ((event: unknown) => void) | null = null;
-      #channel: FakeChannel | null = null;
+      // Plain members, never `#private`: Playwright transpiles this init
+      // function and private members need helpers the page does not have
+      // ("_classPrivateMethodInitSpec is not defined"), which silently made
+      // every fake peer throw and every line fall back with CONNECT.
+      fakeChannel: FakeChannel | null = null;
       constructor() {
         super();
         own.__cqDuplexPeers = (own.__cqDuplexPeers ?? 0) + 1;
-        own.__cqDuplexState = (state) => this.#setState(state);
+        own.__cqDuplexState = (state) => this.fakeSetState(state);
       }
       addTrack(track: MediaStreamTrack) {
         return {
@@ -92,9 +96,9 @@ export async function installDuplexFake(
         };
       }
       createDataChannel(label: string) {
-        this.#channel = new FakeChannel(label);
-        channelRef = this.#channel;
-        return this.#channel;
+        this.fakeChannel = new FakeChannel(label);
+        channelRef = this.fakeChannel;
+        return this.fakeChannel;
       }
       createOffer() {
         return Promise.resolve({
@@ -106,8 +110,8 @@ export async function installDuplexFake(
         return Promise.resolve();
       }
       setRemoteDescription() {
-        this.#setState("connected");
-        setTimeout(() => this.#channel?.open(), 10);
+        this.fakeSetState("connected");
+        setTimeout(() => this.fakeChannel?.open(), 10);
         return Promise.resolve();
       }
       getStats() {
@@ -120,10 +124,10 @@ export async function installDuplexFake(
         return [];
       }
       close() {
-        this.#channel?.close();
-        this.#setState("closed");
+        this.fakeChannel?.close();
+        this.fakeSetState("closed");
       }
-      #setState(state: RTCPeerConnectionState) {
+      fakeSetState(state: RTCPeerConnectionState) {
         this.connectionState = state;
         this.onconnectionstatechange?.();
         this.dispatchEvent(new Event("connectionstatechange"));

@@ -48,15 +48,37 @@ export async function contextAs(
 ): Promise<BrowserContext> {
   mkdirSync(STATE_DIR, { recursive: true });
   const state = resolve(STATE_DIR, `${email}.json`);
-  if (existsSync(state)) {
-    return browser.newContext({ ...options, storageState: state });
-  }
-  const context = await browser.newContext(options);
+  // A context made here does not inherit the config's `use` options, so the
+  // microphone grant is given explicitly (without it every voice line fell
+  // back with CONNECT before a peer was ever made).
+  const withMic = { permissions: ["microphone"], ...options };
+  const context = existsSync(state)
+    ? await browser.newContext({ ...withMic, storageState: state })
+    : await browser.newContext(withMic);
+  await keepBrowserLocal(context);
+  if (existsSync(state)) return context;
   const page = await context.newPage();
   await signInThroughUi(page, email);
   await context.storageState({ path: state });
   await page.close();
   return context;
+}
+
+/**
+ * The browser half of "no live provider calls": anything not on loopback is
+ * refused at the context (a test's own page.route / routeWebSocket fakes,
+ * registered on the page, take precedence). Found: a duplex fallback opened
+ * wss://agent.deepgram.com from the test browser with a fake token.
+ */
+export async function keepBrowserLocal(context: BrowserContext): Promise<void> {
+  const remote = /^(?!https?:\/\/(127\.0\.0\.1|localhost)[:/]|data:|blob:)/u;
+  await context.route(remote, (route) => route.abort("blockedbyclient"));
+  await context.routeWebSocket(
+    /^wss?:\/\/(?!127\.0\.0\.1|localhost)/u,
+    (ws) => {
+      void ws.close({ code: 1008, reason: "recovery: no remote sockets" });
+    },
+  );
 }
 
 /**
