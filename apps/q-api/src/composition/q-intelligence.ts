@@ -63,6 +63,7 @@ import {
 } from "@capital-q/q-specialists";
 import { createAppActionArgumentReader } from "./app-action-arguments.js";
 import { createPostgresAwaitingActions } from "./awaiting-actions.js";
+import { createPostgresConversationCore } from "./conversation-core-state.js";
 import { createAppActionRouter } from "./app-action-router.js";
 import { createProfileGapReader } from "./profile-gap-reader.js";
 
@@ -458,6 +459,10 @@ export function composeQIntelligence(
     // A declared action waiting on their reply, kept on the conversation
     // (20261129090000) so a restart or another instance still continues it.
     pendingAppActions: createPostgresAwaitingActions({ sql: dependencies.sql }),
+    // RECOVERY B3: the core's state on the conversation (20261220200000);
+    // until that migration is applied, its reads and writes fail and the
+    // seam stays on memory, as before.
+    coreState: createPostgresConversationCore({ sql: dependencies.sql }),
     appActions: createToolAppActionPort({
       tools,
       // A declared action served by its hand-written tool (`legacyTool`,

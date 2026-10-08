@@ -135,6 +135,13 @@ import {
   type QOpenRecordPort,
 } from "./references.js";
 import {
+  CORE_LOAD_DEADLINE_MS,
+  loadWithin,
+  readCoreSnapshot,
+  type ConversationCoreScope,
+  type ConversationCoreStore,
+} from "./conversation-core.js";
+import {
   focusFromHistory,
   listsFromHistory,
   listsFromManifest,
@@ -409,6 +416,12 @@ export type SpecialistQAnswerDependencies = {
    * own tools decide, as before.
    */
   readonly handOver?: QHandOverPort | undefined;
+  /**
+   * RECOVERY-2026-10 B3: where the conversation core's state outlives the
+   * process (unclear count, last action, question series, tool focus).
+   * Absent: memory only, as before.
+   */
+  readonly coreState?: ConversationCoreStore | undefined;
   /**
    * Work handed over in general (QA 2026-10-03): prepares a standing
    * instruction. Absent: such a turn is answered as before.
@@ -1807,6 +1820,63 @@ export function createSpecialistQAnswer(
   const sequences = new Map<string, QuestionSequence>();
   /** The last turn's tool focus per conversation, bounded like the rest. */
   const focuses = new Map<string, QToolFocus>();
+
+  /**
+   * RECOVERY-2026-10 B3 (audit B-02): the core's state, kept durable when a
+   * store is composed. Read once per conversation per process (memory is
+   * the first read after that); written after every turn. A failed or slow
+   * store leaves the turn on memory, never fails it.
+   */
+  const coreStore = dependencies.coreState;
+  const hydrated = new Set<string>();
+  const scopeOfRun = new Map<string, ConversationCoreScope>();
+  const hydrate = async (scope: ConversationCoreScope): Promise<void> => {
+    if (coreStore === undefined || hydrated.has(scope.conversationId)) return;
+    hydrated.add(scope.conversationId);
+    while (hydrated.size > MAX_CONVERSATIONS) {
+      const oldest = hydrated.values().next().value;
+      if (oldest === undefined) break;
+      hydrated.delete(oldest);
+    }
+    const snapshot = readCoreSnapshot(
+      await loadWithin(coreStore.load(scope), CORE_LOAD_DEADLINE_MS),
+    );
+    if (snapshot === null) return;
+    const id = scope.conversationId;
+    // What this process already knows is newer than the stored copy.
+    if (!unclearInARow.has(id) && snapshot.unclearInARow > 0) {
+      unclearInARow.set(id, snapshot.unclearInARow);
+    }
+    if (!lastActed.has(id) && snapshot.lastAction !== null) {
+      lastActed.set(id, snapshot.lastAction);
+    }
+    if (!sequences.has(id) && snapshot.sequence !== null) {
+      sequences.set(id, snapshot.sequence);
+    }
+    if (!focuses.has(id) && snapshot.focus !== null) {
+      focuses.set(id, snapshot.focus);
+    }
+  };
+  const persistCore = async (runId: string): Promise<void> => {
+    const scope = scopeOfRun.get(runId);
+    scopeOfRun.delete(runId);
+    if (coreStore === undefined || scope === undefined) return;
+    const id = scope.conversationId;
+    await coreStore
+      .save(scope, {
+        v: 1,
+        unclearInARow: unclearInARow.get(id) ?? 0,
+        lastAction: lastActed.get(id) ?? null,
+        sequence: sequences.get(id) ?? null,
+        focus: focuses.get(id) ?? null,
+      })
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, qRunId: runId },
+          "the conversation core's state was not saved; memory keeps it",
+        );
+      });
+  };
   const keepSequence = (
     conversationId: string,
     next: QuestionSequence | null,
@@ -2174,6 +2244,15 @@ export function createSpecialistQAnswer(
     // a list of yes and no words. The two readings are made per turn.
     const decideAfterReading = decide;
     const speculative: { current: Speculation | null } = { current: null };
+    // B3: the core's state as the last turn left it, on whichever instance.
+    const coreScope = { tenantId: request.tenantId, conversationId };
+    scopeOfRun.set(request.runId, coreScope);
+    while (scopeOfRun.size > PREREADS_MAX) {
+      const oldest = scopeOfRun.keys().next().value;
+      if (oldest === undefined) break;
+      scopeOfRun.delete(oldest);
+    }
+    await hydrate(coreScope);
     const outcome = await answerTurnRead(
       request,
       history,
@@ -2189,6 +2268,7 @@ export function createSpecialistQAnswer(
       // adopted): nothing of it is said, stored or done.
       speculative.current?.cancel("ACTED");
     });
+    await persistCore(request.runId);
     // One status per card per answer: a card this turn handed to the
     // engine is named by the engine's own line, never also "still waiting".
     const prepared = preparedThisRun.get(request.runId);
