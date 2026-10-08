@@ -880,7 +880,18 @@ function layOutChart(chart: QChart, theme: Palette, frame: Frame): ChartBox {
  * baseline, the value printed at its end. For comparisons whose labels
  * are long, which columns would have to wrap into three lines.
  */
-function layOutBars(chart: QChart, theme: Palette, frame: Frame): LaidOutBox[] {
+function layOutBars(chart: QChart, theme: Palette, area: Frame): LaidOutBox[] {
+  // The rows sit a little above the middle of the space, not at its top.
+  const rowFor = (height: number) =>
+    Math.min(60, Math.floor(height / chart.points.length));
+  const frame: Frame = {
+    ...area,
+    y:
+      area.y +
+      Math.round(
+        (area.height - rowFor(area.height) * chart.points.length) * 0.35,
+      ),
+  };
   const labelSize = Math.max(theme.sizes.label, theme.minimumSize);
   const values = chart.points.map((point) => Number(point.value));
   const highest = values.reduce(
@@ -904,7 +915,7 @@ function layOutBars(chart: QChart, theme: Palette, frame: Frame): LaidOutBox[] {
     40,
     frame.x + frame.width - valueWidth - 8 - barLeft,
   );
-  const row = Math.min(52, Math.floor(frame.height / chart.points.length));
+  const row = rowFor(area.height);
   const thickness = Math.max(10, Math.round(row * 0.46));
   const boxes: LaidOutBox[] = [
     {
@@ -2131,7 +2142,10 @@ function teamSlide(
   const rowHeight = disc + 96;
   found.forEach((person, i) => {
     const x = area.x + (i % columns) * (width + gap);
-    const y = area.y + 8 + Math.floor(i / columns) * rowHeight;
+    // The grid sits a little above the middle of the space it has.
+    const gridHeight = Math.ceil(found.length / columns) * rowHeight - 24;
+    const lift = Math.max(0, Math.round((BOTTOM - area.y - gridHeight) * 0.4));
+    const y = area.y + lift + Math.floor(i / columns) * rowHeight;
     if (y + rowHeight - 24 > BOTTOM) {
       ctx.dropped.push(`${person.name} — ${person.role}`);
       return;
@@ -2202,7 +2216,7 @@ function timelineSlide(ctx: Context, slide: QSlide, area: Frame): void {
   const marker = 32;
   const textSize = ctx.size(theme.sizes.label + 2);
   const drawn = marker + 20 + textSize * 1.4 * 4;
-  const top = area.y + Math.max(0, Math.round((BOTTOM - area.y - drawn) / 2.4));
+  const top = area.y + Math.max(0, Math.round((BOTTOM - area.y - drawn) / 2));
   const centreY = top + marker / 2;
   const numberInk = inkOn(theme.accent, theme.background, theme.ink);
   ctx.boxes.push({
