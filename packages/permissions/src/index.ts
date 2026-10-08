@@ -192,6 +192,19 @@ export {
   type DataRoomStore,
 } from "./application/data-room.js";
 export {
+  accessHistory,
+  createFounderRequestsService,
+  inboxCounts,
+  questionSets,
+  sortInbox,
+  toQuestion,
+  type FounderRequestsDependencies,
+  type FounderRequestsNotice,
+  type FounderRequestsOutcome,
+  type FounderRequestsRefusal,
+  type FounderRequestsService,
+} from "./application/founder-requests.js";
+export {
   createCompanyDeckService,
   type CompanyDeckReading,
   type CompanyDeckRecord,

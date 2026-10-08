@@ -120,7 +120,9 @@ export type DiligenceView = {
     readonly requestedAt: string;
     /** Who asked (their profile's name); null when it names nobody. */
     readonly requestedByName: string | null;
-    readonly status: "OPEN" | "FULFILLED";
+    readonly status: "OPEN" | "FULFILLED" | "DECLINED";
+    /** The founder's note when declined (2026-10-08). */
+    readonly declineNote: string | null;
     readonly fulfilledBy: {
       readonly documentId: string;
       readonly title: string | null;
@@ -245,6 +247,10 @@ export function createDiligenceService(dependencies: {
       (request === null || request.relationshipId !== party.relationshipId)
     ) {
       return refused("NOT_FOUND");
+    }
+    // Declined already (2026-10-08): a share cannot also answer it.
+    if (request !== null && request.decline !== null) {
+      return refused("NOT_SHAREABLE");
     }
     const correlationId =
       command.correlationId ?? dependencies.newCorrelationId();
@@ -374,7 +380,13 @@ export function createDiligenceService(dependencies: {
           note: row.note,
           requestedAt: row.createdAt,
           requestedByName: row.requestedByName,
-          status: row.fulfilment === null ? "OPEN" : "FULFILLED",
+          status:
+            row.fulfilment !== null
+              ? "FULFILLED"
+              : row.decline !== null
+                ? "DECLINED"
+                : "OPEN",
+          declineNote: row.decline?.note ?? null,
           fulfilledBy:
             row.fulfilment === null
               ? null

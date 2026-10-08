@@ -223,6 +223,13 @@ export {
   type RecordStatementOutcome,
   type StatementEvidencePort,
 } from "./q/statement-recorder.js";
+export {
+  answerKnowledgeKey,
+  createInvestorAnswerRecorder,
+  type InvestorAnswerCommand,
+  type InvestorAnswerRecorded,
+  type InvestorAnswerRecorder,
+} from "./q/answer-recorder.js";
 
 export {
   LIVE_MEMORY_STATUSES,

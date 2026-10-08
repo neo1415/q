@@ -230,6 +230,12 @@ export {
   type DiligenceRequestRepository,
 } from "./infrastructure/postgres-diligence.js";
 export {
+  createPostgresDiligenceQuestions,
+  type DiligenceAnswerRecord,
+  type DiligenceQuestionRecord,
+  type DiligenceQuestionRepository,
+} from "./infrastructure/postgres-diligence-questions.js";
+export {
   createPostgresPassStandingReader,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
