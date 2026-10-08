@@ -83,6 +83,8 @@ function build(scene: {
   readonly report?: QAttentionReport | "DENIED";
   /** C's receipt facts for the person's recent screen acts. */
   readonly receipts?: readonly string[];
+  /** What the (fake) analyst answers. */
+  readonly answer?: string;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -90,7 +92,7 @@ function build(scene: {
       {
         kind: "TEXT",
         text: JSON.stringify({
-          answer: "Nothing is waiting for you.",
+          answer: scene.answer ?? "Nothing is waiting for you.",
           responseShape: "CONCISE",
           insufficientEvidence: false,
           recommendation: null,
@@ -240,6 +242,59 @@ describe("what needs them, answered from the attention report", () => {
   });
 });
 
+describe("a move or screen act that did not land is said, never claimed (C's follow-up)", () => {
+  // C's navigationFacts / receiptFacts wording, newest last.
+  const FAILED_MOVE =
+    "NOT done: /capital/readiness never opened on their screen (FAILED).";
+
+  it("a FAILED receipt makes the next answer say so first, and drops a claim it happened", async () => {
+    const { seam, request, persisted } = build({
+      said: "so what does the readiness tab say?",
+      turnKind: "QUESTION_TO_Q",
+      receipts: [
+        "SELECT_TAB tab.overview: done on their screen (DONE).",
+        FAILED_MOVE,
+      ],
+      answer:
+        "I've opened the readiness tab for you. Your readiness has three open items.",
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const said = persisted.join("\n");
+    expect(said).toMatch(
+      /^My last step on your screen didn't go through \(\/capital\/readiness never opened on your screen\)\./u,
+    );
+    expect(said).not.toContain("I've opened the readiness tab");
+    expect(said).toContain("Your readiness has three open items.");
+  });
+
+  it("a UI act that missed its control is said the same way", async () => {
+    const { seam, request, persisted } = build({
+      said: "and the risks?",
+      turnKind: "QUESTION_TO_Q",
+      receipts: [
+        "SCROLL_TO section.risks: NOT done: that control is not on their screen (TARGET_MISSING).",
+      ],
+    });
+    await seam.answer(request);
+    expect(persisted.join("\n")).toMatch(
+      /^My last step on your screen didn't go through \(that control is not on your screen\)\./u,
+    );
+  });
+
+  it("says nothing when the newest act landed", async () => {
+    const { seam, request, persisted } = build({
+      said: "what's next?",
+      turnKind: "QUESTION_TO_Q",
+      receipts: [
+        FAILED_MOVE,
+        "Opened /capital/readiness on their screen (DONE).",
+      ],
+    });
+    await seam.answer(request);
+    expect(persisted.join("\n")).not.toContain("didn't go through");
+  });
+});
+
 describe("receipts of Q's last screen acts reach the next turn (C's request)", () => {
   it("puts the receipt facts in front of the answer model", async () => {
     const { seam, request, alpha } = build({
@@ -255,7 +310,7 @@ describe("receipts of Q's last screen acts reach the next turn (C's request)", (
       .filter((message) => message.role === "SYSTEM")
       .map((message) => message.content)
       .join("\n");
-    expect(sent).toContain("WHAT YOUR RECENT SCREEN ACTS DID");
+    expect(sent).toContain("WHAT YOUR RECENT SCREEN ACTS AND MOVES DID");
     expect(sent).toContain("tab.readiness: NOT done");
   });
 
@@ -270,7 +325,7 @@ describe("receipts of Q's last screen acts reach the next turn (C's request)", (
       .flatMap((call) => call.request.messages)
       .map((message) => message.content)
       .join("\n");
-    expect(sent).not.toContain("WHAT YOUR RECENT SCREEN ACTS DID");
+    expect(sent).not.toContain("WHAT YOUR RECENT SCREEN ACTS AND MOVES DID");
   });
 });
 

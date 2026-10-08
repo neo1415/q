@@ -609,8 +609,42 @@ export function screenActsNote(facts: readonly string[]): ModelMessage | null {
   if (facts.length === 0) return null;
   return {
     role: "SYSTEM",
-    content: `WHAT YOUR RECENT SCREEN ACTS DID (receipts from their screen, oldest first): ${facts.slice(-6).join(" ")} Only an act marked DONE happened. If they ask, or the last act was NOT done, say so plainly in a few words and offer what would work (another control on this page, or opening the right page first); never say a NOT done act worked.`,
+    content: `WHAT YOUR RECENT SCREEN ACTS AND MOVES DID (receipts from their screen, oldest first): ${facts.slice(-8).join(" ")} Only an act or move marked DONE happened. If they ask, or the last one was NOT done, say so plainly in a few words and offer what would work (another control on this page, or opening the right page first); never say a NOT done act or move worked.`,
   };
+}
+
+/**
+ * C's follow-up: when Q's newest act or move did not land, the answer
+ * says so first, in code's words, once -- whatever the model writes. The
+ * newest receipt decides (a later DONE supersedes an earlier failure); a
+ * line Q already said in its last reply is not said again.
+ */
+/** A sentence saying a screen act or move happened ("I've opened it"). */
+const LANDED_CLAIM =
+  /\b(?:I(?:'ve|’ve| have)\s+(?:now\s+)?(?:opened|moved|scrolled|switched|selected|taken you)|(?:it|that|the (?:page|tab|section))(?:'s|’s| is)\s+(?:now\s+)?(?:open|up|showing)|done on your screen)\b/iu;
+
+/** The text without sentences that claim a screen act landed. */
+export function withoutLandedClaims(text: string): string {
+  const sentences = text.match(/[^.!?\n]+[.!?]*\s*/gu) ?? [text];
+  return sentences
+    .filter((sentence) => !LANDED_CLAIM.test(sentence))
+    .join("")
+    .trim();
+}
+
+export function screenActMissLine(
+  facts: readonly string[],
+  lastQ: string | null,
+): string | null {
+  const newest = facts.at(-1);
+  if (newest === undefined || !/\bNOT done\b/u.test(newest)) return null;
+  const reason = /NOT done: (.+?) \([A-Z_]+\)\.?$/u.exec(newest)?.[1];
+  const why =
+    reason === undefined
+      ? ""
+      : ` (${reason.replace(/\btheir\b/gu, "your").replace(/\.$/u, "")})`;
+  const line = `My last step on your screen didn't go through${why}.`;
+  return lastQ !== null && lastQ.includes("didn't go through") ? null : line;
 }
 
 export const SAY_DO_NOTE: ModelMessage = {
@@ -2972,6 +3006,9 @@ export function createModelGatewayQAnswer(
       // Public sources this run read, attached to the answer as structured
       // sources (CQ-Q-VOICE-001 R3; R23). Public fields only.
       const publicSources: PublicSourceLike[] = [];
+      // C's receipts (UI acts and moves), read once for the whole turn.
+      const screenReceipts: readonly string[] =
+        dependencies.uiActReceipts?.(request.actor) ?? [];
       const persistAnswer = async (
         content: string,
         /**
@@ -3021,6 +3058,20 @@ export function createModelGatewayQAnswer(
           tie === null || /\btied\b/iu.test(content)
             ? content
             : `${content}\n\n${tie}`.slice(0, ANSWER_LIMIT_CHARS);
+        // C's follow-up: a move or screen act that did not land is said
+        // first, plainly, once (never left for the model to smooth over).
+        const missed = screenActMissLine(
+          screenReceipts,
+          [...earlier].reverse().find((message) => message.role === "Q")
+            ?.content ?? null,
+        );
+        if (missed !== null && !content.includes("didn't go through")) {
+          const rest = withoutLandedClaims(content);
+          content = (rest.length === 0 ? missed : `${missed}\n\n${rest}`).slice(
+            0,
+            ANSWER_LIMIT_CHARS,
+          );
+        }
         // Nothing of a speculative answer is stored until it is adopted.
         if (gate !== null) await gate.ready();
         return transactions.run(async (tx) => {
@@ -3376,9 +3427,7 @@ export function createModelGatewayQAnswer(
       }
       // C's request: whether Q's last screen acts happened, from the
       // browser's receipts, so Q says so honestly next turn.
-      const screenActs = screenActsNote(
-        dependencies.uiActReceipts?.(request.actor) ?? [],
-      );
+      const screenActs = screenActsNote(screenReceipts);
       if (screenActs !== null) messages = [...messages, screenActs];
 
       type AnswerResult = Awaited<
