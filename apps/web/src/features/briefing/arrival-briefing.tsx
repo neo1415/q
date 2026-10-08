@@ -63,6 +63,7 @@ import {
   type ArrivalDecisionResult,
 } from "./arrival-actions";
 import {
+  carryStatus,
   claimGreeting,
   isHandled,
   leftIn,
@@ -70,6 +71,7 @@ import {
   markLeft,
   refreshArrival,
   setArrivalSpoken,
+  takeCarriedStatus,
   useArrival,
   type ArrivalLoader,
 } from "./arrival-store";
@@ -209,7 +211,7 @@ function useSequence(
   const [state, setState] = useState(() =>
     startSequence(cards.map(sequenceCardOf)),
   );
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(takeCarriedStatus);
   const [reading, setReading] = useState(false);
   const ref = useRef(state);
   const commit = useCallback((next: SequenceState) => {
@@ -244,7 +246,10 @@ function useSequence(
           : result.message;
         setStatus(done);
         // A retry brings a new card (or a new hold): read the cards again.
-        if (result.ok && result.reload === true) reload();
+        if (result.ok && result.reload === true) {
+          carryStatus(done);
+          reload();
+        }
       } else if (step.note === "EDIT_NOT_APPLIED") {
         setStatus("That change didn't fit the message. Edit it here instead.");
       }

@@ -150,6 +150,20 @@ export function claimGreeting(round: number): boolean {
   return true;
 }
 
+/**
+ * A line said just before the cards are read again (a retry's outcome),
+ * kept for the next sequence to show: re-reading never swallows it.
+ */
+let carried: string | null = null;
+export function carryStatus(text: string | null): void {
+  carried = text;
+}
+export function takeCarriedStatus(): string | null {
+  const text = carried;
+  carried = null;
+  return text;
+}
+
 /** For the dev harness and tests: start over. */
 export function resetArrival(): void {
   status = { kind: "PENDING" };
@@ -158,4 +172,5 @@ export function resetArrival(): void {
   handled.clear();
   leftRound = -1;
   greetedRound = -1;
+  carried = null;
 }
