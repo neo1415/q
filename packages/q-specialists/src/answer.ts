@@ -251,6 +251,14 @@ import {
   ordinalOf,
   pageRequestOf,
 } from "./page-request.js";
+import {
+  cannotOpenPartLine,
+  matchOwnCounterpart,
+  namedRecordRequestOf,
+  notFoundLine,
+  pagesFor,
+  whichOneLine,
+} from "./named-record-request.js";
 import type { TurnReference } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
@@ -1797,6 +1805,59 @@ export function createSpecialistQAnswer(
     };
   };
 
+  /**
+   * RECOVERY-2026-10 (C, INC-1): a navigation request that names a record
+   * (named-record-request.ts). Resolved against their own relationships
+   * first; opened through open_page's own authorize step (so nothing they
+   * could not open by hand ever opens); a name that means several of theirs,
+   * or nothing they can open, gets one truthful line naming candidates.
+   * Null: not such a request, or a plain-words name nothing of theirs
+   * matches (the normal path answers it).
+   */
+  const namedRecordAnswer = async (
+    request: QAnswerRequest,
+    text: string,
+  ): Promise<{
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+    readonly log: string;
+  } | null> => {
+    const port = dependencies.openRecord;
+    if (port === undefined) return null;
+    const asked = namedRecordRequestOf(text);
+    if (asked === null) return null;
+    const side =
+      ownInvestorOrganisationIn(request.plan) !== null ? "INVESTOR" : "FOUNDER";
+    const names = await (
+      dependencies.counterpartNames?.(request) ?? Promise.resolve([])
+    ).catch(() => [] as readonly string[]);
+    const match = matchOwnCounterpart(asked.name, names);
+    if (match.kind === "SEVERAL") {
+      return { said: whichOneLine(match.names), blocks: [], log: "SEVERAL" };
+    }
+    // Their own counterpart by its exact name, else (for a plainly meant
+    // record) the name as said, matched by open_page against what they
+    // can reach: their Saves, feed and the network.
+    if (match.kind === "NONE" && !asked.explicit) return null;
+    const name = match.kind === "ONE" ? match.name : asked.name;
+    for (const page of pagesFor(asked.facet, side)) {
+      const intent = await port.open(request, { page, name }).catch(() => null);
+      if (intent === null) continue;
+      return {
+        said: openingLine(page, name),
+        blocks: [{ kind: "UI_INTENT", intent }],
+        log: `${match.kind === "ONE" ? "OWN" : "REACHABLE"}_${page}`,
+      };
+    }
+    return match.kind === "ONE"
+      ? {
+          said: cannotOpenPartLine(asked, name),
+          blocks: [],
+          log: "PART_UNAVAILABLE",
+        }
+      : { said: notFoundLine(asked, match.near), blocks: [], log: "NOT_FOUND" };
+  };
+
   /** B6: the reference each run's words were bound to, for its answer. */
   const resolvedInRun = new Map<string, string>();
   const withReferences = (request: QAnswerRequest): QAnswerRequest => {
@@ -2505,6 +2566,18 @@ export function createSpecialistQAnswer(
     // route table, before any model ("take me to the explore page" went to
     // Discover twice when the reader chose); a page Capital Q lacks is said
     // so, and "the third company on the list" is the card on screen.
+    // RECOVERY-2026-10 (C, INC-1): "take me to Shiftwell relationship",
+    // "open Shiftwell", "the data room for Shiftwell": the one record the
+    // name means, among their own relationships first, opened by code --
+    // or one short line naming who it could be. Never "Understood.".
+    const byName = await namedRecordAnswer(request, latest.content);
+    if (byName !== null) {
+      logger?.info(
+        { qRunId: request.runId, outcome: byName.log },
+        "q opened a record by its name",
+      );
+      return recordAnswer(request, conversationId, byName.said, byName.blocks);
+    }
     const paged = pageAnswer(latest.content, history, capabilities);
     if (paged !== null) {
       logger?.info(

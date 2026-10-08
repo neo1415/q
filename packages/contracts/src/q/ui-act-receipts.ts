@@ -30,16 +30,64 @@ export const QUiActReportSchema = z
   });
 export type QUiActReport = z.infer<typeof QUiActReportSchema>;
 
+/**
+ * An in-app route as the browser's router settled on it: fixed segments,
+ * record ids and codes only (the app's own route map built it), never
+ * labels or free text.
+ */
+export const QAppRouteSchema = z
+  .string()
+  .max(300)
+  .regex(/^\/[A-Za-z0-9/_\-?=&.%#]*$/);
+
+/**
+ * INC-1 (2026-10-08): a move Q made ("open Shiftwell's data room") and
+ * whether it landed -- DONE with the route the router settled on, or
+ * FAILED when it never did -- so a move is never claimed without one.
+ */
+export const QNavigationReceiptSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("DONE"),
+      expected: QAppRouteSchema.nullable(),
+      route: QAppRouteSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("FAILED"),
+      expected: QAppRouteSchema.nullable(),
+    })
+    .strict(),
+]);
+export type QNavigationReceipt = z.infer<typeof QNavigationReceiptSchema>;
+export const Q_NAVIGATION_RECEIPTS_MAX = 8;
+
 export const QUiActReceiptsRequestSchema = z
   .object({
-    reports: z.array(QUiActReportSchema).min(1).max(Q_UI_ACT_RECEIPTS_MAX),
+    reports: z.array(QUiActReportSchema).max(Q_UI_ACT_RECEIPTS_MAX),
+    navigations: z
+      .array(QNavigationReceiptSchema)
+      .max(Q_NAVIGATION_RECEIPTS_MAX)
+      .optional(),
     manifest: QPageManifestSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (request) =>
+      request.reports.length > 0 || (request.navigations?.length ?? 0) > 0,
+    { message: "a report carries at least one receipt", path: ["reports"] },
+  );
 export type QUiActReceiptsRequest = z.infer<typeof QUiActReceiptsRequestSchema>;
 
 export const QUiActReceiptsResponseSchema = z
-  .object({ accepted: z.number().int().min(0).max(Q_UI_ACT_RECEIPTS_MAX) })
+  .object({
+    accepted: z
+      .number()
+      .int()
+      .min(0)
+      .max(Q_UI_ACT_RECEIPTS_MAX + Q_NAVIGATION_RECEIPTS_MAX),
+  })
   .strict();
 export type QUiActReceiptsResponse = z.infer<
   typeof QUiActReceiptsResponseSchema

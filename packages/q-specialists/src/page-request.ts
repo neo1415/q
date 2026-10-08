@@ -241,7 +241,7 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   "work costs": d("WORK_COST"),
 };
 
-const VERB =
+export const PAGE_VERB =
   /^(?:(?:hey|ok|okay)\s+q[,\s]+)?(?:(?:can|could|would|will)\s+you\s+|please\s+|q[,\s]+)*(?:take\s+me\s+(?:back\s+)?(?:to|into)|bring\s+me\s+to|go\s+(?:back\s+)?to|navigate\s+to|switch\s+to|jump\s+to|head\s+to|open(?:\s+up)?|pull\s+up|bring\s+up|show\s+me|let'?s\s+go\s+to|i\s+(?:want|need|would\s+like|'d\s+like)\s+to\s+(?:go\s+to|see|open))\s+(.+)$/iu;
 
 /** Words that only frame a page's name. */
@@ -295,7 +295,7 @@ export function pageRequestOf(text: string): PageRequest | null {
   const said = text.trim().replace(/[.!?]+$/u, "");
   if (said.length === 0 || said.length > 160) return null;
   if (HOME.test(said)) return { kind: "PAGE", target: d("HOME") };
-  const verb = VERB.exec(said);
+  const verb = PAGE_VERB.exec(said);
   const object = verb?.[1]?.trim();
   if (object === undefined || object.length === 0) return null;
   const key = normalise(object);

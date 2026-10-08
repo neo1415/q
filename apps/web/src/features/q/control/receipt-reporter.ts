@@ -1,11 +1,17 @@
 import type { QPageManifest } from "@capital-q/contracts";
 
-import { onUiActReport, type UiActReport } from "../ui-act-controller";
+import {
+  onNavigationOutcome,
+  onUiActReport,
+  type NavigationOutcome,
+  type UiActReport,
+} from "../ui-act-controller";
 
 /**
- * RECOVERY-2026-10 (C2): every UI act's receipt goes to the Q API, so the
- * next turn -- typed or spoken -- knows what the screen did and Q never
- * claims an act it has no receipt for.
+ * RECOVERY-2026-10 (C2): every UI act's receipt -- and (INC-1) every move
+ * Q made, with the route the router settled on or FAILED -- goes to the Q
+ * API, so the next turn, typed or spoken, knows what the screen did and Q
+ * never claims an act or a move it has no receipt for.
  *
  * Through a route handler, not a server action: server actions run one at
  * a time per tab (audit C-08), and a receipt must not wait behind a voice
@@ -14,9 +20,11 @@ import { onUiActReport, type UiActReport } from "../ui-act-controller";
 export const Q_UI_ACTS_ROUTE = "/api/q-ui-acts";
 const BATCH_MS = 250;
 const BATCH_MAX = 16;
+const NAVIGATIONS_MAX = 8;
 
 export type ReceiptTransport = (body: {
   readonly reports: readonly UiActReport[];
+  readonly navigations?: readonly NavigationOutcome[] | undefined;
   readonly manifest?: QPageManifest | undefined;
 }) => Promise<void>;
 
@@ -40,25 +48,34 @@ export function startReceiptReporter(
   transport: ReceiptTransport = fetchTransport,
 ): () => void {
   let pending: UiActReport[] = [];
+  let moves: NavigationOutcome[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
   const flush = () => {
     timer = null;
-    if (pending.length === 0) return;
+    if (pending.length === 0 && moves.length === 0) return;
     const reports = pending.slice(0, BATCH_MAX);
     pending = pending.slice(BATCH_MAX);
+    const navigations = moves.slice(0, NAVIGATIONS_MAX);
+    moves = moves.slice(NAVIGATIONS_MAX);
     const now = manifest();
     void transport({
       reports,
+      ...(navigations.length === 0 ? {} : { navigations }),
       ...(now === undefined ? {} : { manifest: now }),
     });
-    if (pending.length > 0) timer = setTimeout(flush, 0);
+    if (pending.length > 0 || moves.length > 0) timer = setTimeout(flush, 0);
   };
-  const stop = onUiActReport((report) => {
+  const stopActs = onUiActReport((report) => {
     pending.push(report);
     timer ??= setTimeout(flush, BATCH_MS);
   });
+  const stopMoves = onNavigationOutcome((outcome) => {
+    moves.push(outcome);
+    timer ??= setTimeout(flush, BATCH_MS);
+  });
   return () => {
-    stop();
+    stopActs();
+    stopMoves();
     if (timer !== null) clearTimeout(timer);
     flush();
   };
