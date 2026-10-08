@@ -136,6 +136,8 @@ describe("registry", () => {
         // Founder direction 2026-09-30: the Investor Twin rehearsal.
         "INVESTOR_TWIN_TURN",
         "REHEARSAL_SCORE",
+        // Founder live 2026-10-08: a code-built answer in Q's own words.
+        "SPOKEN_REPLY",
         // Founder direction 2026-09-30: founder research during setup.
         "FOUNDER_RESEARCH_READER",
         // AUTO (ADR 0030): Q's delegated work.

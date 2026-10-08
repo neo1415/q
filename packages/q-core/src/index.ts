@@ -1274,6 +1274,35 @@ export {
 // PROFILE block (overnight A5): the deck into twelve sections.
 export { DECK_EXTRACTION_V1 } from "./prompts/tasks/deck-extraction.v1.js";
 export {
+  SPEAK_FROM_FACTS_V1,
+  SPOKEN_REPLY_V1,
+} from "./prompts/tasks/spoken-reply.v1.js";
+export {
+  SPOKEN_REPLY_SCHEMA_NAME,
+  SPOKEN_REPLY_SCHEMA_VERSION,
+  SPOKEN_REPLY_UNTRUSTED,
+  SpokenReplyResultSchema,
+  SpokenReplyVariablesSchema,
+  type SpokenReplyResult,
+  type SpokenReplyVariables,
+} from "./prompts/schemas/spoken-reply.js";
+export {
+  BANNED_SPOKEN_PHRASES,
+  factsForVoice,
+  requestedCount,
+  shownCardsOf,
+  SPOKEN_FACTS_VERSION,
+  SPOKEN_FACTS_WORDS_MAX,
+  SPOKEN_FIDELITY_ISSUES,
+  spokenFactsOf,
+  spokenFidelityIssues,
+  spokenList,
+  type SpokenFacts,
+  type SpokenFactsKind,
+  type SpokenFidelityIssue,
+  type SpokenItem,
+} from "./speech/spoken-facts.js";
+export {
   DECK_EXTRACTION_SCHEMA_NAME,
   DECK_EXTRACTION_SCHEMA_VERSION,
   DECK_EXTRACTION_UNTRUSTED,
