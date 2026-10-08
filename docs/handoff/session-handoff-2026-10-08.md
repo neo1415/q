@@ -24,7 +24,7 @@ Read `CLAUDE.md` first. Deploy branch: push HEAD to `recovery/2026-09-12`, `reco
 
 ## Builders still running when this was written
 
-Update at 11:25 UTC: `build/founder-agents` round 3 is **finished** (SHA `ee304b16`, not merged). It recalibrates the reviewer for replies (v3), sets the rewriter to v3, checks every rewrite in code, turns a near miss into a card for Daniel, and treats "connecting" as a meeting ask. `build/verify-nudge` is **finished** (SHA `e3da99b5`, not merged). Merge both, deploy, kick 4fe0050f, and verify as Marcus and Bumpa.
+Update at 11:25 UTC: `build/founder-agents` round 3 is **finished** (SHA `ee304b16`, not merged). It recalibrates the reviewer for replies (v3), sets the rewriter to v3, checks every rewrite in code, turns a near miss into a card for Daniel, and treats "connecting" as a meeting ask. `build/verify-nudge` is **finished** (SHA `e3da99b5`, not merged). Merge both, deploy, kick 4fe0050f, and verify as Marcus and Bumpa. `build/deal-close` is **finished** too (SHA `7d4d638c`, not merged). It has migration `20261220170000_network_deal_close.sql` and pgTAP 890, which hasn't run; run it on the local Supabase before the hosted migration. Known gaps: the document pickers show IDs, and meeting summaries don't include notes yet.
 
 
 Each pushes to its own branch. Merge them, check them, deploy, then verify live:
