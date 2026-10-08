@@ -40,8 +40,10 @@ import {
 import { needsYouNotice } from "./digest.js";
 import {
   checkMessage,
+  distinctiveWords,
   factAnswer,
   materialLine,
+  numbersIn,
   outsideCriteria,
   senderLines,
   type InstructionMaterial,
@@ -317,6 +319,7 @@ export const ASK_WORDS: Readonly<Record<string, string>> = {
   DELEGATION_DAILY_CAP:
     "I've sent as many messages on my own today as your delegation allows",
   NOT_REVIEWED: "the reviewer couldn't read it first",
+  MEETING_NEEDS_YES: "it proposes a call, and calls are yours to agree",
 };
 
 // ---------------------------------------------------------------------------
@@ -449,7 +452,31 @@ export type ValidationContext = {
   readonly delegation?: { readonly id: string } | null | undefined;
   /** Steps done under the delegation today (updated as steps pass). */
   readonly delegatedToday?: { count: number } | undefined;
+  /**
+   * Founder side (Tensorgate, 8 Oct): per conversation, what code read of
+   * it -- the distinctive words of their latest unanswered message (a reply
+   * that takes up what they said is specific to them) and the numbers the
+   * sender's own side already stated there (the person's own words are on
+   * record in that thread). Code's matching only; never the planner's.
+   */
+  readonly threads?:
+    | ReadonlyMap<
+        string,
+        {
+          readonly theirTerms: readonly string[];
+          readonly ourNumbers: readonly number[];
+        }
+      >
+    | undefined;
 };
+
+/** Numbers in the sender's side's messages of a transcript ("[US iso] text"). */
+export function threadOwnNumbers(transcript: string): readonly number[] {
+  return transcript
+    .split(/\n(?=\[(?:US|THEM) )/u)
+    .filter((line) => line.startsWith("[US "))
+    .flatMap((line) => numbersIn(line.replace(/^\[US [^\]]*\]\s*/u, "")));
+}
 
 /**
  * Whole working days (the grant's own days, in its zone) after `from`'s
@@ -676,6 +703,28 @@ export function validateStep(
       };
     }
     const checked = messageProblem(parsed.data, subject, context, step);
+    // Tensorgate, 8 Oct: Zino asked "Would you be open to connecting?" and
+    // every reply proposing a call was refused (booking is ASK; delegation
+    // was switched on 25 seconds later), so nothing reached the founder at
+    // all. In a founder's reply to an investor, a proposed call is the
+    // founder's card -- their yes, not silence. (The investor side keeps its
+    // refusal and re-plan, unchanged.)
+    if (
+      checked.problem === "MEETING_NOT_ALLOWED" &&
+      context.material?.sender.side === "COMPANY" &&
+      subject !== null &&
+      context.facts?.get(subject)?.lastFrom === "THEM" &&
+      // Every other check still applies to the card's words.
+      messageProblem(parsed.data, subject, context, step, true).problem === null
+    ) {
+      return {
+        verdict: "ASK",
+        action,
+        input: parsed.data,
+        relationshipId: subject,
+        code: "MEETING_NEEDS_YES",
+      };
+    }
     if (checked.problem !== null) {
       return {
         verdict: "REFUSED",
@@ -1089,6 +1138,8 @@ function messageProblem(
   subject: string | null,
   context: ValidationContext,
   step: InstructionPlanStep,
+  /** A proposed call goes to the person's card: not a problem here. */
+  meetingToAsk = false,
 ): { readonly problem: RefusalCode | null; readonly factReply: boolean } {
   const pass = { problem: null, factReply: false } as const;
   const refuse = (problem: RefusalCode) => ({ problem, factReply: false });
@@ -1126,13 +1177,21 @@ function messageProblem(
   // has its own, stricter grounding check below.
   const answeringThem =
     thread?.asksQuestion === true && thread.lastFrom === "THEM";
+  const read = subject === null ? undefined : context.threads?.get(subject);
+  const anchors = counterpart.flatMap((fact) => fact.anchors);
   const woo = wooProblem({
     body: body.body,
     replying,
     recipientTerms:
-      answeringThem || (!written && !replying)
+      answeringThem || (!written && !replying) || anchors.length === 0
         ? []
-        : counterpart.flatMap((fact) => fact.anchors),
+        : [
+            ...anchors,
+            // Tensorgate, 8 Oct: a reply that takes up what they said is
+            // specific to them, though it names nothing from their profile.
+            // Only widens a check that already applies; never adds one.
+            ...(replying ? (read?.theirTerms ?? []) : []),
+          ],
   });
   if (woo !== null) {
     return refuse(woo === "WOO_TOO_LONG" ? "MESSAGE_TOO_LONG" : woo);
@@ -1166,6 +1225,7 @@ function messageProblem(
     // Under delegation, proposing a time in a live conversation is one of
     // the routine moves the person handed over.
     bookingAuto:
+      meetingToAsk ||
       context.grant.actions.some(
         (entry) =>
           entry.action === "schedule.meeting.book" && entry.mode === "AUTO",
@@ -1175,6 +1235,7 @@ function messageProblem(
     asks: step.message?.asks,
     side: material?.sender.side,
     criteria: material?.sender.criteria,
+    ownStated: read?.ourNumbers ?? [],
   });
   if (problem !== null) return refuse(problem);
   return {
@@ -1817,6 +1878,22 @@ export function createInstructionEngine(
         }
       }
 
+      // Tensorgate, 8 Oct: code's own reading of each conversation for the
+      // message checks -- their latest words' distinctive terms, and the
+      // numbers the person's own side already stated there.
+      const threads = new Map(
+        [...transcripts].map(([relationshipId, read]) => [
+          relationshipId,
+          {
+            theirTerms:
+              read.theirLatest === null
+                ? []
+                : distinctiveWords(read.theirLatest),
+            ourNumbers: threadOwnNumbers(read.thread),
+          },
+        ]),
+      );
+
       // Live QA (instruction 76d6f281): whether each conversation already
       // holds the person's side's message, read from the chats themselves.
       const covered = inScope(grant.data, people)
@@ -1891,6 +1968,9 @@ export function createInstructionEngine(
       let refusals = "None.";
       let plan: InstructionPlanResult | null = null;
       let verdicts: StepVerdict[] = [];
+      // Why each conversation's step was last refused, across the re-plans:
+      // a reply that never passed is said, never "nothing to do".
+      const lastRefusal = new Map<string, RefusalCode>();
       for (let attempt = 0; attempt <= MAX_REPLANS; attempt += 1) {
         if (!(left >= micros(PLAN_MAX_COST_USD))) {
           await pauseForBudget(row, grant.data, actor);
@@ -1972,6 +2052,7 @@ export function createInstructionEngine(
             awaiting,
             delegation,
             delegatedToday: delegatedNow,
+            threads,
           }),
         );
         const refused = verdicts
@@ -1981,6 +2062,14 @@ export function createInstructionEngine(
               entry.verdict.verdict === "REFUSED" &&
               entry.verdict.code !== "OUTSIDE_HOURS",
           );
+        for (const { verdict } of refused) {
+          if (
+            verdict.verdict === "REFUSED" &&
+            verdict.relationshipId !== null
+          ) {
+            lastRefusal.set(verdict.relationshipId, verdict.code);
+          }
+        }
         if (refused.length === 0 || attempt === MAX_REPLANS) break;
         refusals = refused
           .map(
@@ -1995,17 +2084,6 @@ export function createInstructionEngine(
       // "Can't find founders" beside five found, "can't run every weekend"
       // for the instruction that is the schedule): such lines are dropped.
       plan = { ...plan, cannot: realCannots(plan.cannot) };
-      if (plan.steps.length === 0 && plan.cannot.length === 0) {
-        const covered = inScope(grant.data, people).length;
-        await note(
-          row,
-          "idle",
-          covered === 0
-            ? "Nothing to work on yet: no one is in reach of this instruction. I'll look again later."
-            : `Looked at ${String(covered)} ${covered === 1 ? "person" : "people"}: nothing to do right now. I'll look again later.`,
-          "NOTHING_TO_DO",
-        );
-      }
 
       // Founder brief J2: the reviewer grades each message before it is
       // sent or offered. A redraft is re-checked by code's own message
@@ -2031,6 +2109,7 @@ export function createInstructionEngine(
           pace: paces,
           awaiting,
           delegation,
+          threads,
         };
         const reviewedPlan = plan;
         verdicts = await Promise.all(
@@ -2106,6 +2185,8 @@ export function createInstructionEngine(
                     subject,
                     recheckContext,
                     step,
+                    verdict.verdict === "ASK" &&
+                      verdict.code === "MEETING_NEEDS_YES",
                   ).problem,
               },
             );
@@ -2438,6 +2519,102 @@ export function createInstructionEngine(
             for (const index of indexes) await runStep(index);
           }),
       );
+
+      // Tensorgate, 8 Oct: Zino's reply sat unanswered while the firing
+      // said "nothing to do" (every drafted reply was refused, and the last
+      // plan was empty). A message from them that this firing neither
+      // answered, nor carded, nor held, nor already put to the person goes
+      // to the person now -- with code's reason -- once per message of theirs.
+      const handled = new Set(
+        verdicts
+          .filter((verdict) => verdict.verdict !== "REFUSED")
+          .map((verdict) => verdict.relationshipId)
+          .filter((id): id is string => id !== null),
+      );
+      const reachable = inScope(grant.data, people).filter(
+        (person) =>
+          person.relationshipId !== null &&
+          connectedFor(people, person.relationshipId),
+      );
+      const waitingReplies = reachable.filter((person) => {
+        const id = person.relationshipId;
+        if (id === null || paces.get(id)?.lastFrom !== "THEM") return false;
+        const read = facts.get(id);
+        if (read?.declined === true) return false;
+        if (handled.has(id) || awaiting?.has(id) === true) return false;
+        if (cardsWaiting.some((card) => card.relationship_id === id)) {
+          return false;
+        }
+        // Their question already went to the person, quoted, above.
+        const verdict =
+          read === undefined
+            ? null
+            : questionVerdict(read, material?.sender.facts ?? null);
+        return !(
+          questions.has(id) &&
+          verdict !== null &&
+          verdict !== "ANSWERABLE"
+        );
+      });
+      for (const [offset, person] of waitingReplies.entries()) {
+        const id = person.relationshipId ?? "";
+        const since = paces.get(id)?.lastFromThemAt?.toISOString() ?? "unknown";
+        const name = person.name.slice(0, 80);
+        const code = lastRefusal.get(id);
+        const why =
+          code === undefined
+            ? "I couldn't put together a reply I could send for you"
+            : REFUSAL_WORDS[code].reason;
+        const words = `${name}'s message is waiting for a reply. I couldn't answer it on my own: ${why}. Reply in the chat, or tell me what to say and I'll send it.`;
+        await store
+          .recordStep({
+            instruction: row,
+            runKey,
+            stepIndex: 160 + offset,
+            action: "q.note",
+            mode: "ASK",
+            status: "NOTED",
+            relationshipId: id,
+            words,
+            reasonCode: "REPLY_WAITING",
+            qActionId: null,
+            idempotencyKey: `instr:${row.id}:reply-waiting:${id}:${since}`,
+          })
+          .catch(() => false);
+        await store
+          .notify({
+            instruction: row,
+            key: `reply-waiting:${id}:${since}`,
+            priority: "NEEDS_YOU",
+            title: `${name} is waiting for a reply`,
+            body: words,
+          })
+          .catch(() => false);
+      }
+      if (
+        plan.steps.length === 0 &&
+        plan.cannot.length === 0 &&
+        waitingReplies.length === 0
+      ) {
+        const covered = inScope(grant.data, people).length;
+        // Item 3 (Tensorgate): the line says why nothing was done.
+        const allRead = reachable.every(
+          (person) =>
+            person.relationshipId !== null && paces.has(person.relationshipId),
+        );
+        await note(
+          row,
+          "quiet",
+          covered === 0
+            ? "Nothing to work on yet: no one is in reach of this instruction. I'll look again later."
+            : reachable.length === 0
+              ? `Looked at ${String(covered)} ${covered === 1 ? "person" : "people"}: no one has accepted yet, so there's no conversation to answer. I'll look again when someone writes.`
+              : allRead
+                ? `Looked at ${String(covered)} ${covered === 1 ? "person" : "people"}: no unanswered messages, so nothing to send right now. I'll look again when someone writes.`
+                : `Looked at ${String(covered)} ${covered === 1 ? "person" : "people"}: nothing needs a reply right now. I'll look again when someone writes.`,
+          "NOTHING_TO_DO",
+        );
+      }
 
       // S7: what waits on them is a NEEDS_YOU notice at once.
       const waiting = needsYouNotice({
