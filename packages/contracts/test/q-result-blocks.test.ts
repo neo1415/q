@@ -173,6 +173,24 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       { label: "Apex Capital", countryCode: "GB", subject: null, note: null },
     ],
   },
+  ATTENTION: {
+    kind: "ATTENTION",
+    report: {
+      items: [
+        {
+          key: "approval:1",
+          source: "APPROVAL",
+          title: "One change waits for your yes",
+          note: "Send the follow-up to Apex Capital",
+          since: "2026-10-08T09:00:00.000Z",
+          decidable: true,
+        },
+      ],
+      activity: null,
+      unread: ["UNANSWERED_MESSAGE"],
+      readAt: "2026-10-08T09:05:00.000Z",
+    },
+  },
   TIMELINE: {
     kind: "TIMELINE",
     title: "Your relationship",

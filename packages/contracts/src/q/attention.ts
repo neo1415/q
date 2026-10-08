@@ -65,7 +65,7 @@ export const QAttentionItemSchema = z
     source: QAttentionSourceSchema,
     /** Plain words: "Zino Aviation is waiting for your reply". */
     title: z.string().min(1).max(200),
-    detail: z.string().max(600).optional(),
+    note: z.string().max(600).optional(),
     entity: QAttentionEntitySchema.optional(),
     /** The counterpart's display name, when there is one. */
     counterpart: z.string().max(120).optional(),

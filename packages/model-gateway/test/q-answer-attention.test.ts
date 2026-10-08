@@ -60,7 +60,7 @@ const REPORT: QAttentionReport = {
       key: "msg:1",
       source: "UNANSWERED_MESSAGE",
       title: "Zino Aviation Capital is waiting for your reply",
-      detail: 'They wrote: "Could you share the updated model?"',
+      note: 'They wrote: "Could you share the updated model?"',
       since: "2026-10-07T15:43:00.000Z",
       decidable: true,
     },
