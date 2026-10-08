@@ -384,6 +384,51 @@ describe("agent states from what the server recorded (P7)", () => {
       expect(nodes.get("SCHEDULER")?.state).toBe("idle");
     });
 
+    it("Tensorgate, 8 Oct: the lead's line says why nothing was done, and a waiting reply is held for the person", () => {
+      const waiting =
+        "Zino Aviation's message is waiting for a reply. I couldn't answer it on my own: the message proposed a call. Reply in the chat, or tell me what to say and I'll send it.";
+      const ov = overview({
+        instructions: [
+          instruction([
+            step({
+              action: "q.note",
+              status: "NOTED",
+              reasonCode: "REPLY_WAITING",
+              words: waiting,
+            }),
+          ]),
+        ],
+      });
+      const nodes = byRole(agentNodes({ overview: ov, jobs: [], now: NOW }));
+      expect(nodes.get("CONVERSATION")?.state).toBe("held");
+      expect(nodes.get("CONVERSATION")?.now).toBe(waiting);
+      expect(nodes.get("LEAD")?.now).toMatch(
+        /^Ran \d\d:\d\d\. Zino Aviation's message is waiting for a reply\..* Next run /u,
+      );
+      const quiet = byRole(
+        agentNodes({
+          overview: overview({
+            instructions: [
+              instruction([
+                step({
+                  action: "q.note",
+                  status: "NOTED",
+                  reasonCode: "NOTHING_TO_DO",
+                  words:
+                    "Looked at 1 person: no unanswered messages, so nothing to send right now. I'll look again when someone writes.",
+                }),
+              ]),
+            ],
+          }),
+          jobs: [],
+          now: NOW,
+        }),
+      );
+      expect(quiet.get("LEAD")?.now).toMatch(
+        /^Ran \d\d:\d\d\. Looked at 1 person: no unanswered messages, so nothing to send right now\. Next run /u,
+      );
+    });
+
     it("a card the job already shows keeps its text and approval, under the drafting specialist", () => {
       const ov = overview({
         instructions: [

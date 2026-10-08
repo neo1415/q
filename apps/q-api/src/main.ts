@@ -1810,7 +1810,10 @@ setInterval(() => {
   void instructionTriggers.sweep().catch((error: unknown) => {
     logger.warn({ err: error }, "standing instruction sweep failed");
   });
-}, 120_000).unref();
+  // Every minute (Tensorgate, 8 Oct): what is made due outside this process
+  // (a delegation switched on, a resume) runs within the minute; a chat
+  // message also wakes the sweep at once through the wake channel.
+}, 60_000).unref();
 // Lead 2026-10-03: Q acts alone only once budget (S5) and quarantine (S6)
 // are live. Off by default: every AUTO step is asked.
 const instructionsAuto = process.env.CQ_INSTRUCTIONS_AUTO === "on";

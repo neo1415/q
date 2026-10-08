@@ -331,7 +331,11 @@ type InstructionStep = InstructionDto["steps"][number];
 export function stepRole(step: InstructionStep): Role | null {
   const { action } = step;
   if (action === "q.note") {
-    if (step.reasonCode === "QUESTION_FOR_YOU") return "CONVERSATION";
+    if (
+      step.reasonCode === "QUESTION_FOR_YOU" ||
+      step.reasonCode === "REPLY_WAITING"
+    )
+      return "CONVERSATION";
     if (step.reasonCode === "NOTHING_TO_DO") return "MANDATE_WATCHER";
     return null;
   }
@@ -422,7 +426,12 @@ function instructionCandidates(
         out.push([
           role,
           {
-            state: step.reasonCode === "QUESTION_FOR_YOU" ? "held" : "done",
+            // A message only the person can answer now waits on them.
+            state:
+              step.reasonCode === "QUESTION_FOR_YOU" ||
+              step.reasonCode === "REPLY_WAITING"
+                ? "held"
+                : "done",
             now: words,
             job: null,
             title,
@@ -459,11 +468,24 @@ function leadSchedule(
     active.length === 1 && active[0] !== undefined
       ? jobTitle(active[0].goal || "Your standing instruction")
       : `${String(active.length)} standing instructions`;
+  // Tensorgate, 8 Oct: "all idle" said nothing of why. The last run's own
+  // reason -- no unanswered messages, or whose message waits -- in its words.
+  const why = active
+    .flatMap((one) => one.steps)
+    .filter(
+      (step) =>
+        (step.reasonCode === "NOTHING_TO_DO" ||
+          step.reasonCode === "REPLY_WAITING") &&
+        last !== undefined &&
+        Date.parse(step.at) >= Date.parse(last),
+    )
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0]
+    ?.words.replace(/ I'll look again[^.]*\.$/u, "");
   if (last !== undefined && now - Date.parse(last) < DAY_MS) {
     return {
       candidate: {
         state: "done",
-        now: `Ran ${clockWords(last, now)}. ${nextWords}`,
+        now: `Ran ${clockWords(last, now)}.${why === undefined ? "" : ` ${why}`} ${nextWords}`,
         job: null,
         title,
         since: last,

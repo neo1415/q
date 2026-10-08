@@ -677,6 +677,12 @@ export type MessageCheckInput = {
   readonly side?: "INVESTOR" | "COMPANY" | undefined;
   /** The investor's declared criteria, for a claim of fit. */
   readonly criteria?: SenderCriteria | undefined;
+  /**
+   * Numbers the sender's own side already stated in this conversation
+   * (Tensorgate, 8 Oct: the founder's "$180k contracts, 31m requests" in
+   * his own first message). Repeating the person's own words is grounded.
+   */
+  readonly ownStated?: readonly number[] | undefined;
 };
 
 const normal = (text: string) =>
@@ -709,13 +715,14 @@ export function checkMessage(input: MessageCheckInput): MessageProblem | null {
   // question about the sender, only the sender's own declared facts (ASK
   // card f3e411b7: a "typical USD 600,000" no field declares).
   const known = new Set(
-    [
-      ...(declaredKinds.length > 0 ? [] : input.counterpart),
-      ...input.sender,
-    ].flatMap((fact) => [
-      ...numbersIn(fact.text),
-      ...fact.anchors.flatMap((anchor) => numbersIn(anchor)),
-    ]),
+    [...(declaredKinds.length > 0 ? [] : input.counterpart), ...input.sender]
+      .flatMap((fact) => [
+        ...numbersIn(fact.text),
+        ...fact.anchors.flatMap((anchor) => numbersIn(anchor)),
+      ])
+      // Not when answering their question about a declared field: that
+      // answer comes from the declared facts alone (ASK card f3e411b7).
+      .concat(declaredKinds.length > 0 ? [] : (input.ownStated ?? [])),
   );
   // A duration or a time proposed ("a 20 minute call", "at 3pm") is not
   // a fact about anyone.

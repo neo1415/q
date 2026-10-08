@@ -66,6 +66,18 @@ export function createQWorkPagePort(
                     returning id`;
               const row = rows[0];
               if (row === undefined) return false;
+              if (enabled) {
+                // Tensorgate, 8 Oct: delegation went on 25 seconds after the
+                // first firing, and the reply waited four hours for the next.
+                // Switching it on makes the instruction due now (the sweep
+                // claims it within the minute).
+                await tx.sql`
+                  update q_runtime.standing_instructions
+                     set next_fire_at = clock_timestamp(),
+                         updated_at = clock_timestamp()
+                   where id = ${id} and user_id = ${actor.userId}
+                     and tenant_id = ${actor.tenantId} and status = 'ACTIVE'`;
+              }
               await audited.audit.record(tx, {
                 ...auditActorFromContext(actor),
                 auditEventId: createAuditEventId(),

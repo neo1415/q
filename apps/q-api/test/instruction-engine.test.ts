@@ -986,7 +986,7 @@ describe("a firing", () => {
         status: "NOTED",
         reasonCode: "NOTHING_TO_DO",
         words:
-          "Looked at 2 people: nothing to do right now. I'll look again later.",
+          "Looked at 2 people: nothing needs a reply right now. I'll look again when someone writes.",
       }),
     ]);
   });
