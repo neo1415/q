@@ -1,1 +1,64 @@
-[{"text":"I'm Daniel Park, CTO of TensorGate. Here's the technical problem.","endMs":3420,"startMs":0},{"text":"A bank wants to use a large language model on customer data,","endMs":7480,"startMs":3620},{"text":"but the moment that data leaves their environment, compliance says no.","endMs":11620,"startMs":7620},{"text":"And they're right to.","endMs":12600,"startMs":11740},{"text":"So what we built is a gateway that runs inside a hardware enclave.","endMs":16920,"startMs":12820},{"text":"The prompt is decrypted only inside the enclave.","endMs":19860,"startMs":17080},{"text":"The model runs there.","endMs":21100,"startMs":20020},{"text":"And we generate a cryptographic attestation for every single request","endMs":25180,"startMs":21200},{"text":"so the security team can prove exactly what code...","endMs":28000,"startMs":25180},{"text":"touched the data. The hard part, honestly, was latency. Enclaves used to add seconds. We got","endMs":33193,"startMs":28053},{"text":"the overhead down to about 40 milliseconds by batching attestation and pinning memory. Four","endMs":38293,"startMs":33193},{"text":"design partners in banking and healthcare, two already on paid contracts, 31 million requests","endMs":43573,"startMs":38293},{"text":"served. We're raising a $4 million seed. The insight's simple. If you can prove where the","endMs":48613,"startMs":43573},{"text":"data went, regulated companies can finally say yes.","endMs":51633,"startMs":48613}]
+[
+  {
+    "text": "I'm Daniel Park, CTO of TensorGate. Here's the technical problem.",
+    "endMs": 3420,
+    "startMs": 0
+  },
+  {
+    "text": "A bank wants to use a large language model on customer data,",
+    "endMs": 7480,
+    "startMs": 3620
+  },
+  {
+    "text": "but the moment that data leaves their environment, compliance says no.",
+    "endMs": 11620,
+    "startMs": 7620
+  },
+  { "text": "And they're right to.", "endMs": 12600, "startMs": 11740 },
+  {
+    "text": "So what we built is a gateway that runs inside a hardware enclave.",
+    "endMs": 16920,
+    "startMs": 12820
+  },
+  {
+    "text": "The prompt is decrypted only inside the enclave.",
+    "endMs": 19860,
+    "startMs": 17080
+  },
+  { "text": "The model runs there.", "endMs": 21100, "startMs": 20020 },
+  {
+    "text": "And we generate a cryptographic attestation for every single request",
+    "endMs": 25180,
+    "startMs": 21200
+  },
+  {
+    "text": "so the security team can prove exactly what code...",
+    "endMs": 28000,
+    "startMs": 25180
+  },
+  {
+    "text": "touched the data. The hard part, honestly, was latency. Enclaves used to add seconds. We got",
+    "endMs": 33193,
+    "startMs": 28053
+  },
+  {
+    "text": "the overhead down to about 40 milliseconds by batching attestation and pinning memory. Four",
+    "endMs": 38293,
+    "startMs": 33193
+  },
+  {
+    "text": "design partners in banking and healthcare, two already on paid contracts, 31 million requests",
+    "endMs": 43573,
+    "startMs": 38293
+  },
+  {
+    "text": "served. We're raising a $4 million seed. The insight's simple. If you can prove where the",
+    "endMs": 48613,
+    "startMs": 43573
+  },
+  {
+    "text": "data went, regulated companies can finally say yes.",
+    "endMs": 51633,
+    "startMs": 48613
+  }
+]
