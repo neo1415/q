@@ -49,8 +49,8 @@ describe("what Q's last screen acts did", () => {
     expect(note?.role).toBe("SYSTEM");
     expect(note?.content).toContain(facts[0]);
     expect(note?.content).toContain(facts[1]);
-    expect(note?.content).toContain("Only an act marked DONE happened");
-    expect(note?.content).toContain("never say a NOT done act worked");
+    expect(note?.content).toContain("Only an act or move marked DONE happened");
+    expect(note?.content).toContain("never say a NOT done act or move worked");
   });
 
   it("is absent when there are no receipts", () => {
