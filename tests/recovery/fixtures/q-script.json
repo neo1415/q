@@ -3,7 +3,7 @@
   "rules": [
     {
       "name": "baseline-turn-reader",
-      "when": { "instructions": "TASK: TURN_READER" },
+      "when": { "task": "TURN_READER" },
       "reply": {
         "json": {
           "kind": "QUESTION_TO_Q",

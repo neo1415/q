@@ -20,10 +20,16 @@
  *
  *   { "rules": [ {
  *       "name": "open-readiness",
- *       "when": { "user": "readiness", "tool": "operate_screen",
- *                 "instructions": "regex", "afterTool": "operate_screen" },
+ *       "when": { "task": "COMPANY_ANALYST", "user": "readiness",
+ *                 "tool": "operate_screen", "instructions": "regex",
+ *                 "afterTool": "operate_screen" },
  *       "reply": { "toolCalls": [ { "name": "operate_screen", "arguments": {…} } ] }
  *     } ] }
+ *
+ * Prompt templates travel in the user message ("TASK: TURN_READER ..." with
+ * the person's words inside it), so `task` matches the template by name and
+ * `user` is a regex over that whole message: pick a phrase only the
+ * person's words contain. `afterTool: null` means "no tool answered yet".
  *
  * reply is one of: {text}, {json}, {toolCalls[, text]}, {status, body}
  * (an HTTP failure such as 429 or 500), {hang: true} (never answers; the
@@ -100,7 +106,14 @@ function view(body) {
   return {
     instructions: typeof body.instructions === "string" ? body.instructions : "",
     lastUser: users.at(-1) ?? "",
-    allText: [body.instructions ?? "", ...users].join("\n"),
+    // Everything the model would read, tool results included: the Context
+    // Firewall tests look for private words anywhere in it.
+    allText: [
+      body.instructions ?? "",
+      ...input.map((item) =>
+        typeof item?.output === "string" ? item.output : textOfContent(item?.content),
+      ),
+    ].join("\n"),
     tools: (Array.isArray(body.tools) ? body.tools : [])
       .map((tool) => tool?.name ?? tool?.function?.name)
       .filter((name) => typeof name === "string"),
@@ -115,6 +128,11 @@ function matches(rule, seen) {
   if (
     when.instructions !== undefined &&
     !new RegExp(when.instructions, "iu").test(seen.instructions)
+  )
+    return false;
+  if (
+    when.task !== undefined &&
+    !new RegExp(`TASK: ${when.task}\\b`, "u").test(seen.allText)
   )
     return false;
   if (when.tool !== undefined && !seen.tools.includes(when.tool)) return false;
