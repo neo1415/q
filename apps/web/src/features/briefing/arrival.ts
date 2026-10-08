@@ -114,6 +114,47 @@ export type ArrivalWords = {
   readonly spoken: string;
 };
 
+/** "Zino Aviation is waiting for a reply" -> "Zino Aviation". */
+const WAITING_NAME =
+  /^(.+?) (?:is waiting for (?:a|your) reply|sent you a message|wrote back|replied)\b/u;
+
+/**
+ * Notices still waiting on them, said once per name (live 2026-10-08:
+ * "Zino Aviation wrote back. Zino Aviation is waiting for a reply. Zino
+ * Aviation sent you a message."). A name the lowdown already said is
+ * "they"; a notice that names no one is said as its title.
+ */
+export function waitingWords(
+  titles: readonly string[],
+  lowdown: string,
+): string | null {
+  const names: string[] = [];
+  const others: string[] = [];
+  for (const title of titles) {
+    const name = WAITING_NAME.exec(title.trim())?.[1]?.trim();
+    if (name === undefined) {
+      const line = title.trim().replace(/[.!?\s]*$/u, ".");
+      if (line.length > 1 && !others.includes(line)) others.push(line);
+    } else if (!names.includes(name)) {
+      names.push(name);
+    }
+  }
+  const parts: string[] = [];
+  if (names.length > 0) {
+    const said = names.length === 1 && lowdown.includes(names[0] ?? "");
+    const who = said
+      ? "They're"
+      : names.length === 1
+        ? `${names[0] ?? ""} is`
+        : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""} are`;
+    parts.push(
+      `${who} waiting for ${names.length === 1 ? "your reply" : "replies"}.`,
+    );
+  }
+  parts.push(...others.slice(0, 2));
+  return parts.length === 0 ? null : parts.join(" ");
+}
+
 /** What Q says on arrival, from the data alone. */
 export function arrivalWords(
   data: ArrivalData,
@@ -132,11 +173,7 @@ export function arrivalWords(
   });
   // Live 2026-10-08: "All quiet; nothing needs you" while an investor's
   // message waited for a reply. What waits on them is said, never "quiet".
-  const waiting = (data.waiting ?? []).slice(0, 3);
-  const waitingLine =
-    waiting.length === 0
-      ? null
-      : waiting.map((title) => title.replace(/[.!?\s]*$/u, ".")).join(" ");
+  const waitingLine = waitingWords(data.waiting ?? [], read.text);
   const lowdown =
     waitingLine === null
       ? read
