@@ -11,6 +11,8 @@ import type {
 import { ArrowLeft, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { QAperture } from "@/features/q-aperture";
+import { useQSessionOptional } from "@/features/q/q-session";
 
 import { FeedCard } from "../discover/feed-card";
 import {
@@ -108,6 +110,7 @@ export function ExploreFeed({
   const reducedMotion = useReducedMotionPreference();
   const { muted, setMuted } = useFeedSound(reducedMotion);
   const { askAbout, open: qOpen } = useGlobalQ();
+  const session = useQSessionOptional();
 
   const companies = useMemo(() => items.map(asCompany), [items]);
   const at = Math.min(active, Math.max(0, items.length - 1));
@@ -182,8 +185,13 @@ export function ExploreFeed({
         sourceFor={sourceFor}
         reducedMotion={reducedMotion}
         hold={false}
-        // Q open mutes the pitch, as on Discover; it keeps playing.
-        muted={muted || qOpen}
+        // Q open, speaking or listening mutes the pitch, as on Discover.
+        muted={
+          muted ||
+          qOpen ||
+          session?.voice.client.state === "Q_SPEAKING" ||
+          session?.voice.active === true
+        }
         onMutedChange={setMuted}
         label={`Pitches related to ${anchor.canonicalName}`}
         nextLabel="Next related pitch"
@@ -235,6 +243,12 @@ export function ExploreFeed({
               saved={isSaved}
               deciding={false}
               showMedia={false}
+              askQMark={
+                <QAperture
+                  state={session?.presence.state ?? "IDLE"}
+                  size={24}
+                />
+              }
               onSave={() => onSave(current)}
               onPass={() => {
                 onHide(current);
