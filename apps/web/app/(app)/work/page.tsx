@@ -44,6 +44,17 @@ function workViewOf(
   return WORK_VIEWS.find((view) => view === value);
 }
 
+/**
+ * The Work page is one decision scroll (needs, in progress, done) plus the
+ * Team map and Cost; a deep link to an older tab name lands on the scroll.
+ */
+function pageViewOf(
+  view: WorkViewParam | undefined,
+): "work" | "team" | "cost" | undefined {
+  if (view === undefined) return undefined;
+  return view === "team" || view === "cost" ? view : "work";
+}
+
 async function WorkLists({
   view,
 }: {
@@ -99,7 +110,7 @@ async function WorkLists({
       )}
       <WorkPage
         key={view ?? "default"}
-        initialView={view}
+        initialView={pageViewOf(view)}
         suggestions={suggestions?.ok === true ? suggestions.value : null}
         approvals={approvals?.ok === true ? approvals.value : null}
         views={views}
