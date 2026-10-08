@@ -51,7 +51,11 @@ import {
 } from "@/features/work/workforce-actions";
 
 import type { ArrivalCard, ArrivalData } from "./arrival";
-import { attentionFromReads, sourceOfNotice } from "./attention";
+import {
+  attentionFromReads,
+  createQApiAttentionReader,
+  sourceOfNotice,
+} from "./attention";
 import {
   ARRIVAL_MATCHES_MAX,
   matchOpinion,
@@ -209,6 +213,9 @@ export async function arrivalBriefingAction(
   const now = Date.now();
   const since = parsed.data ?? new Date(now - 24 * 3_600_000).toISOString();
   const seenMatches = browser.data?.seenMatches;
+  // RECOVERY B1: the Q API's attention report (every source, the same read
+  // as Q's own answer), beside the arrival's other reads.
+  const attentionRead = createQApiAttentionReader(session)(since);
   const [account, sinceRead, approvals, workforce, done, notices, context] =
     await Promise.all([
       accountDetails().catch(() => null),
@@ -337,16 +344,19 @@ export async function arrivalBriefingAction(
         : Math.max(0, (now - Date.parse(parsed.data)) / 3_600_000),
     cards,
     waiting: waitingNotices,
-    // E2: one report of what needs them, unread sources named (the
-    // bridge until workstream B's attention read is composed).
-    attention: attentionFromReads({
-      cards: approvals?.ok === true ? cards : null,
-      notices: needsYouNotices,
-      jobs: workforce?.jobs ?? null,
-      newMatches: matches === undefined ? undefined : (matches?.total ?? null),
-      since,
-      now: new Date(now),
-    }),
+    // E2: one report of what needs them, unread sources named: workstream
+    // B's read when it answered, else the bridge from this page's reads.
+    attention:
+      (await attentionRead) ??
+      attentionFromReads({
+        cards: approvals?.ok === true ? cards : null,
+        notices: needsYouNotices,
+        jobs: workforce?.jobs ?? null,
+        newMatches:
+          matches === undefined ? undefined : (matches?.total ?? null),
+        since,
+        now: new Date(now),
+      }),
     attentionLinks: Object.fromEntries(
       (needsYouNotices ?? []).flatMap((notice) =>
         notice.linkPath === null
