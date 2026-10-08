@@ -1311,6 +1311,16 @@ export {
   SPOKEN_REPLY_V1,
 } from "./prompts/tasks/spoken-reply.v1.js";
 export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
+export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
+export {
+  SMALL_TALK_SCHEMA_NAME,
+  SMALL_TALK_SCHEMA_VERSION,
+  SMALL_TALK_UNTRUSTED,
+  SmallTalkResultSchema,
+  SmallTalkVariablesSchema,
+  type SmallTalkResult,
+  type SmallTalkVariables,
+} from "./prompts/schemas/small-talk.js";
 export {
   BRIEFING_COMMAND_SCHEMA_NAME,
   BRIEFING_COMMAND_SCHEMA_VERSION,

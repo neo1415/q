@@ -11,6 +11,13 @@ import { UuidSchema } from "../common/ids.js";
  * subset. A source that could not be read is reported as UNREAD, never
  * as empty.
  */
+/**
+ * `GET`: the person's own report (workstream B's reader, the same one Q's
+ * `what_needs_me` uses). Query `since` (ISO time, within a month) dates
+ * NEW_MATCHES and the activity summary; omitted, the last day.
+ */
+export const Q_ATTENTION_PATH = "/v1/q/attention" as const;
+
 export const Q_ATTENTION_SOURCES = [
   /** A counterpart wrote last and is waiting for a reply. */
   "UNANSWERED_MESSAGE",

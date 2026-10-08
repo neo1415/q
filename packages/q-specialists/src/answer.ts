@@ -63,6 +63,8 @@ import {
   stepQuestionSequence,
   unclearTurnReply,
   spokenUnclearReply,
+  pleasantryOf,
+  pleasantryReply,
   naturalPlaceLine,
   spokenFactsOf,
   withoutRecommendationClaims,
@@ -163,6 +165,9 @@ type PointedAt = {
   readonly note: string;
   readonly control?: ControlBinding | undefined;
 };
+
+/** B5: spoken words that address Q by name ("thanks, Q"). */
+const NAMES_Q = /(?:^|[\s,!.])(?:q|cue|queue)(?:$|[\s,!.?])/iu;
 
 /** B6: "him" / "them" bound to an organisation, as a hand-over subject. */
 function handOverSubjectPointed(
@@ -461,6 +466,23 @@ export type SpecialistQAnswerDependencies = {
    * Absent: memory only, as before.
    */
   readonly coreState?: ConversationCoreStore | undefined;
+  /**
+   * RECOVERY-2026-10 B5: a turn read as small talk, answered in one short
+   * tool-free call (model-gateway createSmallTalkReply). Null: the full
+   * path answers it. Absent: small talk takes the full path, as before.
+   */
+  readonly smallTalk?:
+    | ((
+        request: QAnswerRequest,
+        input: {
+          readonly said: string;
+          readonly recent: readonly {
+            readonly role: "USER" | "Q";
+            readonly text: string;
+          }[];
+        },
+      ) => Promise<string | null>)
+    | undefined;
   /**
    * Work handed over in general (QA 2026-10-03): prepares a standing
    * instruction. Absent: such a turn is answered as before.
@@ -2015,6 +2037,8 @@ export function createSpecialistQAnswer(
       const conversationId = history[0]?.conversationId;
       const latest = [...history].reverse().find((m) => m.role === "USER");
       if (conversationId === undefined || latest === undefined) return null;
+      // B5: a pleasantry is answered by code; its reading would be waste.
+      if (pleasantryOf(latest.content) !== null) return null;
       const key = lastActions.get(conversationId);
       // A conversation's first turn has no known actions: read later.
       if (key === undefined) return null;
@@ -2192,12 +2216,8 @@ export function createSpecialistQAnswer(
     // person's own facts) start now, beside the reading below; the answer
     // takes them up if the turn goes there (speed sweep 2026-10-01: the
     // reading's ~1 s and those reads' ~0.5-1 s ran one after the other).
-    delegate.warm?.(request);
-    // What this run can do, read beside the conversation rather than after
-    // it (latency2): the turn reader is told its actions, so the reading
-    // could not start until both were in.
-    const capabilitiesRead = capabilitiesOf(request);
-    capabilitiesRead.catch(() => undefined);
+    // RECOVERY B5: started once the conversation is read (one short DB
+    // read later), so a pure pleasantry never pays for them.
     const history = await repositories.messages.listRecentForConversationOfRun(
       sql,
       request.tenantId,
@@ -2206,6 +2226,39 @@ export function createSpecialistQAnswer(
     );
     const conversationId = history[0]?.conversationId;
     const latest = [...history].reverse().find((m) => m.role === "USER");
+    // RECOVERY B5 (audit B-05): "hi Q", "thanks", "how are you?" -- a turn
+    // that is nothing but a pleasantry is answered by code: no reader, no
+    // prefetch, no analyst. Spoken, only when it names Q or opens the
+    // conversation, since words to the room are the reader's to judge.
+    if (conversationId !== undefined && latest !== undefined) {
+      const pleasantry = pleasantryOf(latest.content);
+      const spokenTurn = latest.utteranceRef !== undefined;
+      const opensConversation =
+        history.filter((m) => m.role === "USER").length === 1;
+      if (
+        pleasantry !== null &&
+        // A series of questions in hand reads every turn as its own.
+        !sequences.has(conversationId) &&
+        (!spokenTurn || NAMES_Q.test(latest.content) || opensConversation)
+      ) {
+        const lastQ = [...history].reverse().find((m) => m.role === "Q");
+        logger?.info(
+          { qRunId: request.runId, pleasantry },
+          "q answered a pleasantry by code",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          pleasantryReply(pleasantry, request.runId, lastQ?.content ?? null),
+        );
+      }
+    }
+    delegate.warm?.(request);
+    // What this run can do, read beside the conversation rather than after
+    // it (latency2): the turn reader is told its actions, so the reading
+    // could not start until both were in.
+    const capabilitiesRead = capabilitiesOf(request);
+    capabilitiesRead.catch(() => undefined);
     if (
       turns === undefined ||
       conversationId === undefined ||
@@ -2768,6 +2821,37 @@ export function createSpecialistQAnswer(
           };
     }
     unclearInARow.delete(conversationId);
+    // RECOVERY B5 (audit B-05): small talk is one short tool-free call,
+    // never the analyst with its prefetch and ~127 tools. Not when the turn
+    // is about a record, a series is in hand, or the reading is a guess;
+    // a failed reply goes the full way, never silence.
+    if (
+      dependencies.smallTalk !== undefined &&
+      read !== null &&
+      read.kind === "SMALL_TALK" &&
+      read.confidence !== "LOW" &&
+      request.subjects.length === 0 &&
+      !sequences.has(conversationId)
+    ) {
+      const said = await dependencies.smallTalk(request, {
+        said: latest.content,
+        recent: history
+          .filter((m) => m.id !== latest.id)
+          .slice(-6)
+          .map((m) => ({
+            role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
+            text: m.content,
+          })),
+      });
+      if (said !== null) {
+        speculative.current?.cancel("ACTED");
+        logger?.info(
+          { qRunId: request.runId },
+          "q answered small talk in one tool-free call",
+        );
+        return recordAnswer(request, conversationId, said);
+      }
+    }
     // What the turn points back at (TURN_READER v40, follow-55): one record
     // to open, or Q's last action again. Bound here by code to a record of
     // theirs or to that action, before any screen is opened for the turn

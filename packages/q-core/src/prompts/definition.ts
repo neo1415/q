@@ -109,6 +109,8 @@ export const PROMPT_IDS = [
   "SPOKEN_REPLY",
   /** Zino 2026-10-08: their own words about the briefing's cards, as verbs. */
   "BRIEFING_COMMAND",
+  /** RECOVERY-2026-10 B5: small talk, answered in one tool-free call. */
+  "SMALL_TALK",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -173,6 +175,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   PREFERENCE_POLARITY: "preference-polarity",
   MEETING_OUTCOME_READER: "meeting-outcome-reader",
   UTTERANCE_CHECK: "utterance-check",
+  SMALL_TALK: "small-talk",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
