@@ -300,7 +300,9 @@
             Private LLM inference for regulated companies, inside a hardware
             enclave.
           </p>
-          <p class="muted small" style="margin: 0">Seed · London, United Kingdom</p>
+          <p class="muted small" style="margin: 0">
+            Seed · London, United Kingdom
+          </p>
         </div>
       </header>
       <div class="actions" data-investor>
@@ -316,7 +318,9 @@
       </nav>
 
       <div class="notice" data-owner hidden>
-        <p><strong>Your pitch video says you're raising $4M seed (0:43).</strong></p>
+        <p>
+          <strong>Your pitch video says you're raising $4M seed (0:43).</strong>
+        </p>
         <p class="muted small">
           Your raise itself isn't shared with investors, so your overview shows
           what you said in the pitch, labelled as said in your pitch video.
@@ -359,9 +363,18 @@
           </summary>
           <div class="body">
             <dl class="rows">
-              <div><dt>Sector</dt><dd>Matches</dd></div>
-              <div><dt>Stage</dt><dd>Matches</dd></div>
-              <div><dt>Cheque size</dt><dd>Unknown</dd></div>
+              <div>
+                <dt>Sector</dt>
+                <dd>Matches</dd>
+              </div>
+              <div>
+                <dt>Stage</dt>
+                <dd>Matches</dd>
+              </div>
+              <div>
+                <dt>Cheque size</dt>
+                <dd>Unknown</dd>
+              </div>
             </dl>
           </div>
         </details>
@@ -382,17 +395,28 @@
         <details class="fold" open>
           <summary>
             <h2>The raise</h2>
-            <span class="line">$4M seed, said in their pitch · deck not shared yet</span>
+            <span class="line"
+              >$4M seed, said in their pitch · deck not shared yet</span
+            >
             <span class="chev">⌄</span>
           </summary>
           <div class="body">
             <blockquote>
               <p>&ldquo;We're raising a $4 million seed.&rdquo;</p>
-              <cite>Daniel Park, pitch video, at <a href="#">0:43</a> · the company's own claim, self-reported</cite>
+              <cite
+                >Daniel Park, pitch video, at <a href="#">0:43</a> · the
+                company's own claim, self-reported</cite
+              >
             </blockquote>
             <dl class="rows">
-              <div><dt>Raise on Capital Q</dt><dd>Not shared with you</dd></div>
-              <div><dt>Pitch deck</dt><dd>Not shared with you</dd></div>
+              <div>
+                <dt>Raise on Capital Q</dt>
+                <dd>Not shared with you</dd>
+              </div>
+              <div>
+                <dt>Pitch deck</dt>
+                <dd>Not shared with you</dd>
+              </div>
             </dl>
           </div>
         </details>
@@ -404,11 +428,22 @@
           </summary>
           <div class="body">
             <ul class="plain">
-              <li>4 design partners in banking and healthcare <span class="muted small">· 0:38</span></li>
-              <li>2 already on paid contracts <span class="muted small">· 0:38</span></li>
-              <li>31 million requests served <span class="muted small">· 0:38</span></li>
+              <li>
+                4 design partners in banking and healthcare
+                <span class="muted small">· 0:38</span>
+              </li>
+              <li>
+                2 already on paid contracts
+                <span class="muted small">· 0:38</span>
+              </li>
+              <li>
+                31 million requests served
+                <span class="muted small">· 0:38</span>
+              </li>
             </ul>
-            <p class="muted small" style="margin: 0">The company's own claims from the pitch video. Not verified.</p>
+            <p class="muted small" style="margin: 0">
+              The company's own claims from the pitch video. Not verified.
+            </p>
           </div>
         </details>
         <details class="fold">
@@ -438,7 +473,9 @@
         <details class="fold">
           <summary>
             <h2>Company details</h2>
-            <span class="line">Founded 2024 · Not verified by Capital Q yet</span>
+            <span class="line"
+              >Founded 2024 · Not verified by Capital Q yet</span
+            >
             <span class="chev">⌄</span>
           </summary>
           <div class="body"></div>
@@ -449,8 +486,12 @@
       const q = new URLSearchParams(location.search);
       document.documentElement.dataset.theme = q.get("theme") ?? "light";
       if (q.get("view") === "owner") {
-        document.querySelectorAll("[data-investor]").forEach((el) => el.remove());
-        document.querySelectorAll("[data-owner]").forEach((el) => (el.hidden = false));
+        document
+          .querySelectorAll("[data-investor]")
+          .forEach((el) => el.remove());
+        document
+          .querySelectorAll("[data-owner]")
+          .forEach((el) => (el.hidden = false));
       }
     </script>
   </body>

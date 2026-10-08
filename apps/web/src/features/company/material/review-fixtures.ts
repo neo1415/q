@@ -20,6 +20,48 @@ export const REVIEW_COMPANY_ID = "6f1d3c2a-4b5e-4f70-8a91-0b2c3d4e5f60";
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
+const reviewPitchRaise = {
+  kind: "RAISE" as const,
+  statement: "We're raising $750,000 on a SAFE for our seed round.",
+  pitchId: id(901),
+  pitchTitle: "Elevator pitch",
+  atSeconds: 41,
+  money: { amount: "750000", currency: "USD" },
+  stageCode: "seed",
+  instrument: "SAFE",
+  truthClass: "USER_CLAIM" as const,
+  evidenceStatus: "SELF_REPORTED" as const,
+  source: "PITCH_VIDEO" as const,
+};
+const reviewPitchClaims = [
+  reviewPitchRaise,
+  {
+    ...reviewPitchRaise,
+    kind: "INSTRUMENT" as const,
+  },
+  ...[
+    ["Forty-two clinics on paid plans", 22],
+    ["Claims paid in 19 days on average, down from 94", 27],
+  ].map(([statement, atSeconds]) => ({
+    ...reviewPitchRaise,
+    kind: "TRACTION" as const,
+    statement: String(statement),
+    atSeconds: Number(atSeconds),
+    money: null,
+    stageCode: null,
+    instrument: null,
+  })),
+  {
+    ...reviewPitchRaise,
+    kind: "USE_OF_FUNDS" as const,
+    statement: "The money goes to two engineers and our first three states.",
+    atSeconds: 47,
+    money: null,
+    stageCode: null,
+    instrument: null,
+  },
+];
+
 export function reviewProfile(
   viewer: "INVESTOR" | "OWNER",
   empty = false,
@@ -46,9 +88,13 @@ export function reviewProfile(
       organisationVerified: true,
       facts: [],
       deck: null,
-      pitchClaims: [],
-      raiseFromPitch: null,
-      pitchRaiseNotice: null,
+      // What the fictional pitch says (2026-10-08 overview review).
+      pitchClaims: empty ? [] : reviewPitchClaims,
+      raiseFromPitch: empty ? null : reviewPitchRaise,
+      pitchRaiseNotice:
+        empty || viewer === "INVESTOR"
+          ? null
+          : { state: "SHOWN_FROM_PITCH", said: reviewPitchRaise },
       team: empty
         ? []
         : [
