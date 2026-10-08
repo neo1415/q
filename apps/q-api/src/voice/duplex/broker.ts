@@ -252,6 +252,8 @@ type DuplexLine = {
   } | null;
   /** Q's last answer asked for their yes: their reply is Q's to take. */
   awaitingApproval: boolean;
+  /** A3: Q's last spoken words asked them something. */
+  qAsked: boolean;
 };
 
 /** How long a narration poll is held open when nothing is said. */
@@ -893,6 +895,7 @@ export function createDuplexBroker(
         guided,
         turn: null,
         awaitingApproval: false,
+        qAsked: false,
       });
       logger.info(
         {
@@ -927,6 +930,7 @@ export function createDuplexBroker(
               guided: line.guided,
               awaitingApproval: line.awaitingApproval,
               cardInFocus: heard.cardInFocus === true,
+              answeringQ: line.qAsked,
             });
       if (words.length > 0) {
         openTurn(
@@ -972,6 +976,7 @@ export function createDuplexBroker(
             ? "ask_q"
             : current.routed;
       keep(line, "Q", text, routed, { providerRef: said.responseId });
+      line.qAsked = /\?["'”’)\]]*$/u.test(text);
       if (routed !== "ask_q" && claimsInability(text)) {
         logger.warn(
           { qVoiceSessionId: voiceSessionId, routed },

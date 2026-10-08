@@ -40,6 +40,7 @@ import {
   duplexConfigFrom,
 } from "../src/voice/duplex/config.js";
 import { registerDuplexVoiceRoutes } from "../src/voice/duplex/routes.js";
+import { routeDuplexTurn } from "../src/voice/duplex/routing.js";
 import {
   createVoiceTurnTimings,
   timedVoiceTurns,
@@ -341,5 +342,61 @@ describe("A8: the ask_q deadline", () => {
         .askDeadlineMs,
     ).toBe(30_000);
     expect(duplexConfigFrom({}).sideband).toBe(false);
+  });
+});
+
+describe("A3 (C-03/B-01): the voice never answers business on its own", () => {
+  const plain = { guided: false, awaitingApproval: false, cardInFocus: false };
+  const card = { ...plain, cardInFocus: true };
+
+  it.each([
+    "find anything that needs my attention",
+    "What does Halyard invest in?",
+    "open their pitch deck",
+    "how is my raise going",
+    "Who else should I talk to?",
+  ])("%s with a card in focus -> ASK_Q", (said) => {
+    expect(routeDuplexTurn(said, card)).toBe("ASK_Q");
+  });
+
+  it.each([
+    "send it",
+    "send the Tensorgate one but make it warmer",
+    "not now",
+    "skip",
+    "book Thursday at 3",
+    "yes",
+    "do it",
+    "ignore Spheros",
+  ])("%s with a card in focus -> decide_card (MODEL)", (said) => {
+    expect(routeDuplexTurn(said, card)).toBe("MODEL");
+  });
+
+  it("a bare yes to a question Q asked is Q's; a greeting stays small talk", () => {
+    expect(routeDuplexTurn("yes", { ...plain, answeringQ: true })).toBe(
+      "ASK_Q",
+    );
+    expect(routeDuplexTurn("yes", plain)).toBe("SMALLTALK");
+    expect(routeDuplexTurn("thanks!", plain)).toBe("SMALLTALK");
+  });
+
+  it("the broker remembers that Q asked something and routes the reply to Q", async () => {
+    const turn = vi.fn<VoiceTurnHandler>(async (_b, _t, _s, speaker) => {
+      await speaker.speak("Here it is.");
+      return { kind: "SPOKEN", path: "Q" };
+    });
+    const broker = await brokerWith(turn);
+    broker.said({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      said: { responseId: "resp_1", text: "Three fit. Want the detail?" },
+    });
+    const result = await broker.heard({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      heard: { itemId: "item_2", transcript: "Yeah." },
+    });
+    expect(result?.route).toBe("ASK_Q");
+    expect(turn).toHaveBeenCalledTimes(1);
   });
 });
