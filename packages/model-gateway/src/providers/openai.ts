@@ -142,18 +142,32 @@ function classify(status: number | undefined): ModelFailureClass {
   return "TRANSIENT";
 }
 
-/** Capital Q's messages as Responses input. Nothing else travels. */
+/**
+ * Capital Q's messages as Responses input. Nothing else travels.
+ *
+ * RECOVERY-2026-10 F-03: only the LEADING system messages (the charter)
+ * become `instructions`, the highest-authority channel. A SYSTEM message
+ * after the conversation starts is a code-written note mid-transcript; it
+ * keeps its place, as a `developer` item, instead of being lifted to the
+ * top -- so nothing that arrives later in the transcript can ever gain
+ * instruction authority by position. Untrusted content is never SYSTEM.
+ */
 export function toInput(messages: readonly ModelMessage[]): {
   readonly instructions: string | undefined;
   readonly input: ResponseInput;
 } {
+  let leading = 0;
+  while (messages[leading]?.role === "SYSTEM") leading += 1;
   const instructions = messages
-    .filter((message) => message.role === "SYSTEM")
+    .slice(0, leading)
     .map((message) => message.content)
     .join("\n\n");
   const input: ResponseInput = [];
-  for (const message of messages) {
-    if (message.role === "SYSTEM") continue;
+  for (const message of messages.slice(leading)) {
+    if (message.role === "SYSTEM") {
+      input.push({ role: "developer", content: message.content });
+      continue;
+    }
     if (message.role === "USER") {
       input.push({
         role: "user",
