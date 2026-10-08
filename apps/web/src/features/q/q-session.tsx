@@ -40,6 +40,7 @@ import { resumeQAction } from "./actions";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { turnsFrom, workingLabel, type QTurn } from "./conversation";
 import { performClientAction, registerClientRouter } from "./client-actions";
+import { navigationInFlight } from "./ui-act-controller";
 import { followOfTurns } from "./follow-navigation";
 import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
@@ -156,6 +157,11 @@ const Q_PAGE = "/home";
  */
 function writeToQPageUrl(conversationId: string): void {
   if (window.location.pathname !== Q_PAGE) return;
+  // RECOVERY-2026-10 (C, G-D14/D16): while Q's own move to another page is
+  // in flight, rewriting /home's URL replaces the router's state and the
+  // move is lost (the person stays on /home?c=). The tab's own pointer
+  // already names the conversation.
+  if (navigationInFlight()) return;
   const next = new URLSearchParams(window.location.search);
   if (next.get(Q_CONVERSATION_PARAM) === conversationId) return;
   next.set(Q_CONVERSATION_PARAM, conversationId);

@@ -4,6 +4,7 @@ import { manifestVersion } from "./manifest";
 import { performOnControl } from "./control/perform";
 import { controlOf, kindOfId, registerControl } from "./control/registry";
 import {
+  currentRoute,
   noteRoute as noteSettledRoute,
   resetRouteState,
   routeEpoch,
@@ -29,7 +30,9 @@ export type UiActHandler = (
 ) => Promise<QUiActReceipt["status"]> | QUiActReceipt["status"];
 
 /** The new page's route reported (or this long passed) after a move. */
-export const NAVIGATION_WAIT_MS = 6_000;
+export const NAVIGATION_WAIT_MS = 20_000;
+/** A move reported FAILED is still listened for this long, to correct it. */
+export const LATE_LANDING_MS = 60_000;
 /** A step after a move or another act may wait this long for its control. */
 export const REGISTRATION_WAIT_MS = 4_000;
 /** Otherwise, a moment's grace for a control that is mounting. */
@@ -42,6 +45,15 @@ const HISTORY_WAIT_MS = 3_000;
 const SCROLL_WAIT_MS = 1_500;
 const POLL_MS = 50;
 const LEDGER_MAX = 16;
+
+/** G-R1: the page's receipts as window events, for tests to record. */
+export const UI_ACT_RECEIPT_EVENT = "cq:ui-act-receipt";
+export const NAVIGATION_RECEIPT_EVENT = "cq:navigation-receipt";
+
+function dispatch(name: string, detail: unknown): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(name, { detail }));
+}
 
 const listeners = new Set<(receipt: QUiActReceipt) => void>();
 const reports = new Set<(report: UiActReport) => void>();
@@ -101,31 +113,13 @@ export function recentUiActReports(): readonly UiActReport[] {
 // Route trail: where this tab has been, in order (BACK, "the page I was on").
 // ---------------------------------------------------------------------------
 
+/** What the act queue waits for: the next settled route after a move. */
 let navigationPending: {
   readonly from: number;
   readonly at: number;
   readonly expected: string | null;
 } | null = null;
 let lastActivity = 0;
-
-/**
- * The shell reports each route the router settled on (QControlRuntime);
- * a move Q was waiting for has then arrived.
- */
-export function noteRoute(path: string): void {
-  const from = routeEpoch();
-  noteSettledRoute(path);
-  if (routeEpoch() === from) return;
-  const pending = navigationPending;
-  navigationPending = null;
-  lastActivity = Date.now();
-  // A redirect (an old address) still lands: the route it settled on says where.
-  if (pending !== null) {
-    settleOutcome({ status: "DONE", expected: pending.expected, route: path });
-  }
-}
-
-export { routeTrail };
 
 /** How a move Q made ended: the route the router settled on, or none. */
 export type NavigationOutcome =
@@ -137,9 +131,8 @@ export type NavigationOutcome =
   | { readonly status: "FAILED"; readonly expected: string | null };
 
 const navigationListeners = new Set<(outcome: NavigationOutcome) => void>();
-let navigationTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Heard once per move Q made: settled, or not within the bound. */
+/** Heard per move Q made: settled, or not within the bound. */
 export function onNavigationOutcome(
   listener: (outcome: NavigationOutcome) => void,
 ): () => void {
@@ -147,28 +140,142 @@ export function onNavigationOutcome(
   return () => navigationListeners.delete(listener);
 }
 
-function settleOutcome(outcome: NavigationOutcome): void {
-  if (navigationTimer !== null) clearTimeout(navigationTimer);
-  navigationTimer = null;
+/**
+ * The move whose outcome is not yet known (or was reported FAILED and may
+ * still land late). One at a time: a newer move replaces it.
+ */
+let move: {
+  readonly expected: string | null;
+  failed: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+} | null = null;
+
+/**
+ * Whether the route the router settled on is the one asked for: the same
+ * path, with every query value the move named (a page may add its own,
+ * like the conversation it names). Never "any route change": a URL the
+ * page rewrites for itself is not the move landing (G-D14).
+ */
+export function routesMatch(expected: string, actual: string): boolean {
+  const base = "http://route.local";
+  let want: URL;
+  let got: URL;
+  try {
+    want = new URL(expected, base);
+    got = new URL(actual, base);
+  } catch {
+    return false;
+  }
+  const path = (url: URL) => url.pathname.replace(/\/+$/u, "") || "/";
+  if (path(want) !== path(got)) return false;
+  for (const [key, value] of want.searchParams) {
+    if (got.searchParams.get(key) !== value) return false;
+  }
+  return true;
+}
+
+/** Where this tab is now, by the router's settled route, else its URL. */
+function landedOn(expected: string | null): string | null {
+  const candidates = [
+    currentRoute(),
+    typeof window === "undefined"
+      ? null
+      : `${window.location.pathname}${window.location.search}`,
+  ];
+  for (const candidate of candidates) {
+    if (candidate === null) continue;
+    if (expected === null || routesMatch(expected, candidate)) return candidate;
+  }
+  return null;
+}
+
+function emit(outcome: NavigationOutcome): void {
   for (const listener of navigationListeners) listener(outcome);
+  dispatch(NAVIGATION_RECEIPT_EVENT, outcome);
+}
+
+function landed(route: string): void {
+  const current = move;
+  if (current === null) return;
+  if (current.timer !== null) clearTimeout(current.timer);
+  move = null;
+  // A move reported FAILED that lands late is reported again, DONE: the
+  // newest receipt is the truth, so Q never confesses a page that opened.
+  emit({ status: "DONE", expected: current.expected, route });
+}
+
+/**
+ * The shell reports each route the router settled on (QControlRuntime);
+ * a move Q was waiting for has arrived when it is that route.
+ */
+export function noteRoute(path: string): void {
+  const from = routeEpoch();
+  noteSettledRoute(path);
+  if (routeEpoch() === from) return;
+  lastActivity = Date.now();
+  const expected = navigationPending?.expected ?? null;
+  if (
+    navigationPending !== null &&
+    (expected === null || routesMatch(expected, path))
+  ) {
+    navigationPending = null;
+  }
+  if (
+    move !== null &&
+    (move.expected === null || routesMatch(move.expected, path))
+  ) {
+    landed(path);
+  }
+}
+
+export { routeTrail };
+
+/** A move of Q's is on its way and has not landed yet. */
+export function navigationInFlight(): boolean {
+  return move !== null && !move.failed;
 }
 
 /**
  * A move is on its way (Q's own navigation, to `path` when known): the
  * next step waits for the new route, so it never runs on the page being
- * left, and the move itself is confirmed only when the router settles --
- * a move that never lands is reported FAILED, never assumed.
+ * left, and the move itself is DONE only once the router settles on that
+ * route. At the deadline it is checked once more against where the tab
+ * actually is; only a move that is not there is FAILED, and a late landing
+ * is still reported DONE.
  */
 export function expectNavigation(path?: string): void {
   const expected = path ?? null;
-  navigationPending = { from: routeEpoch(), at: Date.now(), expected };
   lastActivity = Date.now();
-  if (navigationTimer !== null) clearTimeout(navigationTimer);
-  navigationTimer = setTimeout(() => {
-    navigationTimer = null;
-    if (navigationPending?.expected !== expected) return;
+  // The same move asked twice (the typed and the room follow) is one move.
+  if (move !== null && move.expected === expected && !move.failed) return;
+  navigationPending = { from: routeEpoch(), at: Date.now(), expected };
+  if (move?.timer != null) clearTimeout(move.timer);
+  if (expected !== null && landedOn(expected) !== null) {
+    move = null;
     navigationPending = null;
-    settleOutcome({ status: "FAILED", expected });
+    emit({ status: "DONE", expected, route: landedOn(expected) ?? expected });
+    return;
+  }
+  const current: NonNullable<typeof move> = {
+    expected,
+    failed: false,
+    timer: null,
+  };
+  move = current;
+  current.timer = setTimeout(() => {
+    current.timer = null;
+    if (move !== current) return;
+    const there = expected === null ? null : landedOn(expected);
+    if (there !== null) {
+      landed(there);
+      return;
+    }
+    current.failed = true;
+    emit({ status: "FAILED", expected });
+    // Still listened for a while: a slow page that lands corrects it.
+    current.timer = setTimeout(() => {
+      if (move === current) move = null;
+    }, LATE_LANDING_MS);
   }, NAVIGATION_WAIT_MS);
 }
 
@@ -189,10 +296,13 @@ async function settleNavigation(): Promise<void> {
   const pending = navigationPending;
   if (pending === null) return;
   await until(
-    () => routeEpoch() !== pending.from,
+    () =>
+      navigationPending !== pending ||
+      (routeEpoch() !== pending.from &&
+        (pending.expected === null || landedOn(pending.expected) !== null)),
     Math.max(0, pending.at + NAVIGATION_WAIT_MS - Date.now()),
   );
-  navigationPending = null;
+  if (navigationPending === pending) navigationPending = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +447,13 @@ export function performUiAct(intent: QUiActIntent): Promise<QUiActReceipt> {
     if (ledger.length > LEDGER_MAX) ledger.shift();
     for (const listener of listeners) listener(receipt);
     for (const listener of reports) listener(report);
+    // G-R1: tests observe receipts as the page reports them (a DOM event,
+    // never authority; the server reads the posted batch).
+    dispatch(UI_ACT_RECEIPT_EVENT, {
+      ...receipt,
+      act: intent.act,
+      ...(intent.target === undefined ? {} : { target: intent.target }),
+    });
     return receipt;
   });
   queue = done.catch(() => undefined);
@@ -346,8 +463,8 @@ export function performUiAct(intent: QUiActIntent): Promise<QUiActReceipt> {
 /** Clears the trail and the ledger (tests). */
 export function resetUiActController(): void {
   resetRouteState();
-  if (navigationTimer !== null) clearTimeout(navigationTimer);
-  navigationTimer = null;
+  if (move?.timer != null) clearTimeout(move.timer);
+  move = null;
   navigationPending = null;
   lastActivity = 0;
   ledger.length = 0;

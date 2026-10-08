@@ -32,7 +32,9 @@ import { currentManifest } from "../src/features/q/manifest";
 import {
   expectNavigation,
   noteRoute,
+  navigationInFlight,
   onNavigationOutcome,
+  routesMatch,
   performUiAct,
   type NavigationOutcome,
   recentUiActReports,
@@ -476,9 +478,117 @@ describe("Q's moves are confirmed by the settled route (C3)", () => {
     const outcomes: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
     expectNavigation("/documents");
-    await vi.advanceTimersByTimeAsync(7_000);
+    await vi.advanceTimersByTimeAsync(21_000);
     stop();
     expect(outcomes).toEqual([{ status: "FAILED", expected: "/documents" }]);
+  });
+
+  it("G-D14: a slow page that lands after the deadline is corrected to DONE", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    noteRoute("/home");
+    window.history.replaceState(null, "", "/home");
+    const outcomes: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
+    expectNavigation("/company/x?tab=dataroom");
+    await vi.advanceTimersByTimeAsync(21_000);
+    // A dev-mode compile took 25 s: the page lands after the FAILED.
+    noteRoute("/company/x?tab=dataroom");
+    stop();
+    expect(outcomes.map((o) => o.status)).toEqual(["FAILED", "DONE"]);
+    expect(outcomes.at(-1)).toEqual({
+      status: "DONE",
+      expected: "/company/x?tab=dataroom",
+      route: "/company/x?tab=dataroom",
+    });
+  });
+
+  it("G-D14: at the deadline, a tab that is already there is DONE, never FAILED", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    noteRoute("/home");
+    window.history.replaceState(null, "", "/home");
+    const outcomes: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
+    expectNavigation("/relationships/company/x");
+    // The URL moved but the settled-route report was missed.
+    window.history.replaceState(null, "", "/relationships/company/x");
+    await vi.advanceTimersByTimeAsync(21_000);
+    stop();
+    expect(outcomes).toEqual([
+      {
+        status: "DONE",
+        expected: "/relationships/company/x",
+        route: "/relationships/company/x",
+      },
+    ]);
+  });
+
+  it("G-D14: the page rewriting its own URL (/home?c=) is not the move landing", () => {
+    noteRoute("/home");
+    window.history.replaceState(null, "", "/home");
+    const outcomes: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
+    expectNavigation("/relationships/company/x");
+    expect(navigationInFlight()).toBe(true);
+    noteRoute("/home?c=abc");
+    expect(outcomes).toEqual([]);
+    noteRoute("/relationships/company/x");
+    stop();
+    expect(outcomes).toEqual([
+      {
+        status: "DONE",
+        expected: "/relationships/company/x",
+        route: "/relationships/company/x",
+      },
+    ]);
+    expect(navigationInFlight()).toBe(false);
+  });
+
+  it("the same move asked twice is one move, one receipt; already there is DONE at once", () => {
+    noteRoute("/home");
+    window.history.replaceState(null, "", "/home");
+    const outcomes: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
+    expectNavigation("/documents");
+    expectNavigation("/documents");
+    noteRoute("/documents");
+    expectNavigation("/documents?tab=mine");
+    stop();
+    expect(outcomes.map((o) => o.status)).toEqual(["DONE"]);
+    expect(routesMatch("/documents", "/documents?c=1")).toBe(true);
+    expect(routesMatch("/company/x?tab=dataroom", "/company/x")).toBe(false);
+  });
+
+  it("G-R1: receipts are also window events, for tests to record", async () => {
+    const seen: unknown[] = [];
+    const record = (event: Event) =>
+      seen.push((event as CustomEvent<unknown>).detail);
+    window.addEventListener("cq:ui-act-receipt", record);
+    window.addEventListener("cq:navigation-receipt", record);
+    noteRoute("/home");
+    window.history.replaceState(null, "", "/home");
+    expectNavigation("/work");
+    noteRoute("/work");
+    render(<Tabs />);
+    await performUiAct(act_("SCROLL_TO", { target: "section.risks" }));
+    window.removeEventListener("cq:ui-act-receipt", record);
+    window.removeEventListener("cq:navigation-receipt", record);
+    expect(seen).toEqual([
+      { status: "DONE", expected: "/work", route: "/work" },
+      expect.objectContaining({
+        status: "DONE",
+        act: "SCROLL_TO",
+        target: "section.risks",
+      }),
+    ]);
+  });
+
+  it("G-R8: registered roots carry data-q-control, list items data-q-control-item", () => {
+    render(<Tabs />);
+    manifestControls();
+    expect(
+      document.querySelector('[data-q-control="list.investors"]'),
+    ).not.toBeNull();
+    expect(document.querySelectorAll("[data-q-control-item]")).toHaveLength(3);
   });
 });
 
@@ -538,7 +648,7 @@ describe("INC-1: opening a named record is confirmed and reported with its route
       page: "COMPANY_DATA_ROOM",
       id: SHIFTWELL,
     });
-    await vi.advanceTimersByTimeAsync(7_000);
+    await vi.advanceTimersByTimeAsync(21_000);
     stop();
     registerClientRouter(null);
     const report = QUiActReceiptsRequestSchema.parse(sent.at(-1));
