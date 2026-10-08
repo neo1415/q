@@ -133,7 +133,7 @@ export function attentionFromReads(reads: AttentionReads): QAttentionReport {
         key: key(card.kind === "HELD" ? "HELD_DRAFT" : "APPROVAL", card.key),
         source: card.kind === "HELD" ? "HELD_DRAFT" : "APPROVAL",
         title: clip(card.title, 200),
-        detail: clip(card.summary, 600),
+        note: clip(card.summary, 600),
         ...(card.approvalId === null
           ? {}
           : { entity: { kind: "APPROVAL" as const, id: card.approvalId } }),
@@ -156,7 +156,7 @@ export function attentionFromReads(reads: AttentionReads): QAttentionReport {
         key: key(source, notice.id),
         source,
         title: clip(notice.title, 200),
-        ...(notice.body === null ? {} : { detail: clip(notice.body, 600) }),
+        ...(notice.body === null ? {} : { note: clip(notice.body, 600) }),
         since: notice.createdAt,
         decidable: false,
       });

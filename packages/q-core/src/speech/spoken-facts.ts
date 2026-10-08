@@ -814,7 +814,7 @@ export function spokenFactsOfAttention(report: QAttentionReport): SpokenFacts {
     name: item.counterpart ?? item.title,
     score: null,
     about: item.title,
-    does: item.detail ?? null,
+    does: item.note ?? null,
     strengths: [],
     unknowns: [],
   }));

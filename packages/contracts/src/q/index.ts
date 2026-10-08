@@ -470,6 +470,7 @@ export {
   QMapBlockSchema,
   QTableBlockSchema,
   QTimelineBlockSchema,
+  QAttentionBlockSchema,
   chartableSeries,
   parseQResultBlocks,
   type QResultBlockDrop,

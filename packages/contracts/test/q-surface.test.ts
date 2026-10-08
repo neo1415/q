@@ -200,6 +200,24 @@ const completedRun = {
       ],
     },
     {
+      kind: "ATTENTION",
+      report: {
+        items: [
+          {
+            key: "approval:1",
+            source: "APPROVAL",
+            title: "One change waits for your yes",
+            note: "Send the follow-up to Apex Capital",
+            since: "2026-10-08T09:00:00.000Z",
+            decidable: true,
+          },
+        ],
+        activity: null,
+        unread: ["UNANSWERED_MESSAGE"],
+        readAt: "2026-10-08T09:05:00.000Z",
+      },
+    },
+    {
       kind: "TIMELINE",
       title: "Your relationship",
       events: [
@@ -368,6 +386,8 @@ describe("type-level guarantees", () => {
         case "MAP":
         case "TIMELINE":
           return block.title;
+        case "ATTENTION":
+          return block.report.readAt;
         default: {
           const unreachable: never = block;
           return unreachable;

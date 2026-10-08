@@ -282,6 +282,7 @@ function disclosable(
       case "CHART":
       case "MAP":
       case "TIMELINE":
+      case "ATTENTION": // the person's own attention items, no evidence
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
       case "COMPARISON":

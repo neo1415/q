@@ -328,7 +328,7 @@ describe("the attention report", () => {
     const report = await readAttention(port, actorA, { now: NOW });
     const notices = report.items.filter((item) => item.source === "NOTICE");
     expect(notices).toHaveLength(ATTENTION_ITEMS_PER_SOURCE);
-    expect(notices.at(-1)?.detail).toBe("(and 22 more like this)");
+    expect(notices.at(-1)?.note).toBe("(and 22 more like this)");
     expect(
       report.items.filter((item) => item.source === "NEW_MATCHES"),
     ).toHaveLength(3);

@@ -8,6 +8,7 @@ import {
 import { QActionProposalSchema } from "./action.js";
 import { QAnswerCardsBlockSchema, QMapSpecSchema } from "./answer-cards.js";
 import { QArtifactStatusSchema, QArtifactTypeSchema } from "./artifact.js";
+import { QAttentionReportSchema } from "./attention.js";
 import { QArtifactIdSchema } from "./ids.js";
 import { QUncertainConfidenceLevelSchema } from "./confidence.js";
 import { QEvidenceRefsSchema } from "./evidence-ref.js";
@@ -59,6 +60,8 @@ export const Q_RESULT_BLOCK_KINDS = [
   "CHART",
   "MAP",
   "TIMELINE",
+  // RECOVERY-2026-10 (G-R4): what needs the person, item by item.
+  "ATTENTION",
 ] as const;
 
 export type QResultBlockKind = (typeof Q_RESULT_BLOCK_KINDS)[number];
@@ -461,6 +464,15 @@ export const QTimelineBlockSchema = z
     { message: "events are in time order, oldest first", path: ["events"] },
   );
 
+/**
+ * RECOVERY-2026-10 (G-R4): the attention report behind "what needs me",
+ * so the items render as items and an unread source is visible, never
+ * "nothing waiting" (attention.ts). The person's own work, read for them.
+ */
+export const QAttentionBlockSchema = z
+  .object({ kind: z.literal("ATTENTION"), report: QAttentionReportSchema })
+  .strict();
+
 export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTextBlockSchema,
   QCompanyReferenceBlockSchema,
@@ -480,6 +492,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QChartBlockSchema,
   QMapBlockSchema,
   QTimelineBlockSchema,
+  QAttentionBlockSchema,
 ]);
 
 export type QResultBlock = z.infer<typeof QResultBlockSchema>;

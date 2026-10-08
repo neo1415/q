@@ -86,7 +86,7 @@ export function attentionAnswerText(report: QAttentionReport): string {
     );
     report.items.forEach((item, index) => {
       lines.push(
-        `${String(index + 1)}. ${item.title}${item.detail === undefined ? "" : ` — ${item.detail}`}`,
+        `${String(index + 1)}. ${item.title}${item.note === undefined ? "" : ` — ${item.note}`}`,
       );
     });
   }
