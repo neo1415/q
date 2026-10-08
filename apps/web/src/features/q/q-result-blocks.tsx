@@ -20,6 +20,14 @@ import { StaticAnswerCards } from "./static-answer-cards";
 import { recordPagePath, settingsPath, setupPath } from "./client-actions";
 import { roomCardHref } from "./room/room-card-view";
 import type { QTurnObjectBlock } from "./conversation";
+import {
+  ChartBody,
+  MapBody,
+  TableBody,
+  TimelineBody,
+} from "./blocks/data-blocks";
+import { subjectHref } from "./blocks/data-block-logic";
+import { useSubjectNames } from "./blocks/use-subject-names";
 import { useWire } from "./use-wire";
 import { wireNow } from "./wire";
 
@@ -416,34 +424,13 @@ export function QResultBlocks({
             );
 
           case "INVESTOR_REFERENCE":
+            // E-08: named and opening their profile where they may see it.
             return (
-              <QResultCard
+              <InvestorReference
                 key={key}
-                label="Investor"
-                actions={
-                  onAsk === undefined ? undefined : (
-                    <button
-                      type="button"
-                      className={buttonClassName("quiet", "compact")}
-                      onClick={() => {
-                        onAsk("Tell me more about that investor.");
-                      }}
-                    >
-                      Ask Q about them
-                    </button>
-                  )
-                }
-              >
-                {/* The investor's logo through its gated photo route, which
-                    answers only where this reader may see their name. */}
-                <EntityAvatar
-                  kind="investor"
-                  name="Investor"
-                  investorOrganisationId={block.investorOrganisationId}
-                  size={40}
-                  decorative
-                />
-              </QResultCard>
+                investorOrganisationId={block.investorOrganisationId}
+                onAsk={onAsk}
+              />
             );
 
           case "COMPARISON_CARDS":
@@ -455,60 +442,31 @@ export function QResultBlocks({
             return <StaticAnswerCards key={key} block={block} onAsk={onAsk} />;
 
           case "COMPARISON":
+            return <ComparisonTable key={key} block={block} />;
+
+          // E4: laid-out data, built by code from validated reads.
+          case "TABLE":
             return (
-              <QResultCard key={key} label="Side by side">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left">
-                    <thead>
-                      <tr>
-                        <th className="cq-label px-0 py-2 pr-4 text-(--cq-text-tertiary)">
-                          <span className="sr-only">Attribute</span>
-                        </th>
-                        {block.subjects.map((subject, column) => (
-                          <th
-                            key={`${subject.kind}-${String(column)}`}
-                            scope="col"
-                            className="cq-label px-4 py-2 text-(--cq-text-tertiary)"
-                          >
-                            {subjectLabel(subject)} {column + 1}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {block.rows.map((row) => (
-                        <tr
-                          key={row.label}
-                          className="border-t border-(--cq-border-subtle)"
-                        >
-                          <th
-                            scope="row"
-                            className="cq-body-sm px-0 py-2 pr-4 font-normal text-(--cq-text-secondary)"
-                          >
-                            {row.label}
-                          </th>
-                          {row.values.map((value, column) => (
-                            <td
-                              key={`${row.label}-${String(column)}`}
-                              className="cq-body-sm px-4 py-2 text-(--cq-text-primary)"
-                            >
-                              {/* An empty cell is how the contract says
-                                  "unknown". Never a zero, never a dash
-                                  that could be read as one. */}
-                              {value === "" ? (
-                                <span className="text-(--cq-text-tertiary)">
-                                  Not known
-                                </span>
-                              ) : (
-                                value
-                              )}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <QResultCard key={key} label="Side by side" title={block.title}>
+                <TableBody block={block} />
+              </QResultCard>
+            );
+          case "CHART":
+            return (
+              <QResultCard key={key} label="Chart" title={block.title}>
+                <ChartBody block={block} />
+              </QResultCard>
+            );
+          case "MAP":
+            return (
+              <QResultCard key={key} label="Map" title={block.title}>
+                <MapBody map={block} />
+              </QResultCard>
+            );
+          case "TIMELINE":
+            return (
+              <QResultCard key={key} label="Timeline" title={block.title}>
+                <TimelineBody block={block} />
               </QResultCard>
             );
 
@@ -622,5 +580,145 @@ export function QResultBlocks({
         }
       })}
     </div>
+  );
+}
+
+/** An investor Q referred to: their name and their page (E-08). */
+function InvestorReference({
+  investorOrganisationId,
+  onAsk,
+}: {
+  readonly investorOrganisationId: string;
+  readonly onAsk?: ((question: string) => void) | undefined;
+}) {
+  const subject = {
+    kind: "INVESTOR_ORGANISATION" as const,
+    investorOrganisationId,
+  };
+  const name = useSubjectNames([subject])(subject);
+  const href = subjectHref(subject);
+  return (
+    <QResultCard
+      label="Investor"
+      title={name ?? undefined}
+      actions={
+        <>
+          {href === null ? null : (
+            <Link
+              href={href}
+              className={buttonClassName("secondary", "compact")}
+              data-q-investor-open
+            >
+              Open profile
+            </Link>
+          )}
+          {onAsk === undefined ? null : (
+            <button
+              type="button"
+              className={buttonClassName("quiet", "compact")}
+              onClick={() => {
+                onAsk(
+                  name === null
+                    ? "Tell me more about that investor."
+                    : `Tell me more about ${name}.`,
+                );
+              }}
+            >
+              {name === null ? "Ask Q about them" : `Ask Q about ${name}`}
+            </button>
+          )}
+        </>
+      }
+    >
+      {/* The investor's logo through its gated photo route, which
+          answers only where this reader may see their name. */}
+      <EntityAvatar
+        kind="investor"
+        name={name ?? "Investor"}
+        investorOrganisationId={investorOrganisationId}
+        size={40}
+        decorative
+      />
+    </QResultCard>
+  );
+}
+
+/** Subjects side by side, each column headed by its name (E-08). */
+function ComparisonTable({
+  block,
+}: {
+  readonly block: Extract<QTurnObjectBlock, { kind: "COMPARISON" }>;
+}) {
+  const nameOf = useSubjectNames(block.subjects);
+  return (
+    <QResultCard label="Side by side">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr>
+              <th className="cq-label px-0 py-2 pr-4 text-(--cq-text-tertiary)">
+                <span className="sr-only">Attribute</span>
+              </th>
+              {block.subjects.map((subject, column) => {
+                const name = nameOf(subject);
+                const href = name === null ? null : subjectHref(subject);
+                return (
+                  <th
+                    key={`${subject.kind}-${String(column)}`}
+                    scope="col"
+                    className="cq-label px-4 py-2 text-(--cq-text-primary)"
+                    data-q-comparison-head
+                  >
+                    {name === null ? (
+                      `${subjectLabel(subject)} ${String(column + 1)}`
+                    ) : href === null ? (
+                      name
+                    ) : (
+                      <Link
+                        href={href}
+                        className="underline decoration-(--cq-border-strong) underline-offset-2"
+                      >
+                        {name}
+                      </Link>
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rows.map((row) => (
+              <tr
+                key={row.label}
+                className="border-t border-(--cq-border-subtle)"
+              >
+                <th
+                  scope="row"
+                  className="cq-body-sm px-0 py-2 pr-4 font-normal text-(--cq-text-secondary)"
+                >
+                  {row.label}
+                </th>
+                {row.values.map((value, column) => (
+                  <td
+                    key={`${row.label}-${String(column)}`}
+                    className="cq-body-sm px-4 py-2 text-(--cq-text-primary)"
+                  >
+                    {/* An empty cell is how the contract says "unknown".
+                        Never a zero, never a dash that could be read as one. */}
+                    {value === "" ? (
+                      <span className="text-(--cq-text-tertiary)">
+                        Not known
+                      </span>
+                    ) : (
+                      value
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </QResultCard>
   );
 }
