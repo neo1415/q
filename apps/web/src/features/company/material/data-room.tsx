@@ -13,6 +13,8 @@ import {
   type DataRoomLevel,
   type DataRoomOwnerDocument,
   type DataRoomOwnerView,
+  type InterestDto,
+  type RelationshipStateV2,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
@@ -36,6 +38,7 @@ import {
 } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
+import { ExpressInterest } from "../../network/express-interest";
 import { stageLabel } from "../declared-labels";
 import { FileViewer } from "./file-viewer";
 import {
@@ -44,6 +47,7 @@ import {
   openDocumentAction,
   requestAccessAction,
   setLevelAction,
+  setOutlineAction,
   type OpenedFile,
 } from "./material-actions";
 
@@ -180,7 +184,122 @@ const FILTERS: readonly (readonly [Filter, string])[] = [
   ["NOT_OPENED", "Not opened yet"],
 ];
 
+/**
+ * The room before the founder accepts the investor's interest (founder
+ * decision 2026-10-08): locked, with what to do next. Folder names and
+ * counts show only when the founder allows them; never titles.
+ */
+export function LockedDataRoom({
+  companyId,
+  companyName,
+  locked,
+  interest = null,
+  relationshipState = null,
+}: {
+  readonly companyId: string;
+  readonly companyName: string;
+  readonly locked: NonNullable<DataRoomInvestorView["locked"]>;
+  readonly interest?: InterestDto | null | undefined;
+  readonly relationshipState?: RelationshipStateV2 | null | undefined;
+}) {
+  const pending = locked.reason === "INTEREST_PENDING";
+  return (
+    <section
+      className="flex flex-col gap-4 py-2"
+      aria-label="Data room"
+      data-data-room="investor-locked"
+      data-locked-reason={locked.reason}
+    >
+      <div className="flex items-start gap-3">
+        <Lock
+          size={ICON_SIZE.regular}
+          aria-hidden="true"
+          className="mt-0.5 shrink-0 text-(--cq-text-secondary)"
+        />
+        <div className="flex flex-col gap-1">
+          <p className="cq-body text-(--cq-text-primary)">
+            {pending
+              ? `Your interest is with ${companyName}.`
+              : `${companyName}'s data room opens once you're connected.`}
+          </p>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {pending
+              ? "Once they accept it, their data room opens here and you can request documents."
+              : "Express interest to request data-room access. Once the founders accept, you can see their data room and ask for documents."}
+          </p>
+        </div>
+      </div>
+      {pending ? null : (
+        <div data-locked-cta>
+          <ExpressInterest
+            companyId={companyId}
+            companyName={companyName}
+            surface="COMPANY_PROFILE"
+            initialInterest={interest}
+            relationshipState={relationshipState}
+          />
+        </div>
+      )}
+      {locked.outline === null || locked.outline.length === 0 ? null : (
+        <div className="flex flex-col gap-2" data-locked-outline>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            What&rsquo;s in it, folder by folder:
+          </p>
+          <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+            {locked.outline.map((folder) => (
+              <li
+                key={folder.code}
+                className="flex min-h-11 items-center justify-between gap-3 py-2"
+              >
+                <span className="cq-body-sm text-(--cq-text-primary)">
+                  {folder.label}
+                </span>
+                <span className="cq-body-sm text-(--cq-text-secondary)">
+                  {plural(folder.documents, "document")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function InvestorDataRoom({
+  companyId,
+  companyName,
+  view,
+  interest = null,
+  relationshipState = null,
+}: {
+  readonly companyId: string;
+  readonly companyName: string;
+  readonly view: DataRoomInvestorView;
+  /** For the locked room's Express interest (the profile's own). */
+  readonly interest?: InterestDto | null | undefined;
+  readonly relationshipState?: RelationshipStateV2 | null | undefined;
+}) {
+  if (view.access === "LOCKED" && view.locked !== undefined)
+    return (
+      <LockedDataRoom
+        companyId={companyId}
+        companyName={companyName}
+        locked={view.locked}
+        interest={interest}
+        relationshipState={relationshipState}
+      />
+    );
+  return (
+    <ConnectedDataRoom
+      companyId={companyId}
+      companyName={companyName}
+      view={view}
+    />
+  );
+}
+
+function ConnectedDataRoom({
   companyId,
   companyName,
   view,
@@ -635,6 +754,22 @@ export function OwnerDataRoom({
   >({});
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [outline, setOutline] = useState(view.outlineBeforeConnection ?? false);
+
+  const toggleOutline = () => {
+    const next = !outline;
+    setOutline(next);
+    start(async () => {
+      const result = await setOutlineAction({
+        companyId,
+        outlineBeforeConnection: next,
+      });
+      if (!result.ok) {
+        setOutline(!next);
+        setMessage(result.message);
+      }
+    });
+  };
 
   // F10: an item filed here in this visit counts as present at once.
   const filedAs = (code: string) =>
@@ -756,7 +891,7 @@ export function OwnerDataRoom({
           </h2>
           <p className="cq-body-sm text-(--cq-text-secondary)">
             What investors can see, folder by folder. You choose for each
-            document.
+            document. Investors see it once you accept their interest.
           </p>
         </div>
         <Link
@@ -765,6 +900,41 @@ export function OwnerDataRoom({
         >
           <Upload size={ICON_SIZE.compact} aria-hidden="true" /> Upload files
         </Link>
+      </div>
+
+      <div
+        className="flex flex-wrap items-center justify-between gap-3"
+        data-room-outline-setting
+      >
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <p className="cq-body-sm text-(--cq-text-primary)">
+            Before you connect
+          </p>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {outline
+              ? "Investors not yet connected see folder names and counts. Titles and documents stay hidden."
+              : "Investors not yet connected see only that your data room opens once you accept their interest."}
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-pressed={outline}
+          disabled={pending}
+          onClick={toggleOutline}
+          className={buttonClassName("secondary", "regular")}
+        >
+          {outline ? (
+            <>
+              <EyeOff size={ICON_SIZE.compact} aria-hidden="true" /> Hide folder
+              names
+            </>
+          ) : (
+            <>
+              <Eye size={ICON_SIZE.compact} aria-hidden="true" /> Show folder
+              names
+            </>
+          )}
+        </button>
       </div>
 
       {view.checklist.length === 0 ? null : (

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -59,13 +60,42 @@ const HISTORY_WORDS = {
   EXPIRED: "ended for",
 } as const;
 
+/**
+ * Investors whose interest waits on the founder: not shareable until
+ * accepted (founder decision 2026-10-08), so offered as "connect first".
+ */
+function AwaitingConnection({
+  awaiting,
+}: {
+  readonly awaiting: readonly AccessCandidate[];
+}) {
+  if (awaiting.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1" data-access-awaiting>
+      <p className="cq-caption text-(--cq-text-secondary)">
+        Waiting for you to accept their interest:{" "}
+        {awaiting.map((a) => a.investorOrganisationName).join(", ")}. Connect
+        first, then share.
+      </p>
+      <Link
+        href="/company/interest"
+        className="cq-caption inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-2"
+      >
+        Review their interest
+      </Link>
+    </div>
+  );
+}
+
 function AddInvestor({
   candidates,
+  awaiting = [],
   label,
   onShare,
   busy,
 }: {
   readonly candidates: readonly AccessCandidate[];
+  readonly awaiting?: readonly AccessCandidate[] | undefined;
   readonly label: string;
   readonly busy: boolean;
   readonly onShare: (input: {
@@ -79,13 +109,22 @@ function AddInvestor({
   const [days, setDays] = useState<number>(DATA_ROOM_GRANT_DEFAULT_DAYS);
   if (candidates.length === 0) {
     return (
-      <p className="cq-caption text-(--cq-text-tertiary)">
-        You can share with investors you&apos;re in touch with. None yet.
-      </p>
+      <div className="flex flex-col gap-2">
+        <p className="cq-caption text-(--cq-text-tertiary)" data-access-none>
+          You can share with investors you&apos;re connected to. None yet.
+        </p>
+        <AwaitingConnection awaiting={awaiting} />
+      </div>
     );
   }
   return (
     <div className="grid gap-2 sm:grid-cols-2">
+      <p
+        className="cq-caption text-(--cq-text-tertiary) sm:col-span-2"
+        data-access-explain
+      >
+        You can share with investors you&apos;re connected to.
+      </p>
       <label className="cq-caption flex flex-col gap-1 text-(--cq-text-secondary) sm:col-span-2">
         Add an investor
         <select
@@ -144,6 +183,9 @@ function AddInvestor({
         >
           {label}
         </button>
+      </div>
+      <div className="sm:col-span-2">
+        <AwaitingConnection awaiting={awaiting} />
       </div>
     </div>
   );
@@ -302,6 +344,7 @@ function DocumentAccess({
         )}
         <AddInvestor
           candidates={access.candidates}
+          awaiting={access.awaitingConnection}
           label="Share"
           busy={busy}
           onShare={(input) =>
@@ -410,6 +453,7 @@ function FolderAccess({
         </p>
         <AddInvestor
           candidates={access.candidates}
+          awaiting={access.awaitingConnection}
           label="Share the folder"
           busy={busy}
           onShare={(input) =>

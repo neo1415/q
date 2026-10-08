@@ -467,6 +467,7 @@ export {
   openDataRoomDocument,
   requestDataRoomAccess,
   setDataRoomLevel,
+  setDataRoomOutline,
 } from "./profile-material.js";
 
 export { exploreRelated, exploreSearch, exploreSlate } from "./explore.js";

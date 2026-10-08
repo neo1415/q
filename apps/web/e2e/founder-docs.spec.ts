@@ -112,3 +112,47 @@ test("the investor sees a decline's words and the founder's answer", async ({
     "waiting for an answer",
   );
 });
+
+test("before the founder accepts, the investor's data room is locked, with how to get in", async ({
+  page,
+}) => {
+  await page.goto("/dev/founder-docs?view=locked");
+  const room = page.locator('[data-data-room="investor-locked"]');
+  await expect(room).toContainText(
+    "Express interest to request data-room access.",
+  );
+  await expect(
+    room.locator("[data-locked-cta]").getByRole("button").first(),
+  ).toBeVisible();
+  await expect(room).not.toContainText("Unit economics");
+  await expect(room.locator("[data-locked-outline]")).toHaveCount(0);
+
+  await page.goto("/dev/founder-docs?view=pending");
+  const waiting = page.locator('[data-data-room="investor-locked"]');
+  await expect(waiting).toContainText("Your interest is with Ledgerline");
+  await expect(waiting.locator("[data-locked-outline]")).toContainText(
+    "Financials",
+  );
+});
+
+test("the founder shares only with connected investors, and sees who to connect first", async ({
+  page,
+}) => {
+  await page.goto("/dev/founder-docs?view=dataroom");
+  await expect(page.locator("[data-room-outline-setting]")).toContainText(
+    "Before you connect",
+  );
+  await page.goto("/dev/founder-docs?view=access");
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.locator("[data-access-explain]")).toHaveText(
+    "You can share with investors you're connected to.",
+  );
+  await expect(sheet.locator("[data-access-awaiting]")).toContainText(
+    "Meridian Seed (fictional)",
+  );
+  await expect(
+    sheet.locator("[data-access-candidate] option", {
+      hasText: "Meridian Seed",
+    }),
+  ).toHaveCount(0);
+});

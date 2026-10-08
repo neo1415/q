@@ -23,6 +23,7 @@ import {
   reviewInbox,
   reviewInvestorBoard,
   reviewInvestorRoom,
+  reviewLockedRoom,
   reviewOwnerRoom,
   ZINO,
 } from "@/features/documents/requests/review-fixtures";
@@ -38,7 +39,14 @@ export function FounderDocsHarness({
   view,
   item,
 }: {
-  readonly view: "requested" | "dataroom" | "access" | "folder" | "investor";
+  readonly view:
+    | "requested"
+    | "dataroom"
+    | "access"
+    | "folder"
+    | "investor"
+    | "locked"
+    | "pending";
   readonly item: string | null;
 }) {
   const inbox = useMemo(() => reviewInbox(), []);
@@ -55,6 +63,20 @@ export function FounderDocsHarness({
         ? { kind: "FOLDER", folderCode: "financials", label: "Financials" }
         : null,
   );
+  // 2026-10-08: before the founder accepts the interest.
+  if (view === "locked" || view === "pending") {
+    return (
+      <InvestorDataRoom
+        companyId={REVIEW_COMPANY}
+        companyName="Ledgerline (fictional)"
+        view={reviewLockedRoom(
+          view === "locked" ? "NOT_CONNECTED" : "INTEREST_PENDING",
+        )}
+        // The harness never reaches the server: an expression is refused.
+        interest={null}
+      />
+    );
+  }
   if (view === "investor") {
     return (
       <div className="flex flex-col gap-10">
