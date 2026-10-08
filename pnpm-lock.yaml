@@ -509,6 +509,9 @@ importers:
       '@capital-q/platform-admin':
         specifier: workspace:*
         version: link:../../packages/platform-admin
+      '@capital-q/q-actions':
+        specifier: workspace:*
+        version: link:../../packages/q-actions
       '@capital-q/q-artifacts':
         specifier: workspace:*
         version: link:../../packages/q-artifacts

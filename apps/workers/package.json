@@ -35,6 +35,7 @@
     "@capital-q/organisations": "workspace:*",
     "@capital-q/permissions": "workspace:*",
     "@capital-q/platform-admin": "workspace:*",
+    "@capital-q/q-actions": "workspace:*",
     "@capital-q/q-artifacts": "workspace:*",
     "@capital-q/q-core": "workspace:*",
     "@capital-q/q-daily": "workspace:*",
