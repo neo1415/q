@@ -200,7 +200,11 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- Diligence (2026-10-02): server-only; both sides read through the API.
   ('network', 'diligence_requests',         'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'diligence_fulfilments',      'INTERNAL_SERVER_ONLY', '{}'),
-  ('identity', 'platform_admins',           'INTERNAL_SERVER_ONLY', '{}'),
+  -- Founder documents (2026-10-08): server-only, like diligence.
+  ('network', 'diligence_request_declines', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'diligence_questions',        'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'diligence_question_answers', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('identity', 'platform_admins',          'INTERNAL_SERVER_ONLY', '{}'),
   -- BIZ-007 integrations, guarded from the inbound email packet on: a
   -- person reads their own rows (suites 530 and 710); OAuth states are the
   -- server's alone. google_accounts' SELECT is column-scoped.
