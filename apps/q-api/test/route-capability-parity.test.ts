@@ -592,6 +592,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/workforce.ts GET Q_WORKFORCE_OVERVIEW_PATH": exempt(
     "the workforce page's team and month spend against the person's limit; Q reports its usage in conversation through its usage tools",
   ),
+  "q-api/http/briefing-command.ts POST Q_BRIEFING_COMMAND_PATH": exempt(
+    "the arrival briefing's reading of the person's own words into card verbs for their own screen; it changes nothing (the card sequence runs and checks each verb), so it is the Q conversation's transport, not an action",
+  ),
   "q-api/http/workforce.ts POST Q_WORKFORCE_DRAFT_RETRY_PATH": exempt(
     "a held card's own 'Ask Q to try again' (button, or the person's words read into the card's typed verb in the arrival briefing); it only rewrites and offers an approval card, which the Approval Engine decides",
   ),
@@ -1049,6 +1052,8 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
  */
 const HELD_RETRY: ReadonlySet<string> = new Set([
   "q-api/http/workforce.ts POST Q_WORKFORCE_DRAFT_RETRY_PATH",
+  // A POST that only reads the person's words into verbs; changes nothing.
+  "q-api/http/briefing-command.ts POST Q_BRIEFING_COMMAND_PATH",
 ]);
 
 /** POST routes that only read (a search with a body), mapped to a read tool. */

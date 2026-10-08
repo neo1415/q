@@ -138,6 +138,8 @@ describe("registry", () => {
         "REHEARSAL_SCORE",
         // Founder live 2026-10-08: a code-built answer in Q's own words.
         "SPOKEN_REPLY",
+        // Zino 2026-10-08: their own words about the briefing's cards.
+        "BRIEFING_COMMAND",
         // Founder direction 2026-09-30: founder research during setup.
         "FOUNDER_RESEARCH_READER",
         // AUTO (ADR 0030): Q's delegated work.

@@ -107,6 +107,8 @@ export const PROMPT_IDS = [
   "DECK_EXTRACTION",
   /** Founder live 2026-10-08: a code-built answer said in Q's own words. */
   "SPOKEN_REPLY",
+  /** Zino 2026-10-08: their own words about the briefing's cards, as verbs. */
+  "BRIEFING_COMMAND",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -141,6 +143,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   DILIGENCE_DOCUMENT_SUMMARY: "diligence-document-summary",
   DECK_EXTRACTION: "deck-extraction",
   SPOKEN_REPLY: "spoken-reply",
+  BRIEFING_COMMAND: "briefing-command",
   INVESTOR_PERSONA: "investor-persona",
   INVESTOR_TWIN_TURN: "investor-twin-turn",
   REHEARSAL_SCORE: "rehearsal-score",

@@ -167,6 +167,7 @@ import {
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
 import { createHeldRetry } from "./composition/workforce/held-retry.js";
+import { createBriefingCommandReader } from "./composition/briefing-command.js";
 import {
   createPostgresWorkforceStore,
   createStaleHoldsReader,
@@ -5457,6 +5458,13 @@ const { app, logger: appLogger } = createApp(
           )?.investorOrganisationId ?? null,
         ownCompany: workOwnCompany,
       },
+    }),
+    // Zino 2026-10-08: the briefing's free-form words, read into card verbs.
+    briefingCommand: createBriefingCommandReader({
+      gateway: modelGateway,
+      dataPosture: demoDataPosture,
+      principalName: (who) => workforceDisplayName(who.userId),
+      logger,
     }),
     // Lead 2026-10-03: the person's own usage this month.
     usage: createOwnUsage({

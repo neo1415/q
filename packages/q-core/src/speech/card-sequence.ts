@@ -369,7 +369,43 @@ export type SequenceEvent =
   /** The person typed their own version in the editor. */
   | { readonly type: "EDITED"; readonly body: string }
   /** The effect for this card finished. */
-  | { readonly type: "SETTLED"; readonly key: string; readonly ok: boolean };
+  | { readonly type: "SETTLED"; readonly key: string; readonly ok: boolean }
+  /**
+   * Bring this card forward (a tap on it, or the person naming it): it
+   * moves to the focus position, the order of the rest unchanged. A card
+   * left for later comes back; a decided one does not.
+   */
+  | { readonly type: "FOCUS"; readonly key: string };
+
+function bringForward(state: SequenceState, key: string): SequenceStep {
+  if (state.pending !== null) return idle(state, "BUSY");
+  const index = state.cards.findIndex((one) => one.key === key);
+  const card = state.cards[index];
+  if (card === undefined) return idle(state, "NO_CARD");
+  const outcome = state.outcomes[key];
+  if (outcome !== undefined && outcome !== "LATER") {
+    return idle(state, "MOVED_ON");
+  }
+  const rest = state.cards.filter((_, at) => at !== index);
+  const focus = index < state.focus ? state.focus - 1 : state.focus;
+  const cards = [...rest.slice(0, focus), card, ...rest.slice(focus)];
+  const outcomes = Object.fromEntries(
+    Object.entries(state.outcomes).filter(([one]) => one !== key),
+  );
+  return {
+    state: {
+      ...state,
+      cards,
+      focus,
+      left: false,
+      confirming: null,
+      editing: false,
+      outcomes,
+    },
+    effect: null,
+    note: null,
+  };
+}
 
 /** One event, one typed step. Deterministic; the caller runs the effect. */
 export function stepSequence(
@@ -401,6 +437,7 @@ export function stepSequence(
       note: null,
     };
   }
+  if (event.type === "FOCUS") return bringForward(state, event.key);
   const card = focusedCard(state);
   if (card === null) return idle(state, state.left ? "LEFT" : "NO_CARD");
   if (state.pending !== null) return idle(state, "BUSY");
@@ -563,4 +600,40 @@ export function sameShownMessage(
   current: string | null,
 ): boolean {
   return (shown ?? "").trim() === (current ?? "").trim();
+}
+
+// ---------------------------------------------------------------------------
+// Free-form words, checked by code (Zino, 2026-10-08).
+
+const NEGATION =
+  /\b(?:don'?t|do not|never|not|no|hold(?: off| it| on)?|wait|stop|ignore|skip|cancel|forget|drop|dismiss|later)\b/u;
+const SEND_WISH =
+  /\b(?:send|sent|approve|go ahead|ship|fire (?:it )?off|post|reply|answer|accept|book|yes|ok|okay|do it|go for it|confirm)\b/u;
+const DISMISS_WISH =
+  /\b(?:ignore|dismiss|drop|bin|delete|reject|forget|kill|scrap|discard|don'?t send|do not send|no to)\b/u;
+
+function clausesOf(words: string): readonly string[] {
+  return words
+    .toLowerCase()
+    .replace(/[\u2019]/gu, "'")
+    .split(/[.;!?,]|\b(?:but|and|then|also|except)\b/u)
+    .map((one) => one.trim())
+    .filter((one) => one.length > 0);
+}
+
+/**
+ * Whether the person's own words plainly ask for something to be sent:
+ * some clause wishes a send and says no "don't", "wait" or "ignore". A
+ * model's reading of a send is acted on only when this holds; otherwise
+ * the card is only brought forward to decide by hand.
+ */
+export function wordsAllowSend(words: string): boolean {
+  return clausesOf(words).some(
+    (clause) => SEND_WISH.test(clause) && !NEGATION.test(clause),
+  );
+}
+
+/** Whether the person's own words plainly ask for something to be dropped. */
+export function wordsAllowDismiss(words: string): boolean {
+  return clausesOf(words).some((clause) => DISMISS_WISH.test(clause));
 }

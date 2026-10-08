@@ -1,5 +1,7 @@
 import type { OwnUsage } from "./composition/usage.js";
 import { registerUsageRoutes } from "./http/usage.js";
+import { registerBriefingCommandRoutes } from "./http/briefing-command.js";
+import type { BriefingCommandReader } from "./composition/briefing-command.js";
 import type { MeetingHostRuntime } from "./composition/meeting-host-runtime.js";
 import type { RecallStatusWebhook } from "./composition/recall-bots.js";
 import { registerMeetingHostRoutes } from "./http/meeting-host.js";
@@ -172,6 +174,8 @@ export type QApiModules = {
   readonly namedPhotos?: WorkRoutesDependencies["namedPhotos"] | undefined;
   /** The person's own usage this month (lead 2026-10-03). */
   readonly usage?: OwnUsage | undefined;
+  /** Zino 2026-10-08: the briefing's free-form words, read into card verbs. */
+  readonly briefingCommand?: BriefingCommandReader | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
   // BILLING block (ADR 0034): the plan's rehearsal allowance.
   readonly rehearsalEntitlements?:
@@ -490,6 +494,17 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       daily: modules.daily,
+    });
+  }
+
+  if (
+    modules.briefingCommand !== undefined &&
+    security.resolver !== undefined
+  ) {
+    registerBriefingCommandRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      read: modules.briefingCommand,
     });
   }
 
