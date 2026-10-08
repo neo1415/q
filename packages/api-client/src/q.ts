@@ -13,6 +13,11 @@ import {
   qVoiceDuplexNarrationPath,
   qVoiceDuplexRejoinPath,
   qVoiceDuplexToolPath,
+  qVoiceDuplexHeardPath,
+  qVoiceDuplexSaidPath,
+  QVoiceDuplexHeardResultSchema,
+  type QVoiceDuplexHeard,
+  type QVoiceDuplexSaid,
   qVoiceDuplexUsagePath,
   QVoiceDuplexNarrationResultSchema,
   QVoiceDuplexRejoinResultSchema,
@@ -264,6 +269,49 @@ export function relayQVoiceDuplexTool(
     QVoiceDuplexToolResultSchema,
     { body: input },
   );
+}
+
+/**
+ * VOICE-BRAIN: one finished turn of the person's; the server decides who
+ * answers it and, for a substantive one, returns Q's answer.
+ */
+export function sendQVoiceDuplexHeard(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexHeard,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexHeardPath(voiceSessionId),
+    QVoiceDuplexHeardResultSchema,
+    { body: input },
+  );
+}
+
+/** VOICE-BRAIN: what the voice said in one response, for the transcript. */
+export async function sendQVoiceDuplexSaid(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexSaid,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${qVoiceDuplexSaidPath(voiceSessionId)}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
 }
 
 /** DUPLEX: one response's usage, for the spend cap. */

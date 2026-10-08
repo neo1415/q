@@ -34,6 +34,12 @@ export type DuplexConfig = {
    * CQ_VOICE_REALTIME_SPEED, bounded 0.8-1.2.
    */
   readonly speechSpeed: number;
+  /**
+   * VOICE-BRAIN (founder live 2026-10-08): the server, not the realtime
+   * model, decides who answers each turn; substantive turns always go to
+   * Q's pipeline. On unless CQ_VOICE_REALTIME_ROUTE_TURNS is "off".
+   */
+  readonly routeTurns: boolean;
 };
 
 export const DUPLEX_DEFAULTS: DuplexConfig = {
@@ -47,6 +53,7 @@ export const DUPLEX_DEFAULTS: DuplexConfig = {
   secretTtlSeconds: 60,
   backchannel: true,
   speechSpeed: 0.95,
+  routeTurns: true,
 };
 
 function bounded(
@@ -67,6 +74,7 @@ export function duplexConfigFrom(
 ): DuplexConfig {
   const flag = env.CQ_VOICE_REALTIME?.trim().toLowerCase();
   const backchannel = env.CQ_VOICE_REALTIME_BACKCHANNEL?.trim().toLowerCase();
+  const routeTurns = env.CQ_VOICE_REALTIME_ROUTE_TURNS?.trim().toLowerCase();
   return {
     enabled: flag === "on" || flag === "true" || flag === "1",
     maxSessionMs:
@@ -117,6 +125,11 @@ export function duplexConfigFrom(
       DUPLEX_DEFAULTS.speechSpeed,
       0.8,
       1.2,
+    ),
+    routeTurns: !(
+      routeTurns === "off" ||
+      routeTurns === "false" ||
+      routeTurns === "0"
     ),
     backchannel: !(
       backchannel === "off" ||

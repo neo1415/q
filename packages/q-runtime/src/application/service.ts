@@ -1,5 +1,6 @@
 import { createPostgresQRuntimeRepositories } from "../infrastructure/postgres-q-runtime-repositories.js";
 import { createAppendQRunMessage } from "./append-message.js";
+import { createRecordSpokenExchange } from "./spoken-exchange.js";
 import { createCancelQRun } from "./cancel-run.js";
 import {
   createArchiveQConversation,
@@ -33,6 +34,8 @@ export type QRuntimeService = {
   readonly hideConversationMessage: ReturnType<
     typeof createHideQConversationMessage
   >;
+  /** VOICE-BRAIN: what the voice said without Q, into the conversation. */
+  readonly recordSpokenExchange: ReturnType<typeof createRecordSpokenExchange>;
 };
 
 export type QRuntimeServiceOptions = Omit<
@@ -58,5 +61,6 @@ export function createQRuntimeService(
     getConversation: createGetQConversation(dependencies),
     archiveConversation: createArchiveQConversation(dependencies),
     hideConversationMessage: createHideQConversationMessage(dependencies),
+    recordSpokenExchange: createRecordSpokenExchange(dependencies),
   };
 }

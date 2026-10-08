@@ -5,10 +5,15 @@ import {
   rejoinQVoiceDuplex,
   relayQVoiceDuplexTool,
   reportQVoiceDuplexUsage,
+  sendQVoiceDuplexHeard,
+  sendQVoiceDuplexSaid,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   QVoiceDuplexEndSchema,
+  QVoiceDuplexHeardSchema,
+  QVoiceDuplexSaidSchema,
+  type QVoiceDuplexHeardResult,
   QVoiceDuplexRejoinSchema,
   QVoiceDuplexToolCallSchema,
   QVoiceDuplexUsageReportSchema,
@@ -49,6 +54,40 @@ export async function relayDuplexToolAction(
     return await relayQVoiceDuplexTool(session, id.data, call.data);
   } catch {
     return null;
+  }
+}
+
+/** VOICE-BRAIN: a finished turn of theirs; the server decides who answers. */
+export async function sendDuplexHeardAction(
+  rawVoiceSessionId: unknown,
+  rawHeard: unknown,
+): Promise<QVoiceDuplexHeardResult | null> {
+  const id = UuidSchema.safeParse(rawVoiceSessionId);
+  const heard = QVoiceDuplexHeardSchema.safeParse(rawHeard);
+  if (!id.success || !heard.success) return null;
+  const session = await sessionFor();
+  if (session === null) return null;
+  try {
+    return await sendQVoiceDuplexHeard(session, id.data, heard.data);
+  } catch {
+    return null;
+  }
+}
+
+/** VOICE-BRAIN: what the voice said, for the line's transcript. */
+export async function sendDuplexSaidAction(
+  rawVoiceSessionId: unknown,
+  rawSaid: unknown,
+): Promise<void> {
+  const id = UuidSchema.safeParse(rawVoiceSessionId);
+  const said = QVoiceDuplexSaidSchema.safeParse(rawSaid);
+  if (!id.success || !said.success) return;
+  const session = await sessionFor();
+  if (session === null) return;
+  try {
+    await sendQVoiceDuplexSaid(session, id.data, said.data);
+  } catch {
+    // The transcript is kept beside the line, never in its way.
   }
 }
 

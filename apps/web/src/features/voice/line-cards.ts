@@ -74,6 +74,11 @@ export function setStandingNote(note: string | null): void {
   standing = note;
 }
 
+/** VOICE-BRAIN: a decision card is in focus now (its reply is the card's). */
+export function cardInFocus(): boolean {
+  return decider !== null && standing !== null;
+}
+
 /** Whether a line that can take notes is open now. */
 export function lineTakesNotes(): boolean {
   return listeners.size > 0;

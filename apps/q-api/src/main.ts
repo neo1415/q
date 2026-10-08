@@ -108,6 +108,8 @@ import { createDuplexBroker } from "./voice/duplex/broker.js";
 import { duplexConfigFrom } from "./voice/duplex/config.js";
 import { createMemoryListeningStore } from "./voice/duplex/listening.js";
 import { createPostgresDuplexSpend } from "./voice/duplex/spend.js";
+import { createPostgresDuplexTranscriptStore } from "./voice/duplex/transcript.js";
+import { ownCompanyAskerNote } from "./composition/own-company-asker.js";
 import {
   createDocumentStudioPort,
   createDocumentsModule,
@@ -3596,6 +3598,8 @@ const qIntelligence = composeQIntelligence({
         ? ""
         : `, ${row.business_title === null ? "of" : `${row.business_title.slice(0, 60)} of`} their own company ${company}${row.website_url === null ? "" : ` (${row.website_url.slice(0, 200)})`}`,
       ".",
+      // "Portfolio" from a founder means their own company (live 2026-10-08).
+      company.length === 0 ? "" : ownCompanyAskerNote(company),
       // A founder who has no deck yet (often one who put it off until
       // setup was done): Q offers once to make it, never presses -- on a
       // conversation's first answer only (live 2026-10-02: on every turn).
@@ -5368,6 +5372,18 @@ const duplexBroker =
         spend: createPostgresDuplexSpend(database.sql),
         // BACKCHANNEL: the person's listening level, through the Write Gate.
         listening: createMemoryListeningStore(memoryService),
+        // VOICE-BRAIN: both sides of the line, with who answered each turn;
+        // a turn the voice answered alone goes into the conversation too.
+        transcript: createPostgresDuplexTranscriptStore({
+          sql: database.sql,
+          mirror: ({ actor, conversationId, messages }) =>
+            qRuntime.recordSpokenExchange({
+              actor,
+              conversationId,
+              messages,
+              correlationId: CorrelationIdSchema.parse(createCorrelationId()),
+            }),
+        }),
         logger,
       })
     : undefined;

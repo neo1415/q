@@ -778,6 +778,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // Q room R7: the line's waiting lines (silence ladder), read by its owner.
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_NARRATION_PATH":
     Q_TRANSPORT,
+  // VOICE-BRAIN (2026-10-08): the person's finished turn (the server runs
+  // Q for it) and what the voice said (the line's transcript).
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_HEARD_PATH": Q_TRANSPORT,
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_SAID_PATH": Q_TRANSPORT,
   "q-api/voice/think.ts POST dependencies.path": Q_TRANSPORT,
   "q-api/voice/think.ts POST `${dependencies.path}/chat/completions`":
     Q_TRANSPORT,
@@ -1054,6 +1058,8 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_END_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_REJOIN_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_NARRATION_PATH",
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_HEARD_PATH",
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_SAID_PATH",
 ]);
 
 /**
