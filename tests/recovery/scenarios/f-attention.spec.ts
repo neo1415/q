@@ -32,11 +32,11 @@ test("Scenario F: what needs my attention names what is waiting, from the attent
     {
       name: "attention",
       when: { user: "needs my attention", afterTool: null },
-      reply: { toolCalls: [{ name: "read_attention", arguments: {} }] },
+      reply: { toolCalls: [{ name: "what_needs_me", arguments: {} }] },
     },
     {
       name: "after-attention",
-      when: { afterTool: "read_attention" },
+      when: { afterTool: "what_needs_me" },
       reply: answer("Two things need you."),
     },
   ]);
@@ -45,7 +45,9 @@ test("Scenario F: what needs my attention names what is waiting, from the attent
   // The model was offered the attention tool, and its report reached it.
   expect(
     seen.some((request) =>
-      (request.tools ?? []).some((tool) => /attention/u.test(tool)),
+      (request.tools ?? []).some((tool) =>
+        /what_needs_me|attention/u.test(tool),
+      ),
     ),
   ).toBe(true);
   const reportText = seen.map((request) => request.input ?? "").join("\n");

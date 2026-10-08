@@ -173,7 +173,8 @@ test("Scenario A: Capital, the Readiness tab, scroll to risks, explain the secon
   await ask(page, "scroll to the risks");
   await expectReceipt(page, { target: "section.risks", status: "DONE" });
   const risks = page.locator('[data-q-control="section.risks"]');
-  await expect(risks).toBeInViewport();
+  // QControl wraps with display:contents (no box): the section is its first child.
+  await expect(risks.locator(":scope > *").first()).toBeInViewport();
 
   // "The second one" is whatever is second on screen: the model must have
   // been shown it (B6). Its title is read from the page, not assumed.

@@ -104,35 +104,82 @@ export async function expectLastTurnTerminal(
   page: Page,
   allowed: readonly QTurnDisposition[] = TERMINAL,
   timeout = 120_000,
-): Promise<QTurnDisposition> {
+): Promise<QTurnDisposition | null> {
+  // Soft: a missing disposition is reported, and the test still goes on to
+  // check the real effects (URL, tab, section, server state), so one run
+  // shows everything that is wrong rather than the first thing.
+  if ((await turns(page).count()) === 0) {
+    await page.waitForTimeout(3_000);
+    if ((await turns(page).count()) === 0) {
+      expect
+        .soft(0, "no rendered turn carries data-q-turn-id (G-R3)")
+        .toBeGreaterThan(0);
+      return null;
+    }
+  }
   const last = turns(page).last();
-  await expect(last).toHaveAttribute(
+  await expect
+    .soft(last)
+    .toHaveAttribute(
+      "data-q-disposition",
+      new RegExp(`^(${allowed.join("|")})$`, "u"),
+      {
+        timeout,
+      },
+    );
+  return (await last.getAttribute(
     "data-q-disposition",
-    new RegExp(`^(${allowed.join("|")})$`, "u"),
-    { timeout },
-  );
-  return (await last.getAttribute("data-q-disposition")) as QTurnDisposition;
-}
-
-/** Records every UI act receipt the page reports (G-R1). Call before goto. */
-export async function recordReceipts(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const own = window as Window & { __cqReceipts?: unknown[] };
-    own.__cqReceipts = [];
-    window.addEventListener("cq:ui-act-receipt", (event) => {
-      own.__cqReceipts?.push((event as CustomEvent).detail);
-    });
-  });
+  )) as QTurnDisposition | null;
 }
 
 export type SeenReceipt = QUiActReceipt & { act?: string; target?: string };
 
-export async function receipts(page: Page): Promise<SeenReceipt[]> {
-  return page.evaluate(
-    () =>
-      ((window as Window & { __cqReceipts?: unknown[] }).__cqReceipts ??
-        []) as never,
-  );
+const seen = new WeakMap<Page, SeenReceipt[]>();
+
+/**
+ * Records every UI act receipt the page reports to the server. Workstream C
+ * reports them as a batch POST to /api/q-ui-acts ({reports: [{intent,
+ * receipt}]}, apps/web/src/features/q/control/receipt-reporter.ts), so the
+ * suite reads the same body the server receives. A receipt is evidence the
+ * product believes it acted; every test also checks the effect itself.
+ */
+export async function recordReceipts(page: Page): Promise<void> {
+  const list: SeenReceipt[] = [];
+  seen.set(page, list);
+  page.on("request", (request) => {
+    if (
+      request.method() !== "POST" ||
+      !request.url().includes("/api/q-ui-acts")
+    )
+      return;
+    try {
+      const body = JSON.parse(request.postData() ?? "{}") as {
+        reports?: Array<{
+          intent?: { act?: string; target?: string };
+          receipt?: QUiActReceipt;
+        }>;
+      };
+      for (const report of body.reports ?? []) {
+        if (report.receipt === undefined) continue;
+        list.push({
+          ...report.receipt,
+          ...(report.intent?.act === undefined
+            ? {}
+            : { act: report.intent.act }),
+          ...(report.intent?.target === undefined
+            ? {}
+            : { target: report.intent.target }),
+        });
+      }
+    } catch {
+      // Not JSON: not a receipt batch.
+    }
+  });
+  await Promise.resolve();
+}
+
+export function receipts(page: Page): Promise<SeenReceipt[]> {
+  return Promise.resolve([...(seen.get(page) ?? [])]);
 }
 
 export async function expectReceipt(

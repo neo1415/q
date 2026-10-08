@@ -156,6 +156,11 @@ start_one() {
   case "$1" in
     db)
       ensure_docker
+      # Containers restart with the daemon; Postgres needs a moment after that.
+      for _ in $(seq 1 120); do
+        docker exec supabase_db_capital-q pg_isready -U postgres >/dev/null 2>&1 && break
+        sleep 1
+      done
       # The containers survive in docker; storage and realtime may have been left stopped.
       (cd "$ROOT" && npx supabase status >/dev/null 2>&1) || (cd "$ROOT" && npx supabase start -x studio,imgproxy,vector,logflare,edge-runtime,supavisor)
       for c in supabase_storage_capital-q supabase_realtime_capital-q; do

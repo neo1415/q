@@ -107,6 +107,10 @@ function view(body) {
     instructions:
       typeof body.instructions === "string" ? body.instructions : "",
     lastUser: users.at(-1) ?? "",
+    // The person's words may sit in their own user message, apart from the
+    // template (B spotlights untrusted input), so `user` reads every user
+    // message. Tests use phrases unique to the turn they script.
+    usersText: users.join("\n"),
     // Everything the model would read, tool results included: the Context
     // Firewall tests look for private words anywhere in it.
     allText: [
@@ -128,7 +132,7 @@ function matches(rule, seen) {
   const when = rule.when ?? {};
   if (
     when.user !== undefined &&
-    !new RegExp(when.user, "iu").test(seen.lastUser)
+    !new RegExp(when.user, "iu").test(seen.usersText)
   )
     return false;
   if (
