@@ -518,7 +518,7 @@ export function CompanyProfileView({
                   "Not shared yet"
                 )}
               </StripCell>
-              <StripCell term="Where">
+              <StripCell term="Location">
                 {profile.headquartersCity ??
                   countryLabel(profile.headquartersCountry) ??
                   "Not declared"}
