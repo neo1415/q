@@ -302,7 +302,7 @@ describe("seeded company search (2026-10-08)", () => {
         sent.push([...strings]);
         return {};
       };
-      companySearchJoins(sql as never, parsed);
+      void companySearchJoins(sql as never, parsed);
       for (const strings of sent) {
         expect(strings.every((s) => typeof s === "string")).toBe(true);
       }
