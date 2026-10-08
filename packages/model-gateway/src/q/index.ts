@@ -617,6 +617,13 @@ export function screenActsNote(facts: readonly string[]): ModelMessage | null {
 }
 
 /**
+ * G-D3: what Q says when the only thing to say is the change it prepared;
+ * the card (the Approval Engine's) carries the detail. Prepared, never done.
+ */
+export const PREPARED_FOR_APPROVAL_LINE =
+  "I've prepared that for your approval. The details are on the card; nothing happens until you approve it.";
+
+/**
  * C's follow-up: when Q's newest act or move did not land, the answer
  * says so first, in code's words, once -- whatever the model writes. The
  * newest receipt decides (a later DONE supersedes an earlier failure); a
@@ -4234,7 +4241,7 @@ export function createModelGatewayQAnswer(
             "a request had nothing done and nothing said; Q says it could not",
           );
         }
-        const content = (
+        let content = (
           gapsSaid !== null
             ? [...(approvalLine === null ? [] : [approvalLine]), gapsSaid.line]
             : [
@@ -4278,7 +4285,34 @@ export function createModelGatewayQAnswer(
           .join("\n\n")
           .slice(0, ANSWER_LIMIT_CHARS)
           .trim();
+        // RECOVERY G-D3: a proposal prepared this turn is the answer even
+        // when every sentence about it was Capital Q's to say and went
+        // ("I've prepared that reminder for you to approve." failed the
+        // turn and lost the card). Prepared, never done: the card waits.
+        const proposalPrepared =
+          preparedByTool ||
+          toolCalls.some((call) => {
+            const kind = offeredByName.get(call.providerName)?.classification;
+            return (
+              call.status === "SUCCEEDED" &&
+              call.providerName.startsWith("propose_") &&
+              kind !== undefined &&
+              kind !== "READ_ONLY" &&
+              kind !== "ANALYTICAL"
+            );
+          });
+        if (content.length === 0 && proposalPrepared) {
+          logger?.info(
+            { qRunId: request.runId },
+            "an answer emptied by the status guards kept its prepared change",
+          );
+          content = PREPARED_FOR_APPROVAL_LINE;
+        }
         if (content.length === 0 && spoken.removed === 0) {
+          logger?.warn(
+            { qRunId: request.runId },
+            "an answer had nothing left to say after the guards; the turn failed",
+          );
           return {
             kind: "FAILED",
             diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE",
