@@ -9,9 +9,9 @@ import type {
 
 import {
   ANSWER_AUDIO_WATCHDOG_MS,
+  ANSWER_INSTRUCTIONS,
   ANSWER_NOT_SPOKEN_NOTICE,
   BARGE_CONFIRM_MS,
-  DELIVERY_REPAIR,
   DuplexLine,
   IGNORED_NOTICE,
   THINKING_WATCHDOG_MS,
@@ -347,14 +347,14 @@ describe("A4: every accepted turn ends in one disposition", () => {
     expect(h.outcomes.at(-1)).toMatchObject({
       disposition: "FAILED",
       failure: "RESULT_DELIVERY",
-      notice: DELIVERY_REPAIR,
+      notice: ANSWER_NOT_SPOKEN_NOTICE,
     });
     // The repair line is out of band: it never enters the conversation.
     expect(h.channel().creates().at(-1)).toMatchObject({
       response: { conversation: "none" },
     });
     expect(JSON.stringify(h.channel().creates().at(-1))).toContain(
-      "lost my words",
+      "Three investors fit.",
     );
   });
 
@@ -648,6 +648,8 @@ describe("A9 (C-09) and the sideband call id", () => {
       streams: [{} as MediaStream],
       receiver: {},
     } as unknown as RTCTrackEvent);
+    // Q's opener: a response the line asked for.
+    h.line.speakFirst("Hi.");
     qSpeaks(h);
     expect(h.line.outputLevel()).toBeGreaterThan(0);
     h.line.setMuted(true);
@@ -670,5 +672,48 @@ describe("A10 (C-17): natural delivery on the line", () => {
     expect(opening).not.toMatch(/word for word|exactly this/i);
     expect(opening).toContain("Hi Ada. Three investors fit your raise.");
     expect(opening).toContain("Keep every name, fact");
+  });
+});
+
+describe("G-D20 and INC-1 (b): no free model speech, one line per answer", () => {
+  it("hands the answer over with explicit instructions, never a bare response", async () => {
+    const h = harness();
+    await h.line.open();
+    say(h, "item_1", "Who fits?");
+    await settle();
+    const creates = h.channel().creates();
+    expect(creates).toHaveLength(1);
+    expect(creates[0]).toMatchObject({
+      response: { instructions: ANSWER_INSTRUCTIONS, tool_choice: "none" },
+    });
+    expect(ANSWER_INSTRUCTIONS).toMatch(/^Say this to the person/u);
+    expect(ANSWER_INSTRUCTIONS).toMatch(/never 'give me a moment'/u);
+  });
+
+  it("cuts a response nobody asked for: never heard, shown or kept as said", async () => {
+    const h = harness();
+    await h.line.open();
+    say(h, "item_1", "Who fits?");
+    await settle();
+    qSpeaks(h, "resp_a", "Three investors fit.");
+    const lines = () =>
+      h.events.onLine.mock.calls.filter(([role]) => role === "q").length;
+    expect(lines()).toBe(1);
+    for (const id of ["resp_dup_1", "resp_dup_2"]) {
+      h.channel().emit({ type: "response.created", response: { id } });
+      h.channel().emit({
+        type: "response.output_audio_transcript.done",
+        response_id: id,
+        transcript: "Here are the three companies.",
+      });
+    }
+    expect(lines()).toBe(1);
+    expect(h.relays.said).toHaveBeenCalledTimes(1);
+    expect(h.channel().sent).toContainEqual(
+      expect.objectContaining({
+        type: "response.cancel",
+        response_id: "resp_dup_1",
+      }),
+    );
   });
 });

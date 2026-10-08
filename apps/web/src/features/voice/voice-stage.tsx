@@ -304,7 +304,11 @@ export function VoiceStage({
             </span>
           ) : null}
           {notice !== null ? (
-            <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+            >
               <span className="cq-body text-(--cq-text-primary)">{notice}</span>
               <button
                 type="button"
