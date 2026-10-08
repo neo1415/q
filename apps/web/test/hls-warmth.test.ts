@@ -19,7 +19,7 @@ type Config = {
 };
 const created: Config[] = [];
 
-vi.mock("hls.js/light", () => {
+vi.mock("hls.js", () => {
   class FakeHls {
     static isSupported() {
       return true;

@@ -54,7 +54,7 @@ export function PitchWarmup() {
     const run = async () => {
       markWarmed(Date.now());
       // The stream engine's code too, so Discover's first attach is local.
-      void import("hls.js/light").catch(() => undefined);
+      void import("hls.js").catch(() => undefined);
       const page = await loadSlatePageAction(null, null);
       if (!page.ok || controller.signal.aborted) return;
       for (const item of page.value.items.slice(0, FIRST)) {
