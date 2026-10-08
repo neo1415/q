@@ -32,7 +32,7 @@ import type { JobSourceKind, Owner, WorkforceStore } from "./store.js";
  * the review still runs and its verdict still binds.
  */
 
-export const DRAFT_REVIEW_PROMPT_VERSION = "draft-review/v2" as const;
+export const DRAFT_REVIEW_PROMPT_VERSION = "draft-review/v3" as const;
 
 export type OutwardSource = {
   readonly kind: Exclude<JobSourceKind, "JOB">;
@@ -77,7 +77,19 @@ export type OutwardVerdict =
       readonly feedback: string;
       readonly jobId: string | null;
       readonly draftId: string | null;
+      /**
+       * The body is the best code-clean draft, just under the bar: the
+       * caller may offer it as the person's card (never send it). Only
+       * when the caller asked for near misses.
+       */
+      readonly nearMiss?: true | undefined;
     };
+
+/**
+ * Tensorgate, 8 Oct: a code-clean draft this many points under the bar
+ * (out of 100; the bar is 75) is offered to the person rather than lost.
+ */
+export const NEAR_MISS_POINTS = 10;
 
 /**
  * A message's job, writer and reviewer runs, filed before its first draft
@@ -111,6 +123,8 @@ export type OutwardReview = {
         { readonly jobId: string; readonly parentRunId: string } | undefined;
       /** Filed already, before the first draft was written. */
       readonly prepared?: PreparedDraft | null | undefined;
+      /** Hand back a near miss (HELD, `nearMiss`) for the person's card. */
+      readonly nearMiss?: boolean | undefined;
     },
   ) => Promise<OutwardVerdict>;
   /** A prepared message the writer had nothing honest for: its runs end. */
@@ -263,13 +277,22 @@ export function createOutwardReview(dependencies: {
             }),
           consistency: (body) => threadProblems(body, asks),
           threadRule: asks.length > 0,
+          // The writer is told what their latest message left open, in
+          // code's fixed words, beside the fixes (Tensorgate: a redraft
+          // asked Zino the very question Zino had asked).
           redraft: (body, feedback) =>
             dependencies.models.redraft(who, writerTrace, {
               ...frame,
               draft: body.slice(0, 4_000),
-              feedback: feedback.slice(0, 2_000),
+              feedback: (asks.length === 0
+                ? feedback
+                : `${feedback}\nWhat their latest message left open (code): ${asksLine(asks)} Respond to it; never ask them what they already asked or offered.`
+              ).slice(0, 2_000),
             }),
           recheck: options?.recheck,
+          ...(options?.nearMiss === true
+            ? { nearMissPoints: NEAR_MISS_POINTS }
+            : {}),
           ...(filed === null || store === undefined
             ? {}
             : {
@@ -284,6 +307,21 @@ export function createOutwardReview(dependencies: {
                     body: one.body,
                   }),
                 onGrade: async (draftId, grade) => {
+                  logger?.info(
+                    {
+                      jobId: filed.jobId,
+                      draftId,
+                      score: grade.score,
+                      threshold: policy.threshold,
+                      passed: grade.passed,
+                      failedIntegrity: grade.failedIntegrity,
+                      criteria: grade.criteria.map(
+                        (one) => `${one.criterion}:${String(one.score)}`,
+                      ),
+                      threadProblems: grade.threadProblems?.length ?? 0,
+                    },
+                    "workforce draft graded",
+                  );
                   if (draftId === null) return;
                   await store.addGrade(who, {
                     jobId: filed.jobId,
@@ -358,6 +396,7 @@ export function createOutwardReview(dependencies: {
             feedback: outcome.grade?.feedback ?? "",
             jobId,
             draftId: outcome.draftId,
+            ...(outcome.nearMiss === true ? { nearMiss: true as const } : {}),
           };
     },
 

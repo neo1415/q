@@ -112,8 +112,10 @@ import { ERRAND_REPLY_V1 } from "./tasks/errand-reply.v1.js";
 import {
   DRAFT_REDRAFT_V1,
   DRAFT_REDRAFT_V2,
+  DRAFT_REDRAFT_V3,
   DRAFT_REVIEW_V1,
   DRAFT_REVIEW_V2,
+  DRAFT_REVIEW_V3,
   JOB_PLAN_V1,
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
@@ -453,8 +455,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     ERRAND_REPLY_V1,
     DRAFT_REVIEW_V1,
     DRAFT_REVIEW_V2,
+    DRAFT_REVIEW_V3,
     DRAFT_REDRAFT_V1,
     DRAFT_REDRAFT_V2,
+    DRAFT_REDRAFT_V3,
     REPLY_READER_V1,
     JOB_PLAN_V1,
     ONBOARDING_MOVE_READER_V1,

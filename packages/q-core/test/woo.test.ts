@@ -87,7 +87,7 @@ describe("the prompts carry it", () => {
 
   it("the redraft, the investor's chat and the founder's stand-in are new versions", () => {
     const redraft = registry.getActive("DRAFT_REDRAFT").definition;
-    expect(redraft.version).toBe(2);
+    expect(redraft.version).toBe(3);
     expect(redraft.template).toContain(WOO_GUIDANCE);
     const converse = registry.getActive("WORK_CONVERSE").definition;
     expect(converse.version).toBe(2);

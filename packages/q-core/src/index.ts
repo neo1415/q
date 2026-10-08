@@ -1251,8 +1251,10 @@ export {
 export {
   DRAFT_REDRAFT_V1,
   DRAFT_REDRAFT_V2,
+  DRAFT_REDRAFT_V3,
   DRAFT_REVIEW_V1,
   DRAFT_REVIEW_V2,
+  DRAFT_REVIEW_V3,
   JOB_PLAN_V1,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
