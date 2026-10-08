@@ -24,11 +24,36 @@ import {
  * DOM order is the rank order the tiles were placed in.
  */
 
+/** A pointer resting this long on a tile is intent, not a pass across it. */
+const HOVER_INTENT_MS = 120;
+
+function intentHandlers(onIntent: () => void) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const cancel = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+  return {
+    onPointerEnter: (event: React.PointerEvent) => {
+      if (event.pointerType !== "mouse") return;
+      cancel();
+      timer = setTimeout(onIntent, HOVER_INTENT_MS);
+    },
+    onPointerLeave: cancel,
+    onPointerDown: () => {
+      cancel();
+      onIntent();
+    },
+    onFocus: onIntent,
+  };
+}
+
 export function ExploreTile({
   tile,
   poster,
   sectorLabels,
   onOpen,
+  onIntent,
   showWhy = true,
   style,
   index,
@@ -37,6 +62,11 @@ export function ExploreTile({
   readonly poster: string | null;
   readonly sectorLabels: ReadonlyMap<string, string>;
   readonly onOpen: () => void;
+  /**
+   * The person is about to open this pitch (a resting pointer, a press, or
+   * keyboard focus): its first seconds are fetched before the click.
+   */
+  readonly onIntent?: (() => void) | undefined;
   readonly showWhy?: boolean;
   readonly style?: React.CSSProperties | undefined;
   readonly index: number;
@@ -55,6 +85,7 @@ export function ExploreTile({
       <button
         type="button"
         onClick={onOpen}
+        {...(onIntent === undefined ? {} : intentHandlers(onIntent))}
         className="cq-explore-tile group"
         aria-label={`${tile.canonicalName}: ${hook}. ${meta}${duration === null ? "" : `. ${duration}`}. ${reason.text}`}
       >
@@ -150,6 +181,7 @@ export function ExploreGrid({
   columns,
   sectorLabels,
   onOpen,
+  onIntent,
   label = "Pitches",
 }: {
   readonly tiles: readonly ExploreTileDto[];
@@ -158,6 +190,7 @@ export function ExploreGrid({
   readonly columns: number | null;
   readonly sectorLabels: ReadonlyMap<string, string>;
   readonly onOpen: (index: number) => void;
+  readonly onIntent?: ((index: number) => void) | undefined;
   readonly label?: string;
 }) {
   const ratios = tiles.map((tile, index) =>
@@ -181,6 +214,7 @@ export function ExploreGrid({
               poster={posters[tile.pitch.mediaAssetId] ?? null}
               sectorLabels={sectorLabels}
               onOpen={() => onOpen(index)}
+              onIntent={onIntent && (() => onIntent(index))}
               style={responsive.cells[index]}
             />
           ))}
@@ -213,6 +247,7 @@ export function ExploreGrid({
               poster={posters[tile.pitch.mediaAssetId] ?? null}
               sectorLabels={sectorLabels}
               onOpen={() => onOpen(placement.index)}
+              onIntent={onIntent && (() => onIntent(placement.index))}
               style={{
                 ...placementStyle(placement, columns),
               }}

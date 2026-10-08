@@ -27,6 +27,7 @@ import {
   loadExploreRelatedAction,
   type ExploreActionResult,
 } from "./explore-actions";
+import { useIntentWarmup } from "../discover/player/use-intent-warmup";
 import { ExploreFeed, type ExploreFeedItem } from "./explore-feed";
 import { ExploreGrid, ExploreGridSkeleton } from "./explore-grid";
 import {
@@ -363,6 +364,8 @@ export function ExploreScreen({
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // A tile the person is about to open is warmed before the click.
+  const warm = useIntentWarmup(source.authorize);
   const open = useCallback((list: readonly ExploreTileDto[], index: number) => {
     const anchor = list[index];
     if (anchor === undefined) return;
@@ -608,6 +611,11 @@ export function ExploreScreen({
             columns={columns}
             sectorLabels={sectorLabels}
             onOpen={(index) => open(shown, index)}
+            onIntent={(index) => {
+              const tile = shown[index];
+              if (tile !== undefined)
+                warm(tile.companyId, tile.pitch.mediaAssetId);
+            }}
           />
           {cursor === null ? null : (
             <div

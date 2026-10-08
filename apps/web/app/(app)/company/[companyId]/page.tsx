@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import {
   getCompanyAssumptions,
@@ -16,7 +17,7 @@ import {
   RelationshipStateV2Schema,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
-import { EmptyState } from "@capital-q/ui/states";
+import { EmptyState, Skeleton } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
 import {
@@ -29,7 +30,12 @@ import {
   type ProfileTab,
 } from "@/features/company/company-profile-view";
 import { apiSession } from "@/features/q/context";
-import { QPageState, QSection } from "@/features/q/q-section";
+import { Fold } from "@/features/company/overview-sections";
+import {
+  ProfileTabQSection,
+  ProfileTabs,
+} from "@/features/company/profile-tabs";
+import { QSection } from "@/features/q/q-section";
 import { QPageSubject } from "@/features/q/q-subject";
 import { ArrowLeft, ICON_SIZE } from "@capital-q/ui/icons";
 
@@ -131,21 +137,25 @@ export default async function CompanyPage({
   );
   const tab: ProfileTab =
     profile.overview === null ? "elevator" : (requested ?? "overview");
-  // Each tab's read is the API's, for this reader; only the open tab (and
-  // the deck, whose team facts the Team tab shows) is fetched.
-  const [dataRoom, deck, assumptions] = await Promise.all([
+  // Each tab's read is the API's, for this reader. Every tab arrives with
+  // the page so switching tabs happens in place (ProfileTabs): the data
+  // room is read now (its size is in the tab bar); the deck (whose team
+  // facts the Team tab shows) and the assumptions stream into their own
+  // panels and never hold the page.
+  const deck =
     profile.overview !== null
-      ? getCompanyDataRoom(session, profile.companyId).catch(() => null)
-      : null,
-    profile.overview !== null && (tab === "deck" || tab === "team")
       ? getCompanyDeck(session, profile.companyId).catch(() => null)
-      : null,
-    // Q.07: the investor's assumptions to test, built by the API from what
-    // this investor may see (confirmed readings only); never for others.
-    investor && profile.overview !== null && tab === "overview"
+      : null;
+  // Q.07: the investor's assumptions to test, built by the API from what
+  // this investor may see (confirmed readings only); never for others.
+  const assumptions =
+    investor && profile.overview !== null
       ? getCompanyAssumptions(session, profile.companyId).catch(() => null)
-      : null,
-  ]);
+      : null;
+  const dataRoom =
+    profile.overview !== null
+      ? await getCompanyDataRoom(session, profile.companyId).catch(() => null)
+      : null;
   const questionsRoute: QuestionsRoute =
     relationship === null || !isMatchedRelationshipState(relationship.state)
       ? { kind: "NOT_CONNECTED" }
@@ -155,86 +165,125 @@ export default async function CompanyPage({
 
   return (
     <PageContainer className="flex flex-col gap-6">
-      <QPageSubject
-        subject={{
-          kind: "COMPANY",
-          companyId: profile.companyId,
-          label: profile.canonicalName,
-          scope: "network_visible",
-        }}
-      />
-      {/* Q room R1: the profile, its open tab and the data room's size. */}
-      <QPageState
-        tab={tab}
+      {/* Q room R1: the profile, its open tab (said by ProfileTabs, as it
+          changes) and the data room's size. */}
+      <ProfileTabs
+        base={`/company/${encodeURIComponent(profile.companyId)}`}
+        initial={tab}
+        available={
+          profile.overview === null
+            ? ["elevator"]
+            : ["overview", "elevator", "dataroom", "deck", "team"]
+        }
         focus={{ kind: "COMPANY", id: profile.companyId }}
-      />
-      <QSection
-        id="profile"
-        kind="COMPANY_PROFILE"
-        refs={[{ kind: "COMPANY", id: profile.companyId }]}
-        total={1}
-        label={`${profile.canonicalName} profile`}
-      />
-      {dataRoom === null ? null : (
+      >
+        <QPageSubject
+          subject={{
+            kind: "COMPANY",
+            companyId: profile.companyId,
+            label: profile.canonicalName,
+            scope: "network_visible",
+          }}
+        />
         <QSection
-          id="data-room"
-          kind="DATA_ROOM"
-          refs={
-            dataRoom.viewer === "OWNER"
-              ? dataRoom.documents.slice(0, 12).map((document) => ({
-                  kind: "UPLOADED_DOCUMENT" as const,
-                  id: document.documentId,
-                }))
-              : []
+          id="profile"
+          kind="COMPANY_PROFILE"
+          refs={[{ kind: "COMPANY", id: profile.companyId }]}
+          total={1}
+          label={`${profile.canonicalName} profile`}
+        />
+        {dataRoom === null ? null : (
+          <ProfileTabQSection
+            id="data-room"
+            kind="DATA_ROOM"
+            refs={
+              dataRoom.viewer === "OWNER"
+                ? dataRoom.documents.slice(0, 12).map((document) => ({
+                    kind: "UPLOADED_DOCUMENT" as const,
+                    id: document.documentId,
+                  }))
+                : []
+            }
+            total={dataRoom.documents.length}
+            labelOn="dataroom"
+            label={`data room, ${String(dataRoom.documents.length)} files`}
+          />
+        )}
+        <BackToDiscover />
+        <CompanyProfileView
+          profile={profile}
+          tab={tab}
+          interest={interest?.interest ?? null}
+          connected={isMatchedRelationshipState(
+            standing?.relationship?.state ?? "",
+          )}
+          sectorLabels={sectorLabels}
+          diligence={diligence}
+          dataRoom={dataRoom}
+          deck={deck}
+          previewAsInvestor={query?.as === "investor"}
+          overviewStreamed={
+            assumptions === null ? null : (
+              <Suspense fallback={<AssumptionsFoldLoading />}>
+                <AssumptionsFold
+                  assumptions={assumptions}
+                  companyName={profile.canonicalName}
+                  route={questionsRoute}
+                />
+              </Suspense>
+            )
           }
-          total={dataRoom.documents.length}
-          label={
-            tab === "dataroom"
-              ? `data room, ${String(dataRoom.documents.length)} files`
-              : undefined
+          relationshipState={
+            RelationshipStateV2Schema.safeParse(standing?.relationship?.state)
+              .data ?? null
           }
         />
-      )}
-      <BackToDiscover />
-      <CompanyProfileView
-        profile={profile}
-        tab={tab}
-        interest={interest?.interest ?? null}
-        connected={isMatchedRelationshipState(
-          standing?.relationship?.state ?? "",
-        )}
-        sectorLabels={sectorLabels}
-        diligence={diligence}
-        dataRoom={dataRoom}
-        deck={deck}
-        previewAsInvestor={query?.as === "investor"}
-        overviewExtraSummary={
-          assumptions === null
-            ? undefined
-            : [
-                `${String(assumptions.assumptions.length)} to test`,
-                assumptions.counts.unknown > 0
-                  ? `${String(assumptions.counts.unknown)} not known yet`
-                  : null,
-              ]
-                .filter((part) => part !== null)
-                .join(" · ")
-        }
-        overviewExtra={
-          assumptions === null ? null : (
-            <AssumptionsSection
-              board={assumptions}
-              companyName={profile.canonicalName}
-              route={questionsRoute}
-            />
-          )
-        }
-        relationshipState={
-          RelationshipStateV2Schema.safeParse(standing?.relationship?.state)
-            .data ?? null
-        }
-      />
+      </ProfileTabs>
     </PageContainer>
+  );
+}
+
+/** Q.07's fold: the investor's assumptions to test, streamed in. */
+async function AssumptionsFold({
+  assumptions,
+  companyName,
+  route,
+}: {
+  readonly assumptions: Promise<Awaited<
+    ReturnType<typeof getCompanyAssumptions>
+  > | null>;
+  readonly companyName: string;
+  readonly route: QuestionsRoute;
+}) {
+  const board = await assumptions;
+  if (board === null) return null;
+  return (
+    <Fold
+      id="company-assumptions"
+      title="Assumptions to test"
+      summary={[
+        `${String(board.assumptions.length)} to test`,
+        board.counts.unknown > 0
+          ? `${String(board.counts.unknown)} not known yet`
+          : null,
+      ]
+        .filter((part) => part !== null)
+        .join(" · ")}
+    >
+      <AssumptionsSection
+        board={board}
+        companyName={companyName}
+        route={route}
+      />
+    </Fold>
+  );
+}
+
+function AssumptionsFoldLoading() {
+  return (
+    <div className="border-b border-(--cq-border-subtle) py-4" aria-busy="true">
+      <Skeleton lines={1} className="w-1/3" />
+    </div>
   );
 }
 

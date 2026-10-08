@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, use, type ReactNode } from "react";
 
 import type {
   CompanyDeckView,
@@ -51,6 +51,12 @@ import {
   ProfileFitProvider,
 } from "./material/fit-panel-slot";
 import { TeamTab } from "./material/team";
+import type { ProfileTab } from "./profile-tab";
+import {
+  ProfilePanelSkeleton,
+  ProfileTabLink,
+  ProfileTabPanel,
+} from "./profile-tabs";
 
 /**
  * A company's profile (founder request 2026-10-02): an identity header,
@@ -68,24 +74,7 @@ import { TeamTab } from "./material/team";
  * never zeros.
  */
 
-export type ProfileTab = "overview" | "elevator" | "dataroom" | "deck" | "team";
-
-/** `?tab=` as the URL says it; "videos" is the old name of Elevator. */
-export function profileTabOf(requested: string | undefined): ProfileTab | null {
-  switch (requested) {
-    case "overview":
-    case "elevator":
-    case "dataroom":
-    case "deck":
-    case "team":
-      return requested;
-    case "videos":
-      return "elevator";
-    case undefined:
-    default:
-      return null;
-  }
-}
+export { profileTabOf, type ProfileTab } from "./profile-tab";
 
 /** What the company shared with this reader in diligence, by title. */
 export type DiligenceShared = {
@@ -203,6 +192,7 @@ export function CompanyProfileView({
   previewAsInvestor = false,
   overviewExtra = null,
   overviewExtraSummary,
+  overviewStreamed = null,
 }: {
   readonly profile: CompanyProfileDto;
   readonly tab: ProfileTab;
@@ -217,14 +207,23 @@ export function CompanyProfileView({
   readonly diligence?: DiligenceShared | null;
   /** The Data room tab's read (the API decides the reader); null: not available. */
   readonly dataRoom?: DataRoomView | null;
-  /** The Pitch deck tab's read; null: not available. */
-  readonly deck?: CompanyDeckView | null;
+  /**
+   * The Pitch deck tab's read; null: not available. A promise streams into
+   * the Pitch deck and Team panels behind their own skeleton, so the page
+   * and its other tabs never wait for it.
+   */
+  readonly deck?: Eventually<CompanyDeckView | null>;
   /** The owner looking at their own deck as investors see it. */
   readonly previewAsInvestor?: boolean;
   /** Rendered in the overview after the key facts (Q.07 assumptions). */
   readonly overviewExtra?: ReactNode;
   /** The one line its fold says while closed. */
   readonly overviewExtraSummary?: string | undefined;
+  /**
+   * Rendered in the same place, as given: a read the page streams in
+   * (its own fold, behind its own placeholder).
+   */
+  readonly overviewStreamed?: ReactNode;
 }) {
   const { overview } = profile;
   const investor = profile.viewer === "INVESTOR";
@@ -399,11 +398,12 @@ export function CompanyProfileView({
         className="flex gap-5 overflow-x-auto border-b border-(--cq-border-subtle) [grid-area:tabs] sm:gap-6"
       >
         {tabs.map(([value, label, count]) => (
-          <Link
+          <ProfileTabLink
             key={value}
-            href={value === "overview" ? base : `${base}?tab=${value}`}
-            aria-current={tab === value ? "page" : undefined}
-            className={`${tabClass(tab === value)} shrink-0`}
+            tab={value}
+            fallbackHref={value === "overview" ? base : `${base}?tab=${value}`}
+            current={tab === value}
+            className={(active) => `${tabClass(active)} shrink-0`}
             data-profile-tab={value}
           >
             {label}
@@ -412,12 +412,11 @@ export function CompanyProfileView({
                 {count}
               </span>
             )}
-          </Link>
+          </ProfileTabLink>
         ))}
       </nav>
-
       <div className="min-w-0 [grid-area:body]">
-        {tab === "elevator" || overview === null ? (
+        <ProfileTabPanel tab="elevator" serverTab={tab}>
           <section
             className="flex flex-col gap-4"
             aria-label="Elevator"
@@ -433,333 +432,341 @@ export function CompanyProfileView({
             )}
             <CompanyVideos company={company} videos={profile.videos} />
           </section>
-        ) : tab === "dataroom" ? (
-          dataRoom === null ? (
-            <p className="cq-body py-6 text-(--cq-text-secondary)">
-              The data room isn&rsquo;t available to you.
-            </p>
-          ) : dataRoom.viewer === "OWNER" ? (
-            <OwnerDataRoom companyId={profile.companyId} view={dataRoom} />
-          ) : (
-            <InvestorDataRoom
-              companyId={profile.companyId}
-              companyName={profile.canonicalName}
-              view={dataRoom}
-            />
-          )
-        ) : tab === "deck" ? (
-          deck === null ? (
-            <p className="cq-body py-6 text-(--cq-text-secondary)">
-              The deck isn&rsquo;t available to you.
-            </p>
-          ) : deck.viewer === "OWNER" &&
-            deck.coaching !== null &&
-            !previewAsInvestor ? (
-            <DeckCoach
-              companyId={profile.companyId}
-              view={deck}
-              coaching={deck.coaching}
-            />
-          ) : (
-            <DeckForReaders
-              companyId={profile.companyId}
-              companyName={profile.canonicalName}
-              view={deck}
-            />
-          )
-        ) : tab === "team" ? (
-          <TeamTab
-            companyId={profile.companyId}
-            team={overview.team}
-            fromDeck={
-              deck?.extraction?.sections.find(
-                (section) => section.section === "TEAM",
-              )?.facts ?? []
-            }
-          />
-        ) : (
-          <div className="flex flex-col" data-profile-overview>
-            {/* The owner is told when their pitch and their raise disagree. */}
-            {overview.pitchRaiseNotice === null ? null : (
-              <div className="pb-6">
-                <OwnerPitchNotice notice={overview.pitchRaiseNotice} />
-              </div>
-            )}
-
-            {/*
-            The summary strip: four facts in words, one hairline -- not a
-            metric-card grid, no score. The raise names where it came from.
-          */}
-            <dl
-              className="grid grid-cols-2 gap-x-6 gap-y-4 border-b border-(--cq-border-subtle) pb-5 sm:grid-cols-4"
-              data-profile-key-facts
-            >
-              <StripCell term="Stage">
-                {stageLabel(profile.currentStageCode) ?? "Not declared"}
-              </StripCell>
-              <StripCell term="Raising">
-                {overview.raise !== null ? (
-                  compactMoneyText(overview.raise)
-                ) : overview.raiseFromPitch !== null ? (
-                  <>
-                    {pitchRaiseText(overview.raiseFromPitch)}
-                    <Link
-                      href={elevatorHref(profile.companyId)}
-                      className="cq-caption block font-normal text-(--cq-text-secondary) underline underline-offset-4"
-                      data-raise-source="PITCH_VIDEO"
-                    >
-                      Said in their pitch,{" "}
-                      {pitchMoment(overview.raiseFromPitch.atSeconds)}
-                    </Link>
-                  </>
-                ) : diligence === null ? (
-                  "Not shared"
-                ) : (
-                  "Not shared yet"
+        </ProfileTabPanel>
+        {overview === null ? null : (
+          <>
+            <ProfileTabPanel tab="overview" serverTab={tab}>
+              <div className="flex flex-col" data-profile-overview>
+                {/* The owner is told when their pitch and their raise disagree. */}
+                {overview.pitchRaiseNotice === null ? null : (
+                  <div className="pb-6">
+                    <OwnerPitchNotice notice={overview.pitchRaiseNotice} />
+                  </div>
                 )}
-              </StripCell>
-              <StripCell term="Where">
-                {profile.headquartersCity ??
-                  countryLabel(profile.headquartersCountry) ??
-                  "Not declared"}
-              </StripCell>
-              {investor ? <FitStripCell /> : null}
-            </dl>
 
-            {overviewExtra === null || overviewExtra === undefined ? null : (
-              <Fold
-                id="company-assumptions"
-                title="Assumptions to test"
-                summary={overviewExtraSummary ?? "What to ask before a call"}
-              >
-                {overviewExtra}
-              </Fold>
-            )}
-
-            <Fold id="company-raise" title="The raise" summary={raiseSummary}>
-              {sayRaise === null ? null : (
-                <PitchQuote claim={sayRaise} companyId={profile.companyId} />
-              )}
-              <ProfileRows
-                rows={[
-                  // The raise is founder-private until shared with this
-                  // reader; "not shared" never says whether one exists.
-                  [
-                    overview.raise === null && sayRaise !== null
-                      ? "Raise on Capital Q"
-                      : "Raising",
-                    overview.raise !== null ? (
-                      moneyText(overview.raise)
-                    ) : diligence === null ? (
-                      "Not shared with you"
-                    ) : (
-                      <NotSharedYet href={diligence.href} />
-                    ),
-                  ],
-                  ...claimsOf("INSTRUMENT")
-                    .slice(0, 1)
-                    .map(
-                      (claim) =>
-                        [
-                          "Instrument",
-                          `${claim.instrument ?? claim.statement} (said at ${pitchMoment(claim.atSeconds)})`,
-                        ] as const,
-                    ),
-                  // A deck is named only where it was shared with them.
-                  ...(investor && overview.deck === null
-                    ? ([
-                        [
-                          "Pitch deck",
-                          diligence === null ? (
-                            "Not shared with you"
-                          ) : (
-                            <NotSharedYet href={diligence.href} />
-                          ),
-                        ],
-                      ] as const)
-                    : overview.deck === null
-                      ? []
-                      : ([["Pitch deck", overview.deck.title]] as const)),
-                  ...(diligence !== null && diligence.titles.length > 0
-                    ? ([
-                        [
-                          "Shared in diligence",
-                          <Link
-                            key="shared"
-                            href={diligence.href}
-                            className="underline underline-offset-4"
-                          >
-                            {diligence.titles.join(", ")}
-                          </Link>,
-                        ],
-                      ] as const)
-                    : []),
-                ]}
-              />
-              {claimsOf("USE_OF_FUNDS").map((claim) => (
-                <PitchQuote
-                  key={`${claim.pitchId}-${String(claim.atSeconds)}`}
-                  claim={claim}
-                  companyId={profile.companyId}
-                />
-              ))}
-              {/* The deck is downloaded where it is named (design-48 v2). */}
-              {!investor || overview.deck === null ? null : (
-                <div className="pt-1">
-                  <DeckDownload
-                    companyId={profile.companyId}
-                    title={overview.deck.title}
-                    scanned={overview.deck.scanned}
-                  />
-                </div>
-              )}
-            </Fold>
-
-            <Fold
-              id="company-traction"
-              title="Traction"
-              summary={
-                traction.length === 0
-                  ? "Nothing stated in their pitch yet"
-                  : `${String(traction.length)} ${traction.length === 1 ? "figure" : "figures"}, said in their pitch`
-              }
-            >
-              {traction.length === 0 ? (
-                <p className="cq-body-sm text-(--cq-text-secondary)">
-                  No traction figure is stated in the pitch videos you can
-                  watch. That is not known yet, not zero.
-                </p>
-              ) : (
-                <>
-                  <PitchClaimList claims={traction} />
-                  <p className="cq-caption text-(--cq-text-secondary)">
-                    The company&rsquo;s own claims, from its pitch video. Not
-                    verified.
-                  </p>
-                </>
-              )}
-            </Fold>
-
-            <Fold id="company-team" title="Team" summary={teamSummary}>
-              {overview.team.length === 0 ? (
-                <p className="cq-body-sm text-(--cq-text-secondary)">
-                  No one is named for you yet.
-                </p>
-              ) : (
-                <TeamList team={overview.team} />
-              )}
-            </Fold>
-
-            <Fold
-              id="company-market"
-              title="Market"
-              summary={
-                sectorLabels.length === 0
-                  ? "Sector not declared"
-                  : sectorLabels.join(", ")
-              }
-            >
-              <ProfileRows
-                rows={[
-                  [
-                    "Sector",
-                    sectorLabels.length === 0
-                      ? "Not declared"
-                      : sectorLabels.join(", "),
-                  ],
-                ]}
-              />
-              {overview.primaryDescription === null ? null : (
-                <section
-                  className="flex flex-col gap-2"
-                  aria-labelledby="company-words"
+                {/*
+                The summary strip: four facts in words, one hairline -- not a
+                metric-card grid, no score. The raise names where it came from.
+              */}
+                <dl
+                  className="grid grid-cols-2 gap-x-6 gap-y-4 border-b border-(--cq-border-subtle) pb-5 sm:grid-cols-4"
+                  data-profile-key-facts
                 >
-                  <h3
-                    id="company-words"
-                    className="cq-label text-(--cq-text-secondary)"
+                  <StripCell term="Stage">
+                    {stageLabel(profile.currentStageCode) ?? "Not declared"}
+                  </StripCell>
+                  <StripCell term="Raising">
+                    {overview.raise !== null ? (
+                      compactMoneyText(overview.raise)
+                    ) : overview.raiseFromPitch !== null ? (
+                      <>
+                        {pitchRaiseText(overview.raiseFromPitch)}
+                        <ProfileTabLink
+                          tab="elevator"
+                          fallbackHref={elevatorHref(profile.companyId)}
+                          className="cq-caption block font-normal text-(--cq-text-secondary) underline underline-offset-4"
+                          data-raise-source="PITCH_VIDEO"
+                        >
+                          Said in their pitch,{" "}
+                          {pitchMoment(overview.raiseFromPitch.atSeconds)}
+                        </ProfileTabLink>
+                      </>
+                    ) : diligence === null ? (
+                      "Not shared"
+                    ) : (
+                      "Not shared yet"
+                    )}
+                  </StripCell>
+                  <StripCell term="Where">
+                    {profile.headquartersCity ??
+                      countryLabel(profile.headquartersCountry) ??
+                      "Not declared"}
+                  </StripCell>
+                  {investor ? <FitStripCell /> : null}
+                </dl>
+
+                {overviewExtra === null ||
+                overviewExtra === undefined ? null : (
+                  <Fold
+                    id="company-assumptions"
+                    title="Assumptions to test"
+                    summary={
+                      overviewExtraSummary ?? "What to ask before a call"
+                    }
                   >
-                    In their words
-                  </h3>
-                  <ReadMore text={overview.primaryDescription} />
-                </section>
-              )}
-            </Fold>
+                    {overviewExtra}
+                  </Fold>
+                )}
 
-            <Fold
-              id="company-unknowns"
-              title="Risks and unknowns"
-              summary={
-                unknowns.length === 0
-                  ? "Every key fact is declared; see what rests on what"
-                  : `Not known yet: ${unknowns.slice(0, 3).join(", ")}${unknowns.length > 3 ? ` and ${String(unknowns.length - 3)} more` : ""}`
-              }
-            >
-              {unknowns.length === 0 ? null : (
-                <p className="cq-body-sm text-(--cq-text-secondary)">
-                  Not known yet: {unknowns.join(", ")}. Unknown is not negative;
-                  it is a question to ask.
-                </p>
-              )}
-              {/*
-              What is known on the three evidence axes, and why it is in the
-              reader's feed (CQ-WEB-024): from the same projection as above.
-            */}
-              <CompanyDeeperView
-                companyId={profile.companyId}
-                companyName={profile.canonicalName}
-                facts={overview.facts}
-                connected={connected}
-              />
-            </Fold>
+                {overviewStreamed}
 
-            <Fold
-              id="company-details"
-              title="Company details"
-              summary={[
-                foundedYear === null
-                  ? "Founded date not declared"
-                  : `Founded ${foundedYear}`,
-                overview.organisationVerified
-                  ? "Verified by Capital Q"
-                  : "Not verified by Capital Q yet",
-              ].join(" · ")}
-            >
-              <ProfileRows
-                rows={[
-                  [
-                    "Founded",
-                    overview.foundedDate === null
-                      ? "Not declared"
-                      : formatLongDay(overview.foundedDate),
-                  ],
-                  ["Legal name", overview.legalName ?? "Not declared"],
-                  [
-                    "Verification",
+                <Fold
+                  id="company-raise"
+                  title="The raise"
+                  summary={raiseSummary}
+                >
+                  {sayRaise === null ? null : (
+                    <PitchQuote
+                      claim={sayRaise}
+                      companyId={profile.companyId}
+                    />
+                  )}
+                  <ProfileRows
+                    rows={[
+                      // The raise is founder-private until shared with this
+                      // reader; "not shared" never says whether one exists.
+                      [
+                        overview.raise === null && sayRaise !== null
+                          ? "Raise on Capital Q"
+                          : "Raising",
+                        overview.raise !== null ? (
+                          moneyText(overview.raise)
+                        ) : diligence === null ? (
+                          "Not shared with you"
+                        ) : (
+                          <NotSharedYet href={diligence.href} />
+                        ),
+                      ],
+                      ...claimsOf("INSTRUMENT")
+                        .slice(0, 1)
+                        .map(
+                          (claim) =>
+                            [
+                              "Instrument",
+                              `${claim.instrument ?? claim.statement} (said at ${pitchMoment(claim.atSeconds)})`,
+                            ] as const,
+                        ),
+                      // A deck is named only where it was shared with them.
+                      ...(investor && overview.deck === null
+                        ? ([
+                            [
+                              "Pitch deck",
+                              diligence === null ? (
+                                "Not shared with you"
+                              ) : (
+                                <NotSharedYet href={diligence.href} />
+                              ),
+                            ],
+                          ] as const)
+                        : overview.deck === null
+                          ? []
+                          : ([["Pitch deck", overview.deck.title]] as const)),
+                      ...(diligence !== null && diligence.titles.length > 0
+                        ? ([
+                            [
+                              "Shared in diligence",
+                              <Link
+                                key="shared"
+                                href={diligence.href}
+                                className="underline underline-offset-4"
+                              >
+                                {diligence.titles.join(", ")}
+                              </Link>,
+                            ],
+                          ] as const)
+                        : []),
+                    ]}
+                  />
+                  {claimsOf("USE_OF_FUNDS").map((claim) => (
+                    <PitchQuote
+                      key={`${claim.pitchId}-${String(claim.atSeconds)}`}
+                      claim={claim}
+                      companyId={profile.companyId}
+                    />
+                  ))}
+                  {/* The deck is downloaded where it is named (design-48 v2). */}
+                  {!investor || overview.deck === null ? null : (
+                    <div className="pt-1">
+                      <DeckDownload
+                        companyId={profile.companyId}
+                        title={overview.deck.title}
+                        scanned={overview.deck.scanned}
+                      />
+                    </div>
+                  )}
+                </Fold>
+
+                <Fold
+                  id="company-traction"
+                  title="Traction"
+                  summary={
+                    traction.length === 0
+                      ? "Nothing stated in their pitch yet"
+                      : `${String(traction.length)} ${traction.length === 1 ? "figure" : "figures"}, said in their pitch`
+                  }
+                >
+                  {traction.length === 0 ? (
+                    <p className="cq-body-sm text-(--cq-text-secondary)">
+                      No traction figure is stated in the pitch videos you can
+                      watch. That is not known yet, not zero.
+                    </p>
+                  ) : (
+                    <>
+                      <PitchClaimList claims={traction} />
+                      <p className="cq-caption text-(--cq-text-secondary)">
+                        The company&rsquo;s own claims, from its pitch video.
+                        Not verified.
+                      </p>
+                    </>
+                  )}
+                </Fold>
+
+                <Fold id="company-team" title="Team" summary={teamSummary}>
+                  {overview.team.length === 0 ? (
+                    <p className="cq-body-sm text-(--cq-text-secondary)">
+                      No one is named for you yet.
+                    </p>
+                  ) : (
+                    <TeamList team={overview.team} />
+                  )}
+                </Fold>
+
+                <Fold
+                  id="company-market"
+                  title="Market"
+                  summary={
+                    sectorLabels.length === 0
+                      ? "Sector not declared"
+                      : sectorLabels.join(", ")
+                  }
+                >
+                  <ProfileRows
+                    rows={[
+                      [
+                        "Sector",
+                        sectorLabels.length === 0
+                          ? "Not declared"
+                          : sectorLabels.join(", "),
+                      ],
+                    ]}
+                  />
+                  {overview.primaryDescription === null ? null : (
+                    <section
+                      className="flex flex-col gap-2"
+                      aria-labelledby="company-words"
+                    >
+                      <h3
+                        id="company-words"
+                        className="cq-label text-(--cq-text-secondary)"
+                      >
+                        In their words
+                      </h3>
+                      <ReadMore text={overview.primaryDescription} />
+                    </section>
+                  )}
+                </Fold>
+
+                <Fold
+                  id="company-unknowns"
+                  title="Risks and unknowns"
+                  summary={
+                    unknowns.length === 0
+                      ? "Every key fact is declared; see what rests on what"
+                      : `Not known yet: ${unknowns.slice(0, 3).join(", ")}${unknowns.length > 3 ? ` and ${String(unknowns.length - 3)} more` : ""}`
+                  }
+                >
+                  {unknowns.length === 0 ? null : (
+                    <p className="cq-body-sm text-(--cq-text-secondary)">
+                      Not known yet: {unknowns.join(", ")}. Unknown is not
+                      negative; it is a question to ask.
+                    </p>
+                  )}
+                  {/*
+                  What is known on the three evidence axes, and why it is in the
+                  reader's feed (CQ-WEB-024): from the same projection as above.
+                */}
+                  <CompanyDeeperView
+                    companyId={profile.companyId}
+                    companyName={profile.canonicalName}
+                    facts={overview.facts}
+                    connected={connected}
+                  />
+                </Fold>
+
+                <Fold
+                  id="company-details"
+                  title="Company details"
+                  summary={[
+                    foundedYear === null
+                      ? "Founded date not declared"
+                      : `Founded ${foundedYear}`,
                     overview.organisationVerified
-                      ? "Organisation verified by Capital Q"
+                      ? "Verified by Capital Q"
                       : "Not verified by Capital Q yet",
-                  ],
-                  ...(overview.websiteUrl === null
-                    ? []
-                    : ([
-                        [
-                          "Website",
-                          <span
-                            key="web"
-                            className="flex items-center gap-1.5 break-all"
-                          >
-                            <Globe
-                              size={ICON_SIZE.compact}
-                              aria-hidden="true"
-                            />
-                            {overview.websiteUrl}
-                          </span>,
-                        ],
-                      ] as const)),
-                ]}
-              />
-            </Fold>
-          </div>
+                  ].join(" · ")}
+                >
+                  <ProfileRows
+                    rows={[
+                      [
+                        "Founded",
+                        overview.foundedDate === null
+                          ? "Not declared"
+                          : formatLongDay(overview.foundedDate),
+                      ],
+                      ["Legal name", overview.legalName ?? "Not declared"],
+                      [
+                        "Verification",
+                        overview.organisationVerified
+                          ? "Organisation verified by Capital Q"
+                          : "Not verified by Capital Q yet",
+                      ],
+                      ...(overview.websiteUrl === null
+                        ? []
+                        : ([
+                            [
+                              "Website",
+                              <span
+                                key="web"
+                                className="flex items-center gap-1.5 break-all"
+                              >
+                                <Globe
+                                  size={ICON_SIZE.compact}
+                                  aria-hidden="true"
+                                />
+                                {overview.websiteUrl}
+                              </span>,
+                            ],
+                          ] as const)),
+                    ]}
+                  />
+                </Fold>
+              </div>
+            </ProfileTabPanel>
+            <ProfileTabPanel tab="dataroom" serverTab={tab}>
+              {dataRoom === null ? (
+                <p className="cq-body py-6 text-(--cq-text-secondary)">
+                  The data room isn&rsquo;t available to you.
+                </p>
+              ) : dataRoom.viewer === "OWNER" ? (
+                <OwnerDataRoom companyId={profile.companyId} view={dataRoom} />
+              ) : (
+                <InvestorDataRoom
+                  companyId={profile.companyId}
+                  companyName={profile.canonicalName}
+                  view={dataRoom}
+                />
+              )}
+            </ProfileTabPanel>
+            <ProfileTabPanel tab="deck" serverTab={tab}>
+              <Suspense fallback={<ProfilePanelSkeleton />}>
+                <DeckPanel
+                  deck={deck}
+                  companyId={profile.companyId}
+                  companyName={profile.canonicalName}
+                  previewAsInvestor={previewAsInvestor}
+                />
+              </Suspense>
+            </ProfileTabPanel>
+            <ProfileTabPanel tab="team" serverTab={tab}>
+              <Suspense fallback={<ProfilePanelSkeleton />}>
+                <TeamPanel
+                  deck={deck}
+                  companyId={profile.companyId}
+                  team={overview.team}
+                />
+              </Suspense>
+            </ProfileTabPanel>
+          </>
         )}
       </div>
     </article>
@@ -771,6 +778,66 @@ export function CompanyProfileView({
     </ProfileFitProvider>
   ) : (
     page
+  );
+}
+
+type Eventually<T> = T | Promise<T>;
+
+function useSettled<T>(value: Eventually<T>): T {
+  return value instanceof Promise ? use(value) : value;
+}
+
+function DeckPanel({
+  deck: eventually,
+  companyId,
+  companyName,
+  previewAsInvestor,
+}: {
+  readonly deck: Eventually<CompanyDeckView | null>;
+  readonly companyId: string;
+  readonly companyName: string;
+  readonly previewAsInvestor: boolean;
+}) {
+  const deck = useSettled(eventually);
+  if (deck === null) {
+    return (
+      <p className="cq-body py-6 text-(--cq-text-secondary)">
+        The deck isn&rsquo;t available to you.
+      </p>
+    );
+  }
+  return deck.viewer === "OWNER" &&
+    deck.coaching !== null &&
+    !previewAsInvestor ? (
+    <DeckCoach companyId={companyId} view={deck} coaching={deck.coaching} />
+  ) : (
+    <DeckForReaders
+      companyId={companyId}
+      companyName={companyName}
+      view={deck}
+    />
+  );
+}
+
+function TeamPanel({
+  deck: eventually,
+  companyId,
+  team,
+}: {
+  readonly deck: Eventually<CompanyDeckView | null>;
+  readonly companyId: string;
+  readonly team: readonly CompanyProfileTeamMember[];
+}) {
+  const deck = useSettled(eventually);
+  return (
+    <TeamTab
+      companyId={companyId}
+      team={team}
+      fromDeck={
+        deck?.extraction?.sections.find((section) => section.section === "TEAM")
+          ?.facts ?? []
+      }
+    />
   );
 }
 

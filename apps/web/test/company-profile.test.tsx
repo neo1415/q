@@ -62,6 +62,27 @@ vi.mock("@/components/app-shell/global-q", () => ({
   useQMomentSource: () => undefined,
 }));
 
+// The router's search params follow history, as Next.js's do for a
+// shallow pushState (and for Back and Forward).
+const locationListeners = new Set<() => void>();
+vi.mock("next/navigation", async (original) => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    ...(await original<typeof import("next/navigation")>()),
+    useSearchParams: () =>
+      new URLSearchParams(
+        useSyncExternalStore(
+          (listener) => {
+            locationListeners.add(listener);
+            return () => locationListeners.delete(listener);
+          },
+          () => window.location.search,
+        ),
+      ),
+  };
+});
+const { ProfileTabs } = await import("../src/features/company/profile-tabs");
+
 const { CompanyAvatarLink } =
   await import("../src/features/company/company-avatar");
 const { CompanyProfileView, moneyText } =
@@ -545,5 +566,110 @@ describe("the overview, decluttered, with what the pitch says", () => {
       "Your pitch video says you’re raising $4M seed (0:43).",
     );
     expect(notice?.textContent).toContain("still hears it");
+  });
+});
+
+describe("moving between a profile's tabs", () => {
+  it("switches in place: a shallow URL, no request, the panel kept, Back works", async () => {
+    const profile = investorProfile();
+    const base = `/company/${profile.companyId}`;
+    window.history.replaceState(null, "", base);
+    const pushState = window.history.pushState.bind(window.history);
+    const pushes: string[] = [];
+    const spy = vi
+      .spyOn(window.history, "pushState")
+      .mockImplementation((state, unused, url) => {
+        pushes.push(String(url));
+        pushState(state, unused, url);
+        for (const listener of locationListeners) listener();
+      });
+    const onPop = () => {
+      for (const listener of locationListeners) listener();
+    };
+    window.addEventListener("popstate", onPop);
+    const { container } = render(
+      <ProfileTabs
+        base={base}
+        initial="overview"
+        available={["overview", "elevator", "dataroom", "deck", "team"]}
+      >
+        <CompanyProfileView
+          profile={profile}
+          tab="overview"
+          interest={null}
+          connected={false}
+          sectorLabels={["Energy storage"]}
+          deck={null}
+        />
+      </ProfileTabs>,
+    );
+    const overview = container.querySelector("[data-profile-overview]");
+    expect(overview).not.toBeNull();
+    const team = container.querySelector<HTMLAnchorElement>(
+      '[data-profile-tab="team"]',
+    );
+    expect(team?.getAttribute("href")).toBe(`${base}?tab=team`);
+    if (team === null) throw new Error("no Team tab");
+    fireEvent.click(team);
+
+    // A shallow URL change, and the Team panel shown at once.
+    expect(pushes).toEqual([`${base}?tab=team`]);
+    expect(team.getAttribute("aria-current")).toBe("page");
+    expect(
+      container
+        .querySelector('[data-profile-panel="team"]')
+        ?.hasAttribute("hidden"),
+    ).toBe(false);
+    // The overview is the same element, kept and hidden, not rebuilt.
+    expect(container.querySelector("[data-profile-overview]")).toBe(overview);
+    expect(
+      container
+        .querySelector('[data-profile-panel="overview"]')
+        ?.hasAttribute("hidden"),
+    ).toBe(true);
+
+    // Back returns to the overview the same way.
+    window.history.back();
+    await waitFor(() =>
+      expect(
+        container
+          .querySelector('[data-profile-panel="overview"]')
+          ?.hasAttribute("hidden"),
+      ).toBe(false),
+    );
+    expect(
+      container
+        .querySelector('[data-profile-tab="overview"]')
+        ?.getAttribute("aria-current"),
+    ).toBe("page");
+    window.removeEventListener("popstate", onPop);
+    spy.mockRestore();
+  });
+
+  it("leaves a modified click (a new browser tab) to the browser", () => {
+    const profile = investorProfile();
+    const base = `/company/${profile.companyId}`;
+    window.history.replaceState(null, "", base);
+    const spy = vi.spyOn(window.history, "pushState");
+    const { container } = render(
+      <ProfileTabs
+        base={base}
+        initial="overview"
+        available={["overview", "elevator", "dataroom", "deck", "team"]}
+      >
+        <CompanyProfileView
+          profile={profile}
+          tab="overview"
+          interest={null}
+          connected={false}
+          sectorLabels={[]}
+        />
+      </ProfileTabs>,
+    );
+    const deck = container.querySelector('[data-profile-tab="deck"]');
+    if (deck === null) throw new Error("no deck tab");
+    fireEvent.click(deck, { metaKey: true });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });
