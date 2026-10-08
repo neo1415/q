@@ -293,6 +293,7 @@ import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supa
 import { apiServiceIdentity, createApp } from "./app.js";
 import { createChatSafetyAudit } from "./chat-safety-audit.js";
 import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
+import { createRaiseSharing } from "./pitch-claims.js";
 import { createQWorkPagePort } from "./q-work-port.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createInvestorCardFacts } from "./investor-card-facts.js";
@@ -2016,6 +2017,25 @@ const { app, logger } = createApp(config, security, {
         ) ?? { photo: null, cover: null }
       );
     },
+    // 2026-10-08: what the pitches say, read from each transcript under
+    // the same playback rule as the player (the transcript is part of the
+    // pitch), and the raise's sharing for the disclosure precedence.
+    pitchCues: async (actor, companyId, mediaAssetId) => {
+      const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+      if (!parsed.success) return null;
+      const view = await media.getPitchTranscript({
+        actor,
+        companyId,
+        mediaAssetId: parsed.data,
+      });
+      return view.status === "AVAILABLE" ? view.cues : null;
+    },
+    raiseSharing: createRaiseSharing({
+      sql: database.sql,
+      companies: disclosurePorts.companies,
+      capital: disclosurePorts.capital,
+      policies: createPostgresDisclosurePolicyRepository(),
+    }),
     disclosedRaise: async (actor, companyId) =>
       (
         await discoverFilterFacts.disclosedRaises?.({

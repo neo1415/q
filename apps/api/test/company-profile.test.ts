@@ -677,3 +677,194 @@ describe("ADR 0041: the team on the profile", () => {
     }
   });
 });
+
+/**
+ * What the pitches say (founder, 2026-10-08: Tensorgate's raise is said in
+ * the video, the overview said "not shared"). The cues are Tensorgate's,
+ * verbatim, from the two cues that carry the traction and the raise.
+ */
+const TENSORGATE_CUES = [
+  {
+    startMs: 38293,
+    endMs: 43573,
+    text: "design partners in banking and healthcare, two already on paid contracts, 31 million requests",
+  },
+  {
+    startMs: 43573,
+    endMs: 48613,
+    text: "served. We're raising a $4 million seed. The insight's simple. If you can prove where the",
+  },
+];
+
+type PitchBody = {
+  overview: {
+    raise: { amount: string; currency: string } | null;
+    raiseFromPitch: {
+      money: { amount: string; currency: string } | null;
+      atSeconds: number;
+      pitchId: string;
+      truthClass: string;
+      evidenceStatus: string;
+      source: string;
+    } | null;
+    pitchClaims: { kind: string; pitchId: string; atSeconds: number }[];
+    pitchRaiseNotice: { state: string } | null;
+  } | null;
+};
+
+function pitchPorts(options: {
+  readonly investor: boolean;
+  readonly declared: boolean;
+  readonly sharing: "NETWORK" | "PRIVATE" | "HIDDEN" | "THROWS";
+  readonly playable?: readonly string[];
+}) {
+  const base = ports({
+    investor: options.investor,
+    ...(options.playable === undefined ? {} : { playable: options.playable }),
+  });
+  const read: string[] = [];
+  const profile: CompanyProfilePorts = {
+    ...base.profile,
+    disclosedRaise: () =>
+      Promise.resolve(
+        options.declared ? { amount: "5000000", currency: "USD" } : null,
+      ),
+    pitchCues: (_actor, _companyId, mediaAssetId) => {
+      read.push(mediaAssetId);
+      return Promise.resolve(
+        mediaAssetId === INVESTORS_VIDEO ? TENSORGATE_CUES : null,
+      );
+    },
+    raiseSharing: () =>
+      options.sharing === "THROWS"
+        ? Promise.reject(new Error("policy read failed"))
+        : Promise.resolve(options.sharing),
+  };
+  return { profile, read };
+}
+
+async function pitchBody(
+  profile: CompanyProfilePorts,
+  owned = false,
+): Promise<PitchBody> {
+  const app = buildApp({
+    profile,
+    owned,
+    ...(owned
+      ? {
+          context: {
+            ...VIEWER,
+            tenantId: COMPANY_TENANT,
+            organisationId: COMPANY_ORG,
+          },
+        }
+      : {}),
+  });
+  const body = (
+    await app.inject({ method: "GET", url: PROFILE_URL })
+  ).json<PitchBody>();
+  await app.close();
+  return body;
+}
+
+describe("GET /v1/companies/:id/profile — what the pitch says", () => {
+  it("an investor sees the raise as said in the pitch, with its moment, where the declared raise is not shared", async () => {
+    const { profile } = pitchPorts({
+      investor: true,
+      declared: false,
+      sharing: "PRIVATE",
+    });
+    const body = await pitchBody(profile);
+    expect(body.overview?.raise).toBeNull();
+    expect(body.overview?.raiseFromPitch).toMatchObject({
+      money: { amount: "4000000", currency: "USD" },
+      atSeconds: 43,
+      pitchId: INVESTORS_VIDEO,
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+      source: "PITCH_VIDEO",
+    });
+    expect(
+      body.overview?.pitchClaims
+        .filter((c) => c.kind === "TRACTION")
+        .map((c) => c.atSeconds),
+    ).toEqual([38, 38]);
+    expect(body.overview?.pitchRaiseNotice).toBeNull();
+  });
+
+  it("reads no transcript of a video the reader may not play", async () => {
+    const { profile, read } = pitchPorts({
+      investor: true,
+      declared: false,
+      sharing: "PRIVATE",
+      playable: [NETWORK_VIDEO],
+    });
+    const body = await pitchBody(profile);
+    expect(read).toEqual([NETWORK_VIDEO]);
+    expect(body.overview?.raiseFromPitch).toBeNull();
+    expect(body.overview?.pitchClaims).toEqual([]);
+  });
+
+  it("a raise the founder turned off stays hidden: no raise from the pitch either", async () => {
+    for (const sharing of ["HIDDEN", "THROWS"] as const) {
+      const { profile } = pitchPorts({
+        investor: true,
+        declared: false,
+        sharing,
+      });
+      const body = await pitchBody(profile);
+      expect(body.overview?.raiseFromPitch).toBeNull();
+      expect(
+        body.overview?.pitchClaims.some((c) =>
+          ["RAISE", "STAGE", "INSTRUMENT"].includes(c.kind),
+        ),
+      ).toBe(false);
+      expect(JSON.stringify(body)).not.toContain("4000000");
+      // Traction said in the same pitch is not the raise and stays.
+      expect(
+        body.overview?.pitchClaims.some((c) => c.kind === "TRACTION"),
+      ).toBe(true);
+    }
+  });
+
+  it("a disclosed declared raise wins; a different figure in the pitch stays beside it", async () => {
+    const { profile } = pitchPorts({
+      investor: true,
+      declared: true,
+      sharing: "NETWORK",
+    });
+    const body = await pitchBody(profile);
+    expect(body.overview?.raise).toEqual({
+      amount: "5000000",
+      currency: "USD",
+    });
+    expect(body.overview?.raiseFromPitch).toBeNull();
+    expect(body.overview?.pitchClaims.some((c) => c.kind === "RAISE")).toBe(
+      true,
+    );
+  });
+
+  it("the owner is told what investors see, and when their hidden raise is still said in the video", async () => {
+    const cases = [
+      { declared: false, sharing: "PRIVATE", state: "SHOWN_FROM_PITCH" },
+      { declared: true, sharing: "HIDDEN", state: "HIDDEN_BY_FOUNDER" },
+      { declared: true, sharing: "NETWORK", state: "DIFFERS_FROM_DECLARED" },
+    ] as const;
+    for (const { declared, sharing, state } of cases) {
+      const { profile } = pitchPorts({ investor: false, declared, sharing });
+      const body = await pitchBody(profile, true);
+      expect(body.overview?.pitchRaiseNotice?.state).toBe(state);
+    }
+  });
+
+  it("a founder viewing another company gets no claims and no transcript is read", async () => {
+    const { profile, read } = pitchPorts({
+      investor: false,
+      declared: false,
+      sharing: "PRIVATE",
+    });
+    const body = await pitchBody(profile);
+    expect(body.overview).toBeNull();
+    expect(read).toEqual([]);
+  });
+});

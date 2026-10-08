@@ -93,6 +93,64 @@ export type CompanyProfileTeamMember = z.infer<
   typeof CompanyProfileTeamMemberSchema
 >;
 
+/**
+ * What a founder said in a pitch video this reader may play (2026-10-08),
+ * read deterministically from the pitch's transcript. The company's own
+ * claim (USER_CLAIM, SELF_REPORTED), with the pitch and the moment it was
+ * said as its provenance. It reaches exactly the people who may play the
+ * pitch: the transcript is part of the pitch, never a separate disclosure.
+ */
+export const PitchClaimKindSchema = z.enum([
+  "RAISE",
+  "STAGE",
+  "INSTRUMENT",
+  "TRACTION",
+  "USE_OF_FUNDS",
+]);
+export type PitchClaimKind = z.infer<typeof PitchClaimKindSchema>;
+
+export const PitchClaimDtoSchema = z
+  .object({
+    kind: PitchClaimKindSchema,
+    /** The founder's words, as transcribed. */
+    statement: z.string().min(1).max(300),
+    pitchId: UuidSchema,
+    /** The owner's name for the video, where they named it. */
+    pitchTitle: z.string().max(200).nullable(),
+    /** Where in the pitch it is said, in whole seconds. */
+    atSeconds: z.number().int().min(0).max(86_400),
+    money: MoneySchema.nullable(),
+    stageCode: z.string().max(40).nullable(),
+    instrument: z.string().max(60).nullable(),
+    truthClass: z.literal("USER_CLAIM"),
+    evidenceStatus: z.literal("SELF_REPORTED"),
+    source: z.literal("PITCH_VIDEO"),
+  })
+  .strict();
+export type PitchClaimDto = z.infer<typeof PitchClaimDtoSchema>;
+
+/**
+ * The owner's view only: their pitch states a raise their profile does not
+ * show as declared. The founder is told; nothing is decided for them.
+ *
+ *   SHOWN_FROM_PITCH       the raise is not shared, so investors who may
+ *                          play the pitch see what it says, labelled so
+ *   HIDDEN_BY_FOUNDER      they turned a raise share off: the overview
+ *                          shows no raise, though the video still says it
+ *   DIFFERS_FROM_DECLARED  the declared raise differs from what is said
+ */
+export const PitchRaiseNoticeSchema = z
+  .object({
+    state: z.enum([
+      "SHOWN_FROM_PITCH",
+      "HIDDEN_BY_FOUNDER",
+      "DIFFERS_FROM_DECLARED",
+    ]),
+    said: PitchClaimDtoSchema,
+  })
+  .strict();
+export type PitchRaiseNotice = z.infer<typeof PitchRaiseNoticeSchema>;
+
 export const CompanyProfileOverviewSchema = z
   .object({
     legalName: z.string().nullable(),
@@ -116,6 +174,16 @@ export const CompanyProfileOverviewSchema = z
      * the owner. Empty: none declared, or not shown to this reader.
      */
     team: z.array(CompanyProfileTeamMemberSchema).max(50).default([]),
+    /** What the pitches this reader may play say; absent from older servers. */
+    pitchClaims: z.array(PitchClaimDtoSchema).max(40).default([]),
+    /**
+     * The raise as said in a pitch, where the declared raise is not
+     * disclosed to this reader and the founder has not hidden it. The
+     * server decides; null otherwise.
+     */
+    raiseFromPitch: PitchClaimDtoSchema.nullable().default(null),
+    /** OWNER only: the pitch and the declared raise disagree in what shows. */
+    pitchRaiseNotice: PitchRaiseNoticeSchema.nullable().default(null),
   })
   .strict();
 export type CompanyProfileOverview = z.infer<
