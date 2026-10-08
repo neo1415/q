@@ -5,6 +5,7 @@ import type { ServerResponse } from "node:http";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
+import type { QFailureClass, QTurnDisposition } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 
 import type { VoiceSessionBindings } from "./bindings.js";
@@ -14,6 +15,7 @@ import { sentences } from "./speech.js";
 import { createThinkGate, type ThinkGate } from "./think-gate.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import { turnFailureLine, turnSucceeded } from "./turn-failure.js";
+import type { VoiceTurnBoard } from "./turn-board.js";
 import type { VoiceTurnHandler } from "./turn.js";
 
 /**
@@ -65,6 +67,11 @@ export type VoiceThinkDependencies = {
   readonly logger: Logger;
   /** When a think may start work (think-gate.ts); a default one otherwise. */
   readonly gate?: ThinkGate | undefined;
+  /**
+   * RECOVERY A4: where each turn's terminal disposition is noted for the
+   * screen (the turn board the browser already polls).
+   */
+  readonly board?: Pick<VoiceTurnBoard, "noteOutcome"> | undefined;
 };
 
 /** One response stream to the provider; a turn may move to a newer one. */
@@ -368,15 +375,37 @@ export function registerVoiceThinkRoute(
         finishSink(live.sink);
       },
     };
+    // RECOVERY A4: every think ends in one disposition, noted for the
+    // screen: an empty stream (Q chose silence) used to leave "Thinking"
+    // for 14 s and then nothing.
+    let disposition: QTurnDisposition | null = null;
+    let failure: QFailureClass | undefined;
     try {
       // In a burst of re-asks, wait a moment to see whether another
       // follows before creating anything (think-gate.ts).
       const admitted = await gate.admit(line, controller.signal);
-      if (admitted !== "DROPPED") {
-        await turn(binding, transcript, controller.signal, speaker);
+      if (admitted === "DROPPED") {
+        disposition = "SUPERSEDED";
+      } else {
+        const outcome = await turn(
+          binding,
+          transcript,
+          controller.signal,
+          speaker,
+        );
         turnSucceeded(binding);
+        disposition = timedOut
+          ? "FAILED"
+          : controller.signal.aborted || outcome.kind === "INTERRUPTED"
+            ? "CANCELLED"
+            : wroteContent
+              ? "ANSWERED"
+              : "IGNORED";
+        if (timedOut) failure = "TIMEOUT";
       }
     } catch (error: unknown) {
+      disposition = "FAILED";
+      failure = timedOut ? "TIMEOUT" : "TOOL_FAILED";
       logger.error(
         { err: error, qVoiceSessionId: binding.voiceSessionId },
         "voice think turn failed",
@@ -388,6 +417,20 @@ export function registerVoiceThinkRoute(
         write(turnFailureLine(binding, error));
       }
     } finally {
+      if (disposition !== null) {
+        dependencies.board?.noteOutcome(binding.voiceSessionId, {
+          disposition,
+          ...(failure === undefined ? {} : { failure }),
+        });
+        logger.info(
+          {
+            qVoiceSessionId: binding.voiceSessionId,
+            disposition,
+            ...(failure === undefined ? {} : { failure }),
+          },
+          "voice turn ended",
+        );
+      }
       if (inFlight.get(line) === live) inFlight.delete(line);
       clearInterval(keepAlive);
       clearTimeout(deadline);

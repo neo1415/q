@@ -25,11 +25,13 @@ import {
   openVoiceLine,
   type VoiceLineHolder,
 } from "./voice-line";
+import { IGNORED_NOTICE } from "./provider/duplex-notices";
 import { LINE_LOST_NOTICE, RECONNECTING_NOTICE } from "./provider/line-health";
 import type {
   VoiceSessionClient,
   VoiceSessionEvents,
   VoiceTranscriptLine,
+  VoiceTurnOutcome,
 } from "./session";
 
 /**
@@ -123,6 +125,8 @@ const STABLE_LINE_MS = 20_000;
 const LINK_STATUS_LINGER_MS = 4_000;
 /** How long a turn's "not answered" sentence stays on screen (A4). */
 const TURN_NOTICE_MS = 8_000;
+/** A board outcome this recent already accounts for the watchdog's turn. */
+const WATCHDOG_COVERED_MS = 16_000;
 const GAVE_UP =
   "I couldn't get the line back. You can keep typing, or start voice again when you're ready.";
 
@@ -297,9 +301,29 @@ export function useVoiceInterview(
    * DUPLEX: a full-duplex line ended into the standard voice. Until the
    * person ends voice, every line (a reconnect too) is the standard one.
    */
+  const showTurnOutcome = (outcome: VoiceTurnOutcome): void => {
+    events.onTurnOutcome?.(outcome);
+    const shown = outcome.notice;
+    if (shown === undefined) return;
+    setNotice(shown);
+    if (turnNoticeTimer.current !== null) {
+      window.clearTimeout(turnNoticeTimer.current);
+    }
+    turnNoticeTimer.current = window.setTimeout(() => {
+      turnNoticeTimer.current = null;
+      setNotice((current) => (current === shown ? null : current));
+    }, TURN_NOTICE_MS);
+  };
+  const showTurnOutcomeRef = useRef(showTurnOutcome);
+  useEffect(() => {
+    showTurnOutcomeRef.current = showTurnOutcome;
+  });
   const duplexOff = useRef(false);
   const renewals = useRef(0);
   const turnNoticeTimer = useRef<number | null>(null);
+  /** The board's last turn outcome shown (standard line), and when. */
+  const lastOutcomeSeq = useRef(0);
+  const boardOutcomeAt = useRef(0);
   useEffect(
     () => () => {
       if (turnNoticeTimer.current !== null) {
@@ -384,17 +408,15 @@ export function useVoiceInterview(
     // RECOVERY A4: a turn that ended without an answer is never silent on
     // screen: its sentence shows for a while, then goes.
     onTurnOutcome: (outcome) => {
-      events.onTurnOutcome?.(outcome);
-      const shown = outcome.notice;
-      if (shown === undefined) return;
-      setNotice(shown);
-      if (turnNoticeTimer.current !== null) {
-        window.clearTimeout(turnNoticeTimer.current);
+      // The standard line's watchdog only speaks for a turn the server
+      // has not already accounted for on the board.
+      if (
+        outcome.failure === "TIMEOUT" &&
+        Date.now() - boardOutcomeAt.current < WATCHDOG_COVERED_MS
+      ) {
+        return;
       }
-      turnNoticeTimer.current = window.setTimeout(() => {
-        turnNoticeTimer.current = null;
-        setNotice((current) => (current === shown ? null : current));
-      }, TURN_NOTICE_MS);
+      showTurnOutcome(outcome);
     },
   });
   const clientRef = useRef(client);
@@ -630,6 +652,24 @@ export function useVoiceInterview(
             ? current
             : read.value,
         );
+        // RECOVERY A4 (standard line): a turn Q chose not to answer is
+        // shown, once, rather than left as a silent "Thinking".
+        const outcome = read.value.outcome;
+        if (outcome !== undefined && outcome.seq > lastOutcomeSeq.current) {
+          const first = lastOutcomeSeq.current === 0 && outcome.seq > 1;
+          lastOutcomeSeq.current = outcome.seq;
+          // A line that reconnected reads the board as it was: older
+          // outcomes are not shown again.
+          if (!first) {
+            boardOutcomeAt.current = Date.now();
+            showTurnOutcomeRef.current({
+              disposition: outcome.disposition,
+              failure: outcome.failure,
+              notice:
+                outcome.disposition === "IGNORED" ? IGNORED_NOTICE : undefined,
+            });
+          }
+        }
       } else if (read.gone === true) {
         // The server has let this session go while the socket is still
         // open here. Nothing said into it will ever be answered, so the

@@ -738,6 +738,8 @@ export function createApp(
         bindings: modules.voice.bindings,
         turn: modules.voice.turn,
         logger: modules.voice.logger,
+        // RECOVERY A4: each turn's disposition, for the screen.
+        board: modules.voice.board,
       });
     }
   }

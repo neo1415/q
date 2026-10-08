@@ -787,6 +787,19 @@ export const QVoiceTurnStateSchema = z
     conversationId: QConversationIdSchema.optional(),
     /** PRESENCE: the latest spoken answer's gestures, played once per answer. */
     presence: QVoicePresenceSchema.optional(),
+    /**
+     * RECOVERY A4 (standard line): how the latest turn ended, numbered so
+     * the screen shows each once. A turn Q chose not to answer (IGNORED)
+     * is shown instead of a silent "Thinking".
+     */
+    outcome: z
+      .object({
+        seq: z.number().int().min(1),
+        disposition: QTurnDispositionSchema,
+        failure: QFailureClassSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type QVoiceTurnState = z.infer<typeof QVoiceTurnStateSchema>;
