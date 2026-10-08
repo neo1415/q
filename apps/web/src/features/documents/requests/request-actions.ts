@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import {
+  ApiProblemError,
   answerInvestorQuestion,
   declineDocumentRequest,
   fulfilDocumentRequest,
@@ -181,9 +182,16 @@ export async function shareDocumentAction(
   try {
     await shareDocumentAccess(api, documentId.data, body.data);
     return done();
-  } catch {
-    return failed("That wasn't shared. Try again.");
+  } catch (error: unknown) {
+    return failed(shareFailure(error));
   }
+}
+
+/** A refused share says why: only connected investors are shared with. */
+function shareFailure(error: unknown): string {
+  return error instanceof ApiProblemError && error.status === 403
+    ? "You can share with investors you're connected to. Accept their interest first, then share."
+    : "That wasn't shared. Try again.";
 }
 
 export async function shareFolderAction(
@@ -205,8 +213,8 @@ export async function shareFolderAction(
   try {
     await shareFolderAccess(api, companyId.data, folderCode.data, body.data);
     return done();
-  } catch {
-    return failed("That wasn't shared. Try again.");
+  } catch (error: unknown) {
+    return failed(shareFailure(error));
   }
 }
 

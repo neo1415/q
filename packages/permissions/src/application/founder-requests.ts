@@ -46,6 +46,7 @@ import {
   type DataRoomDocument,
   type DataRoomService,
   type DataRoomStore,
+  type RelationshipConnection,
 } from "./data-room.js";
 import type { DisclosurePolicyManager } from "./policy-manager.js";
 import type { DisclosurePolicyRepository } from "./ports.js";
@@ -88,7 +89,12 @@ const DAY_MS = 86_400_000;
 const ANSWER_SHARE_DAYS = 30;
 
 export type FounderRequestsRefusal =
-  "NOT_FOUND" | "ALREADY_ANSWERED" | "NOT_SHAREABLE" | "VERSION_CONFLICT";
+  | "NOT_FOUND"
+  | "ALREADY_ANSWERED"
+  | "NOT_SHAREABLE"
+  | "VERSION_CONFLICT"
+  /** Shares go only to investors the company is connected with. */
+  | "NOT_CONNECTED";
 
 export type FounderRequestsOutcome<T> =
   | { readonly outcome: "OK"; readonly value: T }
@@ -100,8 +106,12 @@ export type FounderRequestsNotice = {
   readonly title: string;
   readonly key: string;
   readonly priority: "NEEDS_YOU" | "UPDATE";
-  /** REQUESTS: the founder's inbox item; PROFILE: the investor's view of the company. */
-  readonly target: "REQUESTS" | "PROFILE";
+  /**
+   * REQUESTS: the founder's inbox item; PROFILE: the investor's view of the
+   * company; DILIGENCE: the investor's Diligence tab (answers to questions
+   * their request carried).
+   */
+  readonly target: "REQUESTS" | "PROFILE" | "DILIGENCE";
 };
 
 export type FounderRequestsDependencies = {
@@ -134,13 +144,21 @@ export type FounderRequestsDependencies = {
     readonly tenantId: string;
     readonly investorOrganisationId: string;
   } | null>;
-  /** The company's relationships, with the investor organisation's name. */
+  /**
+   * The company's relationships, with the investor organisation's name and
+   * where each stands: only CONNECTED ones can be shared with.
+   */
   readonly relationshipsOf: (companyId: string) => Promise<
     readonly {
       readonly relationshipId: string;
       readonly investorOrganisationName: string;
+      readonly connection: RelationshipConnection;
     }[]
   >;
+  /** Whether the founder accepted this relationship's interest. */
+  readonly connectionOf: (
+    relationshipId: string,
+  ) => Promise<RelationshipConnection>;
   readonly investorOf: (
     actor: ActorContext,
   ) => Promise<{ readonly investorOrganisationId: string } | null>;
@@ -334,8 +352,77 @@ export function createFounderRequestsService(
     const byId = new Map(
       relationships.map((r) => [r.relationshipId, r.investorOrganisationName]),
     );
-    return { relationships, nameOf: (id: string) => byId.get(id) ?? null };
+    const pick = (connection: RelationshipConnection) =>
+      relationships
+        .filter((r) => r.connection === connection)
+        .slice(0, 200)
+        .map((r) => ({
+          relationshipId: r.relationshipId,
+          investorOrganisationName: r.investorOrganisationName,
+        }));
+    return {
+      relationships,
+      // The share picker: connected investors only; those waiting on the
+      // founder's answer are shown apart, as "connect first".
+      candidates: pick("CONNECTED"),
+      awaitingConnection: pick("INTEREST_PENDING"),
+      nameOf: (id: string) => byId.get(id) ?? null,
+    };
   }
+
+  /**
+   * The investor's notice for an answer. A question their diligence
+   * request carried opens their Diligence tab, where that request now
+   * reads "Answered N of M" (then "Answered"); a question asked elsewhere
+   * opens the company, where its assumption card holds the answer.
+   */
+  async function answerNotice(
+    question: DiligenceQuestionRecord,
+    answerKey: string,
+  ): Promise<FounderRequestsNotice> {
+    const vehicle = await quietly(
+      dependencies.diligenceRequests.find(sql, question.sentRef),
+      null,
+    );
+    if (vehicle === null || vehicle.relationshipId !== question.relationshipId)
+      return {
+        relationshipId: question.relationshipId,
+        actingSide: "COMPANY",
+        title: "{actor} answered your question",
+        key: answerKey,
+        priority: "NEEDS_YOU",
+        target: "PROFILE",
+      };
+    const set = (
+      await dependencies.questions.listForRelationship(
+        sql,
+        question.relationshipId,
+      )
+    ).filter((record) => record.sentRef === question.sentRef);
+    const answered = set.filter(
+      (record) => record.answer !== null || record.id === question.id,
+    ).length;
+    const total = Math.max(set.length, 1);
+    return {
+      relationshipId: question.relationshipId,
+      actingSide: "COMPANY",
+      title: (answered >= total
+        ? total === 1
+          ? `{actor} answered your question on ${vehicle.title}`
+          : `{actor} answered all ${String(total)} of your questions on ${vehicle.title}`
+        : `{actor} answered ${String(answered)} of ${String(total)} of your questions on ${vehicle.title}`
+      ).slice(0, 200),
+      key: answerKey,
+      priority: "NEEDS_YOU",
+      target: "DILIGENCE",
+    };
+  }
+
+  const connected = async (relationshipId: string) =>
+    (await quietly(
+      dependencies.connectionOf(relationshipId),
+      "NOT_CONNECTED" as const,
+    )) === "CONNECTED";
 
   /** Files a document in a folder (shared only when new); its level otherwise stays. */
   async function file(
@@ -562,6 +649,8 @@ export function createFounderRequestsService(
           title: found.title,
         };
       }
+      if (!(await connected(request.relationshipId)))
+        return refused("NOT_CONNECTED");
       const correlationId =
         command.correlationId ?? dependencies.newCorrelationId();
       if (
@@ -771,13 +860,14 @@ export function createFounderRequestsService(
       const own = await ownDocument(actor, documentId);
       if (own === null) return null;
       const { document } = own;
-      const [{ relationships, nameOf }, policies] = await Promise.all([
-        names(document.companyId),
-        dependencies.policyRepository.findAllForResource(sql, {
-          type: "document",
-          id: document.documentId,
-        }),
-      ]);
+      const [{ candidates, awaitingConnection, nameOf }, policies] =
+        await Promise.all([
+          names(document.companyId),
+          dependencies.policyRepository.findAllForResource(sql, {
+            type: "document",
+            id: document.documentId,
+          }),
+        ]);
       const at = now();
       return {
         documentId: document.documentId,
@@ -802,7 +892,8 @@ export function createFounderRequestsService(
           }))
           .slice(0, 200),
         history: accessHistory(policies, nameOf, at),
-        candidates: relationships.slice(0, 200),
+        candidates,
+        awaitingConnection,
       };
     },
 
@@ -814,7 +905,11 @@ export function createFounderRequestsService(
     ): Promise<FolderAccessDto | null> => {
       const company = await ownCompany(actor, companyId);
       if (company === null) return null;
-      const [folders, documents, { relationships }] = await Promise.all([
+      const [
+        folders,
+        documents,
+        { relationships, candidates, awaitingConnection },
+      ] = await Promise.all([
         store.folders(sql),
         store.documentsOf(sql, company.id),
         names(company.id),
@@ -855,7 +950,8 @@ export function createFounderRequestsService(
           level: d.level,
         })),
         investors: investors.filter((investor) => investor.documents > 0),
-        candidates: relationships.slice(0, 200),
+        candidates,
+        awaitingConnection,
       };
     },
 
@@ -897,6 +993,9 @@ export function createFounderRequestsService(
       );
       if (relationship === null || relationship.companyId !== company.id)
         return refused("NOT_FOUND");
+      // Refused, not hidden: only a connected investor is shared with.
+      if (!(await connected(command.relationshipId)))
+        return refused("NOT_CONNECTED");
       const shareable = documents.filter((d) => d.currentVersionId !== null);
       if (shareable.length === 0) return refused("NOT_SHAREABLE");
       const correlationId =
@@ -1123,6 +1222,9 @@ export function createFounderRequestsService(
         )
           return refused("NOT_SHAREABLE");
       }
+      // Attaching documents shares them: only with a connected investor.
+      if (documentIds.length > 0 && !(await connected(question.relationshipId)))
+        return refused("NOT_CONNECTED");
       const correlationId =
         command.correlationId ?? dependencies.newCorrelationId();
       const expiresAt = expiryAfter(ANSWER_SHARE_DAYS);
@@ -1182,14 +1284,16 @@ export function createFounderRequestsService(
         return inserted;
       });
       if (made.created) {
-        await notifyQuietly({
-          relationshipId: question.relationshipId,
-          actingSide: "COMPANY",
-          title: `{actor} answered your question`.slice(0, 200),
-          key: made.id,
-          priority: "NEEDS_YOU",
-          target: "PROFILE",
-        });
+        await notifyQuietly(
+          await answerNotice(question, made.id).catch(() => ({
+            relationshipId: question.relationshipId,
+            actingSide: "COMPANY" as const,
+            title: "{actor} answered your question",
+            key: made.id,
+            priority: "NEEDS_YOU" as const,
+            target: "PROFILE" as const,
+          })),
+        );
       }
       return {
         outcome: "OK",

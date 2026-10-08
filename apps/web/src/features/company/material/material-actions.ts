@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import {
+  ApiProblemError,
   confirmDeckReading,
   decideDataRoomRequest,
   openCompanyDeck,
@@ -14,9 +15,11 @@ import {
   requestDataRoomAccess,
   reviewDeckSection,
   setDataRoomLevel,
+  setDataRoomOutline,
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
+  DATA_ROOM_CONNECT_FIRST,
   DATA_ROOM_GRANT_DAYS,
   DataRoomLevelSchema,
   DeckSectionCodeSchema,
@@ -144,8 +147,36 @@ export async function requestAccessAction(input: {
     );
     revalidatePath(`/company/${companyId.data}`);
     return { ok: true, value: undefined };
+  } catch (error: unknown) {
+    // Not connected yet: the server refuses, and says what to do instead.
+    return failed(
+      error instanceof ApiProblemError && error.status === 403
+        ? DATA_ROOM_CONNECT_FIRST
+        : "The request wasn't sent. Try again.",
+    );
+  }
+}
+
+/** The founder lets unconnected investors see the folder outline, or not. */
+export async function setOutlineAction(input: {
+  readonly companyId: string;
+  readonly outlineBeforeConnection: boolean;
+}): Promise<MaterialResult> {
+  const companyId = Id.safeParse(input.companyId);
+  const api = await session();
+  if (!companyId.success || api === null)
+    return failed("That didn't save. Try again.");
+  try {
+    await setDataRoomOutline(
+      api,
+      companyId.data,
+      input.outlineBeforeConnection,
+    );
+    revalidatePath(`/company/${companyId.data}`);
+    revalidatePath("/documents");
+    return { ok: true, value: undefined };
   } catch {
-    return failed("The request wasn't sent. Try again.");
+    return failed("That didn't save. Try again.");
   }
 }
 
@@ -172,8 +203,12 @@ export async function decideRequestAction(input: {
     );
     revalidatePath(`/company/${input.companyId}`);
     return { ok: true, value: undefined };
-  } catch {
-    return failed("That didn't go through. Try again.");
+  } catch (error: unknown) {
+    return failed(
+      error instanceof ApiProblemError && error.status === 403
+        ? "You can share with investors you're connected to. Accept their interest first, then approve."
+        : "That didn't go through. Try again.",
+    );
   }
 }
 

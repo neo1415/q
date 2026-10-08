@@ -72,6 +72,8 @@ export const COMPANY_DATA_ROOM_REQUESTS_PATH =
 export const DATA_ROOM_DOCUMENT_LEVEL_PATH =
   "/v1/data-room/documents/:documentId/level" as const;
 /** `POST` — the founder approves (with an expiry) or declines a request. */
+export const COMPANY_DATA_ROOM_OUTLINE_PATH =
+  "/v1/companies/:companyId/data-room/outline" as const;
 export const DATA_ROOM_REQUEST_DECISION_PATH =
   "/v1/data-room/requests/:requestId/decision" as const;
 
@@ -120,10 +122,43 @@ export const DataRoomFolderSchema = z
   .strict();
 export type DataRoomFolder = z.infer<typeof DataRoomFolderSchema>;
 
+/**
+ * Data-room access goes through the relationship (founder decision
+ * 2026-10-08): until the founder accepts the investor's interest the room
+ * is LOCKED: no titles, no contents, no requests. The outline (folder
+ * names and how many listed documents each holds) shows only when the
+ * founder allows it.
+ */
+export const DATA_ROOM_ACCESS = ["CONNECTED", "LOCKED"] as const;
+export const DataRoomLockedSchema = z
+  .object({
+    /** NOT_CONNECTED: no interest yet (or declined); INTEREST_PENDING: waiting on the founder. */
+    reason: z.enum(["NOT_CONNECTED", "INTEREST_PENDING"]),
+    /** Null: the founder keeps even the outline for connected investors. */
+    outline: z
+      .array(
+        z
+          .object({
+            code: DataRoomCodeSchema,
+            label: z.string().min(1).max(80),
+            documents: z.number().int().min(0).max(500),
+          })
+          .strict(),
+      )
+      .max(40)
+      .nullable(),
+  })
+  .strict();
+export type DataRoomLocked = z.infer<typeof DataRoomLockedSchema>;
+
 export const DataRoomInvestorViewSchema = z
   .object({
     viewer: z.literal("INVESTOR"),
     companyId: UuidSchema,
+    /** Absent: an older server, read as CONNECTED. */
+    access: z.enum(DATA_ROOM_ACCESS).optional(),
+    /** Present exactly when access is LOCKED (folders and documents are then empty). */
+    locked: DataRoomLockedSchema.optional(),
     folders: z.array(DataRoomFolderSchema).max(40),
     documents: z.array(DataRoomInvestorDocumentSchema).max(500),
   })
@@ -203,6 +238,11 @@ export const DataRoomOwnerViewSchema = z
     documents: z.array(DataRoomOwnerDocumentSchema).max(500),
     checklist: z.array(DataRoomChecklistItemSchema).max(100),
     requests: z.array(DataRoomRequestSchema).max(200),
+    /**
+     * Investors not yet connected may see folder names and counts (never
+     * titles or contents). Default off; absent from an older server.
+     */
+    outlineBeforeConnection: z.boolean().optional(),
   })
   .strict();
 export type DataRoomOwnerView = z.infer<typeof DataRoomOwnerViewSchema>;
@@ -264,6 +304,17 @@ export const DecideDataRoomRequestSchema = z.discriminatedUnion("decision", [
     .strict(),
 ]);
 export type DecideDataRoomRequest = z.infer<typeof DecideDataRoomRequestSchema>;
+
+export const SetDataRoomOutlineRequestSchema = z
+  .object({ outlineBeforeConnection: z.boolean() })
+  .strict();
+export type SetDataRoomOutlineRequest = z.infer<
+  typeof SetDataRoomOutlineRequestSchema
+>;
+
+/** The words the server and Q use when an unconnected investor asks. */
+export const DATA_ROOM_CONNECT_FIRST =
+  "Express interest to request data-room access. Once the founders accept, you can see their data room and ask for documents." as const;
 
 export const DataRoomLevelResultSchema = z
   .object({

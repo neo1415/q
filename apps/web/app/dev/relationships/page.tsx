@@ -299,6 +299,7 @@ export default async function RelationshipsReviewPage({
                 fulfilledBy: founder
                   ? null
                   : { documentId: doc(1), title: "Pitch deck v3" },
+                questions: null,
               },
               {
                 requestId: id("9", 2),
@@ -312,6 +313,7 @@ export default async function RelationshipsReviewPage({
                   documentId: doc(2),
                   title: "Cap table Sep 2026",
                 },
+                questions: null,
               },
               ...(founder
                 ? []
@@ -325,6 +327,40 @@ export default async function RelationshipsReviewPage({
                       status: "OPEN" as const,
                       declineNote: null,
                       fulfilledBy: null,
+                      questions: null,
+                    },
+                    // 2026-10-08: a request that carried questions stands
+                    // where its answers stand.
+                    {
+                      requestId: id("9", 5),
+                      title: "Questions on traction",
+                      note: null,
+                      requestedAt: ago(26),
+                      requestedByName: "Amara Diallo-Benson",
+                      status: "OPEN" as const,
+                      declineNote: null,
+                      fulfilledBy: null,
+                      questions: [
+                        {
+                          questionId: id("a", 1),
+                          question: "How many customers paid last month?",
+                          assumptionId: "TRACTION:1",
+                          assumptionLabel: "Paying customers",
+                          answer: {
+                            text: "131 paid in September.",
+                            answeredAt: ago(4),
+                            truthClass: "USER_CLAIM" as const,
+                            evidenceStatus: "SELF_REPORTED" as const,
+                          },
+                        },
+                        {
+                          questionId: id("a", 2),
+                          question: "What does the take rate depend on?",
+                          assumptionId: null,
+                          assumptionLabel: null,
+                          answer: null,
+                        },
+                      ],
                     },
                     {
                       requestId: id("9", 4),
@@ -335,6 +371,7 @@ export default async function RelationshipsReviewPage({
                       status: "DECLINED" as const,
                       declineNote: "We'll share these after a term sheet.",
                       fulfilledBy: null,
+                      questions: null,
                     },
                   ]),
             ],

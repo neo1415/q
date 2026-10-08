@@ -32,6 +32,9 @@ const actions = vi.hoisted(() => ({
   revoke: vi.fn((..._args: unknown[]) =>
     Promise.resolve({ ok: true, value: undefined }),
   ),
+  outline: vi.fn((..._args: unknown[]) =>
+    Promise.resolve({ ok: true, value: undefined }),
+  ),
 }));
 
 vi.mock("../src/features/documents/requests/request-actions", () => ({
@@ -57,6 +60,7 @@ vi.mock("../src/features/company/material/material-actions", () => ({
   newRequestKey: vi.fn(),
   openDocumentAction: vi.fn(),
   requestAccessAction: vi.fn(),
+  setOutlineAction: actions.outline,
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
@@ -66,7 +70,7 @@ const { RequestsInbox } =
   await import("../src/features/documents/requests/requests-inbox");
 const { AccessSheet } =
   await import("../src/features/documents/requests/access-sheet");
-const { OwnerDataRoom } =
+const { InvestorDataRoom, OwnerDataRoom } =
   await import("../src/features/company/material/data-room");
 const model = await import("../src/features/documents/requests/requests-model");
 const cards = await import("../src/features/q/room/document-cards");
@@ -317,6 +321,93 @@ describe("pure parts", () => {
     expect(unit?.meta).toContain("Only investors I choose");
     expect(unit?.meta).toContain(
       "Zino Capital (fictional) (view only, watermarked",
+    );
+  });
+});
+
+describe("access goes through the relationship (2026-10-08)", () => {
+  it("lists only connected investors to share with, says so, and offers 'connect first' for those waiting", () => {
+    render(
+      <AccessSheet
+        companyId={fixtures.REVIEW_COMPANY}
+        target={{
+          kind: "DOCUMENT",
+          documentId: fixtures.UNIT_ECONOMICS,
+          title: "Unit economics",
+        }}
+        initial={fixtures.reviewDocumentAccess()}
+        onClose={() => undefined}
+      />,
+    );
+    expect(document.querySelector("[data-access-explain]")?.textContent).toBe(
+      "You can share with investors you're connected to.",
+    );
+    const options = Array.from(
+      document.querySelectorAll("[data-access-candidate] option"),
+    ).map((option) => option.textContent);
+    expect(options).not.toContain("Meridian Seed (fictional)");
+    const awaiting = document.querySelector("[data-access-awaiting]");
+    expect(awaiting?.textContent).toContain("Meridian Seed (fictional)");
+    expect(awaiting?.textContent).toContain("Connect first, then share.");
+    expect(
+      screen
+        .getByRole("link", { name: "Review their interest" })
+        .getAttribute("href"),
+    ).toBe("/company/interest");
+  });
+
+  it("lets the founder show the outline before connecting, server-confirmed", async () => {
+    render(
+      <OwnerDataRoom
+        companyId={fixtures.REVIEW_COMPANY}
+        view={{ ...fixtures.reviewOwnerRoom(), outlineBeforeConnection: false }}
+        inDocuments
+      />,
+    );
+    const toggle = screen.getByRole("button", { name: /Show folder names/ });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(actions.outline).toHaveBeenCalledWith({
+        companyId: fixtures.REVIEW_COMPANY,
+        outlineBeforeConnection: true,
+      }),
+    );
+  });
+
+  it("shows an unconnected investor a locked room: no titles, and how to get in", () => {
+    render(
+      <InvestorDataRoom
+        companyId={fixtures.REVIEW_COMPANY}
+        companyName="Ledgerline (fictional)"
+        view={fixtures.reviewLockedRoom("NOT_CONNECTED")}
+      />,
+    );
+    const room = document.querySelector('[data-data-room="investor-locked"]');
+    expect(room?.textContent).toContain(
+      "Express interest to request data-room access.",
+    );
+    expect(room?.querySelector("[data-locked-cta]")).not.toBeNull();
+    expect(room?.querySelector("[data-locked-outline]")).toBeNull();
+    expect(room?.textContent).not.toContain("Unit economics");
+    expect(screen.queryByRole("button", { name: /Request/ })).toBeNull();
+  });
+
+  it("says the interest is waiting, with the outline the founder allowed", () => {
+    render(
+      <InvestorDataRoom
+        companyId={fixtures.REVIEW_COMPANY}
+        companyName="Ledgerline (fictional)"
+        view={fixtures.reviewLockedRoom("INTEREST_PENDING")}
+      />,
+    );
+    const room = document.querySelector('[data-data-room="investor-locked"]');
+    expect(room?.textContent).toContain(
+      "Your interest is with Ledgerline (fictional).",
+    );
+    expect(room?.querySelector("[data-locked-cta]")).toBeNull();
+    expect(room?.querySelector("[data-locked-outline]")?.textContent).toContain(
+      "Financials2 documents",
     );
   });
 });

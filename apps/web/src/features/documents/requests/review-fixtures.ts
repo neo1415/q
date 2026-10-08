@@ -22,6 +22,8 @@ export const REVIEW_COMPANY = uuid(1);
 export const ZINO = uuid(201);
 export const KILN = uuid(202);
 export const HARBOUR = uuid(203);
+/** Expressed interest; the founder has not accepted it (not shareable yet). */
+export const MERIDIAN = uuid(204);
 export const MANAGEMENT_ACCOUNTS = uuid(301);
 export const CAP_TABLE = uuid(302);
 export const UNIT_ECONOMICS = uuid(303);
@@ -273,6 +275,12 @@ export function reviewDocumentAccess(): DocumentAccessDto {
         investorOrganisationName: "Zino Capital (fictional)",
       },
     ],
+    awaitingConnection: [
+      {
+        relationshipId: MERIDIAN,
+        investorOrganisationName: "Meridian Seed (fictional)",
+      },
+    ],
   };
 }
 
@@ -300,6 +308,7 @@ export function reviewFolderAccess(): FolderAccessDto {
       },
     ],
     candidates: reviewDocumentAccess().candidates,
+    awaitingConnection: reviewDocumentAccess().awaitingConnection,
   };
 }
 
@@ -368,6 +377,36 @@ export function reviewInvestorBoard(): AssumptionBoardDto {
   };
 }
 
+/**
+ * The data room before the founder accepts the investor's interest
+ * (2026-10-08): locked; the outline only when the founder allows it.
+ */
+export function reviewLockedRoom(
+  reason: "NOT_CONNECTED" | "INTEREST_PENDING",
+): DataRoomInvestorView {
+  return {
+    viewer: "INVESTOR",
+    companyId: REVIEW_COMPANY,
+    access: "LOCKED",
+    locked: {
+      reason,
+      outline:
+        reason === "INTEREST_PENDING"
+          ? [
+              {
+                code: "cap_table",
+                label: "Cap table and equity",
+                documents: 1,
+              },
+              { code: "financials", label: "Financials", documents: 2 },
+            ]
+          : null,
+    },
+    folders: [],
+    documents: [],
+  };
+}
+
 /** The investor's data room: one shared on request, one declined, one listed. */
 export function reviewInvestorRoom(): DataRoomInvestorView {
   const base = {
@@ -380,6 +419,7 @@ export function reviewInvestorRoom(): DataRoomInvestorView {
   return {
     viewer: "INVESTOR",
     companyId: REVIEW_COMPANY,
+    access: "CONNECTED",
     folders: [
       { code: "cap_table", label: "Cap table and equity" },
       { code: "financials", label: "Financials" },

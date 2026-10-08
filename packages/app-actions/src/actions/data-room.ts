@@ -4,7 +4,10 @@ import {
   DATA_ROOM_DOCUMENT_LEVEL_PATH,
   DATA_ROOM_GRANT_DEFAULT_DAYS,
   DATA_ROOM_REQUEST_DECISION_PATH,
+  COMPANY_DATA_ROOM_OUTLINE_PATH,
   COMPANY_DATA_ROOM_REQUESTS_PATH,
+  DATA_ROOM_CONNECT_FIRST,
+  SetDataRoomOutlineRequestSchema,
   DECK_EXTRACTION_CONFIRM_PATH,
   DECK_READ_AGAIN_PATH,
   DECK_SECTION_LABELS,
@@ -78,6 +81,12 @@ const REFUSALS: Readonly<
   INVESTOR_ONLY: {
     code: "PERMISSION_DENIED",
     detail: "Only investors ask for documents.",
+  },
+  // Refused, not hidden (founder decision 2026-10-08): the room opens
+  // through the relationship.
+  NOT_CONNECTED: {
+    code: "PERMISSION_DENIED",
+    detail: DATA_ROOM_CONNECT_FIRST,
   },
   NOT_REQUESTABLE: {
     code: "RESOURCE_CONFLICT",
@@ -330,10 +339,19 @@ export const REQUEST_DATA_ROOM_ACCESS = defineAppAction<
     toCanonical: async (tool, context, ports) => {
       const companyId = tool.company;
       let documentId: string | null = null;
+      const room = await ports.dataRoom
+        ?.view(context.actor, companyId)
+        .catch(() => null);
+      // Not connected yet: the guidance, not an error (the server refuses
+      // the request too).
+      if (room?.viewer === "INVESTOR" && room.access === "LOCKED")
+        return refusal(
+          room.locked?.reason === "INTEREST_PENDING"
+            ? "Their data room opens once the founders accept your interest; you can ask for documents then."
+            : DATA_ROOM_CONNECT_FIRST,
+        );
       if (tool.document !== undefined) {
-        const view = await ports.dataRoom
-          ?.view(context.actor, companyId)
-          .catch(() => null);
+        const view = room;
         if (view === null || view === undefined || view.viewer !== "INVESTOR")
           return null;
         const wanted = tool.document.toLowerCase();
@@ -363,6 +381,63 @@ export const REQUEST_DATA_ROOM_ACCESS = defineAppAction<
       };
     },
   },
+});
+
+// --- the outline before a connection (founder) ---------------------------------
+
+const Outline = z
+  .object({
+    companyId: UuidSchema,
+    input: SetDataRoomOutlineRequestSchema,
+  })
+  .strict();
+
+export const SET_DATA_ROOM_OUTLINE = defineAppAction<
+  z.infer<typeof Outline>,
+  DataRoomOutcome<{ readonly outlineBeforeConnection: boolean }>
+>({
+  name: "data_room.outline.set",
+  supersedes: true,
+  short: "show the data-room outline",
+  area: "documents",
+  classification: "CONSEQUENTIAL",
+  does: "Lets investors who are not connected yet see the data room's folder names and how many documents each holds (never titles or contents), or hides them again.",
+  input: Outline,
+  output:
+    z.custom<DataRoomOutcome<{ readonly outlineBeforeConnection: boolean }>>(),
+  authorize: servicesDecide,
+  run: (ports, context, input) =>
+    room(ports).setOutline({
+      actor: context.actor,
+      companyId: input.companyId,
+      outlineBeforeConnection: input.input.outlineBeforeConnection,
+    }),
+  targets: (input) => [{ kind: "COMPANY", companyId: input.companyId }],
+  card: (input) => ({
+    summary: input.input.outlineBeforeConnection
+      ? "Show your data room's outline before connecting"
+      : "Hide your data room's outline until you connect",
+    preview: input.input.outlineBeforeConnection
+      ? "Investors not yet connected see folder names and counts. Titles and documents stay hidden."
+      : "Investors not yet connected see only that the data room opens once you accept their interest.",
+  }),
+  done: (out) =>
+    out.outcome === "OK"
+      ? "Done. Your data room shows it that way now."
+      : failedWords(out),
+  succeeded,
+  http: {
+    method: "PUT",
+    path: COMPANY_DATA_ROOM_OUTLINE_PATH,
+    fromRequest: (params, body) => ({
+      companyId: params["companyId"],
+      input: body,
+    }),
+    problem,
+    notFound,
+    respond: (out) => (out.outcome === "OK" ? out.value : undefined),
+  },
+  qCapability: "offer.data_room_outline",
 });
 
 // --- answer a request (founder) -------------------------------------------------
@@ -896,6 +971,7 @@ export const DATA_ROOM_ACTIONS: readonly AnyAppAction[] = [
   SET_DATA_ROOM_LEVEL,
   REQUEST_DATA_ROOM_ACCESS,
   DECIDE_DATA_ROOM_REQUEST,
+  SET_DATA_ROOM_OUTLINE,
   CONFIRM_DECK_READING,
   REVIEW_DECK_SECTION,
   READ_DECK_AGAIN,

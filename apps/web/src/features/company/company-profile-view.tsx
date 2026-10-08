@@ -786,6 +786,8 @@ export function CompanyProfileView({
                   companyId={profile.companyId}
                   companyName={profile.canonicalName}
                   view={dataRoom}
+                  interest={interest}
+                  relationshipState={relationshipState}
                 />
               )}
             </ProfileTabPanel>

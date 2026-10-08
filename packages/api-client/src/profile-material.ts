@@ -1,5 +1,6 @@
 import {
   COMPANIES_PATH,
+  COMPANY_DATA_ROOM_OUTLINE_PATH,
   COMPANY_DATA_ROOM_REQUESTS_PATH,
   COMPANY_DATA_ROOM_SEGMENT,
   COMPANY_DECK_OPEN_SEGMENT,
@@ -19,6 +20,7 @@ import {
   DeckSectionReviewResultSchema,
   FounderPersonDtoSchema,
   IDEMPOTENCY_KEY_HEADER,
+  SetDataRoomOutlineRequestSchema,
   type DecideDataRoomRequest,
   type DeckSectionCode,
   type DeckSectionReviewAction,
@@ -104,6 +106,24 @@ export function setDataRoomLevel(
     ),
     DataRoomLevelResultSchema,
     { body: request },
+  );
+}
+
+/** The founder lets unconnected investors see the folder outline, or not. */
+export function setDataRoomOutline(
+  session: ApiSession,
+  companyId: string,
+  outlineBeforeConnection: boolean,
+) {
+  return call(
+    session,
+    "PUT",
+    COMPANY_DATA_ROOM_OUTLINE_PATH.replace(
+      ":companyId",
+      encodeURIComponent(companyId),
+    ),
+    SetDataRoomOutlineRequestSchema,
+    { body: { outlineBeforeConnection } },
   );
 }
 

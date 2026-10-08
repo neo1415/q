@@ -27,6 +27,7 @@ const request = (
   status,
   declineNote: null,
   fulfilledBy,
+  questions: null,
 });
 
 const share = (viewedAt: string | null): DiligenceDto["shares"][number] => ({
@@ -67,6 +68,42 @@ describe("diligence request status", () => {
       words: "Needs a new file",
       answerable: true,
       share: null,
+    });
+  });
+});
+
+describe("a request that carried questions (2026-10-08)", () => {
+  const asked = (answers: readonly (string | null)[]) => ({
+    ...request("OPEN", null),
+    questions: answers.map((text, index) => ({
+      questionId: `8f1e2a4c-1b2c-4d3e-8f9a-0b1c2d3e4f${String(10 + index)}`,
+      question: `Question ${String(index + 1)}?`,
+      assumptionId: null,
+      assumptionLabel: null,
+      answer:
+        text === null
+          ? null
+          : {
+              text,
+              answeredAt: "2026-10-05T07:00:00.000Z",
+              truthClass: "USER_CLAIM" as const,
+              evidenceStatus: "SELF_REPORTED" as const,
+            },
+    })),
+  });
+
+  it("stays Requested until an answer arrives", () => {
+    expect(requestStatus(asked([null, null]), []).words).toBe("Requested");
+  });
+
+  it("reads Answered N of M, then Answered, from its answers", () => {
+    expect(requestStatus(asked(["131 paid.", null]), [])).toMatchObject({
+      words: "Answered 1 of 2",
+      answerable: false,
+    });
+    expect(requestStatus(asked(["131 paid.", "Volume."]), [])).toMatchObject({
+      words: "Answered",
+      tone: "positive",
     });
   });
 });

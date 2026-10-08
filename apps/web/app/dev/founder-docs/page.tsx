@@ -23,6 +23,8 @@ const VIEWS = [
   "access",
   "folder",
   "investor",
+  "locked",
+  "pending",
 ] as const;
 
 /**
@@ -47,7 +49,8 @@ export default async function FounderDocsReviewPage({
   const view =
     VIEWS.find((candidate) => candidate === raw) ?? ("requested" as const);
   const item = typeof params["item"] === "string" ? params["item"] : null;
-  const investor = view === "investor";
+  const investor =
+    view === "investor" || view === "locked" || view === "pending";
   return (
     <AppShell
       context={{

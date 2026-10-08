@@ -743,6 +743,38 @@ export const DiligenceDtoSchema = z
               })
               .strict()
               .nullable(),
+            /**
+             * When the request carried the investor's questions: each one
+             * with the founder's answer (their claim, USER_CLAIM), so the
+             * request's state comes from its answers (Answered N of M).
+             * Null: a plain document request.
+             */
+            questions: z
+              .array(
+                z
+                  .object({
+                    questionId: UuidSchema,
+                    question: z.string().max(2000),
+                    assumptionId: z.string().max(200).nullable(),
+                    assumptionLabel: z.string().max(300).nullable(),
+                    answer: z
+                      .object({
+                        text: z.string().max(2000),
+                        answeredAt: UtcTimestampSchema,
+                        truthClass: z.literal("USER_CLAIM"),
+                        evidenceStatus: z.enum([
+                          "SELF_REPORTED",
+                          "DOCUMENT_SUPPORTED",
+                        ]),
+                      })
+                      .strict()
+                      .nullable(),
+                  })
+                  .strict(),
+              )
+              .max(5)
+              .nullable()
+              .default(null),
           })
           .strict(),
       )

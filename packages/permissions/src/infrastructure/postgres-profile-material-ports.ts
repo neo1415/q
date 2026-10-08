@@ -1,6 +1,9 @@
 import type { DatabaseExecutor } from "@capital-q/database";
 
-import type { DataRoomCompany } from "../application/data-room.js";
+import type {
+  DataRoomCompany,
+  RelationshipConnection,
+} from "../application/data-room.js";
 
 /**
  * Small, permission-neutral reads the data-room and deck services need,
@@ -65,6 +68,31 @@ export function createPostgresProfileMaterialPorts(options: {
         select id from network.relationships
          where company_id = ${companyId} and investor_organisation_id = ${investorOrganisationId}`;
       return rows[0]?.id ?? null;
+    },
+
+    /**
+     * Where the relationship stands for data-room access, read from its
+     * history (not the cached state, which the projector may not have
+     * caught up on): CONNECTED once the founder accepted the interest.
+     */
+    connectionOf: async (
+      relationshipId: string,
+    ): Promise<RelationshipConnection> => {
+      if (!UUID.test(relationshipId)) return "NOT_CONNECTED";
+      const rows = await sql<{ connection: RelationshipConnection }[]>`
+        select case
+                 when exists (select 1 from network.relationship_events e
+                               where e.relationship_id = ${relationshipId}
+                                 and e.event_type = 'connection_accepted')
+                   then 'CONNECTED'
+                 when (select e.event_type from network.relationship_events e
+                        where e.relationship_id = ${relationshipId}
+                          and e.event_type in ('interest_expressed', 'interest_declined')
+                        order by e.sequence desc limit 1) = 'interest_expressed'
+                   then 'INTEREST_PENDING'
+                 else 'NOT_CONNECTED'
+               end as connection`;
+      return rows[0]?.connection ?? "NOT_CONNECTED";
     },
   };
 }

@@ -232,7 +232,10 @@ export type AppActionPorts = {
     | undefined;
   /** The data room (overnight A3): levels, requests and answers. */
   readonly dataRoom?:
-    | Pick<DataRoomService, "view" | "setLevel" | "requestAccess" | "decide">
+    | Pick<
+        DataRoomService,
+        "view" | "setLevel" | "setOutline" | "requestAccess" | "decide"
+      >
     | undefined;
   /**
    * Founder documents (2026-10-08): the requests inbox, answering, the

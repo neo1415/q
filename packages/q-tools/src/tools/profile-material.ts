@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   CompanyDeckViewSchema,
+  DATA_ROOM_CONNECT_FIRST,
   DataRoomViewSchema,
   DeckCoachingSchema,
   DeckSectionSchema,
@@ -236,6 +237,11 @@ const DataRoomOutputSchema = z
       )
       .max(500),
     openRequests: z.number().int().min(0),
+    /**
+     * Investor only, when not connected yet: what to tell them instead of
+     * any document (the room opens through the relationship).
+     */
+    locked: z.string().optional(),
   })
   .strict();
 
@@ -281,6 +287,22 @@ export function createReadCompanyDataRoomTool(
     },
     execute: (_input, _context, view) => {
       const folder = new Map(view.folders.map((f) => [f.code, f.label]));
+      if (view.viewer === "INVESTOR" && view.access === "LOCKED") {
+        const outline = view.locked?.outline ?? null;
+        return Promise.resolve({
+          viewer: "INVESTOR" as const,
+          documents: [],
+          openRequests: 0,
+          locked: [
+            view.locked?.reason === "INTEREST_PENDING"
+              ? "Their data room opens once the founders accept your interest; you can ask for documents then."
+              : DATA_ROOM_CONNECT_FIRST,
+            outline === null || outline.length === 0
+              ? ""
+              : ` Folders they list: ${outline.map((f) => `${f.label} (${String(f.documents)})`).join(", ")}.`,
+          ].join(""),
+        });
+      }
       if (view.viewer === "INVESTOR") {
         const words = {
           OPEN: "open to you",

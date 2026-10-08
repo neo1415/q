@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useId, useRef, useState } from "react";
 
 import type { DiligenceDto } from "@capital-q/contracts";
@@ -46,7 +47,13 @@ type Share = DiligenceDto["shares"][number];
 
 export type RequestStatus = {
   readonly words:
-    "Requested" | "Shared" | "Viewed" | "Needs a new file" | "Declined";
+    | "Requested"
+    | "Shared"
+    | "Viewed"
+    | "Needs a new file"
+    | "Declined"
+    | "Answered"
+    | `Answered ${string} of ${string}`;
   readonly tone: "waiting" | "positive" | "accent" | "neutral";
   /** The founder can still answer it. */
   readonly answerable: boolean;
@@ -72,6 +79,26 @@ export function requestStatus(
       share: null,
     };
   }
+  // 2026-10-08: a request that carried the investor's questions stands
+  // where its answers stand (it was showing "Requested" after answers
+  // arrived). The founder answers its questions, not with a file.
+  const questions = request.questions ?? [];
+  if (
+    questions.length > 0 &&
+    (request.status !== "FULFILLED" || request.fulfilledBy === null)
+  ) {
+    const answered = questions.filter((q) => q.answer !== null).length;
+    if (answered > 0)
+      return {
+        words:
+          answered >= questions.length
+            ? "Answered"
+            : `Answered ${String(answered)} of ${String(questions.length)}`,
+        tone: answered >= questions.length ? "positive" : "waiting",
+        answerable: false,
+        share: null,
+      };
+  }
   if (request.status !== "FULFILLED" || request.fulfilledBy === null) {
     return {
       words: "Requested",
@@ -93,6 +120,63 @@ export function requestStatus(
   return share.viewedAt === null
     ? { words: "Shared", tone: "positive", answerable: false, share }
     : { words: "Viewed", tone: "accent", answerable: false, share };
+}
+
+/**
+ * The questions a request carried, each with the founder's answer (their
+ * claim, never verified fact), linked to the assumption card it tests.
+ */
+function QuestionAnswers({
+  questions,
+  companyId,
+  founder,
+  counterpart,
+}: {
+  readonly questions: NonNullable<DiligenceRequest["questions"]>;
+  readonly companyId: string;
+  readonly founder: boolean;
+  readonly counterpart: string;
+}) {
+  return (
+    <ol className="flex flex-col gap-3" data-request-questions>
+      {questions.map((question) => (
+        <li
+          key={question.questionId}
+          className="flex flex-col gap-1 border-l-2 border-(--cq-border) pl-3"
+          data-question-answered={question.answer === null ? "no" : "yes"}
+        >
+          <p className="cq-body-sm text-(--cq-text-primary)">
+            {question.question}
+          </p>
+          {question.answer === null ? (
+            <p className="cq-caption text-(--cq-text-tertiary)">
+              {founder ? "Not answered yet." : `Waiting on ${counterpart}.`}
+            </p>
+          ) : (
+            <>
+              <p className="cq-body-sm text-(--cq-text-secondary)">
+                {question.answer.text}
+              </p>
+              <p className="cq-caption text-(--cq-text-tertiary)">
+                {founder ? "Your answer" : `${counterpart}'s answer`} ·{" "}
+                {question.answer.evidenceStatus === "DOCUMENT_SUPPORTED"
+                  ? "with a document"
+                  : "their own words, not verified"}
+              </p>
+            </>
+          )}
+          {question.assumptionLabel === null ? null : (
+            <Link
+              href={`/company/${encodeURIComponent(companyId)}#assumptions`}
+              className="cq-caption inline-flex min-h-11 items-center self-start text-(--cq-text-secondary) underline underline-offset-2 hover:text-(--cq-text-primary)"
+            >
+              On the assumptions card: {question.assumptionLabel}
+            </Link>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
 }
 
 const TONES: Readonly<Record<RequestStatus["tone"], string>> = {
@@ -354,6 +438,15 @@ export function RelationshipDiligence({
                         : `: “${request.declineNote}”`}
                     </p>
                   ) : null}
+                  {request.questions === null ||
+                  request.questions.length === 0 ? null : (
+                    <QuestionAnswers
+                      questions={request.questions}
+                      companyId={companyId}
+                      founder={founder}
+                      counterpart={counterpart}
+                    />
+                  )}
                   {status.share === null ? null : fileRow(status.share)}
                   {mine && uploading !== null ? (
                     <UploadProgress
@@ -361,7 +454,22 @@ export function RelationshipDiligence({
                       fraction={uploading.fraction}
                     />
                   ) : null}
-                  {founder && area.open && status.answerable && !mine ? (
+                  {founder &&
+                  request.questions !== null &&
+                  request.questions.some((q) => q.answer === null) ? (
+                    <Link
+                      href={`/documents?tab=requested&item=${encodeURIComponent(request.requestId)}`}
+                      className="cq-body-sm inline-flex min-h-11 items-center self-start text-(--cq-text-primary) underline underline-offset-2"
+                    >
+                      Answer their questions
+                    </Link>
+                  ) : null}
+                  {founder &&
+                  area.open &&
+                  status.answerable &&
+                  !mine &&
+                  (request.questions === null ||
+                    request.questions.length === 0) ? (
                     <div className="grid grid-cols-2 gap-2 sm:flex">
                       <UploadButton
                         disabled={busy !== null || uploading !== null}
