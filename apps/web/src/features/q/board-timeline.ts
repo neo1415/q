@@ -78,6 +78,10 @@ function kindOf(blocks: readonly QTurnObjectBlock[]): string {
         return "Waiting for your yes";
       case "ARTIFACT_REFERENCE":
         return "File Q made for you";
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
       case "CLARIFICATION_REQUEST":
@@ -164,6 +168,9 @@ function sourcesOf(turn: Extract<QTurn, { kind: "Q" }>): BoardSource[] {
 
 export function boardTimeline(turns: readonly QTurn[]): BoardEntry[] {
   const entries: BoardEntry[] = [];
+  // INC-1: one run, one Board entry, as first filed; a later copy of the
+  // same run (room feed, read-back) never adds or merges a second.
+  const runs = new Set<string>();
   let question: string | undefined;
   for (const turn of turns) {
     if (turn.kind === "PERSON") {
@@ -171,8 +178,18 @@ export function boardTimeline(turns: readonly QTurn[]): BoardEntry[] {
       continue;
     }
     if (turn.streaming) continue;
-    const blocks = turn.blocks.filter((block) => KEPT.has(block.kind));
+    let cards = false;
+    const blocks = turn.blocks.filter((block) => {
+      if (!KEPT.has(block.kind)) return false;
+      if (block.kind !== "ANSWER_CARDS") return true;
+      if (cards) return false;
+      cards = true;
+      return true;
+    });
     if (blocks.length === 0) continue;
+    const run = turn.runId ?? turn.id;
+    if (runs.has(run)) continue;
+    runs.add(run);
     entries.push({
       id: turn.id,
       at: turn.at,
