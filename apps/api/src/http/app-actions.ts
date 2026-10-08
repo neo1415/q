@@ -106,6 +106,7 @@ async function answer(
   http: AppActionHttp<unknown, unknown>,
   input: unknown,
   run: () => Promise<unknown>,
+  replayed = false,
 ): Promise<unknown> {
   let out: unknown;
   try {
@@ -143,8 +144,12 @@ async function answer(
   if (http.location !== undefined) {
     void reply.header("Location", http.location(out, input));
   }
-  const status =
+  const declared =
     typeof http.status === "function" ? http.status(out) : (http.status ?? 200);
+  // A replayed key created nothing and started nothing this time: the
+  // first run's 201/202 becomes 200, as the services' own replays answer.
+  const status =
+    replayed && (declared === 201 || declared === 202) ? 200 : declared;
   // 204 answers with no body, whatever `respond` would say.
   if (status === 204) return reply.status(204).send();
   void reply.status(status);
@@ -219,7 +224,10 @@ export function registerAppActionRoutes(
           return undefined;
         }
         const run = () => action.run(dependencies.ports, context, input);
-        if (intentKey === undefined) {
+        // A service that keys its own work (`idempotencyKeyOf`) is the
+        // durable guard and answers its replays itself (`deduplicated`, its
+        // own conflict rules); a second, in-process guard would shadow that.
+        if (intentKey === undefined || http.idempotencyKeyOf !== undefined) {
           return answer(request, reply, dependencies, http, input, run);
         }
         // One run per person, action and key; a retry replays its outcome.
@@ -250,6 +258,7 @@ export function registerAppActionRoutes(
           http,
           input,
           () => decision.outcome,
+          decision.kind === "REPLAY",
         );
       },
     });

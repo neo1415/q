@@ -51,13 +51,21 @@ describe("where a person stands with onboarding", () => {
   it("asks both journeys side by side: ~120 ms, not 240 ms, founder first", async () => {
     journeys.status = { founder: "ACTIVE", investor: "ACTIVE" };
     journeys.most = 0;
-    const started = Date.now();
-    expect(await resolveOnboardingState()).toEqual({
-      kind: "UNFINISHED",
-      journey: "founder",
-    });
-    expect(journeys.most).toBe(2);
-    expect(Date.now() - started).toBeLessThan(2 * READ_MS);
+    // Fake timers, not the wall clock: on a loaded machine real time made
+    // this flaky. Both reads finish after one READ_MS only if they overlap.
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const state = resolveOnboardingState().finally(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(READ_MS);
+      expect(settled).toBe(true);
+      expect(await state).toEqual({ kind: "UNFINISHED", journey: "founder" });
+      expect(journeys.most).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("is DONE when either journey completed, whatever the other says", async () => {
