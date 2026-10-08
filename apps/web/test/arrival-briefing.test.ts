@@ -191,9 +191,9 @@ describe("spoken replies are decided by the person's own words", () => {
 
   it("the line hands the call to the page's decider, with what was heard", async () => {
     const seen: unknown[] = [];
-    const off = registerCardDecider(async (input) => {
+    const off = registerCardDecider((input) => {
       seen.push(input);
-      return { ok: true };
+      return Promise.resolve({ ok: true });
     });
     expect(
       await decideCardByVoice(JSON.stringify({ words: "send it" }), "send it"),

@@ -96,11 +96,13 @@ export function BriefingHarness({
   at,
   timeZone,
   fail,
+  dock,
 }: {
   readonly state: "quiet" | "cards";
   readonly at: string;
   readonly timeZone: string;
   readonly fail: boolean;
+  readonly dock: boolean;
 }) {
   const [log, setLog] = useState<readonly ArrivalDecision[]>([]);
   const [voice, setVoice] = useState<string>("");
@@ -126,17 +128,33 @@ export function BriefingHarness({
   const now = useCallback(() => new Date(at), [at]);
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-8 bg-(--cq-canvas) px-4 py-10">
-      <ArrivalBriefing
-        variant="page"
-        load={load}
-        decide={decide}
-        now={now}
-        fallback={
-          <h1 className="cq-title-lg text-center" data-harness-fallback>
-            Welcome back, Zino.
-          </h1>
-        }
-      />
+      {dock ? (
+        <aside
+          aria-label="Q's briefing"
+          className="fixed right-4 bottom-6 z-(--cq-z-presence) flex w-[min(380px,calc(100vw-32px))] flex-col rounded-(--cq-radius-xl) border border-(--cq-border) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-overlay) empty:hidden"
+          data-arrival-dock
+        >
+          <ArrivalBriefing
+            variant="dock"
+            load={load}
+            decide={decide}
+            now={now}
+            onClose={() => undefined}
+          />
+        </aside>
+      ) : (
+        <ArrivalBriefing
+          variant="page"
+          load={load}
+          decide={decide}
+          now={now}
+          fallback={
+            <h1 className="cq-title-lg text-center" data-harness-fallback>
+              Welcome back, Zino.
+            </h1>
+          }
+        />
+      )}
       <form
         className="flex gap-2"
         onSubmit={(event) => {

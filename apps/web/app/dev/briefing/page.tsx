@@ -18,7 +18,8 @@ export const metadata: Metadata = {
  * through the same path the voice line uses. Nothing here reaches Q, the
  * database or a provider.
  *
- * `?state=quiet` is a day with nothing; `?at=<ISO>&tz=<zone>` sets the
+ * `?state=quiet` is a day with nothing; `?variant=dock` is the compact
+ * version another page shows beside the dock; `?at=<ISO>&tz=<zone>` sets the
  * clock; `?fail=changed` makes approvals come back as changed.
  *
  * Development only; a production build serves it only when
@@ -46,6 +47,7 @@ export default async function BriefingHarnessPage({
       at={one("at") ?? "2026-10-08T13:30:00.000Z"}
       timeZone={one("tz") ?? "Africa/Lagos"}
       fail={one("fail") === "changed"}
+      dock={one("variant") === "dock"}
     />
   );
 }

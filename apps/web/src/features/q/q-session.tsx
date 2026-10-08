@@ -41,10 +41,14 @@ import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
 import { resumableConversation } from "./resume-conversation";
 import { useQRoomFeed } from "./room-feed";
+import { setOpenDocument } from "./screen";
+import { spokenNotYetStored, type SpokenLine } from "./spoken";
+import { useQConversation, type QConversation } from "./use-q-conversation";
+import { rereadUntilSettled } from "./voice-reread";
 
 /** "Good afternoon. What's on your mind?", by the browser's clock. */
 function plainHello(): string {
-  let zone: string | null = null;
+  let zone: string | null;
   try {
     zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
   } catch {
@@ -52,10 +56,6 @@ function plainHello(): string {
   }
   return `${arrivalGreeting({ firstName: null, now: new Date(), timeZone: zone })} What's on your mind?`;
 }
-import { setOpenDocument } from "./screen";
-import { spokenNotYetStored, type SpokenLine } from "./spoken";
-import { useQConversation, type QConversation } from "./use-q-conversation";
-import { rereadUntilSettled } from "./voice-reread";
 
 /**
  * One Q conversation for the whole signed-in app (ADR 0017 F1; spec §6.4).

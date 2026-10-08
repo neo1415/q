@@ -295,17 +295,14 @@ function FocusCard({
     state.confirming?.key === card.key ? state.confirming : null;
   const command = (kind: "APPROVE" | "DISMISS" | "LATER" | "CANCEL") =>
     send({ type: "COMMAND", command: { kind } }, "BUTTON");
-  const meta = [
-    card.kind === "HELD" ? "Held back, not sent" : null,
-    total > 1 ? `${String(position)} of ${String(total)}` : null,
-  ]
-    .filter((part): part is string => part !== null)
-    .join(" · ");
+  // The count is the sequence's header; the card says what it is.
+  const meta = card.kind === "HELD" ? "Held back, not sent" : "";
+  const place = total > 1 ? `, ${String(position)} of ${String(total)}` : "";
   return (
     <article
-      aria-label={`${card.title}${card.counterpart === null ? "" : `, ${card.counterpart}`}`}
+      aria-label={`${card.title}${card.counterpart === null ? "" : `, ${card.counterpart}`}${place}`}
       className={cx(
-        "relative z-[1] flex flex-col rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised)",
+        "relative flex flex-col rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised)",
         compact ? "gap-2 p-3" : "gap-3 p-4",
       )}
       data-arrival-card={card.key}
@@ -572,7 +569,7 @@ function Sequence({
     }
     return status === null ? null : (
       <p className="m-0 cq-body-sm text-(--cq-text-secondary)" role="status">
-        {status} That's everything for now.
+        {status} That&apos;s everything for now.
       </p>
     );
   }
