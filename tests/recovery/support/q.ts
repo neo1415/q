@@ -143,10 +143,59 @@ const seen = new WeakMap<Page, SeenReceipt[]>();
  * suite reads the same body the server receives. A receipt is evidence the
  * product believes it acted; every test also checks the effect itself.
  */
+export type SeenNavigation = {
+  readonly status: "DONE" | "FAILED";
+  readonly expected: string | null;
+  readonly route?: string;
+};
+const navigationsSeen = new WeakMap<Page, SeenNavigation[]>();
+const acceptedSeen = new WeakMap<Page, number[]>();
+
+/** INC-1 navigation receipts the page reported, and q-api's `accepted` counts. */
+export function navigationReceipts(page: Page): {
+  readonly navigations: readonly SeenNavigation[];
+  readonly accepted: readonly number[];
+} {
+  return {
+    navigations: [...(navigationsSeen.get(page) ?? [])],
+    accepted: [...(acceptedSeen.get(page) ?? [])],
+  };
+}
+
 export async function recordReceipts(page: Page): Promise<void> {
   const list: SeenReceipt[] = [];
   seen.set(page, list);
+  const navigations: SeenNavigation[] = [];
+  navigationsSeen.set(page, navigations);
+  const accepted: number[] = [];
+  acceptedSeen.set(page, accepted);
+  page.on("response", (response) => {
+    if (
+      response.request().method() !== "POST" ||
+      !response.url().includes("/api/q-ui-acts")
+    )
+      return;
+    void response
+      .json()
+      .then((body: { accepted?: unknown }) => {
+        if (typeof body.accepted === "number") accepted.push(body.accepted);
+      })
+      .catch(() => accepted.push(-response.status()));
+  });
   page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      request.url().includes("/api/q-ui-acts")
+    ) {
+      try {
+        const body = JSON.parse(request.postData() ?? "{}") as {
+          navigations?: SeenNavigation[];
+        };
+        navigations.push(...(body.navigations ?? []));
+      } catch {
+        // Not JSON: not a receipt batch.
+      }
+    }
     if (
       request.method() !== "POST" ||
       !request.url().includes("/api/q-ui-acts")
