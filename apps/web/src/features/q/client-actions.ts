@@ -13,7 +13,7 @@ import { storeVoicePreference } from "@/features/voice/voice-preference";
 
 import { forgetActiveConversations } from "./active-conversation";
 import { loadWire, wireNow, type WireContracts } from "./wire";
-import { performUiAct } from "./ui-act-controller";
+import { expectNavigation, performUiAct } from "./ui-act-controller";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -262,6 +262,11 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   // The Sign out button's own steps: forget which chats were open on this
   // tab, then the server action that ends the session and redirects.
   goTo: (path) => {
+    // RECOVERY-2026-10 (C2): a UI act queued after this move waits for the
+    // new page instead of acting on the one being left.
+    if (path !== `${window.location.pathname}${window.location.search}`) {
+      expectNavigation();
+    }
     if (clientRouterPush !== null) clientRouterPush(path);
     else window.location.assign(path);
   },

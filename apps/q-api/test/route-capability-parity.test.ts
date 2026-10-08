@@ -759,6 +759,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/q-mcp.ts POST Q_MCP_PATH": exempt(
     "the MCP connector surface: an external client calling Q's tools, not a person's action",
   ),
+  // RECOVERY-2026-10 (C2): the screen's receipts of Q's own UI acts.
+  "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST Q_RUNS_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts GET runPath": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_MESSAGES_SUFFIX}`": Q_TRANSPORT,
@@ -1068,6 +1070,9 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_NARRATION_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_HEARD_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_SAID_PATH",
+  // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
+  // conversation's own transport, never a person's action.
+  "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",
 ]);
 
 /**
