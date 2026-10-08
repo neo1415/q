@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 import type {
   FitProfileDto,
@@ -21,6 +21,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
+import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 import { RelationshipFitChips } from "@/features/fit/relationship-fit-chips";
 import {
   dismissReminderAction,
@@ -79,6 +80,14 @@ const FILTER_WORDS: Readonly<Record<Filter, string>> = {
   DISCOVERED: STATE_WORDS.DISCOVERED,
 };
 const FILTERS = Object.keys(FILTER_WORDS) as Filter[];
+
+/** Q's ids (literal, for the capability parity matrix). */
+const Q_BOARD_LIST: Readonly<Record<string, string>> = {
+  "list.relationships": "[data-relationships-list]",
+};
+const Q_BOARD_SEARCH: Readonly<Record<string, string>> = {
+  "input.relationship-search": "[data-relationships-search]",
+};
 
 const TONE: Readonly<Record<ReturnType<typeof stageTone>, StatusTone>> = {
   positive: "positive",
@@ -147,6 +156,25 @@ export function RelationshipsBoard({
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
+  // RECOVERY-2026-10 (C1): the board's search, list and filter, for Q. The
+  // filter takes a code (ALL, NEEDS_YOU, ...) through the pills' own setter.
+  const boardRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
+  useQControlGroup({ kind: "LIST", ref: boardRef, ids: Q_BOARD_LIST });
+  useQControlGroup({ kind: "INPUT", ref: boardRef, ids: Q_BOARD_SEARCH });
+  useQControl({
+    id: "filter.relationships",
+    kind: "FILTER",
+    ref: filterRef,
+    onAct: (intent) => {
+      if (intent.act !== "FILTER") return "NOT_APPLICABLE";
+      const wanted = intent.value === null ? "ALL" : intent.value;
+      const key = FILTERS.find((one) => one === wanted);
+      if (key === undefined) return "NOT_APPLICABLE";
+      setFilter(key);
+      return "DONE";
+    },
+  });
   const [digests, setDigests] = useState(initialDigests);
   const [cursor, setCursor] = useState(firstCursor);
   const ordered = useMemo(() => items.toSorted(listOrder), [items]);
@@ -228,7 +256,11 @@ export function RelationshipsBoard({
   );
 
   return (
-    <div className="flex flex-col gap-5" data-relationships-board>
+    <div
+      ref={boardRef}
+      className="flex flex-col gap-5"
+      data-relationships-board
+    >
       <label className="flex min-h-12 items-center gap-2.5 rounded-xl border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
         <Search
           size={ICON_SIZE.regular}
@@ -249,6 +281,7 @@ export function RelationshipsBoard({
       </label>
 
       <div
+        ref={filterRef}
         role="group"
         aria-label="Show"
         className="-mx-(--cq-page-gutter) flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-(--cq-page-gutter) [scrollbar-width:none]"
@@ -313,11 +346,16 @@ export function RelationshipsBoard({
             <span className="text-right">Last activity</span>
             <span className="text-right">Next step</span>
           </div>
-          <ul aria-label="Relationships" className="flex flex-col gap-2">
+          <ul
+            aria-label="Relationships"
+            className="flex flex-col gap-2"
+            data-relationships-list
+          >
             {visible.map((row) => (
               <li
                 key={row.item.relationshipId}
                 data-relationship-id={row.item.relationshipId}
+                data-q-item
               >
                 <RelationshipRow
                   item={row.item}

@@ -129,6 +129,9 @@ async function byKind(
       const item = items[index - 1];
       if (item === undefined) return "TARGET_MISSING";
       const open = actionable(item);
+      // An item with nothing to open (a ranked risk, a line of text) is
+      // selected by bringing it into view; a click on it would do nothing.
+      if (!isInteractive(open)) return scrollTo(item);
       if (isDisabled(open)) return "NOT_APPLICABLE";
       open.click();
       return "DONE";

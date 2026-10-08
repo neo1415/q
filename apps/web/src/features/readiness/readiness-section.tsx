@@ -7,6 +7,7 @@ import {
 } from "@capital-q/contracts";
 
 import { AskQChips } from "@/features/capital/ask-q-chips";
+import { QControl } from "@/features/q/control/q-control";
 
 import { ReadinessStatusBadge } from "./readiness-status";
 
@@ -100,63 +101,69 @@ export function ReadinessSection({
   return (
     <div className="flex flex-col gap-6" data-readiness>
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <section
-          aria-labelledby="stop-raise-heading"
-          className="rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-5"
-        >
-          <h3
-            id="stop-raise-heading"
-            className="cq-title-sm text-(--cq-text-primary)"
+        <QControl id="section.risks" kind="SECTION">
+          <section
+            aria-labelledby="stop-raise-heading"
+            className="rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-5"
           >
-            What could stop your raise
-          </h3>
-          {readiness.blockers.length === 0 ? (
-            <p className="cq-body-sm pt-2 text-(--cq-text-secondary)">
-              Nothing that investors at your stage usually ask for first is
-              missing from what you&apos;ve shared.
-            </p>
-          ) : (
-            <ol className="flex flex-col pt-2">
-              {readiness.blockers.map((blocker, index) => (
-                <li
-                  key={blocker.id}
-                  className="grid grid-cols-[1.5rem_1fr] gap-3 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
-                  >
-                    {index + 1}
-                  </span>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="cq-body font-semibold text-(--cq-text-primary)">
-                      {blocker.title}
-                    </span>
-                    <span className="cq-body-sm text-(--cq-text-secondary)">
-                      {blocker.why}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-          <div className="flex flex-wrap gap-2 pt-3">
-            <Link
-              href="/capital?tab=action-plan"
-              className="cq-label inline-flex min-h-11 items-center rounded-(--cq-radius-md) bg-(--cq-accent) px-4 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
+            <h3
+              id="stop-raise-heading"
+              className="cq-title-sm text-(--cq-text-primary)"
             >
-              Open the action plan
-            </Link>
-            <AskQChips
-              asks={[
-                {
-                  label: "Ask Q about this",
-                  prompt: "What could stop my raise, and what fixes each one?",
-                },
-              ]}
-            />
-          </div>
-        </section>
+              What could stop your raise
+            </h3>
+            {readiness.blockers.length === 0 ? (
+              <p className="cq-body-sm pt-2 text-(--cq-text-secondary)">
+                Nothing that investors at your stage usually ask for first is
+                missing from what you&apos;ve shared.
+              </p>
+            ) : (
+              <QControl id="list.risks" kind="LIST">
+                <ol className="flex flex-col pt-2">
+                  {readiness.blockers.map((blocker, index) => (
+                    <li
+                      key={blocker.id}
+                      data-q-item
+                      className="grid grid-cols-[1.5rem_1fr] gap-3 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
+                      >
+                        {index + 1}
+                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="cq-body font-semibold text-(--cq-text-primary)">
+                          {blocker.title}
+                        </span>
+                        <span className="cq-body-sm text-(--cq-text-secondary)">
+                          {blocker.why}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </QControl>
+            )}
+            <div className="flex flex-wrap gap-2 pt-3">
+              <Link
+                href="/capital?tab=action-plan"
+                className="cq-label inline-flex min-h-11 items-center rounded-(--cq-radius-md) bg-(--cq-accent) px-4 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
+              >
+                Open the action plan
+              </Link>
+              <AskQChips
+                asks={[
+                  {
+                    label: "Ask Q about this",
+                    prompt:
+                      "What could stop my raise, and what fixes each one?",
+                  },
+                ]}
+              />
+            </div>
+          </section>
+        </QControl>
         <section
           aria-labelledby="glance-heading"
           className="rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-5"
@@ -183,78 +190,80 @@ export function ReadinessSection({
         </section>
       </div>
 
-      <ul
-        aria-label="Readiness by pillar"
-        className="overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
-      >
-        {readiness.pillars.map((pillar) => (
-          <li
-            key={pillar.pillar}
-            className="border-t border-(--cq-border-subtle) first:border-t-0"
-          >
-            <details className="group">
-              <summary className="grid min-h-11 cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-5 py-3.5 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:grid-cols-[11rem_9rem_1fr_auto]">
-                <span className="cq-body font-semibold text-(--cq-text-primary)">
-                  {pillar.label}
-                </span>
-                <ReadinessStatusBadge status={pillar.status} />
-                <span className="cq-body-sm col-span-2 text-(--cq-text-secondary) lg:col-span-1">
-                  {pillar.summary}
-                </span>
-                <span className="cq-caption hidden text-(--cq-text-tertiary) lg:inline">
-                  {pillar.evidence.length === 1
-                    ? "1 piece of evidence"
-                    : `${String(pillar.evidence.length)} pieces of evidence`}
-                </span>
-              </summary>
-              <div className="grid gap-5 border-t border-dashed border-(--cq-border) bg-(--cq-surface-raised) px-5 py-4 lg:grid-cols-2">
-                <div>
-                  <h4 className="cq-caption pb-2 font-semibold text-(--cq-text-tertiary)">
-                    Evidence
-                  </h4>
-                  {pillar.evidence.length === 0 ? (
-                    <p className="cq-body-sm text-(--cq-text-secondary)">
-                      Nothing on record yet.
-                    </p>
-                  ) : (
-                    <ul className="flex flex-col">
-                      {pillar.evidence.map((line, index) => (
-                        <li
-                          key={`${line.label}-${String(index)}`}
-                          className="cq-body-sm flex justify-between gap-3 border-t border-(--cq-border-subtle) py-2 first:border-t-0"
-                        >
-                          <span className="text-(--cq-text-primary)">
-                            {line.label}
-                          </span>
-                          <span className="cq-caption shrink-0 rounded-(--cq-radius-sm) border border-(--cq-border) px-1.5 py-0.5 text-(--cq-text-secondary)">
-                            {evidenceTag(line)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+      <QControl id="list.pillars" kind="LIST">
+        <ul
+          aria-label="Readiness by pillar"
+          className="overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
+        >
+          {readiness.pillars.map((pillar) => (
+            <li
+              key={pillar.pillar}
+              className="border-t border-(--cq-border-subtle) first:border-t-0"
+            >
+              <details className="group">
+                <summary className="grid min-h-11 cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-5 py-3.5 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:grid-cols-[11rem_9rem_1fr_auto]">
+                  <span className="cq-body font-semibold text-(--cq-text-primary)">
+                    {pillar.label}
+                  </span>
+                  <ReadinessStatusBadge status={pillar.status} />
+                  <span className="cq-body-sm col-span-2 text-(--cq-text-secondary) lg:col-span-1">
+                    {pillar.summary}
+                  </span>
+                  <span className="cq-caption hidden text-(--cq-text-tertiary) lg:inline">
+                    {pillar.evidence.length === 1
+                      ? "1 piece of evidence"
+                      : `${String(pillar.evidence.length)} pieces of evidence`}
+                  </span>
+                </summary>
+                <div className="grid gap-5 border-t border-dashed border-(--cq-border) bg-(--cq-surface-raised) px-5 py-4 lg:grid-cols-2">
+                  <div>
+                    <h4 className="cq-caption pb-2 font-semibold text-(--cq-text-tertiary)">
+                      Evidence
+                    </h4>
+                    {pillar.evidence.length === 0 ? (
+                      <p className="cq-body-sm text-(--cq-text-secondary)">
+                        Nothing on record yet.
+                      </p>
+                    ) : (
+                      <ul className="flex flex-col">
+                        {pillar.evidence.map((line, index) => (
+                          <li
+                            key={`${line.label}-${String(index)}`}
+                            className="cq-body-sm flex justify-between gap-3 border-t border-(--cq-border-subtle) py-2 first:border-t-0"
+                          >
+                            <span className="text-(--cq-text-primary)">
+                              {line.label}
+                            </span>
+                            <span className="cq-caption shrink-0 rounded-(--cq-radius-sm) border border-(--cq-border) px-1.5 py-0.5 text-(--cq-text-secondary)">
+                              {evidenceTag(line)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="cq-caption pb-2 font-semibold text-(--cq-text-tertiary)">
+                      What would move it
+                    </h4>
+                    {pillar.improve.length === 0 ? (
+                      <p className="cq-body-sm text-(--cq-text-secondary)">
+                        Nothing expected is missing here.
+                      </p>
+                    ) : (
+                      <ul className="cq-body-sm flex list-disc flex-col gap-1 ps-5 text-(--cq-text-secondary)">
+                        {pillar.improve.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h4 className="cq-caption pb-2 font-semibold text-(--cq-text-tertiary)">
-                    What would move it
-                  </h4>
-                  {pillar.improve.length === 0 ? (
-                    <p className="cq-body-sm text-(--cq-text-secondary)">
-                      Nothing expected is missing here.
-                    </p>
-                  ) : (
-                    <ul className="cq-body-sm flex list-disc flex-col gap-1 ps-5 text-(--cq-text-secondary)">
-                      {pillar.improve.map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </details>
-          </li>
-        ))}
-      </ul>
+              </details>
+            </li>
+          ))}
+        </ul>
+      </QControl>
       <p className="cq-caption text-(--cq-text-tertiary)">
         Rules {readiness.rulesVersion.replace("readiness-rules/", "")} ·
         revision {readiness.revision} · recomputed every time you open this

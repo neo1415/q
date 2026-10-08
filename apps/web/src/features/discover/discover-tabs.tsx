@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import type { YourCompaniesPageDto } from "@capital-q/contracts";
+
+import { useQControlGroup } from "@/features/q/control/q-control";
 
 import {
   setDiscoverTab,
@@ -25,6 +33,12 @@ const TABS: readonly { readonly tab: DiscoverTab; readonly label: string }[] = [
   { tab: "FOR_YOU", label: "For you" },
   { tab: "YOURS", label: "Your companies" },
 ];
+
+/** Q's ids for the tabs (literal, for the capability parity matrix). */
+const Q_DISCOVER_TABS: Readonly<Record<string, string>> = {
+  "tab.for-you": '[data-discover-tab-button="FOR_YOU"]',
+  "tab.yours": '[data-discover-tab-button="YOURS"]',
+};
 
 const useIsomorphicLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -52,6 +66,9 @@ export function DiscoverTabs({
   // Your companies mounts the first time it is opened, then stays.
   const [yoursOpened, setYoursOpened] = useState(initialTab === "YOURS");
 
+  // RECOVERY-2026-10 (C1): the two tabs, for Q, by their own markers.
+  const tabsRef = useRef<HTMLElement>(null);
+  useQControlGroup({ kind: "TAB", ref: tabsRef, ids: Q_DISCOVER_TABS });
   const choose = (next: DiscoverTab) => {
     if (next === "YOURS") setYoursOpened(true);
     setDiscoverTab(next);
@@ -64,7 +81,7 @@ export function DiscoverTabs({
 
   return (
     <div className="cq-discover" data-discover-tab={tab}>
-      <nav aria-label="Discover" className="cq-discover-tabs">
+      <nav aria-label="Discover" className="cq-discover-tabs" ref={tabsRef}>
         {TABS.map((entry) => {
           const selected = entry.tab === tab;
           return (

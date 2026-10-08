@@ -54,6 +54,36 @@ export function useQControl({
 }
 
 /**
+ * Several controls of one part at once -- a tab bar's tabs -- each found
+ * in the part by the page's own marker, so the bar's markup is untouched.
+ * `ids` maps each control id to the selector of its element inside `ref`.
+ */
+export function useQControlGroup({
+  kind,
+  ref,
+  ids,
+}: {
+  readonly kind: QControlKind;
+  readonly ref: RefObject<HTMLElement | null>;
+  readonly ids: Readonly<Record<string, string>>;
+}): void {
+  const key = JSON.stringify(ids);
+  useEffect(() => {
+    const entries = Object.entries(JSON.parse(key) as Record<string, string>);
+    const stops = entries.map(([id, selector]) =>
+      registerControl({
+        id,
+        kind,
+        element: () => ref.current?.querySelector<HTMLElement>(selector) ?? null,
+      }),
+    );
+    return () => {
+      for (const stop of stops) stop();
+    };
+  }, [key, kind, ref]);
+}
+
+/**
  * The same, around a part a server component renders: a `display:
  * contents` marker (no box, so no layout change) whose act goes to the
  * first interactive element inside it -- a tab's link, a menu's button --

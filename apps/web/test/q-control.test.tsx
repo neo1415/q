@@ -122,12 +122,15 @@ describe("the control registry mirrors the lead contract (C1)", () => {
     });
     const second = registerControl({
       id: "section.one",
-      kind: "LIST",
+      kind: "SECTION",
       element: () => element,
     });
     first();
-    expect(manifestControls().map((c) => c.kind)).toEqual(["LIST"]);
+    expect(manifestControls().map((c) => c.id)).toEqual(["section.one"]);
     second();
+    expect(manifestControls()).toEqual([]);
+    // The id's first part names its kind; a mismatch never registers.
+    registerControl({ id: "tab.one", kind: "SECTION", element: () => element });
     expect(manifestControls()).toEqual([]);
     element.remove();
   });

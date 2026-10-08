@@ -16,6 +16,7 @@ import {
 import type { QManifestRef, QManifestSectionKind } from "@capital-q/contracts";
 import { Skeleton } from "@capital-q/ui/states";
 
+import { useQControl } from "@/features/q/control/q-control";
 import { QPageState, QSection } from "@/features/q/q-section";
 
 import { profileTabHref, profileTabOf, type ProfileTab } from "./profile-tab";
@@ -107,6 +108,15 @@ export function useProfileTab(): ProfileTab | null {
   return useContext(Context)?.tab ?? null;
 }
 
+/** Q's ids for the profile's tabs (literal, for the parity matrix). */
+const Q_PROFILE_TABS: Readonly<Record<ProfileTab, string>> = {
+  overview: "tab.overview",
+  elevator: "tab.elevator",
+  dataroom: "tab.dataroom",
+  deck: "tab.deck",
+  team: "tab.team",
+};
+
 /**
  * A link to one of the profile's tabs. Inside `ProfileTabs` it switches in
  * place; a modified click (new tab, new window) is the browser's.
@@ -135,6 +145,14 @@ export function ProfileTabLink({
 }) {
   const context = useContext(Context);
   const active = context === null ? (current ?? false) : context.tab === tab;
+  // RECOVERY-2026-10 (C1): the tab bar's links are Q's tabs (other links
+  // to a tab, in the page's text, are not).
+  const ref = useRef<HTMLAnchorElement>(null);
+  useQControl({
+    id: current === undefined ? "" : Q_PROFILE_TABS[tab],
+    kind: "TAB",
+    ref,
+  });
   const href = context === null ? fallbackHref : context.hrefFor(tab);
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (context === null) return;
@@ -153,6 +171,7 @@ export function ProfileTabLink({
   };
   return (
     <a
+      ref={ref}
       href={href}
       onClick={onClick}
       aria-current={current !== undefined && active ? "page" : undefined}

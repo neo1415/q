@@ -2,7 +2,7 @@ import type { QUiActIntent, QUiActReceipt } from "@capital-q/contracts";
 
 import { manifestVersion } from "./manifest";
 import { performOnControl } from "./control/perform";
-import { controlOf, registerControl } from "./control/registry";
+import { controlOf, kindOfId, registerControl } from "./control/registry";
 
 /**
  * RECOVERY-2026-10 seam: universal application control
@@ -54,9 +54,11 @@ export function registerUiControl(
   id: string,
   handler: UiActHandler,
 ): () => void {
+  const kind = kindOfId(id);
+  if (kind === null) return () => undefined;
   return registerControl({
     id,
-    kind: "BUTTON",
+    kind,
     // A handler-only control has no element of its own; it acts anywhere.
     element: () =>
       typeof document === "undefined" ? null : document.documentElement,

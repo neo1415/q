@@ -24,6 +24,32 @@ export const CONTROL_ID =
   /^[a-z][a-z0-9_-]{0,31}(\.[a-z0-9][a-z0-9_-]{0,47}){1,3}$/u;
 export const CONTROLS_MAX = 48;
 
+/**
+ * An id says what it is: its first part names its kind, so "tab.mandate"
+ * is a tab wherever it appears, and the capability parity matrix
+ * (scripts/recovery/capability-parity.mjs, which reads this map) knows
+ * every control's kind from its id alone.
+ */
+export const CONTROL_PREFIX: Readonly<Record<string, QControlKind>> = {
+  tab: "TAB",
+  section: "SECTION",
+  list: "LIST",
+  item: "LIST_ITEM",
+  button: "BUTTON",
+  menu: "MENU",
+  disclosure: "DISCLOSURE",
+  filter: "FILTER",
+  toggle: "TOGGLE",
+  input: "INPUT",
+  dialog: "DIALOG",
+  carousel: "CAROUSEL",
+};
+
+/** The kind an id names, or null when its first part names none. */
+export function kindOfId(id: string): QControlKind | null {
+  return CONTROL_PREFIX[id.split(".")[0] ?? ""] ?? null;
+}
+
 export type ControlStatus = QUiActReceipt["status"];
 
 /**
@@ -71,12 +97,14 @@ export function subscribeControls(listener: () => void): () => void {
 
 /**
  * Registers a control; the returned function unregisters it. An id that
- * breaks the contract's rule is refused (a no-op), so a typo can never
- * reach the manifest. The newest registration of an id wins while it is
+ * breaks the contract's rule, or whose first part names another kind, is
+ * refused (a no-op), so a typo can never reach the manifest. The newest registration of an id wins while it is
  * mounted (a page replacing its own panel).
  */
 export function registerControl(entry: ControlEntry): () => void {
-  if (!CONTROL_ID.test(entry.id)) return () => undefined;
+  if (!CONTROL_ID.test(entry.id) || kindOfId(entry.id) !== entry.kind) {
+    return () => undefined;
+  }
   order += 1;
   const registered: Registered = { ...entry, order };
   controls.set(entry.id, registered);
