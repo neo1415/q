@@ -92,11 +92,12 @@ export function cachingLoader(
       this.aborted = false;
       const key = mediaCacheKey(mediaKey, context.url);
       // Byte ranges are another shape of the same file; not ours to key.
-      if (
-        key === null ||
-        context.rangeStart !== undefined ||
-        context.rangeEnd !== undefined
-      ) {
+      // hls.js sets `rangeStart: 0, rangeEnd: 0` on EVERY fragment and
+      // means "no range" by it (its loader sends a Range header only when
+      // `rangeEnd` is non-zero), so only a non-zero end is a real range.
+      // Testing for `!== undefined` bypassed the cache for every segment in
+      // production: the warm-up filled it and the player never read it.
+      if (key === null || (context.rangeEnd ?? 0) > 0) {
         this.inner.load(context, config, callbacks);
         return;
       }

@@ -208,10 +208,11 @@ describe("the cache in front of hls.js", () => {
     Loader: new (config: HlsConfig) => Loader<LoaderContext>,
     url: string,
     responseType: "arraybuffer" | "text",
+    range: { rangeStart?: number; rangeEnd?: number } = {},
   ) {
     return new Promise<{ ok: boolean; data: unknown }>((resolve) => {
       new Loader(config).load(
-        { url, responseType, type: "manifest" } as LoaderContext,
+        { url, responseType, type: "manifest", ...range } as LoaderContext,
         loaderConfig,
         {
           onSuccess: (response) => resolve({ ok: true, data: response.data }),
@@ -244,6 +245,30 @@ describe("the cache in front of hls.js", () => {
       new Uint8Array([1, 2, 3]),
     );
     expect(offline.loads).toHaveLength(0);
+  });
+
+  it("caches the fragments hls.js really asks for (range 0-0 means no range)", async () => {
+    // hls.js's fragment loader sets rangeStart 0 and rangeEnd 0 on every
+    // fragment; only a non-zero end is a byte range.
+    const cache = createMediaCache(memoryStorage(), () => Promise.resolve(1e9));
+    const online: Calls = { loads: [] };
+    const loader = cachingLoader(fakeBase(online, "ok"), ASSET, cache);
+    const segment = `https://c.test/${TOKEN}/audio/130/seg_1.mp4`;
+    const noRange = { rangeStart: 0, rangeEnd: 0 };
+    await load(loader, segment, "arraybuffer", noRange);
+    await vi.waitFor(async () => expect(await cache.entries()).toHaveLength(1));
+    const offline: Calls = { loads: [] };
+    const again = cachingLoader(fakeBase(offline, "error"), ASSET, cache);
+    expect((await load(again, segment, "arraybuffer", noRange)).ok).toBe(true);
+    expect(offline.loads).toHaveLength(0);
+
+    // A real byte range is another shape of the file: never keyed.
+    const ranged = { rangeStart: 0, rangeEnd: 1024 };
+    const net: Calls = { loads: [] };
+    const part = cachingLoader(fakeBase(net, "ok"), ASSET, cache);
+    await load(part, segment.replace("seg_1", "seg_2"), "arraybuffer", ranged);
+    expect(net.loads).toHaveLength(1);
+    expect(await cache.entries()).toHaveLength(1);
   });
 
   it("always asks the network for a playlist, and answers from the device only offline", async () => {

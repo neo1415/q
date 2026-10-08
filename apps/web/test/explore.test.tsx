@@ -4,6 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ExploreTileDto } from "@capital-q/contracts";
 
+import {
+  DEFAULT_PREFETCH_BUDGET,
+  policyForOffset,
+} from "../src/features/discover/feed/feed-state";
+import {
+  resetSoundChoiceForTests,
+  soundMuted,
+} from "../src/features/discover/player/sound-policy";
 import { ExploreFeed } from "../src/features/explore/explore-feed";
 import {
   FIXTURE_POSTERS,
@@ -177,6 +185,47 @@ describe("the related feed", () => {
     );
     expect(profile).not.toBeNull();
     expect(container.textContent ?? "").not.toMatch(COUNT_WORDS);
+  });
+});
+
+describe("the opened pitch plays like Discover (ADR 0064)", () => {
+  it("gets Discover's sound policy and preload window", () => {
+    const related = fixtureRelated(FIXTURE_TILES[0]?.pitch.mediaAssetId ?? "");
+    if (related === null) throw new Error("the fixture has no related feed");
+    resetSoundChoiceForTests();
+    const items = [related.anchor, ...related.items];
+    const { container } = render(
+      <ExploreFeed
+        items={items}
+        sectorLabels={labels}
+        authorize={() => new Promise(() => undefined)}
+        saved={new Set()}
+        onSave={() => undefined}
+        onHide={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const policyOf = (name: string) =>
+      container
+        .querySelector(`video[aria-label="Pitch from ${name}"]`)
+        ?.getAttribute("data-policy") ?? "NONE";
+    // The same window Discover's controller computes: the opened pitch
+    // plays, the next two buffer (the one after is a poster, no player).
+    items.slice(0, 3).forEach((item, offset) => {
+      expect(policyOf(item.canonicalName)).toBe(
+        policyForOffset(offset, DEFAULT_PREFETCH_BUDGET),
+      );
+    });
+    expect(policyOf(items[1]?.canonicalName ?? "")).toBe("STARTUP_BUFFER");
+    expect(policyOf(items[2]?.canonicalName ?? "")).toBe("STARTUP_BUFFER");
+    // Sound on by default, as on Discover: the stage is not muted, and
+    // nothing on it says the pitch is muted.
+    expect(soundMuted(null, false)).toBe(false);
+    const active = container.querySelector<HTMLVideoElement>(
+      "[data-slot-active] video",
+    );
+    expect(active?.muted).toBe(false);
+    expect(active?.hasAttribute("muted")).toBe(false);
   });
 });
 

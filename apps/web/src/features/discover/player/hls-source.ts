@@ -12,9 +12,13 @@ import { PLAYBACK_FAILED_EVENT, type AttachSource } from "./pitch-playback";
  * a `canPlayType` check, so Safari and every MP4 pay nothing for it and it
  * never lands on the first-load or LCP path.
  *
- * hls.js light build: no DRM, no alternate audio tracks, no subtitles
- * engine — none of which a 60-second pitch uses, and all of which are most
- * of the full build's weight.
+ * The full hls.js build, never `hls.js/light`. Cloudflare Stream serves a
+ * pitch's sound as a separate audio rendition (`#EXT-X-MEDIA:TYPE=AUDIO`
+ * with the video levels pointing at `AUDIO="group_audio"`), and the light
+ * build has no alternate-audio support: it plays the video track only, so
+ * every pitch was silent with the element unmuted at volume 1 (measured in
+ * production 2026-10-08: no audio fragment requested, 0 audio bytes
+ * decoded, on Discover and Explore alike).
  */
 
 function playsHlsNatively(video: HTMLVideoElement): boolean {
@@ -228,7 +232,7 @@ export const attachHlsOrNativeSource: AttachSource = (video, url, mediaKey) => {
   let destroy: (() => void) | null = null;
   let cancelled = false;
 
-  void import("hls.js/light")
+  void import("hls.js")
     .then(({ default: Hls }) => {
       if (cancelled) return;
       if (!Hls.isSupported()) {
