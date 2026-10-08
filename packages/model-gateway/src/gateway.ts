@@ -40,6 +40,7 @@ import {
   type EligibleCandidate,
 } from "./policy/eligibility.js";
 import { alwaysHealthy } from "./policy/health.js";
+import type { ModelSpendCap } from "./policy/spend-cap.js";
 import {
   acceptStructuredOutput,
   type InvalidListItems,
@@ -77,6 +78,11 @@ export type ModelGatewayDependencies = {
    * what makes a SYNTHETIC_DEMO posture inert there.
    */
   readonly syntheticDemo?: SyntheticDemoRoutingAllowance | null | undefined;
+  /**
+   * The aggregate daily spend cap (audit F-D8; policy/spend-cap.ts).
+   * Absent: no aggregate cap, only the per-request and per-feature ones.
+   */
+  readonly spendCap?: ModelSpendCap | undefined;
   readonly clock?: ModelClock | undefined;
   readonly logger?: Logger | undefined;
   /** Injectable for deterministic tests; production waits for real. */
@@ -256,6 +262,9 @@ export function createModelGateway(
   async function recordUsage(
     entry: Parameters<ModelUsageRepository["record"]>[0],
   ): Promise<void> {
+    // Counted toward the daily cap whether or not the ledger write lands:
+    // the provider charged for it either way.
+    if (entry.costUsd !== undefined) dependencies.spendCap?.note(entry.costUsd);
     try {
       await dependencies.usage.record(entry);
     } catch (error: unknown) {
@@ -663,6 +672,34 @@ export function createModelGateway(
         attempts: 0,
         candidates: [],
       });
+    }
+    if (dependencies.spendCap !== undefined) {
+      const verdict = await dependencies.spendCap.check();
+      if (!verdict.allowed) {
+        metrics.budgetRejected.add(1, {
+          task_class: request.taskClass,
+          scope: "DAILY_AGGREGATE",
+        });
+        // One structured line an operator can alert on: the Q failure
+        // class, the cap and today's spend, never content.
+        logger?.error(
+          {
+            qFailureClass: "BUDGET",
+            failureClass: "BUDGET_EXCEEDED",
+            spendCap: "DAILY_AGGREGATE",
+            capUsd: verdict.capUsd,
+            spentUsd: Number(verdict.spentUsd.toFixed(4)),
+            taskClass: request.taskClass,
+            qRunId: request.attribution.qRunId,
+          },
+          "daily model spend cap reached; request refused",
+        );
+        throw new ModelGatewayError("the daily model spend cap is reached", {
+          failureClass: "BUDGET_EXCEEDED",
+          attempts: 0,
+          candidates: [],
+        });
+      }
     }
     const now = clock.now();
     const catalog: ModelCatalog = indexCatalog(

@@ -6,8 +6,11 @@ import {
   createModelProviderRegistry,
   createPostgresModelCatalog,
   createPostgresModelUsageRepository,
+  createDailySpendCap,
+  createPostgresDailySpendReader,
   createProcessLocalProviderHealth,
   createSyntheticDemoRoutingAllowance,
+  parseDailySpendCapUsd,
   type ModelProvider,
 } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
@@ -27,6 +30,8 @@ export function composeWorkerModelGateway(options: {
   readonly databaseUrl: string;
   readonly sql: DatabaseExecutor;
   readonly logger: Parameters<typeof createModelGateway>[0]["logger"];
+  /** For tests; the process environment otherwise. */
+  readonly env?: Readonly<Record<string, string | undefined>> | undefined;
 }) {
   const { config } = options;
   const providerSecrets = config.secrets.modelProviders;
@@ -87,12 +92,34 @@ export function composeWorkerModelGateway(options: {
   const dataPosture: ModelDataPosture =
     syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO";
 
+  // F-D8: one ceiling on everything the ledger counts, per UTC day. Read
+  // here rather than in the worker config schema because every
+  // deployable's gateway shares it; an invalid value fails startup.
+  // Unset: no aggregate cap, as before.
+  const dailyCapUsd = parseDailySpendCapUsd(options.env ?? process.env);
+  const spendCap =
+    dailyCapUsd === undefined
+      ? undefined
+      : createDailySpendCap({
+          capUsd: dailyCapUsd,
+          readSpentSinceUsd: createPostgresDailySpendReader({
+            sql: options.sql,
+          }),
+          onReadFailure: (error) => {
+            options.logger?.warn(
+              { err: error, spendCap: "DAILY_AGGREGATE" },
+              "daily spend cap could not read the ledger; using the last total",
+            );
+          },
+        });
+
   const gateway = createModelGateway({
     catalog: createPostgresModelCatalog({ sql: options.sql }),
     registry: createModelProviderRegistry(providers),
     usage: createPostgresModelUsageRepository({ sql: options.sql }),
     health: createProcessLocalProviderHealth(),
     syntheticDemo,
+    spendCap,
     logger: options.logger,
   });
   return { providers, syntheticDemo, dataPosture, gateway };

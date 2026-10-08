@@ -120,6 +120,14 @@ export {
   createInMemoryModelUsageRepository,
   createPostgresModelUsageRepository,
 } from "./infrastructure/postgres-usage.js";
+export { createPostgresDailySpendReader } from "./infrastructure/postgres-daily-spend.js";
+export {
+  createDailySpendCap,
+  parseDailySpendCapUsd,
+  type DailySpendCapOptions,
+  type ModelSpendCap,
+  type SpendCapVerdict,
+} from "./policy/spend-cap.js";
 export {
   createPostgresUsageReader,
   monthOf,
