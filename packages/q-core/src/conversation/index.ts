@@ -86,6 +86,7 @@ export {
 } from "./general-turn.js";
 export {
   isUnclearTurn,
+  spokenUnclearReply,
   unclearTurnReply,
   type UnclearTurnReply,
 } from "./unclear.js";

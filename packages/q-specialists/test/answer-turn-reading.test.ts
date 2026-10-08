@@ -826,9 +826,14 @@ describe("spoken words that were not for Q (founder live 2026-09-29)", () => {
     expect(run.delegated()).toBe(1);
   });
 
-  it("never asks the room to say that again: an unclear spoken turn is silent", async () => {
+  // RECOVERY-2026-10 (live T1, 11:13): "Fidiani inanituma attention" was
+  // read UNCLEAR, Q went SILENT, and the realtime voice improvised "could
+  // you give me more detail…" in Q's place. SILENT is now only for speech
+  // meant for someone else (the test above); a spoken turn to Q that could
+  // not be made out always gets Q's own short prompt, never a model.
+  it("answers an unclear spoken turn to Q with a short prompt, varied, never silence", async () => {
     const run = seam({
-      said: "machines",
+      said: "Fidiani inanituma attention",
       reading: {
         kind: "UNCLEAR_TRANSCRIPT",
         confidence: "LOW",
@@ -840,9 +845,39 @@ describe("spoken words that were not for Q (founder live 2026-09-29)", () => {
       outcomes: [],
       spoken: true,
     });
-    await run.answer.answer(request());
-    expect(run.stored).toHaveLength(0);
+    const outcomes = [
+      await run.answer.answer(request()),
+      await run.answer.answer(request()),
+      await run.answer.answer(request()),
+    ];
     expect(run.delegated()).toBe(0);
+    for (const outcome of outcomes) {
+      expect(outcome.kind === "ANSWERED" && outcome.messageId).not.toBeNull();
+    }
+    const lines = run.stored.map((message) => message.content);
+    expect(lines).toEqual([
+      "Sorry, I didn't catch that. Say it again?",
+      "I still couldn't make that out. Could you put it another way, or type it?",
+      "I'm not catching it, sorry. Typing it in the box works too.",
+    ]);
+  });
+
+  it("invites a cut-off spoken turn to go on", async () => {
+    const run = seam({
+      said: "can you show me the",
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "LOW",
+        transcript: "FRAGMENT",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+      },
+      outcomes: [],
+      spoken: true,
+    });
+    await run.answer.answer(request());
+    expect(run.stored.map((message) => message.content)).toEqual(["Go on."]);
   });
 });
 

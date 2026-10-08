@@ -42,3 +42,43 @@ export function unclearTurnReply(
     ? { kind: "PROMPT", line: "Go on." }
     : { kind: "PROMPT", line: "Sorry, say that again?" };
 }
+
+/**
+ * RECOVERY-2026-10 (live T1, 2026-10-08 11:13): a spoken turn addressed
+ * to Q that could not be made out is never answered with silence. Silence
+ * let the realtime voice improvise for Q ("could you give me more
+ * detail…") and lost the turn. Speech meant for someone else is decided
+ * earlier (the reader's addressedToQ) and is the only silent case; here Q
+ * always says something short, varied so it never repeats itself, and
+ * offers typing once it has failed twice.
+ */
+export function spokenUnclearReply(
+  reading: Reading,
+  unclearBefore: number,
+): { readonly kind: "PROMPT"; readonly line: string } {
+  if (
+    reading.transcript === "FRAGMENT" &&
+    reading.kind !== "UNCLEAR_TRANSCRIPT"
+  ) {
+    return {
+      kind: "PROMPT",
+      line: unclearBefore === 0 ? "Go on." : "Go on, I'm listening.",
+    };
+  }
+  if (unclearBefore === 0) {
+    return {
+      kind: "PROMPT",
+      line: "Sorry, I didn't catch that. Say it again?",
+    };
+  }
+  if (unclearBefore === 1) {
+    return {
+      kind: "PROMPT",
+      line: "I still couldn't make that out. Could you put it another way, or type it?",
+    };
+  }
+  return {
+    kind: "PROMPT",
+    line: "I'm not catching it, sorry. Typing it in the box works too.",
+  };
+}

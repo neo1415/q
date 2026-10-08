@@ -61,6 +61,7 @@ import {
   researchDirectiveFor,
   stepQuestionSequence,
   unclearTurnReply,
+  spokenUnclearReply,
   naturalPlaceLine,
   spokenFactsOf,
   withoutRecommendationClaims,
@@ -2442,11 +2443,13 @@ export function createSpecialistQAnswer(
     if (read !== null && isUnclearTurn(read)) {
       const before = unclearInARow.get(conversationId) ?? 0;
       unclearInARow.set(conversationId, before + 1);
-      // Spoken, an unclear turn is almost always the room, not the
-      // person: asking "say that again?" to background noise is Q talking
-      // to itself. Typed, it is a real message worth one prompt.
+      // RECOVERY-2026-10 (live T1): a spoken turn reaching here was read as
+      // addressed to Q (speech for the room was marked not-for-Q above and
+      // is the only silent case), so it always gets a short prompt.
+      // Silence lost the turn and let the realtime voice improvise for Q.
+      // Typed: one prompt, then quiet, as before.
       const reply = spoken
-        ? ({ kind: "SILENT" } as const)
+        ? spokenUnclearReply(read, before)
         : unclearTurnReply(read, before);
       logger?.info(
         { qRunId: request.runId, unclearInARow: before + 1, reply: reply.kind },
