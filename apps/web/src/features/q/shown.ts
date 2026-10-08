@@ -35,6 +35,8 @@ export type ShownItem = {
   readonly blocks: readonly QTurnObjectBlock[];
   /** Which of Q's answers (counting from 1) showed it. */
   readonly answer: number;
+  /** The run it belongs to (INC-1): one run, one set. */
+  readonly run: string;
 };
 
 function titleOf(blocks: readonly QTurnObjectBlock[]): string {
@@ -55,30 +57,74 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
       case "INVESTOR_REFERENCE":
       case "ACTION_PROPOSAL":
       case "UI_INTENT":
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
         break;
     }
   }
   return "Shown by Q";
 }
 
-/** Every object Q's settled answers showed, oldest first. */
+/**
+ * The run an answer belongs to (INC-1, 2026-10-08): one run's result is
+ * one set, however many times it reaches the thread (the room feed and the
+ * read-back can each bring the same run's message).
+ */
+export function resultKey(turn: Extract<QTurn, { kind: "Q" }>): string {
+  return turn.runId ?? turn.id;
+}
+
+/**
+ * One answer's showable blocks as one set: a turn that carries more than
+ * one card block (a late duplicate) shows its first, never two merged.
+ */
+function oneSet(
+  blocks: readonly QTurnObjectBlock[],
+): readonly QTurnObjectBlock[] {
+  let cards = false;
+  return blocks.filter((block) => {
+    if (!SHOWABLE.has(block.kind)) return false;
+    if (block.kind !== "ANSWER_CARDS") return true;
+    if (cards) return false;
+    cards = true;
+    return true;
+  });
+}
+
+/** Every object Q's settled answers showed, oldest first, one per run. */
 export function shownItems(turns: readonly QTurn[]): readonly ShownItem[] {
   const items: ShownItem[] = [];
-  let answer = 0;
+  const answered = new Set<string>();
+  const shownRuns = new Set<string>();
   for (const turn of turns) {
     if (turn.kind !== "Q") continue;
-    answer += 1;
+    // The same run again is the same answer, not a newer one.
+    const key = resultKey(turn);
+    answered.add(key);
     if (turn.streaming) continue;
-    const blocks = turn.blocks.filter((block) => SHOWABLE.has(block.kind));
+    const blocks = oneSet(turn.blocks);
     if (blocks.length === 0) continue;
-    items.push({ id: turn.id, title: titleOf(blocks), blocks, answer });
+    // Already shown as its own set: never a second, never merged.
+    if (shownRuns.has(key)) continue;
+    shownRuns.add(key);
+    items.push({
+      id: turn.id,
+      title: titleOf(blocks),
+      blocks,
+      answer: answered.size,
+      run: key,
+    });
   }
   return items;
 }
 
 /** How many answers Q has given in these turns. */
 export function answersIn(turns: readonly QTurn[]): number {
-  return turns.filter((turn) => turn.kind === "Q").length;
+  const runs = new Set<string>();
+  for (const turn of turns) if (turn.kind === "Q") runs.add(resultKey(turn));
+  return runs.size;
 }
 
 /**

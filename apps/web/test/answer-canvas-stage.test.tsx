@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { demoTop } from "../src/features/q/answer-canvas-fixtures";
 import type { QTurn } from "../src/features/q/conversation";
 import { QPresenceStage } from "../src/features/q/q-presence-stage";
+import { clearResultShelf } from "../src/features/q/result-shelf";
 
 /**
  * On the Q page (C1, C4): an answer with cards takes the stage with the
@@ -12,7 +13,11 @@ import { QPresenceStage } from "../src/features/q/q-presence-stage";
  * cards fly to the Board (which counts them) and the presence returns.
  */
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  // INC-1: the per-tab shelf of shown sets is module state.
+  clearResultShelf();
+});
 
 const turn = (id: string, text: string, cards = false): QTurn => ({
   kind: "Q",
