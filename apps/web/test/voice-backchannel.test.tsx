@@ -638,9 +638,11 @@ describe("changing it by voice and in Settings", () => {
       '"eagerness":"high"',
     );
     // Q then confirms once, in its own turn.
-    expect(h.channel().ofType("response.create").at(-1)).toEqual({
-      type: "response.create",
-    });
+    // (A plain response, in the conversation; the event id only lets a
+    // provider error be matched to it, RECOVERY A4.)
+    const confirm = h.channel().ofType("response.create").at(-1);
+    expect(confirm).toMatchObject({ type: "response.create" });
+    expect(confirm).not.toHaveProperty("response");
     // And it stays quiet afterwards.
     h.channel().emit({ type: "input_audio_buffer.speech_started" });
     for (let i = 0; i < 6; i += 1) {

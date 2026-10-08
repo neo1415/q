@@ -393,6 +393,20 @@ export function timedVoiceTurns(
       // worked (founder live 2026-10-07, narration polls held 12 s empty).
       ...(speaker.narrate === undefined ? {} : { narrate: speaker.narrate }),
       ...(speaker.deferred === undefined ? {} : { deferred: speaker.deferred }),
+      // C-02 (audit 2026-10-08): the same bug class for `facts`. Dropped
+      // here, the duplex voice never got the facts to say in its own words
+      // and a second model rewrite ran instead. Facts handed over are Q's
+      // words leaving, for the timing too.
+      ...(speaker.facts === undefined
+        ? {}
+        : {
+            facts: (
+              facts: Parameters<NonNullable<VoiceSpeaker["facts"]>>[0],
+            ) => {
+              timing.spoke();
+              speaker.facts?.(facts);
+            },
+          }),
     };
     try {
       const outcome = await timings.run(timing, () =>

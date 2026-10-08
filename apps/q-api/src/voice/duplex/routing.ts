@@ -164,6 +164,104 @@ export function isSmallTalk(transcript: string): boolean {
     .every((w) => TRIVIAL.has(w));
 }
 
+/**
+ * RECOVERY A3 (C-03/B-01, founder live 2026-10-08): with a card in focus,
+ * only a reply about the card is the card's. "Find anything that needs my
+ * attention" (6 words) went to the voice model and decide_card because
+ * every utterance of twelve words or fewer did. A card reply names what
+ * to do with the card; a question or a request for something else is Q's.
+ */
+const CARD_VERBS = new Set([
+  "send",
+  "sent",
+  "approve",
+  "approved",
+  "go",
+  "yes",
+  "yeah",
+  "yep",
+  "ok",
+  "okay",
+  "sure",
+  "no",
+  "nope",
+  "skip",
+  "later",
+  "dismiss",
+  "ignore",
+  "drop",
+  "cancel",
+  "edit",
+  "change",
+  "rewrite",
+  "redo",
+  "warmer",
+  "shorter",
+  "longer",
+  "softer",
+  "friendlier",
+  "formal",
+  "casual",
+  "book",
+  "schedule",
+  "reschedule",
+  "accept",
+  "decline",
+  "next",
+  "previous",
+  "moving",
+  "retry",
+  "again",
+  "snooze",
+  "remind",
+  "leave",
+  "keep",
+  "pass",
+]);
+const CARD_PHRASES = ["not now", "move on", "do it", "that one", "this one"];
+/** Opening words of a question or of a request for something else. */
+const ELSEWHERE = new Set([
+  "what",
+  "what's",
+  "whats",
+  "why",
+  "how",
+  "who",
+  "who's",
+  "which",
+  "where",
+  "find",
+  "show",
+  "open",
+  "tell",
+  "explain",
+  "read",
+  "give",
+  "search",
+  "look",
+  "check",
+  "take",
+  "anything",
+  "is",
+  "are",
+  "does",
+  "do",
+]);
+
+/** True when the words are a reply about the decision card in focus. */
+export function isCardReply(transcript: string): boolean {
+  const said = words(transcript);
+  if (said.length === 0 || said.length > 12) return false;
+  const first = said[0] ?? "";
+  // "do it" is a reply; "do they fit?" is not.
+  const joined = ` ${said.join(" ")} `;
+  if (ELSEWHERE.has(first) && !joined.startsWith(" do it ")) return false;
+  if (CARD_PHRASES.some((phrase) => joined.includes(` ${phrase} `))) {
+    return true;
+  }
+  return said.some((w) => CARD_VERBS.has(w));
+}
+
 export function routeDuplexTurn(
   transcript: string,
   situation: {
@@ -171,13 +269,19 @@ export function routeDuplexTurn(
     readonly guided: boolean;
     /** Q's last answer asked for their yes: the reply is Q's to take. */
     readonly awaitingApproval: boolean;
-    /** A decision card is in focus: a short reply goes to decide_card. */
+    /** A decision card is in focus: a reply about it goes to decide_card. */
     readonly cardInFocus: boolean;
+    /**
+     * Q's last words were a question to them ("want the detail?"): a bare
+     * "yes" or "no" answers Q, so it is Q's, never the voice's alone.
+     */
+    readonly answeringQ?: boolean | undefined;
   },
 ): DuplexTurnRoute {
   if (situation.guided || situation.awaitingApproval) return "ASK_Q";
   // The card's own code reads the reply (the same typed action a button
   // sends); the voice only passes the words through decide_card.
-  if (situation.cardInFocus && words(transcript).length <= 12) return "MODEL";
+  if (situation.cardInFocus && isCardReply(transcript)) return "MODEL";
+  if (situation.answeringQ === true) return "ASK_Q";
   return isSmallTalk(transcript) ? "SMALLTALK" : "ASK_Q";
 }

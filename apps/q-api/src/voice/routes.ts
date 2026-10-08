@@ -935,6 +935,16 @@ export function registerQVoiceRoutes(
     registerDuplexVoiceRoutes(app, {
       broker: dependencies.duplex,
       withContext,
+      // A11 (C-16): a line this instance does not hold is adopted from the
+      // sealed binding the browser presents; the token alone authorises
+      // nothing (the route's actor must be its owner).
+      restore: async (request) => {
+        const presented = request.headers[Q_VOICE_SESSION_TOKEN_HEADER];
+        if (typeof presented !== "string" || presented.length === 0) {
+          return null;
+        }
+        return dependencies.bindings.restore(presented);
+      },
     });
   }
 }

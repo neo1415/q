@@ -311,6 +311,14 @@ export {
   type QVoiceDuplexRejoin,
   QVoiceDuplexRejoinResultSchema,
   type QVoiceDuplexRejoinResult,
+  Q_VOICE_DUPLEX_OUTCOME_PATH,
+  qVoiceDuplexOutcomePath,
+  QVoiceDuplexTurnReportSchema,
+  type QVoiceDuplexTurnReport,
+  Q_VOICE_DUPLEX_ATTACH_PATH,
+  qVoiceDuplexAttachPath,
+  QVoiceDuplexAttachSchema,
+  type QVoiceDuplexAttach,
 } from "./voice.js";
 
 export {

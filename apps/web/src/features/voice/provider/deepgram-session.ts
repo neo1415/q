@@ -59,6 +59,9 @@ const SETTINGS_WITHIN_MS = 10_000;
 const SPEECH_WITHIN_MS = 10_000;
 /** "Thinking" with no reply at all gives way to listening after this. */
 export const THINKING_GIVE_UP_MS = 14_000;
+/** What the person sees when no reply came at all (RECOVERY A4). */
+export const STANDARD_TIMEOUT_NOTICE =
+  "I didn't get an answer to that one. Ask me again?";
 /** A working microphone produces frames continuously, silence included. */
 const FRAMES_WITHIN_MS = 4_000;
 /**
@@ -133,6 +136,12 @@ export function useDeepgramVoiceSession(
   events: VoiceSessionEvents = {},
 ): VoiceSessionClient {
   const [state, setState] = useState<VoiceState>("IDLE");
+  // The watchdog reads the current state without a side effect in an
+  // updater (RECOVERY A4).
+  const stateRef = useRef<VoiceState>("IDLE");
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
   const [connected, setConnected] = useState(false);
   const [transcript, setTranscript] = useState<readonly VoiceTranscriptLine[]>(
     [],
@@ -361,9 +370,15 @@ export function useDeepgramVoiceSession(
         thinkingWatch = window.setTimeout(() => {
           thinkingWatch = null;
           if (liveRef.current !== live) return;
-          setState((current) =>
-            current === "THINKING" ? "LISTENING" : current,
-          );
+          if (stateRef.current !== "THINKING") return;
+          setState("LISTENING");
+          // RECOVERY A4: never a silent give-up; the screen says so
+          // (unless the server already said how the turn ended).
+          eventsRef.current.onTurnOutcome?.({
+            disposition: "FAILED",
+            failure: "TIMEOUT",
+            notice: STANDARD_TIMEOUT_NOTICE,
+          });
         }, THINKING_GIVE_UP_MS);
       };
       let lineUp = false;

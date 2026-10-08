@@ -10,10 +10,13 @@ import type {
   QVoiceDuplexSaid,
   QVoiceDuplexToolCall,
   QVoiceDuplexToolResult,
+  QVoiceDuplexTurnReport,
   QVoiceDuplexUsageReport,
   QVoiceDuplexUsageResult,
   QVoiceListeningLevel,
   QSilenceBeat,
+  QFailureClass,
+  QTurnDisposition,
 } from "@capital-q/contracts";
 
 import type { VoiceState } from "../session";
@@ -26,6 +29,13 @@ import {
   RECONNECTING_NOTICE,
   WEAK_LINE_NOTICE,
 } from "./line-health";
+import {
+  DELIVERY_REPAIR,
+  IGNORED_NOTICE,
+  LOST_TURN_NOTICE,
+  RENEWING_NOTICE,
+  TIMEOUT_REPAIR,
+} from "./duplex-notices";
 import {
   BackchannelPolicy,
   LEVEL_FRAME_MS,
@@ -139,6 +149,91 @@ const HEARD_MAX = 4;
 /** What a line accepts as its opening; the contract caps firstMessage at 700. */
 const OPENING_MAX = 700;
 
+/**
+ * RECOVERY A4 (C-06): the longest a turn may stay "Thinking" before the
+ * line gives up on it out loud. Past the server's ask_q deadline (30 s)
+ * plus a relay's worth of slack, so the server's own words come first.
+ */
+export const THINKING_WATCHDOG_MS = 40_000;
+/** An answer handed to the voice must start being heard within this. */
+export const ANSWER_AUDIO_WATCHDOG_MS = 12_000;
+/** How long a blip over Q waits for its words before it is let go (C-11). */
+const BLIP_WORDS_WAIT_MS = 2_500;
+/** Sounds that are not words: a blip of only these is let go. */
+const NOT_WORDS = new Set([
+  "mm",
+  "mmm",
+  "mhm",
+  "mm-hmm",
+  "hmm",
+  "hm",
+  "uh",
+  "um",
+  "er",
+  "ah",
+  "oh",
+  "huh",
+]);
+export {
+  DELIVERY_REPAIR,
+  IDLE_NOTICE,
+  IGNORED_NOTICE,
+  LOST_TURN_NOTICE,
+  RENEWING_NOTICE,
+  TIMEOUT_REPAIR,
+} from "./duplex-notices";
+const NOISE_RESUME =
+  "A noise interrupted you; it was not the person speaking. Carry on with your answer from where you stopped, without repeating what you already said and without mentioning the noise.";
+/**
+ * C-03: small talk is answered by the voice, and only as small talk. Per
+ * response, so the voice cannot drift into an answer of its own.
+ */
+const SMALLTALK_REPLY =
+  "You are Q, the person's investment analyst, on a live call. They said something social (a greeting, thanks, an acknowledgement). Reply in a few warm, natural words, then stop. No facts, figures, names, advice or offers of your own.";
+
+/** How one turn on the line ended (RECOVERY A4), with its timings. */
+export type DuplexTurnOutcome = {
+  readonly turnId: string;
+  readonly disposition: QTurnDisposition;
+  readonly failure?: QFailureClass | undefined;
+  /** What the person is shown, when the turn ended without an answer. */
+  readonly notice?: string | undefined;
+  /** End of their turn to Q's first audio (answered turns). */
+  readonly firstAudioMs?: number | undefined;
+  /** The server relay's round trip (routed turns). */
+  readonly relayMs?: number | undefined;
+};
+
+/** One accepted turn, until its terminal disposition. */
+type OpenTurn = {
+  readonly id: string;
+  readonly seq: number;
+  readonly openedAt: number;
+  /** When the person's turn ended (for time to first audio). */
+  readonly endedAt: number;
+  /** What the server said this turn is, once its answer is handed over. */
+  expected: {
+    readonly disposition: QTurnDisposition;
+    readonly failure?: QFailureClass | undefined;
+  } | null;
+  /** Its answer was asked for and must now be heard. */
+  awaitingAudio: boolean;
+  /** The answer's client event id, to match a provider error to it. */
+  createEventId: string | null;
+  /** The answer's response, once the provider created it. */
+  responseId: string | null;
+  /** Its answer was cancelled by a barge-in before anyone heard it. */
+  interrupted: boolean;
+  watchdog: unknown;
+  relayMs?: number | undefined;
+};
+
+let turnCounter = 0;
+function newTurnId(now: number): string {
+  turnCounter += 1;
+  return `turn_${now.toString(36)}${turnCounter.toString(36).padStart(4, "0")}`;
+}
+
 export type DuplexFallbackCause =
   "CONNECT" | "NETWORK" | "RELAY" | "CAP" | "MAX_LENGTH";
 type RejoinCause = QVoiceDuplexRejoin["cause"];
@@ -196,6 +291,8 @@ export type DuplexLineEvents = {
     | undefined;
   /** VOICE-BRAIN: a decision card is in focus on their screen now. */
   readonly cardInFocus?: (() => boolean) | undefined;
+  /** RECOVERY A4: a turn reached its terminal disposition. */
+  readonly onTurnOutcome?: ((outcome: DuplexTurnOutcome) => void) | undefined;
 };
 
 /**
@@ -245,6 +342,14 @@ export type DuplexRelays = {
     | undefined;
   /** VOICE-BRAIN: what the voice said in one response (the transcript). */
   readonly said?: ((said: QVoiceDuplexSaid) => Promise<void>) | undefined;
+  /** RECOVERY A4: each turn's disposition and timings, for the server log. */
+  readonly outcome?:
+    ((outcome: QVoiceDuplexTurnReport) => Promise<void>) | undefined;
+  /**
+   * SIDEBAND (A8): the call's id, from the SDP answer's Location header,
+   * so the server can attach to the call. Absent: no sideband.
+   */
+  readonly attach?: ((callId: string) => Promise<void>) | undefined;
 };
 
 /** What the line needs from the browser; injected so a test can fake it. */
@@ -490,6 +595,29 @@ export class DuplexLine {
   readonly #recentBridges: string[] = [];
   /** Q's answer, held while a bridge finishes. */
   #heldAnswer: { send: () => void; timer: unknown } | null = null;
+  /** RECOVERY A4: the turn being answered now, until it has ended. */
+  #turn: OpenTurn | null = null;
+  /** The person is mid-utterance (between speech_started and _stopped). */
+  #userSpeaking = false;
+  /**
+   * An answer that came back while the person was making a sound: said
+   * once the sound turns out to be noise, dropped when it is a new turn.
+   */
+  #heldForSpeech: {
+    readonly seq: number;
+    readonly generation: number;
+    readonly send: () => void;
+  } | null = null;
+  /** A barge-in cut Q's answer: resumed if it was only a noise (C-07). */
+  #cutAnswer = false;
+  /** C-07: resume the cut answer once the cancel has landed. */
+  #resumeAfterDone = false;
+  /** A response.create refused because another was active, sent after it. */
+  #queuedCreate: Record<string, unknown> | null = null;
+  #createCount = 0;
+  /** C-11: short sounds over Q, waiting for their words. */
+  readonly #blips = new Map<string, unknown>();
+  #outputMeter: LevelMeter | null = null;
 
   constructor(input: {
     readonly credential: QVoiceDuplexCredential;
@@ -597,7 +725,12 @@ export class DuplexLine {
     peer.ontrack = (event) => {
       if (this.#peer !== peer) return;
       const [stream] = event.streams;
-      if (stream !== undefined) audio.srcObject = stream;
+      if (stream !== undefined) {
+        audio.srcObject = stream;
+        // C-09: Q's own level, for the presence.
+        this.#outputMeter?.close();
+        this.#outputMeter = this.#env.createLevelMeter?.(stream) ?? null;
+      }
       // A slightly deeper playout buffer: words are delayed, not cut.
       const receiver = event.receiver as
         (RTCRtpReceiver & { jitterBufferTarget?: number | null }) | undefined;
@@ -638,9 +771,19 @@ export class DuplexLine {
       }),
     );
     if (!answered.ok) throw new Error("offer refused");
+    // SIDEBAND (A8): the call's id is the last segment of the Location
+    // header (/v1/realtime/calls/rtc_…); the server attaches with it.
+    const callId = answered.headers.get("location")?.split("/").pop()?.trim();
     const sdp = await answered.text();
     await peer.setRemoteDescription({ type: "answer", sdp });
     await this.#withTimeout(this.#channelOpen(channel));
+    if (
+      callId !== undefined &&
+      /^rtc_[A-Za-z0-9_-]{1,120}$/.test(callId) &&
+      this.#relays.attach !== undefined
+    ) {
+      void this.#relays.attach(callId).catch(() => undefined);
+    }
   }
 
   /** A call is up: its length limit and its health sampling start. */
@@ -677,6 +820,7 @@ export class DuplexLine {
     this.#responseActive = false;
     this.#item = null;
     this.#turnEndedAt = null;
+    this.#queuedCreate = null;
     try {
       channel?.close();
     } catch {
@@ -795,7 +939,10 @@ export class DuplexLine {
         ),
       });
     }
-    if (results.length > 0) this.#send({ type: "response.create" });
+    if (results.length > 0) {
+      this.#createResponse({});
+      if (this.#turn !== null) this.#expectAnswer(this.#turn, null);
+    }
   }
 
   #remember(role: "user" | "q", text: string): void {
@@ -1000,6 +1147,19 @@ export class DuplexLine {
     if (live === false) void this.#reacquireMicrophone();
   }
 
+  /**
+   * A11 (C-16): the server no longer knows this line, even from its sealed
+   * token. The turn in flight is said to be lost (never silently dropped)
+   * and the line is renewed: a fresh one comes up on the same thread.
+   */
+  gone(): void {
+    if (this.#over || this.#rejoining) return;
+    const lost = this.#turn !== null;
+    if (lost) this.#closeTurn("FAILED", "NETWORK", LOST_TURN_NOTICE);
+    // The notice is shown once the renewed line is up.
+    this.#fallback("RELAY", lost ? LOST_TURN_NOTICE : RENEWING_NOTICE);
+  }
+
   /** The person ended it. */
   close(): void {
     if (this.#over) return;
@@ -1074,7 +1234,9 @@ export class DuplexLine {
     this.#send({
       type: "response.create",
       response: {
-        instructions: `Say exactly this to the person, word for word, and nothing else; then stop and listen: ${JSON.stringify(words)}`,
+        // C-17 (founder: "it sounds mechanical"): the opening's content, in
+        // Q's own natural voice, never read out word for word.
+        instructions: `Open the call by saying this to the person in your own natural voice, as Q. Keep every name, fact and its meaning, add nothing, and keep it about as short; then stop and listen: ${JSON.stringify(words)}`,
         tool_choice: "none",
       },
     });
@@ -1184,7 +1346,7 @@ export class DuplexLine {
    */
   #maybeBargeIn(): void {
     if (this.#bargePending !== null) return;
-    if (this.#audio !== null && !this.#speakingSilenced) {
+    if (this.#speaking && this.#audio !== null && !this.#speakingSilenced) {
       this.#audio.volume = this.#volume * BARGE_DUCK_GAIN;
     }
     const timer = this.#env.setTimeout(() => {
@@ -1205,6 +1367,7 @@ export class DuplexLine {
     if (this.#audio !== null && !this.#speakingSilenced) {
       this.#audio.volume = this.#volume;
     }
+    this.#releaseHeld();
   }
 
   /** Q's audio stops now: the person is speaking. */
@@ -1214,6 +1377,10 @@ export class DuplexLine {
       this.#bargePending = null;
     }
     this.#generation += 1;
+    // C-07: what was cut is resumed if the "speech" turns out to be noise.
+    const turn = this.#turn;
+    if (turn !== null && turn.awaitingAudio) turn.interrupted = true;
+    if (this.#speaking || this.#responseActive) this.#cutAnswer = true;
     const item = this.#item;
     if (this.#audio !== null) {
       // Silenced at once, locally, before any round trip.
@@ -1262,13 +1429,20 @@ export class DuplexLine {
         // The person talking cancels any reaction or bridge at once.
         this.#cutOutOfBand(null);
         if (this.#policy.turnStarted(this.#env.now())) this.#turnItems = [];
-        if (this.#speaking) this.#maybeBargeIn();
-        else if (this.#responseActive) this.#bargeIn();
+        // A blip that produced no commit must not delete the next real
+        // turn (audit A2).
+        this.#dropNextCommit = false;
+        this.#userSpeaking = true;
+        // C-07: a sound while Q's answer is still being generated (not yet
+        // audible) is confirmed like one over Q's voice: a cough no longer
+        // cancels an answer nobody has heard yet.
+        if (this.#speaking || this.#responseActive) this.#maybeBargeIn();
         else this.#events.onState("USER_SPEAKING");
         this.#updateBusy();
         break;
       }
       case "input_audio_buffer.speech_stopped":
+        this.#userSpeaking = false;
         if (this.#bargePending !== null) {
           // A blip, not a turn: Q carries on, and the blip's audio
           // never becomes something Q answers.
@@ -1279,14 +1453,14 @@ export class DuplexLine {
         this.#turnEndedAt = this.#env.now();
         this.#policy.turnEnded(this.#env.now());
         this.#events.onState("THINKING");
+        // An unrouted line has no flush to decide: the model answers.
+        if (!this.#routeTurns) this.#releaseHeld();
         break;
       case "input_audio_buffer.committed": {
         const itemId = text(event, "item_id");
         if (this.#dropNextCommit && this.#awaitingCommit === null) {
           this.#dropNextCommit = false;
-          if (itemId !== undefined) {
-            this.#send({ type: "conversation.item.delete", item_id: itemId });
-          }
+          if (itemId !== undefined) this.#awaitBlipWords(itemId);
           break;
         }
         // A commit the line asked for (a reaction mid-turn) is not the
@@ -1300,6 +1474,10 @@ export class DuplexLine {
         this.#committed(itemId);
         if (this.#routeTurns && !reaction && itemId !== undefined) {
           this.#turnFinished(itemId);
+        } else if (!this.#routeTurns && !reaction) {
+          // Unrouted: the provider answers this turn itself.
+          const turn = this.#openTurn();
+          this.#expectAnswer(turn, null);
         }
         break;
       }
@@ -1320,17 +1498,34 @@ export class DuplexLine {
         if (itemId !== undefined && !this.#transcripts.has(itemId)) {
           this.#transcripts.set(itemId, "");
         }
+        if (itemId !== undefined && this.#blips.has(itemId)) {
+          this.#blipWords(itemId, said);
+          break;
+        }
         this.#tryFlushTurn();
         break;
       }
-      case "conversation.item.input_audio_transcription.failed":
+      case "conversation.item.input_audio_transcription.failed": {
         // Not heard: the turn goes to Q without words once it times out.
+        const itemId = text(event, "item_id");
+        const code = text(field(event, "error"), "code");
+        console.warn("[q-voice] transcription failed", { code });
+        if (itemId !== undefined && this.#blips.has(itemId)) {
+          this.#blipWords(itemId, "");
+        }
         break;
-      case "response.created":
+      }
+      case "response.created": {
         this.#responseActive = true;
         this.#unsilence();
         this.#updateBusy();
+        const turn = this.#turn;
+        const id = text(field(event, "response"), "id");
+        if (turn !== null && turn.awaitingAudio && turn.responseId === null) {
+          turn.responseId = id ?? null;
+        }
         break;
+      }
       case "response.output_item.added": {
         const item = field(event, "item");
         const id = text(item, "id");
@@ -1349,6 +1544,8 @@ export class DuplexLine {
         this.#speaking = true;
         this.#unsilence();
         if (this.#item !== null) this.#item.startedAt = this.#env.now();
+        this.#cutAnswer = false;
+        this.#answerHeard();
         this.#events.onState("Q_SPEAKING");
         this.#touch();
         this.#updateBusy();
@@ -1406,8 +1603,12 @@ export class DuplexLine {
         if (id !== undefined && usage !== undefined) {
           void this.#report(usageReportOf(id, usage));
         }
+        this.#responseDone(id, response);
         break;
       }
+      case "error":
+        this.#providerError(field(event, "error"));
+        break;
       default:
         break;
     }
@@ -1420,6 +1621,14 @@ export class DuplexLine {
     if (callId === undefined || name === undefined) return;
     const generation = this.#generation;
     const transport = this.#transport;
+    // C-05: a newer routed turn makes this answer stale, as a barge-in does.
+    const seq = this.#turnSeq;
+    const turn =
+      this.#turn !== null && this.#turn.seq === seq
+        ? this.#turn
+        : this.#openTurn();
+    turn.awaitingAudio = false;
+    turn.responseId = null;
     this.#touch();
     this.#events.onState("THINKING");
     let bridge: unknown = null;
@@ -1486,6 +1695,7 @@ export class DuplexLine {
       this.#updateBusy();
     }
     if (this.#over) return;
+    const stale = seq !== this.#turnSeq;
     if (result?.listening !== undefined) {
       this.setListening(result.listening);
       this.#events.onListening?.(result.listening);
@@ -1502,7 +1712,9 @@ export class DuplexLine {
       });
     if (this.#rejoining) {
       // Said once the new call is up (see #replayConversation).
-      if (generation === this.#generation) this.#pendingResults.push(output);
+      if (generation === this.#generation && !stale) {
+        this.#pendingResults.push(output);
+      }
       return;
     }
     if (transport !== this.#transport) {
@@ -1524,12 +1736,38 @@ export class DuplexLine {
         },
       });
     }
-    // Talked over while it worked: the result is kept, but not said.
-    if (generation !== this.#generation) return;
-    this.#afterBridge(() => {
-      if (this.#over || generation !== this.#generation) return;
-      this.#send({ type: "response.create" });
-      this.#touch();
+    // Talked over while it worked, or a newer turn came: the result is
+    // kept on the line, but not said.
+    if (stale) {
+      if (this.#turn === turn) this.#closeTurn("SUPERSEDED");
+      return;
+    }
+    if (generation !== this.#generation) {
+      if (this.#turn === turn) this.#closeTurn("CANCELLED");
+      return;
+    }
+    // Q chose silence: nothing for the voice to say, and it must not make
+    // something up (C-01/C-03).
+    if (result?.silent === true) {
+      this.#ignored(turn);
+      return;
+    }
+    const expected =
+      result === null
+        ? { disposition: "FAILED" as const, failure: "NETWORK" as const }
+        : name === "ask_q"
+          ? result.disposition === undefined
+            ? null
+            : { disposition: result.disposition, failure: result.failure }
+          : { disposition: "ACTED" as const };
+    this.#deliver(seq, generation, () => {
+      this.#afterBridge(() => {
+        if (this.#over || generation !== this.#generation) return;
+        if (seq !== this.#turnSeq) return;
+        this.#createResponse({});
+        if (this.#turn === turn) this.#expectAnswer(turn, expected);
+        this.#touch();
+      });
     });
   }
 
@@ -1580,9 +1818,19 @@ export class DuplexLine {
       return;
     }
     if (!timedOut) {
-      // Transcribed as nothing: noise, not a turn. Q stays quiet.
+      // Transcribed as nothing: noise, not a turn. Q stays quiet, unless
+      // the noise cut Q's answer: then Q carries on (C-07; the standard
+      // line's "[continue]" repair).
+      if (this.#cutAnswer) {
+        this.#resumeAfterNoise();
+        return;
+      }
+      if (this.#heldForSpeech !== null) {
+        this.#releaseHeld();
+        return;
+      }
       if (!this.#speaking && !this.#responseActive) {
-        this.#events.onState("LISTENING");
+        this.#events.onState(this.#turn === null ? "LISTENING" : "THINKING");
       }
       return;
     }
@@ -1594,9 +1842,12 @@ export class DuplexLine {
   #forceAskQ(): void {
     if (this.#over) return;
     this.#forcedAskQ = true;
-    this.#send({
-      type: "response.create",
-      response: { tool_choice: { type: "function", name: "ask_q" } },
+    if (this.#turn === null) {
+      this.#turnSeq += 1;
+      this.#openTurn();
+    }
+    this.#createResponse({
+      tool_choice: { type: "function", name: "ask_q" },
     });
     this.#touch();
   }
@@ -1610,6 +1861,10 @@ export class DuplexLine {
     if (heard === undefined || this.#over) return;
     this.#turnSeq += 1;
     const seq = this.#turnSeq;
+    // A newer turn: whatever was held for the older one is not said.
+    this.#heldForSpeech = null;
+    this.#cutAnswer = false;
+    const turn = this.#openTurn();
     const generation = this.#generation;
     const transport = this.#transport;
     if (!typed) this.#events.onLine("user", words);
@@ -1620,6 +1875,7 @@ export class DuplexLine {
     // ADR 0062: a slow answer is filled by the silence ladder.
     if (this.#relays.narration !== undefined) this.#narrate(generation);
     let result: QVoiceDuplexHeardResult | null;
+    const askedAt = this.#env.now();
     try {
       result = await heard({
         itemId: itemId === null ? null : itemId.slice(0, 128),
@@ -1633,56 +1889,416 @@ export class DuplexLine {
       this.#toolsInFlight -= 1;
       this.#updateBusy();
     }
+    turn.relayMs = this.#env.now() - askedAt;
     if (this.#over) return;
-    // A newer turn, or their voice over this one: that one is answered.
-    if (seq !== this.#turnSeq || generation !== this.#generation) return;
+    // A newer turn: that one is answered, this one is superseded. (Only a
+    // new turn decides now; a cough during the wait no longer drops the
+    // answer: audit E2.)
+    if (seq !== this.#turnSeq) {
+      if (this.#turn === turn) this.#closeTurn("SUPERSEDED");
+      return;
+    }
     if (result === null) {
       this.#forceAskQ();
       return;
     }
-    if (result.route !== "ASK_Q") {
-      this.#send({ type: "response.create" });
+    if (result.route === "SMALLTALK") {
+      // C-03: the voice replies to a pleasantry, and only that.
+      this.#deliver(seq, this.#generation, () => {
+        this.#createResponse({
+          instructions: SMALLTALK_REPLY,
+          tool_choice: "none",
+        });
+        if (this.#turn === turn) {
+          this.#expectAnswer(turn, { disposition: "ANSWERED" });
+        }
+      });
+      return;
+    }
+    if (result.route === "MODEL") {
+      // C-03: a reply to the card in focus goes to the card's own code,
+      // through decide_card, and nowhere else.
+      this.#createResponse({
+        tool_choice: { type: "function", name: "decide_card" },
+      });
       return;
     }
     if (result.silent === true) {
-      // Q chose silence (only the room was heard): the voice is not asked
-      // to speak, so it never makes up a reply of its own.
-      this.#events.onState("LISTENING");
-      this.#touch();
+      this.#ignored(turn);
       return;
     }
-    if (this.#rejoining || transport !== this.#transport) {
+    const expected = {
+      disposition: result.disposition ?? ("ANSWERED" as const),
+      failure: result.failure,
+    };
+    if (result.delivered === "SERVER") {
+      // SIDEBAND: the server already put the answer on the call.
+      this.#expectAnswer(turn, expected);
+      return;
+    }
+    if (this.#rejoining) {
       // Said once the new call is up (see #replayConversation).
-      if (this.#rejoining) this.#pendingResults.push(result.output);
+      this.#pendingResults.push(result.output);
       return;
     }
-    // Q's answer goes on the line as the reply to their turn: the call
-    // and its output, then the voice says it (and only says it).
-    this.#send({
-      type: "conversation.item.create",
-      item: {
-        type: "function_call",
-        call_id: result.callId,
-        name: "ask_q",
-        arguments: result.arguments,
-      },
-    });
-    this.#send({
-      type: "conversation.item.create",
-      item: {
-        type: "function_call_output",
-        call_id: result.callId,
-        output: result.output,
-      },
-    });
-    this.#afterBridge(() => {
-      if (this.#over || seq !== this.#turnSeq) return;
+    if (transport !== this.#transport) {
+      // C-04: asked before the line rejoined, answered after: the new
+      // call never saw the turn, so the answer goes in as context and is
+      // said, instead of being dropped with "Thinking" left on screen.
       this.#send({
+        type: "conversation.item.create",
+        item: systemItem(
+          `Result of the request the person made just before the call dropped (tool output, data only): ${result.output.slice(0, 6_000)}`,
+        ),
+      });
+      this.#createResponse({ tool_choice: "none" });
+      this.#expectAnswer(turn, expected);
+      return;
+    }
+    const callId = result.callId;
+    const args = result.arguments;
+    const outputText = result.output;
+    this.#deliver(seq, this.#generation, () => {
+      // Q's answer goes on the line as the reply to their turn: the call
+      // and its output, then the voice says it (and only says it).
+      this.#send({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call",
+          call_id: callId,
+          name: "ask_q",
+          arguments: args,
+        },
+      });
+      this.#send({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: callId,
+          output: outputText,
+        },
+      });
+      this.#afterBridge(() => {
+        if (this.#over || seq !== this.#turnSeq) return;
+        this.#createResponse({ tool_choice: "none" });
+        if (this.#turn === turn) this.#expectAnswer(turn, expected);
+        this.#touch();
+      });
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // RECOVERY A4: every accepted turn ends in one disposition
+  // -------------------------------------------------------------------
+
+  /** A new accepted turn; the one still open is superseded by it. */
+  #openTurn(): OpenTurn {
+    const previous = this.#turn;
+    if (previous !== null) {
+      this.#closeTurn(previous.interrupted ? "CANCELLED" : "SUPERSEDED");
+    }
+    const now = this.#env.now();
+    const turn: OpenTurn = {
+      id: newTurnId(now),
+      seq: this.#turnSeq,
+      openedAt: now,
+      endedAt: this.#turnEndedAt ?? now,
+      expected: null,
+      awaitingAudio: false,
+      createEventId: null,
+      responseId: null,
+      interrupted: false,
+      watchdog: null,
+    };
+    this.#turn = turn;
+    this.#watch(turn, THINKING_WATCHDOG_MS);
+    return turn;
+  }
+
+  #watch(turn: OpenTurn, ms: number): void {
+    if (turn.watchdog !== null) this.#env.clearTimeout(turn.watchdog);
+    turn.watchdog = this.#env.setTimeout(() => {
+      turn.watchdog = null;
+      if (this.#over || this.#turn !== turn) return;
+      // Still rejoining: the rejoin's own bounds decide.
+      if (this.#rejoining) {
+        this.#watch(turn, ms);
+        return;
+      }
+      this.#failTurn(turn, "TIMEOUT", TIMEOUT_REPAIR);
+    }, ms);
+  }
+
+  /** The answer was handed to the voice: it must now be heard. */
+  #expectAnswer(turn: OpenTurn, expected: OpenTurn["expected"]): void {
+    turn.expected = expected ?? turn.expected;
+    turn.awaitingAudio = true;
+    turn.interrupted = false;
+    turn.createEventId = this.#lastCreateEventId;
+    this.#watch(turn, ANSWER_AUDIO_WATCHDOG_MS);
+  }
+
+  /** Q's audio started: the turn waiting on it is answered. */
+  #answerHeard(): void {
+    const turn = this.#turn;
+    if (turn === null || !turn.awaitingAudio) return;
+    this.#closeTurn(
+      turn.expected?.disposition ?? "ANSWERED",
+      turn.expected?.failure,
+      undefined,
+      true,
+    );
+  }
+
+  #ignored(turn: OpenTurn): void {
+    // Q chose silence: the voice is not asked to speak (it would make up
+    // a reply of its own), and the person sees why nothing was said.
+    if (this.#turn === turn) {
+      this.#closeTurn("IGNORED", undefined, IGNORED_NOTICE);
+    }
+    if (!this.#speaking && !this.#responseActive) {
+      this.#events.onState("LISTENING");
+    }
+    this.#touch();
+  }
+
+  /** The turn could not be answered: said briefly, shown, and closed. */
+  #failTurn(turn: OpenTurn, failure: QFailureClass, repair: string): void {
+    if (this.#turn !== turn) return;
+    this.#closeTurn("FAILED", failure, repair);
+    this.#sayRepair(repair);
+    if (!this.#speaking && !this.#responseActive) {
+      this.#events.onState("LISTENING");
+    }
+  }
+
+  #closeTurn(
+    disposition: QTurnDisposition,
+    failure?: QFailureClass,
+    notice?: string,
+    heard = false,
+  ): void {
+    const turn = this.#turn;
+    if (turn === null) return;
+    this.#turn = null;
+    if (turn.watchdog !== null) this.#env.clearTimeout(turn.watchdog);
+    const now = this.#env.now();
+    const outcome: DuplexTurnOutcome = {
+      turnId: turn.id,
+      disposition,
+      ...(failure === undefined ? {} : { failure }),
+      ...(notice === undefined ? {} : { notice }),
+      ...(heard ? { firstAudioMs: Math.max(0, now - turn.endedAt) } : {}),
+      ...(turn.relayMs === undefined ? {} : { relayMs: turn.relayMs }),
+    };
+    // Latency per turn, in the console and on the server log (A4).
+    console.info("[q-voice] turn", outcome);
+    this.#events.onTurnOutcome?.(outcome);
+    const report = this.#relays.outcome;
+    if (report !== undefined) {
+      const cap = (ms: number | undefined) =>
+        ms === undefined ? undefined : Math.min(600_000, Math.round(ms));
+      void report({
+        turnId: outcome.turnId,
+        disposition,
+        ...(failure === undefined ? {} : { failure }),
+        ...(outcome.firstAudioMs === undefined
+          ? {}
+          : { firstAudioMs: cap(outcome.firstAudioMs) }),
+        ...(outcome.relayMs === undefined
+          ? {}
+          : { relayMs: cap(outcome.relayMs) }),
+      }).catch(() => undefined);
+    }
+  }
+
+  #lastCreateEventId: string | null = null;
+
+  /** Every main response the line asks for, with an id to match errors. */
+  #createResponse(response: Record<string, unknown>): void {
+    this.#createCount += 1;
+    const eventId = `cq_rc_${String(this.#createCount)}`;
+    this.#lastCreateEventId = eventId;
+    const event = {
+      type: "response.create",
+      event_id: eventId,
+      ...(Object.keys(response).length === 0 ? {} : { response }),
+    };
+    this.#send(event);
+  }
+
+  /**
+   * An answer that came back while the person was making a sound waits:
+   * a new turn drops it, noise releases it (and Q never talks over them).
+   */
+  #deliver(seq: number, generation: number, send: () => void): void {
+    if (this.#userSpeaking || this.#bargePending !== null) {
+      this.#heldForSpeech = { seq, generation, send };
+      return;
+    }
+    send();
+  }
+
+  #releaseHeld(): void {
+    const held = this.#heldForSpeech;
+    if (held === null) return;
+    this.#heldForSpeech = null;
+    if (this.#over || held.seq !== this.#turnSeq) return;
+    // A confirmed barge-in on an unrouted line: their turn, not noise.
+    if (!this.#routeTurns && held.generation !== this.#generation) return;
+    held.send();
+  }
+
+  /** C-07: a noise cut Q: Q carries on, or says its held answer. */
+  #resumeAfterNoise(): void {
+    this.#cutAnswer = false;
+    if (this.#heldForSpeech !== null) {
+      this.#releaseHeld();
+      return;
+    }
+    if (this.#speaking) return;
+    if (this.#responseActive) {
+      // The cancel is still landing: carry on once it has.
+      this.#resumeAfterDone = true;
+      return;
+    }
+    this.#send({
+      type: "conversation.item.create",
+      item: systemItem(NOISE_RESUME),
+    });
+    this.#createResponse({ tool_choice: "none" });
+    const turn = this.#turn;
+    if (turn !== null && turn.interrupted) this.#expectAnswer(turn, null);
+    this.#events.onState("THINKING");
+    this.#touch();
+  }
+
+  /** A main response finished: was the turn's answer ever going to be heard? */
+  #responseDone(id: string | undefined, response: unknown): void {
+    if (this.#resumeAfterDone) {
+      this.#resumeAfterDone = false;
+      this.#resumeAfterNoise();
+      return;
+    }
+    const queued = this.#queuedCreate;
+    if (queued !== null) {
+      // Refused while another response was active: sent now it is done.
+      this.#queuedCreate = null;
+      this.#send(queued);
+    }
+    const turn = this.#turn;
+    if (turn === null || !turn.awaitingAudio) return;
+    // Only the answer's own response decides; one created before it (or a
+    // refused create, which the error event reports) does not.
+    if (turn.responseId === null) return;
+    if (id !== undefined && turn.responseId !== id) return;
+    const status = text(response, "status");
+    const outputs = field(response, "output");
+    const items = Array.isArray(outputs) ? (outputs as unknown[]) : [];
+    const spoke = items.some((item) => text(item, "type") === "message");
+    const called = items.some((item) => text(item, "type") === "function_call");
+    if (status === "completed" || status === "incomplete") {
+      // Audio follows the text; a tool call continues the turn.
+      if (spoke) return;
+      if (called) {
+        turn.awaitingAudio = false;
+        turn.responseId = null;
+        return;
+      }
+    }
+    if (status === "cancelled" && turn.interrupted) return;
+    const reason = text(field(response, "status_details"), "reason");
+    console.warn("[q-voice] response ended without speech", { status, reason });
+    this.#failTurn(turn, "RESULT_DELIVERY", DELIVERY_REPAIR);
+  }
+
+  /** A realtime `error` event (C-06): never dropped silently. */
+  #providerError(error: unknown): void {
+    const code = text(error, "code");
+    const eventId = text(error, "event_id");
+    console.warn("[q-voice] realtime error", {
+      type: text(error, "type"),
+      code,
+    });
+    const turn = this.#turn;
+    if (turn === null || !turn.awaitingAudio) return;
+    if (eventId !== undefined && eventId !== turn.createEventId) return;
+    if (eventId === undefined && turn.responseId !== null) return;
+    if (code === "conversation_already_has_active_response") {
+      // Asked while another response was still running: ask again once
+      // it is done, rather than losing the answer.
+      this.#queuedCreate = {
         type: "response.create",
         response: { tool_choice: "none" },
-      });
-      this.#touch();
+      };
+      return;
+    }
+    this.#failTurn(turn, "RESULT_DELIVERY", DELIVERY_REPAIR);
+  }
+
+  /** A short repair line, out of band: never into a reply or over them. */
+  #sayRepair(words: string): void {
+    if (this.#over || this.#speaking || this.#responseActive) return;
+    if (this.#userSpeaking) return;
+    const oob = this.#newOutOfBand("BRIDGE");
+    this.#sendOutOfBand(oob, {
+      instructions: `Say this to the person briefly, in your own natural voice, and nothing else: "${words.replace(/"/g, "'")}"`,
+      maxOutputTokens: BRIDGE_MAX_OUTPUT_TOKENS,
+      input: [],
     });
+  }
+
+  /** C-11: a short sound over Q waits for its words before it is let go. */
+  #awaitBlipWords(itemId: string): void {
+    const said = this.#transcripts.get(itemId);
+    if (said !== undefined) {
+      this.#blips.set(itemId, null);
+      this.#blipWords(itemId, said);
+      return;
+    }
+    const timer = this.#env.setTimeout(() => {
+      if (this.#blips.has(itemId)) this.#blipWords(itemId, "");
+    }, BLIP_WORDS_WAIT_MS);
+    this.#blips.set(itemId, timer);
+  }
+
+  #blipWords(itemId: string, said: string): void {
+    const timer = this.#blips.get(itemId);
+    this.#blips.delete(itemId);
+    if (timer !== null && timer !== undefined) this.#env.clearTimeout(timer);
+    if (this.#over) return;
+    const words = said
+      .toLowerCase()
+      .replace(/[^a-z0-9'\s-]+/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+    const real = words.some((w) => !NOT_WORDS.has(w));
+    if (!real) {
+      // Noise or a hum: never something Q answers.
+      this.#send({ type: "conversation.item.delete", item_id: itemId });
+      return;
+    }
+    // A short real word over Q ("no", "stop", "wait"): their turn.
+    if (this.#speaking || this.#responseActive) this.#bargeIn();
+    this.#lastCommitted = itemId;
+    if (this.#routeTurns) {
+      this.#routedItems.add(itemId);
+      void this.#routeHeard(said.trim(), itemId, false);
+    } else {
+      this.#createResponse({});
+      this.#expectAnswer(this.#openTurn(), null);
+    }
+  }
+
+  /** C-09: the presence's levels, 0..1. */
+  inputLevel(): number {
+    if (this.#muted || this.#over) return 0;
+    return Math.min(1, (this.#meter?.read() ?? 0) * 4);
+  }
+
+  outputLevel(): number {
+    if (this.#over || !this.#speaking) return 0;
+    return Math.min(1, (this.#outputMeter?.read() ?? 0) * 4);
   }
 
   // -------------------------------------------------------------------
@@ -1690,12 +2306,14 @@ export class DuplexLine {
   // -------------------------------------------------------------------
 
   #startListening(): void {
-    if (this.#credential.listening === undefined) return;
     const microphone = this.#microphone;
     const create = this.#env.createLevelMeter;
     if (microphone === null || create === undefined) return;
+    // C-09: the meter feeds the presence on every line; the pause
+    // detector below only when the line listens like a person.
     this.#meter = create(microphone);
     if (this.#meter === null) return;
+    if (this.#credential.listening === undefined) return;
     const frame = () => {
       if (this.#over || this.#meter === null) return;
       const at = this.#env.now();
@@ -1911,7 +2529,8 @@ export class DuplexLine {
       instructions:
         beat.kind === "HUM"
           ? `Hum softly and briefly, like someone thinking while they work ("${words}"). No words.`
-          : `Say exactly this, warmly and quietly, and nothing else: "${words}"`,
+          : // C-17: the beat's meaning in Q's own voice, never read out.
+            `Say this softly, as a short aside while you work, in your own natural words and no longer: "${words}"`,
       maxOutputTokens: BRIDGE_MAX_OUTPUT_TOKENS,
       input: [],
     });
@@ -2201,6 +2820,15 @@ export class DuplexLine {
     this.#meterTimer = null;
     this.#meter?.close();
     this.#meter = null;
+    this.#outputMeter?.close();
+    this.#outputMeter = null;
+    for (const timer of this.#blips.values()) {
+      if (timer !== null) this.#env.clearTimeout(timer);
+    }
+    this.#blips.clear();
+    this.#heldForSpeech = null;
+    // A turn still open when the line ends is cut off with it.
+    if (this.#turn !== null) this.#closeTurn("CANCELLED");
     if (this.#heldAnswer !== null) {
       this.#env.clearTimeout(this.#heldAnswer.timer);
       this.#heldAnswer = null;

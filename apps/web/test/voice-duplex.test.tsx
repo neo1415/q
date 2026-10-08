@@ -357,6 +357,12 @@ describe("barge-in", () => {
 
     expect(h.events.onInterrupted).not.toHaveBeenCalled();
     expect(h.audio.volume).toBe(1);
+    // C-11: the blip waits for its words; a cough has none and is let go.
+    channel.emit({
+      type: "conversation.item.input_audio_transcription.completed",
+      item_id: "blip_1",
+      transcript: "",
+    });
     expect(channel.types()).toEqual(["conversation.item.delete"]);
     expect(channel.sent[0]).toMatchObject({ item_id: "blip_1" });
   });
