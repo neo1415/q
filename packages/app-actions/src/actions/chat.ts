@@ -74,6 +74,13 @@ const SEND = defineAppAction<
       relationshipId: input.relationshipId,
       request: input.input,
       idempotencyKey: input.idempotencyKey,
+      // Recovery D-07: Q's sends are marked as Q's; the screen's never are.
+      ...(context.surface === "Q" && context.qActionId !== undefined
+        ? { qActionId: context.qActionId }
+        : {}),
+      ...(context.surface === "Q" && context.qDelegationId !== undefined
+        ? { qDelegationId: context.qDelegationId }
+        : {}),
     }),
   targets: (input) => relationshipTarget(input.relationshipId),
   // The words themselves and who gets them: the card is what they approve.

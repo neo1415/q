@@ -2720,6 +2720,9 @@ export function createInstructionEngine(
             idempotencyKey: key,
             correlationId: CorrelationIdSchema.parse(`cor_${randomUUID()}`),
             surface: "Q" as const,
+            // Recovery D-07: Q's own send is marked as Q's, under the
+            // delegation it acted on (else the standing instruction).
+            qDelegationId: verdict.delegationId ?? row.id,
           };
           try {
             // The declaration's own authorize step, then its one service
