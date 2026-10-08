@@ -144,11 +144,10 @@ describe("operate_screen (RECOVERY C2)", () => {
   });
 
   it("page acts take no target; BACK is the page they were on", async () => {
-    expect(await allowedAct({ act: "BACK" })).toEqual({
-      kind: "UI_ACT",
-      actId: expect.stringMatching(/^uia_/u),
-      act: "BACK",
-    });
+    const back = await allowedAct({ act: "BACK" });
+    expect(back).toMatchObject({ kind: "UI_ACT", act: "BACK" });
+    expect(back.actId).toMatch(/^uia_/u);
+    expect(back).not.toHaveProperty("target");
     expect(
       await allowedAct({ act: "SCROLL_DOWN", target: "x" }),
     ).not.toHaveProperty("target");
