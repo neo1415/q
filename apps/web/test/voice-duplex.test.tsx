@@ -493,7 +493,7 @@ describe("tool calls and usage", () => {
     await settle();
   });
 
-  it("reconnects the narration poll after a dropped connection, never saying a beat twice (R9)", async () => {
+  it("reconnects the narration poll after a dropped connection, and says one bridge for the turn (R9, INC-1)", async () => {
     let finish: () => void = () => undefined;
     const beat = (sequence: number, text: string) => ({
       sequence,
@@ -502,19 +502,13 @@ describe("tool calls and usage", () => {
     let calls = 0;
     const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() => {
       calls += 1;
-      if (calls === 1) {
-        return Promise.resolve({
-          beats: [beat(1, "Reading the deck…")],
-          idle: false,
-        });
-      }
       // The network drops: once as nothing, once as a throw.
-      if (calls === 2) return Promise.resolve(null);
-      if (calls === 3) return Promise.reject(new TypeError("Failed to fetch"));
-      // Back: the server repeats the beat already said, then a new one.
+      if (calls === 1) return Promise.resolve(null);
+      if (calls === 2) return Promise.reject(new TypeError("Failed to fetch"));
+      // Back: two beats are waiting; one bridge per turn is said (INC-1).
       return Promise.resolve({
         beats: [beat(1, "Reading the deck…"), beat(2, "Checking the numbers…")],
-        idle: true,
+        idle: false,
       });
     });
     const h = harness({
@@ -544,50 +538,27 @@ describe("tool calls and usage", () => {
             (event as { type?: string }).type === "response.create" &&
             JSON.stringify(event).includes(words),
         ).length;
-    await vi.advanceTimersByTimeAsync(700);
-    await settle();
-    expect(said("Reading the deck")).toBe(1);
-    // Each beat is out of band; let the first finish so the next may speak.
-    const first = h
-      .channel()
-      .sent.find((event) =>
-        JSON.stringify(event).includes("Reading the deck"),
-      ) as { response: { metadata: unknown } };
-    h.channel().emit({
-      type: "response.done",
-      response: {
-        id: "resp_1",
-        status: "completed",
-        metadata: first.response.metadata,
-      },
-    });
     await vi.advanceTimersByTimeAsync(5_000);
     await settle();
-    expect(narration).toHaveBeenCalledTimes(4);
-    expect(narration.mock.calls.map(([after]) => after)).toEqual([0, 1, 1, 1]);
+    expect(narration.mock.calls.map(([after]) => after)).toEqual([0, 0, 0]);
     expect(said("Reading the deck")).toBe(1);
-    expect(said("Checking the numbers")).toBe(1);
+    expect(said("Checking the numbers")).toBe(0);
+    // And no more polls for this turn: its one bridge is said.
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(narration).toHaveBeenCalledTimes(3);
     finish();
     await settle();
   });
 
-  it("offline, the narration poll waits for the connection instead of going quiet, and says no beat twice (W7)", async () => {
+  it("offline, the narration poll waits for the connection instead of going quiet (W7)", async () => {
     let finish: () => void = () => undefined;
     const beat = (sequence: number, text: string) => ({
       sequence,
       beat: { kind: "STAGE_LINE" as const, text },
     });
-    let online = true;
+    let online = false;
     const listeners = new Set<() => void>();
-    let calls = 0;
     const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() => {
-      calls += 1;
-      if (calls === 1) {
-        return Promise.resolve({
-          beats: [beat(1, "Reading the deck…")],
-          idle: false,
-        });
-      }
       if (!online) return Promise.reject(new TypeError("Failed to fetch"));
       return Promise.resolve({
         beats: [beat(1, "Reading the deck…"), beat(2, "Checking the numbers…")],
@@ -630,39 +601,20 @@ describe("tool calls and usage", () => {
             (event as { type?: string }).type === "response.create" &&
             JSON.stringify(event).includes(words),
         ).length;
-    // The first poll is answered, then the connection goes.
-    online = false;
-    await vi.advanceTimersByTimeAsync(700);
-    await settle();
-    expect(said("Reading the deck")).toBe(1);
-    const first = h
-      .channel()
-      .sent.find((event) =>
-        JSON.stringify(event).includes("Reading the deck"),
-      ) as { response: { metadata: unknown } };
-    h.channel().emit({
-      type: "response.done",
-      response: {
-        id: "resp_1",
-        status: "completed",
-        metadata: first.response.metadata,
-      },
-    });
     // Well past the old ~5.6 s give-up: one failed poll, then it waits.
     await vi.advanceTimersByTimeAsync(20_000);
     await settle();
-    expect(narration).toHaveBeenCalledTimes(2);
+    expect(narration).toHaveBeenCalledTimes(1);
     expect(listeners.size).toBe(1);
-    // Back online: it polls again at once, from the last beat heard.
+    // Back online: it polls again at once.
     online = true;
     for (const listener of [...listeners]) listener();
     await vi.advanceTimersByTimeAsync(10);
     await settle();
-    expect(narration).toHaveBeenCalledTimes(3);
-    expect(narration.mock.calls.map(([after]) => after)).toEqual([0, 1, 1]);
+    expect(narration).toHaveBeenCalledTimes(2);
     expect(listeners.size).toBe(0);
     expect(said("Reading the deck")).toBe(1);
-    expect(said("Checking the numbers")).toBe(1);
+    expect(said("Checking the numbers")).toBe(0);
     finish();
     await settle();
   });
@@ -1022,6 +974,8 @@ describe("the server decides who answers each turn (VOICE-BRAIN)", () => {
     expect(h.relays.heard).toHaveBeenCalledWith({
       itemId: "item_1",
       transcript: "Open my pitch deck.",
+      // INC-1: the turn's id, which its `said` confirmation echoes.
+      turnId: expect.stringMatching(/^turn_/u) as unknown,
     });
     expect(h.events.onLine).toHaveBeenCalledWith("user", "Open my pitch deck.");
     const sent = h.channel().sent;
@@ -1117,6 +1071,7 @@ describe("the server decides who answers each turn (VOICE-BRAIN)", () => {
       transcript: "send it",
       typed: true,
       cardInFocus: true,
+      turnId: expect.stringMatching(/^turn_/u) as unknown,
     });
     expect(h.channel().types()).toEqual([
       "conversation.item.create",

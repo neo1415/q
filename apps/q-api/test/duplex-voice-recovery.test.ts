@@ -110,6 +110,8 @@ async function brokerWith(
   extra: {
     readonly open?: boolean;
     readonly sideband?: DuplexBrokerDependencies["sideband"];
+    readonly transcript?: DuplexBrokerDependencies["transcript"];
+    readonly logger?: DuplexBrokerDependencies["logger"];
   } = {},
 ): Promise<DuplexBroker> {
   const provider: RealtimeSessionProvider = {
@@ -167,8 +169,9 @@ async function brokerWith(
     },
     turn,
     spend: { spentTodayUsd: () => Promise.resolve(0) },
-    logger,
+    logger: extra.logger ?? logger,
     ...(extra.sideband === undefined ? {} : { sideband: extra.sideband }),
+    ...(extra.transcript === undefined ? {} : { transcript: extra.transcript }),
   });
   if (extra.open === false) return broker;
   const opened = await broker.open({ binding: binding() });
@@ -800,5 +803,152 @@ describe("the transport harness prices", () => {
         expect(block(name)).toContain(`${key}: ${String(value)},`);
       }
     }
+  });
+});
+
+describe("INC-1 (top three, live 2026-10-08): the server side of one turn's lifecycle", () => {
+  const TURN_1 = "turn_top3aaaa01";
+  const TURN_2 = "turn_rankbbbb02";
+
+  it("offers at most one bridge per ask_q, and none once the answer is in", async () => {
+    let answerReady: () => void = () => undefined;
+    let finish: () => void = () => undefined;
+    const broker = await brokerWith(async (_b, _t, _s, speaker) => {
+      speaker.narrate?.({ kind: "STAGE_LINE", text: "Bridge 1" });
+      speaker.narrate?.({ kind: "STAGE_LINE", text: "Bridge 1b" });
+      await new Promise<void>((resolve) => {
+        answerReady = resolve;
+      });
+      await speaker.speak(
+        "Your top three are Halyard, Clearwater and Tensorgate.",
+      );
+      // The ladder keeps going while the answer is post-processed
+      // (production: narration #2 and #3 after the run completed).
+      speaker.narrate?.({ kind: "STAGE_LINE", text: "Bridge 2" });
+      speaker.narrate?.({ kind: "PROGRESS", text: "Bridge 3" });
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      return { kind: "SPOKEN", path: "Q" };
+    });
+    const pending = broker.heard({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      heard: {
+        itemId: "item_1",
+        transcript: "Top three companies for my mandate?",
+        turnId: TURN_1,
+      },
+    });
+    await Promise.resolve();
+    const first = await broker.narration({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      after: 0,
+    });
+    expect(first?.beats.map((b) => b.beat)).toEqual([
+      { kind: "STAGE_LINE", text: "Bridge 1" },
+    ]);
+    answerReady();
+    await Promise.resolve();
+    await Promise.resolve();
+    const afterAnswer = await broker.narration({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      after: 1,
+      signal: AbortSignal.abort(),
+    });
+    expect(afterAnswer?.beats).toEqual([]);
+    finish();
+    expect((await pending)?.route).toBe("ASK_Q");
+  });
+
+  it("SPOKEN only on the client's said for that turn id; a stale said is never kept", async () => {
+    const kept: { role: string; content: string }[] = [];
+    const info = vi.fn();
+    const spyLogger = {
+      ...logger,
+      info,
+      warn: vi.fn(),
+    } as unknown as typeof logger;
+    const broker = await brokerWith(
+      async (_b, _t, _s, speaker) => {
+        await speaker.speak(
+          "Your top three are Halyard, Clearwater and Tensorgate.",
+        );
+        return { kind: "SPOKEN", path: "Q" };
+      },
+      {},
+      {
+        logger: spyLogger,
+        transcript: {
+          record: (entry) => {
+            kept.push({ role: entry.role, content: entry.content });
+            return Promise.resolve();
+          },
+          mirror: () => Promise.resolve(),
+        },
+      },
+    );
+    await broker.heard({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      heard: { itemId: "i1", transcript: "Top three?", turnId: TURN_1 },
+    });
+    // Handed over is not spoken: nothing logged as SPOKEN yet.
+    expect(
+      info.mock.calls.some(
+        ([, message]) => message === "duplex voice turn spoken",
+      ),
+    ).toBe(false);
+    // A newer turn opens; then the stale reply for turn 1 arrives.
+    await broker.heard({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      heard: { itemId: "i2", transcript: "Rank them.", turnId: TURN_2 },
+    });
+    broker.said({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      said: {
+        responseId: "resp_stale",
+        text: "Let me find the top three, give me a moment.",
+        turnId: TURN_1,
+      },
+    });
+    expect(kept.filter((k) => k.role === "Q")).toEqual([]);
+    // The current turn's answer, confirmed: SPOKEN.
+    broker.said({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      said: { responseId: "resp_2", text: "Ranked.", turnId: TURN_2 },
+    });
+    expect(kept.filter((k) => k.role === "Q")).toEqual([
+      { role: "Q", content: "Ranked." },
+    ]);
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({ turnId: TURN_2, outcome: "SPOKEN" }),
+      "duplex voice turn spoken",
+    );
+  });
+
+  it("the voice turn timing says HANDED, not SPOKEN, for a deferred (duplex) speaker", async () => {
+    const info = vi.fn();
+    const timings = createVoiceTurnTimings({
+      logger: { ...logger, info },
+      graceMs: 0,
+    });
+    const timed = timedVoiceTurns(async (_b, _t, _s, speaker) => {
+      await speaker.speak("Your top three are ready.");
+      return { kind: "SPOKEN", path: "Q" };
+    }, timings);
+    const broker = await brokerWith(timed);
+    await askQ(broker, "Top three?");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const outcomes = info.mock.calls
+      .filter(([, message]) => message === "voice turn timed")
+      .map(([fields]) => (fields as { outcome?: string }).outcome);
+    expect(outcomes).toContain("HANDED");
+    expect(outcomes).not.toContain("SPOKEN");
   });
 });
