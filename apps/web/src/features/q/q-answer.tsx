@@ -53,7 +53,12 @@ export function replyParts(blocks: readonly QTurnObjectBlock[]): {
       case "COMPARISON":
       case "COMPARISON_CARDS":
       case "CLARIFICATION_REQUEST":
-        // What the answer produced or needs from the person: in view.
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
+        // What the answer produced or needs from the person, and (E4) its
+        // laid-out data: in view.
         inline.push(block);
         break;
       case "ANSWER_CARDS":
