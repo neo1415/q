@@ -21,6 +21,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
+import { effectShown } from "@/features/q/control/perform";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 import { RelationshipFitChips } from "@/features/fit/relationship-fit-chips";
 import {
@@ -172,7 +173,14 @@ export function RelationshipsBoard({
       const key = FILTERS.find((one) => one === wanted);
       if (key === undefined) return "NOT_APPLICABLE";
       setFilter(key);
-      return "DONE";
+      // DONE once the pill shows it is on, not when it was asked.
+      return effectShown(
+        () =>
+          filterRef.current
+            ?.querySelector(`[data-filter="${key}"]`)
+            ?.getAttribute("aria-pressed") === "true",
+        2_000,
+      ).then((shown) => (shown ? "DONE" : "FAILED"));
     },
   });
   const [digests, setDigests] = useState(initialDigests);

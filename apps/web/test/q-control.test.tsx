@@ -35,7 +35,25 @@ import {
 } from "../src/features/q/ui-act-controller";
 
 let n = 0;
-const scrollIntoView = vi.fn();
+/** What a scroll brought into view (jsdom lays nothing out). */
+const inView = new Set<Element>();
+const scrollIntoView = vi.fn(function (this: Element) {
+  inView.add(this);
+});
+function rectOf(this: Element): DOMRect {
+  const top = inView.has(this) ? 10 : 5_000;
+  return {
+    top,
+    bottom: top + 40,
+    left: 0,
+    right: 100,
+    width: 100,
+    height: 40,
+    x: 0,
+    y: top,
+    toJSON: () => ({}),
+  };
+}
 const act_ = (
   act: QUiActIntent["act"],
   extra: Partial<QUiActIntent> = {},
@@ -47,7 +65,9 @@ const act_ = (
 beforeEach(() => {
   resetControls();
   resetUiActController();
+  inView.clear();
   Element.prototype.scrollIntoView = scrollIntoView;
+  Element.prototype.getBoundingClientRect = rectOf;
 });
 afterEach(() => {
   cleanup();
@@ -56,6 +76,7 @@ afterEach(() => {
 
 function Tabs() {
   const [tab, setTab] = useState<"overview" | "readiness">("overview");
+  const [open, setOpen] = useState<string | null>(null);
   return (
     <div role="tablist">
       {(["overview", "readiness"] as const).map((key) => (
@@ -77,9 +98,16 @@ function Tabs() {
         <ul>
           {["a", "b", "c"].map((name) => (
             <li key={name}>
-              <a href={`#${name}`} onClick={() => opened.push(name)}>
+              <button
+                type="button"
+                aria-expanded={open === name}
+                onClick={() => {
+                  opened.push(name);
+                  setOpen(name);
+                }}
+              >
                 {name}
-              </a>
+              </button>
             </li>
           ))}
         </ul>
@@ -209,17 +237,18 @@ describe("UI acts run through the control's own handler, with a receipt (C2)", (
     expect((await pending).status).toBe("FAILED");
   });
 
-  it("SELECT_ITEM opens the nth item through its own link; out of range is TARGET_MISSING", async () => {
+  it("SELECT_ITEM opens the nth item through its own control, DONE once it shows open", async () => {
     opened.length = 0;
     render(<Tabs />);
-    expect(
-      (
-        await performUiAct(
-          act_("SELECT_ITEM", { target: "list.investors", index: 2 }),
-        )
-      ).status,
-    ).toBe("DONE");
+    const receipt = await act(() =>
+      performUiAct(act_("SELECT_ITEM", { target: "list.investors", index: 2 })),
+    );
+    expect(receipt.status).toBe("DONE");
     expect(opened).toEqual(["b"]);
+    expect(screen.getByRole("button", { name: "b" })).toHaveProperty(
+      "ariaExpanded",
+      "true",
+    );
     expect(
       (
         await performUiAct(
@@ -227,6 +256,92 @@ describe("UI acts run through the control's own handler, with a receipt (C2)", (
         )
       ).status,
     ).toBe("TARGET_MISSING");
+  });
+
+  it("an item whose click shows nothing is FAILED, never done", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(
+      <QControl id="list.dead" kind="LIST">
+        <ul>
+          <li>
+            <button type="button">Nothing happens</button>
+          </li>
+        </ul>
+      </QControl>,
+    );
+    const pending = performUiAct(
+      act_("SELECT_ITEM", { target: "list.dead", index: 1 }),
+    );
+    await vi.advanceTimersByTimeAsync(7_000);
+    expect((await pending).status).toBe("FAILED");
+  });
+
+  it("a link tab is DONE only once the router has settled on its route", async () => {
+    noteRoute("/capital");
+    function LinkTabs() {
+      const [on, setOn] = useState(false);
+      return (
+        <QControl id="tab.readiness" kind="TAB">
+          <a
+            href="/capital?tab=readiness"
+            role="tab"
+            aria-selected={on}
+            onClick={(event) => {
+              event.preventDefault();
+              // The bar marks the pick at once; the router settles later.
+              setOn(true);
+              setTimeout(() => noteRoute("/capital?tab=readiness"), 300);
+            }}
+          >
+            Readiness
+          </a>
+        </QControl>
+      );
+    }
+    render(<LinkTabs />);
+    let settledAt = 0;
+    const pending = performUiAct(
+      act_("SELECT_TAB", { target: "tab.readiness" }),
+    ).then((receipt) => {
+      settledAt = Date.now();
+      return receipt;
+    });
+    const started = Date.now();
+    const receipt = await act(() => pending);
+    expect(receipt.status).toBe("DONE");
+    // Not on the optimistic aria-selected: after the route settled.
+    expect(settledAt - started).toBeGreaterThanOrEqual(250);
+  });
+
+  it("a link tab whose route never settles is FAILED", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    noteRoute("/capital");
+    render(
+      <QControl id="tab.plan" kind="TAB">
+        <a
+          href="/capital?tab=plan"
+          role="tab"
+          aria-selected
+          onClick={(event) => event.preventDefault()}
+        >
+          Plan
+        </a>
+      </QControl>,
+    );
+    const pending = performUiAct(act_("SELECT_TAB", { target: "tab.plan" }));
+    await vi.advanceTimersByTimeAsync(7_000);
+    expect((await pending).status).toBe("FAILED");
+  });
+
+  it("a section that never comes into view is FAILED", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    Element.prototype.scrollIntoView = vi.fn();
+    render(<Tabs />);
+    const pending = performUiAct(
+      act_("SCROLL_TO", { target: "section.risks" }),
+    );
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect((await pending).status).toBe("FAILED");
   });
 
   it("SCROLL_TO brings a section into view", async () => {
@@ -299,14 +414,35 @@ describe("UI acts run through the control's own handler, with a receipt (C2)", (
     expect((await performUiAct(act_("BACK"))).status).toBe("DONE");
   });
 
-  it("scrolls the page without a target", async () => {
-    const scrollBy = vi.fn();
+  it("scrolls the page without a target, DONE once it moved", async () => {
+    const area = {
+      scrollTop: 0,
+      scrollHeight: 3_000,
+      clientHeight: 800,
+      scrollBy({ top }: { top: number }) {
+        setTimeout(() => {
+          area.scrollTop += top;
+        }, 30);
+      },
+      scrollTo: vi.fn(),
+    };
     Object.defineProperty(document, "scrollingElement", {
       configurable: true,
-      value: { scrollBy, scrollTo: vi.fn(), clientHeight: 800 },
+      value: area,
     });
     expect((await performUiAct(act_("SCROLL_DOWN"))).status).toBe("DONE");
-    expect(scrollBy).toHaveBeenCalledWith({ top: 680, behavior: "smooth" });
+    expect(area.scrollTop).toBe(680);
+    // Already at the top: nothing to scroll up, and it is said so.
+    area.scrollTop = 0;
+    expect((await performUiAct(act_("SCROLL_UP"))).status).toBe(
+      "NOT_APPLICABLE",
+    );
+    // A scroll that never lands is not done.
+    area.scrollBy = () => undefined;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const stuck = performUiAct(act_("SCROLL_DOWN"));
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect((await stuck).status).toBe("FAILED");
   });
 });
 

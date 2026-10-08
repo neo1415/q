@@ -74,7 +74,8 @@ export function useQControlGroup({
       registerControl({
         id,
         kind,
-        element: () => ref.current?.querySelector<HTMLElement>(selector) ?? null,
+        element: () =>
+          ref.current?.querySelector<HTMLElement>(selector) ?? null,
       }),
     );
     return () => {

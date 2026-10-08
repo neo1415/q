@@ -3,6 +3,12 @@ import type { QUiActIntent, QUiActReceipt } from "@capital-q/contracts";
 import { manifestVersion } from "./manifest";
 import { performOnControl } from "./control/perform";
 import { controlOf, kindOfId, registerControl } from "./control/registry";
+import {
+  noteRoute as noteSettledRoute,
+  resetRouteState,
+  routeEpoch,
+  routeTrail,
+} from "./control/route-state";
 
 /**
  * RECOVERY-2026-10 seam: universal application control
@@ -32,6 +38,8 @@ export const REGISTRATION_GRACE_MS = 400;
 const SETTLING_MS = 6_000;
 /** BACK/FORWARD: how long the route may take to change. */
 const HISTORY_WAIT_MS = 3_000;
+/** A page scroll: how long it may take to move. */
+const SCROLL_WAIT_MS = 1_500;
 const POLL_MS = 50;
 const LEDGER_MAX = 16;
 
@@ -93,35 +101,30 @@ export function recentUiActReports(): readonly UiActReport[] {
 // Route trail: where this tab has been, in order (BACK, "the page I was on").
 // ---------------------------------------------------------------------------
 
-let route: string | null = null;
-let routeEpoch = 0;
-const trail: string[] = [];
 let navigationPending: { readonly from: number; readonly at: number } | null =
   null;
 let lastActivity = 0;
 
-/** The shell reports each route it shows (route-trail.ts). */
+/**
+ * The shell reports each route the router settled on (QControlRuntime);
+ * a move Q was waiting for has then arrived.
+ */
 export function noteRoute(path: string): void {
-  if (path === route) return;
-  route = path;
-  routeEpoch += 1;
-  trail.push(path);
-  if (trail.length > 32) trail.shift();
+  const from = routeEpoch();
+  noteSettledRoute(path);
+  if (routeEpoch() === from) return;
   navigationPending = null;
   lastActivity = Date.now();
 }
 
-/** The routes this tab showed, oldest first (the person's own trail). */
-export function routeTrail(): readonly string[] {
-  return [...trail];
-}
+export { routeTrail };
 
 /**
  * A move is on its way (Q's own navigation): the next step waits for the
  * new route, so it never runs on the page being left.
  */
 export function expectNavigation(): void {
-  navigationPending = { from: routeEpoch, at: Date.now() };
+  navigationPending = { from: routeEpoch(), at: Date.now() };
   lastActivity = Date.now();
 }
 
@@ -142,7 +145,7 @@ async function settleNavigation(): Promise<void> {
   const pending = navigationPending;
   if (pending === null) return;
   await until(
-    () => routeEpoch !== pending.from,
+    () => routeEpoch() !== pending.from,
     Math.max(0, pending.at + NAVIGATION_WAIT_MS - Date.now()),
   );
   navigationPending = null;
@@ -161,17 +164,27 @@ function scroller(): Element {
 
 async function historyStep(direction: "BACK" | "FORWARD") {
   // No page of this app behind them: a step back would leave Capital Q.
-  if (direction === "BACK" && trail.length < 2) return "NOT_APPLICABLE";
-  const from = routeEpoch;
+  if (direction === "BACK" && routeTrail().length < 2) return "NOT_APPLICABLE";
+  const from = routeEpoch();
   if (direction === "BACK") window.history.back();
   else window.history.forward();
   lastActivity = Date.now();
   // Nothing ahead: the route never changes, which is the honest answer.
-  return (await until(() => routeEpoch !== from, HISTORY_WAIT_MS))
+  return (await until(() => routeEpoch() !== from, HISTORY_WAIT_MS))
     ? "DONE"
     : direction === "FORWARD"
       ? "NOT_APPLICABLE"
       : "FAILED";
+}
+
+/** DONE once the page has actually moved; a scroll that never lands is FAILED. */
+async function scrolled(
+  area: Element,
+  from: number,
+): Promise<QUiActReceipt["status"]> {
+  return (await until(() => area.scrollTop !== from, SCROLL_WAIT_MS))
+    ? "DONE"
+    : "FAILED";
 }
 
 async function pageAct(intent: QUiActIntent): Promise<QUiActReceipt["status"]> {
@@ -180,25 +193,26 @@ async function pageAct(intent: QUiActIntent): Promise<QUiActReceipt["status"]> {
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ? "auto"
       : "smooth";
+  const area = scroller();
+  const top = area.scrollTop;
+  const room = area.scrollHeight - area.clientHeight;
   switch (intent.act) {
     case "SCROLL_TOP":
-      scroller().scrollTo({ top: 0, behavior });
-      return "DONE";
-    case "SCROLL_BOTTOM": {
-      const area = scroller();
-      area.scrollTo({ top: area.scrollHeight, behavior });
-      return "DONE";
-    }
+    case "SCROLL_UP":
+      // Already at the top: nothing to scroll, and it is said so.
+      if (top <= 0) return "NOT_APPLICABLE";
+      if (intent.act === "SCROLL_TOP") area.scrollTo({ top: 0, behavior });
+      else area.scrollBy({ top: -area.clientHeight * 0.85, behavior });
+      return scrolled(area, top);
+    case "SCROLL_BOTTOM":
     case "SCROLL_DOWN":
-    case "SCROLL_UP": {
-      const area = scroller();
-      const step = area.clientHeight * 0.85;
-      area.scrollBy({
-        top: intent.act === "SCROLL_DOWN" ? step : -step,
-        behavior,
-      });
-      return "DONE";
-    }
+      if (top >= room - 1) return "NOT_APPLICABLE";
+      if (intent.act === "SCROLL_BOTTOM") {
+        area.scrollTo({ top: area.scrollHeight, behavior });
+      } else {
+        area.scrollBy({ top: area.clientHeight * 0.85, behavior });
+      }
+      return scrolled(area, top);
     case "BACK":
     case "FORWARD":
       return historyStep(intent.act);
@@ -287,9 +301,7 @@ export function performUiAct(intent: QUiActIntent): Promise<QUiActReceipt> {
 
 /** Clears the trail and the ledger (tests). */
 export function resetUiActController(): void {
-  route = null;
-  routeEpoch = 0;
-  trail.length = 0;
+  resetRouteState();
   navigationPending = null;
   lastActivity = 0;
   ledger.length = 0;

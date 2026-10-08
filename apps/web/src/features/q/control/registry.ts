@@ -204,6 +204,13 @@ export function stateOf(
     case "DISCLOSURE":
     case "MENU":
     case "DIALOG": {
+      // A native disclosure: its <details> says whether it is open.
+      if (
+        element.tagName === "SUMMARY" &&
+        element.parentElement instanceof HTMLDetailsElement
+      ) {
+        return element.parentElement.open ? "OPEN" : "CLOSED";
+      }
       const expanded = attribute(element, "aria-expanded");
       if (expanded === "true") return "OPEN";
       if (expanded === "false") return "CLOSED";
