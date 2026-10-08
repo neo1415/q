@@ -91,12 +91,28 @@ Outside, minimal and listed in the report: `packages/q-specialists/test/answer-t
 
 ## 10. Acceptance (TRACKING F1–F8, SPEC §5 scenario H "duplicate event")
 
-- [ ] F1 registry + scan test + requeue script (dry run shown locally)
-- [ ] F2 CI triggers, db job, e2e job, checkSuites proposal, staging answer
-- [ ] F3 role verified, ADR, append-only migration + pgTAP 895, tenant-predicate ratchet
-- [ ] F4 readiness 503 on DB failure (unit test)
-- [ ] F5 daily cap fails with BUDGET_EXCEEDED, configurable, safe on ledger failure
-- [ ] F6 retention jobs + erasure migration + pgTAP 896
-- [ ] F7 answer-turn-reading, pgTAP 010/240/450/591, F-01 migration, F-02
-- [ ] F8 structured failure log + optional exporter hook
-- [ ] Idempotency audit with tests; destructive-action requests to C; docs drift
+Status at handover (2026-10-08). The grades are SPEC §5's.
+
+- [x] **F1. VERIFIED LOCALLY.** Registry and scan test. Requeue script: dry run, plus `--requeue` against a seeded local dead row.
+- [x] **F2. PARTIAL.**
+  - The CI triggers and the pgTAP job have run on GitHub: the pgTAP job passed on a fresh database.
+  - The quality job fails at the format check on 174 pre-existing lead-owned files.
+  - The e2e job is documented but has not run.
+  - `checkSuites` is set in the IaC and needs the founder to apply it.
+  - Staging: not available at $0 (`docs/recovery/staging.md`).
+- [x] **F3. VERIFIED LOCALLY.**
+  - Role verified on hosted.
+  - ADR 0065 proposed.
+  - Guards for UPDATE and TRUNCATE (DELETE comes in step 2).
+  - pgTAP 895 and the ratchet.
+- [x] **F4. VERIFIED LOCALLY (unit).** Wiring in `main.ts` is a lead request.
+- [x] **F5. VERIFIED LOCALLY (unit; reader run against the local DB).** Wired in workers. q-api and api are a lead request.
+- [x] **F6. VERIFIED LOCALLY.** The SQL was run, then rolled back, against the local DB. pgTAP 896.
+- [x] **F7. VERIFIED LOCALLY.** pgTAP 897 plus the fixed suites; CI pgTAP is green.
+- [x] **F8. IMPLEMENTED.** The exporter needs the SDK dependency, which is the lead's decision.
+- [x] **Idempotency, destructive actions and docs drift.**
+  - Duplicate-delivery test.
+  - App-action key gap and destructive findings sent to C (§5).
+  - OpenAI comments fixed.
+  - CLAUDE.md change proposed (§7).
+  - F-03 defence in depth in the OpenAI adapter. B's fix is still pending.
