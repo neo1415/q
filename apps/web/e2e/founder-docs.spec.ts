@@ -148,7 +148,7 @@ test("the founder shares only with connected investors, and sees who to connect 
     "You can share with investors you're connected to.",
   );
   await expect(sheet.locator("[data-access-awaiting]")).toContainText(
-    "Meridian Seed (fictional)",
+    "Meridian Seed",
   );
   await expect(
     sheet.locator("[data-access-candidate] option", {
