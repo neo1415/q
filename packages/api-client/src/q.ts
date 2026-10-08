@@ -70,6 +70,10 @@ import {
   Q_ROOM_PATH,
   QRoomReadSchema,
   type QRoomRead,
+  Q_UI_ACT_RECEIPTS_PATH,
+  QUiActReceiptsResponseSchema,
+  type QUiActReceiptsRequest,
+  type QUiActReceiptsResponse,
 } from "@capital-q/contracts";
 
 import { readProblemResponse } from "./problem.js";
@@ -366,6 +370,23 @@ export function readQRoom(
     "GET",
     `${Q_ROOM_PATH}?${query.toString()}`,
     QRoomReadSchema,
+  );
+}
+
+/**
+ * RECOVERY-2026-10 (workstream C): what came of Q's UI acts on the
+ * person's screen, so the next turn knows DONE from TARGET_MISSING.
+ */
+export function reportQUiActs(
+  session: ApiSession,
+  input: QUiActReceiptsRequest,
+): Promise<QUiActReceiptsResponse> {
+  return call(
+    session,
+    "POST",
+    Q_UI_ACT_RECEIPTS_PATH,
+    QUiActReceiptsResponseSchema,
+    { body: input },
   );
 }
 

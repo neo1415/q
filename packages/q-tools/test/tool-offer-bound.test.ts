@@ -51,6 +51,8 @@ const CORE = [
   "open_page",
   // Founder report 2026-09-30: scroll, go back, open a page's dialog.
   "control_screen",
+  // RECOVERY-2026-10 (C2): any registered control, with a receipt.
+  "operate_screen",
   "set_discover_filters",
   // Q room R4: a card in the room, asked for mid-anything.
   "show",

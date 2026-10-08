@@ -7,6 +7,8 @@ import type {
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
+import { QControl } from "@/features/q/control/q-control";
+
 import { capitalTabHref } from "./capital-tabs";
 import { money, percent, shareOf } from "./money";
 import { INSTRUMENT_LABELS } from "./round-labels";
@@ -185,53 +187,57 @@ export function StopYourRaise({
   readonly readiness: ReadinessDto | null;
 }) {
   return (
-    <section className={card} aria-labelledby="overview-stop">
-      <h2 id="overview-stop" className="cq-title-sm text-(--cq-text-primary)">
-        What could stop your raise
-      </h2>
-      {readiness === null ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          Your readiness couldn&apos;t load.
-        </p>
-      ) : readiness.blockers.length === 0 ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          Nothing that investors at your stage usually ask for first is missing
-          from what you&apos;ve shared.
-        </p>
-      ) : (
-        <ol className="flex flex-col">
-          {readiness.blockers.slice(0, 3).map((blocker, index) => (
-            <li
-              key={blocker.id}
-              className="grid grid-cols-[1.5rem_1fr] gap-3 border-t border-(--cq-border-subtle) py-3 first:border-t-0 first:pt-0"
-            >
-              <span
-                aria-hidden="true"
-                className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
-              >
-                {index + 1}
-              </span>
-              <div className="flex flex-col gap-0.5">
-                <span className="cq-body font-semibold text-(--cq-text-primary)">
-                  {blocker.title}
-                </span>
-                <span className="cq-body-sm text-(--cq-text-secondary)">
-                  {blocker.why}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-      <div>
-        <Link
-          href={capitalTabHref("readiness")}
-          className={buttonClassName("secondary")}
-        >
-          See readiness
-        </Link>
-      </div>
-    </section>
+    <QControl id="section.risks" kind="SECTION">
+      <section className={card} aria-labelledby="overview-stop">
+        <h2 id="overview-stop" className="cq-title-sm text-(--cq-text-primary)">
+          What could stop your raise
+        </h2>
+        {readiness === null ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Your readiness couldn&apos;t load.
+          </p>
+        ) : readiness.blockers.length === 0 ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Nothing that investors at your stage usually ask for first is
+            missing from what you&apos;ve shared.
+          </p>
+        ) : (
+          <QControl id="list.risks" kind="LIST">
+            <ol className="flex flex-col">
+              {readiness.blockers.slice(0, 3).map((blocker, index) => (
+                <li
+                  key={blocker.id}
+                  className="grid grid-cols-[1.5rem_1fr] gap-3 border-t border-(--cq-border-subtle) py-3 first:border-t-0 first:pt-0"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
+                  >
+                    {index + 1}
+                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="cq-body font-semibold text-(--cq-text-primary)">
+                      {blocker.title}
+                    </span>
+                    <span className="cq-body-sm text-(--cq-text-secondary)">
+                      {blocker.why}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </QControl>
+        )}
+        <div>
+          <Link
+            href={capitalTabHref("readiness")}
+            className={buttonClassName("secondary")}
+          >
+            See readiness
+          </Link>
+        </div>
+      </section>
+    </QControl>
   );
 }
 
@@ -242,57 +248,62 @@ export function NextSteps({
 }) {
   const steps = readiness === null ? [] : nextSteps(readiness);
   return (
-    <section className={card} aria-labelledby="overview-next" data-next-steps>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="overview-next" className="cq-title-sm text-(--cq-text-primary)">
-          Next steps
-        </h2>
-        <Link
-          href={capitalTabHref("action-plan")}
-          className={buttonClassName("secondary")}
-        >
-          Open the action plan
-        </Link>
-      </div>
-      {readiness === null ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          Your action plan couldn&apos;t load.
-        </p>
-      ) : steps.length === 0 ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          Nothing open. Steps appear here when Q finds a gap worth closing.
-        </p>
-      ) : (
-        <ol className="flex flex-col">
-          {steps.map((step, index) => (
-            <li
-              key={step.key}
-              className="grid grid-cols-[1.5rem_1fr] gap-3 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
-            >
-              <span
-                aria-hidden="true"
-                className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-surface-subtle) font-semibold text-(--cq-text-secondary)"
+    <QControl id="section.next-steps" kind="SECTION">
+      <section className={card} aria-labelledby="overview-next" data-next-steps>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2
+            id="overview-next"
+            className="cq-title-sm text-(--cq-text-primary)"
+          >
+            Next steps
+          </h2>
+          <Link
+            href={capitalTabHref("action-plan")}
+            className={buttonClassName("secondary")}
+          >
+            Open the action plan
+          </Link>
+        </div>
+        {readiness === null ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Your action plan couldn&apos;t load.
+          </p>
+        ) : steps.length === 0 ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Nothing open. Steps appear here when Q finds a gap worth closing.
+          </p>
+        ) : (
+          <ol className="flex flex-col">
+            {steps.map((step, index) => (
+              <li
+                key={step.key}
+                className="grid grid-cols-[1.5rem_1fr] gap-3 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
               >
-                {index + 1}
-              </span>
-              <div className="flex flex-col gap-0.5">
-                <span className="cq-body font-semibold text-(--cq-text-primary)">
-                  {step.title}{" "}
-                  <span className="cq-caption rounded-full border border-(--cq-border-subtle) px-2 py-0.5 font-normal text-(--cq-text-secondary)">
-                    {PRIORITY_WORDS[step.priority]}
+                <span
+                  aria-hidden="true"
+                  className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-surface-subtle) font-semibold text-(--cq-text-secondary)"
+                >
+                  {index + 1}
+                </span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="cq-body font-semibold text-(--cq-text-primary)">
+                    {step.title}{" "}
+                    <span className="cq-caption rounded-full border border-(--cq-border-subtle) px-2 py-0.5 font-normal text-(--cq-text-secondary)">
+                      {PRIORITY_WORDS[step.priority]}
+                    </span>
                   </span>
-                </span>
-                <span className="cq-body-sm text-(--cq-text-secondary)">
-                  {step.next}
-                </span>
-                <span className="cq-caption text-(--cq-text-tertiary)">
-                  {step.ownerLabel}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
+                  <span className="cq-body-sm text-(--cq-text-secondary)">
+                    {step.next}
+                  </span>
+                  <span className="cq-caption text-(--cq-text-tertiary)">
+                    {step.ownerLabel}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </QControl>
   );
 }

@@ -23,9 +23,18 @@ import {
 export function followOfAnswer(blocks: readonly QResultBlock[] | undefined): {
   readonly navigate: QNavigateDestination | null;
   readonly clientAction: QClientActionIntent | null;
+  /**
+   * RECOVERY-2026-10 (C2): every client action, in the answer's order. A
+   * chain ("open Capital, the readiness tab, scroll to the risks") is
+   * several UI acts; the screen runs them in order, each after the last
+   * one's receipt. `clientAction` (the latest) stays for the voice line
+   * until it performs these.
+   */
+  readonly clientActions: readonly QClientActionIntent[];
 } {
   let navigate: QNavigateDestination | null = null;
   let clientAction: QClientActionIntent | null = null;
+  const clientActions: QClientActionIntent[] = [];
   for (const block of blocks ?? []) {
     if (block.kind !== "UI_INTENT") continue;
     const intent = block.intent;
@@ -37,9 +46,12 @@ export function followOfAnswer(blocks: readonly QResultBlock[] | undefined): {
     // stored answer, so "open it and read it to me" keeps the open here.
     if (intent.kind === "DOCUMENT_ACT") continue;
     const action = QClientActionIntentSchema.safeParse(intent);
-    if (action.success) clientAction = action.data;
+    if (action.success) {
+      clientAction = action.data;
+      clientActions.push(action.data);
+    }
   }
-  return { navigate, clientAction };
+  return { navigate, clientAction, clientActions };
 }
 
 /**

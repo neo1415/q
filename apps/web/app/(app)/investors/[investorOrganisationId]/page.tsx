@@ -22,6 +22,7 @@ import { LooksForSection } from "@/features/investors/looks-for-section";
 import { ConnectionRequest } from "@/features/network/connection-request";
 import { ProfileHero } from "@/features/profile/profile-header";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { QControl } from "@/features/q/control/q-control";
 
 export const metadata: Metadata = { title: "Investor" };
 export const dynamic = "force-dynamic";
@@ -134,58 +135,65 @@ export default async function InvestorPage({
         the private mandate) and the founder's own fit, then "Draft my
         application" through the existing GateQ form.
       */}
-      <LooksForSection
-        session={session}
-        investorOrganisationId={investor.investorOrganisationId}
-        investorName={investor.displayName}
-      />
+      {/* RECOVERY-2026-10 (C1): what they look for is their public mandate. */}
+      <QControl id="section.mandate" kind="SECTION">
+        <LooksForSection
+          session={session}
+          investorOrganisationId={investor.investorOrganisationId}
+          investorName={investor.displayName}
+        />
+      </QControl>
       <Link
         href={`/rehearsals/investor/${encodeURIComponent(investor.investorOrganisationId)}`}
         className={`${buttonClassName("secondary")} self-start`}
       >
         Rehearse a meeting with them
       </Link>
-      <section
-        aria-labelledby="investor-reach"
-        className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
-      >
-        <h2
-          id="investor-reach"
-          className="cq-title-md text-(--cq-text-primary)"
-        >
-          Connect
-        </h2>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          {inboundLabel(investor.inboundPreference)}.
-        </p>
-        {status === null ? (
-          <p className="cq-body-sm text-(--cq-text-secondary)">
-            Whether you can send a request couldn&apos;t be checked just now.
-            Reload to try again.
-          </p>
-        ) : (
-          <ConnectionRequest
-            investorOrganisationId={investor.investorOrganisationId}
-            investorName={investor.displayName}
-            status={status}
-          />
-        )}
-      </section>
-      {investor.publicDescription === null ? null : (
+      <QControl id="section.connect" kind="SECTION">
         <section
-          aria-labelledby="investor-about"
-          className="flex flex-col gap-2 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
+          aria-labelledby="investor-reach"
+          className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
         >
           <h2
-            id="investor-about"
+            id="investor-reach"
             className="cq-title-md text-(--cq-text-primary)"
           >
-            About
+            Connect
           </h2>
-          <p className="cq-body whitespace-pre-line text-(--cq-text-secondary)">
-            {investor.publicDescription}
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {inboundLabel(investor.inboundPreference)}.
           </p>
+          {status === null ? (
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              Whether you can send a request couldn&apos;t be checked just now.
+              Reload to try again.
+            </p>
+          ) : (
+            <ConnectionRequest
+              investorOrganisationId={investor.investorOrganisationId}
+              investorName={investor.displayName}
+              status={status}
+            />
+          )}
         </section>
+      </QControl>
+      {investor.publicDescription === null ? null : (
+        <QControl id="section.about" kind="SECTION">
+          <section
+            aria-labelledby="investor-about"
+            className="flex flex-col gap-2 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
+          >
+            <h2
+              id="investor-about"
+              className="cq-title-md text-(--cq-text-primary)"
+            >
+              About
+            </h2>
+            <p className="cq-body whitespace-pre-line text-(--cq-text-secondary)">
+              {investor.publicDescription}
+            </p>
+          </section>
+        </QControl>
       )}
     </PageContainer>
   );

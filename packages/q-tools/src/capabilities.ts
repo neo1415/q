@@ -176,6 +176,7 @@ const SHORTS: Readonly<Record<string, string>> = {
   set_pitch_sharing: "who may play their pitch",
   reload_page: "reloads the page",
   control_screen: "scrolls or moves the screen",
+  operate_screen: "operates a control on the screen",
   control_document: "pages, reads or closes the open document",
 };
 
@@ -848,6 +849,13 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "control_screen",
     "NAVIGATION",
     "Scrolls the page they are on, goes back, shows a section, or opens its book-a-call or reminder dialog.",
+    { acts: true },
+  ),
+  // RECOVERY-2026-10 (C2): any control a page registered, with a receipt.
+  tool(
+    "operate_screen",
+    "NAVIGATION",
+    "Operates any control on the page they are on, as their own click would: a tab, a section, the nth item of a list, a disclosure, a menu, a toggle or filter; back and forward; steps in order, each confirmed on their screen.",
     { acts: true },
   ),
   tool(

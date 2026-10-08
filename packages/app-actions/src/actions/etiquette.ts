@@ -170,24 +170,43 @@ const SAVE = defineAppAction<SaveInput, Mine, SaveToolInput>({
   },
 });
 
-const Remove = z.object({}).strict();
+/**
+ * Settings sends nothing; Q's prepared removal names the person whose
+ * guide it removes (themself), which the approval binds to as its target.
+ */
+const Remove = z.object({ userId: z.string().uuid().optional() }).strict();
+const RemoveTool = z.object({}).strict();
 
 const REMOVE = defineAppAction<z.infer<typeof Remove>, Mine>({
   name: "settings.etiquette_guide.remove",
   short: "remove my speaking guide",
   area: "settings",
-  classification: "INSTANT",
+  // RECOVERY-2026-10 (security fix 2): removal deletes every version of
+  // their guide for good, so from Q it is prepared for their approval;
+  // Settings' own Remove (its confirm) is unchanged.
+  classification: "CONSEQUENTIAL",
   does: "Removes their own guide to how Q speaks for them, as Settings does; Q then follows Capital Q's house guide alone.",
   input: Remove,
   output: serviceResult(),
-  authorize: ownOnly,
+  // Only ever their own guide: a named person must be the actor.
+  authorize: (_ports, context, input) =>
+    Promise.resolve(
+      input.userId === undefined || input.userId === context.actor.userId
+        ? { ok: true as const }
+        : { ok: false as const, reason: "That isn't your speaking guide." },
+    ),
   run: async (ports, context) => {
     const port = guides(ports);
     await port.remove(ownerOf(context.actor));
     return { guide: null, house: await port.house() };
   },
-  targets: () => [],
-  card: () => ({ summary: "Remove your speaking guide", preview: "" }),
+  targets: (input) =>
+    input.userId === undefined ? [] : [{ kind: "USER", userId: input.userId }],
+  card: () => ({
+    summary: "Remove your speaking guide",
+    preview:
+      "Every version of your guide is deleted and cannot be brought back; Q then follows Capital Q's house guide alone.",
+  }),
   done: () =>
     "Removed. Q now follows Capital Q's house guide alone when it speaks for you.",
   http: {
@@ -200,8 +219,8 @@ const REMOVE = defineAppAction<z.infer<typeof Remove>, Mine>({
     name: "remove_my_speaking_guide",
     purposes: ["GENERAL_QUESTION", "ACTION_PREPARATION"],
     description:
-      "Removes their own guide to how Q speaks for them, at once, exactly as Remove in Settings does. Call it only when they ask to remove or reset it.",
-    input: Remove,
+      "Removes their own guide to how Q speaks for them, exactly as Remove in Settings does; every version is deleted for good, so it is prepared for their approval. Call it only when they ask to remove or reset it.",
+    input: RemoveTool,
     references: {},
     eval: {
       say: [
@@ -209,7 +228,8 @@ const REMOVE = defineAppAction<z.infer<typeof Remove>, Mine>({
         "Forget how I told you to write for me and go back to the default.",
       ],
     },
-    toCanonical: () => Promise.resolve({}),
+    toCanonical: (_input, context) =>
+      Promise.resolve({ userId: context.actor.userId }),
   },
 });
 
