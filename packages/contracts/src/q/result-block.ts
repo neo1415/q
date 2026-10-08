@@ -440,7 +440,8 @@ export const QTimelineBlockSchema = z
           .object({
             at: TIMELINE_AT,
             label: z.string().trim().min(1).max(120),
-            detail: z.string().trim().max(240).nullable(),
+            // "note", not "detail": `detail` is reserved on public Q schemas.
+            note: z.string().trim().max(240).nullable(),
             subject: QSubjectRefSchema.nullable(),
           })
           .strict(),

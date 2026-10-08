@@ -153,13 +153,13 @@ describe("E4: tables, charts, maps and timelines", () => {
               {
                 at: "2026-09-12",
                 label: "Interest expressed",
-                detail: null,
+                note: null,
                 subject: null,
               },
               {
                 at: "2026-10-03",
                 label: "Meeting booked",
-                detail: "Tuesday 10:00",
+                note: "Tuesday 10:00",
                 subject: null,
               },
             ],

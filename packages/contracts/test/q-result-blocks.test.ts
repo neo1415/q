@@ -136,6 +136,61 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
     kind: "UI_INTENT",
     intent: { kind: "OPEN_COMPANY", companyId: UUID },
   },
+  // RECOVERY E4: visual blocks, from validated data only.
+  TABLE: {
+    kind: "TABLE",
+    title: "Side by side",
+    columns: [
+      { label: "Apex Capital", subject: null },
+      { label: "Northwind", subject: null },
+    ],
+    rows: [{ label: "Based in", cells: ["GB", ""] }],
+  },
+  CHART: {
+    kind: "CHART",
+    chart: "BAR",
+    title: "Monthly revenue",
+    unit: "a month",
+    currency: "USD",
+    series: [
+      {
+        label: "Revenue",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "DOCUMENT_SUPPORTED",
+        source: "From the bank statements they uploaded.",
+        points: [
+          { label: "Aug", value: 1200 },
+          { label: "Sep", value: 1800 },
+        ],
+      },
+    ],
+  },
+  MAP: {
+    kind: "MAP",
+    title: "Where they're based",
+    basis: "Head-office country, as each investor publishes it.",
+    places: [
+      { label: "Apex Capital", countryCode: "GB", subject: null, note: null },
+    ],
+  },
+  TIMELINE: {
+    kind: "TIMELINE",
+    title: "Your relationship",
+    events: [
+      {
+        at: "2026-09-12",
+        label: "Interest expressed",
+        note: null,
+        subject: null,
+      },
+      {
+        at: "2026-10-03",
+        label: "Meeting booked",
+        note: null,
+        subject: null,
+      },
+    ],
+  },
 };
 
 describe("QResultBlock", () => {

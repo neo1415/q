@@ -406,9 +406,9 @@ export function TimelineBody({ block }: { readonly block: Block<"TIMELINE"> }) {
                 </Link>
               )}
             </span>
-            {event.detail === null ? null : (
+            {event.note === null ? null : (
               <span className="cq-caption text-(--cq-text-secondary)">
-                {event.detail}
+                {event.note}
               </span>
             )}
           </li>

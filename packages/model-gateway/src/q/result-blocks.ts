@@ -520,7 +520,7 @@ export function timelineBlock(input: {
   readonly events: readonly {
     readonly at: string;
     readonly label: string;
-    readonly detail?: string | null | undefined;
+    readonly note?: string | null | undefined;
     readonly subject?: QSubjectRef | null | undefined;
   }[];
 }): QResultBlock | null {
@@ -535,7 +535,7 @@ export function timelineBlock(input: {
     events: dated.map((event) => ({
       at: event.at,
       label: event.label.slice(0, 120),
-      detail: event.detail?.slice(0, 240) ?? null,
+      note: event.note?.slice(0, 240) ?? null,
       subject: event.subject ?? null,
     })),
   };

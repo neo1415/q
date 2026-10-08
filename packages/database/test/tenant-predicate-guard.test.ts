@@ -48,7 +48,6 @@ const BASELINE: Readonly<Record<string, readonly string[]>> = {
     "select id, scope, enabled_at from q_runtime.instruction_delegations where instruction_id =",
     "select count(*)::int as done from q_runtime.instruction_steps where instruction_id = $1 an",
     "select 1 as found from q_runtime.instruction_steps where idempotency_key = $1",
-    "select distinct t.relationship_id from q_runtime.instruction_steps t join q_runtime.action",
     "select relationship_id, count(*)::int as sent from q_runtime.instruction_steps where instr",
     "select run_key, step_index, action, mode, status, relationship_id, words, reason_code, q_a",
     "select timezone from identity.user_profiles where id = $1",

@@ -789,6 +789,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/voice/routes.ts POST Q_VOICE_SPEECH_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SPEAK_RELAY_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SESSIONS_PATH": Q_TRANSPORT,
+  // RECOVERY A12: a card's focus and its voice verdict on the standard line.
+  "q-api/voice/routes.ts POST Q_VOICE_CARD_PATH": Q_TRANSPORT,
   // DUPLEX: the full-duplex line's tool relay, usage report and end.
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH": Q_TRANSPORT,
@@ -1087,6 +1089,7 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_SAID_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_OUTCOME_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_ATTACH_PATH",
+  "q-api/voice/routes.ts POST Q_VOICE_CARD_PATH",
   // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
   // conversation's own transport, never a person's action.
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",

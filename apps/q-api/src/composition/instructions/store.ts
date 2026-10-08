@@ -720,7 +720,8 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       const rows = await sql<{ relationship_id: string }[]>`
         select distinct t.relationship_id
           from q_runtime.instruction_steps t
-          join q_runtime.actions a on a.id = t.q_action_id
+          join q_runtime.actions a
+            on a.id = t.q_action_id and a.tenant_id = t.tenant_id
          where t.instruction_id = ${instructionId}
            and t.status = 'ASKED' and t.relationship_id is not null
            and a.status in ('PROPOSED', 'AWAITING_APPROVAL')
@@ -794,7 +795,8 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
       sql<LapsedCard[]>`
         select t.q_action_id, t.relationship_id, t.words, a.updated_at as lapsed_at
           from q_runtime.instruction_steps t
-          join q_runtime.actions a on a.id = t.q_action_id
+          join q_runtime.actions a
+            on a.id = t.q_action_id and a.tenant_id = t.tenant_id
          where t.instruction_id = ${instructionId} and t.status = 'ASKED'
            and a.status = 'EXPIRED'
            and a.updated_at > clock_timestamp() - interval '7 days'

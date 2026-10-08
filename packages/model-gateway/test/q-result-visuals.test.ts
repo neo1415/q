@@ -288,8 +288,8 @@ describe("E4: timeline and chart refuse what must not be drawn", () => {
         kind: "TIMELINE",
         title: "x",
         events: [
-          { at: "2026-10-03", label: "b", detail: null, subject: null },
-          { at: "2026-09-12", label: "a", detail: null, subject: null },
+          { at: "2026-10-03", label: "b", note: null, subject: null },
+          { at: "2026-09-12", label: "a", note: null, subject: null },
         ],
       }).success,
     ).toBe(false);
