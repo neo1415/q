@@ -108,5 +108,17 @@ export const TAXONOMY_CLASSIFICATION_POLICY_V1: TaxonomyClassificationPolicy = {
     "with",
     "you",
     "your",
+    // taxonomy-lexical-v3 (2026-10-08, F7): generic words that name no
+    // sector. "Climate tech" matched Digital Health, Digital Lending and
+    // Insurtech through their aliases "health tech", "credit tech" and
+    // "insurance tech". Whole-phrase aliases ("health tech") still match
+    // exactly; only the shared generic word no longer does.
+    "tech",
+    "technology",
+    "technologies",
+    "startup",
+    "startups",
+    "company",
+    "companies",
   ],
 };

@@ -124,18 +124,33 @@ export async function MandateSummary({
     );
   }
   const labels = await labelsFor(mandate);
-  const named = (vocabulary: "industry" | "geography", exclusion: boolean) =>
+  // F6 (2026-10-08): business models and customer types are business
+  // attributes, not sectors.
+  const kindOf = (code: string) =>
+    code === "geography"
+      ? "geography"
+      : code === "business_model" || code === "customer_type"
+        ? "attribute"
+        : "industry";
+  const named = (
+    vocabulary: "industry" | "geography" | "attribute",
+    exclusion: boolean,
+  ) =>
     mandate.taxonomyPreferences
       .filter(
         (p) =>
-          (vocabulary === "industry"
-            ? p.vocabularyCode !== "geography"
-            : p.vocabularyCode === "geography") && p.isExclusion === exclusion,
+          kindOf(String(p.vocabularyCode)) === vocabulary &&
+          p.isExclusion === exclusion,
       )
       .map((p) => labels.get(p.nodeId) ?? readable(p.canonicalCode));
   const sectors = named("industry", false);
   const places = named("geography", false);
-  const neverShown = [...named("industry", true), ...named("geography", true)];
+  const attributes = named("attribute", false);
+  const neverShown = [
+    ...named("industry", true),
+    ...named("geography", true),
+    ...named("attribute", true),
+  ];
   const hardRules = mandate.constraints.filter((c) => c.isHardExclusion).length;
 
   const rows: readonly (readonly [string, string])[] = [
@@ -143,6 +158,10 @@ export async function MandateSummary({
     ["Cheque", chequeLine(mandate)],
     ["Sectors", sectors.length === 0 ? "Not stated" : sectors.join(", ")],
     ["Geography", places.length === 0 ? "Not stated" : places.join(", ")],
+    [
+      "Business models and customers",
+      attributes.length === 0 ? "Not stated" : attributes.join(", "),
+    ],
     [
       "Never shown",
       neverShown.length === 0 && hardRules === 0

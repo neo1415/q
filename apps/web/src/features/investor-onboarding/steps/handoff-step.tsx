@@ -35,8 +35,8 @@ export function HandoffStep({
             {handoff === undefined
               ? "Not available"
               : active
-                ? `Active, version ${handoff.mandate.version}.`
-                : `Saved as ${handoff.mandate.status.toLowerCase()}, version ${handoff.mandate.version}.`}
+                ? "Active."
+                : `Saved as ${handoff.mandate.status.toLowerCase()}.`}
           </dd>
         </div>
         <div className="flex flex-col gap-1">

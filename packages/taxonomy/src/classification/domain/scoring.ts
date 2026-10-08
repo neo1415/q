@@ -1,7 +1,7 @@
 import type { TaxonomyClassificationPolicy } from "./policy.js";
 
 /**
- * The lexical scoring formula of taxonomy-lexical-v2, in one place.
+ * The lexical scoring formula of taxonomy-lexical-v2 and v3 (v3 adds stop words only), in one place.
  *
  *   coverage = credited candidate tokens / candidate tokens
  *              (exact token = 1; prefix of length >= minPrefixLength either

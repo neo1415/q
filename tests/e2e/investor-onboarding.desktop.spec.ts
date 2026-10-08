@@ -198,7 +198,9 @@ test.describe("investor onboarding (desktop, real API)", () => {
     );
     await expect(page.locator("[data-mandate-version]")).toContainText("draft");
     const versionBefore =
-      (await page.locator("[data-mandate-version]").textContent()) ?? "";
+      (await page
+        .locator("[data-mandate-version]")
+        .getAttribute("data-mandate-version")) ?? "";
     await expect(page.getByText(FORBIDDEN_COPY)).toHaveCount(0);
     await expect(page.getByText(/readiness|score|verified/i)).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
@@ -228,7 +230,9 @@ test.describe("investor onboarding (desktop, real API)", () => {
       "typically 1.5m",
     );
     const versionAfter =
-      (await page.locator("[data-mandate-version]").textContent()) ?? "";
+      (await page
+        .locator("[data-mandate-version]")
+        .getAttribute("data-mandate-version")) ?? "";
     expect(versionAfter).not.toBe(versionBefore);
 
     // Confirm: DRAFT → ACTIVE, then the truthful handoff.
