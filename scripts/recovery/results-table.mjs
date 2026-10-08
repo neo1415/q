@@ -63,7 +63,14 @@ function walk(suite, file) {
         title: spec.title,
         status,
         verdict,
-        label: live && mode !== "LIVE" ? "LIVE-PENDING" : mode,
+        // Every non-live test drives the real local stack (LOCAL-E2E) with
+        // the scripted model and faked voice transports (MOCK).
+        label:
+          live && mode !== "LIVE"
+            ? "LIVE-PENDING"
+            : mode === "LIVE"
+              ? "LIVE"
+              : "LOCAL-E2E (MOCK)",
         expected,
         steps,
         error,

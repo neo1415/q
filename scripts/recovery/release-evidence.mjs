@@ -113,6 +113,9 @@ const GATES = [
       "promises",
       "--project",
       "a11y",
+      // Live specs refuse at once in a MOCK stack: reported LIVE-PENDING.
+      "--project",
+      "live",
     ],
     counts: (t) => ({
       passed: Number(t.match(/(\d+) passed/u)?.[1] ?? 0),
