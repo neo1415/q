@@ -1,0 +1,18 @@
+{
+  "comment": "Baseline rules for scripts/recovery/fake-vendors.mjs. A test puts its own rules in front of these through tests/recovery/support/script.ts.",
+  "rules": [
+    {
+      "name": "baseline-turn-reader",
+      "when": { "instructions": "TASK: TURN_READER" },
+      "reply": {
+        "json": {
+          "kind": "QUESTION_TO_Q",
+          "confidence": "HIGH",
+          "transcript": "CLEAR",
+          "question": null,
+          "aboutNamedOther": false
+        }
+      }
+    }
+  ]
+}
