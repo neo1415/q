@@ -68,6 +68,7 @@ const NO_RULE_ANSWER = {
 };
 
 let memoryScript = null;
+let voiceFail = false;
 const requests = [];
 
 function loadScript() {
@@ -342,8 +343,21 @@ const server = createServer(async (req, res) => {
     });
   }
 
-  // Voice credentials. Reached only once q-api can be pointed here
-  // (request G-R2); the browser side is faked in the page.
+  // Voice credentials, reached through scripts/recovery/vendor-redirect.mjs
+  // (request G-R2 open); the browser side is faked in the page.
+  // PUT /__fake/voice {"fail": true} makes both vendors refuse (a voice
+  // line that cannot open); {"fail": false} restores them.
+  if (path === "/__fake/voice" && req.method === "PUT") {
+    voiceFail = body.fail === true;
+    return send(res, 200, { fail: voiceFail });
+  }
+  if (
+    voiceFail &&
+    (path === "/v1/auth/grant" || path === "/v1/realtime/client_secrets")
+  ) {
+    record({ vendor: "voice-refused", path });
+    return send(res, 503, { error: { message: "scripted voice outage" } });
+  }
   if (path === "/v1/auth/grant" && req.method === "POST") {
     record({ vendor: "deepgram", path });
     return send(res, 200, {

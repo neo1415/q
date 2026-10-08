@@ -23,8 +23,8 @@ test("Scenario E: talk across three pages without the line dropping; interrupt; 
   browser,
 }) => {
   awaits(
-    ["G-R2", "A4", "A6", "A7", "C3", "G-R3"],
-    "no offline voice credential (G-R2); barge-in/stale guard are A6/A7",
+    ["A4", "A6", "A7", "C3", "G-R3"],
+    "barge-in and the stale-reply guard are A6/A7; dispositions G-R3",
   );
   const context = await contextAs(browser, CAST.founder);
   const page = await context.newPage();

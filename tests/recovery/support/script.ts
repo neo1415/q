@@ -91,6 +91,15 @@ export async function useScript(rules: readonly ScriptRule[]): Promise<void> {
   if (!response.ok) throw new Error("fake vendor refused the script");
 }
 
+/** Makes the fake voice vendors refuse to issue credentials (or restores them). */
+export async function failVoiceVendors(fail: boolean): Promise<void> {
+  await fetch(`${FAKE_URL}/__fake/voice`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ fail }),
+  });
+}
+
 export async function resetScript(): Promise<void> {
   await fetch(`${FAKE_URL}/__fake/script`, { method: "DELETE" });
 }

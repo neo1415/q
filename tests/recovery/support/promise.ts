@@ -168,7 +168,6 @@ export function promiseSuite(spec: PromiseSpec): void {
     });
 
     step(6, async ({ browser }) => {
-      awaits(["G-R2"], "no offline voice credential");
       const page = await (await contextAs(browser, spec.actor)).newPage();
       const line = await installDeepgramFake(page);
       await useScript(rules());

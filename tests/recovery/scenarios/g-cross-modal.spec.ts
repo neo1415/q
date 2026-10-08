@@ -22,8 +22,8 @@ test("Scenario G: say it, type the follow-up, say the next: one conversation", a
   browser,
 }) => {
   awaits(
-    ["G-R2", "B3", "B6", "G-R3"],
-    "no offline voice credential (G-R2); cross-modal references are B3/B6",
+    ["B3", "B6", "G-R3"],
+    "cross-modal references are B3/B6; dispositions G-R3",
   );
   const context = await contextAs(browser, CAST.founder);
   const page = await context.newPage();
@@ -98,7 +98,6 @@ test("Scenario G: say it, type the follow-up, say the next: one conversation", a
 test("a typed turn while the line is up is heard by the same conversation", async ({
   browser,
 }) => {
-  awaits(["G-R2"], "no offline voice credential");
   const context = await contextAs(browser, CAST.founder);
   const page = await context.newPage();
   await installDeepgramFake(page);

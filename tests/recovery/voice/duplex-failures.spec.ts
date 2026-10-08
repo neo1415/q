@@ -41,10 +41,6 @@ async function openLine(
 const notice = (page: Page) => page.locator('[role="status"], [role="alert"]');
 
 test.describe("duplex voice failures", () => {
-  test.beforeEach(() => {
-    awaits(["G-R2"], "no offline voice credential from local q-api");
-  });
-
   test("lost microphone permission: the line says Q can't hear, and offers to fix it", async ({
     browser,
   }) => {

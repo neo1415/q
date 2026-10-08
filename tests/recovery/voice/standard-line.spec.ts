@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { contextAs } from "../support/auth.js";
 import { installDeepgramFake } from "../support/deepgram-fake.js";
 import { awaits } from "../support/expected-red.js";
-import { answer, useScript } from "../support/script.js";
+import { answer, failVoiceVendors, useScript } from "../support/script.js";
 import { CAST } from "../support/stack.js";
 
 /**
@@ -14,13 +14,15 @@ import { CAST } from "../support/stack.js";
  * (1.2 s / 3 s / 8 s, then "I couldn't get the line back").
  */
 /**
- * Runnable in MOCK today, because MOCK is exactly this condition: the voice
- * vendor is unreachable, so q-api cannot issue a session (POST
- * /v1/q/voice/sessions logs "unhandled request error" and answers 500
- * instead of a classified problem). The person is told, in text.
+ * Both voice vendors refuse to issue credentials (the fake's scripted voice
+ * outage), so q-api cannot open a line. The person must be told, in text.
+ * (Before the credential redirect, an unreachable vendor gave q-api an
+ * "unhandled request error" 500 rather than a classified problem: G-D9.)
  */
 test("a voice line that cannot open says so", async ({ browser }) => {
   const page = await (await contextAs(browser, CAST.founder)).newPage();
+  // Both voice vendors refuse to issue credentials (fake-vendors.mjs).
+  await failVoiceVendors(true);
   await page.goto("/home");
   await page
     .getByRole("button", { name: /Talk with Q/u })
@@ -43,6 +45,7 @@ test("the voice failure notice is announced (a live region)", async ({
 }) => {
   awaits(["A4"], "defect G-D7: voice failure notice is not in a live region");
   const page = await (await contextAs(browser, CAST.founder)).newPage();
+  await failVoiceVendors(true);
   await page.goto("/home");
   await page
     .getByRole("button", { name: /Talk with Q/u })
@@ -57,14 +60,13 @@ test("the voice failure notice is announced (a live region)", async ({
   ).toBeVisible({ timeout: 20_000 });
 });
 
-test.describe("standard voice line", () => {
-  test.beforeEach(() => {
-    awaits(
-      ["G-R2"],
-      "no offline voice credential: q-api's Deepgram grant URL is a constant (deepgram.ts:16)",
-    );
-  });
+test.afterEach(async () => {
+  await failVoiceVendors(false);
+});
 
+// The voice credential comes from the fake through
+// scripts/recovery/vendor-redirect.mjs, so these run in MOCK on their merits.
+test.describe("standard voice line", () => {
   test("audio flows, a spoken turn is answered by Q", async ({ browser }) => {
     const page = await (await contextAs(browser, CAST.founder)).newPage();
     const line = await installDeepgramFake(page);
