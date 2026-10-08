@@ -95,6 +95,8 @@ function world(options: {
   readonly resolver?: ActorContextResolver;
   readonly reply?: string | null;
   readonly forPerson?: readonly string[];
+  /** The chat refuses the send (recovery D-06). */
+  readonly sendFails?: boolean;
 }) {
   const patches: ErrandPatch[] = [];
   const notices: { step: string; title: string; body: string | null }[] = [];
@@ -168,6 +170,9 @@ function world(options: {
           })),
         }),
       send: (input) => {
+        if (options.sendFails === true) {
+          return Promise.reject(new Error("chat unavailable"));
+        }
         if (input.request.kind === "TEXT") {
           sent.push({
             body: input.request.body,
@@ -287,6 +292,64 @@ describe("errands", () => {
     expect(w.notices[0]?.body).toBe("Who else is in the portfolio?");
     // A brief keeps the errand open for later questions.
     expect(w.patches.some((patch) => patch.status === "DONE")).toBe(false);
+  });
+
+  it("records nothing as answered when the send failed, tells the person once, and retries the same message (D-06)", async () => {
+    const errand = row({
+      plan: plan({
+        brief: "We invest at pre-seed only.",
+        bookCall: null,
+        openingMessage: null,
+      }),
+      stage: "CONVERSING",
+      seen_until: new Date("2026-09-30T08:00:00Z"),
+    });
+    const messages = [
+      {
+        from: "OTHER_SIDE" as const,
+        senderName: "Kemi",
+        kind: "TEXT" as const,
+        text: "Which stage do you invest at?",
+        attachmentTitle: null,
+        sentAt: "2026-09-30T08:30:00Z",
+      },
+    ];
+    const failing = world({
+      errand,
+      messages,
+      reply: "We invest at pre-seed.",
+      sendFails: true,
+    });
+    await failing.runner.tick();
+    expect(failing.sent).toEqual([]);
+    // Never "Q answered", never a reply counted, never their words marked seen.
+    expect(
+      failing.patches.some((patch) =>
+        String(patch.lastStep ?? "").startsWith("Q answered"),
+      ),
+    ).toBe(false);
+    expect(
+      failing.patches.some((patch) => patch.repliesSent !== undefined),
+    ).toBe(false);
+    expect(failing.patches.some((patch) => patch.seenUntil !== undefined)).toBe(
+      false,
+    );
+    expect(failing.patches.at(-1)?.lastStep).toContain("couldn't send");
+    expect(failing.notices.map((notice) => notice.step)).toEqual([
+      "send-failed:2026-09-30T08:30:00.000Z",
+    ]);
+
+    // The chat is back: the next pass sends it, under the same key.
+    const healthy = world({
+      errand,
+      messages,
+      reply: "We invest at pre-seed.",
+    });
+    await healthy.runner.tick();
+    expect(healthy.sent.map((one) => one.key)).toEqual([
+      "errand:00000000-0000-4000-8000-0000000000f1:reply:2026-09-30T08:30:00.000Z",
+    ]);
+    expect(healthy.patches.some((patch) => patch.repliesSent === 1)).toBe(true);
   });
 
   it("never re-reads words it has already answered", async () => {

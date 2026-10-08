@@ -249,6 +249,17 @@ export type QApprovalRepository = {
    * past `now`. Newest first, at most `limit`. The same predicate the
    * single read enforces, so the list never shows what the read refuses.
    */
+  /**
+   * Recovery D2 (audit D-01): PENDING approvals already past `expiresAt`,
+   * oldest first, across tenants -- the eager expiry sweep's work list.
+   * Ids only. Optional so older doubles still compose.
+   */
+  readonly listLapsed?: (
+    executor: DatabaseExecutor,
+    input: { readonly now: Date; readonly limit: number },
+  ) => Promise<
+    readonly { readonly tenantId: TenantId; readonly approvalId: QApprovalId }[]
+  >;
   readonly listPendingForApprover: (
     executor: DatabaseExecutor,
     input: {

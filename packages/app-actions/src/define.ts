@@ -37,6 +37,14 @@ export type AppActionContext = {
   readonly idempotencyKey: string;
   readonly correlationId: CorrelationId;
   readonly surface: "SCREEN" | "Q";
+  /**
+   * Recovery D-07: what Q sent is marked as Q's. Set only by trusted
+   * server code when Q acts: the approved card's action id, or the
+   * delegation (or standing instruction) Q acted under. A message carrying
+   * either shows the other side it was sent by Q (viaQ).
+   */
+  readonly qActionId?: string | undefined;
+  readonly qDelegationId?: string | undefined;
 };
 
 export type AppActionVerdict =

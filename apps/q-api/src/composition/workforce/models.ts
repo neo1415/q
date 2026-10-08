@@ -15,7 +15,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   DraftRedraftResultSchema,
   DraftReviewResultV2Schema,
-  JobPlanResultSchema,
+  JobPlanResultV2Schema,
   renderPrompt,
   ReplyReaderResultSchema,
   type DraftRedraftResult,
@@ -23,7 +23,7 @@ import {
   type DraftReviewResultV2,
   type DraftReviewV2Variables,
   type EtiquettePurpose,
-  type JobPlanResult,
+  type JobPlanResultV2,
   type JobPlanVariables,
   type ReplyReaderResult,
   type ReplyReaderVariables,
@@ -94,7 +94,7 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     variables: PlanVariables,
-  ) => Promise<JobPlanResult | null>;
+  ) => Promise<JobPlanResultV2 | null>;
 };
 
 export function createWorkforceModels(dependencies: {
@@ -216,13 +216,13 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     plan: (who, trace, variables) =>
-      call<PlanVariables, JobPlanResult>({
+      call<PlanVariables, JobPlanResultV2>({
         task: "JOB_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: JobPlanResultSchema,
+        schema: JobPlanResultV2Schema,
         budget: PLAN,
         environmentNotes:
           "You are planning, not acting. Code checks every step against what they allowed before anything happens.",

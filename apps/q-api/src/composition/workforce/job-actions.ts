@@ -12,17 +12,24 @@ import {
   type AnyQActionDefinition,
   type QActionProposer,
 } from "@capital-q/q-actions";
-import { AGENT_REGISTRY, isAgentRole } from "@capital-q/q-orchestrator";
+import {
+  AGENT_REGISTRY,
+  executorRoleOf,
+  isAgentRole,
+  registeredExecutors,
+  type BoundStep,
+} from "@capital-q/q-orchestrator";
 import type { QJobPlanView, QJobPort } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
 import {
   DEFAULT_JOB_BUDGET_USD,
-  EXECUTABLE_JOB_TOOLS,
+  executableJobTools,
   type PlannedJob,
   type WorkforceJobs,
 } from "./jobs.js";
+import type { AgentWorkQueue } from "./queue.js";
 import type { Owner } from "./store.js";
 
 /**
@@ -227,32 +234,64 @@ function preview(payload: WorkforceJobStartPayload): string {
   return lines.join("\n");
 }
 
-/** The approved payload back into the runner's plan, as it was approved. */
+/**
+ * The approved payload back into the runner's plan, as it was approved.
+ *
+ * Recovery D1: a plan approved before the executor registry may carry
+ * WRITER and REVIEWER steps. Those were never separate work -- the sending
+ * step writes and reviews every draft itself -- so they are folded away and
+ * whatever waited on them waits on what they waited on. An older helper
+ * (AD_HOC) runs on the registered executor whose tools cover its own, or
+ * else goes to the person with the reason; it is never widened.
+ */
 export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
+  const executors = registeredExecutors({ research: true });
+  const folded = new Map<string, readonly string[]>();
+  for (const step of payload.steps) {
+    if (step.role === "WRITER" || step.role === "REVIEWER") {
+      folded.set(step.key, step.dependsOn);
+    }
+  }
+  const unfold = (keys: readonly string[], depth = 0): string[] =>
+    depth > 12
+      ? []
+      : keys.flatMap((key) => {
+          const through = folded.get(key);
+          return through === undefined ? [key] : unfold(through, depth + 1);
+        });
+  const steps = payload.steps.flatMap((step): BoundStep[] => {
+    if (!isAgentRole(step.role) || folded.has(step.key)) return [];
+    // Never wider than the approved grant, whatever the payload says.
+    const tools = step.tools.filter((tool) => payload.permitted.includes(tool));
+    const executor =
+      step.role === "AD_HOC"
+        ? (Object.values(executors).find(
+            (one) =>
+              one !== undefined &&
+              tools.length > 0 &&
+              tools.every((tool) => one.tools.includes(tool)),
+          )?.role ?? null)
+        : executorRoleOf(step.role);
+    return [
+      {
+        key: step.key,
+        role: step.role,
+        executor,
+        agentName: step.agentName,
+        goal: step.goal,
+        tools,
+        dependsOn: [...new Set(unfold(step.dependsOn))],
+        budgetUsd: Number(step.budgetUsd),
+        outward: step.tools.some((tool) =>
+          ["chat.message.send", "email.send"].includes(tool),
+        ),
+        spawned: step.spawned,
+      },
+    ];
+  });
   return {
     summary: payload.summary,
-    steps: payload.steps.flatMap((step) =>
-      isAgentRole(step.role)
-        ? [
-            {
-              key: step.key,
-              role: step.role,
-              agentName: step.agentName,
-              goal: step.goal,
-              // Never wider than the approved grant, whatever the payload says.
-              tools: step.tools.filter((tool) =>
-                payload.permitted.includes(tool),
-              ),
-              dependsOn: step.dependsOn,
-              budgetUsd: Number(step.budgetUsd),
-              outward: step.tools.some((tool) =>
-                ["chat.message.send", "email.send"].includes(tool),
-              ),
-              spawned: step.spawned,
-            },
-          ]
-        : [],
-    ),
+    steps,
     refused: [],
     cannot: payload.cannot,
   };
@@ -261,6 +300,13 @@ export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
 export function createWorkforceJobActions(dependencies: {
   /** The jobs runner for one approver, over their own ports. */
   readonly jobsFor: (actor: ActorContext) => WorkforceJobs;
+  /**
+   * Recovery D3: approved jobs are durable work, claimed under a lease by
+   * the runner, never an unawaited promise inside the approval.
+   */
+  readonly queue: Pick<AgentWorkQueue, "enqueue">;
+  /** Wakes the runner now rather than at its next interval. */
+  readonly kick?: (() => void) | undefined;
   readonly logger?: Logger | undefined;
 }): readonly AnyQActionDefinition[] {
   const { logger } = dependencies;
@@ -304,25 +350,23 @@ export function createWorkforceJobActions(dependencies: {
               budgetUsd: Number(action.payload.budgetUsd),
               source: { kind: "JOB", id: action.actionId },
             });
-            // The job runs past the approval: never inside it (model calls,
-            // messages and bookings are slow and each is idempotent by key).
-            void jobs
-              .run(
-                owner,
-                {
-                  goal: action.payload.goal,
-                  budgetUsd: Number(action.payload.budgetUsd),
-                  source: { kind: "JOB", id: action.actionId },
-                  planned: plannedFrom(action.payload),
-                },
-                filed,
-              )
-              .catch((error: unknown) => {
-                logger?.warn(
-                  { err: error, actionId: action.actionId },
-                  "workforce job did not finish",
-                );
-              });
+            // The job runs past the approval, never inside it: it is
+            // enqueued as durable work (exactly the approved plan, with
+            // where it came from) and a worker claims it under a lease, so
+            // a restart resumes it instead of leaving it RUNNING forever.
+            await dependencies.queue.enqueue(owner, {
+              jobId: filed.jobId,
+              plan: action.payload,
+              trace: {
+                actionId: action.actionId,
+                runId: action.runId,
+                organisationId:
+                  context.approver.organisationId ??
+                  action.organisationId ??
+                  undefined,
+              },
+            });
+            dependencies.kick?.();
             return { outcome: "EXECUTED", result: { jobId: filed.jobId } };
           } catch (error: unknown) {
             logger?.warn(
@@ -402,15 +446,21 @@ export function createWorkforceJobBoard(dependencies: {
         ) {
           return { status: "LIMIT_REACHED" };
         }
-        const planned = await dependencies
-          .jobsFor(actor)
+        const jobs = dependencies.jobsFor(actor);
+        const planned = await jobs
           .plan(owner, {
             goal,
-            permitted: EXECUTABLE_JOB_TOOLS,
+            permitted: executableJobTools(jobs.research),
             budgetUsd: budget,
           })
           .catch(() => null);
-        if (planned === null || planned.steps.length === 0) {
+        // D1: a plan with any step no registered executor can run is not
+        // offered at all -- never a partial plan approved as if whole.
+        if (
+          planned === null ||
+          planned.steps.length === 0 ||
+          planned.refused.length > 0
+        ) {
           return { status: "NOT_PLANNED" };
         }
         const steps = planned.steps.slice(0, 12).map((step) => ({

@@ -715,13 +715,19 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
     awaitingAnswer: async (
       instructionId: string,
     ): Promise<ReadonlySet<string>> => {
+      // Recovery D-01: a card whose approval lapsed is not "asked" any
+      // more, even before the expiry sweep has marked it EXPIRED.
       const rows = await sql<{ relationship_id: string }[]>`
         select distinct t.relationship_id
           from q_runtime.instruction_steps t
           join q_runtime.actions a on a.id = t.q_action_id
          where t.instruction_id = ${instructionId}
            and t.status = 'ASKED' and t.relationship_id is not null
-           and a.status in ('PROPOSED', 'AWAITING_APPROVAL')`;
+           and a.status in ('PROPOSED', 'AWAITING_APPROVAL')
+           and not exists (
+             select 1 from q_runtime.approvals l
+              where l.action_id = a.id and l.tenant_id = a.tenant_id
+                and l.status = 'PENDING' and l.expires_at <= clock_timestamp())`;
       return new Set(rows.map((row) => row.relationship_id));
     },
 
@@ -764,7 +770,7 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
     ): Promise<readonly WaitingCard[]> =>
       sql<WaitingCard[]>`
         select t.action, t.relationship_id, t.words, t.created_at,
-               p.id as approval_id,
+               p.id as approval_id, p.expires_at,
                a.proposed_payload #>> '{input,body}' as body
           from q_runtime.instruction_steps t
           join q_runtime.actions a on a.id = t.q_action_id
@@ -773,7 +779,27 @@ export function createPostgresInstructionStore(sql: DatabaseExecutor) {
            and p.status = 'PENDING'
          where t.instruction_id = ${instructionId} and t.status = 'ASKED'
            and a.status in ('PROPOSED', 'AWAITING_APPROVAL')
+           -- Recovery D-01: a lapsed card no longer waits.
+           and (p.id is null or p.expires_at > clock_timestamp())
          limit 100`,
+
+    /**
+     * Recovery D-01: cards Q asked under this instruction whose approval
+     * lapsed (expired, by the sweep or a late decision) in the last week:
+     * the conversation is Q's to draft again, and the person is told once.
+     */
+    lapsedCards: async (
+      instructionId: string,
+    ): Promise<readonly LapsedCard[]> =>
+      sql<LapsedCard[]>`
+        select t.q_action_id, t.relationship_id, t.words, a.updated_at as lapsed_at
+          from q_runtime.instruction_steps t
+          join q_runtime.actions a on a.id = t.q_action_id
+         where t.instruction_id = ${instructionId} and t.status = 'ASKED'
+           and a.status = 'EXPIRED'
+           and a.updated_at > clock_timestamp() - interval '7 days'
+         order by a.updated_at
+         limit 50`,
 
     /** The person's own time zone, when they set one. */
     timeZoneOf: async (owner: Owner): Promise<string | null> =>
@@ -811,7 +837,17 @@ export type WaitingCard = {
   readonly words: string;
   readonly created_at?: Date | undefined;
   readonly approval_id?: string | null | undefined;
+  /** When its open approval lapses (null: no approval yet). */
+  readonly expires_at?: Date | null | undefined;
   readonly body?: string | null | undefined;
+};
+
+/** A card whose approval lapsed before anyone decided it (D-01). */
+export type LapsedCard = {
+  readonly q_action_id: string;
+  readonly relationship_id: string | null;
+  readonly words: string;
+  readonly lapsed_at: Date;
 };
 
 export type InstructionStore = ReturnType<

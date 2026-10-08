@@ -55,7 +55,11 @@ import { useQSessionOptional } from "@/features/q/q-session";
 
 import { DecisionQueue, DoneForYou, useDismissedHeld } from "./decision-queue";
 import { decisionGroups } from "./decisions";
-import { groupNotices, type NoticeGroup } from "./notice-groups";
+import {
+  groupNotices,
+  summarisesCards,
+  type NoticeGroup,
+} from "./notice-groups";
 import { readPlan } from "./plan-words";
 import type { WorkforceView } from "./workforce-actions";
 import { WorkforceCost } from "./workforce-cost";
@@ -151,7 +155,12 @@ export function WorkPage({
   const dismissedHeld = useDismissedHeld();
   // The Work count in the navigation is these notices (founder 2026-10-05:
   // "it says 2 things, but the page says nothing"): they are listed here.
-  const notices = groupNotices(useNotices().items ?? []).needsYou;
+  // D-13: a notice that only summarises the cards below is not a second
+  // thing waiting on them.
+  const notices = groupNotices(useNotices().items ?? []).needsYou.filter(
+    // (When the cards could not be read, the summary is all they have.)
+    (group) => approvals === null || !summarisesCards(group.notice),
+  );
   const [view, setView] = useState<WorkView>(initialView ?? "work");
   const live = useWorkforceLive(
     workforce,

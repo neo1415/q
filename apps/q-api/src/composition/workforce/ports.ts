@@ -1,9 +1,15 @@
 import { randomUUID } from "node:crypto";
 
+import { CorrelationIdSchema } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
+import type { PublicWebResearchService } from "@capital-q/q-research";
 import type { ActorContext } from "@capital-q/security";
 
-import type { OpenConversation, WorkforcePorts } from "./jobs.js";
+import type {
+  OpenConversation,
+  ResearchFound,
+  WorkforcePorts,
+} from "./jobs.js";
 import type { Owner } from "./store.js";
 
 /**
@@ -55,6 +61,8 @@ export type WorkforcePortServices = {
     readonly relationshipId: string;
     readonly body: string;
     readonly idempotencyKey: string;
+    /** D-07: the job that sent it; the message is marked as Q's (viaQ). */
+    readonly qDelegationId?: string | undefined;
   }) => Promise<unknown>;
   /** The writer's first draft of a reply (null: nothing honest to say). */
   readonly writeReply: (input: {
@@ -64,7 +72,21 @@ export type WorkforcePortServices = {
     readonly thread: string;
     readonly callComing: boolean;
     readonly correlationId: string | undefined;
+    /** D-09: what the reply is for (the step's goal); was always "". */
+    readonly brief: string;
   }) => Promise<string | null>;
+  /**
+   * RESEARCH (D1): one bounded public-web research turn, as the person.
+   * Absent where no research provider is composed.
+   */
+  readonly research?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly runId: string;
+        readonly request: string;
+        readonly query: string;
+      }) => Promise<ResearchFound>)
+    | undefined;
   readonly findSlots: (input: {
     readonly actor: ActorContext;
     readonly relationshipId: string;
@@ -182,7 +204,7 @@ export function createWorkforcePorts(
         return open;
       },
 
-      writeReply: async (owner, conversation, intent, correlationId) => {
+      writeReply: async (owner, conversation, intent, correlationId, brief) => {
         if (!mine(owner)) return null;
         return services.writeReply({
           actor,
@@ -193,19 +215,40 @@ export function createWorkforcePorts(
           thread: conversation.thread.slice(-4_000),
           callComing: intent === "PROPOSE_TIMES",
           correlationId,
+          brief: (brief ?? "").slice(0, 600),
         });
       },
 
-      send: async (owner, relationshipId, idempotencyKey, body) => {
+      send: async (owner, relationshipId, idempotencyKey, body, jobId) => {
         if (!mine(owner)) return false;
         await services.sendChat({
           actor,
           relationshipId,
           body: body.slice(0, 4_000),
           idempotencyKey: idempotencyKey.slice(0, 200),
+          ...(jobId === undefined ? {} : { qDelegationId: jobId }),
         });
         return true;
       },
+
+      ...(services.research === undefined
+        ? {}
+        : {
+            research: async (owner, input) => {
+              if (!mine(owner) || services.research === undefined) {
+                return {
+                  status: "UNAVAILABLE" as const,
+                  message: "Not yours to research.",
+                };
+              }
+              return services.research({
+                actor,
+                runId: input.runId,
+                request: input.request,
+                query: input.query,
+              });
+            },
+          }),
 
       freeSlots: async (owner, relationshipId) => {
         if (!mine(owner)) return [];
@@ -241,6 +284,41 @@ export function createWorkforcePorts(
 
       notify: (owner, notice) =>
         mine(owner) ? notify(owner, notice) : Promise.resolve(),
+    };
+  };
+}
+
+/**
+ * RESEARCH (D1) over the composed public-web research service: the job's
+ * request is the person's words; the step's goal is a proposed query that
+ * the service composes before anything leaves Capital Q. Only each
+ * source's address, domain and title are kept -- page text is untrusted
+ * data and never travels into the job.
+ */
+export function workforceResearch(
+  service: PublicWebResearchService | undefined,
+): WorkforcePortServices["research"] {
+  if (service === undefined) return undefined;
+  return async (input) => {
+    const outcome = await service.research({
+      actor: input.actor,
+      runId: input.runId,
+      correlationId: CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+      requestedQuery: input.query,
+      userText: input.request,
+      subject: null,
+    });
+    if (outcome.status !== "OK") {
+      return { status: "UNAVAILABLE", message: outcome.message };
+    }
+    return {
+      status: "OK",
+      query: outcome.query,
+      sources: outcome.sources.map((source) => ({
+        url: source.url,
+        title: source.title,
+        domain: source.domain,
+      })),
     };
   };
 }

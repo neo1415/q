@@ -132,21 +132,39 @@ export function createInstructionActor(dependencies: {
   readonly resolver: ActorContextResolver;
   readonly authUserOf: (userId: string) => Promise<string | null>;
 }) {
-  return async (row: InstructionRow): Promise<ActorContext | null> => {
+  const ownerActor = createOwnerActor(dependencies);
+  return (row: InstructionRow): Promise<ActorContext | null> =>
+    ownerActor(row.user_id, row.organisation_id);
+}
+
+/**
+ * The person, resolved now from their own membership: null when they can
+ * no longer act (suspended, removed, a different user). Shared by standing
+ * instructions and durable workforce jobs (recovery D3), which both act
+ * long after the person approved them.
+ */
+export function createOwnerActor(dependencies: {
+  readonly resolver: ActorContextResolver;
+  readonly authUserOf: (userId: string) => Promise<string | null>;
+}) {
+  return async (
+    userId: string,
+    organisationIdValue: string | null,
+  ): Promise<ActorContext | null> => {
     const authUserId = AuthUserIdSchema.safeParse(
-      await dependencies.authUserOf(row.user_id),
+      await dependencies.authUserOf(userId),
     );
     if (!authUserId.success) return null;
     const organisationId =
-      row.organisation_id === null
+      organisationIdValue === null
         ? undefined
-        : OrganisationIdSchema.parse(row.organisation_id);
+        : OrganisationIdSchema.parse(organisationIdValue);
     const resolution = await resolveHumanActorContext(dependencies.resolver, {
       principal: { authUserId: authUserId.data },
       selection: organisationId === undefined ? {} : { organisationId },
     });
     return resolution.status === "RESOLVED" &&
-      resolution.context.userId === row.user_id
+      resolution.context.userId === userId
       ? resolution.context
       : null;
   };

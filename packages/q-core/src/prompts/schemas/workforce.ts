@@ -364,3 +364,43 @@ export const JobPlanResultSchema = z
   })
   .strict();
 export type JobPlanResult = z.infer<typeof JobPlanResultSchema>;
+
+// JOB_PLAN v2 (recovery D1, audit D-02): the lead contract's roles. Writing
+// and reviewing are not roles; they happen inside CONVERSATION and
+// OUTREACH. Code still refuses a role with no executor in this deployment.
+export const JOB_PLAN_V2_SCHEMA_VERSION = 2;
+
+export const PLAN_AGENT_ROLES_V2 = [
+  "CONVERSATION",
+  "OUTREACH",
+  "RESEARCH",
+  "DOCUMENTS",
+  "SCHEDULING",
+  "DISCOVERY",
+  "DILIGENCE",
+] as const;
+
+export const JobPlanResultV2Schema = z
+  .object({
+    summary: z.string().trim().min(1).max(400),
+    steps: z
+      .array(
+        z
+          .object({
+            key: z
+              .string()
+              .regex(/^[a-z][a-z0-9_]{0,31}$/u)
+              .max(32),
+            role: z.enum(PLAN_AGENT_ROLES_V2),
+            goal: z.string().trim().min(1).max(400),
+            tools: z.array(z.string().min(1).max(80)).max(12),
+            dependsOn: z.array(z.string().max(32)).max(8),
+          })
+          .strict(),
+      )
+      .max(12),
+    /** What the job asks that no registered agent can do. */
+    cannot: z.array(z.string().trim().min(1).max(200)).max(5),
+  })
+  .strict();
+export type JobPlanResultV2 = z.infer<typeof JobPlanResultV2Schema>;

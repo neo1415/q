@@ -281,11 +281,20 @@ export function withPage(
   );
 }
 
+/**
+ * A chat message card, however it was asked for: Q's own card
+ * (`chat.message.send`) or a standing instruction's, which carries the
+ * app action's prefixed type (`app.chat.message.send`, audit D-15).
+ */
+export function isChatSend(type: string | undefined | null): boolean {
+  return type === "chat.message.send" || type === "app.chat.message.send";
+}
+
 /** The decision's own words for its kind of card. */
 export function decisionTitle(item: Decision | HeldDecision): string {
   if (item.kind === "HELD") return "Q held a message";
   const type = item.view?.action.actionType;
-  if (type === "chat.message.send") return "Reply ready to send";
+  if (isChatSend(type)) return "Reply ready to send";
   if (type === "email.send") return "Email ready to send";
   return item.summary;
 }
