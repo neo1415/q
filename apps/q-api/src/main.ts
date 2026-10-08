@@ -2645,8 +2645,10 @@ const qTools = createQTools({
             sql: database.sql,
           })
             .findDiscoverablePitches([companyId])
-            .catch(() => new Map())
-        ).get(companyId);
+            // Typed failure (not an untyped empty Map): an unreadable list
+            // is no pitches, and the lint keeps the read typed.
+            .catch(() => null)
+        )?.get(companyId);
         if (set === undefined) return null;
         const read = await Promise.all(
           [set, ...set.more].slice(0, 5).map(async (pitch) => {
