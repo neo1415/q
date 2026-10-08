@@ -103,6 +103,8 @@ test("model outage: Q says it could not answer, and the run is FAILED, not silen
   );
   expect(result.status).toBe("FAILED");
   expect(JSON.stringify(result.run["failure"] ?? null)).toMatch(/retryable/u);
+  // The outage opened the provider circuit for 30 s (policy/health.ts:78).
+  await new Promise((resolve) => setTimeout(resolve, 35_000));
 });
 
 // Covers the Q conversation. Audit D-01 proper (a standing instruction's

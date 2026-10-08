@@ -63,6 +63,13 @@ export type PromiseSpec = {
   readonly tools: RegExp;
   readonly honesty: { readonly forbid?: RegExp; readonly require?: RegExp };
   readonly awaits?: Partial<Record<number, Await>>;
+  /**
+   * The answer is built by code, not a model (the investor fit sweep,
+   * packages/model-gateway/src/q/index.ts ~3070): steps then check the
+   * stored ANSWER_CARDS block, survival of a model outage, and the
+   * "q answered a fit question from computed fits" line.
+   */
+  readonly codeBuilt?: boolean;
 };
 
 const STEPS = [
@@ -84,7 +91,8 @@ export function promiseSuite(spec: PromiseSpec): void {
   const rules = (): ScriptRule[] => [
     {
       name: `${spec.id}-answer`,
-      when: { user: escape(spec.question) },
+      // The analyst only: the turn reader keeps its baseline verdict.
+      when: { task: "COMPANY_ANALYST", user: escape(spec.question) },
       reply: answer(spec.expected),
     },
   ];
@@ -149,7 +157,13 @@ export function promiseSuite(spec: PromiseSpec): void {
       await useScript(rules());
       await page.goto("/home");
       const reply = await ask(page, spec.question);
-      await expect(reply).toContainText(spec.expected);
+      if (spec.codeBuilt === true) {
+        await expect(
+          page.locator("[data-ac-cards] [data-ac-card]").first(),
+        ).toBeVisible();
+      } else {
+        await expect(reply).toContainText(spec.expected);
+      }
       await expectLastTurnTerminal(page, ["ANSWERED"]);
     });
 
@@ -178,7 +192,9 @@ export function promiseSuite(spec: PromiseSpec): void {
         "GET",
         `/v1/q/runs/${run.runId}`,
       );
-      expect(again.text).toContain(spec.expected);
+      expect(again.text).toContain(
+        spec.codeBuilt === true ? '"ANSWER_CARDS"' : spec.expected,
+      );
       expect(again.text).toContain(spec.question.slice(0, 20));
     });
 
@@ -213,6 +229,12 @@ export function promiseSuite(spec: PromiseSpec): void {
         },
       ];
       const run = await runQ(spec.actor, spec.question, outage);
+      if (spec.codeBuilt === true) {
+        // No model on this path: an outage must not take the answer down.
+        expect(run.status).toBe("COMPLETED");
+        await new Promise((resolve) => setTimeout(resolve, 35_000));
+        return;
+      }
       expect(run.status).toBe("FAILED");
       const page = await (await contextAs(browser, spec.actor)).newPage();
       await useScript(outage);
@@ -221,10 +243,20 @@ export function promiseSuite(spec: PromiseSpec): void {
       await expect(
         page.getByText(/isn't available|couldn't|try again/iu).last(),
       ).toBeVisible({ timeout: 90_000 });
+      await page.close();
+      // The scripted outage opens the gateway's circuit for the provider for
+      // 30 s (packages/model-gateway/src/policy/health.ts:78); the next steps
+      // must not inherit it.
+      await new Promise((resolve) => setTimeout(resolve, 35_000));
     });
 
     step(10, async () => {
       const run = await runQ(spec.actor, spec.question, rules());
+      if (spec.codeBuilt === true) {
+        // The fit computation is wired into Q: its cards are the stored answer.
+        expect(JSON.stringify(run.run)).toContain('"ANSWER_CARDS"');
+        return;
+      }
       const offered = new Set(
         run.vendor.flatMap((request) => request.tools ?? []),
       );
@@ -256,7 +288,11 @@ export function promiseSuite(spec: PromiseSpec): void {
               .some(
                 (line) =>
                   line.includes(run.runId) &&
-                  line.includes('"q answer produced"'),
+                  line.includes(
+                    spec.codeBuilt === true
+                      ? '"q answered a fit question from computed fits"'
+                      : '"q answer produced"',
+                  ),
               ),
           { timeout: 30_000 },
         )

@@ -68,6 +68,7 @@ promiseSuite({
 promiseSuite({
   id: "Q.06",
   title: "Finds the right opportunities (for investors)",
+  codeBuilt: true,
   actor: CAST.investor,
   page: "/discover",
   landmark: /For you/u,

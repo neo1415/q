@@ -118,6 +118,7 @@ test.describe("INC-1 top three companies (typed, browser + server state)", () =>
   test("exactly 3 cards, 3 unique canonical company ids, in the DOM and in the stored message", async ({
     browser,
   }) => {
+    awaits(["E"], "defect G-D13: disclosable() drops ANSWER_CARDS from the stored-message views");
     const page = await (await contextAs(browser, CAST.investor)).newPage();
     await askTopThree(page);
     const stored = await storedCards(CAST.investor);
