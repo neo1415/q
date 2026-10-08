@@ -165,6 +165,7 @@ function world() {
         ...request,
         decision: input.decision,
         expiresAt: input.expiresAt,
+        declineNote: input.note ?? null,
       };
       return Promise.resolve(true);
     },
@@ -603,6 +604,46 @@ describe("request access and approval", () => {
       "data_room.access_requested",
       "data_room.access_decided",
     ]);
+  });
+});
+
+describe("a decline with a note (2026-10-08)", () => {
+  it("tells the investor, and their room shows the founder's words beside the document", async () => {
+    const { service, notices } = world();
+    const asked = await service.requestAccess({
+      actor: investorOne,
+      companyId: COMPANY,
+      documentId: ON_REQUEST_DOC.documentId,
+      idempotencyKey: "key-00000009",
+    });
+    if (asked.outcome !== "OK") throw new Error("asked");
+    expect(
+      (
+        await service.decide({
+          actor: founder,
+          requestId: asked.value.requestId,
+          decision: "DECLINE",
+          note: "  After a term sheet.  ",
+        })
+      ).outcome,
+    ).toBe("OK");
+    expect(notices.at(-1)).toBe(
+      "COMPANY:{actor} declined your request for Cap table summary",
+    );
+    const view = await service.view(investorOne, COMPANY);
+    const document =
+      view?.viewer === "INVESTOR"
+        ? view.documents.find((d) => d.documentId === ON_REQUEST_DOC.documentId)
+        : undefined;
+    expect(document).toMatchObject({
+      access: "REQUESTABLE",
+      declined: { note: "After a term sheet." },
+    });
+    // The founder's view carries the same words.
+    const owner = await service.view(founder, COMPANY);
+    expect(
+      owner?.viewer === "OWNER" ? owner.requests[0]?.declineNote : undefined,
+    ).toBe("After a term sheet.");
   });
 });
 
