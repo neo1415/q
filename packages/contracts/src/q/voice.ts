@@ -777,6 +777,12 @@ export const QVoiceTurnStateSchema = z
      * `navigate`. Absent or null when none.
      */
     clientAction: QClientActionIntentSchema.nullable().optional(),
+    /**
+     * RECOVERY-2026-10 (C2): every client action the answer carried, in
+     * its order ("open Capital, the readiness tab, scroll to the risks").
+     * The screen performs them in order; `clientAction` is the latest.
+     */
+    clientActions: z.array(QClientActionIntentSchema).max(12).optional(),
     /** FORM: the interview leaves the person with the form. CHAT: the voice ends and the typed thread stays. */
     handoff: z.enum(["FORM", "CHAT"]).nullable(),
     degraded: z.boolean(),

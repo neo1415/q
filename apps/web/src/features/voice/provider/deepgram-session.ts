@@ -1,5 +1,7 @@
 "use client";
 
+import { postCardUpdate } from "./duplex-relays";
+import { standardLineCards, type StandardLineCards } from "./standard-cards";
 import type { AgentMicrophone as AgentMicrophoneClass } from "@deepgram/agents";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -138,9 +140,13 @@ export function useDeepgramVoiceSession(
   const [state, setState] = useState<VoiceState>("IDLE");
   // The watchdog reads the current state without a side effect in an
   // updater (RECOVERY A4).
+  /** E-03: the page's decision cards on this line, while it is up. */
+  const cardsRef = useRef<StandardLineCards | null>(null);
   const stateRef = useRef<VoiceState>("IDLE");
   useEffect(() => {
     stateRef.current = state;
+    // E-03: a note held while Q was busy is said once the line is quiet.
+    if (state === "LISTENING") cardsRef.current?.quiet();
   }, [state]);
   const [connected, setConnected] = useState(false);
   const [transcript, setTranscript] = useState<readonly VoiceTranscriptLine[]>(
@@ -188,6 +194,8 @@ export function useDeepgramVoiceSession(
   const injectedRef = useRef<{ text: string; at: number }[]>([]);
 
   const teardown = useCallback(() => {
+    cardsRef.current?.stop();
+    cardsRef.current = null;
     const live = liveRef.current;
     liveRef.current = null;
     if (live === null) return;
@@ -401,6 +409,26 @@ export function useDeepgramVoiceSession(
         setState((current) =>
           current === "CONNECTING" ? "LISTENING" : current,
         );
+        // E-03: the page's cards reach this line as they reach the duplex
+        // one: focus to the server, spoken replies decided by the card's
+        // code, and notes that ask Q to speak said when the line is quiet.
+        cardsRef.current?.stop();
+        cardsRef.current = standardLineCards({
+          post: (update) =>
+            postCardUpdate(
+              credential.voiceSessionId,
+              credential.sessionToken,
+              update,
+            ),
+          speak: (line) => {
+            if (liveRef.current !== live) return;
+            live.session.injectAgentMessage(line);
+            expectSpeech();
+          },
+          canSpeak: () =>
+            liveRef.current === live && stateRef.current === "LISTENING",
+          isCardReply: wire.isQVoiceCardReply,
+        });
         // Q speaks first on an explicit start; that greeting has to be heard.
         if (greeting) expectSpeech();
       });
@@ -450,6 +478,8 @@ export function useDeepgramVoiceSession(
           }
         }
         addLine(role, content);
+        // E-03: a reply about the card in focus is the card's to decide.
+        if (role === "user") cardsRef.current?.heard(content);
         // The swarm and the page pointer follow what Q says, as it says it.
         if (role === "q") announceQSaid(content);
         if (role === "user") {

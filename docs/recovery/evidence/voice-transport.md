@@ -83,7 +83,12 @@ The averages differ by scenario: about $0.026 per turn over 60 turns, and about 
 3. How long the sideband stays up through long silence (community reports say it drops), and whether bounded re-attach covers it.
 4. Behaviour of `response.create` while another response is active. The line queues and retries it once on `conversation_already_has_active_response`; the exact error code is assumed.
 5. Real audio token rates, and the cost per turn from `ai_ops.model_usage`.
-6. Vercel's function duration limit for the relay route. `heard` can hold up to 38 s, the browser deadline.
+6. The relay route against the web host's request timeout.
+   - Web runs on Railway as a Node server, not on Vercel functions, so no per-function duration limit applies.
+   - Railway's documented maximum HTTP request duration is 15 minutes (docs.railway.com, "Public Networking": max request duration). The figure comes from the documentation and has not been tested on our deployment.
+   - The longest relay is `heard`/`tool`: the server's ask_q deadline is 30 s and the browser's relay deadline is 38 s, well inside it.
+   - The relays are plain JSON request/response, with no streaming or WebSocket through the web origin. Only the q-api sideband holds a WebSocket, and it is outbound from q-api to OpenAI, so Railway's inbound limits do not apply to it.
+   - Still to confirm on staging: that the Railway proxy does not cut an idle 30–38 s request sooner. Check the "duplex voice turn" logs for `relayMs` near 30,000.
 
 ## Local live procedure (founder's machine, his microphone, existing configuration)
 
