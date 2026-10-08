@@ -102,6 +102,20 @@ export type OwnRelationship = RelationshipSummaryDto & {
     readonly state: RelationshipSummaryDto["state"];
     readonly at: string;
   }[];
+  /**
+   * The latest chat message in the relationship, by side: THEM means the
+   * other side wrote last and is waiting for a reply (live 2026-10-08:
+   * Q said nothing needed Marcus while Zino Aviation's message waited).
+   * Absent or null: no messages, or not read.
+   */
+  readonly lastMessage?:
+    | {
+        readonly from: "THEM" | "YOU";
+        readonly at: string;
+        readonly preview: string;
+      }
+    | null
+    | undefined;
 };
 
 export type OwnRelationships = {

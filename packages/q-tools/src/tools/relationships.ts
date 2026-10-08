@@ -905,6 +905,16 @@ export const ListMyRelationshipsOutputSchema = z
             stateSince: UtcTimestampSchema,
             milestones: z.array(MilestoneSchema).max(64),
             nextStep: z.enum(RELATIONSHIP_NEXT_STEPS),
+            /** THEM: they wrote last and are waiting for a reply. */
+            lastMessage: z
+              .object({
+                from: z.enum(["THEM", "YOU"]),
+                at: UtcTimestampSchema,
+                preview: z.string().max(240),
+              })
+              .strict()
+              .nullable()
+              .default(null),
           })
           .strict(),
       )
@@ -936,7 +946,7 @@ function createListMyRelationshipsTool(
       core: true,
       providerName: "list_my_relationships",
       description:
-        "Lists the person's own relationships on Capital Q, with each counterparty's name and id: for an investor, every company they expressed interest in and whether it is still awaiting an answer (INTEREST_EXPRESSED), accepted (CONNECTED) or declined, plus the companies they saved or passed on in Discover; for a founder, every investor that expressed interest in their company and where each stands. Each has its state, since when, dated milestones and their next step. Call it whenever they ask about their interests, connections, pipeline, saved companies or 'the companies I'm interested in' -- never ask them for names these records already hold. Saving or passing is not interest.",
+        "Lists the person's own relationships on Capital Q, with each counterparty's name and id: for an investor, every company they expressed interest in and whether it is still awaiting an answer (INTEREST_EXPRESSED), accepted (CONNECTED) or declined, plus the companies they saved or passed on in Discover; for a founder, every investor that expressed interest in their company and where each stands. Each has its state, since when, dated milestones, their next step and the latest chat message (lastMessage.from THEM: they wrote last and are waiting for a reply, which needs the person's attention). Call it whenever they ask about their interests, connections, pipeline, saved companies, 'the companies I'm interested in', messages waiting for them or what needs their attention -- never ask them for names these records already hold. Saving or passing is not interest.",
       classification: "READ_ONLY",
       riskClass: "SAFE_READ",
       requiredCapabilities: [],
@@ -998,6 +1008,14 @@ function createListMyRelationshipsTool(
                 at: UtcTimestampSchema.parse(m.at),
               })),
               nextStep: item.nextStep,
+              lastMessage:
+                item.lastMessage === undefined || item.lastMessage === null
+                  ? null
+                  : {
+                      from: item.lastMessage.from,
+                      at: UtcTimestampSchema.parse(item.lastMessage.at),
+                      preview: item.lastMessage.preview.slice(0, 240),
+                    },
             })),
           saved,
           passed,

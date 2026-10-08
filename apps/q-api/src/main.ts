@@ -2545,6 +2545,7 @@ const qTools = createQTools({
         board: relationshipBoard,
         ownCompany: runtimeDependencies.ownCompany,
         connections: connectionService,
+        latestMessages: latestRelationshipMessages,
       }),
       // Diligence (2026-10-02): get_relationship names the area's requests
       // and shares, read through the diligence service as the person.
@@ -2995,6 +2996,51 @@ const ownRecords = createOwnRecordsPort({
 const qActionRepositories = createPostgresQActionRepositories();
 // Errands (founder direction 2026-09-29): one approval, an exact plan Q
 // carries forward as the relationship moves.
+/**
+ * The latest chat message of each relationship, by side (R35, live
+ * 2026-10-08). Called only with relationships the actor's own list
+ * already returned; text messages only, newest per relationship.
+ */
+async function latestRelationshipMessages(
+  relationshipIds: readonly string[],
+): Promise<
+  ReadonlyMap<
+    string,
+    {
+      readonly side: "INVESTOR" | "COMPANY";
+      readonly at: string;
+      readonly body: string;
+    }
+  >
+> {
+  if (relationshipIds.length === 0) return new Map();
+  const rows = await database.sql<
+    {
+      relationship_id: string;
+      sender_side: "INVESTOR" | "COMPANY";
+      created_at: Date;
+      body: string | null;
+    }[]
+  >`
+    select distinct on (c.relationship_id)
+           c.relationship_id, m.sender_side, m.created_at, m.body
+      from communication.conversations c
+      join communication.messages m on m.conversation_id = c.id
+     where c.relationship_id = any(${[...relationshipIds].slice(0, 200)}::uuid[])
+       and m.kind = 'TEXT'
+     order by c.relationship_id, m.created_at desc`;
+  return new Map(
+    rows.map((row) => [
+      row.relationship_id,
+      {
+        side: row.sender_side,
+        at: new Date(row.created_at).toISOString(),
+        body: row.body ?? "",
+      },
+    ]),
+  );
+}
+
 const errandRelationships = createRelationshipIntelligencePort({
   interests: interestService,
   board: relationshipBoard,

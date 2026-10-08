@@ -185,8 +185,49 @@ export function createRelationshipIntelligencePort(dependencies: {
   readonly connections?:
     | Pick<ConnectionService, "listConnectionRequests" | "connectionStatus">
     | undefined;
+  /**
+   * The latest chat message of each of these relationships (already the
+   * actor's own, listed above), by side. Absent: not annotated.
+   */
+  readonly latestMessages?:
+    | ((relationshipIds: readonly string[]) => Promise<
+        ReadonlyMap<
+          string,
+          {
+            readonly side: "INVESTOR" | "COMPANY";
+            readonly at: string;
+            readonly body: string;
+          }
+        >
+      >)
+    | undefined;
 }): RelationshipIntelligencePort {
-  const { interests, board, ownCompany, connections } = dependencies;
+  const { interests, board, ownCompany, connections, latestMessages } =
+    dependencies;
+  // Who wrote last, from the actor's side: never fails the list.
+  const withLatest = async (
+    side: "INVESTOR" | "COMPANY",
+    items: readonly OwnRelationship[],
+  ): Promise<readonly OwnRelationship[]> => {
+    if (latestMessages === undefined || items.length === 0) return items;
+    const latest = await latestMessages(
+      items.map((item) => item.relationshipId),
+    ).catch(() => null);
+    if (latest === null) return items;
+    return items.map((item) => {
+      const message = latest.get(item.relationshipId);
+      return message === undefined
+        ? item
+        : {
+            ...item,
+            lastMessage: {
+              from: message.side === side ? "YOU" : "THEM",
+              at: message.at,
+              preview: message.body.replace(/\s+/g, " ").trim().slice(0, 240),
+            },
+          };
+    });
+  };
   return {
     // Interest waiting in their own company's inbox, named so "accept
     // Kazikit's interest" can find it (lead 2026-10-03): the company from
@@ -252,7 +293,10 @@ export function createRelationshipIntelligencePort(dependencies: {
         const items = await interests.listRelationshipsForInvestor({ actor });
         return {
           side: "INVESTOR",
-          items: items.map((item) => ownRow(item, "INVESTOR")),
+          items: await withLatest(
+            "INVESTOR",
+            items.map((item) => ownRow(item, "INVESTOR")),
+          ),
         };
       } catch (error) {
         if (!(error instanceof InterestNotPermittedError)) throw error;
@@ -266,7 +310,10 @@ export function createRelationshipIntelligencePort(dependencies: {
       });
       return {
         side: "COMPANY",
-        items: items.map((item) => ownRow(item, "COMPANY")),
+        items: await withLatest(
+          "COMPANY",
+          items.map((item) => ownRow(item, "COMPANY")),
+        ),
       };
     },
     withCompany: async (actor, companyId) => {
