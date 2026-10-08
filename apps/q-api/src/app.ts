@@ -1,3 +1,4 @@
+import type { DatabaseHealth } from "@capital-q/database";
 import type { OwnUsage } from "./composition/usage.js";
 import { registerUsageRoutes } from "./http/usage.js";
 import { registerBriefingCommandRoutes } from "./http/briefing-command.js";
@@ -142,6 +143,12 @@ export type QApiSecurityDependencies = {
  * without a database.
  */
 export type QApiModules = {
+  /**
+   * What /health/ready checks (audit DEF-A4). Absent: readiness reports the
+   * database NOT_CHECKED and stays 200, as it was before probes existed.
+   */
+  readonly healthProbes?:
+    { readonly database: () => Promise<DatabaseHealth> } | undefined;
   /**
    * Why an investor is seeing a company (CQ-REC-007). It lives here
    * rather than beside the slate itself because the natural-language
@@ -758,16 +765,39 @@ export function createApp(
   }
 
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the
-  // process is alive and performs no dependency checks; readiness will grow to
-  // cover configuration and critical initialisation as those are introduced.
+  // process is alive and performs no dependency checks. Readiness asks the
+  // database (audit DEF-A4): Railway's healthcheck gates a deploy's cut-over
+  // on it, and a static "ok" let a release go live with no database. The
+  // answer names the failure kind only, never a host, version or message.
   app.get("/health/live", () => ({ status: "ok", service: SERVICE_NAME }));
 
-  app.get("/health/ready", () => ({
-    status: "ok",
-    service: SERVICE_NAME,
-    environment: config.runtime.deploymentEnvironment,
-    contracts: CONTRACTS_VERSION,
-  }));
+  app.get("/health/ready", async (_request, reply) => {
+    const database =
+      modules.healthProbes === undefined
+        ? undefined
+        : await modules.healthProbes.database();
+    const body = {
+      service: SERVICE_NAME,
+      environment: config.runtime.deploymentEnvironment,
+      contracts: CONTRACTS_VERSION,
+      checks: {
+        database:
+          database === undefined
+            ? "NOT_CHECKED"
+            : database.reachable
+              ? "OK"
+              : database.failure,
+      },
+    };
+    if (database !== undefined && !database.reachable) {
+      logger.warn(
+        { check: "database", failure: database.failure },
+        "not ready",
+      );
+      return reply.code(503).send({ status: "unavailable", ...body });
+    }
+    return { status: "ok", ...body };
+  });
 
   return { app, logger, streams };
 }

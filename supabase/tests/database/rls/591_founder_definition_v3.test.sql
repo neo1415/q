@@ -1,5 +1,6 @@
--- HARDEN 20261110010000: founder definition v3 is published, current, and
--- adds the two early-signal options; v2 stays published for its sessions.
+-- HARDEN 20261110010000: founder definition v3 is published and adds the
+-- two early-signal options; v2 stays published for its sessions. v4
+-- (20261218100000, see 885) has since become current; v3 is not retired.
 begin;
 
 create extension if not exists pgtap with schema extensions;
@@ -9,8 +10,8 @@ select plan(4);
 
 select is(
   (select current_version from onboarding.definitions where journey_type = 'founder'),
-  3,
-  'new founder sessions pin to v3');
+  4,
+  'new founder sessions pin to v4, the version after v3 (885 covers v4 itself)');
 
 select ok(
   (select bool_and(v.published_at is not null)

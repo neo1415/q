@@ -114,13 +114,11 @@ export const modelProviderEnvShape = {
   GROQ_API_KEY_3: apiKey.optional(),
   GROQ_API_KEY_4: apiKey.optional(),
   /**
-   * OpenAI, for diagnosis only (QX-004 core gate).
-   *
-   * No routing policy names it. It is reachable only through the
-   * server-side test route, which refuses to exist outside a local or
-   * test environment and without the synthetic-demo attestation. The
-   * account holds a few dollars; the adapter runs one model and refuses
-   * every other.
+   * OpenAI. Added for diagnosis (QX-004 core gate); since
+   * 20261008130000_ai_ops_openai_primary.sql it is the primary text
+   * provider: every routing policy names gpt-5.6-luna first. Without
+   * this key every request falls to the Gemini and Groq fallbacks. The
+   * adapter runs one model and refuses every other.
    */
   OPENAI_API_KEY: apiKey.optional(),
   // Both spellings, as the Gemini keys already are: the key was in use

@@ -120,14 +120,14 @@ select results_eq(
             ('investor.gateway.view'), ('investor.interest.express'), ('investor.mandate.create'),
             ('investor.mandate.edit'), ('investor.mandate.view'), ('investor.representative.self_edit'),
             ('investor.view'), ('media.create'), ('media.manage'), ('media.view'),
-            ('organisation.admin'), ('organisation.view'),
+            ('organisation.admin'), ('organisation.own'), ('organisation.view'),
             ('q.action.approve'),
             ('verification.decide'), ('verification.request'), ('verification.view') $$,
-  'seeded capability codes match the known reference set (GateQ, artifacts, verification, network interest, handle and connection request migrations extend it)');
+  'seeded capability codes match the known reference set (GateQ, artifacts, verification, network interest, handle, connection request and organisation team migrations extend it)');
 select results_eq(
   $$ select code from permissions.roles order by code $$,
-  $$ values ('organisation_admin'), ('organisation_member') $$,
-  'only the two baseline role templates are seeded');
+  $$ values ('organisation_admin'), ('organisation_member'), ('organisation_owner') $$,
+  'only the two baseline role templates and the owner role (20261207150000 organisation team) are seeded');
 select results_eq(
   $$ select c.code from permissions.role_capabilities rc
        join permissions.roles r on r.id = rc.role_id

@@ -169,6 +169,7 @@ import {
 } from "./evidence/deck-reading-handler.js";
 import { runDeckReadingHeal } from "./evidence/deck-reading-backfill.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
+import { runRetentionTicker } from "./retention/retention.js";
 import { createParserSandbox } from "./parser/sandbox.js";
 import { composeWorkerPresence } from "./presence/composition.js";
 import { runGmailReplyPoller } from "./integrations/gmail-poller.js";
@@ -1357,6 +1358,12 @@ await Promise.all([
   runScheduleTicker({
     schedule,
     meetingMail,
+    signal: shutdownController.signal,
+    logger,
+  }),
+  // DEF-A9 / F-D10: old run checkpoints and unlinked voice turns, hourly.
+  runRetentionTicker({
+    transactions: database.transactions,
     signal: shutdownController.signal,
     logger,
   }),
