@@ -209,7 +209,10 @@ describe("a document made by the worker", () => {
     expect(asked).toEqual([COMPANY]);
     expect(own?.job.grounding).toContain("We are raising ₦150m on a SAFE.");
     const slides = own?.content.content.deck?.slides ?? [];
-    expect(slides.some((slide) => slide.title === "Raising ₦150m")).toBe(true);
+    // Deck quality: the raise's title is its takeaway, amount first.
+    expect(
+      slides.some((slide) => slide.title.startsWith("Raising ₦150m")),
+    ).toBe(true);
     const other = await run("c0000000-0000-4000-8000-0000000000ff");
     expect(asked).toEqual([COMPANY]);
     expect(other?.job.grounding).not.toContain(

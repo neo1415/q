@@ -481,7 +481,12 @@ export function applyPolish(
         : slide.bullets;
     return {
       ...slide,
-      title: index > 0 && safe(change.title) ? change.title : slide.title,
+      // Deck quality: a title built from the slide's own figures (it
+      // carries its topic as the eyebrow) is already the takeaway.
+      title:
+        index > 0 && slide.kicker === undefined && safe(change.title)
+          ? change.title
+          : slide.title,
       // The cover's subtitle is a tagline: a rewrite may improve it only
       // within its twelve words (deck wave 8).
       ...(slide.subtitle !== undefined &&

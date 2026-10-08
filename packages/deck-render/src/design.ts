@@ -12,8 +12,7 @@ import type { QFontPairing, QVisualDirection } from "@capital-q/contracts";
  * Every family here is SIL Open Font License, free for commercial use and
  * embeddable. A PPTX names them (PowerPoint substitutes when one is not
  * installed); the SVG names them with a generic fallback; the PDF embeds
- * the bundled Noto Sans (see `fonts.ts`) until a build bundles the faces,
- * so a pairing changes no data when that happens.
+ * the bundled faces themselves (`faces.ts`, `fonts/`).
  */
 
 export type FontPairing = {
@@ -31,17 +30,21 @@ export const FONT_PAIRINGS: Readonly<Record<QFontPairing, FontPairing>> = {
     headingFont: "Source Serif 4",
     bodyFont: "Inter",
   },
+  // Deck quality 2026-10-08: the text face of these two pairings is Inter.
+  // Plex Sans and Source Sans 3 carry a Reserved Font Name, so a subset
+  // cut of them may not be bundled, and the PDF now draws the faces the
+  // pairing names. The codes stay: they are stored on existing decks.
   PLEX_SANS_PLEX_SERIF: {
     code: "PLEX_SANS_PLEX_SERIF",
-    label: "IBM Plex Serif headings, IBM Plex Sans text",
+    label: "IBM Plex Serif headings, Inter text",
     headingFont: "IBM Plex Serif",
-    bodyFont: "IBM Plex Sans",
+    bodyFont: "Inter",
   },
   SOURCE_SANS_FRAUNCES: {
     code: "SOURCE_SANS_FRAUNCES",
-    label: "Fraunces headings, Source Sans text",
+    label: "Fraunces headings, Inter text",
     headingFont: "Fraunces",
-    bodyFont: "Source Sans 3",
+    bodyFont: "Inter",
   },
   INTER_ONLY: {
     code: "INTER_ONLY",

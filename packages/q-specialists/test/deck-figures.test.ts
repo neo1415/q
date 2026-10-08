@@ -214,9 +214,10 @@ describe("firm figures survive the polish", () => {
       "Paying businesses through accountant partners",
     );
     // 590 → 1,140 is drawn, not written.
+    // Deck quality: named by when they were, as far as the sentence says.
     expect(traction?.chart?.points).toEqual([
-      { label: "Start", value: "590" },
-      { label: "After twelve months", value: "1140" },
+      { label: "A year earlier", value: "590" },
+      { label: "Latest", value: "1140" },
     ]);
     expect(traction?.bullets).toEqual([]);
     // The title agrees with the figures: a headline, not a sentence.

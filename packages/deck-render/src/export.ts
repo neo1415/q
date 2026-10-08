@@ -4,7 +4,11 @@ import type {
 } from "@capital-q/contracts";
 
 import { documentFromArtifact, documentToPdf } from "./document.js";
-import { fetchSlideImages, type GeneratedImageReader } from "./images.js";
+import {
+  fetchSlideImages,
+  imageBytesFor,
+  type GeneratedImageReader,
+} from "./images.js";
 import { layOutDeck } from "./layout.js";
 import { deckToPdf } from "./pdf.js";
 import { deckToPptx } from "./pptx.js";
@@ -58,8 +62,34 @@ export async function renderArtifactFile(input: {
   const meta = { title: version.title, company: input.company };
   const deck = version.content.deck;
   if (deck !== undefined) {
-    const laid = layOutDeck(deck, input.brand);
-    const images = await fetchSlideImages(laid, fetch, input.readGenerated);
+    const first = layOutDeck(deck, input.brand);
+    const images = await fetchSlideImages(first, fetch, input.readGenerated);
+    // Deck quality: a picture that could not be read is not drawn as an
+    // empty half-slide. The slide is laid out again without it, so its
+    // words take the whole width.
+    const missing = deck.slides.some(
+      (slide) =>
+        slide.image !== undefined &&
+        imageBytesFor(slide.image.url, images) === undefined,
+    );
+    const laid = missing
+      ? layOutDeck(
+          {
+            ...deck,
+            slides: deck.slides.map((slide) => {
+              if (
+                slide.image === undefined ||
+                imageBytesFor(slide.image.url, images) !== undefined
+              ) {
+                return slide;
+              }
+              const { image: _unread, ...rest } = slide;
+              return rest;
+            }),
+          },
+          input.brand,
+        )
+      : first;
     const bytes =
       format === "pptx"
         ? await deckToPptx(laid, meta, images)

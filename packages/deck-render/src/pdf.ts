@@ -13,8 +13,10 @@ import {
 import { backgroundBands } from "./background.js";
 import { imageBytesFor, imageKind, type SlideImages } from "./images.js";
 
-import { drawLine, embedFonts, type EmbeddedFonts } from "./fonts.js";
+import type { FaceKey } from "./faces.js";
+import { drawLine, embedFaces, type EmbeddedFont } from "./fonts.js";
 import type { LaidOutDeck, TextBox } from "./layout.js";
+import { arcPath, roundedRectPath } from "./paths.js";
 
 /**
  * The deck as a PDF (QX-004 §7).
@@ -46,13 +48,15 @@ export function colour(hex: string): RGB {
   );
 }
 
+type FaceFor = (face: FaceKey | undefined, bold: boolean) => EmbeddedFont;
+
 function drawText(
   page: PDFPage,
   box: TextBox,
   height: number,
-  fonts: EmbeddedFonts,
+  faceFor: FaceFor,
 ): void {
-  const face = box.bold ? fonts.bold : fonts.regular;
+  const face = faceFor(box.face, box.bold);
   box.lines.forEach((line, index) => {
     // The layout's `y` is the box's top and its baselines sit a size below
     // each line's own top; a PDF's origin is the bottom of the page.
@@ -78,7 +82,26 @@ export async function deckToPdf(
   pdf.setTitle(meta.title);
   if (meta.company !== undefined) pdf.setAuthor(meta.company);
   pdf.setProducer("Capital Q");
-  const fonts = await embedFonts(pdf);
+  // Deck quality: the faces the layout measured in, each backed by Noto
+  // for what it cannot draw. A box with no face (the newspaper) is Noto.
+  const wanted = new Set<FaceKey>();
+  for (const slide of deck.slides) {
+    for (const box of slide.boxes) {
+      if (box.kind === "TEXT" && box.face !== undefined) wanted.add(box.face);
+      if (box.kind === "CHART") {
+        if (box.face !== undefined) wanted.add(box.face);
+        if (box.strongFace !== undefined) wanted.add(box.strongFace);
+      }
+    }
+  }
+  const faces = await embedFaces(pdf, [...wanted]);
+  const faceFor: FaceFor = (face, bold) => {
+    const found = face === undefined ? undefined : faces.get(face);
+    if (found !== undefined) return found;
+    const noto = faces.get(bold ? "NOTO_BOLD" : "NOTO");
+    if (noto === undefined) throw new Error("the bundled face did not embed");
+    return noto;
+  };
 
   for (const laid of deck.slides) {
     const page = pdf.addPage([deck.width, deck.height]);
@@ -100,6 +123,21 @@ export async function deckToPdf(
       });
     }
     for (const box of laid.boxes) {
+      if (box.kind === "RULE" && (box.radius ?? 0) > 0) {
+        page.drawSvgPath(
+          roundedRectPath(box.x, box.y, box.width, box.height, box.radius ?? 0),
+          { x: 0, y: deck.height, color: colour(box.colour) },
+        );
+        continue;
+      }
+      if (box.kind === "ARC") {
+        page.drawSvgPath(arcPath(box), {
+          x: 0,
+          y: deck.height,
+          color: colour(box.colour),
+        });
+        continue;
+      }
       if (box.kind === "RULE") {
         page.drawRectangle({
           x: box.x,
@@ -120,7 +158,7 @@ export async function deckToPdf(
         continue;
       }
       if (box.kind === "TEXT") {
-        drawText(page, box, deck.height, fonts);
+        drawText(page, box, deck.height, faceFor);
         continue;
       }
       if (box.kind === "PATH") {
@@ -194,29 +232,34 @@ export async function deckToPdf(
         y: deck.height - box.baseline,
         width: box.width,
         height: 1,
-        color: colour(deck.theme.muted),
+        color: colour(box.muted ?? deck.theme.muted),
       });
       const slot =
         box.bars.length === 0 ? box.width : box.width / box.bars.length;
-      for (const bar of box.bars) {
+      box.bars.forEach((bar, at) => {
+        const quiet = box.highlight !== undefined && at !== box.highlight;
         page.drawRectangle({
           x: bar.x,
           y: deck.height - bar.y - bar.height,
           width: bar.width,
           height: bar.height,
-          color: colour(box.colour),
+          color: colour(quiet ? (box.quiet ?? box.colour) : box.colour),
         });
         const centre = bar.x + bar.width / 2;
-        drawLine(page, fonts.bold, bar.formatted, {
+        drawLine(page, faceFor(box.strongFace, true), bar.formatted, {
           x: centre - slot / 2,
-          y: deck.height - bar.y + 6,
+          y: deck.height - bar.y + 8,
           size: box.labelSize,
-          colour: colour(deck.theme.ink),
+          colour: colour(
+            quiet
+              ? (box.muted ?? deck.theme.muted)
+              : (box.ink ?? deck.theme.ink),
+          ),
           maxWidth: slot,
           align: "centre",
         });
         bar.label.forEach((line, index) => {
-          drawLine(page, fonts.regular, line, {
+          drawLine(page, faceFor(box.face, false), line, {
             x: centre - slot / 2,
             y:
               deck.height -
@@ -225,12 +268,12 @@ export async function deckToPdf(
                 6 +
                 index * Math.round(box.labelSize * 1.25)),
             size: box.labelSize,
-            colour: colour(deck.theme.muted),
+            colour: colour(box.muted ?? deck.theme.muted),
             maxWidth: slot,
             align: "centre",
           });
         });
-      }
+      });
     }
   }
 

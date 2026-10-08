@@ -2,6 +2,7 @@ import * as pptxgenjs from "pptxgenjs";
 import { backgroundBands } from "./background.js";
 import { imageBytesFor, imageKind, type SlideImages } from "./images.js";
 
+import { FACE_IS_BOLD } from "./faces.js";
 import type { LaidOutDeck, TextBox } from "./layout.js";
 
 /**
@@ -83,13 +84,21 @@ function addText(
     w: inches(box.width),
     h: inches(box.height),
     fontSize: box.size,
-    bold: box.bold,
+    bold: box.bold || (box.face !== undefined && FACE_IS_BOLD[box.face]),
     color: hex(box.colour),
-    fontFace:
-      box.role === "TITLE" || box.role === "HEADING"
-        ? theme.headingFont
-        : theme.bodyFont,
-    align: box.align === "centre" ? "center" : "left",
+    fontFace: (
+      box.face === undefined
+        ? box.role === "TITLE" || box.role === "HEADING"
+        : box.face === theme.faces.heading
+    )
+      ? theme.headingFont
+      : theme.bodyFont,
+    align:
+      box.align === "centre"
+        ? "center"
+        : box.align === "right"
+          ? "right"
+          : "left",
     valign: "top",
     // The layout already wrapped these lines and already decided they fit.
     shrinkText: false,
@@ -143,11 +152,30 @@ export async function deckToPptx(
     }
     for (const box of laid.boxes) {
       if (box.kind === "RULE") {
-        slide.addShape("rect", {
+        const rounded = (box.radius ?? 0) > 0;
+        slide.addShape(rounded ? "roundRect" : "rect", {
           x: inches(box.x),
           y: inches(box.y),
           w: inches(box.width),
           h: inches(box.height),
+          fill: { color: hex(box.colour) },
+          line: { color: hex(box.colour), width: 0 },
+          ...(rounded ? { rectRadius: inches(box.radius ?? 0) } : {}),
+        });
+        continue;
+      }
+      if (box.kind === "ARC") {
+        // PowerPoint's block arc: angles clockwise from three o'clock, and
+        // its thickness as a share of the radius.
+        const from = (box.start - 90 + 360) % 360;
+        const to = (box.start + box.sweep - 90 + 360) % 360;
+        slide.addShape("blockArc", {
+          x: inches(box.x),
+          y: inches(box.y),
+          w: inches(box.width),
+          h: inches(box.height),
+          angleRange: [from, to],
+          arcThicknessRatio: Math.min(1, box.thickness / (box.width / 2)),
           fill: { color: hex(box.colour) },
           line: { color: hex(box.colour), width: 0 },
         });
@@ -216,16 +244,18 @@ export async function deckToPptx(
         y: inches(box.baseline),
         w: inches(box.width),
         h: 0,
-        line: { color: hex(deck.theme.muted), width: 1 },
+        line: { color: hex(box.muted ?? deck.theme.muted), width: 1 },
       });
-      for (const bar of box.bars) {
+      for (const [at, bar] of box.bars.entries()) {
+        const quiet = box.highlight !== undefined && at !== box.highlight;
+        const fill = quiet ? (box.quiet ?? box.colour) : box.colour;
         slide.addShape("rect", {
           x: inches(bar.x),
           y: inches(bar.y),
           w: inches(bar.width),
           h: inches(bar.height),
-          fill: { color: hex(box.colour) },
-          line: { color: hex(box.colour), width: 0 },
+          fill: { color: hex(fill) },
+          line: { color: hex(fill), width: 0 },
         });
         slide.addText(bar.formatted, {
           x: inches(bar.x - 20),
@@ -234,7 +264,11 @@ export async function deckToPptx(
           h: inches(box.labelSize + 6),
           fontSize: box.labelSize,
           bold: true,
-          color: hex(deck.theme.ink),
+          color: hex(
+            quiet
+              ? (box.muted ?? deck.theme.muted)
+              : (box.ink ?? deck.theme.ink),
+          ),
           fontFace: deck.theme.bodyFont,
           align: "center",
           valign: "bottom",
@@ -247,7 +281,7 @@ export async function deckToPptx(
           w: inches(bar.width + 40),
           h: inches(box.labelSize * 1.3 * bar.label.length + 4),
           fontSize: box.labelSize,
-          color: hex(deck.theme.muted),
+          color: hex(box.muted ?? deck.theme.muted),
           fontFace: deck.theme.bodyFont,
           align: "center",
           valign: "top",

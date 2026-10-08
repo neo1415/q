@@ -1,4 +1,6 @@
+import { FACE_IS_BOLD } from "./faces.js";
 import type { LaidOutDeck, LaidOutSlide, TextBox } from "./layout.js";
+import { arcPath } from "./paths.js";
 
 /**
  * A laid-out slide as SVG (QX-004 §6, §7).
@@ -23,8 +25,14 @@ function escape(text: string): string {
 }
 
 function textElement(box: TextBox, fontFamily: string): string {
-  const anchor = box.align === "centre" ? "middle" : "start";
-  const x = box.align === "centre" ? box.x + box.width / 2 : box.x;
+  const anchor =
+    box.align === "centre" ? "middle" : box.align === "right" ? "end" : "start";
+  const x =
+    box.align === "centre"
+      ? box.x + box.width / 2
+      : box.align === "right"
+        ? box.x + box.width
+        : box.x;
   // `y` is the box's top; a baseline sits most of a line-height below it.
   const first = box.y + box.size;
   const lines = box.lines
@@ -33,7 +41,7 @@ function textElement(box: TextBox, fontFamily: string): string {
         `<tspan x="${String(x)}" y="${String(first + index * box.lineHeight)}">${escape(line)}</tspan>`,
     )
     .join("");
-  return `<text font-family="${escape(fontFamily)}" font-size="${String(box.size)}" font-weight="${box.bold ? "700" : "400"}" fill="${escape(box.colour)}" text-anchor="${anchor}">${lines}</text>`;
+  return `<text font-family="${escape(fontFamily)}" font-size="${String(box.size)}" font-weight="${box.bold ? (box.face !== undefined && FACE_IS_BOLD[box.face] ? "600" : "700") : "400"}" fill="${escape(box.colour)}" text-anchor="${anchor}">${lines}</text>`;
 }
 
 /** One slide as a standalone SVG document. */
@@ -55,9 +63,14 @@ export function slideToSvg(slide: LaidOutSlide, deck: LaidOutDeck): string {
           ];
   for (const box of slide.boxes) {
     if (box.kind === "RULE") {
+      const corner = (box.radius ?? 0) > 0 ? ` rx="${String(box.radius)}"` : "";
       parts.push(
-        `<rect x="${String(box.x)}" y="${String(box.y)}" width="${String(box.width)}" height="${String(box.height)}" fill="${escape(box.colour)}"/>`,
+        `<rect x="${String(box.x)}" y="${String(box.y)}" width="${String(box.width)}" height="${String(box.height)}"${corner} fill="${escape(box.colour)}"/>`,
       );
+      continue;
+    }
+    if (box.kind === "ARC") {
+      parts.push(`<path d="${arcPath(box)}" fill="${escape(box.colour)}"/>`);
       continue;
     }
     if (box.kind === "CIRCLE") {
@@ -85,33 +98,34 @@ export function slideToSvg(slide: LaidOutSlide, deck: LaidOutDeck): string {
       continue;
     }
     if (box.kind === "TEXT") {
-      const family = `${
-        box.role === "TITLE" || box.role === "HEADING"
-          ? theme.headingFont
-          : theme.bodyFont
-      }, Helvetica, Arial, sans-serif`;
+      const heading =
+        box.face === undefined
+          ? box.role === "TITLE" || box.role === "HEADING"
+          : box.face === theme.faces.heading;
+      const family = `${heading ? theme.headingFont : theme.bodyFont}, Helvetica, Arial, sans-serif`;
       parts.push(textElement(box, family));
       continue;
     }
     // A chart: the columns, the value over each, the label under each, and
     // one baseline. Nothing else — no gridlines, no legend for one series.
     parts.push(
-      `<line x1="${String(box.x)}" y1="${String(box.baseline)}" x2="${String(box.x + box.width)}" y2="${String(box.baseline)}" stroke="${escape(theme.muted)}" stroke-width="1"/>`,
+      `<line x1="${String(box.x)}" y1="${String(box.baseline)}" x2="${String(box.x + box.width)}" y2="${String(box.baseline)}" stroke="${escape(box.muted ?? theme.muted)}" stroke-width="1"/>`,
     );
-    for (const bar of box.bars) {
+    box.bars.forEach((bar, at) => {
+      const quiet = box.highlight !== undefined && at !== box.highlight;
       parts.push(
-        `<rect x="${String(bar.x)}" y="${String(bar.y)}" width="${String(bar.width)}" height="${String(bar.height)}" fill="${escape(box.colour)}"/>`,
+        `<rect x="${String(bar.x)}" y="${String(bar.y)}" width="${String(bar.width)}" height="${String(bar.height)}" fill="${escape(quiet ? (box.quiet ?? box.colour) : box.colour)}"/>`,
       );
       const centre = bar.x + bar.width / 2;
       parts.push(
-        `<text font-family="${escape(theme.bodyFont)}" font-size="${String(box.labelSize)}" font-weight="700" fill="${escape(theme.ink)}" text-anchor="middle" x="${String(centre)}" y="${String(bar.y - 6)}">${escape(bar.formatted)}</text>`,
+        `<text font-family="${escape(theme.bodyFont)}" font-size="${String(box.labelSize)}" font-weight="700" fill="${escape(quiet ? (box.muted ?? theme.muted) : (box.ink ?? theme.ink))}" text-anchor="middle" x="${String(centre)}" y="${String(bar.y - 8)}">${escape(bar.formatted)}</text>`,
       );
       bar.label.forEach((line, index) => {
         parts.push(
-          `<text font-family="${escape(theme.bodyFont)}" font-size="${String(box.labelSize)}" fill="${escape(theme.muted)}" text-anchor="middle" x="${String(centre)}" y="${String(box.baseline + box.labelSize + 6 + index * Math.round(box.labelSize * 1.25))}">${escape(line)}</text>`,
+          `<text font-family="${escape(theme.bodyFont)}" font-size="${String(box.labelSize)}" fill="${escape(box.muted ?? theme.muted)}" text-anchor="middle" x="${String(centre)}" y="${String(box.baseline + box.labelSize + 6 + index * Math.round(box.labelSize * 1.25))}">${escape(line)}</text>`,
         );
       });
-    }
+    });
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${String(deck.width)} ${String(deck.height)}" width="${String(deck.width)}" height="${String(deck.height)}" role="img" aria-label="${escape(slide.title)}">${parts.join("")}</svg>`;
 }

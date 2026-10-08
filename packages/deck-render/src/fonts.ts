@@ -11,6 +11,8 @@ import {
   type RGB,
 } from "pdf-lib";
 
+import { FACE_FILES, FACE_IS_BOLD, type FaceKey } from "./faces.js";
+
 /**
  * The fonts a PDF is written in (BIZ-001).
  *
@@ -120,6 +122,12 @@ export type EmbeddedFont = {
   readonly font: PDFFont;
   readonly text: (input: string) => string;
   readonly width: (input: string, size: number) => number;
+  /**
+   * Deck quality: where this face has no glyph, the character is drawn
+   * from this one (Noto Sans) instead of being left out.
+   */
+  readonly fallback?: EmbeddedFont | undefined;
+  readonly has?: ((character: string) => boolean) | undefined;
 };
 
 export type EmbeddedFonts = {
@@ -195,6 +203,49 @@ const NO_SHAPING: Readonly<Record<string, boolean>> = Object.fromEntries(
   ].map((feature) => [feature, false]),
 );
 
+function wrapFont(font: PDFFont, fallback?: EmbeddedFont): EmbeddedFont {
+  const text = textFor(font);
+  const drawable = new Set(font.getCharacterSet());
+  // With shaping off a line's width is the sum of its characters'
+  // advances, so each character is measured once per document. Asking
+  // fontkit to lay out every candidate line while wrapping a long brief
+  // was the slow part of an export.
+  const advances = new Map<string, number>();
+  const advance = (character: string): number => {
+    let known = advances.get(character);
+    if (known === undefined) {
+      known = font.widthOfTextAtSize(character, 1000) / 1000;
+      advances.set(character, known);
+    }
+    return known;
+  };
+  const has = (character: string) =>
+    drawable.has(character.codePointAt(0) ?? 0);
+  const own = (input: string, size: number) => {
+    let units = 0;
+    for (const character of text(input)) units += advance(character);
+    return units * size;
+  };
+  const self: EmbeddedFont = {
+    font,
+    text,
+    has,
+    fallback,
+    width: (input, size) =>
+      fallback === undefined
+        ? own(input, size)
+        : runsOf(self, input).reduce(
+            (sum, run) =>
+              sum +
+              (run.face === self
+                ? own(run.text, size)
+                : run.face.width(run.text, size)),
+            0,
+          ),
+  };
+  return self;
+}
+
 /** Embed the bundled faces into `pdf`, subset to what the file draws. */
 export async function embedFonts(pdf: PDFDocument): Promise<EmbeddedFonts> {
   const bytes = await loadFontBytes();
@@ -203,32 +254,78 @@ export async function embedFonts(pdf: PDFDocument): Promise<EmbeddedFonts> {
     pdf.embedFont(bytes.regular, { subset: false, features: NO_SHAPING }),
     pdf.embedFont(bytes.bold, { subset: false, features: NO_SHAPING }),
   ]);
-  const wrapFont = (font: PDFFont): EmbeddedFont => {
-    const text = textFor(font);
-    // With shaping off a line's width is the sum of its characters'
-    // advances, so each character is measured once per document. Asking
-    // fontkit to lay out every candidate line while wrapping a long brief
-    // was the slow part of an export.
-    const advances = new Map<string, number>();
-    const advance = (character: string): number => {
-      let known = advances.get(character);
-      if (known === undefined) {
-        known = font.widthOfTextAtSize(character, 1000) / 1000;
-        advances.set(character, known);
-      }
-      return known;
-    };
-    return {
-      font,
-      text,
-      width: (input, size) => {
-        let units = 0;
-        for (const character of text(input)) units += advance(character);
-        return units * size;
-      },
-    };
-  };
   return { regular: wrapFont(regular), bold: wrapFont(bold) };
+}
+
+const faceBytes = new Map<FaceKey, Promise<Uint8Array>>();
+
+function loadFace(face: FaceKey): Promise<Uint8Array> {
+  let found = faceBytes.get(face);
+  if (found === undefined) {
+    found = readFile(new URL(FACE_FILES[face], FONT_DIRECTORY));
+    faceBytes.set(face, found);
+    found.catch(() => faceBytes.delete(face));
+  }
+  return found;
+}
+
+/**
+ * Deck quality: the deck's own faces, each backed by Noto Sans for the
+ * characters it does not draw. Only the faces a deck uses are embedded
+ * (whole, for the reason given above); every face falls back to the Noto
+ * cut of its own weight.
+ */
+export async function embedFaces(
+  pdf: PDFDocument,
+  wanted: readonly FaceKey[],
+): Promise<ReadonlyMap<FaceKey, EmbeddedFont>> {
+  pdf.registerFontkit(fontkit());
+  const noto = await embedFonts(pdf);
+  const embedded = new Map<FaceKey, EmbeddedFont>([
+    ["NOTO", noto.regular],
+    ["NOTO_BOLD", noto.bold],
+  ]);
+  for (const face of new Set(wanted)) {
+    if (embedded.has(face)) continue;
+    const font = await pdf.embedFont(await loadFace(face), {
+      subset: false,
+      features: NO_SHAPING,
+    });
+    embedded.set(
+      face,
+      wrapFont(font, FACE_IS_BOLD[face] ? noto.bold : noto.regular),
+    );
+  }
+  return embedded;
+}
+
+type Run = { readonly face: EmbeddedFont; readonly text: string };
+
+/**
+ * A line split into runs by which face draws each character: the face
+ * itself where it has the glyph, its fallback where only that does, a
+ * substitute or nothing where neither does.
+ */
+function runsOf(face: EmbeddedFont, input: string): readonly Run[] {
+  if (face.fallback === undefined || face.has === undefined) {
+    return [{ face, text: face.text(input) }];
+  }
+  const runs: { face: EmbeddedFont; text: string }[] = [];
+  const push = (owner: EmbeddedFont, character: string) => {
+    const last = runs[runs.length - 1];
+    if (last !== undefined && last.face === owner) last.text += character;
+    else runs.push({ face: owner, text: character });
+  };
+  for (const character of input.normalize("NFC")) {
+    if (face.has(character)) push(face, character);
+    else if (face.fallback.has?.(character) === true) {
+      push(face.fallback, character);
+    } else {
+      const substitute = face.text(character);
+      if (substitute.length > 0) push(face, substitute);
+    }
+  }
+  return runs;
 }
 
 /**
@@ -252,33 +349,39 @@ export function drawLine(
     readonly size: number;
     readonly colour: RGB;
     readonly maxWidth: number;
-    readonly align?: "left" | "centre";
+    readonly align?: "left" | "centre" | "right";
   },
 ): void {
-  const text = fonts.text(input);
-  if (text.trim().length === 0) return;
-  const natural = fonts.width(text, options.size);
+  const runs = runsOf(fonts, input);
+  if (runs.every((run) => run.text.trim().length === 0)) return;
+  const widths = runs.map((run) => run.face.width(run.text, options.size));
+  const natural = widths.reduce((sum, width) => sum + width, 0);
   const squeeze =
     natural > options.maxWidth && natural > 0
       ? Math.max(0.85, options.maxWidth / natural)
       : 1;
   const drawn = natural * squeeze;
-  const x =
+  let x =
     options.align === "centre"
       ? options.x + (options.maxWidth - drawn) / 2
-      : options.x;
+      : options.align === "right"
+        ? options.x + options.maxWidth - drawn
+        : options.x;
   if (squeeze < 1) {
     page.pushOperators(
       pushGraphicsState(),
       setCharacterSqueeze(Math.round(squeeze * 1000) / 10),
     );
   }
-  page.drawText(text, {
-    x,
-    y: options.y,
-    size: options.size,
-    font: fonts.font,
-    color: options.colour,
+  runs.forEach((run, index) => {
+    page.drawText(run.text, {
+      x,
+      y: options.y,
+      size: options.size,
+      font: run.face.font,
+      color: options.colour,
+    });
+    x += (widths[index] ?? 0) * squeeze;
   });
   if (squeeze < 1) {
     page.pushOperators(popGraphicsState());

@@ -12,6 +12,7 @@ import {
   brandDeck,
   illustrateWithGenerated,
   type OwnDeckFacts,
+  type OwnDeckFigure,
 } from "@capital-q/q-specialists";
 import type { DocumentStudioPort } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -135,6 +136,65 @@ export async function ownDeckFactsOf(
      order by m.is_founder desc, m.started_at asc, m.id asc
      limit 5`;
   const round = rounds[0];
+  // Deck quality (2026-10-08): the round's terms, the team's size, the
+  // company's own website and the confirmed reading of the founder's own
+  // deck, each read on its own so one missing table never costs the rest.
+  const terms = await sql<
+    {
+      target_close: string | null;
+      cap_amount: string | null;
+      cap_currency: string | null;
+    }[]
+  >`
+    select coalesce(
+             (select r.target_close_on::text from core.capital_rounds r
+               where r.tenant_id = ${actor.tenantId} and r.company_id = ${companyId}
+                 and r.status <> 'CLOSED'
+               order by r.is_current desc, r.created_at desc limit 1),
+             (select o.target_close_date::text from core.capital_objectives o
+               where o.tenant_id = ${actor.tenantId} and o.company_id = ${companyId}
+                 and o.status = 'ACTIVE'
+               order by o.started_at desc limit 1)) as target_close,
+           (select r.valuation_cap_amount::text from core.capital_rounds r
+             where r.tenant_id = ${actor.tenantId} and r.company_id = ${companyId}
+               and r.status <> 'CLOSED'
+             order by r.is_current desc, r.created_at desc limit 1) as cap_amount,
+           (select r.currency_code from core.capital_rounds r
+             where r.tenant_id = ${actor.tenantId} and r.company_id = ${companyId}
+               and r.status <> 'CLOSED'
+             order by r.is_current desc, r.created_at desc limit 1) as cap_currency`.catch(
+    () => [],
+  );
+  const sizes = await sql<
+    {
+      team_size: number | null;
+      founder_count: number | null;
+      website: string | null;
+    }[]
+  >`
+    select (select f.team_size from core.company_team_facts f
+             where f.tenant_id = ${actor.tenantId} and f.company_id = ${companyId}
+             order by f.updated_at desc limit 1) as team_size,
+           (select f.founder_count from core.company_team_facts f
+             where f.tenant_id = ${actor.tenantId} and f.company_id = ${companyId}
+             order by f.updated_at desc limit 1) as founder_count,
+           (select c.website_url from core.companies c
+             where c.tenant_id = ${actor.tenantId} and c.id = ${companyId}) as website`.catch(
+    () => [],
+  );
+  // Only a reading the founder confirmed: a Q-extracted figure becomes
+  // something their deck states only after they said it was right.
+  const readings = await sql<{ sections: unknown }[]>`
+    select e.sections
+      from evidence.deck_extractions e
+     where e.tenant_id = ${actor.tenantId}
+       and e.company_id = ${companyId}
+       and exists (select 1 from evidence.deck_extraction_confirmations c
+                    where c.extraction_id = e.id and c.tenant_id = e.tenant_id)
+     order by e.created_at desc
+     limit 1`.catch(() => []);
+  const term = terms[0];
+  const size = sizes[0];
   return {
     round:
       round === undefined
@@ -145,7 +205,18 @@ export async function ownDeckFactsOf(
             instrument: round.instrument,
             name: round.name,
             useOfFunds: round.use_of_funds,
+            targetClose: term?.target_close ?? null,
+            valuationCap:
+              term?.cap_amount === null ||
+              term?.cap_amount === undefined ||
+              term.cap_currency === null
+                ? null
+                : { amount: term.cap_amount, currency: term.cap_currency },
           },
+    teamSize: size?.team_size ?? null,
+    founderCount: size?.founder_count ?? null,
+    website: size?.website ?? null,
+    figures: deckFigures(readings[0]?.sections),
     team: team.flatMap((row) => {
       const name =
         row.display_name ??
@@ -163,6 +234,34 @@ export async function ownDeckFactsOf(
           ];
     }),
   };
+}
+
+/**
+ * The labelled figures of a deck reading, validated at this boundary
+ * (stored JSON is `unknown` until it is checked). At most 80.
+ */
+function deckFigures(sections: unknown): OwnDeckFigure[] {
+  if (!Array.isArray(sections)) return [];
+  const figures: OwnDeckFigure[] = [];
+  for (const section of sections as unknown[]) {
+    if (typeof section !== "object" || section === null) continue;
+    const code = (section as { section?: unknown }).section;
+    const facts = (section as { facts?: unknown }).facts;
+    if (typeof code !== "string" || !Array.isArray(facts)) continue;
+    for (const fact of facts as unknown[]) {
+      if (typeof fact !== "object" || fact === null) continue;
+      const { kind, label, value, asOf } = fact as Record<string, unknown>;
+      if (kind !== "FIGURE" || typeof label !== "string") continue;
+      figures.push({
+        section: code.slice(0, 40),
+        label: label.slice(0, 120),
+        value: typeof value === "string" ? value.slice(0, 160) : null,
+        asOf: typeof asOf === "string" ? asOf.slice(0, 80) : null,
+      });
+      if (figures.length >= 80) return figures;
+    }
+  }
+  return figures;
 }
 
 export type DocumentsModule = Omit<

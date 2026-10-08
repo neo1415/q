@@ -26,6 +26,7 @@ import {
 import type { IllustrationPort } from "./deck-illustrations.js";
 import { composePitchDeck } from "./pitch-deck.js";
 import { fillOwnSlides, type OwnDeckFacts } from "./deck-figures.js";
+import { shapeOwnDeck } from "./deck-shape.js";
 import {
   composeGeneralDocument,
   runDocumentPipeline,
@@ -388,8 +389,15 @@ export async function prepareOrReviseArtifact(input: {
         .catch(() => null);
       if (facts !== null) {
         const filled = fillOwnSlides(base.content, facts);
-        composed = { ...base, content: filled.content };
-        grounding = [...findingStatements, ...filled.grounding];
+        // Deck quality: then the slides their records answer outright
+        // (the raise, team, market, traction, money) are built from them.
+        const shaped = shapeOwnDeck(filled.content, facts);
+        composed = { ...base, content: shaped.content };
+        grounding = [
+          ...findingStatements,
+          ...filled.grounding,
+          ...shaped.grounding,
+        ];
       }
     }
     const kind =

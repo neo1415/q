@@ -72,6 +72,13 @@ describe("QX-004 §5 · a deck knows when it is broken", () => {
     const laid = layOutDeck(deck());
     for (const page of laid.slides) {
       for (const box of page.boxes) {
+        // The cover's colour field runs to the edge on purpose, and the
+        // page number sits in the bottom gutter by design.
+        if (box.kind === "RULE" && box.bleed === true) continue;
+        if (box.kind === "TEXT" && box.role === "FOOTER") {
+          expect(box.y + box.height).toBeLessThanOrEqual(SLIDE_HEIGHT - 16);
+          continue;
+        }
         expect(box.x).toBeGreaterThanOrEqual(MARGIN - 1);
         expect(box.y).toBeGreaterThanOrEqual(MARGIN - 1);
         expect(box.x + box.width).toBeLessThanOrEqual(SLIDE_WIDTH - MARGIN + 1);
@@ -102,7 +109,13 @@ describe("QX-004 §5 · a deck knows when it is broken", () => {
     const laid = layOutDeck(full);
     expect(laid.slides[0]?.dropped).toEqual([]);
     const sizes = (laid.slides[0]?.boxes ?? [])
-      .filter((box) => box.kind === "TEXT")
+      // Captions (a page number, a source) have their own, lower floor.
+      .filter(
+        (box) =>
+          box.kind === "TEXT" &&
+          box.role !== "FOOTER" &&
+          box.role !== "CAPTION",
+      )
       .map((box) => (box.kind === "TEXT" ? box.size : 0));
     expect(Math.min(...sizes)).toBeGreaterThanOrEqual(laid.theme.minimumSize);
   });
@@ -127,15 +140,28 @@ describe("QX-004 §5 · a deck knows when it is broken", () => {
     });
     const laid = layOutDeck(crowded);
     const issues = inspectDeck(laid);
-    expect(issues.map((i) => i.fault)).toContain("CONTENT_DROPPED");
-    // It says which words went missing, in the founder's own text.
-    expect(issues.find((i) => i.fault === "CONTENT_DROPPED")?.detail).toMatch(
-      /did not fit/,
-    );
+    // Deck quality: a crowded slide now closes up into two columns of
+    // rows; whether it then drops a line or carries too many, it is caught.
+    const faults = issues.map((i) => i.fault);
+    expect(
+      faults.includes("CONTENT_DROPPED") || faults.includes("TOO_DENSE"),
+    ).toBe(true);
+    // It says what to change, in the founder's own terms.
+    const dropped = issues.find((i) => i.fault === "CONTENT_DROPPED");
+    if (dropped !== undefined) expect(dropped.detail).toMatch(/did not fit/);
+    else
+      expect(issues.find((i) => i.fault === "TOO_DENSE")?.detail).toMatch(
+        /say less/,
+      );
     // And it did not answer the crowding by shrinking the type to nothing:
     // saying less is the answer, and that is the composer's to make.
     const sizes = (laid.slides[0]?.boxes ?? [])
-      .filter((box) => box.kind === "TEXT")
+      .filter(
+        (box) =>
+          box.kind === "TEXT" &&
+          box.role !== "FOOTER" &&
+          box.role !== "CAPTION",
+      )
       .map((box) => (box.kind === "TEXT" ? box.size : 0));
     expect(Math.min(...sizes)).toBeGreaterThanOrEqual(laid.theme.minimumSize);
   });

@@ -13,6 +13,8 @@ import type { CompanyIntelligenceDimension } from "@capital-q/q-core";
 
 import type { CompanyIntelligenceResult } from "./contracts.js";
 import { illustrateDeck, type StockPhotoPort } from "./deck-photos.js";
+import { withKickers } from "./deck-shape.js";
+import { tidyDeck } from "./deck-tidy.js";
 import { slideTopic, writeDeckSlides } from "./deck-writer.js";
 import {
   illustrateWithGenerated,
@@ -250,7 +252,10 @@ export function markOwnPictureSpaces(
       slide.placeholder !== undefined ||
       slide.chart !== undefined ||
       slide.figures !== undefined ||
-      slide.visual !== undefined
+      slide.visual !== undefined ||
+      // Deck quality: a team set out as people from the founder's own
+      // records is drawn as a grid of them, not beside an empty frame.
+      (slide.kicker === SLIDE_TITLES.TEAM && slide.bullets.length > 0)
     ) {
       return slide;
     }
@@ -719,8 +724,12 @@ export async function runDocumentPipeline(
     extra = rounds < FIX_ROUNDS_MAX ? await critique() : [];
   }
 
-  // Whatever the fixes took away, no slide ships empty.
+  // Whatever the fixes took away, no slide ships empty; labels are
+  // complete phrases and a list of periods is a chart (deck quality).
+  next = tidyDeck(next);
   next = neverEmptySlides(next);
+  // Deck quality: a takeaway title keeps its topic as the eyebrow.
+  next = withKickers(next);
   const base = auditDocument(next, input.grounding);
   const passed = base.passed && !short(review) && review.fixes.length === 0;
   const audit: QDocumentAudit = {

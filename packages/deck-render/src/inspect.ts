@@ -6,7 +6,7 @@ import {
   measure,
   type LaidOutDeck,
   type LaidOutSlide,
-  type CircleBox,
+  type LaidOutBox,
   type TextBox,
 } from "./layout.js";
 
@@ -96,13 +96,38 @@ function inspectSlide(
     // A path's box is its whole chart frame; the labels inside it are
     // meant to be there (DOCS).
     (box) =>
-      box.kind !== "RULE" && box.kind !== "CIRCLE" && box.kind !== "PATH",
+      box.kind !== "RULE" &&
+      box.kind !== "CIRCLE" &&
+      box.kind !== "PATH" &&
+      box.kind !== "ARC",
   );
   for (const box of slide.boxes) {
     // A photo is full-bleed on its side by design; a logo is not.
     if (box.kind === "IMAGE" && box.fit !== "contain") continue;
-    // So is the space a picture is still to fill (Q room W5).
-    if (box.kind === "RULE" && box.placeholder === "IMAGE") continue;
+    // So is the space a picture is still to fill (Q room W5), and a
+    // colour field that runs to the edge on purpose (the cover's panel).
+    if (
+      box.kind === "RULE" &&
+      (box.placeholder === "IMAGE" || box.bleed === true)
+    ) {
+      continue;
+    }
+    // The page number and company sit in the bottom gutter by design;
+    // they are still held inside the slide.
+    if (box.kind === "TEXT" && box.role === "FOOTER") {
+      if (
+        box.x < MARGIN - 1 ||
+        box.x + box.width > SLIDE_WIDTH - MARGIN + 1 ||
+        box.y + box.height > SLIDE_HEIGHT - 16
+      ) {
+        at(
+          "OUT_OF_MARGIN",
+          `the footer on "${slide.title}" runs off the slide`,
+        );
+        break;
+      }
+      continue;
+    }
     if (
       box.x < MARGIN - 1 ||
       box.y < MARGIN - 1 ||
@@ -137,8 +162,9 @@ function inspectSlide(
   );
   let lines = 0;
   for (const box of texts) {
-    lines += box.lines.length;
-    if (box.size < theme.minimumSize) {
+    const small = box.role === "CAPTION" || box.role === "FOOTER";
+    if (!small) lines += box.lines.length;
+    if (box.size < (small ? theme.captionMinimum : theme.minimumSize)) {
       at(
         "TYPE_TOO_SMALL",
         `text on "${slide.title}" was shrunk below what a room can read`,
@@ -157,28 +183,22 @@ function inspectSlide(
     // so it is drawn past the box it was measured into — which the box's
     // own coordinates do not show, and a reader sees as text running off
     // the slide.
-    if (box.lines.some((line) => measure(line, box.size) > box.width + 1)) {
+    if (
+      box.lines.some(
+        (line) => measure(line, box.size, box.face) > box.width + 1,
+      )
+    ) {
       at(
         "OUT_OF_MARGIN",
         `a word on "${slide.title}" is wider than the space it has`,
       );
     }
-    // A step number is read against its marker, not the page.
-    const centreX = box.x + box.width / 2;
-    const centreY = box.y + box.height / 2;
-    const marker = slide.boxes.find(
-      (other): other is CircleBox =>
-        other.kind === "CIRCLE" &&
-        centreX >= other.x &&
-        centreX <= other.x + other.width &&
-        centreY >= other.y &&
-        centreY <= other.y + other.height,
-    );
+    // Text is read against what is drawn under it: a step's marker, a
+    // panel, the cover's colour field — or, failing those, the page.
+    const under = fillUnder(slide.boxes, box);
     const ratio = worstContrast(
       box.colour,
-      marker === undefined
-        ? (slide.background ?? [theme.background])
-        : [marker.colour],
+      under === undefined ? (slide.background ?? [theme.background]) : [under],
     );
     if (ratio !== null && ratio < CONTRAST_MIN) {
       at(
@@ -223,6 +243,34 @@ function inspectSlide(
  */
 export function inspectDeck(deck: LaidOutDeck): readonly DeckIssue[] {
   return deck.slides.flatMap((slide) => inspectSlide(slide, deck.theme));
+}
+
+/**
+ * The colour of the last filled shape drawn before `box` that holds the
+ * centre of its first line (rules and markers; a hairline is too thin to
+ * be a background).
+ */
+function fillUnder(
+  boxes: readonly LaidOutBox[],
+  box: TextBox,
+): string | undefined {
+  const centreX = box.x + box.width / 2;
+  const centreY = box.y + Math.min(box.height, box.lineHeight) / 2;
+  let found: string | undefined;
+  for (const other of boxes) {
+    if (other === box) break;
+    if (other.kind !== "RULE" && other.kind !== "CIRCLE") continue;
+    if (other.width < 6 || other.height < 6) continue;
+    if (
+      centreX >= other.x &&
+      centreX <= other.x + other.width &&
+      centreY >= other.y &&
+      centreY <= other.y + other.height
+    ) {
+      found = other.colour;
+    }
+  }
+  return found;
 }
 
 /** The lowest contrast of a colour against any stop of a background. */

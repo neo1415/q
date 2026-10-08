@@ -255,7 +255,15 @@ export {
   placeholderDetail,
   promoteFirmFigures,
   type OwnDeckFacts,
+  type OwnDeckFigure,
 } from "./company/deck-figures.js";
+// Deck quality: the founder's own deck from their own records.
+export {
+  shapeOwnDeck,
+  useOfFunds,
+  withKickers,
+  type ShapedDeck,
+} from "./company/deck-shape.js";
 export {
   createDeckPageRenderer,
   createVisionDocumentCritic,
