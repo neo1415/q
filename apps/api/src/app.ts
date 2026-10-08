@@ -68,6 +68,7 @@ import type {
   AppActionPorts,
   GateQPolicyExtractionPort,
   QWorkPagePort,
+  WorkforceJobPort,
 } from "@capital-q/app-actions";
 
 import { deckAudiencePort, documentChangePort } from "./deck-audience-port.js";
@@ -387,6 +388,8 @@ export type ApiModules = {
     ProfileImageRoutesDependencies["profileImages"] | undefined;
   /** WORK-58: pause/resume their own instruction, set a suggestion aside. */
   readonly qWork?: QWorkPagePort | undefined;
+  /** Recovery D6: stop one of Q's approved jobs. */
+  readonly workforceJobs?: WorkforceJobPort | undefined;
   /**
    * Pictures of the people and organisations a list names (founder
    * decision 2026-10-04). Absent: those lists read as initials.
@@ -698,6 +701,9 @@ export function createApp(
             documentChanges: documentChangePort(modules.evidence),
           }),
       ...(modules.qWork === undefined ? {} : { qWork: modules.qWork }),
+      ...(modules.workforceJobs === undefined
+        ? {}
+        : { workforceJobs: modules.workforceJobs }),
       ...(modules.etiquette === undefined
         ? {}
         : { etiquetteGuides: modules.etiquette.guides }),

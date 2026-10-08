@@ -189,9 +189,69 @@ const DISMISS = defineAppAction<z.infer<typeof Dismiss>, null>({
   qCapability: "offer.work_suggestions",
 });
 
+/**
+ * Recovery D6: one of Q's jobs the person approved, stopped. The durable
+ * work row ends CANCELLED ("Stopped by you.") and its job STOPPED; a worker
+ * running it starts no further step. The person's own jobs only.
+ */
+export type WorkforceJobPort = {
+  /** False: not theirs, or no longer running. */
+  readonly stop: (actor: ActorContext, jobId: string) => Promise<boolean>;
+};
+
+/** Until the lead moves it to contracts, the route is declared here. */
+export const Q_WORKFORCE_JOB_STOP_PATH =
+  "/v1/q/workforce/jobs/:jobId/stop" as const;
+export const qWorkforceJobStopPath = (jobId: string) =>
+  Q_WORKFORCE_JOB_STOP_PATH.replace(":jobId", encodeURIComponent(jobId));
+
+const jobs = (ports: AppActionPorts) =>
+  ports.workforceJobs ?? portMissing("workforceJobs");
+
+const ByJob = z.object({ jobId: UuidSchema }).strict();
+
+const JOB_STOP = defineAppAction<z.infer<typeof ByJob>, z.infer<typeof Acted>>({
+  name: "q.work.job.stop",
+  short: "stop one of Q's jobs",
+  area: "work",
+  classification: "INSTANT",
+  does: "Stops one of Q's jobs they approved: no further step starts, and the job shows it was stopped by them, as Work's Stop this job does.",
+  input: ByJob,
+  output: Acted,
+  authorize: ownRows,
+  run: async (ports, context, input) => ({
+    acted: await jobs(ports).stop(context.actor, input.jobId),
+  }),
+  targets: () => [],
+  card: () => ({ summary: "Stop this job", preview: "" }),
+  done: (out) => (out.acted ? "Stopped." : "That job isn't running."),
+  succeeded: (out) => out.acted,
+  http: {
+    method: "POST",
+    path: Q_WORKFORCE_JOB_STOP_PATH,
+    fromRequest: (params) => ({ jobId: params["jobId"] }),
+    notFound: (out) => !out.acted,
+    respond: () => QWorkAcceptedDtoSchema.parse({ accepted: true }),
+  },
+  // Q and the screen share it: the same port, the same rows.
+  tool: {
+    name: "stop_q_job",
+    purposes: ["GENERAL_QUESTION", "ACTION_PREPARATION"],
+    description:
+      "Stops one of Q's jobs the person approved (by its job id from their Work page), at once, exactly as Work's Stop this job does. Call it only when they ask to stop that job.",
+    input: ByJob,
+    references: {},
+    eval: {
+      say: ["Stop that job.", "Cancel the research job you're running."],
+    },
+    toCanonical: (input) => Promise.resolve(input),
+  },
+});
+
 export const WORK_ACTIONS: readonly AnyAppAction[] = [
   PAUSE,
   RESUME,
   DISMISS,
   DELEGATION,
+  JOB_STOP,
 ];

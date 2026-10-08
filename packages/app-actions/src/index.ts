@@ -26,7 +26,13 @@ export {
   type AppActionVerdict,
 } from "./define.js";
 export type { AppActionPorts } from "./ports.js";
-export { WORK_ACTIONS, type QWorkPagePort } from "./actions/work.js";
+export {
+  WORK_ACTIONS,
+  Q_WORKFORCE_JOB_STOP_PATH,
+  qWorkforceJobStopPath,
+  type QWorkPagePort,
+  type WorkforceJobPort,
+} from "./actions/work.js";
 export {
   GATEQ_ACTIONS,
   type GateQPolicyExtractionPort,

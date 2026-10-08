@@ -669,6 +669,8 @@ export const Q_INSTANT_ACTION_TOOLS = [
   // AUTO block (ADR 0030): inside an approved delegation, the person's own
   // word -- stop, a time they chose, away/back -- acts at once.
   "stop_q_work",
+  // Recovery D6: stop one of Q's approved jobs (q.work.job.stop).
+  "stop_q_job",
   "answer_q_work",
   "set_away",
   // DOCS: a suggestion filed for the person to confirm (applies nothing),

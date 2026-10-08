@@ -1,4 +1,4 @@
-import type { QWorkPagePort } from "@capital-q/app-actions";
+import type { QWorkPagePort, WorkforceJobPort } from "@capital-q/app-actions";
 import {
   auditActorFromContext,
   AuditActionTypeSchema,
@@ -122,5 +122,37 @@ export function createQWorkPagePort(
         values (${actor.tenantId}, ${actor.userId}, ${key})
         on conflict (user_id, suggestion_key) do nothing`;
     },
+  };
+}
+
+/**
+ * Recovery D6: "Stop this job" on the person's own approved workforce job.
+ * The durable work row ends CANCELLED and the job STOPPED, together; a
+ * worker holding it loses its lease and starts no further step. Every
+ * predicate is the person's own user and tenant. False: not theirs, or no
+ * longer running. (q-api composes the same rule over its queue for Q.)
+ */
+export function createWorkforceJobPort(
+  transactions: TransactionManager,
+): WorkforceJobPort {
+  return {
+    stop: (actor, jobId) =>
+      transactions.run(async (tx) => {
+        const stopped = await tx.sql<{ job_id: string }[]>`
+          update q_runtime.agent_work_queue
+             set state = 'CANCELLED', reason = 'Stopped by you.',
+                 locked_by = null, locked_until = null,
+                 finished_at = clock_timestamp()
+           where job_id = ${jobId} and user_id = ${actor.userId}
+             and tenant_id = ${actor.tenantId}
+             and state in ('QUEUED', 'RUNNING', 'RECOVERING')
+          returning job_id`;
+        if (stopped.length === 0) return false;
+        await tx.sql`
+          update q_runtime.workforce_jobs set status = 'STOPPED'
+           where id = ${jobId} and user_id = ${actor.userId}
+             and tenant_id = ${actor.tenantId} and status <> 'STOPPED'`;
+        return true;
+      }),
   };
 }

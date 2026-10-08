@@ -2,7 +2,9 @@ import type { QWorkState } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { StepResult } from "@capital-q/q-orchestrator";
 
-import type { Owner } from "./store.js";
+import type { WorkforceJobPort } from "@capital-q/app-actions";
+
+import type { Owner, WorkforceStore } from "./store.js";
 
 /**
  * Durable agent work (recovery D3, audit D-08): `q_runtime.agent_work_queue`.
@@ -420,4 +422,23 @@ export function createInMemoryAgentWorkQueue(
       ),
   };
   return { ...queue, rows };
+}
+
+/**
+ * Recovery D6: "Stop this job" for Q (the app action `q.work.job.stop`).
+ * The person's own live work row ends CANCELLED, and its job STOPPED; the
+ * worker running it starts no further step (its next step reads the row).
+ */
+export function workforceJobStopPort(
+  queue: Pick<AgentWorkQueue, "cancel">,
+  store: Pick<WorkforceStore, "setJobStatus">,
+): WorkforceJobPort {
+  return {
+    stop: async (actor, jobId) => {
+      const owner = { tenantId: actor.tenantId, userId: actor.userId };
+      const stopped = await queue.cancel(owner, jobId);
+      if (stopped) await store.setJobStatus(owner, jobId, "STOPPED");
+      return stopped;
+    },
+  };
 }
