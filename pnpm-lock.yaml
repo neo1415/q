@@ -1389,6 +1389,9 @@ importers:
         specifier: 10.3.1
         version: 10.3.1
     devDependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
