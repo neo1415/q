@@ -9,11 +9,7 @@ import type {
   QVoiceTurnState,
 } from "@capital-q/contracts";
 
-import {
-  readVoiceTurnAction,
-  sendVoiceScreenAction,
-  startVoiceSessionAction,
-} from "./actions";
+import { startVoiceSessionAction } from "./actions";
 import { currentScreen, currentViewing } from "../q/screen";
 import { announceQGestures } from "../q-swarm/q-gestures";
 import { storeVoicePreference, useVoicePreference } from "./voice-preference";
@@ -26,6 +22,7 @@ import {
   type VoiceLineHolder,
 } from "./voice-line";
 import { IGNORED_NOTICE } from "./provider/duplex-notices";
+import { readVoiceTurn, sendVoiceScreen } from "./provider/duplex-relays";
 import { LINE_LOST_NOTICE, RECONNECTING_NOTICE } from "./provider/line-health";
 import type {
   VoiceSessionClient,
@@ -68,6 +65,13 @@ export type VoiceInterview = {
    * that shows a notice says it instead of going silent.
    */
   readonly linkStatus?: string | null | undefined;
+  /**
+   * G-R3: each voice turn's terminal disposition, by turn id (the duplex
+   * line's turns), for `data-q-disposition` / `data-q-failure` on the
+   * rendered turn. The latest few only.
+   */
+  readonly turnOutcomes?:
+    Readonly<Record<string, VoiceTurnOutcome>> | undefined;
   /** Start (or restart with a different voice). */
   readonly talk: (input: {
     readonly thread: VoiceInterviewThread;
@@ -123,6 +127,8 @@ const RECONNECT_DELAYS_MS = [1_200, 3_000, 8_000] as const;
 const STABLE_LINE_MS = 20_000;
 /** How long "switching to standard voice" stays once that voice is up. */
 const LINK_STATUS_LINGER_MS = 4_000;
+/** G-R3: voice turn outcomes kept for the rendered turns. */
+const TURN_OUTCOMES_KEPT = 40;
 /** How long a turn's "not answered" sentence stays on screen (A4). */
 const TURN_NOTICE_MS = 8_000;
 /** A board outcome this recent already accounts for the watchdog's turn. */
@@ -177,6 +183,9 @@ export function useVoiceInterview(
   const [settled, setVoice] = useState<QVoiceChoice | null>(null);
   const voice = settled ?? preferred;
   const [notice, setNotice] = useState<string | null>(null);
+  const [turnOutcomes, setTurnOutcomes] = useState<
+    Readonly<Record<string, VoiceTurnOutcome>>
+  >({});
   const [linkStatus, setLinkStatus] = useState<string | null>(null);
   /**
    * I1: the duplex line's own status while it carries on (weak,
@@ -303,6 +312,15 @@ export function useVoiceInterview(
    */
   const showTurnOutcome = (outcome: VoiceTurnOutcome): void => {
     events.onTurnOutcome?.(outcome);
+    const id = outcome.turnId;
+    if (id !== undefined) {
+      setTurnOutcomes((current) =>
+        Object.fromEntries([
+          ...Object.entries(current).slice(-(TURN_OUTCOMES_KEPT - 1)),
+          [id, outcome],
+        ]),
+      );
+    }
     const shown = outcome.notice;
     if (shown === undefined) return;
     setNotice(shown);
@@ -622,16 +640,15 @@ export function useVoiceInterview(
       ]);
       if (screenKey !== sentScreen) {
         sentScreen = screenKey;
-        void sendVoiceScreenAction(
+        // G-D19: fetches through the voice route, never server actions
+        // (they queue behind every other action on the page).
+        void sendVoiceScreen(
           voiceSessionId,
           viewing === undefined ? screen : { ...screen, viewing },
           sessionToken.current,
         );
       }
-      const read = await readVoiceTurnAction(
-        voiceSessionId,
-        sessionToken.current,
-      );
+      const read = await readVoiceTurn(voiceSessionId, sessionToken.current);
       if (cancelled) {
         return;
       }
@@ -723,6 +740,7 @@ export function useVoiceInterview(
     active,
     voice,
     notice: linkStatus ?? lineStatus ?? notice,
+    turnOutcomes,
     linkStatus: linkStatus ?? lineStatus,
     talk,
     end,

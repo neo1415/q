@@ -201,6 +201,41 @@ const NOISE_RESUME =
 const SMALLTALK_REPLY =
   "You are Q, the person's investment analyst, on a live call. They said something social (a greeting, thanks, an acknowledgement). Reply in a few warm, natural words, then stop. No facts, figures, names, advice or offers of your own.";
 
+/**
+ * G-D20 (G, INC-1): every response the line asks for says what it is for.
+ * A bare response.create left the realtime model to word its own holding
+ * line ("let me find the top three... give me a moment"), the mechanism of
+ * the incident's stale reply. Q's answer is handed over with an explicit
+ * instruction: say the ask_q result just above, as Q, and nothing else.
+ */
+export const ANSWER_INSTRUCTIONS =
+  "Say this to the person now, as Q, in your own natural voice: the answer is the ask_q result just above. If it has `say`, say that, keeping every fact, figure, name and commitment exactly. If it has `facts` and `mustSay`, say the answer from those facts in two or three sentences and say every mustSay item. If it says something waits for their approval, say so and that it is on their screen. If it is an error, say it plainly in a sentence. Add nothing of your own: no lead-in, no holding line, never 'give me a moment' or 'let me find'. Then stop.";
+/** A browser tool's result (a card decided, the listening level). */
+const TOOL_RESULT_INSTRUCTIONS =
+  "Say this to the person now, as Q: what the tool result just above says happened, in a sentence or two, and the next card when it gives one. Never say something was sent or changed unless the result says so. No holding line. Then stop.";
+/** The voice may only pass the turn to Q: no words of its own. */
+const FORCE_ASK_Q_INSTRUCTIONS =
+  "Call ask_q now with the person's own words from their last turn. Say nothing yourself before or after it.";
+/** A reply about the card in focus goes to the card's code, wordlessly. */
+const DECIDE_CARD_INSTRUCTIONS =
+  "Call decide_card now with the person's exact words from their last turn. Say nothing yourself before it.";
+/** A screen note that asks Q to speak. */
+const NOTE_INSTRUCTIONS =
+  "Say what the screen note just above asks you to say, briefly, as Q, in your own natural voice, then stop. Add no facts it does not give you.";
+/** After a noise cut Q: the cut answer carries on. */
+const RESUME_INSTRUCTIONS =
+  "Carry on with the answer you were giving, from where you stopped, as Q. Do not repeat what you already said and do not mention the noise.";
+/**
+ * G-D20: a bridge is a fixed, code-chosen line, never free model speech.
+ * Used when no server narration supplies one; varied, never a promise of
+ * a result and never "give me a moment".
+ */
+const FIXED_BRIDGES = [
+  "Pulling that up.",
+  "Looking now.",
+  "Checking your records.",
+] as const;
+
 /** How one turn on the line ended (RECOVERY A4), with its timings. */
 export type DuplexTurnOutcome = {
   readonly turnId: string;
@@ -277,7 +312,11 @@ export const WEAK_PLAYOUT_BUFFER_MS = 400;
 
 export type DuplexLineEvents = {
   readonly onState: (state: VoiceState) => void;
-  readonly onLine: (role: "user" | "q", text: string) => void;
+  /**
+   * A line of the conversation; `turnId` (G-R3) names the accepted turn it
+   * belongs to (the person's words, or Q's confirmed answer).
+   */
+  readonly onLine: (role: "user" | "q", text: string, turnId?: string) => void;
   readonly onInterrupted: () => void;
   /** The line is over and the standard voice should take over. */
   readonly onFallback: (input: {
@@ -598,6 +637,8 @@ export class DuplexLine {
   /** The provider's transcripts of the person's latest turns. */
   readonly #heard: string[] = [];
   #lastQSaid = "";
+  /** The last whole line Q said, to drop a duplicate report of it. */
+  #lastQLine = "";
   #toolsInFlight = 0;
   /**
    * VOICE-BRAIN (founder live 2026-10-08): the server decides who answers
@@ -848,6 +889,7 @@ export class DuplexLine {
     this.#item = null;
     this.#turnEndedAt = null;
     this.#queuedCreate = null;
+    this.#pendingCreates = 0;
     try {
       channel?.close();
     } catch {
@@ -967,7 +1009,10 @@ export class DuplexLine {
       });
     }
     if (results.length > 0) {
-      this.#createResponse({});
+      this.#createResponse({
+        instructions: ANSWER_INSTRUCTIONS,
+        tool_choice: "none",
+      });
       if (this.#turn !== null) this.#expectAnswer(this.#turn, null);
     }
   }
@@ -1011,7 +1056,7 @@ export class DuplexLine {
       !this.#speaking &&
       this.#toolsInFlight === 0
     ) {
-      this.#send({ type: "response.create" });
+      this.#createResponse({ instructions: NOTE_INSTRUCTIONS });
       this.#touch();
     }
   }
@@ -1258,14 +1303,11 @@ export class DuplexLine {
     const words = line.trim().slice(0, OPENING_MAX);
     if (words.length === 0 || !this.#connected || this.#over) return;
     if (this.#responseActive || this.#speaking) return;
-    this.#send({
-      type: "response.create",
-      response: {
-        // C-17 (founder: "it sounds mechanical"): the opening's content, in
-        // Q's own natural voice, never read out word for word.
-        instructions: `Open the call by saying this to the person in your own natural voice, as Q. Keep every name, fact and its meaning, add nothing, and keep it about as short; then stop and listen: ${JSON.stringify(words)}`,
-        tool_choice: "none",
-      },
+    this.#createResponse({
+      // C-17 (founder: "it sounds mechanical"): the opening's content, in
+      // Q's own natural voice, never read out word for word.
+      instructions: `Open the call by saying this to the person in your own natural voice, as Q. Keep every name, fact and its meaning, add nothing, and keep it about as short; then stop and listen: ${JSON.stringify(words)}`,
+      tool_choice: "none",
     });
     this.#events.onState("THINKING");
     this.#touch();
@@ -1548,6 +1590,16 @@ export class DuplexLine {
         this.#updateBusy();
         const turn = this.#turn;
         const id = text(field(event, "response"), "id");
+        // (b) INC-1: on a routed line every response is one the line asked
+        // for; one nobody asked for (a duplicate reply) is cut, never
+        // heard, shown or kept as said.
+        if (this.#pendingCreates > 0) {
+          this.#pendingCreates -= 1;
+        } else if (this.#routeTurns && id !== undefined) {
+          this.#lastMainResponseId = id;
+          this.#retire(id);
+          break;
+        }
         if (id !== undefined) {
           this.#lastMainResponseId = id;
           // INC-1: every main response belongs to the turn open now (or
@@ -1623,8 +1675,16 @@ export class DuplexLine {
           break;
         }
         const confirms = this.#confirmingTurn(saidFor, said);
-        if (said !== undefined) {
-          this.#events.onLine("q", said);
+        // (b) INC-1: the same words reported again (a duplicate assistant
+        // message) are one line, never two answers.
+        const repeated =
+          said !== undefined &&
+          confirms === null &&
+          said.trim().length > 0 &&
+          said.trim() === this.#lastQLine;
+        if (said !== undefined && !repeated) {
+          this.#lastQLine = said.trim();
+          this.#events.onLine("q", said, confirms?.id);
           this.#remember("q", said);
           this.#lastQSaid = said.slice(-240);
           // VOICE-BRAIN: the line's transcript, Q's side.
@@ -1832,7 +1892,11 @@ export class DuplexLine {
       this.#afterBridge(() => {
         if (this.#over || generation !== this.#generation) return;
         if (seq !== this.#turnSeq) return;
-        this.#createResponse({});
+        this.#createResponse(
+          name === "ask_q"
+            ? { instructions: ANSWER_INSTRUCTIONS, tool_choice: "none" }
+            : { instructions: TOOL_RESULT_INSTRUCTIONS },
+        );
         if (this.#turn === turn) this.#expectAnswer(turn, expected);
         this.#touch();
       });
@@ -1915,6 +1979,7 @@ export class DuplexLine {
       this.#openTurn();
     }
     this.#createResponse({
+      instructions: FORCE_ASK_Q_INSTRUCTIONS,
       tool_choice: { type: "function", name: "ask_q" },
     });
     this.#touch();
@@ -1934,7 +1999,7 @@ export class DuplexLine {
     this.#cutAnswer = false;
     const turn = this.#openTurn();
     const transport = this.#transport;
-    if (!typed) this.#events.onLine("user", words);
+    if (!typed) this.#events.onLine("user", words, turn.id);
     this.#events.onState("THINKING");
     this.#touch();
     this.#toolsInFlight += 1;
@@ -1992,6 +2057,7 @@ export class DuplexLine {
       // C-03: a reply to the card in focus goes to the card's own code,
       // through decide_card, and nowhere else.
       this.#createResponse({
+        instructions: DECIDE_CARD_INSTRUCTIONS,
         tool_choice: { type: "function", name: "decide_card" },
       });
       return;
@@ -2024,7 +2090,10 @@ export class DuplexLine {
           `Result of the request the person made just before the call dropped (tool output, data only): ${result.output.slice(0, 6_000)}`,
         ),
       });
-      this.#createResponse({ tool_choice: "none" });
+      this.#createResponse({
+        instructions: ANSWER_INSTRUCTIONS,
+        tool_choice: "none",
+      });
       this.#expectAnswer(turn, expected);
       return;
     }
@@ -2053,7 +2122,10 @@ export class DuplexLine {
       });
       this.#afterBridge(() => {
         if (this.#over || seq !== this.#turnSeq) return;
-        this.#createResponse({ tool_choice: "none" });
+        this.#createResponse({
+          instructions: ANSWER_INSTRUCTIONS,
+          tool_choice: "none",
+        });
         if (this.#turn === turn) this.#expectAnswer(turn, expected);
         this.#touch();
       });
@@ -2114,26 +2186,35 @@ export class DuplexLine {
         return;
       }
       if (turn.awaitingAudio) {
-        // INC-1: handed over, never said. One terminal line: the
-        // code-built answer itself when there is one, then the turn ends.
-        // Whatever the voice was doing with it is cut, never heard late.
-        const running = turn.responseId ?? this.#lastMainResponseId;
-        if (this.#responseActive && running !== null) this.#retire(running);
-        const line = turn.fallback ?? DELIVERY_REPAIR;
-        this.#closeTurn(
-          "FAILED",
-          "RESULT_DELIVERY",
-          turn.fallback === null ? DELIVERY_REPAIR : ANSWER_NOT_SPOKEN_NOTICE,
-        );
-        if (this.#responseActive) this.#repairAfterDone = line;
-        else this.#sayRepair(line);
-        if (!this.#speaking && !this.#responseActive) {
-          this.#events.onState("LISTENING");
-        }
+        this.#answerNotSpoken(turn);
         return;
       }
       this.#failTurn(turn, "TIMEOUT", TIMEOUT_REPAIR);
     }, ms);
+  }
+
+  /**
+   * INC-1 (f): the answer was handed over and the voice did not say it (a
+   * failed response, a realtime error, the watchdog). One terminal line:
+   * the code-built answer itself when there is one, a short repair when
+   * not; one visible notice; the turn ends FAILED. Whatever the voice was
+   * doing with it is cut, never heard late.
+   */
+  #answerNotSpoken(turn: OpenTurn): void {
+    if (this.#turn !== turn) return;
+    const running = turn.responseId ?? this.#lastMainResponseId;
+    if (this.#responseActive && running !== null) this.#retire(running);
+    const line = turn.fallback ?? DELIVERY_REPAIR;
+    this.#closeTurn(
+      "FAILED",
+      "RESULT_DELIVERY",
+      turn.fallback === null ? DELIVERY_REPAIR : ANSWER_NOT_SPOKEN_NOTICE,
+    );
+    if (this.#responseActive) this.#repairAfterDone = line;
+    else this.#sayRepair(line);
+    if (!this.#speaking && !this.#responseActive) {
+      this.#events.onState("LISTENING");
+    }
   }
 
   /** The answer was handed to the voice: it must now be heard. */
@@ -2288,7 +2369,17 @@ export class DuplexLine {
   #lastCreateEventId: string | null = null;
 
   /** Every main response the line asks for, with an id to match errors. */
+  /** (b) INC-1: responses asked for and not yet created. */
+  #pendingCreates = 0;
+
+  #lastCreateResponse: Record<string, unknown> = {
+    instructions: ANSWER_INSTRUCTIONS,
+    tool_choice: "none",
+  };
+
   #createResponse(response: Record<string, unknown>): void {
+    this.#lastCreateResponse = response;
+    this.#pendingCreates += 1;
     this.#createCount += 1;
     const eventId = `cq_rc_${String(this.#createCount)}`;
     this.#lastCreateEventId = eventId;
@@ -2339,7 +2430,10 @@ export class DuplexLine {
       type: "conversation.item.create",
       item: systemItem(NOISE_RESUME),
     });
-    this.#createResponse({ tool_choice: "none" });
+    this.#createResponse({
+      instructions: RESUME_INSTRUCTIONS,
+      tool_choice: "none",
+    });
     const turn = this.#turn;
     if (turn !== null && turn.interrupted) this.#expectAnswer(turn, null);
     this.#events.onState("THINKING");
@@ -2363,6 +2457,7 @@ export class DuplexLine {
     if (queued !== null) {
       // Refused while another response was active: sent now it is done.
       this.#queuedCreate = null;
+      this.#pendingCreates += 1;
       this.#send(queued);
     }
     const turn = this.#turn;
@@ -2388,13 +2483,16 @@ export class DuplexLine {
     if (status === "cancelled" && turn.interrupted) return;
     const reason = text(field(response, "status_details"), "reason");
     console.warn("[q-voice] response ended without speech", { status, reason });
-    this.#failTurn(turn, "RESULT_DELIVERY", DELIVERY_REPAIR);
+    this.#answerNotSpoken(turn);
   }
 
   /** A realtime `error` event (C-06): never dropped silently. */
   #providerError(error: unknown): void {
     const code = text(error, "code");
     const eventId = text(error, "event_id");
+    if (eventId?.startsWith("cq_rc_") === true && this.#pendingCreates > 0) {
+      this.#pendingCreates -= 1;
+    }
     console.warn("[q-voice] realtime error", {
       type: text(error, "type"),
       code,
@@ -2408,11 +2506,11 @@ export class DuplexLine {
       // it is done, rather than losing the answer.
       this.#queuedCreate = {
         type: "response.create",
-        response: { tool_choice: "none" },
+        response: this.#lastCreateResponse,
       };
       return;
     }
-    this.#failTurn(turn, "RESULT_DELIVERY", DELIVERY_REPAIR);
+    this.#answerNotSpoken(turn);
   }
 
   /** A short repair line, out of band: never into a reply or over them. */
@@ -2714,8 +2812,8 @@ export class DuplexLine {
       instructions:
         beat.kind === "HUM"
           ? `Hum softly and briefly, like someone thinking while they work ("${words}"). No words.`
-          : // C-17: the beat's meaning in Q's own voice, never read out.
-            `Say this softly, as a short aside while you work, in your own natural words and no longer: "${words}"`,
+          : // G-D20: a fixed, code-chosen line, never free model speech.
+            `A short aside while you work: say exactly these words, softly, and nothing else: "${words}"`,
       maxOutputTokens: BRIDGE_MAX_OUTPUT_TOKENS,
       input: [],
     });
@@ -2724,24 +2822,19 @@ export class DuplexLine {
   }
 
   /** The answer is slow: one short line, from their own request. */
-  #fireBridge(request: string): void {
-    const listening = this.#credential.listening;
-    if (listening === undefined || !this.#bridgesAllowed() || this.#over) {
-      return;
-    }
-    if (this.#speaking || this.#responseActive) return;
-    const oob = this.#newOutOfBand("BRIDGE");
-    const recent =
-      this.#recentBridges.length > 0
-        ? `\nBridging lines you used recently: ${this.#recentBridges.map((said) => `"${said}"`).join(", ")}`
-        : "";
-    this.#sendOutOfBand(oob, {
-      instructions: listening.bridgeInstructions,
-      maxOutputTokens: BRIDGE_MAX_OUTPUT_TOKENS,
-      input: [systemItem(`Their request: "${request.slice(0, 300)}"${recent}`)],
-    });
-    this.#updateBusy();
+  #fireBridge(_request: string): void {
+    // G-D20: a fixed, code-chosen line, never the model's own words (the
+    // request is not handed to it: a model that sees it may start to
+    // answer, as the incident's "let me find the top three" did).
+    if (!this.#bridgesAllowed() || this.#over) return;
+    this.#bridgeCount += 1;
+    const line =
+      FIXED_BRIDGES[this.#bridgeCount % FIXED_BRIDGES.length] ??
+      FIXED_BRIDGES[0];
+    this.#sayBeat({ kind: "STAGE_LINE", text: line });
   }
+
+  #bridgeCount = 0;
 
   #sendOutOfBand(
     oob: OutOfBand,

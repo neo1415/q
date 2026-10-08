@@ -764,7 +764,11 @@ export function QConversationPanel({
         <StageNotice title="That didn't go through">{q.notice}</StageNotice>
       ) : null}
       {voice.notice !== null ? (
-        <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+        >
           <span className="cq-body text-(--cq-text-primary)">
             {voice.notice}
           </span>

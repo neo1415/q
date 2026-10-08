@@ -30,6 +30,16 @@ const IDS = {
 
 const startVoiceSessionAction = vi.fn();
 const polled: string[] = [];
+// G-D19: the turn board poll and the screen are fetches through the voice
+// route now, not server actions.
+vi.mock("../src/features/voice/provider/duplex-relays", async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  readVoiceTurn: (id: string) => {
+    polled.push(id);
+    return Promise.resolve({ ok: false, gone: false });
+  },
+  sendVoiceScreen: () => Promise.resolve(),
+}));
 vi.mock("../src/features/voice/actions", () => ({
   startVoiceSessionAction: (...args: unknown[]) =>
     startVoiceSessionAction(...args) as unknown,

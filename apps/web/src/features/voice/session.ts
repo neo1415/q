@@ -44,6 +44,11 @@ export type VoiceTranscriptLine = {
   /** True while more may still arrive for this line. */
   readonly partial: boolean;
   readonly at: number;
+  /**
+   * G-R3: the accepted turn this line belongs to (the person's words, or
+   * Q's confirmed answer), for `data-q-turn-id` on the rendered turn.
+   */
+  readonly turnId?: string | undefined;
 };
 
 /**
@@ -102,6 +107,8 @@ export function transcriptLineFor(
  * without an answer (never a provider error string).
  */
 export type VoiceTurnOutcome = {
+  /** G-R3: the turn it ends (duplex; absent on the standard line). */
+  readonly turnId?: string | undefined;
   readonly disposition: QTurnDisposition;
   readonly failure?: QFailureClass | undefined;
   readonly notice?: string | undefined;
