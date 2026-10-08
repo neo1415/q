@@ -804,6 +804,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // Q for it) and what the voice said (the line's transcript).
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_HEARD_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_SAID_PATH": Q_TRANSPORT,
+  // RECOVERY-2026-10 (A4, A8): a voice turn's terminal outcome, and the
+  // server's sideband attach to the realtime call -- the line's transport.
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_OUTCOME_PATH": Q_TRANSPORT,
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_ATTACH_PATH": Q_TRANSPORT,
   "q-api/voice/think.ts POST dependencies.path": Q_TRANSPORT,
   "q-api/voice/think.ts POST `${dependencies.path}/chat/completions`":
     Q_TRANSPORT,
@@ -1083,6 +1087,8 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_NARRATION_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_HEARD_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_SAID_PATH",
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_OUTCOME_PATH",
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_ATTACH_PATH",
   // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
   // conversation's own transport, never a person's action.
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",
