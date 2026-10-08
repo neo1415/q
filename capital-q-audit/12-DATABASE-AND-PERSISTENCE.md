@@ -158,3 +158,31 @@ Column lists come from live `information_schema.columns` (metadata only). "Rows"
 - Live: `plans`, `features`, `plan_features`, `fee_schedules`, `usage_events` (89; `account_key, feature_key, period_start, quantity, idempotency_key, surface, voided_at`). Consumption goes through SQL function `billing.consume(…)` (`packages/billing/src/entitlements.ts:355`).
 - Schema-only: `customers, subscriptions, plan_assignments, provider_events, credit_entries, fee_entries, limit_overrides` (all 0). Stripe is CONFIGURED-UNUSED.
 
+## 5. Persistence across agent runs, chat and voice: what survives and what does not
+
+| Flow | Persisted | Not persisted / gap | Evidence |
+| --- | --- | --- | --- |
+| Typed Q chat | The user turn and Q's answer as `conversation_messages` (with `result_blocks` cards), plus `runs`, `run_events`, `model_usage` | — | §4.5-4.6 |
+| Standard voice line (Deepgram/ElevenLabs → `/v1/q/voice/think`) | Each substantive turn becomes a `createRun` with `modality: "VOICE"` in the line's conversation (`apps/q-api/src/voice/turn.ts:1017-1041`) | The line's binding (which conversation, subjects, screen) is held in memory and in the sealed token (`voice/bindings.ts`, `session-token.ts`). Turns the handler answers itself without a run (e.g. onboarding `UNCLEAR` "I didn't catch that", `turn.ts:659-664`) are **not** written to `voice_line_turns`, which is duplex-only. Whether a SILENT answer is stored as an empty Q message was not verified | |
+| Duplex voice line (OpenAI Realtime) | Since today only: both sides in `q_runtime.voice_line_turns` with `routed`. Model-only exchanges are mirrored into `conversation_messages` (`apps/q-api/src/main.ts:5481`; `voice/duplex/transcript.ts:24-31`) | **Every duplex call before migration 20261220150000 (today) left no transcript.** The table holds 21 rows, 4 with no conversation. Realtime model improvisations (e.g. the 11:13 "Got it—let's focus on what's pressing…") persist only as `model_only` rows | migration header lines 1-18 |
+| Cards beside Q ("room") | — | The room feed is process memory only (`room/feed.ts:35-37`). A deploy or restart drops it, and the browser must restart from a new epoch. Typed-run cards reach the room only while a room reader is open (`feed.ts:62-70`) | §02-6 |
+| Standing instructions / workforce agents | `standing_instructions`, `instruction_steps`, `workforce_jobs/agent_runs/drafts/grades/handoffs/draft_outcomes`, `q_runtime.actions` for approval cards | Review grading state is "in memory and bounded: a restart between grading …" (`composition/workforce/review.ts:485`). The LangGraph checkpoint thread is per run (`q-orchestrator/src/thread.ts:18`), so no graph state carries across runs; continuity comes only from the domain tables | |
+| Relationship (founder↔investor) chat | `communication.conversations` / `communication.messages` (42 messages) | This is a **separate store** from Q conversations (`q_runtime.conversation_messages`). Q only sees relationship chat through tools/ports (`relationship.own.list` and `lastMessage` per RULES). There is no shared "inbox" table of "things waiting for the user". "Waiting" is recomputed from `communication.messages`, `q_runtime.approvals`, `notifications` and others in `apps/q-api/src/composition/waiting.ts` | relevant to the live "nothing is waiting" miss (other investigators) |
+| Cross-conversation memory | `q_knowledge.memory_items` (57 active) through the write gate | Only 62 memory items for 164 users and 4,584 messages. Interview "raised checks" and onboarding findings are process-local (`voice/interview-agent.ts:301`, `voice/onboarding-conductor.ts:272`) | |
+| Meeting host (Recall) | `meeting_host_notes`, `meeting_roster_entries`, `meeting_emails` | Live call sessions are in memory: "one q-api instance hosts a call" (`composition/meeting-host-runtime.ts:51`). A deploy mid-call ends hosting. Screen/camera frames are held 30 s in memory by design (`meeting-screen-vision.ts:52`) | |
+| Rehearsals | `q_runtime.rehearsals.turns` jsonb | Frames in memory only (by design) | |
+| Domain events about Q actions | `events.outbox` rows | Never published (§6) | |
+
+## 6. Outbox and events persistence
+
+- `events.outbox` (6,312): `event_id, tenant_id, event_type, event_version, payload, created_at, available_at, published_at, attempt_count, last_error`. Writers are each domain package through `createOutboxWriter({ registry })` inside the domain transaction. The publisher is in workers (§02-7).
+- **DEF-A1 (confirmed live):** 657 rows unpublished, all `q.action.{prepared(321), rejected(198), approved(69), executed(62), execution_failed(7)}`, all `EVENT_SCHEMA_INVALID` after 10 attempts, from 2026-09-26 to today. Root cause: `apps/workers/src/event-registry.ts:1-35` omits the q-actions event set. These rows are permanently excluded from claiming (`attempt_count < maxAttempts`, `outbox-publisher.ts:154`), so they stay as dead rows forever.
+- There is no outbox retention or cleanup: published rows accumulate (5,655 published).
+
+## 7. Growth and retention
+
+Database size is 202 MB. LangGraph checkpoint tables take about 90 MB, the largest share, with no pruning. `model_usage` is 6.6 MB and `run_events` 8.3 MB. No retention jobs were found for checkpoints, outbox, run_events or model_usage (grep for deletes outside `q-evals`/`dev` finds none).
+
+## 8. Data model diagram
+
+See `diagrams/data-model.md`.
