@@ -1,0 +1,101 @@
+# Investigator C — Voice system findings
+
+HEAD 520bd123. Full report: `capital-q-audit/04-VOICE-SYSTEM.md`. Excerpts: `capital-q-audit/evidence/voice/`.
+
+## CONFIRMED DEFECTS
+
+| ID | Severity | Symptom | Evidence | Root cause |
+|---|---|---|---|---|
+| C-01 | High | Any **model-initiated** `ask_q` (MODEL/SMALLTALK-routed turns, card-in-focus turns, forced ask_q after a missing transcript) whose answer Q chose to keep silent makes the voice say "that didn't go through, try again" instead of staying quiet | `apps/q-api/src/voice/duplex/broker.ts:556-558` (adds `silent`), `broker.ts:944` (tool returns it), `apps/q-api/src/voice/duplex/routes.ts:86` (`QVoiceDuplexToolResultSchema.parse`), `packages/contracts/src/q/voice.ts:432-441` (`.strict()`, no `silent`), `apps/web/src/features/voice/duplex-actions.ts:53-57` (null), `apps/web/src/features/voice/provider/duplex-line.ts:1496-1502` | Contract drift: `silent` added to the heard result only. Probe: `safeParse` → `unrecognized_keys ["silent"]`. No test covers it |
+| C-02 | High | The founder's "speak from facts in your own words" fix never runs on the duplex line; an extra SPOKEN_REPLY model call runs instead and the voice reads its output "faithfully" | `apps/q-api/src/voice/turn-timing.ts:369-395` (timedSpeaker forwards `narrate`, `deferred`, not `facts`); `apps/q-api/src/main.ts:5383`, `5472` (broker gets the wrapped handler); `apps/q-api/src/voice/turn.ts:951-958`; `broker.ts:550-554` | `facts` was added to `VoiceSpeaker` (`provider.ts:62`, commit e0a952e9) without updating the timing wrapper (same bug class fixed for `narrate` in 5a80c610) |
+| C-03 | High | Realtime model answers without Q on SMALLTALK and MODEL turns; MODEL is any utterance of ≤12 words while a briefing card is in focus (e.g. "find anything that needs my attention") | `duplex-line.ts:1643-1646`; `apps/q-api/src/voice/duplex/routing.ts:178-182`; `apps/web/src/features/voice/line-cards.ts:78-80`; `apps/web/src/features/briefing/arrival-briefing.tsx:752-754` | Routing by word count while a card is in focus; the voice model then chooses decide_card / ask_q (with its paraphrase) / its own reply |
+| C-04 | Medium | A routed answer is silently lost if the line rejoined while Q was working; state stays "Thinking" | `duplex-line.ts:1654-1658` (pushes only `if (this.#rejoining)`) vs `1508-1516` (relayTool handles it) | Missing branch for "transport changed, rejoin complete" |
+| C-05 | Medium | Stale model-initiated answer spoken after a newer question | `duplex-line.ts:1421`, `1528-1533` (generation only), `1611-1612` (`#turnSeq` not checked in relayTool) | Two guard counters; relayTool uses the one that only barge-in moves |
+| C-06 | Medium | Duplex "Thinking" can last indefinitely; no watchdog, realtime `error` events and failed `response.done` are ignored | `duplex-line.ts:1258-1413` (no `error` case), `1400-1410`; contrast `deepgram-session.ts:358-368` | Missing error handling/watchdog |
+| C-07 | Medium | A cough/echo while Q's answer is being generated (before audio) cancels the answer; if it transcribes empty, nothing is ever said | `duplex-line.ts:1265-1266` (immediate barge-in), `1211-1237`, `1582-1587`; no duplex repair (standard has `deepgram-session.ts:454-474`) | Barge-in confirm only applies while audio plays |
+| C-08 | Medium | Duplex relays (`heard`, `tool`, `usage`, `said`, `rejoin`, `end`) are Next.js server actions, serialised per client with the 1.5 s turn poll and any other page action; `heard` holds for the whole ask_q with no deadline | `duplex-session.ts:135-143`; `duplex-actions.ts:1`; `use-voice-interview.ts:577-586`; Next `app-router-instance.js` `dispatchAction` (queue); acknowledged in `provider/narration-poll.ts:7-8`; `broker.ts:528-535` (no deadline); `packages/api-client/src/request.ts:54-63` (no timeout) | Transport choice for relays |
+| C-09 | Medium | Duplex presence shows no input/output level, so the stage looks idle while listening or speaking | `apps/web/src/features/voice/provider/duplex-session.ts:246-248` | Not implemented |
+| C-10 | Medium | Duplex line ends after 30 s of quiet with no notice and no reconnect | `duplex-line.ts:1153-1175`; `apps/q-api/src/voice/duplex/config.ts:49`; `use-voice-interview.ts:249-255` | Idle policy; `ended("ended")` path is silent |
+| C-11 | Low | Short real words (<450 ms, "no", "stop") over Q are deleted as blips | `duplex-line.ts:132`, `1272-1277`, `1199-1208`, `1285-1291` | Duration-only blip test |
+| C-12 | Low | `#turnItems` capped at 3; on NATURAL listening a long turn's earliest committed items are never routed | `duplex-line.ts:137`, `1296-1297`, `1544-1550`; `backchannel.ts:54-60` | Cap shared between reaction context and turn routing |
+| C-13 | Low | Out-of-band beats/backchannel play at volume 0 after a cut or barge-in until the next main response | `duplex-line.ts:2010-2015`, `2088-2093`, `1239-1244` | `#speakingSilenced` cleared only by main responses |
+| C-14 | Low | First voice_line_turns USER row of a new conversation has NULL conversation_id; small talk before the first ask_q is never mirrored to conversation_messages | `broker.ts:616-634`, `894-912`; `turn.ts:1041` | Order of operations |
+| C-15 | Low | Forced ask_q shows the model's paraphrase as the person's line | `duplex-line.ts:1433-1435` | By design but misleading |
+| C-16 | Info | Duplex broker state is in-process only; restart/deploy/second replica loses lines (heard → 404 → degraded path → fallback) | `broker.ts:453` (vs sealed standard bindings `routes.ts:785-798`) | Not hardened like HARDEN P0 |
+| C-17 | Info | Mechanical delivery by instruction: "Say exactly this … word for word", "say that faithfully" | `duplex-line.ts:1077`, `1914`; `instructions.ts:113`, `213` | Prompt design |
+
+## UNVERIFIED RISKS
+
+| Hypothesis | What would verify it |
+|---|---|
+| R1: The lead's 12:02–12:58 "minted, rejoined, ended ~20 s later, fell back" is two `DUPLEX_CONNECT_MS` timeouts (open + second-chance rejoin) because the sandbox blocks WebRTC media | Browser log of `#tryConnect` failures / server log "duplex voice line rejoined" then "ended" with `reason FALLBACK cause CONNECT` (`duplex-line.ts:541-556`, `broker.ts:1122-1125`, `1145-1157`) |
+| R2: A second `response.create` while a response is active is refused by the provider and the newer answer is lost (error ignored) | Capture realtime `error` events in a test call; add an `error` case log |
+| R3: `dropNextCommit` survives a blip that produced no commit and deletes the next real turn | Event trace where speech_stopped is not followed by committed |
+| R4: Reaction commit later than 400 ms is treated as end of turn and routes a fragment | Event timing trace with NATURAL listening |
+| R5: Multiple q-api replicas or deploys mid-call cause duplex 404s | Render instance count; logs "No such voice line" 404s on `/duplex/*` |
+| R6: Vercel function duration limits cut long `heard` server actions (→ null → forced ask_q → second Q run) | `vercel.json`/project settings; logs of aborted heard requests |
+| R7: Standard-line Deepgram token (60 s TTL) expires before the immediate fallback after a slow mic prompt + two duplex connect timeouts | Timing of `getUserMedia` + `#tryConnect` in a fallback trace |
+| R8: Duplex `<audio autoplay>` not in the DOM fails autoplay on Safari/iOS | Manual test on Safari |
+| R9: `said` from the previous response attributed to the next turn (history pairs wrong) | voice_line_turns rows ordered by spoken_at around fast follow-ups |
+| R10: After a SILENT answer the next ask shares the same utteranceRef and supersedes the previous stored user message | Inspect conversation_messages utterance_ref for consecutive duplex turns |
+
+## OPEN QUESTIONS
+
+1. Production values of `CQ_VOICE_REALTIME`, `CQ_VOICE_REALTIME_DAILY_CAP_USD` (default 1 USD platform-wide), `_IDLE_SECONDS`, `_ROUTE_TURNS`, `_BACKCHANNEL`, and whether the synthetic-demo attestation is set (required to mint above PUBLIC).
+2. Is the duplex `heard` round-trip ever measured? (No log found.)
+3. Should SILENT be spoken at all on a voice line when the transcript is non-empty but unclear (v44 `heardAs` re-reads once)?
+4. Is MODEL routing on card-in-focus intended for any ≤12-word question, or only replies about the card?
+5. Is the 30 s duplex idle end intended to be silent, or should it fall back/notify?
+6. Why are direct read tools computed (`broker.ts:697-699`) but not minted (`733-740`)?
+
+## EVIDENCE INDEX
+
+| Conclusion | path:line |
+|---|---|
+| Duplex first, standard on same credential on failure | `apps/web/src/features/voice/use-voice-session.ts:57-62` |
+| Duplex offered on top of standard credential | `apps/q-api/src/voice/routes.ts:866-896` |
+| One standard binding per person | `apps/q-api/src/voice/routes.ts:809` |
+| Realtime model / transcriber / voices | `packages/model-gateway/src/realtime/openai.ts:26`, `48`, `59` |
+| semantic_vad, create_response false, interrupt_response false | `openai.ts:110-122`; `duplex-line.ts:1042-1062` |
+| getUserMedia constraints duplex | `duplex-line.ts:283-286` |
+| Standard STT model and EOT | `apps/q-api/src/voice/providers/deepgram.ts:198-235` |
+| Routing rules | `apps/q-api/src/voice/duplex/routing.ts:167-183` |
+| Heard routing + ask_q server-side | `broker.ts:816-855` |
+| Silent result returned by askQ | `broker.ts:555-559` |
+| Strict tool result schema without silent | `packages/contracts/src/q/voice.ts:432-441` |
+| Tool route strict parse | `apps/q-api/src/voice/duplex/routes.ts:86` |
+| Browser on non-ASK_Q → model answers | `duplex-line.ts:1643-1646` |
+| Browser on silent → LISTENING | `duplex-line.ts:1647-1652` |
+| Transport-changed drop | `duplex-line.ts:1654-1658` |
+| relayTool generation-only guard | `duplex-line.ts:1421`, `1528-1533` |
+| Forced ask_q | `duplex-line.ts:1589-1602` |
+| No error case in dispatcher | `duplex-line.ts:1258-1413` |
+| Barge-in confirm 450 ms; immediate during generation | `duplex-line.ts:132`, `1265-1266`, `1185-1237` |
+| Idle end | `duplex-line.ts:1153-1175`; `config.ts:49` |
+| Levels 0 on duplex | `duplex-session.ts:246-248` |
+| timedSpeaker drops facts | `apps/q-api/src/voice/turn-timing.ts:369-395` |
+| fromFacts uses speaker.facts | `apps/q-api/src/voice/turn.ts:951-979` |
+| Spoken unclear → SILENT | `packages/q-specialists/src/answer.ts:2442-2462` |
+| heardAs re-read | `answer.ts:2340-2378` |
+| Not addressed to Q → no answer | `answer.ts:2426-2437` |
+| Turn handler NOTHING paths | `turn.ts:1864-1866`, `1913`, `1944-1951`, `2089-2090` |
+| Standard think deadline/keep-alive | `apps/q-api/src/voice/think.ts:42-59`, `330-347` |
+| Standard thinking watchdog 14 s | `deepgram-session.ts:61`, `358-368` |
+| Speak relay and ElevenLabs model order | `routes.ts:396-548`; `providers/elevenlabs-speak.ts` header + constants |
+| speakable flattening + 1,200-char cap | `apps/q-api/src/voice/speech.ts:12`, `271-305` |
+| "Say exactly this" opener/beats | `duplex-line.ts:1077`, `1914`; `duplex/instructions.ts:213` |
+| Server actions serialized | `node_modules/.pnpm/next@16.3.4…/next/dist/client/components/app-router-instance.js` (`dispatchAction`, `runRemainingActions`); `provider/narration-poll.ts:7-8` |
+| No deadline on duplex askQ | `broker.ts:528-535`; `packages/api-client/src/request.ts:54-63` |
+| In-memory duplex lines | `broker.ts:453` |
+| Daily cap default 1 USD platform-wide | `config.ts:48`; `spend.ts:23-28` |
+| Transcript store | `apps/q-api/src/voice/duplex/transcript.ts:65`; `broker.ts:584-634`, `857-916` |
+| Latency log "voice turn timed" | `turn-timing.ts:14-48`, `143-200` |
+| Duplex first-audio stats at line end | `duplex-line.ts:1342-1348`, `862-883`; `broker.ts:1141-1158` |
+
+## COVERAGE
+
+Inspected (read implementation): `apps/web/src/features/voice/{session.ts, voice-line.ts, use-voice-session.ts, use-voice-interview.ts, duplex-actions.ts, line-cards.ts, voice-preference.ts}`, `provider/{duplex-line.ts (all), duplex-session.ts, deepgram-session.ts (all), narration-poll.ts, backchannel.ts (rules, detector), pcm-player.ts (head), pcm-schedule.ts (defaults), agent-socket.ts (constants/buffering)}`; `apps/web/src/features/briefing/arrival-briefing.tsx:740-805`; `apps/q-api/src/voice/duplex/{broker.ts (all), routes.ts, routing.ts, instructions.ts, config.ts, transcript.ts, spend.ts, listening.ts}`; `apps/q-api/src/voice/{routes.ts:380-940, think.ts, turn.ts:668-1453 and 1720-2176, turn-timing.ts (head, wrapper), narration.ts, speech.ts (speakable/bounded), utterance.ts, provider.ts, providers/deepgram.ts, providers/elevenlabs-speak.ts (header/constants)}`; `apps/q-api/src/main.ts:5005-5110, 5375-5500`; `packages/model-gateway/src/realtime/{index.ts, openai.ts}`; `packages/contracts/src/q/voice.ts:395-495`; `packages/q-specialists/src/answer.ts:2325-2470`; `packages/q-core/src/prompts/tasks/spoken-reply.v1.ts:19-47`; `packages/api-client/src/{q.ts:255-300, request.ts}`; Next 16.3.4 `app-router-instance.js` action queue.
+
+Tests run: 7 files / 131 tests passed (duplex broker, duplex routes, transcription hint, turn timing, web duplex, duplex fallback, barge-in). One schema probe.
+
+Not inspected: ElevenLabs Speech Engine transport (`elevenlabs-session.ts`, `providers/elevenlabs.ts`, `attach.ts`); interview/onboarding voice (`interview-agent.ts`, `interview-steps.ts`, `onboarding-*.ts`); rehearsal; one-way TTS (`use-q-speech.ts`, `synthesis.ts`); `bindings.ts`; `think-gate.ts`; `turn.ts:1-667`, `1604-1720`; `elevenlabs-speak.ts` stream body; `voice-stage.tsx` rendering; the turn reader prompt v44 body; Q answer correctness ("nothing is waiting"); production env and infrastructure.
