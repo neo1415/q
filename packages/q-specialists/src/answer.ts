@@ -47,6 +47,7 @@ export function recordAudienceTool(utterance: string): string | null {
 }
 import {
   type QNavigateDestination,
+  type QPageManifest,
   type QResponseMessage,
   type QResultBlock,
   type QVisibleStage,
@@ -112,7 +113,11 @@ import type {
   QSpecialistProbe,
   QSpecialistTurnReading,
 } from "./contracts.js";
-import { actOnHandOver, type QHandOverPort } from "./hand-over.js";
+import {
+  actOnHandOver,
+  type HandOverSubject,
+  type QHandOverPort,
+} from "./hand-over.js";
 import {
   actOnDelegation,
   DELEGATION_CANDIDATE,
@@ -129,6 +134,70 @@ import {
   type LastAction,
   type QOpenRecordPort,
 } from "./references.js";
+import {
+  focusFromHistory,
+  listsFromHistory,
+  listsFromManifest,
+  referenceAskOf,
+  resolutionNote,
+  resolveReference,
+  type ReferenceAsk,
+  type ResolvedReference,
+} from "./conversation-entities.js";
+
+/** B6: a reference in the turn, bound to records, with its note. */
+type PointedAt = {
+  readonly ask: ReferenceAsk;
+  readonly resolved: ResolvedReference;
+  readonly note: string;
+};
+
+/** B6: "him" / "them" bound to an organisation, as a hand-over subject. */
+function handOverSubjectPointed(
+  pointed: PointedAt | null,
+): HandOverSubject | null {
+  if (pointed === null || pointed.ask.kind !== "COUNTERPART") return null;
+  if (pointed.resolved.kind !== "ONE") return null;
+  const entity = pointed.resolved.entity;
+  if (entity.kind === "COMPANY") {
+    return { kind: "COMPANY", companyId: entity.id };
+  }
+  if (entity.kind === "INVESTOR_ORGANISATION") {
+    return { kind: "INVESTOR_ORGANISATION", investorOrganisationId: entity.id };
+  }
+  return null;
+}
+
+/** The reader's [Q context] note with the binding first (it is bounded). */
+function withResolution(
+  note: string | null,
+  pointed: PointedAt | null,
+): string | null {
+  if (pointed === null) return note;
+  const rest = note === null ? "" : note.replace(/^\[Q context\]\s*/u, " ");
+  return `[Q context] ${pointed.note}${rest}`.slice(0, 400);
+}
+
+function pointedAt(
+  text: string,
+  history: readonly QConversationMessage[],
+  manifest: QPageManifest | null | undefined,
+): PointedAt | null {
+  const ask = referenceAskOf(text);
+  if (ask === null) return null;
+  const latestQ = [...history].reverse().find((one) => one.role === "Q");
+  const resolved = resolveReference(ask, {
+    page: listsFromManifest(manifest),
+    answers: listsFromHistory(history),
+    answerIsNewest: (latestQ?.blocks ?? []).some(
+      (block) => block.kind === "ANSWER_CARDS",
+    ),
+    focus: focusFromHistory(history),
+  });
+  return resolved === null
+    ? null
+    : { ask, resolved, note: resolutionNote(ask, resolved) };
+}
 import {
   cannotOpenLine,
   cardAt,
@@ -1676,6 +1745,55 @@ export function createSpecialistQAnswer(
     };
   };
 
+  /** B6: the reference each run's words were bound to, for its answer. */
+  const resolvedInRun = new Map<string, string>();
+  const withReferences = (request: QAnswerRequest): QAnswerRequest => {
+    const note = resolvedInRun.get(request.runId);
+    return note === undefined || request.references !== undefined
+      ? request
+      : { ...request, references: note };
+  };
+  const openPointedRecord = (
+    text: string,
+    pointed: PointedAt,
+    capabilities: readonly QCapability[],
+  ): {
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+  } | null => {
+    if (manifestOf(capabilities).navigate.length === 0) return null;
+    const { ask, resolved } = pointed;
+    if (ask.kind !== "ORDINAL" || resolved.kind !== "ONE") return null;
+    // An open request ("open the second one") or a correction of what was
+    // opened ("not that investor, the second one"); "explain the second
+    // one" is a question, answered with the binding as a note instead.
+    if (ordinalOf(text) === null && !ask.correction) return null;
+    // Q's own company cards: the existing card path talks about the card.
+    if (
+      resolved.via === "Q_ANSWER" &&
+      resolved.entity.kind === "COMPANY" &&
+      !ask.correction
+    ) {
+      return null;
+    }
+    const page =
+      resolved.entity.kind === "COMPANY"
+        ? ("COMPANY" as const)
+        : resolved.entity.kind === "INVESTOR_ORGANISATION"
+          ? ("INVESTOR" as const)
+          : null;
+    if (page === null) return null;
+    return {
+      said: openingLine(page, resolved.entity.name ?? undefined),
+      blocks: [
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "OPEN_RECORD_PAGE", page, id: resolved.entity.id },
+        },
+      ],
+    };
+  };
+
   /** Unclear turns in a row, per conversation (bounded with the rest). */
   const unclearInARow = new Map<string, number>();
   /** Runs answering their likely words (TURN_READER v44): never twice. */
@@ -2180,6 +2298,47 @@ export function createSpecialistQAnswer(
     // What Q showed and last did, for "that one" and "try again".
     const shown = shownItems(history);
     const lastAction = lastActed.get(conversationId) ?? null;
+    // RECOVERY-2026-10 B6: what the words point at ("the second one", "not
+    // that investor, the second one", "compare those two", "go back…",
+    // "book a meeting with him"), bound by code to records on their page,
+    // in Q's lists or in the conversation's focus. Null: not a reference.
+    const pointed = pointedAt(
+      latest.content,
+      history,
+      // The plan's screen: what the firewall kept of the page.
+      request.plan.screen?.manifest,
+    );
+    if (pointed !== null) {
+      resolvedInRun.set(request.runId, pointed.note);
+      while (resolvedInRun.size > PREREADS_MAX) {
+        const oldest = resolvedInRun.keys().next().value;
+        if (oldest === undefined) break;
+        resolvedInRun.delete(oldest);
+      }
+      logger?.info(
+        {
+          qRunId: request.runId,
+          ask: pointed.ask.kind,
+          via: pointed.resolved.kind === "ONE" ? pointed.resolved.via : "PAIR",
+        },
+        "q bound a reference",
+      );
+    }
+    // "Open the second one" / "not that investor, the second one": a record
+    // on their page or in Q's list, opened by code. Q's own company cards
+    // keep their richer path below (talked about from the card).
+    const openedByReference =
+      pointed === null
+        ? null
+        : openPointedRecord(latest.content, pointed, capabilities);
+    if (openedByReference !== null) {
+      return recordAnswer(
+        request,
+        conversationId,
+        openedByReference.said,
+        openedByReference.blocks,
+      );
+    }
     // A bare screen command ("scroll down", "go back") is done at once in
     // code, like the wake words: it needs no reading, no model and no view
     // of the screen (founder 2026-10-06: Q said it could not scroll
@@ -2278,7 +2437,7 @@ export function createSpecialistQAnswer(
             correlationId: request.correlationId,
             signal: request.signal,
           },
-          referenceNote(shown, lastAction),
+          withResolution(referenceNote(shown, lastAction), pointed),
         ),
       );
     // Read early, beside the firewall (ADR 0035), with the same words, the
@@ -2874,7 +3033,7 @@ export function createSpecialistQAnswer(
       const handed = await actOnHandOver(
         dependencies.handOver,
         request,
-        read.handOver,
+        { ...read.handOver, pointed: handOverSubjectPointed(pointed) },
         read.timeWindow ?? null,
       ).catch((error: unknown) => {
         logger?.warn(
@@ -3110,13 +3269,13 @@ export function createSpecialistQAnswer(
       route.ownRecords === true ||
       !specialist.supports(probe)
     ) {
-      return delegate.answer(request);
+      return delegate.answer(withReferences(request));
     }
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
     );
     if (company === undefined || company.kind !== "COMPANY") {
-      return delegate.answer(request);
+      return delegate.answer(withReferences(request));
     }
 
     last = null;

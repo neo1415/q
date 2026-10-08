@@ -526,6 +526,18 @@ export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "comparisonCards",
 ];
 
+/**
+ * RECOVERY-2026-10 B6: the binding of the turn's reference, as Capital Q's
+ * note. Names in it came from records the person saw; still, they are
+ * quoted as names, and the note tells the model to read the record by id.
+ */
+export function referencesNote(references: string): ModelMessage {
+  return {
+    role: "SYSTEM",
+    content: `WHAT THEY ARE POINTING AT (Capital Q bound their words to records they already saw on their screen or in your answers; use it rather than asking which one they mean, and read the record by its id with the right tool before saying anything about it): ${references.slice(0, 600)}`,
+  };
+}
+
 export const SAY_DO_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
@@ -3243,6 +3255,12 @@ export function createModelGatewayQAnswer(
       }
       if (ownProfile !== null || onboardingFacts.length > 0) {
         messages = [...messages, OWN_MANDATE_NOTE];
+      }
+      // RECOVERY-2026-10 B6: what their words point at, bound by code to
+      // records they already saw ("the second one", "compare those two",
+      // "him"). Ids, so a tool can read the record; it grants nothing.
+      if (request.references !== undefined) {
+        messages = [...messages, referencesNote(request.references)];
       }
 
       type AnswerResult = Awaited<

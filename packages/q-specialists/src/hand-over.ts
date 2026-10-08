@@ -191,12 +191,21 @@ export async function actOnHandOver(
   handOver: {
     readonly kind?: "MEETING" | "HAND_OVER" | undefined;
     readonly counterpartName: string | null;
+    /**
+     * RECOVERY-2026-10 B6: who "him", "her" or "them" points at, bound by
+     * code from the conversation's focus ("book a meeting with him" after
+     * talking about an investor). Used like the subject on screen, and
+     * only when no name was given and the screen shows no one.
+     */
+    readonly pointed?: HandOverSubject | null | undefined;
   },
   /** The time they asked for, if any (TURN_READER v28). */
   window: HandOverTimeWindow | null = null,
 ): Promise<HandOverOutcome> {
   let subject: HandOverSubject | null = null;
-  const onScreen = handOverSubjectOf(request);
+  const onScreen =
+    handOverSubjectOf(request) ??
+    (handOver.counterpartName === null ? (handOver.pointed ?? null) : null);
   // A company request waiting on this investor comes first: handing it
   // over means accepting it and opening the conversation. Who it is: the
   // name they gave, else the company on screen, else (one waiting) that
