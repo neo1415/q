@@ -1439,7 +1439,12 @@ export function createOperateScreenTool(
       if (input.target === undefined) {
         return refuse("Name the control: its id from the screen's controls.");
       }
-      const onScreen = options.screenControls?.(execution);
+      // The page's own manifest (it rides on every run's plan) unless a
+      // composition supplies its own reader: Q resolves against what is on
+      // screen now, the catalog only when the page sent none.
+      const onScreen =
+        options.screenControls?.(execution) ??
+        execution.plan.screen?.manifest?.controls;
       const found = resolveControlTarget(input.target, onScreen);
       if (found.kind === "SEVERAL") {
         return refuse(
