@@ -1351,6 +1351,7 @@ export {
   SPOKEN_FIDELITY_ISSUES,
   naturalPlaceLine,
   spokenFactsOf,
+  spokenFactsOfAttention,
   spokenFidelityIssues,
   spokenList,
   type SpokenFacts,

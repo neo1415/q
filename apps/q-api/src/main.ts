@@ -543,6 +543,7 @@ import { createVoiceTurnBoard } from "./voice/turn-board.js";
 import { createQRoomFeed } from "./room/feed.js";
 import {
   createUiActReceiptLedger,
+  navigationFacts,
   receiptFacts,
   recentUiActReceipts,
 } from "./http/ui-act-receipts.js";
@@ -3611,8 +3612,11 @@ const qReceipts: QReceiptPort = {
 const qIntelligence = composeQIntelligence({
   // RECOVERY (C's request): what came of Q's recent screen acts, from the
   // receipts ledger (composed further down; read only once turns run).
-  uiActReceipts: (actor) =>
-    receiptFacts(recentUiActReceipts(uiActReceipts, actor)),
+  uiActReceipts: (actor) => [
+    ...receiptFacts(recentUiActReceipts(uiActReceipts, actor)),
+    // C: where Q moved them, and whether the page opened.
+    ...navigationFacts(uiActReceipts.recentNavigations(actor)),
+  ],
   // Voice speculation (latency2): each spoken answer's adoption or
   // cancellation lands on its "voice turn timed" line and the metric.
   speculation: { observe: (event) => voiceTimings.speculated(event) },
@@ -5483,6 +5487,8 @@ const voiceTurn = timedVoiceTurns(
     qStream,
     interviewAgent,
     board: voiceTurnBoard,
+    // RECOVERY B1 on voice: "what needs me" said from the report's items.
+    attention: (actor) => qTools.attention(actor),
     room: qRoom,
     welcome: welcomeHost,
     pronunciation,

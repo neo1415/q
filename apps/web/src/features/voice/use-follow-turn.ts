@@ -5,7 +5,12 @@ import { useEffect, useRef } from "react";
 import type { QVoiceTurnState } from "@capital-q/contracts";
 
 import { performClientAction } from "../q/client-actions";
-import { expectNavigation } from "../q/ui-act-controller";
+import {
+  expectNavigation,
+  onNavigationOutcome,
+  type NavigationOutcome,
+} from "../q/ui-act-controller";
+import { noteToLine } from "./line-cards";
 import { destinationPath } from "./destinations";
 import type { VoiceSessionClient } from "./session";
 
@@ -17,10 +22,42 @@ import type { VoiceSessionClient } from "./session";
  * receipts are confirmed there. Returns the turn left for the caller: its
  * move (and hand-off), with the actions already performed.
  */
+/** What Q says when a move it made never opened (C's FAILED receipt). */
+export const MOVE_FAILED_LINE =
+  "That page didn't open on your screen. Want me to try again?";
+
+/**
+ * With workstream C: a spoken move is reported through the same hook as a
+ * typed one (`expectNavigation` -> the router's DONE, or FAILED when it
+ * never settles -> the receipt reporter), so the next turn knows. And the
+ * line is told at once when it FAILED, so Q never lets "it's open" stand
+ * for a page that did not open.
+ */
+export function watchSpokenMove(
+  path: string,
+  onFailed: () => void = () => {
+    noteToLine(
+      "Screen note (data, not the person's words): the page you just moved them to did NOT open on their screen (FAILED). Tell them briefly that it didn't open and offer to try again; do not say it is open.",
+      true,
+      MOVE_FAILED_LINE,
+    );
+  },
+  subscribe: (
+    listener: (outcome: NavigationOutcome) => void,
+  ) => () => void = onNavigationOutcome,
+): void {
+  const stop = subscribe((outcome) => {
+    if (outcome.expected !== path) return;
+    stop();
+    if (outcome.status === "FAILED") onFailed();
+  });
+}
+
 export function performTurnChain(
   turn: QVoiceTurnState,
   perform: (action: unknown) => boolean = performClientAction,
   expect: (path?: string) => void = expectNavigation,
+  watch: (path: string) => void = watchSpokenMove,
 ): QVoiceTurnState {
   const chain =
     turn.clientActions !== undefined && turn.clientActions.length > 0
@@ -34,6 +71,7 @@ export function performTurnChain(
     typeof window !== "undefined" &&
     path !== `${window.location.pathname}${window.location.search}`
   ) {
+    watch(path);
     expect(path);
   }
   for (const action of chain) perform(action);
