@@ -193,6 +193,7 @@ export function createDuplexSideband(dependencies: {
           "duplex sideband realtime error",
         );
         break;
+      case undefined:
       default:
         // Function calls are the browser relay's to execute (one owner).
         break;

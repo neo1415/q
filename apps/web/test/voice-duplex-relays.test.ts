@@ -143,8 +143,10 @@ describe("the browser's duplex relays", () => {
     const calls: string[] = [];
     let release: () => void = () => undefined;
     const doFetch = vi.fn<typeof fetch>((url) => {
-      calls.push(String(url));
-      if (String(url).endsWith("/heard")) {
+      const path =
+        typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+      calls.push(path);
+      if (path.endsWith("/heard")) {
         return new Promise((resolve) => {
           release = () => {
             resolve(Response.json(ANSWER));

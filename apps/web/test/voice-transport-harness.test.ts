@@ -11,11 +11,6 @@ import type {
   QTurnDisposition,
 } from "@capital-q/contracts";
 
-// One source of truth for prices: the gateway's own tables.
-import {
-  OPENAI_REALTIME_MINI_PRICES,
-  OPENAI_TRANSCRIBE_PRICES,
-} from "../../../packages/model-gateway/src/realtime/openai.js";
 import {
   DuplexLine,
   type DuplexEnvironment,
@@ -54,6 +49,32 @@ import {
  */
 
 type Mode = "ACTION_QUEUE" | "ROUTE" | "SIDEBAND";
+
+/**
+ * USD per million tokens: the gateway's own tables
+ * (`OPENAI_REALTIME_MINI_PRICES`, `OPENAI_TRANSCRIBE_PRICES` in
+ * packages/model-gateway/src/realtime/openai.ts, 2026-10-04/08). Copied:
+ * the web app does not depend on the gateway. The q-api test
+ * `duplex-voice-recovery.test.ts` fails if these drift from the gateway.
+ */
+const HARNESS_REALTIME_PRICES = {
+  textInput: 0.6,
+  cachedTextInput: 0.06,
+  textOutput: 2.4,
+  audioInput: 10,
+  cachedAudioInput: 0.3,
+  audioOutput: 20,
+} as const;
+const HARNESS_TRANSCRIBE_PRICES = {
+  textInput: 2.5,
+  cachedTextInput: 2.5,
+  textOutput: 10,
+  audioInput: 6,
+  cachedAudioInput: 6,
+  audioOutput: 0,
+} as const;
+const OPENAI_REALTIME_MINI_PRICES = HARNESS_REALTIME_PRICES;
+const OPENAI_TRANSCRIBE_PRICES = HARNESS_TRANSCRIBE_PRICES;
 
 type Timings = {
   /** Browser <-> web <-> Q API round trip for a relay, ms. */

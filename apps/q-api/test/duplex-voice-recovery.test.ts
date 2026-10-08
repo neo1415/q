@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import Fastify, { type FastifyInstance } from "fastify";
 import { describe, expect, it, vi } from "vitest";
@@ -19,6 +21,7 @@ import {
   type RealtimeSessionProvider,
 } from "@capital-q/model-gateway/realtime";
 import {
+  OPENAI_TRANSCRIBE_PRICES,
   OPENAI_REALTIME_MINI_PRICES,
   createOpenAISidebandConnector,
   type RealtimeSidebandConnector,
@@ -776,5 +779,26 @@ describe("A10 (C-17): natural delivery", () => {
     // The substance is still bound.
     expect(text).toContain("Keep every fact, figure, name and commitment");
     expect(text).toContain("Hi Ada. Three investors fit your raise.");
+  });
+});
+
+describe("the transport harness prices", () => {
+  it("are the gateway's own tables (the web harness keeps a copy)", () => {
+    const harness = readFileSync(
+      resolve(__dirname, "../../web/test/voice-transport-harness.test.ts"),
+      "utf8",
+    );
+    const block = (name: string) =>
+      harness
+        .slice(harness.indexOf(`const ${name} = {`))
+        .split("} as const")[0] ?? "";
+    for (const [name, prices] of [
+      ["HARNESS_REALTIME_PRICES", OPENAI_REALTIME_MINI_PRICES],
+      ["HARNESS_TRANSCRIBE_PRICES", OPENAI_TRANSCRIBE_PRICES],
+    ] as const) {
+      for (const [key, value] of Object.entries(prices)) {
+        expect(block(name)).toContain(`${key}: ${String(value)},`);
+      }
+    }
   });
 });
