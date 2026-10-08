@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global process, console, Buffer, URL */
+/* global process, console, Buffer, URL, setTimeout */
 /**
  * Recovery G: a loopback stand-in for the model and voice vendors.
  *
@@ -104,14 +104,17 @@ function view(body) {
       .map((item) => [item.call_id, item.name]),
   );
   return {
-    instructions: typeof body.instructions === "string" ? body.instructions : "",
+    instructions:
+      typeof body.instructions === "string" ? body.instructions : "",
     lastUser: users.at(-1) ?? "",
     // Everything the model would read, tool results included: the Context
     // Firewall tests look for private words anywhere in it.
     allText: [
       body.instructions ?? "",
       ...input.map((item) =>
-        typeof item?.output === "string" ? item.output : textOfContent(item?.content),
+        typeof item?.output === "string"
+          ? item.output
+          : textOfContent(item?.content),
       ),
     ].join("\n"),
     tools: (Array.isArray(body.tools) ? body.tools : [])
@@ -123,7 +126,10 @@ function view(body) {
 
 function matches(rule, seen) {
   const when = rule.when ?? {};
-  if (when.user !== undefined && !new RegExp(when.user, "iu").test(seen.lastUser))
+  if (
+    when.user !== undefined &&
+    !new RegExp(when.user, "iu").test(seen.lastUser)
+  )
     return false;
   if (
     when.instructions !== undefined &&
@@ -245,14 +251,16 @@ function readBody(req) {
 function record(entry) {
   const line = { n: requests.length, at: new Date().toISOString(), ...entry };
   requests.push(line);
-  if (LOG_FILE !== undefined) appendFileSync(LOG_FILE, `${JSON.stringify(line)}\n`);
+  if (LOG_FILE !== undefined)
+    appendFileSync(LOG_FILE, `${JSON.stringify(line)}\n`);
 }
 
 function embedding(text, dimensions) {
   const out = new Array(dimensions);
   let seed = createHash("sha256").update(text).digest();
   for (let i = 0; i < dimensions; i += 1) {
-    if (i % 32 === 0 && i > 0) seed = createHash("sha256").update(seed).digest();
+    if (i % 32 === 0 && i > 0)
+      seed = createHash("sha256").update(seed).digest();
     out[i] = seed[i % 32] / 255 - 0.5;
   }
   const norm = Math.hypot(...out) || 1;
@@ -264,10 +272,14 @@ const server = createServer(async (req, res) => {
   const path = url.pathname;
   const body = req.method === "GET" ? {} : await readBody(req);
 
-  if (path === "/__fake/health") return send(res, 200, { ok: true, script: SCRIPT_FILE });
+  if (path === "/__fake/health")
+    return send(res, 200, { ok: true, script: SCRIPT_FILE });
   if (path === "/__fake/requests") {
     const since = Number(url.searchParams.get("since") ?? 0);
-    return send(res, 200, { requests: requests.slice(since), next: requests.length });
+    return send(res, 200, {
+      requests: requests.slice(since),
+      next: requests.length,
+    });
   }
   if (path === "/__fake/script" && req.method === "PUT") {
     memoryScript = body;
@@ -282,7 +294,9 @@ const server = createServer(async (req, res) => {
   if (path === "/v1/responses" && req.method === "POST") {
     const seen = view(body);
     const script = loadScript();
-    const rule = (script.rules ?? []).find((candidate) => matches(candidate, seen));
+    const rule = (script.rules ?? []).find((candidate) =>
+      matches(candidate, seen),
+    );
     const reply = rule?.reply ?? { json: NO_RULE_ANSWER };
     record({
       vendor: "openai",
@@ -298,7 +312,11 @@ const server = createServer(async (req, res) => {
       await new Promise((r) => setTimeout(r, reply.delayMs));
     if (reply.hang === true) return; // the caller's own timeout is under test
     if (reply.status !== undefined)
-      return send(res, reply.status, reply.body ?? { error: { message: "scripted failure" } });
+      return send(
+        res,
+        reply.status,
+        reply.body ?? { error: { message: "scripted failure" } },
+      );
     const response = responseObject(body.model, reply);
     return body.stream === true ? sse(res, response) : send(res, 200, response);
   }
@@ -324,7 +342,10 @@ const server = createServer(async (req, res) => {
   // (request G-R2); the browser side is faked in the page.
   if (path === "/v1/auth/grant" && req.method === "POST") {
     record({ vendor: "deepgram", path });
-    return send(res, 200, { access_token: `fake-dg-${randomUUID()}`, expires_in: 60 });
+    return send(res, 200, {
+      access_token: `fake-dg-${randomUUID()}`,
+      expires_in: 60,
+    });
   }
   if (path === "/v1/realtime/client_secrets" && req.method === "POST") {
     record({ vendor: "openai-realtime", path });
@@ -336,11 +357,17 @@ const server = createServer(async (req, res) => {
   }
 
   record({ vendor: "unknown", path, method: req.method });
-  return send(res, 404, { error: { message: `fake-vendors: no route ${path}` } });
+  return send(res, 404, {
+    error: { message: `fake-vendors: no route ${path}` },
+  });
 });
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(
-    JSON.stringify({ msg: "fake vendors listening", port: PORT, script: SCRIPT_FILE }),
+    JSON.stringify({
+      msg: "fake vendors listening",
+      port: PORT,
+      script: SCRIPT_FILE,
+    }),
   );
 });

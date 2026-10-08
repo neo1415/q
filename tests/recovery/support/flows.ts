@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { call, tokenFor } from "./http";
+import { call, tokenFor } from "./http.js";
 import {
   answer,
   useScript,
@@ -8,8 +8,8 @@ import {
   vendorRequestsSince,
   type ScriptRule,
   type VendorRequest,
-} from "./script";
-import { Q_API_URL } from "./stack";
+} from "./script.js";
+import { Q_API_URL } from "./stack.js";
 
 /**
  * Q turns over the HTTP API (POST /v1/q/runs), for tests that need Q to
@@ -24,7 +24,12 @@ export type RunResult = {
   readonly vendor: readonly VendorRequest[];
 };
 
-const SETTLED = new Set(["COMPLETED", "FAILED", "CANCELLED", "AWAITING_APPROVAL"]);
+const SETTLED = new Set([
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+  "AWAITING_APPROVAL",
+]);
 
 export async function runQ(
   email: string,
@@ -41,7 +46,9 @@ export async function runQ(
     ...(conversationId === undefined ? {} : { conversationId }),
   });
   const runId = String((created as { runId?: unknown }).runId);
-  const conversation = String((created as { conversationId?: unknown }).conversationId);
+  const conversation = String(
+    (created as { conversationId?: unknown }).conversationId,
+  );
   let run: Record<string, unknown> = {};
   for (let i = 0; i < 120; i += 1) {
     const reply = await call(email, "q-api", "GET", `/v1/q/runs/${runId}`);
@@ -70,7 +77,9 @@ async function callWithKey(email: string, body: unknown): Promise<unknown> {
     body: JSON.stringify(body),
   });
   if (response.status !== 202 && response.status !== 200) {
-    throw new Error(`run refused ${String(response.status)}: ${(await response.text()).slice(0, 200)}`);
+    throw new Error(
+      `run refused ${String(response.status)}: ${(await response.text()).slice(0, 200)}`,
+    );
   }
   return response.json();
 }
@@ -88,8 +97,17 @@ export async function pendingReminderApproval(
   const result = await runQ(email, `Please remind me tomorrow: ${title}`, [
     {
       name: "propose-reminder",
-      when: { task: "COMPANY_ANALYST", user: "remind me tomorrow", tool: "propose_reminder", afterTool: null },
-      reply: { toolCalls: [{ name: "propose_reminder", arguments: { title, remindAt } }] },
+      when: {
+        task: "COMPANY_ANALYST",
+        user: "remind me tomorrow",
+        tool: "propose_reminder",
+        afterTool: null,
+      },
+      reply: {
+        toolCalls: [
+          { name: "propose_reminder", arguments: { title, remindAt } },
+        ],
+      },
     },
     {
       name: "after-reminder",
@@ -98,7 +116,8 @@ export async function pendingReminderApproval(
     },
   ]);
   const listed = await call(email, "q-api", "GET", "/v1/q/approvals");
-  const items = ((listed.body as { items?: unknown[] } | null)?.items ?? []) as Array<{
+  const items = ((listed.body as { items?: unknown[] } | null)?.items ??
+    []) as Array<{
     approvalId: string;
     runId: string;
     summary: string;

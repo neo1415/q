@@ -21,7 +21,9 @@ function axeSource(): string {
       ? readdirSync(store).find((name) => name.startsWith("axe-core@"))
       : undefined;
     const file =
-      dir === undefined ? undefined : resolve(store, dir, "node_modules/axe-core/axe.min.js");
+      dir === undefined
+        ? undefined
+        : resolve(store, dir, "node_modules/axe-core/axe.min.js");
     if (file === undefined || !existsSync(file)) {
       throw new Error("axe-core is not installed (request G-R6)");
     }
@@ -40,11 +42,21 @@ export type AxeViolation = {
 export async function axe(page: Page): Promise<AxeViolation[]> {
   await page.addScriptTag({ path: axeSource() });
   return page.evaluate(async () => {
-    const runner = (window as unknown as {
-      axe: { run: (ctx: unknown, opts: unknown) => Promise<{ violations: unknown[] }> };
-    }).axe;
+    const runner = (
+      window as unknown as {
+        axe: {
+          run: (
+            ctx: unknown,
+            opts: unknown,
+          ) => Promise<{ violations: unknown[] }>;
+        };
+      }
+    ).axe;
     const result = await runner.run(document, {
-      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
+      runOnly: {
+        type: "tag",
+        values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"],
+      },
     });
     return result.violations as never;
   });
@@ -52,6 +64,9 @@ export async function axe(page: Page): Promise<AxeViolation[]> {
 
 export function summarise(violations: readonly AxeViolation[]): string {
   return violations
-    .map((v) => `${v.impact ?? "?"} ${v.id}: ${v.help} (${String(v.nodes.length)}) e.g. ${v.nodes[0]?.target.join(" ") ?? ""}`)
+    .map(
+      (v) =>
+        `${v.impact ?? "?"} ${v.id}: ${v.help} (${String(v.nodes.length)}) e.g. ${v.nodes[0]?.target.join(" ") ?? ""}`,
+    )
     .join("\n");
 }

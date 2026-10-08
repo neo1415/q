@@ -1,5 +1,5 @@
-import { accessTokenFor } from "./auth";
-import { API_URL, Q_API_URL } from "./stack";
+import { accessTokenFor } from "./auth.js";
+import { API_URL, Q_API_URL } from "./stack.js";
 
 /**
  * API-level calls as a signed-in person (their own bearer token, never a
@@ -19,7 +19,11 @@ export function tokenFor(email: string): Promise<string> {
   return token;
 }
 
-export type Reply = { readonly status: number; readonly body: unknown; readonly text: string };
+export type Reply = {
+  readonly status: number;
+  readonly body: unknown;
+  readonly text: string;
+};
 
 export async function call(
   email: string | null,
@@ -30,7 +34,8 @@ export async function call(
 ): Promise<Reply> {
   const base = service === "api" ? API_URL : Q_API_URL;
   const headers: Record<string, string> = { accept: "application/json" };
-  if (email !== null) headers["authorization"] = `Bearer ${await tokenFor(email)}`;
+  if (email !== null)
+    headers["authorization"] = `Bearer ${await tokenFor(email)}`;
   if (body !== undefined) headers["content-type"] = "application/json";
   const response = await fetch(`${base}${path}`, {
     method,
@@ -38,13 +43,16 @@ export async function call(
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const text = await response.text();
-  let parsed: unknown = null;
+  return { status: response.status, body: parseOrNull(text), text };
+}
+
+function parseOrNull(text: string): unknown {
+  if (text.length === 0) return null;
   try {
-    parsed = text.length === 0 ? null : JSON.parse(text);
+    return JSON.parse(text) as unknown;
   } catch {
-    parsed = null;
+    return null;
   }
-  return { status: response.status, body: parsed, text };
 }
 
 /** A refusal is 401/403/404 (problem details), never a 2xx carrying data. */

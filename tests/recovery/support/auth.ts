@@ -1,14 +1,19 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
 
 import {
   PASSWORD,
   RUN_PATH,
   SUPABASE_PUBLISHABLE_KEY,
   SUPABASE_URL,
-} from "./stack";
+} from "./stack.js";
 
 /**
  * Seeded synthetic accounts only (`*@fictional.capitalq.local`). A signed-in
@@ -17,7 +22,10 @@ import {
  */
 const STATE_DIR = resolve(RUN_PATH, "auth");
 
-export async function signInThroughUi(page: Page, email: string): Promise<void> {
+export async function signInThroughUi(
+  page: Page,
+  email: string,
+): Promise<void> {
   await page.addInitScript(() => {
     try {
       sessionStorage.setItem("cq.splash.seen", "1");
@@ -57,14 +65,17 @@ export async function contextAs(
  * a signed-in person can and cannot reach.
  */
 export async function accessTokenFor(email: string): Promise<string> {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_PUBLISHABLE_KEY,
-      "content-type": "application/json",
+  const response = await fetch(
+    `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
+    {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ email, password: PASSWORD }),
     },
-    body: JSON.stringify({ email, password: PASSWORD }),
-  });
+  );
   if (!response.ok) {
     throw new Error(`sign-in for ${email} refused: ${String(response.status)}`);
   }

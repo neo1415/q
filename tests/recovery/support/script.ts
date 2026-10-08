@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { FAKE_URL } from "./stack";
+import { FAKE_URL } from "./stack.js";
 
 /**
  * Drives scripts/recovery/fake-vendors.mjs: what the "model" decides in a
@@ -38,7 +38,10 @@ export type ScriptRule = {
 };
 
 const BASELINE = JSON.parse(
-  readFileSync(resolve(import.meta.dirname, "../fixtures/q-script.json"), "utf8"),
+  readFileSync(
+    resolve(import.meta.dirname, "../fixtures/q-script.json"),
+    "utf8",
+  ),
 ) as { rules: ScriptRule[] };
 
 /** Q's structured answer, the minimum the answer schema accepts. */
@@ -59,7 +62,10 @@ export function answer(
 }
 
 /** The turn reader's verdict for one utterance. */
-export function reading(kind: string, extra: Record<string, unknown> = {}): ScriptRule {
+export function reading(
+  kind: string,
+  extra: Record<string, unknown> = {},
+): ScriptRule {
   return {
     name: `reader-${kind}`,
     when: { task: "TURN_READER" },
@@ -100,8 +106,12 @@ export type VendorRequest = {
 };
 
 /** Requests the fake vendor received since a mark (`vendorMark()`). */
-export async function vendorRequestsSince(mark: number): Promise<VendorRequest[]> {
-  const response = await fetch(`${FAKE_URL}/__fake/requests?since=${String(mark)}`);
+export async function vendorRequestsSince(
+  mark: number,
+): Promise<VendorRequest[]> {
+  const response = await fetch(
+    `${FAKE_URL}/__fake/requests?since=${String(mark)}`,
+  );
   const body = (await response.json()) as { requests: VendorRequest[] };
   return body.requests;
 }
@@ -112,7 +122,10 @@ export async function vendorRequestsSince(mark: number): Promise<VendorRequest[]
  * test that attributes requests to the NEXT person's turn must not count
  * those. Bounded; returns the mark at quiet.
  */
-export async function vendorSettled(quietMs = 3_000, maxMs = 60_000): Promise<number> {
+export async function vendorSettled(
+  quietMs = 3_000,
+  maxMs = 60_000,
+): Promise<number> {
   const started = Date.now();
   let mark = await vendorMark();
   let since = Date.now();
@@ -126,7 +139,9 @@ export async function vendorSettled(quietMs = 3_000, maxMs = 60_000): Promise<nu
       return mark;
     }
   }
-  throw new Error("the vendor never went quiet: background model work did not settle");
+  throw new Error(
+    "the vendor never went quiet: background model work did not settle",
+  );
 }
 
 export async function vendorMark(): Promise<number> {

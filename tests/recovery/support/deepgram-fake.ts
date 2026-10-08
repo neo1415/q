@@ -63,15 +63,29 @@ export async function installDeepgramFake(page: Page): Promise<DeepgramFake> {
     say: async (text: string) => {
       const ws = socket;
       const endpoint = think();
-      if (ws === null || endpoint === null) throw new Error("the line is not up");
+      if (ws === null || endpoint === null)
+        throw new Error("the line is not up");
       ws.send(JSON.stringify({ type: "UserStartedSpeaking" }));
-      ws.send(JSON.stringify({ type: "ConversationText", role: "user", content: text }));
+      ws.send(
+        JSON.stringify({
+          type: "ConversationText",
+          role: "user",
+          content: text,
+        }),
+      );
       ws.send(JSON.stringify({ type: "AgentThinking", content: "" }));
       history.push({ role: "user", content: text });
       const response = await fetch(endpoint.url, {
         method: "POST",
-        headers: { "content-type": "application/json", ...(endpoint.headers ?? {}) },
-        body: JSON.stringify({ model: "capital-q", stream: true, messages: history }),
+        headers: {
+          "content-type": "application/json",
+          ...(endpoint.headers ?? {}),
+        },
+        body: JSON.stringify({
+          model: "capital-q",
+          stream: true,
+          messages: history,
+        }),
       });
       const raw = await response.text();
       let reply = "";
@@ -90,8 +104,16 @@ export async function installDeepgramFake(page: Page): Promise<DeepgramFake> {
       }
       history.push({ role: "assistant", content: reply });
       if (reply.length > 0) {
-        ws.send(JSON.stringify({ type: "AgentStartedSpeaking", total_latency: 0.1 }));
-        ws.send(JSON.stringify({ type: "ConversationText", role: "assistant", content: reply }));
+        ws.send(
+          JSON.stringify({ type: "AgentStartedSpeaking", total_latency: 0.1 }),
+        );
+        ws.send(
+          JSON.stringify({
+            type: "ConversationText",
+            role: "assistant",
+            content: reply,
+          }),
+        );
       }
       ws.send(JSON.stringify({ type: "AgentAudioDone" }));
       return reply;
@@ -100,7 +122,9 @@ export async function installDeepgramFake(page: Page): Promise<DeepgramFake> {
       await socket?.close({ code, reason: "fake drop" });
     },
     error: (description: string) => {
-      socket?.send(JSON.stringify({ type: "Error", description, code: "FAKE" }));
+      socket?.send(
+        JSON.stringify({ type: "Error", description, code: "FAKE" }),
+      );
     },
   };
 }

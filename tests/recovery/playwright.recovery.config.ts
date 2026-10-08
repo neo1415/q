@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
 
-import { STACK_MODE, WEB_URL } from "./support/stack";
+import { STACK_MODE, WEB_URL } from "./support/stack.js";
 
 /**
  * Recovery G: independent verification of the release candidate.
@@ -39,7 +39,9 @@ const chromium = {
   ...devices["Desktop Chrome"],
   viewport: { width: 1440, height: 900 },
   permissions: ["microphone"],
-  ...(PROXY === undefined ? {} : { proxy: { server: PROXY }, ignoreHTTPSErrors: true }),
+  ...(PROXY === undefined
+    ? {}
+    : { proxy: { server: PROXY }, ignoreHTTPSErrors: true }),
   launchOptions: {
     executablePath: CHROMIUM,
     headless: !REAL_MIC,
@@ -48,7 +50,9 @@ const chromium = {
       : [
           "--use-fake-ui-for-media-stream",
           "--use-fake-device-for-media-stream",
-          ...(MIC === undefined ? [] : [`--use-file-for-fake-audio-capture=${MIC}`]),
+          ...(MIC === undefined
+            ? []
+            : [`--use-file-for-fake-audio-capture=${MIC}`]),
           "--autoplay-policy=no-user-gesture-required",
         ],
   },
@@ -65,10 +69,7 @@ export default defineConfig({
   outputDir: `${OUT}/results`,
   // Every report says which world it ran in; results-table.mjs prints it.
   metadata: { mode: MODE },
-  reporter: [
-    ["list"],
-    ["json", { outputFile: `${OUT}/report.json` }],
-  ],
+  reporter: [["list"], ["json", { outputFile: `${OUT}/report.json` }]],
   use: {
     baseURL: WEB_URL,
     trace: "retain-on-failure",
@@ -90,7 +91,11 @@ export default defineConfig({
       name: "phone",
       testDir: "./scenarios",
       testMatch: /a-navigate\.spec\.ts$/u,
-      use: { ...chromium, ...devices["Pixel 7"], viewport: { width: 390, height: 844 } },
+      use: {
+        ...chromium,
+        ...devices["Pixel 7"],
+        viewport: { width: 390, height: 844 },
+      },
     },
   ],
 });

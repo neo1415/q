@@ -14,9 +14,13 @@ import type { Page } from "@playwright/test";
  * The SDP POST is answered by `page.route`, or held forever to simulate a
  * realtime connect timeout (DUPLEX_CONNECT_MS, duplex-line.ts:352).
  */
-export type DuplexMode = "connect" | "never-answer" | "refuse" | "channel-never-opens";
+export type DuplexMode =
+  "connect" | "never-answer" | "refuse" | "channel-never-opens";
 
-export async function installDuplexFake(page: Page, mode: DuplexMode = "connect"): Promise<void> {
+export async function installDuplexFake(
+  page: Page,
+  mode: DuplexMode = "connect",
+): Promise<void> {
   await page.addInitScript((fakeMode: DuplexMode) => {
     type Listener = (event: { data: string }) => void;
     const own = window as Window & {
@@ -27,8 +31,10 @@ export async function installDuplexFake(page: Page, mode: DuplexMode = "connect"
     };
     own.__cqDuplexSent = [];
     own.__cqDuplexPeers = 0;
-    let channelRef: { onmessage: Listener | null; dispatch: (data: string) => void } | null =
-      null;
+    let channelRef: {
+      onmessage: Listener | null;
+      dispatch: (data: string) => void;
+    } | null = null;
     own.__cqDuplexEmit = (event) => channelRef?.dispatch(JSON.stringify(event));
 
     class FakeChannel extends EventTarget {
@@ -40,7 +46,6 @@ export async function installDuplexFake(page: Page, mode: DuplexMode = "connect"
       constructor(label: string) {
         super();
         this.label = label;
-        channelRef = this;
       }
       open() {
         if (fakeMode === "channel-never-opens") return;
@@ -51,7 +56,7 @@ export async function installDuplexFake(page: Page, mode: DuplexMode = "connect"
       }
       dispatch(data: string) {
         const event = new MessageEvent("message", { data });
-        this.onmessage?.(event as never);
+        this.onmessage?.(event);
         this.dispatchEvent(event);
       }
       send(data: string) {
@@ -80,22 +85,33 @@ export async function installDuplexFake(page: Page, mode: DuplexMode = "connect"
         own.__cqDuplexState = (state) => this.#setState(state);
       }
       addTrack(track: MediaStreamTrack) {
-        return { track, replaceTrack: async () => undefined, getParameters: () => ({}) };
+        return {
+          track,
+          replaceTrack: () => Promise.resolve(),
+          getParameters: () => ({}),
+        };
       }
       createDataChannel(label: string) {
         this.#channel = new FakeChannel(label);
+        channelRef = this.#channel;
         return this.#channel;
       }
-      async createOffer() {
-        return { type: "offer", sdp: "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=fake\r\n" };
+      createOffer() {
+        return Promise.resolve({
+          type: "offer",
+          sdp: "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=fake\r\n",
+        });
       }
-      async setLocalDescription() {}
-      async setRemoteDescription() {
+      setLocalDescription() {
+        return Promise.resolve();
+      }
+      setRemoteDescription() {
         this.#setState("connected");
         setTimeout(() => this.#channel?.open(), 10);
+        return Promise.resolve();
       }
-      async getStats() {
-        return new Map();
+      getStats() {
+        return Promise.resolve(new Map());
       }
       getReceivers() {
         return [];
@@ -113,12 +129,14 @@ export async function installDuplexFake(page: Page, mode: DuplexMode = "connect"
         this.dispatchEvent(new Event("connectionstatechange"));
       }
     }
-    (window as unknown as { RTCPeerConnection: unknown }).RTCPeerConnection = FakePeer;
+    (window as unknown as { RTCPeerConnection: unknown }).RTCPeerConnection =
+      FakePeer;
   }, mode);
 
   await page.route(/\/v1\/realtime\/calls/u, async (route) => {
     if (mode === "never-answer") return new Promise<void>(() => undefined);
-    if (mode === "refuse") return route.fulfill({ status: 500, body: "refused" });
+    if (mode === "refuse")
+      return route.fulfill({ status: 500, body: "refused" });
     return route.fulfill({
       status: 201,
       headers: {
@@ -131,17 +149,38 @@ export async function installDuplexFake(page: Page, mode: DuplexMode = "connect"
 }
 
 /** Emits a realtime server event on the fake data channel. */
-export async function emitRealtime(page: Page, event: Record<string, unknown>): Promise<void> {
+export async function emitRealtime(
+  page: Page,
+  event: Record<string, unknown>,
+): Promise<void> {
   await page.evaluate((e) => {
-    (window as Window & { __cqDuplexEmit?: (x: unknown) => void }).__cqDuplexEmit?.(e);
+    (
+      window as Window & { __cqDuplexEmit?: (x: unknown) => void }
+    ).__cqDuplexEmit?.(e);
   }, event);
 }
 
 /** A whole spoken user turn as the realtime API reports it. */
-export async function userSays(page: Page, itemId: string, transcript: string): Promise<void> {
-  await emitRealtime(page, { type: "input_audio_buffer.speech_started", item_id: itemId, audio_start_ms: 0 });
-  await emitRealtime(page, { type: "input_audio_buffer.speech_stopped", item_id: itemId, audio_end_ms: 1200 });
-  await emitRealtime(page, { type: "input_audio_buffer.committed", item_id: itemId, previous_item_id: null });
+export async function userSays(
+  page: Page,
+  itemId: string,
+  transcript: string,
+): Promise<void> {
+  await emitRealtime(page, {
+    type: "input_audio_buffer.speech_started",
+    item_id: itemId,
+    audio_start_ms: 0,
+  });
+  await emitRealtime(page, {
+    type: "input_audio_buffer.speech_stopped",
+    item_id: itemId,
+    audio_end_ms: 1200,
+  });
+  await emitRealtime(page, {
+    type: "input_audio_buffer.committed",
+    item_id: itemId,
+    previous_item_id: null,
+  });
   await emitRealtime(page, {
     type: "conversation.item.input_audio_transcription.completed",
     item_id: itemId,
@@ -150,15 +189,23 @@ export async function userSays(page: Page, itemId: string, transcript: string): 
   });
 }
 
-export async function duplexSent(page: Page): Promise<Array<{ type?: string }>> {
+export async function duplexSent(
+  page: Page,
+): Promise<Array<{ type?: string }>> {
   return page.evaluate(
     () =>
-      ((window as Window & { __cqDuplexSent?: unknown[] }).__cqDuplexSent ?? []) as never,
+      ((window as Window & { __cqDuplexSent?: unknown[] }).__cqDuplexSent ??
+        []) as never,
   );
 }
 
-export async function setPeerState(page: Page, state: RTCPeerConnectionState): Promise<void> {
+export async function setPeerState(
+  page: Page,
+  state: RTCPeerConnectionState,
+): Promise<void> {
   await page.evaluate((s) => {
-    (window as Window & { __cqDuplexState?: (x: string) => void }).__cqDuplexState?.(s);
+    (
+      window as Window & { __cqDuplexState?: (x: string) => void }
+    ).__cqDuplexState?.(s);
   }, state);
 }

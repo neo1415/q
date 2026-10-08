@@ -8,7 +8,8 @@ import { resolve } from "node:path";
  */
 const ROOT = resolve(import.meta.dirname, "../../..");
 const RUN_DIR =
-  process.env["CQ_RECOVERY_RUN_DIR"] ?? resolve(ROOT, ".playwright/recovery-stack");
+  process.env["CQ_RECOVERY_RUN_DIR"] ??
+  resolve(ROOT, ".playwright/recovery-stack");
 
 function stackEnv(): Record<string, string> {
   const file = resolve(RUN_DIR, "stack.env");
@@ -71,13 +72,18 @@ export function world(): {
 } {
   const file = resolve(RUN_DIR, "fictional-world/manifest.json");
   if (!existsSync(file)) {
-    throw new Error(`no seeded world at ${file}: run scripts/recovery/local-stack.sh seed`);
+    throw new Error(
+      `no seeded world at ${file}: run scripts/recovery/local-stack.sh seed`,
+    );
   }
   const manifest = JSON.parse(readFileSync(file, "utf8")) as {
     companies: WorldCompany[];
     investors: WorldInvestor[];
   };
-  const find = <T extends { key: string }>(list: readonly T[], key: string): T => {
+  const find = <T extends { key: string }>(
+    list: readonly T[],
+    key: string,
+  ): T => {
     const found = list.find((entry) => entry.key === key);
     if (found === undefined) throw new Error(`seed has no ${key}`);
     return found;

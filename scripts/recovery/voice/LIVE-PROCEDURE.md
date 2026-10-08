@@ -45,13 +45,13 @@ A browser window opens, signed in as Ledgerfold's founder. When the line shows *
 
 Record five short clips, 3–8 seconds each, at a normal pace in a normal room. Use any recorder that can export WAV, or `ffmpeg -f avfoundation -i ":0" -ac 1 -ar 16000 -sample_fmt s16 01-raise.wav` on a Mac. Put each in `.playwright/recovery-stack/clips/`, with a `.txt` file holding the exact words:
 
-| File | Say |
-|---|---|
-| `01-raise.wav` | How much are we raising for this round? |
-| `02-navigate.wav` | Abeg carry me go my documents. |
-| `03-attention.wav` | Wetin dey need my attention today? |
-| `04-investor.wav` | Open Savanna Seed and show me their mandate. |
-| `05-correct.wav` | Send it on Tuesday, no, Wednesday morning. |
+| File               | Say                                          |
+| ------------------ | -------------------------------------------- |
+| `01-raise.wav`     | How much are we raising for this round?      |
+| `02-navigate.wav`  | Abeg carry me go my documents.               |
+| `03-attention.wav` | Wetin dey need my attention today?           |
+| `04-investor.wav`  | Open Savanna Seed and show me their mandate. |
+| `05-correct.wav`   | Send it on Tuesday, no, Wednesday morning.   |
 
 Convert anything else first: `ffmpeg -i in.m4a -ac 1 -ar 16000 -sample_fmt s16 01-raise.wav`.
 

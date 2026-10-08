@@ -82,13 +82,15 @@ net.Socket.prototype.connect = function guardedConnect(...args) {
 // processes never use it. A LIVE run on a machine that can only reach the
 // vendor through a proxy sets CQ_EGRESS_KEEP_PROXY=1 and lists the proxy
 // host in CQ_EGRESS_ALLOW; the report then says the guard was proxy-wide.
-for (const name of process.env.CQ_EGRESS_KEEP_PROXY === "1" ? [] : [
-  "HTTPS_PROXY",
-  "HTTP_PROXY",
-  "https_proxy",
-  "http_proxy",
-  "ALL_PROXY",
-  "all_proxy",
-]) {
+for (const name of process.env.CQ_EGRESS_KEEP_PROXY === "1"
+  ? []
+  : [
+      "HTTPS_PROXY",
+      "HTTP_PROXY",
+      "https_proxy",
+      "http_proxy",
+      "ALL_PROXY",
+      "all_proxy",
+    ]) {
   delete process.env[name];
 }

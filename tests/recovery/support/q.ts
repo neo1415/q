@@ -1,5 +1,22 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import type { QTurnDisposition, QUiActReceipt } from "@capital-q/contracts";
+/**
+ * Mirrors of the lead's contracts (packages/contracts/src/q/turn.ts and
+ * ui-act.ts). The root test project does not depend on @capital-q/contracts;
+ * these are what the DOM is read against, nothing is produced from them.
+ */
+type QTurnDisposition =
+  | "ANSWERED"
+  | "CLARIFIED"
+  | "ACTED"
+  | "FAILED"
+  | "CANCELLED"
+  | "SUPERSEDED"
+  | "IGNORED";
+type QUiActReceipt = {
+  readonly actId: string;
+  readonly status: "DONE" | "TARGET_MISSING" | "NOT_APPLICABLE" | "FAILED";
+  readonly seq?: number;
+};
 
 /**
  * Talking to Q the way a person does, and reading what the product shows.
@@ -23,14 +40,17 @@ export const TERMINAL: readonly QTurnDisposition[] = [
 ];
 
 export function composer(page: Page): Locator {
-  return page
-    .getByPlaceholder(/^(Message Q|Ask Q|Type instead)/u)
-    .first();
+  return page.getByPlaceholder(/^(Message Q|Ask Q|Type instead)/u).first();
 }
 
 /** Opens Q from wherever the person is (the Q page, or the shell's Ask Q). */
 export async function openQ(page: Page): Promise<void> {
-  if (await composer(page).isVisible().catch(() => false)) return;
+  if (
+    await composer(page)
+      .isVisible()
+      .catch(() => false)
+  )
+    return;
   await page.getByRole("button", { name: "Ask Q" }).first().click();
   await expect(composer(page)).toBeVisible({ timeout: 30_000 });
 }
@@ -45,7 +65,9 @@ export async function ask(page: Page, text: string): Promise<Locator> {
   const before = await settledAnswers(page).count();
   await composer(page).fill(text);
   await composer(page).press("Enter");
-  await expect(settledAnswers(page)).toHaveCount(before + 1, { timeout: 120_000 });
+  await expect(settledAnswers(page)).toHaveCount(before + 1, {
+    timeout: 120_000,
+  });
   return settledAnswers(page).nth(before);
 }
 
@@ -90,7 +112,9 @@ export type SeenReceipt = QUiActReceipt & { act?: string; target?: string };
 
 export async function receipts(page: Page): Promise<SeenReceipt[]> {
   return page.evaluate(
-    () => ((window as Window & { __cqReceipts?: unknown[] }).__cqReceipts ?? []) as never,
+    () =>
+      ((window as Window & { __cqReceipts?: unknown[] }).__cqReceipts ??
+        []) as never,
   );
 }
 
@@ -104,10 +128,14 @@ export async function expectReceipt(
       async () =>
         (await receipts(page)).some((receipt) =>
           Object.entries(match).every(
-            ([key, value]) => (receipt as Record<string, unknown>)[key] === value,
+            ([key, value]) =>
+              (receipt as Record<string, unknown>)[key] === value,
           ),
         ),
-      { timeout, message: `a UI act receipt matching ${JSON.stringify(match)}` },
+      {
+        timeout,
+        message: `a UI act receipt matching ${JSON.stringify(match)}`,
+      },
     )
     .toBe(true);
 }

@@ -8,7 +8,10 @@ import type { BrowserContext, Page, Route } from "@playwright/test";
 /** Next.js server actions are POSTs carrying a `next-action` header. */
 function isServerAction(route: Route): boolean {
   const request = route.request();
-  return request.method() === "POST" && request.headers()["next-action"] !== undefined;
+  return (
+    request.method() === "POST" &&
+    request.headers()["next-action"] !== undefined
+  );
 }
 
 /**
@@ -34,7 +37,10 @@ export async function failServerActions(
 }
 
 /** Network loss for `ms`, then back. */
-export async function dropNetwork(context: BrowserContext, ms: number): Promise<void> {
+export async function dropNetwork(
+  context: BrowserContext,
+  ms: number,
+): Promise<void> {
   await context.setOffline(true);
   await new Promise((resolve) => setTimeout(resolve, ms));
   await context.setOffline(false);
@@ -57,7 +63,9 @@ export async function trackMicrophones(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const own = window as Window & { __cqTracks?: MediaStreamTrack[] };
     own.__cqTracks = [];
-    const original = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
+    const original = navigator.mediaDevices?.getUserMedia?.bind(
+      navigator.mediaDevices,
+    );
     if (original === undefined) return;
     navigator.mediaDevices.getUserMedia = async (constraints) => {
       const stream = await original(constraints);
