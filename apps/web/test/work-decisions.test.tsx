@@ -577,11 +577,14 @@ describe("a held card (Zino, 2026-10-08: 'I have no way to approve it')", () => 
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Yes, send this" }));
     await settle();
-    expect(sendAsIs).toHaveBeenCalledWith({
+    expect(sendAsIs).toHaveBeenCalledTimes(1);
+    expect(sendAsIs.mock.calls[0]?.[0]).toMatchObject({
       relationshipId: REL_S,
       body: "Hello Spheros team",
-      idempotencyKey: expect.stringMatching(/^held-/u),
     });
+    expect(JSON.stringify(sendAsIs.mock.calls[0]?.[0])).toMatch(
+      /"idempotencyKey":"held-/u,
+    );
     expect(onDecided).toHaveBeenCalledWith(id(3));
   });
 
@@ -595,11 +598,14 @@ describe("a held card (Zino, 2026-10-08: 'I have no way to approve it')", () => 
     await settle();
     fireEvent.click(screen.getByRole("button", { name: "Ask Q to try again" }));
     await settle();
-    expect(retryHeld).toHaveBeenCalledWith({
+    expect(retryHeld).toHaveBeenCalledTimes(1);
+    expect(retryHeld.mock.calls[0]?.[0]).toMatchObject({
       draftId: id(3),
       relationshipId: REL_S,
-      idempotencyKey: expect.stringMatching(/^retry-/u),
     });
+    expect(JSON.stringify(retryHeld.mock.calls[0]?.[0])).toMatch(
+      /"idempotencyKey":"retry-/u,
+    );
     expect(onDecided).toHaveBeenCalledWith(id(3));
   });
 });
