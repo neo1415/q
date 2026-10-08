@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./speech": {
+      "types": "./dist/speech/public.d.ts",
+      "default": "./dist/speech/public.js"
     }
   },
   "main": "./dist/index.js",

@@ -182,7 +182,7 @@ export function useDismissedHeld(): ReadonlySet<string> {
   return useMemo(() => parseDismissed(raw), [raw]);
 }
 
-function dismissHeld(draftId: string): void {
+export function dismissHeld(draftId: string): void {
   try {
     const next = [...parseDismissed(rawDismissed()), draftId].slice(-200);
     window.localStorage.setItem(HELD_KEY, JSON.stringify(next));

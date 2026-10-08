@@ -352,6 +352,9 @@ importers:
       '@capital-q/onboarding':
         specifier: workspace:*
         version: link:../../packages/onboarding
+      '@capital-q/q-core':
+        specifier: workspace:*
+        version: link:../../packages/q-core
       '@capital-q/ui':
         specifier: workspace:*
         version: link:../../packages/ui

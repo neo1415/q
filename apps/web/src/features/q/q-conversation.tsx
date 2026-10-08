@@ -33,6 +33,10 @@ import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { ViewTransition } from "@/components/view-transition";
 import type { Briefing } from "@/features/home/briefing";
+import {
+  arrivalPending,
+  arrivalSpoken,
+} from "@/features/briefing/arrival-store";
 import { decideBriefing } from "@/features/home/briefing-gate";
 import {
   DECK_OFFER_QUESTION,
@@ -160,6 +164,14 @@ async function spokenWelcome(
   welcomeLead: string | undefined,
   briefing: Promise<Briefing | null> | undefined,
 ): Promise<string> {
+  // The arrival briefing (2026-10-08), when this page gives one: greeting
+  // by their clock, the lowdown, and the first card put to them.
+  for (let waited = 0; arrivalPending() && waited < BRIEFING_WAIT_MS;) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    waited += 100;
+  }
+  const arrival = arrivalSpoken();
+  if (arrival !== null) return arrival;
   if (briefing === undefined) return welcomeLine;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<null>((resolve) => {
