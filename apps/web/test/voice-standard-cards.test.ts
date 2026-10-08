@@ -13,8 +13,18 @@ import {
   setStandingNote,
   spokenNote,
 } from "../src/features/voice/line-cards";
+import {
+  NAVIGATION_WAIT_MS,
+  noteRoute,
+  onNavigationOutcome,
+  type NavigationOutcome,
+} from "../src/features/q/ui-act-controller";
+import { onLineNote } from "../src/features/voice/line-cards";
 import { standardLineCards } from "../src/features/voice/provider/standard-cards";
-import { performTurnChain } from "../src/features/voice/use-follow-turn";
+import {
+  MOVE_FAILED_LINE,
+  performTurnChain,
+} from "../src/features/voice/use-follow-turn";
 
 /**
  * RECOVERY A, audit E-03: the standard voice line (Deepgram, think,
@@ -178,6 +188,7 @@ describe("a spoken answer's chain of client actions (with workstream C)", () => 
       (path) => {
         calls.push(`expect:${path ?? ""}`);
       },
+      () => undefined,
     );
     expect(calls[0]).toMatch(/^expect:\/capital/u);
     expect(calls.slice(1)).toEqual([
@@ -207,5 +218,63 @@ describe("a spoken answer's chain of client actions (with workstream C)", () => 
       () => undefined,
     );
     expect(calls).toEqual([{ kind: "RELOAD_PAGE" }]);
+  });
+});
+
+describe("a spoken move reports its receipt like a typed one (with workstream C)", () => {
+  const moveTurn = {
+    sequence: 7,
+    asking: null,
+    navigate: "CAPITAL",
+    handoff: null,
+    degraded: false,
+  } as QVoiceTurnState;
+
+  it("a move that never opens is reported FAILED, and the line is told to say so", () => {
+    vi.useFakeTimers();
+    try {
+      const outcomes: NavigationOutcome[] = [];
+      const notes: (string | undefined)[] = [];
+      cleanups.push(onNavigationOutcome((o) => outcomes.push(o)));
+      cleanups.push(
+        onLineNote((_note, respond, say) => {
+          if (respond) notes.push(say);
+        }),
+      );
+      performTurnChain(moveTurn, () => true);
+      vi.advanceTimersByTime(NAVIGATION_WAIT_MS + 10);
+      expect(outcomes).toEqual([
+        {
+          status: "FAILED",
+          expected: expect.stringMatching(/capital/u) as unknown,
+        },
+      ]);
+      expect(notes).toEqual([MOVE_FAILED_LINE]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a move that lands is reported DONE, and nothing is said about it", () => {
+    vi.useFakeTimers();
+    try {
+      const outcomes: NavigationOutcome[] = [];
+      const notes: (string | undefined)[] = [];
+      cleanups.push(onNavigationOutcome((o) => outcomes.push(o)));
+      cleanups.push(
+        onLineNote((_note, respond, say) => {
+          if (respond) notes.push(say);
+        }),
+      );
+      noteRoute("/somewhere-else");
+      performTurnChain(moveTurn, () => true);
+      const expected = outcomes.length;
+      noteRoute("/capital");
+      expect(outcomes.slice(expected)[0]).toMatchObject({ status: "DONE" });
+      vi.advanceTimersByTime(NAVIGATION_WAIT_MS + 10);
+      expect(notes).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

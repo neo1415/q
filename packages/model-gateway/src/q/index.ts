@@ -121,6 +121,9 @@ export type { QOwnIndex } from "./own-standing.js";
 export { companiesInOutcome } from "./card-subjects.js";
 export { fitAnswerCardsBlock, fitsInOutcome } from "./fit-cards.js";
 export { readinessLeadLines } from "./own-readiness.js";
+// RECOVERY B1 on voice (workstream A): the voice line says this answer from
+// the attention report, for the same question.
+export { asksWhatNeedsThem } from "./attention-answer.js";
 export {
   createSmallTalkReply,
   type SmallTalkReply,

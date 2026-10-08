@@ -1,4 +1,9 @@
-import type { QAnswerCard, QResultBlock } from "@capital-q/contracts";
+import type {
+  QAnswerCard,
+  QAttentionReport,
+  QAttentionSource,
+  QResultBlock,
+} from "@capital-q/contracts";
 
 /**
  * Facts to speak, not words to read (research 2026-10-07 §4, founder live
@@ -22,7 +27,7 @@ import type { QAnswerCard, QResultBlock } from "@capital-q/contracts";
 
 export const SPOKEN_FACTS_VERSION = 1 as const;
 
-export type SpokenFactsKind = "RANKED" | "RECORD" | "NAVIGATE";
+export type SpokenFactsKind = "RANKED" | "RECORD" | "NAVIGATE" | "ATTENTION";
 
 export type SpokenItem = {
   readonly name: string;
@@ -67,6 +72,11 @@ export type SpokenFacts = {
   readonly talkAbout: boolean;
   /** Said when no model can say it in time; passes every check. */
   readonly fallback: string;
+  /**
+   * ATTENTION: sources that could not be read (never said as "nothing"),
+   * in plain words; empty when every source was read.
+   */
+  readonly unread?: readonly string[] | undefined;
 };
 
 const NUMBER_WORDS = [
@@ -679,15 +689,33 @@ export function spokenFidelityIssues(
       }
     }
   }
+  if (facts.kind === "ATTENTION") {
+    const unread = facts.unread ?? [];
+    const saysNothing = NOTHING_WAITING.test(said);
+    // Something waits: never "nothing is waiting". Nothing waits: say so
+    // plainly, and only when every source was read.
+    if (facts.items.length > 0 && saysNothing) issues.add("MUST_SAY");
+    if (facts.items.length === 0 && unread.length === 0 && !saysNothing) {
+      issues.add("MUST_SAY");
+    }
+    if (unread.length > 0 && !COULD_NOT_CHECK.test(said)) {
+      issues.add("MUST_SAY");
+    }
+  }
   if (BANNED_SPOKEN_PHRASES.some((pattern) => pattern.test(said))) {
     issues.add("BANNED");
   }
-  if (words(said) > SPOKEN_FACTS_WORDS_MAX) issues.add("LENGTH");
+  // ATTENTION names up to three items in their own words: a little room.
+  const maxWords =
+    facts.kind === "ATTENTION"
+      ? SPOKEN_FACTS_WORDS_MAX + 40
+      : SPOKEN_FACTS_WORDS_MAX;
+  if (words(said) > maxWords) issues.add("LENGTH");
   const allowed = new Set<string>();
   for (const item of facts.items) {
     if (item.score !== null) allowed.add(item.score);
     // Their raise and their own one line are facts too ("$2 million").
-    for (const text of [item.raise, item.does]) {
+    for (const text of [item.raise, item.does, item.name, item.about]) {
       for (const match of (text ?? "").matchAll(/\b\d+(?:\.\d+)?\b/gu)) {
         allowed.add(match[0]);
       }
@@ -740,5 +768,116 @@ export function factsForVoice(
     ...(facts.caveat === null ? {} : { caveat: facts.caveat }),
     ...(facts.next === null ? {} : { next: facts.next }),
     detailOnScreen: facts.onScreen,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// ATTENTION (RECOVERY-2026-10, B1 on voice): "what needs my attention",
+// said from the attention report's items -- the real ones, by name -- or,
+// truthfully, that nothing is waiting; a source that could not be read is
+// said as unchecked, never as empty.
+
+const NOTHING_WAITING =
+  /\b(?:nothing(?:'s|\s+is)?\s+(?:waiting|pending|needs)|no(?:thing)?\s+(?:one|body)\s+is\s+waiting|you(?:'re|\s+are)\s+all\s+clear|all\s+clear)\b/iu;
+const COULD_NOT_CHECK =
+  /\b(?:couldn't|could\s+not|can't|cannot|wasn't\s+able\s+to|unable\s+to)\s+(?:check|read|see|reach|get\s+to)\b/iu;
+
+const ATTENTION_SOURCE_WORDS: Readonly<Record<QAttentionSource, string>> = {
+  UNANSWERED_MESSAGE: "your messages",
+  APPROVAL: "your approvals",
+  HELD_DRAFT: "drafts held back",
+  AGENT_BLOCKED: "Q's agents",
+  DOCUMENT_REQUEST: "document requests",
+  INTEREST_REQUEST: "interest requests",
+  MEETING: "your calls",
+  REMINDER: "your reminders",
+  NEW_MATCHES: "new matches",
+  NOTICE: "your notices",
+};
+
+/** Items said aloud; the rest are counted and are in the chat. */
+const ATTENTION_SAID_MAX = 3;
+
+function sentenceOf(text: string): string {
+  const trimmed = text.trim();
+  return /[.!?]$/u.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+/**
+ * The spoken facts of an attention report: each item's counterpart (or
+ * title) must be said; the count is what it is; unread sources are said
+ * as unchecked. Deterministic; the fallback passes every check.
+ */
+export function spokenFactsOfAttention(report: QAttentionReport): SpokenFacts {
+  const said = report.items.slice(0, ATTENTION_SAID_MAX);
+  const items: SpokenItem[] = said.map((item) => ({
+    name: item.counterpart ?? item.title,
+    score: null,
+    about: item.title,
+    does: item.detail ?? null,
+    strengths: [],
+    unknowns: [],
+  }));
+  const more = report.items.length - said.length;
+  const unread = report.unread.map((source) => ATTENTION_SOURCE_WORDS[source]);
+  const unreadLine =
+    unread.length === 0
+      ? null
+      : `I couldn't check ${spokenList(unread)} just now, so something may be waiting there.`;
+  const lines: string[] = [];
+  if (report.items.length === 0) {
+    lines.push(
+      unread.length === 0
+        ? "Nothing is waiting on you right now."
+        : "I found nothing waiting in the places I could check.",
+    );
+  } else {
+    lines.push(
+      report.items.length === 1
+        ? "One thing needs you."
+        : `${sayNumber(report.items.length)} things need you.`.replace(
+            /^./u,
+            (c) => c.toUpperCase(),
+          ),
+    );
+    said.forEach((item, index) => {
+      const lead =
+        index === 0 ? "" : index === said.length - 1 ? "And " : "Then ";
+      const title = sentenceOf(item.title);
+      lines.push(
+        lead.length === 0
+          ? title
+          : `${lead}${title.charAt(0).toLowerCase()}${title.slice(1)}`,
+      );
+    });
+    if (more > 0) {
+      lines.push(
+        `${more === 1 ? "One more is" : `${sayNumber(more)} more are`} in the chat.`.replace(
+          /^./u,
+          (c) => c.toUpperCase(),
+        ),
+      );
+    }
+  }
+  if (unreadLine !== null) lines.push(unreadLine);
+  return {
+    version: SPOKEN_FACTS_VERSION,
+    kind: "ATTENTION",
+    requested: null,
+    items,
+    ties: [],
+    alsoLevel: 0,
+    others: [],
+    // The real items, by name (a counterpart, else the item itself).
+    mustSay: said.map((item) => item.counterpart ?? item.title),
+    caveat: unreadLine,
+    next: report.items.some((item) => item.decidable)
+      ? "Want to go through them one by one?"
+      : null,
+    onScreen: false,
+    place: null,
+    talkAbout: false,
+    fallback: lines.join(" "),
+    unread,
   };
 }
