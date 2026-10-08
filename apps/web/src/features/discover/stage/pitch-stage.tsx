@@ -62,7 +62,7 @@ const AXIS_LOCK = 12;
 /**
  * Which cards hold a player, by offset from the one in view: the one
  * behind (kept, so a swipe back is instant), the one in view, and the next
- * two (buffering, ADR 0063). The card at index i always lives in slot
+ * two (buffering, ADR 0064). The card at index i always lives in slot
  * i % SLOT_COUNT, so moving on hands the next card's element -- already
  * buffered -- the ACTIVE tier in place, with no re-attach.
  */
@@ -71,7 +71,7 @@ const SLOT_COUNT = SLOT_OFFSETS.length;
 
 /**
  * The media layer: at most four players, recycled (spec §9.5 as amended
- * by ADR 0063). A card the controller has put in the POSTER tier but that
+ * by ADR 0064). A card the controller has put in the POSTER tier but that
  * has no slot gets its poster warmed as an image and no `<video>`.
  */
 function FeedMedia({

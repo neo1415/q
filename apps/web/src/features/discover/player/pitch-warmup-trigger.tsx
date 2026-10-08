@@ -11,7 +11,7 @@ import { warmPitch } from "./pitch-warmup";
 
 /**
  * An investor's first pitches, warmed while they are anywhere else in the
- * app (ADR 0063): once per browser session, when the page is idle, never
+ * app (ADR 0064): once per browser session, when the page is idle, never
  * on Save-Data or a slow link, and never on Discover itself (its own
  * window does that). The slate read and the grants are the same reads
  * Discover makes; nothing is recorded, and nothing plays.

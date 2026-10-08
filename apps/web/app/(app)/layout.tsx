@@ -116,7 +116,7 @@ export default async function ApplicationLayout({
       <BrandStyle css={brandCss} />
       {children}
       <InstallPrompt />
-      {/* An investor's first pitches, cached before Discover opens (ADR 0063). */}
+      {/* An investor's first pitches, cached before Discover opens (ADR 0064). */}
       {context.kind === "INVESTOR" && unfinished === null ? (
         <PitchWarmup />
       ) : null}

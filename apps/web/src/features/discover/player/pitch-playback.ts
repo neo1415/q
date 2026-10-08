@@ -177,7 +177,7 @@ export const FIRST_FRAME_TIMEOUT_MS = 8_000;
 /**
  * Attach `url` to the element; returns the detach. `mediaKey` (the media
  * asset id the URL was authorised for) lets a streaming adapter key its
- * cache by the asset rather than the rotating signed URL (ADR 0063).
+ * cache by the asset rather than the rotating signed URL (ADR 0064).
  */
 export type AttachSource = (
   video: HTMLVideoElement,

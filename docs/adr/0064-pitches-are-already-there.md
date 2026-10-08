@@ -1,4 +1,4 @@
-# ADR 0063: Pitches are already there (preload window, device cache, one stage, sound on)
+# ADR 0064: Pitches are already there (preload window, device cache, one stage, sound on)
 
 Status: Accepted (founder direction 2026-10-08, repeated: "the next video or next two must always be ready", "a FIFO cache with a high budget", "Explore ... should be exactly the Discover player", "Discover sound must be on every time").
 Amends: doc 20 §50 (preload window), §51 (warm buffer), §158 (service worker / PWA may not cache private signed video), §159 (offline video is not V1); CLAUDE.md "Feed and media" (one preload controller, unchanged; the window it allows widens). Extends ADR 0026 (sound on).

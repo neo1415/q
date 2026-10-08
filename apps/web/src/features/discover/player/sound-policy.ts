@@ -4,7 +4,7 @@ import { useCallback, useSyncExternalStore } from "react";
 
 /**
  * Pitch sound, one policy for every feed player (Discover and Explore's
- * viewer; ADR 0026 as extended by ADR 0063).
+ * viewer; ADR 0026 as extended by ADR 0064).
  *
  * - Sound is on by default, every session. Only an explicit mute is
  *   remembered, and only for this browser session, so the next visit

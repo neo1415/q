@@ -108,13 +108,13 @@ export type FeedPrefetchBudget = {
   readonly startupBufferAhead: number;
   /**
    * Of those behind, how many keep their player and buffer attached, so a
-   * swipe back plays at once from memory (ADR 0063).
+   * swipe back plays at once from memory (ADR 0064).
    */
   readonly keepBehind: number;
 };
 
 /**
- * Doc 20 §50 as amended by ADR 0063 (founder direction 2026-10-08: "the
+ * Doc 20 §50 as amended by ADR 0064 (founder direction 2026-10-08: "the
  * next video or next two must always be ready while the current one
  * plays"): current ACTIVE, the next two buffering, the one after that a
  * poster, the one behind kept as it was, the rest nothing.

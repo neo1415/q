@@ -6,7 +6,7 @@ import {
 import { mediaCacheKey, pageMediaCache, type MediaCache } from "./media-cache";
 
 /**
- * Warming the first pitches before Discover opens (ADR 0063; founder
+ * Warming the first pitches before Discover opens (ADR 0064; founder
  * 2026-10-08: "before you even open the app, 2-3 videos are already
  * cached"). Given a URL the server authorised for this viewer, fetch the
  * start of the stream -- the init segments and first fragments of the

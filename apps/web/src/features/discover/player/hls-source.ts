@@ -55,7 +55,7 @@ function looksLikeHls(url: string): boolean {
 
 /**
  * How much a stream may buffer ahead, by the controller's tier (doc 20
- * §48/§51 as amended by ADR 0063).
+ * §48/§51 as amended by ADR 0064).
  *
  * hls.js's own limit is the larger of `maxBufferLength` and what
  * `maxBufferSize` (60 MB) holds at the level's bitrate, capped only by
@@ -214,7 +214,7 @@ export function recoverStream(video: HTMLVideoElement): boolean {
  * plain path. Every other HLS stream loads the engine, and the detach function
  * destroys it — which is what actually cancels the segment fetches it
  * started (doc 20 §236's preload abort). With a media key, the engine's
- * loader reads and fills the pitch media cache (ADR 0063).
+ * loader reads and fills the pitch media cache (ADR 0064).
  */
 export const attachHlsOrNativeSource: AttachSource = (video, url, mediaKey) => {
   if (!looksLikeHls(url) || (playsHlsNatively(video) && !hasMse())) {

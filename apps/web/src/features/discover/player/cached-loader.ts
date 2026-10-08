@@ -10,7 +10,7 @@ import type {
 import { isPlaylistUrl, mediaCacheKey, type MediaCache } from "./media-cache";
 
 /**
- * hls.js's loader, with the pitch media cache in front of it (ADR 0063).
+ * hls.js's loader, with the pitch media cache in front of it (ADR 0064).
  *
  * Segments: cache first, then the network, and what the network returns is
  * stored. A loop, a swipe back, a revisit under a new grant, or a pitch

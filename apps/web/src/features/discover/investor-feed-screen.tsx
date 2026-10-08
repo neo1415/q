@@ -214,7 +214,7 @@ function InvestorFeed({
   });
   const { setOpen, open: qOpen } = useGlobalQ();
   const session = useQSessionOptional();
-  // Sound on, like TikTok, every session (ADR 0026, ADR 0063): one
+  // Sound on, like TikTok, every session (ADR 0026, ADR 0064): one
   // policy shared with Explore's viewer (player/sound-policy.ts).
   const { muted, setMuted } = useFeedSound(reducedMotion);
   // Which of a company's videos is showing (ADR 0022); the first (newest)

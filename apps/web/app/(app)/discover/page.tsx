@@ -144,7 +144,7 @@ export default async function DiscoverPage({
      * authorization is a short metadata call, never media; nothing here is
      * fetched from the CDN except the first poster, below.
      */
-    // The whole first window (ADR 0063): the card in view, the two that
+    // The whole first window (ADR 0064): the card in view, the two that
     // buffer behind it, and the poster after them.
     const reach = (slate?.items ?? []).slice(0, 4);
     const grants = await Promise.all(

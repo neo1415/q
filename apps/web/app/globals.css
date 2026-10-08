@@ -3327,7 +3327,7 @@
     color: var(--cq-stage-text);
     background: var(--cq-stage-canvas);
   }
-  /* The opened pitch is Discover's stage (ADR 0063): full height, the
+  /* The opened pitch is Discover's stage (ADR 0064): full height, the
      whole overlay; its top bar clears the stage's sound control. */
   .cq-explore-feed > .cq-feed {
     flex: 1;

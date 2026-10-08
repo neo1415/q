@@ -12,7 +12,7 @@ import { SubmitButton } from "./submit-button";
 
 /**
  * What this browser keeps for the person signing out: which chat each Q
- * surface was in, and the pitches cached on the device (ADR 0063). The
+ * surface was in, and the pitches cached on the device (ADR 0064). The
  * next person to sign in here starts with neither.
  */
 function forgetThisPerson(): void {

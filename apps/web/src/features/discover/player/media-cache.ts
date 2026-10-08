@@ -1,5 +1,5 @@
 /**
- * The pitch media cache (ADR 0063; founder direction 2026-10-08: "once a
+ * The pitch media cache (ADR 0064; founder direction 2026-10-08: "once a
  * video is played it's cached ... a FIFO cache with a high budget").
  *
  * A pitch's HLS segments are immutable (`Cache-Control: public,
