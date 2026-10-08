@@ -68,7 +68,7 @@ const TWO = report({
       key: "msg:1",
       source: "UNANSWERED_MESSAGE",
       title: "Zino Aviation is waiting for your reply",
-      detail: "They wrote 21 hours ago",
+      note: "They wrote 21 hours ago",
       counterpart: "Zino Aviation",
       since: NOW,
       decidable: false,
@@ -95,7 +95,7 @@ function writtenAnswer(r: QAttentionReport): string {
     `${String(r.items.length)} things need you:`,
     ...r.items.map(
       (item, i) =>
-        `${String(i + 1)}. ${item.title}${item.detail === undefined ? "" : ` — ${item.detail}`}`,
+        `${String(i + 1)}. ${item.title}${item.note === undefined ? "" : ` — ${item.note}`}`,
     ),
   ].join("\n");
 }

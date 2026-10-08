@@ -157,6 +157,7 @@ function objectBlocksOf(
       case "EVIDENCE":
       case "FINDING":
       case "UNCERTAINTY":
+      case "ATTENTION": // G-R4: the prose says it until E's renderer lands
       case "PUBLIC_SOURCE": // carried as the turn's own public sources
         return false;
     }

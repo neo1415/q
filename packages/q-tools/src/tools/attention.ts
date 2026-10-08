@@ -191,8 +191,8 @@ export async function readAttention(
       if (last !== undefined) {
         items[items.length - 1] = {
           ...last,
-          detail: clip(
-            `${last.detail === undefined ? "" : `${last.detail} `}(and ${String(more)} more like this)`,
+          note: clip(
+            `${last.note === undefined ? "" : `${last.note} `}(and ${String(more)} more like this)`,
             600,
           ),
         };
@@ -290,7 +290,7 @@ export function attentionSourcesFromPorts(
               `${item.counterpart.name} is waiting for your reply`,
               200,
             ),
-            detail: clip(`They wrote: "${last.preview}"`, 600),
+            note: clip(`They wrote: "${last.preview}"`, 600),
             entity: relationshipEntity(item),
             counterpart: clip(item.counterpart.name, 120),
             since,
@@ -372,7 +372,7 @@ export function attentionSourcesFromPorts(
                 `${item.counterpart.name} asked for ${String(area.openRequests.length)} diligence item${area.openRequests.length === 1 ? "" : "s"}`,
                 200,
               ),
-              detail: clip(`Open: ${asked}`, 600),
+              note: clip(`Open: ${asked}`, 600),
               entity: relationshipEntity(item),
               counterpart: clip(item.counterpart.name, 120),
               since,
@@ -397,7 +397,7 @@ export function attentionSourcesFromPorts(
             source: "APPROVAL",
             title: clip(item.summary, 200),
             ...(item.summary.length > 200
-              ? { detail: clip(item.summary, 600) }
+              ? { note: clip(item.summary, 600) }
               : {}),
             ...(UUID.safeParse(item.approvalId).success
               ? { entity: { kind: "APPROVAL" as const, id: item.approvalId } }
@@ -432,7 +432,7 @@ export function attentionSourcesFromPorts(
               `${meeting.purpose || "Call"}${who.length > 0 ? ` with ${who}` : ""}`,
               200,
             ),
-            detail: clip(
+            note: clip(
               `Starts ${new Date(startsAt).toISOString()}${meeting.hasBrief ? "; a brief is ready" : ""}`,
               600,
             ),
@@ -459,7 +459,7 @@ export function attentionSourcesFromPorts(
             key: `reminder:${reminder.id}`,
             source: "REMINDER",
             title: clip(reminder.title, 200),
-            detail: `Due ${new Date(due).toISOString()}`,
+            note: `Due ${new Date(due).toISOString()}`,
             since: new Date(due).toISOString(),
             decidable: true,
           },
@@ -485,7 +485,7 @@ export function attentionSourcesFromPorts(
             ),
             ...(lane.offered.length > 0
               ? {
-                  detail: clip(
+                  note: clip(
                     `Q offered: ${lane.offered.map((slot) => slot.label).join(", ")}`,
                     600,
                   ),
@@ -520,7 +520,7 @@ export function attentionSourcesFromPorts(
             ),
             ...(job.run?.pauseReason == null
               ? {}
-              : { detail: `Reason: ${job.run.pauseReason}` }),
+              : { note: `Reason: ${job.run.pauseReason}` }),
             entity: { kind: "JOB", id: job.id },
             since: job.lastStep?.at ?? job.createdAt,
             decidable: true,
