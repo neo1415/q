@@ -524,6 +524,45 @@ export const QVoiceDuplexSaidSchema = z
   .strict();
 export type QVoiceDuplexSaid = z.infer<typeof QVoiceDuplexSaidSchema>;
 
+/**
+ * POST (RECOVERY A4): how one turn on the line ended, with its timings,
+ * for the server's per-turn log. Ids and milliseconds only, never words.
+ */
+export const Q_VOICE_DUPLEX_OUTCOME_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/outcome" as const;
+export const qVoiceDuplexOutcomePath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/outcome`;
+const TurnMsSchema = z.number().int().min(0).max(600_000);
+export const QVoiceDuplexTurnReportSchema = z
+  .object({
+    turnId: z.string().regex(/^turn_[A-Za-z0-9_-]{8,64}$/),
+    disposition: QTurnDispositionSchema,
+    failure: QFailureClassSchema.optional(),
+    /** End of their turn to Q's first audio. */
+    firstAudioMs: TurnMsSchema.optional(),
+    /** The heard relay's round trip. */
+    relayMs: TurnMsSchema.optional(),
+  })
+  .strict();
+export type QVoiceDuplexTurnReport = z.infer<
+  typeof QVoiceDuplexTurnReportSchema
+>;
+
+/**
+ * POST (RECOVERY A8, SIDEBAND): the realtime call's id, from the SDP
+ * answer's Location header, so the server can attach to the call. Only
+ * acted on when the sideband is on; the id alone grants nothing without
+ * the server's own provider key.
+ */
+export const Q_VOICE_DUPLEX_ATTACH_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/attach" as const;
+export const qVoiceDuplexAttachPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/attach`;
+export const QVoiceDuplexAttachSchema = z
+  .object({ callId: z.string().regex(/^rtc_[A-Za-z0-9_-]{1,120}$/) })
+  .strict();
+export type QVoiceDuplexAttach = z.infer<typeof QVoiceDuplexAttachSchema>;
+
 const TokenCountSchema = z.number().int().min(0).max(2_000_000);
 
 /** One response's usage, as the model reported it, by modality. */
