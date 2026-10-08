@@ -3045,6 +3045,7 @@ const errandRelationships = createRelationshipIntelligencePort({
   interests: interestService,
   board: relationshipBoard,
   ownCompany: runtimeDependencies.ownCompany,
+  latestMessages: latestRelationshipMessages,
 });
 // ADMIN block: a suspended account resolves to no actor (ADR 0033).
 const actorContextResolver = withSuspension(
