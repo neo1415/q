@@ -87,7 +87,8 @@ export type AttentionSources = Partial<
  * app over its own stores. Absent members leave their source unread.
  */
 export type AttentionPort = {
-  readonly sources: AttentionSources;
+  /** Absent or partial: the missing sources are reported unread. */
+  readonly sources?: AttentionSources | undefined;
   readonly activity?:
     | ((
         actor: ActorContext,
@@ -146,7 +147,7 @@ export async function readAttention(
 
   const results = await Promise.all(
     SOURCE_ORDER.map(async (source) => {
-      const readers = port.sources[source] ?? [];
+      const readers = port.sources?.[source] ?? [];
       if (readers.length === 0) {
         return { source, items: [] as QAttentionItem[], read: false };
       }
@@ -531,7 +532,7 @@ export function attentionSourcesFromPorts(
 
   const extra = ports.attention;
   for (const source of SOURCE_ORDER) {
-    sources[source].push(...(extra?.sources[source] ?? []));
+    sources[source].push(...(extra?.sources?.[source] ?? []));
   }
   return {
     sources,

@@ -61,6 +61,8 @@ const CORE = [
   "approve_pending_proposal",
   "decline_pending_proposal",
   "list_pending_approvals",
+  // RECOVERY-2026-10 B1: "anything need me?" can come mid-anything.
+  "what_needs_me",
   // Setup reminders: "stop reminding me" must work whenever Q has said it.
   "set_onboarding_reminders",
   "continue_onboarding",
