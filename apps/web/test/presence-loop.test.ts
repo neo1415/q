@@ -16,7 +16,7 @@ import {
 
 const INPUTS: PresenceInputs = {
   state: "IDLE",
-  showsFace: false,
+  stage: false,
   showing: false,
   motion: "full",
   bloom: false,

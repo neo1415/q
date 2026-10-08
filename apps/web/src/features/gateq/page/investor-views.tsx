@@ -271,7 +271,7 @@ export function FindView({
 const DIMENSION_WORDS: Readonly<Record<string, string>> = {
   TAXONOMY: "Sector",
   EXCLUDED_TAXONOMY: "Never",
-  GEOGRAPHY: "Where",
+  GEOGRAPHY: "Location",
   STAGE: "Stage",
   RAISE_SIZE: "Round size",
   CHEQUE_COMPATIBILITY: "Cheque size",

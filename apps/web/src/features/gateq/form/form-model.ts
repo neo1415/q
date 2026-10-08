@@ -365,7 +365,7 @@ const DIMENSION_WORDS: Readonly<Record<string, string>> = {
   STAGE: "Stage",
   TAXONOMY: "Sector",
   EXCLUDED_TAXONOMY: "Never",
-  GEOGRAPHY: "Where",
+  GEOGRAPHY: "Location",
   RAISE_SIZE: "Round size",
   CHEQUE_COMPATIBILITY: "Cheque size",
 };

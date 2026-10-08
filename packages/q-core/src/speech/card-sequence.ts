@@ -14,7 +14,10 @@
  *   in full and needs its own "send this?" yes. Changing it again needs that
  *   yes again. Its idempotency key is bound to the exact body.
  * - A held draft was never offered for approval, so "send it" on one asks
- *   "send this?" first, exactly like an edit.
+ *   "send this exact message?" first, exactly like an edit.
+ * - "Try again" on a held draft asks Q to write and review it again
+ *   (Zino, 2026-10-08); a pass comes back as an ordinary approval card,
+ *   never sent by this step.
  *
  * Pure: no I/O, no model. An utterance that is not plainly one of these
  * commands is not a command (null), and goes to Q as any other turn.
@@ -41,6 +44,7 @@ export type CardCommand =
   | { readonly kind: "EDIT"; readonly edit: CardEdit | null }
   | { readonly kind: "DISMISS" }
   | { readonly kind: "LATER" }
+  | { readonly kind: "RETRY" }
   | { readonly kind: "LEAVE" }
   | { readonly kind: "CANCEL" };
 
@@ -98,6 +102,9 @@ const LEAVE = whole(
 const CANCEL = whole(
   String.raw`cancel(?: (?:it|that|the edit|my edit))?|never ?mind|keep (?:it|the original)(?: as it was)?|go back|undo(?: that)?`,
 );
+const RETRY = whole(
+  String.raw`(?:ask q to )?try (?:it )?again|(?:can you |could you )?(?:re-?write|redo|re-?draft) (?:it|that|this)(?: again)?|write (?:it|that|this) again|have another go|give it another go|review (?:it|that|this) again`,
+);
 const EDIT_OPEN = whole(
   String.raw`edit(?: it| that| this)?|let me edit(?: it| that| this)?|i'll edit(?: it| that| this)?|i want to (?:edit|change) (?:it|that|this)|change (?:it|that|this)`,
 );
@@ -147,6 +154,7 @@ export function parseCardCommand(words: string): CardCommand | null {
   if (DISMISS.test(said)) return { kind: "DISMISS" };
   if (CANCEL.test(said)) return { kind: "CANCEL" };
   if (APPROVE.test(said)) return { kind: "APPROVE" };
+  if (RETRY.test(said)) return { kind: "RETRY" };
   if (LATER.test(said)) return { kind: "LATER" };
   if (EDIT_OPEN.test(said)) return { kind: "EDIT", edit: null };
   if (YES.test(said)) return { kind: "YES" };
@@ -222,7 +230,8 @@ export type SequenceCard = {
   readonly canDecide: boolean;
 };
 
-export type CardOutcome = "APPROVED" | "SENT_EDITED" | "DISMISSED" | "LATER";
+export type CardOutcome =
+  "APPROVED" | "SENT_EDITED" | "DISMISSED" | "LATER" | "RETRIED";
 
 export type SequenceState = {
   readonly cards: readonly SequenceCard[];
@@ -268,6 +277,13 @@ export type SequenceEffect =
       readonly kind: "DISMISS_HELD";
       readonly key: string;
       readonly draftId: string;
+    }
+  | {
+      /** Q writes and reviews the held draft again; a pass is a new card. */
+      readonly kind: "RETRY_HELD";
+      readonly key: string;
+      readonly draftId: string;
+      readonly relationshipId: string | null;
     };
 
 /** Why a command did nothing, for a short reply. */
@@ -276,6 +292,7 @@ export type SequenceNote =
   | "BUSY"
   | "CANNOT_DECIDE"
   | "CANNOT_EDIT"
+  | "CANNOT_RETRY"
   | "EDIT_NOT_APPLIED"
   | "SAY_SEND"
   | "NOTHING_TO_CANCEL"
@@ -352,7 +369,43 @@ export type SequenceEvent =
   /** The person typed their own version in the editor. */
   | { readonly type: "EDITED"; readonly body: string }
   /** The effect for this card finished. */
-  | { readonly type: "SETTLED"; readonly key: string; readonly ok: boolean };
+  | { readonly type: "SETTLED"; readonly key: string; readonly ok: boolean }
+  /**
+   * Bring this card forward (a tap on it, or the person naming it): it
+   * moves to the focus position, the order of the rest unchanged. A card
+   * left for later comes back; a decided one does not.
+   */
+  | { readonly type: "FOCUS"; readonly key: string };
+
+function bringForward(state: SequenceState, key: string): SequenceStep {
+  if (state.pending !== null) return idle(state, "BUSY");
+  const index = state.cards.findIndex((one) => one.key === key);
+  const card = state.cards[index];
+  if (card === undefined) return idle(state, "NO_CARD");
+  const outcome = state.outcomes[key];
+  if (outcome !== undefined && outcome !== "LATER") {
+    return idle(state, "MOVED_ON");
+  }
+  const rest = state.cards.filter((_, at) => at !== index);
+  const focus = index < state.focus ? state.focus - 1 : state.focus;
+  const cards = [...rest.slice(0, focus), card, ...rest.slice(focus)];
+  const outcomes = Object.fromEntries(
+    Object.entries(state.outcomes).filter(([one]) => one !== key),
+  );
+  return {
+    state: {
+      ...state,
+      cards,
+      focus,
+      left: false,
+      confirming: null,
+      editing: false,
+      outcomes,
+    },
+    effect: null,
+    note: null,
+  };
+}
 
 /** One event, one typed step. Deterministic; the caller runs the effect. */
 export function stepSequence(
@@ -372,13 +425,19 @@ export function stepSequence(
         note: null,
       };
     }
-    const kind = state.confirming?.key === event.key ? "SENT_EDITED" : null;
+    const kind =
+      state.outcomes[event.key] === "RETRIED"
+        ? "RETRIED"
+        : state.confirming?.key === event.key
+          ? "SENT_EDITED"
+          : null;
     return {
       state: advance(state, kind ?? state.outcomes[event.key] ?? "APPROVED"),
       effect: null,
       note: null,
     };
   }
+  if (event.type === "FOCUS") return bringForward(state, event.key);
   const card = focusedCard(state);
   if (card === null) return idle(state, state.left ? "LEFT" : "NO_CARD");
   if (state.pending !== null) return idle(state, "BUSY");
@@ -439,6 +498,27 @@ export function stepSequence(
           outcomes: { ...state.outcomes, [card.key]: "DISMISSED" },
         },
         effect,
+        note: null,
+      };
+    }
+    case "RETRY": {
+      if (card.kind !== "HELD" || card.draftId === null) {
+        return idle(state, "CANNOT_RETRY");
+      }
+      return {
+        state: {
+          ...state,
+          pending: card.key,
+          confirming: null,
+          editing: false,
+          outcomes: { ...state.outcomes, [card.key]: "RETRIED" },
+        },
+        effect: {
+          kind: "RETRY_HELD",
+          key: card.key,
+          draftId: card.draftId,
+          relationshipId: card.relationshipId,
+        },
         note: null,
       };
     }
@@ -520,4 +600,40 @@ export function sameShownMessage(
   current: string | null,
 ): boolean {
   return (shown ?? "").trim() === (current ?? "").trim();
+}
+
+// ---------------------------------------------------------------------------
+// Free-form words, checked by code (Zino, 2026-10-08).
+
+const NEGATION =
+  /\b(?:don'?t|do not|never|not|no|hold(?: off| it| on)?|wait|stop|ignore|skip|cancel|forget|drop|dismiss|later)\b/u;
+const SEND_WISH =
+  /\b(?:send|sent|approve|go ahead|ship|fire (?:it )?off|post|reply|answer|accept|book|yes|ok|okay|do it|go for it|confirm)\b/u;
+const DISMISS_WISH =
+  /\b(?:ignore|dismiss|drop|bin|delete|reject|forget|kill|scrap|discard|don'?t send|do not send|no to)\b/u;
+
+function clausesOf(words: string): readonly string[] {
+  return words
+    .toLowerCase()
+    .replace(/[\u2019]/gu, "'")
+    .split(/[.;!?,]|\b(?:but|and|then|also|except)\b/u)
+    .map((one) => one.trim())
+    .filter((one) => one.length > 0);
+}
+
+/**
+ * Whether the person's own words plainly ask for something to be sent:
+ * some clause wishes a send and says no "don't", "wait" or "ignore". A
+ * model's reading of a send is acted on only when this holds; otherwise
+ * the card is only brought forward to decide by hand.
+ */
+export function wordsAllowSend(words: string): boolean {
+  return clausesOf(words).some(
+    (clause) => SEND_WISH.test(clause) && !NEGATION.test(clause),
+  );
+}
+
+/** Whether the person's own words plainly ask for something to be dropped. */
+export function wordsAllowDismiss(words: string): boolean {
+  return clausesOf(words).some((clause) => DISMISS_WISH.test(clause));
 }

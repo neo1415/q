@@ -166,7 +166,12 @@ import {
 } from "./composition/workforce/ports.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
-import { createPostgresWorkforceStore } from "./composition/workforce/store.js";
+import { createHeldRetry } from "./composition/workforce/held-retry.js";
+import { createBriefingCommandReader } from "./composition/briefing-command.js";
+import {
+  createPostgresWorkforceStore,
+  createStaleHoldsReader,
+} from "./composition/workforce/store.js";
 import { houseEtiquetteOf, stanceDeclines } from "@capital-q/q-core";
 import { createWorkPage } from "./composition/work/page.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
@@ -4268,6 +4273,15 @@ const instructionCards = createPostgresCompanyCardPort({ sql: database.sql });
 const instructionDiscovery = createPostgresDiscoveryRepository({
   sql: database.sql,
 });
+// Zino, 2026-10-08: "Ask Q to try again" on a held message, and the
+// automatic second look at holds the reviewer could not grade.
+const heldRetry = createHeldRetry({
+  store: workforceStore,
+  engine: () => instructionEngine.current,
+  staleHolds: createStaleHoldsReader(database.sql),
+  logger,
+});
+
 instructionEngine.current = createInstructionEngine({
   review: outwardReview,
   track: workforceTracker(workforceStore, "INSTRUCTION"),
@@ -4392,6 +4406,9 @@ void createWorkWakeListener({
     void workRuntime.tick().catch(() => undefined);
     // Accepts and declines that landed while nobody listened (a deploy).
     void instructionTriggers.catchUpMoves().catch(() => undefined);
+    // Holds the reviewer could not grade (before the 8 Oct note fix, or a
+    // reviewer outage): written and reviewed again once each.
+    void heldRetry.sweepStale().catch(() => undefined);
   },
   targets: [
     {
@@ -5436,6 +5453,7 @@ const { app, logger: appLogger } = createApp(
           ),
         monthlyLimitUsd: () => Promise.resolve(workforceMonthlyLimit),
       }),
+      heldRetry,
       onDecision: feedbackFromApprovals({
         store: workforceStore,
         learning: createWorkforceLearning({
@@ -5470,6 +5488,13 @@ const { app, logger: appLogger } = createApp(
           )?.investorOrganisationId ?? null,
         ownCompany: workOwnCompany,
       },
+    }),
+    // Zino 2026-10-08: the briefing's free-form words, read into card verbs.
+    briefingCommand: createBriefingCommandReader({
+      gateway: modelGateway,
+      dataPosture: demoDataPosture,
+      principalName: (who) => workforceDisplayName(who.userId),
+      logger,
     }),
     // Lead 2026-10-03: the person's own usage this month.
     usage: createOwnUsage({

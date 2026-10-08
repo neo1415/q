@@ -13,6 +13,9 @@ import {
   sameShownMessage,
   startSequence,
   stepSequence,
+  summaryOfCards,
+  wordsAllowDismiss,
+  wordsAllowSend,
   type SequenceCard,
   type SequenceState,
 } from "../src/index.js";
@@ -369,6 +372,29 @@ describe("card sequence", () => {
     });
   });
 
+  it("'try again' on a held draft asks Q to write it again; on an approval it does nothing (Zino, 2026-10-08)", () => {
+    for (const words of ["try again", "ask Q to try again", "rewrite it"]) {
+      expect(parseCardCommand(words)).toEqual({ kind: "RETRY" });
+    }
+    const asked = say(startSequence([HELD, APPROVAL]), "try again please");
+    expect(asked.effect).toEqual({
+      kind: "RETRY_HELD",
+      key: "dr-2",
+      draftId: "dr-2",
+      relationshipId: HELD.relationshipId,
+    });
+    const settled = stepSequence(asked.state, {
+      type: "SETTLED",
+      key: "dr-2",
+      ok: true,
+    });
+    expect(settled.state.outcomes["dr-2"]).toBe("RETRIED");
+    expect(focusedCard(settled.state)?.key).toBe("ap-1");
+    const refused = say(settled.state, "try again");
+    expect(refused.effect).toBeNull();
+    expect(refused.note).toBe("CANNOT_RETRY");
+  });
+
   it("dismiss, later and leave", () => {
     const start = startSequence([APPROVAL, HELD, PLAN]);
     const dismissed = say(start, "dismiss it");
@@ -404,5 +430,75 @@ describe("card sequence", () => {
     expect(sameShownMessage("Happy to.", " Happy to. ")).toBe(true);
     expect(sameShownMessage("Happy to.", "Happy to!")).toBe(false);
     expect(sameShownMessage(null, null)).toBe(true);
+  });
+});
+
+describe("the whole briefing in a sentence, and free-form words (Zino, 2026-10-08)", () => {
+  it("summarises every card up front, from facts only", () => {
+    expect(
+      summaryOfCards([
+        {
+          kind: "HELD",
+          counterpart: "Spheros",
+          theySaid: null,
+          message: "Hi Ada",
+          summary: "Held",
+        },
+        {
+          kind: "APPROVAL",
+          counterpart: "Tensorgate",
+          theySaid: "Could we do a call on Thursday?",
+          message: "Thursday works.",
+          summary: "Reply",
+        },
+        {
+          kind: "APPROVAL",
+          counterpart: "Clearwater",
+          theySaid: "Our deck is attached.",
+          message: "Thanks, reading it now.",
+          summary: "Reply",
+        },
+      ]),
+    ).toBe(
+      "Three things: the Spheros reply is held, Tensorgate wants a call Thursday, and Clearwater sent their deck.",
+    );
+    expect(summaryOfCards([])).toBeNull();
+  });
+
+  it("brings a named card forward without losing the rest, and never a decided one", () => {
+    const start = startSequence([APPROVAL, HELD, PLAN]);
+    const forward = stepSequence(start, { type: "FOCUS", key: "ap-3" });
+    expect(forward.state.cards.map((one) => one.key)).toEqual([
+      "ap-3",
+      "ap-1",
+      "dr-2",
+    ]);
+    expect(focusedCard(forward.state)?.key).toBe("ap-3");
+    const later = say(forward.state, "skip");
+    expect(focusedCard(later.state)?.key).toBe("ap-1");
+    const back = stepSequence(later.state, { type: "FOCUS", key: "ap-3" });
+    expect(focusedCard(back.state)?.key).toBe("ap-3");
+    expect(back.state.outcomes["ap-3"]).toBeUndefined();
+    const dismissed = say(back.state, "dismiss it");
+    const settled = stepSequence(dismissed.state, {
+      type: "SETTLED",
+      key: "ap-3",
+      ok: true,
+    });
+    expect(
+      stepSequence(settled.state, { type: "FOCUS", key: "ap-3" }).note,
+    ).toBe("MOVED_ON");
+  });
+
+  it("lets a model's send through only when the words plainly ask for one", () => {
+    expect(wordsAllowSend("send the Tensorgate one")).toBe(true);
+    expect(wordsAllowSend("go ahead with Clearwater, ignore Spheros")).toBe(
+      true,
+    );
+    expect(wordsAllowSend("don't send the Tensorgate one")).toBe(false);
+    expect(wordsAllowSend("wait on Tensorgate")).toBe(false);
+    expect(wordsAllowSend("what did Tensorgate say?")).toBe(false);
+    expect(wordsAllowDismiss("ignore Spheros")).toBe(true);
+    expect(wordsAllowDismiss("send Spheros")).toBe(false);
   });
 });

@@ -602,6 +602,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/workforce.ts GET Q_WORKFORCE_OVERVIEW_PATH": exempt(
     "the workforce page's team and month spend against the person's limit; Q reports its usage in conversation through its usage tools",
   ),
+  "q-api/http/briefing-command.ts POST Q_BRIEFING_COMMAND_PATH": exempt(
+    "the arrival briefing's reading of the person's own words into card verbs for their own screen; it changes nothing (the card sequence runs and checks each verb), so it is the Q conversation's transport, not an action",
+  ),
+  "q-api/http/workforce.ts POST Q_WORKFORCE_DRAFT_RETRY_PATH": exempt(
+    "a held card's own 'Ask Q to try again' (button, or the person's words read into the card's typed verb in the arrival briefing); it only rewrites and offers an approval card, which the Approval Engine decides",
+  ),
   "q-api/http/workforce.ts GET Q_WORKFORCE_JOB_PATH": exempt(
     "one job's agent record (runs, hand-offs, drafts, grades, timeline) for the workforce page; Q reports its work through list_q_work",
   ),
@@ -795,6 +801,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
   "/dev/briefing": exempt("development-only page"),
+  "/dev/q-nav": exempt("development-only page"),
+  "/dev/q-nav/work": exempt("development-only page"),
   "/dev/workforce": exempt("development-only page"),
   "/dev/gateq-v2": exempt("development-only page"),
   "/dev/canvas": exempt("development-only page"),
@@ -1047,6 +1055,20 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_NARRATION_PATH",
 ]);
 
+/**
+ * Zino 2026-10-08: "Ask Q to try again" on a held message. The rewrite
+ * runs inside the instruction engine and the reviewer, which live in
+ * q-api, where the registry's generated routes (apps/api) cannot reach
+ * them; it changes nothing outward (a pass becomes an approval card the
+ * Approval Engine decides). Named here rather than lifting the legacy
+ * ceiling; pending the lead's decision on declaring q-api actions.
+ */
+const HELD_RETRY: ReadonlySet<string> = new Set([
+  "q-api/http/workforce.ts POST Q_WORKFORCE_DRAFT_RETRY_PATH",
+  // A POST that only reads the person's words into verbs; changes nothing.
+  "q-api/http/briefing-command.ts POST Q_BRIEFING_COMMAND_PATH",
+]);
+
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH",
@@ -1095,6 +1117,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         !Q_TRANSPORT_NOT_ACTIONS.has(key) &&
         !GATEQ_GUEST_NOT_ACTIONS.has(key) &&
         !Q_ROOM_DOCUMENT_DROPS.has(key) &&
+        !HELD_RETRY.has(key) &&
         // ADR 0040: the operations console stays exempt (never Q's to act
         // on), so its writes are not legacy waiting to migrate.
         ROUTE_COVERAGE[key] !== OPERATIONS_CONSOLE,

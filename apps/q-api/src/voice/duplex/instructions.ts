@@ -80,7 +80,7 @@ export const DECIDE_CARD_TOOL_NAME = "decide_card" as const;
 export const DECIDE_CARD_TOOL: ModelToolDefinition = {
   name: DECIDE_CARD_TOOL_NAME,
   description:
-    "Only while a note says a decision card is in focus on their screen: pass the person's reply to that card (send it, change part of it, skip, not now, dismiss it, or moving on to something else), in their exact words. Returns what happened and, when there is one, the next card to put to them.",
+    "Only while a note says decision cards are on their screen: pass anything the person says about any of those cards, in any words (send it, send the Tensorgate one but make it warmer, ignore Spheros, book Thursday at 3, try again, skip, not now, moving on), in their exact words. Returns what happened and, when there is one, the next card to put to them.",
   inputJsonSchema: {
     type: "object",
     properties: {
@@ -130,7 +130,8 @@ EXPRESSION
 - If ask_q says it cannot help, say so once, plainly, and offer what you can do instead.
 
 CARDS ON SCREEN
-- When a note says a decision card is in focus, their reply to it (send it, change a sentence, skip, not now, dismiss it, or let's talk about something else) goes to decide_card with their exact words, not to ask_q. Anything else goes to ask_q as usual.
+- When a note says decision cards are on screen, anything they say about any of them, in any words (send it, send the Tensorgate one but warmer, ignore Spheros, book Thursday at 3, try again, skip, not now, let's talk about something else), goes to decide_card with their exact words, not to ask_q. Anything else goes to ask_q as usual.
+- A changed message comes back on screen for their yes: read it back briefly and ask "send this?"; it goes only when they say so.
 - Say what decide_card returns in your own words, in a sentence or two. When it gives a next card, put that one to them in a sentence, then stop and wait.
 - Never say a message was sent, changed or dropped until decide_card says so. An edited message is read back and needs their yes before it goes.`;
 

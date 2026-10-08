@@ -1050,7 +1050,14 @@ export * from "./readiness.js";
 // end READINESS block
 
 // WORKFORCE block (founder brief J1-J9): Q's workforce of agents.
+export * from "./briefing-command.js";
 export {
+  Q_WORKFORCE_DRAFT_RETRY_PATH,
+  qWorkforceDraftRetryPath,
+  WorkforceDraftRetryRequestSchema,
+  WorkforceDraftRetryResultDtoSchema,
+  type WorkforceDraftRetryRequest,
+  type WorkforceDraftRetryResultDto,
   Q_WORKFORCE_JOB_PATH,
   Q_WORKFORCE_JOBS_PATH,
   Q_WORKFORCE_OVERVIEW_PATH,

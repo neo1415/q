@@ -330,6 +330,69 @@ export function gistOf(text: string, maxWords = 20): string {
     : `${words.slice(0, maxWords).join(" ")}…`;
 }
 
+const COUNT_WORDS = [
+  "",
+  "One thing",
+  "Two things",
+  "Three things",
+  "Four things",
+  "Five things",
+  "Six things",
+] as const;
+
+const WEEKDAY =
+  /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|this week|next week)\b/iu;
+const MEETING =
+  /\b(call|meet|meeting|chat|catch up|catch-up|zoom|coffee|\d+ ?min(?:ute)?s)\b/iu;
+const DECK = /\b(deck|pitch deck|attached|attachment|data ?room|one-pager)\b/iu;
+
+/** One card in a few words, from its facts alone (never invented). */
+function cardGist(card: DecisionCardFacts): string {
+  const name = card.counterpart ?? "someone";
+  if (card.kind === "HELD") return `the ${name} reply is held`;
+  if (card.message === null) {
+    const gist = gistOf(card.summary, 10).replace(/[.!?]$/u, "");
+    return `${gist.charAt(0).toLowerCase()}${gist.slice(1)}`;
+  }
+  const said = card.theySaid ?? "";
+  if (MEETING.test(said)) {
+    const day = WEEKDAY.exec(said)?.[1];
+    if (day === undefined) return `${name} wants a call`;
+    const lower = day.toLowerCase();
+    const when =
+      lower.startsWith("this ") || lower.startsWith("next ")
+        ? lower
+        : lower === "today" || lower === "tomorrow"
+          ? lower
+          : `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`;
+    return `${name} wants a call ${when}`;
+  }
+  if (DECK.test(said)) return `${name} sent their deck`;
+  if (said.length > 0) return `${name} wrote back`;
+  return `a message to ${name} is ready`;
+}
+
+/**
+ * Every pending card in one sentence, up front (Zino, 2026-10-08: "Q
+ * actually gives a summary of all the cards"): "Three things: the Spheros
+ * reply is held, Tensorgate wants a call Thursday, and Clearwater sent
+ * their deck." Null with no cards.
+ */
+export function summaryOfCards(
+  cards: readonly DecisionCardFacts[],
+): string | null {
+  if (cards.length === 0) return null;
+  const parts = cards.map(cardGist);
+  const count = COUNT_WORDS[cards.length] ?? `${String(cards.length)} things`;
+  const list =
+    parts.length === 1
+      ? (parts[0] ?? "")
+      : parts.length === 2
+        ? `${parts[0] ?? ""} and ${parts[1] ?? ""}`
+        : `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1) ?? ""}`;
+  return `${count}: ${list}.`;
+}
+
 const ORDINALS = ["First", "Next", "Then", "After that"] as const;
 
 /**

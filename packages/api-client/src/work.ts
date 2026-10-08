@@ -33,6 +33,12 @@ import {
   Q_WORKFORCE_JOBS_PATH,
   Q_WORKFORCE_OVERVIEW_PATH,
   qWorkforceJobPath,
+  qWorkforceDraftRetryPath,
+  Q_BRIEFING_COMMAND_PATH,
+  BriefingCommandResultDtoSchema,
+  type BriefingCommandRequest,
+  IDEMPOTENCY_KEY_HEADER,
+  WorkforceDraftRetryResultDtoSchema,
   WorkforceJobDetailDtoSchema,
   WorkforceJobListDtoSchema,
   WorkforceOverviewDtoSchema,
@@ -315,6 +321,43 @@ export function getWorkforceOverview(session: ApiSession) {
     "GET",
     Q_WORKFORCE_OVERVIEW_PATH,
     WorkforceOverviewDtoSchema,
+  );
+}
+/**
+ * `POST /v1/q/workforce/drafts/:draftId/retry` (Q API): "Ask Q to try
+ * again" on a held message. A pass comes back OFFERED as an approval card.
+ */
+export function retryWorkforceDraft(
+  session: ApiSession,
+  draftId: string,
+  relationshipId: string | null,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    qWorkforceDraftRetryPath(draftId),
+    WorkforceDraftRetryResultDtoSchema,
+    {
+      body: { relationshipId },
+      headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+    },
+  );
+}
+/**
+ * `POST /v1/q/briefing/command` (Q API): the person's own words about the
+ * briefing's cards, read into card verbs. Changes nothing by itself.
+ */
+export function readBriefingCommand(
+  session: ApiSession,
+  request: BriefingCommandRequest,
+) {
+  return call(
+    session,
+    "POST",
+    Q_BRIEFING_COMMAND_PATH,
+    BriefingCommandResultDtoSchema,
+    { body: request },
   );
 }
 // end WORKFORCE block

@@ -23,6 +23,8 @@ import { Button } from "@capital-q/ui/button";
 import { ChevronDown, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { Skeleton } from "@capital-q/ui/states";
 
+import { bodyDigest } from "@capital-q/q-core/speech";
+
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import {
   chatThreadAction,
@@ -45,6 +47,7 @@ import {
   type DoneGroup,
   type HeldDecision,
 } from "./decisions";
+import { retryHeldAction, sendHeldAsIsAction } from "./held-actions";
 import { readPlan } from "./plan-words";
 import { listDoneAction } from "./work-page-actions";
 import { outOfTen } from "./workforce-view";
@@ -556,9 +559,49 @@ function HeldCard({
   readonly relationshipId: string | null;
   readonly onDecided: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [mode, setMode] = useState<"READ" | "EDIT" | "CONFIRM">("READ");
   const [status, setStatus] = useState<string | null>(null);
-  const ask = useAskQ();
+  const [pending, startTransition] = useTransition();
+  // Zino, 2026-10-08: a held message can be sent as it is, after "Send this
+  // exact message?". The text sent is exactly the text on screen, and the
+  // send's key is bound to it, so a repeated press is the same send.
+  const sendAsIs = () =>
+    startTransition(async () => {
+      if (relationshipId === null) return;
+      setStatus(null);
+      const result = await sendHeldAsIsAction({
+        relationshipId,
+        body: item.body,
+        idempotencyKey: `held-${item.draftId.slice(0, 36)}-${bodyDigest(item.body)}`,
+      }).catch(() => null);
+      if (result?.ok === true) {
+        threadCache.delete(relationshipId);
+        dismissHeld(item.draftId);
+        onDecided();
+      } else {
+        setStatus(result?.message ?? "That didn't send. Try again.");
+      }
+    });
+  // "Ask Q to try again": written and reviewed again now; a pass comes
+  // back as an ordinary approval card in this queue.
+  const retry = () =>
+    startTransition(async () => {
+      setStatus(null);
+      const result = await retryHeldAction({
+        draftId: item.draftId,
+        relationshipId,
+        idempotencyKey: `retry-${crypto.randomUUID()}`,
+      }).catch(() => null);
+      if (result === null) {
+        setStatus("Q couldn't try again just now. Try later.");
+        return;
+      }
+      setStatus(result.message);
+      if (result.ok) {
+        dismissHeld(item.draftId);
+        onDecided();
+      }
+    });
   return (
     <Card>
       <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
@@ -570,7 +613,7 @@ function HeldCard({
         </span>
         <span>{item.reason}</span>
       </p>
-      {editing && relationshipId !== null ? (
+      {mode === "EDIT" && relationshipId !== null ? (
         <EditAndSend
           initial={item.body}
           relationshipId={relationshipId}
@@ -578,19 +621,74 @@ function HeldCard({
             dismissHeld(item.draftId);
             onDecided();
           }}
-          onCancel={() => setEditing(false)}
+          onCancel={() => setMode("READ")}
         />
+      ) : mode === "CONFIRM" && relationshipId !== null ? (
+        <div className="flex flex-col gap-2" data-held-confirm>
+          <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
+            Send this exact message to {name}?
+          </p>
+          <Quote>
+            <span className="sr-only">What will be sent: </span>
+            {item.body}
+          </Quote>
+          <div className="flex flex-wrap items-center gap-1">
+            <Button variant="primary" disabled={pending} onClick={sendAsIs}>
+              Yes, send this
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={pending}
+              onClick={() => setMode("EDIT")}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="quiet"
+              disabled={pending}
+              onClick={() => setMode("READ")}
+              className="text-(--cq-text-secondary)"
+            >
+              Cancel
+            </Button>
+          </div>
+          <p className="m-0 cq-caption text-(--cq-text-tertiary)">
+            Nothing is sent until you say yes. It goes exactly as shown.
+          </p>
+        </div>
       ) : (
         <>
           <Quote>{item.body}</Quote>
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1" data-held-verbs>
             {relationshipId === null ? null : (
-              <Button variant="secondary" onClick={() => setEditing(true)}>
+              <Button
+                variant="primary"
+                disabled={pending}
+                onClick={() => setMode("CONFIRM")}
+              >
+                Send as is
+              </Button>
+            )}
+            {relationshipId === null ? null : (
+              <Button
+                variant="secondary"
+                disabled={pending}
+                onClick={() => setMode("EDIT")}
+              >
                 Edit &amp; send
               </Button>
             )}
             <Button
               variant="quiet"
+              disabled={pending}
+              onClick={retry}
+              className="text-(--cq-text-secondary)"
+            >
+              {pending ? "Q is trying again…" : "Ask Q to try again"}
+            </Button>
+            <Button
+              variant="quiet"
+              disabled={pending}
               onClick={() => {
                 dismissHeld(item.draftId);
                 onDecided();
@@ -599,21 +697,16 @@ function HeldCard({
             >
               Dismiss
             </Button>
-            {ask === null ? null : (
-              <Button
-                variant="quiet"
-                onClick={() =>
-                  setStatus(
-                    ask(
-                      `Q held a message to ${name} and didn't send it. Why, and what should I send instead?`,
-                    ),
-                  )
-                }
-                className="text-(--cq-text-secondary)"
-              >
-                Ask Q
-              </Button>
-            )}
+            <Button
+              variant="quiet"
+              disabled={pending}
+              onClick={() =>
+                setStatus(`Later, then. It stays here until you decide.`)
+              }
+              className="text-(--cq-text-secondary)"
+            >
+              Later
+            </Button>
           </div>
         </>
       )}

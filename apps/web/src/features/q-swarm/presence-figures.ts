@@ -1,4 +1,3 @@
-import { faceFigure } from "./presence-face";
 import {
   createFigureFrame,
   DEPTH_UNITS,
@@ -25,8 +24,7 @@ export {
  * What Q's particles can form (PRESENCE spec §3-4; K1-K2, ADR 0051), as
  * pure functions of time and the voice: a cloud on its own current, the
  * cloud leaning in to listen, the free shapes (ring, wave, spiral, the Q
- * mark in knots of light, a ribbon; presence-shapes.ts), a warm human face
- * while Q speaks on the Q page (presence-face.ts), and the gestures an
+ * mark in knots of light, a ribbon; presence-shapes.ts) and the gestures an
  * answer asks for -- ? ! $ buildings, a rising chart, clapping hands,
  * hands that explain.
  *
@@ -45,7 +43,6 @@ export const FIGURE_KINDS: readonly FigureKind[] = [
   "CONSTELLATION",
   "LETTER_Q",
   "RIBBON",
-  "FACE",
   "QUESTION",
   "EXCLAIM",
   "MONEY",
@@ -55,17 +52,8 @@ export const FIGURE_KINDS: readonly FigureKind[] = [
   "HANDS",
 ];
 
-/** Figures that show Q's face: only the speaking face (ADR 0051). */
-export const FACE_FIGURES: ReadonlySet<FigureKind> = new Set(["FACE"]);
-
 /** Figures that show Q's hands. */
 export const HAND_FIGURES: ReadonlySet<FigureKind> = new Set(["CLAP", "HANDS"]);
-
-/**
- * Figures drawn fine: smaller points and a dark floor, so painted tone
- * (the face) reads as light and shade rather than as a lit blob.
- */
-export const FINE_FIGURES: ReadonlySet<FigureKind> = new Set(["FACE"]);
 
 // ---------------------------------------------------------------------------
 // Point sets
@@ -684,8 +672,6 @@ export function buildFigure(kind: FigureKind, count: number): Figure {
       return cloudFigure(count);
     case "ATTENTIVE":
       return attentiveFigure(count);
-    case "FACE":
-      return faceFigure(count);
     case "QUESTION":
       return glyphFigure(kind, questionPoints(count, random), count);
     case "EXCLAIM":

@@ -59,8 +59,6 @@ export type DrawOptions = {
   readonly pixels: number;
   readonly colour: Rgb;
   readonly dim: boolean;
-  /** Fine figures (the face): smaller points, a near-dark floor. */
-  readonly fine?: boolean | undefined;
 };
 
 let points = new Float32Array(0);
@@ -75,10 +73,9 @@ export function layoutPoints(
   const half = options.pixels / 2;
   const unit = half / FRAME_HALF_UNITS;
   // Small surfaces get relatively larger points, so they still read.
-  const fine = options.fine === true;
-  const base = Math.max(1.6, options.pixels / 150) * (fine ? 0.75 : 1);
+  const base = Math.max(1.6, options.pixels / 150);
   const fade = options.dim ? 0.45 : 1;
-  const floor = fine ? 0.03 : 0.25;
+  const floor = 0.25;
   for (let i = 0; i < n; i += 1) {
     const depth = Math.max(-1, Math.min(1, sim.z[i] ?? 0));
     const light = Math.max(0, Math.min(1.3, sim.b[i] ?? 0));

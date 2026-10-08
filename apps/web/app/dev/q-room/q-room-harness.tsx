@@ -315,7 +315,7 @@ export function QRoomHarness() {
             <QAperture
               state="IDLE"
               size={mini === true ? 44 : compact ? 64 : 200}
-              face
+              stage
               showing={compact}
             />
           )}

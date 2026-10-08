@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { useQMotion } from "../q-aperture/q-motion";
 import type { QApertureState } from "../q-aperture/aperture-state";
-import { faceAllowed } from "./presence-machine";
+import { isStage } from "./presence-machine";
 import { surfaceDpr } from "./presence-budget";
 import { resolveColour, type Rgb } from "./presence-gl";
 import { whenIdle } from "../q/room/room-read";
@@ -29,10 +29,9 @@ export { particleCount } from "./presence-budget";
  * same particles flat.
  *
  * The free shapes (K1) carry Q's state: cloud, spiral, ring, wave, and
- * the Q mark in knots of light while answer cards are up. The human face (K2,
- * ADR 0051) shows only while Q speaks, and only where the caller says the
- * surface is the Q page's own presence (`face`) at 160 px or more; every
- * other surface has no face. Below 72 px only the cloud, the listening
+ * the Q mark in knots of light while answer cards are up. Q has no human
+ * face (Zino, 2026-10-08); the Q page's own presence (`stage`, 160 px or
+ * more) is where the Q moment shows. Below 72 px only the cloud, the listening
  * lean, the spiral and the ring are drawn. Reduced motion draws each
  * figure still, in one turned pose. Off screen or in a hidden tab,
  * nothing runs. Q room W7: at most 30 frames a second (presence-loop.ts).
@@ -43,7 +42,7 @@ export function QSwarm({
   pixels,
   inputLevel,
   outputLevel,
-  face = false,
+  stage = false,
   showing = false,
 }: {
   readonly state: QApertureState;
@@ -51,7 +50,7 @@ export function QSwarm({
   readonly inputLevel?: (() => number) | undefined;
   readonly outputLevel?: (() => number) | undefined;
   /** This surface is the Q page's own presence: it may show the face. */
-  readonly face?: boolean | undefined;
+  readonly stage?: boolean | undefined;
   /** Answer cards are on screen beside this presence: the Q mark. */
   readonly showing?: boolean | undefined;
 }) {
@@ -61,12 +60,12 @@ export function QSwarm({
   // Motion Off still deserves the 3D still; only a device asking for
   // light work (Save-Data, low memory, forced colours) keeps to 2D.
   const allow3d = environment.gpu || motion === "off";
-  const showsFace = faceAllowed({ face, pixels });
+  const onStage = isStage({ stage, pixels });
   const live = useRef({
     state,
     inputLevel,
     outputLevel,
-    showsFace,
+    onStage,
     showing,
     motion,
     bloom,
@@ -76,12 +75,12 @@ export function QSwarm({
       state,
       inputLevel,
       outputLevel,
-      showsFace,
+      onStage,
       showing,
       motion,
       bloom,
     };
-  }, [state, inputLevel, outputLevel, showsFace, showing, motion, bloom]);
+  }, [state, inputLevel, outputLevel, onStage, showing, motion, bloom]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -101,7 +100,7 @@ export function QSwarm({
     };
     const inputs = (): PresenceInputs => ({
       state: live.current.state,
-      showsFace: live.current.showsFace,
+      stage: live.current.onStage,
       showing: live.current.showing,
       motion: live.current.motion,
       bloom: live.current.bloom,
@@ -211,12 +210,12 @@ export function QSwarm({
     };
   }, [pixels, allow3d]);
 
-  // A state, face, cards or motion change restarts a stopped loop (reduced
+  // A state, stage, cards or motion change restarts a stopped loop (reduced
   // motion, or after a hidden tab): with no timers, this is the only way a
   // still presence changes shape, and it is exactly when it should.
   useEffect(() => {
     canvasRef.current?.dispatchEvent(new Event("cq:redraw"));
-  }, [state, showsFace, showing, motion, bloom]);
+  }, [state, onStage, showing, motion, bloom]);
 
   return (
     <canvas

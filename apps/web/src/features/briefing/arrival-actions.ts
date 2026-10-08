@@ -2,11 +2,14 @@
 
 import { z } from "zod";
 
-import { getQWorkSince } from "@capital-q/api-client";
-import type {
-  ChatThreadDto,
-  QApprovalView,
-  QWorkSinceDto,
+import { getQWorkSince, readBriefingCommand } from "@capital-q/api-client";
+import {
+  BriefingCommandRequestSchema,
+  type BriefingCommandRequest,
+  type BriefingCommandResultDto,
+  type ChatThreadDto,
+  type QApprovalView,
+  type QWorkSinceDto,
 } from "@capital-q/contracts";
 import {
   sameShownMessage,
@@ -26,6 +29,7 @@ import {
 } from "@/features/q/actions";
 import { qApiSession } from "@/features/q/context";
 import { decisionGroups, decisionTitle } from "@/features/work/decisions";
+import { retryHeldAction } from "@/features/work/held-actions";
 import { readPlan } from "@/features/work/plan-words";
 import { listDoneAction } from "@/features/work/work-page-actions";
 import { loadWorkforceAction } from "@/features/work/workforce-actions";
@@ -218,12 +222,28 @@ const DecideInput = z.discriminatedUnion("kind", [
     replacesApprovalId: Id.nullable(),
   }),
   z.object({ kind: z.literal("DISMISS_APPROVAL"), approvalId: Id }),
+  z.object({
+    kind: z.literal("RETRY_HELD"),
+    draftId: Id,
+    relationshipId: Id.nullable(),
+    idempotencyKey: z
+      .string()
+      .min(8)
+      .max(120)
+      .regex(/^[A-Za-z0-9_-]+$/u),
+  }),
 ]);
 
 export type ArrivalDecision = z.input<typeof DecideInput>;
 
 export type ArrivalDecisionResult =
-  | { readonly ok: true }
+  | {
+      readonly ok: true;
+      /** What came of it, when more than "done" (a retry's outcome). */
+      readonly message?: string | undefined;
+      /** New cards may be waiting: read the briefing again. */
+      readonly reload?: true | undefined;
+    }
   | {
       readonly ok: false;
       readonly message: string;
@@ -294,6 +314,16 @@ export async function decideArrivalCardAction(
       }
       return { ok: true };
     }
+    case "RETRY_HELD": {
+      const result = await retryHeldAction({
+        draftId: input.draftId,
+        relationshipId: input.relationshipId,
+        idempotencyKey: input.idempotencyKey,
+      });
+      return result.ok
+        ? { ok: true, message: result.message, reload: true }
+        : { ok: false, message: result.message };
+    }
     case "DISMISS_APPROVAL": {
       const result = await rejectQApprovalAction(input.approvalId).catch(
         () => null,
@@ -303,4 +333,21 @@ export async function decideArrivalCardAction(
         : { ok: false, message: "That didn't go through. Try again." };
     }
   }
+}
+
+/**
+ * The person's own words about the cards on their screen, read into card
+ * verbs (Zino, 2026-10-08). Changes nothing: the card sequence in the
+ * browser runs each verb and checks it against the same words. A failed
+ * read is "unclear", never a guess.
+ */
+export async function readArrivalWordsAction(
+  raw: BriefingCommandRequest,
+): Promise<BriefingCommandResultDto> {
+  const unclear: BriefingCommandResultDto = { actions: [], unclear: true };
+  const parsed = BriefingCommandRequestSchema.safeParse(raw);
+  if (!parsed.success) return unclear;
+  const session = await qApiSession();
+  if (session === null) return unclear;
+  return readBriefingCommand(session, parsed.data).catch(() => unclear);
 }

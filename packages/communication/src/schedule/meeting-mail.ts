@@ -127,7 +127,7 @@ export function meetingEmail(input: {
           { label: "When", value: when },
           { label: "Length", value: `${String(minutes)} minutes` },
           {
-            label: "Where",
+            label: "Location",
             value:
               input.meetLink === null ? "Video link to follow" : "Google Meet",
           },

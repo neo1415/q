@@ -7,14 +7,22 @@ import {
   lowdownOf,
   parseCardCommand,
   remainingAfterFocus,
+  summaryOfCards,
+  wordsAllowDismiss,
+  wordsAllowSend,
   type ArrivalActivity,
   type CardCommand,
   type DecisionCardFacts,
   type SequenceCard,
+  type SequenceEvent,
   type SequenceNote,
   type SequenceState,
 } from "@capital-q/q-core/speech";
-import type { NamedPicture } from "@capital-q/contracts";
+import type {
+  BriefingCommandRequest,
+  BriefingCommandResultDto,
+  NamedPicture,
+} from "@capital-q/contracts";
 
 /**
  * The arrival briefing as the page shows and Q says it (Zino, 2026-10-08):
@@ -95,6 +103,8 @@ export type ArrivalWords = {
   readonly quiet: boolean;
   /** The first card, put to them; null with none. */
   readonly firstCard: string | null;
+  /** Every card in one sentence ("Three things: ..."); null with none. */
+  readonly summary: string | null;
   /** Everything Q says first, on voice. */
   readonly spoken: string;
 };
@@ -120,12 +130,24 @@ export function arrivalWords(
     first === undefined
       ? null
       : cardLine(decisionFactsOf(first), 1, data.cards.length);
+  // Zino, 2026-10-08: all of it up front, then any words they like.
+  const summary =
+    data.cards.length < 2
+      ? null
+      : summaryOfCards(data.cards.map(decisionFactsOf));
   return {
     greeting,
     lowdown: lowdown.text,
     quiet: lowdown.quiet,
     firstCard,
-    spoken: [greeting, lowdown.text, firstCard]
+    summary,
+    spoken: [
+      greeting,
+      lowdown.text,
+      ...(summary === null
+        ? [firstCard]
+        : [summary, "Tell me what you'd like done with any of them."]),
+    ]
       .filter((part): part is string => part !== null && part.length > 0)
       .join(" "),
   };
@@ -175,6 +197,8 @@ const NOTE_WORDS: Readonly<Record<SequenceNote, string>> = {
     "That card can't be decided any more (already decided or expired).",
   CANNOT_EDIT:
     "That card can't be edited by voice; it's on screen to decide there.",
+  CANNOT_RETRY:
+    "Only a message Q held can be written again; this card is ready to decide as it is.",
   EDIT_NOT_APPLIED:
     "That change didn't fit the message (no such sentence or words); ask which part to change.",
   SAY_SEND:
@@ -237,4 +261,108 @@ export function focusNote(
   return `Screen note (data, not the person's words): a decision card is in focus. ${JSON.stringify(
     cardFactsForVoice(decisionFactsOf(card), state.focus + 1, cards.length),
   )}`;
+}
+
+// ---------------------------------------------------------------------------
+// Any words (Zino, 2026-10-08: "I can use any words I like to tell it what I
+// want done, and it does it"). A model reads the person's own words into
+// verbs; code turns each verb into the same typed events a button sends,
+// and checks it against the words first.
+
+/** The cards as the reader sees them: c1, c2... in screen order. */
+export function commandCardsOf(
+  cards: readonly ArrivalCard[],
+): BriefingCommandRequest["cards"] {
+  return cards.slice(0, 8).map((card, index) => ({
+    ref: `c${String(index + 1)}`,
+    kind: card.kind,
+    to: card.counterpart?.slice(0, 200) ?? null,
+    theyWrote: card.theySaid === null ? null : card.theySaid.slice(0, 600),
+    message: card.message === null ? null : card.message.slice(0, 4_000),
+    summary: card.summary.slice(0, 400),
+  }));
+}
+
+export type WordsPlan = {
+  /** Events for the card sequence, in order. */
+  readonly events: readonly SequenceEvent[];
+  /** What code held back, in plain words for the status line and voice. */
+  readonly held: readonly string[];
+};
+
+/**
+ * The reader's verbs as sequence events. Each card is brought forward
+ * first; a send runs only when the words plainly ask for one (else the
+ * card is only brought forward to decide by hand); a changed message is
+ * put on screen for "Send this exact message?", last, one at a time.
+ */
+export function planFromReading(
+  reading: BriefingCommandResultDto,
+  cards: readonly ArrivalCard[],
+  words: string,
+): WordsPlan {
+  const byRef = new Map(
+    cards.slice(0, 8).map((card, index) => [`c${String(index + 1)}`, card]),
+  );
+  const now: SequenceEvent[] = [];
+  let confirm: SequenceEvent[] | null = null;
+  const held: string[] = [];
+  const seen = new Set<string>();
+  for (const action of reading.actions) {
+    const card = byRef.get(action.ref);
+    if (card === undefined || seen.has(card.key)) continue;
+    seen.add(card.key);
+    const focus: SequenceEvent = { type: "FOCUS", key: card.key };
+    const name = card.counterpart ?? "That one";
+    switch (action.verb) {
+      case "SEND":
+        if (!wordsAllowSend(words)) {
+          held.push(`${name} is up to you to send; nothing was sent`);
+          confirm ??= [focus];
+        } else if (card.kind === "HELD") {
+          // Held, never offered: "Send this exact message?" before it goes.
+          if (confirm === null) {
+            confirm = [
+              focus,
+              { type: "COMMAND", command: { kind: "APPROVE" } },
+            ];
+          } else {
+            held.push(`${name} is next, after this one`);
+          }
+        } else {
+          now.push(focus, { type: "COMMAND", command: { kind: "APPROVE" } });
+        }
+        break;
+      case "DISMISS":
+        if (wordsAllowDismiss(words)) {
+          now.push(focus, { type: "COMMAND", command: { kind: "DISMISS" } });
+        } else {
+          held.push(`${name} is up to you; nothing was dropped`);
+        }
+        break;
+      case "LATER":
+        now.push(focus, { type: "COMMAND", command: { kind: "LATER" } });
+        break;
+      case "RETRY":
+        now.push(focus, { type: "COMMAND", command: { kind: "RETRY" } });
+        break;
+      case "REWRITE":
+        if (
+          action.rewrite === null ||
+          card.message === null ||
+          card.relationshipId === null
+        ) {
+          held.push(`${name} can't be changed here`);
+        } else if (confirm === null) {
+          confirm = [focus, { type: "EDITED", body: action.rewrite }];
+        } else {
+          held.push(`${name} is next, after this one`);
+        }
+        break;
+      case "SHOW":
+        confirm ??= [focus];
+        break;
+    }
+  }
+  return { events: [...now, ...(confirm ?? [])], held };
 }

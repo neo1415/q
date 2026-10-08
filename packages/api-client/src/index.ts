@@ -387,6 +387,8 @@ export {
   unsubscribePush,
   listWorkforceJobs,
   getWorkforceJob,
+  retryWorkforceDraft,
+  readBriefingCommand,
   getWorkforceOverview,
 } from "./work.js";
 // end AUTO block

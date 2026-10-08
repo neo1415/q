@@ -2,10 +2,18 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import type {
+  BriefingCommandRequest,
+  BriefingCommandResultDto,
+} from "@capital-q/contracts";
+import { cx } from "@capital-q/ui";
+
 import {
   ArrivalBriefing,
   heardOnLine,
 } from "@/features/briefing/arrival-briefing";
+import { ArrivalRoom, useRoomSlots } from "@/features/briefing/arrival-room";
+import { QAperture } from "@/features/q-aperture";
 import type { ArrivalData } from "@/features/briefing/arrival";
 import type {
   ArrivalDecision,
@@ -91,18 +99,57 @@ function fixture(state: "quiet" | "cards", timeZone: string): ArrivalData {
   };
 }
 
+/**
+ * A scripted reader in place of the model (BRIEFING_COMMAND): which card
+ * by its name in the words, which verb by a few words. Enough to drive the
+ * same path the model's reading takes; the real reading is tested in q-api.
+ */
+function scriptedReading(
+  request: BriefingCommandRequest,
+): BriefingCommandResultDto {
+  const words = request.words.toLowerCase();
+  const actions = request.cards.flatMap(
+    (card): BriefingCommandResultDto["actions"] => {
+      const name = (card.to ?? "").toLowerCase().split(" ")[0] ?? "";
+      if (name.length === 0 || !words.includes(name)) return [];
+      const at = words.indexOf(name);
+      const near = words.slice(Math.max(0, at - 24), at + name.length + 40);
+      if (/warmer|book|at 3/u.test(near) && card.message !== null) {
+        const rewrite = /book|at 3/u.test(near)
+          ? `${card.message} Thursday at 3pm works for me.`
+          : `Thank you, I'd really enjoy that. ${card.message}`;
+        return [{ ref: card.ref, verb: "REWRITE" as const, rewrite }];
+      }
+      if (/ignore|drop/u.test(near)) {
+        return [{ ref: card.ref, verb: "DISMISS" as const, rewrite: null }];
+      }
+      if (/try again/u.test(near)) {
+        return [{ ref: card.ref, verb: "RETRY" as const, rewrite: null }];
+      }
+      if (/send/u.test(near)) {
+        return [{ ref: card.ref, verb: "SEND" as const, rewrite: null }];
+      }
+      return [{ ref: card.ref, verb: "SHOW" as const, rewrite: null }];
+    },
+  );
+  return { actions, unclear: actions.length === 0 };
+}
+
 export function BriefingHarness({
   state,
   at,
   timeZone,
   fail,
   dock,
+  room = false,
 }: {
   readonly state: "quiet" | "cards";
   readonly at: string;
   readonly timeZone: string;
   readonly fail: boolean;
   readonly dock: boolean;
+  /** The Q stage: cards either side of Q on a wide screen. */
+  readonly room?: boolean | undefined;
 }) {
   const [log, setLog] = useState<readonly ArrivalDecision[]>([]);
   const [voice, setVoice] = useState<string>("");
@@ -120,14 +167,40 @@ export function BriefingHarness({
                 "It changed since you saw it. Here's the current version.",
               changed: true,
             }
-          : { ok: true },
+          : decision.kind === "RETRY_HELD"
+            ? {
+                ok: true,
+                message:
+                  "Q wrote it again and the reviewer passed it. It's waiting for your approval.",
+                reload: true,
+              }
+            : { ok: true },
       );
     },
     [fail],
   );
+  const [read, setRead] = useState<readonly string[]>([]);
+  const readWords = useCallback((request: BriefingCommandRequest) => {
+    setRead((was) => [...was, request.words]);
+    return Promise.resolve(scriptedReading(request));
+  }, []);
+  const slots = useRoomSlots();
   const now = useCallback(() => new Date(at), [at]);
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-8 bg-(--cq-canvas) px-4 py-10">
+    <main
+      className={cx(
+        "mx-auto flex min-h-dvh w-full flex-col gap-8 bg-(--cq-canvas) px-4 py-10",
+        room
+          ? cx("max-w-2xl items-center", slots.filled && "lg:max-w-6xl")
+          : "max-w-(--cq-layout-reading)",
+      )}
+    >
+      {room ? (
+        <ArrivalRoom>
+          <QAperture state="IDLE" size="stage" stage />
+          <span className="cq-label text-(--cq-text-primary)">Ready</span>
+        </ArrivalRoom>
+      ) : null}
       {dock ? (
         <aside
           aria-label="Q's briefing"
@@ -138,6 +211,7 @@ export function BriefingHarness({
             variant="dock"
             load={load}
             decide={decide}
+            readWords={readWords}
             now={now}
             onClose={() => undefined}
           />
@@ -147,6 +221,7 @@ export function BriefingHarness({
           variant="page"
           load={load}
           decide={decide}
+          readWords={readWords}
           now={now}
           fallback={
             <h1 className="cq-title-lg text-center" data-harness-fallback>
@@ -182,6 +257,9 @@ export function BriefingHarness({
       </pre>
       <pre className="cq-caption whitespace-pre-wrap" data-harness-log>
         {JSON.stringify(log)}
+      </pre>
+      <pre className="cq-caption whitespace-pre-wrap" data-harness-read>
+        {JSON.stringify(read)}
       </pre>
     </main>
   );

@@ -70,7 +70,7 @@ const nextId = () => {
   return `playground-${String(sequence)}-${String(Date.now())}`;
 };
 
-/** Timed state sequences for a screen recording of the free shapes and the face. */
+/** Timed state sequences for a screen recording of the free shapes. */
 const PLAYS: Readonly<Record<string, readonly QApertureState[]>> = {
   shapes: [
     "IDLE",
@@ -81,7 +81,7 @@ const PLAYS: Readonly<Record<string, readonly QApertureState[]>> = {
     "COMPLETE",
     "IDLE",
   ],
-  face: [
+  speaking: [
     "IDLE",
     "LISTENING",
     "SPEAKING",
@@ -96,13 +96,13 @@ const PLAYS: Readonly<Record<string, readonly QApertureState[]>> = {
 export function PresencePlayground({
   initialState,
   initialGesture,
-  initialFace,
+  initialStage,
   play,
   qMoment = false,
 }: {
   readonly initialState: string | null;
   readonly initialGesture: string | null;
-  readonly initialFace: boolean;
+  readonly initialStage: boolean;
   readonly play: string | null;
   /** `?q=1`: the Q moment, again every few seconds, for screenshots. */
   readonly qMoment?: boolean;
@@ -110,7 +110,7 @@ export function PresencePlayground({
   const [state, setState] = useState<QApertureState>(
     isState(initialState) ? initialState : "IDLE",
   );
-  const [face, setFace] = useState(initialFace);
+  const [stage, setStage] = useState(initialStage);
   useEffect(() => {
     const sequence = play === null ? undefined : PLAYS[play];
     if (sequence === undefined) return;
@@ -163,7 +163,7 @@ export function PresencePlayground({
   }, [initialGesture, gesture]);
 
   // The Q moment (the letter Q) on the stage's presence. It forms only
-  // where the Q page's presence would: face on, resting, motion full.
+  // where the Q page's presence would: on the stage, resting, motion full.
   const formQ = useCallback(() => {
     stageRef.current
       ?.querySelector("canvas")
@@ -243,7 +243,7 @@ export function PresencePlayground({
             size="stage"
             inputLevel={input}
             outputLevel={output}
-            face={face}
+            stage={stage}
             label
           />
         </div>
@@ -259,13 +259,13 @@ export function PresencePlayground({
               </Button>
               <Button onClick={heyQ}>“Hey Q”</Button>
               <Button
-                aria-pressed={face}
-                variant={face ? "primary" : "secondary"}
-                onClick={() => setFace((on) => !on)}
+                aria-pressed={stage}
+                variant={stage ? "primary" : "secondary"}
+                onClick={() => setStage((on) => !on)}
               >
-                Face while speaking (Q page)
+                The Q page stage
               </Button>
-              <Button onClick={formQ} disabled={!face} data-q-moment>
+              <Button onClick={formQ} disabled={!stage} data-q-moment>
                 Form the Q (Q page, resting)
               </Button>
             </div>

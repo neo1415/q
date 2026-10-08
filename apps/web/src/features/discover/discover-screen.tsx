@@ -32,7 +32,7 @@ import { EmptyState } from "@capital-q/ui/states";
 const REASON_LABELS: Readonly<Record<DiscoveryReasonDto["kind"], string>> = {
   STAGE_IN_RANGE: "Stage",
   SECTOR_MATCH: "Sector",
-  GEOGRAPHY_MATCH: "Where",
+  GEOGRAPHY_MATCH: "Location",
   BUSINESS_MODEL_MATCH: "Model",
   CUSTOMER_TYPE_MATCH: "Customers",
   DECLARED_DEPLOYING: "Status",

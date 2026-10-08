@@ -1630,6 +1630,50 @@ function peopleLines(
     .slice(0, 12_000);
 }
 
+/**
+ * "Ask Q to try again" on a message Q held (Zino, 2026-10-08: "if I even
+ * wanted to approve it, I have no way to do so"). The held draft is
+ * written and reviewed again now, with the instruction's own material and
+ * the real thread, exactly as a firing would. A pass is never sent: it is
+ * offered as an ordinary approval card (the Approval Engine binds the
+ * exact payload), so the person decides it. A second hold says why.
+ */
+export type HeldRetryInput = {
+  readonly instructionId: string;
+  /** The person asking: must own the instruction. */
+  readonly userId: string;
+  /** Where to write; null: found by the held draft's counterpart name. */
+  readonly relationshipId: string | null;
+  /** Who the held draft was to; a relationship that is someone else is refused. */
+  readonly counterpartName: string | null;
+  /** The held draft's id (the card key) and its exact text. */
+  readonly draftId: string;
+  readonly body: string;
+  /** The person's own idempotency key for this press. */
+  readonly idempotencyKey: string;
+};
+
+export type HeldRetryResult =
+  | {
+      readonly outcome: "OFFERED";
+      readonly qActionId: string;
+      readonly body: string;
+    }
+  | {
+      readonly outcome: "HELD";
+      readonly reason: string;
+      readonly body: string;
+    }
+  | {
+      readonly outcome: "UNAVAILABLE";
+      readonly reason:
+        | "NOT_ACTIVE"
+        | "NO_ACTOR"
+        | "NOT_IN_REACH"
+        | "NO_REVIEWER"
+        | "CARD_NOT_PREPARED";
+    };
+
 export function createInstructionEngine(
   dependencies: InstructionEngineDependencies,
 ): {
@@ -1637,6 +1681,7 @@ export function createInstructionEngine(
     instructionId: string,
     runKey: string,
   ) => Promise<InstructionFiringResult>;
+  readonly retryHeld: (input: HeldRetryInput) => Promise<HeldRetryResult>;
 } {
   const { store, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
@@ -2788,6 +2833,154 @@ export function createInstructionEngine(
         refused: refusedCount,
         deferred,
         cannot: plan.cannot.map((entry) => ({ ...entry })),
+      };
+    },
+
+    retryHeld: async (input) => {
+      const review = dependencies.review;
+      if (review === undefined) {
+        return { outcome: "UNAVAILABLE", reason: "NO_REVIEWER" };
+      }
+      const row = await store.instruction(input.instructionId);
+      // Someone else's instruction is the same answer as a stopped one.
+      if (
+        row === null ||
+        row.status !== "ACTIVE" ||
+        row.user_id !== input.userId
+      ) {
+        return { outcome: "UNAVAILABLE", reason: "NOT_ACTIVE" };
+      }
+      const grant = InstructionGrantSchema.safeParse(row.grant_payload);
+      if (!grant.success) {
+        return { outcome: "UNAVAILABLE", reason: "NOT_ACTIVE" };
+      }
+      const actor = await dependencies.actorFor(row);
+      if (actor === null || actor.userId !== row.user_id) {
+        return { outcome: "UNAVAILABLE", reason: "NO_ACTOR" };
+      }
+      // Still theirs to write to under this instruction: in its scope now.
+      const people = await dependencies.people(actor).catch(() => []);
+      const person = inScope(grant.data, people).find((one) =>
+        input.relationshipId === null
+          ? one.relationshipId !== null && one.name === input.counterpartName
+          : one.relationshipId === input.relationshipId &&
+            (input.counterpartName === null ||
+              one.name === input.counterpartName),
+      );
+      const relationshipId = person?.relationshipId ?? null;
+      if (person === undefined || relationshipId === null) {
+        return { outcome: "UNAVAILABLE", reason: "NOT_IN_REACH" };
+      }
+      const at = now();
+      const material = await Promise.resolve()
+        .then(() => dependencies.material?.(actor, [person]) ?? null)
+        .catch(() => null);
+      const read =
+        dependencies.readThread === undefined
+          ? null
+          : await dependencies
+              .readThread({
+                actor,
+                instructionId: row.id,
+                relationshipId,
+                topics: grant.data.topics,
+                now: at,
+                maxCostUsd: PLAN_MAX_COST_USD,
+              })
+              .catch(() => null);
+      if (read !== null && read.costUsd > 0) {
+        await store.addSpend(row.id, read.costUsd).catch(() => undefined);
+      }
+      const principalName =
+        (await dependencies.principalName?.(actor).catch(() => null)) ??
+        "the person";
+      const theyWroteLast =
+        read?.facts?.lastFrom === "THEM" || read?.pace?.lastFrom === "THEM";
+      const outcome = await review.review(
+        { tenantId: row.tenant_id, userId: row.user_id },
+        { kind: "INSTRUCTION", id: row.id, goal: row.goal_text },
+        {
+          principalName,
+          counterpartName: person.name,
+          channel: "CHAT",
+          stage: theyWroteLast
+            ? "REPLY"
+            : (read?.transcript ?? "").trim().length > 0
+              ? "FOLLOW_UP"
+              : "FIRST",
+          purpose: `Write again the message Q held for ${person.name} (their standing instruction: ${row.goal_text})`,
+          material: [
+            `Platform: ${principalName} writes inside Capital Q, where ${person.name} has a Capital Q profile; "Their" facts come from that profile and "Sender" facts are ${principalName}'s own declared mandate and profile.`,
+            ...(material?.sender.facts ?? []).map(
+              (fact) => `Sender ${fact.label}: ${fact.text}`,
+            ),
+            ...(material?.counterparts.get(person.counterpartId) ?? []).map(
+              (fact) => `Their ${fact.label}: ${fact.text}`,
+            ),
+          ].join("\n"),
+          thread: read?.transcript ?? "",
+          theirLatest: read?.theirLatest ?? null,
+          body: input.body,
+        },
+      );
+      if (outcome.verdict === "HELD") {
+        return { outcome: "HELD", reason: outcome.reason, body: outcome.body };
+      }
+      // A pass is offered, never sent: the person approves the exact text.
+      const key = `instr:${row.id}:retry-${input.draftId}:${input.idempotencyKey}`;
+      const payload = {
+        relationshipId,
+        idempotencyKey:
+          `retry-${input.draftId.slice(0, 36)}-${input.idempotencyKey}`.slice(
+            0,
+            120,
+          ),
+        input: { kind: "TEXT", body: outcome.body },
+      };
+      const words = `Message to ${person.name}, written again after it was held`;
+      const card = await dependencies
+        .ask(actor, {
+          instructionId: row.id,
+          actionType: "app.chat.message.send",
+          payload,
+          words,
+          key,
+        })
+        .catch((error: unknown) => {
+          logger?.warn(
+            { err: error, instructionId: row.id },
+            "held retry card not prepared",
+          );
+          return null;
+        });
+      if (card === null) {
+        return { outcome: "UNAVAILABLE", reason: "CARD_NOT_PREPARED" };
+      }
+      await review.settle(
+        { tenantId: row.tenant_id, userId: row.user_id },
+        outcome,
+        "OFFERED",
+        card.qActionId,
+      );
+      await store
+        .recordStep({
+          instruction: row,
+          runKey: `retry-${input.draftId}`.slice(0, 80),
+          stepIndex: 0,
+          action: "chat.message.send",
+          mode: "ASK",
+          status: "ASKED",
+          relationshipId,
+          words,
+          reasonCode: null,
+          qActionId: card.qActionId,
+          idempotencyKey: key,
+        })
+        .catch(() => false);
+      return {
+        outcome: "OFFERED",
+        qActionId: card.qActionId,
+        body: outcome.body,
       };
     },
   };

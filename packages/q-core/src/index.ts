@@ -1289,6 +1289,18 @@ export {
   SPEAK_FROM_FACTS_V1,
   SPOKEN_REPLY_V1,
 } from "./prompts/tasks/spoken-reply.v1.js";
+export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
+export {
+  BRIEFING_COMMAND_SCHEMA_NAME,
+  BRIEFING_COMMAND_SCHEMA_VERSION,
+  BRIEFING_COMMAND_UNTRUSTED,
+  BRIEFING_VERBS,
+  BriefingCommandResultSchema,
+  BriefingCommandVariablesSchema,
+  type BriefingCommandResult,
+  type BriefingCommandVariables,
+  type BriefingVerb,
+} from "./prompts/schemas/briefing-command.js";
 export {
   SPOKEN_REPLY_SCHEMA_NAME,
   SPOKEN_REPLY_SCHEMA_VERSION,
@@ -1325,6 +1337,7 @@ export {
   localHour,
   lowdownOf,
   partOfDay,
+  summaryOfCards,
   type ActivityCount,
   type ArrivalActivity,
   type ArrivalFacts,
@@ -1337,6 +1350,8 @@ export {
   bodyDigest,
   focusedCard,
   parseCardCommand,
+  wordsAllowDismiss,
+  wordsAllowSend,
   remainingAfterFocus,
   sameShownMessage,
   sentencesOf,

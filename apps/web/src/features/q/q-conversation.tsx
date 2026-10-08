@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import { describeQStreamTransport } from "@capital-q/api-client";
+import { cx } from "@capital-q/ui";
 import { Button } from "@capital-q/ui/button";
 import {
   Captions,
@@ -37,6 +38,7 @@ import {
   arrivalPending,
   arrivalSpoken,
 } from "@/features/briefing/arrival-store";
+import { ArrivalRoom, useRoomSlots } from "@/features/briefing/arrival-room";
 import { decideBriefing } from "@/features/home/briefing-gate";
 import {
   DECK_OFFER_QUESTION,
@@ -138,6 +140,8 @@ export type QConversationPanelProps = {
   readonly context: QSurfaceContext;
   /** The conversation the URL names, resolved on the server (QX-003A). */
   readonly conversationId?: string | null | undefined;
+  /** "New chat": start a new conversation (a bare page keeps the current one). */
+  readonly fresh?: boolean | undefined;
   /** Q's welcome, shown on the stage before the first turn (A, K). */
   readonly welcome?: ReactNode | undefined;
   /** The welcome as Q says it: the line Q opens with. */
@@ -291,6 +295,7 @@ export function QConversationPanel({
   connected,
   context,
   conversationId: openConversationId = null,
+  fresh = false,
   welcome,
   welcomeLine,
   welcomeLead,
@@ -303,11 +308,16 @@ export function QConversationPanel({
 
   // The page names the conversation (its URL); the store holds it, so
   // arriving from the dock in the same conversation reads nothing again
-  // (ADR 0017 F1, spec §6.4). A bare /home is a new conversation.
+  // (ADR 0017 F1, spec §6.4). Zino, 2026-10-08: "make sure Q is
+  // persistent across navigation" -- a bare /home (the header's mark, the
+  // phone's centre tab, "take me to Q" by voice) keeps whatever this tab
+  // is in: the conversation, the open line and its captions. Only "New
+  // chat" (`fresh`) starts over.
   const openConversation = session.open;
   useEffect(() => {
+    if (openConversationId === null && !fresh) return;
     openConversation(openConversationId);
-  }, [openConversation, openConversationId]);
+  }, [openConversation, openConversationId, fresh]);
 
   const openArtifact = session.artifactId;
   const showArtifact = session.openArtifact;
@@ -604,6 +614,7 @@ export function QConversationPanel({
     !q.loading &&
     q.state.failure === null;
 
+  const room = useRoomSlots();
   const stateLabel = voice.active
     ? client.muted
       ? "Muted"
@@ -943,7 +954,7 @@ export function QConversationPanel({
                               size={compact ? 64 : 200}
                               inputLevel={client.inputLevel}
                               outputLevel={client.outputLevel}
-                              face
+                              stage
                               showing={compact || showingCards}
                             />
                           </ViewTransition>
@@ -1153,30 +1164,41 @@ export function QConversationPanel({
                 {notices}
               </div>
             ) : (
-              <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 py-6">
-                <ViewTransition
-                  name="q-aperture"
-                  share="cq-q-morph"
-                  default="none"
-                >
-                  <QAperture
-                    state={presence.state}
-                    size="stage"
-                    inputLevel={client.inputLevel}
-                    outputLevel={client.outputLevel}
-                    face
-                  />
-                </ViewTransition>
-                <div className="flex flex-col items-center gap-1" role="status">
-                  <span className="cq-label text-(--cq-text-primary)">
-                    {stateLabel}
-                  </span>
-                  {!voice.active && q.working && stage !== undefined ? (
-                    <span className="cq-caption text-(--cq-text-secondary)">
-                      {stage}
+              <div
+                className={cx(
+                  "mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-6 py-6",
+                  // The arrival room: decision cards either side of Q.
+                  room.filled && "lg:max-w-6xl",
+                )}
+              >
+                <ArrivalRoom>
+                  <ViewTransition
+                    name="q-aperture"
+                    share="cq-q-morph"
+                    default="none"
+                  >
+                    <QAperture
+                      state={presence.state}
+                      size="stage"
+                      inputLevel={client.inputLevel}
+                      outputLevel={client.outputLevel}
+                      stage
+                    />
+                  </ViewTransition>
+                  <div
+                    className="flex flex-col items-center gap-1"
+                    role="status"
+                  >
+                    <span className="cq-label text-(--cq-text-primary)">
+                      {stateLabel}
                     </span>
-                  ) : null}
-                </div>
+                    {!voice.active && q.working && stage !== undefined ? (
+                      <span className="cq-caption text-(--cq-text-secondary)">
+                        {stage}
+                      </span>
+                    ) : null}
+                  </div>
+                </ArrivalRoom>
 
                 {voice.active ? null : (
                   <button

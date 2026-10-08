@@ -21,9 +21,9 @@ export const metadata: Metadata = {
  *
  * `?state=SPEAKING` starts in a state; `?gesture=MONEY` plays a gesture
  * once the page is up (and again every few seconds, for screenshots).
- * `?face=1` lets the stage show Q's speaking face (as the Q page does);
- * `?play=shapes` or `?play=face` cycles the states for a screen recording.
- * `?face=1&q=1` forms the Q moment (the letter Q) every few seconds.
+ * `?stage=1` (or the older `?face=1`) marks the presence as the Q page's stage;
+ * `?play=shapes` or `?play=speaking` cycles the states for a screen recording.
+ * `?stage=1&q=1` forms the Q moment (the letter Q) every few seconds.
  */
 export default async function PresencePage({
   searchParams,
@@ -50,7 +50,7 @@ export default async function PresencePage({
       <PresencePlayground
         initialState={one(params["state"]) ?? null}
         initialGesture={one(params["gesture"]) ?? null}
-        initialFace={one(params["face"]) === "1"}
+        initialStage={one(params["stage"] ?? params["face"]) === "1"}
         play={one(params["play"]) ?? null}
         qMoment={one(params["q"]) === "1"}
       />

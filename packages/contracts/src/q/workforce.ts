@@ -414,3 +414,57 @@ export const WorkforceJobStartPayloadSchema = z
 export type WorkforceJobStartPayload = z.infer<
   typeof WorkforceJobStartPayloadSchema
 >;
+
+// ---------------------------------------------------------------------------
+// "Ask Q to try again" on a held message (Zino, 2026-10-08).
+
+/**
+ * `POST` (Idempotency-Key required): the held draft is written and reviewed
+ * again now. A pass is OFFERED as an ordinary approval card (its
+ * `qActionId`), never sent; the person approves the exact text there. A
+ * second hold says why. The draft id is input: someone else's is the same
+ * NOT_FOUND as one that does not exist.
+ */
+export const Q_WORKFORCE_DRAFT_RETRY_PATH =
+  "/v1/q/workforce/drafts/:draftId/retry" as const;
+
+export const qWorkforceDraftRetryPath = (draftId: string) =>
+  Q_WORKFORCE_DRAFT_RETRY_PATH.replace(":draftId", encodeURIComponent(draftId));
+
+export const WorkforceDraftRetryRequestSchema = z
+  .object({
+    /** The conversation the card is in; checked against the draft's person. */
+    relationshipId: UuidSchema.nullable(),
+  })
+  .strict();
+export type WorkforceDraftRetryRequest = z.infer<
+  typeof WorkforceDraftRetryRequestSchema
+>;
+
+const ReasonCode = z.string().regex(/^[A-Z][A-Z_]{1,63}$/u);
+
+export const WorkforceDraftRetryResultDtoSchema = z.discriminatedUnion(
+  "outcome",
+  [
+    z
+      .object({
+        outcome: z.literal("OFFERED"),
+        qActionId: UuidSchema,
+        body: z.string().max(8_000),
+      })
+      .strict(),
+    z
+      .object({
+        outcome: z.literal("HELD"),
+        reason: ReasonCode,
+        body: z.string().max(8_000),
+      })
+      .strict(),
+    z
+      .object({ outcome: z.literal("UNAVAILABLE"), reason: ReasonCode })
+      .strict(),
+  ],
+);
+export type WorkforceDraftRetryResultDto = z.infer<
+  typeof WorkforceDraftRetryResultDtoSchema
+>;

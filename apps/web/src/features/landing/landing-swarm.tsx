@@ -8,8 +8,8 @@ import { useEffect, useRef, type RefObject } from "react";
  * interface, so it can be swapped for the shared 3D presence without
  * touching the scenes that drive it.
  *
- * Why not the app's QSwarm: it draws a square, face-forming presence
- * (HEAD while listening, FACE while speaking), with no full-stage bloom.
+ * Why not the app's QSwarm: it draws a square, state-shaped presence
+ * (a lean while listening, a wave while speaking), with no full-stage bloom.
  * The landing's approved motion keeps Q a cloud that gathers into its
  * working ring and pulses while speaking, across a wide stage.
  *

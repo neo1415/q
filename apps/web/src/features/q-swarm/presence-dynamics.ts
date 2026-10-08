@@ -53,13 +53,11 @@ const GESTURE_FIGURES: ReadonlySet<FigureKind> = new Set([
 /**
  * Seconds a change of figure takes: fixed per destination (P11), so the
  * same change always takes the same time. Settling back to rest is the
- * slowest; the face forms a little slower than a shape so it reads as
- * arriving, not snapping in.
+ * slowest.
  */
 export function morphSeconds(to: FigureKind): number {
   if (GESTURE_FIGURES.has(to)) return 0.8;
   if (to === "CLOUD" || to === "ATTENTIVE") return 1.2;
-  if (to === "FACE") return 1.3;
   // The Q moment gathers as calmly as the cloud settles (presence-q-moment).
   if (to === "LETTER_Q") return 1.2;
   return 1;
