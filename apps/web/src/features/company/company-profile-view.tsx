@@ -171,13 +171,13 @@ function NotSharedYet({ href }: { readonly href: string }) {
   );
 }
 
-function tabClass(active: boolean): string {
-  return `cq-body-sm inline-flex min-h-11 items-center border-b-2 px-1 ${
-    active
-      ? "border-(--cq-text-primary) text-(--cq-text-primary)"
-      : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-  }`;
-}
+// Plain strings: the tab link is a client component, and a function prop
+// cannot cross from the server.
+const TAB_CLASS =
+  "cq-body-sm inline-flex min-h-11 shrink-0 items-center border-b-2 px-1";
+const TAB_ACTIVE = "border-(--cq-text-primary) text-(--cq-text-primary)";
+const TAB_IDLE =
+  "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)";
 
 export function CompanyProfileView({
   profile,
@@ -403,7 +403,9 @@ export function CompanyProfileView({
             tab={value}
             fallbackHref={value === "overview" ? base : `${base}?tab=${value}`}
             current={tab === value}
-            className={(active) => `${tabClass(active)} shrink-0`}
+            className={TAB_CLASS}
+            activeClassName={TAB_ACTIVE}
+            idleClassName={TAB_IDLE}
             data-profile-tab={value}
           >
             {label}

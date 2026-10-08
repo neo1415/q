@@ -116,6 +116,8 @@ export function ProfileTabLink({
   fallbackHref,
   current,
   className,
+  activeClassName,
+  idleClassName,
   children,
   ...data
 }: {
@@ -124,7 +126,10 @@ export function ProfileTabLink({
   readonly fallbackHref: string;
   /** Marks the open tab with aria-current (the tab bar). */
   readonly current?: boolean;
-  readonly className?: string | ((active: boolean) => string);
+  readonly className?: string;
+  /** Added while this tab is open, and while it is not. */
+  readonly activeClassName?: string;
+  readonly idleClassName?: string;
   readonly children: ReactNode;
   readonly [data: `data-${string}`]: string | undefined;
 }) {
@@ -151,9 +156,9 @@ export function ProfileTabLink({
       href={href}
       onClick={onClick}
       aria-current={current !== undefined && active ? "page" : undefined}
-      className={
-        typeof className === "function" ? className(active) : className
-      }
+      className={[className, active ? activeClassName : idleClassName]
+        .filter((part) => part !== undefined && part !== "")
+        .join(" ")}
       {...data}
     >
       {children}
