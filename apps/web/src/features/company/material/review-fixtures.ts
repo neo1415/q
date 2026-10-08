@@ -46,6 +46,9 @@ export function reviewProfile(
       organisationVerified: true,
       facts: [],
       deck: null,
+      pitchClaims: [],
+      raiseFromPitch: null,
+      pitchRaiseNotice: null,
       team: empty
         ? []
         : [

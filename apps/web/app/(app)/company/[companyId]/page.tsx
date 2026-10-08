@@ -208,6 +208,18 @@ export default async function CompanyPage({
         dataRoom={dataRoom}
         deck={deck}
         previewAsInvestor={query?.as === "investor"}
+        overviewExtraSummary={
+          assumptions === null
+            ? undefined
+            : [
+                `${String(assumptions.assumptions.length)} to test`,
+                assumptions.counts.unknown > 0
+                  ? `${String(assumptions.counts.unknown)} not known yet`
+                  : null,
+              ]
+                .filter((part) => part !== null)
+                .join(" · ")
+        }
         overviewExtra={
           assumptions === null ? null : (
             <AssumptionsSection
