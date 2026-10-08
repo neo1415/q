@@ -102,6 +102,9 @@ import { MANDATE_LABELS } from "./mandate-labels.js";
 
 export type QIntelligenceDependencies = {
   readonly sql: DatabaseExecutor;
+  /** RECOVERY (C's request): receipt facts of the person's recent UI acts. */
+  readonly uiActReceipts?:
+    ((actor: QAnswerRequest["actor"]) => readonly string[]) | undefined;
   /**
    * Voice speculation (latency2): a spoken question's answer starts beside
    * the turn reader. `observe` hears whether each was adopted or cancelled
@@ -324,6 +327,9 @@ export function composeQIntelligence(
     sql,
     transactions,
     tools,
+    ...(dependencies.uiActReceipts === undefined
+      ? {}
+      : { uiActReceipts: dependencies.uiActReceipts }),
     context: evidence.context,
     ...(statements === undefined ? {} : { statements }),
     ...(dependencies.profileUpdates === undefined

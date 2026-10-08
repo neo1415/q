@@ -587,6 +587,19 @@ export function referencesNote(references: string): ModelMessage {
   };
 }
 
+/**
+ * RECOVERY-2026-10 (C's request): Q's recent screen acts and what their
+ * receipts say. A screen act happened only with a DONE receipt; anything
+ * else is said as not done, never smoothed over. Null: no receipts.
+ */
+export function screenActsNote(facts: readonly string[]): ModelMessage | null {
+  if (facts.length === 0) return null;
+  return {
+    role: "SYSTEM",
+    content: `WHAT YOUR RECENT SCREEN ACTS DID (receipts from their screen, oldest first): ${facts.slice(-6).join(" ")} Only an act marked DONE happened. If they ask, or the last act was NOT done, say so plainly in a few words and offer what would work (another control on this page, or opening the right page first); never say a NOT done act worked.`,
+  };
+}
+
 export const SAY_DO_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
@@ -1318,6 +1331,13 @@ export type ModelGatewayQAnswerDependencies = {
   readonly context?: QAuthorisedContextPort | undefined;
   /** The Tool Registry's port (CQ-Q-007). Absent: no tool is offered. */
   readonly tools?: QToolPort | undefined;
+  /**
+   * RECOVERY-2026-10 (C's request): what came of Q's recent screen acts,
+   * from the receipts the person's browser reported (C's `receiptFacts`:
+   * code's words over control ids and closed statuses). Absent: none.
+   */
+  readonly uiActReceipts?:
+    ((actor: QAnswerRequest["actor"]) => readonly string[]) | undefined;
   readonly sensitivity?: QAnswerSensitivityPolicy | undefined;
   /**
    * What KIND of material this composition handles (doc 15 §62). Omitted
@@ -3320,6 +3340,12 @@ export function createModelGatewayQAnswer(
       if (request.references !== undefined) {
         messages = [...messages, referencesNote(request.references)];
       }
+      // C's request: whether Q's last screen acts happened, from the
+      // browser's receipts, so Q says so honestly next turn.
+      const screenActs = screenActsNote(
+        dependencies.uiActReceipts?.(request.actor) ?? [],
+      );
+      if (screenActs !== null) messages = [...messages, screenActs];
 
       type AnswerResult = Awaited<
         ReturnType<typeof gateway.execute<CompanyAnalystV17Result>>

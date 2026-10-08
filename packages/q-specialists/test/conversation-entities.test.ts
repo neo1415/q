@@ -26,6 +26,7 @@ import {
   resolveReference,
   type ConversationEntity,
 } from "../src/conversation-entities.js";
+import { controlReferenceOf } from "../src/conversation-entities.js";
 
 /**
  * RECOVERY-2026-10 B6 (Scenarios A, B, G): what the person points at --
@@ -445,5 +446,113 @@ describe("references through the answer seam (Scenarios A, B, G)", () => {
     const run = seam();
     await run.say("what's our runway?");
     expect(run.delegatedWith[0]?.references).toBeUndefined();
+  });
+});
+
+// --- the page's own controls (C's request; Scenarios A and B) ---------------
+
+/** Capital, readiness view: tabs, sections and a list registered by C. */
+const CAPITAL_PAGE: QPageManifest = {
+  v: 2,
+  seq: 11,
+  inView: [],
+  sections: [],
+  dialogs: [],
+  controls: [
+    { id: "tab.overview", kind: "TAB", state: "SELECTED" },
+    { id: "tab.readiness", kind: "TAB" },
+    { id: "tab.due-diligence", kind: "TAB" },
+    { id: "section.risks", kind: "SECTION" },
+    { id: "list.risks", kind: "LIST", count: 5 },
+  ],
+};
+
+describe("binding words to the page's controls", () => {
+  const controls = CAPITAL_PAGE.controls;
+
+  it.each([
+    [
+      "open the readiness tab",
+      "RESOLVED: the readiness tab = control tab.readiness on their screen (operate_screen SELECT_TAB target tab.readiness).",
+    ],
+    [
+      "go to the due diligence tab",
+      "RESOLVED: the due diligence tab = control tab.due-diligence on their screen (operate_screen SELECT_TAB target tab.due-diligence).",
+    ],
+    [
+      "scroll to the risks section",
+      "RESOLVED: the risks section = control section.risks on their screen (operate_screen SCROLL_TO target section.risks).",
+    ],
+    [
+      "explain the second one",
+      "RESOLVED: number 2 = item 2 of list.risks on their screen (operate_screen SELECT_ITEM target list.risks index 2).",
+    ],
+    [
+      "open the last one",
+      "RESOLVED: number 5 = item 5 of list.risks on their screen (operate_screen SELECT_ITEM target list.risks index 5).",
+    ],
+  ])("%j", (said, note) => {
+    expect(controlReferenceOf(said, controls)).toBe(note);
+  });
+
+  it("binds nothing the page does not have", () => {
+    expect(controlReferenceOf("open the mandate tab", controls)).toBeNull();
+    expect(controlReferenceOf("explain the ninth one", controls)).toBeNull();
+    expect(controlReferenceOf("open the readiness tab", [])).toBeNull();
+  });
+
+  it("tells the reader and the answer which control 'the second one' is", async () => {
+    const run = seam();
+    await run.say("explain the second one", CAPITAL_PAGE);
+    expect(run.delegatedWith[0]?.references).toBe(
+      "RESOLVED: number 2 = item 2 of list.risks on their screen (operate_screen SELECT_ITEM target list.risks index 2).",
+    );
+    expect(run.notes.at(-1)).toMatch(
+      /^\[Q context\] RESOLVED: number 2 = item 2 of list\.risks/u,
+    );
+  });
+
+  it("works 'open the readiness tab' on this page by code, not by navigating away", async () => {
+    const run = seam();
+    const last = await run.say("open the readiness tab", CAPITAL_PAGE);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.content).toBe("Opening the readiness tab.");
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: {
+          kind: "UI_ACT",
+          actId: expect.stringMatching(/^uia_[a-f0-9]{24}$/u) as string,
+          act: "SELECT_TAB",
+          target: "tab.readiness",
+        },
+      },
+    ]);
+  });
+
+  it("'open the second one' on a registered list opens that item", async () => {
+    const run = seam();
+    const last = await run.say("open the second one", CAPITAL_PAGE);
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          kind: "UI_ACT",
+          act: "SELECT_ITEM",
+          target: "list.risks",
+          index: 2,
+        }) as unknown,
+      },
+    ]);
+  });
+
+  it("a tab this page does not have is left to the page table and the answer", async () => {
+    const run = seam();
+    const last = await run.say("open the mandate tab", CAPITAL_PAGE);
+    expect(
+      (last?.blocks ?? []).some(
+        (block) => block.kind === "UI_INTENT" && block.intent.kind === "UI_ACT",
+      ),
+    ).toBe(false);
   });
 });

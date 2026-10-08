@@ -142,29 +142,34 @@ import {
   type ConversationCoreStore,
 } from "./conversation-core.js";
 import {
+  asksToOperate,
+  controlBindingOf,
   focusFromHistory,
   listsFromHistory,
   listsFromManifest,
   referenceAskOf,
   resolutionNote,
   resolveReference,
+  type ControlBinding,
   type ReferenceAsk,
   type ResolvedReference,
 } from "./conversation-entities.js";
 
 /** B6: a reference in the turn, bound to records, with its note. */
 type PointedAt = {
-  readonly ask: ReferenceAsk;
-  readonly resolved: ResolvedReference;
+  readonly ask: ReferenceAsk | null;
+  /** Null: bound to one of the page's controls, said in `note`. */
+  readonly resolved: ResolvedReference | null;
   readonly note: string;
+  readonly control?: ControlBinding | undefined;
 };
 
 /** B6: "him" / "them" bound to an organisation, as a hand-over subject. */
 function handOverSubjectPointed(
   pointed: PointedAt | null,
 ): HandOverSubject | null {
-  if (pointed === null || pointed.ask.kind !== "COUNTERPART") return null;
-  if (pointed.resolved.kind !== "ONE") return null;
+  if (pointed === null || pointed.ask?.kind !== "COUNTERPART") return null;
+  if (pointed.resolved?.kind !== "ONE") return null;
   const entity = pointed.resolved.entity;
   if (entity.kind === "COMPANY") {
     return { kind: "COMPANY", companyId: entity.id };
@@ -191,19 +196,53 @@ function pointedAt(
   manifest: QPageManifest | null | undefined,
 ): PointedAt | null {
   const ask = referenceAskOf(text);
-  if (ask === null) return null;
-  const latestQ = [...history].reverse().find((one) => one.role === "Q");
-  const resolved = resolveReference(ask, {
-    page: listsFromManifest(manifest),
-    answers: listsFromHistory(history),
-    answerIsNewest: (latestQ?.blocks ?? []).some(
-      (block) => block.kind === "ANSWER_CARDS",
-    ),
-    focus: focusFromHistory(history),
-  });
-  return resolved === null
+  if (ask !== null) {
+    const latestQ = [...history].reverse().find((one) => one.role === "Q");
+    const resolved = resolveReference(ask, {
+      page: listsFromManifest(manifest),
+      answers: listsFromHistory(history),
+      answerIsNewest: (latestQ?.blocks ?? []).some(
+        (block) => block.kind === "ANSWER_CARDS",
+      ),
+      focus: focusFromHistory(history),
+    });
+    if (resolved !== null) {
+      return { ask, resolved, note: resolutionNote(ask, resolved) };
+    }
+  }
+  // C's request: the page's own controls ("open the readiness tab", "the
+  // second one" on a list the page registered without record refs).
+  const control = controlBindingOf(text, manifest?.controls);
+  return control === null
     ? null
-    : { ask, resolved, note: resolutionNote(ask, resolved) };
+    : { ask, resolved: null, note: control.note, control };
+}
+
+import { randomUUID } from "node:crypto";
+
+/** The act on the page's own control, with a fresh act id for its receipt. */
+function controlActBlock(control: ControlBinding): QResultBlock {
+  return {
+    kind: "UI_INTENT",
+    intent: {
+      kind: "UI_ACT",
+      actId: `uia_${randomUUID().replace(/-/gu, "").slice(0, 24)}`,
+      act: control.act,
+      target: control.target,
+      ...(control.index === undefined ? {} : { index: control.index }),
+    },
+  };
+}
+
+/** What Q says as it works a control (never that it is done: the receipt says). */
+function controlActLine(control: ControlBinding): string {
+  const name = (control.target.split(".").at(-1) ?? "").replace(/-/gu, " ");
+  if (control.act === "SELECT_TAB") return `Opening the ${name} tab.`;
+  if (control.act === "SELECT_ITEM") {
+    return `Opening number ${String(control.index ?? 1)}.`;
+  }
+  if (control.act === "SCROLL_TO") return `Taking you to ${name}.`;
+  return `Working the ${name} control.`;
 }
 import {
   cannotOpenLine,
@@ -1776,7 +1815,7 @@ export function createSpecialistQAnswer(
   } | null => {
     if (manifestOf(capabilities).navigate.length === 0) return null;
     const { ask, resolved } = pointed;
-    if (ask.kind !== "ORDINAL" || resolved.kind !== "ONE") return null;
+    if (ask?.kind !== "ORDINAL" || resolved?.kind !== "ONE") return null;
     // An open request ("open the second one") or a correction of what was
     // opened ("not that investor, the second one"); "explain the second
     // one" is a question, answered with the binding as a note instead.
@@ -2398,8 +2437,13 @@ export function createSpecialistQAnswer(
       logger?.info(
         {
           qRunId: request.runId,
-          ask: pointed.ask.kind,
-          via: pointed.resolved.kind === "ONE" ? pointed.resolved.via : "PAIR",
+          ask: pointed.ask?.kind ?? "CONTROL",
+          via:
+            pointed.resolved === null
+              ? "CONTROL"
+              : pointed.resolved.kind === "ONE"
+                ? pointed.resolved.via
+                : "PAIR",
         },
         "q bound a reference",
       );
@@ -2417,6 +2461,26 @@ export function createSpecialistQAnswer(
         conversationId,
         openedByReference.said,
         openedByReference.blocks,
+      );
+    }
+    // "Open the readiness tab", "open the second one" on this page: a
+    // control the page registered, worked here by code (before the page
+    // table, which would navigate away). The screen reports a receipt;
+    // the line says what Q is doing, never that it is done.
+    if (pointed?.control !== undefined && asksToOperate(latest.content)) {
+      logger?.info(
+        {
+          qRunId: request.runId,
+          act: pointed.control.act,
+          target: pointed.control.target,
+        },
+        "q is working a control on their page",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        controlActLine(pointed.control),
+        [controlActBlock(pointed.control)],
       );
     }
     // A bare screen command ("scroll down", "go back") is done at once in

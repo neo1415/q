@@ -81,6 +81,8 @@ function build(scene: {
   readonly said: string;
   readonly turnKind?: string;
   readonly report?: QAttentionReport | "DENIED";
+  /** C's receipt facts for the person's recent screen acts. */
+  readonly receipts?: readonly string[];
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -169,6 +171,9 @@ function build(scene: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     tools,
+    ...(scene.receipts === undefined
+      ? {}
+      : { uiActReceipts: () => scene.receipts ?? [] }),
   });
   const request = {
     runId: RUN,
@@ -232,6 +237,40 @@ describe("what needs them, answered from the attention report", () => {
     });
     await seam.answer(request);
     expect(alpha.calls.length).toBeGreaterThan(0);
+  });
+});
+
+describe("receipts of Q's last screen acts reach the next turn (C's request)", () => {
+  it("puts the receipt facts in front of the answer model", async () => {
+    const { seam, request, alpha } = build({
+      said: "did the readiness tab open?",
+      turnKind: "QUESTION_TO_Q",
+      receipts: [
+        "SELECT_TAB tab.readiness: NOT done: that control is not on their screen (TARGET_MISSING).",
+      ],
+    });
+    await seam.answer(request);
+    const sent = alpha.calls
+      .flatMap((call) => call.request.messages)
+      .filter((message) => message.role === "SYSTEM")
+      .map((message) => message.content)
+      .join("\n");
+    expect(sent).toContain("WHAT YOUR RECENT SCREEN ACTS DID");
+    expect(sent).toContain("tab.readiness: NOT done");
+  });
+
+  it("adds nothing when there are no receipts", async () => {
+    const { seam, request, alpha } = build({
+      said: "did the readiness tab open?",
+      turnKind: "QUESTION_TO_Q",
+      receipts: [],
+    });
+    await seam.answer(request);
+    const sent = alpha.calls
+      .flatMap((call) => call.request.messages)
+      .map((message) => message.content)
+      .join("\n");
+    expect(sent).not.toContain("WHAT YOUR RECENT SCREEN ACTS DID");
   });
 });
 

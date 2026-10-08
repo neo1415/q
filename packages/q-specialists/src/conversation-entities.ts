@@ -3,6 +3,7 @@ import type {
   QManifestRefKind,
   QManifestSectionKind,
   QResultBlock,
+  QUiAct,
 } from "@capital-q/contracts";
 import type { QConversationMessage } from "@capital-q/q-runtime";
 
@@ -339,6 +340,126 @@ export function resolveReference(
         : { kind: "ONE", entity: counterpart, via: "FOCUS" };
     }
   }
+}
+
+type ManifestControl = NonNullable<QPageManifest["controls"]>[number];
+
+/** "the readiness tab", "the risks section", "the mandate tab". */
+const NAMED_CONTROL =
+  /\b(?:the\s+|my\s+|their\s+)?([a-z][a-z0-9 -]{1,40}?)\s+(tab|section|list|panel|filter|menu|toggle)\b/iu;
+
+const ACT_FOR: Readonly<Record<string, QUiAct>> = {
+  TAB: "SELECT_TAB",
+  SECTION: "SCROLL_TO",
+  LIST: "SCROLL_TO",
+  DISCLOSURE: "EXPAND",
+  MENU: "OPEN",
+  DIALOG: "OPEN",
+  TOGGLE: "SET",
+  FILTER: "FILTER",
+};
+
+const slug = (text: string) =>
+  text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-|-$/gu, "");
+
+/**
+ * RECOVERY-2026-10 (C's request): the page's own controls, by what the
+ * words name. "Open the readiness tab" is tab.readiness; "the second one"
+ * with no record list on screen is item 2 of the page's list control (the
+ * one whose name the words carry, else the only list). The binding names
+ * the operate_screen act; the tool still checks the id against the page.
+ * Null: nothing on the page matches.
+ */
+export function controlReferenceOf(
+  text: string,
+  controls: readonly ManifestControl[] | undefined,
+): string | null {
+  return controlBindingOf(text, controls)?.note ?? null;
+}
+
+/** A control the words name, with the act operate_screen would take. */
+export type ControlBinding = {
+  readonly target: string;
+  readonly act: QUiAct;
+  readonly index?: number | undefined;
+  readonly note: string;
+};
+
+/** Words that ask for the act itself, not a question about the control. */
+const DO_IT =
+  /^\s*(?:(?:can|could|would)\s+you\s+|please\s+|q[,\s]+)*(?:open|show(?:\s+me)?|go\s+to|switch\s+to|take\s+me\s+to|jump\s+to|scroll\s+(?:down\s+|up\s+)?to|select|pick|click(?:\s+on)?|bring\s+up|pull\s+up)\b/iu;
+
+/** True when the words ask Q to work the control now ("open the X tab"). */
+export function asksToOperate(text: string): boolean {
+  return DO_IT.test(text.replace(/[’]/gu, "'"));
+}
+
+export function controlBindingOf(
+  text: string,
+  controls: readonly ManifestControl[] | undefined,
+): ControlBinding | null {
+  if (controls === undefined || controls.length === 0) return null;
+  const said = text.replace(/[’]/gu, "'");
+  const named = NAMED_CONTROL.exec(said);
+  if (named !== null) {
+    // The control's name is the word or two before "tab"/"section"
+    // ("open the readiness tab", "the due diligence section").
+    const words = slug(named[1] ?? "")
+      .split("-")
+      .filter(Boolean);
+    const names = [words.slice(-2).join("-"), words.slice(-1).join("-")];
+    const kind = (named[2] ?? "").toUpperCase();
+    const flat = (value: string) => value.replace(/-/gu, "");
+    for (const name of names) {
+      if (name.length === 0) continue;
+      const match = controls.find((control) => {
+        const [prefix, ...rest] = control.id.split(".");
+        const last = rest.at(-1) ?? "";
+        return (
+          flat(last) === flat(name) &&
+          (prefix === kind.toLowerCase() || control.kind === kind)
+        );
+      });
+      if (match !== undefined) {
+        const act = ACT_FOR[match.kind] ?? "ACTIVATE";
+        return {
+          target: match.id,
+          act,
+          note: `RESOLVED: the ${name.replace(/-/gu, " ")} ${kind.toLowerCase()} = control ${match.id} on their screen (operate_screen ${act} target ${match.id}).`,
+        };
+      }
+    }
+  }
+  const ask = referenceAskOf(said);
+  if (ask?.kind !== "ORDINAL") return null;
+  const lists = controls.filter((control) => control.kind === "LIST");
+  const wanted =
+    ask.entityKind === "INVESTOR_ORGANISATION"
+      ? "investor"
+      : ask.entityKind === "COMPANY"
+        ? "compan"
+        : ask.entityKind === "DOCUMENT"
+          ? "document"
+          : null;
+  const list =
+    (wanted === null
+      ? undefined
+      : lists.find((control) => control.id.includes(wanted))) ??
+    (lists.length === 1 ? lists[0] : undefined);
+  if (list === undefined) return null;
+  const count = list.count;
+  const index = ask.position === -1 ? (count ?? null) : ask.position;
+  if (index === null || (count !== undefined && index > count)) return null;
+  return {
+    target: list.id,
+    act: "SELECT_ITEM",
+    index,
+    note: `RESOLVED: number ${String(index)} = item ${String(index)} of ${list.id} on their screen (operate_screen SELECT_ITEM target ${list.id} index ${String(index)}).`,
+  };
 }
 
 const KIND_LABEL: Readonly<Record<EntityKind, string>> = {
