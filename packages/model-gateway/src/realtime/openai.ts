@@ -39,14 +39,19 @@ export const OPENAI_REALTIME_MINI_PRICES: RealtimePrices = {
   audioOutput: 20,
 };
 
-/** The input transcription model (BACKCHANNEL), and its prices (2026-10-04). */
-export const OPENAI_REALTIME_TRANSCRIBE_MODEL = "gpt-4o-mini-transcribe";
-export const OPENAI_TRANSCRIBE_MINI_PRICES: RealtimePrices = {
-  textInput: 1.25,
-  cachedTextInput: 1.25,
-  textOutput: 5,
-  audioInput: 3,
-  cachedAudioInput: 3,
+/**
+ * The input transcription model, and its prices (2026-10-08). On a routed
+ * line every word Q acts on comes from this transcript, so it is the full
+ * model, not mini: the founder's "find anything that needs my attention"
+ * came back from mini as "Fidiani inanituma attention" (live 11:13 UTC).
+ */
+export const OPENAI_REALTIME_TRANSCRIBE_MODEL = "gpt-4o-transcribe";
+export const OPENAI_TRANSCRIBE_PRICES: RealtimePrices = {
+  textInput: 2.5,
+  cachedTextInput: 2.5,
+  textOutput: 10,
+  audioInput: 6,
+  cachedAudioInput: 6,
   audioOutput: 0,
 };
 
@@ -69,7 +74,7 @@ export function createOpenAIRealtimeProvider(options: {
     prices: options.prices ?? OPENAI_REALTIME_MINI_PRICES,
     transcription: {
       modelCode: OPENAI_REALTIME_TRANSCRIBE_MODEL,
-      prices: OPENAI_TRANSCRIBE_MINI_PRICES,
+      prices: OPENAI_TRANSCRIBE_PRICES,
     },
     mint: async (request, context): Promise<RealtimeSessionGrant> => {
       let response: Response;
@@ -119,6 +124,14 @@ export function createOpenAIRealtimeProvider(options: {
                     ? {
                         transcription: {
                           model: OPENAI_REALTIME_TRANSCRIBE_MODEL,
+                          ...(request.transcriptionHint?.language === undefined
+                            ? {}
+                            : {
+                                language: request.transcriptionHint.language,
+                              }),
+                          ...(request.transcriptionHint?.prompt === undefined
+                            ? {}
+                            : { prompt: request.transcriptionHint.prompt }),
                         },
                       }
                     : {}),

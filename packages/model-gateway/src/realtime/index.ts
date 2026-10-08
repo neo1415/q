@@ -89,6 +89,18 @@ export type RealtimeSessionRequest = {
    * not slow. Absent: the provider's default.
    */
   readonly speechSpeed?: number | undefined;
+  /**
+   * The input transcriber's bias (live 2026-10-08: "find anything that needs
+   * my attention" was heard as "Fidiani inanituma attention"): the spoken
+   * language (ISO 639-1) and a short prompt naming the words this person
+   * is likely to say (their companies, investors, people). Hints only.
+   */
+  readonly transcriptionHint?:
+    | {
+        readonly language?: string | undefined;
+        readonly prompt?: string | undefined;
+      }
+    | undefined;
 };
 
 /** What produced a usage report; all of it is VOICE_REALTIME spend. */
@@ -140,6 +152,18 @@ export type RealtimeMintRequest = {
   readonly transcribeInput?: boolean | undefined;
   readonly routeTurns?: boolean | undefined;
   readonly speechSpeed?: number | undefined;
+  /**
+   * The input transcriber's bias (live 2026-10-08: "find anything that needs
+   * my attention" was heard as "Fidiani inanituma attention"): the spoken
+   * language (ISO 639-1) and a short prompt naming the words this person
+   * is likely to say (their companies, investors, people). Hints only.
+   */
+  readonly transcriptionHint?:
+    | {
+        readonly language?: string | undefined;
+        readonly prompt?: string | undefined;
+      }
+    | undefined;
   /** The plan's ceiling: the most sensitive thing the line may carry. */
   readonly sensitivity: ModelSensitivity;
   readonly attribution: RealtimeAttribution;
@@ -266,6 +290,9 @@ export function createRealtimeVoiceGateway(options: {
             ...(request.speechSpeed === undefined
               ? {}
               : { speechSpeed: request.speechSpeed }),
+            ...(request.transcriptionHint === undefined
+              ? {}
+              : { transcriptionHint: request.transcriptionHint }),
           },
           { signal },
         );

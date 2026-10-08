@@ -213,6 +213,50 @@ type DuplexLine = {
 const NARRATION_HOLD_MS = 12_000;
 const NARRATION_KEPT = 8;
 
+/**
+ * The transcriber's bias. Every routed turn is acted on from its
+ * transcript, so it is told the language (the device's, English by
+ * default: unpinned, an accented "find anything that needs my attention"
+ * came back as "Fidiani inanituma attention", live 2026-10-08) and the
+ * words this person is likely to say. Names are data for the recogniser,
+ * never instructions; each is bounded and the list is capped.
+ */
+const TRANSCRIPTION_VOCABULARY = [
+  "Capital Q",
+  "Q",
+  "Discover",
+  "Explore",
+  "data room",
+  "pitch deck",
+  "one-pager",
+  "raise",
+  "investors",
+  "founders",
+  "mandate",
+  "diligence",
+  "briefing",
+  "relationships",
+] as const;
+const TRANSCRIPTION_NAMES_MAX = 40;
+
+export function transcriptionHintFor(input: {
+  readonly locale?: string | undefined;
+  readonly vocabulary?: readonly string[] | undefined;
+}): { readonly language: string; readonly prompt: string } {
+  const language = /^[a-z]{2}\b/i.exec(input.locale ?? "")?.[0];
+  const names = [
+    ...new Set(
+      (input.vocabulary ?? [])
+        .map((name) => name.replace(/\s+/g, " ").trim().slice(0, 60))
+        .filter((name) => name.length > 1),
+    ),
+  ].slice(0, TRANSCRIPTION_NAMES_MAX);
+  return {
+    language: language?.toLowerCase() ?? "en",
+    prompt: `A person talking to Q, their investment analyst, on Capital Q, for example: "Find anything that needs my attention." "Open their pitch deck." Words and names: ${[...names, ...TRANSCRIPTION_VOCABULARY].join(", ")}.`,
+  };
+}
+
 /** The turns of a line the next ask_q carries. */
 const LINE_HISTORY_MAX = 12;
 
@@ -222,6 +266,8 @@ export type DuplexBroker = {
     readonly binding: VoiceSessionBinding;
     readonly firstMessage?: string | undefined;
     readonly locale?: string | undefined;
+    /** Names this person is likely to say, for the transcriber. */
+    readonly vocabulary?: readonly string[] | undefined;
   }) => Promise<DuplexOpenResult>;
   /** Null when there is no such line for this person (or it has ended). */
   readonly tool: (input: {
@@ -455,6 +501,7 @@ export function createDuplexBroker(
   ): Promise<{
     readonly output: string;
     readonly approvalPending: boolean;
+    readonly silent?: boolean;
   }> => {
     const voiceSessionId = line.voiceSessionId;
     const wake = () => {
@@ -506,6 +553,10 @@ export function createDuplexBroker(
         return output(askQFactsOutput(facts));
       }
       const { say, amused } = forRealtime(said);
+      if (say.length === 0) {
+        line.awaitingApproval = false;
+        return { ...output({ ok: true, say: "" }, false), silent: true };
+      }
       const approvalPending = said.endsWith(APPROVAL_QUESTION);
       line.awaitingApproval = approvalPending;
       return output(
@@ -589,7 +640,7 @@ export function createDuplexBroker(
       return lines.size;
     },
 
-    open: async ({ binding, firstMessage, locale }) => {
+    open: async ({ binding, firstMessage, locale, vocabulary }) => {
       if (!enabled) return { kind: "FALLBACK", reason: "OFF" };
       // A rehearsal line speaks only as the person Q plays; never duplex.
       if (binding.thread.rehearsal !== undefined) return fallback("REHEARSAL");
@@ -705,6 +756,7 @@ export function createDuplexBroker(
                   : ("AUTO" as const),
             }
           : {}),
+        transcriptionHint: transcriptionHintFor({ locale, vocabulary }),
         sensitivity: decision.plan.maxSensitivity,
         attribution: {
           tenantId: actor.tenantId,
@@ -798,6 +850,7 @@ export function createDuplexBroker(
         arguments: JSON.stringify({ request: words }),
         output: result.output,
         approvalPending: result.approvalPending,
+        ...(result.silent === true ? { silent: true } : {}),
       };
     },
 

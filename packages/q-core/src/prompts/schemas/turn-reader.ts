@@ -630,3 +630,15 @@ export const TurnReaderV40ResultSchema = TurnReaderV31ResultSchema.extend({
   reference: TurnReferenceSchema.nullable().default(null),
 }).strict();
 export type TurnReaderV40Result = z.infer<typeof TurnReaderV40ResultSchema>;
+
+export const TURN_READER_V44_SCHEMA_VERSION = 44;
+
+/**
+ * v44: the words a garbled spoken turn most likely were, read by sound
+ * (live 2026-10-08: "Fidiani inanituma attention"). Null when the words
+ * read as written. Q answers the likely words instead of going silent.
+ */
+export const TurnReaderV44ResultSchema = TurnReaderV40ResultSchema.extend({
+  heardAs: z.string().trim().min(1).max(300).nullable().default(null),
+}).strict();
+export type TurnReaderV44Result = z.infer<typeof TurnReaderV44ResultSchema>;

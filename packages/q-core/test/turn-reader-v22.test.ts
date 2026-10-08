@@ -12,7 +12,7 @@ import {
 describe("TURN_READER v22", () => {
   it("is superseded by v23, and v21 is deprecated", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition.version).toBe(43);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(44);
     expect(TURN_READER_V21.status).toBe("DEPRECATED");
   });
 

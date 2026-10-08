@@ -476,6 +476,12 @@ export const QVoiceDuplexHeardResultSchema = z.discriminatedUnion("route", [
       arguments: z.string().max(8_000),
       output: z.string().max(16_000),
       approvalPending: z.boolean(),
+      /**
+       * Q chose to say nothing (words that were only the room): the voice
+       * is not asked to speak, so it never improvises a reply of its own
+       * (live 2026-10-08: "could you give me a bit more detail?").
+       */
+      silent: z.boolean().optional(),
     })
     .strict(),
   z.object({ route: z.literal("SMALLTALK") }).strict(),

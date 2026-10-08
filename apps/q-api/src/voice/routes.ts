@@ -876,6 +876,13 @@ export function registerQVoiceRoutes(
             binding,
             firstMessage,
             locale: input.locale,
+            vocabulary: [
+              ...ownNames,
+              ...(input.organisationHint === undefined
+                ? []
+                : [input.organisationHint]),
+              ...rememberedTerms,
+            ],
           });
           if (opened.kind === "DUPLEX") {
             duplex = opened.credential;

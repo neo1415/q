@@ -1644,6 +1644,13 @@ export class DuplexLine {
       this.#send({ type: "response.create" });
       return;
     }
+    if (result.silent === true) {
+      // Q chose silence (only the room was heard): the voice is not asked
+      // to speak, so it never makes up a reply of its own.
+      this.#events.onState("LISTENING");
+      this.#touch();
+      return;
+    }
     if (this.#rejoining || transport !== this.#transport) {
       // Said once the new call is up (see #replayConversation).
       if (this.#rejoining) this.#pendingResults.push(result.output);

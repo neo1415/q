@@ -9,7 +9,7 @@ import {
 import {
   createOpenAIRealtimeProvider,
   OPENAI_REALTIME_MINI_PRICES,
-  OPENAI_TRANSCRIBE_MINI_PRICES,
+  OPENAI_TRANSCRIBE_PRICES,
 } from "../src/realtime/openai.js";
 import type { SyntheticDemoRoutingAllowance } from "../src/policy/synthetic-demo.js";
 
@@ -173,7 +173,7 @@ describe("realtime voice gateway", () => {
         ...fakeProvider(),
         transcription: {
           modelCode: "fake-transcribe",
-          prices: OPENAI_TRANSCRIBE_MINI_PRICES,
+          prices: OPENAI_TRANSCRIBE_PRICES,
         },
       },
       enabled: true,
@@ -214,7 +214,7 @@ describe("realtime voice gateway", () => {
       attribution: ATTRIBUTION,
       kind: "TRANSCRIPTION",
     });
-    expect(tx).toBeCloseTo(0.00255, 6);
+    expect(tx).toBeCloseTo(0.0051, 6);
     expect(gateway.price(minute, "TRANSCRIPTION")).toBeLessThan(
       gateway.price(minute),
     );
@@ -339,6 +339,7 @@ describe("openai realtime adapter", () => {
         secretTtlSeconds: 60,
         turnEagerness: "AUTO",
         transcribeInput: true,
+        transcriptionHint: { language: "en", prompt: "Tensorgate, Zino" },
       },
       { signal: new AbortController().signal },
     );
@@ -350,15 +351,21 @@ describe("openai realtime adapter", () => {
         audio: {
           input: {
             turn_detection: { eagerness: string };
-            transcription?: { model: string };
+            transcription?: {
+              model: string;
+              language?: string;
+              prompt?: string;
+            };
           };
         };
       };
     };
     expect(body.session.audio.input.turn_detection.eagerness).toBe("auto");
-    expect(body.session.audio.input.transcription?.model).toBe(
-      "gpt-4o-mini-transcribe",
-    );
+    expect(body.session.audio.input.transcription).toEqual({
+      model: "gpt-4o-transcribe",
+      language: "en",
+      prompt: "Tensorgate, Zino",
+    });
   });
 
   it("maps a refusal to a coded failure, never a vendor message", async () => {

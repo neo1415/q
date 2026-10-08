@@ -1677,6 +1677,8 @@ export function createSpecialistQAnswer(
 
   /** Unclear turns in a row, per conversation (bounded with the rest). */
   const unclearInARow = new Map<string, number>();
+  /** Runs answering their likely words (TURN_READER v44): never twice. */
+  const reheard = new Set<string>();
 
   /**
    * A series of questions the person asked Q to put to them, per
@@ -2334,6 +2336,45 @@ export function createSpecialistQAnswer(
         },
         "q turn read",
       );
+    }
+    // TURN_READER v44 (Zino live 2026-10-08 11:13): garbled speech read by
+    // sound. The likely words become their turn, recorded beside what the
+    // recogniser heard (kept, never overwritten), and the turn is answered
+    // from them; going silent let the voice ask "could you give me more
+    // detail?" about "find anything that needs my attention". Once per run.
+    const heardAs = spoken ? (read?.heardAs?.trim() ?? "") : "";
+    if (
+      heardAs.length > 0 &&
+      heardAs.toLowerCase() !== latest.content.trim().toLowerCase() &&
+      latest.utteranceRef !== undefined &&
+      read?.addressedToQ !== false &&
+      !reheard.has(request.runId)
+    ) {
+      speculative.current?.cancel("ACTED");
+      const utteranceRef = latest.utteranceRef;
+      await transactions.run((tx) =>
+        repositories.messages.insert(tx, {
+          tenantId: request.tenantId,
+          conversationId,
+          runId: request.runId,
+          role: "USER",
+          content: heardAs,
+          // Its own utterance, so it never supersedes the run's first line.
+          ...(utteranceRef.length <= 249
+            ? { utteranceRef: `${utteranceRef}:heard` }
+            : {}),
+        }),
+      );
+      logger?.info(
+        { qRunId: request.runId, kind: read?.kind ?? null },
+        "q read garbled speech by sound",
+      );
+      reheard.add(request.runId);
+      try {
+        return await answerTurn(request);
+      } finally {
+        reheard.delete(request.runId);
+      }
     }
     // A reading the speculation cannot be is known now: stop it at once
     // rather than at the end of the path.

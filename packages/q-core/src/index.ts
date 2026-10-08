@@ -284,6 +284,10 @@ export {
   V43_PREPARE_HEAD,
 } from "./prompts/tasks/turn-reader.v43.js";
 export {
+  TURN_READER_V44,
+  V44_UNCLEAR,
+} from "./prompts/tasks/turn-reader.v44.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -340,6 +344,9 @@ export {
   TurnReaderV40ResultSchema,
   TurnReferenceSchema,
   type TurnReaderV40Result,
+  TURN_READER_V44_SCHEMA_VERSION,
+  TurnReaderV44ResultSchema,
+  type TurnReaderV44Result,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,

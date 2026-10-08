@@ -37,7 +37,7 @@ export const TURN_READER_V43: PromptDefinition<
 > = {
   ...TURN_READER_V42,
   version: 43,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder brief 2026-10-05 (C5): PREPARE_DOCUMENT only when they ask for a file; wanting to see a list, top N, comparison or research is ANSWER, shown on screen as cards; Q_REPORT no longer lists a comparison.",
   effectiveFrom: "2026-10-05",

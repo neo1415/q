@@ -5616,14 +5616,37 @@ const { app, logger: appLogger } = createApp(
                   company === null
                     ? null
                     : await companies.findCanonicalCompanyProfile(company.id);
-                return ownRecordTerms({
-                  companyNames: [
-                    company?.canonicalName ?? null,
-                    profile?.legalName ?? null,
-                  ],
-                  firmName: firm?.displayName ?? null,
-                  personName,
-                });
+                // The other side of their own relationships (the names a
+                // briefing reads out and they answer about), most recent
+                // first: names they already see on their own pages.
+                const counterparts =
+                  organisationId === undefined
+                    ? []
+                    : await database.sql<{ name: string }[]>`
+                        select case
+                                 when c.organisation_id = ${organisationId}
+                                   then io.display_name
+                                 else c.canonical_name
+                               end as name
+                          from network.relationships r
+                          join core.companies c on c.id = r.company_id
+                          join core.investor_organisations io
+                            on io.id = r.investor_organisation_id
+                         where c.organisation_id = ${organisationId}
+                            or io.organisation_id = ${organisationId}
+                         order by r.state_updated_at desc
+                         limit 20`.catch(() => []);
+                return [
+                  ...ownRecordTerms({
+                    companyNames: [
+                      company?.canonicalName ?? null,
+                      profile?.legalName ?? null,
+                    ],
+                    firmName: firm?.displayName ?? null,
+                    personName,
+                  }),
+                  ...counterparts.map((row) => row.name),
+                ];
               },
             },
             logger,

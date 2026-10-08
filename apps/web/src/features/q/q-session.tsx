@@ -15,7 +15,7 @@ import {
 import type { QRoomEntry } from "@capital-q/contracts";
 import { arrivalGreeting } from "@capital-q/q-core/speech";
 
-import { arrivalSpoken } from "@/features/briefing/arrival-store";
+import { voiceBriefing } from "@/features/briefing/arrival-voice";
 
 import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
@@ -358,7 +358,8 @@ export function QSessionProvider({
         },
         // Never "I'm listening" (Zino, 2026-10-08): the arrival briefing
         // when this page load gives one, else a hello by their clock.
-        firstMessage: greeting ?? arrivalSpoken() ?? plainHello(),
+        firstMessage:
+          greeting ?? (await voiceBriefing().catch(() => null)) ?? plainHello(),
       });
     },
     [

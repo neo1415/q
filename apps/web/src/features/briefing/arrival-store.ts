@@ -86,6 +86,49 @@ export function startArrival(loader: ArrivalLoader): void {
   });
 }
 
+function currentStatus(): ArrivalStatus {
+  return status;
+}
+
+/**
+ * A call is starting: the briefing's data, read now if this page load has
+ * none (the gate gives the cards once per browser session, but a call is
+ * the person asking to be briefed; live 2026-10-08 11:13 a call opened
+ * "What would you like to work on today?" because the gate had said no).
+ * What it reads is put on screen too, so the cards Q names are there to
+ * decide. Null when nothing could be read in time.
+ */
+export async function arrivalForVoice(
+  loader: ArrivalLoader,
+  timeoutMs: number,
+): Promise<ArrivalData | null> {
+  let data: ArrivalData | null;
+  if (status.kind === "READY") {
+    data = status.data;
+  } else {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), timeoutMs);
+    });
+    data = await Promise.race([
+      loader(decideArrival().since).catch(() => null),
+      late,
+    ]);
+    clearTimeout(timer);
+    // Read again: the page's own load may have landed while this waited.
+    if (data !== null && currentStatus().kind !== "READY") {
+      started = true;
+      round += 1;
+      set({ kind: "READY", data, round, nudge: false });
+    }
+  }
+  if (data === null) return null;
+  return {
+    ...data,
+    cards: data.cards.filter((card) => !handled.has(card.key)),
+  };
+}
+
 /** New decisions arrived later (an agent needs them): the cards again. */
 export function refreshArrival(loader: ArrivalLoader): void {
   void load(loader, null, true);

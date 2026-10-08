@@ -34,10 +34,8 @@ import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { ViewTransition } from "@/components/view-transition";
 import type { Briefing } from "@/features/home/briefing";
-import {
-  arrivalPending,
-  arrivalSpoken,
-} from "@/features/briefing/arrival-store";
+import { arrivalPending } from "@/features/briefing/arrival-store";
+import { voiceBriefing } from "@/features/briefing/arrival-voice";
 import { ArrivalRoom, useRoomSlots } from "@/features/briefing/arrival-room";
 import { decideBriefing } from "@/features/home/briefing-gate";
 import {
@@ -174,7 +172,9 @@ async function spokenWelcome(
     await new Promise((resolve) => setTimeout(resolve, 100));
     waited += 100;
   }
-  const arrival = arrivalSpoken();
+  // A call always opens with the briefing, read now if this page load did
+  // not give it (live 2026-10-08: a call opened with the generic welcome).
+  const arrival = await voiceBriefing().catch(() => null);
   if (arrival !== null) return arrival;
   if (briefing === undefined) return welcomeLine;
   let timer: ReturnType<typeof setTimeout> | undefined;
