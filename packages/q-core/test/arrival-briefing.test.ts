@@ -369,6 +369,29 @@ describe("card sequence", () => {
     });
   });
 
+  it("'try again' on a held draft asks Q to write it again; on an approval it does nothing (Zino, 2026-10-08)", () => {
+    for (const words of ["try again", "ask Q to try again", "rewrite it"]) {
+      expect(parseCardCommand(words)).toEqual({ kind: "RETRY" });
+    }
+    const asked = say(startSequence([HELD, APPROVAL]), "try again please");
+    expect(asked.effect).toEqual({
+      kind: "RETRY_HELD",
+      key: "dr-2",
+      draftId: "dr-2",
+      relationshipId: HELD.relationshipId,
+    });
+    const settled = stepSequence(asked.state, {
+      type: "SETTLED",
+      key: "dr-2",
+      ok: true,
+    });
+    expect(settled.state.outcomes["dr-2"]).toBe("RETRIED");
+    expect(focusedCard(settled.state)?.key).toBe("ap-1");
+    const refused = say(settled.state, "try again");
+    expect(refused.effect).toBeNull();
+    expect(refused.note).toBe("CANNOT_RETRY");
+  });
+
   it("dismiss, later and leave", () => {
     const start = startSequence([APPROVAL, HELD, PLAN]);
     const dismissed = say(start, "dismiss it");

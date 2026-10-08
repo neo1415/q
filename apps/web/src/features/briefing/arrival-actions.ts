@@ -26,6 +26,7 @@ import {
 } from "@/features/q/actions";
 import { qApiSession } from "@/features/q/context";
 import { decisionGroups, decisionTitle } from "@/features/work/decisions";
+import { retryHeldAction } from "@/features/work/held-actions";
 import { readPlan } from "@/features/work/plan-words";
 import { listDoneAction } from "@/features/work/work-page-actions";
 import { loadWorkforceAction } from "@/features/work/workforce-actions";
@@ -218,12 +219,28 @@ const DecideInput = z.discriminatedUnion("kind", [
     replacesApprovalId: Id.nullable(),
   }),
   z.object({ kind: z.literal("DISMISS_APPROVAL"), approvalId: Id }),
+  z.object({
+    kind: z.literal("RETRY_HELD"),
+    draftId: Id,
+    relationshipId: Id.nullable(),
+    idempotencyKey: z
+      .string()
+      .min(8)
+      .max(120)
+      .regex(/^[A-Za-z0-9_-]+$/u),
+  }),
 ]);
 
 export type ArrivalDecision = z.input<typeof DecideInput>;
 
 export type ArrivalDecisionResult =
-  | { readonly ok: true }
+  | {
+      readonly ok: true;
+      /** What came of it, when more than "done" (a retry's outcome). */
+      readonly message?: string | undefined;
+      /** New cards may be waiting: read the briefing again. */
+      readonly reload?: true | undefined;
+    }
   | {
       readonly ok: false;
       readonly message: string;
@@ -293,6 +310,16 @@ export async function decideArrivalCardAction(
         await rejectQApprovalAction(input.replacesApprovalId).catch(() => null);
       }
       return { ok: true };
+    }
+    case "RETRY_HELD": {
+      const result = await retryHeldAction({
+        draftId: input.draftId,
+        relationshipId: input.relationshipId,
+        idempotencyKey: input.idempotencyKey,
+      });
+      return result.ok
+        ? { ok: true, message: result.message, reload: true }
+        : { ok: false, message: result.message };
     }
     case "DISMISS_APPROVAL": {
       const result = await rejectQApprovalAction(input.approvalId).catch(

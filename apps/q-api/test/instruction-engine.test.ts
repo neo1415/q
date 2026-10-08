@@ -1781,6 +1781,73 @@ describe("a firing with the reviewer on", () => {
     });
   });
 
+  it("Zino 2026-10-08: 'Ask Q to try again' rewrites and reviews a held message, then offers it as a card -- never sends it", async () => {
+    ran.length = 0;
+    const { store, review, seen } = reviewer([passing], null);
+    const { engine, row, asks } = world([], true, AFTER_HOURS, "0", {
+      review,
+      principalName: () => Promise.resolve("Ada Obi"),
+    });
+    const result = await engine.retryHeld({
+      instructionId: row.id,
+      userId,
+      relationshipId: null,
+      counterpartName: "Acme Robotics",
+      draftId: randomUUID(),
+      body: "Ada here: your 310 installs stand out.",
+      idempotencyKey: "press-000000001",
+    });
+    expect(result).toMatchObject({
+      outcome: "OFFERED",
+      body: "Ada here: your 310 installs stand out.",
+    });
+    // Reviewed again (even outside working hours: the person asked).
+    expect(seen).toEqual(["Ada here: your 310 installs stand out."]);
+    expect(ran).toHaveLength(0);
+    expect(asks).toEqual([
+      expect.objectContaining({
+        actionType: "app.chat.message.send",
+        payload: expect.objectContaining({
+          relationshipId: REL,
+          input: {
+            kind: "TEXT",
+            body: "Ada here: your 310 installs stand out.",
+          },
+        }),
+      }),
+    ]);
+    expect(store.rows.outcomes).toEqual([
+      expect.objectContaining({ outcome: "OFFERED" }),
+    ]);
+  });
+
+  it("a retry that holds again says why; someone else's instruction or person is refused", async () => {
+    const { review } = reviewer([failing], null);
+    const { engine, row, asks } = world([], true, IN_HOURS, "0", { review });
+    const base = {
+      instructionId: row.id,
+      userId,
+      relationshipId: REL,
+      counterpartName: "Acme Robotics",
+      draftId: randomUUID(),
+      body: "Could we get 30 minutes?",
+      idempotencyKey: "press-000000002",
+    };
+    expect(await engine.retryHeld(base)).toMatchObject({
+      outcome: "HELD",
+      reason: expect.stringMatching(/^[A-Z_]+$/u),
+    });
+    expect(asks).toHaveLength(0);
+    expect(await engine.retryHeld({ ...base, userId: randomUUID() })).toEqual({
+      outcome: "UNAVAILABLE",
+      reason: "NOT_ACTIVE",
+    });
+    // The draft was to Acme: Beta's conversation is not where it goes.
+    expect(
+      await engine.retryHeld({ ...base, relationshipId: OTHER_REL }),
+    ).toEqual({ outcome: "UNAVAILABLE", reason: "NOT_IN_REACH" });
+  });
+
   it("Zino 2026-10-08: the reviewer reads the real thread, and a reply that ignores their meeting offer is redrafted before it is sent", async () => {
     ran.length = 0;
     const store = createInMemoryWorkforceStore();

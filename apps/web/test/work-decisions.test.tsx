@@ -34,6 +34,12 @@ vi.mock("../src/features/chat/chat-actions", () => ({
   sendChatMessageAction: (id: string, message: unknown, key: string) =>
     send(id, message, key),
 }));
+const sendAsIs = vi.fn<(input: unknown) => Promise<unknown>>();
+const retryHeld = vi.fn<(input: unknown) => Promise<unknown>>();
+vi.mock("../src/features/work/held-actions", () => ({
+  sendHeldAsIsAction: (input: unknown) => sendAsIs(input),
+  retryHeldAction: (input: unknown) => retryHeld(input),
+}));
 const listDone = vi.fn<(cursor: string) => Promise<unknown>>();
 vi.mock("../src/features/work/work-page-actions", () => ({
   listDoneAction: (cursor: string) => listDone(cursor),
@@ -46,7 +52,15 @@ const { DecisionQueue, DoneForYou } =
 
 afterEach(() => {
   cleanup();
-  for (const mock of [approve, reject, send, thread, listDone])
+  for (const mock of [
+    approve,
+    reject,
+    send,
+    thread,
+    listDone,
+    sendAsIs,
+    retryHeld,
+  ])
     mock.mockReset();
 });
 
@@ -511,6 +525,82 @@ describe("a decision card", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     await settle();
     expect(reject).toHaveBeenCalledWith(APPROVAL_T);
+  });
+});
+
+describe("a held card (Zino, 2026-10-08: 'I have no way to approve it')", () => {
+  const REL_S = id(77);
+  function show(onDecided = vi.fn()) {
+    thread.mockResolvedValue({ ok: false });
+    const held = decisionGroups({
+      approvals: [],
+      views: new Map(),
+      jobs: [tensorgateJob],
+      now: NOW,
+    })
+      .filter((group) => group.name === "Spheros")
+      .map((group) => ({ ...group, relationshipId: REL_S }));
+    render(
+      <DecisionQueue
+        groups={held}
+        jobs={[tensorgateJob]}
+        done={[]}
+        renderPlan={() => null}
+        onDecided={onDecided}
+      />,
+    );
+    return onDecided;
+  }
+
+  it("offers Send as is, Edit & send, Ask Q to try again, Dismiss and Later", async () => {
+    show();
+    await settle();
+    for (const name of [
+      "Send as is",
+      "Edit & send",
+      "Ask Q to try again",
+      "Dismiss",
+      "Later",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+  });
+
+  it("Send as is asks 'Send this exact message?' and sends exactly that text", async () => {
+    sendAsIs.mockResolvedValue({ ok: true, message: "Sent." });
+    const onDecided = show();
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "Send as is" }));
+    expect(sendAsIs).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Send this exact message to Spheros?"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Yes, send this" }));
+    await settle();
+    expect(sendAsIs).toHaveBeenCalledWith({
+      relationshipId: REL_S,
+      body: "Hello Spheros team",
+      idempotencyKey: expect.stringMatching(/^held-/u),
+    });
+    expect(onDecided).toHaveBeenCalledWith(id(3));
+  });
+
+  it("Ask Q to try again re-runs the writer and reviewer for that draft", async () => {
+    retryHeld.mockResolvedValue({
+      ok: true,
+      offered: true,
+      message: "Q wrote it again and the reviewer passed it.",
+    });
+    const onDecided = show();
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "Ask Q to try again" }));
+    await settle();
+    expect(retryHeld).toHaveBeenCalledWith({
+      draftId: id(3),
+      relationshipId: REL_S,
+      idempotencyKey: expect.stringMatching(/^retry-/u),
+    });
+    expect(onDecided).toHaveBeenCalledWith(id(3));
   });
 });
 

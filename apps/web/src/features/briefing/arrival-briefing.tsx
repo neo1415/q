@@ -101,6 +101,8 @@ function doneWords(
     case "DISMISS_APPROVAL":
     case "DISMISS_HELD":
       return `Dropped the message to ${who}; nothing was sent`;
+    case "RETRY_HELD":
+      return `Q wrote the message to ${who} again`;
   }
 }
 
@@ -138,6 +140,18 @@ async function run(
     case "DISMISS_HELD":
       dismissHeld(effect.draftId);
       return { ok: true };
+    case "RETRY_HELD": {
+      const result = await decide({
+        kind: "RETRY_HELD",
+        draftId: effect.draftId,
+        relationshipId: effect.relationshipId,
+        // One rewrite per press.
+        idempotencyKey: `retry-${crypto.randomUUID()}`,
+      });
+      // The old hold is replaced by what came back (a card, or a new hold).
+      if (result.ok) dismissHeld(effect.draftId);
+      return result;
+    }
   }
 }
 
@@ -145,6 +159,7 @@ async function run(
 function useSequence(
   cards: readonly ArrivalCard[],
   decide: ArrivalDecide,
+  reload: () => void,
 ): {
   readonly state: SequenceState;
   readonly status: string | null;
@@ -185,8 +200,12 @@ function useSequence(
             ok: result.ok,
           }).state,
         );
-        done = result.ok ? doneWords(effect, card) : result.message;
-        setStatus(result.ok ? `${done}.` : result.message);
+        done = result.ok
+          ? (result.message ?? `${doneWords(effect, card)}.`)
+          : result.message;
+        setStatus(done);
+        // A retry brings a new card (or a new hold): read the cards again.
+        if (result.ok && result.reload === true) reload();
       } else if (step.note === "EDIT_NOT_APPLIED") {
         setStatus("That change didn't fit the message. Edit it here instead.");
       }
@@ -195,7 +214,7 @@ function useSequence(
         const note = focusNote(cards, ref.current);
         if (note !== null) {
           noteToLine(
-            `${note}${done === null ? "" : ` Just now: ${done}.`} Put this card to them briefly, then stop.`,
+            `${note}${done === null ? "" : ` Just now: ${done.replace(/\.$/u, "")}.`} Put this card to them briefly, then stop.`,
             true,
           );
         }
@@ -207,7 +226,7 @@ function useSequence(
         done,
       });
     },
-    [cards, commit, decide],
+    [cards, commit, decide, reload],
   );
   return { state, status, send };
 }
@@ -293,8 +312,9 @@ function FocusCard({
   const busy = state.pending === card.key;
   const confirming =
     state.confirming?.key === card.key ? state.confirming : null;
-  const command = (kind: "APPROVE" | "DISMISS" | "LATER" | "CANCEL") =>
-    send({ type: "COMMAND", command: { kind } }, "BUTTON");
+  const command = (
+    kind: "APPROVE" | "DISMISS" | "LATER" | "CANCEL" | "RETRY",
+  ) => send({ type: "COMMAND", command: { kind } }, "BUTTON");
   // The count is the sequence's header; the card says what it is.
   const meta = card.kind === "HELD" ? "Held back, not sent" : "";
   const place = total > 1 ? `, ${String(position)} of ${String(total)}` : "";
@@ -342,8 +362,8 @@ function FocusCard({
         <>
           <p className="m-0 cq-body font-medium text-(--cq-text-primary)">
             {card.kind === "HELD" && confirming.body === card.message
-              ? "Send this as it is?"
-              : "Here's your version. Send this?"}
+              ? "Send this exact message?"
+              : "Here's your version. Send this exact message?"}
           </p>
           <blockquote
             className="m-0 rounded-(--cq-radius-md) bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)"
@@ -425,9 +445,22 @@ function FocusCard({
                 {card.message === null ? "Approve" : "Approve & send"}
               </Button>
             ) : null}
+            {card.kind === "HELD" &&
+            card.relationshipId !== null &&
+            card.message !== null ? (
+              // Held, never offered: "Send this exact message?" first.
+              <Button
+                variant="primary"
+                disabled={busy}
+                onClick={() => command("APPROVE")}
+                data-arrival-send-as-is
+              >
+                Send as is
+              </Button>
+            ) : null}
             {card.relationshipId !== null && card.message !== null ? (
               <Button
-                variant={card.kind === "HELD" ? "primary" : "secondary"}
+                variant="secondary"
                 disabled={busy || (card.kind === "APPROVAL" && !card.canDecide)}
                 onClick={() =>
                   send(
@@ -437,6 +470,17 @@ function FocusCard({
                 }
               >
                 Edit &amp; send
+              </Button>
+            ) : null}
+            {card.kind === "HELD" && card.draftId !== null ? (
+              <Button
+                variant="quiet"
+                disabled={busy}
+                onClick={() => command("RETRY")}
+                className="text-(--cq-text-secondary)"
+                data-arrival-retry
+              >
+                {busy ? "Q is trying again…" : "Ask Q to try again"}
               </Button>
             ) : null}
             <Button
@@ -463,8 +507,8 @@ function FocusCard({
           ) : null}
           {compact ? null : (
             <p className="m-0 cq-caption text-(--cq-text-tertiary)">
-              Or say “send it”, “change the second sentence to…”, “skip”, “not
-              now”.
+              Or say “send it”, “change the second sentence to…”, “try again”,
+              “skip”, “not now”.
             </p>
           )}
         </>
@@ -481,6 +525,7 @@ function Sequence({
   nudge,
   round,
   onSettled,
+  reload,
 }: {
   readonly data: ArrivalData;
   readonly decide: ArrivalDecide;
@@ -488,8 +533,10 @@ function Sequence({
   readonly nudge: boolean;
   readonly round: number;
   readonly onSettled?: (() => void) | undefined;
+  /** New cards may be waiting (a retry): read the briefing again. */
+  readonly reload: () => void;
 }) {
-  const { state, status, send } = useSequence(data.cards, decide);
+  const { state, status, send } = useSequence(data.cards, decide, reload);
   // What this sequence settled stays settled across pages (arrival-store).
   useEffect(() => {
     for (const key of Object.keys(state.outcomes)) markHandled(key);
@@ -787,6 +834,7 @@ export function ArrivalBriefing({
           nudge={ready.nudge}
           round={ready.round}
           onSettled={onSettled}
+          reload={() => refreshArrival(load)}
         />
       )}
     </div>

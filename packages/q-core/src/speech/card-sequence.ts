@@ -14,7 +14,10 @@
  *   in full and needs its own "send this?" yes. Changing it again needs that
  *   yes again. Its idempotency key is bound to the exact body.
  * - A held draft was never offered for approval, so "send it" on one asks
- *   "send this?" first, exactly like an edit.
+ *   "send this exact message?" first, exactly like an edit.
+ * - "Try again" on a held draft asks Q to write and review it again
+ *   (Zino, 2026-10-08); a pass comes back as an ordinary approval card,
+ *   never sent by this step.
  *
  * Pure: no I/O, no model. An utterance that is not plainly one of these
  * commands is not a command (null), and goes to Q as any other turn.
@@ -41,6 +44,7 @@ export type CardCommand =
   | { readonly kind: "EDIT"; readonly edit: CardEdit | null }
   | { readonly kind: "DISMISS" }
   | { readonly kind: "LATER" }
+  | { readonly kind: "RETRY" }
   | { readonly kind: "LEAVE" }
   | { readonly kind: "CANCEL" };
 
@@ -98,6 +102,9 @@ const LEAVE = whole(
 const CANCEL = whole(
   String.raw`cancel(?: (?:it|that|the edit|my edit))?|never ?mind|keep (?:it|the original)(?: as it was)?|go back|undo(?: that)?`,
 );
+const RETRY = whole(
+  String.raw`(?:ask q to )?try (?:it )?again|(?:can you |could you )?(?:re-?write|redo|re-?draft) (?:it|that|this)(?: again)?|write (?:it|that|this) again|have another go|give it another go|review (?:it|that|this) again`,
+);
 const EDIT_OPEN = whole(
   String.raw`edit(?: it| that| this)?|let me edit(?: it| that| this)?|i'll edit(?: it| that| this)?|i want to (?:edit|change) (?:it|that|this)|change (?:it|that|this)`,
 );
@@ -147,6 +154,7 @@ export function parseCardCommand(words: string): CardCommand | null {
   if (DISMISS.test(said)) return { kind: "DISMISS" };
   if (CANCEL.test(said)) return { kind: "CANCEL" };
   if (APPROVE.test(said)) return { kind: "APPROVE" };
+  if (RETRY.test(said)) return { kind: "RETRY" };
   if (LATER.test(said)) return { kind: "LATER" };
   if (EDIT_OPEN.test(said)) return { kind: "EDIT", edit: null };
   if (YES.test(said)) return { kind: "YES" };
@@ -222,7 +230,8 @@ export type SequenceCard = {
   readonly canDecide: boolean;
 };
 
-export type CardOutcome = "APPROVED" | "SENT_EDITED" | "DISMISSED" | "LATER";
+export type CardOutcome =
+  "APPROVED" | "SENT_EDITED" | "DISMISSED" | "LATER" | "RETRIED";
 
 export type SequenceState = {
   readonly cards: readonly SequenceCard[];
@@ -268,6 +277,13 @@ export type SequenceEffect =
       readonly kind: "DISMISS_HELD";
       readonly key: string;
       readonly draftId: string;
+    }
+  | {
+      /** Q writes and reviews the held draft again; a pass is a new card. */
+      readonly kind: "RETRY_HELD";
+      readonly key: string;
+      readonly draftId: string;
+      readonly relationshipId: string | null;
     };
 
 /** Why a command did nothing, for a short reply. */
@@ -276,6 +292,7 @@ export type SequenceNote =
   | "BUSY"
   | "CANNOT_DECIDE"
   | "CANNOT_EDIT"
+  | "CANNOT_RETRY"
   | "EDIT_NOT_APPLIED"
   | "SAY_SEND"
   | "NOTHING_TO_CANCEL"
@@ -372,7 +389,12 @@ export function stepSequence(
         note: null,
       };
     }
-    const kind = state.confirming?.key === event.key ? "SENT_EDITED" : null;
+    const kind =
+      state.outcomes[event.key] === "RETRIED"
+        ? "RETRIED"
+        : state.confirming?.key === event.key
+          ? "SENT_EDITED"
+          : null;
     return {
       state: advance(state, kind ?? state.outcomes[event.key] ?? "APPROVED"),
       effect: null,
@@ -439,6 +461,27 @@ export function stepSequence(
           outcomes: { ...state.outcomes, [card.key]: "DISMISSED" },
         },
         effect,
+        note: null,
+      };
+    }
+    case "RETRY": {
+      if (card.kind !== "HELD" || card.draftId === null) {
+        return idle(state, "CANNOT_RETRY");
+      }
+      return {
+        state: {
+          ...state,
+          pending: card.key,
+          confirming: null,
+          editing: false,
+          outcomes: { ...state.outcomes, [card.key]: "RETRIED" },
+        },
+        effect: {
+          kind: "RETRY_HELD",
+          key: card.key,
+          draftId: card.draftId,
+          relationshipId: card.relationshipId,
+        },
         note: null,
       };
     }

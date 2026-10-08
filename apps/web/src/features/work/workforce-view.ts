@@ -128,7 +128,7 @@ export const HELD_WORDS: Readonly<Record<string, string>> = {
     "Held after two tries: it still didn't reach your bar. Read it, send your own, or let it go.",
   INTEGRITY: "It would have said something Capital Q can't stand behind.",
   REVIEW_UNAVAILABLE:
-    "Q's reviewer couldn't check it, so it wasn't sent. Read it and send your own, or ask Q to try again.",
+    "Q's reviewer couldn't check it, so it wasn't sent. Send it as it is, edit it, or ask Q to try again.",
   WRITER_GAVE_UP: "It couldn't be written honestly from what you approved.",
   CODE_CHECK: "A redraft broke a rule for this conversation.",
   THREAD_MISMATCH:

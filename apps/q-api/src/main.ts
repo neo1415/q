@@ -166,7 +166,11 @@ import {
 } from "./composition/workforce/ports.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
-import { createPostgresWorkforceStore } from "./composition/workforce/store.js";
+import { createHeldRetry } from "./composition/workforce/held-retry.js";
+import {
+  createPostgresWorkforceStore,
+  createStaleHoldsReader,
+} from "./composition/workforce/store.js";
 import { houseEtiquetteOf, stanceDeclines } from "@capital-q/q-core";
 import { createWorkPage } from "./composition/work/page.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
@@ -4238,6 +4242,15 @@ const instructionCards = createPostgresCompanyCardPort({ sql: database.sql });
 const instructionDiscovery = createPostgresDiscoveryRepository({
   sql: database.sql,
 });
+// Zino, 2026-10-08: "Ask Q to try again" on a held message, and the
+// automatic second look at holds the reviewer could not grade.
+const heldRetry = createHeldRetry({
+  store: workforceStore,
+  engine: () => instructionEngine.current,
+  staleHolds: createStaleHoldsReader(database.sql),
+  logger,
+});
+
 instructionEngine.current = createInstructionEngine({
   review: outwardReview,
   track: workforceTracker(workforceStore, "INSTRUCTION"),
@@ -4362,6 +4375,9 @@ void createWorkWakeListener({
     void workRuntime.tick().catch(() => undefined);
     // Accepts and declines that landed while nobody listened (a deploy).
     void instructionTriggers.catchUpMoves().catch(() => undefined);
+    // Holds the reviewer could not grade (before the 8 Oct note fix, or a
+    // reviewer outage): written and reviewed again once each.
+    void heldRetry.sweepStale().catch(() => undefined);
   },
   targets: [
     {
@@ -5406,6 +5422,7 @@ const { app, logger: appLogger } = createApp(
           ),
         monthlyLimitUsd: () => Promise.resolve(workforceMonthlyLimit),
       }),
+      heldRetry,
       onDecision: feedbackFromApprovals({
         store: workforceStore,
         learning: createWorkforceLearning({

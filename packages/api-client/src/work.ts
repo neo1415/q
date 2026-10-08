@@ -33,6 +33,9 @@ import {
   Q_WORKFORCE_JOBS_PATH,
   Q_WORKFORCE_OVERVIEW_PATH,
   qWorkforceJobPath,
+  qWorkforceDraftRetryPath,
+  IDEMPOTENCY_KEY_HEADER,
+  WorkforceDraftRetryResultDtoSchema,
   WorkforceJobDetailDtoSchema,
   WorkforceJobListDtoSchema,
   WorkforceOverviewDtoSchema,
@@ -315,6 +318,27 @@ export function getWorkforceOverview(session: ApiSession) {
     "GET",
     Q_WORKFORCE_OVERVIEW_PATH,
     WorkforceOverviewDtoSchema,
+  );
+}
+/**
+ * `POST /v1/q/workforce/drafts/:draftId/retry` (Q API): "Ask Q to try
+ * again" on a held message. A pass comes back OFFERED as an approval card.
+ */
+export function retryWorkforceDraft(
+  session: ApiSession,
+  draftId: string,
+  relationshipId: string | null,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    qWorkforceDraftRetryPath(draftId),
+    WorkforceDraftRetryResultDtoSchema,
+    {
+      body: { relationshipId },
+      headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+    },
   );
 }
 // end WORKFORCE block

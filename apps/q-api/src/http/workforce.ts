@@ -3,7 +3,12 @@ import { z } from "zod";
 
 import {
   createProblemDetails,
+  IDEMPOTENCY_KEY_HEADER,
+  IdempotencyKeyHeaderSchema,
   PROBLEM_CONTENT_TYPE,
+  Q_WORKFORCE_DRAFT_RETRY_PATH,
+  WorkforceDraftRetryRequestSchema,
+  WorkforceDraftRetryResultDtoSchema,
   Q_WORKFORCE_JOB_PATH,
   Q_WORKFORCE_JOBS_PATH,
   Q_WORKFORCE_OVERVIEW_PATH,
@@ -13,6 +18,7 @@ import {
   WorkforceJobListQuerySchema,
 } from "@capital-q/contracts";
 
+import type { HeldRetry } from "../composition/workforce/held-retry.js";
 import type { WorkforcePage } from "../composition/workforce/page.js";
 import {
   getActorContext,
@@ -26,12 +32,18 @@ import {
  * are input: every call answers only for the person's own jobs, and
  * someone else's id is the same 404 as one that does not exist. Approving,
  * editing or rejecting an offered draft is the Approval Engine's own
- * route; its decisions feed the agents' learning (J3).
+ * route; its decisions feed the agents' learning (J3). The one write is
+ * "Ask Q to try again" on a held message: written and reviewed again, a
+ * pass offered as an approval card (never sent from here).
  */
 
 export type WorkforceRoutesDependencies = ActorContextDependencies & {
   readonly page: WorkforcePage;
+  /** Absent: the retry route is not offered (404). */
+  readonly heldRetry?: Pick<HeldRetry, "retry"> | undefined;
 };
+
+const DraftParams = z.object({ draftId: z.string().uuid() }).strict();
 
 const JobParams = z.object({ jobId: z.string().uuid() }).strict();
 
@@ -108,4 +120,42 @@ export function registerWorkforceRoutes(
       return WorkforceJobDetailDtoSchema.parse(detail);
     },
   );
+
+  const heldRetry = dependencies.heldRetry;
+  if (heldRetry !== undefined) {
+    app.post(
+      Q_WORKFORCE_DRAFT_RETRY_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const actor = getActorContext(request);
+        const params = DraftParams.safeParse(request.params);
+        if (!params.success) {
+          return problem(request, reply, "RESOURCE_NOT_FOUND");
+        }
+        const raw = request.headers[IDEMPOTENCY_KEY_HEADER];
+        const key = IdempotencyKeyHeaderSchema.safeParse(
+          typeof raw === "string" ? raw : undefined,
+        );
+        const body = WorkforceDraftRetryRequestSchema.safeParse(
+          request.body ?? {},
+        );
+        if (!key.success || !body.success) {
+          return problem(request, reply, "VALIDATION_FAILED");
+        }
+        const answer = await heldRetry.retry(
+          { tenantId: actor.tenantId, userId: actor.userId },
+          {
+            draftId: params.data.draftId,
+            relationshipId: body.data.relationshipId,
+            idempotencyKey: key.data,
+          },
+        );
+        if (answer.outcome === "UNAVAILABLE" && answer.reason === "NOT_FOUND") {
+          return problem(request, reply, "RESOURCE_NOT_FOUND");
+        }
+        void reply.header("Cache-Control", "no-store");
+        return WorkforceDraftRetryResultDtoSchema.parse(answer);
+      },
+    );
+  }
 }

@@ -175,6 +175,8 @@ const NOTE_WORDS: Readonly<Record<SequenceNote, string>> = {
     "That card can't be decided any more (already decided or expired).",
   CANNOT_EDIT:
     "That card can't be edited by voice; it's on screen to decide there.",
+  CANNOT_RETRY:
+    "Only a message Q held can be written again; this card is ready to decide as it is.",
   EDIT_NOT_APPLIED:
     "That change didn't fit the message (no such sentence or words); ask which part to change.",
   SAY_SEND:

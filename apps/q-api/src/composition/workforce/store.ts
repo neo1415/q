@@ -314,6 +314,47 @@ function goalOf(text: string): string {
   return clip(text, 400) || "Work for you.";
 }
 
+/**
+ * Holds the reviewer could not grade in the last week, from standing
+ * instructions, that no later message to the same person superseded
+ * (held-retry.ts looks at each again once). The service's own sweep, not
+ * a person's read: it returns owners and ids only, never bodies.
+ */
+export function createStaleHoldsReader(sql: DatabaseExecutor) {
+  return async (
+    limit: number,
+  ): Promise<
+    readonly {
+      readonly tenantId: string;
+      readonly userId: string;
+      readonly draftId: string;
+    }[]
+  > => {
+    const rows = await sql<
+      { tenant_id: string; user_id: string; draft_id: string }[]
+    >`
+      select o.tenant_id, o.user_id, o.draft_id
+        from q_runtime.workforce_draft_outcomes o
+        join q_runtime.workforce_drafts d on d.id = o.draft_id
+        join q_runtime.workforce_jobs j on j.id = o.job_id
+       where o.outcome = 'HELD' and o.reason = 'REVIEW_UNAVAILABLE'
+         and o.created_at > clock_timestamp() - interval '7 days'
+         and j.source_kind = 'INSTRUCTION' and j.status <> 'STOPPED'
+         and not exists (
+           select 1 from q_runtime.workforce_drafts later
+            where later.job_id = d.job_id
+              and later.counterpart_name is not distinct from d.counterpart_name
+              and later.created_at > d.created_at)
+       order by o.created_at desc
+       limit ${Math.max(1, Math.min(20, limit))}`;
+    return rows.map((row) => ({
+      tenantId: row.tenant_id,
+      userId: row.user_id,
+      draftId: row.draft_id,
+    }));
+  };
+}
+
 export function createPostgresWorkforceStore(
   sql: DatabaseExecutor,
 ): WorkforceStore {

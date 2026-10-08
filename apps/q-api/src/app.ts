@@ -161,7 +161,7 @@ export type QApiModules = {
   readonly workPage?: WorkRoutesDependencies["page"] | undefined;
   /** Founder brief J5: Q's workforce, the person's own jobs and feedback. */
   readonly workforce?:
-    | (Pick<WorkforceRoutesDependencies, "page"> & {
+    | (Pick<WorkforceRoutesDependencies, "page" | "heldRetry"> & {
         readonly onDecision?: QApprovalRoutesDependencies["onDecision"];
       })
     | undefined;
@@ -526,6 +526,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       page: modules.workforce.page,
+      heldRetry: modules.workforce.heldRetry,
     });
   }
 
