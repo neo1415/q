@@ -61,36 +61,39 @@ function completeVoiceTurn(turn: QVoiceTurnState) {
   for (const listener of voiceState.listeners) listener();
 }
 vi.mock("../src/features/voice/use-voice-interview", async () => {
-  const { useEffect, useState } = await import("react");
-  return {
-    useVoiceInterview: () => {
-      const [, force] = useState(0);
-      useEffect(() => {
-        const listener = () => force((n) => n + 1);
-        voiceState.listeners.add(listener);
-        return () => {
-          voiceState.listeners.delete(listener);
-        };
-      }, []);
-      return {
-        client: {
-          state: "LISTENING",
-          inputLevel: 0,
-          outputLevel: 0,
-          muted: false,
-          setMuted: vi.fn(),
-          sendText: vi.fn(),
-        },
-        active: true,
-        voice: "FEMALE",
-        notice: null,
-        talk: vi.fn(),
-        end: vi.fn(),
-        chooseVoice: vi.fn(),
-        clearNotice: vi.fn(),
-        turn: voiceState.turn,
+  const { createContext, useEffect, useState } = await import("react");
+  const useVoiceInterview = () => {
+    const [, force] = useState(0);
+    useEffect(() => {
+      const listener = () => force((n) => n + 1);
+      voiceState.listeners.add(listener);
+      return () => {
+        voiceState.listeners.delete(listener);
       };
-    },
+    }, []);
+    return {
+      client: {
+        state: "LISTENING",
+        inputLevel: 0,
+        outputLevel: 0,
+        muted: false,
+        setMuted: vi.fn(),
+        sendText: vi.fn(),
+      },
+      active: true,
+      voice: "FEMALE",
+      notice: null,
+      talk: vi.fn(),
+      end: vi.fn(),
+      chooseVoice: vi.fn(),
+      clearNotice: vi.fn(),
+      turn: voiceState.turn,
+    };
+  };
+  return {
+    useVoiceInterview,
+    // The Q session reads its voice through this context (default: the hook).
+    VoiceInterviewSource: createContext(useVoiceInterview),
   };
 });
 
