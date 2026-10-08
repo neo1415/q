@@ -29,6 +29,8 @@ import {
 
 import { registerProblemHandling } from "./http/problem-handler.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
+import type { QRoomFeed } from "./room/feed.js";
+import { registerQRoomRoutes } from "./room/routes.js";
 import {
   registerQArtifactRoutes,
   type QArtifactRoutesDependencies,
@@ -214,6 +216,11 @@ export type QApiModules = {
   readonly ownPictures?: QArtifactRoutesDependencies["ownPictures"];
   /** The orchestration boundary; absent means runs are only persisted. */
   readonly orchestration?: QRunRoutesDependencies["orchestration"];
+  /**
+   * voice-cards: the person's Q room feed (every run's answer, any path);
+   * absent means no room route and nothing published.
+   */
+  readonly room?: QRoomFeed | undefined;
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
   readonly qActions?: QApprovalRoutesDependencies["qActions"] | undefined;
   /** What runs an approved action: resume, or the gate when the run cannot resume. */
@@ -360,7 +367,16 @@ export function createApp(
       identity: security.identity,
       qRuntime: modules.qRuntime,
       orchestration: modules.orchestration,
+      room: modules.room,
     });
+    if (modules.room !== undefined) {
+      registerQRoomRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        room: modules.room,
+      });
+    }
     // A person's conversations (ADR 0012): the same owner rule, the
     // same personal-context allowance, read back from the runtime.
     registerQConversationRoutes(app, {

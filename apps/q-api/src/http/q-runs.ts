@@ -34,6 +34,7 @@ import {
   requireActorContextOrPersonalHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import type { QRoomFeed } from "../room/feed.js";
 
 /**
  * `/v1/q/runs` — the Q run lifecycle at the HTTP boundary (doc 22 §66-68,
@@ -65,6 +66,12 @@ export type QRunRoutesDependencies = ActorContextDependencies & {
   readonly orchestration?:
     | { readonly orchestrator: QOrchestrator; readonly autostart: boolean }
     | undefined;
+  /**
+   * voice-cards: a typed run's answer is published to the person's Q room
+   * too, while they have a reader open (the dock on another page, a voice
+   * line), so every surface renders from the same feed.
+   */
+  readonly room?: Pick<QRoomFeed, "watchRun"> | undefined;
 };
 
 function correlation(): CorrelationId {
@@ -133,6 +140,15 @@ export function registerQRunRoutes(
             "q orchestration ended with an error",
           );
         });
+    }
+
+    if (result.created) {
+      dependencies.room?.watchRun({
+        actor,
+        runId: result.run.id,
+        conversationId: result.run.conversationId,
+        correlationId,
+      });
     }
 
     // 202: durably accepted, not analysed. A replayed retry gets the same

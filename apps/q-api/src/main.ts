@@ -508,6 +508,7 @@ import { createOnboardingConductor } from "./voice/onboarding-conductor.js";
 import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
 import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenlabs-pronunciation.js";
 import { createVoiceTurnBoard } from "./voice/turn-board.js";
+import { createQRoomFeed } from "./room/feed.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
@@ -5099,6 +5100,9 @@ const interviewLoop = createInterviewAgent({
   dataPosture: demoDataPosture,
 });
 const voiceTurnBoard = createVoiceTurnBoard();
+// voice-cards: the person's Q room feed, beside the turn board (same
+// process, same lifetime): every run's answer, whichever path made it.
+const qRoom = createQRoomFeed({ qStream, logger });
 const welcomeHost = createWelcomeHost({
   gateway: modelGateway,
   logger,
@@ -5172,6 +5176,7 @@ const voiceTurn = timedVoiceTurns(
     qStream,
     interviewAgent,
     board: voiceTurnBoard,
+    room: qRoom,
     welcome: welcomeHost,
     pronunciation,
     // A spoken yes to a proposal is the same decision a tap records.
@@ -5400,6 +5405,7 @@ const { app, logger: appLogger } = createApp(
     qActions,
     continueApproved,
     qStream: { service: qStream },
+    room: qRoom,
     // Q as an MCP server, only where a deployment turned it on. The same
     // registry and pipeline a run uses; a different modality, no more
     // authority.
