@@ -48,6 +48,7 @@ import {
   arrivalWords,
   commandCardsOf,
   focusNote,
+  focusSay,
   planFromReading,
   readSpokenReply,
   sequenceCardOf,
@@ -74,6 +75,8 @@ import {
   useArrival,
   type ArrivalLoader,
 } from "./arrival-store";
+import { useQControl } from "@/features/q/control/q-control";
+
 import { loadArrival } from "./arrival-browser";
 import { setRoomFilled, useRoomSlots } from "./arrival-room";
 
@@ -261,6 +264,8 @@ function useSequence(
           noteToLine(
             `${note}${done === null ? "" : ` Just now: ${done.replace(/\.$/u, "")}.`} Put this card to them briefly, then stop.`,
             true,
+            // The standard line says this as it is (E-03).
+            focusSay(cards, ref.current, done) ?? undefined,
           );
         }
       }
@@ -780,6 +785,30 @@ export function Sequence({
     if (open) void send({ type: "FOCUS", key: focusKey }, "VOICE");
   }, [focusKey, focusedKey, data.cards, state.outcomes, send]);
 
+  // RECOVERY-2026-10 (C1 hooks): "open the second card" brings that card
+  // into focus, exactly as a tap on its line does. Handled here, never by
+  // the default click: the card in focus starts with its decision buttons,
+  // and a screen act must not approve anything.
+  const listRef = useRef<HTMLElement | null>(null);
+  const stillOpen = data.cards.filter((one) => {
+    const outcome = state.outcomes[one.key];
+    return outcome === undefined || outcome === "LATER";
+  });
+  useQControl({
+    id: "list.arrival-cards",
+    kind: "LIST",
+    ref: listRef,
+    count: stillOpen.length,
+    onAct: async (intent) => {
+      if (intent.act !== "SELECT_ITEM") return "NOT_APPLICABLE";
+      const target = stillOpen[(intent.index ?? 1) - 1];
+      if (target === undefined) return "TARGET_MISSING";
+      await send({ type: "FOCUS", key: target.key }, "BUTTON");
+      onExpand?.();
+      return "DONE";
+    },
+  });
+
   // The open line knows which card is in focus; a line opened later too.
   useEffect(() => {
     setStandingNote(active ? focusNote(data.cards, state) : null);
@@ -819,6 +848,9 @@ export function Sequence({
           }
         : {
             ok: false,
+            // Explicit for the lines (A's standard-cards reads this field;
+            // the wording below is for the duplex model only).
+            notAboutCards: true,
             situation:
               "That isn't about the cards. Pass their words to ask_q; the cards stay on screen.",
           };
@@ -835,6 +867,7 @@ export function Sequence({
       noteToLine(
         `${note} This just came in from Q's work. At a natural pause, mention it once, gently, in a sentence; don't interrupt them.`,
         true,
+        focusSay(data.cards, state, "Something new just came in.") ?? undefined,
       );
     }
   }, [nudge, active, data.cards, state]);
@@ -859,6 +892,9 @@ export function Sequence({
     // spoken "send it" still means this one), one tap to bring it back.
     return (
       <div
+        ref={(node) => {
+          listRef.current = node;
+        }}
         className="flex min-h-11 items-center gap-2"
         data-arrival-sequence
         data-arrival-layout="strip"
@@ -906,6 +942,7 @@ export function Sequence({
       exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
       transition={{ duration: reduced ? 0 : 0.22, ease: EASE }}
       data-arrival-item={index}
+      data-q-item
     >
       {one.key === current.key ? (
         focusCard
@@ -926,6 +963,9 @@ export function Sequence({
 
   return (
     <section
+      ref={(node) => {
+        listRef.current = node;
+      }}
       aria-label="Needs you"
       className={cx("flex w-full flex-col", compact ? "gap-2" : "gap-2.5")}
       data-arrival-sequence

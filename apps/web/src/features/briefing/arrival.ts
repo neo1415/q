@@ -94,6 +94,29 @@ export type ArrivalData = {
   readonly questions?: readonly ReadinessFollowUp[] | null | undefined;
 };
 
+/**
+ * The card in focus as a line ready to say as it is (q-core `cardLine`),
+ * for the standard voice line, which has no model in the browser to
+ * phrase a note (workstream A, E-03). `lead` goes first ("Done.").
+ */
+export function focusSay(
+  cards: readonly ArrivalCard[],
+  state: SequenceState,
+  lead?: string | null,
+): string | null {
+  const focused = focusedCard(state);
+  if (focused === null) return null;
+  const card = cards.find((one) => one.key === focused.key);
+  if (card === undefined) return null;
+  const line = cardLine(
+    decisionFactsOf(card),
+    state.focus + 1,
+    state.cards.length,
+  );
+  const first = lead?.trim() ?? "";
+  return first.length === 0 ? line : `${first} ${line}`;
+}
+
 /** "I still have three questions investors will ask you." (Q.01) */
 export function questionsWords(
   questions: readonly ReadinessFollowUp[] | null | undefined,

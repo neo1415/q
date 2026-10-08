@@ -57,6 +57,11 @@ const { resetArrivalGate } =
   await import("../src/features/briefing/arrival-gate");
 const { cardInFocus } = await import("../src/features/voice/line-cards");
 const { announceQSaid } = await import("../src/features/q-swarm/q-said");
+const { decideCardByVoice, onLineNote } =
+  await import("../src/features/voice/line-cards");
+const { performUiAct } = await import("../src/features/q/ui-act-controller");
+const { decideArrivalCardAction } =
+  await import("../src/features/briefing/arrival-actions");
 
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -352,5 +357,69 @@ describe("Q.01: the questions Q still has stay beside Q", () => {
     fireEvent.click(screen.getByText("Under $20k"));
     await settle();
     expect(answerQuestionAction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("follow-ups with A and C", () => {
+  it("tells the line explicitly when words are not about the cards", async () => {
+    render(<Page />);
+    await settle();
+    await screen.findByText("Kora Health");
+    const out = await act(() =>
+      decideCardByVoice(
+        JSON.stringify({ words: "how is the weather in Lagos" }),
+        "how is the weather in Lagos",
+      ),
+    );
+    expect(JSON.parse(out ?? "{}")).toMatchObject({
+      ok: false,
+      notAboutCards: true,
+    });
+  });
+
+  it("hands the standard line a ready-to-say card line when a tap moves the focus", async () => {
+    const heard: { note: string; say: string | undefined }[] = [];
+    const stop = onLineNote((note, _respond, say) => heard.push({ note, say }));
+    render(<Page />);
+    await settle();
+    await screen.findByText("Kora Health");
+    fireEvent.click(
+      document.querySelector(`[data-arrival-line="${uuid(2)}"]`) as Element,
+    );
+    await settle();
+    stop();
+    const moved = heard.find((one) => one.note.includes("Put this card"));
+    expect(moved?.say).toBeTruthy();
+    expect(moved?.say).toContain("Tensorgate");
+  });
+
+  it("'open the second card' focuses it through the control, and decides nothing", async () => {
+    render(<Page />);
+    await settle();
+    await screen.findByText("Kora Health");
+    const receipt = await act(() =>
+      performUiAct({
+        kind: "UI_ACT",
+        actId: "uia_test_second_card",
+        act: "SELECT_ITEM",
+        target: "list.arrival-cards",
+        index: 2,
+      }),
+    );
+    expect(receipt.status).toBe("DONE");
+    expect(
+      document.querySelector(`[data-arrival-card="${uuid(2)}"]`),
+    ).not.toBeNull();
+    expect(decideArrivalCardAction).not.toHaveBeenCalled();
+    const missing = await act(() =>
+      performUiAct({
+        kind: "UI_ACT",
+        actId: "uia_test_ninth_card",
+        act: "SELECT_ITEM",
+        target: "list.arrival-cards",
+        index: 9,
+      }),
+    );
+    expect(missing.status).toBe("TARGET_MISSING");
   });
 });
