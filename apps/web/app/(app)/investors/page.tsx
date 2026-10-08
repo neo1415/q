@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { GoToDiscover } from "./go-to-discover";
 
 import {
   getFitProfiles,
@@ -136,8 +136,23 @@ export default async function InvestorsPage() {
   }
 
   // A founder's investor list is Discover's Investors tab (demo audit
-  // 2026-10-03: the same list lived at two addresses). Old links land there.
-  redirect("/discover");
+  // 2026-10-03: the same list lived at two addresses). Old links land there,
+  // through the client router: a server redirect after the shell streamed
+  // becomes a meta refresh (axe, critical).
+  return (
+    <PageContainer>
+      <GoToDiscover />
+      <EmptyState
+        title="Investors are on Discover."
+        description="Your investor list lives on Discover's Investors tab."
+        action={
+          <Link href="/discover" className={buttonClassName("secondary")}>
+            Open Discover
+          </Link>
+        }
+      />
+    </PageContainer>
+  );
 }
 
 async function requestFits(
