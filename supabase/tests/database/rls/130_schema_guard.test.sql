@@ -160,6 +160,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('media',    'pitch_transcripts',         'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'conversations',            'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'conversation_messages',    'INTERNAL_SERVER_ONLY', '{}'),
+  -- Voice line transcripts (both sides), server-only; suite 889.
+  ('q_runtime', 'voice_line_turns',         'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'runs',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'work_suggestion_dismissals', 'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'run_events',               'INTERNAL_SERVER_ONLY', '{}'),
