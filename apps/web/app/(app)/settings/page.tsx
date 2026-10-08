@@ -263,8 +263,13 @@ export default async function SettingsPage({
             title="Notifications"
             description="In-app notices always show."
           >
+            {/* A definition list holds only term/description groups (axe
+                definition-list, 2026-10-08): the setting is its description. */}
             <div className="px-5 py-4">
-              <PushSetting />
+              <dt className="sr-only">Notifications on this device</dt>
+              <dd>
+                <PushSetting />
+              </dd>
             </div>
           </SettingsCard>
 

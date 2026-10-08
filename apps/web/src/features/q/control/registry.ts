@@ -108,6 +108,8 @@ export function registerControl(entry: ControlEntry): () => void {
   order += 1;
   const registered: Registered = { ...entry, order };
   controls.set(entry.id, registered);
+  const element = entry.element();
+  if (element !== null) markControl(entry.id, entry.kind, element);
   changed();
   return () => {
     if (controls.get(entry.id) === registered) {
@@ -115,6 +117,26 @@ export function registerControl(entry: ControlEntry): () => void {
       changed();
     }
   };
+}
+
+/**
+ * G-R8: a registered control's root says its id (`data-q-control`), and a
+ * list's items say they are its items (`data-q-control-item`), so a test
+ * finds the very element Q acts on. Marks only; nothing reads them for
+ * authority. Refreshed whenever the manifest is read, as lists change.
+ */
+function markControl(id: string, kind: QControlKind, element: HTMLElement) {
+  // A handler-only control (registerUiControl) has no root of its own.
+  if (element === element.ownerDocument.documentElement) return;
+  if (element.getAttribute("data-q-control") !== id) {
+    element.setAttribute("data-q-control", id);
+  }
+  if (kind !== "LIST") return;
+  for (const item of listItems(element)) {
+    if (!item.hasAttribute("data-q-control-item")) {
+      item.setAttribute("data-q-control-item", "");
+    }
+  }
 }
 
 export function controlOf(id: string): ControlEntry | undefined {
@@ -328,6 +350,7 @@ export function manifestControls(): QManifestControl[] {
   for (const entry of controls.values()) {
     const element = entry.element();
     if (element === null || !element.isConnected || hidden(element)) continue;
+    markControl(entry.id, entry.kind, element);
     const state = stateOf(entry.kind, stateElement(entry.kind, element));
     let count: number | undefined;
     if (entry.kind === "LIST") {
