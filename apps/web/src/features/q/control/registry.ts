@@ -245,11 +245,34 @@ export function stateOf(
  */
 export function listItems(element: HTMLElement): HTMLElement[] {
   const marked = element.querySelectorAll<HTMLElement>("[data-q-item]");
-  if (marked.length > 0) return [...marked];
-  const items = element.querySelectorAll<HTMLElement>(
-    'li, [role="listitem"], [role="option"], [role="row"]',
-  );
-  if (items.length > 0) return [...items];
+  if (marked.length > 0) {
+    // An item's own nested items are not items of this list.
+    return [...marked].filter(
+      (item) =>
+        item.parentElement?.closest("[data-q-item]") == null ||
+        !element.contains(item.parentElement.closest("[data-q-item]")),
+    );
+  }
+  // The outermost list's own items: a pillar's inner bullet list is part
+  // of its pillar, not another pillar.
+  const list = element.matches('ul, ol, [role="list"], [role="listbox"]')
+    ? element
+    : element.querySelector<HTMLElement>(
+        'ul, ol, [role="list"], [role="listbox"], [role="grid"], [role="table"]',
+      );
+  if (list !== null) {
+    const items = [
+      ...list.querySelectorAll<HTMLElement>(
+        'li, [role="listitem"], [role="option"], [role="row"]',
+      ),
+    ].filter(
+      (item) =>
+        item.parentElement?.closest(
+          'ul, ol, [role="list"], [role="listbox"], [role="grid"], [role="table"]',
+        ) === list,
+    );
+    if (items.length > 0) return items;
+  }
   const box =
     element.children.length === 1 && element.firstElementChild !== null
       ? element.firstElementChild
