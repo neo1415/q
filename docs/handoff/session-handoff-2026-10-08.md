@@ -24,6 +24,9 @@ Read `CLAUDE.md` first. Deploy branch: push HEAD to `recovery/2026-09-12`, `reco
 
 ## Builders still running when this was written
 
+Update at 11:25 UTC: `build/founder-agents` round 3 is **finished** (SHA `ee304b16`, not merged). It recalibrates the reviewer for replies (v3), sets the rewriter to v3, checks every rewrite in code, turns a near miss into a card for Daniel, and treats "connecting" as a meeting ask. `build/verify-nudge` is **finished** (SHA `e3da99b5`, not merged). Merge both, deploy, kick 4fe0050f, and verify as Marcus and Bumpa.
+
+
 Each pushes to its own branch. Merge them, check them, deploy, then verify live:
 
 | Branch | What it builds |
