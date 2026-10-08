@@ -18,6 +18,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { formatLongDay } from "@/components/date-format";
+import { capitalTabHref } from "@/features/capital/capital-tabs";
 
 import { ExpressInterest } from "../network/express-interest";
 
@@ -164,6 +165,24 @@ function TeamList({
 
 export { moneyText };
 
+/**
+ * The owner's own profile with no raise declared (founder 2026-10-08, seen
+ * as Bumpa's founder: "The raise · Not shared with you" read as if someone
+ * were withholding their own raise from them). For the owner and their
+ * team a missing raise is a step: add it in Capital, Raise & rounds.
+ */
+function AddYourRaise() {
+  return (
+    <Link
+      href={capitalTabHref("raise")}
+      className="underline underline-offset-4"
+      data-owner-raise="ADD"
+    >
+      Add your raise
+    </Link>
+  );
+}
+
 /** In diligence, "not shared" is a next step, not a dead end. */
 function NotSharedYet({ href }: { readonly href: string }) {
   return (
@@ -232,6 +251,11 @@ export function CompanyProfileView({
 }) {
   const { overview } = profile;
   const investor = profile.viewer === "INVESTOR";
+  // The owner (and their team) reading their own company: nothing here is
+  // "shared with you" -- it is theirs. Previewing as an investor keeps the
+  // investor's words on purpose.
+  const own = profile.viewer === "OWNER" && !previewAsInvestor;
+  const pitchSaid = own ? "said in your pitch" : "said in their pitch";
   const place = [
     profile.headquartersCity,
     countryLabel(profile.headquartersCountry),
@@ -260,8 +284,10 @@ export function CompanyProfileView({
     overview?.raise
       ? compactMoneyText(overview.raise)
       : overview?.raiseFromPitch
-        ? `${pitchRaiseText(overview.raiseFromPitch)}, said in their pitch`
-        : "Not shared with you",
+        ? `${pitchRaiseText(overview.raiseFromPitch)}, ${pitchSaid}`
+        : own
+          ? "Not added yet"
+          : "Not shared with you",
     investor
       ? overview?.deck
         ? "deck shared with you"
@@ -477,10 +503,12 @@ export function CompanyProfileView({
                           className="cq-caption block font-normal text-(--cq-text-secondary) underline underline-offset-4"
                           data-raise-source="PITCH_VIDEO"
                         >
-                          Said in their pitch,{" "}
+                          {own ? "Said in your pitch, " : "Said in their pitch, "}
                           {pitchMoment(overview.raiseFromPitch.atSeconds)}
                         </ProfileTabLink>
                       </>
+                    ) : own ? (
+                      <AddYourRaise />
                     ) : diligence === null ? (
                       "Not shared"
                     ) : (
@@ -531,6 +559,8 @@ export function CompanyProfileView({
                           : "Raising",
                         overview.raise !== null ? (
                           moneyText(overview.raise)
+                        ) : own ? (
+                          <AddYourRaise />
                         ) : diligence === null ? (
                           "Not shared with you"
                         ) : (
@@ -602,7 +632,7 @@ export function CompanyProfileView({
                   summary={
                     traction.length === 0
                       ? "Nothing stated in their pitch yet"
-                      : `${String(traction.length)} ${traction.length === 1 ? "figure" : "figures"}, said in their pitch`
+                      : `${String(traction.length)} ${traction.length === 1 ? "figure" : "figures"}, ${pitchSaid}`
                   }
                 >
                   {traction.length === 0 ? (

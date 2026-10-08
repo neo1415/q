@@ -31,6 +31,7 @@ import {
   type ProfileTab,
 } from "@/features/company/company-profile-view";
 import { apiSession } from "@/features/q/context";
+import { BackLink } from "@/features/company/back-link";
 import { Fold } from "@/features/company/overview-sections";
 import {
   ProfileTabQSection,
@@ -251,7 +252,12 @@ export default async function CompanyPage({
             label={`data room, ${String(dataRoom.documents.length)} files`}
           />
         )}
-        <BackToDiscover />
+        {/* Their own company is not something they found in Discover. */}
+        {profile.viewer === "OWNER" ? (
+          <BackLink fallbackHref="/home" />
+        ) : (
+          <BackToDiscover />
+        )}
         <CompanyProfileView
           profile={profile}
           tab={tab}
