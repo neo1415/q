@@ -6,6 +6,14 @@ import {
   ClaimDecisionRequestSchema,
   ClaimDecisionResultDtoSchema,
   type ClaimDecisionResultDto,
+  COMPANY_CLAIM_EVIDENCE_COMPLETE_PATH,
+  COMPANY_CLAIM_EVIDENCE_PATH,
+  ClaimEvidenceCompleteDtoSchema,
+  ClaimEvidenceUploadDtoSchema,
+  ClaimEvidenceUploadRequestSchema,
+  type ClaimEvidenceCompleteDto,
+  type ClaimEvidenceUploadDto,
+  type ClaimEvidenceUploadRequest,
   CompanyClaimRequestSchema,
   CompanyClaimResultDtoSchema,
   GATEQ_STARTUP_ALERTS_PATH,
@@ -19,7 +27,13 @@ import {
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
-import { defineAppAction, portMissing, type AnyAppAction } from "../define.js";
+import {
+  defineAppAction,
+  definePersonAction,
+  portMissing,
+  type AnyAppAction,
+  type AnyPersonAction,
+} from "../define.js";
 
 /**
  * F3 (2026-10-06): "Find my startup", declared once (ADR 0040).
@@ -31,12 +45,40 @@ import { defineAppAction, portMissing, type AnyAppAction } from "../define.js";
  */
 
 export type CompanyClaimsPort = {
-  /** Null: the company is not one they may see (the same as none). */
+  /**
+   * Null: the company is not one they may see (the same as none).
+   * 2026-10-08 (F2): the requester is a person; a newcomer with no
+   * organisation yet claims too. Their own context, when present, adds the
+   * companies their organisation may see. Nothing about the company changes
+   * until a decision admits them into its organisation.
+   */
   readonly request: (
-    actor: ActorContext,
+    requester: {
+      readonly userId: string;
+      readonly tenantId?: string | undefined;
+      readonly organisationId?: string | undefined;
+    },
     companyId: string,
     input: CompanyClaimRequest,
   ) => Promise<CompanyClaimResultDto | null>;
+  /**
+   * 2026-10-08: the claimant's registry document: a direct upload to
+   * private storage on their own pending REGISTRY_DOCUMENT claim, then
+   * what storage observed. NOT_FOUND: no such claim of theirs.
+   */
+  readonly evidenceUpload?:
+    | ((
+        requester: { readonly userId: string },
+        companyId: string,
+        input: ClaimEvidenceUploadRequest,
+      ) => Promise<ClaimEvidenceUploadDto>)
+    | undefined;
+  readonly evidenceComplete?:
+    | ((
+        requester: { readonly userId: string },
+        companyId: string,
+      ) => Promise<ClaimEvidenceCompleteDto>)
+    | undefined;
   /**
    * P14: a company admin decides a claim on their own company; approval
    * admits the requester as a Member. Null: nothing they may decide.
@@ -68,7 +110,7 @@ const Claim = z
   .strict();
 type ClaimOut = CompanyClaimResultDto | null;
 
-const CLAIM = defineAppAction<z.infer<typeof Claim>, ClaimOut>({
+const CLAIM = definePersonAction<z.infer<typeof Claim>, ClaimOut>({
   name: "company.claim.request",
   short: "claim my company",
   area: "gateway",
@@ -76,22 +118,16 @@ const CLAIM = defineAppAction<z.infer<typeof Claim>, ClaimOut>({
   does: "Asks to claim their company on Capital Q, or to join it when it already has members.",
   input: Claim,
   output: z.custom<ClaimOut>(),
-  authorize: serviceDecides,
   run: (ports, context, input) =>
     (ports.companyClaims ?? portMissing("companyClaims")).request(
-      context.actor,
+      {
+        userId: context.person.userId,
+        tenantId: context.person.context?.tenantId,
+        organisationId: context.person.context?.organisationId,
+      },
       input.companyId,
       input.input,
     ),
-  targets: () => [],
-  card: () => ({ summary: "Claim", preview: "" }),
-  done: (out) =>
-    out === null
-      ? "That company isn't one you can see."
-      : out.status === "EMAIL_NOT_AT_COMPANY"
-        ? "That email isn't at the company's website domain."
-        : "Your request is in.",
-  succeeded: (out) => out !== null && out.status !== "EMAIL_NOT_AT_COMPANY",
   http: {
     method: "POST",
     path: COMPANY_CLAIM_REQUESTS_PATH,
@@ -103,6 +139,78 @@ const CLAIM = defineAppAction<z.infer<typeof Claim>, ClaimOut>({
     respond: (out) => CompanyClaimResultDtoSchema.parse(out),
     notFound: (out) => out === null,
     idempotencyKeyOf: (input) => input.input.clientRequestId,
+  },
+  qCapability: "offer.find_my_startup",
+});
+
+const Evidence = z
+  .object({ companyId: UuidSchema, input: ClaimEvidenceUploadRequestSchema })
+  .strict();
+
+/**
+ * 2026-10-08: the registry document behind a claim. The browser puts the
+ * bytes straight to private storage; the API never relays them. Evidence
+ * for whoever decides, never a decision.
+ */
+const CLAIM_EVIDENCE = definePersonAction<
+  z.infer<typeof Evidence>,
+  ClaimEvidenceUploadDto
+>({
+  name: "company.claim.evidence.upload",
+  short: "attach a registry document",
+  area: "gateway",
+  classification: "INSTANT",
+  does: "Attaches their registry document to their claim on a company.",
+  input: Evidence,
+  output: z.custom<ClaimEvidenceUploadDto>(),
+  run: (ports, context, input) => {
+    const upload =
+      (ports.companyClaims ?? portMissing("companyClaims")).evidenceUpload ??
+      portMissing("companyClaims");
+    return upload(
+      { userId: context.person.userId },
+      input.companyId,
+      input.input,
+    );
+  },
+  http: {
+    method: "POST",
+    path: COMPANY_CLAIM_EVIDENCE_PATH,
+    fromRequest: (params, body) => ({
+      companyId: params["companyId"],
+      input: body,
+    }),
+    respond: (out) => ClaimEvidenceUploadDtoSchema.parse(out),
+    notFound: (out) => out.status === "NOT_FOUND",
+  },
+  qCapability: "offer.find_my_startup",
+});
+
+const EvidenceDone = z.object({ companyId: UuidSchema }).strict();
+
+const CLAIM_EVIDENCE_DONE = definePersonAction<
+  z.infer<typeof EvidenceDone>,
+  ClaimEvidenceCompleteDto
+>({
+  name: "company.claim.evidence.complete",
+  short: "finish attaching a document",
+  area: "gateway",
+  classification: "INSTANT",
+  does: "Confirms their registry document finished uploading to their claim.",
+  input: EvidenceDone,
+  output: z.custom<ClaimEvidenceCompleteDto>(),
+  run: (ports, context, input) => {
+    const complete =
+      (ports.companyClaims ?? portMissing("companyClaims")).evidenceComplete ??
+      portMissing("companyClaims");
+    return complete({ userId: context.person.userId }, input.companyId);
+  },
+  http: {
+    method: "POST",
+    path: COMPANY_CLAIM_EVIDENCE_COMPLETE_PATH,
+    fromRequest: (params) => ({ companyId: params["companyId"] }),
+    respond: (out) => ClaimEvidenceCompleteDtoSchema.parse(out),
+    notFound: (out) => out.status === "NOT_FOUND",
   },
   qCapability: "offer.find_my_startup",
 });
@@ -231,7 +339,13 @@ const DECIDE_CLAIM = defineAppAction<z.infer<typeof Decide>, DecideOut>({
 });
 
 export const GATEQ_FIND_ACTIONS: readonly AnyAppAction[] = [
-  CLAIM,
   SAVE_ALERT,
   DECIDE_CLAIM,
+];
+
+/** F2: a claim is a person's act, organisation or not. */
+export const GATEQ_FIND_PERSON_ACTIONS: readonly AnyPersonAction[] = [
+  CLAIM,
+  CLAIM_EVIDENCE,
+  CLAIM_EVIDENCE_DONE,
 ];

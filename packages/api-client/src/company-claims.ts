@@ -1,5 +1,12 @@
 import {
   ADMIN_COMPANY_CLAIM_DECISION_PATH,
+  ADMIN_COMPANY_CLAIM_EVIDENCE_PATH,
+  AdminClaimEvidenceDtoSchema,
+  COMPANY_CLAIM_EVIDENCE_COMPLETE_PATH,
+  COMPANY_CLAIM_EVIDENCE_PATH,
+  ClaimEvidenceCompleteDtoSchema,
+  ClaimEvidenceUploadDtoSchema,
+  type ClaimEvidenceUploadRequest,
   ADMIN_COMPANY_CLAIMS_PATH,
   ADMIN_COMPANY_PUBLISH_PATH,
   AdminCompanyPublishResultDtoSchema,
@@ -86,4 +93,36 @@ export const publishCompanyAsAdmin = (
     fill(ADMIN_COMPANY_PUBLISH_PATH, { companyId }),
     AdminCompanyPublishResultDtoSchema,
     { body: input },
+  );
+
+/** 2026-10-08: a direct upload for the claimant's registry document. */
+export const requestClaimEvidenceUpload = (
+  session: ApiSession,
+  companyId: string,
+  input: ClaimEvidenceUploadRequest,
+) =>
+  call(
+    session,
+    "POST",
+    fill(COMPANY_CLAIM_EVIDENCE_PATH, { companyId }),
+    ClaimEvidenceUploadDtoSchema,
+    { body: input },
+  );
+
+export const completeClaimEvidence = (session: ApiSession, companyId: string) =>
+  call(
+    session,
+    "POST",
+    fill(COMPANY_CLAIM_EVIDENCE_COMPLETE_PATH, { companyId }),
+    ClaimEvidenceCompleteDtoSchema,
+    { body: {} },
+  );
+
+/** 2026-10-08: a two-minute signed read of a claim's document, for an operator. */
+export const getAdminClaimEvidence = (session: ApiSession, requestId: string) =>
+  call(
+    session,
+    "GET",
+    fill(ADMIN_COMPANY_CLAIM_EVIDENCE_PATH, { requestId }),
+    AdminClaimEvidenceDtoSchema,
   );

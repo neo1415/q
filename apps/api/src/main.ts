@@ -2305,6 +2305,28 @@ const { app, logger } = createApp(config, security, {
   }),
   companyClaims: createCompanyClaims({
     sql: database.sql,
+    // 2026-10-08: a registry-document claim's file goes straight from the
+    // browser to private storage under a server-chosen key; the operator
+    // reads it through a two-minute signed URL. No storage, no evidence.
+    evidenceStorage:
+      storage === undefined
+        ? undefined
+        : {
+            authorizeUpload: ({ key, contentType, maxBytes }) =>
+              storage.createUploadAuthorization({
+                object: { bucket: DOCUMENT_STORAGE_BUCKET, key },
+                contentType,
+                maxBytes,
+              }),
+            stat: (key) =>
+              storage.statObject({ bucket: DOCUMENT_STORAGE_BUCKET, key }),
+            authorizeDownload: ({ key, fileName }) =>
+              storage.createDownloadAuthorization({
+                object: { bucket: DOCUMENT_STORAGE_BUCKET, key },
+                expiresInSeconds: 120,
+                downloadFilename: fileName,
+              }),
+          },
     // P14: an approved claim admits the requester through the team's own
     // command (membership, roles, active context, audit, event).
     admit: (input) =>

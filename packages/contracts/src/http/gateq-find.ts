@@ -139,6 +139,21 @@ export const PendingClaimDtoSchema = z
     workEmailDomain: z.string().max(254).nullable(),
     emailConfirmed: z.boolean(),
     requestedAt: z.string(),
+    /**
+     * 2026-10-08: a registry-document claim's uploaded file, once the
+     * upload is confirmed. Null: nothing attached yet. The bytes are read
+     * through ADMIN_COMPANY_CLAIM_EVIDENCE_PATH, never inline.
+     */
+    evidence: z
+      .object({
+        fileName: z.string().min(1).max(200),
+        contentType: z.string().max(100),
+        sizeBytes: z.number().int().positive(),
+        uploadedAt: z.string(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict();
 export type PendingClaimDto = z.infer<typeof PendingClaimDtoSchema>;
@@ -470,3 +485,80 @@ export function alertMatches(
   }
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// 2026-10-08: a registry document attached to a claim
+// ---------------------------------------------------------------------------
+
+/**
+ * The claimant's own registry document (a certificate of incorporation, a
+ * registry extract). The browser sends the bytes straight to private
+ * storage under a key the server chose; the API never relays them. A file
+ * is evidence for whoever decides, never a decision by itself.
+ */
+export const COMPANY_CLAIM_EVIDENCE_PATH =
+  "/v1/companies/:companyId/claim-requests/evidence" as const;
+export const COMPANY_CLAIM_EVIDENCE_COMPLETE_PATH =
+  "/v1/companies/:companyId/claim-requests/evidence/complete" as const;
+export const ADMIN_COMPANY_CLAIM_EVIDENCE_PATH =
+  "/v1/admin/company-claims/:requestId/evidence" as const;
+
+export const CLAIM_EVIDENCE_CONTENT_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+] as const;
+export const CLAIM_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
+
+export const ClaimEvidenceUploadRequestSchema = z
+  .object({
+    fileName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .regex(/^[^/\\]+$/u),
+    contentType: z.enum(CLAIM_EVIDENCE_CONTENT_TYPES),
+    sizeBytes: z.number().int().positive().max(CLAIM_EVIDENCE_MAX_BYTES),
+  })
+  .strict();
+export type ClaimEvidenceUploadRequest = z.infer<
+  typeof ClaimEvidenceUploadRequestSchema
+>;
+
+export const ClaimEvidenceUploadDtoSchema = z
+  .object({
+    status: z.enum(["READY", "NOT_FOUND", "UNAVAILABLE"]),
+    /** READY only: one direct PUT to private storage, short-lived. */
+    upload: z
+      .object({
+        method: z.literal("PUT"),
+        url: z.string().url(),
+        headers: z.record(z.string(), z.string()),
+        expiresAt: z.string(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type ClaimEvidenceUploadDto = z.infer<
+  typeof ClaimEvidenceUploadDtoSchema
+>;
+
+export const ClaimEvidenceCompleteDtoSchema = z
+  .object({
+    status: z.enum(["ATTACHED", "NOT_UPLOADED", "NOT_FOUND", "UNAVAILABLE"]),
+  })
+  .strict();
+export type ClaimEvidenceCompleteDto = z.infer<
+  typeof ClaimEvidenceCompleteDtoSchema
+>;
+
+export const AdminClaimEvidenceDtoSchema = z
+  .object({
+    url: z.string().url(),
+    fileName: z.string().max(200),
+    expiresAt: z.string(),
+  })
+  .strict();
+export type AdminClaimEvidenceDto = z.infer<typeof AdminClaimEvidenceDtoSchema>;

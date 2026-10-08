@@ -25,7 +25,10 @@ import { WORK_ACTIONS } from "./actions/work.js";
 import { GATEQ_ACTIONS } from "./actions/gateq.js";
 import { TEAM_ACTIONS, TEAM_PERSON_ACTIONS } from "./actions/team.js";
 import { GATEQ_INBOX_ACTIONS } from "./actions/gateq-inbox.js";
-import { GATEQ_FIND_ACTIONS } from "./actions/gateq-find.js";
+import {
+  GATEQ_FIND_ACTIONS,
+  GATEQ_FIND_PERSON_ACTIONS,
+} from "./actions/gateq-find.js";
 import { READINESS_ACTIONS } from "./actions/readiness.js";
 import { INVESTOR_PROMISE_ACTIONS } from "./actions/investor-promises.js";
 
@@ -78,4 +81,5 @@ export const PERSON_ACTIONS: readonly AnyPersonAction[] = Object.freeze([
   // G1/G2: accepting an invitation and asking to join, before or beside
   // any organisation of their own.
   ...TEAM_PERSON_ACTIONS,
+  ...GATEQ_FIND_PERSON_ACTIONS,
 ]);

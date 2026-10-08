@@ -63,6 +63,24 @@ export default async function AdminClaimsPage() {
                       : ` at ${claim.workEmailDomain} · ${claim.emailConfirmed ? "code confirmed" : "code not confirmed"}`}{" "}
                     · {when(claim.requestedAt)}
                   </span>
+                  {claim.method !==
+                  "REGISTRY_DOCUMENT" ? null : claim.evidence === null ||
+                    claim.evidence === undefined ? (
+                    <span className="cq-caption text-(--cq-text-secondary)">
+                      No document attached yet
+                    </span>
+                  ) : (
+                    <a
+                      className="cq-body-sm text-(--cq-text-primary) underline underline-offset-4"
+                      href={`/admin/claims/${claim.requestId}/evidence`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open {claim.evidence.fileName} (
+                      {Math.max(1, Math.round(claim.evidence.sizeBytes / 1024))}{" "}
+                      KB)
+                    </a>
+                  )}
                 </div>
                 {context.can("claims.decide") ? (
                   <ClaimDecision

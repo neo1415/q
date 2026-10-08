@@ -689,6 +689,11 @@ export function createApp(
         : { onboardingNudges: modules.onboardingNudges }),
       ...(security.people === undefined ? {} : { people: security.people }),
       ...(modules.team === undefined ? {} : { team: modules.team }),
+      // F2 (2026-10-08): a newcomer claims their company before having an
+      // organisation of their own.
+      ...(modules.companyClaims === undefined
+        ? {}
+        : { companyClaims: modules.companyClaims }),
     },
   });
 
@@ -696,6 +701,7 @@ export function createApp(
     registerAdminRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
+      identities: security.identities,
       admin: modules.admin,
       freshTokens: modules.adminFreshTokens,
       decideVerification: modules.adminVerificationDecider,

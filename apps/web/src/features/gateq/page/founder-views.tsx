@@ -32,6 +32,8 @@ import { askToJoinAction } from "@/features/team/team-actions";
 
 import {
   claimAction,
+  claimEvidenceCompleteAction,
+  claimEvidenceUploadAction,
   confirmClaimCodeAction,
   searchClaimableAction,
 } from "./gateq-actions";
@@ -399,6 +401,8 @@ function ClaimSheet({
   );
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
+  // 2026-10-08: the registry document, attached to the claim it backs.
+  const [registryFile, setRegistryFile] = useState<File | null>(null);
   // P14: after a work-email claim, the code from that email.
   const [awaitingCode, setAwaitingCode] = useState(false);
   const [code, setCode] = useState("");
@@ -496,6 +500,21 @@ function ClaimSheet({
                 />
               </div>
             ) : null}
+            {method === "REGISTRY_DOCUMENT" ? (
+              <div className="gq-field">
+                <label className="gq-label" htmlFor="gq-claim-registry">
+                  Certificate of incorporation or registry extract (PDF, PNG or
+                  JPEG, up to 10 MB)
+                </label>
+                <input
+                  id="gq-claim-registry"
+                  className="gq-input"
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg"
+                  onChange={(e) => setRegistryFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+            ) : null}
             {awaitingCode ? (
               <div className="gq-field" data-claim-code>
                 <label className="gq-label" htmlFor="gq-claim-code">
@@ -561,7 +580,9 @@ function ClaimSheet({
             <Button
               variant="primary"
               disabled={
-                pending || (method === "WORK_EMAIL" && email.trim() === "")
+                pending ||
+                (method === "WORK_EMAIL" && email.trim() === "") ||
+                (method === "REGISTRY_DOCUMENT" && registryFile === null)
               }
               onClick={() => {
                 setProblem(null);
@@ -585,6 +606,36 @@ function ClaimSheet({
                     return setProblem(
                       `Use an email at ${domain ?? "your company's website"}.`,
                     );
+                  }
+                  if (
+                    method === "REGISTRY_DOCUMENT" &&
+                    registryFile !== null &&
+                    (done.value.status === "REQUESTED" ||
+                      done.value.status === "ALREADY_REQUESTED")
+                  ) {
+                    const upload = await claimEvidenceUploadAction(
+                      company.companyId,
+                      {
+                        fileName: registryFile.name.slice(0, 200),
+                        contentType: registryFile.type,
+                        sizeBytes: registryFile.size,
+                      },
+                    );
+                    if (!upload.ok) return setProblem(upload.message);
+                    const put = await fetch(upload.value.url, {
+                      method: "PUT",
+                      headers: upload.value.headers,
+                      body: registryFile,
+                    }).catch(() => null);
+                    const attached =
+                      put?.ok === true
+                        ? await claimEvidenceCompleteAction(company.companyId)
+                        : null;
+                    if (attached?.ok !== true || !attached.value) {
+                      return setProblem(
+                        "Your request is in, but the document didn't upload. Try attaching it again.",
+                      );
+                    }
                   }
                   if (
                     method === "WORK_EMAIL" &&

@@ -214,6 +214,7 @@ export {
   emailAtCompany,
   type ClaimSearcher,
   type ClaimCodeMailer,
+  type ClaimEvidenceStorage,
   type CompanyClaims,
 } from "./claims/company-claims.js";
 

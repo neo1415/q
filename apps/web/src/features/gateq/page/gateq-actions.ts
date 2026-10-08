@@ -17,8 +17,11 @@ import {
   starGateqApplications,
   discoverCompanies,
   confirmClaimCode,
+  completeClaimEvidence,
+  requestClaimEvidenceUpload,
 } from "@capital-q/api-client";
 import {
+  ClaimEvidenceUploadRequestSchema,
   CompanyClaimRequestSchema,
   GateqInboxArchiveRequestSchema,
   GateqInboxAssignRequestSchema,
@@ -233,6 +236,53 @@ export async function claimAction(
     return { ok: false, message: "Check the email and try again." };
   }
   return withSession((s) => requestCompanyClaim(s, companyId, parsed.data));
+}
+
+/**
+ * 2026-10-08: the registry document behind a claim. The API answers a
+ * short-lived direct upload; the browser puts the file straight to private
+ * storage and then says it is done. Bytes never pass through this server.
+ */
+export async function claimEvidenceUploadAction(
+  companyId: string,
+  input: unknown,
+): Promise<
+  Done<{
+    readonly url: string;
+    readonly headers: Readonly<Record<string, string>>;
+  }>
+> {
+  const parsed = ClaimEvidenceUploadRequestSchema.safeParse(input);
+  if (!Id.safeParse(companyId).success || !parsed.success) {
+    return {
+      ok: false,
+      message: "Attach a PDF, PNG or JPEG of 10 MB or less.",
+    };
+  }
+  const out = await withSession((s) =>
+    requestClaimEvidenceUpload(s, companyId, parsed.data),
+  );
+  if (!out.ok) return out;
+  if (out.value.upload === undefined) {
+    return {
+      ok: false,
+      message: "Documents can't be attached right now. Try again later.",
+    };
+  }
+  return {
+    ok: true,
+    value: { url: out.value.upload.url, headers: out.value.upload.headers },
+  };
+}
+
+export async function claimEvidenceCompleteAction(
+  companyId: string,
+): Promise<Done<boolean>> {
+  if (!Id.safeParse(companyId).success) return { ok: false, message: FAILED };
+  return withSession(
+    async (s) =>
+      (await completeClaimEvidence(s, companyId)).status === "ATTACHED",
+  );
 }
 
 export type FoundStartup = {
