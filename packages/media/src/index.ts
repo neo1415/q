@@ -125,6 +125,14 @@ export {
   type SyncPitchTranscriptOutcome,
 } from "./application/transcript-use-cases.js";
 export {
+  extractPitchClaims,
+  moneyIn,
+  pitchMomentLabel,
+  PITCH_CLAIMS_READER_VERSION,
+  type PitchClaim,
+  type PitchClaimKind,
+} from "./domain/pitch-claims.js";
+export {
   cuesAround,
   parseWebVtt,
   WEB_VTT_MAX_CUES,

@@ -115,6 +115,9 @@ function investorProfile(
       raise: { amount: "1500000.00", currency: "USD" },
       organisationVerified: true,
       facts: [],
+      pitchClaims: [],
+      raiseFromPitch: null,
+      pitchRaiseNotice: null,
       deck: {
         title: "Kivu seed deck",
         sharedAt: "2026-09-30T10:00:00.000Z",
@@ -226,12 +229,15 @@ describe("the profile, for an investor", () => {
         .getByRole("link", { name: "Overview" })
         .getAttribute("aria-current"),
     ).toBe("page");
-    // Once in the key facts, once under The raise.
-    expect(screen.getAllByText("USD 1,500,000")).toHaveLength(2);
+    // Short in the summary strip, exact under The raise.
+    expect(
+      document.querySelector("[data-profile-key-facts]")?.textContent,
+    ).toContain("$1.5M");
+    expect(screen.getAllByText("USD 1,500,000")).toHaveLength(1);
     expect(
       screen.getByRole("heading", { name: "In their words" }),
     ).toBeTruthy();
-    expect(screen.getByText("Energy storage")).toBeTruthy();
+    expect(screen.getAllByText("Energy storage").length).toBeGreaterThan(0);
     expect(
       screen.getAllByText("Organisation verified by Capital Q").length,
     ).toBeGreaterThan(0);
@@ -252,7 +258,7 @@ describe("the profile, for an investor", () => {
     );
     expect(buttons.some((text) => /deck/i.test(text ?? ""))).toBe(false);
     const fold = document.querySelector(
-      "details[data-phone-fold=company-details]",
+      "details[data-overview-fold=company-details]",
     );
     expect(fold?.hasAttribute("open")).toBe(false);
     expect(
@@ -424,5 +430,120 @@ describe("the Elevator tab (A2: replaces Videos)", () => {
       container.querySelectorAll("[data-company-pitch]").length,
     ).toBeLessThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Play The pitch" })).toBeTruthy();
+  });
+});
+
+/**
+ * The overview declutter and the pitch as a source (founder, 2026-10-08):
+ * every section is a closed fold that still says what is inside, and the
+ * raise said in a pitch is shown as said there, with its moment.
+ */
+const PITCH_ID = "00000000-0000-4000-8000-0000000a0001";
+const saidRaise = {
+  kind: "RAISE" as const,
+  statement: "served. We're raising a $4 million seed.",
+  pitchId: PITCH_ID,
+  pitchTitle: null,
+  atSeconds: 43,
+  money: { amount: "4000000", currency: "USD" },
+  stageCode: "seed",
+  instrument: null,
+  truthClass: "USER_CLAIM" as const,
+  evidenceStatus: "SELF_REPORTED" as const,
+  source: "PITCH_VIDEO" as const,
+};
+const traction = {
+  ...saidRaise,
+  kind: "TRACTION" as const,
+  statement: "31 million requests served",
+  atSeconds: 38,
+  money: null,
+  stageCode: null,
+};
+
+function withPitch(
+  overview: Partial<NonNullable<CompanyProfileDto["overview"]>>,
+  viewer: CompanyProfileDto["viewer"] = "INVESTOR",
+): CompanyProfileDto {
+  const base = investorProfile();
+  if (base.overview === null) throw new Error("fixture has an overview");
+  return {
+    ...base,
+    viewer,
+    overview: { ...base.overview, raise: null, ...overview },
+  };
+}
+
+describe("the overview, decluttered, with what the pitch says", () => {
+  it("shows the raise as said in the pitch, with the moment, where the raise is not shared", () => {
+    renderProfile(
+      withPitch({
+        raiseFromPitch: saidRaise,
+        pitchClaims: [saidRaise, traction],
+      }),
+    );
+    const strip = document.querySelector("[data-profile-key-facts]");
+    expect(strip?.textContent).toContain("$4M seed");
+    expect(strip?.textContent).toContain("Said in their pitch, 0:43");
+    expect(strip?.textContent).not.toContain("Not shared");
+    const quote = document.querySelector("blockquote[data-pitch-claim=RAISE]");
+    expect(quote?.textContent).toContain("raising a $4 million seed");
+    expect(quote?.textContent).toContain("0:43");
+    expect(quote?.textContent).toContain("own claim, self-reported");
+    expect(
+      document.querySelector("li[data-pitch-claim=TRACTION]")?.textContent,
+    ).toContain("31 million requests served · said at 0:38");
+  });
+
+  it("still says not shared when there is no raise from the pitch (unknown stays unknown)", () => {
+    renderProfile(withPitch({ raiseFromPitch: null, pitchClaims: [] }));
+    const strip = document.querySelector("[data-profile-key-facts]");
+    expect(strip?.textContent).toContain("Not shared");
+    expect(
+      document.querySelector("[data-overview-fold=company-traction]")
+        ?.textContent,
+    ).toContain("Nothing stated in their pitch yet");
+  });
+
+  it("folds every section, closed, each with a one-line summary", () => {
+    renderProfile(withPitch({ raiseFromPitch: saidRaise }));
+    const folds = [...document.querySelectorAll("details[data-overview-fold]")];
+    expect(
+      folds.map((fold) => fold.getAttribute("data-overview-fold")),
+    ).toEqual([
+      "company-raise",
+      "company-traction",
+      "company-team",
+      "company-market",
+      "company-unknowns",
+      "company-details",
+    ]);
+    for (const fold of folds) {
+      expect(fold.hasAttribute("open")).toBe(false);
+      const line = fold.querySelector("summary p")?.textContent ?? "";
+      expect(line.length).toBeGreaterThan(3);
+    }
+    expect(
+      document.querySelector("[data-overview-fold=company-raise] summary p")
+        ?.textContent,
+    ).toBe("$4M seed, said in their pitch · deck shared with you");
+  });
+
+  it("tells the owner when their pitch says a raise the profile does not show", () => {
+    renderProfile(
+      withPitch(
+        {
+          pitchRaiseNotice: { state: "HIDDEN_BY_FOUNDER", said: saidRaise },
+        },
+        "OWNER",
+      ),
+    );
+    const notice = document.querySelector(
+      "[data-pitch-raise-notice=HIDDEN_BY_FOUNDER]",
+    );
+    expect(notice?.textContent).toContain(
+      "Your pitch video says you’re raising $4M seed (0:43).",
+    );
+    expect(notice?.textContent).toContain("still hears it");
   });
 });

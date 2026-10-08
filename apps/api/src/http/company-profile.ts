@@ -27,6 +27,7 @@ import { DocumentNotFoundError } from "@capital-q/evidence";
 import {
   pitchSummary,
   type DiscoverablePitchQueryPort,
+  type TimedCue,
 } from "@capital-q/media";
 import type { ActorContext } from "@capital-q/security";
 
@@ -35,6 +36,11 @@ import {
   requireActorContextHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import {
+  pitchClaimsFor,
+  presentPitchRaise,
+  type RaiseSharing,
+} from "../pitch-claims.js";
 import type { CompanyNetworkViewPort } from "./companies.js";
 
 /**
@@ -62,7 +68,10 @@ import type { CompanyNetworkViewPort } from "./companies.js";
  *                      shared with the reader in their relationship chat
  *                      (R34), opened through the chat's own attachment read;
  *   the team           ADR 0041's allow-listed projection, for an investor
- *                      the pitch rule admits (and the owner).
+ *                      the pitch rule admits (and the owner);
+ *   pitch claims       what the pitches this reader may play say, read from
+ *                      each transcript under the same playback rule
+ *                      (../pitch-claims.ts holds the raise precedence).
  *
  * The role decides the shape, server-side. A founder viewing another
  * company receives identity and network videos only; the overview, the
@@ -157,6 +166,21 @@ export type CompanyProfilePorts = {
   readonly team: (
     company: CompanyProfileFacts,
   ) => Promise<readonly CompanyProfileTeamMember[]>;
+  /**
+   * A pitch's transcript cues for this actor, read under the media
+   * context's playback rule; null where they may not play it or there is
+   * none. Absent: no pitch claims.
+   */
+  readonly pitchCues?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+        mediaAssetId: string,
+      ) => Promise<readonly TimedCue[] | null>)
+    | undefined;
+  /** How the founder set the current raise's sharing (pitch-claims.ts). */
+  readonly raiseSharing?:
+    ((companyId: string) => Promise<RaiseSharing>) | undefined;
 };
 
 export type CompanyProfileRoutesDependencies = ActorContextDependencies & {
@@ -322,6 +346,27 @@ export function registerCompanyProfileRoutes(
             : ([] as const),
         ]);
 
+      // What the pitches say, only from videos this reader may play (the
+      // list above is already the player's own rule; the transcript read
+      // asks it again). A founder viewing another company gets none.
+      const claims =
+        full && profile.pitchCues !== undefined
+          ? await pitchClaimsFor(videos, (mediaAssetId) =>
+              quietly(
+                profile.pitchCues?.(actor, company.id, mediaAssetId) ??
+                  Promise.resolve(null),
+                null,
+              ),
+            )
+          : [];
+      const sharing: RaiseSharing =
+        claims.some((claim) => claim.kind === "RAISE") &&
+        profile.raiseSharing !== undefined
+          ? // Unknown sharing is treated as hidden: privacy wins.
+            await quietly(profile.raiseSharing(company.id), "HIDDEN")
+          : "PRIVATE";
+      const pitch = presentPitchRaise({ viewer, raise, claims, sharing });
+
       void reply.header("Cache-Control", "no-store");
       return CompanyProfileDtoSchema.parse({
         viewer,
@@ -353,6 +398,9 @@ export function registerCompanyProfileRoutes(
                         deck.kind !== "AUDIENCE" || deck.scanned !== false,
                     },
               team: [...team],
+              pitchClaims: pitch.pitchClaims,
+              raiseFromPitch: pitch.raiseFromPitch,
+              pitchRaiseNotice: pitch.pitchRaiseNotice,
             }
           : null,
         videos,

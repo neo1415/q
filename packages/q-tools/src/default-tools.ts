@@ -62,6 +62,7 @@ import {
 import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
+import { createReadCompanyPitchesTool } from "./tools/pitch-transcripts.js";
 import { createExploreTools } from "./tools/explore.js";
 import { createVisibilityTools } from "./tools/visibility.js";
 import { createQDailyTools } from "./tools/daily.js";
@@ -206,6 +207,10 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...(ports.pitchMoments === undefined
       ? []
       : [createGetPitchMomentTool(ports.pitchMoments)]),
+    // 2026-10-08: what a company's pitches say, with moments, as evidence.
+    ...(ports.pitchMoments?.forCompany === undefined
+      ? []
+      : [createReadCompanyPitchesTool(ports.pitchMoments)]),
     // Explore (ADR 0055): "pitches like X" and "search the network".
     ...(ports.explore === undefined ? [] : createExploreTools(ports.explore)),
     // CQ-BIZ-003: who can see what, and sharing, prepared for approval.

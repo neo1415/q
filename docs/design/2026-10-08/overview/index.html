@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Company overview (design)</title>
+    <!--
+  The company Overview, decluttered, and the pitch video as a source
+  (founder, 2026-10-08: "it always says how much they're raising isn't
+  shared, whereas they literally say it in the video ... as much as I want
+  all the information in Overview, it's cluttered").
+  Query: ?device=phone|desktop &theme=light|dark &view=investor|owner
+
+  Shape, top to bottom:
+    1. Header (unchanged): logo, name, one-liner, Interest / Pass.
+    2. Summary strip: Stage · Raising · Where · Fit, four words-only cells.
+       Raising carries its source in a second line: "Said in their pitch,
+       0:43" (a link that plays the pitch at that moment).
+    3. Six folds, closed, each a heading plus ONE summary line, so the page
+       reads as a table of contents first:
+         Fit with your mandate · Q's view · The raise · Traction ·
+         Team · Market · Risks and unknowns · Company details
+       One hairline between folds; no cards inside folds; facts as a
+       definition list; the pitch's own words as a quote with its time.
+  Owner view: a single notice when the pitch says a raise the profile
+  does not show (founder-private wins; the founder is told, nothing leaks).
+
+  Research, briefly:
+  - Crunchbase / PitchBook company pages: a summary row of 4-6 facts, then
+    long sections. We take: the summary row; we drop the wall below it.
+  - Apple Settings / GOV.UK accordions: a heading and one line saying what
+    is inside, so a closed list is still informative. We take: the summary
+    line under every fold heading.
+  - Linear issue sidebar: few properties, words not badges.
+  Fictional data apart from Tensorgate's pitch line, quoted from its video.
+-->
+    <style>
+      :root {
+        --cq-font-sans:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue",
+          Arial, sans-serif;
+        --cq-radius-md: 12px;
+      }
+      [data-theme="light"] {
+        --cq-canvas: #f6f4ef;
+        --cq-surface-raised: #fff;
+        --cq-surface-subtle: #f1ede4;
+        --cq-text-primary: #16140f;
+        --cq-text-secondary: #4f4a40;
+        --cq-text-tertiary: #655e51;
+        --cq-border-subtle: #e7e1d5;
+        --cq-border: #d9d1c1;
+        --cq-accent: #8a6a12;
+      }
+      [data-theme="dark"] {
+        --cq-canvas: #0f0e0b;
+        --cq-surface-raised: #1d1a13;
+        --cq-surface-subtle: #24211a;
+        --cq-text-primary: #f4efe2;
+        --cq-text-secondary: #c9c0ab;
+        --cq-text-tertiary: #a59c87;
+        --cq-border-subtle: #2a261c;
+        --cq-border: #3a3427;
+        --cq-accent: #c9a227;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        margin: 0;
+        font-family: var(--cq-font-sans);
+        background: var(--cq-canvas);
+        color: var(--cq-text-primary);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .head {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .logo {
+        width: 64px;
+        height: 64px;
+        border-radius: 14px;
+        background: var(--cq-surface-subtle);
+        display: grid;
+        place-items: center;
+        font-weight: 600;
+        flex: none;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 0;
+        line-height: 1.2;
+      }
+      .muted {
+        color: var(--cq-text-secondary);
+      }
+      .small {
+        font-size: 13px;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: 10px;
+        border: 1px solid var(--cq-border);
+        background: var(--cq-surface-raised);
+        color: var(--cq-text-primary);
+        font: inherit;
+        font-size: 14px;
+      }
+      .btn.primary {
+        background: var(--cq-text-primary);
+        color: var(--cq-canvas);
+        border-color: transparent;
+      }
+      .tabs {
+        display: flex;
+        gap: 22px;
+        border-bottom: 1px solid var(--cq-border-subtle);
+        overflow-x: auto;
+        font-size: 14px;
+      }
+      .tabs span {
+        padding: 12px 2px;
+        color: var(--cq-text-secondary);
+        white-space: nowrap;
+      }
+      .tabs span.on {
+        color: var(--cq-text-primary);
+        border-bottom: 2px solid var(--cq-text-primary);
+      }
+      .strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px 20px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--cq-border-subtle);
+        margin: 0;
+      }
+      .strip dt {
+        font-size: 12px;
+        color: var(--cq-text-secondary);
+      }
+      .strip dd {
+        margin: 2px 0 0;
+        font-size: 17px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .strip .src {
+        display: block;
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--cq-text-secondary);
+      }
+      .strip a,
+      .fold a {
+        color: inherit;
+        text-underline-offset: 3px;
+      }
+      details.fold {
+        border-bottom: 1px solid var(--cq-border-subtle);
+      }
+      details.fold > summary {
+        list-style: none;
+        cursor: pointer;
+        min-height: 56px;
+        padding: 12px 0;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 2px 12px;
+        align-items: center;
+      }
+      details.fold > summary::-webkit-details-marker {
+        display: none;
+      }
+      .fold h2 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .fold .line {
+        grid-column: 1;
+        font-size: 14px;
+        color: var(--cq-text-secondary);
+      }
+      .chev {
+        grid-row: 1 / span 2;
+        grid-column: 2;
+        color: var(--cq-text-tertiary);
+        transition: transform 0.15s;
+      }
+      details[open] .chev {
+        transform: rotate(180deg);
+      }
+      .body {
+        padding: 0 0 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      dl.rows {
+        margin: 0;
+      }
+      dl.rows > div {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 10px 0;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      dl.rows > div:first-child {
+        border-top: 0;
+      }
+      dl.rows dt {
+        color: var(--cq-text-secondary);
+        font-size: 14px;
+      }
+      dl.rows dd {
+        margin: 0;
+        text-align: right;
+      }
+      blockquote {
+        margin: 0;
+        padding-left: 12px;
+        border-left: 2px solid var(--cq-border);
+      }
+      blockquote p {
+        margin: 0;
+      }
+      blockquote cite {
+        display: block;
+        font-style: normal;
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        margin-top: 4px;
+      }
+      .notice {
+        border: 1px solid var(--cq-border);
+        border-radius: var(--cq-radius-md);
+        padding: 14px 16px;
+        background: var(--cq-surface-raised);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .notice p {
+        margin: 0;
+      }
+      ul.plain {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      ul.plain li {
+        padding: 8px 0;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      ul.plain li:first-child {
+        border-top: 0;
+      }
+      .glyphs {
+        font-variant-numeric: tabular-nums;
+      }
+      @media (max-width: 640px) {
+        .strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        h1 {
+          font-size: 21px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="head">
+        <div class="logo" aria-hidden="true">TG</div>
+        <div>
+          <h1>Tensorgate</h1>
+          <p style="margin: 4px 0" class="">
+            Private LLM inference for regulated companies, inside a hardware
+            enclave.
+          </p>
+          <p class="muted small" style="margin: 0">
+            Seed · London, United Kingdom
+          </p>
+        </div>
+      </header>
+      <div class="actions" data-investor>
+        <button class="btn primary">Express interest</button>
+        <button class="btn">Pass</button>
+        <button class="btn" style="border: 0; background: none">
+          Your relationship ›
+        </button>
+      </div>
+      <nav class="tabs">
+        <span class="on">Overview</span><span>Elevator 1</span
+        ><span>Data room 3</span><span>Pitch deck</span><span>Team 2</span>
+      </nav>
+
+      <div class="notice" data-owner hidden>
+        <p>
+          <strong>Your pitch video says you're raising $4M seed (0:43).</strong>
+        </p>
+        <p class="muted small">
+          Your raise itself isn't shared with investors, so your overview shows
+          what you said in the pitch, labelled as said in your pitch video.
+          Anyone who can watch the video already hears it.
+        </p>
+        <div class="actions">
+          <button class="btn">Show my raise to investors</button>
+          <button class="btn">Hide it from the overview</button>
+        </div>
+      </div>
+
+      <dl class="strip" aria-label="Summary">
+        <div>
+          <dt>Stage</dt>
+          <dd>Seed</dd>
+        </div>
+        <div>
+          <dt>Raising</dt>
+          <dd>
+            $4M seed
+            <a class="src" href="#">Said in their pitch, 0:43</a>
+          </dd>
+        </div>
+        <div>
+          <dt>Where</dt>
+          <dd>London</dd>
+        </div>
+        <div data-investor>
+          <dt>Fit with you</dt>
+          <dd>Good fit<span class="src">Moderate confidence</span></dd>
+        </div>
+      </dl>
+
+      <section aria-label="Overview sections">
+        <details class="fold" data-investor>
+          <summary>
+            <h2>Fit with your mandate</h2>
+            <span class="line">Good fit · 6 of 9 match, 2 unknown</span>
+            <span class="chev">⌄</span>
+          </summary>
+          <div class="body">
+            <dl class="rows">
+              <div>
+                <dt>Sector</dt>
+                <dd>Matches</dd>
+              </div>
+              <div>
+                <dt>Stage</dt>
+                <dd>Matches</dd>
+              </div>
+              <div>
+                <dt>Cheque size</dt>
+                <dd>Unknown</dd>
+              </div>
+            </dl>
+          </div>
+        </details>
+        <details class="fold" data-investor>
+          <summary>
+            <h2>Q's view</h2>
+            <span class="line">3 assumptions to test before a first call</span>
+            <span class="chev">⌄</span>
+          </summary>
+          <div class="body">
+            <ul class="plain">
+              <li>Paid contracts convert from design partners</li>
+              <li>40 ms enclave overhead holds at bank scale</li>
+              <li>Attestation is what compliance buys</li>
+            </ul>
+          </div>
+        </details>
+        <details class="fold" open>
+          <summary>
+            <h2>The raise</h2>
+            <span class="line"
+              >$4M seed, said in their pitch · deck not shared yet</span
+            >
+            <span class="chev">⌄</span>
+          </summary>
+          <div class="body">
+            <blockquote>
+              <p>&ldquo;We're raising a $4 million seed.&rdquo;</p>
+              <cite
+                >Daniel Park, pitch video, at <a href="#">0:43</a> · the
+                company's own claim, self-reported</cite
+              >
+            </blockquote>
+            <dl class="rows">
+              <div>
+                <dt>Raise on Capital Q</dt>
+                <dd>Not shared with you</dd>
+              </div>
+              <div>
+                <dt>Pitch deck</dt>
+                <dd>Not shared with you</dd>
+              </div>
+            </dl>
+          </div>
+        </details>
+        <details class="fold">
+          <summary>
+            <h2>Traction</h2>
+            <span class="line">3 figures, said in their pitch</span>
+            <span class="chev">⌄</span>
+          </summary>
+          <div class="body">
+            <ul class="plain">
+              <li>
+                4 design partners in banking and healthcare
+                <span class="muted small">· 0:38</span>
+              </li>
+              <li>
+                2 already on paid contracts
+                <span class="muted small">· 0:38</span>
+              </li>
+              <li>
+                31 million requests served
+                <span class="muted small">· 0:38</span>
+              </li>
+            </ul>
+            <p class="muted small" style="margin: 0">
+              The company's own claims from the pitch video. Not verified.
+            </p>
+          </div>
+        </details>
+        <details class="fold">
+          <summary>
+            <h2>Team</h2>
+            <span class="line">2 named · Daniel Park, CTO</span>
+            <span class="chev">⌄</span>
+          </summary>
+          <div class="body"></div>
+        </details>
+        <details class="fold">
+          <summary>
+            <h2>Market</h2>
+            <span class="line">AI infrastructure, Security</span>
+            <span class="chev">⌄</span>
+          </summary>
+          <div class="body"></div>
+        </details>
+        <details class="fold">
+          <summary>
+            <h2>Risks and unknowns</h2>
+            <span class="line">Founded date and legal name not declared</span>
+            <span class="chev">⌄</span>
+          </summary>
+          <div class="body"></div>
+        </details>
+        <details class="fold">
+          <summary>
+            <h2>Company details</h2>
+            <span class="line"
+              >Founded 2024 · Not verified by Capital Q yet</span
+            >
+            <span class="chev">⌄</span>
+          </summary>
+          <div class="body"></div>
+        </details>
+      </section>
+    </main>
+    <script>
+      const q = new URLSearchParams(location.search);
+      document.documentElement.dataset.theme = q.get("theme") ?? "light";
+      if (q.get("view") === "owner") {
+        document
+          .querySelectorAll("[data-investor]")
+          .forEach((el) => el.remove());
+        document
+          .querySelectorAll("[data-owner]")
+          .forEach((el) => (el.hidden = false));
+      }
+    </script>
+  </body>
+</html>

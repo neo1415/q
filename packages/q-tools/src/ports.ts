@@ -323,6 +323,41 @@ export type PitchMomentPort = {
     | { readonly status: "PENDING" | "NONE" }
     | null
   >;
+  /**
+   * 2026-10-08: every pitch of a company this person may play, with its
+   * transcript and what it claims (the media context's deterministic
+   * reading), each read under the playback rule. Null: none to read.
+   * Absent: no read_company_pitches tool.
+   */
+  readonly forCompany?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<readonly CompanyPitchTranscript[] | null>)
+    | undefined;
+};
+
+/** One pitch's transcript and claims, as read_company_pitches returns it. */
+export type CompanyPitchTranscript = {
+  readonly pitchId: string;
+  readonly title: string | null;
+  readonly status: "AVAILABLE" | "PENDING" | "NONE";
+  readonly cues: readonly {
+    readonly startMs: number;
+    readonly endMs: number;
+    readonly text: string;
+  }[];
+  readonly claims: readonly {
+    readonly kind: string;
+    readonly statement: string;
+    readonly atMs: number;
+    readonly money: {
+      readonly amount: string;
+      readonly currency: string;
+    } | null;
+    readonly stageCode: string | null;
+    readonly instrument: string | null;
+  }[];
 };
 
 /**
