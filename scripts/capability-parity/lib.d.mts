@@ -25,3 +25,15 @@ export function renderMatrix(input: {
   }[];
   readonly acts: Readonly<Record<string, readonly string[]>>;
 }): string;
+
+export function byCodePoint(a: string, b: string): number;
+export const REPO_ROOT: string;
+export function generatedFiles(
+  root: string,
+  actions: readonly unknown[],
+  qCapabilityId: (action: never) => string | null,
+): Promise<{
+  readonly controls: CollectedControl[];
+  readonly catalog: { readonly file: string; readonly text: string };
+  readonly matrix: { readonly file: string; readonly text: string };
+}>;

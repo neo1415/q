@@ -9,8 +9,80 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const WEB = ["apps/web/src", "apps/web/app"];
+
+/**
+ * Code-point order: the same on every machine and locale (localeCompare
+ * ordered "section.action-plan" and "section.actions" differently by ICU
+ * locale, so the generator and the test disagreed across machines).
+ */
+export function byCodePoint(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** The repository root, from this file's own location (never the cwd). */
+export const REPO_ROOT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+);
+
+/** The app actions as matrix rows, in code-point order by name. */
+export function actionRows(actions, qCapabilityId) {
+  return actions
+    .map((action) => ({
+      name: action.name,
+      classification: action.classification,
+      capability: qCapabilityId(action),
+      route:
+        action.http === undefined
+          ? null
+          : `${action.http.method} ${action.http.path}`,
+      does: action.does,
+    }))
+    .sort((a, b) => byCodePoint(a.name, b.name));
+}
+
+/**
+ * Both generated files, exactly as they belong on disk: rendered, then
+ * formatted with the repository's own prettier config, so what the
+ * generator writes is what the parity test expects, byte for byte.
+ */
+export async function generatedFiles(root, actions, qCapabilityId) {
+  const prettier = await import("prettier");
+  const format = async (text, file) =>
+    prettier.format(text, {
+      ...((await prettier.resolveConfig(file)) ?? {}),
+      filepath: file,
+    });
+  const controls = collectControls(root);
+  const catalogFile = join(
+    root,
+    "packages/q-tools/src/tools/control-catalog.ts",
+  );
+  const matrixFile = join(root, "docs/recovery/capability-parity.md");
+  return {
+    controls,
+    catalog: {
+      file: catalogFile,
+      text: await format(renderCatalog(controls), catalogFile),
+    },
+    matrix: {
+      file: matrixFile,
+      text: await format(
+        renderMatrix({
+          controls,
+          pages: pageRoutes(root),
+          actions: actionRows(actions, qCapabilityId),
+          acts: kindActs(root),
+        }),
+        matrixFile,
+      ),
+    },
+  };
+}
 
 /** The id prefixes and their kinds, read from the registry itself. */
 export function controlPrefixes(root) {
@@ -89,7 +161,7 @@ export function collectControls(root) {
   }
   return [...found.values()]
     .map((entry) => ({ ...entry, sources: [...entry.sources].sort() }))
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .sort((a, b) => byCodePoint(a.id, b.id));
 }
 
 /** The web app's pages (signed-in routes), as the parity test reads them. */
@@ -116,7 +188,7 @@ export function pageRoutes(root) {
           .join("/"),
       file: relative(root, page).split("\\").join("/"),
     }))
-    .sort((a, b) => a.route.localeCompare(b.route));
+    .sort((a, b) => byCodePoint(a.route, b.route));
 }
 
 /** The acts each kind takes (the web registry's KIND_ACTS, read from source). */

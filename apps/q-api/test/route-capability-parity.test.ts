@@ -14,14 +14,12 @@ import {
   Q_CONTROL_CATALOG,
   Q_CONTROL_KIND_ACTS,
 } from "@capital-q/q-tools";
-import * as prettier from "prettier";
 
 import {
   collectControls,
+  generatedFiles,
   kindActs,
-  pageRoutes as pageRoutesOf,
-  renderCatalog,
-  renderMatrix,
+  REPO_ROOT,
 } from "../../../scripts/capability-parity/lib.mjs";
 
 /**
@@ -1122,7 +1120,8 @@ const READS_BY_POST: ReadonlySet<string> = new Set([
  * or a stale row -- fails here.
  */
 describe("every page control is something Q can operate (RECOVERY C6)", () => {
-  const ROOT = join(APPS, "..");
+  // The repository root as the generator finds it, whatever the cwd.
+  const ROOT = REPO_ROOT;
 
   it("the catalog lists exactly the controls registered in source", () => {
     const registered = collectControls(ROOT).map((control) => control.id);
@@ -1142,46 +1141,20 @@ describe("every page control is something Q can operate (RECOVERY C6)", () => {
   });
 
   it("the catalog and the matrix on disk are what the generator writes", async () => {
-    const controls = collectControls(ROOT);
-    const format = async (text: string, file: string) =>
-      prettier.format(text, {
-        ...((await prettier.resolveConfig(file)) ?? {}),
-        filepath: file,
-      });
-    const catalogFile = join(
+    // The generator's own function: same order, same root, same format.
+    const files = await generatedFiles(
       ROOT,
-      "packages/q-tools/src/tools/control-catalog.ts",
+      [...APP_ACTIONS, ...PERSON_ACTIONS],
+      qCapabilityId,
     );
-    expect(readFileSync(catalogFile, "utf8")).toBe(
-      await format(renderCatalog(controls), catalogFile),
-    );
-    const matrixFile = join(ROOT, "docs/recovery/capability-parity.md");
-    const actions = [...APP_ACTIONS, ...PERSON_ACTIONS]
-      .map((action) => ({
-        name: action.name,
-        classification: action.classification,
-        capability: qCapabilityId(action),
-        route:
-          action.http === undefined
-            ? null
-            : `${action.http.method} ${action.http.path}`,
-        does: action.does,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
     expect(
-      readFileSync(matrixFile, "utf8"),
+      readFileSync(files.catalog.file, "utf8"),
       "run node scripts/capability-parity/generate.mjs",
-    ).toBe(
-      await format(
-        renderMatrix({
-          controls,
-          pages: pageRoutesOf(ROOT),
-          actions,
-          acts: kindActs(ROOT),
-        }),
-        matrixFile,
-      ),
-    );
+    ).toBe(files.catalog.text);
+    expect(
+      readFileSync(files.matrix.file, "utf8"),
+      "run node scripts/capability-parity/generate.mjs",
+    ).toBe(files.matrix.text);
   });
 });
 
