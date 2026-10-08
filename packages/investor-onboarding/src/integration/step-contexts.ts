@@ -20,6 +20,8 @@ import type {
   InvestorReviewContext,
 } from "../definition/contexts.js";
 import {
+  BUSINESS_MODEL_VOCABULARIES,
+  CUSTOMER_TYPE_VOCABULARIES,
   DEPLOYMENT_STATUS_OPTIONS,
   DISCOVERY_MODE_OPTIONS,
   FOUNDER_PREFERENCE_OPTIONS,
@@ -52,6 +54,12 @@ export type InvestorStepContextOptions = InvestorDomainDependencies & {
   readonly services?:
     ((executor: DatabaseExecutor) => InvestorDomainServices) | undefined;
 };
+
+/** F6: taxonomy vocabularies the review shows as business attributes. */
+const ATTRIBUTE_VOCABULARIES: ReadonlySet<string> = new Set<string>([
+  ...BUSINESS_MODEL_VOCABULARIES,
+  ...CUSTOMER_TYPE_VOCABULARIES,
+]);
 
 const BUSINESS_ATTRIBUTE_LABELS: Readonly<Record<string, string>> = {
   capital_light: "Capital-light",
@@ -250,14 +258,35 @@ function reviewProvider(
             label(INVESTMENT_ROLE_OPTIONS, code),
           ).map((r) => ({ key: r.code, label: r.label })),
           geographies: taxonomy.filter((t) => t.vocabularyCode === "geography"),
+          // F6 (2026-10-08): business models and customer types are
+          // taxonomy preferences too, but they are business attributes, not
+          // sectors; the review listed them under Sectors and showed
+          // "Business attributes: Not set".
           sectors: taxonomy.filter(
-            (t) => t.vocabularyCode !== "geography" && !t.isExclusion,
+            (t) =>
+              t.vocabularyCode !== "geography" &&
+              !ATTRIBUTE_VOCABULARIES.has(t.vocabularyCode) &&
+              !t.isExclusion,
           ),
-          businessAttributes: codedItems(
-            mandate,
-            "business.attribute",
-            (code) => BUSINESS_ATTRIBUTE_LABELS[code] ?? code,
-          ),
+          businessAttributes: [
+            ...taxonomy
+              .filter(
+                (t) =>
+                  ATTRIBUTE_VOCABULARIES.has(t.vocabularyCode) &&
+                  !t.isExclusion,
+              )
+              .map((t) => ({
+                code: t.nodeId,
+                label: t.label,
+                strength: t.strength,
+                isExclusion: t.isExclusion,
+              })),
+            ...codedItems(
+              mandate,
+              "business.attribute",
+              (code) => BUSINESS_ATTRIBUTE_LABELS[code] ?? code,
+            ),
+          ],
           founderPreferences: codedItems(
             mandate,
             "founder.business_attribute",

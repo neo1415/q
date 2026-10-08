@@ -10,6 +10,7 @@ import {
   getDiligence,
   getOwnInterest,
   getRelationshipWithCompany,
+  listClaimableCompanies,
   listTaxonomyNodes,
 } from "@capital-q/api-client";
 import {
@@ -75,6 +76,47 @@ export default async function CompanyPage({
     session === null
       ? null
       : await getCompanyProfile(session, companyId).catch(() => null);
+
+  if (profile === null && session !== null) {
+    // F3 (2026-10-08): a founder with no organisation yet opening their own
+    // company's page. If it is a company they may see and claim (or join),
+    // say so instead of "not available".
+    const claimable = await listClaimableCompanies(session, companyId)
+      .then((result) => result.companies[0] ?? null)
+      .catch(() => null);
+    if (claimable !== null && !claimable.yours) {
+      const join = claimable.members > 0;
+      return (
+        <PageContainer>
+          <BackToDiscover />
+          <EmptyState
+            title={
+              join
+                ? `Do you work at ${claimable.name}?`
+                : `Is ${claimable.name} your company?`
+            }
+            description={
+              claimable.requested
+                ? "Your request is in. Capital Q checks it and lets you know; the company's page opens to you once you're in."
+                : join
+                  ? "Its team is already on Capital Q. Ask them to let you in, and the company's page opens to you."
+                  : "Nobody has claimed it on Capital Q yet. Claim it with a work email or a registry document, and once it's approved it's yours to run."
+            }
+          />
+          {claimable.requested ? null : (
+            <div className="mt-4 flex justify-center">
+              <Link
+                href={`/gateq?tab=claim&q=${encodeURIComponent(claimable.name)}`}
+                className={buttonClassName("primary")}
+              >
+                {join ? "Ask to join" : "Claim this company"}
+              </Link>
+            </div>
+          )}
+        </PageContainer>
+      );
+    }
+  }
 
   if (profile === null || session === null) {
     return (

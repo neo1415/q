@@ -324,7 +324,6 @@ describe("the action registry", () => {
       ["gateq.inbox.draft_pass", "gateq_inbox_draft_pass", "READ"],
       ["gateq.inbox.summarise", "gateq_inbox_summarise", "READ"],
       // F3: find my startup (claim on screen) and a saved startup search.
-      ["company.claim.request", "offer.find_my_startup", "INSTANT"],
       ["gateq.startup_alert.save", "save_startup_alert", "INSTANT"],
       ["company.claim.decide", "offer.team_manage", "CONSEQUENTIAL"],
       // Q.04/Q.01: their own plan step and Q's questions, their own word.
@@ -362,12 +361,20 @@ describe("person-scoped actions (onboarding)", () => {
       "person.profile.edit",
       "team.invitation.accept",
       "team.join_request.create",
+      // F2 (2026-10-08): a newcomer claims before having an organisation.
+      "company.claim.request",
+      "company.claim.evidence.upload",
+      "company.claim.evidence.complete",
     ]);
     for (const action of PERSON_ACTIONS) {
       // G1/G2: joining a team is the person's own consent, from the
       // invitation's link; Q offers it, never takes it.
       expect(qCapabilityId(action), action.name).toMatch(
-        action.area === "team" ? /^offer\.team_join$/ : /^tool\.[a-z_]+$/,
+        action.area === "team"
+          ? /^offer\.team_join$/
+          : action.area === "gateway"
+            ? /^offer\.find_my_startup$/
+            : /^tool\.[a-z_]+$/,
       );
     }
   });

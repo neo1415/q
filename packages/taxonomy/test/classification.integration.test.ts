@@ -502,7 +502,7 @@ describe("@capital-q/taxonomy classification against local PostgreSQL", () => {
         classifierModel: "deterministic_lexical",
         // d75e825c (F1/F2) bumped the classifier to v2: weak similarity alone
         // no longer suggests a category.
-        classifierVersion: "taxonomy-lexical-v2",
+        classifierVersion: "taxonomy-lexical-v3",
         // geography v2 since 20261008100000 (more of Africa).
         taxonomyVersion: { geography: 2, industry: 1, product_category: 1 },
         status: "COMPLETED",
@@ -823,7 +823,7 @@ describe("@capital-q/taxonomy classification against local PostgreSQL", () => {
       expect(joined).toContain('"inputHash"');
       expect(joined).toContain('"resolution"');
       // Classifier v2 since d75e825c (F1/F2).
-      expect(joined).toContain('"classifierVersion":"taxonomy-lexical-v2"');
+      expect(joined).toContain('"classifierVersion":"taxonomy-lexical-v3"');
       expect(JSON.stringify(run.metadata)).not.toContain(MARKER);
       expect(
         await count(

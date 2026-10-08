@@ -160,6 +160,19 @@ export function createFitComposition(
     investorSubject: dependencies.eligibilityPorts.investorSubject,
     eligibility: dependencies.eligibility,
     inputs,
+    // F5 (2026-10-08): a network-shared real company nobody has joined.
+    unclaimedPublic: async (companyIds) => {
+      const rows = await dependencies.sql<{ id: string }[]>`
+        select c.id
+          from core.companies c
+         where c.id = any(${[...companyIds]}::uuid[])
+           and c.company_status = 'active'
+           and c.marketplace_visibility in ('network_visible', 'public_external')
+           and not exists (select 1 from identity.organisation_memberships m
+                            where m.organisation_id = c.organisation_id
+                              and m.membership_status = 'active')`;
+      return new Set(rows.map((row) => row.id));
+    },
     candidates: async (actor) => {
       const [relationships, requests, feed] = await Promise.all([
         quiet("relationships", dependencies.relationships(actor)),

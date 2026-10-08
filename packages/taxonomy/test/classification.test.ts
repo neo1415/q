@@ -219,7 +219,7 @@ describe("contracts (§181)", () => {
     ).toBe(false);
     expect(TAXONOMY_CLASSIFIER_PROVIDER).toBe("capital_q");
     expect(TAXONOMY_CLASSIFIER_MODEL).toBe("deterministic_lexical");
-    expect(TAXONOMY_CLASSIFIER_VERSION).toBe("taxonomy-lexical-v2");
+    expect(TAXONOMY_CLASSIFIER_VERSION).toBe("taxonomy-lexical-v3");
     expect(policy.version).toBe(TAXONOMY_CLASSIFIER_VERSION);
   });
 
@@ -278,6 +278,14 @@ describe("normalisation and tokenisation (§18-19, §159-161)", () => {
       ),
     ).toEqual(["drop", "table", "taxonomy", "nodes", "fintech", "payments"]);
     expect(tokenizeForLexicalSearch("a b c", policy)).toEqual([]);
+    // F7 (v3): a generic word names no sector, so "climate tech" no longer
+    // overlaps "health tech", "credit tech" or "insurance tech".
+    expect(tokenizeForLexicalSearch("climate tech", policy)).toEqual([
+      "climate",
+    ]);
+    expect(tokenizeForLexicalSearch("saas technology startup", policy)).toEqual(
+      ["saas"],
+    );
     expect(tokenizeForLexicalSearch("payments payments", policy)).toEqual([
       "payments",
     ]);

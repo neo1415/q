@@ -331,12 +331,14 @@ export function MandateReviewStep({
           </dl>
           <p
             className="cq-caption text-(--cq-text-tertiary)"
-            data-mandate-version
+            data-mandate-version={review.mandate.version}
           >
+            {/* F8 (2026-10-08): the internal revision counter moves on every
+                answer, so a brand-new mandate read "draft, version 16". The
+                person sees its state; the revision stays an attribute. */}
             Mandate “{review.mandate.name}”,{" "}
-            {review.mandate.status.toLowerCase()}, version{" "}
-            {review.mandate.version}. Confirming makes it active; you can change
-            it later.
+            {review.mandate.status.toLowerCase()}. Confirming makes it active;
+            you can change it later.
           </p>
         </>
       )}

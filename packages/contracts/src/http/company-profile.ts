@@ -87,6 +87,13 @@ export const CompanyProfileTeamMemberSchema = z
     businessTitle: z.string().max(120).nullable(),
     isFounder: z.boolean(),
     shortBio: z.string().max(COMPANY_TEAM_BIO_MAX).nullable(),
+    /**
+     * 2026-10-08 (F9): where the name comes from. MEMBER (or absent): a
+     * person on the company's team on Capital Q. PUBLIC_SOURCE: named in a
+     * network-visible public-web claim (USER_CLAIM, never verified) on a
+     * company with no members yet; the reader is told so.
+     */
+    source: z.enum(["MEMBER", "PUBLIC_SOURCE"]).optional(),
   })
   .strict();
 export type CompanyProfileTeamMember = z.infer<

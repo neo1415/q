@@ -16,6 +16,8 @@ import {
   ADMIN_BREAK_GLASS_DECISION_PATH,
   ADMIN_BREAK_GLASS_PATH,
   ADMIN_COMPANY_CLAIM_DECISION_PATH,
+  ADMIN_COMPANY_CLAIM_EVIDENCE_PATH,
+  AdminClaimEvidenceDtoSchema,
   ADMIN_COMPANY_CLAIMS_PATH,
   ADMIN_COMPANY_PUBLISH_PATH,
   AdminClaimDecisionRequestSchema,
@@ -109,11 +111,17 @@ import {
 } from "@capital-q/platform-admin";
 import type { AuthenticatedPrincipal } from "@capital-q/security";
 
+import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
+
 import {
   getActorContext,
   requireActorContextHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import {
+  getOnboardingActor,
+  requireOnboardingActorHook,
+} from "../security/onboarding-actor.js";
 
 /**
  * Capital Q's operations console (ADR 0033). Every route asks the platform
@@ -172,7 +180,12 @@ export type AdminRoutesDependencies = ActorContextDependencies & {
    * profile public. Absent: those routes answer not found after the guard.
    */
   readonly companyClaims?:
-    Pick<CompanyClaims, "pending" | "decide"> | undefined;
+    Pick<CompanyClaims, "pending" | "decide" | "evidenceForAdmin"> | undefined;
+  /**
+   * 2026-10-08: the person lookup, so a platform admin reaches the console
+   * without an organisation context. Absent: organisation context required.
+   */
+  readonly identities?: ApplicationIdentityLookup | undefined;
   readonly admitClaim?: TeamService["admitClaim"] | undefined;
   readonly publishCompany?: PlatformCompanyPublishing | undefined;
 };
@@ -208,7 +221,19 @@ export function registerAdminRoutes(
   app: FastifyInstance,
   dependencies: AdminRoutesDependencies,
 ): void {
-  const withContext = requireActorContextHook(dependencies);
+  // 2026-10-08: being a platform admin is a person's role, not an
+  // organisation's: with the person lookup composed, the console answers an
+  // admin who has no organisation context (or has not picked one) too. The
+  // grant still comes only from identity.platform_admins via `guard`.
+  const identities = dependencies.identities;
+  const withContext =
+    identities === undefined
+      ? requireActorContextHook(dependencies)
+      : requireOnboardingActorHook({ ...dependencies, identities });
+  const adminUserOf = (request: FastifyRequest): string =>
+    identities === undefined
+      ? getActorContext(request).userId
+      : getOnboardingActor(request).userId;
   const { admin } = dependencies;
   const correlation =
     dependencies.newCorrelationId ??
@@ -220,10 +245,7 @@ export function registerAdminRoutes(
     reply: FastifyReply,
     permission: AdminPermission,
   ): Promise<AdminGrant | null> {
-    const access = await admin.authorize(
-      getActorContext(request).userId,
-      permission,
-    );
+    const access = await admin.authorize(adminUserOf(request), permission);
     if (access.kind === "GRANTED") {
       void reply.header("Cache-Control", "no-store");
       return access.grant;
@@ -264,7 +286,7 @@ export function registerAdminRoutes(
   // --- who am I --------------------------------------------------------------
 
   app.get(ADMIN_ME_PATH, { onRequest: withContext }, async (request, reply) => {
-    const userId = getActorContext(request).userId;
+    const userId = adminUserOf(request);
     const role = await admin.roleOf(userId);
     if (role === null) return notFound(request, reply);
     const stepUp = await admin.liveStepUp(userId);
@@ -282,7 +304,7 @@ export function registerAdminRoutes(
     ADMIN_STEP_UP_PATH,
     { onRequest: withContext },
     async (request, reply) => {
-      const userId = getActorContext(request).userId;
+      const userId = adminUserOf(request);
       if ((await admin.roleOf(userId)) === null)
         return notFound(request, reply);
       const input = await body(request, reply, AdminStepUpRequestSchema);
@@ -978,6 +1000,30 @@ export function registerAdminRoutes(
     },
   );
 
+  // 2026-10-08: the claimant's registry document, a short-lived signed read
+  // for the deciding operator; every read is recorded.
+  app.get(
+    ADMIN_COMPANY_CLAIM_EVIDENCE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const grant = await guard(request, reply, "claims.read");
+      if (grant === null) return reply;
+      const requestId = param(request, "requestId");
+      const claims = dependencies.companyClaims;
+      if (requestId === null || claims === undefined) {
+        return notFound(request, reply);
+      }
+      const evidence = await claims.evidenceForAdmin(requestId);
+      if (evidence === null) return notFound(request, reply);
+      await admin.recordAction(grant, {
+        actionType: "claim.evidence_viewed",
+        resourceType: "company_claim",
+        resourceId: requestId,
+      });
+      return AdminClaimEvidenceDtoSchema.parse(evidence);
+    },
+  );
+
   app.post(
     ADMIN_COMPANY_PUBLISH_PATH,
     { onRequest: withContext },
@@ -995,8 +1041,15 @@ export function registerAdminRoutes(
         AdminCompanyPublishRequestSchema,
       );
       if (input === null) return reply;
+      // Publishing writes through the company's own command, which takes an
+      // organisation context: an admin without one gets not found.
+      const actor =
+        identities === undefined
+          ? getActorContext(request)
+          : getOnboardingActor(request).context;
+      if (actor === null) return notFound(request, reply);
       const outcome = await publish({
-        actor: getActorContext(request),
+        actor,
         companyId,
         publicExternal: input.publicExternal,
         reason: input.reason,

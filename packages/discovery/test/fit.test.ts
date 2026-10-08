@@ -615,6 +615,7 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
       Record<string, readonly EligibilityReasonCode[]>
     >;
     readonly mandateId?: string | null;
+    readonly unclaimed?: readonly string[];
   }) {
     const read: string[][] = [];
     const evaluated: string[][] = [];
@@ -663,6 +664,14 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
         },
       },
       candidates: () => Promise.resolve(options.candidates ?? []),
+      ...(options.unclaimed === undefined
+        ? {}
+        : {
+            unclaimedPublic: (ids: readonly string[]) =>
+              Promise.resolve(
+                new Set(ids.filter((id) => options.unclaimed?.includes(id))),
+              ),
+          }),
       clock: () => NOW,
     });
     return { service, read, evaluated };
@@ -688,6 +697,29 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     expect(result.items.map((i) => i.assessment.profile.companyId)).toEqual([
       ID(1),
     ]);
+    expect(w.read).toEqual([[ID(1)]]);
+  });
+
+  it("F5: an unclaimed public profile (not in Discover) has a fit from public facts, labelled; a claimed not-ready company stays absent", async () => {
+    const w = world({
+      reasons: {
+        [ID(1)]: ["COMPANY_NOT_MARKETPLACE_ELIGIBLE"],
+        [ID(2)]: ["COMPANY_NOT_MARKETPLACE_ELIGIBLE"],
+        [ID(3)]: [
+          "COMPANY_NOT_MARKETPLACE_ELIGIBLE",
+          "COMPANY_NOT_DISCOVERABLE_BY_INVESTOR",
+        ],
+      },
+      unclaimed: [ID(1), ID(3)],
+    });
+    const result = await w.service.profiles(actor, [ID(1), ID(2), ID(3)]);
+    expect(result.kind).toBe("OK");
+    if (result.kind !== "OK") return;
+    expect(result.items.map((i) => i.assessment.profile.companyId)).toEqual([
+      ID(1),
+    ]);
+    expect(result.items[0]?.line).toBe("Unclaimed public profile");
+    expect(result.items[0]?.assessment.profile.hardRule ?? null).toBeNull();
     expect(w.read).toEqual([[ID(1)]]);
   });
 

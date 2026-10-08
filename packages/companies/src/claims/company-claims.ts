@@ -1,5 +1,11 @@
-import { createHash, randomInt } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 
+import {
+  CLAIM_EVIDENCE_MAX_BYTES,
+  type ClaimEvidenceCompleteDto,
+  type ClaimEvidenceUploadDto,
+  type ClaimEvidenceUploadRequest,
+} from "@capital-q/contracts";
 import type {
   ClaimableCompanyDto,
   ClaimDecisionResultDto,
@@ -9,7 +15,6 @@ import type {
   PendingClaimDto,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
-import type { ActorContext } from "@capital-q/security";
 
 import { parseCompanySearch } from "../domain/company-search.js";
 import { companySearchJoins } from "../infrastructure/company-search-sql.js";
@@ -44,6 +49,7 @@ export type ClaimSearcher = {
  */
 
 const VISIBLE = ["network_visible", "public_external"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 function hostOf(website: string | null): string | null {
   if (website === null) return null;
@@ -83,8 +89,35 @@ export type ClaimCodeMailer = (input: {
   readonly expiresInMinutes: number;
 }) => Promise<boolean>;
 
+/**
+ * 2026-10-08: private storage for a claim's registry document, composed by
+ * the app (bucket and provider stay there). The browser puts the bytes
+ * straight to storage; this module only issues the key and reads back what
+ * storage observed.
+ */
+export type ClaimEvidenceStorage = {
+  readonly authorizeUpload: (input: {
+    readonly key: string;
+    readonly contentType: string;
+    readonly maxBytes: number;
+  }) => Promise<{
+    readonly method: "PUT";
+    readonly url: string;
+    readonly headers: Readonly<Record<string, string>>;
+    readonly providerExpiresAt: string;
+  }>;
+  readonly stat: (
+    key: string,
+  ) => Promise<{ readonly sizeBytes: number } | null>;
+  readonly authorizeDownload: (input: {
+    readonly key: string;
+    readonly fileName: string;
+  }) => Promise<{ readonly url: string; readonly providerExpiresAt: string }>;
+};
+
 export function createCompanyClaims(options: {
   readonly sql: DatabaseExecutor;
+  readonly evidenceStorage?: ClaimEvidenceStorage | undefined;
   readonly codeMailer?: ClaimCodeMailer | undefined;
   /** Test seam: a known code. */
   readonly newCode?: (() => string) | undefined;
@@ -140,7 +173,7 @@ export function createCompanyClaims(options: {
             or (c.organisation_id = ${actor.organisationId ?? null}::uuid
                 and c.tenant_id = ${actor.tenantId ?? null}::uuid)
             or (${exactHost}::text is not null
-                and lower(regexp_replace(c.website_url, '^https?://(www\.)?([^/:?#]+).*$', '\2')) = ${exactHost}::text))
+                and lower(regexp_replace(c.website_url, '^https?://(www\\.)?([^/:?#]+).*$', '\\2')) = ${exactHost}::text))
        and ${where}
      order by c.canonical_name
      limit 20`;
@@ -164,6 +197,16 @@ export function createCompanyClaims(options: {
     ): Promise<readonly ClaimableCompanyDto[]> => {
       const query = text.trim().slice(0, 120);
       if (query.length < 2) return [];
+      // F3 (2026-10-08): a company page the person cannot open yet asks by
+      // id whether it is one they may claim. The same visibility rule as a
+      // typed search: only a company they may already see.
+      if (UUID.test(query)) {
+        const rows = await visible(
+          actor,
+          sql`c.id = ${query.toLowerCase()}::uuid`,
+        );
+        return rows.map(toDto);
+      }
       const parsed = parseCompanySearch(query);
       if (parsed === null) return [];
       // P13: the same reading and ranking as every company search (exact,
@@ -192,7 +235,7 @@ export function createCompanyClaims(options: {
                 or (c.organisation_id = ${actor.organisationId ?? null}::uuid
                     and c.tenant_id = ${actor.tenantId ?? null}::uuid)
                 or (${exactHost}::text is not null
-                    and lower(regexp_replace(c.website_url, '^https?://(www\.)?([^/:?#]+).*$', '\2')) = ${exactHost}::text))
+                    and lower(regexp_replace(c.website_url, '^https?://(www\\.)?([^/:?#]+).*$', '\\2')) = ${exactHost}::text))
            and (s.score > 0 or c.legal_name ilike ${like})
          order by greatest(s.score, case when c.legal_name ilike ${like} then 640 else 0 end) desc,
                   c.canonical_name, c.id
@@ -201,7 +244,7 @@ export function createCompanyClaims(options: {
     },
 
     request: async (
-      actor: ActorContext,
+      actor: ClaimSearcher,
       companyId: string,
       input: CompanyClaimRequest,
     ): Promise<CompanyClaimResultDto | null> => {
@@ -310,11 +353,16 @@ export function createCompanyClaims(options: {
           work_email: string | null;
           email_confirmed: boolean;
           created_at: Date;
+          evidence_file_name: string | null;
+          evidence_content_type: string | null;
+          evidence_size_bytes: number | null;
+          evidence_uploaded_at: Date | null;
         }[]
       >`
         select r.id, r.company_id, c.canonical_name, p.display_name as requester_name,
                r.method, r.work_email, r.email_confirmed_at is not null as email_confirmed,
-               r.created_at
+               r.created_at, r.evidence_file_name, r.evidence_content_type,
+               r.evidence_size_bytes, r.evidence_uploaded_at
           from core.company_claim_requests r
           join core.companies c on c.id = r.company_id and c.tenant_id = r.tenant_id
           left join identity.user_profiles p on p.id = r.requester_user_id
@@ -340,7 +388,128 @@ export function createCompanyClaims(options: {
             : (row.work_email.split("@")[1] ?? null),
         emailConfirmed: row.email_confirmed,
         requestedAt: new Date(row.created_at).toISOString(),
+        evidence:
+          row.evidence_uploaded_at === null ||
+          row.evidence_file_name === null ||
+          row.evidence_size_bytes === null
+            ? null
+            : {
+                fileName: row.evidence_file_name,
+                contentType: row.evidence_content_type ?? "application/pdf",
+                sizeBytes: row.evidence_size_bytes,
+                uploadedAt: new Date(row.evidence_uploaded_at).toISOString(),
+              },
       }));
+    },
+
+    /**
+     * 2026-10-08: a short-lived direct upload for the claimant's registry
+     * document, on their own pending REGISTRY_DOCUMENT claim only. A new
+     * upload replaces the one before it (a new key; nothing is overwritten).
+     */
+    evidenceUpload: async (
+      requester: { readonly userId: string },
+      companyId: string,
+      input: ClaimEvidenceUploadRequest,
+    ): Promise<ClaimEvidenceUploadDto> => {
+      const storage = options.evidenceStorage;
+      if (storage === undefined) return { status: "UNAVAILABLE" };
+      const rows = await sql<{ id: string }[]>`
+        select id from core.company_claim_requests
+         where company_id = ${companyId} and requester_user_id = ${requester.userId}
+           and status = 'PENDING' and method = 'REGISTRY_DOCUMENT'
+         limit 1`;
+      const id = rows[0]?.id;
+      if (id === undefined) return { status: "NOT_FOUND" };
+      const key = `company-claims/${id}/${randomUUID()}`;
+      const upload = await storage.authorizeUpload({
+        key,
+        contentType: input.contentType,
+        maxBytes: CLAIM_EVIDENCE_MAX_BYTES,
+      });
+      await sql`
+        update core.company_claim_requests
+           set evidence_object_key = ${key},
+               evidence_file_name = ${input.fileName},
+               evidence_content_type = ${input.contentType},
+               evidence_size_bytes = null,
+               evidence_uploaded_at = null
+         where id = ${id} and status = 'PENDING'`;
+      return {
+        status: "READY",
+        upload: {
+          method: upload.method,
+          url: upload.url,
+          headers: { ...upload.headers },
+          expiresAt: upload.providerExpiresAt,
+        },
+      };
+    },
+
+    /** 2026-10-08: the upload finished; record what storage observed. */
+    evidenceComplete: async (
+      requester: { readonly userId: string },
+      companyId: string,
+    ): Promise<ClaimEvidenceCompleteDto> => {
+      const storage = options.evidenceStorage;
+      if (storage === undefined) return { status: "UNAVAILABLE" };
+      const rows = await sql<{ id: string; key: string | null }[]>`
+        select id, evidence_object_key as key from core.company_claim_requests
+         where company_id = ${companyId} and requester_user_id = ${requester.userId}
+           and status = 'PENDING' and method = 'REGISTRY_DOCUMENT'
+         limit 1`;
+      const row = rows[0];
+      if (row === undefined || row.key === null) return { status: "NOT_FOUND" };
+      const stat = await storage.stat(row.key);
+      if (
+        stat === null ||
+        stat.sizeBytes < 1 ||
+        stat.sizeBytes > CLAIM_EVIDENCE_MAX_BYTES
+      ) {
+        return { status: "NOT_UPLOADED" };
+      }
+      await sql`
+        update core.company_claim_requests
+           set evidence_size_bytes = ${stat.sizeBytes}, evidence_uploaded_at = now()
+         where id = ${row.id} and evidence_object_key = ${row.key}`;
+      return { status: "ATTACHED" };
+    },
+
+    /**
+     * 2026-10-08: a platform admin reads a pending claim's document, on a
+     * company nobody holds (the same scope as the claims queue). Null:
+     * nothing to show (one answer, no oracle).
+     */
+    evidenceForAdmin: async (
+      requestId: string,
+    ): Promise<{
+      readonly url: string;
+      readonly fileName: string;
+      readonly expiresAt: string;
+    } | null> => {
+      const storage = options.evidenceStorage;
+      if (storage === undefined) return null;
+      const rows = await sql<{ key: string; file_name: string }[]>`
+        select r.evidence_object_key as key, r.evidence_file_name as file_name
+          from core.company_claim_requests r
+          join core.companies c on c.id = r.company_id and c.tenant_id = r.tenant_id
+         where r.id = ${requestId} and r.status = 'PENDING'
+           and r.evidence_uploaded_at is not null and r.evidence_object_key is not null
+           and not exists (select 1 from identity.organisation_memberships m
+                            where m.organisation_id = c.organisation_id
+                              and m.membership_status = 'active')
+         limit 1`;
+      const row = rows[0];
+      if (row === undefined) return null;
+      const out = await storage.authorizeDownload({
+        key: row.key,
+        fileName: row.file_name,
+      });
+      return {
+        url: out.url,
+        fileName: row.file_name,
+        expiresAt: out.providerExpiresAt,
+      };
     },
 
     /** P14: is this person an admin or owner of the company's organisation, now? */

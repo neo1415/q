@@ -80,20 +80,23 @@ function fakeSql(people: ReadonlyMap<string, Person>) {
 function appFor(
   userId: string,
   people: ReadonlyMap<string, Person>,
+  options: { readonly noOrganisation?: boolean } = {},
 ): FastifyInstance {
   const sql = fakeSql(people);
   const resolver: ActorContextResolver = {
     resolveHumanContext: () =>
-      Promise.resolve({
-        status: "RESOLVED",
-        context: {
-          userId: UserIdSchema.parse(userId),
-          tenantId: TENANT,
-          organisationId: ORG,
-          membershipId: MEMBERSHIP,
-          actorType: "HUMAN",
-        },
-      }),
+      options.noOrganisation === true
+        ? Promise.resolve({ status: "CONTEXT_REQUIRED" })
+        : Promise.resolve({
+            status: "RESOLVED",
+            context: {
+              userId: UserIdSchema.parse(userId),
+              tenantId: TENANT,
+              organisationId: ORG,
+              membershipId: MEMBERSHIP,
+              actorType: "HUMAN",
+            },
+          }),
   };
   return createApp(
     parseApiConfig({ NODE_ENV: "test" }),
@@ -107,7 +110,9 @@ function appFor(
           }),
       },
       resolver,
-      identities: { lookup: () => Promise.resolve(null) },
+      identities: {
+        lookup: () => Promise.resolve({ userId: UserIdSchema.parse(userId) }),
+      },
     },
     {
       admin: createPlatformAdmin({
@@ -582,6 +587,18 @@ describe("admin console RBAC (every route)", () => {
     expect(nobody.statusCode).toBe(404);
   });
 
+  it("answers an admin who has no organisation context (2026-10-08), and still no one else", async () => {
+    const owner = await appFor(idFor("platform_owner", false), PEOPLE, {
+      noOrganisation: true,
+    }).inject({ method: "GET", url: "/v1/admin/me" });
+    expect(owner.statusCode).toBe(200);
+    expect(owner.json<{ role: string }>().role).toBe("platform_owner");
+    const nobody = await appFor(USERS.nobody, PEOPLE, {
+      noOrganisation: true,
+    }).inject({ method: "GET", url: "/v1/admin/me" });
+    expect(nobody.statusCode).toBe(404);
+  });
+
   it("refuses a step-up for a non-admin and a stale or unverifiable token", async () => {
     const nobody = await call(USERS.nobody, {
       method: "POST",
@@ -630,7 +647,10 @@ describe("account suspension", () => {
             }),
         },
         resolver,
-        identities: { lookup: () => Promise.resolve(null) },
+        identities: {
+          lookup: () =>
+            Promise.resolve({ userId: UserIdSchema.parse(USERS.nobody) }),
+        },
       },
       {
         admin: createPlatformAdmin({

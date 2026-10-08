@@ -6,6 +6,7 @@ import {
   getGateqInboxItem,
   listGateways,
   listMyGateqApplications,
+  listClaimableCompanies,
 } from "@capital-q/api-client";
 import {
   GateqInboxViewSchema,
@@ -60,6 +61,16 @@ export default async function GateqPage({ searchParams }: Props) {
   if (context.kind !== "INVESTOR" || session === null) {
     const tab: GateqTab =
       one(params["tab"]) === "claim" ? "claim" : "applications";
+    // F3 (2026-10-08): "Claim this company" from its page opens this tab
+    // already searched for it.
+    const claimQuery =
+      tab === "claim" ? (one(params["q"]) ?? "").trim().slice(0, 120) : "";
+    const claimResults =
+      claimQuery.length < 2 || session === null
+        ? []
+        : await listClaimableCompanies(session, claimQuery)
+            .then((result) => result.companies)
+            .catch(() => []);
     const applications: readonly FounderApplicationDto[] | null =
       session === null || tab !== "applications"
         ? []
@@ -74,7 +85,11 @@ export default async function GateqPage({ searchParams }: Props) {
           maxWidth={tab === "claim" ? 760 : 860}
         >
           {tab === "claim" ? (
-            <ClaimView state="full" />
+            <ClaimView
+              state="full"
+              initialQuery={claimQuery}
+              initialResults={claimResults}
+            />
           ) : (
             <FounderApplications
               state={
