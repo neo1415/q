@@ -1020,3 +1020,67 @@ describe("approval by conversation (live 2026-09-27 #1, #2)", () => {
     expect(none).toBe("Which one do you want to approve?");
   });
 });
+
+// RECOVERY-2026-10 G-D3: "I've prepared that reminder for you to approve."
+// after a propose_* round failed the whole turn and lost the proposal.
+// Prepared-but-not-executed is truthful when a proposal exists this turn.
+describe("a natural answer after a proposal (G-D3)", () => {
+  const PROPOSE_REMINDER: QOfferedTool = {
+    toolName: "schedule.reminder.propose",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "propose_reminder",
+      description: "Prepares a reminder for their approval.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const proposed = (proposal: QToolProposal): QToolCallOutcome => ({
+    ...succeeded(proposal, { status: "PREPARED" }),
+    toolName: "schedule.reminder.propose",
+    classification: "SIDE_EFFECT",
+  });
+
+  it.each([
+    ["I've prepared that reminder for you to approve.", true],
+    ["I've prepared that reminder for you to approve.", false],
+    ["I've set up the reminder for tomorrow; approve it on the card.", false],
+  ])(
+    "%j (marked as action talk: %s) keeps the turn and the proposal",
+    async (said, marked) => {
+      const tools = toolPort([PROPOSE_REMINDER], proposed);
+      const { seam, request, messages } = build({
+        script: [
+          {
+            kind: "TOOL_CALLS",
+            calls: [
+              {
+                callId: "r1",
+                name: "propose_reminder",
+                arguments: { title: "Call Savanna Seed", remindAt: "tomorrow" },
+              },
+            ],
+          },
+          {
+            kind: "TEXT",
+            text: JSON.stringify(
+              marked
+                ? { ...analystResult(said), actionTalk: [said] }
+                : analystResult(said),
+            ),
+          },
+        ],
+        tools,
+      });
+      const outcome = await seam.answer(request);
+      expect(outcome.kind).toBe("ANSWERED");
+      expect(tools.executed.map((p) => p.name)).toEqual(["propose_reminder"]);
+      // Something truthful about the waiting card is said, never "done".
+      const answer = messages.at(-1)?.content ?? "";
+      expect(messages.at(-1)?.role).toBe("Q");
+      expect(answer.length).toBeGreaterThan(0);
+      expect(answer).not.toMatch(/\b(?:is now set|has been set|done)\b/iu);
+    },
+  );
+});
