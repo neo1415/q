@@ -520,3 +520,107 @@ Path constants were resolved from `packages/contracts`. `<name>` / `${name}` are
 
 Unresolved local prefixes: `approvalPath = /v1/q/approvals/:approvalId`, `artifactPath = /v1/q/artifacts/:artifactId`, `conversationPath = /v1/q/conversations/:conversationId`, `runPath = /v1/q/runs/:runId`, `eventsPath = /v1/q/runs/:runId/events` (SSE), and `dependencies.path` = the voice "think" endpoint (OpenAI-compatible `/chat/completions` that ElevenLabs/Deepgram call back) and the interview route. These names were inferred from the contracts constants (`Q_RUNS_PATH`, `Q_RUN_EVENTS_SUFFIX`) imported in `apps/web/app/api/q-stream/.../route.ts:3-8`; the exact constant values were not all opened.
 
+## 4. Authentication, actor context and sessions
+
+Evidence: `evidence/architecture/auth-*.md`. Diagram: `diagrams/auth-permission-boundaries.md`.
+
+| Layer | Mechanism | Location |
+| --- | --- | --- |
+| Browser ↔ web | Supabase Auth cookie session through `@supabase/ssr`. Cookies are `httpOnly`, `sameSite=lax`, `secure` per config (`apps/web/src/auth/cookie-options.ts:14-22`). `proxy.ts` refreshes the session and protects routes on its matcher (`apps/web/proxy.ts:14-48`) | `apps/web/src/auth/*` |
+| Web server identity | `getSessionUser` uses `supabase.auth.getClaims()`, verified locally with no Auth round trip (`apps/web/src/auth/session.ts`). `getSessionAccessToken` reads `getSession().access_token` for forwarding | `session.ts` |
+| Web → api/q-api | `Authorization: Bearer <Supabase access token>` from the cookie session; never from client JS | `packages/api-client/src/request.ts` |
+| api / q-api authn | `createSupabaseRequestAuthenticator` is bearer-only and reads no cookies (`apps/api/src/security/supabase-authenticator.ts:20-37`). It calls `client.auth.getUser(token)`, a **network call to Supabase Auth on every protected request, uncached** (`packages/security/src/supabase/access-token-authenticator.ts:69-89`) | duplicated in both apps |
+| Actor context | `requireActorContextHook`: authenticate → parse the `ORGANISATION_CONTEXT_HEADER` selector → `requireHumanActorContext(resolver)` against the DB (`packages/security/src/postgres/actor-context-resolver.ts`) → `request.actorContext`. Tenant, membership, role and actor-type headers are never read (`apps/api/src/security/actor-context.ts:78-137`) | api, q-api |
+| Personal context | q-api only: `requireActorContextOrPersonalHook` gives a person with no organisation a `personalActorContext(userId)` under a well-known personal tenant (`apps/q-api/src/security/actor-context.ts:141-215`) | q-api |
+| Onboarding actor | `apps/api/src/security/onboarding-actor.ts`: a person-only context for person-scoped app actions | api |
+| Authorization | `AuthorizationService` with capability/role policies from `permissions.*` (`packages/security/src/authorization/*`, `packages/security/src/postgres/authorization-policy-source.ts`), and per-action `authorize()` in `packages/app-actions` | packages |
+| Suspension | `apps/api/src/security/suspension.ts`, `apps/q-api/src/composition/suspension.ts`; `q_runtime.person_standing.suspended_at` | |
+| Admin step-up / break-glass | `/v1/admin/step-up`, `/v1/admin/break-glass*` (`apps/api/src/http/admin.ts:303,686-743`); `platform_ops.step_ups`, `break_glass_*` | api |
+| Voice line binding | A sealed **AES-256-GCM token** carries the resolved binding, *including the person's Supabase access token*, header `x-q-voice-session`, TTL 4 h (`apps/q-api/src/voice/session-token.ts:20-52`). The key is HKDF-derived from `SUPABASE_SECRET_KEY`, **or from `DATABASE_URL` when that is absent** (`apps/q-api/src/main.ts:5111-5114`). `.railway/railway.ts` declares no `SUPABASE_SECRET_KEY` for q-api (`railway.ts:166-184`), so in the declared configuration the voice token key is derived from the database connection string | q-api |
+| Webhooks | Cloudflare Stream (`/v1/webhooks/cloudflare-stream`), Stripe (`/v1/webhooks/stripe`), Postmark inbound (`/v1/inbound/email/postmark`), Gmail Pub/Sub push (`/v1/integrations/google/gmail-push`), Recall meeting host (`MEETING_HOST_WEBHOOK_PATH`, `apps/q-api/src/http/meeting-host.ts:49`). Each verifies its own secret (`CLOUDFLARE_STREAM_WEBHOOK_SECRET`, `STRIPE_WEBHOOK_SECRET`, `INBOUND_EMAIL_WEBHOOK_SECRET`, `GOOGLE_PUBSUB_PUSH_*`, `RECALL_WEBHOOK_SECRET`). The webhook verifiers' internals were not inspected by A | |
+
+Sessions in services are stateless (bearer per request). The only server-held session state is voice lines (sealed token plus an in-memory cache, `apps/q-api/src/voice/bindings.ts:28,130`), duplex lines, meeting-host sessions (`composition/meeting-host-runtime.ts:51`) and rehearsal frames. All of these are process-local (§6).
+
+## 5. Storage, video and caching
+
+- **Supabase Storage**: 4 buckets (`cq-documents-private`, `cq-extractions-private`, `cq-document-images`, `cq-profile-images`), created in migrations; 4 rows live. Access uses the privileged `SUPABASE_SECRET_KEY` in api ("without it the document upload boundary refuses to open", `railway.ts:140-143`) and workers (`railway.ts:207`). Uploads go through `document_upload_sessions` and signed URLs (`packages/evidence`).
+- **Cloudflare Stream**: `packages/media/src/infrastructure/cloudflare-stream-video-provider.ts`. Env names `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_STREAM_API_TOKEN`, `CLOUDFLARE_STREAM_SIGNING_KEY_ID`, `CLOUDFLARE_STREAM_SIGNING_KEY_PEM`, `CLOUDFLARE_STREAM_CUSTOMER_SUBDOMAIN`, `CLOUDFLARE_STREAM_WEBHOOK_SECRET` (`packages/config/src/video-providers.ts`). Playback goes through `POST …/pitch/:mediaAssetId/playback` (signed). Captions are proxied by `app/api/pitch-captions`.
+- **Caching**: no shared cache (no Redis/Upstash; the grep hits are unrelated identifiers). React `cache()` per request in web (`session.ts`), `cache-control: no-store` on Q routes (`apps/web/app/api/q-room/route.ts:21,44`), and process-local maps in q-api (127 `new Map` sites outside `dev/`).
+
+## 6. Realtime, streams and process-local state
+
+| Channel | Transport | Durable? | Location |
+| --- | --- | --- | --- |
+| Q run events | SSE `GET /v1/q/runs/:runId/events`, projected from `q_runtime.run_events`. `id:` is the sequence and `Last-Event-ID` resumes; 15 s heartbeat comments; limits of 8 streams/user and 4/run (`apps/q-api/src/http/q-events.ts:40-100`). Fan-out uses Postgres LISTEN/NOTIFY (`packages/q-runtime/src/infrastructure/postgres-run-event-notifier.ts:22-89`), so it is multi-instance safe. The web proxies it at `app/api/q-stream/v1/q/runs/[runId]/events/route.ts` | **Yes** (DB) | IMPLEMENTED |
+| Q room feed | Long poll `GET /v1/q/room?after&epoch&wait`, proxied by `app/api/q-room/route.ts`. Voice turn handlers publish answers, and typed runs are published via `watchRun` only while a reader is open (`apps/q-api/src/room/feed.ts:17-40`) | **No.** "Process-local and forgettable … the epoch names this process" (`feed.ts:35-37`). Lost on deploy or restart; a second replica would split rooms | IMPLEMENTED, single-instance only |
+| Voice turn board | In memory (`apps/q-api/src/voice/turn-board.ts:7`) | No | |
+| Duplex lines | In memory in the broker (`apps/q-api/src/voice/duplex/broker.ts`). Transcript persisted to `q_runtime.voice_line_turns` | Partly | |
+| Meeting host sessions | "Sessions live in this process's memory: one q-api instance hosts a call" (`composition/meeting-host-runtime.ts:51`) | No | |
+| Speech performance relay | Process-local (`voice/speech-performance.ts:201`) | No | |
+| Workforce review grading | "In memory and bounded: a restart between grading …" (`composition/workforce/review.ts:485`) | No | |
+| Interview/onboarding raised checks | "A restart forgets them" (`voice/interview-agent.ts:301`, `voice/onboarding-conductor.ts:272`) | No | |
+| Wake channels | Postgres NOTIFY: `Q_WORK_WAKE_CHANNEL` (`apps/q-api/src/main.ts:4505-4512`), instruction triggers, run events | Signal only | |
+
+Consequence: with one replica and many deploys a day (`session-token.ts:22-27`: "We deploy many times a day"), every deploy empties the room feed, voice board, duplex lines and in-flight meeting-host sessions. The lead's 12:02-12:58 observation (duplex line "rejoined, then ended ~20s later") is consistent with, but not proven to be caused by, this design. The deploy log was not inspected.
+
+## 7. Background work: workers, outbox and scheduled sweeps
+
+**Outbox** (`packages/eventing`). Domain writes insert into `events.outbox` in the same transaction. The workers' `OutboxPublisher` claims rows (`FOR UPDATE SKIP LOCKED`), validates each payload against the **workers' event registry**, and sends it to the pgmq queue `domain-events` (`supabase/migrations/20260902190411_events_outbox_foundation.sql:76`). Failures back off up to `maxAttempts` (10) and then stay as stuck rows (`packages/eventing/src/publisher/outbox-publisher.ts:15-35,160-230`).
+
+**DEFECT (live, confirmed):** `apps/workers/src/event-registry.ts:1-35` registers organisation, company, investor, evidence, capital, network, permissions, taxonomy, onboarding, media, verification and integrations events, but **not** `@capital-q/q-actions` events (q-actions is not even a workers dependency). q-api writes `q.action.prepared/approved/rejected/executed/execution_failed` (`packages/q-actions/src/events/index.ts:46-110`). Live, 657 outbox rows are unpublished, all `q.action.*`, all with `last_error` code `EVENT_SCHEMA_INVALID` and 10 attempts. Every q.action event since 2026-09-26 has been dropped (evidence/architecture/live-db-aggregates.md). The declared consumers `@capital-q/q` and `@capital-q/intelligence` (`q-actions/src/events/index.ts:35`) therefore never receive them. q-api compensates with its own 2-minute "approved action sweep" (`apps/q-api/src/main.ts:3808-3830`).
+
+**pgmq queues**: `domain-events`, `documents` + `documents-dead`, `recommendation-refresh` + `-dead` (migrations `20260902190411`, `20260905210000`, `20260929090000`).
+
+**Workers loops** (`apps/workers/src/main.ts:1338-1452`, one `Promise.all`): outbox runner; domain-event consumer (`documentEvents`); recommendation refresh; document pipeline (malware policy `REQUIRE_CLEAN`, so on staging "uploads are accepted and held, not parsed" until a scanner exists, `railway.ts:189-208`); Gmail reply poller; schedule ticker; notice-delivery ticker; document-job ticker; Q Daily ticker; company-embedding refresh every 30 min (only when an embedder is configured); deck read-again (1/min, ≤20/day); deck-reading heal (15 min, ≤$0.25/sweep); auto-verification requests (10 min); synthetic auto-verify (10 min, synthetic only). Event handlers live in `apps/workers/src/{network,verification,evidence,events,recommendations}/*` (chat-message notice, interest/outcome/commitment notices, relationship projection, Q work wake, newly-ready company, startup alerts).
+
+**Schedulers inside q-api** (HTTP process, `setInterval(...).unref()`): standing-instruction sweep every 60 s (`main.ts:1892-1899`); approved-action sweep every 2 min (`main.ts:3808-3830`); orphaned-run sweep at boot and periodically (`main.ts:3844-3860`); meeting assistant enlist/collect (`main.ts:4141-4155`); errands tick every 60 s behind kill switch `q.autonomy.errands` (`main.ts:4268-4276`); Q work runtime tick every 60 s plus a LISTEN wake (`main.ts:4499-4515`); scout at 5 min and then every 6 h (`main.ts:5000-5001`). These are timer loops in a web-serving process with one replica: they are not leader-elected. The instruction sweep is "claimed in the DB" (`main.ts:1886`), and the orphan sweep says a second instance is safe (`main.ts:3840-3843`). The other loops' multi-instance safety was not verified.
+
+## 8. Third-party integrations (env var NAMES only)
+
+| Integration | Purpose | Adapter | Env names |
+| --- | --- | --- | --- |
+| Supabase | Postgres, Auth, Storage | `packages/database`, `packages/security/src/supabase`, `@supabase/ssr` | `DATABASE_URL`, `DATABASE_CONNECTION_MODE`, `DATABASE_PRIVILEGED_URL`, `DATABASE_MIGRATION_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| OpenAI | Chat (primary since migration 20261008130000), Realtime duplex, transcription, images | `packages/model-gateway/src/providers/openai.ts`, `realtime/openai.ts`, `images/openai.ts` | `OPENAI_API_KEY` / `OPEN_AI_API_KEY`, `CQ_TEST_MODEL_PROVIDER`, `CQ_VOICE_REALTIME*` (9 tuning vars, `apps/q-api/src/voice/duplex/config.ts:75-124`) |
+| Google Gemini | Chat/classification | `model-gateway/src/providers/google.ts` | `GEMINI_API_KEY`, `GEMINI_API_KEY2`/`_2` |
+| Groq | Chat (rotating keys) | `model-gateway/src/providers/groq.ts` | `GROQ_API_KEY`, `GROQ_API_KEY_2..4` |
+| Deepgram | STT, Voice Agent, TTS | `apps/q-api/src/voice/providers/deepgram*.ts`, web `agent-socket.ts` | `DEEPGRAM_API_KEY`, `Q_VOICE_PROVIDER` |
+| ElevenLabs | Speech Engine, TTS, pronunciation | `apps/q-api/src/voice/providers/elevenlabs*.ts` | `ELEVENLABS_API_KEY`, `ELEVENLABS_SPEECH_ENGINE_ID`, `ELEVENLABS_SPEECH_ENGINE_ID_MALE`, `Q_VOICE_EXPRESSIVE` |
+| Tavily / Bright Data / SerpAPI | Public web research | `packages/q-research/src/providers/tavily.ts`, `apps/q-api/src/composition/research.ts` | `TAVILY_API_KEY`, `BRIGHT_DATA_API_KEY`, `SERP_API_KEY` |
+| Companies House / SEC EDGAR | Investor research | `apps/q-api/src/composition/investor-research.ts` | `COMPANIES_HOUSE_API_KEY`, `SEC_EDGAR_USER_AGENT` |
+| Cloudflare Stream | Pitch video | `packages/media/src/infrastructure/cloudflare-stream-video-provider.ts` | `CLOUDFLARE_*` (§5) |
+| Recall.ai | Meeting bots, transcripts, vision | `apps/q-api/src/composition/recall-bots.ts` | `RECALL_API`, `RECALL_API_KEY`, `RECALL_REGION`, `RECALL_TRANSCRIBER`, `RECALL_SCREEN_VISION`, `RECALL_CAMERA_VISION`, `RECALL_WEBHOOK_SECRET`, `CQ_MEETING_HOST` |
+| Google Workspace | Gmail and Calendar OAuth, Pub/Sub push | `packages/integrations/src/google/{gmail,calendar}.ts` | `GOOGLE_WORKSPACE_CLIENT_ID/SECRET/REDIRECT_URI`, `GOOGLE_TOKEN_ENCRYPTION_KEY`, `GOOGLE_PUBSUB_TOPIC`, `GOOGLE_PUBSUB_PUSH_AUDIENCE`, `GOOGLE_PUBSUB_PUSH_SERVICE_ACCOUNT` |
+| Email out | SMTP/Brevo via nodemailer | `packages/integrations`, `packages/email` | `SMTP_HOST/PORT/USER/PASS/SENDER`, `SMTP_API_KEY`, `BREVO_API_KEY` |
+| Email in | Postmark inbound | `apps/api/src/http/inbound-email.ts` | `POSTMARK_INBOUND_ADDRESS`, `INBOUND_EMAIL_WEBHOOK_SECRET` |
+| Web Push | VAPID | `apps/api/src/http/push.ts` | `WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_SUBJECT` |
+| Stripe | Billing (no live subscriptions) | `packages/billing/src/provider.ts` | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
+| Pexels | Stock photos | `packages/model-gateway/src/images/stock.ts`, `packages/q-daily/src/infrastructure/pexels.ts` | `PEXELS_API_KEY`, `PEXELS_API` |
+| TEI embeddings | Semantic retrieval | `packages/q-embeddings` | `Q_EMBEDDING_PROVIDER`, `Q_EMBEDDING_BASE_URL`, `Q_EMBEDDING_TIMEOUT_MS`, `Q_EMBEDDING_MAX_BATCH_ITEMS` (not deployed, §1) |
+| MCP | Q as MCP server/client | `apps/q-api/src/http/q-mcp.ts` (`POST /v1/mcp`), `packages/q-connectors` | `Q_MCP_SERVER` |
+
+Other runtime flags read directly from `process.env`, bypassing `packages/config`: `CQ_DEV_PREVIEW`, `CQ_DOCUMENT_PIPELINE`, `CQ_DOCUMENT_CRITIC`, `CQ_INSTRUCTIONS_AUTO`, `CQ_REVIEW_PAGES`, `CQ_DESIGN_REVIEW`, `Q_DAILY_DISABLED`, `Q_DAILY_MAX_EDITIONS_PER_DAY`, `Q_WORKFORCE_MONTHLY_LIMIT_USD`, `Q_API_PUBLIC_URL`, `RAILWAY_SERVICE__CAPITAL_Q_WEB_URL`, `CAPITAL_Q_SYNTHETIC_*`, `CQ_SEED_ACCOUNT_PASSWORD`, `CQ_EVAL_DATABASE_URL`. Base runtime: `NODE_ENV`, `CAPITAL_Q_ENV`, `REGION`, `LOG_LEVEL`, `HOST`, `PORT`, `SERVICE_VERSION`, `CQ_API_URL`, `CQ_Q_API_URL`, `CQ_WEB_ORIGIN`, `CQ_MALWARE_POLICY`, `CQ_FOUNDER_ONBOARDING_ADAPTER`, `CQ_DOCUMENT_UPLOAD_MAX_BYTES`, `CQ_DOCUMENT_IMAGES*`, `Q_PERSONALITY`.
+
+**Feature flags / kill switches**: DB table `platform_ops.feature_flags` (+`feature_flag_events`), admin routes `GET/POST /v1/admin/flags` (`apps/api/src/http/admin.ts:818,830`). Code checks found: `q.autonomy.errands` (`apps/q-api/src/main.ts:4270`), `q.autonomy.delegations`, `q.daily`. Most behaviour toggles are env flags, not DB flags.
+
+**Model routing** is data, not code: `ai_ops.routing_policies` (`preferred_models`, `fallback_models`, `hedge_after_ms`) and `ai_ops.models/providers/model_prices`. Five migrations on 2026-10-08 changed routing: `20261008110000_ai_ops_dialogue_drop_dead_fallback`, `…120000_ai_ops_demo_routing_gemini_openai`, `…130000_ai_ops_openai_primary`, and `20261110000000_ai_ops_fast_classification_flash_lite_first`.
+
+## 9. Errors and observability
+
+- **Problem details (RFC 9457)**: `application/problem+json` (`packages/contracts/src/http/problem-details.ts:11,88`). Handlers are `apps/api/src/http/problem-handler.ts` (782 lines) and `apps/q-api/src/http/problem-handler.ts` (347 lines), two diverged implementations. App actions map unavailable ports to a problem (`apps/api/src/http/app-actions.ts:140-153`). Authorization denies on app actions return 404 (`app-actions.ts:186-189`).
+- **Logging**: pino with path redaction (`packages/observability/src/logger.ts:8-38,113,137`) and request-id context (`withObservabilityContext`). Logs go to stdout → Railway, which "only keeps the current deployment's recent lines" (`docs/handoff/session-handoff-2026-10-08.md:11`). There is no log shipping.
+- **Tracing/metrics**: `TELEMETRY_EXPORT_ENABLED = false`; "nothing is exported anywhere yet … spans are created and discarded" (`packages/observability/src/telemetry.ts:15-21`). Meters such as `q_sse_heartbeats_total` (`q-events.ts:175`) are no-ops. **CONFIGURED-UNUSED.**
+- **De-facto metrics**: `ai_ops.model_usage` (13,172 rows; per-call tokens, latency, cost, error_code), `audit.material_actions` (4,315), `platform_ops.q_firewall_decisions`, and the admin Q monitor `/v1/admin/q/{monitor,errors,runs/:runId}`.
+
+## 10. Component cards
+
+| Component | Purpose | Location | Callers | Callees | I/O contract | State | Permissions | Errors / known failures |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Web app | UI, cookie session, proxy to services | `apps/web` | Browser | api-client → api/q-api; Supabase Auth; Deepgram/ElevenLabs/OpenAI realtime; Cloudflare HLS | Next routes, server actions, `/api/*` handlers | Cookie session; browser-side Q store | Route policy in `proxy.ts` (UI gating only; services re-authorize) | Duplex fell back to the standard line in the lead's headless test; the opener used the generic `returning.ts` greeting (fixed today per RULES) |
+| api-client | Typed HTTP/SSE client | `packages/api-client` | web server code | api, q-api | contracts Zod schemas | none | bearer passthrough | Problem parsing in `problem.ts` |
+| apps/api | Domain HTTP API, app-action registry, admin, webhooks | `apps/api/src/{main,app}.ts` | web, q-api (private `CQ_API_URL`) | domain packages, Postgres, Storage, Stripe, Cloudflare, Postmark, Web Push, q-api interview (`CQ_Q_API_URL`, `apps/api/src/q/interview-client.ts`) | `/v1/*` (§3.1-3.2) | stateless | actor context + `authorize()` | `/health/ready` is static; writes `q_runtime.standing_instructions` directly (`q-work-port.ts:75-118`) |
+| apps/q-api | Q runtime: runs, SSE, approvals, voice, work/instructions/workforce, rehearsals, meetings, daily, fit | `apps/q-api/src/main.ts` (5,895 lines) | web, speech providers (think callback), Recall webhooks, api (interview) | model gateway (OpenAI/Gemini/Groq), q-* packages, research providers, Deepgram/ElevenLabs/OpenAI realtime, Postgres | `/v1/q/*`, `/v1/fit/*`, `/v1/mcp` (§3.3) | Process-local room, voice, duplex, meeting state (§6); DB runs/events | actor or personal context; Q tool authorize; approvals | Live: unclear-speech turns returned SILENT, standing-instruction drafts below threshold (RULES live evidence); 1,225 of 2,822 runs CANCELLED |
+| apps/workers | Outbox publishing, queue consumers, document pipeline, tickers | `apps/workers/src/main.ts` | none (DB-driven) | Postgres/pgmq, Storage, model gateway (Gemini/Groq), research, Gmail, SMTP | events/jobs contracts | DB only | privileged storage key | q.action events never publish (§7); documents held unparsed under `REQUIRE_CLEAN` |
+| Outbox/eventing | Transactional outbox → pgmq | `packages/eventing` | all domain writers | pgmq `domain-events` | `EventRegistry` Zod schemas | `events.outbox` | n/a | 657 stuck rows |
+| Model gateway | Provider-neutral inference, routing policy, usage metering | `packages/model-gateway` | q-specialists, q-api, workers, gateq-intake, q-daily | OpenAI, Gemini, Groq SDKs | task class in → validated result | `ai_ops.*` | Context Firewall upstream | Config comment says OpenAI is diagnosis-only (stale) |
+| Security | Authn adapters, actor resolution, authorization | `packages/security` | api, q-api, most packages | Supabase Auth, Postgres | `ActorContext` | none | — | Uncached Auth round trip per request |
+| Database | One postgres.js pool per process, transactions | `packages/database` | all repositories | Supavisor → Postgres as `postgres` (inferred) | `RequestDatabase` | pool | none at DB level (RLS bypassed; see 12 §2) | — |
