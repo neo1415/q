@@ -351,7 +351,7 @@ function capitalisedWord(word: string): string {
  */
 export function fitSweepSummary(input: {
   readonly block: QAnswerCardsBlock;
-  readonly scope: "RELATIONSHIPS" | "SAVED" | "CANDIDATES";
+  readonly scope: "RELATIONSHIPS" | "SAVED" | "CANDIDATES" | "PREVIOUS";
   readonly place: string | null;
   readonly considered: number;
   /** The person's own words, for how many they asked for. */
@@ -370,7 +370,10 @@ export function fitSweepSummary(input: {
         ? `I looked at the ${counted(input.considered)} ${plural(input.considered)} you've reached out to.`
         : input.scope === "SAVED"
           ? `I looked at your ${counted(input.considered)} saved ${plural(input.considered)}.`
-          : null;
+          : input.scope === "PREVIOUS"
+            ? // INC-1: "rank them" is the set just shown, said as such.
+              `Here are the same ${counted(block.cards.length)} ${plural(block.cards.length)}, ranked.`
+            : null;
   const lead = set === null ? "" : `${set} `;
   if (scored.length === 0) {
     return `${lead}None of them has enough information for a score yet.`;
