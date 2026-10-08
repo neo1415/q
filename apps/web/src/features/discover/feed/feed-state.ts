@@ -106,20 +106,36 @@ export type FeedPrefetchBudget = {
   readonly warmBehind: number;
   /** Of those ahead, how many may buffer a startup segment. */
   readonly startupBufferAhead: number;
+  /**
+   * Of those behind, how many keep their player and buffer attached, so a
+   * swipe back plays at once from memory (ADR 0063).
+   */
+  readonly keepBehind: number;
 };
 
-/** Doc 20 §50: current ACTIVE, next 1 startup buffer, next 2 poster, rest none. */
+/**
+ * Doc 20 §50 as amended by ADR 0063 (founder direction 2026-10-08: "the
+ * next video or next two must always be ready while the current one
+ * plays"): current ACTIVE, the next two buffering, the one after that a
+ * poster, the one behind kept as it was, the rest nothing.
+ */
 export const DEFAULT_PREFETCH_BUDGET: FeedPrefetchBudget = {
-  warmAhead: 2,
+  warmAhead: 3,
   warmBehind: 1,
-  startupBufferAhead: 1,
+  startupBufferAhead: 2,
+  keepBehind: 1,
 };
 
-/** Doc 20 §50, constrained network: current ACTIVE, next 1 poster, rest none. */
+/**
+ * Doc 20 §50, constrained network: current ACTIVE, next 1 poster, rest
+ * none. Only Save-Data, a 2g/3g link, or real stalls of a pitch that was
+ * already playing put a feed here (use-feed-budget.ts).
+ */
 export const CONSTRAINED_PREFETCH_BUDGET: FeedPrefetchBudget = {
   warmAhead: 1,
   warmBehind: 0,
   startupBufferAhead: 0,
+  keepBehind: 0,
 };
 
 /** The policy for a card at `offset` from the active one. */
@@ -133,6 +149,7 @@ export function policyForOffset(
     if (offset <= budget.warmAhead) return "POSTER";
     return "NONE";
   }
+  if (-offset <= budget.keepBehind) return "STARTUP_BUFFER";
   return -offset <= budget.warmBehind ? "POSTER" : "NONE";
 }
 

@@ -167,32 +167,33 @@ describe("moving through the feed", () => {
 });
 
 describe("the prefetch window", () => {
-  it("gives one card ACTIVE, buffers the next, posters the one after", () => {
+  it("gives one card ACTIVE, buffers the next two, posters the one after (ADR 0063)", () => {
     const state = run(
       [{ type: "ADVANCED" }, { type: "ADVANCED" }],
-      loaded([1, 2, 3, 4, 5, 6]),
+      loaded([1, 2, 3, 4, 5, 6, 7]),
     );
     const at = prefetchWindow(state, DEFAULT_PREFETCH_BUDGET);
 
     expect(at.active).toBe("c-3");
     expect(at.policyByCompanyId["c-3"]).toBe("ACTIVE");
     expect(at.policyByCompanyId["c-4"]).toBe("STARTUP_BUFFER");
-    expect(at.policyByCompanyId["c-5"]).toBe("POSTER");
-    // Behind stays lightweight but resident, so a retreat is not a reload.
-    expect(at.policyByCompanyId["c-2"]).toBe("POSTER");
+    expect(at.policyByCompanyId["c-5"]).toBe("STARTUP_BUFFER");
+    expect(at.policyByCompanyId["c-6"]).toBe("POSTER");
+    // The one behind keeps its buffer, so a swipe back plays at once.
+    expect(at.policyByCompanyId["c-2"]).toBe("STARTUP_BUFFER");
   });
 
   it("leaves everything outside the budget cold", () => {
     const state = run(
       [{ type: "ADVANCED" }, { type: "ADVANCED" }],
-      loaded([1, 2, 3, 4, 5, 6]),
+      loaded([1, 2, 3, 4, 5, 6, 7]),
     );
     const at = prefetchWindow(state, DEFAULT_PREFETCH_BUDGET);
 
     expect(at.policyByCompanyId["c-1"]).toBe("NONE");
-    expect(at.policyByCompanyId["c-6"]).toBe("NONE");
-    expect(at.cold).toEqual(["c-1", "c-6"]);
-    expect(at.warm).toEqual(["c-2", "c-4", "c-5"]);
+    expect(at.policyByCompanyId["c-7"]).toBe("NONE");
+    expect(at.cold).toEqual(["c-1", "c-7"]);
+    expect(at.warm).toEqual(["c-2", "c-4", "c-5", "c-6"]);
   });
 
   it("buffers nothing ahead on a constrained connection", () => {

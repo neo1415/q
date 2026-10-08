@@ -1202,7 +1202,9 @@
   .cq-feed-sound:active {
     transform: scale(0.94);
   }
-  .cq-feed-quality {
+  .cq-feed-chip {
+    border: none;
+    cursor: pointer;
     display: inline-flex;
     min-height: 28px;
     align-items: center;
@@ -3324,6 +3326,16 @@
     display: flex;
     color: var(--cq-stage-text);
     background: var(--cq-stage-canvas);
+  }
+  /* The opened pitch is Discover's stage (ADR 0063): full height, the
+     whole overlay; its top bar clears the stage's sound control. */
+  .cq-explore-feed > .cq-feed {
+    flex: 1;
+    min-width: 0;
+    height: 100dvh;
+  }
+  .cq-feed .cq-explore-feed-top {
+    padding-left: 52px;
   }
   .cq-explore-feed-scroller {
     position: relative;

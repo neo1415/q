@@ -149,8 +149,13 @@ describe("the related feed", () => {
         startOnRequest
       />,
     );
-    const items = container.querySelectorAll("[data-feed-index]");
-    expect(items[0]?.getAttribute("aria-label")).toBe("Kora Health");
+    // Discover's own stage: the opened pitch is the card in view.
+    expect(container.querySelector("[data-feed-immersive]")).not.toBeNull();
+    expect(
+      container
+        .querySelector("[data-slot-active] video")
+        ?.getAttribute("aria-label"),
+    ).toBe("Pitch from Kora Health");
     expect(
       screen.getAllByText("Related to Kora Health").length,
     ).toBeGreaterThan(0);
@@ -167,10 +172,10 @@ describe("the related feed", () => {
     fireEvent.click(back);
     expect(onClose).toHaveBeenCalled();
     // The profile, never a Q card.
-    const profile = container.querySelector("[data-explore-profile]");
-    expect(profile?.getAttribute("href")).toBe(
-      `/company/${related.anchor.companyId}`,
+    const profile = container.querySelector(
+      `a[href="/company/${related.anchor.companyId}"]`,
     );
+    expect(profile).not.toBeNull();
     expect(container.textContent ?? "").not.toMatch(COUNT_WORDS);
   });
 });

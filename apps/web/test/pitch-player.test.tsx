@@ -941,6 +941,7 @@ describe("the end of a pitch is never a failure (founder, 2026-10-05)", () => {
     expect(attachSource).toHaveBeenLastCalledWith(
       video,
       "https://cdn.test/sample-2.mp4",
+      expect.any(String),
     );
     expect(screen.queryByRole("status")).toBeNull();
     expect(video.loop).toBe(true);
