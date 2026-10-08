@@ -21,6 +21,7 @@ export type QControlCatalogEntry = {
 };
 
 export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
+  { id: "carousel.feed", kind: "CAROUSEL" },
   { id: "filter.relationships", kind: "FILTER" },
   { id: "input.document-search", kind: "INPUT" },
   { id: "input.relationship-search", kind: "INPUT" },

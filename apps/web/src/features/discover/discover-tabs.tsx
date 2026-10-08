@@ -10,7 +10,10 @@ import {
 
 import type { YourCompaniesPageDto } from "@capital-q/contracts";
 
-import { useQControlGroup } from "@/features/q/control/q-control";
+import { Q_FEED_EVENT } from "@/features/q/client-actions";
+import { effectShown } from "@/features/q/control/perform";
+import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
+import { currentManifest } from "@/features/q/manifest";
 
 import {
   setDiscoverTab,
@@ -69,6 +72,31 @@ export function DiscoverTabs({
   // RECOVERY-2026-10 (C1): the two tabs, for Q, by their own markers.
   const tabsRef = useRef<HTMLElement>(null);
   useQControlGroup({ kind: "TAB", ref: tabsRef, ids: Q_DISCOVER_TABS });
+  // The feed's next/previous, through the feed's own controls (the event
+  // its Next and Back keys answer), DONE once the company in focus moved.
+  const feedRef = useRef<HTMLDivElement>(null);
+  useQControl({
+    id: "carousel.feed",
+    kind: "CAROUSEL",
+    ref: feedRef,
+    onAct: async (intent) => {
+      if (intent.act !== "NEXT" && intent.act !== "PREVIOUS") {
+        return "NOT_APPLICABLE";
+      }
+      const before = currentManifest()?.focus?.id ?? null;
+      window.dispatchEvent(
+        new CustomEvent(Q_FEED_EVENT, {
+          detail: intent.act === "NEXT" ? "NEXT_ITEM" : "PREVIOUS_ITEM",
+        }),
+      );
+      return (await effectShown(
+        () => (currentManifest()?.focus?.id ?? null) !== before,
+        3_000,
+      ))
+        ? "DONE"
+        : "FAILED";
+    },
+  });
   const choose = (next: DiscoverTab) => {
     if (next === "YOURS") setYoursOpened(true);
     setDiscoverTab(next);
@@ -99,7 +127,7 @@ export function DiscoverTabs({
           );
         })}
       </nav>
-      <div hidden={tab !== "FOR_YOU"} inert={tab !== "FOR_YOU"}>
+      <div ref={feedRef} hidden={tab !== "FOR_YOU"} inert={tab !== "FOR_YOU"}>
         {forYou}
       </div>
       {yoursOpened ? (
