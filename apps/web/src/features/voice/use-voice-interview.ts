@@ -121,6 +121,8 @@ const RECONNECT_DELAYS_MS = [1_200, 3_000, 8_000] as const;
 const STABLE_LINE_MS = 20_000;
 /** How long "switching to standard voice" stays once that voice is up. */
 const LINK_STATUS_LINGER_MS = 4_000;
+/** How long a turn's "not answered" sentence stays on screen (A4). */
+const TURN_NOTICE_MS = 8_000;
 const GAVE_UP =
   "I couldn't get the line back. You can keep typing, or start voice again when you're ready.";
 
@@ -297,6 +299,15 @@ export function useVoiceInterview(
    */
   const duplexOff = useRef(false);
   const renewals = useRef(0);
+  const turnNoticeTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (turnNoticeTimer.current !== null) {
+        window.clearTimeout(turnNoticeTimer.current);
+      }
+    },
+    [],
+  );
   const client = useVoiceSession({
     ...events,
     onLine: (line) => {
@@ -369,6 +380,21 @@ export function useVoiceInterview(
     onError: (message) => {
       setNotice(message);
       events.onError?.(message);
+    },
+    // RECOVERY A4: a turn that ended without an answer is never silent on
+    // screen: its sentence shows for a while, then goes.
+    onTurnOutcome: (outcome) => {
+      events.onTurnOutcome?.(outcome);
+      const shown = outcome.notice;
+      if (shown === undefined) return;
+      setNotice(shown);
+      if (turnNoticeTimer.current !== null) {
+        window.clearTimeout(turnNoticeTimer.current);
+      }
+      turnNoticeTimer.current = window.setTimeout(() => {
+        turnNoticeTimer.current = null;
+        setNotice((current) => (current === shown ? null : current));
+      }, TURN_NOTICE_MS);
     },
   });
   const clientRef = useRef(client);

@@ -196,3 +196,144 @@ export function createOpenAIRealtimeProvider(options: {
     },
   };
 }
+
+/**
+ * SIDEBAND (RECOVERY A8; developers.openai.com/api/docs/guides/
+ * realtime-server-controls, read 2026-10-08). The browser's SDP answer
+ * carries the call's id in its Location header (`/v1/realtime/calls/
+ * rtc_…`); the server attaches to that call over a WebSocket with its own
+ * key and receives the call's events, and can add items and ask for
+ * responses. The key never leaves the server. NOT VERIFIED ON A LIVE CALL:
+ * the guide documents `session.update` and tool results on this socket;
+ * `conversation.item.create` and `response.create` are the same events the
+ * data channel carries and are assumed to behave the same.
+ */
+export const OPENAI_REALTIME_SIDEBAND_URL = "wss://api.openai.com/v1/realtime";
+
+/** One attached sideband socket, as the broker sees it. */
+export type RealtimeSidebandSocket = {
+  readonly send: (event: Readonly<Record<string, unknown>>) => void;
+  readonly close: () => void;
+};
+
+export type RealtimeSidebandHandlers = {
+  readonly onEvent: (event: unknown) => void;
+  /** The socket closed; `clean` when this side closed it. */
+  readonly onClose: (clean: boolean) => void;
+};
+
+/** Attaches to one call by its id; rejects when the socket never opens. */
+export type RealtimeSidebandConnector = (
+  callId: string,
+  handlers: RealtimeSidebandHandlers,
+) => Promise<RealtimeSidebandSocket>;
+
+/** The few WebSocket members used, so a test can pass a fake. */
+export type SidebandWebSocketLike = {
+  readyState: number;
+  send(data: string): void;
+  close(): void;
+  addEventListener(type: string, listener: (event: unknown) => void): void;
+};
+
+export type SidebandWebSocketFactory = (
+  url: string,
+  headers: Readonly<Record<string, string>>,
+) => SidebandWebSocketLike;
+
+const OPEN = 1;
+const SIDEBAND_OPEN_MS = 10_000;
+const CALL_ID = /^rtc_[A-Za-z0-9_-]{1,120}$/;
+
+function isSocketLike(value: unknown): value is SidebandWebSocketLike {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof Reflect.get(value, "send") === "function" &&
+    typeof Reflect.get(value, "close") === "function" &&
+    typeof Reflect.get(value, "addEventListener") === "function"
+  );
+}
+
+/**
+ * Node's own WebSocket (undici), which accepts request headers as a second
+ * argument; no new dependency.
+ */
+export const nodeSidebandWebSocket: SidebandWebSocketFactory = (
+  url,
+  headers,
+) => {
+  const Ctor: unknown = Reflect.get(globalThis, "WebSocket");
+  if (typeof Ctor !== "function") throw new Error("no WebSocket here");
+  const socket: unknown = Reflect.construct(Ctor, [url, { headers }]);
+  if (!isSocketLike(socket)) throw new Error("not a WebSocket");
+  return socket;
+};
+
+export function createOpenAISidebandConnector(options: {
+  readonly apiKey: string;
+  readonly url?: string | undefined;
+  readonly webSocket?: SidebandWebSocketFactory | undefined;
+  readonly openTimeoutMs?: number | undefined;
+}): RealtimeSidebandConnector {
+  const create = options.webSocket ?? nodeSidebandWebSocket;
+  return (callId, handlers) => {
+    if (!CALL_ID.test(callId)) {
+      return Promise.reject(new Error("not a realtime call id"));
+    }
+    const url = `${options.url ?? OPENAI_REALTIME_SIDEBAND_URL}?call_id=${encodeURIComponent(callId)}`;
+    let socket: SidebandWebSocketLike;
+    try {
+      socket = create(url, { authorization: `Bearer ${options.apiKey}` });
+    } catch (error: unknown) {
+      return Promise.reject(
+        error instanceof Error ? error : new Error("sideband not opened"),
+      );
+    }
+    let closedHere = false;
+    return new Promise<RealtimeSidebandSocket>((resolve, reject) => {
+      let opened = false;
+      const timer = setTimeout(() => {
+        if (opened) return;
+        closedHere = true;
+        socket.close();
+        reject(new Error("sideband did not open"));
+      }, options.openTimeoutMs ?? SIDEBAND_OPEN_MS);
+      socket.addEventListener("open", () => {
+        opened = true;
+        clearTimeout(timer);
+        resolve({
+          send: (event) => {
+            if (socket.readyState === OPEN) socket.send(JSON.stringify(event));
+          },
+          close: () => {
+            closedHere = true;
+            socket.close();
+          },
+        });
+      });
+      socket.addEventListener("message", (message) => {
+        const data: unknown = Reflect.get(Object(message), "data");
+        if (typeof data !== "string") return;
+        let event: unknown;
+        try {
+          event = JSON.parse(data);
+        } catch {
+          return;
+        }
+        handlers.onEvent(event);
+      });
+      socket.addEventListener("close", () => {
+        clearTimeout(timer);
+        if (!opened) {
+          reject(new Error("sideband closed before it opened"));
+          return;
+        }
+        handlers.onClose(closedHere);
+      });
+      socket.addEventListener("error", () => {
+        // The close event follows and decides.
+      });
+    });
+  };
+}

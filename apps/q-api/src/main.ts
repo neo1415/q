@@ -103,9 +103,13 @@ import {
 import { createGoogleImageProvider } from "@capital-q/model-gateway/images/google";
 import { createOpenAIImageProvider } from "@capital-q/model-gateway/images/openai";
 import { createRealtimeVoiceGateway } from "@capital-q/model-gateway/realtime";
-import { createOpenAIRealtimeProvider } from "@capital-q/model-gateway/realtime/openai";
+import {
+  createOpenAIRealtimeProvider,
+  createOpenAISidebandConnector,
+} from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
 import { duplexConfigFrom } from "./voice/duplex/config.js";
+import { createDuplexSideband } from "./voice/duplex/sideband.js";
 import { createMemoryListeningStore } from "./voice/duplex/listening.js";
 import { createPostgresDuplexSpend } from "./voice/duplex/spend.js";
 import { createPostgresDuplexTranscriptStore } from "./voice/duplex/transcript.js";
@@ -5486,6 +5490,17 @@ const duplexBroker =
             }),
         }),
         logger,
+        // RECOVERY A8: the server's own connection to each call, only when
+        // CQ_VOICE_REALTIME_SIDEBAND is on (off by default; not yet
+        // verified on a live call).
+        sideband: (onUsage) =>
+          createDuplexSideband({
+            connect: createOpenAISidebandConnector({
+              apiKey: providerSecrets.openai?.reveal() ?? "",
+            }),
+            logger,
+            onUsage,
+          }),
       })
     : undefined;
 logger.info(

@@ -18,6 +18,7 @@ import {
   type QVoiceDuplexSaid,
   type QVoiceDuplexToolCall,
   type QVoiceDuplexToolResult,
+  type QVoiceDuplexTurnReport,
   type QVoiceDuplexUsageReport,
   type QVoiceDuplexUsageResult,
 } from "@capital-q/contracts";
@@ -61,6 +62,7 @@ import {
   type DuplexListeningStore,
 } from "./listening.js";
 import { routeDuplexTurn, routedAs, type DuplexRoutedAs } from "./routing.js";
+import type { DuplexSideband } from "./sideband.js";
 import type { DuplexSpendLedger } from "./spend.js";
 import type { DuplexTranscriptStore } from "./transcript.js";
 
@@ -376,6 +378,29 @@ export type DuplexBroker = {
   }) => boolean;
   /** Open lines, for tests and the startup log. */
   readonly size: () => number;
+  /**
+   * A11 (C-16): a line this instance does not hold (a deploy, a restart,
+   * another replica), rebuilt from its binding as restored from the sealed
+   * token: the same plan, tools and session, no new realtime call (the
+   * browser's call never depended on this process). False when it cannot
+   * be: duplex off, a rehearsal, someone else's binding, a denied plan.
+   */
+  readonly adopt: (input: {
+    readonly actor: ActorContext;
+    readonly binding: VoiceSessionBinding;
+  }) => Promise<boolean>;
+  /** RECOVERY A4: one turn's disposition and timings, logged. */
+  readonly outcome: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly report: QVoiceDuplexTurnReport;
+  }) => boolean;
+  /** A8 SIDEBAND: the call's id; attached only when the sideband is on. */
+  readonly attach: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly callId: string;
+  }) => boolean;
 };
 
 export type DuplexBrokerDependencies = {
@@ -391,6 +416,18 @@ export type DuplexBrokerDependencies = {
   /** VOICE-BRAIN: the line's transcript, both sides (server-only). */
   readonly transcript?: DuplexTranscriptStore | undefined;
   readonly now?: (() => number) | undefined;
+  /**
+   * A8 SIDEBAND: builds the server's connection to a call from the
+   * broker's own usage recorder. Used only when config.sideband is on.
+   */
+  readonly sideband?:
+    | ((
+        onUsage: (
+          voiceSessionId: string,
+          report: QVoiceDuplexUsageReport,
+        ) => void,
+      ) => DuplexSideband)
+    | undefined;
 };
 
 /** A speaker that keeps what Q would have said, for the model to say. */
@@ -499,14 +536,28 @@ export function createDuplexBroker(
   const now = dependencies.now ?? Date.now;
   const lines = new Map<string, DuplexLine>();
   const enabled = config.enabled && gateway.enabled;
+  // A8: built once; usage it sees lands on the same ledger as the
+  // browser's reports, counted once per response.
+  const sideband: DuplexSideband | undefined =
+    config.sideband && dependencies.sideband !== undefined
+      ? dependencies.sideband((voiceSessionId, report) => {
+          const line = lines.get(voiceSessionId);
+          if (line !== undefined) void record(line, report);
+        })
+      : undefined;
 
   const expired = (line: DuplexLine, at: number) =>
     at - line.openedAt > config.maxSessionMs + GRACE_MS ||
     at - line.lastActivityAt > config.idleMs + GRACE_MS;
 
+  const forget = (voiceSessionId: string) => {
+    lines.delete(voiceSessionId);
+    sideband?.detach(voiceSessionId);
+  };
+
   const sweep = () => {
     const at = now();
-    for (const [id, line] of lines) if (expired(line, at)) lines.delete(id);
+    for (const [id, line] of lines) if (expired(line, at)) forget(id);
   };
 
   /** What open lines still hold against today's cap. */
@@ -530,6 +581,39 @@ export function createDuplexBroker(
       return null;
     }
     return line;
+  };
+
+  /**
+   * One response's usage on the line's ledger, once per response id
+   * (the browser's report and the sideband's are the same response).
+   * False when it could not be recorded: spend that cannot be recorded
+   * cannot be capped, so the line stops.
+   */
+  const record = async (
+    line: DuplexLine,
+    report: QVoiceDuplexUsageReport,
+  ): Promise<boolean> => {
+    if (line.seen.has(report.responseId)) return true;
+    line.seen.add(report.responseId);
+    const { responseId: _responseId, kind, ...usage } = report;
+    const counted = kind ?? "RESPONSE";
+    line.kinds[counted] = (line.kinds[counted] ?? 0) + 1;
+    try {
+      line.spentUsd += await gateway.record({
+        usage,
+        kind: counted,
+        attribution: {
+          tenantId: line.actor.tenantId,
+          userId: line.actor.userId,
+          correlationId: `rt_${line.voiceSessionId}`,
+        },
+      });
+      return true;
+    } catch (error: unknown) {
+      logger.warn({ err: error }, "duplex usage could not be recorded");
+      forget(line.voiceSessionId);
+      return false;
+    }
   };
 
   const fallback = (reason: DuplexFallbackReason): DuplexOpenResult => {
@@ -737,6 +821,158 @@ export function createDuplexBroker(
     );
   };
 
+  /**
+   * Everything a line is before its realtime call exists: the Context
+   * Firewall's plan, the tool offer, the listening level and the session
+   * the call is minted with. Shared by `open` and by `adopt` (A11), which
+   * rebuilds the line on another instance without minting a new call.
+   */
+  const prepare = async (
+    binding: VoiceSessionBinding,
+    input: {
+      readonly firstMessage?: string | undefined;
+      readonly locale?: string | undefined;
+      readonly vocabulary?: readonly string[] | undefined;
+    },
+  ): Promise<
+    | { readonly kind: "FALLBACK"; readonly reason: DuplexFallbackReason }
+    | {
+        readonly kind: "READY";
+        readonly mint: RealtimeMintRequest;
+        readonly listening: QVoiceDuplexListening | undefined;
+        readonly direct: readonly QOfferedTool[];
+        readonly line: (at: number) => DuplexLine;
+      }
+  > => {
+    const { actor } = binding;
+    const { firstMessage, locale, vocabulary } = input;
+    const refuse = (reason: DuplexFallbackReason) =>
+      ({ kind: "FALLBACK", reason }) as const;
+    // The Context Firewall before anything a model sees: the same plan a
+    // Q answer gets for this person, thread and screen.
+    const runId = QRunIdSchema.parse(randomUUID());
+    const correlationId = CorrelationIdSchema.parse(createCorrelationId());
+    const decision = await firewall.plan({
+      actor,
+      runId,
+      correlationId,
+      capability: "ANSWER",
+      subjects: binding.thread.subjects ?? [],
+      ...(binding.thread.screen === undefined
+        ? {}
+        : { screen: binding.thread.screen }),
+    });
+    if (decision.outcome === "DENIED") return refuse("DENIED");
+    const context: QToolExecutionContext = {
+      actor,
+      runId,
+      correlationId,
+      capability: "ANSWER",
+      plan: decision.plan,
+    };
+
+    // Only what the registry offers this plan, and of that only reads.
+    let offered: readonly QOfferedTool[];
+    try {
+      offered = await tools.offer(context);
+    } catch (error: unknown) {
+      logger.warn({ err: error }, "duplex tool offer failed");
+      return refuse("TOOLS_UNAVAILABLE");
+    }
+    const direct = offered
+      .filter((tool) => tool.classification === "READ_ONLY")
+      .slice(0, config.maxDirectTools);
+
+    // BACKCHANNEL: the person's remembered level. A read that fails
+    // costs the line its memory, never the line: the default applies.
+    const listens = config.backchannel;
+    let listening: QVoiceDuplexListening | undefined;
+    if (listens) {
+      let remembered = null;
+      try {
+        remembered = (await dependencies.listening?.read(actor)) ?? null;
+      } catch (error: unknown) {
+        logger.warn({ err: error }, "duplex listening level unreadable");
+      }
+      listening = {
+        level: remembered?.level ?? Q_VOICE_LISTENING_DEFAULT,
+        setAt:
+          remembered === null ? null : new Date(remembered.setAt).toISOString(),
+        backchannelInstructions: BACKCHANNEL_INSTRUCTIONS,
+        bridgeInstructions: BRIDGE_INSTRUCTIONS,
+      };
+    }
+
+    const guided =
+      binding.thread.welcome === true ||
+      binding.thread.onboarding !== undefined;
+    const mint: RealtimeMintRequest = {
+      instructions: duplexInstructions({
+        firstMessage,
+        locale,
+        listening: listens,
+        guided,
+      }),
+      tools: duplexTools(
+        // Every line answers through ask_q alone (founder 2026-10-06):
+        // with read tools of its own the voice model answered around Q,
+        // so the mandate, the answer cards and page navigation (which
+        // only Q's run holds) never reached the person.
+        [],
+        { listening: listens },
+      ),
+      voice: binding.voice,
+      maxOutputTokens: config.maxOutputTokens,
+      secretTtlSeconds: config.secretTtlSeconds,
+      speechSpeed: config.speechSpeed,
+      // VOICE-BRAIN: the model never answers a turn by itself; every
+      // turn is transcribed and the server decides who answers it.
+      ...(config.routeTurns ? { routeTurns: true, transcribeInput: true } : {}),
+      ...(listens
+        ? {
+            transcribeInput: true,
+            turnEagerness:
+              listening?.level === "OFF"
+                ? ("HIGH" as const)
+                : ("AUTO" as const),
+          }
+        : {}),
+      transcriptionHint: transcriptionHintFor({ locale, vocabulary }),
+      sensitivity: decision.plan.maxSensitivity,
+      attribution: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        correlationId,
+      },
+    };
+    const line = (at: number): DuplexLine => ({
+      voiceSessionId: binding.voiceSessionId,
+      actor,
+      binding,
+      context,
+      direct: new Set(direct.map((tool) => tool.definition.name)),
+      openedAt: at,
+      mint,
+      listeningCredential: listening,
+      rejoins: 0,
+      lastActivityAt: at,
+      spentUsd: 0,
+      seen: new Set(),
+      listening: listens,
+      kinds: {},
+      history: [],
+      narration: [],
+      narrationSequence: 0,
+      asking: 0,
+      listeners: new Set(),
+      guided,
+      turn: null,
+      awaitingApproval: false,
+      qAsked: false,
+    });
+    return { kind: "READY", mint, listening, direct, line };
+  };
+
   return {
     enabled,
     size: () => {
@@ -752,7 +988,7 @@ export function createDuplexBroker(
       sweep();
       // One duplex line per person: a new one replaces what was open.
       for (const [id, line] of lines) {
-        if (line.actor.userId === actor.userId) lines.delete(id);
+        if (line.actor.userId === actor.userId) forget(id);
       }
 
       let spent: number;
@@ -767,136 +1003,17 @@ export function createDuplexBroker(
         return fallback("CAP_REACHED");
       }
 
-      // The Context Firewall before anything a model sees: the same plan a
-      // Q answer gets for this person, thread and screen.
-      const runId = QRunIdSchema.parse(randomUUID());
-      const correlationId = CorrelationIdSchema.parse(createCorrelationId());
-      const decision = await firewall.plan({
-        actor,
-        runId,
-        correlationId,
-        capability: "ANSWER",
-        subjects: binding.thread.subjects ?? [],
-        ...(binding.thread.screen === undefined
-          ? {}
-          : { screen: binding.thread.screen }),
+      const prepared = await prepare(binding, {
+        firstMessage,
+        locale,
+        vocabulary,
       });
-      if (decision.outcome === "DENIED") return fallback("DENIED");
-      const context: QToolExecutionContext = {
-        actor,
-        runId,
-        correlationId,
-        capability: "ANSWER",
-        plan: decision.plan,
-      };
-
-      // Only what the registry offers this plan, and of that only reads.
-      let offered: readonly QOfferedTool[];
-      try {
-        offered = await tools.offer(context);
-      } catch (error: unknown) {
-        logger.warn({ err: error }, "duplex tool offer failed");
-        return fallback("TOOLS_UNAVAILABLE");
-      }
-      const direct = offered
-        .filter((tool) => tool.classification === "READ_ONLY")
-        .slice(0, config.maxDirectTools);
-
-      // BACKCHANNEL: the person's remembered level. A read that fails
-      // costs the line its memory, never the line: the default applies.
-      const listens = config.backchannel;
-      let listening: QVoiceDuplexListening | undefined;
-      if (listens) {
-        let remembered = null;
-        try {
-          remembered = (await dependencies.listening?.read(actor)) ?? null;
-        } catch (error: unknown) {
-          logger.warn({ err: error }, "duplex listening level unreadable");
-        }
-        listening = {
-          level: remembered?.level ?? Q_VOICE_LISTENING_DEFAULT,
-          setAt:
-            remembered === null
-              ? null
-              : new Date(remembered.setAt).toISOString(),
-          backchannelInstructions: BACKCHANNEL_INSTRUCTIONS,
-          bridgeInstructions: BRIDGE_INSTRUCTIONS,
-        };
-      }
-
-      const guided =
-        binding.thread.welcome === true ||
-        binding.thread.onboarding !== undefined;
-      const mint: RealtimeMintRequest = {
-        instructions: duplexInstructions({
-          firstMessage,
-          locale,
-          listening: listens,
-          guided,
-        }),
-        tools: duplexTools(
-          // Every line answers through ask_q alone (founder 2026-10-06):
-          // with read tools of its own the voice model answered around Q,
-          // so the mandate, the answer cards and page navigation (which
-          // only Q's run holds) never reached the person.
-          [],
-          { listening: listens },
-        ),
-        voice: binding.voice,
-        maxOutputTokens: config.maxOutputTokens,
-        secretTtlSeconds: config.secretTtlSeconds,
-        speechSpeed: config.speechSpeed,
-        // VOICE-BRAIN: the model never answers a turn by itself; every
-        // turn is transcribed and the server decides who answers it.
-        ...(config.routeTurns
-          ? { routeTurns: true, transcribeInput: true }
-          : {}),
-        ...(listens
-          ? {
-              transcribeInput: true,
-              turnEagerness:
-                listening?.level === "OFF"
-                  ? ("HIGH" as const)
-                  : ("AUTO" as const),
-            }
-          : {}),
-        transcriptionHint: transcriptionHintFor({ locale, vocabulary }),
-        sensitivity: decision.plan.maxSensitivity,
-        attribution: {
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          correlationId,
-        },
-      };
+      if (prepared.kind === "FALLBACK") return fallback(prepared.reason);
+      const { mint, listening, direct } = prepared;
       const minted = await gateway.mint(mint);
       if (minted.status !== "MINTED") return fallback("MINT_UNAVAILABLE");
 
-      const at = now();
-      lines.set(binding.voiceSessionId, {
-        voiceSessionId: binding.voiceSessionId,
-        actor,
-        binding,
-        context,
-        direct: new Set(direct.map((tool) => tool.definition.name)),
-        openedAt: at,
-        mint,
-        listeningCredential: listening,
-        rejoins: 0,
-        lastActivityAt: at,
-        spentUsd: 0,
-        seen: new Set(),
-        listening: listens,
-        kinds: {},
-        history: [],
-        narration: [],
-        narrationSequence: 0,
-        asking: 0,
-        listeners: new Set(),
-        guided,
-        turn: null,
-        awaitingApproval: false,
-        qAsked: false,
-      });
+      lines.set(binding.voiceSessionId, prepared.line(now()));
       logger.info(
         {
           qVoiceSessionId: binding.voiceSessionId,
@@ -943,18 +1060,35 @@ export function createDuplexBroker(
       }
       if (route !== "ASK_Q") return { route };
       if (line.turn !== null) line.turn.asked = true;
+      const heardAt = now();
       const result = await askQ(
         line,
         words,
         signal ?? new AbortController().signal,
       );
+      const callId = `cq_${randomUUID().replace(/-/g, "")}`;
+      const args = JSON.stringify({ request: words });
+      // A8 SIDEBAND: the answer goes on the call from here, at once; the
+      // browser only learns it was delivered. Never a silent or cancelled
+      // turn, and never one the person has spoken over since.
+      const delivered =
+        sideband !== undefined &&
+        result.silent !== true &&
+        result.disposition !== "CANCELLED" &&
+        sideband.deliver(voiceSessionId, {
+          callId,
+          arguments: args,
+          output: result.output,
+          since: heardAt,
+        });
       return {
         route: "ASK_Q",
         // The browser records this call on the line, then its output, so
         // the voice says Q's answer as the reply to their turn.
-        callId: `cq_${randomUUID().replace(/-/g, "")}`,
-        arguments: JSON.stringify({ request: words }),
+        callId,
+        arguments: args,
         output: result.output,
+        ...(delivered ? { delivered: "SERVER" as const } : {}),
         approvalPending: result.approvalPending,
         ...(result.silent === true ? { silent: true } : {}),
         disposition: result.disposition,
@@ -1130,28 +1264,7 @@ export function createDuplexBroker(
       if (line === null) return null;
       const at = now();
       line.lastActivityAt = at;
-      if (!line.seen.has(report.responseId)) {
-        line.seen.add(report.responseId);
-        const { responseId: _responseId, kind, ...usage } = report;
-        const counted = kind ?? "RESPONSE";
-        line.kinds[counted] = (line.kinds[counted] ?? 0) + 1;
-        try {
-          line.spentUsd += await gateway.record({
-            usage,
-            kind: counted,
-            attribution: {
-              tenantId: actor.tenantId,
-              userId: actor.userId,
-              correlationId: `rt_${voiceSessionId}`,
-            },
-          });
-        } catch (error: unknown) {
-          // Spend that could not be recorded cannot be capped: stop.
-          logger.warn({ err: error }, "duplex usage could not be recorded");
-          lines.delete(voiceSessionId);
-          return { continue: false };
-        }
-      }
+      if (!(await record(line, report))) return { continue: false };
       if (at - line.openedAt >= config.maxSessionMs) {
         // Kept (I1): the browser rejoins this line with a fresh call; an
         // abandoned one is swept GRACE_MS past its length.
@@ -1161,11 +1274,11 @@ export function createDuplexBroker(
       try {
         spent = await spend.spentTodayUsd(new Date(at));
       } catch {
-        lines.delete(voiceSessionId);
+        forget(voiceSessionId);
         return { continue: false };
       }
       if (spent >= config.dailyCapUsd) {
-        lines.delete(voiceSessionId);
+        forget(voiceSessionId);
         logger.info({ spentUsd: spent }, "duplex daily cap reached");
         return { continue: false, notice: DUPLEX_CAP_NOTICE };
       }
@@ -1203,7 +1316,7 @@ export function createDuplexBroker(
         spent = await spend.spentTodayUsd(new Date(now()));
       } catch (error: unknown) {
         logger.warn({ err: error }, "duplex spend ledger unreadable");
-        lines.delete(voiceSessionId);
+        forget(voiceSessionId);
         return {};
       }
       // This line's own reservation is already inside `reserved()`.
@@ -1211,7 +1324,7 @@ export function createDuplexBroker(
         spent >= config.dailyCapUsd ||
         spent + reserved() > config.dailyCapUsd
       ) {
-        lines.delete(voiceSessionId);
+        forget(voiceSessionId);
         logger.info({ spentUsd: spent, cause }, "duplex daily cap reached");
         return { notice: DUPLEX_CAP_NOTICE };
       }
@@ -1221,7 +1334,7 @@ export function createDuplexBroker(
           { qVoiceSessionId: voiceSessionId, cause },
           "duplex voice rejoin could not mint",
         );
-        lines.delete(voiceSessionId);
+        forget(voiceSessionId);
         return {};
       }
       const at = now();
@@ -1247,10 +1360,63 @@ export function createDuplexBroker(
       };
     },
 
+    adopt: async ({ actor, binding }) => {
+      if (!enabled || binding.thread.rehearsal !== undefined) return false;
+      // The sealed token names the person; only that person may adopt it.
+      if (
+        binding.actor.userId !== actor.userId ||
+        binding.actor.tenantId !== actor.tenantId
+      ) {
+        return false;
+      }
+      sweep();
+      if (lines.has(binding.voiceSessionId)) return true;
+      const prepared = await prepare(binding, {});
+      if (prepared.kind === "FALLBACK") {
+        logger.info(
+          {
+            qVoiceSessionId: binding.voiceSessionId,
+            reason: prepared.reason,
+          },
+          "duplex voice line not adopted",
+        );
+        return false;
+      }
+      // One duplex line per person, as on open.
+      for (const [id, held] of lines) {
+        if (held.actor.userId === actor.userId) forget(id);
+      }
+      lines.set(binding.voiceSessionId, prepared.line(now()));
+      logger.info(
+        { qVoiceSessionId: binding.voiceSessionId },
+        "duplex voice line adopted",
+      );
+      return true;
+    },
+
+    outcome: ({ actor, voiceSessionId, report }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return false;
+      line.lastActivityAt = now();
+      // Ids and milliseconds only: never the person's words.
+      logger.info(
+        { qVoiceSessionId: voiceSessionId, ...report },
+        "duplex voice turn",
+      );
+      return true;
+    },
+
+    attach: ({ actor, voiceSessionId, callId }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return false;
+      sideband?.attach(voiceSessionId, callId);
+      return true;
+    },
+
     end: ({ actor, voiceSessionId, reason, cause, stats }) => {
       const line = ownLine(actor, voiceSessionId);
       if (line === null) return false;
-      lines.delete(voiceSessionId);
+      forget(voiceSessionId);
       logger.info(
         {
           qVoiceSessionId: voiceSessionId,

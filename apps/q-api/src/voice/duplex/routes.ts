@@ -1,19 +1,24 @@
 import type {
   FastifyInstance,
   FastifyReply,
+  FastifyRequest,
   onRequestHookHandler,
 } from "fastify";
 
 import {
   parseContract,
+  Q_VOICE_DUPLEX_ATTACH_PATH,
   Q_VOICE_DUPLEX_END_PATH,
+  Q_VOICE_DUPLEX_OUTCOME_PATH,
   Q_VOICE_DUPLEX_HEARD_PATH,
   Q_VOICE_DUPLEX_NARRATION_PATH,
   Q_VOICE_DUPLEX_SAID_PATH,
   Q_VOICE_DUPLEX_REJOIN_PATH,
   Q_VOICE_DUPLEX_TOOL_PATH,
   Q_VOICE_DUPLEX_USAGE_PATH,
+  QVoiceDuplexAttachSchema,
   QVoiceDuplexEndSchema,
+  QVoiceDuplexTurnReportSchema,
   QVoiceDuplexHeardResultSchema,
   QVoiceDuplexHeardSchema,
   QVoiceDuplexSaidSchema,
@@ -28,6 +33,7 @@ import {
 } from "@capital-q/contracts";
 
 import { getActorContext } from "../../security/actor-context.js";
+import type { VoiceSessionBinding } from "../bindings.js";
 import type { DuplexBroker } from "./broker.js";
 
 /**
@@ -52,12 +58,42 @@ export function registerDuplexVoiceRoutes(
     readonly broker: DuplexBroker;
     /** The same onRequest hook the other voice routes use. */
     readonly withContext: onRequestHookHandler;
+    /**
+     * A11 (C-16): the binding the request's sealed voice-session token
+     * names, restored on this instance; null without a valid token.
+     */
+    readonly restore?:
+      | ((request: FastifyRequest) => Promise<VoiceSessionBinding | null>)
+      | undefined;
   },
 ): void {
   const { broker, withContext } = dependencies;
   const actorOf = getActorContext;
   const idOf = (params: unknown) =>
     (params as { voiceSessionId?: string }).voiceSessionId ?? "";
+
+  /**
+   * A11 (C-16): the broker's answer for this request, adopting the line
+   * from its sealed binding once when this instance does not hold it (a
+   * deploy, a restart, another replica). Before, every relay after a
+   * deploy was a 404 and the turn in flight was lost.
+   */
+  const withLine = async <T>(
+    request: FastifyRequest,
+    run: () => T | Promise<T>,
+    missing: (value: T) => boolean,
+  ): Promise<T> => {
+    const first = await run();
+    if (!missing(first) || dependencies.restore === undefined) return first;
+    const binding = await dependencies.restore(request);
+    if (binding === null || binding.voiceSessionId !== idOf(request.params)) {
+      return first;
+    }
+    const adopted = await broker.adopt({ actor: actorOf(request), binding });
+    return adopted ? run() : first;
+  };
+  const isNull = (value: unknown) => value === null;
+  const isFalse = (value: boolean) => !value;
 
   app.post(
     Q_VOICE_DUPLEX_TOOL_PATH,
@@ -73,12 +109,17 @@ export function registerDuplexVoiceRoutes(
       reply.raw.once("close", () => {
         if (!reply.raw.writableFinished) controller.abort();
       });
-      const result = await broker.tool({
-        actor: actorOf(request),
-        voiceSessionId: idOf(request.params),
-        call,
-        signal: controller.signal,
-      });
+      const result = await withLine(
+        request,
+        () =>
+          broker.tool({
+            actor: actorOf(request),
+            voiceSessionId: idOf(request.params),
+            call,
+            signal: controller.signal,
+          }),
+        isNull,
+      );
       if (result === null) return gone(reply);
       return reply
         .code(200)
@@ -102,12 +143,17 @@ export function registerDuplexVoiceRoutes(
       reply.raw.once("close", () => {
         if (!reply.raw.writableFinished) controller.abort();
       });
-      const result = await broker.heard({
-        actor: actorOf(request),
-        voiceSessionId: idOf(request.params),
-        heard,
-        signal: controller.signal,
-      });
+      const result = await withLine(
+        request,
+        () =>
+          broker.heard({
+            actor: actorOf(request),
+            voiceSessionId: idOf(request.params),
+            heard,
+            signal: controller.signal,
+          }),
+        isNull,
+      );
       if (result === null) return gone(reply);
       return reply
         .code(200)
@@ -120,17 +166,22 @@ export function registerDuplexVoiceRoutes(
   app.post(
     Q_VOICE_DUPLEX_SAID_PATH,
     { onRequest: withContext },
-    (request, reply) => {
+    async (request, reply) => {
       const said = parseContract(
         QVoiceDuplexSaidSchema,
         request.body ?? {},
         "That is not something said.",
       );
-      const known = broker.said({
-        actor: actorOf(request),
-        voiceSessionId: idOf(request.params),
-        said,
-      });
+      const known = await withLine(
+        request,
+        () =>
+          broker.said({
+            actor: actorOf(request),
+            voiceSessionId: idOf(request.params),
+            said,
+          }),
+        isFalse,
+      );
       if (!known) return gone(reply);
       return reply.code(204).send();
     },
@@ -145,11 +196,16 @@ export function registerDuplexVoiceRoutes(
         request.body ?? {},
         "That usage report is not valid.",
       );
-      const result = await broker.usage({
-        actor: actorOf(request),
-        voiceSessionId: idOf(request.params),
-        report,
-      });
+      const result = await withLine(
+        request,
+        () =>
+          broker.usage({
+            actor: actorOf(request),
+            voiceSessionId: idOf(request.params),
+            report,
+          }),
+        isNull,
+      );
       if (result === null) return gone(reply);
       return reply
         .code(200)
@@ -172,12 +228,17 @@ export function registerDuplexVoiceRoutes(
       reply.raw.once("close", () => {
         if (!reply.raw.writableFinished) controller.abort();
       });
-      const result = await broker.narration({
-        actor: actorOf(request),
-        voiceSessionId: idOf(request.params),
-        after: body.after,
-        signal: controller.signal,
-      });
+      const result = await withLine(
+        request,
+        () =>
+          broker.narration({
+            actor: actorOf(request),
+            voiceSessionId: idOf(request.params),
+            after: body.after,
+            signal: controller.signal,
+          }),
+        isNull,
+      );
       if (result === null) return gone(reply);
       return reply
         .code(200)
@@ -196,16 +257,71 @@ export function registerDuplexVoiceRoutes(
         request.body ?? {},
         "That is not a reason to rejoin.",
       );
-      const result = await broker.rejoin({
-        actor: actorOf(request),
-        voiceSessionId: idOf(request.params),
-        cause: body.cause,
-      });
+      const result = await withLine(
+        request,
+        () =>
+          broker.rejoin({
+            actor: actorOf(request),
+            voiceSessionId: idOf(request.params),
+            cause: body.cause,
+          }),
+        isNull,
+      );
       if (result === null) return gone(reply);
       return reply
         .code(200)
         .header("Cache-Control", "no-store")
         .send(QVoiceDuplexRejoinResultSchema.parse(result));
+    },
+  );
+
+  // RECOVERY A4: one turn's disposition and timings, for the server log.
+  app.post(
+    Q_VOICE_DUPLEX_OUTCOME_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const report = parseContract(
+        QVoiceDuplexTurnReportSchema,
+        request.body ?? {},
+        "That is not a turn outcome.",
+      );
+      const known = await withLine(
+        request,
+        () =>
+          broker.outcome({
+            actor: actorOf(request),
+            voiceSessionId: idOf(request.params),
+            report,
+          }),
+        isFalse,
+      );
+      if (!known) return gone(reply);
+      return reply.code(204).send();
+    },
+  );
+
+  // A8 SIDEBAND: the call's id; the server attaches only when it is on.
+  app.post(
+    Q_VOICE_DUPLEX_ATTACH_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const body = parseContract(
+        QVoiceDuplexAttachSchema,
+        request.body ?? {},
+        "That is not a call.",
+      );
+      const known = await withLine(
+        request,
+        () =>
+          broker.attach({
+            actor: actorOf(request),
+            voiceSessionId: idOf(request.params),
+            callId: body.callId,
+          }),
+        isFalse,
+      );
+      if (!known) return gone(reply);
+      return reply.code(204).send();
     },
   );
 

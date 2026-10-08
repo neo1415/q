@@ -30,6 +30,13 @@ import {
   WEAK_LINE_NOTICE,
 } from "./line-health";
 import {
+  DELIVERY_REPAIR,
+  IGNORED_NOTICE,
+  LOST_TURN_NOTICE,
+  RENEWING_NOTICE,
+  TIMEOUT_REPAIR,
+} from "./duplex-notices";
+import {
   BackchannelPolicy,
   LEVEL_FRAME_MS,
   overlongReaction,
@@ -167,15 +174,14 @@ const NOT_WORDS = new Set([
   "oh",
   "huh",
 ]);
-/**
- * What the person sees (and, for a failure, hears) when a turn ends
- * without an answer. Plain words; never a provider error string.
- */
-export const IGNORED_NOTICE =
-  "Not answered: that didn't sound meant for me. Say it again if it was.";
-export const TIMEOUT_REPAIR =
-  "Sorry, that took too long on my side. Ask me again?";
-export const DELIVERY_REPAIR = "Sorry, I lost my words there. Ask me again?";
+export {
+  DELIVERY_REPAIR,
+  IDLE_NOTICE,
+  IGNORED_NOTICE,
+  LOST_TURN_NOTICE,
+  RENEWING_NOTICE,
+  TIMEOUT_REPAIR,
+} from "./duplex-notices";
 const NOISE_RESUME =
   "A noise interrupted you; it was not the person speaking. Carry on with your answer from where you stopped, without repeating what you already said and without mentioning the noise.";
 /**
@@ -1139,6 +1145,19 @@ export class DuplexLine {
       ?.getAudioTracks()
       .some((track) => track.readyState !== "ended");
     if (live === false) void this.#reacquireMicrophone();
+  }
+
+  /**
+   * A11 (C-16): the server no longer knows this line, even from its sealed
+   * token. The turn in flight is said to be lost (never silently dropped)
+   * and the line is renewed: a fresh one comes up on the same thread.
+   */
+  gone(): void {
+    if (this.#over || this.#rejoining) return;
+    const lost = this.#turn !== null;
+    if (lost) this.#closeTurn("FAILED", "NETWORK", LOST_TURN_NOTICE);
+    // The notice is shown once the renewed line is up.
+    this.#fallback("RELAY", lost ? LOST_TURN_NOTICE : RENEWING_NOTICE);
   }
 
   /** The person ended it. */

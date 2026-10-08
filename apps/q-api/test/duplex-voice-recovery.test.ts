@@ -8,6 +8,9 @@ import {
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   QVoiceDuplexHeardResultSchema,
   QVoiceDuplexToolResultSchema,
+  QVoiceDuplexTurnReportSchema,
+  qVoiceDuplexHeardPath,
+  qVoiceDuplexOutcomePath,
   qVoiceDuplexToolPath,
 } from "@capital-q/contracts";
 import { createInMemoryModelUsageRepository } from "@capital-q/model-gateway";
@@ -15,7 +18,11 @@ import {
   createRealtimeVoiceGateway,
   type RealtimeSessionProvider,
 } from "@capital-q/model-gateway/realtime";
-import { OPENAI_REALTIME_MINI_PRICES } from "@capital-q/model-gateway/realtime/openai";
+import {
+  OPENAI_REALTIME_MINI_PRICES,
+  createOpenAISidebandConnector,
+  type RealtimeSidebandConnector,
+} from "@capital-q/model-gateway/realtime/openai";
 import { createLogger } from "@capital-q/observability";
 import { spokenFactsOf } from "@capital-q/q-core";
 import {
@@ -34,6 +41,7 @@ import {
   ASK_Q_TOO_LONG,
   createDuplexBroker,
   type DuplexBroker,
+  type DuplexBrokerDependencies,
 } from "../src/voice/duplex/broker.js";
 import {
   DUPLEX_DEFAULTS,
@@ -41,6 +49,11 @@ import {
 } from "../src/voice/duplex/config.js";
 import { registerDuplexVoiceRoutes } from "../src/voice/duplex/routes.js";
 import { routeDuplexTurn } from "../src/voice/duplex/routing.js";
+import {
+  createDuplexSideband,
+  SIDEBAND_REATTACH_MAX,
+  sidebandUsageReport,
+} from "../src/voice/duplex/sideband.js";
 import {
   createVoiceTurnTimings,
   timedVoiceTurns,
@@ -90,6 +103,10 @@ function binding(): VoiceSessionBinding {
 async function brokerWith(
   turn: VoiceTurnHandler,
   config: Partial<typeof DUPLEX_DEFAULTS> = {},
+  extra: {
+    readonly open?: boolean;
+    readonly sideband?: DuplexBrokerDependencies["sideband"];
+  } = {},
 ): Promise<DuplexBroker> {
   const provider: RealtimeSessionProvider = {
     code: "fake",
@@ -147,7 +164,9 @@ async function brokerWith(
     turn,
     spend: { spentTodayUsd: () => Promise.resolve(0) },
     logger,
+    ...(extra.sideband === undefined ? {} : { sideband: extra.sideband }),
   });
+  if (extra.open === false) return broker;
   const opened = await broker.open({ binding: binding() });
   expect(opened.kind).toBe("DUPLEX");
   return broker;
@@ -164,6 +183,11 @@ const askQ = (broker: DuplexBroker, request: string, signal?: AbortSignal) =>
     },
     signal,
   });
+
+const answeringTurn: VoiceTurnHandler = async (_b, _t, _s, speaker) => {
+  await speaker.speak("Three investors fit.");
+  return { kind: "SPOKEN", path: "Q" };
+};
 
 const silentTurn: VoiceTurnHandler = () => Promise.resolve({ kind: "NOTHING" });
 
@@ -398,5 +422,343 @@ describe("A3 (C-03/B-01): the voice never answers business on its own", () => {
     });
     expect(result?.route).toBe("ASK_Q");
     expect(turn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("A11 (C-16): a line survives a deploy or restart", () => {
+  const answering: VoiceTurnHandler = async (_b, _t, _s, speaker) => {
+    await speaker.speak("Three investors fit.");
+    return { kind: "SPOKEN", path: "Q" };
+  };
+
+  async function routesFor(
+    broker: DuplexBroker,
+    restore: (token: string) => VoiceSessionBinding | null,
+  ) {
+    const server: FastifyInstance = Fastify();
+    server.decorateRequest("actorContext", undefined);
+    registerDuplexVoiceRoutes(server, {
+      broker,
+      withContext: (request, _reply, done) => {
+        request.actorContext = ACTOR;
+        done();
+      },
+      restore: (request) => {
+        const token = request.headers["x-q-voice-session"];
+        return Promise.resolve(
+          typeof token === "string" ? restore(token) : null,
+        );
+      },
+    });
+    await server.ready();
+    return server;
+  }
+
+  it("a fresh instance adopts the line from its sealed binding and answers the turn in flight", async () => {
+    // The instance that minted the line is gone; this one never saw it.
+    const fresh = await brokerWith(answering, {}, { open: false });
+    const server = await routesFor(fresh, (token) =>
+      token === "sealed" ? binding() : null,
+    );
+    const response = await server.inject({
+      method: "POST",
+      url: qVoiceDuplexHeardPath(ID),
+      headers: { "x-q-voice-session": "sealed" },
+      payload: { itemId: "item_1", transcript: "Who fits my raise?" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      route: "ASK_Q",
+      disposition: "ANSWERED",
+    });
+    expect(fresh.size()).toBe(1);
+    await server.close();
+  });
+
+  it("is still not found without a token, with someone else's, or for another line", async () => {
+    const fresh = await brokerWith(answering, {}, { open: false });
+    const server = await routesFor(fresh, (token) =>
+      token === "theirs"
+        ? {
+            ...binding(),
+            actor: {
+              ...ACTOR,
+              userId: UserIdSchema.parse(
+                "b0000000-0000-4000-8000-000000000009",
+              ),
+            },
+          }
+        : token === "other"
+          ? { ...binding(), voiceSessionId: randomUUID() }
+          : null,
+    );
+    for (const headers of [
+      {},
+      { "x-q-voice-session": "theirs" },
+      { "x-q-voice-session": "other" },
+    ]) {
+      const response = await server.inject({
+        method: "POST",
+        url: qVoiceDuplexHeardPath(ID),
+        headers,
+        payload: { itemId: "item_1", transcript: "Who fits my raise?" },
+      });
+      expect(response.statusCode).toBe(404);
+    }
+    expect(fresh.size()).toBe(0);
+    await server.close();
+  });
+
+  it("logs each turn's disposition and timings, never words", async () => {
+    const broker = await brokerWith(answering);
+    const server = await routesFor(broker, () => null);
+    const response = await server.inject({
+      method: "POST",
+      url: qVoiceDuplexOutcomePath(ID),
+      payload: {
+        turnId: "turn_abcdefgh01",
+        disposition: "ANSWERED",
+        firstAudioMs: 1_240,
+        relayMs: 900,
+      },
+    });
+    expect(response.statusCode).toBe(204);
+    // Words are refused by the contract itself (strict).
+    expect(
+      QVoiceDuplexTurnReportSchema.safeParse({
+        turnId: "turn_abcdefgh01",
+        disposition: "ANSWERED",
+        said: "Who fits my raise?",
+      }).success,
+    ).toBe(false);
+    await server.close();
+  });
+});
+
+describe("A8 SIDEBAND (fake socket; not verified on a live call)", () => {
+  type Sent = Record<string, unknown>;
+  function fakeConnector() {
+    const sockets: {
+      callId: string;
+      sent: Sent[];
+      emit: (event: unknown) => void;
+      drop: () => void;
+      closed: boolean;
+    }[] = [];
+    const connect: RealtimeSidebandConnector = (callId, handlers) => {
+      const socket = {
+        callId,
+        sent: [] as Sent[],
+        emit: handlers.onEvent,
+        drop: () => {
+          handlers.onClose(false);
+        },
+        closed: false,
+      };
+      sockets.push(socket);
+      return Promise.resolve({
+        send: (event) => {
+          socket.sent.push({ ...event });
+        },
+        close: () => {
+          socket.closed = true;
+        },
+      });
+    };
+    return { connect, sockets };
+  }
+
+  it("delivers Q's answer on the call from the server, and the browser is told", async () => {
+    const fake = fakeConnector();
+    const broker = await brokerWith(
+      async (_b, _t, _s, speaker) => {
+        await speaker.speak("Three investors fit.");
+        return { kind: "SPOKEN", path: "Q" };
+      },
+      { sideband: true },
+      {
+        sideband: (onUsage) =>
+          createDuplexSideband({ connect: fake.connect, logger, onUsage }),
+      },
+    );
+    expect(
+      broker.attach({ actor: ACTOR, voiceSessionId: ID, callId: "rtc_abc" }),
+    ).toBe(true);
+    await Promise.resolve();
+    const result = await broker.heard({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      heard: { itemId: "item_1", transcript: "Who fits my raise?" },
+    });
+    expect(result).toMatchObject({ route: "ASK_Q", delivered: "SERVER" });
+    expect(fake.sockets[0]?.sent.map((e) => e.type)).toEqual([
+      "conversation.item.create",
+      "conversation.item.create",
+      "response.create",
+    ]);
+    expect(JSON.stringify(fake.sockets[0]?.sent)).toContain(
+      "Three investors fit.",
+    );
+  });
+
+  it("does not deliver a turn the person spoke over since it was heard", async () => {
+    const fake = fakeConnector();
+    let finish: () => void = () => undefined;
+    const broker = await brokerWith(
+      async (_b, _t, _s, speaker) => {
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+        await speaker.speak("Old answer.");
+        return { kind: "SPOKEN", path: "Q" };
+      },
+      { sideband: true },
+      {
+        sideband: (onUsage) =>
+          createDuplexSideband({
+            connect: fake.connect,
+            logger,
+            onUsage,
+            now: () => Date.now() + 5,
+          }),
+      },
+    );
+    broker.attach({ actor: ACTOR, voiceSessionId: ID, callId: "rtc_abc" });
+    await Promise.resolve();
+    const pending = broker.heard({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      heard: { itemId: "item_1", transcript: "Who fits my raise?" },
+    });
+    await Promise.resolve();
+    fake.sockets[0]?.emit({ type: "input_audio_buffer.speech_started" });
+    finish();
+    const result = await pending;
+    expect(result).not.toHaveProperty("delivered");
+    expect(fake.sockets[0]?.sent).toEqual([]);
+  });
+
+  it("records usage from the call itself, once per response with the browser's report", async () => {
+    const fake = fakeConnector();
+    const seen: string[] = [];
+    const broker = await brokerWith(
+      answeringTurn,
+      { sideband: true },
+      {
+        sideband: (onUsage) =>
+          createDuplexSideband({
+            connect: fake.connect,
+            logger,
+            onUsage: (id, report) => {
+              seen.push(report.responseId);
+              onUsage(id, report);
+            },
+          }),
+      },
+    );
+    broker.attach({ actor: ACTOR, voiceSessionId: ID, callId: "rtc_abc" });
+    await Promise.resolve();
+    fake.sockets[0]?.emit({
+      type: "response.done",
+      response: {
+        id: "resp_1",
+        status: "completed",
+        usage: { output_token_details: { audio_tokens: 400 } },
+      },
+    });
+    fake.sockets[0]?.emit({
+      type: "error",
+      error: { type: "invalid_request_error", code: "x" },
+    });
+    expect(seen).toEqual(["resp_1"]);
+    expect(
+      sidebandUsageReport("resp_1", {
+        output_token_details: { audio_tokens: 400 },
+      }).outputAudioTokens,
+    ).toBe(400);
+    // The browser's report of the same response is not counted twice.
+    const usage = await broker.usage({
+      actor: ACTOR,
+      voiceSessionId: ID,
+      report: sidebandUsageReport("resp_1", {}),
+    });
+    expect(usage).toMatchObject({ continue: true });
+  });
+
+  it("re-attaches a dropped sideband a bounded number of times", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = fakeConnector();
+      const sideband = createDuplexSideband({
+        connect: fake.connect,
+        logger,
+        onUsage: () => undefined,
+      });
+      sideband.attach(ID, "rtc_abc");
+      await vi.advanceTimersByTimeAsync(0);
+      for (let i = 0; i < SIDEBAND_REATTACH_MAX + 2; i += 1) {
+        fake.sockets.at(-1)?.drop();
+        await vi.advanceTimersByTimeAsync(10_000);
+      }
+      expect(fake.sockets).toHaveLength(SIDEBAND_REATTACH_MAX + 1);
+      sideband.detach(ID);
+      expect(sideband.attached(ID)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("is never attached when the flag is off", async () => {
+    const fake = fakeConnector();
+    const broker = await brokerWith(
+      answeringTurn,
+      {},
+      {
+        sideband: (onUsage) =>
+          createDuplexSideband({ connect: fake.connect, logger, onUsage }),
+      },
+    );
+    broker.attach({ actor: ACTOR, voiceSessionId: ID, callId: "rtc_abc" });
+    expect(fake.sockets).toHaveLength(0);
+  });
+
+  it("the OpenAI connector attaches with the server's key in a header, to the call's id, and refuses a bad id", async () => {
+    const opened: { url: string; headers: Record<string, string> }[] = [];
+    const listeners = new Map<string, (event: unknown) => void>();
+    const connector = createOpenAISidebandConnector({
+      apiKey: "disabled-locally-000000000000",
+      webSocket: (url, headers) => {
+        opened.push({ url, headers: { ...headers } });
+        return {
+          readyState: 1,
+          send: () => undefined,
+          close: () => undefined,
+          addEventListener: (type, listener) => {
+            listeners.set(type, listener);
+          },
+        };
+      },
+    });
+    const events: unknown[] = [];
+    const pending = connector("rtc_abc123", {
+      onEvent: (event) => events.push(event),
+      onClose: () => undefined,
+    });
+    listeners.get("open")?.({});
+    await pending;
+    listeners.get("message")?.({ data: '{"type":"session.updated"}' });
+    expect(opened[0]?.url).toBe(
+      "wss://api.openai.com/v1/realtime?call_id=rtc_abc123",
+    );
+    expect(opened[0]?.headers.authorization).toBe(
+      "Bearer disabled-locally-000000000000",
+    );
+    expect(events).toEqual([{ type: "session.updated" }]);
+    await expect(
+      connector("https://evil.example/", {
+        onEvent: () => undefined,
+        onClose: () => undefined,
+      }),
+    ).rejects.toThrow();
   });
 });
