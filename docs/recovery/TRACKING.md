@@ -63,3 +63,30 @@ The integration branch contains **all seven workstreams** (F, E, A, D, C, B, G's
 | F8    | Failure logging / OTel hook (F-07)                                                                 | F         | DONE (SDK not installed)                                                                                                                                                                                                                | MERGED                    | UNIT                                                              | NO   |                                                                                                                                                                                                                                                                                                                                                                          |
 | G1–G3 | Local stack, scenarios A–H, voice failure sims, promise tests                                      | G         | WIP (harness merged)                                                                                                                                                                                                                    | MERGED (part)             | —                                                                 | NO   | full run against integration in progress                                                                                                                                                                                                                                                                                                                                 |
 | INC-1 | Live "top three" incident (2026-10-08 19:14)                                                       | A+B+C+E+G | DONE (A voice lifecycle `109f5879`; B counts, "rank them" binding, mandate-fit labels, tie sentence `bf54fad2`; C named-record navigation with receipts `c0ae3eb8`; E card stability `5c847d66`; lead: card measures max 9, no "is up") | MERGED                    | UNIT + component replays (A 3 incident tests; B 8; C 9+25+6; E 5) | NO   | `docs/recovery/evidence/incident-2026-10-08-top-three.md`. Follow-ups merged: history keeps cards (G-D13, lead `117d32f6`), failed moves said in the next turn (B `b247615a`), voiced attention items and voice-move receipts (A `b81efd0c`). Real-browser regression by G pending. Unverified live: realtime events carry `response_id` (A's turn binding relies on it) |
+
+## Real-browser verification (G, LOCAL-E2E with MOCK providers, $0)
+
+**Full harness on integration before the INC-1 fixes:** 188 tests.
+
+| Project       | Result                                                                                                                                                          |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Permissions   | 15/15 green                                                                                                                                                     |
+| Scenarios     | 19 green, 9 green with annotations, 26 expected red. Navigation from /home, /documents and /relationships is green; /capital is red                             |
+| Promises      | 96 steps: 53 green, 6 green with annotations, 18 expected red (needs G-R3), 19 unexpected red that turned out to be harness bugs (fixed; not yet rerun in full) |
+| Voice         | Rerun after the harness fix: 3 green, 9 red. Standard line: 3 green, 2 red                                                                                      |
+| /home         | 10/10 green after fix `56b12fb2`                                                                                                                                |
+| Accessibility | 3 serious or critical findings: a meta-refresh on /investors, contrast on /discover, a definition list on /settings                                             |
+
+**INC-1 browser replay:** baseline `520bd123` vs integration `9324df74`.
+
+- **Green on integration:** exactly 3 cards with 3 unique ids, and the DOM matches the stored message; "rank them" keeps the same 3; reconnect keeps the cards; "Open Ledgerfold" lands with a DONE receipt.
+- **Still red:**
+  - mandate-fit wording not rendered (G-D17, E);
+  - cards lost after an attention answer (G-D18, E; a regression from the baseline);
+  - failed voice final not visible (A);
+  - multiple answer lines for one turn (A);
+  - data room by name denied (G-D16, C).
+- **Flaky:** ≤1 bridge (A); "Take me to … relationship" (C, G-D14).
+- **Fixed by the lead since:** G-D13 (history dropped cards, `117d32f6`) and G-D8 (busy pages returned 500, `00770d61`; migration `20261220210000`, local only).
+- **Dispatched:** A (G-D19, G-D20, G-D7, failed-final visibility), B (G-D3, G-R4), C (G-D14, G-D16, G-R1, accessibility), D (G-R5), E (G-D17, G-D18, G-R3, accessibility), F (G-D9). The lead added axe-core as a root devDependency (G-R6).
+- **Environment (G-D11):** real cloud-shell credentials leaked into locally started services. q-api tried to send email via Brevo, and the egress guard refused all 33 attempts, so nothing was sent and nothing was charged. G's stack now starts each service from a clean environment.
