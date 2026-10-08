@@ -121,6 +121,11 @@ export type { QOwnIndex } from "./own-standing.js";
 export { companiesInOutcome } from "./card-subjects.js";
 export { fitAnswerCardsBlock, fitsInOutcome } from "./fit-cards.js";
 export { readinessLeadLines } from "./own-readiness.js";
+export {
+  createSmallTalkReply,
+  type SmallTalkReply,
+  type SmallTalkTurn,
+} from "./small-talk.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { onScreenCompanyFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";

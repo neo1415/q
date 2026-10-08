@@ -163,7 +163,7 @@ describe("a requested series of questions (R35)", () => {
     await c.say("Seed and Series A.", ANSWER);
     await c.say("Fintech and climate.", ANSWER);
     await c.say("Europe only.", ANSWER);
-    await c.say("Thanks.", { ...base, kind: "SMALL_TALK", sequence: null });
+    await c.say("Interesting stuff.", { ...base, kind: "SMALL_TALK", sequence: null });
     expect(
       c.steps.map((s) =>
         s === null ? null : [s.kind, "number" in s ? s.number : null],

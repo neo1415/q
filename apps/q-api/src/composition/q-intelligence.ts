@@ -6,6 +6,7 @@ import type { ModelGateway } from "@capital-q/model-gateway";
 import {
   createModelGatewayQAnswer,
   createQTurnReader,
+  createSmallTalkReply,
   type QArtifactReviser,
   type QReceiptPort,
   type ClearCheck,
@@ -469,6 +470,14 @@ export function composeQIntelligence(
     // until that migration is applied, its reads and writes fail and the
     // seam stays on memory, as before.
     coreState: createPostgresConversationCore({ sql: dependencies.sql }),
+    // RECOVERY B5: small talk in one short tool-free call.
+    smallTalk: createSmallTalkReply({
+      gateway,
+      ...(dependencies.dataPosture === undefined
+        ? {}
+        : { dataPosture: dependencies.dataPosture }),
+      ...(logger === undefined ? {} : { logger }),
+    }),
     appActions: createToolAppActionPort({
       tools,
       // A declared action served by its hand-written tool (`legacyTool`,
