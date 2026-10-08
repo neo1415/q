@@ -143,6 +143,14 @@ const STOP = new Set([
   "to",
   "who",
   "with",
+  // 2026-10-08: generic words that name no kind of company ("climate tech
+  // in Germany" is a climate search).
+  "tech",
+  "technology",
+  "technologies",
+  "platform",
+  "solution",
+  "solutions",
 ]);
 
 /** Sector words a person types, to what declared profiles say. */
@@ -189,13 +197,59 @@ const SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   security: ["security"],
   cybersecurity: ["security"],
   proptech: ["property", "real estate", "proptech"],
+  // 2026-10-08: words founders and investors used for the seeded companies
+  // that their own descriptions say differently.
+  construction: ["construction", "builder", "building site"],
+  builder: ["builder", "construction"],
+  battery: ["batter", "cell", "energy storage", "stationary storage"],
+  batterie: ["batter", "cell", "energy storage", "stationary storage"],
+  storage: ["storage", "stored", "cold room", "warehouse"],
+  pharma: ["pharma", "medicine", "drug"],
+  pharmaceutical: ["pharma", "medicine", "drug"],
+  medicine: ["medicine", "pharma", "drug"],
+  traceability: ["trac", "serialis", "serializ", "recall"],
+  eye: ["eye", "retina", "vision"],
+  retinopathy: ["retina", "diabet"],
+  screening: ["screen", "refer", "diagnos"],
+  regtech: ["regtech", "regulat", "compliance", "supervisor"],
+  compliance: ["compliance", "regulat", "supervisor"],
+  confidential: ["confidential", "enclave", "sensitive data"],
+  invoicing: ["invoic"],
+  tax: ["tax", "vat"],
+  vat: ["vat", "tax"],
+  school: ["school", "education", "fees"],
+  customs: ["customs", "clearing", "clearance", "duty"],
+  shipping: ["shipping", "freight", "customs", "clearing", "port"],
+  homecare: ["home care", "care agenc"],
+  grain: ["grain", "warehouse", "agri"],
 };
 
 export type CompanySearchTerm = {
   readonly word: string;
   /** Any one of these, as a substring of the folded document, matches. */
   readonly any: readonly string[];
+  /**
+   * 2026-10-08: the word itself, as typed and stemmed. The same word as a
+   * whole word in the document ranks above a longer word that only
+   * contains it ("customs" above "customer").
+   */
+  readonly exact: readonly string[];
 };
+
+/**
+ * 2026-10-08: how many of a described search's words must match. One or
+ * two words: all of them. Three or more: all but one, so a long
+ * description still finds the company whose page says one of its words
+ * differently ("solar cold storage Kenya" finds solar cold rooms).
+ */
+export function requiredTermMatches(termCount: number): number {
+  return termCount <= 2 ? termCount : termCount - 1;
+}
+
+/** Whole-word needles for a term: the word and its plural, space-bounded. */
+export function exactNeedles(term: CompanySearchTerm): readonly string[] {
+  return term.exact.flatMap((form) => [` ${form} `, ` ${form}s `]);
+}
 
 export type ParsedCompanySearch = {
   readonly text: string;
@@ -251,13 +305,15 @@ export function parseCompanySearch(raw: string): ParsedCompanySearch | null {
   }
   const terms = rest
     .split(" ")
-    .filter((word) => word.length > 0 && !STOP.has(word))
+    // A single letter ("e" of "e-invoicing") names nothing.
+    .filter((word) => word.length > 1 && !STOP.has(word))
     .slice(0, TERMS_MAX)
     .map((word) => {
       const base = stem(word);
       return {
         word: base,
         any: [...new Set([base, ...(SYNONYMS[word] ?? SYNONYMS[base] ?? [])])],
+        exact: [...new Set([word, base])],
       };
     });
   return {
@@ -362,6 +418,11 @@ export function scoreCompanySearch(
     const sim = Math.max(
       trigramSimilarity(name, parsed.letters),
       trigramSimilarity(key, parsed.key),
+      // 2026-10-08: a misspelling of one word of a longer name ("dristi"
+      // for Drishti Health).
+      ...nameWords(doc.name).map((word) =>
+        trigramSimilarity(word, parsed.letters),
+      ),
     );
     if (sim >= FUZZY_NAME_MIN) best = 300 + Math.round(300 * sim);
   }
@@ -370,6 +431,13 @@ export function scoreCompanySearch(
     if (described !== null) best = Math.max(best, described);
   }
   return best > 0 ? best : null;
+}
+
+/** The name's words of three letters or more, folded. */
+export function nameWords(name: string): readonly string[] {
+  return foldSearchText(name)
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 3);
 }
 
 function describedScore(
@@ -391,12 +459,19 @@ function describedScore(
       ...(doc.labels ?? []),
     ].join(" "),
   ).replace(/[^a-z0-9]+/g, " ")} `;
+  let matched = 0;
+  let exact = 0;
   for (const term of parsed.terms) {
-    if (!term.any.some((needle) => haystack.includes(needle))) return null;
+    if (term.any.some((needle) => haystack.includes(needle))) matched += 1;
+    if (exactNeedles(term).some((needle) => haystack.includes(needle))) {
+      exact += 1;
+    }
   }
+  if (matched < requiredTermMatches(parsed.terms.length)) return null;
   return (
     200 +
-    20 * parsed.terms.length +
+    20 * matched +
+    5 * exact +
     10 * (parsed.countries.length > 0 ? 1 : 0) +
     10 * (parsed.stages.length > 0 ? 1 : 0)
   );

@@ -1,8 +1,10 @@
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import {
+  exactNeedles,
   FUZZY_NAME_MIN,
   isDescriptiveSearch,
+  requiredTermMatches,
   type ParsedCompanySearch,
 } from "../domain/company-search.js";
 
@@ -32,21 +34,32 @@ export function companySearchJoins(
   const descriptive = isDescriptiveSearch(parsed);
   const letters = parsed.letters;
   const key = parsed.key;
-  const terms = parsed.terms.reduce(
+  // 2026-10-08: how many words match (a substring, synonyms included) and
+  // how many appear as the whole word; the domain twin counts the same.
+  const matched = parsed.terms.reduce(
     (acc, term) =>
-      sql`${acc} and d.doc like any(${term.any.map(likeNeedle)}::text[])`,
-    sql`true`,
+      sql`${acc} + (case when d.doc like any(${term.any.map(likeNeedle)}::text[]) then 1 else 0 end)`,
+    sql`0`,
   );
+  const exact = parsed.terms.reduce(
+    (acc, term) =>
+      sql`${acc} + (case when d.doc like any(${exactNeedles(term).map(likeNeedle)}::text[]) then 1 else 0 end)`,
+    sql`0`,
+  );
+  const bonus =
+    (parsed.countries.length > 0 ? 10 : 0) +
+    (parsed.stages.length > 0 ? 10 : 0);
   const described = descriptive
     ? sql`case when (${parsed.countries.length === 0} or c.headquarters_country = any(${[...parsed.countries]}::text[]))
                 and (${parsed.stages.length === 0} or c.current_stage_code = any(${[...parsed.stages]}::text[]))
-                and ${terms}
-               then ${200 + 20 * parsed.terms.length + (parsed.countries.length > 0 ? 10 : 0) + (parsed.stages.length > 0 ? 10 : 0)}
+                and t.matched >= ${requiredTermMatches(parsed.terms.length)}::int
+               then 200 + 20 * t.matched + 5 * t.exact + ${bonus}::int
                else 0 end`
     : sql`0`;
   return sql`
     cross join lateral (
-      select regexp_replace(translate(lower(c.canonical_name), ${ACCENTED}, ${PLAIN}), '[^a-z0-9]', '', 'g') as nl
+      select regexp_replace(translate(lower(c.canonical_name), ${ACCENTED}, ${PLAIN}), '[^a-z0-9]', '', 'g') as nl,
+             btrim(regexp_replace(translate(lower(c.canonical_name), ${ACCENTED}, ${PLAIN}), '[^a-z0-9]+', ' ', 'g')) as words
     ) n
     cross join lateral (
       -- searchKey(): ph->f, ck|ch|c|q->k, x->ks, z->s, y->i, doubles collapsed
@@ -71,6 +84,16 @@ export function companySearchJoins(
       else '' end as doc
     ) d
     cross join lateral (
+      select ${matched}::int as matched, ${exact}::int as exact
+    ) t
+    cross join lateral (
+      -- 2026-10-08: the closest single word of the name, for a misspelling
+      -- of one word of a longer name ("dristi" for Drishti Health).
+      select coalesce(max(extensions.similarity(w, ${letters})), 0) as word_sim
+        from regexp_split_to_table(n.words, ' ') w
+       where length(w) >= 3
+    ) nw
+    cross join lateral (
       select greatest(
         case
           when n.nl = ${letters} then 1000
@@ -87,8 +110,8 @@ export function companySearchJoins(
                    = ${[...letters].sort().join("")}
             then 550
           when ${letters.length >= 3}
-               and greatest(extensions.similarity(n.nl, ${letters}), extensions.similarity(k.nk, ${key})) >= ${FUZZY_NAME_MIN}::float8
-            then 300 + round(300 * greatest(extensions.similarity(n.nl, ${letters}), extensions.similarity(k.nk, ${key})))::int
+               and greatest(extensions.similarity(n.nl, ${letters}), extensions.similarity(k.nk, ${key}), nw.word_sim) >= ${FUZZY_NAME_MIN}::float8
+            then 300 + round(300 * greatest(extensions.similarity(n.nl, ${letters}), extensions.similarity(k.nk, ${key}), nw.word_sim))::int
           else 0
         end,
         ${described}) as score
