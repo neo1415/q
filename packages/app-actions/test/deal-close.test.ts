@@ -152,17 +152,14 @@ describe("deal close actions", () => {
           }),
       },
     } as unknown as AppActionPorts;
-    expect(
-      await family?.tool?.toCanonical(
-        { relationship: REL, operation: "MARK_SIGNED" },
-        context,
-        ambiguous,
-      ),
-    ).toEqual({
-      refused: expect.stringMatching(
-        /Choose the signed copy/,
-      ) as unknown as string,
-    });
+    const refused = await family?.tool?.toCanonical(
+      { relationship: REL, operation: "MARK_SIGNED" },
+      context,
+      ambiguous,
+    );
+    expect(JSON.stringify(refused)).toMatch(
+      /"refused":"Choose the signed copy/,
+    );
   });
 
   it("a close files the closing report once; a replayed close files nothing", async () => {

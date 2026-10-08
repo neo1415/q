@@ -104,7 +104,7 @@ export function DealStageStrip({
       {steps.map((step) => (
         <li
           key={step.key}
-          className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-1.5"
+          className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:justify-start sm:gap-1.5"
           data-stage={step.key}
           data-status={step.status}
           aria-current={

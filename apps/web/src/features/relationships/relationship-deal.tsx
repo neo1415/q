@@ -141,7 +141,7 @@ function Confirm({
     >
       <Button
         variant={primary ? "primary" : "secondary"}
-        className="min-h-11"
+        className="min-h-11 self-start"
         disabled={disabled}
         onClick={() => setOpen(true)}
       >
@@ -735,7 +735,7 @@ export function RelationshipDeal({
           </label>
           <select
             id={`${noteId}-kind`}
-            className={`${INPUT} w-auto`}
+            className={INPUT.replace("w-full", "w-full sm:w-auto")}
             value={reportKind}
             onChange={(e) =>
               setReportKind(e.target.value as RelationshipReportKind)

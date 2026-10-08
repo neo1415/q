@@ -153,9 +153,6 @@ type TermsRow = {
   signed_at: Date | null;
 };
 
-const NAME = (alias: string) =>
-  `coalesce(nullif(btrim(${alias}.display_name), ''), nullif(btrim(concat_ws(' ', ${alias}.given_name, ${alias}.family_name)), ''))`;
-
 export function createDealCloseService(dependencies: {
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
@@ -228,7 +225,7 @@ export function createDealCloseService(dependencies: {
       }[]
     >`
       select e.sequence, e.event_type, e.occurred_at, e.visibility_scope,
-             e.payload, e.actor_id, ${executor.unsafe(NAME("u"))} as actor_name
+             e.payload, e.actor_id, coalesce(nullif(btrim(u.display_name), ''), nullif(btrim(concat_ws(' ', u.given_name, u.family_name)), '')) as actor_name
         from network.relationship_events e
         left join identity.user_profiles u on u.id = e.actor_id
        where e.relationship_id = ${relationshipId}
@@ -255,8 +252,8 @@ export function createDealCloseService(dependencies: {
              t.valuation_basis, t.pre_money_valuation::text as pre_money_valuation,
              t.discount_percent::text as discount_percent, t.pro_rata,
              t.other_terms, t.terms_document_id, t.recorded_by_side,
-             ${executor.unsafe(NAME("r"))} as recorded_by, t.created_at,
-             t.signed_document_id, ${executor.unsafe(NAME("s"))} as signed_by,
+             coalesce(nullif(btrim(r.display_name), ''), nullif(btrim(concat_ws(' ', r.given_name, r.family_name)), '')) as recorded_by, t.created_at,
+             t.signed_document_id, coalesce(nullif(btrim(s.display_name), ''), nullif(btrim(concat_ws(' ', s.given_name, s.family_name)), '')) as signed_by,
              t.signed_at
         from network.deal_terms t
         left join identity.user_profiles r on r.id = t.recorded_by_user_id
@@ -372,9 +369,9 @@ export function createDealCloseService(dependencies: {
       }[]
     >`
       select c.id, c.amount::text as amount, c.currency_code, c.level, c.status,
-             ${executor.unsafe(NAME("s"))} as stated_by, c.created_at,
-             ${executor.unsafe(NAME("k"))} as confirmed_by, c.confirmed_at,
-             ${executor.unsafe(NAME("r"))} as received_by, c.received_at
+             coalesce(nullif(btrim(s.display_name), ''), nullif(btrim(concat_ws(' ', s.given_name, s.family_name)), '')) as stated_by, c.created_at,
+             coalesce(nullif(btrim(k.display_name), ''), nullif(btrim(concat_ws(' ', k.given_name, k.family_name)), '')) as confirmed_by, c.confirmed_at,
+             coalesce(nullif(btrim(r.display_name), ''), nullif(btrim(concat_ws(' ', r.given_name, r.family_name)), '')) as received_by, c.received_at
         from network.commitments c
         left join identity.user_profiles s on s.id = c.stated_by_user_id
         left join identity.user_profiles k on k.id = c.confirmed_by_user_id
@@ -429,7 +426,7 @@ export function createDealCloseService(dependencies: {
       }[]
     >`
       select p.id, p.kind, p.version, p.title, p.visibility_scope, p.owner_side,
-             ${sql.unsafe(NAME("u"))} as generated_by, p.created_at, p.content_sha256
+             coalesce(nullif(btrim(u.display_name), ''), nullif(btrim(concat_ws(' ', u.given_name, u.family_name)), '')) as generated_by, p.created_at, p.content_sha256
         from network.relationship_reports p
         left join identity.user_profiles u on u.id = p.generated_by_user_id
        where p.relationship_id = ${party.relationshipId}
@@ -470,7 +467,7 @@ export function createDealCloseService(dependencies: {
       }[]
     >`
       select d.closed_on::text as closed_on, d.closed_by_side,
-             ${sql.unsafe(NAME("u"))} as closed_by, d.note
+             coalesce(nullif(btrim(u.display_name), ''), nullif(btrim(concat_ws(' ', u.given_name, u.family_name)), '')) as closed_by, d.note
         from network.deal_closes d
         left join identity.user_profiles u on u.id = d.closed_by_user_id
        where d.relationship_id = ${party.relationshipId}`;
@@ -976,7 +973,7 @@ export function createDealCloseService(dependencies: {
         }[]
       >`
         select a.occurred_at, a.action_type, a.resource_type, a.resource_id,
-               ${sql.unsafe(NAME("u"))} as who, a.outcome
+               coalesce(nullif(btrim(u.display_name), ''), nullif(btrim(concat_ws(' ', u.given_name, u.family_name)), '')) as who, a.outcome
           from audit.material_actions a
           left join identity.user_profiles u on u.id = a.authority_user_id
          where a.relationship_id = ${party.relationshipId}
@@ -1019,7 +1016,7 @@ export function createDealCloseService(dependencies: {
         declined_at: Date | null;
       }[]
     >`
-      select q.title, q.created_at, ${sql.unsafe(NAME("u"))} as asked_by,
+      select q.title, q.created_at, coalesce(nullif(btrim(u.display_name), ''), nullif(btrim(concat_ws(' ', u.given_name, u.family_name)), '')) as asked_by,
              f.created_at as fulfilled_at, d.created_at as declined_at
         from network.diligence_requests q
         left join network.diligence_fulfilments f on f.request_id = q.id
@@ -1037,7 +1034,7 @@ export function createDealCloseService(dependencies: {
         evidence_status: string | null;
       }[]
     >`
-      select q.question, q.created_at, ${sql.unsafe(NAME("u"))} as asked_by,
+      select q.question, q.created_at, coalesce(nullif(btrim(u.display_name), ''), nullif(btrim(concat_ws(' ', u.given_name, u.family_name)), '')) as asked_by,
              a.answer, a.created_at as answered_at, a.evidence_status
         from network.diligence_questions q
         left join lateral (
@@ -1051,7 +1048,7 @@ export function createDealCloseService(dependencies: {
     const closes = await sql<
       { closed_on: string; closed_by: string | null; note: string | null }[]
     >`
-      select d.closed_on::text as closed_on, ${sql.unsafe(NAME("u"))} as closed_by, d.note
+      select d.closed_on::text as closed_on, coalesce(nullif(btrim(u.display_name), ''), nullif(btrim(concat_ws(' ', u.given_name, u.family_name)), '')) as closed_by, d.note
         from network.deal_closes d
         left join identity.user_profiles u on u.id = d.closed_by_user_id
        where d.relationship_id = ${party.relationshipId}`;

@@ -7,6 +7,7 @@ import type {
   TransactionManager,
 } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
+import { CorrelationIdSchema } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -106,13 +107,11 @@ function world() {
     }
     if (text.includes("from network.deal_terms t")) {
       return result(
-        [...terms]
-          .reverse()
-          .map((t) => ({
-            ...t,
-            recorded_by: "Ada Obi",
-            signed_by: t["signed_at"] === null ? null : "Femi Ade",
-          })),
+        [...terms].reverse().map((t) => ({
+          ...t,
+          recorded_by: "Ada Obi",
+          signed_by: t["signed_at"] === null ? null : "Femi Ade",
+        })),
       );
     }
     if (text.includes("select id, version from network.deal_terms"))
@@ -183,7 +182,7 @@ function world() {
       return result([{ item_code: values[3] }]);
     if (text.includes("from network.relationship_reports p")) {
       // The SQL's own visibility filter, as Postgres would apply it.
-      const [, , ownPrivate, side] = values;
+      const [, ownPrivate, side] = values;
       return result(
         reports
           .filter(
@@ -222,7 +221,7 @@ function world() {
         visibility_scope: values[4],
         version: values[5],
         title: values[6],
-        content: JSON.parse(String(values[7])),
+        content: JSON.parse(String(values[7])) as unknown,
         content_sha256: values[8],
         generated_by_user_id: values[11],
         idempotency_key: values[12],
@@ -243,7 +242,6 @@ function world() {
     if (text.includes("from audit.material_actions")) return result([]);
     return Promise.reject(new Error(`unexpected query: ${text}`));
   };
-  Object.assign(fake, { unsafe: (fragment: string) => fragment });
   const sql = fake as unknown as DatabaseExecutor;
   let queue: Promise<unknown> = Promise.resolve();
   const transactions: TransactionManager = {
@@ -272,7 +270,7 @@ function world() {
       announced.push(event.data as { outcome: string });
       return Promise.resolve({ status: "ENQUEUED" as const });
     },
-  } as OutboxWriter;
+  };
   const audit: MaterialActionAuditWriter = {
     record: (_tx, input) => {
       audits.push(input);
@@ -317,7 +315,8 @@ function world() {
         company: "Tensorgate",
         investor: "Northwind Ventures",
       }),
-    newCorrelationId: () => "cor_00000000-0000-4000-8000-000000000001" as never,
+    newCorrelationId: () =>
+      CorrelationIdSchema.parse("cor_00000000-0000-4000-8000-000000000001"),
     now: () => new Date("2026-10-10T12:00:00.000Z"),
   });
   return { service, events, terms, closes, reports, audits, announced, add };
