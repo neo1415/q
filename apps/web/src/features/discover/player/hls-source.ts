@@ -264,6 +264,13 @@ export const attachHlsOrNativeSource: AttachSource = (video, url, mediaKey) => {
         // Keep what was played: the loop and a swipe back read it from
         // memory rather than the network.
         backBufferLength: Infinity,
+        // The stream carries its own subtitle rendition; the player shows
+        // our same-origin captions <track>, so hls.js must not add a second
+        // text track (the founder saw every caption twice).
+        renderTextTracksNatively: false,
+        enableWebVTT: false,
+        enableIMSC1: false,
+        enableCEA708Captions: false,
         ...(cache === null || mediaKey === undefined
           ? {}
           : {
