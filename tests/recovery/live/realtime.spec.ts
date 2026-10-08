@@ -33,7 +33,7 @@ test("the line opens on the realtime transport and Q answers a spoken question",
 }) => {
   const page = await (await contextAs(browser, CAST.founder)).newPage();
   await page.goto("/home");
-  await page.getByRole("button", { name: /Talk with Q/u }).click();
+  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
   await expect(page.getByRole("button", { name: /^End/u })).toBeVisible({
     timeout: 30_000,
   });

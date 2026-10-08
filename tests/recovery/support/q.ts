@@ -61,6 +61,11 @@ export async function openQ(page: Page): Promise<void> {
   await expect(composer(page)).toBeVisible({ timeout: 30_000 });
 }
 
+/** Starts the voice line (the Q page shows "Talk with Q" twice: stage and composer). */
+export async function talk(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+}
+
 export function settledAnswers(page: Page): Locator {
   return page.locator('[data-q-answer="settled"]');
 }

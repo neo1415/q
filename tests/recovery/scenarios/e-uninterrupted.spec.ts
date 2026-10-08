@@ -42,7 +42,7 @@ test("Scenario E: talk across three pages without the line dropping; interrupt; 
     },
   ]);
   await page.goto("/home");
-  await page.getByRole("button", { name: /Talk with Q/u }).click();
+  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
   await expect(page.getByRole("button", { name: /^End/u })).toBeVisible({
     timeout: 60_000,
   });

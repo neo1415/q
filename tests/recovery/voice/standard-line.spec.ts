@@ -13,6 +13,38 @@ import { CAST } from "../support/stack.js";
  * answer comes back, and a dropped socket follows the reconnect ladder
  * (1.2 s / 3 s / 8 s, then "I couldn't get the line back").
  */
+/**
+ * Runnable in MOCK today, because MOCK is exactly this condition: the voice
+ * vendor is unreachable, so q-api cannot issue a session (POST
+ * /v1/q/voice/sessions logs "unhandled request error" and answers 500
+ * instead of a classified problem). The person is told, in text.
+ */
+test("a voice line that cannot open says so", async ({ browser }) => {
+  const page = await (await contextAs(browser, CAST.founder)).newPage();
+  await page.goto("/home");
+  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+  await expect(page.getByText("I couldn't start voice right now. Try again.")).toBeVisible({
+    timeout: 20_000,
+  });
+});
+
+/**
+ * Defect G-D7 (WCAG 2.2 SC 4.1.3 Status Messages): that notice is plain
+ * text beside a Dismiss button, in no live region, so a screen reader is
+ * never told the line failed.
+ */
+test("the voice failure notice is announced (a live region)", async ({ browser }) => {
+  awaits(["A4"], "defect G-D7: voice failure notice is not in a live region");
+  const page = await (await contextAs(browser, CAST.founder)).newPage();
+  await page.goto("/home");
+  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+  await expect(
+    page
+      .locator('[role="alert"], [role="status"], [aria-live="polite"], [aria-live="assertive"]')
+      .filter({ hasText: "I couldn't start voice right now" }),
+  ).toBeVisible({ timeout: 20_000 });
+});
+
 test.describe("standard voice line", () => {
   test.beforeEach(() => {
     awaits(
@@ -32,7 +64,7 @@ test.describe("standard voice line", () => {
       },
     ]);
     await page.goto("/home");
-    await page.getByRole("button", { name: /Talk with Q/u }).click();
+    await page.getByRole("button", { name: /Talk with Q/u }).first().click();
     await expect
       .poll(() => line.frames(), { timeout: 30_000 })
       .toBeGreaterThan(10);
@@ -48,7 +80,7 @@ test.describe("standard voice line", () => {
     const page = await (await contextAs(browser, CAST.founder)).newPage();
     const line = await installDeepgramFake(page);
     await page.goto("/home");
-    await page.getByRole("button", { name: /Talk with Q/u }).click();
+    await page.getByRole("button", { name: /Talk with Q/u }).first().click();
     await expect
       .poll(() => line.settings() !== null, { timeout: 30_000 })
       .toBe(true);
@@ -64,7 +96,7 @@ test.describe("standard voice line", () => {
     const page = await (await contextAs(browser, CAST.founder)).newPage();
     const line = await installDeepgramFake(page);
     await page.goto("/home");
-    await page.getByRole("button", { name: /Talk with Q/u }).click();
+    await page.getByRole("button", { name: /Talk with Q/u }).first().click();
     await expect
       .poll(() => line.settings() !== null, { timeout: 30_000 })
       .toBe(true);
