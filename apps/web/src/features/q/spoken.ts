@@ -22,6 +22,8 @@ export type SpokenLine = {
    * in the thread until it is stored itself.
    */
   readonly after?: string | null | undefined;
+  /** G-R3: the voice turn it belongs to (A's line), when the line says. */
+  readonly turnId?: string | undefined;
 };
 
 /**

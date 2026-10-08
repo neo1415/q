@@ -57,6 +57,7 @@ export function replyParts(blocks: readonly QTurnObjectBlock[]): {
       case "CHART":
       case "MAP":
       case "TIMELINE":
+      case "ATTENTION":
         // What the answer produced or needs from the person, and (E4) its
         // laid-out data: in view.
         inline.push(block);

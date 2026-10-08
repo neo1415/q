@@ -61,6 +61,7 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
       case "CHART":
       case "MAP":
       case "TIMELINE":
+      case "ATTENTION":
         break;
     }
   }

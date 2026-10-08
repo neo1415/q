@@ -82,6 +82,7 @@ function kindOf(blocks: readonly QTurnObjectBlock[]): string {
       case "CHART":
       case "MAP":
       case "TIMELINE":
+      case "ATTENTION":
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
       case "CLARIFICATION_REQUEST":

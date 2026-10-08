@@ -273,6 +273,8 @@ type Line = {
   readonly id: string;
   readonly role: "person" | "q";
   readonly text: string;
+  /** G-R3: the voice turn a spoken line belongs to. */
+  readonly turnId?: string | undefined;
   /** The Q turn behind it, when it is a stored answer. */
   readonly turn?: Extract<QTurn, { kind: "Q" }> | undefined;
 };
@@ -545,10 +547,38 @@ export function QConversationPanel({
       role: line.role === "user" ? ("person" as const) : ("q" as const),
       text: line.text,
       after: line.after,
+      turnId: line.turnId,
     })),
   ).map((line): Line =>
-    "after" in line ? { id: line.id, role: line.role, text: line.text } : line,
+    "after" in line
+      ? {
+          id: line.id,
+          role: line.role,
+          text: line.text,
+          ...(line.turnId === undefined ? {} : { turnId: line.turnId }),
+        }
+      : line,
   );
+  // G-R3: how a rendered turn ended: A's outcome for a voice turn, the
+  // answer's own for a stored one; a spoken Q line was said, so answered.
+  const turnOutcomes = voice.turnOutcomes;
+  const rowDisposition = (line: Line): string | undefined => {
+    const voiced =
+      line.turnId === undefined ? undefined : turnOutcomes?.[line.turnId];
+    if (voiced !== undefined) return voiced.disposition;
+    if (line.role === "person") return undefined;
+    return line.turn === undefined
+      ? "ANSWERED"
+      : (dispositionOfTurn(line.turn) ?? undefined);
+  };
+  const rowFailure = (line: Line): string | undefined => {
+    const voiced =
+      line.turnId === undefined ? undefined : turnOutcomes?.[line.turnId];
+    return voiced?.disposition === "FAILED"
+      ? (voiced.failure ?? undefined)
+      : undefined;
+  };
+
   // While the person is speaking their words are the thread's newest
   // bubble, growing in place; the same words once stored are not shown
   // twice.
@@ -813,8 +843,15 @@ export function QConversationPanel({
           until something newer is said, with its disposition. */}
       {unanswered === null ? null : (
         <p
+          role="status"
           className="cq-body-sm m-0 text-(--cq-text-secondary)"
-          data-q-turn-id={unanswered.id}
+          // The turn's own row carries its id when the line put one on the
+          // screen; this line then only says how it ended.
+          data-q-turn-id={
+            lines.some((line) => line.turnId === unanswered.id)
+              ? undefined
+              : unanswered.id
+          }
           data-q-turn-role="Q"
           data-q-disposition={unanswered.disposition}
           data-q-failure={unanswered.failure ?? undefined}
@@ -1050,21 +1087,19 @@ export function QConversationPanel({
                           line.role === "person" ? (
                             <li
                               key={line.id}
-                              data-q-turn-id={line.id}
+                              data-q-turn-id={line.turnId ?? line.id}
                               data-q-turn-role="USER"
+                              data-q-disposition={rowDisposition(line)}
                             >
                               You: {line.text}
                             </li>
                           ) : (
                             <li
                               key={line.id}
-                              data-q-turn-id={line.id}
+                              data-q-turn-id={line.turnId ?? line.id}
                               data-q-turn-role="Q"
-                              data-q-disposition={
-                                line.turn === undefined
-                                  ? "ANSWERED"
-                                  : (dispositionOfTurn(line.turn) ?? undefined)
-                              }
+                              data-q-disposition={rowDisposition(line)}
+ data-q-failure={rowFailure(line)}
                             >
                               Q: {plainFromMarkdown(line.text)}
                             </li>
@@ -1148,8 +1183,9 @@ export function QConversationPanel({
                                 key={line.id}
                                 className="flex flex-col"
                                 data-q-row="person"
-                                data-q-turn-id={line.id}
+                                data-q-turn-id={line.turnId ?? line.id}
                                 data-q-turn-role="USER"
+                                data-q-disposition={rowDisposition(line)}
                               >
                                 <p className="cq-q-bubble cq-body">
                                   <span className="sr-only">You: </span>
@@ -1165,14 +1201,10 @@ export function QConversationPanel({
                                 key={line.id}
                                 className="flex flex-col"
                                 data-q-row="q"
-                                data-q-turn-id={line.id}
+                                data-q-turn-id={line.turnId ?? line.id}
                                 data-q-turn-role="Q"
-                                data-q-disposition={
-                                  line.turn === undefined
-                                    ? "ANSWERED"
-                                    : (dispositionOfTurn(line.turn) ??
-                                      undefined)
-                                }
+                                data-q-disposition={rowDisposition(line)}
+ data-q-failure={rowFailure(line)}
                               >
                                 <span className="sr-only">Q: </span>
                                 {line.turn === undefined ? (
@@ -1236,8 +1268,9 @@ export function QConversationPanel({
                           key={line.id}
                           className="flex flex-col"
                           data-q-row="person"
-                          data-q-turn-id={line.id}
+                          data-q-turn-id={line.turnId ?? line.id}
                           data-q-turn-role="USER"
+                          data-q-disposition={rowDisposition(line)}
                         >
                           <p className="cq-q-bubble cq-body">
                             <span className="sr-only">You: </span>
@@ -1253,13 +1286,10 @@ export function QConversationPanel({
                           key={line.id}
                           className="flex flex-col"
                           data-q-row="q"
-                          data-q-turn-id={line.id}
+                          data-q-turn-id={line.turnId ?? line.id}
                           data-q-turn-role="Q"
-                          data-q-disposition={
-                            line.turn === undefined
-                              ? "ANSWERED"
-                              : (dispositionOfTurn(line.turn) ?? undefined)
-                          }
+                          data-q-disposition={rowDisposition(line)}
+ data-q-failure={rowFailure(line)}
                         >
                           <span className="sr-only">Q: </span>
                           {line.turn === undefined ? (

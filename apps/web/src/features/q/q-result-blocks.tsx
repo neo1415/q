@@ -20,6 +20,7 @@ import { StaticAnswerCards } from "./static-answer-cards";
 import { recordPagePath, settingsPath, setupPath } from "./client-actions";
 import { roomCardHref } from "./room/room-card-view";
 import type { QTurnObjectBlock } from "./conversation";
+import { AttentionBody } from "./blocks/attention-block";
 import {
   ChartBody,
   MapBody,
@@ -461,6 +462,13 @@ export function QResultBlocks({
             return (
               <QResultCard key={key} label="Map" title={block.title}>
                 <MapBody map={block} />
+              </QResultCard>
+            );
+          case "ATTENTION":
+            // G-R4: everything that needs them, and what was not read.
+            return (
+              <QResultCard key={key} label="Needs you">
+                <AttentionBody report={block.report} />
               </QResultCard>
             );
           case "TIMELINE":

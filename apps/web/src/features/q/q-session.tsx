@@ -256,14 +256,20 @@ export function QSessionProvider({
   const voice = useVoice({
     onLine: (line) => {
       setSpoken((current) =>
-        upsertLine(current, { id: line.id, role: line.role, text: line.text }),
+        upsertLine(current, {
+          id: line.id,
+          role: line.role,
+          text: line.text,
+          // G-R3: which voice turn it belongs to (A), for the rendered turn.
+          ...(line.turnId === undefined ? {} : { turnId: line.turnId }),
+        }),
       );
     },
     onTurnOutcome: (outcome) => {
       setVoiceOutcomes((current) => {
         const seq = (current.at(-1)?.seq ?? 0) + 1;
         const row: VoiceOutcomeRow = {
-          id: `voice-turn-${String(seq)}`,
+          id: outcome.turnId ?? `voice-turn-${String(seq)}`,
           seq,
           disposition: outcome.disposition,
           failure: outcome.failure ?? null,
