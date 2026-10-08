@@ -23,18 +23,21 @@ function recordingSql() {
 }
 
 describe("claim SQL text (F1)", () => {
-  it.each(["Bumpa", "getbumpa.com", "zzqqxxvv", "fintech in Nigeria"])(
-    "search for %s sends no undefined segment",
-    async (text) => {
-      const { sql, sent } = recordingSql();
-      const claims = createCompanyClaims({ sql: sql as never });
-      await claims.search({ userId: "u1" }, text);
-      expect(sent.length).toBeGreaterThan(0);
-      for (const strings of sent) {
-        expect(strings.every((s) => typeof s === "string")).toBe(true);
-      }
-    },
-  );
+  it.each([
+    "Bumpa",
+    "getbumpa.com",
+    "zzqqxxvv",
+    "fintech in Nigeria",
+    "11111111-0000-4000-8000-000000000001",
+  ])("search for %s sends no undefined segment", async (text) => {
+    const { sql, sent } = recordingSql();
+    const claims = createCompanyClaims({ sql: sql as never });
+    await claims.search({ userId: "u1" }, text);
+    expect(sent.length).toBeGreaterThan(0);
+    for (const strings of sent) {
+      expect(strings.every((s) => typeof s === "string")).toBe(true);
+    }
+  });
 
   it("a claim request from a person with no organisation sends no undefined segment", async () => {
     const { sql, sent } = recordingSql();

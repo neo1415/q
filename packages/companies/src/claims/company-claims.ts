@@ -49,6 +49,7 @@ export type ClaimSearcher = {
  */
 
 const VISIBLE = ["network_visible", "public_external"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 function hostOf(website: string | null): string | null {
   if (website === null) return null;
@@ -196,6 +197,16 @@ export function createCompanyClaims(options: {
     ): Promise<readonly ClaimableCompanyDto[]> => {
       const query = text.trim().slice(0, 120);
       if (query.length < 2) return [];
+      // F3 (2026-10-08): a company page the person cannot open yet asks by
+      // id whether it is one they may claim. The same visibility rule as a
+      // typed search: only a company they may already see.
+      if (UUID.test(query)) {
+        const rows = await visible(
+          actor,
+          sql`c.id = ${query.toLowerCase()}::uuid`,
+        );
+        return rows.map(toDto);
+      }
       const parsed = parseCompanySearch(query);
       if (parsed === null) return [];
       // P13: the same reading and ranking as every company search (exact,

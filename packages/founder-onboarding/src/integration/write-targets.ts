@@ -219,6 +219,46 @@ async function updateCompanyIfChanged(
 // company.bootstrap (F1.company_name)
 // ---------------------------------------------------------------------------
 
+/**
+ * F3 (2026-10-08): how a company name compares: lower case, legal suffixes
+ * (Ltd, Limited, Inc, LLC, PLC, Corp) dropped, letters and digits only. "Bumpa
+ * Ltd." and "bumpa" are the same company name.
+ */
+export function companyNameKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/gu, "")
+    .replace(/\b(ltd|limited|inc|llc|plc|corp)\b\.?/gu, "")
+    .replace(/[^a-z0-9]/gu, "");
+}
+
+/**
+ * The name of an existing active canonical company with the same name key,
+ * that the network may see (network_visible / public_external, ADR-001) and
+ * that is not in the founder's own organisation. A private company is never
+ * matched, so this cannot reveal one.
+ */
+export async function existingCanonicalCompany(
+  sql: TransactionContext["sql"],
+  name: string,
+  ownOrganisationId: string | null,
+): Promise<string | null> {
+  const key = companyNameKey(name);
+  if (key.length < 2) return null;
+  const rows = await sql<{ canonical_name: string }[]>`
+    select c.canonical_name
+      from core.companies c
+     where c.company_status = 'active'
+       and c.marketplace_visibility in ('network_visible', 'public_external')
+       and (${ownOrganisationId}::uuid is null or c.organisation_id <> ${ownOrganisationId}::uuid)
+       and regexp_replace(
+             regexp_replace(lower(c.canonical_name), '\\m(ltd|limited|inc|llc|plc|corp)\\M\\.?', '', 'g'),
+             '[^a-z0-9]', '', 'g') = ${key}
+     limit 1`;
+  return rows[0]?.canonical_name ?? null;
+}
+
 async function bootstrapCompany(
   services: FounderDomainServices,
   context: OnboardingWriteContext,
@@ -235,6 +275,22 @@ async function bootstrapCompany(
       correlationId,
     );
     return;
+  }
+
+  // F3 (2026-10-08): one canonical company per real company. A founder
+  // naming a company already on Capital Q (one the network may see, outside
+  // their own organisation) claims it instead of creating a second record.
+  const existing = await existingCanonicalCompany(
+    context.tx.sql,
+    name,
+    actor.context?.organisationId ?? null,
+  );
+  if (existing !== null) {
+    invalid(
+      "value.text",
+      "company_already_on_capital_q",
+      `${existing} is already on Capital Q. If it's yours, claim it from GateQ → Find my startup (/gateq?tab=claim&q=${encodeURIComponent(existing)}) instead of creating it again. If yours is a different company, add what sets its name apart.`,
+    );
   }
 
   let actorContext: ActorContext;
