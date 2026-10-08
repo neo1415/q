@@ -55,7 +55,12 @@ function joined(cues: readonly TimedCue[]): {
   for (const cue of cues) {
     if (text !== "") text += " ";
     starts.push(text.length);
-    text += cue.text.replace(/\s+/g, " ").trim();
+    text += cue.text
+      .replace(/\s+/g, " ")
+      // Generated captions split numbers ("$400 ,000", "$1 .8 million"):
+      // rejoin a digit and its separator, never anything else.
+      .replace(/(\d) ([.,]\d)/g, "$1$2")
+      .trim();
   }
   return {
     text,
@@ -87,7 +92,8 @@ function sentences(text: string): Span[] {
 /** Clauses of a sentence, split at commas and semicolons. */
 function clauses(sentence: Span): Span[] {
   const out: Span[] = [];
-  for (const match of sentence.text.matchAll(/[^,;]+/g)) {
+  // A comma inside a number ("$350,000") does not end a clause.
+  for (const match of sentence.text.matchAll(/(?:[^,;]|,(?=\d{3}\b))+/g)) {
     const raw = match[0];
     const lead = raw.length - raw.trimStart().length;
     const trimmed = raw.trim().replace(/[.!?]+$/, "");
@@ -103,6 +109,8 @@ const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
   "£": "GBP",
   "€": "EUR",
   "₦": "NGN",
+  // "R280 million": the rand, only directly before a digit (see MONEY).
+  R: "ZAR",
 };
 const CURRENCY_WORDS: Readonly<Record<string, string>> = {
   usd: "USD",
@@ -116,6 +124,9 @@ const CURRENCY_WORDS: Readonly<Record<string, string>> = {
   euros: "EUR",
   ngn: "NGN",
   naira: "NGN",
+  zar: "ZAR",
+  rand: "ZAR",
+  kes: "KES",
 };
 const SCALE: Readonly<Record<string, number>> = {
   k: 3,
@@ -140,14 +151,51 @@ function scaled(number: string, exponent: number): string {
 }
 
 const MONEY = new RegExp(
-  String.raw`(?:(\$|£|€|₦)|\b(USD|GBP|EUR|NGN)\s?)?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s?(k|mm|mn|m|bn|b|thousand|million|billion)?\b(?:\s+(US\s+dollars|dollars?|pounds?|euros?|naira))?`,
+  String.raw`(?:(\$|£|€|₦|\bR(?=\d))|\b(USD|GBP|EUR|NGN|ZAR|KES)\s?)?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s?(k|mm|mn|m|bn|b|thousand|million|billion)?\b(?:\s+(US\s+dollars?|dollars?|pounds?|euros?|naira|rand))?`,
   "i",
 );
 
 /** The first money said in a phrase, only with a currency said too. */
+const SPOKEN: Readonly<Record<string, number>> = {
+  a: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  fifteen: 15,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+};
+
+/**
+ * "one and a half million dollars" -> "1.5 million dollars", "half a
+ * million" -> "0.5 million": a founder says figures; captions spell them.
+ * Only a spoken number directly before a scale word is rewritten.
+ */
+function spokenFigures(phrase: string): string {
+  return phrase
+    .replace(/\bhalf a (thousand|million|billion)\b/gi, "0.5 $1")
+    .replace(
+      /\b(a|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty)( and a half)? (thousand|million|billion)\b/gi,
+      (_all, word: string, half: string | undefined, scale: string) =>
+        `${String(SPOKEN[word.toLowerCase()] ?? 0)}${half === undefined ? "" : ".5"} ${scale}`,
+    );
+}
+
 export function moneyIn(
-  phrase: string,
+  spoken: string,
 ): { readonly amount: string; readonly currency: string } | null {
+  const phrase = spokenFigures(spoken);
   for (const match of phrase.matchAll(new RegExp(MONEY.source, "gi"))) {
     const [, symbol, code, number, scale, word] = match;
     if (number === undefined) continue;
@@ -188,7 +236,23 @@ const NUMBER_WORDS =
   "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|hundreds|thousand|thousands|dozens?";
 const HAS_NUMBER = new RegExp(String.raw`\d|\b(?:${NUMBER_WORDS})\b`, "i");
 const TRACTION_NOUN =
-  /\b(?:customers?|clients?|users?|design partners?|pilots?|contracts?|requests?|revenue|ARR|MRR|GMV|transactions?|downloads?|subscribers?|merchants?|retention|waitlist|LOIs?|letters of intent|bookings|orders|patients|hospitals|schools|banks|deployments?|installs?|sign-?ups?|paying)\b/i;
+  /\b(?:customers?|clients?|users?|design partners?|pilots?|contracts?|requests?|revenue|ARR|MRR|GMV|transactions?|downloads?|subscribers?|merchants?|retention|waitlist|LOIs?|letters of intent|bookings|orders|patients|hospitals|schools|deployments?|installs?|sign-?ups?|paying|use us|live with us|on our platform)\b/i;
+
+const TRACTION_CLAUSE_MAX = 140;
+const QUOTE_MAX = 160;
+
+/**
+ * The whole sentence when it is short; else the words around the raise,
+ * cut at word boundaries and marked as cut (unpunctuated captions run on).
+ */
+function quoteAround(sentence: string, index: number): string {
+  if (sentence.length <= QUOTE_MAX) return sentence;
+  let from = Math.max(0, index - 24);
+  let to = Math.min(sentence.length, index + QUOTE_MAX - 24);
+  if (from > 0) from = sentence.indexOf(" ", from) + 1;
+  if (to < sentence.length) to = sentence.lastIndexOf(" ", to);
+  return `${from > 0 ? "…" : ""}${sentence.slice(from, to).trim()}${to < sentence.length ? "…" : ""}`;
+}
 
 function bounded(text: string): string {
   return text.length <= STATEMENT_MAX
@@ -209,21 +273,23 @@ export function extractPitchClaims(cues: readonly TimedCue[]): PitchClaim[] {
   let traction = 0;
   for (const sentence of sentences(text)) {
     const atMs = timeAt(sentence.start);
-    if (!raised && RAISING.test(sentence.text)) {
-      // The raise clause itself, so "served. We're raising $4M" quotes the raise.
-      const clause =
-        clauses(sentence).find((c) => RAISING.test(c.text)) ?? sentence;
-      const money = moneyIn(clause.text) ?? moneyIn(sentence.text);
+    const raising = raised ? null : RAISING.exec(sentence.text);
+    if (raising !== null) {
+      // Only what follows "raising" is the raise: a revenue figure earlier
+      // in an unpunctuated caption is not the round.
+      const ask = sentence.text.slice(raising.index, raising.index + 160);
+      const money = moneyIn(ask);
       if (money !== null) {
         raised = true;
-        const stageCode = STAGES.find(([p]) => p.test(sentence.text))?.[1];
-        const instrument = INSTRUMENTS.find(([p]) =>
-          p.test(sentence.text),
-        )?.[1];
+        const stageCode = STAGES.find(([p]) => p.test(ask))?.[1];
+        const instrument = INSTRUMENTS.find(([p]) => p.test(ask))?.[1];
+        // The moment "raising" is said, and the words around it.
+        const raiseAt = timeAt(sentence.start + raising.index);
+        const statement = quoteAround(sentence.text, raising.index);
         out.push({
           kind: "RAISE",
-          statement: bounded(sentence.text),
-          atMs,
+          statement,
+          atMs: raiseAt,
           money,
           ...(stageCode === undefined ? {} : { stageCode }),
           ...(instrument === undefined ? {} : { instrument }),
@@ -231,16 +297,16 @@ export function extractPitchClaims(cues: readonly TimedCue[]): PitchClaim[] {
         if (stageCode !== undefined) {
           out.push({
             kind: "STAGE",
-            statement: bounded(sentence.text),
-            atMs,
+            statement,
+            atMs: raiseAt,
             stageCode,
           });
         }
         if (instrument !== undefined) {
           out.push({
             kind: "INSTRUMENT",
-            statement: bounded(sentence.text),
-            atMs,
+            statement,
+            atMs: raiseAt,
             instrument,
           });
         }
@@ -257,7 +323,14 @@ export function extractPitchClaims(cues: readonly TimedCue[]): PitchClaim[] {
     }
     for (const clause of clauses(sentence)) {
       if (traction >= TRACTION_MAX) break;
-      if (HAS_NUMBER.test(clause.text) && TRACTION_NOUN.test(clause.text)) {
+      // A run-on caption with no punctuation is no clause to quote.
+      if (
+        clause.text.length <= TRACTION_CLAUSE_MAX &&
+        // Someone else's figure ("McKinsey says banks...") is market, not traction.
+        !/\b(?:says|according to)\b/i.test(clause.text) &&
+        HAS_NUMBER.test(clause.text) &&
+        TRACTION_NOUN.test(clause.text)
+      ) {
         traction += 1;
         out.push({
           kind: "TRACTION",

@@ -102,6 +102,40 @@ describe("extractPitchClaims", () => {
     expect(pitchMomentLabel(61000)).toBe("1:01");
   });
 
+  it("reads figures the captions split or group, as said in the seeded pitches", () => {
+    const raiseOf = (text: string) =>
+      extractPitchClaims([{ startMs: 5000, endMs: 9000, text }]).find(
+        (c) => c.kind === "RAISE",
+      )?.money;
+    expect(
+      raiseOf(
+        "Yamfield is raising $400 ,000 on a safe to build eight cold rooms.",
+      ),
+    ).toEqual({ amount: "400000", currency: "USD" });
+    expect(
+      raiseOf("Clinicrest is raising $1 .8 million in a priced seed."),
+    ).toEqual({ amount: "1800000", currency: "USD" });
+    expect(raiseOf("Kazakit is raising $350,000 on a safe.")).toEqual({
+      amount: "350000",
+      currency: "USD",
+    });
+  });
+
+  it("reads spoken figures and the rand, and still refuses a figure with no currency", () => {
+    expect(
+      moneyIn("we're raising a one and a half million dollar seed"),
+    ).toEqual({ amount: "1500000", currency: "USD" });
+    expect(moneyIn("we're raising two million dollars to expand")).toEqual({
+      amount: "2000000",
+      currency: "USD",
+    });
+    expect(moneyIn("raising R280 million in Series B equity")).toEqual({
+      amount: "280000000",
+      currency: "ZAR",
+    });
+    expect(moneyIn("We're raising two and a half million")).toBeNull();
+  });
+
   it("says nothing for a pitch with no transcript", () => {
     expect(extractPitchClaims([])).toEqual([]);
   });
