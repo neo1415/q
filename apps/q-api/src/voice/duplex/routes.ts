@@ -7,11 +7,16 @@ import type {
 import {
   parseContract,
   Q_VOICE_DUPLEX_END_PATH,
+  Q_VOICE_DUPLEX_HEARD_PATH,
   Q_VOICE_DUPLEX_NARRATION_PATH,
+  Q_VOICE_DUPLEX_SAID_PATH,
   Q_VOICE_DUPLEX_REJOIN_PATH,
   Q_VOICE_DUPLEX_TOOL_PATH,
   Q_VOICE_DUPLEX_USAGE_PATH,
   QVoiceDuplexEndSchema,
+  QVoiceDuplexHeardResultSchema,
+  QVoiceDuplexHeardSchema,
+  QVoiceDuplexSaidSchema,
   QVoiceDuplexNarrationRequestSchema,
   QVoiceDuplexNarrationResultSchema,
   QVoiceDuplexRejoinResultSchema,
@@ -79,6 +84,55 @@ export function registerDuplexVoiceRoutes(
         .code(200)
         .header("Cache-Control", "no-store")
         .send(QVoiceDuplexToolResultSchema.parse(result));
+    },
+  );
+
+  // VOICE-BRAIN: a finished turn of the person's; the server decides who
+  // answers it, and runs Q for a substantive one.
+  app.post(
+    Q_VOICE_DUPLEX_HEARD_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const heard = parseContract(
+        QVoiceDuplexHeardSchema,
+        request.body ?? {},
+        "That turn is not valid.",
+      );
+      const controller = new AbortController();
+      reply.raw.once("close", () => {
+        if (!reply.raw.writableFinished) controller.abort();
+      });
+      const result = await broker.heard({
+        actor: actorOf(request),
+        voiceSessionId: idOf(request.params),
+        heard,
+        signal: controller.signal,
+      });
+      if (result === null) return gone(reply);
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(QVoiceDuplexHeardResultSchema.parse(result));
+    },
+  );
+
+  // VOICE-BRAIN: what the voice said, for the line's transcript.
+  app.post(
+    Q_VOICE_DUPLEX_SAID_PATH,
+    { onRequest: withContext },
+    (request, reply) => {
+      const said = parseContract(
+        QVoiceDuplexSaidSchema,
+        request.body ?? {},
+        "That is not something said.",
+      );
+      const known = broker.said({
+        actor: actorOf(request),
+        voiceSessionId: idOf(request.params),
+        said,
+      });
+      if (!known) return gone(reply);
+      return reply.code(204).send();
     },
   );
 

@@ -71,6 +71,16 @@ import {
 import { utteranceRefOf } from "../src/voice/utterance.js";
 import { utcDayStart } from "../src/voice/duplex/spend.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
+import { isSmallTalk, routeDuplexTurn } from "../src/voice/duplex/routing.js";
+import type {
+  DuplexTranscriptEntry,
+  DuplexTranscriptStore,
+} from "../src/voice/duplex/transcript.js";
+import {
+  claimsInability,
+  stallsForPermission,
+} from "../src/voice/duplex/broker.js";
+import { ownCompanyAskerNote } from "../src/composition/own-company-asker.js";
 
 /**
  * DUPLEX: the full-duplex broker. Fakes for the provider, the ledger and
@@ -193,6 +203,8 @@ function harness(
     readonly recordThrows?: boolean;
     readonly backchannel?: boolean;
     readonly listening?: DuplexListeningStore;
+    readonly routeTurns?: boolean;
+    readonly transcript?: DuplexTranscriptStore;
   } = {},
 ) {
   const order: string[] = [];
@@ -279,7 +291,11 @@ function harness(
       ...DUPLEX_DEFAULTS,
       enabled: options.enabled ?? true,
       backchannel: options.backchannel ?? true,
+      routeTurns: options.routeTurns ?? true,
     },
+    ...(options.transcript === undefined
+      ? {}
+      : { transcript: options.transcript }),
     ...(options.listening === undefined
       ? {}
       : { listening: options.listening }),
@@ -985,7 +1001,7 @@ describe("listening like a person (BACKCHANNEL)", () => {
   });
 
   it("leaves the line exactly as before when switched off", async () => {
-    const h = harness({ backchannel: false });
+    const h = harness({ backchannel: false, routeTurns: false });
     const opened = await h.broker.open({ binding: binding() });
     if (opened.kind !== "DUPLEX") throw new Error("expected a duplex line");
     expect(opened.credential.listening).toBeUndefined();
@@ -1140,5 +1156,291 @@ describe("listening like a person (BACKCHANNEL)", () => {
         report: { ...REPORT, responseId: "bc_2", kind: "BACKCHANNEL" },
       }),
     ).toEqual({ continue: false, notice: DUPLEX_CAP_NOTICE });
+  });
+});
+
+/**
+ * VOICE-BRAIN (founder live 2026-10-08, Daniel Park of Tensorgate): on one
+ * duplex call a single ask_q ran; everything else was the realtime model
+ * answering alone ("I can't open files", "are you ready?", no strategy).
+ * The server now decides who answers each finished turn.
+ */
+describe("the realtime model is the voice, never the brain (VOICE-BRAIN)", () => {
+  const id = binding().voiceSessionId;
+  function transcriptFake() {
+    const entries: DuplexTranscriptEntry[] = [];
+    const mirrored: { conversationId: string; messages: unknown }[] = [];
+    const store: DuplexTranscriptStore = {
+      record: (entry) => {
+        entries.push(entry);
+        return Promise.resolve();
+      },
+      mirror: ({ conversationId, messages }) => {
+        mirrored.push({ conversationId, messages });
+        return Promise.resolve(messages.length);
+      },
+    };
+    return { store, entries, mirrored };
+  }
+  const heard = (transcript: string, extra: object = {}) => ({
+    itemId: `item_${randomUUID().slice(0, 8)}`,
+    transcript,
+    ...extra,
+  });
+
+  it("mints a line on which the model never answers a turn by itself", async () => {
+    const h = harness();
+    const opened = await h.broker.open({ binding: binding() });
+    if (opened.kind !== "DUPLEX") throw new Error("expected a duplex line");
+    expect(h.mints[0]?.routeTurns).toBe(true);
+    expect(h.mints[0]?.transcribeInput).toBe(true);
+    expect(opened.credential.routeTurns).toBe(true);
+  });
+
+  // Founder fixtures (Tensorgate): documents, own company, strategy.
+  const SUBSTANTIVE = [
+    "Open my pitch deck.",
+    "Read the data room's financials.",
+    "What's in my one-pager?",
+    "Can you open files?",
+    "Show me an overview of the portfolio performance and risk metrics.",
+    "How is my company doing?",
+    "Give me a fundraising strategy.",
+    "How should I approach Zino?",
+    "What should I do next?",
+  ];
+
+  it.each(SUBSTANTIVE)(
+    "%s -> Q's pipeline answers it, even though the model never called ask_q",
+    async (said) => {
+      const fake = transcriptFake();
+      const h = harness({ transcript: fake.store });
+      await h.broker.open({ binding: binding() });
+      const result = await h.broker.heard({
+        actor: ACTOR,
+        voiceSessionId: id,
+        heard: heard(said),
+      });
+      expect(result?.route).toBe("ASK_Q");
+      if (result?.route !== "ASK_Q") throw new Error("expected ask_q");
+      // The broker ran the same spoken turn ask_q runs, with their words.
+      expect(h.turn).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(result.arguments)).toEqual({ request: said });
+      expect(JSON.parse(result.output)).toMatchObject({
+        ok: true,
+        say: `Heard: ${said}`,
+      });
+      expect(fake.entries[0]).toMatchObject({
+        role: "USER",
+        content: said,
+        routed: "ask_q",
+      });
+    },
+  );
+
+  it.each([
+    "Okay.",
+    "Thanks!",
+    "Hi Q, how are you?",
+    "Mm-hmm",
+    "got it, great",
+  ])("%s -> small talk the voice may answer; Q is not run", async (said) => {
+    const h = harness();
+    await h.broker.open({ binding: binding() });
+    const result = await h.broker.heard({
+      actor: ACTOR,
+      voiceSessionId: id,
+      heard: heard(said),
+    });
+    expect(result).toEqual({ route: "SMALLTALK" });
+    expect(h.turn).not.toHaveBeenCalled();
+  });
+
+  it("routes deterministically: capability questions and anything with content are Q's", () => {
+    const plain = {
+      guided: false,
+      awaitingApproval: false,
+      cardInFocus: false,
+    };
+    expect(isSmallTalk("can you see it?")).toBe(false);
+    expect(isSmallTalk("yes, open it")).toBe(false);
+    expect(isSmallTalk("can you hear me?")).toBe(true);
+    expect(routeDuplexTurn("yes", plain)).toBe("SMALLTALK");
+    // A yes to an approval Q asked for is Q's to take.
+    expect(routeDuplexTurn("yes", { ...plain, awaitingApproval: true })).toBe(
+      "ASK_Q",
+    );
+    // Q leads a guided line: even a hello is Q's.
+    expect(routeDuplexTurn("hello", { ...plain, guided: true })).toBe("ASK_Q");
+    // A short reply to a card in focus goes to decide_card via the voice.
+    expect(routeDuplexTurn("send it", { ...plain, cardInFocus: true })).toBe(
+      "MODEL",
+    );
+  });
+
+  it("keeps both sides of the line, marks which turns went to Q, and mirrors model-only turns into the conversation", async () => {
+    const fake = transcriptFake();
+    const h = harness({ transcript: fake.store });
+    const line = binding();
+    await h.broker.open({ binding: line });
+    // A Q answer starts the conversation.
+    await h.broker.heard({
+      actor: ACTOR,
+      voiceSessionId: id,
+      heard: heard("Open my pitch deck."),
+    });
+    line.thread.conversationId = "cb899610-72e5-442a-b99e-7fe8477cbf55";
+    expect(
+      h.broker.said({
+        actor: ACTOR,
+        voiceSessionId: id,
+        said: { responseId: "resp_1", text: "It's open on your screen." },
+      }),
+    ).toBe(true);
+    await h.broker.heard({
+      actor: ACTOR,
+      voiceSessionId: id,
+      heard: heard("Thanks!"),
+    });
+    h.broker.said({
+      actor: ACTOR,
+      voiceSessionId: id,
+      said: { responseId: "resp_2", text: "Any time." },
+    });
+    await Promise.resolve();
+    expect(fake.entries.map((e) => [e.role, e.routed, e.content])).toEqual([
+      ["USER", "ask_q", "Open my pitch deck."],
+      ["Q", "ask_q", "It's open on your screen."],
+      ["USER", "smalltalk", "Thanks!"],
+      ["Q", "smalltalk", "Any time."],
+    ]);
+    // Only the model-only exchange is mirrored: Q's run stored its own.
+    expect(fake.mirrored).toEqual([
+      {
+        conversationId: "cb899610-72e5-442a-b99e-7fe8477cbf55",
+        messages: [
+          { role: "USER", content: "Thanks!" },
+          { role: "Q", content: "Any time." },
+        ],
+      },
+    ]);
+    // And Q's next answer reads that exchange.
+    await h.broker.heard({
+      actor: ACTOR,
+      voiceSessionId: id,
+      heard: heard("What's in my one-pager?"),
+    });
+    const lastCall = vi.mocked(h.turn).mock.calls.at(-1);
+    expect(lastCall?.[1].map((t) => t.content)).toContain("Any time.");
+  });
+
+  it("a turn the model sent to ask_q itself is recorded as Q's", async () => {
+    const fake = transcriptFake();
+    const h = harness({ transcript: fake.store });
+    await h.broker.open({ binding: binding() });
+    await h.broker.tool({
+      actor: ACTOR,
+      voiceSessionId: id,
+      call: {
+        callId: "call_1",
+        name: "ask_q",
+        arguments: JSON.stringify({ request: "Read my deck" }),
+      },
+    });
+    h.broker.said({
+      actor: ACTOR,
+      voiceSessionId: id,
+      said: { responseId: "resp_1", text: "Your deck opens with the problem." },
+    });
+    expect(fake.entries.map((e) => [e.role, e.routed])).toEqual([
+      ["USER", "ask_q"],
+      ["Q", "ask_q"],
+    ]);
+  });
+
+  it("logs one routed= line per user turn and flags a claimed inability or a stall", async () => {
+    const info = vi.spyOn(logger, "info");
+    const warn = vi.spyOn(logger, "warn");
+    const h = harness();
+    await h.broker.open({ binding: binding() });
+    await h.broker.heard({
+      actor: ACTOR,
+      voiceSessionId: id,
+      heard: heard("Give me a fundraising strategy."),
+    });
+    await h.broker.heard({
+      actor: ACTOR,
+      voiceSessionId: id,
+      heard: heard("thanks"),
+    });
+    h.broker.said({
+      actor: ACTOR,
+      voiceSessionId: id,
+      said: { responseId: "r1", text: "I can't open files, sorry. Ready?" },
+    });
+    const routed = info.mock.calls
+      .filter((c) => c[1] === "duplex user turn routed")
+      .map((c) => (c[0] as { routed: string }).routed);
+    expect(routed).toEqual(["ask_q", "smalltalk"]);
+    const warned = warn.mock.calls.map((c) => c[1]);
+    expect(warned).toContain("duplex voice claimed an inability without Q");
+    expect(warned).toContain(
+      "duplex voice asked leave instead of doing the task",
+    );
+    info.mockRestore();
+    warn.mockRestore();
+  });
+
+  it("detects self-claimed inability and asking leave, and not ordinary answers", () => {
+    expect(claimsInability("I can't open files.")).toBe(true);
+    expect(claimsInability("I don't have access to your documents.")).toBe(
+      true,
+    );
+    expect(claimsInability("I'm unable to see your screen")).toBe(true);
+    expect(claimsInability("Your deck opens with the problem.")).toBe(false);
+    expect(stallsForPermission("Are you ready?")).toBe(true);
+    expect(stallsForPermission("Sound good?")).toBe(true);
+    expect(stallsForPermission("Shall I start?")).toBe(true);
+    expect(stallsForPermission("Lead with traction: 40% month on month.")).toBe(
+      false,
+    );
+  });
+
+  it("tells the voice never to answer alone, claim inability or ask leave", async () => {
+    const h = harness();
+    await h.broker.open({ binding: binding() });
+    const instructions = h.mints[0]?.instructions ?? "";
+    expect(instructions).toContain(
+      "Never answer a question from your own knowledge",
+    );
+    expect(instructions).toContain('never "I can\'t open files"');
+    expect(instructions).toContain('Never "ready?", "sound good?", "shall I?"');
+    expect(instructions).toContain("at most three sentences spoken");
+  });
+
+  it("a founder's 'portfolio' is their own company", () => {
+    const note = ownCompanyAskerNote("Tensorgate");
+    expect(note).toContain("they mean Tensorgate itself");
+    expect(note).toContain("never answer that there are no portfolio metrics");
+  });
+
+  it("another person's line answers nothing", async () => {
+    const h = harness();
+    await h.broker.open({ binding: binding() });
+    expect(
+      await h.broker.heard({
+        actor: STRANGER,
+        voiceSessionId: id,
+        heard: heard("Open my pitch deck."),
+      }),
+    ).toBeNull();
+    expect(
+      h.broker.said({
+        actor: STRANGER,
+        voiceSessionId: id,
+        said: { responseId: "r", text: "x" },
+      }),
+    ).toBe(false);
+    expect(h.turn).not.toHaveBeenCalled();
   });
 });

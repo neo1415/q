@@ -336,6 +336,14 @@ export const QVoiceDuplexCredentialSchema = z
     idleMs: z.number().int().min(5_000).max(600_000),
     /** BACKCHANNEL: absent when the server has them switched off. */
     listening: QVoiceDuplexListeningSchema.optional(),
+    /**
+     * VOICE-BRAIN (founder live 2026-10-08): the realtime model is only
+     * the voice. It never answers a turn by itself: the line was minted
+     * without automatic responses, the browser sends each finished turn's
+     * transcript to the server (`heard`), and the server decides whether
+     * Q answers it (ask_q) or the voice may (small talk).
+     */
+    routeTurns: z.boolean().optional(),
   })
   .strict();
 export type QVoiceDuplexCredential = z.infer<
@@ -434,6 +442,61 @@ export const QVoiceDuplexToolResultSchema = z
 export type QVoiceDuplexToolResult = z.infer<
   typeof QVoiceDuplexToolResultSchema
 >;
+
+/**
+ * POST: one finished turn of the person's on a routed duplex line, as the
+ * provider transcribed it (or as they typed it). The server decides who
+ * answers: Q (it runs ask_q itself and returns the result for the voice
+ * to say) or the voice (small talk; a reply to a card in focus).
+ */
+export const Q_VOICE_DUPLEX_HEARD_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/heard" as const;
+export const qVoiceDuplexHeardPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/heard`;
+export const QVoiceDuplexHeardSchema = z
+  .object({
+    /** The provider's item id for the turn (null when typed). */
+    itemId: z.string().min(1).max(128).nullable(),
+    /** The provider's transcript of the person: untrusted input. */
+    transcript: z.string().min(1).max(2_000),
+    typed: z.boolean().optional(),
+    /** A decision card is in focus on their screen (decide_card). */
+    cardInFocus: z.boolean().optional(),
+  })
+  .strict();
+export type QVoiceDuplexHeard = z.infer<typeof QVoiceDuplexHeardSchema>;
+
+export const Q_VOICE_DUPLEX_ROUTES = ["ASK_Q", "SMALLTALK", "MODEL"] as const;
+export const QVoiceDuplexHeardResultSchema = z.discriminatedUnion("route", [
+  z
+    .object({
+      route: z.literal("ASK_Q"),
+      /** The call the browser records on the line, then its output. */
+      callId: z.string().min(1).max(128),
+      arguments: z.string().max(8_000),
+      output: z.string().max(16_000),
+      approvalPending: z.boolean(),
+    })
+    .strict(),
+  z.object({ route: z.literal("SMALLTALK") }).strict(),
+  z.object({ route: z.literal("MODEL") }).strict(),
+]);
+export type QVoiceDuplexHeardResult = z.infer<
+  typeof QVoiceDuplexHeardResultSchema
+>;
+
+/** POST: what the voice said in one response (the transcript's Q side). */
+export const Q_VOICE_DUPLEX_SAID_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/said" as const;
+export const qVoiceDuplexSaidPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/said`;
+export const QVoiceDuplexSaidSchema = z
+  .object({
+    responseId: z.string().min(1).max(128),
+    text: z.string().min(1).max(4_000),
+  })
+  .strict();
+export type QVoiceDuplexSaid = z.infer<typeof QVoiceDuplexSaidSchema>;
 
 const TokenCountSchema = z.number().int().min(0).max(2_000_000);
 

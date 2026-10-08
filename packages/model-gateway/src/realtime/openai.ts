@@ -106,7 +106,9 @@ export function createOpenAIRealtimeProvider(options: {
                     type: "semantic_vad",
                     eagerness:
                       request.turnEagerness === "AUTO" ? "auto" : "high",
-                    create_response: true,
+                    // VOICE-BRAIN: on a routed line the server decides who
+                    // answers each turn; the model never answers by itself.
+                    create_response: request.routeTurns !== true,
                     // Not the provider: the browser confirms a barge-in after
                     // sustained speech (BARGE_CONFIRM_MS) and then cancels and
                     // truncates itself, so a cough or echo never cuts Q

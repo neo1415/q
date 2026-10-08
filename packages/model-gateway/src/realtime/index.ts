@@ -78,6 +78,12 @@ export type RealtimeSessionRequest = {
   /** BACKCHANNEL: transcribe the person's speech (for context and quotes). */
   readonly transcribeInput?: boolean | undefined;
   /**
+   * VOICE-BRAIN: the model never answers a finished turn by itself; the
+   * browser asks the server who answers (ask_q or the voice) and starts
+   * the response. Default false (the provider answers every turn).
+   */
+  readonly routeTurns?: boolean | undefined;
+  /**
    * voiceq-63: the voice's speaking rate (1 is the provider's default).
    * The founder heard "rapid-fire" speech; a touch under 1 is unhurried,
    * not slow. Absent: the provider's default.
@@ -132,6 +138,7 @@ export type RealtimeMintRequest = {
   readonly secretTtlSeconds: number;
   readonly turnEagerness?: "HIGH" | "AUTO" | undefined;
   readonly transcribeInput?: boolean | undefined;
+  readonly routeTurns?: boolean | undefined;
   readonly speechSpeed?: number | undefined;
   /** The plan's ceiling: the most sensitive thing the line may carry. */
   readonly sensitivity: ModelSensitivity;
@@ -253,6 +260,9 @@ export function createRealtimeVoiceGateway(options: {
             ...(request.transcribeInput === undefined
               ? {}
               : { transcribeInput: request.transcribeInput }),
+            ...(request.routeTurns === undefined
+              ? {}
+              : { routeTurns: request.routeTurns }),
             ...(request.speechSpeed === undefined
               ? {}
               : { speechSpeed: request.speechSpeed }),

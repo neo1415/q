@@ -5,12 +5,15 @@ import {
   Q_VOICE_LISTENING_DEFAULT,
   QRunIdSchema,
   type QSilenceBeat,
+  type QVoiceDuplexHeard,
+  type QVoiceDuplexHeardResult,
   type QVoiceDuplexListening,
   type QVoiceDuplexNarrationResult,
   type QVoiceDuplexCredential,
   type QVoiceDuplexLineStats,
   type QVoiceDuplexRejoin,
   type QVoiceDuplexRejoinResult,
+  type QVoiceDuplexSaid,
   type QVoiceDuplexToolCall,
   type QVoiceDuplexToolResult,
   type QVoiceDuplexUsageReport,
@@ -55,7 +58,9 @@ import {
   nextListeningLevel,
   type DuplexListeningStore,
 } from "./listening.js";
+import { routeDuplexTurn, routedAs, type DuplexRoutedAs } from "./routing.js";
 import type { DuplexSpendLedger } from "./spend.js";
+import type { DuplexTranscriptStore } from "./transcript.js";
 
 /**
  * The full-duplex voice broker (DUPLEX; flag CQ_VOICE_REALTIME, off by
@@ -188,6 +193,20 @@ type DuplexLine = {
   asking: number;
   /** Wakes a waiting narration poll. */
   readonly listeners: Set<() => void>;
+  /** Q leads this line (welcome, interview): every turn is Q's. */
+  readonly guided: boolean;
+  /**
+   * VOICE-BRAIN: the turn being answered now. Opened when the person's
+   * turn is heard (or ask_q is called without one), closed when the voice
+   * has said its reply. `asked`: Q's pipeline answered it.
+   */
+  turn: {
+    readonly routed: DuplexRoutedAs;
+    readonly words: string;
+    asked: boolean;
+  } | null;
+  /** Q's last answer asked for their yes: their reply is Q's to take. */
+  awaitingApproval: boolean;
 };
 
 /** How long a narration poll is held open when nothing is said. */
@@ -244,6 +263,24 @@ export type DuplexBroker = {
     readonly after: number;
     readonly signal?: AbortSignal | undefined;
   }) => Promise<QVoiceDuplexNarrationResult | null>;
+  /**
+   * VOICE-BRAIN: one finished turn of the person's, as transcribed. The
+   * server decides who answers it: for a substantive turn it runs ask_q
+   * itself and returns the result for the voice to say. Null when there
+   * is no such line for this person.
+   */
+  readonly heard: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly heard: QVoiceDuplexHeard;
+    readonly signal?: AbortSignal | undefined;
+  }) => Promise<QVoiceDuplexHeardResult | null>;
+  /** VOICE-BRAIN: what the voice said in one response (transcript, Q side). */
+  readonly said: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly said: QVoiceDuplexSaid;
+  }) => boolean;
   /** Open lines, for tests and the startup log. */
   readonly size: () => number;
 };
@@ -258,6 +295,8 @@ export type DuplexBrokerDependencies = {
   readonly logger: Logger;
   /** BACKCHANNEL: the person's remembered listening level. */
   readonly listening?: DuplexListeningStore | undefined;
+  /** VOICE-BRAIN: the line's transcript, both sides (server-only). */
+  readonly transcript?: DuplexTranscriptStore | undefined;
   readonly now?: (() => number) | undefined;
 };
 
@@ -322,6 +361,43 @@ const output = (value: unknown, approvalPending = false) => ({
 
 const QUOTE_MAX = 400;
 
+/**
+ * What the voice must never say on its own (founder live 2026-10-08: "it
+ * says it can't open files"). Q can open, read and show their documents;
+ * a voice that claims otherwise answered without Q. Detected and logged:
+ * the routing is the enforcement, this is the alarm.
+ */
+const CLAIMED_INABILITY = [
+  /\bi\s*(?:can(?:'|’)?t|cannot|can\s+not)\s+(?:open|read|see|access|view|show|look\s+at|pull\s+up|get\s+to)\b/i,
+  /\bi\s*(?:am|'m|’m)\s+(?:not\s+able|unable)\s+to\b/i,
+  /\bi\s+(?:do\s+not|don(?:'|’)?t)\s+have\s+(?:access|the\s+ability|any\s+(?:access|information|data|way))\b/i,
+  /\bas\s+an\s+ai\b/i,
+];
+
+export function claimsInability(said: string): boolean {
+  return CLAIMED_INABILITY.some((pattern) => pattern.test(said));
+}
+
+/**
+ * Asking leave instead of doing the task (founder live 2026-10-08: "are
+ * you ready?", "sound good?" while the strategy never came). The realtime
+ * provider gives no hook between a response's text and its audio, so this
+ * is the transcript audit: logged per response, kept with the turn.
+ */
+const STALLS = [
+  /\b(?:are\s+you\s+)?ready\s*\?/i,
+  /\bsound(?:s)?\s+good\s*\?/i,
+  /\bshall\s+(?:i|we)\b/i,
+  /\b(?:do\s+you\s+)?want\s+me\s+to\s+(?:go\s+ahead|start|begin|proceed)\b/i,
+  /\bwould\s+you\s+like\s+me\s+to\s+(?:go\s+ahead|start|begin|proceed|walk\s+you)\b/i,
+  /\b(?:should|can)\s+i\s+(?:go\s+ahead|start|begin|proceed)\b/i,
+  /\blet\s+me\s+know\s+when\s+you(?:'|’)?re\s+ready\b/i,
+];
+
+export function stallsForPermission(said: string): boolean {
+  return STALLS.some((pattern) => pattern.test(said));
+}
+
 export function createDuplexBroker(
   dependencies: DuplexBrokerDependencies,
 ): DuplexBroker {
@@ -366,6 +442,144 @@ export function createDuplexBroker(
   const fallback = (reason: DuplexFallbackReason): DuplexOpenResult => {
     logger.info({ reason }, "duplex voice fell back to the standard line");
     return { kind: "FALLBACK", reason };
+  };
+
+  /**
+   * One spoken turn on the standard handler: the same seam, the same Q
+   * run, the same tools, approvals and conduct.
+   */
+  const askQ = async (
+    line: DuplexLine,
+    request: string,
+    abort: AbortSignal,
+  ): Promise<{
+    readonly output: string;
+    readonly approvalPending: boolean;
+  }> => {
+    const voiceSessionId = line.voiceSessionId;
+    const wake = () => {
+      for (const listener of line.listeners) listener();
+    };
+    const speaker = collectingSpeaker(`rt_${voiceSessionId}`, (beat) => {
+      if (beat.kind === "TONE") return;
+      line.narrationSequence += 1;
+      line.narration.push({ sequence: line.narrationSequence, beat });
+      line.narration.splice(
+        0,
+        Math.max(0, line.narration.length - NARRATION_KEPT),
+      );
+      wake();
+    });
+    // Each ask_q's beats start fresh; the numbering carries on.
+    line.narration.length = 0;
+    line.asking += 1;
+    try {
+      const asked: VoiceTranscriptTurn = {
+        role: "user",
+        content: request.slice(0, ASK_Q_MAX_CHARS),
+      };
+      const outcome = await turn(
+        line.binding,
+        // The realtime turn detector already ended their turn: never
+        // held for sounding unfinished.
+        settledTurn([...line.history, asked]),
+        abort,
+        speaker,
+      );
+      const said = speaker.said();
+      // What was asked stays on the line's record either way; what Q
+      // said, only when it was said.
+      line.history.push(asked);
+      if (outcome.kind !== "INTERRUPTED" && !abort.aborted && said !== "") {
+        line.history.push({ role: "agent", content: said });
+      }
+      line.history.splice(
+        0,
+        Math.max(0, line.history.length - LINE_HISTORY_MAX),
+      );
+      if (outcome.kind === "INTERRUPTED" || abort.aborted) {
+        return output({ ok: false, interrupted: true });
+      }
+      const facts = speaker.heldFacts();
+      if (facts !== null) {
+        line.awaitingApproval = false;
+        return output(askQFactsOutput(facts));
+      }
+      const { say, amused } = forRealtime(said);
+      const approvalPending = said.endsWith(APPROVAL_QUESTION);
+      line.awaitingApproval = approvalPending;
+      return output(
+        amused
+          ? { ok: true, say, delivery: AMUSED_DELIVERY }
+          : { ok: true, say },
+        approvalPending,
+      );
+    } catch (error: unknown) {
+      logger.warn(
+        { err: error, qVoiceSessionId: voiceSessionId },
+        "duplex ask_q turn failed",
+      );
+      return output({
+        ok: false,
+        error: "That didn't go through on my side.",
+      });
+    } finally {
+      line.asking -= 1;
+      wake();
+    }
+  };
+
+  /** Written beside the line, never in its way: a lost row is logged. */
+  const keep = (
+    line: DuplexLine,
+    role: "USER" | "Q",
+    content: string,
+    routed: DuplexRoutedAs,
+    extra: {
+      readonly typed?: boolean;
+      readonly providerRef?: string | null;
+    } = {},
+  ) => {
+    const store = dependencies.transcript;
+    if (store === undefined) return;
+    void store
+      .record({
+        actor: line.actor,
+        voiceSessionId: line.voiceSessionId,
+        conversationId: line.binding.thread.conversationId ?? null,
+        role,
+        content,
+        routed,
+        typed: extra.typed,
+        providerRef: extra.providerRef,
+        spokenAt: new Date(now()),
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          { err: error, qVoiceSessionId: line.voiceSessionId },
+          "duplex transcript turn not kept",
+        );
+      });
+  };
+
+  const openTurn = (
+    line: DuplexLine,
+    words: string,
+    routed: DuplexRoutedAs,
+    typed: boolean,
+    providerRef: string | null = null,
+  ) => {
+    line.turn = { routed, words, asked: false };
+    keep(line, "USER", words, routed, { typed, providerRef });
+    logger.info(
+      {
+        qVoiceSessionId: line.voiceSessionId,
+        routed,
+        words: words.split(/\s+/).filter((w) => w.length > 0).length,
+        typed,
+      },
+      "duplex user turn routed",
+    );
   };
 
   return {
@@ -477,6 +691,11 @@ export function createDuplexBroker(
         maxOutputTokens: config.maxOutputTokens,
         secretTtlSeconds: config.secretTtlSeconds,
         speechSpeed: config.speechSpeed,
+        // VOICE-BRAIN: the model never answers a turn by itself; every
+        // turn is transcribed and the server decides who answers it.
+        ...(config.routeTurns
+          ? { routeTurns: true, transcribeInput: true }
+          : {}),
         ...(listens
           ? {
               transcribeInput: true,
@@ -517,6 +736,9 @@ export function createDuplexBroker(
         narrationSequence: 0,
         asking: 0,
         listeners: new Set(),
+        guided,
+        turn: null,
+        awaitingApproval: false,
       });
       logger.info(
         {
@@ -534,8 +756,110 @@ export function createDuplexBroker(
           maxSessionMs: config.maxSessionMs,
           idleMs: config.idleMs,
           ...(listening === undefined ? {} : { listening }),
+          ...(config.routeTurns ? { routeTurns: true } : {}),
         },
       };
+    },
+
+    heard: async ({ actor, voiceSessionId, heard, signal }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return null;
+      line.lastActivityAt = now();
+      const words = heard.transcript.trim().slice(0, ASK_Q_MAX_CHARS);
+      const route =
+        words.length === 0
+          ? "SMALLTALK"
+          : routeDuplexTurn(words, {
+              guided: line.guided,
+              awaitingApproval: line.awaitingApproval,
+              cardInFocus: heard.cardInFocus === true,
+            });
+      if (words.length > 0) {
+        openTurn(
+          line,
+          words,
+          routedAs(route),
+          heard.typed === true,
+          heard.itemId,
+        );
+      }
+      if (route !== "ASK_Q") return { route };
+      if (line.turn !== null) line.turn.asked = true;
+      const result = await askQ(
+        line,
+        words,
+        signal ?? new AbortController().signal,
+      );
+      return {
+        route: "ASK_Q",
+        // The browser records this call on the line, then its output, so
+        // the voice says Q's answer as the reply to their turn.
+        callId: `cq_${randomUUID().replace(/-/g, "")}`,
+        arguments: JSON.stringify({ request: words }),
+        output: result.output,
+        approvalPending: result.approvalPending,
+      };
+    },
+
+    said: ({ actor, voiceSessionId, said }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return false;
+      line.lastActivityAt = now();
+      const text = said.text.trim();
+      if (text.length === 0) return true;
+      const current = line.turn;
+      const routed: DuplexRoutedAs =
+        current === null
+          ? "model_only"
+          : current.asked
+            ? "ask_q"
+            : current.routed;
+      keep(line, "Q", text, routed, { providerRef: said.responseId });
+      if (routed !== "ask_q" && claimsInability(text)) {
+        logger.warn(
+          { qVoiceSessionId: voiceSessionId, routed },
+          "duplex voice claimed an inability without Q",
+        );
+      }
+      if (stallsForPermission(text)) {
+        logger.warn(
+          { qVoiceSessionId: voiceSessionId, routed },
+          "duplex voice asked leave instead of doing the task",
+        );
+      }
+      if (current !== null && routed !== "ask_q") {
+        // Q's next ask_q reads this exchange, and so do the history and
+        // Q's recall: it is part of the conversation.
+        line.history.push(
+          { role: "user", content: current.words },
+          { role: "agent", content: text.slice(0, SPOKEN_MAX) },
+        );
+        line.history.splice(
+          0,
+          Math.max(0, line.history.length - LINE_HISTORY_MAX),
+        );
+        const conversationId = line.binding.thread.conversationId;
+        const store = dependencies.transcript;
+        if (conversationId !== undefined && store !== undefined) {
+          void store
+            .mirror({
+              actor,
+              conversationId,
+              messages: [
+                { role: "USER", content: current.words },
+                { role: "Q", content: text },
+              ],
+            })
+            .catch((error: unknown) => {
+              logger.warn(
+                { err: error, qVoiceSessionId: voiceSessionId },
+                "duplex model-only turn not mirrored",
+              );
+            });
+        }
+      }
+      line.turn = null;
+      return true;
     },
 
     tool: async ({ actor, voiceSessionId, call, signal }) => {
@@ -553,75 +877,18 @@ export function createDuplexBroker(
         if (typeof request !== "string" || request.trim().length === 0) {
           return output({ ok: false, error: "Nothing was asked." });
         }
-        // One spoken turn on the standard handler: the same seam, the
-        // same Q run, the same tools, approvals and conduct.
-        const wake = () => {
-          for (const listener of line.listeners) listener();
-        };
-        const speaker = collectingSpeaker(`rt_${voiceSessionId}`, (beat) => {
-          if (beat.kind === "TONE") return;
-          line.narrationSequence += 1;
-          line.narration.push({ sequence: line.narrationSequence, beat });
-          line.narration.splice(
-            0,
-            Math.max(0, line.narration.length - NARRATION_KEPT),
+        // The model passed the turn to Q itself (a card reply that was
+        // not one, small talk that was not, a turn heard without words).
+        if (line.turn === null) {
+          openTurn(
+            line,
+            request.trim().slice(0, ASK_Q_MAX_CHARS),
+            "ask_q",
+            false,
           );
-          wake();
-        });
-        // Each ask_q's beats start fresh; the numbering carries on.
-        line.narration.length = 0;
-        line.asking += 1;
-        try {
-          const asked: VoiceTranscriptTurn = {
-            role: "user",
-            content: request.slice(0, ASK_Q_MAX_CHARS),
-          };
-          const outcome = await turn(
-            line.binding,
-            // The realtime turn detector already ended their turn: never
-            // held for sounding unfinished.
-            settledTurn([...line.history, asked]),
-            abort,
-            speaker,
-          );
-          const said = speaker.said();
-          // What was asked stays on the line's record either way; what Q
-          // said, only when it was said.
-          line.history.push(asked);
-          if (outcome.kind !== "INTERRUPTED" && !abort.aborted && said !== "") {
-            line.history.push({ role: "agent", content: said });
-          }
-          line.history.splice(
-            0,
-            Math.max(0, line.history.length - LINE_HISTORY_MAX),
-          );
-          if (outcome.kind === "INTERRUPTED" || abort.aborted) {
-            return output({ ok: false, interrupted: true });
-          }
-          const facts = speaker.heldFacts();
-          if (facts !== null) {
-            return output(askQFactsOutput(facts));
-          }
-          const { say, amused } = forRealtime(said);
-          return output(
-            amused
-              ? { ok: true, say, delivery: AMUSED_DELIVERY }
-              : { ok: true, say },
-            said.endsWith(APPROVAL_QUESTION),
-          );
-        } catch (error: unknown) {
-          logger.warn(
-            { err: error, qVoiceSessionId: voiceSessionId },
-            "duplex ask_q turn failed",
-          );
-          return output({
-            ok: false,
-            error: "That didn't go through on my side.",
-          });
-        } finally {
-          line.asking -= 1;
-          wake();
         }
+        if (line.turn !== null) line.turn.asked = true;
+        return askQ(line, request, abort);
       }
 
       if (call.name === SET_LISTENING_TOOL_NAME && line.listening) {
