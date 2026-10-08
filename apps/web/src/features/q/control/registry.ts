@@ -27,7 +27,7 @@ export const CONTROLS_MAX = 48;
 /**
  * An id says what it is: its first part names its kind, so "tab.mandate"
  * is a tab wherever it appears, and the capability parity matrix
- * (scripts/recovery/capability-parity.mjs, which reads this map) knows
+ * (scripts/capability-parity/generate.mjs, which reads this map) knows
  * every control's kind from its id alone.
  */
 export const CONTROL_PREFIX: Readonly<Record<string, QControlKind>> = {

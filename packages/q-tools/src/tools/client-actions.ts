@@ -1,6 +1,11 @@
+import { randomUUID } from "node:crypto";
+
 import { z } from "zod";
 
 import {
+  QUiActSchema,
+  type QManifestControl,
+  type QUiAct,
   DISCOVER_FILTER_LIST_MAX,
   DiscoverRaiseAmountSchema,
   Q_TASK_CLASSES,
@@ -21,6 +26,7 @@ import {
 } from "@capital-q/contracts";
 import { readOwn } from "@capital-q/app-actions";
 import { CompanyIdSchema } from "@capital-q/companies";
+import type { QToolExecutionContext } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -33,6 +39,10 @@ import {
 import { actorWideScope, scopesOfKind } from "../plan.js";
 import type { QToolPorts } from "../ports.js";
 
+import {
+  Q_CONTROL_CATALOG,
+  type QControlCatalogEntry,
+} from "./control-catalog.js";
 import { networkVisibleCompanies } from "./network-companies.js";
 
 /**
@@ -1264,6 +1274,222 @@ export function createSetDiscoverFiltersTool(): AnyQToolDefinition {
   });
 }
 
+export const OPERATE_SCREEN = "client.screen.operate" as const;
+
+/**
+ * The acts each control kind takes (the web registry's KIND_ACTS, which
+ * the parity test pins to this copy): an act a kind does not take is
+ * refused here, before it reaches the screen.
+ */
+export const Q_CONTROL_KIND_ACTS: Readonly<
+  Record<QControlCatalogEntry["kind"], readonly QUiAct[]>
+> = {
+  TAB: ["SELECT_TAB", "ACTIVATE", "SCROLL_TO", "FOCUS"],
+  SECTION: ["SCROLL_TO", "FOCUS"],
+  LIST: ["SELECT_ITEM", "SCROLL_TO", "FOCUS"],
+  LIST_ITEM: ["ACTIVATE", "SCROLL_TO", "FOCUS"],
+  BUTTON: ["ACTIVATE", "SCROLL_TO", "FOCUS"],
+  MENU: ["OPEN", "CLOSE", "EXPAND", "COLLAPSE", "SCROLL_TO", "FOCUS"],
+  DISCLOSURE: ["EXPAND", "COLLAPSE", "OPEN", "CLOSE", "SCROLL_TO", "FOCUS"],
+  FILTER: ["FILTER", "SCROLL_TO", "FOCUS"],
+  TOGGLE: ["SET", "SCROLL_TO", "FOCUS"],
+  INPUT: ["FOCUS", "SCROLL_TO"],
+  DIALOG: ["CLOSE", "FOCUS"],
+  CAROUSEL: ["NEXT", "PREVIOUS", "SCROLL_TO", "FOCUS"],
+};
+
+/** Acts on the page itself: never a target. */
+const PAGE_ACTS: ReadonlySet<QUiAct> = new Set([
+  "SCROLL_DOWN",
+  "SCROLL_UP",
+  "SCROLL_TOP",
+  "SCROLL_BOTTOM",
+  "BACK",
+  "FORWARD",
+]);
+
+export const OperateScreenInputSchema = z
+  .object({
+    act: QUiActSchema.describe(
+      "SELECT_TAB a tab; SCROLL_TO a section or list; SELECT_ITEM the nth item of a list (index); EXPAND / COLLAPSE a disclosure; OPEN / CLOSE a menu or dialog; SET a toggle (value true/false); FILTER a filter (value: a code, null clears); FOCUS an input; ACTIVATE a plain button. Without a target: SCROLL_DOWN / SCROLL_UP / SCROLL_TOP / SCROLL_BOTTOM the page, BACK (the page they were on) and FORWARD.",
+    ),
+    target: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .optional()
+      .describe(
+        "The control's id from the screen's controls (tab.readiness, section.risks, list.investors, section.mandate), or its short name (readiness, risks). Leave out for page acts.",
+      ),
+    index: z
+      .number()
+      .int()
+      .min(1)
+      .max(500)
+      .optional()
+      .describe("SELECT_ITEM: which item, 1-based (the second one is 2)."),
+    value: z
+      .union([
+        z.boolean(),
+        z.string().regex(/^[A-Za-z0-9_.,:-]{1,64}$/),
+        z.null(),
+      ])
+      .optional()
+      .describe("SET: true or false. FILTER: a code value, or null to clear."),
+  })
+  .strict();
+export type OperateScreenInput = z.infer<typeof OperateScreenInputSchema>;
+
+/** The run's own screen, when its composition carries the page manifest. */
+export type ScreenControlsReader = (
+  execution: QToolExecutionContext,
+) => readonly QManifestControl[] | undefined;
+
+type Candidate = {
+  readonly id: string;
+  readonly kind: QControlCatalogEntry["kind"];
+};
+
+function nameKeyOf(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9.-]/g, "");
+}
+
+/**
+ * Which control a target names: an exact id on screen or in the catalog,
+ * else a short name matched against the ids' names (on screen first).
+ * Several matches are never guessed between.
+ */
+export function resolveControlTarget(
+  said: string,
+  onScreen: readonly Candidate[] | undefined,
+  catalog: readonly Candidate[] = Q_CONTROL_CATALOG,
+):
+  | { readonly kind: "ONE"; readonly control: Candidate }
+  | { readonly kind: "SEVERAL"; readonly ids: readonly string[] }
+  | { readonly kind: "NONE"; readonly near: readonly string[] } {
+  const key = nameKeyOf(said);
+  const exact =
+    onScreen?.find((control) => control.id === key) ??
+    catalog.find((control) => control.id === key);
+  if (exact !== undefined) return { kind: "ONE", control: exact };
+  const name = key.includes(".") ? key.slice(key.indexOf(".") + 1) : key;
+  const match = (pool: readonly Candidate[]) =>
+    pool.filter((control) => {
+      const own = control.id.slice(control.id.indexOf(".") + 1);
+      return own === name;
+    });
+  const pools = onScreen === undefined ? [catalog] : [onScreen, catalog];
+  for (const pool of pools) {
+    const found = match(pool);
+    if (found.length === 1 && found[0] !== undefined) {
+      return { kind: "ONE", control: found[0] };
+    }
+    if (found.length > 1) {
+      return { kind: "SEVERAL", ids: found.map((control) => control.id) };
+    }
+  }
+  const near = (onScreen ?? catalog)
+    .filter((control) => name.length > 2 && control.id.includes(name))
+    .map((control) => control.id)
+    .slice(0, 6);
+  return { kind: "NONE", near };
+}
+
+/**
+ * RECOVERY-2026-10 (C2): Q operates any control the page registered --
+ * a tab, a section, a list's nth item, a disclosure, a filter -- through
+ * the page's own handler, exactly as a click does. The act happens on the
+ * screen after the answer lands; the screen reports a receipt (DONE,
+ * TARGET_MISSING, NOT_APPLICABLE, FAILED) the next turn reads, and DONE
+ * comes only once the page shows the effect. Nothing is read or written
+ * on the server; a consequential change is never a screen act (it is an
+ * app action, prepared for approval).
+ */
+export function createOperateScreenTool(
+  options: { readonly screenControls?: ScreenControlsReader | undefined } = {},
+): AnyQToolDefinition {
+  return defineQTool<
+    OperateScreenInput,
+    QClientActionToolResult,
+    QClientActionToolResult
+  >({
+    ...COMMON,
+    id: OPERATE_SCREEN,
+    providerName: "operate_screen",
+    description:
+      "Operates a control on the page they are on, as their own click would: pick a tab, scroll to a section, open the nth item of a list, expand or collapse, open or close a menu, set a toggle or filter, go back or forward, scroll the page. Name the control by its id from the screen's controls (or its short name). For another page, open it first (open_page or the navigation tools) and then call this: the screen waits for the new page. Call once per step, in order. It happens on their screen after your answer, which reports whether it worked: say what you are doing ('Opening the Readiness tab'), never that it is done. If more than one control matches, ask which one.",
+    input: OperateScreenInputSchema,
+    authorize: (input, execution) => {
+      const refuse = (reason: string) =>
+        Promise.resolve(deny<QClientActionToolResult>("NOT_AVAILABLE", reason));
+      if (!ownConversation(execution.actor, execution.plan)) {
+        return Promise.resolve(deny<QClientActionToolResult>("NOT_AVAILABLE"));
+      }
+      const actId = `uia_${randomUUID().replace(/-/g, "").slice(0, 24)}`;
+      if (PAGE_ACTS.has(input.act)) {
+        return Promise.resolve(
+          allowed({ kind: "UI_ACT", actId, act: input.act }),
+        );
+      }
+      if (input.target === undefined) {
+        return refuse("Name the control: its id from the screen's controls.");
+      }
+      const onScreen = options.screenControls?.(execution);
+      const found = resolveControlTarget(input.target, onScreen);
+      if (found.kind === "SEVERAL") {
+        return refuse(
+          `More than one control matches "${input.target}": ${found.ids.join(", ")}. Ask which one.`,
+        );
+      }
+      if (found.kind === "NONE") {
+        return refuse(
+          found.near.length === 0
+            ? `No control on Capital Q is called "${input.target}".`
+            : `No control is called "${input.target}"; close: ${found.near.join(", ")}.`,
+        );
+      }
+      const control = found.control;
+      if (!Q_CONTROL_KIND_ACTS[control.kind].includes(input.act)) {
+        return refuse(
+          `${control.id} is a ${control.kind.toLowerCase()}; it takes ${Q_CONTROL_KIND_ACTS[control.kind].join(", ")}.`,
+        );
+      }
+      if (input.act === "SELECT_ITEM" && input.index === undefined) {
+        return refuse("Say which item: index, 1-based.");
+      }
+      if (input.act === "SET" && typeof input.value !== "boolean") {
+        return refuse("SET takes value true or false.");
+      }
+      if (
+        input.act === "FILTER" &&
+        (input.value === undefined || typeof input.value === "boolean")
+      ) {
+        return refuse("FILTER takes a code value, or null to clear.");
+      }
+      return Promise.resolve(
+        allowed({
+          kind: "UI_ACT",
+          actId,
+          act: input.act,
+          target: control.id,
+          ...(input.act === "SELECT_ITEM" && input.index !== undefined
+            ? { index: input.index }
+            : {}),
+          ...((input.act === "SET" || input.act === "FILTER") &&
+          input.value !== undefined
+            ? { value: input.value }
+            : {}),
+        }),
+      );
+    },
+  });
+}
+
 export function createClientActionTools(
   ports: Pick<
     QToolPorts,
@@ -1276,8 +1502,10 @@ export function createClientActionTools(
     | "work"
     | "appActions"
   >,
+  options: { readonly screenControls?: ScreenControlsReader | undefined } = {},
 ): readonly AnyQToolDefinition[] {
   return [
+    createOperateScreenTool(options),
     createSetThemeTool(),
     createReloadPageTool(),
     createOpenWebsiteTool(ports),

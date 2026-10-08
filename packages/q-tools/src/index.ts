@@ -103,6 +103,13 @@ export {
   matchCounterpart,
   nameSimilarity,
   CONTROL_SCREEN,
+  OPERATE_SCREEN,
+  OperateScreenInputSchema,
+  Q_CONTROL_KIND_ACTS,
+  createOperateScreenTool,
+  resolveControlTarget,
+  type OperateScreenInput,
+  type ScreenControlsReader,
   CONTROL_DOCUMENT,
   createControlDocumentTool,
   ControlScreenInputSchema,
@@ -675,3 +682,8 @@ export {
   type ExploreToolPort,
   type SearchNetworkOutput,
 } from "./tools/explore.js";
+// RECOVERY-2026-10 (C6): the generated catalog of page control ids.
+export {
+  Q_CONTROL_CATALOG,
+  type QControlCatalogEntry,
+} from "./tools/control-catalog.js";

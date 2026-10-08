@@ -15,7 +15,7 @@ import { registerControl, type ControlHandler } from "./registry";
  * Q's act runs through the element's own click (or `onAct`, the page's own
  * handler, for acts a click cannot express, such as a filter's value).
  * Ids are code's names, never page text; they must be string literals so
- * the capability parity matrix (scripts/recovery/capability-parity.mjs)
+ * the capability parity matrix (scripts/capability-parity/generate.mjs)
  * can list them.
  */
 export function useQControl({
