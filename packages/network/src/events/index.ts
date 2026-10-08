@@ -127,6 +127,10 @@ export const RELATIONSHIP_OUTCOMES = [
   "RESUMED",
   "DILIGENCE_STARTED",
   "PROGRESSED",
+  // Deal close (2026-10-08): terms recorded, signed, closed.
+  "TERMS_RECORDED",
+  "TERMS_SIGNED",
+  "CLOSED",
 ] as const;
 export type RelationshipOutcome = (typeof RELATIONSHIP_OUTCOMES)[number];
 

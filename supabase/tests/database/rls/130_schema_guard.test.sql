@@ -199,6 +199,12 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- side only when shared (suite 640).
   ('network', 'relationship_pass_reasons',  'PUBLIC_REFERENCE',     '{SELECT}'),
   ('network', 'relationship_passes',        'RLS_REQUIRED',         '{SELECT}'),
+  -- Deal close (2026-10-08): terms and closes read by both parties,
+  -- reports by visibility, checklists by their own side (suite 890).
+  ('network', 'deal_terms',                 'RLS_REQUIRED',         '{SELECT}'),
+  ('network', 'deal_closes',                'RLS_REQUIRED',         '{SELECT}'),
+  ('network', 'deal_close_checklist',       'RLS_REQUIRED',         '{SELECT}'),
+  ('network', 'relationship_reports',       'RLS_REQUIRED',         '{SELECT}'),
   -- Diligence (2026-10-02): server-only; both sides read through the API.
   ('network', 'diligence_requests',         'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'diligence_fulfilments',      'INTERNAL_SERVER_ONLY', '{}'),

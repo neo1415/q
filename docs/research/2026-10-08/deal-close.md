@@ -11,17 +11,17 @@ Nothing here is a live-provider claim; it is background for the design.
 
 ## 1. How an early-stage round actually closes
 
-| Step | What happens | Evidence that it happened |
-| --- | --- | --- |
-| Meeting(s) | Partner meeting, follow-ups, maybe a partner-meeting pitch | Calendar, notes |
-| Diligence | Data room, reference calls, customer calls, cap table, financials | Questions asked/answered, documents shared |
-| Soft commit | "We're in for $250k if the round comes together"; often conditional (lead found, round size, valuation) | Email / verbal; not binding |
-| Terms | SAFE (cap, discount, MFN, pro-rata side letter) **or** convertible note (cap, discount, interest, maturity) **or** priced round term sheet (pre-money, option pool, liquidation pref, board, pro-rata, info rights). Term sheet usually non-binding except confidentiality/exclusivity | Term sheet / SAFE PDF |
-| Confirmatory diligence + legal docs | Priced: SPA, SHA/IRA, articles; SAFE: the SAFE itself + side letter | Drafts, redlines |
-| Signing | DocuSign/Carta signature by both sides | Signed PDF, signature certificate |
-| Funds wired | Investor wires against wire instructions; founder confirms receipt (wire fraud: always verify instructions out-of-band) | Bank confirmation |
-| Close | Company counter-signs/issues; cap table updated; share certificates / SAFE register; first close and later closes (tranches) are common | Closing set, cap table entry |
-| Post-close | Investor update cadence (monthly or quarterly), board/observer seat, info rights, portfolio onboarding (who to contact, reporting template) | Updates sent |
+| Step                                | What happens                                                                                                                                                                                                                                                                           | Evidence that it happened                  |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Meeting(s)                          | Partner meeting, follow-ups, maybe a partner-meeting pitch                                                                                                                                                                                                                             | Calendar, notes                            |
+| Diligence                           | Data room, reference calls, customer calls, cap table, financials                                                                                                                                                                                                                      | Questions asked/answered, documents shared |
+| Soft commit                         | "We're in for $250k if the round comes together"; often conditional (lead found, round size, valuation)                                                                                                                                                                                | Email / verbal; not binding                |
+| Terms                               | SAFE (cap, discount, MFN, pro-rata side letter) **or** convertible note (cap, discount, interest, maturity) **or** priced round term sheet (pre-money, option pool, liquidation pref, board, pro-rata, info rights). Term sheet usually non-binding except confidentiality/exclusivity | Term sheet / SAFE PDF                      |
+| Confirmatory diligence + legal docs | Priced: SPA, SHA/IRA, articles; SAFE: the SAFE itself + side letter                                                                                                                                                                                                                    | Drafts, redlines                           |
+| Signing                             | DocuSign/Carta signature by both sides                                                                                                                                                                                                                                                 | Signed PDF, signature certificate          |
+| Funds wired                         | Investor wires against wire instructions; founder confirms receipt (wire fraud: always verify instructions out-of-band)                                                                                                                                                                | Bank confirmation                          |
+| Close                               | Company counter-signs/issues; cap table updated; share certificates / SAFE register; first close and later closes (tranches) are common                                                                                                                                                | Closing set, cap table entry               |
+| Post-close                          | Investor update cadence (monthly or quarterly), board/observer seat, info rights, portfolio onboarding (who to contact, reporting template)                                                                                                                                            | Updates sent                               |
 
 Key facts for the model:
 
@@ -41,13 +41,13 @@ Key facts for the model:
 
 ## 3. What the platforms show
 
-| Platform | Relevant surface | What we take |
-| --- | --- | --- |
-| Carta | Round closing workflow: investors, amounts, docs to sign, funds status per investor, then cap table issued; audit log of signatures | Per-investor checklist (terms → signed → funds → issued) and a closing set |
-| AngelList (RUV/SPV/Stack) | Commitment → sign docs → wire → "Closed" with a closing statement per investor; post-close K-1s/updates | Clear final state + downloadable closing statement |
-| Visible | Investor updates and portfolio reporting after close; update cadence templates | Post-close update cadence suggestion, portfolio entry |
-| DealRoom / Affinity / DealCloud-style pipelines | Stage pipeline (Sourced → Met → Diligence → IC → Term sheet → Closed / Passed) with stage dates | One stage strip, both parties, dates per stage |
-| Ironclad / DocSend / data rooms | Document version + who-viewed + signed copy | Documents attached to the stage they evidence |
+| Platform                                        | Relevant surface                                                                                                                    | What we take                                                               |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Carta                                           | Round closing workflow: investors, amounts, docs to sign, funds status per investor, then cap table issued; audit log of signatures | Per-investor checklist (terms → signed → funds → issued) and a closing set |
+| AngelList (RUV/SPV/Stack)                       | Commitment → sign docs → wire → "Closed" with a closing statement per investor; post-close K-1s/updates                             | Clear final state + downloadable closing statement                         |
+| Visible                                         | Investor updates and portfolio reporting after close; update cadence templates                                                      | Post-close update cadence suggestion, portfolio entry                      |
+| DealRoom / Affinity / DealCloud-style pipelines | Stage pipeline (Sourced → Met → Diligence → IC → Term sheet → Closed / Passed) with stage dates                                     | One stage strip, both parties, dates per stage                             |
+| Ironclad / DocSend / data rooms                 | Document version + who-viewed + signed copy                                                                                         | Documents attached to the stage they evidence                              |
 
 ## 4. Implications for Capital Q
 
