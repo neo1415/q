@@ -481,3 +481,12 @@ export * from "./readiness.js";
 export * from "./investor-promises.js";
 // Founder documents (2026-10-08): requests inbox, access editor, answers.
 export * from "./founder-documents.js";
+// Deal close (2026-10-08).
+export {
+  closeDeal,
+  generateRelationshipReport,
+  getRelationshipDeal,
+  markDealSigned,
+  recordDealTerms,
+  tickDealChecklist,
+} from "./deal-close.js";

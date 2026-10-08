@@ -343,30 +343,5 @@ export function postCloseCadence(): {
   };
 }
 
-/**
- * A respectful note for a pass (research 2026-10-08: pass fast, clearly,
- * with one honest line). Deterministic from the reason code; the investor
- * approves or edits it, and it reaches the founder only if they share it.
- */
-const PASS_REASON_LINES: Readonly<Record<string, string>> = {
-  STAGE: "it's earlier than our fund invests",
-  SECTOR: "it sits outside the sectors our fund covers",
-  GEOGRAPHY: "it's outside the markets our fund invests in",
-  TRACTION: "we'd want to see more traction before we invest",
-  TEAM: "we don't think we're the right partner for the team at this point",
-  VALUATION: "we couldn't get comfortable with the valuation",
-  BUSINESS_MODEL: "we couldn't get comfortable with the business model yet",
-  MARKET: "we weren't able to get conviction on the market",
-  TIMING: "the timing isn't right for our fund",
-  ROUND: "the round's structure doesn't fit our fund",
-};
-
-export function draftPassNote(input: {
-  readonly companyName: string;
-  readonly reasonCode: string | null;
-}): string {
-  const reason =
-    input.reasonCode === null ? undefined : PASS_REASON_LINES[input.reasonCode];
-  const why = reason === undefined ? "" : `: ${reason}`;
-  return `Thank you for the time and openness through our conversations about ${input.companyName}. We've decided not to proceed at this stage${why}. We'd be glad to hear how things develop, and we wish you and the team every success.`;
-}
+/** The respectful pass note lives with the contract both sides render. */
+export { draftPassNote } from "@capital-q/contracts";

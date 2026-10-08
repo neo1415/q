@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
-import type {
-  PassReasonListDto,
-  RelationshipPassResponseDto,
-  RelationshipStateV2,
+import {
+  draftPassNote,
+  type PassReasonListDto,
+  type RelationshipPassResponseDto,
+  type RelationshipStateV2,
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
@@ -326,12 +327,33 @@ function PassDialog({
               ))}
             </div>
           </fieldset>
-          <label
-            htmlFor={noteId}
-            className="cq-body-sm mt-3 block text-(--cq-text-secondary)"
-          >
-            A note for your organisation (optional)
-          </label>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <label
+              htmlFor={noteId}
+              className="cq-body-sm block text-(--cq-text-secondary)"
+            >
+              A note (private to your organisation unless you share it)
+            </label>
+            <Button
+              variant="quiet"
+              size="compact"
+              className="min-h-11"
+              onClick={() => {
+                // Deal close (2026-10-08): a respectful note, drafted from
+                // the reason, for the investor to edit; it reaches the
+                // founder only when shared, exactly as written here.
+                setNote(
+                  draftPassNote({
+                    companyName: counterpart,
+                    reasonCode: reason,
+                  }),
+                );
+                setShare(true);
+              }}
+            >
+              Draft a respectful note
+            </Button>
+          </div>
           <textarea
             id={noteId}
             value={note}

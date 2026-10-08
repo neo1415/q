@@ -29,6 +29,31 @@ export const NETWORK_RELATIONSHIP_REPORT_PDF_PATH =
 export const NETWORK_RELATIONSHIP_AUDIT_EXPORT_PATH =
   "/v1/network/relationships/:relationshipId/audit-export" as const;
 
+const withRelationship = (path: string, relationshipId: string) =>
+  path.replace(":relationshipId", encodeURIComponent(relationshipId));
+export const networkRelationshipDealPath = (relationshipId: string) =>
+  withRelationship(NETWORK_RELATIONSHIP_DEAL_PATH, relationshipId);
+export const networkRelationshipDealTermsPath = (relationshipId: string) =>
+  withRelationship(NETWORK_RELATIONSHIP_DEAL_TERMS_PATH, relationshipId);
+export const networkRelationshipDealSignedPath = (relationshipId: string) =>
+  withRelationship(NETWORK_RELATIONSHIP_DEAL_SIGNED_PATH, relationshipId);
+export const networkRelationshipDealClosePath = (relationshipId: string) =>
+  withRelationship(NETWORK_RELATIONSHIP_DEAL_CLOSE_PATH, relationshipId);
+export const networkRelationshipDealChecklistPath = (relationshipId: string) =>
+  withRelationship(NETWORK_RELATIONSHIP_DEAL_CHECKLIST_PATH, relationshipId);
+export const networkRelationshipReportsPath = (relationshipId: string) =>
+  withRelationship(NETWORK_RELATIONSHIP_REPORTS_PATH, relationshipId);
+export const networkRelationshipReportPdfPath = (
+  relationshipId: string,
+  reportId: string,
+) =>
+  withRelationship(
+    NETWORK_RELATIONSHIP_REPORT_PDF_PATH,
+    relationshipId,
+  ).replace(":reportId", encodeURIComponent(reportId));
+export const networkRelationshipAuditExportPath = (relationshipId: string) =>
+  withRelationship(NETWORK_RELATIONSHIP_AUDIT_EXPORT_PATH, relationshipId);
+
 export const DEAL_STAGE_CODES = [
   "MET",
   "DILIGENCE",
@@ -284,3 +309,31 @@ export const RelationshipReportDtoSchema =
     content: RelationshipReportContentSchema,
   }).strict();
 export type RelationshipReportDto = z.infer<typeof RelationshipReportDtoSchema>;
+
+/**
+ * A respectful note for a pass (research 2026-10-08: pass fast, clearly,
+ * with one honest line). Deterministic from the reason code; the investor
+ * approves or edits it, and it reaches the founder only if they share it.
+ */
+const PASS_REASON_LINES: Readonly<Record<string, string>> = {
+  STAGE: "it's earlier than our fund invests",
+  SECTOR: "it sits outside the sectors our fund covers",
+  GEOGRAPHY: "it's outside the markets our fund invests in",
+  TRACTION: "we'd want to see more traction before we invest",
+  TEAM: "we don't think we're the right partner for the team at this point",
+  VALUATION: "we couldn't get comfortable with the valuation",
+  BUSINESS_MODEL: "we couldn't get comfortable with the business model yet",
+  MARKET: "we weren't able to get conviction on the market",
+  TIMING: "the timing isn't right for our fund",
+  ROUND: "the round's structure doesn't fit our fund",
+};
+
+export function draftPassNote(input: {
+  readonly companyName: string;
+  readonly reasonCode: string | null;
+}): string {
+  const reason =
+    input.reasonCode === null ? undefined : PASS_REASON_LINES[input.reasonCode];
+  const why = reason === undefined ? "" : `: ${reason}`;
+  return `Thank you for the time and openness through our conversations about ${input.companyName}. We've decided not to proceed at this stage${why}. We'd be glad to hear how things develop, and we wish you and the team every success.`;
+}
