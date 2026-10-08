@@ -1080,6 +1080,7 @@ export function createDuplexBroker(
           ...(line.listeningCredential === undefined
             ? {}
             : { listening: line.listeningCredential }),
+          ...(line.mint.routeTurns === true ? { routeTurns: true } : {}),
         },
       };
     },

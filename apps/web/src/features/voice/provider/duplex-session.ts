@@ -6,6 +6,8 @@ import {
   endDuplexAction,
   rejoinDuplexAction,
   relayDuplexToolAction,
+  sendDuplexHeardAction,
+  sendDuplexSaidAction,
   reportDuplexUsageAction,
 } from "../duplex-actions";
 import {
@@ -13,7 +15,7 @@ import {
   readListeningPreference,
   storeListeningPreference,
 } from "../listening-preference";
-import { decideCardByVoice, onLineNote } from "../line-cards";
+import { cardInFocus, decideCardByVoice, onLineNote } from "../line-cards";
 import { resolveListeningLevel } from "./backchannel";
 import { pollNarration } from "./narration-poll";
 import {
@@ -136,6 +138,8 @@ export function useDuplexVoiceSession(
         end: (reason, detail) => endDuplexAction(id, reason, detail),
         rejoin: (cause) => rejoinDuplexAction(id, cause),
         narration: (after) => pollNarration(id, after),
+        heard: (heard) => sendDuplexHeardAction(id, heard),
+        said: (said) => sendDuplexSaidAction(id, said),
       };
       const line = new Line({
         credential: duplex,
@@ -161,6 +165,7 @@ export function useDuplexVoiceSession(
           onInterrupted: () => eventsRef.current.onInterrupted?.(),
           // The arrival briefing's card in focus is decided on the page,
           // by the same code its buttons use (line-cards.ts).
+          cardInFocus,
           onClientTool: ({ name, arguments: args, heard }) =>
             name === "decide_card"
               ? decideCardByVoice(args, heard)

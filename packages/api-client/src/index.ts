@@ -170,6 +170,8 @@ export {
   getQVoiceTurnState,
   setQVoiceScreen,
   relayQVoiceDuplexTool,
+  sendQVoiceDuplexHeard,
+  sendQVoiceDuplexSaid,
   reportQVoiceDuplexUsage,
   pollQVoiceDuplexNarration,
   readQRoom,

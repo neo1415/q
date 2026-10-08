@@ -107,6 +107,9 @@ function harness(
     readonly microphone?: () => Promise<MediaStream>;
     readonly narration?: DuplexRelays["narration"];
     readonly env?: Partial<DuplexEnvironment>;
+    readonly credential?: QVoiceDuplexCredential;
+    readonly heard?: DuplexRelays["heard"];
+    readonly cardInFocus?: () => boolean;
   } = {},
 ) {
   const peer = new FakePeer();
@@ -162,6 +165,14 @@ function harness(
     ...(options.narration === undefined
       ? {}
       : { narration: options.narration }),
+    ...(options.heard === undefined
+      ? {}
+      : {
+          heard: vi.fn<NonNullable<DuplexRelays["heard"]>>(options.heard),
+          said: vi.fn<NonNullable<DuplexRelays["said"]>>(() =>
+            Promise.resolve(),
+          ),
+        }),
   };
   const events = {
     onState: vi.fn<DuplexLineEvents["onState"]>(),
@@ -169,9 +180,12 @@ function harness(
     onInterrupted: vi.fn<DuplexLineEvents["onInterrupted"]>(),
     onFallback: vi.fn<DuplexLineEvents["onFallback"]>(),
     onEnded: vi.fn<DuplexLineEvents["onEnded"]>(),
+    ...(options.cardInFocus === undefined
+      ? {}
+      : { cardInFocus: options.cardInFocus }),
   };
   const line = new DuplexLine({
-    credential: CREDENTIAL,
+    credential: options.credential ?? CREDENTIAL,
     relays,
     events,
     environment,
@@ -947,5 +961,170 @@ describe("choosing the line", () => {
       });
     });
     expect(deepgramStart).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * VOICE-BRAIN (founder live 2026-10-08): on a routed line the realtime
+ * model never answers a turn by itself. Each finished turn's transcript
+ * goes to the server, which runs Q for a substantive one; the voice only
+ * says the result.
+ */
+describe("the server decides who answers each turn (VOICE-BRAIN)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const ROUTED: QVoiceDuplexCredential = { ...CREDENTIAL, routeTurns: true };
+  const finish = (
+    h: ReturnType<typeof harness>,
+    itemId: string,
+    transcript: string | null,
+  ) => {
+    h.channel().emit({ type: "input_audio_buffer.speech_started" });
+    h.channel().emit({ type: "input_audio_buffer.speech_stopped" });
+    h.channel().emit({ type: "input_audio_buffer.committed", item_id: itemId });
+    if (transcript !== null) {
+      h.channel().emit({
+        type: "conversation.item.input_audio_transcription.completed",
+        item_id: itemId,
+        transcript,
+      });
+    }
+  };
+
+  it("hands a substantive turn to Q even though the model never called ask_q, then has the voice say Q's answer", async () => {
+    const h = harness({
+      credential: ROUTED,
+      heard: () =>
+        Promise.resolve({
+          route: "ASK_Q" as const,
+          callId: "cq_1",
+          arguments: JSON.stringify({ request: "Open my pitch deck." }),
+          output: JSON.stringify({
+            ok: true,
+            say: "It's open on your screen.",
+          }),
+          approvalPending: false,
+        }),
+    });
+    await h.line.open();
+    finish(h, "item_1", "Open my pitch deck.");
+    await settle();
+    expect(h.relays.heard).toHaveBeenCalledWith({
+      itemId: "item_1",
+      transcript: "Open my pitch deck.",
+    });
+    expect(h.events.onLine).toHaveBeenCalledWith("user", "Open my pitch deck.");
+    const sent = h.channel().sent;
+    expect(sent.map((e) => (e as { type: string }).type)).toEqual([
+      "conversation.item.create",
+      "conversation.item.create",
+      "response.create",
+    ]);
+    expect(sent[0]).toMatchObject({
+      item: { type: "function_call", call_id: "cq_1", name: "ask_q" },
+    });
+    expect(sent[1]).toMatchObject({
+      item: { type: "function_call_output", call_id: "cq_1" },
+    });
+    // The voice only says it: it may not call anything for this reply.
+    expect(sent[2]).toMatchObject({ response: { tool_choice: "none" } });
+    // And what it said goes to the line's transcript.
+    h.channel().emit({
+      type: "response.output_audio_transcript.done",
+      response_id: "resp_1",
+      transcript: "It's open on your screen.",
+    });
+    await settle();
+    expect(h.relays.said).toHaveBeenCalledWith({
+      responseId: "resp_1",
+      text: "It's open on your screen.",
+    });
+  });
+
+  it("lets the voice answer small talk itself", async () => {
+    const h = harness({
+      credential: ROUTED,
+      heard: () => Promise.resolve({ route: "SMALLTALK" as const }),
+    });
+    await h.line.open();
+    finish(h, "item_1", "Thanks!");
+    await settle();
+    expect(h.channel().types()).toEqual(["response.create"]);
+    expect(h.relays.tool).not.toHaveBeenCalled();
+  });
+
+  it("says nothing to a turn transcribed as nothing (noise)", async () => {
+    const h = harness({
+      credential: ROUTED,
+      heard: () => Promise.resolve({ route: "SMALLTALK" as const }),
+    });
+    await h.line.open();
+    finish(h, "item_noise", "");
+    await settle();
+    expect(h.relays.heard).not.toHaveBeenCalled();
+    expect(h.channel().types()).toEqual([]);
+  });
+
+  it("without the transcript, the voice can only pass the turn to Q", async () => {
+    const h = harness({
+      credential: ROUTED,
+      heard: () => Promise.resolve({ route: "SMALLTALK" as const }),
+    });
+    await h.line.open();
+    finish(h, "item_1", null);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(h.relays.heard).not.toHaveBeenCalled();
+    expect(h.channel().sent.at(-1)).toMatchObject({
+      type: "response.create",
+      response: { tool_choice: { type: "function", name: "ask_q" } },
+    });
+  });
+
+  it("a relay that did not get through still sends the turn to Q, never to the voice alone", async () => {
+    const h = harness({
+      credential: ROUTED,
+      heard: () => Promise.resolve(null),
+    });
+    await h.line.open();
+    finish(h, "item_1", "How should I approach Zino?");
+    await settle();
+    expect(h.channel().sent.at(-1)).toMatchObject({
+      response: { tool_choice: { type: "function", name: "ask_q" } },
+    });
+  });
+
+  it("tells the server when a card is in focus, and routes a typed turn too", async () => {
+    const h = harness({
+      credential: ROUTED,
+      heard: () => Promise.resolve({ route: "MODEL" as const }),
+      cardInFocus: () => true,
+    });
+    await h.line.open();
+    h.line.sendText("send it");
+    await settle();
+    expect(h.relays.heard).toHaveBeenCalledWith({
+      itemId: null,
+      transcript: "send it",
+      typed: true,
+      cardInFocus: true,
+    });
+    expect(h.channel().types()).toEqual([
+      "conversation.item.create",
+      "response.create",
+    ]);
+  });
+
+  it("an unrouted line answers as before", async () => {
+    const h = harness({
+      heard: () => Promise.resolve({ route: "SMALLTALK" as const }),
+    });
+    await h.line.open();
+    finish(h, "item_1", "Open my pitch deck.");
+    await settle();
+    expect(h.relays.heard).not.toHaveBeenCalled();
   });
 });
