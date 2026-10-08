@@ -95,3 +95,25 @@ export function finishedSince<
       Date.parse(one.job.updatedAt) >= since,
   );
 }
+
+/**
+ * G-R5: the job's state as one QWorkState, for `data-work-state`: the
+ * durable row's when queued, else the job status's honest equivalent.
+ */
+export function workStateOf(job: WorkforceJobSummaryDto): QWorkState {
+  if (job.workState !== undefined) return job.workState;
+  switch (job.status) {
+    case "PLANNING":
+      return "PLANNED";
+    case "HELD":
+      return "NEEDS_DECISION";
+    case "DONE":
+      return "COMPLETED";
+    case "FAILED":
+      return "FAILED";
+    case "STOPPED":
+      return "CANCELLED";
+    case "RUNNING":
+      return "RUNNING";
+  }
+}
