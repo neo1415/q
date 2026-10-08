@@ -410,8 +410,33 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
   };
 }
 
-/** The screen as the run records it: the route, and only entities in `refs`. */
+/**
+ * The most a run's screen may hold (q_runtime.runs `runs_screen_check`,
+ * 20261220210000). Past it the manifest is left out, never the turn.
+ */
+export const RUN_SCREEN_MAX_CHARS = 32_768;
+
+/**
+ * The screen as the run records it: the route, and only entities in `refs`.
+ * A manifest that would take it past the column's bound is dropped (G-D8:
+ * busy pages failed the insert and every turn from them answered 500).
+ */
 function screenKept(
+  screen: NonNullable<CreateQRunRequest["screen"]>,
+  refs: readonly QSubjectRef[],
+): NonNullable<CreateQRunRequest["screen"]> {
+  const kept = screenWithManifest(screen, refs);
+  if (
+    kept.manifest !== undefined &&
+    JSON.stringify(kept).length > RUN_SCREEN_MAX_CHARS
+  ) {
+    const { manifest: _dropped, ...rest } = kept;
+    return rest;
+  }
+  return kept;
+}
+
+function screenWithManifest(
   screen: NonNullable<CreateQRunRequest["screen"]>,
   refs: readonly QSubjectRef[],
 ): NonNullable<CreateQRunRequest["screen"]> {

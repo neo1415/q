@@ -9,7 +9,10 @@ import {
 } from "@capital-q/contracts";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
-import { createCreateQRun } from "../src/application/create-run.js";
+import {
+  createCreateQRun,
+  RUN_SCREEN_MAX_CHARS,
+} from "../src/application/create-run.js";
 import type { QRuntimeDependencies } from "../src/application/dependencies.js";
 
 /**
@@ -224,5 +227,51 @@ describe("the screen context on a Q run", () => {
         screen: { route: "COMPANY", companyId: "not-a-uuid" },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("a busy page's manifest on the run (G-D8)", () => {
+  // The largest manifest the contract accepts: every list at its maximum,
+  // every id at its longest. It used to fail the run's 512-character check.
+  const uuid = "c0000000-0000-4000-8000-000000000001";
+  const slug = (n: number) => `s${String(n)}`.padEnd(40, "x");
+  const part = (n: number) => `p${String(n)}`.padEnd(48, "x");
+  const largest = {
+    v: 2 as const,
+    seq: Number.MAX_SAFE_INTEGER,
+    inView: Array.from({ length: 12 }, (_, n) => slug(n)),
+    sections: Array.from({ length: 12 }, (_, n) => ({
+      id: slug(n),
+      kind: "GATEQ_APPLICATION" as const,
+      refs: Array.from({ length: 12 }, () => ({
+        kind: "GATEQ_APPLICATION" as const,
+        id: uuid,
+      })),
+      total: 10_000,
+    })),
+    dialogs: Array.from({ length: 3 }, (_, n) => ({
+      id: slug(n),
+      kind: "DOCUMENT_VIEWER" as const,
+      refs: Array.from({ length: 4 }, () => ({
+        kind: "GATEQ_APPLICATION" as const,
+        id: uuid,
+      })),
+    })),
+    focus: { kind: "GATEQ_APPLICATION" as const, id: uuid },
+    controls: Array.from({ length: 48 }, (_, n) => ({
+      id: `${"c".padEnd(32, "x")}.${part(n)}.${part(n)}.${part(n)}`,
+      kind: "LIST" as const,
+      count: 10_000,
+    })),
+  };
+
+  it("keeps the largest manifest the contract accepts, inside the run's bound", async () => {
+    const h = harness(() => true);
+    await h.ask({ route: "WORK", manifest: largest });
+    expect(h.runs).toHaveLength(1);
+    expect(h.runs[0]?.screen?.manifest).toEqual(largest);
+    const stored = JSON.stringify(h.runs[0]?.screen);
+    expect(stored.length).toBeGreaterThan(512);
+    expect(stored.length).toBeLessThanOrEqual(RUN_SCREEN_MAX_CHARS);
   });
 });
