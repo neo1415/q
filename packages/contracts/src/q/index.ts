@@ -447,6 +447,19 @@ export {
   QUncertaintyBlockSchema,
   type QResultBlock,
   type QResultBlockKind,
+  // RECOVERY-2026-10 E3/E4
+  Q_RESULT_CHART_POINTS_MAX,
+  Q_RESULT_CHART_SERIES_MAX,
+  Q_TABLE_COLUMNS_MAX,
+  Q_TABLE_ROWS_MAX,
+  Q_TIMELINE_EVENTS_MAX,
+  QChartBlockSchema,
+  QMapBlockSchema,
+  QTableBlockSchema,
+  QTimelineBlockSchema,
+  chartableSeries,
+  parseQResultBlocks,
+  type QResultBlockDrop,
 } from "./result-block.js";
 
 export {
@@ -469,6 +482,13 @@ export {
   type QAnswerCardMeasure,
   type QAnswerCardsBlock,
   type QAnswerCardsShape,
+  // RECOVERY-2026-10 E4
+  Q_ANSWER_CARD_FIT_BASIS_MAX,
+  Q_MAP_PLACES_MAX,
+  QMapPlaceSchema,
+  QMapSpecSchema,
+  type QMapPlace,
+  type QMapSpec,
 } from "./answer-cards.js";
 
 export {
