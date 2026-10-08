@@ -50,7 +50,20 @@ G proves or disproves the claims of workstreams A–F. A test that is red becaus
 - **G-R1 (C):** `performUiAct` also dispatches `window` `CustomEvent("cq:ui-act-receipt", {detail: QUiActReceipt & {act, target}})`. Tests record receipts with an init script.
 - **G-R3 (A, B, E):** every rendered Q turn element carries `data-q-turn-id` and `data-q-disposition` (one of `QTurnDisposition`), and `data-q-failure` when FAILED. IGNORED is rendered visibly (SPEC §4.3).
 - **G-R4 (B):** the attention answer renders `data-q-attention-unread="<SOURCE,…>"` when any source was unread.
-- **G-R5 (D):** Work rows carry `data-work-state` (one of `QWorkState`).
+- **G-R5 (D):** Work rows carry `data-work-state` (one of `QWorkState`). Plan cards carry `data-work-role` per step, and drafts carry `data-work-draft`.
+- **G-R8 (C, E, B):**
+  - registered controls render `data-q-control="<id>"` on their root, with `data-q-control-item` on list items;
+  - approval cards carry `data-q-approval-card`;
+  - attention items carry `data-q-attention-item`;
+  - conversation turns carry `data-q-turn-role="USER|Q"`.
+
+Receipts and attributes are never the only proof (lead, 2026-10-08). Every UI test also checks the outcome itself: the URL, the selected tab, the section in view, the page heading. Where a server state applies, it re-reads it through the API or the local database: an approval's status, an artifact after a delete or archive, a job's state.
+
+### 3.3a Modes: MOCK and LIVE-PENDING (lead, 2026-10-08; budget $0)
+
+Every result this build produces is **MOCK**. The model is the fake vendor, and WebRTC and the Deepgram socket are faked in the page. Live AI calls have a $0 budget and are never made by an agent. `scripts/recovery/voice/LIVE-PROCEDURE.md` is the written local procedure the founder runs later on his own machine, with his existing configuration and microphone. It covers the live project, the five recorded clips through `play-clips.mjs`, and the cost readouts from `live-cost.mjs`. Until he runs it, `tests/recovery/live/*` reports **LIVE-PENDING** (`results-table.mjs`). `local-stack.sh` keeps a `CQ_RECOVERY_MODE=live` switch only for that procedure. It refuses the disabled placeholder key, and it opens the egress guard only to the OpenAI and Deepgram hosts.
+
+Coverage priority (lead): lost voice turns, agent execution failures, security (permission-negative), then global navigation.
 
 ### 3.4 Voice
 
@@ -84,6 +97,7 @@ Runs the gates one at a time (format:check, lint on changed files or full when `
 - **G-R2 (A, F):** local/test-only vendor base override for voice: `CQ_VOICE_VENDOR_BASE_URL` read where `GRANT_URL` (`deepgram.ts:16`) and the realtime URLs (`realtime/openai.ts:28-30`) are built, refused unless `CAPITAL_Q_ENV` is `local` or `test`. Without it no voice test can run against q-api offline.
 - **G-R6:** add `axe-core` (4.13.0, already in the lockfile) as a root devDependency so `tests/recovery/support/axe.ts` resolves it normally rather than from the pnpm store path.
 - **G-R7:** confirm the founder brief's 12-step promise structure (§3.6 is an assumption).
+- **G-R8:** the DOM hooks listed in §3.3.
 
 ## 6. Risks
 
