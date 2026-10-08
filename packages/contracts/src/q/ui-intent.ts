@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { QUiActIntentSchema } from "./ui-act.js";
 import { UuidSchema } from "../common/ids.js";
 import { StageCodeSchema } from "../http/companies.js";
 import {
@@ -609,6 +610,8 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QShowInQRoomIntentSchema,
   QShowCalendarConnectIntentSchema,
   QDocumentActIntentSchema,
+  // RECOVERY-2026-10: universal application control (ui-act.ts).
+  QUiActIntentSchema,
 ]);
 export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
 
@@ -631,6 +634,8 @@ export const Q_CLIENT_ACTION_TOOLS = [
   "show",
   // Q room W3: the document open in the room.
   "control_document",
+  // RECOVERY-2026-10: any registered control on the page (ui-act.ts).
+  "operate_screen",
 ] as const;
 
 /**
@@ -733,6 +738,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QShowInQRoomIntentSchema,
   QShowCalendarConnectIntentSchema,
   QDocumentActIntentSchema,
+  QUiActIntentSchema,
 ]);
 
 export type QUiIntent = z.infer<typeof QUiIntentSchema>;

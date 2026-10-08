@@ -78,6 +78,7 @@ const INTENT_ROUTES: Readonly<
       | "SHOW_IN_Q_ROOM"
       | "SHOW_CALENDAR_CONNECT"
       | "DOCUMENT_ACT"
+      | "UI_ACT"
     >,
     string | null
   >
@@ -116,7 +117,8 @@ export function intentHref(intent: QUiIntent): string | null {
     intent.kind === "SCREEN_ACT" ||
     // Q room R5: its own card below, not a link.
     intent.kind === "SHOW_CALENDAR_CONNECT" ||
-    intent.kind === "DOCUMENT_ACT"
+    intent.kind === "DOCUMENT_ACT" ||
+    intent.kind === "UI_ACT"
   ) {
     return null;
   }
@@ -228,6 +230,8 @@ function intentLabel(intent: QUiIntent): string {
       return "Connect Google Calendar";
     case "DOCUMENT_ACT":
       return "The open document";
+    case "UI_ACT":
+      return "On this page";
   }
 }
 

@@ -1127,3 +1127,9 @@ export {
   type QRoomReadQuery,
   type QRoomSource,
 } from "./room.js";
+
+// RECOVERY-2026-10 lead contracts (docs/recovery/SPEC.md §3).
+export * from "./turn.js";
+export * from "./ui-act.js";
+export * from "./attention.js";
+export * from "./agent-capability.js";

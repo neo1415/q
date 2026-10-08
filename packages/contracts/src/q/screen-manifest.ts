@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { QManifestControlSchema, Q_MANIFEST_CONTROLS_MAX } from "./ui-act.js";
 
 /**
  * Q room R1: what the whole page shows, as references (q.screen.v2).
@@ -171,6 +172,14 @@ export const QPageManifestSchema = z
     dialogs: z.array(QManifestDialogSchema).max(Q_MANIFEST_DIALOGS_MAX),
     /** The one record in focus: the Discover card, the open card. */
     focus: QManifestRefSchema.optional(),
+    /**
+     * RECOVERY-2026-10: the controls Q may operate on this page now, by
+     * semantic id and kind (ui-act.ts). Ids only; never labels or values.
+     */
+    controls: z
+      .array(QManifestControlSchema)
+      .max(Q_MANIFEST_CONTROLS_MAX)
+      .optional(),
   })
   .strict();
 export type QPageManifest = z.infer<typeof QPageManifestSchema>;

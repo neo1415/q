@@ -13,6 +13,7 @@ import { storeVoicePreference } from "@/features/voice/voice-preference";
 
 import { forgetActiveConversations } from "./active-conversation";
 import { loadWire, wireNow, type WireContracts } from "./wire";
+import { performUiAct } from "./ui-act-controller";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -376,6 +377,10 @@ function performChecked(
     // Q room W3: the open document's viewer reads its acts from the answer
     // itself (each answer once), so a voice and a typed turn page alike.
     case "DOCUMENT_ACT":
+      return true;
+    // RECOVERY-2026-10: a registered control on the page, with a receipt.
+    case "UI_ACT":
+      void performUiAct(action);
       return true;
   }
 }
