@@ -174,7 +174,16 @@ export const PLAYBACK_FAILED_EVENT = "cq-playback-failed";
  */
 export const FIRST_FRAME_TIMEOUT_MS = 8_000;
 
-export type AttachSource = (video: HTMLVideoElement, url: string) => () => void;
+/**
+ * Attach `url` to the element; returns the detach. `mediaKey` (the media
+ * asset id the URL was authorised for) lets a streaming adapter key its
+ * cache by the asset rather than the rotating signed URL (ADR 0063).
+ */
+export type AttachSource = (
+  video: HTMLVideoElement,
+  url: string,
+  mediaKey?: string,
+) => () => void;
 
 /**
  * The native path: progressive MP4, or HLS on a browser that reads it.

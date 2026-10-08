@@ -86,11 +86,11 @@ function videoIn(container: HTMLElement): HTMLVideoElement {
   return video;
 }
 
-let play: ReturnType<typeof vi.fn>;
+let play = vi.fn<() => Promise<void>>();
 
 beforeEach(() => {
   // jsdom has no media pipeline; `play()` is not implemented at all.
-  play = vi.fn(() => Promise.resolve());
+  play = vi.fn<() => Promise<void>>(() => Promise.resolve());
   Object.defineProperty(HTMLMediaElement.prototype, "play", {
     configurable: true,
     writable: true,
@@ -941,6 +941,7 @@ describe("the end of a pitch is never a failure (founder, 2026-10-05)", () => {
     expect(attachSource).toHaveBeenLastCalledWith(
       video,
       "https://cdn.test/sample-2.mp4",
+      expect.any(String),
     );
     expect(screen.queryByRole("status")).toBeNull();
     expect(video.loop).toBe(true);
@@ -1019,5 +1020,58 @@ describe("the end of a pitch is never a failure (founder, 2026-10-05)", () => {
         "can't play in this browser",
       ),
     );
+  });
+});
+
+describe("starting, whatever the browser says first (ADR 0063)", () => {
+  it("plays once the source can play when attaching aborted the first play()", async () => {
+    // A cached stream engine attaches within a tick and aborts the play()
+    // made just before it: the pitch sat on its first frame, paused.
+    play.mockImplementationOnce(() =>
+      Promise.reject(new DOMException("aborted", "AbortError")),
+    );
+    const { container } = render(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={() => Promise.resolve(authorization())}
+        reducedMotion={false}
+        variant="stage"
+        initialAuthorization={authorization({ mediaAssetId: FIRST_PITCH_ID })}
+      />,
+    );
+    const video = videoIn(container);
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+    act(() => {
+      video.dispatchEvent(new Event("canplay"));
+    });
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+  });
+
+  it("plays muted when the browser refuses sound, and says how to get it back", async () => {
+    play.mockImplementationOnce(() =>
+      Promise.reject(new DOMException("no gesture", "NotAllowedError")),
+    );
+    const { container } = render(
+      <PitchPlayer
+        company={company(1)}
+        policy="ACTIVE"
+        authorize={() => Promise.resolve(authorization())}
+        reducedMotion={false}
+        variant="stage"
+        initialAuthorization={authorization({ mediaAssetId: FIRST_PITCH_ID })}
+      />,
+    );
+    const video = videoIn(container);
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+    expect(video.muted).toBe(true);
+    act(() => {
+      video.dispatchEvent(new Event("play"));
+    });
+    expect(
+      await screen.findByRole("button", { name: "Tap for sound" }),
+    ).toBeTruthy();
+    // Never the old "Slow connection" claim.
+    expect(container.textContent ?? "").not.toMatch(/slow connection/i);
   });
 });

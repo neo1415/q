@@ -1,6 +1,7 @@
 "use client";
 
 import { signOutAction } from "@/auth/actions";
+import { clearMediaCache } from "@/features/discover/player/media-cache";
 import { forgetActiveConversations } from "@/features/q/active-conversation";
 
 import { cx } from "@capital-q/ui";
@@ -9,6 +10,16 @@ import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { SubmitButton } from "./submit-button";
 
+/**
+ * What this browser keeps for the person signing out: which chat each Q
+ * surface was in, and the pitches cached on the device (ADR 0063). The
+ * next person to sign in here starts with neither.
+ */
+function forgetThisPerson(): void {
+  forgetActiveConversations();
+  void clearMediaCache();
+}
+
 /** Sign out is a server action: the provider session ends, not a React state. */
 export function SignOutButton() {
   return (
@@ -16,7 +27,7 @@ export function SignOutButton() {
       action={signOutAction}
       // Which chat each Q surface was in belongs to this person; the next
       // one to sign in on this tab starts at Q's welcome.
-      onSubmit={forgetActiveConversations}
+      onSubmit={forgetThisPerson}
     >
       <SubmitButton
         variant="secondary"
@@ -60,7 +71,7 @@ export function SignOutControl({
     </button>
   );
   return (
-    <form action={signOutAction} onSubmit={forgetActiveConversations}>
+    <form action={signOutAction} onSubmit={forgetThisPerson}>
       {appearance === "icon" ? (
         <Tooltip content="Sign out">{button}</Tooltip>
       ) : (

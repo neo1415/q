@@ -1,3 +1,5 @@
+import { cachingLoader } from "./cached-loader";
+import { pageMediaCache } from "./media-cache";
 import { PLAYBACK_FAILED_EVENT, type AttachSource } from "./pitch-playback";
 
 /**
@@ -20,6 +22,27 @@ function playsHlsNatively(video: HTMLVideoElement): boolean {
   return video.canPlayType("application/vnd.apple.mpegurl") !== "";
 }
 
+/**
+ * Media Source Extensions with H.264 and AAC: where present, the engine
+ * plays the stream even if the browser also plays HLS natively. Chrome
+ * now does (measured 2026-10-08, Chrome 155): its native player started
+ * every pitch at 240p, refetched on the loop, and bypassed the device
+ * cache. Only where there is no MSE (the iPhone) does the browser's own
+ * player take it.
+ */
+function hasMse(): boolean {
+  if (typeof window === "undefined" || typeof MediaSource === "undefined") {
+    return false;
+  }
+  try {
+    return MediaSource.isTypeSupported(
+      'video/mp4; codecs="avc1.42E01E,mp4a.40.2"',
+    );
+  } catch {
+    return false;
+  }
+}
+
 function looksLikeHls(url: string): boolean {
   try {
     return new URL(url, "https://placeholder.invalid").pathname.endsWith(
@@ -32,22 +55,22 @@ function looksLikeHls(url: string): boolean {
 
 /**
  * How much a stream may buffer ahead, by the controller's tier (doc 20
- * §48/§51; spec docs/specs/2026-10/harden.md §2).
+ * §48/§51 as amended by ADR 0063).
  *
  * hls.js's own limit is the larger of `maxBufferLength` and what
  * `maxBufferSize` (60 MB) holds at the level's bitrate, capped only by
- * `maxMaxBufferLength` -- so `maxBufferLength` alone never limited a warm
- * card: it quietly buffered the whole pitch. The cap is the ceiling that
- * actually binds. A warm card holds a few seconds, enough for frame one and
- * an instant start; the playing card may run ahead normally.
+ * `maxMaxBufferLength` -- so the cap is the ceiling that actually binds.
+ * A warm card (the next two, and the one behind) holds enough to start at
+ * once and keep going while the rest arrives; the playing card buffers the
+ * whole pitch (they are short), so its loop never goes back to the network.
  */
 export type StreamWarmth = "warm" | "active";
 
-const BUFFER_SECONDS: Readonly<
+export const BUFFER_SECONDS: Readonly<
   Record<StreamWarmth, { readonly ahead: number; readonly cap: number }>
 > = {
-  warm: { ahead: 4, cap: 6 },
-  active: { ahead: 30, cap: 60 },
+  warm: { ahead: 10, cap: 12 },
+  active: { ahead: 180, cap: 240 },
 };
 
 type BufferConfig = {
@@ -81,38 +104,120 @@ export function setStreamWarmth(
 }
 
 /**
- * The adapter the feed uses.
+ * The first rung's bandwidth guess, before a single segment is measured.
  *
- * Progressive MP4 and native-HLS browsers take the plain path. Only a
- * Chromium/Firefox HLS stream loads the engine, and the detach function
- * destroys it — which is what actually cancels the segment fetches it
- * started (doc 20 §236's preload abort).
+ * hls.js's defaults were the "Slow connection" every pitch started with
+ * (measured 2026-10-08): a 500 kbit/s guess plus `testBandwidth`, which
+ * loads the lowest rendition's first fragment to measure the link -- so
+ * every pitch, on any connection, started at 240x426 and the player
+ * announced a slow connection it had never measured. The guess is now the
+ * link's own estimate (Network Information API `downlink`), discounted and
+ * bounded, or a broadband default where the browser does not say; ABR then
+ * measures real segments and moves down if the link truly cannot keep up.
  */
+export const DEFAULT_START_ESTIMATE = 5_000_000;
+
+/** The screen's long side in device pixels (at most 2x), for the first rung. */
+export function startLongSide(): number {
+  if (typeof window === "undefined") return 1280;
+  return Math.round(
+    Math.max(window.innerHeight, window.innerWidth) *
+      Math.min(2, window.devicePixelRatio || 1),
+  );
+}
+
+type Rung = {
+  readonly width: number;
+  readonly height: number;
+  readonly bitrate: number;
+};
+
 /**
- * The link's own estimate of its speed (Network Information API `downlink`,
- * Mbit/s), discounted and bounded, as hls.js's starting bandwidth guess.
- * Absent on Safari and Firefox, where hls.js keeps its own default; a hint
- * only, never a decision (doc 20 §52).
+ * The first rendition: the smallest whose long side covers the screen's
+ * (within 10%), among those the estimated bandwidth can carry; the largest
+ * it can carry when none covers it. -1 for no renditions. Pure, shared
+ * with the warm-up so both pick the same rung.
  */
-export function startingBandwidthEstimate(): number | null {
-  if (typeof navigator === "undefined") return null;
+export function pickStartLevel(
+  levels: readonly Rung[],
+  longSide: number,
+  estimate: number,
+): number {
+  const order = levels
+    .map((level, at) => ({ level, at }))
+    .sort((a, b) => a.level.bitrate - b.level.bitrate);
+  let best = order[0]?.at ?? -1;
+  for (const { level, at } of order) {
+    if (level.bitrate > estimate) break;
+    best = at;
+    if (Math.max(level.width, level.height) >= longSide * 0.9) return at;
+  }
+  return best;
+}
+
+export function startingBandwidthEstimate(): number {
+  if (typeof navigator === "undefined") return DEFAULT_START_ESTIMATE;
   const link: unknown = Reflect.get(navigator, "connection");
-  if (typeof link !== "object" || link === null) return null;
+  if (typeof link !== "object" || link === null) return DEFAULT_START_ESTIMATE;
   const downlink: unknown = Reflect.get(link, "downlink");
   if (
     typeof downlink !== "number" ||
     !Number.isFinite(downlink) ||
     downlink <= 0
   ) {
-    return null;
+    return DEFAULT_START_ESTIMATE;
   }
+  // Chrome rounds `downlink` and caps it at 10; a capped 10 means "fast".
   return Math.round(
-    Math.min(10_000_000, Math.max(300_000, downlink * 1_000_000 * 0.8)),
+    Math.min(20_000_000, Math.max(1_000_000, downlink * 1_000_000 * 0.8)),
   );
 }
 
-export const attachHlsOrNativeSource: AttachSource = (video, url) => {
-  if (!looksLikeHls(url) || playsHlsNatively(video)) {
+/** Each streamed element's in-place recovery. */
+const streams = new WeakMap<HTMLVideoElement, () => boolean>();
+
+/**
+ * Where a pitch's picture starts: the first buffered instant, not 0. A
+ * fragmented stream's first frame can sit a few milliseconds after 0, and
+ * a seek to exactly 0 lands in a gap the engine fills by fetching the
+ * first fragment again, at whatever rendition it is on by then -- which is
+ * what broke the loop (measured 2026-10-08: a DEMUXER_ERROR on the seek
+ * back, then a whole new grant and reload).
+ */
+export function loopStart(video: HTMLVideoElement): number {
+  const ranges = video.buffered;
+  if (ranges.length === 0) return 0;
+  const first = ranges.start(0);
+  return first > 0 && first < 1 ? first : 0;
+}
+
+/** The end of a pitch: back to its first frame, from memory, and on. */
+export function restartPitch(video: HTMLVideoElement): void {
+  video.currentTime = loopStart(video);
+  void video.play().catch(() => undefined);
+}
+
+/**
+ * A pitch that already played and then trips (a decoder error at the loop)
+ * is recovered in place, from what is buffered and cached, rather than
+ * with a new grant and a reload. False when there is no engine to recover
+ * (native playback) or it already tried in the last minute.
+ */
+export function recoverStream(video: HTMLVideoElement): boolean {
+  return streams.get(video)?.() ?? false;
+}
+
+/**
+ * The adapter the feed uses.
+ *
+ * Progressive MP4, and HLS where there is no MSE (the iPhone), take the
+ * plain path. Every other HLS stream loads the engine, and the detach function
+ * destroys it — which is what actually cancels the segment fetches it
+ * started (doc 20 §236's preload abort). With a media key, the engine's
+ * loader reads and fills the pitch media cache (ADR 0063).
+ */
+export const attachHlsOrNativeSource: AttachSource = (video, url, mediaKey) => {
+  if (!looksLikeHls(url) || (playsHlsNatively(video) && !hasMse())) {
     video.src = url;
     return () => {
       video.removeAttribute("src");
@@ -134,7 +239,7 @@ export const attachHlsOrNativeSource: AttachSource = (video, url) => {
         return;
       }
       const warmth = wanted.get(video) ?? "warm";
-      const estimate = startingBandwidthEstimate();
+      const cache = mediaKey === undefined ? null : pageMediaCache();
       const engine = new Hls({
         // A pitch is about 60 seconds and the preload budget is the
         // controller's: see BUFFER_SECONDS.
@@ -143,35 +248,76 @@ export const attachHlsOrNativeSource: AttachSource = (video, url) => {
         // Fetch the first fragment while the media pipeline is still being
         // set up, so a warm card has frame one before it is swiped to.
         startFragPrefetch: true,
+        // Loading starts once the first rung is chosen (MANIFEST_PARSED).
+        autoStartLoad: false,
         // The stage is the size of the viewport; a rendition larger than
         // the element is bytes nobody sees.
         capLevelToPlayerSize: true,
-        // The first rung is chosen from this estimate before a single
-        // segment has been measured; afterwards ABR measures for itself.
-        ...(estimate === null ? {} : { abrEwmaDefaultEstimate: estimate }),
+        // The first rung is chosen from this estimate, not from a test
+        // download of the lowest one (see startingBandwidthEstimate).
+        abrEwmaDefaultEstimate: startingBandwidthEstimate(),
+        testBandwidth: false,
+        // Keep what was played: the loop and a swipe back read it from
+        // memory rather than the network.
+        backBufferLength: Infinity,
+        ...(cache === null || mediaKey === undefined
+          ? {}
+          : {
+              loader: cachingLoader(Hls.DefaultConfig.loader, mediaKey, cache),
+            }),
       });
       engines.set(video, engine.config);
+      // The first rung, chosen here rather than by hls.js (which measured
+      // 240p first, then climbed): the screen's size within the link's
+      // estimate. The warm-up picks the same rung, so its cached start is
+      // the one played. Loading waits for it (autoStartLoad off): hls.js's
+      // own start ran before this handler and began at the lowest rung.
+      engine.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+        const level = pickStartLevel(
+          data.levels,
+          startLongSide(),
+          startingBandwidthEstimate(),
+        );
+        if (level >= 0) engine.startLevel = level;
+        engine.startLoad(-1);
+      });
       // A fatal engine error (a codec this browser cannot decode, a
       // manifest that will not load) never reaches the element on its own:
       // it is said on the element, so the player can show its fallback
       // instead of a poster that never moves.
-      // A fatal media error (the decoder or buffer tripping, as it can on
-      // the seek back to the start when a pitch loops) is recovered in
-      // place once, as hls.js documents, before it counts as a failure.
-      let recovered = false;
+      // A fatal media error (the decoder or buffer tripping) is recovered
+      // in place, as hls.js documents, before it counts as a failure.
+      let recovering = false;
+      const recover = (): boolean => {
+        if (recovering) return false;
+        recovering = true;
+        const resume = loopStart(video);
+        engine.recoverMediaError();
+        video.currentTime = resume;
+        void video.play().catch(() => undefined);
+        // One recovery a minute: a stream that keeps tripping is a failure.
+        window.setTimeout(() => {
+          recovering = false;
+        }, 60_000);
+        return true;
+      };
       engine.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return;
-        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) {
-          recovered = true;
-          engine.recoverMediaError();
-          return;
-        }
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && recover()) return;
         video.dispatchEvent(new Event(PLAYBACK_FAILED_EVENT));
       });
+      // A stream is looped by the player's `ended` (restartPitch), not by
+      // the element: `loop` on an MSE element seeks to exactly 0 (see
+      // loopStart), and with `loop` set `ended` never fires.
+      const wasLooping = video.loop;
+      video.loop = false;
+      streams.set(video, recover);
       engine.loadSource(url);
       engine.attachMedia(video);
       destroy = () => {
         engines.delete(video);
+        streams.delete(video);
+        video.loop = wasLooping;
         engine.destroy();
       };
     })

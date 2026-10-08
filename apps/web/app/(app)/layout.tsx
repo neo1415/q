@@ -19,6 +19,7 @@ import { adminContext } from "@/features/admin/admin-context";
 import { BrandStyle, loadBrandStyle } from "@/features/brand-theme/brand-style";
 import { InstallPrompt } from "@/pwa/install-prompt";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
+import { PitchWarmup } from "@/features/discover/player/pitch-warmup-trigger";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -115,6 +116,10 @@ export default async function ApplicationLayout({
       <BrandStyle css={brandCss} />
       {children}
       <InstallPrompt />
+      {/* An investor's first pitches, cached before Discover opens (ADR 0063). */}
+      {context.kind === "INVESTOR" && unfinished === null ? (
+        <PitchWarmup />
+      ) : null}
       <QSwarmPointer />
     </AppShell>
   );

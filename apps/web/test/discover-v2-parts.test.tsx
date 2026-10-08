@@ -34,7 +34,7 @@ const { stepPlaybackRate, rateLabel } =
   await import("../src/features/discover/stage/playback-rate");
 const { linkIsStalling, reportPlaybackStall, resetPlaybackStallsForTests } =
   await import("../src/features/discover/feed/use-feed-budget");
-const { startingBandwidthEstimate } =
+const { DEFAULT_START_ESTIMATE, startingBandwidthEstimate } =
   await import("../src/features/discover/player/hls-source");
 const { evidenceWords, FeedCard } =
   await import("../src/features/discover/feed-card");
@@ -154,8 +154,9 @@ describe("a link that keeps stalling (doc 20 §53)", () => {
 });
 
 describe("the first rendition", () => {
-  it("starts from the link's own estimate, discounted and bounded; no hint, no guess", () => {
-    expect(startingBandwidthEstimate()).toBeNull();
+  it("starts from the link's own estimate, discounted and bounded; broadband when the browser does not say", () => {
+    // Never hls.js's 500 kbit/s default: that started every pitch at 240p.
+    expect(startingBandwidthEstimate()).toBe(DEFAULT_START_ESTIMATE);
     Object.defineProperty(navigator, "connection", {
       configurable: true,
       value: { downlink: 2.5 },
@@ -163,9 +164,14 @@ describe("the first rendition", () => {
     expect(startingBandwidthEstimate()).toBe(2_000_000);
     Object.defineProperty(navigator, "connection", {
       configurable: true,
+      value: { downlink: 10 },
+    });
+    expect(startingBandwidthEstimate()).toBe(8_000_000);
+    Object.defineProperty(navigator, "connection", {
+      configurable: true,
       value: { downlink: 0.1 },
     });
-    expect(startingBandwidthEstimate()).toBe(300_000);
+    expect(startingBandwidthEstimate()).toBe(1_000_000);
   });
 });
 

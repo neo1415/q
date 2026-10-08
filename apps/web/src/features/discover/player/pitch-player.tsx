@@ -15,7 +15,6 @@ import {
   Pause,
   Play,
   RotateCw,
-  Signal,
   Volume2,
   VolumeX,
   WifiOff,
@@ -31,7 +30,8 @@ import {
 } from "./pitch-playback";
 import { claimActivePlayer, releaseActivePlayer } from "./active-player";
 import { reportPlaybackStall } from "../feed/use-feed-budget";
-import { setStreamWarmth } from "./hls-source";
+import { recoverStream, restartPitch, setStreamWarmth } from "./hls-source";
+import { hasBeenActive, onAudioUnlock } from "./sound-policy";
 import { usePitchPlayback } from "./use-pitch-playback";
 
 /**
@@ -141,8 +141,6 @@ type PitchPlayerProps = {
  * would notice, and a ring that flashes reads as a fault (Discover v2).
  */
 export const BUFFERING_DELAY_MS = 400;
-/** A rendition whose short side is below this is "lower quality". */
-const LOW_QUALITY_SHORT_SIDE = 360;
 
 /**
  * The tier a request-to-play player is really in: the controller's, but
@@ -212,8 +210,9 @@ export function PitchPlayer({
   const pendingPlay = useRef(false);
   const [captionsOn, setCaptionsOn] = useState(true);
 
+  const mediaAssetId = company.pitch?.mediaAssetId ?? null;
   const { intent, posterUrl, playbackUrl, failed, retry } = usePitchPlayback({
-    mediaAssetId: company.pitch?.mediaAssetId ?? null,
+    mediaAssetId,
     policy: requestedPolicy(policy, requested),
     authorize,
     reducedMotion,
@@ -254,6 +253,9 @@ export function PitchPlayer({
     let timer: number | undefined;
     let played = false;
     const give = () => {
+      // In place first: the stream's own recovery keeps its buffer and
+      // cache; a new grant and a reload is the second resort.
+      if (played && recoverStream(video)) return;
       if (played && silentRefresh.current !== null) {
         played = false;
         silentRefresh.current();
@@ -304,8 +306,8 @@ export function PitchPlayer({
   useEffect(() => {
     const video = videoRef.current;
     if (video === null || playbackUrl === null) return;
-    return attachSource(video, playbackUrl);
-  }, [attachSource, playbackUrl]);
+    return attachSource(video, playbackUrl, mediaAssetId ?? undefined);
+  }, [attachSource, playbackUrl, mediaAssetId]);
 
   // Only for the source that failed: a new authorization is a new chance.
   const cannotPlay = unplayable !== null && unplayable === playbackUrl;
@@ -344,43 +346,56 @@ export function PitchPlayer({
     // With sound on and no tap yet, a browser refuses the play outright.
     // Then it plays muted, and the first tap or key anywhere brings the
     // sound back (founder direction 2026-09-29: sound on, like TikTok).
+    //
+    // Any other refusal is the source changing under the request: the
+    // stream engine attaching (a cached engine attaches within a tick)
+    // aborts a play() made just before. That used to leave the pitch on
+    // its first frame, paused, until something re-rendered (measured
+    // 2026-10-08); it now starts as soon as the element can play.
+    let cancelled = false;
+    const retryWhenReady = () => {
+      if (!cancelled && video.paused) void video.play().catch(() => undefined);
+    };
     void video.play().catch((error: unknown) => {
-      if (
-        video.muted ||
-        !(error instanceof DOMException) ||
-        error.name !== "NotAllowedError"
-      ) {
+      if (cancelled) return;
+      const refusedSound =
+        !video.muted &&
+        error instanceof DOMException &&
+        error.name === "NotAllowedError";
+      if (!refusedSound) {
+        if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          retryWhenReady();
+        } else {
+          video.addEventListener("canplay", retryWhenReady, { once: true });
+        }
         return;
       }
       video.muted = true;
       setSoundBlocked(true);
       void video.play().catch(() => undefined);
     });
+    return () => {
+      cancelled = true;
+      video.removeEventListener("canplay", retryWhenReady);
+    };
   }, [intent.autoplay, playbackUrl, hold, startOnRequest]);
 
   // The first gesture after a muted fallback restores the sound the person
   // has on; one they turned off stays off.
+  // Only once the browser allows it (sound-policy.ts): unmuting a playing
+  // video without user activation pauses it.
   useEffect(() => {
     if (!soundBlocked) return;
-    const restore = (event: Event) => {
-      // The sound control handles its own tap.
-      if (
-        event.target instanceof Element &&
-        event.target.closest("[data-sound-toggle]") !== null
-      ) {
-        return;
-      }
+    const restore = () => {
       const video = videoRef.current;
       if (video !== null && !mutedRef.current) video.muted = false;
       setSoundBlocked(false);
     };
-    const options = { once: true, capture: true } as const;
-    window.addEventListener("pointerdown", restore, options);
-    window.addEventListener("keydown", restore, options);
-    return () => {
-      window.removeEventListener("pointerdown", restore, options);
-      window.removeEventListener("keydown", restore, options);
-    };
+    if (hasBeenActive() === true) {
+      restore();
+      return;
+    }
+    return onAudioUnlock(restore);
   }, [soundBlocked]);
 
   // Leaving the page is leaving the claim.
@@ -427,43 +442,44 @@ export function PitchPlayer({
    * link that keeps stalling (doc 20 §53).
    */
   const [buffering, setBuffering] = useState(false);
-  const [lowQuality, setLowQuality] = useState(false);
   const meantToPlay = policy === "ACTIVE" && !hold && intent.autoplay;
   useEffect(() => {
     const video = videoRef.current;
     if (video === null || playbackUrl === null) return;
     let timer: number | undefined;
+    // Waiting for the first frame is a start, not a stall: counting it
+    // narrowed the preload window on every swipe to a card that was not
+    // buffered yet, which left the next one cold as well (2026-10-08).
+    let started = false;
     const clear = () => {
       if (timer !== undefined) window.clearTimeout(timer);
       timer = undefined;
       setBuffering(false);
+    };
+    const playingNow = () => {
+      started = true;
+      clear();
     };
     const stalled = () => {
       if (timer !== undefined || video.paused) return;
       timer = window.setTimeout(() => {
         timer = undefined;
         setBuffering(true);
-        reportPlaybackStall();
+        if (started) reportPlaybackStall();
       }, BUFFERING_DELAY_MS);
     };
-    const resized = () => {
-      const short = Math.min(video.videoWidth, video.videoHeight);
-      setLowQuality(short > 0 && short < LOW_QUALITY_SHORT_SIDE);
-    };
     video.addEventListener("waiting", stalled);
-    video.addEventListener("playing", clear);
+    video.addEventListener("playing", playingNow);
     video.addEventListener("canplaythrough", clear);
     video.addEventListener("pause", clear);
     video.addEventListener("emptied", clear);
-    video.addEventListener("resize", resized);
     return () => {
       clear();
       video.removeEventListener("waiting", stalled);
-      video.removeEventListener("playing", clear);
+      video.removeEventListener("playing", playingNow);
       video.removeEventListener("canplaythrough", clear);
       video.removeEventListener("pause", clear);
       video.removeEventListener("emptied", clear);
-      video.removeEventListener("resize", resized);
     };
   }, [playbackUrl]);
 
@@ -548,13 +564,9 @@ export function PitchPlayer({
           playsInline
           muted={muted}
           loop
-          // Streamed (MSE/HLS) sources can ignore `loop`; restart by hand so
-          // a pitch always loops seamlessly (founder, 2026-09-28).
-          onEnded={(event) => {
-            const video = event.currentTarget;
-            video.currentTime = 0;
-            void video.play().catch(() => undefined);
-          }}
+          // A streamed source turns `loop` off (hls-source.ts) and loops
+          // here, from its first buffered frame, without the network.
+          onEnded={(event) => restartPitch(event.currentTarget)}
           {...(intent.preload === null ? {} : { preload: intent.preload })}
           {...(posterUrl === null ? {} : { poster: posterUrl })}
           aria-label={`Pitch from ${company.canonicalName}`}
@@ -602,15 +614,18 @@ export function PitchPlayer({
                 />
               )}
             </button>
-            {lowQuality && playing ? (
-              <span className="cq-feed-quality" data-low-quality>
-                <Signal
-                  aria-hidden="true"
-                  size={ICON_SIZE.compact}
-                  strokeWidth={ICON_STROKE}
-                />
-                Slow connection · lower quality
-              </span>
+            {/* The browser, not the person, has the sound off: say how to
+                get it back, once, quietly (TikTok's "Tap to unmute"). */}
+            {soundBlocked && !muted && playing ? (
+              <button
+                type="button"
+                className="cq-feed-chip"
+                onClick={toggleSound}
+                data-sound-toggle
+                data-sound-blocked
+              >
+                Tap for sound
+              </button>
             ) : null}
           </div>
         ) : null}
@@ -729,13 +744,9 @@ export function PitchPlayer({
           playsInline
           muted={muted}
           loop
-          // Streamed (MSE/HLS) sources can ignore `loop`; restart by hand so
-          // a pitch always loops seamlessly (founder, 2026-09-28).
-          onEnded={(event) => {
-            const video = event.currentTarget;
-            video.currentTime = 0;
-            void video.play().catch(() => undefined);
-          }}
+          // A streamed source turns `loop` off (hls-source.ts) and loops
+          // here, from its first buffered frame, without the network.
+          onEnded={(event) => restartPitch(event.currentTarget)}
           // Derived only from the controller's tier. `undefined` when no
           // source is attached, so the browser is told nothing to fetch.
           {...(intent.preload === null ? {} : { preload: intent.preload })}

@@ -227,25 +227,35 @@ function policies(container: HTMLElement): Record<string, string> {
   return out;
 }
 
-describe("the three-player ring", () => {
-  it("never holds more than three video elements, however far the reader goes", async () => {
+describe("the four-player ring (ADR 0063)", () => {
+  it("never holds more than four video elements, however far the reader goes", async () => {
     const { container } = await renderFeed();
     for (let step = 0; step < 4; step += 1) {
-      expect(videos(container).length).toBeLessThanOrEqual(3);
+      expect(videos(container).length).toBeLessThanOrEqual(4);
       fireEvent.keyDown(feedRegion(), { key: "ArrowDown" });
       await screen.findByRole("heading", { name: `Company ${step + 2}` });
     }
-    expect(videos(container).length).toBeLessThanOrEqual(3);
+    expect(videos(container).length).toBeLessThanOrEqual(4);
   });
 
-  it("gives the active card ACTIVE, the next a startup buffer, and the one behind a poster", async () => {
+  it("gives the active card ACTIVE, buffers the next two, and keeps the one behind", async () => {
     const { container } = await renderFeed();
     fireEvent.keyDown(feedRegion(), { key: "ArrowDown" });
     await screen.findByRole("heading", { name: "Company 2" });
 
     expect(policies(container)).toEqual({
-      "Pitch from Company 1": "POSTER",
+      "Pitch from Company 1": "STARTUP_BUFFER",
       "Pitch from Company 2": "ACTIVE",
+      "Pitch from Company 3": "STARTUP_BUFFER",
+      "Pitch from Company 4": "STARTUP_BUFFER",
+    });
+  });
+
+  it("buffers the next two from the moment the feed loads", async () => {
+    const { container } = await renderFeed();
+    expect(policies(container)).toEqual({
+      "Pitch from Company 1": "ACTIVE",
+      "Pitch from Company 2": "STARTUP_BUFFER",
       "Pitch from Company 3": "STARTUP_BUFFER",
     });
   });
@@ -257,6 +267,7 @@ describe("the three-player ring", () => {
     expect(policies(container)).toEqual({
       "Pitch from Company 1": "ACTIVE",
       "Pitch from Company 2": "POSTER",
+      "Pitch from Company 3": "NONE",
     });
     expect(container.querySelector("[data-poster-warm]")).toBeNull();
   });
@@ -282,23 +293,23 @@ describe("the three-player ring", () => {
   });
 });
 
-describe("the poster after next", () => {
+describe("the poster after the buffered two", () => {
   it("is warmed as an image, with no player, and its grant is reused when its slot arrives", async () => {
     const { container } = await renderFeed();
 
     const warm = await waitFor(() => {
       const image = container.querySelector<HTMLImageElement>(
-        `img[data-poster-warm="${companyId(3)}"]`,
+        `img[data-poster-warm="${companyId(4)}"]`,
       );
       expect(image).not.toBeNull();
       return image;
     });
     expect(warm?.getAttribute("src")).toBe(
-      `https://cdn.test/${assetId(3)}/poster.jpg`,
+      `https://cdn.test/${assetId(4)}/poster.jpg`,
     );
     expect(warm?.hidden).toBe(true);
     expect(
-      container.querySelector('video[aria-label="Pitch from Company 3"]'),
+      container.querySelector('video[aria-label="Pitch from Company 4"]'),
     ).toBeNull();
 
     fireEvent.keyDown(feedRegion(), { key: "ArrowDown" });
@@ -306,15 +317,15 @@ describe("the poster after next", () => {
     await waitFor(() =>
       expect(
         container
-          .querySelector('video[aria-label="Pitch from Company 3"]')
+          .querySelector('video[aria-label="Pitch from Company 4"]')
           ?.getAttribute("poster"),
-      ).toBe(`https://cdn.test/${assetId(3)}/poster.jpg`),
+      ).toBe(`https://cdn.test/${assetId(4)}/poster.jpg`),
     );
 
-    const asksForThree = authorisePlaybackAction.mock.calls.filter(
-      ([id]) => id === companyId(3),
+    const asksForFour = authorisePlaybackAction.mock.calls.filter(
+      ([id]) => id === companyId(4),
     );
-    expect(asksForThree).toHaveLength(1);
+    expect(asksForFour).toHaveLength(1);
   });
 
   it("reuses a grant when the reader comes back to a card whose slot was recycled", async () => {
@@ -562,7 +573,7 @@ describe("Q watches the pitch with the person", () => {
 describe("the first cards' grants from the server", () => {
   it("asks nothing on the client for cards the server already authorised", async () => {
     const page = slate([1, 2, 3, 4, 5]).value;
-    const warm = [1, 2, 3].map((n) => ({
+    const warm = [1, 2, 3, 4].map((n) => ({
       companyId: companyId(n),
       authorization: grantFor(assetId(n)),
     }));
@@ -584,7 +595,7 @@ describe("the first cards' grants from the server", () => {
     );
     await waitFor(() =>
       expect(
-        container.querySelector(`img[data-poster-warm="${companyId(3)}"]`),
+        container.querySelector(`img[data-poster-warm="${companyId(4)}"]`),
       ).not.toBeNull(),
     );
     expect(authorisePlaybackAction).not.toHaveBeenCalled();
