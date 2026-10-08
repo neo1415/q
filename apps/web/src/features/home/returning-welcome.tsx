@@ -9,6 +9,9 @@ import { ChevronRight, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { askQAction, type QSubjectInput } from "@/features/q/actions";
 import { useQSurfaceTools } from "@/features/q/q-surface-tools";
 
+import { ArrivalBriefing } from "@/features/briefing/arrival-briefing";
+import { useArrivalStatus } from "@/features/briefing/arrival-store";
+
 import type { Briefing } from "./briefing";
 import { QBriefing } from "./q-briefing";
 import type { ReturningCard, ReturningGreeting } from "./returning";
@@ -74,6 +77,8 @@ export function ReturningWelcome({
 }) {
   const router = useRouter();
   const tools = useQSurfaceTools();
+  const arrival = useArrivalStatus();
+  const arrived = arrival.kind === "READY" && !arrival.nudge;
   const [asking, setAsking] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Today's setup reminder, when this welcome carries it: counted once the
@@ -118,17 +123,27 @@ export function ReturningWelcome({
       className="flex w-full flex-col items-center gap-5"
       data-q-returning
     >
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h1
-          id="returning-headline"
-          className="cq-title-lg text-balance text-(--cq-text-primary)"
-        >
-          {greeting.headline}
-        </h1>
-        <p className="cq-body-lg cq-prose text-balance text-(--cq-text-secondary)">
-          {greeting.question}
-        </p>
-      </div>
+      {/*
+        The arrival briefing (2026-10-08): greeting by their clock, the
+        lowdown, then what needs them, one card at a time. Until it is read,
+        and when this is not an arrival, the welcome below shows instead.
+      */}
+      <ArrivalBriefing
+        variant="page"
+        fallback={
+          <div className="flex flex-col items-center gap-2 text-center">
+            <h1
+              id="returning-headline"
+              className="cq-title-lg text-balance text-(--cq-text-primary)"
+            >
+              {greeting.headline}
+            </h1>
+            <p className="cq-body-lg cq-prose text-balance text-(--cq-text-secondary)">
+              {greeting.question}
+            </p>
+          </div>
+        }
+      />
 
       {greeting.leftOff === null || putOff ? null : (
         // Q's own last question, as Q asked it: where they left off is
@@ -146,7 +161,10 @@ export function ReturningWelcome({
         </figure>
       )}
 
-      {briefing === undefined ? null : <QBriefing briefing={briefing} />}
+      {/* The arrival briefing carries what waits on them; not said twice. */}
+      {briefing === undefined || arrived ? null : (
+        <QBriefing briefing={briefing} />
+      )}
 
       {shownCards.length > 0 ? (
         <ul

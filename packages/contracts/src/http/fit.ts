@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
+import { MoneySchema } from "../common/money.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { EvidenceStatusSchema } from "../evidence/vocabulary.js";
 
@@ -209,6 +210,10 @@ export const FitComparisonEntryDtoSchema = z
     name: z.string().min(1).max(200),
     /** "Seed · Clean energy · Nairobi"; only what this reader may see. */
     line: z.string().max(200).nullable(),
+    /** What the company does, in its own one line; absent from an older server. */
+    about: z.string().max(400).nullable().optional(),
+    /** The current raise, only where disclosure lets this reader see it. */
+    raise: MoneySchema.nullable().optional(),
     sources: z.array(FitCandidateSourceSchema).min(1).max(3),
     profile: FitProfileDtoSchema,
     /** Rows where this entry is the best of the set (shown with a word, never colour alone). */

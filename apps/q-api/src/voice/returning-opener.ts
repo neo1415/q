@@ -1,4 +1,5 @@
 import type { DatabaseExecutor } from "@capital-q/database";
+import { arrivalGreeting, isTimeZone } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
 import { narrationOf } from "../composition/instructions/digest.js";
@@ -33,6 +34,11 @@ export type OpenerFacts = {
    * waits on them, composed by code from the recorded steps.
    */
   readonly instructionNews?: string | null | undefined;
+  /**
+   * Their own IANA time zone, when they set one (founder 2026-10-08:
+   * "greet me according to the time"). Absent: a plain hello.
+   */
+  readonly timeZone?: string | null | undefined;
 };
 
 const TRIM = 70;
@@ -57,7 +63,13 @@ export function composeReturningOpener(
   facts: OpenerFacts,
   now: Date,
 ): string {
-  const hello = name === null ? "Welcome back." : `Hi ${name}.`;
+  // By their own clock when Q knows it ("Good afternoon, Zino."), else a
+  // plain hello: Q never guesses a time of day from the server's zone.
+  const hello = isTimeZone(facts.timeZone)
+    ? arrivalGreeting({ firstName: name, now, timeZone: facts.timeZone })
+    : name === null
+      ? "Welcome back."
+      : `Hi ${name}.`;
   if (facts.nextCall !== null) {
     const call = `You have "${clip(facts.nextCall.purpose)}" ${whenFrom(facts.nextCall.startsAt, now)}.`;
     const also =
@@ -97,7 +109,7 @@ export function createOpenerFacts(dependencies: {
     const current = now();
     const soon = new Date(current.getTime() + 36 * 3_600_000);
     const dayEnd = new Date(current.getTime() + 24 * 3_600_000);
-    const [calls, reminders, notices] = await Promise.all([
+    const [calls, reminders, notices, zone] = await Promise.all([
       sql<{ purpose: string; starts_at: Date }[]>`
         select m.purpose, m.starts_at
           from communication.meetings m
@@ -120,6 +132,9 @@ export function createOpenerFacts(dependencies: {
           from communication.notifications
          where user_id = ${actor.userId} and read_at is null
          group by kind`,
+      sql<{ timezone: string | null }[]>`
+        select timezone from identity.user_profiles
+         where id = ${actor.userId}`.catch(() => []),
     ]);
     const call = calls[0];
     // Their standing instruction's last day, from its own steps; what waits
@@ -150,6 +165,7 @@ export function createOpenerFacts(dependencies: {
        limit 1`.catch(() => []);
     const latest = instruction[0];
     return {
+      timeZone: zone[0]?.timezone ?? null,
       instructionNews:
         latest === undefined
           ? null

@@ -76,4 +76,26 @@ describe("after a call (2026-10-02)", () => {
       "Hi Zino. My notes from your last call are ready. How did it go? It sounded like next steps are diligence — record that?",
     );
   });
+
+  it("greets by the person's own clock when their time zone is known (2026-10-08)", () => {
+    // 08:00 UTC is 09:00 in Lagos and 04:00 in New York.
+    expect(
+      composeReturningOpener(
+        "Zino",
+        { ...none, timeZone: "Africa/Lagos" },
+        NOW,
+      ),
+    ).toMatch(/^Good morning, Zino\. /u);
+    expect(
+      composeReturningOpener(
+        "Zino",
+        { ...none, timeZone: "America/New_York" },
+        NOW,
+      ),
+    ).toMatch(/^Hi Zino, you're up late\. /u);
+    // An unknown zone is not guessed at.
+    expect(
+      composeReturningOpener("Zino", { ...none, timeZone: "Not/AZone" }, NOW),
+    ).toMatch(/^Hi Zino\. /u);
+  });
 });

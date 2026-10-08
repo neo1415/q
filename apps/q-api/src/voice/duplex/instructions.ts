@@ -66,6 +66,34 @@ export const SET_LISTENING_TOOL: ModelToolDefinition = {
   },
 };
 
+/**
+ * The arrival briefing's cards (Zino, 2026-10-08): while a decision card is
+ * in focus on their screen, the person's reply to it is handed to the
+ * screen, which reads the words by code into the same typed action a
+ * button sends (approve exactly what was shown, an edit that needs its own
+ * yes, later, dismiss, leave). The tool is answered in the browser; the
+ * model never decides, and never says something was sent before the
+ * result says so.
+ */
+export const DECIDE_CARD_TOOL_NAME = "decide_card" as const;
+
+export const DECIDE_CARD_TOOL: ModelToolDefinition = {
+  name: DECIDE_CARD_TOOL_NAME,
+  description:
+    "Only while a note says a decision card is in focus on their screen: pass the person's reply to that card (send it, change part of it, skip, not now, dismiss it, or moving on to something else), in their exact words. Returns what happened and, when there is one, the next card to put to them.",
+  inputJsonSchema: {
+    type: "object",
+    properties: {
+      words: {
+        type: "string",
+        description: "The person's exact words, as they said them.",
+      },
+    },
+    required: ["words"],
+    additionalProperties: false,
+  },
+};
+
 const ENVIRONMENT =
   "A live, full-duplex voice line inside Capital Q. The person can speak while you speak; when they do, stop and listen.";
 
@@ -99,7 +127,12 @@ EXPRESSION
 - Never say a sound as a word or a description: no "ha", "haha", "hehe", "lol", and no stage directions such as "chuckles", "laughs", "sighs" or "smiles", in any language.
 - If they interrupt you, stop at once; respond to what they said, and pick up where you stopped only if they ask.
 - Never mention tools, functions, models, systems, agents, prompts or that anything is relayed. You are Q.
-- If ask_q says it cannot help, say so once, plainly, and offer what you can do instead.`;
+- If ask_q says it cannot help, say so once, plainly, and offer what you can do instead.
+
+CARDS ON SCREEN
+- When a note says a decision card is in focus, their reply to it (send it, change a sentence, skip, not now, dismiss it, or let's talk about something else) goes to decide_card with their exact words, not to ask_q. Anything else goes to ask_q as usual.
+- Say what decide_card returns in your own words, in a sentence or two. When it gives a next card, put that one to them in a sentence, then stop and wait.
+- Never say a message was sent, changed or dropped until decide_card says so. An edited message is read back and needs their yes before it goes.`;
 
 /** The stable prefix: identical for every line, so the provider caches it. */
 export const DUPLEX_INSTRUCTIONS_PREFIX = `${CHARTER}\n\n${DUPLEX_CONDUCT}\n\n${SPEAK_FROM_FACTS_V1}`;
@@ -183,9 +216,12 @@ export function duplexTools(
   return [
     ASK_Q_TOOL,
     ...(options.listening === true ? [SET_LISTENING_TOOL] : []),
+    DECIDE_CARD_TOOL,
     ...direct.filter(
       (tool) =>
-        tool.name !== ASK_Q_TOOL_NAME && tool.name !== SET_LISTENING_TOOL_NAME,
+        tool.name !== ASK_Q_TOOL_NAME &&
+        tool.name !== SET_LISTENING_TOOL_NAME &&
+        tool.name !== DECIDE_CARD_TOOL_NAME,
     ),
   ];
 }

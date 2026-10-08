@@ -43,6 +43,7 @@ import {
 import type { DuplexConfig } from "./config.js";
 import {
   ASK_Q_TOOL_NAME,
+  DECIDE_CARD_TOOL_NAME,
   BACKCHANNEL_INSTRUCTIONS,
   BRIDGE_INSTRUCTIONS,
   duplexInstructions,
@@ -664,6 +665,16 @@ export function createDuplexBroker(
           }),
           listening: level,
         };
+      }
+
+      // The card tool is answered in the browser, where the card is; one
+      // that reaches here had no card in focus to decide.
+      if (call.name === DECIDE_CARD_TOOL_NAME) {
+        return output({
+          ok: false,
+          error:
+            "No card is in focus on their screen. Pass their words to ask_q instead.",
+        });
       }
 
       // Anything else must be a tool this line was offered, and runs only

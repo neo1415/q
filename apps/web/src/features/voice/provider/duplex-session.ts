@@ -13,6 +13,7 @@ import {
   readListeningPreference,
   storeListeningPreference,
 } from "../listening-preference";
+import { decideCardByVoice, onLineNote } from "../line-cards";
 import { resolveListeningLevel } from "./backchannel";
 import { pollNarration } from "./narration-poll";
 import {
@@ -158,6 +159,12 @@ export function useDuplexVoiceSession(
             storeListeningPreference(level);
           },
           onInterrupted: () => eventsRef.current.onInterrupted?.(),
+          // The arrival briefing's card in focus is decided on the page,
+          // by the same code its buttons use (line-cards.ts).
+          onClientTool: ({ name, arguments: args, heard }) =>
+            name === "decide_card"
+              ? decideCardByVoice(args, heard)
+              : Promise.resolve(null),
           onLinkStatus: (status) => {
             if (lineRef.current === line) {
               eventsRef.current.onLinkStatus?.(status);
@@ -192,6 +199,11 @@ export function useDuplexVoiceSession(
       const up = await line.open();
       if (up && lineRef.current === line) {
         setConnected(true);
+        // Notes from the page's cards reach this line while it is up.
+        const stopNotes = onLineNote((note, respond) => {
+          if (lineRef.current === line) line.note(note, respond);
+          else stopNotes();
+        });
         // Q speaks first: the opening the interview has, at once.
         if (firstMessage !== undefined) line.speakFirst(firstMessage);
       }

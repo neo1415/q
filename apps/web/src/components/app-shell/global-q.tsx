@@ -25,6 +25,7 @@ import {
   type QMoment,
   type QMomentSource,
 } from "@/features/q/q-moment";
+import { ArrivalDock } from "@/features/briefing/arrival-dock";
 import { AnswerChip } from "@/features/q/answer-chip";
 import { setScreenFocusSource } from "@/features/q/screen";
 import { QSessionProvider, useQSessionOptional } from "@/features/q/q-session";
@@ -274,6 +275,8 @@ export function GlobalQProvider({
           <GlobalQSheet />
           <GlobalQRunner />
           <AnswerChip />
+          {/* The arrival briefing beside the dock on every other page. */}
+          <ArrivalDock />
           <QSounds />
           {/* ADR 0062: particles around the page edge while Q works. */}
           <QEdgeFlow />

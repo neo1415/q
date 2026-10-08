@@ -20,6 +20,7 @@
     "@capital-q/gateq": "workspace:*",
     "@capital-q/investor-onboarding": "workspace:*",
     "@capital-q/onboarding": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
     "@capital-q/ui": "workspace:*",
     "@deepgram/agents": "^0.1.2",
     "@elevenlabs/react": "1.15.2",

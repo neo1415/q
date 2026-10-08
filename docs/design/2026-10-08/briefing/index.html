@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arrival briefing (design)</title>
+    <!--
+  Arrival briefing (founder, Zino, 2026-10-08: "when I log in ... bring those
+  to me specifically and ask me about them in cards and also speaking to me
+  ... greet me according to the time ... go straight ahead to the work the
+  agents have done, give me the lowdown, and bring up the cards and ask me
+  about each thing. Simple.").
+  Query: ?screen=arrival|edit|quiet|dock &device=phone|desktop &theme=light|dark
+
+  Order on arrival (once per session, or after 2 h away; never on every
+  navigation, never blocking the page):
+    1. Greeting in their timezone, first name   "Good afternoon, Zino."
+    2. Lowdown, 1-3 sentences, from recorded facts only (sent, booked, held,
+       replies, new matches). The same facts are spoken on voice in the
+       voice's own words (SPOKEN_REPLY); the text below is the fallback.
+    3. The decisions as a sequence: ONE card in focus, the rest a stack count
+       ("2 more after this"). Each card: who, what they said, the exact message
+       Q will send, then Approve & send · Edit & send · Dismiss · Later.
+       By voice: "send it", "change the second sentence to ...", "skip",
+       "not now", "let's talk about something else" -> the same typed actions.
+    4. An edit is a new message: shown in full with "Send this?" and a second
+       explicit yes. Nothing goes on the first word.
+    5. "Not now" leaves the sequence; what is left stays in Needs you on Work.
+  Quiet day: one line, no cards ("Good afternoon, Zino. Quiet day, nothing
+  needs you.").
+  Dock (other pages): the same card, compact, under Q's mark; one line of
+  lowdown; the stack count; the same four verbs.
+
+  Research, briefly:
+  - Superhuman's "Get Me To Zero" / Gmail priority: one decision at a time,
+    the next one queued, verbs on the item.
+  - Google Assistant / Alexa: say the gist, then three items at most, then the
+    screen; one question per turn, then stop (rule of three).
+  - Executive assistants' morning brief: the lowdown first, decisions second,
+    "anything else?" last. Nothing waits on a person who wants to move on.
+  Fictional people and companies.
+-->
+    <style>
+      :root {
+        --cq-font-sans:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue",
+          Arial, sans-serif;
+        --cq-radius-sm: 8px;
+        --cq-radius-md: 12px;
+      }
+      [data-theme="light"] {
+        --cq-canvas: #f6f4ef;
+        --cq-surface: #fbfaf7;
+        --cq-surface-raised: #fff;
+        --cq-surface-subtle: #f1ede4;
+        --cq-surface-sunken: #efebe2;
+        --cq-text-primary: #16140f;
+        --cq-text-secondary: #4f4a40;
+        --cq-text-tertiary: #655e51;
+        --cq-border-subtle: #e7e1d5;
+        --cq-border: #d9d1c1;
+        --cq-border-strong: #8f8673;
+        --cq-accent: #8a6a12;
+        --cq-q: #c9a227;
+        --cq-positive: #2f6b3f;
+        --cq-chrome: #16140f;
+        --cq-chrome-text: #f4efe2;
+        --cq-chrome-muted: #bfb6a2;
+      }
+      [data-theme="dark"] {
+        --cq-canvas: #0f0e0b;
+        --cq-surface: #17150f;
+        --cq-surface-raised: #1d1a13;
+        --cq-surface-subtle: #24211a;
+        --cq-surface-sunken: #131109;
+        --cq-text-primary: #f4efe2;
+        --cq-text-secondary: #c9c0ab;
+        --cq-text-tertiary: #a59c87;
+        --cq-border-subtle: #2a261c;
+        --cq-border: #3a3427;
+        --cq-border-strong: #7a715c;
+        --cq-accent: #c9a227;
+        --cq-q: #e0bd4a;
+        --cq-positive: #8fcf9c;
+        --cq-chrome: #0b0a08;
+        --cq-chrome-text: #f4efe2;
+        --cq-chrome-muted: #bfb6a2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: var(--cq-font-sans);
+        background: var(--cq-canvas);
+        color: var(--cq-text-primary);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      .frame {
+        display: flex;
+        min-height: 100vh;
+      }
+      .side {
+        width: 232px;
+        flex: none;
+        background: var(--cq-chrome);
+        color: var(--cq-chrome-muted);
+        padding: 20px 14px;
+        font-size: 14px;
+      }
+      .side b {
+        color: var(--cq-chrome-text);
+        display: block;
+        margin-bottom: 18px;
+      }
+      .side a {
+        display: block;
+        padding: 8px 10px;
+        border-radius: 8px;
+        color: inherit;
+        text-decoration: none;
+      }
+      .side a.on {
+        background: #ffffff14;
+        color: var(--cq-chrome-text);
+      }
+      main {
+        flex: 1;
+        padding: 40px 16px 120px;
+        position: relative;
+      }
+      .phone .side {
+        display: none;
+      }
+      .phone main {
+        padding-top: 24px;
+      }
+      .col {
+        max-width: 640px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      /* Q's mark: glow is allowed on Q only (ADR 0017 F2); no text on it. */
+      .aperture {
+        width: 72px;
+        height: 72px;
+        border-radius: 999px;
+        margin: 0 auto;
+        background: radial-gradient(
+          circle at 50% 50%,
+          var(--cq-q) 0 22%,
+          color-mix(in srgb, var(--cq-q) 35%, transparent) 46%,
+          transparent 70%
+        );
+      }
+      .state {
+        text-align: center;
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+        margin-top: -12px;
+      }
+      h1 {
+        font-size: 28px;
+        font-weight: 600;
+        margin: 0;
+        text-align: center;
+        letter-spacing: -0.01em;
+      }
+      .lowdown {
+        margin: -8px auto 0;
+        max-width: 54ch;
+        text-align: center;
+        color: var(--cq-text-secondary);
+        font-size: 16px;
+        text-wrap: balance;
+      }
+      .seq {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .seqhead {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--cq-text-tertiary);
+      }
+      .seqhead b {
+        color: var(--cq-text-primary);
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .seqhead .leave {
+        margin-left: auto;
+      }
+      .stack {
+        position: relative;
+      }
+      .stack::before,
+      .stack::after {
+        content: "";
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        height: 100%;
+        border-radius: var(--cq-radius-md);
+        border: 1px solid var(--cq-border-subtle);
+        background: var(--cq-surface);
+      }
+      .stack::before {
+        bottom: -6px;
+      }
+      .stack::after {
+        bottom: -12px;
+        left: 24px;
+        right: 24px;
+        z-index: -1;
+      }
+      .stack.one::after {
+        display: none;
+      }
+      .card {
+        position: relative;
+        z-index: 1;
+        background: var(--cq-surface-raised);
+        border: 1px solid var(--cq-border);
+        border-radius: var(--cq-radius-md);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .who {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .mark {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--cq-surface-subtle);
+        color: var(--cq-text-secondary);
+        flex: none;
+      }
+      .who .name {
+        font-weight: 600;
+      }
+      .who .meta {
+        font-size: 13px;
+        color: var(--cq-text-tertiary);
+      }
+      .ask {
+        font-size: 15px;
+        font-weight: 500;
+      }
+      .theirs {
+        font-size: 14px;
+        color: var(--cq-text-secondary);
+        border-left: 2px solid var(--cq-border);
+        padding-left: 10px;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+        margin-bottom: 2px;
+      }
+      blockquote {
+        margin: 0;
+        background: var(--cq-surface-sunken);
+        border-radius: var(--cq-radius-sm);
+        padding: 10px 12px;
+        font-size: 14px;
+        white-space: pre-wrap;
+      }
+      blockquote mark {
+        background: color-mix(in srgb, var(--cq-accent) 22%, transparent);
+        color: inherit;
+        border-radius: 3px;
+        padding: 0 2px;
+      }
+      .verbs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .btn {
+        min-height: 44px;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        background: transparent;
+        color: var(--cq-text-secondary);
+      }
+      .btn.primary {
+        background: var(--cq-text-primary);
+        color: var(--cq-canvas);
+      }
+      .btn.secondary {
+        border-color: var(--cq-border-strong);
+        color: var(--cq-text-primary);
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+      }
+      .composer {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: 24px;
+        max-width: 640px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--cq-border);
+        background: var(--cq-surface-raised);
+        border-radius: 999px;
+        padding: 6px 6px 6px 16px;
+        color: var(--cq-text-tertiary);
+      }
+      .composer span:first-child {
+        flex: 1;
+      }
+      .round {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: var(--cq-text-primary);
+        color: var(--cq-canvas);
+        display: grid;
+        place-items: center;
+      }
+      /* Another page with the dock. */
+      .page h2 {
+        margin: 0 0 12px;
+        font-size: 22px;
+      }
+      .ghost {
+        height: 64px;
+        border-radius: 12px;
+        background: var(--cq-surface-subtle);
+        margin-bottom: 12px;
+      }
+      .dock {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        width: 360px;
+        max-width: calc(100vw - 32px);
+        background: var(--cq-surface-raised);
+        border: 1px solid var(--cq-border);
+        border-radius: 16px;
+        box-shadow: 0 12px 32px #0000002e;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .phone .dock {
+        right: 16px;
+        left: 16px;
+        width: auto;
+      }
+      .dock .top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .dock .aperture {
+        width: 32px;
+        height: 32px;
+        margin: 0;
+        flex: none;
+      }
+      .dock .line {
+        font-size: 14px;
+        color: var(--cq-text-secondary);
+      }
+      .dock .line b {
+        color: var(--cq-text-primary);
+        font-weight: 600;
+      }
+      .dock .card {
+        padding: 12px;
+        gap: 8px;
+        border-color: var(--cq-border-subtle);
+      }
+      .dock blockquote {
+        font-size: 13px;
+        max-height: 6.5em;
+        overflow: hidden;
+      }
+      textarea {
+        width: 100%;
+        min-height: 120px;
+        border-radius: var(--cq-radius-sm);
+        border: 1px solid var(--cq-border-strong);
+        background: var(--cq-surface);
+        color: var(--cq-text-primary);
+        font: inherit;
+        font-size: 14px;
+        padding: 10px 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame" id="frame">
+      <nav class="side" aria-label="Main">
+        <b>Capital Q</b>
+        <a class="on" href="#">Q</a><a href="#">Discover</a
+        ><a href="#">Relationships</a><a href="#">Work</a
+        ><a href="#">Settings</a>
+      </nav>
+      <main id="main"></main>
+    </div>
+    <script>
+      const q = new URLSearchParams(location.search);
+      const screen = q.get("screen") ?? "arrival";
+      document.documentElement.dataset.theme = q.get("theme") ?? "light";
+      if (q.get("device") === "phone") document.body.classList.add("phone");
+      const main = document.getElementById("main");
+
+      const verbs = `<div class="verbs">
+        <button class="btn primary">Approve &amp; send</button>
+        <button class="btn secondary">Edit &amp; send</button>
+        <button class="btn">Dismiss</button>
+        <button class="btn">Later</button>
+      </div>`;
+
+      const card = (dock) => `
+        <article class="card" aria-label="Reply to Halyard Security, 1 of 3">
+          <div class="who"><span class="mark">HS</span>
+            <div><div class="name">Halyard Security</div>
+            <div class="meta">Seed · United States · replied 2 h ago</div></div>
+          </div>
+          ${dock ? "" : '<div class="ask">They asked for a call next week. Send this?</div>'}
+          <div class="theirs"><div class="label">What they said</div>Thanks, this is helpful. Could we find 30 minutes next week to walk through the pilot numbers?</div>
+          <div><div class="label">What Q will send</div>
+          <blockquote>Happy to. Tuesday 10:00 or Thursday 15:00 (your time) both work for me. I'll bring the pilot numbers and the retention cohort.</blockquote></div>
+          ${verbs}
+          ${dock ? "" : '<div class="hint">Or say "send it", "change the second sentence to…", "skip", "not now".</div>'}
+        </article>`;
+
+      const header = (
+        n,
+      ) => `<div class="seqhead"><b>Needs you</b><span>1 of ${n}</span>
+        <button class="btn leave">Not now</button></div>`;
+
+      if (screen === "arrival") {
+        main.innerHTML = `<div class="col">
+          <div class="aperture" aria-hidden="true"></div>
+          <div class="state">Speaking</div>
+          <h1>Good afternoon, Zino.</h1>
+          <p class="lowdown">Since this morning I sent two replies and booked your call with Clearwater for Thursday. Halyard wrote back, and three things need you.</p>
+          <section class="seq">${header(3)}<div class="stack">${card(false)}</div>
+          <div class="hint" style="margin-top:14px">2 more after this. Anything you leave stays in Needs you on Work.</div></section>
+        </div>
+        <div class="composer"><span>Ask Q, or say something else</span><span class="round">↑</span></div>`;
+      } else if (screen === "edit") {
+        main.innerHTML = `<div class="col">
+          <div class="aperture" aria-hidden="true"></div>
+          <div class="state">Listening</div>
+          <h1>Good afternoon, Zino.</h1>
+          <section class="seq">${header(3)}<div class="stack">
+          <article class="card">
+            <div class="who"><span class="mark">HS</span><div><div class="name">Halyard Security</div><div class="meta">Your edit · not sent</div></div></div>
+            <div class="ask">Here's the new version. Send this?</div>
+            <blockquote>Happy to. <mark>Thursday at 3pm my time works best.</mark> I'll bring the pilot numbers and the retention cohort.</blockquote>
+            <div class="verbs"><button class="btn primary">Yes, send this</button><button class="btn secondary">Keep editing</button><button class="btn">Cancel edit</button></div>
+            <div class="hint">You changed the second sentence. Nothing is sent until you say yes.</div>
+          </article></div></section>
+        </div>
+        <div class="composer"><span>Ask Q, or say something else</span><span class="round">↑</span></div>`;
+      } else if (screen === "quiet") {
+        main.innerHTML = `<div class="col">
+          <div class="aperture" aria-hidden="true"></div>
+          <div class="state">Ready</div>
+          <h1>Good afternoon, Zino.</h1>
+          <p class="lowdown">Quiet day, nothing needs you. I'll bring anything new here.</p>
+        </div>
+        <div class="composer"><span>Ask Q anything</span><span class="round">↑</span></div>`;
+      } else {
+        document.querySelector(".side a.on").classList.remove("on");
+        document.querySelectorAll(".side a")[2].classList.add("on");
+        main.innerHTML = `<div class="col page"><h2>Relationships</h2>
+          <div class="ghost"></div><div class="ghost"></div><div class="ghost"></div></div>
+          <aside class="dock" aria-label="Q">
+            <div class="top"><div class="aperture" aria-hidden="true"></div>
+            <div class="line"><b>Good evening, Zino.</b> Halyard wrote back; 3 things need you.</div></div>
+            ${card(true)}
+            <div class="hint">2 more after this · <a href="#" style="color:inherit">Not now</a></div>
+          </aside>`;
+      }
+    </script>
+  </body>
+</html>

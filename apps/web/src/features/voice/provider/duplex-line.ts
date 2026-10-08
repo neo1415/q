@@ -178,7 +178,25 @@ export type DuplexLineEvents = {
   readonly onLinkStatus?: ((status: string | null) => void) | undefined;
   /** BACKCHANNEL: the person changed the level by voice. */
   readonly onListening?: ((level: QVoiceListeningLevel) => void) | undefined;
+  /**
+   * A tool answered in the browser, where what it acts on is (the arrival
+   * briefing's card in focus). `heard` is the provider's transcript of the
+   * person's own last turn, never the model's paraphrase. Null: not
+   * handled here, relayed to the server as any other tool.
+   */
+  readonly onClientTool?:
+    | ((call: {
+        readonly name: string;
+        readonly arguments: string;
+        readonly heard: string | null;
+      }) => Promise<string | null>)
+    | undefined;
 };
+
+/** Tools the browser answers, when a handler for them is given. */
+const CLIENT_TOOLS: ReadonlySet<string> = new Set(["decide_card"]);
+/** How long a client tool waits for the person's own transcript. */
+const OWN_WORDS_WAIT_MS = 1_500;
 
 /** The server-side relays, as server actions; null means "the line is gone". */
 export type DuplexRelays = {
@@ -429,6 +447,8 @@ export class DuplexLine {
   /** The person's items in this turn, for a reaction's context. */
   #turnItems: string[] = [];
   readonly #transcripts = new Map<string, string>();
+  /** The person's last committed audio item (their own words' key). */
+  #lastCommitted: string | null = null;
   /** The provider's transcripts of the person's latest turns. */
   readonly #heard: string[] = [];
   #lastQSaid = "";
@@ -747,6 +767,43 @@ export class DuplexLine {
     if (trimmed.length === 0) return;
     this.#replay.push({ role, text: trimmed });
     if (this.#replay.length > REPLAY_MAX) this.#replay.shift();
+  }
+
+  /**
+   * The provider's transcript of the person's last turn, waiting briefly
+   * for it when the model called a tool before the transcript landed.
+   */
+  async #ownWords(timeoutMs: number): Promise<string | null> {
+    const item = this.#lastCommitted;
+    if (item === null) return this.#heard.at(-1) ?? null;
+    for (let waited = 0; waited <= timeoutMs; waited += 100) {
+      const said = this.#transcripts.get(item);
+      if (said !== undefined) return said;
+      if (this.#over) return null;
+      await this.#wait(100);
+    }
+    return null;
+  }
+
+  /**
+   * A note from the screen (the arrival briefing: a card came into focus,
+   * a card was decided). Context only, never the person's words; with
+   * `respond`, Q says something about it now, unless it is already
+   * speaking or the person is (then it waits for the next turn).
+   */
+  note(text: string, respond: boolean): void {
+    const words = text.trim().slice(0, 2_000);
+    if (words.length === 0 || !this.#connected || this.#over) return;
+    this.#send({ type: "conversation.item.create", item: systemItem(words) });
+    if (
+      respond &&
+      !this.#responseActive &&
+      !this.#speaking &&
+      this.#toolsInFlight === 0
+    ) {
+      this.#send({ type: "response.create" });
+      this.#touch();
+    }
   }
 
   #wait(ms: number): Promise<void> {
@@ -1197,6 +1254,7 @@ export class DuplexLine {
         if (itemId !== undefined) {
           this.#turnItems.push(itemId);
           if (this.#turnItems.length > TURN_ITEMS_MAX) this.#turnItems.shift();
+          this.#lastCommitted = itemId;
         }
         this.#committed(itemId);
         break;
@@ -1332,14 +1390,26 @@ export class DuplexLine {
     this.#updateBusy();
     let result: QVoiceDuplexToolResult | null;
     try {
-      result = await this.#relays.tool({
-        callId: callId.slice(0, 128),
-        name: name.slice(0, 64),
-        arguments: args.slice(0, 8_000),
-        ...(listening
-          ? { heard: [...this.#heard], listening: this.#policy.level }
-          : {}),
-      });
+      const onClientTool = this.#events.onClientTool;
+      const local =
+        onClientTool !== undefined && CLIENT_TOOLS.has(name)
+          ? await onClientTool({
+              name,
+              arguments: args.slice(0, 8_000),
+              heard: await this.#ownWords(OWN_WORDS_WAIT_MS),
+            }).catch(() => null)
+          : null;
+      result =
+        local !== null
+          ? { output: local, approvalPending: false }
+          : await this.#relays.tool({
+              callId: callId.slice(0, 128),
+              name: name.slice(0, 64),
+              arguments: args.slice(0, 8_000),
+              ...(listening
+                ? { heard: [...this.#heard], listening: this.#policy.level }
+                : {}),
+            });
     } catch {
       result = null;
     } finally {

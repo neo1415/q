@@ -13,6 +13,9 @@ import {
 } from "react";
 
 import type { QRoomEntry } from "@capital-q/contracts";
+import { arrivalGreeting } from "@capital-q/q-core/speech";
+
+import { arrivalSpoken } from "@/features/briefing/arrival-store";
 
 import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
@@ -42,6 +45,17 @@ import { setOpenDocument } from "./screen";
 import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import { useQConversation, type QConversation } from "./use-q-conversation";
 import { rereadUntilSettled } from "./voice-reread";
+
+/** "Good afternoon. What's on your mind?", by the browser's clock. */
+function plainHello(): string {
+  let zone: string | null;
+  try {
+    zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    zone = null;
+  }
+  return `${arrivalGreeting({ firstName: null, now: new Date(), timeZone: zone })} What's on your mind?`;
+}
 
 /**
  * One Q conversation for the whole signed-in app (ADR 0017 F1; spec §6.4).
@@ -340,7 +354,9 @@ export function QSessionProvider({
                 : {}),
           ...(named === undefined ? {} : { conversationId: named }),
         },
-        firstMessage: greeting ?? "I'm listening. What would you like to know?",
+        // Never "I'm listening" (Zino, 2026-10-08): the arrival briefing
+        // when this page load gives one, else a hello by their clock.
+        firstMessage: greeting ?? arrivalSpoken() ?? plainHello(),
       });
     },
     [

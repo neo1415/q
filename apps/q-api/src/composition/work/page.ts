@@ -2,7 +2,9 @@ import {
   Q_WORK_DONE_PAGE_MAX,
   Q_WORK_SUGGESTION_KINDS,
   Q_WORK_SUGGESTIONS_MAX,
+  type QWorkActivityCount,
   type QWorkDonePageDto,
+  type QWorkSinceDto,
   type QWorkSuggestionDto,
   type QWorkSuggestionKind,
 } from "@capital-q/contracts";
@@ -498,6 +500,10 @@ export function createWorkPage(dependencies: {
       );
     },
 
+    /** What happened since they were last here (arrival briefing). */
+    since: (actor: ActorContext, since: Date): Promise<QWorkSinceDto> =>
+      readWorkSince(sql, actor, since, now()),
+
     /**
      * What Q finished for them, newest first, a page at a time (keyset on
      * time and id, never an offset). A line links to what it changed only
@@ -599,6 +605,156 @@ export function createWorkPage(dependencies: {
 }
 
 export type WorkPage = ReturnType<typeof createWorkPage>;
+
+/** The kinds of step the lowdown names, by recorded action. */
+const STEP_KINDS = {
+  "chat.message.send": "sent",
+  "schedule.meeting.book": "booked",
+  "relationship.interest.express": "interest",
+} as const;
+
+/** How far back "since" may reach: a week, so the read stays bounded. */
+const SINCE_MAX_MS = 7 * DAY_MS;
+
+function counted(
+  rows: readonly { n: number; names: readonly (string | null)[] | null }[],
+): QWorkActivityCount {
+  const n = rows.reduce((sum, row) => sum + row.n, 0);
+  const names = [
+    ...new Set(
+      rows.flatMap((row) =>
+        (row.names ?? []).filter(
+          (name): name is string => typeof name === "string" && name.length > 0,
+        ),
+      ),
+    ),
+  ]
+    .slice(0, 3)
+    .map((name) => name.slice(0, 200));
+  return { n, names };
+}
+
+/**
+ * What happened on the person's own side since `since` (arrival briefing,
+ * Zino 2026-10-08), read by code from recorded rows. Every predicate is
+ * their own user id, or a relationship whose side they are an active
+ * member of; the other sides' names are the ones their own Work and
+ * relationships pages already show them.
+ */
+export async function readWorkSince(
+  sql: DatabaseExecutor,
+  actor: ActorContext,
+  sinceInput: Date,
+  current: Date,
+): Promise<QWorkSinceDto> {
+  const floor = new Date(current.getTime() - SINCE_MAX_MS);
+  const since = sinceInput < floor ? floor : sinceInput;
+  const [steps, held, replies, matches, zone] = await Promise.all([
+    sql<{ action: string; n: number; names: (string | null)[] | null }[]>`
+      select s.action, count(*)::int as n,
+             (array_agg(distinct
+                case
+                  when r.id is null or i.organisation_id is null then null
+                  when io.organisation_id = i.organisation_id
+                    then (select coalesce(c.canonical_name, c.legal_name)
+                            from core.companies c where c.id = r.company_id)
+                  else io.display_name
+                end))[1:3] as names
+        from q_runtime.instruction_steps s
+        join q_runtime.standing_instructions i on i.id = s.instruction_id
+        left join network.relationships r on r.id = s.relationship_id
+        left join core.investor_organisations io
+          on io.id = r.investor_organisation_id
+       where s.user_id = ${actor.userId} and s.tenant_id = ${actor.tenantId}
+         and s.status = 'DONE' and s.created_at > ${since}
+       group by s.action`,
+    sql<{ n: number; names: (string | null)[] | null }[]>`
+      select count(*)::int as n,
+             (array_agg(distinct d.counterpart_name))[1:3] as names
+        from q_runtime.workforce_draft_outcomes o
+        join q_runtime.workforce_drafts d on d.id = o.draft_id
+       where o.user_id = ${actor.userId} and o.tenant_id = ${actor.tenantId}
+         and o.outcome = 'HELD' and o.created_at > ${since}`,
+    // Their counterparts' new messages: one per relationship, on a side
+    // they are an active member of, never their own side's words.
+    sql<{ n: number; names: (string | null)[] | null }[]>`
+      select count(distinct r.id)::int as n,
+             (array_agg(distinct
+                case when mine.side = 'COMPANY' then io.display_name
+                     else coalesce(co.canonical_name, co.legal_name) end))[1:3] as names
+        from communication.messages m
+        join communication.conversations c on c.id = m.conversation_id
+        join network.relationships r on r.id = c.relationship_id
+        join core.companies co on co.id = r.company_id
+        join core.investor_organisations io on io.id = r.investor_organisation_id
+        join lateral (
+          select case
+                   when exists (select 1 from identity.organisation_memberships om
+                                 where om.user_id = ${actor.userId}
+                                   and om.organisation_id = co.organisation_id
+                                   and om.membership_status = 'active')
+                     then 'COMPANY'
+                   when exists (select 1 from identity.organisation_memberships om
+                                 where om.user_id = ${actor.userId}
+                                   and om.organisation_id = io.organisation_id
+                                   and om.membership_status = 'active')
+                     then 'INVESTOR'
+                 end as side
+        ) mine on mine.side is not null
+       where m.created_at > ${since}
+         and m.kind in ('TEXT', 'ATTACHMENT', 'VOICE_NOTE')
+         and m.sender_side <> mine.side
+         and m.sender_user_id <> ${actor.userId}`,
+    sql<{ n: number; names: (string | null)[] | null }[]>`
+      select count(*)::int as n,
+             (array_agg(distinct
+                case when exists (select 1 from identity.organisation_memberships om
+                                   where om.user_id = ${actor.userId}
+                                     and om.organisation_id = co.organisation_id
+                                     and om.membership_status = 'active')
+                     then io.display_name
+                     else coalesce(co.canonical_name, co.legal_name) end))[1:3] as names
+        from network.relationships r
+        join core.companies co on co.id = r.company_id
+        join core.investor_organisations io on io.id = r.investor_organisation_id
+       where r.current_state = 'CONNECTED' and r.state_updated_at > ${since}
+         and exists (select 1 from identity.organisation_memberships om
+                      where om.user_id = ${actor.userId}
+                        and om.organisation_id in (co.organisation_id, io.organisation_id)
+                        and om.membership_status = 'active')`,
+    sql<{ zone: string | null }[]>`
+      select coalesce(
+               (select nullif(btrim(p.timezone), '')
+                  from identity.user_profiles p where p.id = ${actor.userId}),
+               (select g.grant_payload->'workingHours'->>'timeZone'
+                  from q_runtime.standing_instructions i
+                  join q_runtime.instruction_grants g on g.instruction_id = i.id
+                 where i.user_id = ${actor.userId} and i.tenant_id = ${actor.tenantId}
+                 order by g.created_at desc
+                 limit 1)) as zone`.catch(() => [{ zone: null }]),
+  ]);
+  const byKind = (kind: (typeof STEP_KINDS)[keyof typeof STEP_KINDS]) =>
+    counted(
+      steps.filter(
+        (row) => STEP_KINDS[row.action as keyof typeof STEP_KINDS] === kind,
+      ),
+    );
+  const timeZone = zone[0]?.zone ?? null;
+  return {
+    since: since.toISOString(),
+    sent: byKind("sent"),
+    booked: byKind("booked"),
+    interest: byKind("interest"),
+    held: counted(held),
+    replies: counted(replies),
+    matches: counted(matches),
+    timeZone:
+      timeZone !== null &&
+      /^[A-Za-z]+(?:\/[A-Za-z0-9_+-]+){0,2}$/u.test(timeZone)
+        ? timeZone.slice(0, 64)
+        : null,
+  };
+}
 
 export function encodeCursor(at: Date, id: string): string {
   return Buffer.from(`${at.toISOString()}|${id}`, "utf8").toString("base64url");

@@ -21,6 +21,8 @@ import {
   type PushSubscriptionRequest,
   type QWorkLaneAnswerRequest,
   Q_WORK_DONE_PATH,
+  Q_WORK_SINCE_PATH,
+  QWorkSinceDtoSchema,
   Q_WORK_SUGGESTION_DISMISSALS_PATH,
   Q_WORK_SUGGESTIONS_PATH,
   QWorkDonePageDtoSchema,
@@ -223,6 +225,17 @@ export function listQWorkDone(
     "GET",
     `${Q_WORK_DONE_PATH}${suffix}`,
     QWorkDonePageDtoSchema,
+  );
+}
+
+/** `GET /v1/q/work/since` (Q API): what happened since they were last here. */
+export function getQWorkSince(session: ApiSession, since: string) {
+  const query = new URLSearchParams({ since });
+  return call(
+    session,
+    "GET",
+    `${Q_WORK_SINCE_PATH}?${query.toString()}`,
+    QWorkSinceDtoSchema,
   );
 }
 
