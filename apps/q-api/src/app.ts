@@ -35,6 +35,10 @@ import { registerQConversationRoutes } from "./http/q-conversations.js";
 import type { QRoomFeed } from "./room/feed.js";
 import { registerQRoomRoutes } from "./room/routes.js";
 import {
+  registerUiActReceiptRoutes,
+  type UiActReceiptLedger,
+} from "./http/ui-act-receipts.js";
+import {
   registerQArtifactRoutes,
   type QArtifactRoutesDependencies,
 } from "./http/q-artifacts.js";
@@ -233,6 +237,11 @@ export type QApiModules = {
    * absent means no room route and nothing published.
    */
   readonly room?: QRoomFeed | undefined;
+  /**
+   * RECOVERY-2026-10 (C): receipts of Q's UI acts from the person's screen;
+   * absent means no receipt route.
+   */
+  readonly uiActReceipts?: UiActReceiptLedger | undefined;
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
   readonly qActions?: QApprovalRoutesDependencies["qActions"] | undefined;
   /** What runs an approved action: resume, or the gate when the run cannot resume. */
@@ -387,6 +396,14 @@ export function createApp(
         resolver: security.resolver,
         identity: security.identity,
         room: modules.room,
+      });
+    }
+    if (modules.uiActReceipts !== undefined) {
+      registerUiActReceiptRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        receipts: modules.uiActReceipts,
       });
     }
     // A person's conversations (ADR 0012): the same owner rule, the

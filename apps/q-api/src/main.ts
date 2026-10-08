@@ -537,6 +537,7 @@ import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
 import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenlabs-pronunciation.js";
 import { createVoiceTurnBoard } from "./voice/turn-board.js";
 import { createQRoomFeed } from "./room/feed.js";
+import { createUiActReceiptLedger } from "./http/ui-act-receipts.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
@@ -2645,8 +2646,10 @@ const qTools = createQTools({
             sql: database.sql,
           })
             .findDiscoverablePitches([companyId])
-            .catch(() => new Map())
-        ).get(companyId);
+            // Typed failure (not an untyped empty Map): an unreadable list
+            // is no pitches, and the lint keeps the read typed.
+            .catch(() => null)
+        )?.get(companyId);
         if (set === undefined) return null;
         const read = await Promise.all(
           [set, ...set.more].slice(0, 5).map(async (pitch) => {
@@ -5389,6 +5392,7 @@ const voiceTurnBoard = createVoiceTurnBoard();
 // voice-cards: the person's Q room feed, beside the turn board (same
 // process, same lifetime): every run's answer, whichever path made it.
 const qRoom = createQRoomFeed({ qStream, logger });
+const uiActReceipts = createUiActReceiptLedger();
 const welcomeHost = createWelcomeHost({
   gateway: modelGateway,
   logger,
@@ -5732,6 +5736,8 @@ const { app, logger: appLogger } = createApp(
     continueApproved,
     qStream: { service: qStream },
     room: qRoom,
+    // RECOVERY-2026-10 (C): what came of Q's UI acts on the person's screen.
+    uiActReceipts,
     // Q as an MCP server, only where a deployment turned it on. The same
     // registry and pipeline a run uses; a different modality, no more
     // authority.

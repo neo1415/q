@@ -175,6 +175,7 @@ export {
   reportQVoiceDuplexUsage,
   pollQVoiceDuplexNarration,
   readQRoom,
+  reportQUiActs,
   rejoinQVoiceDuplex,
   endQVoiceDuplex,
   getQApproval,

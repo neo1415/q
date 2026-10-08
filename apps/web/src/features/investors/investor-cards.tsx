@@ -31,7 +31,7 @@ export function InvestorCards({
       data-investor-cards
     >
       {items.map((item) => (
-        <li key={item.investorOrganisationId}>
+        <li key={item.investorOrganisationId} data-q-item>
           <InvestorCard item={item} footer={footer?.(item)} />
         </li>
       ))}

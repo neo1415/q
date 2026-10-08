@@ -10,11 +10,15 @@ import type { ActorContext } from "@capital-q/security";
 import { defineAppAction } from "../define.js";
 
 /**
- * P3 documents page (lead 2026-10-04): rename and delete one of the
- * organisation's own uploaded documents. Deleting is a soft archive in the
- * Evidence context (it can be undone, and a deleted deck stops being
- * downloadable by investors at once); the file and its versions are kept.
- * For Q both are CONSEQUENTIAL: prepared, then approved exactly.
+ * P3 documents page (lead 2026-10-04): rename and archive one of the
+ * organisation's own uploaded documents. The page's "Delete" is this soft
+ * archive in the Evidence context: it can be undone, a deck archived stops
+ * being downloadable by investors at once, and the file and its versions
+ * are kept. RECOVERY-2026-10 (security fix 2): Q's tool says what it does
+ * -- archive_document, not delete -- and there is no permanent delete of
+ * an uploaded document anywhere in the product, so none is offered. For Q
+ * both are CONSEQUENTIAL: prepared, then approved exactly, and the card
+ * names the document by its own title (the exact target).
  *
  * The port is structural so this package keeps its dependencies; each
  * composition adapts the Evidence service (which authorises, audits and
@@ -56,6 +60,18 @@ async function own(
 }
 
 const NOT_THEIRS = "That isn't one of your documents.";
+
+/** The card's exact target: the document's own title, read as the proposer. */
+async function titleOf(
+  ports: { readonly documentChanges?: DocumentChangePort | undefined },
+  actor: ActorContext,
+  documentId: string,
+): Promise<string | null> {
+  return (await own(ports.documentChanges, actor, documentId))?.title ?? null;
+}
+
+const quoted = (title: string | null | undefined) =>
+  title === null || title === undefined ? "this document" : `"${title}"`;
 
 const RenameInput = z
   .object({
@@ -112,8 +128,10 @@ export const RENAME_DOCUMENT = defineAppAction<
     });
   },
   targets: (input) => [{ kind: "DOCUMENT", documentId: input.documentId }],
-  card: (input) => ({
-    summary: `Rename the document to "${input.title}"`,
+  counterpartOf: (ports, actor, input) =>
+    titleOf(ports, actor, input.documentId),
+  card: (input, names) => ({
+    summary: `Rename ${quoted(names?.counterpart)} to "${input.title}"`,
     preview: "Only the name changes; the file stays as it is.",
   }),
   done: (out) => `Done. It's now called "${out.title}".`,
@@ -179,10 +197,10 @@ export const ARCHIVE_DOCUMENT = defineAppAction<
   z.infer<typeof ArchiveTool>
 >({
   name: "document.archive",
-  short: "delete a document",
+  short: "archive a document",
   area: "documents",
   classification: "CONSEQUENTIAL",
-  does: "Deletes one of their own uploaded documents from the documents page, or brings it back; a deleted deck stops being downloadable by investors.",
+  does: "Archives one of their own uploaded documents (the documents page's Delete, which can be undone), or brings it back; an archived deck stops being downloadable by investors. The file is kept.",
   input: ArchiveInput,
   output: z.custom<ManagedDocument>(),
   authorize: async (ports, context, input) =>
@@ -201,21 +219,23 @@ export const ARCHIVE_DOCUMENT = defineAppAction<
     });
   },
   targets: (input) => [{ kind: "DOCUMENT", documentId: input.documentId }],
-  card: (input) =>
+  counterpartOf: (ports, actor, input) =>
+    titleOf(ports, actor, input.documentId),
+  card: (input, names) =>
     input.archived
       ? {
-          summary: "Delete this document",
+          summary: `Archive ${quoted(names?.counterpart)}`,
           preview:
-            "It leaves your documents and investors can no longer download it. You can bring it back.",
+            "It leaves your documents and investors can no longer download it. The file is kept and you can bring it back; nothing is permanently deleted.",
         }
       : {
-          summary: "Bring this document back",
+          summary: `Bring back ${quoted(names?.counterpart)}`,
           preview:
             "It returns to your documents; who can download it stays private.",
         },
   done: (out) =>
     out.status === "ARCHIVED"
-      ? `Deleted "${out.title}". You can bring it back.`
+      ? `Archived "${out.title}". You can bring it back.`
       : `"${out.title}" is back in your documents.`,
   http: {
     method: "POST",
@@ -227,9 +247,9 @@ export const ARCHIVE_DOCUMENT = defineAppAction<
     respond,
   },
   tool: {
-    name: "delete_document",
+    name: "archive_document",
     description:
-      "Deletes one of the person's own uploaded documents (restore: true brings it back), exactly as the documents page does. Prepared for their approval.",
+      "Archives one of the person's own uploaded documents -- what the documents page's Delete does: it can be undone and the file is kept (restore: true brings it back). Never a permanent delete; there is none. Prepared for their approval, with the document named on the card.",
     input: ArchiveTool,
     references: { document: "UPLOAD" },
     scopes: ["COMPANY_PROFILE"],
@@ -239,7 +259,7 @@ export const ARCHIVE_DOCUMENT = defineAppAction<
       "GENERAL_QUESTION",
     ],
     eval: {
-      say: ["Delete {name}.", "Bring {name} back to my documents."],
+      say: ["Archive {name}.", "Bring {name} back to my documents."],
       names: "UPLOAD",
     },
     toCanonical: (input) =>
