@@ -299,6 +299,17 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
     "Opens Human review: the reviews they asked for of a decision and their outcomes.",
   TOP_INVESTORS:
     "Opens Your top three: the investors Capital Q ranks best for their company.",
+  // capital-tabs (2026-10-08): a founder's Capital page, tab by tab.
+  CAPITAL_RAISE:
+    "Opens Capital on its Raise & rounds tab (a founder's): the current round, its commitments, every round and the round's terms.",
+  CAPITAL_READINESS:
+    "Opens Capital on its Readiness tab (a founder's): what could stop the raise and each pillar in words.",
+  CAPITAL_ACTION_PLAN:
+    "Opens Capital on its Action plan tab (a founder's): the Now / Next / Done board built from readiness gaps.",
+  CAPITAL_PLAN:
+    "Opens Capital on its 12-month plan tab (a founder's): the 3/6/12-month Readiness Blueprint.",
+  CAPITAL_INVESTORS:
+    "Opens Capital on its Investors tab (a founder's): their investor relationships.",
 };
 
 /** Screens that belong to a company's own people. */

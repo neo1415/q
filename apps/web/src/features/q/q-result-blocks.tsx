@@ -283,6 +283,11 @@ const DESTINATION_LABELS: Readonly<
   SAVED_COMPARE: "Open Compare",
   REVIEWS: "Open Human review",
   TOP_INVESTORS: "Open your top investors",
+  CAPITAL_RAISE: "Open Raise & rounds",
+  CAPITAL_READINESS: "Open your readiness",
+  CAPITAL_ACTION_PLAN: "Open your action plan",
+  CAPITAL_PLAN: "Open your 12-month plan",
+  CAPITAL_INVESTORS: "Open your investors on Capital",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

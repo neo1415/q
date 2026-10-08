@@ -533,6 +533,11 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   SAVED_COMPARE: "Opening Compare.",
   REVIEWS: "Opening Human review.",
   TOP_INVESTORS: "Opening your top three investors.",
+  CAPITAL_RAISE: "Opening Raise & rounds on Capital.",
+  CAPITAL_READINESS: "Opening your readiness on Capital.",
+  CAPITAL_ACTION_PLAN: "Opening your action plan.",
+  CAPITAL_PLAN: "Opening your 12-month plan.",
+  CAPITAL_INVESTORS: "Opening your investors on Capital.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -575,6 +580,11 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   SAVED_COMPARE: "Compare",
   REVIEWS: "Human review",
   TOP_INVESTORS: "your top three investors",
+  CAPITAL_RAISE: "Capital (Raise & rounds)",
+  CAPITAL_READINESS: "Capital (Readiness)",
+  CAPITAL_ACTION_PLAN: "Capital (Action plan)",
+  CAPITAL_PLAN: "Capital (12-month plan)",
+  CAPITAL_INVESTORS: "Capital (Investors)",
 };
 
 /**

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   READINESS_STATUSES,
   type ReadinessDto,
@@ -139,12 +141,12 @@ export function ReadinessSection({
             </ol>
           )}
           <div className="flex flex-wrap gap-2 pt-3">
-            <a
-              href="#action-plan"
+            <Link
+              href="/capital?tab=action-plan"
               className="cq-label inline-flex min-h-11 items-center rounded-(--cq-radius-md) bg-(--cq-accent) px-4 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
             >
               Open the action plan
-            </a>
+            </Link>
             <AskQChips
               asks={[
                 {

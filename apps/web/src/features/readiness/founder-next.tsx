@@ -42,7 +42,7 @@ export async function FounderNext() {
               {next.length === 1 ? "action" : `${String(next.length)} actions`}
             </h2>
             <Link
-              href="/capital#action-plan"
+              href="/capital?tab=action-plan"
               className="cq-label text-(--cq-accent) underline-offset-2 hover:underline"
             >
               Action plan
@@ -88,7 +88,7 @@ export async function FounderNext() {
             What could stop your raise
           </h2>
           <Link
-            href="/capital#readiness"
+            href="/capital?tab=readiness"
             className="cq-label text-(--cq-accent) underline-offset-2 hover:underline"
           >
             Readiness

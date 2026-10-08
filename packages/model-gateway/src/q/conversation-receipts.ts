@@ -190,6 +190,11 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   SAVED_COMPARE: "Compare",
   REVIEWS: "Human review",
   TOP_INVESTORS: "their top three investors",
+  CAPITAL_RAISE: "Capital (Raise & rounds)",
+  CAPITAL_READINESS: "Capital (Readiness)",
+  CAPITAL_ACTION_PLAN: "Capital (Action plan)",
+  CAPITAL_PLAN: "Capital (12-month plan)",
+  CAPITAL_INVESTORS: "Capital (Investors)",
 };
 
 /** Where the person is, in their terms (R21). */

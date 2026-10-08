@@ -588,6 +588,13 @@ export const Q_VOICE_DESTINATIONS = [
   "SAVED_COMPARE",
   "REVIEWS",
   "TOP_INVESTORS",
+  // capital-tabs (2026-10-08): a founder's Capital page, by its tabs
+  // (CAPITAL itself opens Overview).
+  "CAPITAL_RAISE",
+  "CAPITAL_READINESS",
+  "CAPITAL_ACTION_PLAN",
+  "CAPITAL_PLAN",
+  "CAPITAL_INVESTORS",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",
