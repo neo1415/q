@@ -5,7 +5,11 @@ import {
   problemFromUnknownError,
   type ProblemDetails,
 } from "@capital-q/contracts";
-import type { Logger } from "@capital-q/observability";
+import {
+  classifyVendorFailure,
+  logQFailure,
+  type Logger,
+} from "@capital-q/observability";
 import {
   QConversationArchivedError,
   QConversationNotFoundError,
@@ -330,6 +334,32 @@ export function registerProblemHandling(
   });
 
   app.setErrorHandler((error, request: FastifyRequest, reply: FastifyReply) => {
+    // Recovery G-D9: a vendor this request needed (a speech provider's
+    // token, a realtime secret) was unreachable, too slow or said no. That
+    // is a 503 PROVIDER_UNAVAILABLE, with Retry-After when trying again
+    // may work, and one failure-class log line naming the route, never
+    // the vendor's message, URL or key.
+    const vendor = classifyVendorFailure(error);
+    if (vendor !== undefined) {
+      logQFailure(logger, {
+        failureClass: vendor.failureClass,
+        where: `${request.method} ${request.routeOptions.url ?? "unknown"}`,
+        code: `VENDOR_${vendor.kind}`,
+        correlationId: request.id,
+        ...(vendor.vendorStatus === undefined
+          ? {}
+          : { vendorStatus: vendor.vendorStatus }),
+      });
+      if (vendor.retryable) void reply.header("Retry-After", "5");
+      sendProblem(
+        reply,
+        createProblemDetails({
+          code: "PROVIDER_UNAVAILABLE",
+          requestId: request.id,
+        }),
+      );
+      return;
+    }
     const problem = toProblem(error, request.id);
 
     if (problem.status >= 500) {
