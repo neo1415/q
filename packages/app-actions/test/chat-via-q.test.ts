@@ -60,7 +60,7 @@ describe("chat.message.send marks Q's sends (recovery D-07)", () => {
     await sendAction().run(
       ports,
       context({ surface: "Q", qActionId }) as never,
-      input as never,
+      input,
     );
     expect(calls[0]).toMatchObject({ qActionId });
     expect(calls[0]?.["qDelegationId"]).toBeUndefined();
@@ -72,7 +72,7 @@ describe("chat.message.send marks Q's sends (recovery D-07)", () => {
     await sendAction().run(
       ports,
       context({ surface: "Q", qDelegationId }) as never,
-      input as never,
+      input,
     );
     expect(calls[0]).toMatchObject({ qDelegationId });
   });
@@ -86,7 +86,7 @@ describe("chat.message.send marks Q's sends (recovery D-07)", () => {
         qActionId: randomUUID(),
         qDelegationId: randomUUID(),
       }) as never,
-      input as never,
+      input,
     );
     expect(calls[0]?.["qActionId"]).toBeUndefined();
     expect(calls[0]?.["qDelegationId"]).toBeUndefined();

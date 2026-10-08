@@ -157,10 +157,11 @@ describe("durable workforce jobs against PostgreSQL", () => {
     await queue.enqueue(owner, { jobId: filed.jobId, plan, trace: {} });
 
     // Worker 1 claims it, finishes "discover", then dies mid-"reach".
-    const claimed = await queue.claim(`dead-${randomUUID()}`, 60_000, 50);
+    const deadWorker = `dead-${randomUUID()}`;
+    const claimed = await queue.claim(deadWorker, 60_000, 50);
     const mine = claimed.find((row) => row.job_id === filed.jobId);
     expect(mine?.state).toBe("RUNNING");
-    await queue.recordStep(filed.jobId, mine?.locked_by ?? "", "discover", {
+    await queue.recordStep(filed.jobId, deadWorker, "discover", {
       status: "DONE",
       summary: "Shortlisted 1.",
       outputs: { shortlist: [{ companyId: "c-kept", name: "Kept" }] },

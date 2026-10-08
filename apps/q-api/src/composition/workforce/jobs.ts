@@ -898,5 +898,5 @@ function withDurableResults(
         return result;
       },
     ]),
-  ) as Partial<Record<QAgentRole, AgentExecutor>>;
+  );
 }

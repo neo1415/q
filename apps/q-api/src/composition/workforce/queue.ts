@@ -86,7 +86,7 @@ export type AgentWorkQueue = {
     workerId: string,
     stepKey: string,
     result: StepResult,
-    runId?: string | undefined,
+    runId?: string,
   ) => Promise<void>;
   /** Ends the row this worker holds. False: it was not this worker's. */
   readonly finish: (
