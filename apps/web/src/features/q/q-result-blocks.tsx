@@ -269,6 +269,20 @@ const DESTINATION_LABELS: Readonly<
   RESULTS: "Open Results",
   YOUR_COMPANIES: "Open Your companies",
   WORK: "Open Work",
+  EXPLORE: "Open Explore",
+  PEOPLE_SEARCH: "Open Search",
+  WORK_NEEDS: "Open Needs you",
+  WORK_PROGRESS: "Open In progress",
+  WORK_DONE: "Open Done",
+  WORK_TEAM: "Open Q's team",
+  WORK_COST: "Open Cost",
+  GATEQ_INBOX: "Open your GateQ inbox",
+  GATEQ_FIND: "Open GateQ Find",
+  GATEQ_CLAIM: "Open GateQ Claim",
+  GATEQ_APPLICATIONS: "Open your applications",
+  SAVED_COMPARE: "Open Compare",
+  REVIEWS: "Open Human review",
+  TOP_INVESTORS: "Open your top investors",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

@@ -9,6 +9,7 @@ import type {
   QArtifactSummary,
   QConversationDetail,
   QMessage,
+  QRoomEntry,
   QShowInQRoomIntent,
 } from "@capital-q/contracts";
 
@@ -28,6 +29,7 @@ import { QSection, useQDialog } from "@/features/q/q-section";
 import type { RoomCardResult } from "@/features/q/room/room-actions";
 import type { DeckState, FillResult } from "@/features/q/room/deck-actions";
 import type { DeckLoaders } from "@/features/q/room/q-room-deck";
+import { useQRoomFeed } from "@/features/q/room-feed";
 import { runUploadDrop } from "@/features/q/room/room-read";
 import { currentScreen } from "@/features/q/screen";
 import { loadWire, wireWarmed, type WireContracts } from "@/features/q/wire";
@@ -233,6 +235,21 @@ export function QRoomHarness() {
       live = false;
     };
   }, []);
+  // voice-cards: a voice line is open, so the room feed is read (the test
+  // serves /api/q-room as the Q API would publish a duplex ask_q run);
+  // each answer joins the thread once, by message id, as the Q page's own
+  // session does (use-q-conversation absorb).
+  const [voiceLine, setVoiceLine] = useState(false);
+  const onRoom = useCallback((entries: readonly QRoomEntry[]) => {
+    setMessages((current) => {
+      const held = new Set(current.map((message) => message.messageId));
+      const added = entries
+        .map((entry) => entry.message)
+        .filter((message) => !held.has(message.messageId));
+      return added.length === 0 ? current : [...current, ...added];
+    });
+  }, []);
+  useQRoomFeed(voiceLine, onRoom);
   useQDialog(
     previewOpen,
     "preview",
@@ -273,6 +290,15 @@ export function QRoomHarness() {
           data-harness-working
         >
           Q working
+        </button>
+        <button
+          type="button"
+          className="cq-ac-btn"
+          aria-pressed={voiceLine}
+          onClick={() => setVoiceLine((on) => !on)}
+          data-harness-voice
+        >
+          Voice line
         </button>
         <QCanSee />
       </header>

@@ -41,7 +41,15 @@ export function useFollowTurn(
   }, [client.state]);
 
   useEffect(() => {
-    if (turn === null || turn.sequence <= followed.current) return;
+    // voice-cards: a new line starts its board at sequence 1 (the turn is
+    // cleared to null between lines); the old line's count would otherwise
+    // swallow the new line's first moves -- "take me to ..." said early on
+    // a second line in the same page life was never followed.
+    if (turn === null) {
+      followed.current = 0;
+      return;
+    }
+    if (turn.sequence <= followed.current) return;
     if (
       turn.navigate === null &&
       turn.handoff === null &&

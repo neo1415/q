@@ -22,7 +22,7 @@ export const Q_ROOM_PATH = "/v1/q/room" as const;
 /** Entries kept per person (the newest); a reader further behind skips. */
 export const Q_ROOM_KEPT = 20;
 /** How long a read is held open when nothing new has landed. */
-export const Q_ROOM_HOLD_MS = 20_000;
+export const Q_ROOM_HOLD_MS = 12_000;
 
 export const QRoomSourceSchema = z.enum(["TYPED", "VOICE"]);
 export type QRoomSource = z.infer<typeof QRoomSourceSchema>;
