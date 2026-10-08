@@ -94,6 +94,8 @@ export default defineConfig({
       "**/.next/**",
       "**/.turbo/**",
       "tests/e2e/**",
+      // The web app's own Playwright suite (apps/web/e2e/playwright.config.ts).
+      "apps/web/e2e/**",
       // Real-infrastructure tests run separately via `pnpm test:integration`.
       "**/*.integration.test.ts",
       // Real model calls run only via `pnpm test:live-model` (CQ-Q-005).

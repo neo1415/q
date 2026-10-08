@@ -377,8 +377,12 @@ export function QConversationPanel({
   const [landedBriefing, setLandedBriefing] = useState<Briefing | null>(null);
   useEffect(() => {
     let live = true;
-    void briefing
-      ?.then((given) => {
+    if (briefing === undefined) return;
+    // A promise handed from a server component arrives as React's thenable,
+    // whose then() returns nothing: chaining on it crashed /home (G, release
+    // blocker). Promise.resolve adopts it into a real promise first.
+    Promise.resolve(briefing)
+      .then((given) => {
         if (live) setLandedBriefing(given);
       })
       .catch(() => undefined);
