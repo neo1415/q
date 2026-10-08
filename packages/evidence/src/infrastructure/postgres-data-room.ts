@@ -729,6 +729,36 @@ export function createPostgresDataRoom() {
         returning extraction_id`;
       return made.length > 0;
     },
+
+    /** Unconnected investors may see the folder outline (default: no). */
+    outlineAllowed: async (
+      executor: DatabaseExecutor,
+      companyId: string,
+    ): Promise<boolean> => {
+      const rows = await executor<{ outline_before_connection: boolean }[]>`
+        select outline_before_connection from evidence.data_room_settings
+         where company_id = ${companyId}`;
+      return rows[0]?.outline_before_connection ?? false;
+    },
+
+    setOutlineAllowed: async (
+      tx: TransactionContext,
+      input: {
+        readonly companyId: string;
+        readonly tenantId: string;
+        readonly allowed: boolean;
+        readonly userId: string;
+      },
+    ): Promise<void> => {
+      await tx.sql`
+        insert into evidence.data_room_settings
+          (company_id, tenant_id, outline_before_connection, updated_by_user_id)
+        values (${input.companyId}, ${input.tenantId}, ${input.allowed}, ${input.userId})
+        on conflict (company_id) do update
+          set outline_before_connection = excluded.outline_before_connection,
+              updated_by_user_id = excluded.updated_by_user_id,
+              updated_at = clock_timestamp()`;
+    },
   };
 }
 

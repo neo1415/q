@@ -1,7 +1,5 @@
 import type { MaterialActionAuditWriter } from "@capital-q/audit";
 import {
-  CompanyIdSchema,
-  createPostgresCompanyQueryPort,
   createPostgresFounderPersonSource,
   projectFounderPerson,
 } from "@capital-q/companies";
@@ -19,11 +17,6 @@ import {
   type PrivateDocumentDownloadAuthorizer,
 } from "@capital-q/evidence";
 import {
-  createPostgresInvestorOrganisationQueryPort,
-  InvestorOrganisationIdSchema,
-} from "@capital-q/investors";
-import {
-  createNetworkService,
   createPostgresDiligenceQuestions,
   createPostgresDiligenceRequests,
   createPostgresRelationshipEventRepository,
@@ -153,14 +146,6 @@ export function createProfileMaterial(dependencies: {
         },
       })
     ).outcome === "ALLOW";
-  const network = createNetworkService({
-    sql,
-    transactions: dependencies.transactions,
-    companies: createPostgresCompanyQueryPort({ sql }),
-    investors: createPostgresInvestorOrganisationQueryPort({ sql }),
-    outbox: dependencies.outbox,
-    audit: dependencies.audit,
-  });
   const investorOf = async (actor: ActorContext) => {
     const found = await dependencies.investorOrganisationFor(actor);
     return found === null
@@ -188,21 +173,11 @@ export function createProfileMaterial(dependencies: {
     investorMayFind: dependencies.investorMayFind,
     ownerMayManage,
     relationshipOf: reads.relationshipOf,
-    ensureRelationship: async (command) =>
-      (
-        await network.ensureRelationship({
-          actor: command.actor,
-          companyId: CompanyIdSchema.parse(command.companyId),
-          investorOrganisationId: InvestorOrganisationIdSchema.parse(
-            command.investorOrganisationId,
-          ),
-          source: { type: "DISCOVER" },
-          // The investor's own first contact: private to them until the
-          // request (relationship_shared) is appended.
-          visibilityScope: "investor_private",
-          correlationId: command.correlationId,
-        })
-      ).relationship.id,
+    // Access goes through the relationship (2026-10-08): no relationship is
+    // created here any more; an unconnected investor is refused.
+    connectionOf: reads.connectionOf,
+    outlineAllowed: (companyId) => store.outlineAllowed(sql, companyId),
+    setOutlineAllowed: (tx, input) => store.setOutlineAllowed(tx, input),
     policies: dependencies.policies,
     policyRepository,
     access: dependencies.access,
@@ -266,8 +241,28 @@ export function createProfileMaterial(dependencies: {
     // Only relationships the company can see: a private discovery by an
     // investor (investor_private, no shared event yet) is not listed.
     relationshipsOf: async (companyId) => {
-      const rows = await sql<{ id: string; display_name: string }[]>`
-        select r.id, i.display_name
+      // With where each stands: only connected investors are shared with;
+      // those whose interest waits are offered as "connect first".
+      const rows = await sql<
+        {
+          id: string;
+          display_name: string;
+          connection: "CONNECTED" | "INTEREST_PENDING" | "NOT_CONNECTED";
+        }[]
+      >`
+        select r.id, i.display_name,
+               case
+                 when exists (select 1 from network.relationship_events e
+                               where e.relationship_id = r.id
+                                 and e.event_type = 'connection_accepted')
+                   then 'CONNECTED'
+                 when (select e.event_type from network.relationship_events e
+                        where e.relationship_id = r.id
+                          and e.event_type in ('interest_expressed', 'interest_declined')
+                        order by e.sequence desc limit 1) = 'interest_expressed'
+                   then 'INTEREST_PENDING'
+                 else 'NOT_CONNECTED'
+               end as connection
           from network.relationships r
           join core.investor_organisations i on i.id = r.investor_organisation_id
          where r.company_id = ${companyId}
@@ -279,8 +274,10 @@ export function createProfileMaterial(dependencies: {
       return rows.map((row) => ({
         relationshipId: row.id,
         investorOrganisationName: row.display_name,
+        connection: row.connection,
       }));
     },
+    connectionOf: reads.connectionOf,
     investorOf: dependencies.investorOrganisationFor,
     relationshipOf: reads.relationshipOf,
     policies: dependencies.policies,

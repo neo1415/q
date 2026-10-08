@@ -356,8 +356,16 @@ export const DocumentAccessDtoSchema = z
     version: z.number().int().min(1),
     grants: z.array(AccessGrantSchema).max(200),
     history: z.array(AccessHistoryEntrySchema).max(200),
-    /** Investors this company has a relationship with, to share with. */
+    /**
+     * Investors this company is connected with (interest accepted), to
+     * share with: shares go only through a connected relationship.
+     */
     candidates: z.array(AccessCandidateSchema).max(200),
+    /**
+     * Investors who asked to connect and wait for the founder's answer:
+     * shown as "connect first", never shareable until accepted.
+     */
+    awaitingConnection: z.array(AccessCandidateSchema).max(200).default([]),
   })
   .strict();
 export type DocumentAccessDto = z.infer<typeof DocumentAccessDtoSchema>;
@@ -389,7 +397,9 @@ export const FolderAccessDtoSchema = z
           .strict(),
       )
       .max(200),
+    /** Connected investors only (see DocumentAccessDto.candidates). */
     candidates: z.array(AccessCandidateSchema).max(200),
+    awaitingConnection: z.array(AccessCandidateSchema).max(200).default([]),
   })
   .strict();
 export type FolderAccessDto = z.infer<typeof FolderAccessDtoSchema>;

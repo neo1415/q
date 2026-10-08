@@ -12,11 +12,13 @@ import {
   activeGrants,
   checklistFor,
   createDataRoomService,
+  lockedOutline,
   projectForInvestor,
   type DataRoomChecklistEntry,
   type DataRoomDocument,
   type DataRoomRequestRecord,
   type DataRoomStore,
+  type RelationshipConnection,
   type DisclosurePolicy,
 } from "../src/index.js";
 
@@ -83,7 +85,17 @@ const ON_REQUEST_DOC = doc(2, "ON_REQUEST", "Cap table summary");
 const SHARED_ONLY_DOC = doc(3, "SHARED_ONLY", "Litigation with X");
 const PRIVATE_DOC = doc(4, "PRIVATE", "Directors' passports");
 
-function world() {
+function world(
+  options: {
+    /** Relationship id -> where it stands (default: R1 connected). */
+    readonly connections?: ReadonlyMap<string, RelationshipConnection>;
+    readonly outline?: boolean;
+  } = {},
+) {
+  const connections =
+    options.connections ??
+    new Map<string, RelationshipConnection>([[R1, "CONNECTED"]]);
+  let outline = options.outline ?? false;
   const documents = [PUBLIC_DOC, ON_REQUEST_DOC, SHARED_ONLY_DOC, PRIVATE_DOC];
   const requests: DataRoomRequestRecord[] = [];
   const policies: DisclosurePolicy[] = [];
@@ -216,10 +228,12 @@ function world() {
     ownerMayManage: () => Promise.resolve(true),
     relationshipOf: (_c, investorOrganisationId) =>
       Promise.resolve(relationships.get(investorOrganisationId) ?? null),
-    ensureRelationship: ({ investorOrganisationId }) => {
-      const id = "00000000-0000-4000-8000-000000000502";
-      relationships.set(investorOrganisationId, id);
-      return Promise.resolve(id);
+    connectionOf: (id) =>
+      Promise.resolve(connections.get(id) ?? "NOT_CONNECTED"),
+    outlineAllowed: () => Promise.resolve(outline),
+    setOutlineAllowed: (_tx, input) => {
+      outline = input.allowed;
+      return Promise.resolve();
     },
     policies: {
       grant: (command) => {
@@ -280,6 +294,7 @@ function world() {
   });
   return {
     service,
+    relationships,
     documents,
     requests,
     policies,
@@ -495,17 +510,20 @@ describe("request access and approval", () => {
     ).toEqual({ outcome: "REFUSED", code: "INVESTOR_ONLY" });
   });
 
-  it("creates the canonical relationship on first contact rather than a parallel record", async () => {
-    const { service, requests } = world();
-    await service.requestAccess({
-      actor: investorTwo,
-      companyId: COMPANY,
-      documentId: null,
-      idempotencyKey: "key-two-0001",
-    });
-    expect(requests[0]?.relationshipId).toBe(
-      "00000000-0000-4000-8000-000000000502",
-    );
+  it("refuses an unconnected investor's request server-side, creating nothing", async () => {
+    const { service, requests, relationships, events, notices } = world();
+    expect(
+      await service.requestAccess({
+        actor: investorTwo,
+        companyId: COMPANY,
+        documentId: null,
+        idempotencyKey: "key-two-0001",
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "NOT_CONNECTED" });
+    expect(requests).toHaveLength(0);
+    expect(relationships.has(INV_ORG_2)).toBe(false);
+    expect(events).toHaveLength(0);
+    expect(notices).toHaveLength(0);
   });
 
   it("approves with an expiry: an expiring grant to that relationship, an event and an audit row; the investor can then open it", async () => {
@@ -738,5 +756,129 @@ describe("levels", () => {
         documentId: PUBLIC_DOC.documentId,
       }),
     ).toBeNull();
+  });
+});
+
+describe("access goes through the relationship (2026-10-08)", () => {
+  const R2 = "00000000-0000-4000-8000-000000000502";
+
+  it("locks the room for an investor with no relationship: no titles, no folders, no outline", async () => {
+    const { service } = world();
+    const view = await service.view(investorTwo, COMPANY);
+    if (view?.viewer !== "INVESTOR") throw new Error("investor view");
+    expect(view.access).toBe("LOCKED");
+    expect(view.locked).toEqual({ reason: "NOT_CONNECTED", outline: null });
+    expect(view.documents).toEqual([]);
+    expect(view.folders).toEqual([]);
+    expect(titles(view)).toEqual([]);
+  });
+
+  it("says the interest is waiting, and shows only folder names and listed counts when the founder allows it", async () => {
+    const { service, relationships } = world({
+      connections: new Map<string, RelationshipConnection>([
+        [R1, "CONNECTED"],
+        [R2, "INTEREST_PENDING"],
+      ]),
+      outline: true,
+    });
+    relationships.set(INV_ORG_2, R2);
+    const view = await service.view(investorTwo, COMPANY);
+    if (view?.viewer !== "INVESTOR") throw new Error("investor view");
+    expect(view.access).toBe("LOCKED");
+    expect(view.locked).toEqual({
+      reason: "INTEREST_PENDING",
+      // Public and on-request only: shared-only and private are not counted.
+      outline: [
+        { code: "corporate", label: "Company and incorporation", documents: 2 },
+      ],
+    });
+    expect(titles(view)).toEqual([]);
+  });
+
+  it("opens nothing before the connection, not even a public document", async () => {
+    const { service } = world();
+    expect(
+      await service.open({
+        actor: investorTwo,
+        companyId: COMPANY,
+        documentId: PUBLIC_DOC.documentId,
+      }),
+    ).toBeNull();
+    expect(
+      await service.open({
+        actor: investorOne,
+        companyId: COMPANY,
+        documentId: PUBLIC_DOC.documentId,
+      }),
+    ).not.toBeNull();
+  });
+
+  it("shows a connected investor the room", async () => {
+    const { service } = world();
+    const view = await service.view(investorOne, COMPANY);
+    if (view?.viewer !== "INVESTOR") throw new Error("investor view");
+    expect(view.access).toBe("CONNECTED");
+    expect(view.locked).toBeUndefined();
+  });
+
+  it("refuses to approve an older request from a relationship that is not connected", async () => {
+    const connections = new Map<string, RelationshipConnection>([
+      [R1, "CONNECTED"],
+    ]);
+    const { service, requests, policies } = world({ connections });
+    await service.requestAccess({
+      actor: investorOne,
+      companyId: COMPANY,
+      documentId: ON_REQUEST_DOC.documentId,
+      idempotencyKey: "key-one-0009",
+    });
+    connections.set(R1, "NOT_CONNECTED");
+    expect(
+      await service.decide({
+        actor: founder,
+        requestId: requests[0]?.id ?? "",
+        decision: "APPROVE",
+        days: 30,
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "NOT_CONNECTED" });
+    expect(policies).toHaveLength(0);
+    // A decline still goes through.
+    expect(
+      (
+        await service.decide({
+          actor: founder,
+          requestId: requests[0]?.id ?? "",
+          decision: "DECLINE",
+        })
+      ).outcome,
+    ).toBe("OK");
+  });
+
+  it("lets only the owner allow the outline, audited", async () => {
+    const { service, audits } = world();
+    expect(
+      await service.setOutline({
+        actor: investorOne,
+        companyId: COMPANY,
+        outlineBeforeConnection: true,
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "OWNER_ONLY" });
+    expect(
+      await service.setOutline({
+        actor: founder,
+        companyId: COMPANY,
+        outlineBeforeConnection: true,
+      }),
+    ).toEqual({ outcome: "OK", value: { outlineBeforeConnection: true } });
+    expect(audits.map((a) => a.actionType)).toContain(
+      "data_room.outline_changed",
+    );
+    const owner = await service.view(founder, COMPANY);
+    if (owner?.viewer !== "OWNER") throw new Error("owner view");
+    expect(owner.outlineBeforeConnection).toBe(true);
+  });
+
+  it("outlines nothing when not allowed", () => {
+    expect(lockedOutline([], [PUBLIC_DOC], false)).toBeNull();
   });
 });

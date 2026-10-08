@@ -271,6 +271,7 @@ describe("the action registry", () => {
       ["data_room.document.level.set", "set_data_room_level", "CONSEQUENTIAL"],
       ["data_room.access.request", "request_data_room_access", "CONSEQUENTIAL"],
       ["data_room.request.decide", "answer_data_room_request", "CONSEQUENTIAL"],
+      ["data_room.outline.set", "offer.data_room_outline", "CONSEQUENTIAL"],
       ["deck.extraction.confirm", "confirm_deck_reading", "CONSEQUENTIAL"],
       // F26: one section at a time, and "Read again".
       ["deck.section.review", "review_deck_section", "CONSEQUENTIAL"],

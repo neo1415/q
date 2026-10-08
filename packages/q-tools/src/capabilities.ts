@@ -444,6 +444,13 @@ const OFFERS: readonly QCapability[] = [
     "A folder-wide change is reviewed document by document on the Data room tab's access sheet, where each share and its expiry are listed; Q shares or revokes one document at a time.",
   ),
   offer(
+    "data_room_outline",
+    "DOCUMENT",
+    "Let investors who are not connected yet see the data room's folder names and counts (never titles or contents), or hide them again",
+    "DOCUMENTS",
+    "Whether the outline shows before a connection is the founder's own setting on the Data room tab; Q explains it and opens the tab.",
+  ),
+  offer(
     "document_upload",
     "DOCUMENT",
     "Upload a document of their own (a deck, financials) for Q to read",

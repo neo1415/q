@@ -9,6 +9,7 @@ import {
 import {
   DATA_ROOM_LEVEL_SCOPE,
   DATA_ROOM_LISTED_LEVELS,
+  type DataRoomLocked,
   type CorrelationId,
   type DataRoomInvestorDocument,
   type DataRoomInvestorView,
@@ -53,6 +54,14 @@ import type { DisclosurePolicyRepository } from "./ports.js";
  *   - the level is the founder's per-document choice, stored with its
  *     ADR-001 scope, and never widens anything derived from the file.
  *
+ * Access goes through the relationship (founder decision 2026-10-08): an
+ * investor whose interest the founder has not accepted sees the room
+ * LOCKED (no titles, no contents, no requests; the folder outline only
+ * when the founder allows it), cannot open anything in it and cannot ask;
+ * the founder shares only with connected investors. The rule is enforced
+ * here, again by the database (a request needs an accepted connection),
+ * and by Q's tools, which read the same view.
+ *
  * An investor never receives the title of a document that is neither
  * listed (PUBLIC, ON_REQUEST) nor shared with their relationship: titles
  * leak ("Litigation with X"). Viewing is recorded for the founder and is
@@ -66,6 +75,10 @@ const ACCESS_REQUESTED = AuditActionTypeSchema.parse(
 const ACCESS_DECIDED = AuditActionTypeSchema.parse("data_room.access_decided");
 const RESOURCE_DOCUMENT = AuditResourceTypeSchema.parse("document");
 const RESOURCE_RELATIONSHIP = AuditResourceTypeSchema.parse("relationship");
+const OUTLINE_CHANGED = AuditActionTypeSchema.parse(
+  "data_room.outline_changed",
+);
+const RESOURCE_COMPANY = AuditResourceTypeSchema.parse("company");
 
 const DAY_MS = 86_400_000;
 
@@ -211,10 +224,20 @@ export type DataRoomCompany = {
   readonly countryCode: string | null;
 };
 
+/**
+ * Where a relationship stands for data-room access: CONNECTED once the
+ * founder accepted the investor's interest (a connection_accepted event in
+ * its history); INTEREST_PENDING while the latest interest waits.
+ */
+export type RelationshipConnection =
+  "CONNECTED" | "INTEREST_PENDING" | "NOT_CONNECTED";
+
 export type DataRoomRefusal =
   | "NOT_FOUND"
   | "OWNER_ONLY"
   | "INVESTOR_ONLY"
+  /** The investor and the company are not connected (interest not accepted). */
+  | "NOT_CONNECTED"
   | "NOT_REQUESTABLE"
   | "ALREADY_DECIDED"
   | "VERSION_CONFLICT";
@@ -333,6 +356,31 @@ export function projectForInvestor(
   });
 }
 
+/**
+ * What a not-yet-connected investor may know: nothing, or, when the founder
+ * allows it, each folder's name and how many listed documents it holds
+ * (never a title, never an unlisted document).
+ */
+export function lockedOutline(
+  folders: readonly { readonly code: string; readonly label: string }[],
+  documents: readonly DataRoomDocument[],
+  allowed: boolean,
+): DataRoomLocked["outline"] {
+  if (!allowed) return null;
+  const counts = new Map<string, number>();
+  for (const document of documents) {
+    if (!DATA_ROOM_LISTED_LEVELS.includes(document.level)) continue;
+    counts.set(document.folderCode, (counts.get(document.folderCode) ?? 0) + 1);
+  }
+  return folders
+    .filter((folder) => counts.has(folder.code))
+    .map((folder) => ({
+      code: folder.code,
+      label: folder.label,
+      documents: counts.get(folder.code) ?? 0,
+    }));
+}
+
 /** Active grants of a relationship, by document, with their expiry. */
 export function activeGrants(
   policies: readonly DisclosurePolicy[],
@@ -383,13 +431,25 @@ export function createDataRoomService(dependencies: {
     companyId: string,
     investorOrganisationId: string,
   ) => Promise<string | null>;
-  /** The canonical relationship, created on first contact (never a parallel record). */
-  readonly ensureRelationship: (command: {
-    readonly actor: ActorContext;
-    readonly companyId: string;
-    readonly investorOrganisationId: string;
-    readonly correlationId: CorrelationId;
-  }) => Promise<string>;
+  /** Whether the founder accepted this relationship's interest (from its history). */
+  readonly connectionOf: (
+    relationshipId: string,
+  ) => Promise<RelationshipConnection>;
+  /** The founder lets unconnected investors see the folder outline. Absent: never. */
+  readonly outlineAllowed?:
+    ((companyId: string) => Promise<boolean>) | undefined;
+  /** Records the founder's choice of that (the service checks the owner first). */
+  readonly setOutlineAllowed?:
+    | ((
+        tx: TransactionContext,
+        input: {
+          readonly companyId: string;
+          readonly tenantId: string;
+          readonly allowed: boolean;
+          readonly userId: string;
+        },
+      ) => Promise<void>)
+    | undefined;
   readonly policies: Pick<DisclosurePolicyManager, "grant">;
   readonly policyRepository: Pick<
     DisclosurePolicyRepository,
@@ -468,8 +528,28 @@ export function createDataRoomService(dependencies: {
       dependencies.relationshipOf(company.id, investor.investorOrganisationId),
       null,
     );
-    return { kind: "INVESTOR", company, investor, relationshipId } as const;
+    // Unknown is not connected: a failed read locks, never opens.
+    const connection: RelationshipConnection =
+      relationshipId === null
+        ? "NOT_CONNECTED"
+        : await quietly(
+            dependencies.connectionOf(relationshipId),
+            "NOT_CONNECTED" as const,
+          );
+    return {
+      kind: "INVESTOR",
+      company,
+      investor,
+      relationshipId,
+      connection,
+    } as const;
   }
+
+  const outlineAllowed = (companyId: string) =>
+    quietly(
+      dependencies.outlineAllowed?.(companyId) ?? Promise.resolve(false),
+      false,
+    );
 
   const investorView = async (
     reader: Extract<
@@ -478,6 +558,29 @@ export function createDataRoomService(dependencies: {
     >,
   ): Promise<DataRoomInvestorView> => {
     const { company, investor, relationshipId } = reader;
+    if (reader.connection !== "CONNECTED") {
+      const allowed = await outlineAllowed(company.id);
+      const [folders, documents] = allowed
+        ? await Promise.all([
+            store.folders(sql),
+            store.documentsOf(sql, company.id),
+          ])
+        : [[], []];
+      return {
+        viewer: "INVESTOR",
+        companyId: company.id,
+        access: "LOCKED",
+        locked: {
+          reason:
+            reader.connection === "INTEREST_PENDING"
+              ? "INTEREST_PENDING"
+              : "NOT_CONNECTED",
+          outline: lockedOutline(folders, documents, allowed),
+        },
+        folders: [],
+        documents: [],
+      };
+    }
     const [folders, documents, grants, requests, views] = await Promise.all([
       store.folders(sql),
       store.documentsOf(sql, company.id),
@@ -516,6 +619,7 @@ export function createDataRoomService(dependencies: {
     return {
       viewer: "INVESTOR",
       companyId: company.id,
+      access: "CONNECTED",
       folders: folders.filter((folder) => used.has(folder.code)),
       documents: visible,
     };
@@ -524,13 +628,15 @@ export function createDataRoomService(dependencies: {
   const ownerView = async (
     company: DataRoomCompany,
   ): Promise<DataRoomOwnerView> => {
-    const [folders, items, documents, requests, opened] = await Promise.all([
-      store.folders(sql),
-      store.checklist(sql),
-      store.documentsOf(sql, company.id),
-      store.requests(sql, { companyId: company.id }),
-      store.openedByCounts(sql, company.id),
-    ]);
+    const [folders, items, documents, requests, opened, outline] =
+      await Promise.all([
+        store.folders(sql),
+        store.checklist(sql),
+        store.documentsOf(sql, company.id),
+        store.requests(sql, { companyId: company.id }),
+        store.openedByCounts(sql, company.id),
+        outlineAllowed(company.id),
+      ]);
     // Who has it now: active grants across every relationship that asked.
     const relationships = [
       ...new Set(requests.map((request) => request.relationshipId)),
@@ -597,6 +703,7 @@ export function createDataRoomService(dependencies: {
         accessEndsAt: request.expiresAt,
         declineNote: request.declineNote ?? null,
       })),
+      outlineBeforeConnection: outline,
     };
   };
 
@@ -703,6 +810,48 @@ export function createDataRoomService(dependencies: {
       };
     },
 
+    /** The founder lets (or stops) unconnected investors seeing the folder outline. */
+    setOutline: async (command: {
+      readonly actor: ActorContext;
+      readonly companyId: string;
+      readonly outlineBeforeConnection: boolean;
+    }): Promise<
+      DataRoomOutcome<{ readonly outlineBeforeConnection: boolean }>
+    > => {
+      const reader = await readerOf(command.actor, command.companyId);
+      if (reader === null) return refused("NOT_FOUND");
+      if (reader.kind !== "OWNER") return refused("OWNER_ONLY");
+      if (dependencies.setOutlineAllowed === undefined)
+        return refused("NOT_FOUND");
+      const save = dependencies.setOutlineAllowed;
+      const correlationId = dependencies.newCorrelationId();
+      await transactions.run(async (tx) => {
+        await save(tx, {
+          companyId: reader.company.id,
+          tenantId: reader.company.tenantId,
+          allowed: command.outlineBeforeConnection,
+          userId: command.actor.userId,
+        });
+        await dependencies.audit.record(tx, {
+          ...auditActorFromContext(command.actor),
+          auditEventId: createAuditEventId(),
+          actionType: OUTLINE_CHANGED,
+          resourceType: RESOURCE_COMPANY,
+          resourceId: reader.company.id,
+          occurredAt: occurredNow(),
+          outcome: "SUCCEEDED",
+          metadata: {
+            outlineBeforeConnection: command.outlineBeforeConnection,
+          },
+          correlationId,
+        });
+      });
+      return {
+        outcome: "OK",
+        value: { outlineBeforeConnection: command.outlineBeforeConnection },
+      };
+    },
+
     /** The investor asks for one on-request document, or all of them. */
     requestAccess: async (command: {
       readonly actor: ActorContext;
@@ -717,6 +866,10 @@ export function createDataRoomService(dependencies: {
       const reader = await readerOf(command.actor, command.companyId);
       if (reader === null) return refused("NOT_FOUND");
       if (reader.kind !== "INVESTOR") return refused("INVESTOR_ONLY");
+      // Refused, not hidden: a request goes only through a connected
+      // relationship (the database holds the same rule).
+      if (reader.connection !== "CONNECTED" || reader.relationshipId === null)
+        return refused("NOT_CONNECTED");
       const documents = await store.documentsOf(sql, reader.company.id);
       const requestable = documents.filter(
         (document) => document.level === "ON_REQUEST",
@@ -734,14 +887,7 @@ export function createDataRoomService(dependencies: {
       }
       const correlationId =
         command.correlationId ?? dependencies.newCorrelationId();
-      const relationshipId =
-        reader.relationshipId ??
-        (await dependencies.ensureRelationship({
-          actor: command.actor,
-          companyId: reader.company.id,
-          investorOrganisationId: reader.investor.investorOrganisationId,
-          correlationId,
-        }));
+      const relationshipId = reader.relationshipId;
       const note =
         command.note === undefined || command.note === null
           ? null
@@ -896,6 +1042,13 @@ export function createDataRoomService(dependencies: {
         };
       }
 
+      // Shares go only to connected investors (an older request from before
+      // the rule can still be declined).
+      const connection = await quietly(
+        dependencies.connectionOf(request.relationshipId),
+        "NOT_CONNECTED" as const,
+      );
+      if (connection !== "CONNECTED") return refused("NOT_CONNECTED");
       const days = command.days ?? 30;
       const expiresAt = new Date(
         Date.parse(now()) + days * DAY_MS,
@@ -1010,6 +1163,8 @@ export function createDataRoomService(dependencies: {
       }
       let download = false;
       if (reader.kind === "INVESTOR") {
+        // Nothing in the room opens before the connection, PUBLIC included.
+        if (reader.connection !== "CONNECTED") return null;
         let allowed = document.level === "PUBLIC";
         if (reader.relationshipId !== null) {
           const grants = await grantsOf(reader.relationshipId);

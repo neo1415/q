@@ -79,6 +79,11 @@ const REFUSALS: Readonly<
     code: "RESOURCE_CONFLICT",
     detail: "Someone changed this meanwhile. Refresh and try again.",
   },
+  NOT_CONNECTED: {
+    code: "PERMISSION_DENIED",
+    detail:
+      "You can share with investors you're connected to. Accept their interest first, then share.",
+  },
 };
 type Out<T> = FounderRequestsOutcome<T>;
 const problem = (out: Out<unknown>) =>
@@ -484,14 +489,28 @@ const SHARE_DOCUMENT = defineAppAction<
       ],
       names: "UPLOAD",
     },
-    toCanonical: (tool) =>
-      Promise.resolve({
+    toCanonical: async (tool, context, ports) => {
+      // Shares go only to connected investors: one still waiting gets the
+      // guidance, not an error (the server refuses the share too).
+      const access = await ports.founderRequests
+        ?.documentAccess(context.actor, tool.document)
+        .catch(() => null);
+      if (
+        access?.awaitingConnection.some(
+          (candidate) => candidate.relationshipId === tool.investor,
+        ) === true
+      )
+        return refusal(
+          "You can share with investors you're connected to. Accept their interest first, then share.",
+        );
+      return {
         documentId: tool.document,
         relationshipId: tool.investor,
         accessLevel: tool.access ?? "view",
         days: days(tool.days),
         ...(tool.folder === undefined ? {} : { fileIn: tool.folder }),
-      }),
+      };
+    },
   },
 });
 

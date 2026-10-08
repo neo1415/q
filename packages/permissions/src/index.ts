@@ -168,7 +168,9 @@ export {
 } from "./application/visibility-centre.js";
 export {
   createDiligenceService,
+  questionsByRequest,
   type DiligenceDocument,
+  type DiligenceRequestQuestion,
   type DiligenceDocumentPort,
   type DiligenceOutcome,
   type DiligenceRefusal,
@@ -180,6 +182,7 @@ export {
   checklistFor,
   createDataRoomService,
   fileKind,
+  lockedOutline,
   projectForInvestor,
   stageRank,
   type DataRoomChecklistEntry,
@@ -190,6 +193,7 @@ export {
   type DataRoomRequestRecord,
   type DataRoomService,
   type DataRoomStore,
+  type RelationshipConnection,
 } from "./application/data-room.js";
 export {
   accessHistory,

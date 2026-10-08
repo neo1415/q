@@ -136,6 +136,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('evidence', 'data_room_access_requests',      'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'data_room_request_decisions',    'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'data_room_views',                'INTERNAL_SERVER_ONLY', '{}'),
+  -- 2026-10-08: the founder's outline choice (suite 889).
+  ('evidence', 'data_room_settings',             'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'deck_extractions',               'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'deck_extraction_confirmations',  'INTERNAL_SERVER_ONLY', '{}'),
   -- F26: per-section review and "read again", server-only; suite 810.

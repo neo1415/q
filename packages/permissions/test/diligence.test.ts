@@ -7,6 +7,7 @@ import type {
   TransactionManager,
 } from "@capital-q/database";
 import type {
+  DiligenceQuestionRecord,
   DiligenceRequestRecord,
   DiligenceRequestRepository,
   RelationshipPartyView,
@@ -75,6 +76,7 @@ function world(options: { readonly diligence?: boolean } = {}) {
   let policies: DisclosurePolicy[] = [];
   const events: { eventType: string; payload: unknown }[] = [];
   const requestRows: DiligenceRequestRecord[] = [];
+  const questionRows: DiligenceQuestionRecord[] = [];
   const audits: unknown[] = [];
   const notices: { title: string; priority: string; actingSide: string }[] = [];
   const viewRows: { relationshipId: string; documentId: string }[] = [];
@@ -298,10 +300,17 @@ function world(options: { readonly diligence?: boolean } = {}) {
       });
       return Promise.resolve(1);
     },
+    questions: {
+      listForRelationship: (_sql, relationshipId) =>
+        Promise.resolve(
+          questionRows.filter((q) => q.relationshipId === relationshipId),
+        ),
+    },
     newCorrelationId: (): CorrelationId => "cor_test00000",
   });
   return {
     service,
+    questionRows,
     events,
     audits,
     notices,
@@ -611,5 +620,97 @@ describe("diligence: upload and share in one step (2026-10-04)", () => {
       (await w.service.view({ actor: investorTwo, relationshipId: R2 }))
         ?.shares,
     ).toEqual([]);
+  });
+});
+
+describe("diligence: a request that carried questions (2026-10-08)", () => {
+  const question = (
+    id: string,
+    sentRef: string,
+    position: number,
+    answer: string | null,
+  ): DiligenceQuestionRecord => ({
+    id,
+    tenantId: "00000000-0000-4000-8000-000000000001",
+    relationshipId: R1,
+    companyId: "00000000-0000-4000-8000-0000000000c1",
+    investorOrganisationId: "00000000-0000-4000-8000-0000000000e1",
+    investorOrganisationName: null,
+    askedByName: null,
+    position,
+    question: `Question ${String(position)}?`,
+    assumptionId: position === 1 ? "TRACTION:1" : null,
+    assumptionLabel: position === 1 ? "Paying customers" : null,
+    sentRef,
+    askedAt: "2026-10-05T10:00:00.000Z",
+    answer:
+      answer === null
+        ? null
+        : {
+            id: `${id.slice(0, -2)}aa`,
+            text: answer,
+            documentIds: [],
+            evidenceStatus: "SELF_REPORTED",
+            answeredAt: "2026-10-06T10:00:00.000Z",
+          },
+  });
+
+  it("carries its questions with the answers, so its state comes from them; a plain request carries none", async () => {
+    const w = world();
+    const asked = await w.service.request({
+      actor: investorOne,
+      relationshipId: R1,
+      title: "Questions on traction",
+      idempotencyKey: "diligence-key-q1",
+    });
+    const plain = await w.service.request({
+      actor: investorOne,
+      relationshipId: R1,
+      title: "Cap table",
+      idempotencyKey: "diligence-key-q2",
+    });
+    const vehicle = asked.outcome === "OK" ? asked.value.requestId : "";
+    const other = plain.outcome === "OK" ? plain.value.requestId : "";
+    w.questionRows.push(
+      question("00000000-0000-4000-8000-0000000007b2", vehicle, 2, null),
+      question("00000000-0000-4000-8000-0000000007b1", vehicle, 1, "131 paid."),
+      // Asked in a chat message: never attached to a request.
+      question(
+        "00000000-0000-4000-8000-0000000007b3",
+        "chat-message-1",
+        1,
+        null,
+      ),
+    );
+    const view = await w.service.view({
+      actor: investorOne,
+      relationshipId: R1,
+    });
+    const carried = view?.requests.find((r) => r.requestId === vehicle);
+    expect(carried?.status).toBe("OPEN");
+    expect(carried?.questions).toEqual([
+      {
+        questionId: "00000000-0000-4000-8000-0000000007b1",
+        question: "Question 1?",
+        assumptionId: "TRACTION:1",
+        assumptionLabel: "Paying customers",
+        answer: {
+          text: "131 paid.",
+          answeredAt: "2026-10-06T10:00:00.000Z",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+        },
+      },
+      {
+        questionId: "00000000-0000-4000-8000-0000000007b2",
+        question: "Question 2?",
+        assumptionId: null,
+        assumptionLabel: null,
+        answer: null,
+      },
+    ]);
+    expect(
+      view?.requests.find((r) => r.requestId === other)?.questions,
+    ).toBeNull();
   });
 });

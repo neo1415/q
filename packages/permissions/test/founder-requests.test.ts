@@ -42,6 +42,9 @@ const OTHER_ORG = "00000000-0000-4000-8000-0000000009a9";
 const INV_ORG = "00000000-0000-4000-8000-0000000009e1";
 const R1 = "00000000-0000-4000-8000-000000000901";
 const R_OTHER = "00000000-0000-4000-8000-000000000902";
+/** An investor who expressed interest; the founder has not accepted it yet. */
+const R_PENDING = "00000000-0000-4000-8000-000000000903";
+const INV_ORG_PENDING = "00000000-0000-4000-8000-0000000009e3";
 const NOW = "2026-10-08T09:00:00.000Z" as UtcTimestamp;
 const COR = "cor_test" as CorrelationId;
 
@@ -143,6 +146,11 @@ function world() {
       companyId: OTHER_COMPANY,
       tenantId: TENANT,
       investorOrganisationId: INV_ORG,
+    },
+    [R_PENDING]: {
+      companyId: COMPANY,
+      tenantId: TENANT,
+      investorOrganisationId: INV_ORG_PENDING,
     },
   };
 
@@ -300,8 +308,23 @@ function world() {
     relationshipsOf: (companyId) =>
       Promise.resolve(
         companyId === COMPANY
-          ? [{ relationshipId: R1, investorOrganisationName: "Zino Capital" }]
+          ? [
+              {
+                relationshipId: R1,
+                investorOrganisationName: "Zino Capital",
+                connection: "CONNECTED" as const,
+              },
+              {
+                relationshipId: R_PENDING,
+                investorOrganisationName: "Pending Partners",
+                connection: "INTEREST_PENDING" as const,
+              },
+            ]
           : [],
+      ),
+    connectionOf: (id) =>
+      Promise.resolve(
+        id === R1 || id === R_OTHER ? "CONNECTED" : "INTEREST_PENDING",
       ),
     investorOf: (who) =>
       Promise.resolve(
@@ -830,5 +853,96 @@ describe("founder requests: ordering", () => {
     ] as never);
     expect(items.map((i) => i.itemId)).toEqual(["b", "a", "c"]);
     expect(inboxCounts(items)).toEqual({ open: 1, answered: 1, declined: 1 });
+  });
+});
+
+describe("founder shares go only to connected investors (2026-10-08)", () => {
+  it("lists only connected investors to share with, and those waiting apart", async () => {
+    const { service } = world();
+    const access = await service.documentAccess(founder, FILED.documentId);
+    expect(access?.candidates).toEqual([
+      { relationshipId: R1, investorOrganisationName: "Zino Capital" },
+    ]);
+    expect(access?.awaitingConnection).toEqual([
+      {
+        relationshipId: R_PENDING,
+        investorOrganisationName: "Pending Partners",
+      },
+    ]);
+    const folder = await service.folderAccess(
+      founder,
+      COMPANY,
+      FILED.folderCode,
+    );
+    expect(folder?.candidates.map((c) => c.relationshipId)).toEqual([R1]);
+    expect(folder?.awaitingConnection.map((c) => c.relationshipId)).toEqual([
+      R_PENDING,
+    ]);
+  });
+
+  it("refuses a share with an investor not yet connected, server-side", async () => {
+    const { service, policies } = world();
+    expect(
+      await service.share({
+        actor: founder,
+        documentId: FILED.documentId,
+        relationshipId: R_PENDING,
+        accessLevel: "view",
+        days: 7,
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "NOT_CONNECTED" });
+    expect(policies).toEqual([]);
+  });
+});
+
+describe("questions a diligence request carried (2026-10-08)", () => {
+  it("tells the investor on their Diligence tab, counting answers: 1 of 2, then all", async () => {
+    const { service, notices } = world();
+    const vehicle = "00000000-0000-4000-8000-0000000009d7";
+    const sent = await service.recordQuestions({
+      actor: investor,
+      relationshipId: R1,
+      sentVia: "DILIGENCE_REQUEST",
+      sentRef: vehicle,
+      idempotencyKey: "questions-key-9",
+      questions: [
+        {
+          question: "What is monthly burn?",
+          assumptionId: null,
+          assumptionLabel: null,
+        },
+        {
+          question: "How long is runway?",
+          assumptionId: null,
+          assumptionLabel: null,
+        },
+      ],
+    });
+    const ids = sent.outcome === "OK" ? sent.value.questionIds : [];
+    await service.answer({
+      actor: founder,
+      questionId: ids[0] ?? "",
+      answer: "About 40k a month.",
+      documentIds: [],
+      idempotencyKey: "answer-key-91",
+    });
+    expect(notices.at(-1)).toMatchObject({
+      actingSide: "COMPANY",
+      target: "DILIGENCE",
+      title:
+        "{actor} answered 1 of 2 of your questions on Management accounts, last 12 months",
+    });
+    await service.answer({
+      actor: founder,
+      questionId: ids[1] ?? "",
+      answer: "Eighteen months.",
+      documentIds: [],
+      idempotencyKey: "answer-key-92",
+    });
+    expect(notices.at(-1)).toMatchObject({
+      target: "DILIGENCE",
+      title:
+        "{actor} answered all 2 of your questions on Management accounts, last 12 months",
+    });
   });
 });

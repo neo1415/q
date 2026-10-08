@@ -22,6 +22,9 @@ insert into core.investor_organisations (id, tenant_id, organisation_id, investo
   ('00000000-0000-4000-8000-0000000080e2', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), 'VC', 'Room Capital B');
 insert into network.relationships (id, tenant_id, company_id, investor_organisation_id, current_state) values
   ('00000000-0000-4000-8000-000000008001', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-0000000080c1', '00000000-0000-4000-8000-0000000080e2', 'DISCOVERED');
+-- Requests go only through a connected relationship (suite 889): this one is.
+insert into network.relationship_events (tenant_id, relationship_id, sequence, event_type, actor_type, actor_id, source_type, visibility_scope, correlation_id) values
+  (pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-000000008001', 1, 'connection_accepted', 'HUMAN', pg_temp.rls_id('user_a'), 'MANUAL', 'relationship_shared', 'cor_00000000-0000-4000-8000-000000008001');
 insert into evidence.documents (id, tenant_id, company_id, owner_organisation_id, document_type, title, created_by_user_id) values
   ('00000000-0000-4000-8000-0000000080d1', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-0000000080c1', pg_temp.rls_id('org_a'), 'PITCH_DECK', 'Deck v3', pg_temp.rls_id('user_a')),
   ('00000000-0000-4000-8000-0000000080d2', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-0000000080c1', pg_temp.rls_id('org_a'), 'LEGAL', 'Litigation with X', pg_temp.rls_id('user_a')),

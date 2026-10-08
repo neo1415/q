@@ -12,6 +12,8 @@ import {
   RELATIONSHIP_EVENT_DOCUMENT_REQUESTED,
   RELATIONSHIP_EVENT_DOCUMENT_SHARED,
   RelationshipIdSchema,
+  type DiligenceQuestionRecord,
+  type DiligenceQuestionRepository,
   type DiligenceRequestRepository,
   type InterestService,
   type RelationshipEventAppender,
@@ -127,8 +129,54 @@ export type DiligenceView = {
       readonly documentId: string;
       readonly title: string | null;
     } | null;
+    /** The questions this request carried, with answers; null: none. */
+    readonly questions: readonly DiligenceRequestQuestion[] | null;
   }[];
 };
+
+export type DiligenceRequestQuestion = {
+  readonly questionId: string;
+  readonly question: string;
+  readonly assumptionId: string | null;
+  readonly assumptionLabel: string | null;
+  readonly answer: {
+    readonly text: string;
+    readonly answeredAt: string;
+    readonly truthClass: "USER_CLAIM";
+    readonly evidenceStatus: "SELF_REPORTED" | "DOCUMENT_SUPPORTED";
+  } | null;
+};
+
+/**
+ * The questions a diligence request carried (its id is their send's
+ * reference), in the order asked. A request that carried questions is
+ * answered by their answers, not by a document.
+ */
+export function questionsByRequest(
+  records: readonly DiligenceQuestionRecord[],
+): Map<string, DiligenceRequestQuestion[]> {
+  const out = new Map<string, DiligenceRequestQuestion[]>();
+  for (const record of [...records].sort((a, b) => a.position - b.position)) {
+    const set = out.get(record.sentRef) ?? [];
+    set.push({
+      questionId: record.id,
+      question: record.question,
+      assumptionId: record.assumptionId,
+      assumptionLabel: record.assumptionLabel,
+      answer:
+        record.answer === null
+          ? null
+          : {
+              text: record.answer.text,
+              answeredAt: record.answer.answeredAt,
+              truthClass: "USER_CLAIM",
+              evidenceStatus: record.answer.evidenceStatus,
+            },
+    });
+    out.set(record.sentRef, set);
+  }
+  return out;
+}
 
 export type DiligenceRefusal =
   "NOT_FOUND" | "NOT_OPEN" | "COMPANY_ONLY" | "INVESTOR_ONLY" | "NOT_SHAREABLE";
@@ -154,6 +202,9 @@ export function createDiligenceService(dependencies: {
   readonly access: Pick<DisclosureAccessService, "canDisclose">;
   readonly documents: DiligenceDocumentPort;
   readonly requests: DiligenceRequestRepository;
+  /** The investor's questions and answers (2026-10-08). Absent: none shown. */
+  readonly questions?:
+    Pick<DiligenceQuestionRepository, "listForRelationship"> | undefined;
   readonly appender: RelationshipEventAppender;
   readonly audit: MaterialActionAuditWriter;
   /**
@@ -317,11 +368,17 @@ export function createDiligenceService(dependencies: {
     }): Promise<DiligenceView | null> => {
       const party = await partyOf(query.actor, query.relationshipId);
       if (party === null) return null;
-      const [policies, rows, views] = await Promise.all([
+      const [policies, rows, views, asked] = await Promise.all([
         sharesOf(party),
         requests.listForRelationship(sql, party.relationshipId),
         requests.viewsFor(sql, party.relationshipId),
+        dependencies.questions === undefined
+          ? Promise.resolve([] as readonly DiligenceQuestionRecord[])
+          : dependencies.questions
+              .listForRelationship(sql, party.relationshipId)
+              .catch(() => [] as readonly DiligenceQuestionRecord[]),
       ]);
+      const carried = questionsByRequest(asked);
       const titles = new Map<string, DiligenceDocument>();
       await Promise.all(
         [
@@ -394,6 +451,7 @@ export function createDiligenceService(dependencies: {
                   documentId: row.fulfilment.documentId,
                   title: titles.get(row.fulfilment.documentId)?.title ?? null,
                 },
+          questions: carried.get(row.id) ?? null,
         })),
       };
     },

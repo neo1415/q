@@ -120,6 +120,7 @@ import {
   createNetworkService,
   createRelationshipEventAppender,
   createPostgresDiligenceRequests,
+  createPostgresDiligenceQuestions,
   createRelationshipEventRegistry,
   RELATIONSHIP_EVENT_DEFINITIONS,
   createPostgresRelationshipEventRepository,
@@ -1610,6 +1611,8 @@ const diligence = createDiligenceService({
     },
   },
   requests: createPostgresDiligenceRequests(),
+  // The questions a request carried, so its state comes from their answers.
+  questions: createPostgresDiligenceQuestions(),
   appender: createRelationshipEventAppender({
     registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
     repositories: {
@@ -1669,7 +1672,12 @@ const profileMaterial = createProfileMaterial({
       kind: "DILIGENCE",
       title: input.title,
       body: null,
-      target: input.target === "REQUESTS" ? "DOCUMENTS" : "COMPANY_PROFILE",
+      target:
+        input.target === "REQUESTS"
+          ? "DOCUMENTS"
+          : input.target === "DILIGENCE"
+            ? "DILIGENCE"
+            : "COMPANY_PROFILE",
       key: input.key,
       priority: input.priority,
     }),

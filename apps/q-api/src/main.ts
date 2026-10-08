@@ -291,6 +291,7 @@ import {
   createPostgresRelationshipRepository,
   createRelationshipEventAppender,
   createPostgresDiligenceRequests,
+  createPostgresDiligenceQuestions,
   createRelationshipEventRegistry,
   parseSpokenAmount,
   RELATIONSHIP_EVENT_DEFINITIONS,
@@ -1704,7 +1705,12 @@ const profileMaterial = createProfileMaterial({
       kind: "DILIGENCE",
       title: input.title,
       body: null,
-      target: input.target === "REQUESTS" ? "DOCUMENTS" : "COMPANY_PROFILE",
+      target:
+        input.target === "REQUESTS"
+          ? "DOCUMENTS"
+          : input.target === "DILIGENCE"
+            ? "DILIGENCE"
+            : "COMPANY_PROFILE",
       key: input.key,
       priority: input.priority,
     }),
@@ -1746,6 +1752,8 @@ const diligenceService = createDiligenceService({
     signedDownload: () => Promise.reject(new Error("Q_NEVER_DOWNLOADS")),
   },
   requests: createPostgresDiligenceRequests(),
+  // The questions a request carried, so its state comes from their answers.
+  questions: createPostgresDiligenceQuestions(),
   appender: createRelationshipEventAppender({
     registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
     repositories: {
