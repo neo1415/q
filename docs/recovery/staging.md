@@ -1,73 +1,82 @@
-# Private staging for real voice tests (RECOVERY-2026-10)
+# Pre-production voice testing at $0 (RECOVERY-2026-10)
 
-Founder rule: real microphone and OpenAI Realtime tests run **locally or on private staging, before production**. They run on a small approved budget and **never with production credentials**. This page gives the cheapest path, in two tiers. Each step is marked:
+Founder rules:
 
-- **[script]**: Claude or the lead can run it, given the named token.
-- **[founder]**: needs the founder's account, a click in a dashboard, or a payment decision.
+- Real microphone and OpenAI Realtime tests run **before production**, never with production data or a production deploy.
+- The additional budget is **$0**: no new OpenAI project or key, no new Supabase project, no paid service.
+- Agents make **no billable live calls**. Only the founder runs microphone tests, on his own machine, with the configuration he already has.
 
-No secret value goes in this file, in the repository, or in a chat.
+No secret value appears in this file. The steps below never print, copy or paste one.
 
-## What is shared and what must not be
+## (a) Local full stack on the founder's machine
 
-| Thing                                 | Production today                                                    | Staging must have                                                                                           |
-| ------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Railway                               | project `Q`, environment `production`, branch `recovery/2026-09-12` | its own **environment** in the same project, branch `recovery/2026-09-12-8y2j4w`, its own variables         |
-| Database                              | hosted Supabase `vcohxiqsmnkzxnvawgri`                              | a **separate Supabase project**, or the local stack. Never the production `DATABASE_URL`.                   |
-| Supabase Auth                         | production project's users                                          | the staging project's own users (seeded test accounts)                                                      |
-| OpenAI                                | the production key                                                  | a **separate OpenAI project** with its own key and a hard monthly cap                                       |
-| Gemini / Groq / ElevenLabs / Deepgram | production keys                                                     | unset, or `disabled-locally-000000000000`, unless a test needs them and the founder approves a separate key |
+The browser treats `http://localhost` as a secure context, so the microphone and WebRTC work locally without HTTPS. The database is the local Supabase stack, so nothing touches hosted data.
 
-## Tier 0: local (cheapest; no new hosting)
+**Billing note.** Realtime minutes are billed to the founder's existing OpenAI account by the key already in his `.env.local`. That is the founder's own spend, bounded by the caps in step 3. An agent never runs this.
 
-The browser treats `http://localhost` as a secure context, so the microphone and WebRTC work locally without HTTPS. This tier costs only Realtime minutes.
+### Steps
 
-1. **[founder]** Create the low-cap OpenAI project key (see "The OpenAI key" below).
-2. **[script]** Start the local stack and apply migrations: `pnpm db:start`, then `npx supabase migration up --local`, then `pnpm seed:fictional`.
-3. **[founder]** Put the staging key in your own shell or an untracked `.env.local`, never in the repo: `OPENAI_API_KEY=<staging project key>`. Set every other provider key to `disabled-locally-000000000000`.
-4. **[script]** Enable the line with its caps: `CQ_VOICE_REALTIME=on`, `CQ_VOICE_REALTIME_DAILY_CAP_USD=1`, `CQ_VOICE_REALTIME_MAX_SESSION_SECONDS=300`, and the aggregate text cap `CQ_MODEL_DAILY_SPEND_CAP_USD=2` (workstream F, F5).
-5. **[script]** Start the services with `pnpm dev`, sign in as a seeded founder, and run the voice scenarios (SPEC §5 E, G, H). G's harness records the evidence under `docs/recovery/evidence/`.
+1. **Prerequisites.** Node 24, pnpm (via `corepack enable`), and Docker Desktop running.
+2. **Local database** (no hosted access):
+   ```bash
+   pnpm install --frozen-lockfile
+   pnpm db:start                         # local Supabase in Docker
+   npx supabase migration up --local     # all repo migrations, local only
+   pnpm seed:fictional                   # fictional founders and investors
+   ```
+3. **Configuration: reuse, don't copy.** The services read the repository-root `.env.local` (`scripts/dev-env.mjs` loads it and logs only that it exists), and the web app reads `apps/web/.env.local`. Both are gitignored and already on the founder's machine. Check that they point at the **local** stack, not hosted, without printing values:
+   ```bash
+   grep -c '127.0.0.1:54322' .env.local     # expect 1 or more: DATABASE_URL is local
+   grep -c 'supabase.co' .env.local         # expect 0: no hosted Supabase URL or key
+   grep -c '^OPENAI_API_KEY=' .env.local    # expect 1: the existing key is present
+   ```
+   If the second count is not 0, the file points at hosted data. Stop and fix the file (local values come from `npx supabase status`) before going further.
+4. **Turn the voice line on with tight caps.** Shell variables override the file, so the caps apply to this session only and nothing is edited:
+   ```bash
+   export CQ_VOICE_REALTIME=on
+   export CQ_VOICE_REALTIME_DAILY_CAP_USD=0.50       # duplex hard stop per day (bound 0-20)
+   export CQ_VOICE_REALTIME_MAX_SESSION_SECONDS=300  # one line lasts at most 5 minutes
+   export CQ_MODEL_DAILY_SPEND_CAP_USD=1             # aggregate text cap (F5)
+   export GEMINI_API_KEY=disabled-locally-000000000000
+   export GROQ_API_KEY=disabled-locally-000000000000
+   export ELEVENLABS_API_KEY=disabled-locally-000000000000
+   export DEEPGRAM_API_KEY=disabled-locally-000000000000
+   ```
+   The `disabled-…` values are non-empty on purpose: an empty value would let `.env.local` supply the real key.
+5. **Run:** `pnpm dev`. Open `http://localhost:3000`, sign in as a seeded fictional founder, and allow the microphone.
+6. **Scenarios:** SPEC §5 E (continuous voice across pages, interrupt, correct, continue), G (voice → text → voice), and the voice parts of H (deny the microphone, go offline mid-turn, reload during playback). Keep each line under 5 minutes.
+7. **Evidence and spend.** After the session, read the session's realtime cost from the local ledger (the local database only; this costs nothing):
+   ```bash
+   docker exec supabase_db_capital-q psql -U postgres -Atc \
+     "select count(*), coalesce(sum(cost_usd),0) from ai_ops.model_usage where purpose = 'VOICE_REALTIME' and occurred_at > now() - interval '1 day'"
+   ```
+   Compare it with the OpenAI usage page: duplex usage is reported by the browser (audit F-R3). Record both in `docs/handoff/research/ledger.md`.
+8. **Stop:** Ctrl-C, then `pnpm db:stop`.
 
-**Limits.** This tier tests only one machine and one browser. It cannot show a Railway deploy or restart dropping an in-memory voice line (DEF-A5), and it does not use the hosted network path.
+### What this cannot show
 
-## Tier 1: private staging on Railway
+It runs on one machine and one browser. It cannot reproduce a Railway deploy or restart dropping an in-memory voice line (DEF-A5), nor the hosted network path. Those are checked after a founder-approved deploy, briefly.
 
-### 1. The database (choose one)
+## (b) A Railway staging environment at $0: not possible under these rules
 
-- **A. A second Supabase project (recommended).** The free plan allows two active projects per organisation; a free project pauses after a week of inactivity and is restored from the dashboard.
-  1. **[founder]** supabase.com → New project → name `capital-q-staging`, region `eu-central-1` (same as production), a generated database password. Note the project ref.
-  2. **[founder]** Create a personal access token (Account → Access Tokens), or reuse the one the lead has. Give the lead the project ref, not the password.
-  3. **[script]** `npx supabase link --project-ref <staging-ref>`, then `node scripts/db-push.mjs` (or `npx supabase db push --include-all`). This applies all 178+ migrations to the empty project. Then `pnpm seed:fictional` against the staging `DATABASE_URL`.
-  4. **[founder]** Auth → URL configuration: set the site URL and redirect URLs to the staging web domain from step 2.4.
-- **B. No hosted database.** Run voice tests in Tier 0 only. Tier 1 needs a database the Railway services can reach.
+Railway itself could host a second environment in project `Q` at no extra charge only while the project's total usage stays inside what the current plan already includes. Railway has no free tier beyond the plan. Four more services, even idle, add usage that is not guaranteed to stay inside it.
 
-Supabase branching (a preview branch of the production project) needs a paid plan and shares the production organisation's billing. It is not needed here.
+The blocker is the database, not Railway:
 
-### 2. The Railway environment
+- Staging must not use the production `DATABASE_URL`. That is the whole point of staging, and the services run as a role that bypasses RLS (ADR 0065).
+- A second Supabase project is ruled out by the $0 / no-new-project decision. Supabase's free plan would cost $0, but it is a new project.
+- The founder's local database is not reachable from Railway.
 
-1. **[founder]** Railway → project `Q` → Environments → **New Environment** → name `staging` → **Duplicate** `production`. (CLI equivalent, **[script]** with the founder's token: `railway environment new staging --duplicate production`.) Duplicating copies services and variable _names_; replace every secret below.
-2. **[founder]** For each of the four services in `staging`: Settings → Source → branch `recovery/2026-09-12-8y2j4w`, and turn **Wait for CI** on.
-3. **[script]** Set the variables per service (`railway variable set NAME --stdin --service <svc> --environment staging`, value from stdin):
-   - `DATABASE_URL` = the staging project's session pooler URL (the founder pastes it; it never passes through chat);
-   - `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (api, q-api, workers) and `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (web; these are build-time, so redeploy web after setting them) = the staging project's;
-   - `OPENAI_API_KEY` = the staging project key, on q-api, api and workers only;
-   - `CAPITAL_Q_ENV=staging`, `CQ_VOICE_REALTIME=on`, `CQ_VOICE_REALTIME_DAILY_CAP_USD=1`, `CQ_VOICE_REALTIME_MAX_SESSION_SECONDS=300`, `CQ_MODEL_DAILY_SPEND_CAP_USD=2`;
-   - **delete** `GEMINI_API_KEY*`, `GROQ_API_KEY*`, and every Stripe, Recall, Google Workspace, SMTP/Brevo, Postmark, Web Push and Cloudflare secret the duplicate copied, unless a staged test needs one and the founder approves a separate credential. A duplicated production secret in staging is exactly what this page exists to prevent.
-4. **[founder]** Settings → Networking: generate Railway domains for web, api and q-api in `staging`. Leave workers private. Put the web domain into the staging Supabase Auth redirect URLs (step 1.A.4).
-5. **[founder]** Keep it private. The staging web domain is unguessable but public. Either add the founder's and testers' emails as the only seeded accounts (no open sign-up in the staging Supabase project: Auth → Providers → Email → disable sign-ups after seeding), or put Railway's private networking plus a password gate in front of web. The first option is enough for test data that is entirely fictional.
-6. **[script]** Smoke: `curl https://<staging-q-api>/health/ready` must return 200 with `checks.database = "OK"` (F4, once the lead wires the probe). Then run G's scenarios against the staging web domain.
+So a private Railway staging environment is **not available at $0** today. If the founder later allows one free Supabase project, the path is:
 
-**Cost.** Railway charges usage for each running service. Four small services idle cost a few dollars a month. **[founder]** Stop the environment's services between test sessions (each service's ⋮ menu → Stop, or remove the deploy) to keep it near zero. Supabase free costs nothing.
-
-## The OpenAI key (both tiers)
-
-1. **[founder]** platform.openai.com → Settings → **Projects** → Create project `capital-q-staging`.
-2. **[founder]** That project → **Limits**: set the monthly budget (for example $10). Allow only the models the tests use: the realtime model (`gpt-realtime-mini`), its transcription model, and `gpt-5.6-luna` for text.
-3. **[founder]** For a cap that cannot be exceeded, use prepaid credits with **auto-recharge off**: requests stop when the balance is spent. A budget alone may only alert, depending on the account's billing mode; check the Limits page's wording.
-4. **[founder]** API keys → create a **restricted** key in that project, with permissions only for Model capabilities / Realtime. Hand it over only by pasting it into Railway or a local untracked env file.
-5. **[script]** Every live run is logged in `docs/handoff/research/ledger.md` with its purpose, duration and the `ai_ops.model_usage` sum for the run (duplex rows are `purpose = 'VOICE_REALTIME'`). Duplex usage is reported by the browser (audit F-R3), so compare it with the OpenAI project's usage page after each session.
+1. **[founder]** create the project;
+2. **[script]** `npx supabase link` and `db push`;
+3. **[founder]** in Railway, New Environment `staging` (duplicate `production`), branch `recovery/2026-09-12-8y2j4w`, "Wait for CI" on;
+4. **[script]** replace every copied secret, set `CAPITAL_Q_ENV=staging`, and delete every provider secret staging does not need;
+5. **[founder]** stop the staging services between sessions, so usage stays near zero.
 
 ## Guard rails already in code
 
-- Duplex: off unless `CQ_VOICE_REALTIME=on`; daily cap with default $1 and hard bound $20 (`apps/q-api/src/voice/duplex/config.ts:45-92`).
-- Text and images: the aggregate daily cap `CQ_MODEL_DAILY_SPEND_CAP_USD` (F5). A request past it fails with `BUDGET_EXCEEDED` (Q failure class `BUDGET`).
-- `CQ_SYNTHETIC_DEMO_ROUTING` stays unset on Railway (`.railway/railway.ts`), so a staging deploy never claims to be a demo.
+- **Duplex voice.** Off unless `CQ_VOICE_REALTIME=on`. The daily cap defaults to $1 with a hard bound of $20, and a typo falls back to the default (`apps/q-api/src/voice/duplex/config.ts:45-92`).
+- **Text and images.** The aggregate daily cap `CQ_MODEL_DAILY_SPEND_CAP_USD` (F5). Past it, a request fails with `BUDGET_EXCEEDED` (Q failure class `BUDGET`).
+- **Tests.** No test makes a live provider call; keys are `disabled-locally-000000000000`.
