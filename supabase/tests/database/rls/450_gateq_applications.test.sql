@@ -166,8 +166,20 @@ select is((select count(*)::int from information_schema.columns
               and column_name in ('storage_key', 'content', 'extracted_text', 'bytes')), 0,
   'GateQ stores no bytes, no storage key and no extracted text: Evidence owns the document');
 
-select is((select count(*)::int from information_schema.tables where table_schema = 'gateq'), 9,
-  'nine gateq tables: three for the gateway, five for the application, one for mandate-reading provenance (P7)');
+-- The exact set, not a count: a new gateq table must be added here on purpose.
+-- Gateway (3), application (6), mandate-reading provenance (P7), the founder
+-- inbox (9: items, messages, notes, labels, item labels, activity, settings,
+-- per-user state, pass reasons) and startup alerts.
+select is(
+  array(select table_name::text from information_schema.tables
+         where table_schema = 'gateq' order by 1),
+  array['application_documents', 'application_facts', 'application_founders',
+        'application_sessions', 'application_submissions', 'applications',
+        'gateway_criteria', 'gateway_versions', 'gateways',
+        'inbox_activity', 'inbox_item_labels', 'inbox_items', 'inbox_labels',
+        'inbox_messages', 'inbox_notes', 'inbox_settings', 'inbox_user_state',
+        'pass_reasons', 'policy_extractions', 'startup_alerts']::text[],
+  'the gateq tables are exactly the gateway, application, mandate-reading provenance, inbox and startup-alert sets');
 
 select * from finish();
 rollback;
