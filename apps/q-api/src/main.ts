@@ -16,6 +16,7 @@
  */
 
 import { createFitComposition } from "./composition/fit.js";
+import { createAttentionSources } from "./composition/attention-sources.js";
 import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
 import {
   createPostgresTaxonomyAssignmentRepository,
@@ -2478,6 +2479,9 @@ const qTools = createQTools({
     work: workPort,
     // WORKFORCE block (J1, J4): a job the lead Q plans, one approval.
     jobs: workforceJobBoard.port,
+    // RECOVERY B1: held drafts, stopped jobs, notices, data-room requests,
+    // new matches and Q's activity, for "what needs me".
+    attention: createAttentionSources({ sql: database.sql }),
     // ADMIN block
     results: {
       read: (actor, query) => ownResults.read(actor, resultsWindow(query)),
@@ -5636,6 +5640,8 @@ const { app, logger: appLogger } = createApp(
     readinessBlueprints: readinessService,
     // end BILLING-2 block
     standing: standingStore,
+    // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
+    attention: qTools.attention,
     // DAILY block
     daily: dailyReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },

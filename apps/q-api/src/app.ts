@@ -81,6 +81,10 @@ import {
   type StandingRoutesDependencies,
 } from "./http/standing.js";
 import {
+  registerAttentionRoutes,
+  type AttentionRoutesDependencies,
+} from "./http/q-attention.js";
+import {
   registerDailyRoutes,
   type DailyRoutesDependencies,
 } from "./http/daily.js";
@@ -190,6 +194,8 @@ export type QApiModules = {
   // end BILLING-2 block
   /** Q's standing with each person: personality and patience. */
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
+  /** RECOVERY B1: what needs the person, every source (unread ≠ empty). */
+  readonly attention?: AttentionRoutesDependencies["attention"] | undefined;
   // DAILY block: The Q Daily, the person's own editions and preferences.
   readonly daily?: DailyRoutesDependencies["daily"] | undefined;
   /** Q in a meeting: bring it to a call, read its notes. */
@@ -486,6 +492,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       errands: modules.errands,
+    });
+  }
+  // RECOVERY B1: what needs the person, every source, for every surface.
+  if (modules.attention !== undefined && security.resolver !== undefined) {
+    registerAttentionRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      attention: modules.attention,
     });
   }
   // DAILY block: The Q Daily (the person's own editions and preferences).
