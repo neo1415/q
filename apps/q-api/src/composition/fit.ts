@@ -46,7 +46,8 @@ export type FitCompositionDependencies = {
   readonly sql: DatabaseExecutor;
   readonly eligibilityPorts: EligibilityPorts;
   readonly eligibility: Pick<EligibilityService, "evaluate">;
-  readonly companies: Pick<CompanyQueryPort, "findCanonicalCompany">;
+  readonly companies: Pick<CompanyQueryPort, "findCanonicalCompany"> &
+    Partial<Pick<CompanyQueryPort, "findCanonicalCompanyProfile">>;
   readonly capital: Pick<CapitalObjectiveQueryPort, "getCurrentForCompany">;
   readonly disclosure: Pick<DisclosureAccessService, "evaluateMany">;
   readonly relationships: (actor: ActorContext) => Promise<readonly string[]>;
@@ -77,19 +78,38 @@ export function createFitComposition(
     eligibilityPorts: dependencies.eligibilityPorts,
     identities: async (companyIds) => {
       const found = await Promise.all(companyIds.map(identity));
+      // The company's own one line, only where its profile is classified
+      // for the network (or beyond): the fit service asks only for
+      // companies eligibility already admitted for this reader, and a
+      // private profile's summary is never carried to someone else.
+      const profiles = await Promise.all(
+        found.map((c) =>
+          c === null ||
+          dependencies.companies.findCanonicalCompanyProfile === undefined
+            ? Promise.resolve(null)
+            : dependencies.companies
+                .findCanonicalCompanyProfile(c.id)
+                .catch(() => null),
+        ),
+      );
       return new Map(
-        found
-          .filter((c) => c !== null)
-          .map((c) => [
-            c.id,
-            // The fit service asks only for companies eligibility already
-            // admitted for this reader; the one line is the company's own
-            // declared summary, shown wherever its name is.
-            {
-              name: c.canonicalName,
-              shortDescription: c.shortDescription,
-            },
-          ]),
+        found.flatMap((c, index) => {
+          if (c === null) return [];
+          const profile = profiles[index] ?? null;
+          const shared =
+            profile !== null &&
+            (profile.marketplaceVisibility === "network_visible" ||
+              profile.marketplaceVisibility === "public_external");
+          return [
+            [
+              c.id,
+              {
+                name: c.canonicalName,
+                shortDescription: shared ? profile.shortDescription : null,
+              },
+            ] as const,
+          ];
+        }),
       );
     },
     raises: async (actor, companyIds) => {

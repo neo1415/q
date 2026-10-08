@@ -378,6 +378,7 @@ export {
   setQPresence,
   stopQWork,
   listQWorkSuggestions,
+  getQWorkSince,
   listQWorkDone,
   dismissQWorkSuggestion,
   setQWorkPaused,

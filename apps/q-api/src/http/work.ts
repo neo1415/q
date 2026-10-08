@@ -17,6 +17,9 @@ import {
   QWorkListDtoSchema,
   QWorkReportDtoSchema,
   Q_WORK_DONE_PATH,
+  Q_WORK_SINCE_PATH,
+  QWorkSinceDtoSchema,
+  QWorkSinceQuerySchema,
   Q_WORK_SUGGESTIONS_PATH,
   QWorkDonePageDtoSchema,
   QWorkDoneQuerySchema,
@@ -246,6 +249,21 @@ export function registerWorkRoutes(
         return QWorkSuggestionListDtoSchema.parse({
           items: await withLinkPhotos(dependencies.namedPhotos, items),
         });
+      },
+    );
+
+    app.get(
+      Q_WORK_SINCE_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const query = QWorkSinceQuerySchema.safeParse(request.query ?? {});
+        if (!query.success) return invalid(request, reply);
+        const since = await page.since(
+          getActorContext(request),
+          new Date(query.data.since),
+        );
+        void reply.header("Cache-Control", "no-store");
+        return QWorkSinceDtoSchema.parse(since);
       },
     );
 

@@ -728,8 +728,8 @@ export function registerQVoiceRoutes(
           facts !== null
             ? composeReturningOpener(name, facts, new Date())
             : name !== null
-              ? `Hi ${name}. I'm listening; what would you like to look at?`
-              : "I'm listening. What would you like to look at?";
+              ? `Hi ${name}. What's on your mind?`
+              : "Hi. What's on your mind?";
       }
 
       // Names the person has taught Q to hear, before the recogniser

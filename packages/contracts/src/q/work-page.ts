@@ -163,3 +163,47 @@ export const QWorkDonePageDtoSchema = z
   })
   .strict();
 export type QWorkDonePageDto = z.infer<typeof QWorkDonePageDtoSchema>;
+
+/**
+ * What happened since the person was last here (arrival briefing, Zino
+ * 2026-10-08: "go straight ahead to the work the agents have done, give me
+ * the lowdown"). Counts by kind, from recorded rows on their own side only,
+ * with a few of the other sides' names; and their own time zone when they
+ * set one, so Q greets them by their clock. Nothing here is a model's.
+ */
+export const Q_WORK_SINCE_PATH = "/v1/q/work/since" as const;
+
+export const QWorkSinceQuerySchema = z
+  .object({ since: UtcTimestampSchema })
+  .strict();
+
+export const Q_WORK_SINCE_NAMES_MAX = 3;
+
+export const QWorkActivityCountSchema = z
+  .object({
+    n: z.number().int().min(0),
+    names: z.array(z.string().min(1).max(200)).max(Q_WORK_SINCE_NAMES_MAX),
+  })
+  .strict();
+export type QWorkActivityCount = z.infer<typeof QWorkActivityCountSchema>;
+
+export const QWorkSinceDtoSchema = z
+  .object({
+    since: UtcTimestampSchema,
+    /** Messages Q sent for them. */
+    sent: QWorkActivityCountSchema,
+    /** Meetings Q set up. */
+    booked: QWorkActivityCountSchema,
+    /** Interest Q expressed for them. */
+    interest: QWorkActivityCountSchema,
+    /** Messages Q drafted and held back for them to read. */
+    held: QWorkActivityCountSchema,
+    /** Their counterparts' new messages, per relationship. */
+    replies: QWorkActivityCountSchema,
+    /** Relationships of theirs that became connected. */
+    matches: QWorkActivityCountSchema,
+    /** Their own IANA time zone, when they set one (profile, then working hours). */
+    timeZone: z.string().min(1).max(64).nullable(),
+  })
+  .strict();
+export type QWorkSinceDto = z.infer<typeof QWorkSinceDtoSchema>;

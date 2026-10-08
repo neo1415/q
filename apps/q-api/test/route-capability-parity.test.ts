@@ -599,6 +599,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // WORK-58: Q's work page.
   "q-api/http/work.ts GET Q_WORK_SUGGESTIONS_PATH": cap("navigate.WORK"),
   "q-api/http/work.ts GET Q_WORK_DONE_PATH": cap("tool.list_q_work"),
+  "q-api/http/work.ts GET Q_WORK_SINCE_PATH": cap("tool.list_q_work"),
   "q-api/http/errands.ts DELETE Q_ERRAND_PATH": cap("tool.stop_q_work"),
   // DAILY block: The Q Daily.
   "q-api/http/daily.ts GET Q_DAILY_PATH": cap("tool.get_q_daily"),
