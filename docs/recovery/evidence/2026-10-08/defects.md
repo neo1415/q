@@ -98,7 +98,7 @@ All of these were reproduced on the local stack (`scripts/recovery/local-stack.s
 | G-D7  | Medium (a11y) | A                  | Open                 | Still on integration: "I couldn't start voice right now" is not in a live region                                                                                                                                                                                                                       |
 | a11y  | Serious       | C/E                | Open                 | axe, integration run: `/investors` (founder) meta-refresh (critical); `/discover` (investor) color-contrast (serious); `/settings` (investor) definition-list (serious)                                                                                                                                |
 
-**Harness defects found and fixed by G.** Every MOCK voice verdict before commit `81a15e22`/`<voice fixes>` is void:
+**Harness defects found and fixed by G.** Every MOCK voice verdict before commits `a371c88d` and `81a15e22` is void:
 
 - manual browser contexts lacked the microphone grant;
 - the page RTCPeerConnection fake used `#private` members, which Playwright's transpile cannot run;
