@@ -179,7 +179,38 @@ export type ThreadRead = {
    */
   readonly question?:
     { readonly messageId: string; readonly text: string } | undefined;
+  /**
+   * Zino, 2026-10-08: the conversation as the reviewer reads it, and their
+   * latest unanswered words, for CODE's thread-consistency check and the
+   * reviewer's untrusted thread slot only. Never given to the planner,
+   * which still reads the typed facts alone (S6).
+   */
+  readonly transcript?: string | undefined;
+  readonly theirLatest?: string | undefined;
 };
+
+/** The thread in the reviewer's words: sides and times, oldest first. */
+export function transcriptOf(
+  messages: readonly {
+    readonly from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE";
+    readonly sentAt: string;
+    readonly text: string | null;
+    readonly attachmentTitle?: string | null | undefined;
+  }[],
+): string {
+  return messages
+    .map(
+      (message) =>
+        `[${message.from === "OTHER_SIDE" ? "THEM" : "US"} ${message.sentAt}] ${
+          message.text ??
+          ((message.attachmentTitle ?? null) === null
+            ? ""
+            : `(shared a document: ${message.attachmentTitle ?? ""})`)
+        }`,
+    )
+    .join("\n")
+    .slice(-8_000);
+}
 
 export type QuarantinedThreadReader = (input: {
   readonly actor: ActorContext;
@@ -214,7 +245,12 @@ export function createQuarantinedThreadReader(dependencies: {
     // Read only when the thread itself was read: an unread thread has no
     // known pace, and code then falls back to the typed facts.
     const pace = read === null ? undefined : threadPace(messages);
-    const paced = pace === undefined ? {} : { pace };
+    const theirLatest = theirUnanswered(messages);
+    const paced = {
+      ...(pace === undefined ? {} : { pace }),
+      ...(messages.length === 0 ? {} : { transcript: transcriptOf(messages) }),
+      ...(theirLatest === "" ? {} : { theirLatest }),
+    };
     const latest = messages[messages.length - 1];
     if (latest === undefined) return { facts: null, costUsd: 0, ...paced };
     const key = `${input.instructionId}:${input.relationshipId}:${latest.id}`;

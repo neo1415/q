@@ -124,11 +124,15 @@ function nameOf(run: WorkforceAgentRunDto | undefined): string {
 }
 
 export const HELD_WORDS: Readonly<Record<string, string>> = {
-  BELOW_BAR: "It didn't reach your bar, so Q didn't send it.",
+  BELOW_BAR:
+    "Held after two tries: it still didn't reach your bar. Read it, send your own, or let it go.",
   INTEGRITY: "It would have said something Capital Q can't stand behind.",
-  REVIEW_UNAVAILABLE: "It couldn't be checked just now, so it wasn't sent.",
+  REVIEW_UNAVAILABLE:
+    "Q's reviewer couldn't check it, so it wasn't sent. Read it and send your own, or ask Q to try again.",
   WRITER_GAVE_UP: "It couldn't be written honestly from what you approved.",
   CODE_CHECK: "A redraft broke a rule for this conversation.",
+  THREAD_MISMATCH:
+    "Held: it still didn't answer what they last asked or offered.",
 };
 
 /** The drafts behind one message, oldest first (draft 1, its redrafts). */
@@ -286,6 +290,8 @@ export function jobLines(detail: WorkforceJobDetailDto): readonly JobLine[] {
           title: `Sent draft ${String(draft.attempt)}`,
           what: to,
           at: outcomeAt,
+          // "How Q wrote this": the draft sheet with every draft before it.
+          readDraftId: draft.id,
         },
         outcomeAt,
       );

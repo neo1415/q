@@ -1781,6 +1781,92 @@ describe("a firing with the reviewer on", () => {
     });
   });
 
+  it("Zino 2026-10-08: the reviewer reads the real thread, and a reply that ignores their meeting offer is redrafted before it is sent", async () => {
+    ran.length = 0;
+    const store = createInMemoryWorkforceStore();
+    const threads: string[] = [];
+    const asksSeen: string[] = [];
+    const fixesSeen: string[] = [];
+    const theirs =
+      "Thanks for connecting. Tensorgate is a policy gateway for LLM traffic in regulated industries. Raising a $4m seed. Want the deck, or 20 minutes this week? Daniel";
+    const review = createOutwardReview({
+      store,
+      models: {
+        review: (_who, _trace, variables) => {
+          threads.push(variables.thread);
+          asksSeen.push(variables.pendingAsks);
+          return Promise.resolve({
+            ...passing,
+            integrity: [
+              ...passing.integrity,
+              { rule: "RESPONDS_TO_THREAD" as const, ok: true, note: "" },
+            ],
+          });
+        },
+        redraft: (_who, _trace, variables) => {
+          fixesSeen.push(variables.feedback);
+          return Promise.resolve(
+            "Hi Daniel, 20 minutes this week works well, and please send the deck ahead. Which time suits you?",
+          );
+        },
+      },
+    });
+    const { engine, row } = world(
+      [
+        {
+          steps: [
+            chat(
+              "Running LLM inference inside enclaves stood out. Would you be open to connecting?",
+            ),
+          ],
+          cannot: [],
+        },
+      ],
+      true,
+      IN_HOURS,
+      "0",
+      {
+        review,
+        principalName: () => Promise.resolve("Zino"),
+        readThread: (input: { relationshipId: string }) =>
+          Promise.resolve(
+            input.relationshipId === REL
+              ? {
+                  facts: {
+                    lastFrom: "THEM" as const,
+                    asksQuestion: false,
+                    wantsToMeet: true,
+                    proposedTime: null,
+                    topicNumbers: [],
+                    mentionsTermsOrMoney: false,
+                    declined: false,
+                    tone: "POSITIVE" as const,
+                    questionAbout: [],
+                  },
+                  costUsd: 0,
+                  transcript: `[THEM 2026-10-06T17:28:35Z] ${theirs}`,
+                  theirLatest: theirs,
+                }
+              : { facts: null, costUsd: 0 },
+          ),
+      },
+    );
+    await engine.fire(row.id, "run-thread-check");
+    expect(threads[0]).toContain("Want the deck, or 20 minutes this week?");
+    expect(asksSeen[0]).toBe(
+      "They offered or asked for a call or a meeting. They offered to send a document (deck).",
+    );
+    expect(fixesSeen[0]).toContain("open to connecting");
+    expect(store.rows.drafts.map((d) => d.attempt)).toEqual([1, 2]);
+    expect(store.rows.grades.map((g) => g.passed)).toEqual([false, true]);
+    expect(ran[0]?.input).toMatchObject({
+      input: {
+        kind: "TEXT",
+        body: "Hi Daniel, 20 minutes this week works well, and please send the deck ahead. Which time suits you?",
+      },
+    });
+  });
+
   it("autopilot P1: the reviewer is told the message is written inside Capital Q, so saying so is grounded", async () => {
     ran.length = 0;
     const store = createInMemoryWorkforceStore();

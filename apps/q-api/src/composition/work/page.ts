@@ -512,19 +512,44 @@ export function createWorkPage(dependencies: {
       const after = decodeCursor(query.cursor);
       const weekAgo = new Date(now().getTime() - 7 * DAY_MS);
       const rows = await sql<
-        { id: string; words: string; at: Date; link_path: string | null }[]
+        {
+          id: string;
+          words: string;
+          at: Date;
+          link_path: string | null;
+          relationship_id: string | null;
+          counterpart_name: string | null;
+        }[]
       >`
         select * from (
           select s.id, s.words, s.created_at as at,
+                 -- Zino 2026-10-08: grouped per relationship on Work, with
+                 -- the other side's name and its thread one tap away.
+                 case when i.organisation_id is null then null
+                      else r.id end as relationship_id,
+                 -- The instruction's organisation is an identity org; the
+                 -- relationship names a core investor organisation, which
+                 -- maps to it. (Comparing the two ids directly put every
+                 -- investor's own organisation on the "other side": live
+                 -- 2026-10-08, Zino's Done links opened Zino Aviation.)
                  case
                    when r.id is null or i.organisation_id is null then null
-                   when r.investor_organisation_id = i.organisation_id
+                   when io.organisation_id = i.organisation_id
+                     then (select coalesce(c.canonical_name, c.legal_name)
+                             from core.companies c where c.id = r.company_id)
+                   else io.display_name
+                 end as counterpart_name,
+                 case
+                   when r.id is null or i.organisation_id is null then null
+                   when io.organisation_id = i.organisation_id
                      then '/relationships/company/' || r.company_id::text
                    else '/relationships/investor/' || r.investor_organisation_id::text
                  end as link_path
             from q_runtime.instruction_steps s
             join q_runtime.standing_instructions i on i.id = s.instruction_id
             left join network.relationships r on r.id = s.relationship_id
+            left join core.investor_organisations io
+              on io.id = r.investor_organisation_id
            where s.user_id = ${actor.userId} and s.tenant_id = ${actor.tenantId}
              and s.status = 'DONE'
           union all
@@ -533,6 +558,8 @@ export function createWorkPage(dependencies: {
                    case d.kind when 'INVESTOR_OUTREACH' then 'Outreach finished'
                                else 'Stand-in finished' end) as words,
                  d.updated_at as at,
+                 null::uuid as relationship_id,
+                 null::text as counterpart_name,
                  '/work/' || d.id::text as link_path
             from q_runtime.delegations d
            where d.user_id = ${actor.userId} and d.tenant_id = ${actor.tenantId}
@@ -558,6 +585,8 @@ export function createWorkPage(dependencies: {
           words: row.words.slice(0, 500),
           at: new Date(row.at).toISOString(),
           linkPath: row.link_path,
+          relationshipId: row.relationship_id,
+          counterpartName: row.counterpart_name?.slice(0, 200) ?? null,
         })),
         thisWeek: week[0]?.n ?? 0,
         nextCursor:

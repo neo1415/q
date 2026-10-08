@@ -1,8 +1,11 @@
 import { workforceCorrelationId } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
+  asksLine,
   DEFAULT_REVIEW_POLICY,
+  pendingAsks,
   RUBRIC_VERSION,
+  threadProblems,
   writeWithReview,
   type HoldReason,
   type ReviewPolicy,
@@ -29,7 +32,7 @@ import type { JobSourceKind, Owner, WorkforceStore } from "./store.js";
  * the review still runs and its verdict still binds.
  */
 
-export const DRAFT_REVIEW_PROMPT_VERSION = "draft-review/v1" as const;
+export const DRAFT_REVIEW_PROMPT_VERSION = "draft-review/v2" as const;
 
 export type OutwardSource = {
   readonly kind: Exclude<JobSourceKind, "JOB">;
@@ -48,6 +51,12 @@ export type OutwardDraft = {
   /** What it may state as fact (the brief, the authorised material). */
   readonly material: string;
   readonly thread: string;
+  /**
+   * Their latest unanswered message(s), read by code from the thread
+   * (never by a model). Code checks the draft responds to what it left
+   * open (Zino, 2026-10-08); absent or null: nothing to check against.
+   */
+  readonly theirLatest?: string | null | undefined;
   readonly body: string;
 };
 
@@ -122,6 +131,7 @@ export function heldLine(verdict: OutwardVerdict, counterpart: string): string {
     BELOW_BAR: `didn't reach your bar${verdict.score === null ? "" : ` (scored ${String(verdict.score)})`}`,
     INTEGRITY: "would have said something Capital Q can't stand behind",
     REVIEW_UNAVAILABLE: "couldn't be checked just now",
+    THREAD_MISMATCH: "still didn't answer what they last asked or offered",
     WRITER_GAVE_UP: "couldn't be written honestly from what you approved",
     CODE_CHECK: "broke one of the rules for this conversation when redrafted",
   };
@@ -239,14 +249,20 @@ export function createOutwardReview(dependencies: {
         filed === null ? null : { jobId: filed.jobId, runId: filed.reviewer };
       const writerTrace =
         filed === null ? null : { jobId: filed.jobId, runId: filed.writer };
+      // Thread consistency: what their latest message left open, by code.
+      const asks =
+        draft.stage === "REPLY" ? pendingAsks(draft.theirLatest) : [];
       const outcome = await writeWithReview(
         draft.body,
         {
           review: (body) =>
             dependencies.models.review(who, reviewTrace, {
               ...frame,
+              pendingAsks: asksLine(asks),
               draft: body.slice(0, 4_000),
             }),
+          consistency: (body) => threadProblems(body, asks),
+          threadRule: asks.length > 0,
           redraft: (body, feedback) =>
             dependencies.models.redraft(who, writerTrace, {
               ...frame,

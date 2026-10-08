@@ -111,6 +111,7 @@ import {
   DRAFT_REDRAFT_V1,
   DRAFT_REDRAFT_V2,
   DRAFT_REVIEW_V1,
+  DRAFT_REVIEW_V2,
   JOB_PLAN_V1,
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
@@ -446,6 +447,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     MEETING_NOTES_V3,
     ERRAND_REPLY_V1,
     DRAFT_REVIEW_V1,
+    DRAFT_REVIEW_V2,
     DRAFT_REDRAFT_V1,
     DRAFT_REDRAFT_V2,
     REPLY_READER_V1,

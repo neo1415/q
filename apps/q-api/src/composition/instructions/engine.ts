@@ -1727,6 +1727,13 @@ export function createInstructionEngine(
         string,
         { readonly messageId: string; readonly text: string }
       >();
+      // Zino, 2026-10-08: the conversation and their latest words, for the
+      // reviewer and code's thread-consistency check only -- never the
+      // planner (S6). Before this the reviewer was handed an empty thread.
+      const transcripts = new Map<
+        string,
+        { readonly thread: string; readonly theirLatest: string | null }
+      >();
       if (dependencies.readThread !== undefined) {
         // Conversations with a card still waiting are read first (F24: a
         // stale draft is only seen as stale once its thread is read).
@@ -1756,6 +1763,12 @@ export function createInstructionEngine(
           if (read.pace !== undefined) paces.set(relationshipId, read.pace);
           if (read.question !== undefined) {
             questions.set(relationshipId, read.question);
+          }
+          if (read.transcript !== undefined) {
+            transcripts.set(relationshipId, {
+              thread: read.transcript,
+              theirLatest: read.theirLatest ?? null,
+            });
           }
         }
       }
@@ -2068,14 +2081,22 @@ export function createInstructionEngine(
                 counterpartName,
                 channel: "CHAT",
                 stage:
-                  thread?.lastFrom === "THEM"
+                  thread?.lastFrom === "THEM" ||
+                  (subject !== null && paces.get(subject)?.lastFrom === "THEM")
                     ? "REPLY"
                     : sidesWritten(subject, recheckContext)
                       ? "FOLLOW_UP"
                       : "FIRST",
                 purpose: `${step.words} (their standing instruction: ${row.goal_text})`,
                 material: factsText,
-                thread: "",
+                thread:
+                  (subject === null
+                    ? undefined
+                    : transcripts.get(subject)?.thread) ?? "",
+                theirLatest:
+                  subject === null
+                    ? null
+                    : (transcripts.get(subject)?.theirLatest ?? null),
                 body,
               },
               {
