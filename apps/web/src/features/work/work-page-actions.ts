@@ -13,6 +13,7 @@ import {
   listQWorkSuggestions,
   setQWorkDelegation,
   setQWorkPaused,
+  stopWorkforceJob,
   unsendChatMessage,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -102,6 +103,24 @@ export async function setPausedAction(
       return null;
     },
     paused ? "Q couldn't pause that. Try again." : "Q couldn't resume that.",
+  );
+}
+
+/**
+ * Recovery D6: "Stop this job" -- the app action `q.work.job.stop`, the
+ * same Q's `stop_q_job` runs. Only their own running job; anything else
+ * is the same not-found.
+ */
+export async function stopJobAction(jobId: string): Promise<PageResult<null>> {
+  const id = Id.safeParse(jobId);
+  if (!id.success) return NOT_FOUND;
+  return run(
+    await apiSession(),
+    async (session) => {
+      await stopWorkforceJob(session, id.data);
+      return null;
+    },
+    "Q couldn't stop that job. It may have just finished; try again.",
   );
 }
 
