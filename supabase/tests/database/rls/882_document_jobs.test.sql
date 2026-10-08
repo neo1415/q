@@ -82,7 +82,11 @@ select throws_ok(
   '23514', null, 'an own picture must name its source document');
 
 -- Image model catalog --------------------------------------------------------------
-select is((select status from ai_ops.models where id = 'a2000000-0000-4000-8000-000000000022'),
+-- By model code, not id: …022 is gpt-realtime-mini, and asserting its
+-- status passed for the wrong reason (audit F-D2). 897 pins the ids.
+select is((select m.status from ai_ops.models m join ai_ops.providers p on p.id = m.provider_id
+            where p.code = 'google' and m.model_code = 'gemini-3.1-flash-lite-image'
+              and m.model_type = 'IMAGE_GENERATION'),
   'ACTIVE', 'gemini-3.1-flash-lite-image is the active Gemini image model');
 select is((select status from ai_ops.models where id = 'a2000000-0000-4000-8000-000000000021'),
   'RETIRED', 'gemini-2.5-flash-image is retired, not deleted');
