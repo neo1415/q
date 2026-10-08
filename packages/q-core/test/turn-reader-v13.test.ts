@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Q_NAVIGATE_DESTINATIONS } from "@capital-q/contracts";
+import { READER_DESTINATIONS as Q_NAVIGATE_DESTINATIONS } from "./reader-destinations.js";
 
 import {
   TURN_READER_V12,

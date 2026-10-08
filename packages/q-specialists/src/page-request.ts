@@ -1,0 +1,375 @@
+import type {
+  QAnswerCardsBlock,
+  QNavigateDestination,
+  QSettingsSection,
+} from "@capital-q/contracts";
+import type { QConversationMessage } from "@capital-q/q-runtime";
+
+/**
+ * "Take me to the explore page", read by code (voice-cards, Zino live
+ * 2026-10-08: the turn reader filed it under Discover, twice).
+ *
+ * A request to open a page is answered here, before any model, when the
+ * page it names is one Capital Q has: the words after the verb are looked
+ * up in one table of every page and tab, with the names people use for
+ * them. A named page Capital Q does not have is said plainly ("I can't
+ * open that yet"), never approximated by a neighbour. Anything else (a
+ * record by its name, a question) is not a page request and goes to the
+ * normal path, where Q's tools find the record.
+ *
+ * "The third company on the list" is resolved here too, against the cards
+ * Q put on screen last, never against what a model remembers.
+ */
+
+export type PageTarget =
+  | { readonly kind: "DESTINATION"; readonly destination: QNavigateDestination }
+  | { readonly kind: "SETTINGS"; readonly section: QSettingsSection };
+
+export type PageRequest =
+  | { readonly kind: "PAGE"; readonly target: PageTarget }
+  | { readonly kind: "UNKNOWN"; readonly named: string };
+
+const d = (destination: QNavigateDestination): PageTarget => ({
+  kind: "DESTINATION",
+  destination,
+});
+const s = (section: QSettingsSection): PageTarget => ({
+  kind: "SETTINGS",
+  section,
+});
+
+/**
+ * Every page and tab, by the names people use (normalised: lower case, no
+ * article, no "page"/"tab"/"screen"). One table: tests assert that every
+ * navigable destination has at least one name here.
+ */
+export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
+  // Home / Q
+  home: d("HOME"),
+  homepage: d("HOME"),
+  "home page": d("HOME"),
+  q: d("HOME"),
+  "q room": d("HOME"),
+  "ask q": d("HOME"),
+  // Profile
+  profile: d("PROFILE"),
+  "q card": d("PROFILE"),
+  // Capital
+  capital: d("CAPITAL"),
+  raise: d("CAPITAL"),
+  fundraise: d("CAPITAL"),
+  fundraising: d("CAPITAL"),
+  // Discover
+  discover: d("DISCOVER"),
+  discovery: d("DISCOVER"),
+  feed: d("DISCOVER"),
+  "for you": d("DISCOVER"),
+  "deal feed": d("DISCOVER"),
+  recommendations: d("DISCOVER"),
+  // Explore (never Discover)
+  explore: d("EXPLORE"),
+  explorer: d("EXPLORE"),
+  browse: d("EXPLORE"),
+  "pitch grid": d("EXPLORE"),
+  "all pitches": d("EXPLORE"),
+  pitches: d("EXPLORE"),
+  "browse pitches": d("EXPLORE"),
+  // Search
+  search: d("SEARCH"),
+  "people search": d("PEOPLE_SEARCH"),
+  "search people": d("PEOPLE_SEARCH"),
+  "find people": d("PEOPLE_SEARCH"),
+  "find a person": d("PEOPLE_SEARCH"),
+  "handle search": d("PEOPLE_SEARCH"),
+  // Relationships
+  relationships: d("RELATIONSHIPS"),
+  relationship: d("RELATIONSHIPS"),
+  pipeline: d("RELATIONSHIPS"),
+  deals: d("RELATIONSHIPS"),
+  // Settings and its sections
+  settings: d("SETTINGS"),
+  setting: d("SETTINGS"),
+  preferences: d("SETTINGS"),
+  account: s("account"),
+  "account settings": s("account"),
+  appearance: s("appearance"),
+  theme: s("appearance"),
+  "theme settings": s("appearance"),
+  notifications: s("notifications"),
+  "notification settings": s("notifications"),
+  connections: s("connections"),
+  "connected accounts": s("connections"),
+  integrations: s("connections"),
+  billing: s("billing"),
+  plan: s("plan"),
+  "my plan": s("plan"),
+  subscription: s("plan"),
+  pricing: s("plan"),
+  privacy: s("privacy"),
+  "privacy settings": s("privacy"),
+  "voice settings": s("speaking"),
+  speaking: s("speaking"),
+  "q settings": s("q"),
+  "team settings": s("team"),
+  "settings team": s("team"),
+  "my team": s("team"),
+  memory: d("MEMORY"),
+  memories: d("MEMORY"),
+  "q memory": d("MEMORY"),
+  "what you remember": d("MEMORY"),
+  usage: d("USAGE"),
+  "q usage": d("USAGE"),
+  // A company's own screens
+  verification: d("VERIFICATION"),
+  visibility: d("COMPANY_VISIBILITY"),
+  "visibility settings": d("COMPANY_VISIBILITY"),
+  "company visibility": d("COMPANY_VISIBILITY"),
+  pitch: d("PITCH"),
+  "pitch and media": d("PITCH"),
+  "pitch & media": d("PITCH"),
+  media: d("PITCH"),
+  "pitch video": d("PITCH"),
+  "new pitch": d("NEW_PITCH"),
+  "new pitch video": d("NEW_PITCH"),
+  "add a pitch": d("NEW_PITCH"),
+  "upload a pitch": d("NEW_PITCH"),
+  "investor interest": d("COMPANY_INTEREST"),
+  "incoming interest": d("COMPANY_INTEREST"),
+  "company interest": d("COMPANY_INTEREST"),
+  // Discover's lists
+  saved: d("SAVED"),
+  "saved companies": d("SAVED"),
+  saves: d("SAVED"),
+  shortlist: d("SAVED"),
+  passed: d("PASSED"),
+  "passed companies": d("PASSED"),
+  passes: d("PASSED"),
+  "your companies": d("YOUR_COMPANIES"),
+  "my companies": d("YOUR_COMPANIES"),
+  portfolio: d("YOUR_COMPANIES"),
+  compare: d("SAVED_COMPARE"),
+  comparison: d("SAVED_COMPARE"),
+  "compare saved": d("SAVED_COMPARE"),
+  // Investors
+  investors: d("INVESTORS"),
+  "company requests": d("INVESTORS"),
+  "top investors": d("TOP_INVESTORS"),
+  "top three investors": d("TOP_INVESTORS"),
+  "top 3 investors": d("TOP_INVESTORS"),
+  "best investors": d("TOP_INVESTORS"),
+  // GateQ and its tabs
+  gateq: d("GATEWAY"),
+  "gate q": d("GATEWAY"),
+  "gate queue": d("GATEWAY"),
+  gate: d("GATEWAY"),
+  gateway: d("GATEWAY"),
+  "gateq inbox": d("GATEQ_INBOX"),
+  "gate inbox": d("GATEQ_INBOX"),
+  "gateq find": d("GATEQ_FIND"),
+  "gateq claim": d("GATEQ_CLAIM"),
+  applications: d("GATEQ_APPLICATIONS"),
+  "gateq applications": d("GATEQ_APPLICATIONS"),
+  // Documents, rehearsals, the Daily, results, reviews
+  documents: d("DOCUMENTS"),
+  docs: d("DOCUMENTS"),
+  files: d("DOCUMENTS"),
+  "brand kit": d("DOCUMENTS"),
+  rehearsals: d("REHEARSALS"),
+  rehearsal: d("REHEARSALS"),
+  rehearse: d("REHEARSALS"),
+  daily: d("DAILY"),
+  "q daily": d("DAILY"),
+  newspaper: d("DAILY"),
+  news: d("DAILY"),
+  results: d("RESULTS"),
+  reports: d("RESULTS"),
+  reviews: d("REVIEWS"),
+  "human review": d("REVIEWS"),
+  "human reviews": d("REVIEWS"),
+  // Work and its tabs
+  work: d("WORK"),
+  "q work": d("WORK"),
+  "q's work": d("WORK"),
+  tasks: d("WORK"),
+  "needs you": d("WORK_NEEDS"),
+  "work needs you": d("WORK_NEEDS"),
+  approvals: d("WORK_NEEDS"),
+  "in progress": d("WORK_PROGRESS"),
+  "work in progress": d("WORK_PROGRESS"),
+  "work progress": d("WORK_PROGRESS"),
+  "work done": d("WORK_DONE"),
+  "done work": d("WORK_DONE"),
+  "work team": d("WORK_TEAM"),
+  "q team": d("WORK_TEAM"),
+  "q's team": d("WORK_TEAM"),
+  "work cost": d("WORK_COST"),
+  "work costs": d("WORK_COST"),
+};
+
+const VERB =
+  /^(?:(?:hey|ok|okay)\s+q[,\s]+)?(?:(?:can|could|would|will)\s+you\s+|please\s+|q[,\s]+)*(?:take\s+me\s+(?:back\s+)?(?:to|into)|bring\s+me\s+to|go\s+(?:back\s+)?to|navigate\s+to|switch\s+to|jump\s+to|head\s+to|open(?:\s+up)?|pull\s+up|bring\s+up|show\s+me|let'?s\s+go\s+to|i\s+(?:want|need|would\s+like|'d\s+like)\s+to\s+(?:go\s+to|see|open))\s+(.+)$/iu;
+
+/** Words that only frame a page's name. */
+const FRAME = /\b(?:page|screen|tab|section|view|area)\b/giu;
+const PAGE_WORD = /\b(?:page|screen|tab|section)\s*$/iu;
+
+function normalise(object: string, keepOwner = false): string {
+  const framed = object
+    .toLowerCase()
+    .replace(/[’]/gu, "'")
+    .replace(/[^\p{L}\p{N}&' ]+/gu, " ")
+    .replace(/\b(?:please|for me|now|again|then|real quick|quickly)\b/gu, " ")
+    .replace(FRAME, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  // "your companies" is a page's own name; "my settings" is Settings.
+  const bare = keepOwner
+    ? framed.replace(/^(?:the|a|an)\s+/u, "")
+    : framed
+        .replace(/^(?:the|my|our|your|a|an)\s+/u, "")
+        .replace(/^(?:the|my|our|your)\s+/u, "");
+  return bare.replace(/\s+(?:the|a)$/u, "").trim();
+}
+
+const HOME =
+  /^(?:(?:can|could)\s+you\s+)?(?:take\s+me|go|bring\s+me)\s+(?:back\s+)?home(?:\s+please)?$/iu;
+
+/** "team on work" / "work's team" -> also "work team". */
+function candidates(key: string): readonly string[] {
+  const out = [key];
+  const on = /^(.+?)\s+(?:on|in|of|under|from)\s+(?:the\s+|my\s+)?(.+)$/u.exec(
+    key,
+  );
+  if (on?.[1] !== undefined && on[2] !== undefined) {
+    out.push(`${on[2]} ${on[1]}`, on[1]);
+  }
+  const owned = /^(.+?)'s\s+(.+)$/u.exec(key);
+  if (owned?.[1] !== undefined && owned[2] !== undefined) {
+    out.push(`${owned[1]} ${owned[2]}`);
+  }
+  return out;
+}
+
+/**
+ * A request to open a page, or null when the words are not one (a record
+ * by name, a question, anything else). UNKNOWN only when they named a
+ * page ("... page") in plain lower-case words Capital Q has no page for:
+ * a proper name ("the Tensorgate page") is a record, for the tools.
+ */
+export function pageRequestOf(text: string): PageRequest | null {
+  const said = text.trim().replace(/[.!?]+$/u, "");
+  if (said.length === 0 || said.length > 160) return null;
+  if (HOME.test(said)) return { kind: "PAGE", target: d("HOME") };
+  const verb = VERB.exec(said);
+  const object = verb?.[1]?.trim();
+  if (object === undefined || object.length === 0) return null;
+  const key = normalise(object);
+  if (key.length === 0) return null;
+  for (const candidate of [
+    ...candidates(normalise(object, true)),
+    ...candidates(key),
+  ]) {
+    const target = PAGE_NAMES[candidate];
+    if (target !== undefined) return { kind: "PAGE", target };
+  }
+  const bare = object.replace(PAGE_WORD, "").trim();
+  if (
+    PAGE_WORD.test(object) &&
+    !/'s\b|\b(?:for|of|with|about|between)\b/iu.test(object) &&
+    !/\p{Lu}/u.test(bare.replace(/^(?:The|My|Our|Your)\s+/u, "")) &&
+    key.split(" ").length <= 3
+  ) {
+    return { kind: "UNKNOWN", named: key };
+  }
+  return null;
+}
+
+/** What Q says for a page Capital Q does not have. */
+export function cannotOpenLine(named: string): string {
+  const plain = named.replace(/[^\p{L}\p{N}\s'&-]/gu, "").slice(0, 60);
+  return plain.length === 0
+    ? "I can't open that yet."
+    : `I can't open that yet: there's no "${plain}" page in Capital Q.`;
+}
+
+const ORDINALS: Readonly<Record<string, number>> = {
+  first: 1,
+  "1st": 1,
+  one: 1,
+  "1": 1,
+  second: 2,
+  "2nd": 2,
+  two: 2,
+  "2": 2,
+  third: 3,
+  "3rd": 3,
+  three: 3,
+  "3": 3,
+  fourth: 4,
+  "4th": 4,
+  four: 4,
+  "4": 4,
+  fifth: 5,
+  "5th": 5,
+  five: 5,
+  "5": 5,
+  sixth: 6,
+  "6th": 6,
+  six: 6,
+  "6": 6,
+  seventh: 7,
+  "7th": 7,
+  seven: 7,
+  "7": 7,
+  eighth: 8,
+  "8th": 8,
+  eight: 8,
+  "8": 8,
+  ninth: 9,
+  "9th": 9,
+  nine: 9,
+  "9": 9,
+  tenth: 10,
+  "10th": 10,
+  ten: 10,
+  "10": 10,
+  last: -1,
+};
+
+const ORDINAL =
+  /^(?:(?:can|could|would)\s+you\s+|please\s+)*(?:open(?:\s+up)?|show\s+me|take\s+me\s+to|go\s+to|pull\s+up|bring\s+up|tell\s+me\s+(?:more\s+)?about|what\s+about|more\s+(?:on|about))\s+(?:the\s+)?(?:(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|1st|2nd|3rd|[4-9]th|10th)\s+(?:one|company|startup|card|business|result|option)|(?:company|card|one)\s+number\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})|number\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2}))(?:\s+(?:on|in|from)\s+(?:the|this|that|your|my)\s+(?:list|screen|cards?|ranking|results))?(?:\s+(?:please|for me))?$/iu;
+
+/** The position a turn points at ("the third company"), 1-based; -1 is last. */
+export function ordinalOf(text: string): number | null {
+  const said = text
+    .trim()
+    .replace(/[.!?]+$/u, "")
+    .replace(/[’]/gu, "'");
+  const match = ORDINAL.exec(said);
+  if (match === null) return null;
+  const word = (match[1] ?? match[2] ?? match[3] ?? "").toLowerCase();
+  return ORDINALS[word] ?? null;
+}
+
+/** The answer cards on screen now: the newest answer that carried cards. */
+export function cardsOnScreen(
+  history: readonly QConversationMessage[],
+): QAnswerCardsBlock | null {
+  for (const message of [...history].reverse()) {
+    if (message.role !== "Q") continue;
+    const block = (message.blocks ?? []).find(
+      (one): one is QAnswerCardsBlock => one.kind === "ANSWER_CARDS",
+    );
+    if (block !== undefined) return block;
+  }
+  return null;
+}
+
+/** The card "the third company on the list" means, from the cards on screen. */
+export function cardAt(
+  block: QAnswerCardsBlock,
+  position: number,
+): QAnswerCardsBlock["cards"][number] | null {
+  const index = position === -1 ? block.cards.length - 1 : position - 1;
+  return block.cards[index] ?? null;
+}

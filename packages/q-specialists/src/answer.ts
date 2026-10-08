@@ -126,6 +126,13 @@ import {
   type LastAction,
   type QOpenRecordPort,
 } from "./references.js";
+import {
+  cannotOpenLine,
+  cardAt,
+  cardsOnScreen,
+  ordinalOf,
+  pageRequestOf,
+} from "./page-request.js";
 import type { TurnReference } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
@@ -505,6 +512,20 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   RESULTS: "Opening Results.",
   YOUR_COMPANIES: "Opening Your companies.",
   WORK: "Opening Work.",
+  EXPLORE: "Opening Explore.",
+  PEOPLE_SEARCH: "Opening Search.",
+  WORK_NEEDS: "Opening what needs you on Work.",
+  WORK_PROGRESS: "Opening what's in progress on Work.",
+  WORK_DONE: "Opening what's done on Work.",
+  WORK_TEAM: "Opening the Team tab on Work.",
+  WORK_COST: "Opening the Cost tab on Work.",
+  GATEQ_INBOX: "Opening your GateQ inbox.",
+  GATEQ_FIND: "Opening Find on GateQ.",
+  GATEQ_CLAIM: "Opening Claim on GateQ.",
+  GATEQ_APPLICATIONS: "Opening your GateQ applications.",
+  SAVED_COMPARE: "Opening Compare.",
+  REVIEWS: "Opening Human review.",
+  TOP_INVESTORS: "Opening your top three investors.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -533,6 +554,20 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   RESULTS: "Results",
   YOUR_COMPANIES: "Your companies",
   WORK: "Work",
+  EXPLORE: "Explore",
+  PEOPLE_SEARCH: "Search",
+  WORK_NEEDS: "Work (Needs you)",
+  WORK_PROGRESS: "Work (In progress)",
+  WORK_DONE: "Work (Done)",
+  WORK_TEAM: "Work (Team)",
+  WORK_COST: "Work (Cost)",
+  GATEQ_INBOX: "your GateQ inbox",
+  GATEQ_FIND: "GateQ Find",
+  GATEQ_CLAIM: "GateQ Claim",
+  GATEQ_APPLICATIONS: "your GateQ applications",
+  SAVED_COMPARE: "Compare",
+  REVIEWS: "Human review",
+  TOP_INVESTORS: "your top three investors",
 };
 
 /**
@@ -1544,6 +1579,74 @@ export function createSpecialistQAnswer(
     };
   };
 
+  /**
+   * voice-cards: a page, a Settings section or a card on screen, opened by
+   * code from the person's own words (page-request.ts). Null when the
+   * words are not such a request, or name a screen this run cannot open.
+   */
+  const pageAnswer = (
+    text: string,
+    history: readonly QConversationMessage[],
+    capabilities: readonly QCapability[],
+  ): {
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+    readonly log: string;
+  } | null => {
+    const navigable = manifestOf(capabilities).navigate;
+    if (navigable.length === 0) return null;
+    const position = ordinalOf(text);
+    if (position !== null) {
+      const block = cardsOnScreen(history);
+      const card = block === null ? null : cardAt(block, position);
+      if (card?.subject?.kind !== "COMPANY") return null;
+      return {
+        said: openingLine("COMPANY", card.name),
+        blocks: [
+          {
+            kind: "UI_INTENT",
+            intent: {
+              kind: "OPEN_RECORD_PAGE",
+              page: "COMPANY",
+              id: card.subject.companyId,
+            },
+          },
+        ],
+        log: `CARD_${String(position)}`,
+      };
+    }
+    const asked = pageRequestOf(text);
+    if (asked === null) return null;
+    if (asked.kind === "UNKNOWN") {
+      return { said: cannotOpenLine(asked.named), blocks: [], log: "UNKNOWN" };
+    }
+    const target = asked.target;
+    if (target.kind === "SETTINGS") {
+      if (!navigable.includes("SETTINGS")) return null;
+      return {
+        said: "Opening Settings.",
+        blocks: [
+          {
+            kind: "UI_INTENT",
+            intent: { kind: "OPEN_SETTINGS", section: target.section },
+          },
+        ],
+        log: `SETTINGS_${target.section}`,
+      };
+    }
+    if (!navigable.includes(target.destination)) return null;
+    return {
+      said: DESTINATION_LINES[target.destination],
+      blocks: [
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: target.destination },
+        },
+      ],
+      log: target.destination,
+    };
+  };
+
   /** Unclear turns in a row, per conversation (bounded with the rest). */
   const unclearInARow = new Map<string, number>();
 
@@ -2053,6 +2156,18 @@ export function createSpecialistQAnswer(
           intent: { kind: "SCREEN_ACT", act: screenAct.act },
         },
       ]);
+    }
+    // voice-cards: a page asked for by name is opened by code from one
+    // route table, before any model ("take me to the explore page" went to
+    // Discover twice when the reader chose); a page Capital Q lacks is said
+    // so, and "the third company on the list" is the card on screen.
+    const paged = pageAnswer(latest.content, history, capabilities);
+    if (paged !== null) {
+      logger?.info(
+        { qRunId: request.runId, page: paged.log },
+        "q opened a page by name",
+      );
+      return recordAnswer(request, conversationId, paged.said, paged.blocks);
     }
     saidInRun.set(request.runId, latest.content);
     while (saidInRun.size > PREREADS_MAX) {

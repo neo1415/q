@@ -36,7 +36,36 @@ export type FitSweepAsk = {
    * a plain list of the set, where the cards only accompany the answer.
    */
   readonly fitAsked: boolean;
+  /**
+   * voice-cards: how many they asked for ("top three", "best 5"), so the
+   * cards are exactly that many; null when they named no number.
+   */
+  readonly count: number | null;
 };
+
+const COUNT_WORDS: Readonly<Record<string, number>> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+};
+const COUNT =
+  /\b(?:top|best|strongest|leading|highest[- ]scoring)\s+(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\b|\b(\d{1,2}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:best|top|strongest|leading|highest[- ]scoring)?\s*(?:companies|startups|fits|matches|deals|businesses|ones|options)\b/iu;
+
+/** How many companies the words ask for, 1 to 10; null when no number. */
+export function askedCount(text: string): number | null {
+  const match = COUNT.exec(text);
+  const word = (match?.[1] ?? match?.[2])?.toLowerCase();
+  if (word === undefined) return null;
+  const count = COUNT_WORDS[word] ?? Number(word);
+  return Number.isInteger(count) && count >= 1 && count <= 10 ? count : null;
+}
 
 const FIT_CUE =
   /\b(?:scor(?:e|es|ed|ing)|fit|fits|fitting|match(?:es|ing)?|rank(?:ed|ing|s)?|pros and cons|pros\b|cons\b|(?:best|strongest|top)\s+(?:\d+\s+|three\s+|five\s+|ten\s+)?(?:companies|startups|fits?|matches|ones|deals)|compare|suit(?:s|ed)?)\b/iu;
@@ -80,6 +109,7 @@ export function fitSweepAsk(text: string): FitSweepAsk | null {
     scope: relationships ? "RELATIONSHIPS" : saved ? "SAVED" : "CANDIDATES",
     place,
     fitAsked,
+    count: askedCount(words),
   };
 }
 

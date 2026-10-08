@@ -2911,8 +2911,11 @@ export function createModelGatewayQAnswer(
         request.askedAction === undefined &&
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
+        // voice-cards: "the top three" is three cards, not ten.
         const block = fitSweepCardsBlock(
-          sweep.fits,
+          sweep.ask.count === null
+            ? sweep.fits
+            : sweep.fits.slice(0, sweep.ask.count),
           sweep.ask.place === null
             ? "Fit against your mandate"
             : `Fit against your mandate: ${sweep.ask.place}`,

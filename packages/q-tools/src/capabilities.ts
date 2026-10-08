@@ -275,6 +275,30 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   WORK: "Opens Work, Q's work page: what Q suggests from their own account, what needs their yes, what Q is running for them (goal, status, spend) and what it finished. For 'show my work' or 'what is Q doing'.",
   RESULTS:
     "Opens Results: what their activity on Capital Q produced (introductions, conversations, meetings and where each stands), with reports to download.",
+  // voice-cards: every remaining page and tab, by its own name.
+  EXPLORE:
+    "Opens Explore (/explore): the grid of pitch videos to browse, with search at the top. For 'the explore page' -- never Discover.",
+  PEOPLE_SEARCH:
+    "Opens the Search page: find a person by name or @handle, or pitch videos, in its People and Videos tabs.",
+  WORK_NEEDS: "Opens Work on its Needs you tab: what waits for their yes.",
+  WORK_PROGRESS:
+    "Opens Work on its In progress tab: what Q is running for them now.",
+  WORK_DONE: "Opens Work on its Done tab: what Q finished for them.",
+  WORK_TEAM: "Opens Work on its Team tab: Q's team and the jobs it holds.",
+  WORK_COST: "Opens Work on its Cost tab: what Q's work has cost so far.",
+  GATEQ_INBOX:
+    "Opens GateQ's Inbox (an investor's): the applications that came in through their gate.",
+  GATEQ_FIND:
+    "Opens GateQ's Find tab (an investor's): look for companies to invite.",
+  GATEQ_CLAIM:
+    "Opens GateQ's Claim tab (a founder's): find an investor's gate and apply.",
+  GATEQ_APPLICATIONS:
+    "Opens GateQ's Applications tab (a founder's): the applications they made and where each stands.",
+  SAVED_COMPARE: "Opens Compare: their saved companies side by side.",
+  REVIEWS:
+    "Opens Human review: the reviews they asked for of a decision and their outcomes.",
+  TOP_INVESTORS:
+    "Opens Your top three: the investors Capital Q ranks best for their company.",
 };
 
 /** Screens that belong to a company's own people. */

@@ -1087,3 +1087,18 @@ export {
   type WorkforceTimelineEntryDto,
 } from "./workforce.js";
 // end WORKFORCE block
+
+// voice-cards: the person's Q room feed (every run's answer, any path).
+export {
+  Q_ROOM_HOLD_MS,
+  Q_ROOM_KEPT,
+  Q_ROOM_PATH,
+  QRoomEntrySchema,
+  QRoomReadQuerySchema,
+  QRoomReadSchema,
+  QRoomSourceSchema,
+  type QRoomEntry,
+  type QRoomRead,
+  type QRoomReadQuery,
+  type QRoomSource,
+} from "./room.js";

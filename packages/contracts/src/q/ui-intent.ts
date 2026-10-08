@@ -144,6 +144,21 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "YOUR_COMPANIES",
   // WORK-58: Q's work page (what Q suggests, runs, needs and finished).
   "WORK",
+  // voice-cards: every remaining page and tab, by its own name.
+  "EXPLORE",
+  "PEOPLE_SEARCH",
+  "WORK_NEEDS",
+  "WORK_PROGRESS",
+  "WORK_DONE",
+  "WORK_TEAM",
+  "WORK_COST",
+  "GATEQ_INBOX",
+  "GATEQ_FIND",
+  "GATEQ_CLAIM",
+  "GATEQ_APPLICATIONS",
+  "SAVED_COMPARE",
+  "REVIEWS",
+  "TOP_INVESTORS",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

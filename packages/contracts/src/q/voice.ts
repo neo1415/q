@@ -571,6 +571,23 @@ export const Q_VOICE_DESTINATIONS = [
   "YOUR_COMPANIES",
   // WORK-58: Q's work page ("show my work", "what's Q doing").
   "WORK",
+  // voice-cards (Zino 2026-10-08: "take me to the explore page" went to
+  // Discover, twice): every page and tab a person can open has its own
+  // name, so nothing is ever approximated by a neighbour.
+  "EXPLORE",
+  "PEOPLE_SEARCH",
+  "WORK_NEEDS",
+  "WORK_PROGRESS",
+  "WORK_DONE",
+  "WORK_TEAM",
+  "WORK_COST",
+  "GATEQ_INBOX",
+  "GATEQ_FIND",
+  "GATEQ_CLAIM",
+  "GATEQ_APPLICATIONS",
+  "SAVED_COMPARE",
+  "REVIEWS",
+  "TOP_INVESTORS",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",
