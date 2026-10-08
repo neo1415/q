@@ -19,12 +19,16 @@ import type { FigureKind } from "./presence-figures";
  * | listening                    | the cloud, leaning in                  |
  * | thinking                     | the spiral                             |
  * | working (a tool, an action)  | the ring                               |
- * | speaking                     | the face (Q page, 160 px+), else wave  |
+ * | speaking                     | the wave, rolling with Q's voice       |
  * | asking, waiting on approval  | the "?"                                |
  * | resting with answer cards up | the Q mark in knots of light           |
  *
- * Below 72 px a face, a wave, a "?" or the Q mark cannot be read: a small
+ * Below 72 px a wave, a "?" or the Q mark cannot be read: a small
  * surface keeps to the cloud, the lean, the spiral and the ring.
+ *
+ * Q has no human face (Zino, 2026-10-08: "remove the human face from Q --
+ * let it morph into everything else including the Q, but not the face").
+ * The face figure ADR 0051 added is gone; every other shape stays.
  */
 
 export type PresenceView = {
@@ -32,31 +36,26 @@ export type PresenceView = {
   readonly dim: boolean;
 };
 
-/** The smallest surface a face is drawn on (ADR 0051). */
-export const FACE_MIN_PIXELS = 160;
+/** The smallest Q page presence that counts as the stage (the Q moment). */
+export const STAGE_MIN_PIXELS = 160;
 /** Below this a shape cannot be read: the cloud family only. */
 export const SMALL_PIXELS = 72;
 
 /**
- * Whether a surface may show Q's human face (ADR 0051): only one the
- * caller marks as the Q page's own presence, and only at 160 px or more.
- * Everywhere else Q has no face (design B's option A).
+ * Whether a surface is the Q page's own stage: one the caller marks as the
+ * Q page's presence, at 160 px or more. Only the stage shows the Q moment.
  */
-export function faceAllowed(surface: {
-  readonly face: boolean;
+export function isStage(surface: {
+  readonly stage: boolean;
   readonly pixels: number;
 }): boolean {
-  return surface.face && surface.pixels >= FACE_MIN_PIXELS;
+  return surface.stage && surface.pixels >= STAGE_MIN_PIXELS;
 }
 
-/**
- * The figure for a state. `face` says the surface may show the face
- * (`faceAllowed`); it is used only while Q speaks.
- */
+/** The figure for a state. */
 export function figureForState(
   state: QApertureState,
   small: boolean,
-  face = false,
 ): FigureKind {
   switch (state) {
     case "IDLE":
@@ -71,7 +70,7 @@ export function figureForState(
       return "RING";
     case "SPEAKING":
       // Below 72 px a wave cannot be read: the cloud swells with the voice.
-      return small ? "CLOUD" : face ? "FACE" : "WAVE";
+      return small ? "CLOUD" : "WAVE";
     case "NEEDS_INPUT":
     case "NEEDS_APPROVAL":
       return small ? "ATTENTIVE" : "QUESTION";
@@ -83,8 +82,6 @@ const RESTING: ReadonlySet<QApertureState> = new Set(["IDLE", "COMPLETE"]);
 export type PresenceInput = {
   readonly state: QApertureState;
   readonly small: boolean;
-  /** The surface may show the face while Q speaks (`faceAllowed`). */
-  readonly face?: boolean | undefined;
   /** Answer cards are on screen beside this presence. */
   readonly showing?: boolean | undefined;
 };
@@ -98,7 +95,7 @@ export function presenceFor(input: PresenceInput): PresenceView {
     return { figure: "CONSTELLATION", dim };
   }
   return {
-    figure: figureForState(input.state, input.small, input.face === true),
+    figure: figureForState(input.state, input.small),
     dim,
   };
 }

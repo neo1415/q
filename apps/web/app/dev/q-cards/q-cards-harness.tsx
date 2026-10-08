@@ -147,7 +147,7 @@ export function QCardsHarness({ page }: { readonly page: "q" | "other" }) {
             <QAperture
               state="IDLE"
               size={mini === true ? 44 : compact ? 64 : 200}
-              face
+              stage
               showing={compact}
             />
           )}

@@ -9,7 +9,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const require = createRequire(import.meta.url);
 const { chromium } = require(
   require.resolve("playwright", {
-    paths: [...(process.env.NODE_PATH ?? "").split(":").filter(Boolean), join(dirname(fileURLToPath(import.meta.url)), "../../../../node_modules/.pnpm/playwright@1.62.1/node_modules")],
+    paths: [
+      ...(process.env.NODE_PATH ?? "").split(":").filter(Boolean),
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        "../../../../node_modules/.pnpm/playwright@1.62.1/node_modules",
+      ),
+    ],
   }),
 );
 
@@ -24,7 +30,14 @@ const devices = {
   desktop: { width: 1280, height: 900 },
   phone: { width: 390, height: 844 },
 };
-for (const screen of ["room", "held", "confirm", "command", "dock", "location"]) {
+for (const screen of [
+  "room",
+  "held",
+  "confirm",
+  "command",
+  "dock",
+  "location",
+]) {
   for (const [device, viewport] of Object.entries(devices)) {
     for (const theme of ["light", "dark"]) {
       const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });

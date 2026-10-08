@@ -943,7 +943,7 @@ export function QConversationPanel({
                               size={compact ? 64 : 200}
                               inputLevel={client.inputLevel}
                               outputLevel={client.outputLevel}
-                              face
+                              stage
                               showing={compact || showingCards}
                             />
                           </ViewTransition>
@@ -1164,7 +1164,7 @@ export function QConversationPanel({
                     size="stage"
                     inputLevel={client.inputLevel}
                     outputLevel={client.outputLevel}
-                    face
+                    stage
                   />
                 </ViewTransition>
                 <div className="flex flex-col items-center gap-1" role="status">

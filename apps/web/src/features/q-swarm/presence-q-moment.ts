@@ -16,7 +16,7 @@ import type { QMotion } from "../q-aperture/aperture-frame";
  * Never while Q listens, thinks, works, speaks, asks or is paused, never
  * while answer cards are up, never under reduced motion (the still
  * presence keeps its state's figure), and only on the Q page's own
- * presence (the surface that may show the face).
+ * presence (the stage, `isStage`).
  *
  * The clock is the presence's own (seconds the swarm has run), so time
  * off screen or in a hidden tab never counts towards the next moment.

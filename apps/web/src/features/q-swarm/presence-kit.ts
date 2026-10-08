@@ -2,7 +2,7 @@
  * The shared vocabulary of Q's figures: what a figure is, what animates it
  * and the deterministic randomness every figure is laid out with. Kept
  * apart from the figures themselves so the free shapes (presence-shapes)
- * and the speaking face (presence-face) build on it without a cycle.
+ * and the gestures build on it without a cycle.
  */
 
 export type FigureKind =
@@ -14,7 +14,6 @@ export type FigureKind =
   | "CONSTELLATION"
   | "LETTER_Q"
   | "RIBBON"
-  | "FACE"
   | "QUESTION"
   | "EXCLAIM"
   | "MONEY"

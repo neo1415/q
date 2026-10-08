@@ -2,6 +2,7 @@
 
 - Status: Accepted (founder approval, 2026-10-06; overnight plan items K1, K2, K3 and I2; design B mockups on `build/design-b`, `docs/design/2026-10-06/b/presence.html`, `brand.html` and `sound.html`)
 - Amends: ADR 0017 (the "no face" prohibition, for this one case only; Q keeps its own colour, except where a brand preset sets it), ADR 0049 (the presence's figures)
+- Amended 2026-10-08 (founder, Zino: "Remove the human face from Q -- let it morph into everything else including the Q, but not the face"): K2 is withdrawn. The FACE figure, `presence-face.ts` and the `face` surface flag are removed; Q speaks as the wave on every surface, the Q page included. The free shapes, the Q moment, the states and the W7 performance work stay. ADR 0017's "no face" rule applies again without exception. Design: `docs/design/2026-10-08/q-presence-room/`.
 - Implemented: build/presence2
 
 ## Context

@@ -66,35 +66,14 @@ describe("state to uniforms", () => {
     expect(error.glow).toBeLessThan(idle.glow);
   });
 
-  it("leans towards the cursor, capped, and turns a face less than the cloud", () => {
+  it("leans towards the cursor, capped, and turns the Q mark less than the cloud", () => {
     const right = presenceUniforms({ ...base, leanX: 5 });
     expect(right.yaw - presenceUniforms(base).yaw).toBeCloseTo(LEAN_YAW, 5);
     expect(right.shiftX).toBeGreaterThan(0);
-    const face = presenceUniforms({
-      ...base,
-      figure: "FACE",
-      state: "SPEAKING",
-    });
-    expect(Math.abs(face.yaw)).toBeLessThan(
+    const mark = presenceUniforms({ ...base, figure: "CONSTELLATION" });
+    expect(Math.abs(mark.yaw)).toBeLessThan(
       Math.abs(presenceUniforms(base).yaw),
     );
-  });
-
-  it("draws the face fine: smaller points, a dark floor, no white core", () => {
-    const face = presenceUniforms({
-      ...base,
-      figure: "FACE",
-      state: "SPEAKING",
-    });
-    const wave = presenceUniforms({
-      ...base,
-      figure: "WAVE",
-      state: "SPEAKING",
-    });
-    expect(face.floor).toBeLessThan(0.1);
-    expect(wave.floor).toBeGreaterThan(0.3);
-    expect(face.pointScale).toBeLessThan(wave.pointScale);
-    expect(face.core).toBe(0);
   });
 
   it("whitens only the cloud's dense core, never a ring or a glyph", () => {
@@ -296,29 +275,23 @@ describe("the component: fallback and pause", () => {
     expect(canvas?.dataset["qFigure"]).toBe("CLOUD");
   });
 
-  it("shows the face on the Q page's 200 px stage while Q speaks, and lets it go when speech ends (P11)", async () => {
+  it("speaks as the wave on the Q page's 200 px stage -- never a face -- and lets it go when speech ends", async () => {
     window.localStorage.setItem(Q_MOTION_STORAGE_KEY, "calm");
     const { container, rerender } = render(
-      <QSwarm state="LISTENING" pixels={200} face />,
+      <QSwarm state="LISTENING" pixels={200} stage />,
     );
     const canvas = container.querySelector("canvas");
     await waitFor(() => expect(canvas?.dataset["qRenderer"]).toBe("2d"));
     act(() => runFrames(1));
     expect(canvas?.dataset["qFigure"]).toBe("ATTENTIVE");
     // No timer: the still presence changes only because the state did.
-    rerender(<QSwarm state="SPEAKING" pixels={200} face />);
+    rerender(<QSwarm state="SPEAKING" pixels={200} stage />);
     act(() => runFrames(1));
-    expect(canvas?.dataset["qFigure"]).toBe("FACE");
+    expect(canvas?.dataset["qFigure"]).toBe("WAVE");
     act(() => runFrames(20));
-    expect(canvas?.dataset["qFigure"]).toBe("FACE");
-    rerender(<QSwarm state="IDLE" pixels={200} face />);
+    expect(canvas?.dataset["qFigure"]).toBe("WAVE");
+    rerender(<QSwarm state="IDLE" pixels={200} stage />);
     act(() => runFrames(1));
     expect(canvas?.dataset["qFigure"]).toBe("CLOUD");
-    // Under 160 px, or off the Q page, the same speech has no face.
-    const small = render(<QSwarm state="SPEAKING" pixels={120} face />);
-    act(() => runFrames(1));
-    expect(small.container.querySelector("canvas")?.dataset["qFigure"]).toBe(
-      "WAVE",
-    );
   });
 });

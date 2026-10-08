@@ -1,6 +1,5 @@
 import type { QApertureState } from "../q-aperture/aperture-state";
 import type { QMotion } from "../q-aperture/aperture-frame";
-import { FINE_FIGURES } from "./presence-figures";
 import { figureForState, presenceFor, SMALL_PIXELS } from "./presence-machine";
 import { createPresenceSim, MAX_DT } from "./presence-dynamics";
 import { createQMoment } from "./presence-q-moment";
@@ -38,7 +37,8 @@ const WORK_TO_INTERVAL = 2.2;
 
 export type PresenceInputs = {
   readonly state: QApertureState;
-  readonly showsFace: boolean;
+  /** The Q page's own stage (`isStage`): the Q moment shows here only. */
+  readonly stage: boolean;
   readonly showing: boolean;
   readonly motion: QMotion;
   readonly bloom: boolean;
@@ -114,7 +114,7 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
   const sim = createPresenceSim({
     count: scaledParticleCount(pixels, host.cores),
     // A surface opens already in its state's shape: no flourish on mount.
-    initial: figureForState(inputs.state, small, inputs.showsFace),
+    initial: figureForState(inputs.state, small),
     seed: pixels * 7 + 3,
   });
 
@@ -162,7 +162,6 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
     const view = presenceFor({
       state: inputs.state,
       small,
-      face: inputs.showsFace,
       showing: inputs.showing,
     });
     const interval = last === 0 ? 0 : now - last;
@@ -171,7 +170,7 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
     const shown = moment.at(
       clock,
       inputs.state,
-      inputs.showsFace,
+      inputs.stage,
       inputs.showing,
       inputs.motion,
     )
@@ -233,7 +232,6 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
         pixels: device,
         colour,
         dim: view.dim,
-        fine: FINE_FIGURES.has(sim.figure()),
       });
     }
     if (moving && renderer !== "pending") {

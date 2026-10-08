@@ -13,8 +13,8 @@ import { QSwarm } from "../q-swarm/q-swarm";
  * tail as an aperture of light — it opens to listen, focuses to think,
  * shows progress while working, projects light from the tail while
  * speaking, and dims to an ember when paused. Never a brain or an orb,
- * and the only thing in the product that glows. A face only where the
- * caller marks the Q page's own presence (`face`; ADR 0051).
+ * and the only thing in the product that glows. Never a human face; the
+ * Q page's own presence is marked `stage` (the Q moment shows there).
  *
  * The API is the state and the real signals behind it; nothing here runs
  * a decorative loop:
@@ -58,8 +58,8 @@ export type QApertureProps = {
   readonly label?: string | true | undefined;
   /** A second line: an approved stage, a subject. */
   readonly detail?: string | undefined;
-  /** The Q page's own presence: it may show Q's face while Q speaks (ADR 0051). */
-  readonly face?: boolean | undefined;
+  /** The Q page's own presence (the stage): the Q moment shows here. */
+  readonly stage?: boolean | undefined;
   /** Answer cards are on screen beside this presence (P11: the Q mark). */
   readonly showing?: boolean | undefined;
   readonly className?: string | undefined;
@@ -92,7 +92,7 @@ export function QAperture({
   progress: _progress = null,
   label,
   detail,
-  face = false,
+  stage: onStage = false,
   showing = false,
   className,
 }: QApertureProps) {
@@ -125,7 +125,7 @@ export function QAperture({
           pixels={px}
           inputLevel={inputLevel}
           outputLevel={outputLevel}
-          face={face}
+          stage={onStage}
           showing={showing}
         />
       </div>

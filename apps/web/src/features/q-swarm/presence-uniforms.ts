@@ -1,10 +1,6 @@
 import type { QApertureState } from "../q-aperture/aperture-state";
 import type { QMotion } from "../q-aperture/aperture-frame";
-import {
-  FACE_FIGURES,
-  FINE_FIGURES,
-  type FigureKind,
-} from "./presence-figures";
+import type { FigureKind } from "./presence-figures";
 
 /**
  * What the 3D renderer is told each frame (ADR 0049), as a pure function
@@ -34,7 +30,7 @@ export type PresenceUniforms = {
   readonly keep: number;
   /**
    * The darkest a particle may be drawn, 0..1: high for the swarm (every
-   * point a spark), near zero for the face, whose shade is its shape.
+   * point a spark).
    */
   readonly floor: number;
   /** How much the frame's centre brightens points, 0..1. */
@@ -87,34 +83,28 @@ export function presenceUniforms(input: UniformInput): PresenceUniforms {
   const swayYaw = moving ? Math.sin(input.t * 0.23) * 0.16 : 0;
   const swayPitch = moving ? Math.sin(input.t * 0.17 + 1.1) * 0.06 : 0;
   const listening = input.state === "LISTENING" ? 1 : 0;
-  // A face already carries its own head turn: the camera turns it only a
-  // little more, so Q looks at the person rather than past them. Glyphs
-  // turn half as far as the cloud, so they stay legible.
+  // Glyphs turn half as far as the cloud, so they stay legible; the Q
+  // mark less still.
   const cloud = CLOUD_FIGURES.has(input.figure);
-  const face = FACE_FIGURES.has(input.figure);
-  const fine = FINE_FIGURES.has(input.figure);
-  const turn = cloud ? 1 : face || MARK_FIGURES.has(input.figure) ? 0.3 : 0.55;
+  const turn = cloud ? 1 : MARK_FIGURES.has(input.figure) ? 0.3 : 0.55;
   return {
-    yaw: (STILL_YAW + swayYaw) * turn + leanX * LEAN_YAW * (face ? 0.6 : 1),
+    yaw: (STILL_YAW + swayYaw) * turn + leanX * LEAN_YAW,
     // Listening tips the top towards the person.
     pitch:
-      (STILL_PITCH + swayPitch) * turn -
-      leanY * LEAN_PITCH * (face ? 0.6 : 1) +
-      listening * 0.08,
+      (STILL_PITCH + swayPitch) * turn - leanY * LEAN_PITCH + listening * 0.08,
     shiftX: leanX * LEAN_SHIFT,
     shiftY: leanY * LEAN_SHIFT,
-    // The face is drawn in finer points, so its tone reads as skin.
-    pointScale: (1 + voice * 0.25 + mic * 0.1) * (fine ? 0.8 : 1),
+    pointScale: 1 + voice * 0.25 + mic * 0.1,
     glow:
       (0.75 + voice * 0.5 + mic * 0.3 + (WORKING.has(input.state) ? 0.15 : 0)) *
       (input.dim ? 0.45 : 1),
     // The white core is the cloud's dense centre; a ring or a glyph has
     // none, so it gets none.
-    core: (input.dim ? 0.4 : 1) * (cloud ? 1 : fine ? 0 : 0.2),
+    core: (input.dim ? 0.4 : 1) * (cloud ? 1 : 0.2),
     fade: input.dim ? 0.45 : 1,
     keep: Math.max(0.2, Math.min(1, input.keep)),
-    floor: fine ? 0.06 : 0.38,
-    lift: fine ? 0.15 : 0.6,
+    floor: 0.38,
+    lift: 0.6,
   };
 }
 

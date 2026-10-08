@@ -13,21 +13,15 @@ import {
   morphWeight,
 } from "../src/features/q-swarm/presence-dynamics";
 import {
-  FACE_FRAME_SCALE,
-  FACE_PARTS,
-  facePartsOf,
-} from "../src/features/q-swarm/presence-face";
-import {
   buildFigure,
   createFigureFrame,
-  FACE_FIGURES,
   FIGURE_KINDS,
   type FigureKind,
 } from "../src/features/q-swarm/presence-figures";
 import {
-  FACE_MIN_PIXELS,
-  faceAllowed,
   figureForState,
+  isStage,
+  STAGE_MIN_PIXELS,
   presenceFor,
 } from "../src/features/q-swarm/presence-machine";
 import {
@@ -52,15 +46,14 @@ describe("which figure: one fixed mapping from Q's state (P11)", () => {
   const everyInput = () =>
     Q_APERTURE_STATES.flatMap((state) =>
       [false, true].flatMap((small) =>
-        [false, true].flatMap((face) =>
-          [false, true].map((showing) => ({ state, small, face, showing })),
-        ),
+        [false, true].map((showing) => ({ state, small, showing })),
       ),
     );
 
-  it("gives every state its own shape, and no face anywhere by default", () => {
+  it("gives every state its own shape, and never a face (Zino, 2026-10-08)", () => {
+    expect(FIGURE_KINDS as readonly string[]).not.toContain("FACE");
     for (const state of Q_APERTURE_STATES) {
-      expect(FACE_FIGURES.has(figureForState(state, false))).toBe(false);
+      expect(figureForState(state, false)).not.toBe("FACE");
     }
     const shape = (state: (typeof Q_APERTURE_STATES)[number]) =>
       presenceFor({ state, small: false }).figure;
@@ -96,39 +89,21 @@ describe("which figure: one fixed mapping from Q's state (P11)", () => {
     }
   });
 
-  it("shows the human face whenever Q speaks on the Q page at 160 px or more (ADR 0051)", () => {
-    expect(faceAllowed({ face: true, pixels: FACE_MIN_PIXELS })).toBe(true);
-    expect(faceAllowed({ face: true, pixels: 200 })).toBe(true);
-    expect(faceAllowed({ face: true, pixels: 360 })).toBe(true);
-    expect(faceAllowed({ face: true, pixels: FACE_MIN_PIXELS - 1 })).toBe(
-      false,
-    );
-    // Any other surface, however large, has no face.
-    expect(faceAllowed({ face: false, pixels: 520 })).toBe(false);
-    expect(
-      presenceFor({ state: "SPEAKING", small: false, face: true }),
-    ).toEqual({ figure: "FACE", dim: false });
-    // Cards on screen do not take the face away while Q is speaking.
-    expect(
-      presenceFor({
-        state: "SPEAKING",
-        small: false,
-        face: true,
-        showing: true,
-      }).figure,
-    ).toBe("FACE");
-    // The face is for speaking only: every other state, no face.
+  it("speaks as the wave everywhere, the Q page's stage included: no face", () => {
+    expect(isStage({ stage: true, pixels: STAGE_MIN_PIXELS })).toBe(true);
+    expect(isStage({ stage: true, pixels: STAGE_MIN_PIXELS - 1 })).toBe(false);
+    expect(isStage({ stage: false, pixels: 520 })).toBe(false);
+    expect(presenceFor({ state: "SPEAKING", small: false })).toEqual({
+      figure: "WAVE",
+      dim: false,
+    });
     for (const input of everyInput()) {
-      if (input.state === "SPEAKING") continue;
-      expect(FACE_FIGURES.has(presenceFor(input).figure)).toBe(false);
+      expect(presenceFor(input).figure).not.toBe("FACE");
     }
-    // Speech ends: the face gives way to the listening lean or the cloud.
-    expect(
-      presenceFor({ state: "LISTENING", small: false, face: true }).figure,
-    ).toBe("ATTENTIVE");
-    expect(
-      presenceFor({ state: "IDLE", small: false, face: true }).figure,
-    ).toBe("CLOUD");
+    expect(presenceFor({ state: "LISTENING", small: false }).figure).toBe(
+      "ATTENTIVE",
+    );
+    expect(presenceFor({ state: "IDLE", small: false }).figure).toBe("CLOUD");
   });
 
   it("shows the Q mark while answer cards are up and Q is resting, and only then", () => {
@@ -202,55 +177,6 @@ describe("figures", () => {
           expect(Math.abs(z)).toBeLessThanOrEqual(1);
         }
       }
-    }
-  });
-
-  it("moves the face's lower lip with Q's voice, and blinks only the lids and eyes", () => {
-    const count = 1600;
-    const face = buildFigure("FACE", count);
-    const parts = facePartsOf(count);
-    const quiet = createFigureFrame(count);
-    const loud = createFigureFrame(count);
-    const blink = createFigureFrame(count);
-    face.evaluate({ ...input, output: 0, t: 0 }, quiet);
-    face.evaluate({ ...input, output: 1, t: 0 }, loud);
-    face.evaluate({ ...input, output: 0, t: 0, blink: 1 }, blink);
-    let lip = 0;
-    for (let i = 0; i < count; i += 1) {
-      const dy = (loud.y[i] ?? 0) - (quiet.y[i] ?? 0);
-      if (parts[i] === FACE_PARTS.LOWER_LIP && dy > 0.01) lip += 1;
-      // Only the mouth, lower lip and chin move with the voice.
-      if (
-        parts[i] !== FACE_PARTS.LOWER_LIP &&
-        parts[i] !== FACE_PARTS.MOUTH &&
-        parts[i] !== FACE_PARTS.CHIN
-      ) {
-        expect(dy).toBe(0);
-      }
-      const shut = Math.abs((blink.y[i] ?? 0) - (quiet.y[i] ?? 0)) > 1e-6;
-      if (shut) expect(parts[i]).toBe(FACE_PARTS.LID);
-    }
-    expect(lip).toBeGreaterThan(5);
-  });
-
-  it("lights the face evenly: no dark holes where the eyes and mouth are", () => {
-    const count = 2400;
-    const frame = createFigureFrame(count);
-    buildFigure("FACE", count).evaluate({ ...input, output: 0 }, frame);
-    const parts = facePartsOf(count);
-    // Around each eye, the skin stays lit (the old face had black sockets).
-    for (const side of [-1, 1]) {
-      const cx = side * 0.23 * FACE_FRAME_SCALE;
-      const cy = -0.1 * FACE_FRAME_SCALE;
-      const near: number[] = [];
-      for (let i = 0; i < count; i += 1) {
-        if (parts[i] !== FACE_PARTS.SKIN) continue;
-        const d = Math.hypot((frame.x[i] ?? 0) - cx, (frame.y[i] ?? 0) - cy);
-        if (d < 0.09) near.push(frame.b[i] ?? 0);
-      }
-      expect(near.length).toBeGreaterThan(8);
-      const mean = near.reduce((a, b) => a + b, 0) / near.length;
-      expect(mean).toBeGreaterThan(0.12);
     }
   });
 
@@ -373,7 +299,7 @@ describe("motion: continuous, never a snap", () => {
   it("keeps the bound on a slow phone (30 fps) and through a dropped frame", () => {
     const { maxStep, maxDv } = run(
       30,
-      ["CLOUD", "FACE", "SPIRAL", "MONEY", "RIBBON", "ATTENTIVE", "CLAP"],
+      ["CLOUD", "WAVE", "SPIRAL", "MONEY", "RIBBON", "ATTENTIVE", "CLAP"],
       1.2,
     );
     expect(maxStep).toBeLessThanOrEqual(MAX_SPEED * MAX_DT + 1e-6);
@@ -402,7 +328,7 @@ describe("motion: continuous, never a snap", () => {
     const trace = () => {
       const sim = createPresenceSim({ count: 120, initial: "CLOUD", seed: 9 });
       let t = 0;
-      for (const kind of ["SPIRAL", "FACE", "CLOUD"] as const) {
+      for (const kind of ["SPIRAL", "WAVE", "CLOUD"] as const) {
         sim.setFigure(kind);
         for (let f = 0; f < 40; f += 1) {
           t += 1 / 60;

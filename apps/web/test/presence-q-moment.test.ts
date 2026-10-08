@@ -223,7 +223,7 @@ describe("the letter Q figure", () => {
 describe("the loop with the Q moment", () => {
   const INPUTS: PresenceInputs = {
     state: "IDLE",
-    showsFace: true,
+    stage: true,
     showing: false,
     motion: "full",
     bloom: false,
