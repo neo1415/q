@@ -1,0 +1,66 @@
+# 14 — Confirmed defects
+
+Every item below is backed by implementation evidence: `path:line` from reading the code at HEAD `520bd123` on branch `recovery/2026-09-12-8y2j4w`, a reproduction, or live aggregates. "Confirmed" means the code path exists as described. It does **not** mean each one was reproduced in production unless that is stated. Investigator files hold the full evidence: `_findings/A.md` (architecture/DB), `B.md` (brain/memory), `C.md` (voice), `D.md` (agents/tools), `E.md` (UI), `F.md` (providers/security/tests).
+
+Severity: **High** means it breaks a core promise, loses data, or is a trust or security problem. **Medium** means a visible malfunction or a reliability gap. **Low** means hygiene.
+
+## High
+
+| ID | Area | Defect | How confirmed | Key evidence |
+|---|---|---|---|---|
+| C-01 | Voice | When the realtime model itself calls `ask_q` and Q chooses silence, the broker adds `silent`, which the strict tool-result schema rejects. The voice then says "that didn't go through, try again". **Introduced by the lead session on 2026-10-08.** | Schema probe (`unrecognized_keys ["silent"]`) | `apps/q-api/src/voice/duplex/broker.ts:556-558`; `packages/contracts/src/q/voice.ts:432-441`; `apps/q-api/src/voice/duplex/routes.ts:86` |
+| C-02 | Voice | The "speak from facts" layer never reaches the duplex line. The timing wrapper drops `facts`, an extra SPOKEN_REPLY model call runs, and the voice reads its output "faithfully". | Code read | `apps/q-api/src/voice/turn-timing.ts:369-395`; `main.ts:5383,5472` |
+| C-03 | Voice | The realtime model answers without Q on SMALLTALK turns, and on any utterance of 12 words or fewer while a briefing card is in focus. "Find anything that needs my attention" qualifies. | Code read | `apps/q-api/src/voice/duplex/routing.ts:167-183`; `duplex-line.ts:1643-1646` |
+| E-01 | UI | The arrival cards, and voice control of them, unmount as soon as Q's spoken opener lands or the person types. Q says "three things…" with nothing on screen. | Code read | `apps/web/src/features/q/q-conversation.tsx:523,608,1166-1227`; `q-session.tsx:233-239`; `briefing/arrival-dock.tsx:42` |
+| E-02 | Product | Investors get no "new companies matching my mandate, with Q's view" on arrival. The only mandate-match line is hidden when the new briefing loads. | Code read | `briefing/arrival.ts:35-56`; `home/returning-welcome.tsx:164-167`; `q-api/src/composition/work/page.ts:703-719` |
+| D-01 | Agents | A lapsed approval card (24 h TTL) silently parks the conversation for good. The engine still sees it as "already asked": no redraft, no reply-waiting notice. **Today's Tensorgate→Zino card lapses at about 11:19 UTC on 9 Oct.** | Code read | `q-actions/src/ports.ts:300`; `postgres-repositories.ts:410`; `instructions/store.ts:715-776`; `engine.ts:726-733,2065` |
+| D-02 | Agents | Workforce jobs that follow the lead-Q prompt (WRITER → REVIEWER → CONVERSATION) never send. WRITER has no executor and is HELD; later steps are SKIPPED. | Reproduced | `workforce.v1.ts:353-356`; `job-runner.ts:151-168`; `workforce/jobs.ts:333-338`; `evidence/agents/repro-writer-step.md` |
+| A-01 | Events | Every `q.action.*` outbox event since 2026-09-26 has failed with `EVENT_SCHEMA_INVALID` (657 rows). The workers' registry omits q-actions events. | Live aggregates | `apps/workers/src/event-registry.ts:1-35`; `eventing/src/publisher/outbox-publisher.ts:171-186` |
+| A-02 | Security | Service traffic connects as `postgres` (BYPASSRLS), and all RLS policies target `authenticated`, a role the app never uses. Tenant isolation rests entirely on hand-written `tenant_id` predicates. | Code read plus live catalog. The role is inferred, not read. | `packages/database/src/client.ts:24-41`; live `pg_roles`/`pg_stat_activity` |
+| F-03 | Security | Public-web research excerpts (attacker-controllable) are sent as a SYSTEM message, and the OpenAI adapter merges all SYSTEM messages into `instructions`. | Code read | `model-gateway/src/q/index.ts:1389-1396,3619-3660`; `providers/openai.ts:146-153` |
+| L-01 | Q answers | "What needs my attention?" got "nothing is waiting" while an investor's message had been unanswered for about 21 h. No tool exposed "they wrote last". The lead added `lastMessage` to `relationship.own.list`, deployed in q-api `520bd123`; **not yet verified live.** | Live trace 12:58 UTC | `evidence` in `21-EXECUTION-TRACES.md` T3 |
+
+## Medium
+
+| ID | Area | Defect | Key evidence |
+|---|---|---|---|
+| C-04 | Voice | A routed answer is lost if the line rejoined while Q was working; the UI stays on "Thinking". | `duplex-line.ts:1654-1658` |
+| C-05 | Voice | A stale model-initiated answer can be spoken after a newer question (generation-only guard). | `duplex-line.ts:1421,1528-1533` |
+| C-06 | Voice | No duplex "Thinking" watchdog; realtime `error` events and failed responses are ignored. | `duplex-line.ts:1258-1413` |
+| C-07 | Voice | A cough or echo during generation (before any audio) cancels the answer; there is no repair on duplex. | `duplex-line.ts:1265-1266` |
+| C-08 | Voice | Duplex relays are Next.js server actions, serialized per tab. `heard` holds for the whole Q run with no deadline, blocking the card/navigation poll. | `duplex-session.ts:135-143`; `broker.ts:528-535` |
+| C-09 | Voice | Duplex presence levels are hard-coded to 0, so the stage looks idle while listening or speaking. | `duplex-session.ts:246-248` |
+| C-10 | Voice | The duplex line ends itself after 30 s of quiet, with no notice. | `duplex-line.ts:1153-1175`; `duplex/config.ts:49` |
+| E-03 | UI | Voice→card decisions exist only on the duplex line; the standard line has none. | `duplex-session.ts:166-172,208-211` |
+| E-04 | UI | Silent turns give no visible feedback. | `duplex-line.ts:1647-1652` |
+| E-05 | UI | The first typed question waits up to about 5.5 s on briefing reads, with no indicator. | `q-conversation.tsx:156-193,659-672`; `briefing/arrival-voice.ts` |
+| E-06 | UI | A held draft dismissed in the browser comes back on the next arrival or another device (localStorage only). | `work/decision-queue.tsx:188-196`; `briefing/arrival-actions.ts:136-142` |
+| E-07 | UI | One invalid result block silently drops every block of an answer. | `model-gateway/src/q/result-blocks.ts:428-429` |
+| D-03 | Agents | A near-miss draft is recorded HELD while it is actually an approval card. It shows twice in Work, and "Send as is" could double-send. | `workforce/review.ts:370-411`; `web/features/work/decisions.ts:85-231` |
+| D-04 | Agents | "Nothing needs a reply" is recorded even when threads were not read (budget, cap, read failure). | `engine.ts:2811-2824` |
+| D-05 | Agents | A planner failure costs a full 240-minute cadence, silently, because `next_fire_at` advances before the work runs. | `instructions/store.ts:345-360`; `engine.ts:2170` |
+| D-06 | Agents | An errand records "Q answered X" even when the send failed. | `errands.ts:1418-1436` |
+| D-07 | Trust | Standing-instruction and job sends are not marked "sent by Q". | `app-actions/src/actions/chat.ts:63-76` |
+| D-08 | Agents | Workforce jobs are fire-and-forget and not resumable; a restart leaves them RUNNING forever. | `workforce/job-actions.ts:305-325` |
+| D-09 | Agents | Held replies in a job notify no one, and the writer is given an empty brief. | `workforce/jobs.ts:265-325`; `main.ts:1464` |
+| D-15 | UI | Instruction message cards (`app.chat.message.send`) are not rendered as messages in Work. | `decision-queue.tsx:441-444` |
+| A-03 | Ops | The Railway IaC omits many variables production uses. Web runs on Railway, not Vercel as the ADRs say. | `.railway/railway.ts` |
+| A-04 | Ops | `/health/ready` is static "ok". | `apps/q-api/src/app.ts:760-770` |
+| A-05 | Reliability | User-visible Q state lives in single-process memory: room feed (cards beside Q), duplex lines, voice turn board, meeting host. | `q-api/src/room/feed.ts:35-37`; `duplex/broker.ts:453` |
+| A-06 | Reliability | About ten scheduling loops run as `setInterval` inside the HTTP q-api, with no leader election. | `apps/q-api/src/main.ts` (lines in A.md) |
+| A-07 | Architecture | apps/api writes q-api-owned tables with raw SQL; the agent domain lives in `apps/q-api/src/composition`. | `apps/api/src/q-work-port.ts:55-118` |
+| A-08 | Architecture | Notifications are inserted from 19 places with no owner. | `12 §4.11` |
+| A-09 | Ops | No retention: LangGraph checkpoints are about 90 MB of a 202 MB database. | live aggregates |
+| F-01 | Cost data | Gemini image usage rows point at the realtime model row (UUID collision). | `20261203090000…sql:28`; `20261215090000…sql:11-20` |
+| F-05 | Docs | Config and IaC say OpenAI is "diagnostic only"; it is primary. | `packages/config/src/model-providers.ts:116-124` |
+| F-06 | CI | CI doesn't run on the deploy branch, and Railway deploys without checks. | `.github/workflows/ci.yml:8-13`; `.railway/railway.ts:31,109-112` |
+| F-07 | Ops | Telemetry export is off and there is no error monitoring. | `packages/observability/src/telemetry.ts:11-22` |
+| F-08 | Cost | No aggregate spend cap for text inference. | `model-gateway/src/q/index.ts:401-456` |
+| F-09 | Quality | Deep investigation, synthesis and comparison run on a STANDARD/FAST model (demo floors left lowered). | `20261008120000…sql:13-17,69-75` |
+| F-10 | Privacy | Duplex transcripts with no conversation have no deletion path and block user deletion. | `20261220150000…sql` |
+| F-04 | Tests | `answer-turn-reading.test.ts` "hands on a manifest…" fails on base (stale expected list). | test line 919 |
+
+## Low (abridged; full lists in the investigator files)
+C-11…C-17 (voice blip handling, a reaction-volume bug, a NULL first conversation_id, the forced-ask paraphrase, in-memory broker, "say exactly this" delivery) · D-10…D-16 · E-08…E-11 (unlinked investor cards, three greeting systems, dead UI code, contract comment drift) · A-10…A-15 (a voice token key derived from `DATABASE_URL` as fallback, mis-declared dependency, duplicated security code, future-dated migrations, docs drift) · F-02 (a pgTAP assertion that passes for the wrong reason).
+
+Brain and memory defects from investigator B are listed in `_findings/B.md` and `03`/`05`. See the addendum at the end of this file once it has been merged.
