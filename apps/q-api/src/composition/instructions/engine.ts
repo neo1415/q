@@ -470,12 +470,39 @@ export type ValidationContext = {
     | undefined;
 };
 
-/** Numbers in the sender's side's messages of a transcript ("[US iso] text"). */
-export function threadOwnNumbers(transcript: string): readonly number[] {
+/** A transcript's messages from the sender's side, oldest first. */
+function ownLines(transcript: string): readonly string[] {
   return transcript
     .split(/\n(?=\[(?:US|THEM) )/u)
     .filter((line) => line.startsWith("[US "))
-    .flatMap((line) => numbersIn(line.replace(/^\[US [^\]]*\]\s*/u, "")));
+    .map((line) => line.replace(/^\[US [^\]]*\]\s*/u, "").trim())
+    .filter((line) => line !== "");
+}
+
+/**
+ * The person's own side's earlier words in one conversation, for the
+ * planner (Tensorgate, 8 Oct: the planner knew nothing of the founder's
+ * "4 design partners, $180k contracts", so it had nothing to reply with).
+ * Their own words, never the other side's (S6).
+ */
+export function ownWords(transcript: string | undefined): string {
+  return transcript === undefined
+    ? ""
+    : ownLines(transcript).join(" / ").replace(/\s+/gu, " ").slice(0, 600);
+}
+
+/** Numbers in the sender's side's messages of a transcript ("[US iso] text"). */
+export function threadOwnNumbers(transcript: string): readonly number[] {
+  return ownLines(transcript).flatMap((line) => numbersIn(line));
+}
+
+/** A step's arguments as JSON, or null. */
+function safeJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -1499,6 +1526,12 @@ function peopleLines(
     readonly now: Date;
     readonly timeZone: string;
   },
+  replies?: {
+    /** They wrote last and no one has answered (code's read). */
+    readonly waiting: ReadonlySet<string>;
+    /** The person's own side's earlier words there. */
+    readonly ourWords: ReadonlyMap<string, string>;
+  },
 ): string {
   if (people.length === 0) return "No one yet.";
   return people
@@ -1531,6 +1564,12 @@ function peopleLines(
                 // had written first.
                 "they wrote first and your side hasn't replied: any message is a reply to them, not an introduction"
               : "no message from your side yet",
+        // Tensorgate, 8 Oct: a reply that waits is said in code's words,
+        // with what the person's own side already said there.
+        person.relationshipId !== null &&
+        replies?.waiting.has(person.relationshipId) === true
+          ? `REPLY WAITING: they wrote last and no one has answered: write one REPLY now${((said) => (said === undefined || said === "" ? "" : `; your side already said: "${said}"`))(replies.ourWords.get(person.relationshipId))}`
+          : null,
         // A first message only inside their declared criteria.
         ((outside) =>
           outside === null
@@ -1964,14 +2003,65 @@ export function createInstructionEngine(
         )
         .catch(() => undefined);
 
-      // Plan; validate; re-plan with the reasons at most twice.
+      // Tensorgate, 8 Oct: conversations where they wrote last and no one
+      // has answered -- matched, not declined, no card of ours waiting, and
+      // not a question code already put to the person. Code's read only.
+      const reachable = inScope(grant.data, people).filter(
+        (person) =>
+          person.relationshipId !== null &&
+          connectedFor(people, person.relationshipId),
+      );
+      const replyWaiting = reachable.filter((person) => {
+        const id = person.relationshipId;
+        if (id === null || paces.get(id)?.lastFrom !== "THEM") return false;
+        const read = facts.get(id);
+        if (read?.declined === true || awaiting?.has(id) === true) {
+          return false;
+        }
+        if (cardsWaiting.some((card) => card.relationship_id === id)) {
+          return false;
+        }
+        const verdict =
+          read === undefined
+            ? null
+            : questionVerdict(read, material?.sender.facts ?? null);
+        return !(
+          questions.has(id) &&
+          verdict !== null &&
+          verdict !== "ANSWERABLE"
+        );
+      });
+      const waitingIds = new Set(
+        replyWaiting
+          .map((person) => person.relationshipId)
+          .filter((id): id is string => id !== null),
+      );
+      // The founder's own earlier words in each waiting conversation: the
+      // person's facts (their traction, their offer), for the planner.
+      const ourWords = new Map(
+        [...waitingIds].map((id) => [
+          id,
+          ownWords(transcripts.get(id)?.thread),
+        ]),
+      );
+
+      // Plan; validate; re-plan with the reasons at most twice -- and once
+      // more when a plan leaves a waiting reply unanswered (Tensorgate: the
+      // second kick's plan came back empty with Zino's message waiting).
       let refusals = "None.";
       let plan: InstructionPlanResult | null = null;
       let verdicts: StepVerdict[] = [];
-      // Why each conversation's step was last refused, across the re-plans:
-      // a reply that never passed is said, never "nothing to do".
-      const lastRefusal = new Map<string, RefusalCode>();
-      for (let attempt = 0; attempt <= MAX_REPLANS; attempt += 1) {
+      // Every code a conversation's steps were refused with, across the
+      // re-plans: a reply that never passed is said, with why.
+      const refusalCodes = new Map<string, RefusalCode[]>();
+      const noteRefusal = (id: string | null, code: RefusalCode) => {
+        if (id === null) return;
+        const codes = refusalCodes.get(id) ?? [];
+        if (!codes.includes(code)) refusalCodes.set(id, [...codes, code]);
+      };
+      let nudged = false;
+      let extra = 0;
+      for (let attempt = 0; attempt <= MAX_REPLANS + extra; attempt += 1) {
         if (!(left >= micros(PLAN_MAX_COST_USD))) {
           await pauseForBudget(row, grant.data, actor);
           return empty("OVER_BUDGET");
@@ -1999,6 +2089,7 @@ export function createInstructionEngine(
               material,
               introduced,
               { paces, now: at, timeZone: grant.data.workingHours.timeZone },
+              { waiting: waitingIds, ourWords },
             ),
             history: (
               (history.length === 0
@@ -2063,14 +2154,66 @@ export function createInstructionEngine(
               entry.verdict.code !== "OUTSIDE_HOURS",
           );
         for (const { verdict } of refused) {
-          if (
-            verdict.verdict === "REFUSED" &&
-            verdict.relationshipId !== null
-          ) {
-            lastRefusal.set(verdict.relationshipId, verdict.code);
+          if (verdict.verdict === "REFUSED") {
+            noteRefusal(verdict.relationshipId, verdict.code);
           }
         }
-        if (refused.length === 0 || attempt === MAX_REPLANS) break;
+        // Each plan's verdicts at info level: code, action and the first
+        // words of a draft (Tensorgate: a run said nothing of why).
+        logger?.info(
+          {
+            instructionId: row.id,
+            attempt,
+            steps: current.steps.map((step, index) => ({
+              action: step.action,
+              verdict: verdicts[index]?.verdict ?? null,
+              code: verdicts[index]?.code ?? null,
+              relationshipId: verdicts[index]?.relationshipId ?? null,
+              draft: (textBody(safeJson(step.argumentsJson)) ?? "").slice(
+                0,
+                80,
+              ),
+            })),
+            replyWaiting: waitingIds.size,
+          },
+          "standing instruction plan checked",
+        );
+        const answered = new Set(
+          verdicts
+            .filter((verdict) => verdict.verdict !== "REFUSED")
+            .map((verdict) => verdict.relationshipId),
+        );
+        const unanswered = replyWaiting.filter(
+          (person) => !answered.has(person.relationshipId),
+        );
+        const last = attempt === MAX_REPLANS + extra;
+        if (
+          !nudged &&
+          unanswered.length > 0 &&
+          (refused.length === 0 || last)
+        ) {
+          // Once: the plan left a waiting message unanswered.
+          nudged = true;
+          if (last) extra += 1;
+          refusals = [
+            ...refused.map(
+              ({ verdict, step }) =>
+                `${step?.action ?? "?"}: ${verdict.verdict === "REFUSED" ? verdict.code : ""}`,
+            ),
+            `NO REPLY PLANNED: ${unanswered
+              .map(
+                (person) =>
+                  `${person.name.slice(0, 80)} (relationshipId ${person.relationshipId ?? ""})`,
+              )
+              .join(
+                ", ",
+              )} wrote last and no one has answered. Write one REPLY chat.message.send to each now, following the rules: thank them, take up what they wrote about, one point from WHO YOU WRITE AS or what your side already said, and one soft offer.`,
+          ]
+            .join("\n")
+            .slice(0, 3_000);
+          continue;
+        }
+        if (refused.length === 0 || last) break;
         refusals = refused
           .map(
             ({ verdict, step }) =>
@@ -2192,6 +2335,7 @@ export function createInstructionEngine(
             );
             graded.set(index, outcome);
             if (outcome.verdict === "HELD") {
+              noteRefusal(subject, "BELOW_THE_BAR");
               return {
                 verdict: "REFUSED",
                 code: "BELOW_THE_BAR",
@@ -2531,41 +2675,28 @@ export function createInstructionEngine(
           .map((verdict) => verdict.relationshipId)
           .filter((id): id is string => id !== null),
       );
-      const reachable = inScope(grant.data, people).filter(
+      const waitingReplies = replyWaiting.filter(
         (person) =>
-          person.relationshipId !== null &&
-          connectedFor(people, person.relationshipId),
+          person.relationshipId !== null && !handled.has(person.relationshipId),
       );
-      const waitingReplies = reachable.filter((person) => {
-        const id = person.relationshipId;
-        if (id === null || paces.get(id)?.lastFrom !== "THEM") return false;
-        const read = facts.get(id);
-        if (read?.declined === true) return false;
-        if (handled.has(id) || awaiting?.has(id) === true) return false;
-        if (cardsWaiting.some((card) => card.relationship_id === id)) {
-          return false;
-        }
-        // Their question already went to the person, quoted, above.
-        const verdict =
-          read === undefined
-            ? null
-            : questionVerdict(read, material?.sender.facts ?? null);
-        return !(
-          questions.has(id) &&
-          verdict !== null &&
-          verdict !== "ANSWERABLE"
-        );
-      });
       for (const [offset, person] of waitingReplies.entries()) {
         const id = person.relationshipId ?? "";
         const since = paces.get(id)?.lastFromThemAt?.toISOString() ?? "unknown";
         const name = person.name.slice(0, 80);
-        const code = lastRefusal.get(id);
+        const codes = refusalCodes.get(id) ?? [];
+        const code = codes[codes.length - 1];
         const why =
           code === undefined
-            ? "I couldn't put together a reply I could send for you"
+            ? "my plan had no reply to them"
             : REFUSAL_WORDS[code].reason;
-        const words = `${name}'s message is waiting for a reply. I couldn't answer it on my own: ${why}. Reply in the chat, or tell me what to say and I'll send it.`;
+        // The codes themselves, so the person (and we) can see why.
+        const detail =
+          codes.length === 0 ? "NO_REPLY_PLANNED" : codes.join(", ");
+        const words = `${name}'s message is waiting for a reply. I couldn't answer it on my own: ${why} (${detail}). Reply in the chat, or tell me what to say and I'll send it.`;
+        logger?.info(
+          { instructionId: row.id, relationshipId: id, codes: detail },
+          "standing instruction reply waiting on the person",
+        );
         await store
           .recordStep({
             instruction: row,
