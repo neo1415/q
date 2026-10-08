@@ -108,7 +108,14 @@ const modelProviderEnv = {
 export default defineRailway(() => {
   const repo = github("neo1415/q", {
     branch: INTEGRATION_BRANCH,
-    checkSuites: false,
+    /**
+     * RECOVERY F2 (audit F-D6): wait for CI. A push to the branch deploys
+     * only after the commit's GitHub check suites pass (.github/workflows/
+     * ci.yml now runs on `recovery/**`). Takes effect only when the founder
+     * applies this file, or sets each service's Settings → Source → "Wait
+     * for CI" in the dashboard. While CI is red on the branch, deploys hold.
+     */
+    checkSuites: true,
   });
 
   /**
