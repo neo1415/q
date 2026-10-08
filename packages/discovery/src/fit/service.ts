@@ -56,6 +56,11 @@ export type FitCompanyInputs = {
   readonly name: string;
   /** "Seed · Clean energy · Nairobi", or null. */
   readonly line: string | null;
+  /** What the company does, in its own one line, where this reader may see it. */
+  readonly about?: string | null | undefined;
+  /** The current raise, only where disclosure lets this reader see it. */
+  readonly raise?:
+    { readonly amount: string; readonly currency: string } | null | undefined;
 };
 
 export type FitInputSource = {
@@ -92,6 +97,9 @@ export type FitProfileItem = {
   readonly assessment: FitAssessment;
   readonly name: string;
   readonly line: string | null;
+  readonly about?: string | null | undefined;
+  readonly raise?:
+    { readonly amount: string; readonly currency: string } | null | undefined;
 };
 
 export type FitProfilesResult =
@@ -201,6 +209,8 @@ export function createFitService(
         assessment: assessFit(observed, config, computedAt),
         name: input.name,
         line: input.line,
+        about: input.about ?? null,
+        raise: input.raise ?? null,
       });
     }
     // Request order, as eligibility returned it.
@@ -334,6 +344,8 @@ export function buildFitComparison(input: {
       companyId: item.assessment.profile.companyId,
       name: item.name,
       line: item.line,
+      about: item.about ?? null,
+      raise: item.raise ?? null,
       sources: [
         ...(input.sources.get(item.assessment.profile.companyId) ?? ["FEED"]),
       ].sort(),

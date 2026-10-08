@@ -82,7 +82,13 @@ export function createFitComposition(
           .filter((c) => c !== null)
           .map((c) => [
             c.id,
-            { name: c.canonicalName, shortDescription: null },
+            // The fit service asks only for companies eligibility already
+            // admitted for this reader; the one line is the company's own
+            // declared summary, shown wherever its name is.
+            {
+              name: c.canonicalName,
+              shortDescription: c.shortDescription,
+            },
           ]),
       );
     },

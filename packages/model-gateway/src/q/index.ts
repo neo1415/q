@@ -2926,6 +2926,7 @@ export function createModelGatewayQAnswer(
             scope: sweep.ask.scope,
             place: sweep.ask.place,
             considered: sweep.considered,
+            asked: latest.content,
           });
           const message = await persistAnswer(text, [block]);
           logger?.info(

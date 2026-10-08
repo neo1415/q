@@ -1305,6 +1305,7 @@ export {
   SPOKEN_FACTS_VERSION,
   SPOKEN_FACTS_WORDS_MAX,
   SPOKEN_FIDELITY_ISSUES,
+  naturalPlaceLine,
   spokenFactsOf,
   spokenFidelityIssues,
   spokenList,

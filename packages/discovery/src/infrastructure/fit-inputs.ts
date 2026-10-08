@@ -138,6 +138,13 @@ export function createFitInputSource(
           name: identity.name,
           line:
             [stage, place].filter((s) => s !== undefined).join(" · ") || null,
+          // The company's own one line and its raise, each only as this
+          // reader may see them (identities and raises are reader-scoped).
+          about: identity.shortDescription,
+          raise:
+            raise === undefined
+              ? null
+              : { amount: raise.amount, currency: raise.currency },
         });
       });
       return out;

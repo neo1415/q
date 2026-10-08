@@ -61,6 +61,8 @@ import {
   researchDirectiveFor,
   stepQuestionSequence,
   unclearTurnReply,
+  naturalPlaceLine,
+  spokenFactsOf,
   withoutRecommendationClaims,
   type ConversationState,
   type FailureOperation,
@@ -481,6 +483,11 @@ export type QVisibilityNotebook = {
     readonly visibility: "network_visible" | "organisation_private";
   }) => void;
 };
+
+/** The person's latest words in this conversation, for varied wording. */
+function askedIn(history: readonly QConversationMessage[]): string {
+  return [...history].reverse().find((m) => m.role === "USER")?.content ?? "";
+}
 
 /**
  * What Q says as it takes somebody somewhere (CQ-QACT-001). The same
@@ -1482,7 +1489,7 @@ export function createSpecialistQAnswer(
       return recordAnswer(
         request,
         conversationId,
-        DESTINATION_LINES[destination],
+        naturalPlaceLine(DESTINATION_LINES[destination], askedIn(history)),
         [{ kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } }],
       );
     }
@@ -1600,18 +1607,29 @@ export function createSpecialistQAnswer(
       const block = cardsOnScreen(history);
       const card = block === null ? null : cardAt(block, position);
       if (card?.subject?.kind !== "COMPANY") return null;
-      return {
-        said: openingLine("COMPANY", card.name),
-        blocks: [
-          {
-            kind: "UI_INTENT",
-            intent: {
-              kind: "OPEN_RECORD_PAGE",
-              page: "COMPANY",
-              id: card.subject.companyId,
-            },
+      const blocks: QResultBlock[] = [
+        {
+          kind: "UI_INTENT",
+          intent: {
+            kind: "OPEN_RECORD_PAGE",
+            page: "COMPANY",
+            id: card.subject.companyId,
           },
-        ],
+        },
+      ];
+      // "Tell me about the third company": talked about from its card
+      // (what they do, stage, raise, fit and why, one unknown), and opened
+      // -- never only `Opening "Tensorgate".` (founder live 2026-10-08).
+      const opening = openingLine("COMPANY", card.name);
+      const facts = spokenFactsOf({
+        asked: text,
+        text: opening,
+        blocks,
+        shown: [card],
+      });
+      return {
+        said: facts?.fallback ?? opening,
+        blocks,
         log: `CARD_${String(position)}`,
       };
     }
@@ -1636,7 +1654,7 @@ export function createSpecialistQAnswer(
     }
     if (!navigable.includes(target.destination)) return null;
     return {
-      said: DESTINATION_LINES[target.destination],
+      said: naturalPlaceLine(DESTINATION_LINES[target.destination], text),
       blocks: [
         {
           kind: "UI_INTENT",
@@ -1833,6 +1851,7 @@ export function createSpecialistQAnswer(
     conversationId: QConversationMessage["conversationId"],
     reference: TurnReference,
     shown: ReturnType<typeof shownItems>,
+    history: readonly QConversationMessage[],
   ): Promise<QAnswerOutcome | null> => {
     const port = dependencies.openRecord;
     if (port === undefined) return null;
@@ -1856,12 +1875,21 @@ export function createSpecialistQAnswer(
           { type: "SUCCEEDED", operation: "TOOL" },
         ),
       );
-      return recordAnswer(
-        request,
-        conversationId,
-        openingLine(page, target.name),
-        [{ kind: "UI_INTENT", intent }],
-      );
+      // Said from the card on screen when it is one (what they do, the
+      // fit and why), else plainly ("Here's Tensorgate.").
+      const opening = openingLine(page, target.name);
+      const facts =
+        page === "COMPANY"
+          ? spokenFactsOf({
+              asked: askedIn(history),
+              text: opening,
+              blocks: [{ kind: "UI_INTENT", intent }],
+              shown: cardsOnScreen(history)?.cards ?? [],
+            })
+          : null;
+      return recordAnswer(request, conversationId, facts?.fallback ?? opening, [
+        { kind: "UI_INTENT", intent },
+      ]);
     }
     logger?.info(
       { qRunId: request.runId, open: reference.open },
@@ -2398,6 +2426,7 @@ export function createSpecialistQAnswer(
         conversationId,
         reference,
         shown,
+        history,
       );
       if (opened !== null) return opened;
     }

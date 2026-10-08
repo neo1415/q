@@ -4,6 +4,7 @@ import {
   FIT_COMPARISON_MAX,
   FitComparisonDtoSchema,
   FitProfileDtoSchema,
+  MoneySchema,
   UuidSchema,
 } from "@capital-q/contracts";
 import { fitComparisonText, fitProfileText } from "@capital-q/discovery";
@@ -76,6 +77,10 @@ export const FitProfileOutputSchema = z
   .object({
     status: z.enum(STATUSES),
     name: z.string().nullable(),
+    /** What the company does, in its own one line, when known. */
+    about: z.string().max(400).nullable().optional(),
+    /** The current raise, only where disclosure lets this reader see it. */
+    raise: MoneySchema.nullable().optional(),
     profile: FitProfileDtoSchema.nullable(),
     /** The same profile as plain text. */
     text: z.string(),
@@ -179,6 +184,8 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
       return {
         status: "OK",
         name: item.name,
+        about: item.about ?? null,
+        raise: item.raise ?? null,
         profile: item.assessment.profile,
         text: fitProfileText(item.name, item.assessment.profile),
         guidance: GUIDANCE,

@@ -82,6 +82,13 @@ export const QAnswerCardSchema = z
     key: z.string().trim().min(1).max(64),
     name: z.string().trim().min(1).max(80),
     line: z.string().trim().max(140).nullable(),
+    /**
+     * What the company does, in its own one line, so Q can talk about it
+     * ("tell me about the third one"). Absent from an older server.
+     */
+    about: z.string().trim().max(160).nullable().optional(),
+    /** Its current raise in words ("$2 million"), only as this reader may see it. */
+    raise: z.string().trim().max(60).nullable().optional(),
     hue: z.number().int().min(1).max(Q_ANSWER_CARD_HUES),
     fit: QAnswerCardFitSchema.nullable(),
     reasons: z

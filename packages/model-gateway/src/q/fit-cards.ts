@@ -2,13 +2,16 @@ import {
   FIT_BAND_LABELS,
   FIT_PARAMETER_LABELS,
   FitProfileDtoSchema,
+  MoneySchema,
   QAnswerCardsBlockSchema,
   fitScoreOutOf10,
   type FitProfileDto,
+  type Money,
   type QAnswerCard,
   type QAnswerCardLevel,
   type QAnswerCardsBlock,
 } from "@capital-q/contracts";
+import { spokenFactsOf } from "@capital-q/q-core";
 import type { QToolCallOutcome } from "@capital-q/q-runtime";
 
 import { nameKey } from "./card-subjects.js";
@@ -30,8 +33,57 @@ export type RunFit = {
   readonly companyId: string;
   readonly name: string;
   readonly line: string | null;
+  /** What the company does, in its own one line, when the read carried it. */
+  readonly about?: string | null | undefined;
+  /** The current raise, only as this reader may see it. */
+  readonly raise?: Money | null | undefined;
   readonly profile: FitProfileDto;
 };
+
+/** The raise as said: "$2 million", "500 million naira". */
+export function raiseWords(raise: Money | null | undefined): string | null {
+  if (raise === null || raise === undefined) return null;
+  const amount = Number(raise.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const scaled =
+    amount >= 1e9
+      ? [amount / 1e9, " billion"]
+      : amount >= 1e6
+        ? [amount / 1e6, " million"]
+        : amount >= 1e3
+          ? [amount / 1e3, " thousand"]
+          : [amount, ""];
+  const value = Number((scaled[0] as number).toFixed(1)).toString();
+  const size = `${value}${scaled[1] as string}`;
+  const symbol: Readonly<Record<string, string>> = {
+    USD: "$",
+    GBP: "£",
+    EUR: "€",
+  };
+  const named: Readonly<Record<string, string>> = {
+    NGN: "naira",
+    KES: "Kenyan shillings",
+    ZAR: "rand",
+    GHS: "cedis",
+    EGP: "Egyptian pounds",
+  };
+  const code = raise.currency.toUpperCase();
+  const lead = symbol[code];
+  if (lead !== undefined) return `${lead}${size}`;
+  return `${size} ${named[code] ?? code}`;
+}
+
+function aboutOf(text: unknown): string | null {
+  if (typeof text !== "string") return null;
+  const flat = text.replace(/\s+/gu, " ").trim();
+  if (flat.length === 0) return null;
+  return flat.length > 160 ? `${flat.slice(0, 159)}…` : flat;
+}
+
+function moneyOf(value: unknown): Money | null {
+  const parsed = MoneySchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
 
 /** Every fit one tool outcome carries, read through the contract. */
 export function fitsInOutcome(
@@ -41,6 +93,8 @@ export function fitsInOutcome(
   const data = outcome.result.data as {
     readonly status?: unknown;
     readonly name?: unknown;
+    readonly about?: unknown;
+    readonly raise?: unknown;
     readonly profile?: unknown;
     readonly comparison?: { readonly entries?: unknown } | null;
   } | null;
@@ -55,6 +109,8 @@ export function fitsInOutcome(
         companyId: profile.data.companyId,
         name: data.name,
         line: null,
+        about: aboutOf(data.about),
+        raise: moneyOf(data.raise),
         profile: profile.data,
       },
     ];
@@ -67,6 +123,8 @@ export function fitsInOutcome(
       const row = entry as {
         readonly name?: unknown;
         readonly line?: unknown;
+        readonly about?: unknown;
+        readonly raise?: unknown;
         readonly profile?: unknown;
       };
       const profile = FitProfileDtoSchema.safeParse(row.profile);
@@ -76,6 +134,8 @@ export function fitsInOutcome(
           companyId: profile.data.companyId,
           name: row.name,
           line: typeof row.line === "string" ? row.line : null,
+          about: aboutOf(row.about),
+          raise: moneyOf(row.raise),
           profile: profile.data,
         },
       ];
@@ -170,6 +230,8 @@ function cardOf(fit: RunFit): Omit<QAnswerCard, "key" | "hue"> {
   return {
     name: fit.name.slice(0, 80),
     line: (fit.line ?? band).slice(0, 140),
+    about: fit.about ?? null,
+    raise: raiseWords(fit.raise),
     fit:
       numeric === null || !Number.isFinite(numeric) || known.length === 0
         ? null
@@ -258,51 +320,84 @@ function rankedBlock(
   return parsed.success ? parsed.data : null;
 }
 
-function scoreWords(score: number): string {
-  return `${String(score).replace(/\.0$/u, "")} out of 10`;
+const COUNT_WORDS = [
+  "no",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+] as const;
+
+function counted(n: number): string {
+  return COUNT_WORDS[n] ?? String(n);
+}
+
+function capitalisedWord(word: string): string {
+  return `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;
 }
 
 /**
- * What Q says for a fit sweep, in at most three sentences before the
- * pointer to the cards: how many, the best one or two by name with their
- * scores, one caveat when some could not be scored (natural conversation:
- * answer first, the detail on the cards).
+ * What Q says for a fit sweep, typed or spoken (founder live 2026-10-08,
+ * c10b845f): built from the same facts the voice gets (`spokenFactsOf`),
+ * so a count asked for is the count named, ties are said as ties, and no
+ * template ("fits best, at", "Pros and cons for each are on screen") is
+ * left. Which set was scored leads, when it was not their whole list.
  */
 export function fitSweepSummary(input: {
   readonly block: QAnswerCardsBlock;
   readonly scope: "RELATIONSHIPS" | "SAVED" | "CANDIDATES";
   readonly place: string | null;
   readonly considered: number;
+  /** The person's own words, for how many they asked for. */
+  readonly asked: string;
 }): string {
   const { block, place } = input;
   const scored = block.cards.filter((card) => card.fit !== null);
   const unscored = block.cards.length - scored.length;
-  const where = place === null ? "" : ` in ${place}`;
   const plural = (n: number) => (n === 1 ? "company" : "companies");
   const set =
-    input.scope === "RELATIONSHIPS"
-      ? `the ${String(input.considered)} ${plural(input.considered)} you've reached out to`
-      : input.scope === "SAVED"
-        ? `your ${String(input.considered)} saved ${plural(input.considered)}`
-        : `your top ${String(block.cards.length)} ${plural(block.cards.length)}`;
-  const lead =
     place !== null
       ? block.cards.length === 1
-        ? `${block.cards[0]?.name ?? ""} is the one${where} I can score against your mandate`
-        : `I've scored ${String(block.cards.length)} companies${where} against your mandate`
-      : `I've scored ${set} against your mandate`;
-  const [first, second] = scored;
-  const best =
-    first === undefined
-      ? "None has enough information for a score yet."
-      : second === undefined
-        ? `${first.name} fits best, at ${scoreWords(first.fit?.score ?? 0)}.`
-        : `${first.name} fits best, at ${scoreWords(first.fit?.score ?? 0)}, then ${second.name} at ${scoreWords(second.fit?.score ?? 0)}.`;
+        ? `In ${place}, only ${block.cards[0]?.name ?? ""} has a score on your mandate.`
+        : `In ${place}, I looked at ${counted(block.cards.length)} ${plural(block.cards.length)}.`
+      : input.scope === "RELATIONSHIPS"
+        ? `I looked at the ${counted(input.considered)} ${plural(input.considered)} you've reached out to.`
+        : input.scope === "SAVED"
+          ? `I looked at your ${counted(input.considered)} saved ${plural(input.considered)}.`
+          : null;
+  const lead = set === null ? "" : `${set} `;
+  if (scored.length === 0) {
+    return `${lead}None of them has enough information for a score yet.`;
+  }
+  const facts = spokenFactsOf({
+    asked: input.asked,
+    text: "",
+    blocks: [block],
+  });
+  const body =
+    facts === null
+      ? `${scored[0]?.name ?? ""} is at ${String(scored[0]?.fit?.score ?? "")}.`
+      : facts.fallback;
   const caveat =
-    first !== undefined && unscored > 0
-      ? ` ${String(unscored)} ${unscored === 1 ? "doesn't" : "don't"} have enough information for a score yet.`
-      : "";
-  return `${lead}. ${best}${caveat} Pros and cons for each are on screen.`;
+    unscored > 0
+      ? `${capitalisedWord(counted(unscored))} ${unscored === 1 ? "doesn't" : "don't"} have enough information for a score yet.`
+      : null;
+  if (caveat === null) return `${lead}${body}`;
+  // The caveat goes before the open door, so the answer still ends on
+  // the offer (one question, then stop).
+  const door =
+    /\s(?:They're on screen|Cards are up|I've put them on screen|It's on screen|Card's up)\b/u.exec(
+      body,
+    );
+  return door === null
+    ? `${lead}${body} ${caveat}`
+    : `${lead}${body.slice(0, door.index)} ${caveat}${body.slice(door.index)}`;
 }
 
 /**

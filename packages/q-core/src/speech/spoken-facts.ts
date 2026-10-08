@@ -30,6 +30,10 @@ export type SpokenItem = {
   readonly score: string | null;
   /** "a seed-stage company in the United States"; null when not known. */
   readonly about: string | null;
+  /** What they do, in their own one line; null when not known. */
+  readonly does?: string | null | undefined;
+  /** Their raise as said ("$2 million"); null when not visible. */
+  readonly raise?: string | null | undefined;
   /** Measures that fit strongly, in plain words ("stage", "sector"). */
   readonly strengths: readonly string[];
   /** What is not known yet ("cheque size"). */
@@ -146,6 +150,18 @@ function aboutOf(line: string | null): string | null {
   return `${article} ${staged} company in ${where}`;
 }
 
+/** Their one line, clipped to what a person says in one breath. */
+function doesOf(about: string | null | undefined): string | null {
+  if (about === null || about === undefined) return null;
+  const flat = about
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/[.!?]+$/u, "");
+  if (flat.length === 0) return null;
+  const words = flat.split(" ");
+  return words.length <= 18 ? flat : `${words.slice(0, 18).join(" ")}…`;
+}
+
 function itemOf(card: QAnswerCard): SpokenItem {
   const unknowns = card.reasons.flatMap((reason) => {
     const match = /^(.{3,40}?)\s+(?:is\s+)?not\s+known\b/iu.exec(reason);
@@ -155,6 +171,8 @@ function itemOf(card: QAnswerCard): SpokenItem {
     name: card.name,
     score: card.fit === null ? null : scoreWords(card.fit.score),
     about: aboutOf(card.line),
+    does: doesOf(card.about),
+    raise: card.raise ?? null,
     strengths: card.measures
       .filter((measure) => measure.level === "STRONG")
       .map((measure) => measure.label.toLowerCase())
@@ -290,27 +308,54 @@ function recordFallback(
     seed,
     3,
   );
-  if (item === undefined || (item.about === null && item.score === null)) {
+  const does = item?.does ?? null;
+  if (
+    item === undefined ||
+    (item.about === null && item.score === null && does === null)
+  ) {
     return facts.talkAbout
       ? `${name}: ${shown} I haven't gone through them with you yet. Want me to?`
       : `${pick(["Here's", "Up now:"], seed)} ${name}. ${facts.next === null ? "" : "Want me to run through them?"}`.trim();
   }
   const ack = pick(["sure", "right", "good pick"], seed);
-  const parts: string[] = [];
-  if (item.about !== null) parts.push(`They're ${item.about}`);
-  if (item.score !== null) {
-    parts.push(
-      `${parts.length === 0 ? "They're" : ""} at ${item.score} on your mandate`.trim(),
+  const sentences: string[] = [`${name}, ${ack}.`];
+  if (does !== null) {
+    sentences.push(
+      `${pick(["In a line:", "What they do:"], seed, 4)} ${does}.`,
     );
   }
-  let line = `${name}, ${ack}. ${parts.join(", ")}`;
-  if (item.strengths.length > 0) {
-    line += `: ${spokenList(item.strengths)} line up`;
+  const who: string[] = [];
+  if (item.about !== null) who.push(`They're ${item.about}`);
+  if (item.raise !== null && item.raise !== undefined) {
+    who.push(
+      who.length === 0
+        ? `They're raising ${item.raise}`
+        : `raising ${item.raise}`,
+    );
   }
-  if (item.unknowns[0] !== undefined) {
-    line += `${item.strengths.length > 0 ? ", but" : ", and"} ${item.unknowns[0]} isn't known yet`;
+  if (item.score !== null) {
+    // "They're a seed-stage company in the United States, at 8.8 on your
+    // mandate: stage and sector line up, but cheque size isn't known yet."
+    let fit = `at ${item.score} on your mandate`;
+    if (item.strengths.length > 0) {
+      fit += `: ${spokenList(item.strengths)} line up`;
+    }
+    if (item.unknowns[0] !== undefined) {
+      fit += `${item.strengths.length > 0 ? ", but" : ", and"} ${item.unknowns[0]} isn't known yet`;
+    }
+    sentences.push(
+      who.length === 0
+        ? `They're ${fit}.`
+        : `${who.join(", ")}${who.length > 1 ? ", and" : ","} ${fit}.`,
+    );
+  } else {
+    if (who.length > 0) sentences.push(`${who.join(", ")}.`);
+    if (item.unknowns[0] !== undefined) {
+      sentences.push(`${capitalised(item.unknowns[0])} isn't known yet.`);
+    }
   }
-  return `${line}. ${shown}${facts.talkAbout ? " Want me to go deeper?" : ""}`;
+  sentences.push(`${shown}${facts.talkAbout ? " Want me to go deeper?" : ""}`);
+  return sentences.join(" ");
 }
 
 function navigateFallback(place: string, seed: number): string {
@@ -318,6 +363,21 @@ function navigateFallback(place: string, seed: number): string {
   return pick(
     [`Here's ${place}.`, `${capitalised(place)} is up.`, `Over to ${place}.`],
     seed,
+  );
+}
+
+/**
+ * A page move said as a person says it, varied by what was asked
+ * ("Here's Discover.", "Over to Discover."): never "Taking you to…".
+ * `line` is the code's own destination line ("Taking you to Discover.",
+ * "Opening your profile."); anything else comes back unchanged.
+ */
+export function naturalPlaceLine(line: string, asked: string): string {
+  const place = navigatedPlace(line);
+  if (place === null) return line;
+  return navigateFallback(
+    place.replace(/^home now$/iu, "home"),
+    seedOf(`${asked}\u0000${line}`),
   );
 }
 
@@ -337,11 +397,17 @@ function openedName(text: string): string | null {
 
 /** The place in a code-made navigation line ("Taking you to Discover."). */
 function navigatedPlace(text: string): string | null {
+  const trimmed = text.trim();
+  if (/^(?:Back home|Here's home)\.$/u.test(trimmed)) return "home";
   const match =
-    /^(?:Taking you(?:\s+to)?|Opening)\s+(.{1,60}?)(?:\s+now)?\.$/u.exec(
-      text.trim(),
-    );
-  return match?.[1] === undefined ? null : match[1];
+    /^(?:Taking you(?:\s+to)?|Opening|Here's|Over to)\s+(.{1,60}?)(?:\s+now)?\.$/u.exec(
+      trimmed,
+    ) ?? /^(.{1,60}?)\s+is up\.$/u.exec(trimmed);
+  if (match?.[1] === undefined) return null;
+  const place = match[1];
+  // A quoted name is a record opened, not a page.
+  if (/["“”]/u.test(place)) return null;
+  return place;
 }
 
 /**
@@ -423,11 +489,20 @@ export function spokenFactsOf(input: {
     if (block.kind !== "UI_INTENT") continue;
     const intent = block.intent;
     if (intent.kind === "OPEN_RECORD_PAGE") {
-      const name = openedName(input.text);
-      if (name === null) return null;
-      const card = (input.shown ?? []).find(
-        (shown) => shown.name.toLowerCase() === name.toLowerCase(),
+      // The card the record was opened from, by its id first (the words
+      // may already be natural), then by the name in a code-made line.
+      const byId = (input.shown ?? []).find(
+        (shown) =>
+          shown.subject?.kind === "COMPANY" &&
+          shown.subject.companyId === intent.id,
       );
+      const name = openedName(input.text) ?? byId?.name ?? null;
+      if (name === null) return null;
+      const card =
+        byId ??
+        (input.shown ?? []).find(
+          (shown) => shown.name.toLowerCase() === name.toLowerCase(),
+        );
       const item = card === undefined ? null : itemOf(card);
       const talkAbout = TALK.test(input.asked);
       const facts: Omit<SpokenFacts, "fallback"> = {
@@ -610,8 +685,15 @@ export function spokenFidelityIssues(
   }
   if (words(said) > SPOKEN_FACTS_WORDS_MAX) issues.add("LENGTH");
   const allowed = new Set<string>();
-  for (const item of facts.items)
+  for (const item of facts.items) {
     if (item.score !== null) allowed.add(item.score);
+    // Their raise and their own one line are facts too ("$2 million").
+    for (const text of [item.raise, item.does]) {
+      for (const match of (text ?? "").matchAll(/\b\d+(?:\.\d+)?\b/gu)) {
+        allowed.add(match[0]);
+      }
+    }
+  }
   const counts = [
     facts.items.length,
     facts.alsoLevel,
@@ -642,6 +724,12 @@ export function factsForVoice(
       name: item.name,
       ...(item.score === null ? {} : { fitOnTheirMandate: item.score }),
       ...(item.about === null ? {} : { about: item.about }),
+      ...(item.does === null || item.does === undefined
+        ? {}
+        : { whatTheyDo: item.does }),
+      ...(item.raise === null || item.raise === undefined
+        ? {}
+        : { raising: item.raise }),
       ...(item.strengths.length === 0 ? {} : { strongOn: item.strengths }),
       ...(item.unknowns.length === 0 ? {} : { notKnownYet: item.unknowns }),
     })),

@@ -403,9 +403,12 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
       expect(card.reasons.length).toBeGreaterThan(0);
     }
     expect(cards.at(-1)?.fit).toBeNull();
+    // Built from the facts (research 2026-10-07 §4): the set, the top
+    // three by name with their scores, the caveats, then the open door.
     expect(text).toBe(
-      "I've scored the 5 companies you've reached out to against your mandate. Souqsheet fits best, at 10 out of 10, then Portside at 8.5 out of 10. 1 doesn't have enough information for a score yet. Pros and cons for each are on screen.",
+      "I looked at the five companies you've reached out to. The strongest fits for your mandate: Souqsheet at 10; then Portside at 8.5; then Maji Loop at 8. Cheque size isn't known for any of them yet. One doesn't have enough information for a score yet. I've put them on screen. Want me to dig into one?",
     );
+    expect(text).not.toMatch(/fits best, at|out of 10|Pros and cons/u);
     expect(text).not.toMatch(/can't provide|manufacture/u);
     expect(naturalRegisterIssues(text)).toEqual([]);
   });
@@ -420,10 +423,8 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
       "Maji Loop",
       "Baridi",
     ]);
-    expect(text).toMatch(
-      /^I've scored 2 companies in Kenya against your mandate\./u,
-    );
-    expect(text).toContain("Maji Loop fits best");
+    expect(text).toMatch(/^In Kenya, I looked at two companies\./u);
+    expect(text).toMatch(/Maji Loop at [\d.]+; then Baridi at [\d.]+/u);
     expect(naturalRegisterIssues(text, { spoken: true })).toEqual([]);
     expect(text.split(/\s+/u).length).toBeLessThanOrEqual(SPOKEN_WORDS_MAX);
   });
