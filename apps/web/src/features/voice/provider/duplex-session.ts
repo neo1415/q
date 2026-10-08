@@ -3,20 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  endDuplexAction,
-  rejoinDuplexAction,
-  relayDuplexToolAction,
-  sendDuplexHeardAction,
-  sendDuplexSaidAction,
-  reportDuplexUsageAction,
-} from "../duplex-actions";
-import {
   onListeningPreferenceChange,
   readListeningPreference,
   storeListeningPreference,
 } from "../listening-preference";
 import { cardInFocus, decideCardByVoice, onLineNote } from "../line-cards";
 import { resolveListeningLevel } from "./backchannel";
+import { fetchDuplexRelays } from "./duplex-relays";
 import { pollNarration } from "./narration-poll";
 import {
   transcriptLineFor,
@@ -31,6 +24,7 @@ import type {
   DuplexLine,
   DuplexRelays,
 } from "./duplex-line";
+import { IDLE_NOTICE } from "./duplex-notices";
 
 /**
  * The full-duplex line as a voice client (DUPLEX). `start` resolves true
@@ -132,15 +126,22 @@ export function useDuplexVoiceSession(
       setTranscript([]);
       lastLineRef.current = null;
       const id = credential.voiceSessionId;
-      const relays: DuplexRelays = optionsRef.current.relays?.(id) ?? {
-        tool: (call) => relayDuplexToolAction(id, call),
-        usage: (report) => reportDuplexUsageAction(id, report),
-        end: (reason, detail) => endDuplexAction(id, reason, detail),
-        rejoin: (cause) => rejoinDuplexAction(id, cause),
-        narration: (after) => pollNarration(id, after),
-        heard: (heard) => sendDuplexHeardAction(id, heard),
-        said: (said) => sendDuplexSaidAction(id, said),
-      };
+      // RECOVERY A8: plain fetches with deadlines, never server actions
+      // (those queue one behind another per tab). A11: the sealed line
+      // rides along so any Q API instance can adopt it after a deploy.
+      let current: DuplexLine | null = null;
+      const relays: DuplexRelays =
+        optionsRef.current.relays?.(id) ??
+        fetchDuplexRelays({
+          voiceSessionId: id,
+          sessionToken: credential.sessionToken,
+          narration: (after) => pollNarration(id, after),
+          onGone: () => {
+            if (current !== null && lineRef.current === current) {
+              current.gone();
+            }
+          },
+        });
       const line = new Line({
         credential: duplex,
         // BACKCHANNEL: this device's toggle or the person's remembered
@@ -158,6 +159,14 @@ export function useDuplexVoiceSession(
         events: {
           onState: setState,
           onLine: addLine,
+          onTurnOutcome: (outcome) => {
+            if (lineRef.current !== line) return;
+            eventsRef.current.onTurnOutcome?.({
+              disposition: outcome.disposition,
+              failure: outcome.failure,
+              notice: outcome.notice,
+            });
+          },
           // Changed by voice: this device's toggle shows it too.
           onListening: (level) => {
             storeListeningPreference(level);
@@ -190,17 +199,20 @@ export function useDuplexVoiceSession(
             if (fallback !== undefined) fallback(notice, cause);
             else eventsRef.current.onEnded?.("dropped");
           },
-          onEnded: () => {
+          onEnded: (reason) => {
             // Idle: the line ended itself. One the person ended through
             // `end` is already let go and says nothing more.
             if (lineRef.current !== line) return;
             lineRef.current = null;
             setConnected(false);
+            // C-10: never a silent end: the person sees why voice stopped.
+            if (reason === "IDLE") eventsRef.current.onError?.(IDLE_NOTICE);
             eventsRef.current.onEnded?.("ended");
           },
         },
       });
       lineRef.current = line;
+      current = line;
       const up = await line.open();
       if (up && lineRef.current === line) {
         setConnected(true);
@@ -243,9 +255,12 @@ export function useDuplexVoiceSession(
     lineRef.current?.setVolume(volume);
   }, []);
 
-  // Levels are not sampled on this transport; the presence stays calm.
-  const inputLevel = useCallback(() => 0, []);
-  const outputLevel = useCallback(() => 0, []);
+  // C-09: the presence follows the microphone and Q's own voice.
+  const inputLevel = useCallback(() => lineRef.current?.inputLevel() ?? 0, []);
+  const outputLevel = useCallback(
+    () => lineRef.current?.outputLevel() ?? 0,
+    [],
+  );
 
   return useMemo(
     () => ({

@@ -34,7 +34,10 @@ import {
   createPostgresMaterialActionAuditWriter,
   createPostgresSecurityEventWriter,
 } from "@capital-q/audit";
-import { createRequestDatabaseClient } from "@capital-q/database";
+import {
+  checkDatabaseReadiness,
+  createRequestDatabaseClient,
+} from "@capital-q/database";
 import {
   CorrelationIdSchema,
   type AdminUsageDto,
@@ -297,7 +300,7 @@ import { apiServiceIdentity, createApp } from "./app.js";
 import { createChatSafetyAudit } from "./chat-safety-audit.js";
 import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
 import { createRaiseSharing } from "./pitch-claims.js";
-import { createQWorkPagePort } from "./q-work-port.js";
+import { createQWorkPagePort, createWorkforceJobPort } from "./q-work-port.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createInvestorCardFacts } from "./investor-card-facts.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
@@ -1967,6 +1970,8 @@ const ORGANISATION_ADMIN = CapabilitySchema.parse("organisation.admin");
 // end BILLING block
 
 const { app, logger } = createApp(config, security, {
+  // RECOVERY F4 (A-04): readiness answers 503 when the database is down.
+  healthProbes: { database: () => checkDatabaseReadiness(database.sql) },
   organisations,
   companies,
   investors,
@@ -2596,6 +2601,8 @@ const { app, logger } = createApp(config, security, {
     transactions: database.transactions,
     audit,
   }),
+  // Recovery D6: "Stop this job" (the same rule q-api applies for Q).
+  workforceJobs: createWorkforceJobPort(database.transactions),
   inboundEmail: {
     inboundEmail,
     webhookSecret: inboundEmailConfig.inbound?.webhookSecret.reveal(),

@@ -14,7 +14,7 @@
   199    readonly short?: string | undefined;
   200    readonly area?: string | undefined;
   201  };
-  202  
+  202
   203  /** The reader's input: the person's own latest words and own recent turns. */
   204  /** A name without its parenthetical ("Savanna Seed Partners (fictional)"). */
   205  function bareName(text: string): string {
@@ -24,7 +24,7 @@
   209      .replace(/[^\p{L}\p{N}]+/gu, " ")
   210      .trim();
   211  }
-  212  
+  212
   213  /**
   214   * Whether the words name this counterpart: the whole name, parentheticals
   215   * dropped on both sides, or a run of as many words heard slightly wrong
@@ -48,7 +48,7 @@
   233    }
   234    return false;
   235  }
-  236  
+  236
   237  /** Two summaries of one card: the same words, ignoring case and the full stop. */
   238  function sameCard(a: string, b: string): boolean {
   239    const plain = (text: string) =>
@@ -58,7 +58,7 @@
   243        .toLowerCase();
   244    return plain(a) === plain(b);
   245  }
-  246  
+  246
   247  function turnReaderInput(
   248    history: readonly QConversationMessage[],
   249    latest: QConversationMessage,
@@ -100,13 +100,13 @@
   285      signal: context.signal,
   286    };
   287  }
-  288  
+  288
   289  /** The capability's reader label and area (v32), when it has them. */
   290  const labelOf = (capability: QCapability) => ({
   291    ...(capability.short === undefined ? {} : { short: capability.short }),
   292    ...(capability.area === undefined ? {} : { area: capability.area }),
   293  });
-  294  
+  294
   295  const actionsKey = (actions: readonly ReaderAction[]): string =>
   296    JSON.stringify(
   297      actions.map((a) => ({
@@ -117,5 +117,5 @@
   302        ...(a.area === undefined ? {} : { area: a.area }),
   303      })),
   304    );
-  305  
+  305
 ```

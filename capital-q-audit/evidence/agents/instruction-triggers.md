@@ -6,11 +6,11 @@
 
 ```ts
     1  import type { Logger } from "@capital-q/observability";
-    2  
+    2
     3  import { digestOf } from "./digest.js";
     4  import type { InstructionEngine } from "./engine.js";
     5  import type { InstructionStore } from "./store.js";
-    6  
+    6
     7  /**
     8   * When a standing instruction runs (ADR 0043 S4): on its cadence (every
     9   * four hours by default), as soon as it is approved, when something
@@ -19,10 +19,10 @@
    12   * in the database first, so instances never double-fire; outside the
    13   * person's working hours it is deferred, not planned.
    14   */
-   15  
+   15
    16  const CLAIM_LIMIT = 10;
    17  const OUTSIDE_HOURS_RETRY_MINUTES = 30;
-   18  
+   18
    19  export function createInstructionTriggers(dependencies: {
    20    readonly store: Pick<InstructionStore, "claimDue" | "defer" | "wakeFor"> &
    21      Partial<
@@ -43,7 +43,7 @@
    36  }) {
    37    const { store, logger } = dependencies;
    38    let running: Promise<number> | null = null;
-   39  
+   39
    40    const pass = async (): Promise<number> => {
    41      const engine = dependencies.engine();
    42      if (engine === undefined) return 0;
@@ -86,7 +86,7 @@
    79      });
    80      return due.length;
    81    };
-   82  
+   82
    83    /** S7: each due digest, once, from the recorded steps. */
    84    const digests = async (): Promise<void> => {
    85      if (
@@ -114,7 +114,7 @@
   107        });
   108      }
   109    };
-  110  
+  110
   111    /** One pass at a time per instance; a call during one joins it. */
   112    const sweep = (): Promise<number> => {
   113      running ??= pass().finally(() => {
@@ -122,7 +122,7 @@
   115      });
   116      return running;
   117    };
-  118  
+  118
   119    return {
   120      sweep,
   121      wake: async (relationshipId: string): Promise<number> => {
@@ -154,6 +154,6 @@
   147      },
   148    };
   149  }
-  150  
+  150
   151  export type InstructionTriggers = ReturnType<typeof createInstructionTriggers>;
 ```

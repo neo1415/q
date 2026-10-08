@@ -48,6 +48,7 @@ import {
   arrivalWords,
   commandCardsOf,
   focusNote,
+  focusSay,
   planFromReading,
   readSpokenReply,
   sequenceCardOf,
@@ -56,7 +57,6 @@ import {
   type ArrivalData,
 } from "./arrival";
 import {
-  arrivalBriefingAction,
   decideArrivalCardAction,
   readArrivalWordsAction,
   type ArrivalDecision,
@@ -75,6 +75,9 @@ import {
   useArrival,
   type ArrivalLoader,
 } from "./arrival-store";
+import { useQControl } from "@/features/q/control/q-control";
+
+import { loadArrival } from "./arrival-browser";
 import { setRoomFilled, useRoomSlots } from "./arrival-room";
 
 /**
@@ -261,6 +264,8 @@ function useSequence(
           noteToLine(
             `${note}${done === null ? "" : ` Just now: ${done.replace(/\.$/u, "")}.`} Put this card to them briefly, then stop.`,
             true,
+            // The standard line says this as it is (E-03).
+            focusSay(cards, ref.current, done) ?? undefined,
           );
         }
       }
@@ -693,7 +698,7 @@ function CommandBar({
 const EASE = [0.2, 0, 0, 1] as const;
 
 /** The cards, one in focus, the others a line each; around Q when wide. */
-function Sequence({
+export function Sequence({
   data,
   decide,
   readWords,
@@ -702,6 +707,9 @@ function Sequence({
   round,
   onSettled,
   reload,
+  collapsed = false,
+  onExpand,
+  focusKey = null,
 }: {
   readonly data: ArrivalData;
   readonly decide: ArrivalDecide;
@@ -712,6 +720,14 @@ function Sequence({
   readonly onSettled?: (() => void) | undefined;
   /** New cards may be waiting (a retry): read the briefing again. */
   readonly reload: () => void;
+  /**
+   * E1: an answer holds the centre, so the decisions step aside into one
+   * line. Still mounted: the card in focus can still be decided by voice.
+   */
+  readonly collapsed?: boolean | undefined;
+  readonly onExpand?: (() => void) | undefined;
+  /** E1: the card Q just named (stage-focus.ts); null: none. */
+  readonly focusKey?: string | null | undefined;
 }) {
   const { state, status, reading, send, runWords } = useSequence(
     data.cards,
@@ -742,11 +758,56 @@ function Sequence({
   const room = useRoomSlots();
   const wide = useWide();
   const flank =
-    !compact && wide && room.left !== null && room.right !== null && active;
+    !compact &&
+    !collapsed &&
+    wide &&
+    room.left !== null &&
+    room.right !== null &&
+    active;
   useEffect(() => {
-    setRoomFilled(flank);
-    return () => setRoomFilled(false);
+    setRoomFilled(flank, "needs");
+    return () => setRoomFilled(false, "needs");
   }, [flank]);
+
+  // The card Q names comes into focus, as a tap on it would (E1).
+  // Only a new name moves the focus; the person's own taps stand. Sent as
+  // VOICE: Q named it, so the line is not told to put it to them again.
+  const focusedKey = card?.key ?? null;
+  const lastNamed = useRef<string | null>(null);
+  useEffect(() => {
+    if (focusKey === lastNamed.current) return;
+    lastNamed.current = focusKey;
+    if (focusKey === null || focusKey === focusedKey) return;
+    const outcome = state.outcomes[focusKey];
+    const open =
+      data.cards.some((one) => one.key === focusKey) &&
+      (outcome === undefined || outcome === "LATER");
+    if (open) void send({ type: "FOCUS", key: focusKey }, "VOICE");
+  }, [focusKey, focusedKey, data.cards, state.outcomes, send]);
+
+  // RECOVERY-2026-10 (C1 hooks): "open the second card" brings that card
+  // into focus, exactly as a tap on its line does. Handled here, never by
+  // the default click: the card in focus starts with its decision buttons,
+  // and a screen act must not approve anything.
+  const listRef = useRef<HTMLElement | null>(null);
+  const stillOpen = data.cards.filter((one) => {
+    const outcome = state.outcomes[one.key];
+    return outcome === undefined || outcome === "LATER";
+  });
+  useQControl({
+    id: "list.arrival-cards",
+    kind: "LIST",
+    ref: listRef,
+    count: stillOpen.length,
+    onAct: async (intent) => {
+      if (intent.act !== "SELECT_ITEM") return "NOT_APPLICABLE";
+      const target = stillOpen[(intent.index ?? 1) - 1];
+      if (target === undefined) return "TARGET_MISSING";
+      await send({ type: "FOCUS", key: target.key }, "BUTTON");
+      onExpand?.();
+      return "DONE";
+    },
+  });
 
   // The open line knows which card is in focus; a line opened later too.
   useEffect(() => {
@@ -787,6 +848,9 @@ function Sequence({
           }
         : {
             ok: false,
+            // Explicit for the lines (A's standard-cards reads this field;
+            // the wording below is for the duplex model only).
+            notAboutCards: true,
             situation:
               "That isn't about the cards. Pass their words to ask_q; the cards stay on screen.",
           };
@@ -803,6 +867,7 @@ function Sequence({
       noteToLine(
         `${note} This just came in from Q's work. At a natural pause, mention it once, gently, in a sentence; don't interrupt them.`,
         true,
+        focusSay(data.cards, state, "Something new just came in.") ?? undefined,
       );
     }
   }, [nudge, active, data.cards, state]);
@@ -819,6 +884,36 @@ function Sequence({
       <p className="m-0 cq-body-sm text-(--cq-text-secondary)" role="status">
         {status} That&apos;s everything for now.
       </p>
+    );
+  }
+
+  if (collapsed) {
+    // Stepped aside for an answer: one line, still the card in focus (a
+    // spoken "send it" still means this one), one tap to bring it back.
+    return (
+      <div
+        ref={(node) => {
+          listRef.current = node;
+        }}
+        className="flex min-h-11 items-center gap-2"
+        data-arrival-sequence
+        data-arrival-layout="strip"
+      >
+        <span className="cq-body-sm font-semibold text-(--cq-text-primary)">
+          Needs you
+        </span>
+        <span className="min-w-0 flex-1 truncate cq-body-sm text-(--cq-text-secondary)">
+          {state.cards.length > 1
+            ? `${String(state.focus + 1)} of ${String(state.cards.length)} · `
+            : ""}
+          {current.title}
+        </span>
+        {onExpand === undefined ? null : (
+          <Button variant="quiet" onClick={onExpand} data-arrival-expand>
+            Show
+          </Button>
+        )}
+      </div>
     );
   }
 
@@ -847,6 +942,7 @@ function Sequence({
       exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
       transition={{ duration: reduced ? 0 : 0.22, ease: EASE }}
       data-arrival-item={index}
+      data-q-item
     >
       {one.key === current.key ? (
         focusCard
@@ -867,6 +963,9 @@ function Sequence({
 
   return (
     <section
+      ref={(node) => {
+        listRef.current = node;
+      }}
       aria-label="Needs you"
       className={cx("flex w-full flex-col", compact ? "gap-2" : "gap-2.5")}
       data-arrival-sequence
@@ -971,14 +1070,14 @@ function useWide(): boolean {
   );
 }
 
-const defaultLoad: ArrivalLoader = (since) => arrivalBriefingAction(since);
-const defaultDecide: ArrivalDecide = (decision) =>
+export const defaultLoad: ArrivalLoader = loadArrival;
+export const defaultDecide: ArrivalDecide = (decision) =>
   decideArrivalCardAction(decision);
-const defaultReadWords: ArrivalReadWords = (request) =>
+export const defaultReadWords: ArrivalReadWords = (request) =>
   readArrivalWordsAction(request);
 
 /** New decisions later (an agent needs them): a NEEDS_YOU notice arrives. */
-function useLaterCards(load: ArrivalLoader, ready: boolean): void {
+export function useLaterCards(load: ArrivalLoader, ready: boolean): void {
   const items = useNotices().items;
   const known = useRef<Set<string> | null>(null);
   useEffect(() => {
@@ -1005,8 +1104,15 @@ export function ArrivalBriefing({
   now,
   onSettled,
   onClose,
+  cards = "inline",
 }: {
   readonly variant: "page" | "dock";
+  /**
+   * Where the decision cards go: with the words (the dock, the dev
+   * harness), or on the Q page's stage layer (E1), which keeps them
+   * beside Q once the conversation starts.
+   */
+  readonly cards?: "inline" | "stage" | undefined;
   /** The cards are all decided, or the person left them. */
   readonly onSettled?: (() => void) | undefined;
   /** Dock: the person closed it. */
@@ -1021,7 +1127,7 @@ export function ArrivalBriefing({
   readonly now?: (() => Date) | undefined;
 }) {
   const status = useArrival(load);
-  useLaterCards(load, status.kind !== "PENDING");
+  useLaterCards(load, cards === "inline" && status.kind !== "PENDING");
   const loaded = status.kind === "READY" ? status : null;
   // Once per round: the first surface greets; a later one (another page,
   // the Q page again) shows only what is still undecided.
@@ -1065,11 +1171,14 @@ export function ArrivalBriefing({
 
   if (ready === null || words === null) return <>{fallback}</>;
   const compact = variant === "dock";
+  // E1: on the Q page the cards are the stage's (arrival-stage.tsx), which
+  // outlives this welcome; here only the words.
+  const inline = cards === "inline";
   // On another page, a quiet day says nothing: the dock does not pop up.
   if (compact && ready.data.cards.length === 0 && words.quiet) return null;
   // Nothing left to put to them, and the greeting was given: the page's
   // own welcome (or, in the dock, nothing).
-  if (ready.quietHead && ready.data.cards.length === 0) {
+  if (ready.quietHead && (!inline || ready.data.cards.length === 0)) {
     return compact ? null : <>{fallback}</>;
   }
   return (
@@ -1123,6 +1232,11 @@ export function ArrivalBriefing({
             className="cq-body-lg cq-prose text-balance text-(--cq-text-secondary)"
             data-arrival-lowdown
           >
+            {words.welcome === null ? null : (
+              <span className="text-(--cq-text-primary)" data-arrival-welcome>
+                {words.welcome}{" "}
+              </span>
+            )}
             {words.lowdown}
           </p>
           {words.summary === null ? null : (
@@ -1133,9 +1247,17 @@ export function ArrivalBriefing({
               {words.summary}
             </p>
           )}
+          {words.matches === null ? null : (
+            <p
+              className="cq-body cq-prose text-balance text-(--cq-text-primary)"
+              data-arrival-matches-words
+            >
+              {words.matches}
+            </p>
+          )}
         </div>
       )}
-      {ready.data.cards.length === 0 ? null : (
+      {!inline || ready.data.cards.length === 0 ? null : (
         <Sequence
           key={ready.round}
           data={ready.data}

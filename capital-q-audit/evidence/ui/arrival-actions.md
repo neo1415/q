@@ -14,15 +14,15 @@
    47   * and reject (which bind to the payload the server holds), and the
    48   * person's own message for an edit.
    49   */
-   50  
+   50
    51  /** Cards read in full (exact message and their latest words). */
    52  const CARDS_MAX = 6;
-   53  
+   53
    54  function firstNameOf(display: string | null | undefined): string | null {
    55    const first = display?.trim().split(/\s+/u)[0];
    56    return first === undefined || first.length === 0 ? null : first.slice(0, 40);
    57  }
-   58  
+   58
    59  /** Their words since we last wrote, newest last; null when we wrote last. */
    60  function theirLatest(thread: ChatThreadDto | null): string | null {
    61    if (thread === null) return null;
@@ -33,7 +33,7 @@
    66    if (last === undefined || last.mine) return null;
    67    return last.body;
    68  }
-   69  
+   69
    70  /** The exact content an approval binds to, as the person is shown it. */
    71  function shownOf(view: QApprovalView | null): {
    72    readonly message: string | null;
@@ -45,7 +45,7 @@
    78    }
    79    return { message: null, preview: view.action.preview ?? null };
    80  }
-   81  
+   81
    82  function activityOf(since: QWorkSinceDto | null): ArrivalActivity | null {
    83    if (since === null) return null;
    84    return {
@@ -57,9 +57,9 @@
    90      matches: since.matches,
    91    };
    92  }
-   93  
+   93
    94  const SinceInput = z.string().datetime({ offset: true }).nullable();
-   95  
+   95
    96  /**
    97   * Everything the briefing needs, read in parallel. A read that fails is
    98   * absent (null activity, fewer cards), never an error that stops Q.
@@ -179,7 +179,7 @@
   212      waiting: waitingNotices,
   213    };
   214  }
-  215  
+  215
   216  const Id = z.string().uuid();
   217  const DecideInput = z.discriminatedUnion("kind", [
   218    z.object({
@@ -211,9 +211,9 @@
   244        .regex(/^[A-Za-z0-9_-]+$/u),
   245    }),
   246  ]);
-  247  
+  247
   248  export type ArrivalDecision = z.input<typeof DecideInput>;
-  249  
+  249
   250  export type ArrivalDecisionResult =
   251    | {
   252        readonly ok: true;
@@ -228,7 +228,7 @@
   261        /** The card changed since it was shown: read it again. */
   262        readonly changed?: true;
   263      };
-  264  
+  264
   265  /**
   266   * One decision on one card, as the person made it (a button, or their own
   267   * words read by code). Input from the browser, validated here; the server
@@ -313,4 +313,3 @@
   346    }
   347  }
 ```
-

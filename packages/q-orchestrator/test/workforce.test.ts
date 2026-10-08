@@ -2,9 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { DraftReviewResult } from "@capital-q/q-core";
 
+import { QAgentExecutorSchema } from "@capital-q/contracts";
+
 import {
-  AGENT_REGISTRY,
+  ALL_EXECUTORS,
+  UNREGISTERED_ROLE_REASONS,
   boundPlan,
+  executorRosterText,
+  planIsValid,
+  registeredExecutors,
   gradeOf,
   runJob,
   writeWithReview,
@@ -38,29 +44,49 @@ function review(
   };
 }
 
-describe("the agent registry", () => {
-  it("gives the writer and the reviewer no tools of their own", () => {
-    expect(AGENT_REGISTRY.WRITER.tools).toEqual([]);
-    expect(AGENT_REGISTRY.REVIEWER.tools).toEqual([]);
-    expect(AGENT_REGISTRY.MANDATE_WATCHER.tools).toContain(
-      "relationship.interest.express",
+describe("the executor registry (recovery D1)", () => {
+  it("declares every executor against the lead contract, and no writer or reviewer role", () => {
+    for (const executor of ALL_EXECUTORS) {
+      expect(QAgentExecutorSchema.safeParse(executor).success).toBe(true);
+    }
+    const roles = Object.keys(registeredExecutors({ research: true }));
+    expect(roles).toEqual([
+      "CONVERSATION",
+      "OUTREACH",
+      "SCHEDULING",
+      "DISCOVERY",
+      "RESEARCH",
+    ]);
+    // Documents and diligence have no executor, and say why.
+    expect(UNREGISTERED_ROLE_REASONS.DOCUMENTS).toMatch(/document/u);
+    expect(UNREGISTERED_ROLE_REASONS.DILIGENCE).toBeDefined();
+  });
+
+  it("registers research only where a research provider is composed", () => {
+    expect(registeredExecutors({ research: false }).RESEARCH).toBeUndefined();
+    const roster = executorRosterText(
+      registeredExecutors({ research: false }),
+      new Set(["chat.message.send"]),
     );
+    expect(roster).not.toMatch(/WRITER|REVIEWER|AD_HOC|RESEARCH|DOCUMENTS/u);
+    expect(roster).toMatch(/CONVERSATION/u);
   });
 });
 
 describe("boundPlan", () => {
   const permitted = new Set([
     "search_companies",
+    "list_my_relationships",
     "relationship.interest.express",
     "chat.message.send",
   ]);
 
-  it("keeps only tools the role has and the person allowed", () => {
+  it("keeps only tools the executor has and the person allowed", () => {
     const bound = boundPlan(
       [
         {
           key: "watch",
-          role: "MANDATE_WATCHER",
+          role: "DISCOVERY",
           agentName: null,
           goal: "find matches",
           tools: [
@@ -72,7 +98,7 @@ describe("boundPlan", () => {
         },
         {
           key: "book",
-          role: "SCHEDULER",
+          role: "SCHEDULING",
           agentName: null,
           goal: "book calls",
           tools: ["schedule.meeting.book"],
@@ -82,55 +108,92 @@ describe("boundPlan", () => {
       { permitted, budgetUsd: 1 },
     );
     expect(bound.steps.map((step) => step.key)).toEqual(["watch"]);
-    expect(bound.steps[0]?.tools).toEqual([
-      "search_companies",
-      "relationship.interest.express",
-    ]);
+    expect(bound.steps[0]).toMatchObject({
+      role: "MANDATE_WATCHER",
+      executor: "DISCOVERY",
+      tools: ["search_companies"],
+      outward: false,
+    });
     expect(bound.refused).toEqual([
       { key: "book", reason: "NO_PERMITTED_TOOL" },
     ]);
+    expect(planIsValid(bound)).toBe(false);
   });
 
-  it("spawns an ad-hoc agent with only permitted tools, and refuses one with none", () => {
+  it("refuses WRITER and REVIEWER steps (the audit's repro), so the plan is never offered", () => {
+    // capital-q-audit/evidence/agents/repro-writer-step.md: this plan was
+    // approved, the WRITER step HELD and the reply SKIPPED.
     const bound = boundPlan(
       [
         {
-          key: "nudge",
-          role: "AD_HOC",
-          agentName: "Thank-you writer",
-          goal: "thank the founders who replied",
-          tools: ["chat.message.send", "run_sql"],
+          key: "draft",
+          role: "WRITER",
+          agentName: null,
+          goal: "Draft the reply",
+          tools: [],
           dependsOn: [],
         },
         {
-          key: "wider",
-          role: "AD_HOC",
-          agentName: "Booker",
-          goal: "book",
-          tools: ["schedule.meeting.book"],
+          key: "grade",
+          role: "REVIEWER",
+          agentName: null,
+          goal: "Grade it",
+          tools: [],
+          dependsOn: ["draft"],
+        },
+        {
+          key: "reply",
+          role: "CONVERSATION",
+          agentName: null,
+          goal: "Send the reply",
+          tools: ["list_messages", "chat.message.send"],
+          dependsOn: ["grade"],
+        },
+      ],
+      {
+        permitted: new Set(["list_messages", "chat.message.send"]),
+        budgetUsd: 0.4,
+      },
+    );
+    expect(bound.refused).toEqual([
+      { key: "draft", reason: "NO_EXECUTOR" },
+      { key: "grade", reason: "NO_EXECUTOR" },
+      { key: "reply", reason: "WAITS_ON_MISSING_STEP" },
+    ]);
+    expect(planIsValid(bound)).toBe(false);
+  });
+
+  it("accepts the same job planned the honest way: one conversation step", () => {
+    const bound = boundPlan(
+      [
+        {
+          key: "reply",
+          role: "CONVERSATION",
+          agentName: null,
+          goal: "Reply to Zino",
+          tools: ["list_messages", "chat.message.send"],
           dependsOn: [],
         },
       ],
-      { permitted, budgetUsd: 1 },
+      {
+        permitted: new Set(["list_messages", "chat.message.send"]),
+        budgetUsd: 0.4,
+      },
     );
-    expect(bound.steps).toHaveLength(1);
+    expect(planIsValid(bound)).toBe(true);
     expect(bound.steps[0]).toMatchObject({
-      agentName: "Thank-you writer",
-      tools: ["chat.message.send"],
-      spawned: true,
+      executor: "CONVERSATION",
       outward: true,
+      spawned: false,
     });
-    expect(bound.refused).toEqual([
-      { key: "wider", reason: "NO_PERMITTED_TOOL" },
-    ]);
   });
 
-  it("refuses steps past the job's budget, the lead as a step and unknown roles", () => {
+  it("refuses ad-hoc agents, roles without an executor here, the lead, unknown roles and steps past the budget", () => {
     const bound = boundPlan(
       [
         {
           key: "a",
-          role: "RESEARCH",
+          role: "DISCOVERY",
           agentName: null,
           goal: "g",
           tools: ["search_companies"],
@@ -138,7 +201,7 @@ describe("boundPlan", () => {
         },
         {
           key: "b",
-          role: "RESEARCH",
+          role: "DISCOVERY",
           agentName: null,
           goal: "g",
           tools: ["search_companies"],
@@ -160,15 +223,72 @@ describe("boundPlan", () => {
           tools: [],
           dependsOn: [],
         },
+        {
+          key: "e",
+          role: "AD_HOC",
+          agentName: "Thanker",
+          goal: "g",
+          tools: ["chat.message.send"],
+          dependsOn: [],
+        },
+        {
+          key: "f",
+          role: "DOCUMENTS",
+          agentName: null,
+          goal: "g",
+          tools: [],
+          dependsOn: [],
+        },
+        {
+          key: "g",
+          role: "RESEARCH",
+          agentName: null,
+          goal: "g",
+          tools: ["public_web.search"],
+          dependsOn: [],
+        },
       ],
-      { permitted, budgetUsd: 0.15 },
+      {
+        permitted: new Set([...permitted, "public_web.search"]),
+        budgetUsd: 0.05,
+      },
     );
     expect(bound.steps.map((step) => step.key)).toEqual(["a"]);
     expect(bound.refused.map((one) => one.reason)).toEqual([
       "OVER_BUDGET",
       "LEAD_IS_NOT_A_STEP",
       "UNKNOWN_ROLE",
+      "NO_EXECUTOR",
+      "NO_EXECUTOR",
+      // No research provider composed in the default registry.
+      "NO_EXECUTOR",
     ]);
+  });
+
+  it("plans research when the deployment registers it", () => {
+    const bound = boundPlan(
+      [
+        {
+          key: "look",
+          role: "RESEARCH",
+          agentName: null,
+          goal: "five investors",
+          tools: ["public_web.search"],
+          dependsOn: [],
+        },
+      ],
+      {
+        permitted: new Set(["public_web.search"]),
+        budgetUsd: 1,
+        executors: registeredExecutors({ research: true }),
+      },
+    );
+    expect(planIsValid(bound)).toBe(true);
+    expect(bound.steps[0]).toMatchObject({
+      role: "RESEARCH",
+      executor: "RESEARCH",
+      outward: false,
+    });
   });
 });
 
@@ -310,7 +430,7 @@ describe("runJob", () => {
       [
         {
           key: "watch",
-          role: "MANDATE_WATCHER",
+          role: "DISCOVERY",
           agentName: null,
           goal: "g",
           tools: ["search_companies"],
@@ -326,8 +446,8 @@ describe("runJob", () => {
         },
         {
           key: "thank",
-          role: "AD_HOC",
-          agentName: "Thanker",
+          role: "CONVERSATION",
+          agentName: null,
           goal: "g",
           tools: ["chat.message.send"],
           dependsOn: [],
@@ -345,10 +465,10 @@ describe("runJob", () => {
       steps: bound.steps,
       recorder: port,
       executors: {
-        MANDATE_WATCHER: () =>
+        DISCOVERY: () =>
           Promise.resolve({ status: "HELD", summary: "nothing new" }),
         CONVERSATION: (step) => {
-          conversation.push(step.agentName);
+          conversation.push(step.key);
           return Promise.resolve({ status: "DONE", summary: "replied" });
         },
       },
@@ -358,10 +478,99 @@ describe("runJob", () => {
       "SKIPPED",
       "DONE",
     ]);
-    // The spawned agent ran on the conversation executor, as itself.
-    expect(conversation).toEqual(["Thanker"]);
+    expect(conversation).toEqual(["thank"]);
     expect(runs[0]).toMatchObject({ role: "LEAD", spawnedBy: null });
     expect(runs.slice(1).every((run) => run.spawnedBy === "run-1")).toBe(true);
     expect(handoffs).toContain("run-2->run-3");
+  });
+
+  it("resumes after a restart: a finished step is never redone, an interrupted one runs again (D3)", async () => {
+    const { runs, port } = recorder();
+    const bound = boundPlan(
+      [
+        {
+          key: "watch",
+          role: "DISCOVERY",
+          agentName: null,
+          goal: "g",
+          tools: ["search_companies"],
+          dependsOn: [],
+        },
+        {
+          key: "reply",
+          role: "CONVERSATION",
+          agentName: null,
+          goal: "g",
+          tools: ["chat.message.send"],
+          dependsOn: ["watch"],
+        },
+      ],
+      {
+        permitted: new Set(["search_companies", "chat.message.send"]),
+        budgetUsd: 1,
+      },
+    );
+    const ran: string[] = [];
+    const result = await runJob({
+      jobId: "job-1",
+      goal: "the job",
+      steps: bound.steps,
+      recorder: {
+        ...port,
+        // "watch" finished before the restart; "reply" was interrupted.
+        prior: (_job, key) =>
+          Promise.resolve(
+            key === "watch"
+              ? {
+                  runId: "old-watch",
+                  status: "DONE" as const,
+                  summary: "3 found",
+                }
+              : null,
+          ),
+      },
+      executors: {
+        DISCOVERY: () => {
+          ran.push("watch");
+          return Promise.resolve({ status: "DONE", summary: "again" });
+        },
+        CONVERSATION: () => {
+          ran.push("reply");
+          return Promise.resolve({ status: "DONE", summary: "replied" });
+        },
+      },
+    });
+    expect(ran).toEqual(["reply"]);
+    expect(result.steps).toMatchObject([
+      { key: "watch", runId: "old-watch", status: "DONE", summary: "3 found" },
+      { key: "reply", status: "DONE" },
+    ]);
+    // Lead plus the one re-run step: no second run for the finished step.
+    expect(runs).toHaveLength(2);
+  });
+
+  it("holds a step whose executor is missing, with the reason, instead of faking it", async () => {
+    const { port } = recorder();
+    const result = await runJob({
+      jobId: "job-1",
+      goal: "g",
+      steps: [
+        {
+          key: "old",
+          role: "WRITER",
+          executor: null,
+          agentName: "Writer",
+          goal: "g",
+          tools: [],
+          dependsOn: [],
+          budgetUsd: 0.1,
+          outward: false,
+          spawned: false,
+        },
+      ],
+      recorder: port,
+      executors: {},
+    });
+    expect(result.steps[0]).toMatchObject({ status: "HELD" });
   });
 });

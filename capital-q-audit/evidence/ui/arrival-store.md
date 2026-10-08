@@ -6,22 +6,22 @@
 
 ```
     1  "use client";
-    2  
+    2
     3  import { useEffect, useSyncExternalStore } from "react";
-    4  
+    4
     5  import type { ArrivalData } from "./arrival";
     6  import { decideArrival, onReturn } from "./arrival-gate";
-    7  
+    7
     8  /**
     9   * The arrival briefing's data for this page load, shared by the Q page
    10   * and the dock (whichever is on screen gives it), and what Q says first on
    11   * voice. Browser-only; nothing here persists.
    12   */
-   13  
+   13
    14  export type ArrivalLoader = (
    15    since: string | null,
    16  ) => Promise<ArrivalData | null>;
-   17  
+   17
    18  export type ArrivalStatus =
    19    | { readonly kind: "PENDING" }
    20    /** No briefing on this page load (not an arrival, or nothing read). */
@@ -33,7 +33,7 @@
    26        /** Cards that came in later (no greeting, a gentle nudge). */
    27        readonly nudge: boolean;
    28      };
-   29  
+   29
    30  let status: ArrivalStatus = { kind: "PENDING" };
    31  let started = false;
    32  let round = 0;
@@ -48,21 +48,21 @@
    41  const handled = new Set<string>();
    42  let leftRound = -1;
    43  let greetedRound = -1;
-   44  
+   44
    45  function set(next: ArrivalStatus): void {
    46    status = next;
    47    for (const notify of subscribers) notify();
    48  }
-   49  
+   49
    50  function subscribe(notify: () => void): () => void {
    51    subscribers.add(notify);
    52    return () => {
    53      subscribers.delete(notify);
    54    };
    55  }
-   56  
+   56
    57  const PENDING: ArrivalStatus = { kind: "PENDING" };
-   58  
+   58
    59  async function load(
    60    loader: ArrivalLoader,
    61    since: string | null,
@@ -76,7 +76,7 @@
    69    }
    70    set({ kind: "READY", data, round, nudge });
    71  }
-   72  
+   72
    73  /** Starts this page load's briefing once; later calls share it. */
    74  export function startArrival(loader: ArrivalLoader): void {
    75    if (started) return;
@@ -92,11 +92,11 @@
    85      void load(loader, again.since, false);
    86    });
    87  }
-   88  
+   88
    89  function currentStatus(): ArrivalStatus {
    90    return status;
    91  }
-   92  
+   92
    93  /**
    94   * A call is starting: the briefing's data, read now if this page load has
    95   * none (the gate gives the cards once per browser session, but a call is
@@ -135,12 +135,12 @@
   128      cards: data.cards.filter((card) => !handled.has(card.key)),
   129    };
   130  }
-  131  
+  131
   132  /** New decisions arrived later (an agent needs them): the cards again. */
   133  export function refreshArrival(loader: ArrivalLoader): void {
   134    void load(loader, null, true);
   135  }
-  136  
+  136
   137  export function useArrival(loader: ArrivalLoader): ArrivalStatus {
   138    useEffect(() => {
   139      startArrival(loader);
@@ -151,7 +151,7 @@
   144      () => PENDING,
   145    );
   146  }
-  147  
+  147
   148  /** The briefing's state, without starting it (for surfaces around it). */
   149  export function useArrivalStatus(): ArrivalStatus {
   150    return useSyncExternalStore(
@@ -160,46 +160,46 @@
   153      () => PENDING,
   154    );
   155  }
-  156  
+  156
   157  export function setArrivalSpoken(words: string | null): void {
   158    spoken = words;
   159  }
-  160  
+  160
   161  /** What Q says first on voice when the briefing was given; null otherwise. */
   162  export function arrivalSpoken(): string | null {
   163    return spoken;
   164  }
-  165  
+  165
   166  /** Whether this page load gives a briefing (decided, or about to be). */
   167  export function arrivalPending(): boolean {
   168    return status.kind === "PENDING" && started;
   169  }
-  170  
+  170
   171  /** A card decided or put off on this page load. */
   172  export function markHandled(key: string): void {
   173    handled.add(key);
   174  }
-  175  
+  175
   176  export function isHandled(key: string): boolean {
   177    return handled.has(key);
   178  }
-  179  
+  179
   180  /** The person left the sequence for this round. */
   181  export function markLeft(round: number): void {
   182    leftRound = round;
   183  }
-  184  
+  184
   185  export function leftIn(round: number): boolean {
   186    return leftRound === round;
   187  }
-  188  
+  188
   189  /** Greets once per round; true the first time it is asked for a round. */
   190  export function claimGreeting(round: number): boolean {
   191    if (greetedRound === round) return false;
   192    greetedRound = round;
   193    return true;
   194  }
-  195  
+  195
   196  /**
   197   * A line said just before the cards are read again (a retry's outcome),
   198   * kept for the next sequence to show: re-reading never swallows it.
@@ -213,7 +213,7 @@
   206    carried = null;
   207    return text;
   208  }
-  209  
+  209
   210  /** For the dev harness and tests: start over. */
   211  export function resetArrival(): void {
   212    status = { kind: "PENDING" };
@@ -225,4 +225,3 @@
   218    carried = null;
   219  }
 ```
-

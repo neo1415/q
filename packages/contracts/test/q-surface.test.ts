@@ -165,6 +165,52 @@ const completedRun = {
       title: "Investment brief",
     },
     { kind: "UI_INTENT", intent: { kind: "OPEN_COMPANY", companyId: UUID } },
+    // RECOVERY E4: the visual blocks are part of the public run too.
+    {
+      kind: "TABLE",
+      title: "Side by side",
+      columns: [{ label: "Apex Capital", subject: null }],
+      rows: [{ label: "Based in", cells: ["GB"] }],
+    },
+    {
+      kind: "CHART",
+      chart: "BAR",
+      title: "Monthly revenue",
+      unit: "a month",
+      currency: "USD",
+      series: [
+        {
+          label: "Revenue",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "DOCUMENT_SUPPORTED",
+          source: "From the bank statements they uploaded.",
+          points: [
+            { label: "Aug", value: 1200 },
+            { label: "Sep", value: 1800 },
+          ],
+        },
+      ],
+    },
+    {
+      kind: "MAP",
+      title: "Where they're based",
+      basis: "Head-office country, as each investor publishes it.",
+      places: [
+        { label: "Apex Capital", countryCode: "GB", subject: null, note: null },
+      ],
+    },
+    {
+      kind: "TIMELINE",
+      title: "Your relationship",
+      events: [
+        {
+          at: "2026-09-12",
+          label: "Interest expressed",
+          note: null,
+          subject: null,
+        },
+      ],
+    },
     {
       kind: "PUBLIC_SOURCE",
       url: "https://news.example.com/2026/09/northstar",
@@ -317,6 +363,11 @@ describe("type-level guarantees", () => {
           return block.intent.kind;
         case "PUBLIC_SOURCE":
           return block.url;
+        case "TABLE":
+        case "CHART":
+        case "MAP":
+        case "TIMELINE":
+          return block.title;
         default: {
           const unreachable: never = block;
           return unreachable;

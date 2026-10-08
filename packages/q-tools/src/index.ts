@@ -103,6 +103,13 @@ export {
   matchCounterpart,
   nameSimilarity,
   CONTROL_SCREEN,
+  OPERATE_SCREEN,
+  OperateScreenInputSchema,
+  Q_CONTROL_KIND_ACTS,
+  createOperateScreenTool,
+  resolveControlTarget,
+  type OperateScreenInput,
+  type ScreenControlsReader,
   CONTROL_DOCUMENT,
   createControlDocumentTool,
   ControlScreenInputSchema,
@@ -329,6 +336,24 @@ export {
   type SearchCompaniesOutput,
 } from "./tools/search-companies.js";
 export { createDefaultQTools, createQTools } from "./default-tools.js";
+export {
+  ATTENTION_ITEMS_PER_SOURCE,
+  ATTENTION_SOURCE_DEADLINE_MS,
+  attentionSourcesFromPorts,
+  createAttentionReader,
+  createReadAttentionTool,
+  Q_ATTENTION_PATH,
+  READ_ATTENTION,
+  READ_ATTENTION_PROVIDER_NAME,
+  ReadAttentionInputSchema,
+  readAttention,
+  type AttentionPort,
+  type AttentionReadContext,
+  type AttentionReader,
+  type AttentionSourceReader,
+  type AttentionSources,
+  type ReadAttentionInput,
+} from "./tools/attention.js";
 
 export {
   createDiscoverySlateTool,
@@ -675,3 +700,8 @@ export {
   type ExploreToolPort,
   type SearchNetworkOutput,
 } from "./tools/explore.js";
+// RECOVERY-2026-10 (C6): the generated catalog of page control ids.
+export {
+  Q_CONTROL_CATALOG,
+  type QControlCatalogEntry,
+} from "./tools/control-catalog.js";

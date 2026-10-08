@@ -6,7 +6,7 @@
 
 ```
     1  import { z } from "zod";
-    2  
+    2
     3  import { UuidSchema } from "../common/ids.js";
     4  import { QActionProposalSchema } from "./action.js";
     5  import { QAnswerCardsBlockSchema } from "./answer-cards.js";
@@ -21,7 +21,7 @@
    14    Q_COMPARISON_SUBJECTS_MIN,
    15    QUiIntentSchema,
    16  } from "./ui-intent.js";
-   17  
+   17
    18  /**
    19   * What Q returns: a bounded sequence of typed blocks, not one text blob
    20   * (doc 12 §44, §70; doc 22 §192).
@@ -57,35 +57,35 @@
    50    "UI_INTENT",
    51    "PUBLIC_SOURCE",
    52  ] as const;
-   53  
+   53
    54  export type QResultBlockKind = (typeof Q_RESULT_BLOCK_KINDS)[number];
-   55  
+   55
    56  export const QResultBlockKindSchema = z.enum(Q_RESULT_BLOCK_KINDS);
-   57  
+   57
    58  export const Q_TEXT_BLOCK_MAX_LENGTH = 16_000;
-   59  
+   59
    60  export const QTextBlockSchema = z
    61    .object({
    62      kind: z.literal("TEXT"),
    63      text: z.string().min(1).max(Q_TEXT_BLOCK_MAX_LENGTH),
    64    })
    65    .strict();
-   66  
+   66
    67  export const QCompanyReferenceBlockSchema = z
    68    .object({ kind: z.literal("COMPANY_REFERENCE"), companyId: UuidSchema })
    69    .strict();
-   70  
+   70
    71  export const QInvestorReferenceBlockSchema = z
    72    .object({
    73      kind: z.literal("INVESTOR_REFERENCE"),
    74      investorOrganisationId: UuidSchema,
    75    })
    76    .strict();
-   77  
+   77
    78  export const Q_COMPARISON_ROWS_MAX = 30;
    79  export const Q_COMPARISON_LABEL_MAX_LENGTH = 120;
    80  export const Q_COMPARISON_VALUE_MAX_LENGTH = 500;
-   81  
+   81
    82  /**
    83   * Subjects side by side across labelled rows. Every row has exactly one
    84   * plain-text value per subject, in subject order, so a client can lay the
@@ -119,7 +119,7 @@
   112        path: ["rows"],
   113      },
   114    );
-  115  
+  115
   116  /**
   117   * Named things side by side as cards (founder design 2026-09-28): a name,
   118   * a line under it, and the few points that matter for what was asked. The
@@ -145,22 +145,22 @@
   138        .max(4),
   139    })
   140    .strict();
-  141  
+  141
   142  export const QEvidenceBlockSchema = z
   143    .object({
   144      kind: z.literal("EVIDENCE"),
   145      evidenceRefs: QEvidenceRefsSchema.min(1),
   146    })
   147    .strict();
-  148  
+  148
   149  export const QFindingBlockSchema = z
   150    .object({ kind: z.literal("FINDING"), finding: QPublicFindingSchema })
   151    .strict();
-  152  
+  152
   153  export const Q_UNCERTAINTY_STATEMENT_MAX_LENGTH = 2000;
   154  export const Q_UNCERTAINTY_MISSING_MAX = 10;
   155  export const Q_UNCERTAINTY_MISSING_ITEM_MAX_LENGTH = 200;
-  156  
+  156
   157  /**
   158   * Q saying what it could not establish, and why. Confidence here can only
   159   * be an uncertain level; an uncertainty block claiming HIGH confidence would
@@ -181,12 +181,12 @@
   174        .optional(),
   175    })
   176    .strict();
-  177  
+  177
   178  export const Q_CLARIFICATION_QUESTION_MAX_LENGTH = 1000;
   179  export const Q_CLARIFICATION_OPTIONS_MIN = 2;
   180  export const Q_CLARIFICATION_OPTIONS_MAX = 6;
   181  export const Q_CLARIFICATION_OPTION_MAX_LENGTH = 200;
-  182  
+  182
   183  /** Q asking the person before proceeding (doc 12 §8.2; doc 22 §77). */
   184  export const QClarificationRequestBlockSchema = z
   185    .object({
@@ -199,14 +199,14 @@
   192        .optional(),
   193    })
   194    .strict();
-  195  
+  195
   196  export const QActionProposalBlockSchema = z
   197    .object({
   198      kind: z.literal("ACTION_PROPOSAL"),
   199      proposal: QActionProposalSchema,
   200    })
   201    .strict();
-  202  
+  202
   203  /**
   204   * Something Q composed, referred to from the answer that composed it.
   205   *
@@ -224,7 +224,7 @@
   217      title: z.string().trim().min(1).max(160),
   218    })
   219    .strict();
-  220  
+  220
   221  /**
   222   * A document tool's own result when it filed a new version of one of the
   223   * person's documents (`revise_my_document`). The answer path turns exactly
@@ -253,11 +253,11 @@
   246    })
   247    .strict();
   248  export type QDocumentToolResult = z.infer<typeof QDocumentToolResultSchema>;
-  249  
+  249
   250  export const QUiIntentBlockSchema = z
   251    .object({ kind: z.literal("UI_INTENT"), intent: QUiIntentSchema })
   252    .strict();
-  253  
+  253
   254  /**
   255   * A public web page Q read for this answer (R23, R38). The answer is said
   256   * first; the page sits behind the Sources disclosure with the only fields
@@ -288,7 +288,7 @@
   281      retrievedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   282    })
   283    .strict();
-  284  
+  284
   285  export const QResultBlockSchema = z.discriminatedUnion("kind", [
   286    QTextBlockSchema,
   287    QCompanyReferenceBlockSchema,
@@ -305,12 +305,12 @@
   298    QUiIntentBlockSchema,
   299    QPublicSourceBlockSchema,
   300  ]);
-  301  
+  301
   302  export type QResultBlock = z.infer<typeof QResultBlockSchema>;
-  303  
+  303
   304  /** Blocks per message or run summary. A V1 technical bound. */
   305  export const Q_RESULT_BLOCKS_MAX = 50;
-  306  
+  306
   307  export const QResultBlocksSchema = z
   308    .array(QResultBlockSchema)
   309    .max(Q_RESULT_BLOCKS_MAX);
@@ -324,9 +324,9 @@
 
 ```
     1  import { z } from "zod";
-    2  
+    2
     3  import { QSubjectRefSchema } from "./subject.js";
-    4  
+    4
     5  /**
     6   * Q's answer as cards (founder brief 2026-10-05, C1-C5; ADR 0053).
     7   *
@@ -344,7 +344,7 @@
    19   * `of`, so "based on 4 of 6" says what was not known instead of scoring
    20   * it as zero.
    21   */
-   22  
+   22
    23  /** How one measure fits, in words. Shown with a shape, never colour alone. */
    24  export const Q_ANSWER_CARD_LEVELS = [
    25    "STRONG",
@@ -354,7 +354,7 @@
    29  ] as const;
    30  export const QAnswerCardLevelSchema = z.enum(Q_ANSWER_CARD_LEVELS);
    31  export type QAnswerCardLevel = z.infer<typeof QAnswerCardLevelSchema>;
-   32  
+   32
    33  /**
    34   * RANKED: a "top N", ordered by fit (code orders it).
    35   * SIDE_BY_SIDE: a comparison, in the order asked; the page can lay it out
@@ -368,14 +368,14 @@
    43  ] as const;
    44  export const QAnswerCardsShapeSchema = z.enum(Q_ANSWER_CARDS_SHAPES);
    45  export type QAnswerCardsShape = z.infer<typeof QAnswerCardsShapeSchema>;
-   46  
+   46
    47  export const Q_ANSWER_CARDS_MAX = 10;
    48  export const Q_ANSWER_CARD_REASONS_MAX = 3;
    49  export const Q_ANSWER_CARD_MEASURES_MAX = 8;
    50  export const Q_ANSWER_CARD_FOLLOW_UPS_MAX = 3;
    51  /** Identity colours: `--cq-card-hue-1` .. `--cq-card-hue-7`. */
    52  export const Q_ANSWER_CARD_HUES = 7;
-   53  
+   53
    54  export const QAnswerCardMeasureSchema = z
    55    .object({
    56      label: z.string().trim().min(1).max(40),
@@ -385,7 +385,7 @@
    60    })
    61    .strict();
    62  export type QAnswerCardMeasure = z.infer<typeof QAnswerCardMeasureSchema>;
-   63  
+   63
    64  /** Fit out of 10, computed by code from the known measures. */
    65  export const QAnswerCardFitSchema = z
    66    .object({
@@ -400,7 +400,7 @@
    75      message: "measured never exceeds the measures on the card",
    76    });
    77  export type QAnswerCardFit = z.infer<typeof QAnswerCardFitSchema>;
-   78  
+   78
    79  export const QAnswerCardSchema = z
    80    .object({
    81      /** Stable within the block (the page keys animation and dismissal on it). */
@@ -432,7 +432,7 @@
   107    })
   108    .strict();
   109  export type QAnswerCard = z.infer<typeof QAnswerCardSchema>;
-  110  
+  110
   111  export const QAnswerCardsBlockSchema = z
   112    .object({
   113      kind: z.literal("ANSWER_CARDS"),
@@ -459,4 +459,3 @@
   134    );
   135  export type QAnswerCardsBlock = z.infer<typeof QAnswerCardsBlockSchema>;
 ```
-

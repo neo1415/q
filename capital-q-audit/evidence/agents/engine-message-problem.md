@@ -5,7 +5,7 @@
 - Why included: messageProblem: code's message checks (cold open, woo, mandate, unanswered question, bookingAuto).
 
 ```ts
- 1160  
+ 1160
  1161  /**
  1162   * Code's check of a message: whether it may be written at all in this
  1163   * conversation, then its words against the material it may use.
@@ -123,7 +123,7 @@
  1275        templatedAnswer(thread, context) !== null,
  1276    };
  1277  }
- 1278  
+ 1278
  1279  // ---------------------------------------------------------------------------
  1280  // One firing
 ```

@@ -52,7 +52,7 @@ import type {
   CompanyClaimsPort,
   StartupAlertsPort,
 } from "./actions/gateq-find.js";
-import type { QWorkPagePort } from "./actions/work.js";
+import type { QWorkPagePort, WorkforceJobPort } from "./actions/work.js";
 import type { EtiquetteGuidePort } from "./actions/etiquette.js";
 import type { ReadinessService } from "@capital-q/readiness";
 import type { TeamPort } from "./actions/team.js";
@@ -72,6 +72,8 @@ export type DocumentUploadLimits = {
 export type AppActionPorts = {
   /** WORK-58: pause/resume their own standing instruction, set a card aside. */
   readonly qWork?: QWorkPagePort | undefined;
+  /** Recovery D6: stop one of Q's jobs (the durable work queue). */
+  readonly workforceJobs?: WorkforceJobPort | undefined;
   /** P7: an investor's mandate read into DRAFT gateway rules. */
   readonly gateqPolicyExtraction?: GateQPolicyExtractionPort | undefined;
   /** F4: an investor organisation's GateQ inbox (gateq-intake's inbox service). */

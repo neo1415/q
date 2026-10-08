@@ -21,7 +21,7 @@
   143      },
   144      options.checkpoints.saver,
   145    );
-  146  
+  146
   147    function config(ref: QRunRef, signal: AbortSignal | undefined) {
   148      return {
   149        configurable: {
@@ -31,7 +31,7 @@
   153        ...(signal === undefined ? {} : { signal }),
   154      };
   155    }
-  156  
+  156
   157    async function handleOf(ref: QRunRef): Promise<QRunHandle> {
   158      const run = await runtime.readRun(ref);
   159      if (run === null) {
@@ -40,7 +40,7 @@
   162      }
   163      return toQRunHandle(run);
   164    }
-  165  
+  165
   166    /**
   167     * Drives the engine for one invocation and reconciles the canonical
   168     * lifecycle with what it did. Resolves with the run's handle whatever
@@ -65,7 +65,7 @@
   187          let outcome = "unknown";
   188          try {
   189            const result = await invoke();
-  190  
+  190
   191            if (isInterrupted(result)) {
   192              const current = await runtime.readRun(ref);
   193              if (current?.status === "AWAITING_APPROVAL") {
@@ -162,7 +162,7 @@
   284        },
   285      );
   286    }
-  287  
+  287
   288    /** Maps the action gate's outcome onto the canonical lifecycle. */
   289    async function settleAction(
   290      ref: QRunRef,
@@ -207,7 +207,7 @@
   329          return "unknown";
   330      }
   331    }
-  332  
+  332
   333    return {
   334      start: async (input: QOrchestrationInput) => {
   335        const run = await runtime.loadOwnedRun(
@@ -223,7 +223,7 @@
   345        }
   346        requireSameOrganisationContext(run, input.actor);
   347        const ref = runRef(run);
-  348  
+  348
   349        // RECEIVED → PREFLIGHT, stamping the version and the real start time.
   350        // Anything but ADVANCED means another starter or a cancellation got
   351        // there first; the engine is not touched.
@@ -238,7 +238,7 @@
   360          }
   361          throw new QRunAlreadyStartedError();
   362        }
-  363  
+  363
   364        const initial: QGraphState = {
   365          runId: run.id,
   366          tenantId: run.tenantId,
@@ -271,7 +271,7 @@
   393          "start",
   394        );
   395      },
-  396  
+  396
   397      resume: async (input: QResumeInput) => {
   398        const run = await runtime.loadOwnedRun(
   399          input.actor,
@@ -295,7 +295,7 @@
   417        // context that owns it.
   418        requireSameOrganisationContext(run, input.actor);
   419        const ref = runRef(run);
-  420  
+  420
   421        // AWAITING_INPUT → PLANNING, or AWAITING_APPROVAL → ACTION_EXECUTION.
   422        // Two concurrent resumes serialise on the row lock; the second finds
   423        // the run already moved and is refused rather than driving the
@@ -312,7 +312,7 @@
   434          }
   435          throw new QRunNotResumableError(resumed.run.status);
   436        }
-  437  
+  437
   438        return execute(
   439          ref,
   440          () =>
@@ -334,7 +334,7 @@
   456          "resume",
   457        );
   458      },
-  459  
+  459
   460      cancel: async (input: QCancelInput) => {
   461        // The canonical lifecycle is the authority. A running engine sees the
   462        // result at its next boundary; a suspended one is simply never

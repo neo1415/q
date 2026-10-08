@@ -48,11 +48,11 @@
   138  const HEARD_MAX = 4;
   139  /** What a line accepts as its opening; the contract caps firstMessage at 700. */
   140  const OPENING_MAX = 700;
-  141  
+  141
   142  export type DuplexFallbackCause =
   143    "CONNECT" | "NETWORK" | "RELAY" | "CAP" | "MAX_LENGTH";
   144  type RejoinCause = QVoiceDuplexRejoin["cause"];
-  145  
+  145
   146  /** Rejoins one line may make before it hands over for good. */
   147  export const MAX_REJOINS = 6;
   148  /** Fresh calls tried per rejoin, with a growing pause between them. */
@@ -148,8 +148,7 @@
   347      },
   348    };
   349  }
-  350  
+  350
   351  /** How long the provider has to answer the session offer (a slow line too). */
   352  export const DUPLEX_CONNECT_MS = 10_000;
 ```
-

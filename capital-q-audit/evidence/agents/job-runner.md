@@ -7,7 +7,7 @@
 ```ts
     1  import type { BoundStep } from "./plan.js";
     2  import { AGENT_REGISTRY, type AgentRole } from "./registry.js";
-    3  
+    3
     4  /**
     5   * Running a bounded plan (founder brief J1, J4, J9).
     6   *
@@ -22,9 +22,9 @@
    15   * narrower agent, never a wider one. No executor for a step's tools means
    16   * the step goes to the person.
    17   */
-   18  
+   18
    19  export type StepStatus = "DONE" | "HELD" | "FAILED" | "SKIPPED";
-   20  
+   20
    21  export type StepResult = {
    22    readonly status: Exclude<StepStatus, "SKIPPED">;
    23    /** One line for the timeline, in plain words. */
@@ -32,19 +32,19 @@
    25    /** What later steps may read (ids, counts), never free text from a model. */
    26    readonly outputs?: Readonly<Record<string, unknown>> | undefined;
    27  };
-   28  
+   28
    29  export type AgentContext = {
    30    readonly jobId: string;
    31    readonly runId: string;
    32    /** Finished steps' results by key. */
    33    readonly results: ReadonlyMap<string, StepResult>;
    34  };
-   35  
+   35
    36  export type AgentExecutor = (
    37    step: BoundStep,
    38    context: AgentContext,
    39  ) => Promise<StepResult>;
-   40  
+   40
    41  export type JobRecorder = {
    42    readonly startRun: (input: {
    43      readonly jobId: string;
@@ -68,7 +68,7 @@
    61      readonly note: string;
    62    }) => Promise<void>;
    63  };
-   64  
+   64
    65  export type JobRunResult = {
    66    readonly leadRunId: string;
    67    readonly steps: readonly {
@@ -78,7 +78,7 @@
    71      readonly summary: string;
    72    }[];
    73  };
-   74  
+   74
    75  /** The executor that runs a step: its role's, or for a spawn a covering role's. */
    76  export function executorFor(
    77    step: BoundStep,
@@ -97,7 +97,7 @@
    90    }
    91    return executors.AD_HOC ?? null;
    92  }
-   93  
+   93
    94  export async function runJob(input: {
    95    readonly jobId: string;
    96    readonly goal: string;

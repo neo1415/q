@@ -6,7 +6,7 @@
 
 ```ts
   336      },
-  337  
+  337
   338      /**
   339       * S4: claims the instructions due now -- ACTIVE only: a STOPPED or
   340       * PAUSED one is never claimed, whatever its next_fire_at -- moving each one's next firing
@@ -29,5 +29,5 @@
   357              limit ${limit}
   358              for update skip locked)
   359          returning s.id, s.last_fired_at as claimed_at`,
-  360  
+  360
 ```

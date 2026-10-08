@@ -826,9 +826,14 @@ describe("spoken words that were not for Q (founder live 2026-09-29)", () => {
     expect(run.delegated()).toBe(1);
   });
 
-  it("never asks the room to say that again: an unclear spoken turn is silent", async () => {
+  // RECOVERY-2026-10 (live T1, 11:13): "Fidiani inanituma attention" was
+  // read UNCLEAR, Q went SILENT, and the realtime voice improvised "could
+  // you give me more detail…" in Q's place. SILENT is now only for speech
+  // meant for someone else (the test above); a spoken turn to Q that could
+  // not be made out always gets Q's own short prompt, never a model.
+  it("answers an unclear spoken turn to Q with a short prompt, varied, never silence", async () => {
     const run = seam({
-      said: "machines",
+      said: "Fidiani inanituma attention",
       reading: {
         kind: "UNCLEAR_TRANSCRIPT",
         confidence: "LOW",
@@ -840,9 +845,39 @@ describe("spoken words that were not for Q (founder live 2026-09-29)", () => {
       outcomes: [],
       spoken: true,
     });
-    await run.answer.answer(request());
-    expect(run.stored).toHaveLength(0);
+    const outcomes = [
+      await run.answer.answer(request()),
+      await run.answer.answer(request()),
+      await run.answer.answer(request()),
+    ];
     expect(run.delegated()).toBe(0);
+    for (const outcome of outcomes) {
+      expect(outcome.kind === "ANSWERED" && outcome.messageId).not.toBeNull();
+    }
+    const lines = run.stored.map((message) => message.content);
+    expect(lines).toEqual([
+      "Sorry, I didn't catch that. Say it again?",
+      "I still couldn't make that out. Could you put it another way, or type it?",
+      "I'm not catching it, sorry. Typing it in the box works too.",
+    ]);
+  });
+
+  it("invites a cut-off spoken turn to go on", async () => {
+    const run = seam({
+      said: "can you show me the",
+      reading: {
+        kind: "QUESTION_TO_Q",
+        confidence: "LOW",
+        transcript: "FRAGMENT",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+      },
+      outcomes: [],
+      spoken: true,
+    });
+    await run.answer.answer(request());
+    expect(run.stored.map((message) => message.content)).toEqual(["Go on."]);
   });
 });
 
@@ -976,6 +1011,11 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           expect.objectContaining({ destination: "WORK" }),
           // Profile photo and cover (cropped on the profile).
           expect.objectContaining({ destination: "PROFILE" }),
+          // Data room: share a whole folder, and let unconnected investors
+          // see its folder names and counts (never titles or contents).
+          expect.objectContaining({ destination: "DOCUMENTS" }),
+          expect.objectContaining({ destination: "DOCUMENTS" }),
+          // Upload a document of their own for Q to read.
           expect.objectContaining({ destination: "HOME" }),
           // Unsend, block, unblock, report (chat).
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
@@ -993,9 +1033,9 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           // Submit organisation verification (KYB, ADR 0040 offer): any
           // organisation verifies, an investor's included.
           expect.objectContaining({ destination: "VERIFICATION" }),
-          // GateQ: an investor sets up their gateway from their mandate.
+          // GateQ, in registry order: Find my startup (F4), the inbox's
+          // approved words (F3), and setting up a gateway from a mandate.
           expect.objectContaining({ destination: "GATEWAY" }),
-          // F3/F4: the GateQ inbox's approved words, and Find my startup.
           expect.objectContaining({ destination: "GATEWAY" }),
           expect.objectContaining({ destination: "GATEWAY" }),
         ],

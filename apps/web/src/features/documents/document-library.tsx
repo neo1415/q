@@ -39,6 +39,8 @@ import {
   materialUploadTargetAction,
 } from "@/features/onboarding-kit/material-actions";
 import { artifactFileUrl } from "@/features/q/artifact-download";
+import { newIntentKey } from "@/features/q/control/intent-key";
+import { useQControlGroup } from "@/features/q/control/q-control";
 
 import { DECK_AUDIENCE_OPTIONS, deckAudienceDescription } from "./deck-sharing";
 import { setDeckAudienceAction } from "./deck-sharing-actions";
@@ -274,6 +276,7 @@ function Card({
       className="group relative flex flex-col gap-2.5"
       data-document-row={item.id}
       data-document-status={item.state}
+      data-q-item
     >
       <button
         type="button"
@@ -316,6 +319,7 @@ function Row({
       className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-(--cq-border-subtle) py-2 md:grid-cols-[minmax(0,1fr)_9rem_6rem_7rem_11rem_auto]"
       data-document-row={item.id}
       data-document-status={item.state}
+      data-q-item
     >
       <button
         type="button"
@@ -361,6 +365,14 @@ function Row({
   );
 }
 
+/** Q's ids (literal, for the capability parity matrix). */
+const Q_LIBRARY_LIST: Readonly<Record<string, string>> = {
+  "list.documents": "[data-documents-list]",
+};
+const Q_LIBRARY_SEARCH: Readonly<Record<string, string>> = {
+  "input.document-search": "[data-documents-search]",
+};
+
 export function DocumentLibrary({
   initial,
   companyId,
@@ -378,6 +390,10 @@ export function DocumentLibrary({
   const renameId = useId();
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // RECOVERY-2026-10 (C1): the list (grid or rows) and its search, for Q.
+  const libraryRef = useRef<HTMLElement>(null);
+  useQControlGroup({ kind: "LIST", ref: libraryRef, ids: Q_LIBRARY_LIST });
+  useQControlGroup({ kind: "INPUT", ref: libraryRef, ids: Q_LIBRARY_SEARCH });
   const [items, setItems] = useState<readonly LibraryItem[]>(
     initial?.items ?? [],
   );
@@ -552,25 +568,28 @@ export function DocumentLibrary({
     ask: (item) => askAbout(`About "${item.title}": `),
     remove: (item) => {
       setItems((current) => current.filter((entry) => entry.key !== item.key));
-      void archiveDocumentAction({ documentId: item.id, archived: true }).then(
-        (result) => {
-          if (!result.ok) {
-            setItems((current) => mergePage(current, [item]));
-            setNotice({ text: result.message });
-            return;
-          }
-          setNotice({
-            text: `Deleted "${item.title}".`,
-            undo: () => {
-              setNotice(null);
-              void archiveDocumentAction({
-                documentId: item.id,
-                archived: false,
-              }).then(() => void reload());
-            },
-          });
-        },
-      );
+      void archiveDocumentAction({
+        documentId: item.id,
+        archived: true,
+        intentKey: newIntentKey(),
+      }).then((result) => {
+        if (!result.ok) {
+          setItems((current) => mergePage(current, [item]));
+          setNotice({ text: result.message });
+          return;
+        }
+        setNotice({
+          text: `Deleted "${item.title}".`,
+          undo: () => {
+            setNotice(null);
+            void archiveDocumentAction({
+              documentId: item.id,
+              archived: false,
+              intentKey: newIntentKey(),
+            }).then(() => void reload());
+          },
+        });
+      });
     },
   };
 
@@ -578,6 +597,7 @@ export function DocumentLibrary({
 
   return (
     <section
+      ref={libraryRef}
       aria-labelledby="documents-list"
       className="relative flex flex-col gap-4"
       onDragOver={(event) => {
@@ -948,6 +968,7 @@ export function DocumentLibrary({
                   ),
                 );
                 void renameDocumentAction({
+                  intentKey: newIntentKey(),
                   documentId: item.id,
                   title,
                   expectedVersion: item.version,

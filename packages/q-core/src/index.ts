@@ -736,6 +736,10 @@ export {
   V21_NO_DISCLAIMER_LINE,
 } from "./prompts/tasks/company-analyst.v21.js";
 export {
+  COMPANY_ANALYST_V22,
+  V22_VISUAL_LINE,
+} from "./prompts/tasks/company-analyst.v22.js";
+export {
   COMPANY_ANALYST_V16,
   COMPANY_ANALYST_V16_TURN,
 } from "./prompts/tasks/company-analyst.v16.js";
@@ -818,6 +822,9 @@ export {
   CompanyAnalystV15ResultSchema,
   CompanyAnalystV17ResultSchema,
   CompanyAnalystV19ResultSchema,
+  CompanyAnalystV22ResultSchema,
+  ANALYST_VISUALS,
+  type CompanyAnalystV22Result,
   ArtifactRequestV3Schema,
   ARTIFACT_REQUEST_TYPES_V3,
   type CompanyAnalystV19Result,
@@ -1256,6 +1263,7 @@ export {
   DRAFT_REVIEW_V2,
   DRAFT_REVIEW_V3,
   JOB_PLAN_V1,
+  JOB_PLAN_V2,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
 export {
@@ -1268,7 +1276,10 @@ export {
   DraftReviewResultSchema,
   DraftReviewResultV2Schema,
   JobPlanResultSchema,
+  JobPlanResultV2Schema,
+  JOB_PLAN_V2_SCHEMA_VERSION,
   PLAN_AGENT_ROLES,
+  PLAN_AGENT_ROLES_V2,
   REPLY_REQUEST_KINDS,
   REPLY_STANCES,
   REPLY_TONES,
@@ -1286,6 +1297,7 @@ export {
   type DraftRubricCriterion,
   type DraftStage,
   type JobPlanResult,
+  type JobPlanResultV2,
   type JobPlanVariables,
   type ReplyReaderResult,
   type ReplyReaderVariables,

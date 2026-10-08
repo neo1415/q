@@ -6,17 +6,17 @@
 
 ```
   607  export type WorkPage = ReturnType<typeof createWorkPage>;
-  608  
+  608
   609  /** The kinds of step the lowdown names, by recorded action. */
   610  const STEP_KINDS = {
   611    "chat.message.send": "sent",
   612    "schedule.meeting.book": "booked",
   613    "relationship.interest.express": "interest",
   614  } as const;
-  615  
+  615
   616  /** How far back "since" may reach: a week, so the read stays bounded. */
   617  const SINCE_MAX_MS = 7 * DAY_MS;
-  618  
+  618
   619  function counted(
   620    rows: readonly { n: number; names: readonly (string | null)[] | null }[],
   621  ): QWorkActivityCount {
@@ -34,7 +34,7 @@
   633      .map((name) => name.slice(0, 200));
   634    return { n, names };
   635  }
-  636  
+  636
   637  /**
   638   * What happened on the person's own side since `since` (arrival briefing,
   639   * Zino 2026-10-08), read by code from recorded rows. Every predicate is
@@ -160,7 +160,7 @@
 - Why included: NEW_MATCHES Work suggestion ('Founders fit your mandate / Prepare intros?') lives on Work only.
 
 ```
-  205  
+  205
   206    if (!facts.outreachRunning && facts.feedUncontacted > 0) {
   207      out.push({
   208        key: "new_matches:feed",
@@ -174,7 +174,7 @@
   216        age: 0,
   217      });
   218    }
-  219  
+  219
   220    const saved = facts.savedNoInterest.filter(
   221      (entry) => !facts.busy.has(entry.companyId),
   222    );
@@ -198,4 +198,3 @@
   240        linkPath: "/discover/saved",
   241        age: 0,
 ```
-

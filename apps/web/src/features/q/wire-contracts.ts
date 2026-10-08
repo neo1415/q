@@ -18,6 +18,8 @@ export {
   QShowInQRoomIntentSchema,
   QVoiceDuplexNarrationResultSchema,
   QWebsiteUrlSchema,
+  // E-03 (workstream A): the standard voice line reads card replies.
+  isQVoiceCardReply,
   Q_VISIBLE_STAGE_LABELS,
   Q_VOICE_THINKING_BEATS,
   stripSilenceBeats,

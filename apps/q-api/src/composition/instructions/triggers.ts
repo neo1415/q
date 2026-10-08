@@ -15,6 +15,11 @@ import type { InstructionStore } from "./store.js";
 
 const CLAIM_LIMIT = 10;
 const OUTSIDE_HOURS_RETRY_MINUTES = 30;
+/**
+ * Recovery D-05: the claim already moved the next firing a full cadence
+ * (4 h) ahead; a firing that could not plan, or threw, tries again soon.
+ */
+export const FAILED_FIRING_RETRY_MINUTES = 10;
 
 export function createInstructionTriggers(dependencies: {
   readonly store: Pick<InstructionStore, "claimDue" | "defer" | "wakeFor"> &
@@ -32,6 +37,12 @@ export function createInstructionTriggers(dependencies: {
       >
     >;
   readonly engine: () => InstructionEngine | undefined;
+  /**
+   * Recovery D-01: expires lapsed approvals eagerly (the Approval Engine's
+   * sweep), before any instruction fires, so none treats a lapsed card as
+   * still waiting.
+   */
+  readonly expireLapsed?: (() => Promise<number>) | undefined;
   readonly logger?: Logger | undefined;
 }) {
   const { store, logger } = dependencies;
@@ -40,6 +51,13 @@ export function createInstructionTriggers(dependencies: {
   const pass = async (): Promise<number> => {
     const engine = dependencies.engine();
     if (engine === undefined) return 0;
+    const lapsed = await (
+      dependencies.expireLapsed?.() ?? Promise.resolve(0)
+    ).catch((error: unknown) => {
+      logger?.warn({ err: error }, "lapsed approvals not expired");
+      return 0;
+    });
+    if (lapsed > 0) logger?.info({ lapsed }, "lapsed approvals expired");
     const due = await store.claimDue(CLAIM_LIMIT);
     for (const claim of due) {
       try {
@@ -50,6 +68,10 @@ export function createInstructionTriggers(dependencies: {
         if (result.outcome === "OUTSIDE_HOURS") {
           await store.defer(claim.id, OUTSIDE_HOURS_RETRY_MINUTES);
           continue;
+        }
+        if (result.outcome === "PLANNER_UNAVAILABLE") {
+          // The engine said so on the Work page; try again soon.
+          await store.defer(claim.id, FAILED_FIRING_RETRY_MINUTES);
         }
         logger?.info(
           {
@@ -67,6 +89,23 @@ export function createInstructionTriggers(dependencies: {
           { err: error, instructionId: claim.id },
           "standing instruction firing failed",
         );
+        // Recovery D-05: visible, and retried soon -- not a silent wait
+        // of a full cadence.
+        await store
+          .defer(claim.id, FAILED_FIRING_RETRY_MINUTES)
+          .catch(() => undefined);
+        const row = await store.instruction?.(claim.id).catch(() => null);
+        if (row != null) {
+          await store
+            .notify?.({
+              instruction: row,
+              key: `firing-failed:${claim.claimed_at.toISOString().slice(0, 13)}`,
+              title: "Q's work on your instruction hit a problem",
+              body: `Something went wrong while I was working on it. I'll try again in about ${String(FAILED_FIRING_RETRY_MINUTES)} minutes.`,
+              priority: "UPDATE",
+            })
+            .catch(() => false);
+        }
       }
     }
     await digests().catch((error: unknown) => {

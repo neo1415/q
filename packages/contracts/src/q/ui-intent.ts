@@ -669,6 +669,8 @@ export const Q_INSTANT_ACTION_TOOLS = [
   // AUTO block (ADR 0030): inside an approved delegation, the person's own
   // word -- stop, a time they chose, away/back -- acts at once.
   "stop_q_work",
+  // Recovery D6: stop one of Q's approved jobs (q.work.job.stop).
+  "stop_q_job",
   "answer_q_work",
   "set_away",
   // DOCS: a suggestion filed for the person to confirm (applies nothing),
@@ -684,9 +686,9 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "dismiss_reminder",
   "set_notification_settings",
   "set_q_personality",
-  // ADR 0050: their own speaking guide, versioned and removable in Settings.
+  // ADR 0050: their own speaking guide, versioned in Settings. (Removing it
+  // deletes every version, so it is prepared for approval: RECOVERY-2026-10.)
   "set_my_speaking_guide",
-  "remove_my_speaking_guide",
   // meet-47: "Q, join this call" -- their word is the click; Q joins as
   // the same note-taker, with the same consent line, for both sides.
   "join_call",

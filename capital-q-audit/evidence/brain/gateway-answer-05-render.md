@@ -141,7 +141,7 @@
  2483          ...(pitchMoment === null ? [] : [pitchMoment]),
  2484          ...assembled.facts,
  2485        ];
- 2486  
+ 2486
  2487        const variables: Omit<
  2488          CompanyAnalystV4Variables,
  2489          | "operatingMode"
@@ -218,7 +218,7 @@
  2560          joinedNoteParts(noteParts).includes(
  2561            onboardingNudgeNote(onboardingNudge),
  2562          );
- 2563  
+ 2563
  2564        const budget = budgetForTaskClass(taskClass);
  2565        const base = {
  2566          taskClass,
@@ -244,7 +244,7 @@
  2586         * one thing to whoever is reading.
  2587         */
  2588        const messageId = QMessageIdSchema.parse(randomUUID());
- 2589  
+ 2589
  2590        /**
  2591         * The answer, going out a sentence at a time as the model writes it.
  2592         *
@@ -383,7 +383,7 @@
  2725            publish(said);
  2726          }
  2727        };
- 2728  
+ 2728
  2729        const options: ModelGatewayExecuteOptions<CompanyAnalystV17Result> = {
  2730          signal: request.signal,
 ```

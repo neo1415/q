@@ -3,8 +3,9 @@
 This file doesn't recommend a design. It lists the constraints and facts that a redesign must respect, so an external architect doesn't propose something that breaks a locked decision.
 
 ## Locked product and architecture rules (from `CLAUDE.md`, PADL and ADRs)
+
 - **One Q.** Specialists are internal and are never selectable or named to users. Q never shows raw reasoning.
-- **Context Firewall first.** Filter by scope *before* any model sees data. Founder-private data must never shape investor-facing ranking or assessment. This is release-blocking.
+- **Context Firewall first.** Filter by scope _before_ any model sees data. Founder-private data must never shape investor-facing ranking or assessment. This is release-blocking.
 - **Authority.** Prepare → Recommend → Human approval → Execute for consequential actions, unless explicit scoped delegation exists. Approval binds to the exact payload. Every consequential action has an idempotency key.
 - **Model calls** go only through the Model Gateway, by task class. Models get typed tools (Zod) with an authorize step. There is no arbitrary SQL, shell or HTTP tool.
 - **No LLM in feed ranking.** Ranking is deterministic and versioned. Viewing is not interest. Observed behaviour never rewrites a declared mandate.
@@ -15,6 +16,7 @@ This file doesn't recommend a design. It lists the constraints and facts that a 
 - **Budget.** A small, founder-paid provider budget. No live provider calls in tests.
 
 ## Facts a redesign must account for
+
 - **Hosting.** Railway runs all four services (web, api, q-api, workers). q-api is a single replica holding in-memory state (room feed, duplex lines). Deploys are frequent.
 - **Voice.**
   - Duplex: OpenAI realtime (`gpt-realtime-mini` per `realtime/openai.ts`) over WebRTC, with server-side turn routing (`create_response=false`).
@@ -34,6 +36,7 @@ This file doesn't recommend a design. It lists the constraints and facts that a 
   - Side columns are used only before the conversation starts.
 
 ## What the founder is asking for (verbatim intent, 2026-10-08)
+
 - **On login**, Q greets casually, happy to see them. Then:
   - a full summary of everything it and its agents did (messages answered, calls booked);
   - then everything that needs them: messages it couldn't answer, documents requested, and so on.
@@ -43,6 +46,7 @@ This file doesn't recommend a design. It lists the constraints and facts that a 
 - **Agents** actually reply to investors and book calls.
 
 ## Known tensions to resolve
+
 - **Autonomy vs approval:** "agents answer messages" vs "nothing outward without a pass or a yes".
 - **Realtime voice naturalness vs one brain:** the voice model may not compose answers from its own knowledge.
 - **Latency vs reading first:** a classification call precedes every answer.

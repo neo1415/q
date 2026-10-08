@@ -15,6 +15,8 @@
  * (Q answers small talk); the opposite miss costs the person's trust.
  */
 
+import { isQVoiceCardReply } from "@capital-q/contracts";
+
 export type DuplexTurnRoute = "ASK_Q" | "SMALLTALK" | "MODEL";
 
 /** The routed= value in the per-turn log line and the transcript store. */
@@ -164,6 +166,12 @@ export function isSmallTalk(transcript: string): boolean {
     .every((w) => TRIVIAL.has(w));
 }
 
+/**
+ * RECOVERY A3: a reply about the card in focus (shared with the standard
+ * line, so both lines read a card reply the same way).
+ */
+export const isCardReply = isQVoiceCardReply;
+
 export function routeDuplexTurn(
   transcript: string,
   situation: {
@@ -171,13 +179,19 @@ export function routeDuplexTurn(
     readonly guided: boolean;
     /** Q's last answer asked for their yes: the reply is Q's to take. */
     readonly awaitingApproval: boolean;
-    /** A decision card is in focus: a short reply goes to decide_card. */
+    /** A decision card is in focus: a reply about it goes to decide_card. */
     readonly cardInFocus: boolean;
+    /**
+     * Q's last words were a question to them ("want the detail?"): a bare
+     * "yes" or "no" answers Q, so it is Q's, never the voice's alone.
+     */
+    readonly answeringQ?: boolean | undefined;
   },
 ): DuplexTurnRoute {
   if (situation.guided || situation.awaitingApproval) return "ASK_Q";
   // The card's own code reads the reply (the same typed action a button
   // sends); the voice only passes the words through decide_card.
-  if (situation.cardInFocus && words(transcript).length <= 12) return "MODEL";
+  if (situation.cardInFocus && isCardReply(transcript)) return "MODEL";
+  if (situation.answeringQ === true) return "ASK_Q";
   return isSmallTalk(transcript) ? "SMALLTALK" : "ASK_Q";
 }

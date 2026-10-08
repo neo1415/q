@@ -78,8 +78,10 @@ export const TaskFrameSchema = {
   // crowding out what Q can do). 7,000 since 2026-10-01: with research
   // offered (most Home Q runs) what Q can do still never fitted, and how a
   // reply ends (next step + offer) joined it. The rendered charter stays
-  // bounded.
-  environmentNotes: z.string().max(9_000),
+  // bounded. 9,400 since RECOVERY-2026-10 (B7: what a proposing tool does
+  // and where a point comes from, ~160 characters, without dropping what
+  // Q can do).
+  environmentNotes: z.string().max(9_400),
 };
 
 /** A finding as a model may state it: vocabulary only, no ids, no references. */

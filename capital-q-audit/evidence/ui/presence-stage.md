@@ -108,7 +108,7 @@
   190    const latestQ = turns.findLast(
   191      (turn): turn is Extract<QTurn, { kind: "Q" }> => turn.kind === "Q",
   192    );
-  193  
+  193
   194    const dismiss = (item: ShownItem) => {
   195      const key =
   196        reopened !== null && reopened.id === item.id
@@ -117,7 +117,7 @@
   199      setDismissed((current) => new Set([...current, key]));
   200      if (reopened?.id === item.id) setReopened(null);
   201    };
-  202  
+  202
   203    // The answer on the stage as cards, and one leaving for the Board.
   204    const canvas =
   205      shown === null
@@ -159,7 +159,7 @@
   241        done = true;
   242      };
   243    }, [leaving, onBoardLanded]);
-  244  
+  244
   245    useEffect(() => {
   246      const onShow = (event: Event) => {
   247        if (!(event instanceof CustomEvent)) return;
@@ -176,7 +176,7 @@
   258      window.addEventListener(SHOW_ON_STAGE, onShow);
   259      return () => window.removeEventListener(SHOW_ON_STAGE, onShow);
   260    }, [answers]);
-  261  
+  261
   262    // Q room W3: a data-room document open in the room's centre panel.
   263    const documentOpen = useRoomDocumentOpen();
   264    const showing = shown !== null || roomOpen !== null || documentOpen;
@@ -194,7 +194,7 @@
   276    const [openedWith] = useState<ReadonlySet<string>>(
   277      () => new Set(turns.map((turn) => turn.id)),
   278    );
-  279  
+  279
   280    // W7: once the page has settled, what Q is likely to show first (a room
   281    // card, an answer's cards) is fetched quietly, so the first one shown
   282    // does not wait for its code. Never during the first paint.
@@ -215,7 +215,7 @@
   297        cancel?.();
   298      };
   299    }, []);
-  300  
+  300
   301    return (
   302      <div
   303        className="flex w-full flex-col items-center gap-4"
@@ -232,16 +232,16 @@
   314            {presence(showing)}
   315          </div>
   316        )}
-  317  
+  317
   318        {/* Q's words for a screen reader, never as text on the page. */}
   319        <p className="sr-only" aria-live="polite" data-q-said>
   320          {latestQ === undefined || latestQ.streaming
   321            ? ""
   322            : plainFromMarkdown(latestQ.text)}
   323        </p>
-  324  
+  324
   325        {captions ? <div data-q-captions>{caption}</div> : null}
-  326  
+  326
   327        {leaving === null ? null : (
   328          <div ref={leavingRef} className="w-full" data-q-canvas-leaving>
   329            <Suspense fallback={null}>
@@ -255,7 +255,7 @@
   337            </Suspense>
   338          </div>
   339        )}
-  340  
+  340
   341        {canvas === null || leaving !== null ? null : (
   342          <Suspense fallback={presence(true)}>
   343            <StageCanvas
@@ -274,7 +274,7 @@
   356            />
   357          </Suspense>
   358        )}
-  359  
+  359
   360        {shown === null || canvas !== null ? null : (
   361          <section
   362            aria-labelledby={`${listId}-shown-title`}
@@ -317,7 +317,7 @@
   399            </div>
   400          </section>
   401        )}
-  402  
+  402
   403        {roomShown ? (
   404          <Suspense fallback={null}>
   405            <QRoomStage
@@ -332,14 +332,14 @@
   414            />
   415          </Suspense>
   416        ) : null}
-  417  
+  417
   418        {/* Q room W3: the document Q opened shows here (material-viewer). */}
   419        <div
   420          ref={registerRoomDocumentHost}
   421          className="w-full empty:hidden"
   422          data-q-room-document-host
   423        />
-  424  
+  424
   425        {answered ? (
   426          <Suspense fallback={null}>
   427            <QRoomPdfOffer
@@ -349,9 +349,9 @@
   431            />
   432          </Suspense>
   433        ) : null}
-  434  
+  434
   435        {waiting}
-  436  
+  436
   437        {recent.length === 0 ? null : (
   438          <div
   439            className="flex w-full flex-col items-center gap-2"
@@ -409,10 +409,10 @@
 
 ```
     1  import type { QShowInQRoomIntent } from "@capital-q/contracts";
-    2  
+    2
     3  import type { QTurn, QTurnPublicSource } from "../conversation";
     4  import { wireNow } from "../wire";
-    5  
+    5
     6  /**
     7   * Q room R4: which card is open in the room, decided by code from the
     8   * conversation itself (founder clarification, 6 October): a card stays
@@ -424,7 +424,7 @@
    14   * The reading is words and structure, never a model: a card's subject is
    15   * its record's own name (the server's, never the model's) and its kind.
    16   */
-   17  
+   17
    18  export type RoomCard = {
    19    /** One card per kind and record. */
    20    readonly key: string;
@@ -434,9 +434,9 @@
    24    /** The index of the turn that opened (or reopened) it. */
    25    readonly openedAt: number;
    26  };
-   27  
+   27
    28  export type RoomNote = { readonly id: string; readonly text: string };
-   29  
+   29
    30  export type RoomStage = {
    31    readonly open: RoomCard | null;
    32    /** Cards shown in this conversation and not open now, newest first. */
@@ -444,10 +444,10 @@
    34    /** The latest "Closed … as we moved on", keyed by the turn that moved on. */
    35    readonly note: RoomNote | null;
    36  };
-   37  
+   37
    38  const keyOf = (intent: QShowInQRoomIntent) =>
    39    `${intent.object}:${intent.id ?? "-"}`;
-   40  
+   40
    41  function folded(text: string): string {
    42    return text
    43      .toLowerCase()
@@ -455,7 +455,7 @@
    45      .replace(/[^\p{L}\p{N}]+/gu, " ")
    46      .trim();
    47  }
-   48  
+   48
    49  const GENERIC = new Set([
    50    "the",
    51    "and",
@@ -473,7 +473,7 @@
    63    "sources",
    64    "plan",
    65  ]);
-   66  
+   66
    67  /** The words that name a card's subject: its record's name, then its kind. */
    68  function subjectWords(intent: QShowInQRoomIntent): {
    69    readonly names: readonly string[];
@@ -527,11 +527,11 @@
   117    };
   118    return { names, kinds: kinds[intent.object] };
   119  }
-  120  
+  120
   121  function has(text: string, phrase: string): boolean {
   122    return ` ${folded(text)} `.includes(` ${phrase} `);
   123  }
-  124  
+  124
   125  /** Whether these words are about the card: its name, or its kind by name. */
   126  export function mentions(text: string, intent: QShowInQRoomIntent): boolean {
   127    const { names, kinds } = subjectWords(intent);
@@ -540,14 +540,14 @@
   130      kinds.some((kind) => has(text, kind))
   131    );
   132  }
-  133  
+  133
   134  /** "Close it", "close that card", "hide it", "dismiss": the person's word. */
   135  export function asksToClose(text: string): boolean {
   136    return /^\s*(please\s+)?(close|hide|dismiss|put away)\b(\s+(it|that|this|the card|that card|this card|them|the window))?\s*(please)?[.!]?\s*$/i.test(
   137      text,
   138    );
   139  }
-  140  
+  140
   141  const POINTING = [
   142    "it",
   143    "its",
@@ -566,19 +566,19 @@
   156    "more",
   157    "else",
   158  ];
-  159  
+  159
   160  /** A follow-up that points back at what is open rather than naming anew. */
   161  function pointsBack(text: string): boolean {
   162    return POINTING.some((word) => has(text, word));
   163  }
-  164  
+  164
   165  /** Q room W5: the documents Q makes that open in the room as a deck surface. */
   166  const ROOM_DOCUMENT_TYPES: ReadonlySet<string> = new Set([
   167    "PITCH_DECK",
   168    "ONE_PAGER",
   169    "MEMO",
   170  ]);
-  171  
+  171
   172  function showsOf(turn: Extract<QTurn, { kind: "Q" }>): QShowInQRoomIntent[] {
   173    const out: QShowInQRoomIntent[] = [];
   174    // W7: checked against the wire's contracts; none until they are in.
@@ -606,7 +606,7 @@
   196    }
   197    return out;
   198  }
-  199  
+  199
   200  /** What a closing note calls the card. */
   201  export function describeCard(intent: QShowInQRoomIntent): string {
   202    switch (intent.object) {
@@ -689,19 +689,19 @@
   102    }
   103    return best;
   104  }
-  105  
+  105
   106  export type PlaybackStep = {
   107    readonly focus: number;
   108    readonly said: string;
   109    readonly ms: number;
   110  };
-  111  
+  111
   112  /** Time to say a line aloud, near speaking pace, never rushed. */
   113  export function sayingMs(text: string): number {
   114    const words = text.trim().split(/\s+/u).filter(Boolean).length;
   115    return Math.max(2600, Math.round(words * 360));
   116  }
-  117  
+  117
   118  /**
   119   * The walk-through of an answer when no live voice is driving it: each
   120   * card in focus while its line is said, then the overview (focus -1) with
@@ -721,7 +721,7 @@
   134    }
   135    return steps;
   136  }
-  137  
+  137
   138  /** An answer's ANSWER_CARDS block, if it carries one. */
   139  export function answerCardsOf(
   140    turn: QTurn | undefined,
@@ -732,7 +732,7 @@
   145    }
   146    return null;
   147  }
-  148  
+  148
   149  /**
   150   * Whether the conversation has moved on from the cards that answer
   151   * `answerId` showed (C4). It has when a later answer, now complete,
@@ -755,4 +755,3 @@
   168    return false;
   169  }
 ```
-

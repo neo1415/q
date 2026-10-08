@@ -1049,6 +1049,7 @@ export function createVoiceTurnHandler(
         // A new turn: the last one's move is not made again.
         navigate: null,
         clientAction: null,
+        clientActions: [],
         conversationId: QConversationIdSchema.parse(thread.conversationId),
       });
     }
@@ -1195,6 +1196,8 @@ export function createVoiceTurnHandler(
                 asking: null,
                 navigate: follow.navigate,
                 clientAction: follow.clientAction,
+                // C2: the whole chain, in order, for the screen.
+                clientActions: follow.clientActions.slice(0, 12),
                 handoff: null,
                 degraded: false,
               });

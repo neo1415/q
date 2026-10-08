@@ -75,6 +75,15 @@ function dayLabel(iso: string, now: Date): string {
   }).format(at);
 }
 
+/**
+ * Recovery D-13: an instruction's "N things need your yes" notice only
+ * summarises approval cards that Needs you already shows one by one.
+ * Counted (or listed) beside them, one card was counted twice.
+ */
+export function summarisesCards(notice: NotificationDto): boolean {
+  return /^\d+ things? needs? your yes for /u.test(notice.title);
+}
+
 export function groupNotices(
   items: readonly NotificationDto[],
   now: Date = new Date(),

@@ -6,7 +6,7 @@
 
 ```ts
   360      };
-  361  
+  361
   362  /** What the lead Q may plan with: the tools its specialists can carry out. */
   363  export const EXECUTABLE_JOB_TOOLS: readonly string[] = [
   364    "search_companies",
@@ -18,10 +18,10 @@
   370    "list_schedule",
   371    "schedule.meeting.book",
   372  ];
-  373  
+  373
   374  /** The default budget of one job the lead Q proposes, USD. */
   375  export const DEFAULT_JOB_BUDGET_USD = 0.5;
-  376  
+  376
   377  export type PlannedJob = {
   378    readonly summary: string;
   379    readonly steps: readonly BoundStep[];
@@ -31,7 +31,7 @@
   383    }[];
   384    readonly cannot: readonly string[];
   385  };
-  386  
+  386
   387  export function createWorkforceJobs(dependencies: {
   388    readonly store: WorkforceStore;
   389    readonly models: Pick<WorkforceModels, "plan" | "readReply">;
@@ -45,7 +45,7 @@
   397    readonly logger?: Logger | undefined;
   398  }) {
   399    const { store } = dependencies;
-  400  
+  400
   401    /** The lead Q's plan, bounded by what is permitted and the budget. */
   402    async function plan(
   403      owner: Owner,
@@ -75,7 +75,7 @@
   427        cannot: planned.cannot,
   428      };
   429    }
-  430  
+  430
   431    /** Files the job for its source (one per source), with its lead run. */
   432    async function file(
   433      owner: Owner,
@@ -98,7 +98,7 @@
   450      });
   451      return { jobId: one.job.id, leadRunId: one.leadRunId };
   452    }
-  453  
+  453
   454    /**
   455     * The month's limit and the plan's agent-job allowance, checked before
   456     * anything is planned or run; false holds the job with the reason.
@@ -131,7 +131,7 @@
   483      }
   484      return true;
   485    }
-  486  
+  486
   487    /**
   488     * Carries out a plan already bound (and, for a proposed job, approved):
   489     * never re-planned here. Files the job for its source, checks the plan's
@@ -198,7 +198,7 @@
   550        cannot: planned.cannot,
   551      };
   552    }
-  553  
+  553
   554    return {
   555      plan: (
   556        owner: Owner,
@@ -208,10 +208,10 @@
   560          readonly budgetUsd: number;
   561        },
   562      ) => plan(owner, input, null),
-  563  
+  563
   564      file,
   565      run,
-  566  
+  566
   567      /**
   568       * Plan and carry out one job the person approved. `permitted` is the
   569       * job's grant (tool and action names); `source` ties it to what it was
@@ -260,9 +260,9 @@
   612      },
   613    };
   614  }
-  615  
+  615
   616  export type WorkforceJobs = ReturnType<typeof createWorkforceJobs>;
-  617  
+  617
   618  /**
   619   * Founder brief J5: standing instructions and delegated work are Q's jobs
   620   * too -- the same job record, one per source, shown on the workforce page

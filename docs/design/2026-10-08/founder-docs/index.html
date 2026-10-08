@@ -47,202 +47,771 @@
 -->
     <style>
       :root {
-        --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+        --font:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
       }
       [data-theme="light"] {
-        --canvas: #f6f4ef; --surface: #fbfaf7; --raised: #fff; --subtle: #f1ede4;
-        --t1: #16140f; --t2: #4f4a40; --t3: #655e51; --bs: #e7e1d5; --b: #d9d1c1;
-        --accent: #8a6a12; --accent-soft: #f3ead2; --pos: #2f6b3f; --pos-soft: #e3efe2;
-        --info-soft: #e6ecf3; --info: #2c4f78;
+        --canvas: #f6f4ef;
+        --surface: #fbfaf7;
+        --raised: #fff;
+        --subtle: #f1ede4;
+        --t1: #16140f;
+        --t2: #4f4a40;
+        --t3: #655e51;
+        --bs: #e7e1d5;
+        --b: #d9d1c1;
+        --accent: #8a6a12;
+        --accent-soft: #f3ead2;
+        --pos: #2f6b3f;
+        --pos-soft: #e3efe2;
+        --info-soft: #e6ecf3;
+        --info: #2c4f78;
       }
       [data-theme="dark"] {
-        --canvas: #0f0e0b; --surface: #17150f; --raised: #1d1a13; --subtle: #24211a;
-        --t1: #f4efe2; --t2: #c9c0ab; --t3: #a59c87; --bs: #2a261c; --b: #3a3427;
-        --accent: #c9a227; --accent-soft: #2e2714; --pos: #8fcf9c; --pos-soft: #1d2a1f;
-        --info-soft: #1a2330; --info: #9dbbe0;
+        --canvas: #0f0e0b;
+        --surface: #17150f;
+        --raised: #1d1a13;
+        --subtle: #24211a;
+        --t1: #f4efe2;
+        --t2: #c9c0ab;
+        --t3: #a59c87;
+        --bs: #2a261c;
+        --b: #3a3427;
+        --accent: #c9a227;
+        --accent-soft: #2e2714;
+        --pos: #8fcf9c;
+        --pos-soft: #1d2a1f;
+        --info-soft: #1a2330;
+        --info: #9dbbe0;
       }
-      * { box-sizing: border-box; }
-      body { margin: 0; background: var(--canvas); color: var(--t1); font: 15px/1.5 var(--font); }
-      .wrap { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
-      @media (min-width: 900px) { .wrap { padding: 32px 32px 64px; } }
-      h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
-      h2 { font-size: 18px; margin: 0 0 4px; }
-      h3 { font-size: 15px; margin: 0; }
-      p { margin: 0; }
-      .muted { color: var(--t2); }
-      .tert { color: var(--t3); font-size: 13px; }
-      .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--bs); overflow-x: auto; margin: 0 -16px 24px; padding: 0 16px; scrollbar-width: none; }
-      .tab { flex: none; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; color: var(--t2); border-bottom: 2px solid transparent; font-weight: 500; white-space: nowrap; }
-      .tab[aria-selected="true"] { color: var(--t1); border-color: var(--accent); font-weight: 600; }
-      .chip { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--subtle); color: var(--t2); font-weight: 500; white-space: nowrap; }
-      .chip.pos { background: var(--pos-soft); color: var(--pos); }
-      .chip.info { background: var(--info-soft); color: var(--info); }
-      .chip.acc { background: var(--accent-soft); color: var(--t1); }
-      .seg { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-      .pill { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--bs); color: var(--t2); display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
-      .pill.on { background: var(--t1); color: var(--canvas); border-color: var(--t1); }
-      .list { display: flex; flex-direction: column; gap: 12px; }
-      .card { background: var(--raised); border: 1px solid var(--bs); border-radius: 14px; padding: 16px; }
-      .card.focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-      .row { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
-      .who { display: flex; gap: 10px; align-items: center; }
-      .av { width: 32px; height: 32px; border-radius: 50%; background: var(--subtle); display: grid; place-items: center; font-size: 12px; font-weight: 600; color: var(--t2); flex: none; }
-      .note { border-left: 2px solid var(--b); padding: 2px 0 2px 10px; color: var(--t2); margin: 10px 0; }
-      .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-      .btn { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--b); background: var(--raised); color: var(--t1); font: inherit; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
-      .btn.primary { background: var(--t1); color: var(--canvas); border-color: var(--t1); }
-      .btn.quiet { border-color: transparent; color: var(--t2); }
-      .opts { display: grid; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--bs); }
-      @media (min-width: 700px) { .opts { grid-template-columns: 1fr 1fr 1fr; } }
-      label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--t2); }
-      .sel { min-height: 44px; border: 1px solid var(--b); border-radius: 10px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; color: var(--t1); background: var(--surface); font-size: 14px; }
-      .drop { border: 1.5px dashed var(--b); border-radius: 12px; padding: 14px; text-align: center; color: var(--t2); font-size: 14px; grid-column: 1 / -1; }
-      textarea { width: 100%; min-height: 96px; border: 1px solid var(--b); border-radius: 10px; padding: 10px 12px; font: inherit; background: var(--surface); color: var(--t1); resize: vertical; }
-      .section-h { display: flex; align-items: baseline; justify-content: space-between; margin: 28px 0 10px; }
-      .folder { border-top: 1px solid var(--bs); padding: 12px 0; }
-      .doc { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 0; flex-wrap: wrap; }
-      .doc + .doc { border-top: 1px dashed var(--bs); }
-      .icon { width: 36px; height: 36px; border-radius: 8px; background: var(--subtle); display: grid; place-items: center; font-size: 11px; color: var(--t2); font-weight: 600; flex: none; }
-      .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); }
-      .sheet { position: fixed; right: 0; top: 0; bottom: 0; width: min(480px, 100%); background: var(--surface); border-left: 1px solid var(--bs); padding: 20px 16px; overflow: auto; }
-      @media (max-width: 600px) { .sheet { top: 64px; border-radius: 16px 16px 0 0; border-left: 0; } }
-      .radio { display: flex; gap: 10px; padding: 10px 12px; border: 1px solid var(--bs); border-radius: 10px; align-items: flex-start; }
-      .radio.on { border-color: var(--accent); background: var(--accent-soft); }
-      .radio.off { opacity: 0.62; }
-      .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--b); flex: none; margin-top: 2px; }
-      .radio.on .dot { border: 6px solid var(--accent); }
-      .grants li { display: flex; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--bs); align-items: center; flex-wrap: wrap; }
-      ul { list-style: none; margin: 0; padding: 0; }
-      .hist li { font-size: 13px; color: var(--t2); padding: 4px 0; }
-      .board { display: grid; gap: 12px; }
-      @media (min-width: 800px) { .board { grid-template-columns: repeat(3, 1fr); } }
-      .col h3 { font-size: 13px; color: var(--t2); margin-bottom: 8px; }
-      .ans { background: var(--surface); border: 1px solid var(--bs); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
-      [hidden] { display: none !important; }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--t1);
+        font: 15px/1.5 var(--font);
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+      @media (min-width: 900px) {
+        .wrap {
+          padding: 32px 32px 64px;
+        }
+      }
+      h1 {
+        font-size: 28px;
+        margin: 0 0 12px;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      h3 {
+        font-size: 15px;
+        margin: 0;
+      }
+      p {
+        margin: 0;
+      }
+      .muted {
+        color: var(--t2);
+      }
+      .tert {
+        color: var(--t3);
+        font-size: 13px;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        border-bottom: 1px solid var(--bs);
+        overflow-x: auto;
+        margin: 0 -16px 24px;
+        padding: 0 16px;
+        scrollbar-width: none;
+      }
+      .tab {
+        flex: none;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        color: var(--t2);
+        border-bottom: 2px solid transparent;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .tab[aria-selected="true"] {
+        color: var(--t1);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .chip {
+        font-size: 12px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--subtle);
+        color: var(--t2);
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .chip.pos {
+        background: var(--pos-soft);
+        color: var(--pos);
+      }
+      .chip.info {
+        background: var(--info-soft);
+        color: var(--info);
+      }
+      .chip.acc {
+        background: var(--accent-soft);
+        color: var(--t1);
+      }
+      .seg {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .pill {
+        min-height: 36px;
+        padding: 0 14px;
+        border-radius: 999px;
+        border: 1px solid var(--bs);
+        color: var(--t2);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+      }
+      .pill.on {
+        background: var(--t1);
+        color: var(--canvas);
+        border-color: var(--t1);
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .card {
+        background: var(--raised);
+        border: 1px solid var(--bs);
+        border-radius: 14px;
+        padding: 16px;
+      }
+      .card.focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+      .who {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .av {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--subtle);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--t2);
+        flex: none;
+      }
+      .note {
+        border-left: 2px solid var(--b);
+        padding: 2px 0 2px 10px;
+        color: var(--t2);
+        margin: 10px 0;
+      }
+      .btns {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      .btn {
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: 10px;
+        border: 1px solid var(--b);
+        background: var(--raised);
+        color: var(--t1);
+        font: inherit;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .btn.primary {
+        background: var(--t1);
+        color: var(--canvas);
+        border-color: var(--t1);
+      }
+      .btn.quiet {
+        border-color: transparent;
+        color: var(--t2);
+      }
+      .opts {
+        display: grid;
+        gap: 12px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--bs);
+      }
+      @media (min-width: 700px) {
+        .opts {
+          grid-template-columns: 1fr 1fr 1fr;
+        }
+      }
+      label.f {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 13px;
+        color: var(--t2);
+      }
+      .sel {
+        min-height: 44px;
+        border: 1px solid var(--b);
+        border-radius: 10px;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: var(--t1);
+        background: var(--surface);
+        font-size: 14px;
+      }
+      .drop {
+        border: 1.5px dashed var(--b);
+        border-radius: 12px;
+        padding: 14px;
+        text-align: center;
+        color: var(--t2);
+        font-size: 14px;
+        grid-column: 1 / -1;
+      }
+      textarea {
+        width: 100%;
+        min-height: 96px;
+        border: 1px solid var(--b);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font: inherit;
+        background: var(--surface);
+        color: var(--t1);
+        resize: vertical;
+      }
+      .section-h {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin: 28px 0 10px;
+      }
+      .folder {
+        border-top: 1px solid var(--bs);
+        padding: 12px 0;
+      }
+      .doc {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+        flex-wrap: wrap;
+      }
+      .doc + .doc {
+        border-top: 1px dashed var(--bs);
+      }
+      .icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: var(--subtle);
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        color: var(--t2);
+        font-weight: 600;
+        flex: none;
+      }
+      .scrim {
+        position: fixed;
+        inset: 0;
+        background: rgb(0 0 0 / 0.35);
+      }
+      .sheet {
+        position: fixed;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: min(480px, 100%);
+        background: var(--surface);
+        border-left: 1px solid var(--bs);
+        padding: 20px 16px;
+        overflow: auto;
+      }
+      @media (max-width: 600px) {
+        .sheet {
+          top: 64px;
+          border-radius: 16px 16px 0 0;
+          border-left: 0;
+        }
+      }
+      .radio {
+        display: flex;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--bs);
+        border-radius: 10px;
+        align-items: flex-start;
+      }
+      .radio.on {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .radio.off {
+        opacity: 0.62;
+      }
+      .dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid var(--b);
+        flex: none;
+        margin-top: 2px;
+      }
+      .radio.on .dot {
+        border: 6px solid var(--accent);
+      }
+      .grants li {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 0;
+        border-top: 1px solid var(--bs);
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .hist li {
+        font-size: 13px;
+        color: var(--t2);
+        padding: 4px 0;
+      }
+      .board {
+        display: grid;
+        gap: 12px;
+      }
+      @media (min-width: 800px) {
+        .board {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .col h3 {
+        font-size: 13px;
+        color: var(--t2);
+        margin-bottom: 8px;
+      }
+      .ans {
+        background: var(--surface);
+        border: 1px solid var(--bs);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-top: 8px;
+      }
+      [hidden] {
+        display: none !important;
+      }
     </style>
   </head>
   <body>
     <div class="wrap">
       <h1>Documents</h1>
       <nav class="tabs" role="tablist" aria-label="Documents" data-founder>
-        <span class="tab" role="tab" aria-selected="false" data-tab="mine">My documents <span class="chip">24</span></span>
-        <span class="tab" role="tab" aria-selected="false" data-tab="requested">Requested <span class="chip acc">3 open</span></span>
-        <span class="tab" role="tab" aria-selected="false" data-tab="dataroom">Data room <span class="chip">11</span></span>
+        <span class="tab" role="tab" aria-selected="false" data-tab="mine"
+          >My documents <span class="chip">24</span></span
+        >
+        <span class="tab" role="tab" aria-selected="false" data-tab="requested"
+          >Requested <span class="chip acc">3 open</span></span
+        >
+        <span class="tab" role="tab" aria-selected="false" data-tab="dataroom"
+          >Data room <span class="chip">11</span></span
+        >
       </nav>
 
       <!-- 1 + 4: REQUESTED -->
       <section data-view="requested">
-        <div class="seg"><span class="pill on">Open · 3</span><span class="pill">Answered · 4</span><span class="pill">Declined · 1</span></div>
+        <div class="seg">
+          <span class="pill on">Open · 3</span
+          ><span class="pill">Answered · 4</span
+          ><span class="pill">Declined · 1</span>
+        </div>
         <div class="list">
           <article class="card focus" aria-label="Request from Zino Capital">
             <div class="row">
-              <div class="who"><span class="av">ZC</span><div><h3>Management accounts, last 12 months</h3><p class="tert">Ada Nwosu · Zino Capital · asked 5 Oct · waiting 3 days</p></div></div>
+              <div class="who">
+                <span class="av">ZC</span>
+                <div>
+                  <h3>Management accounts, last 12 months</h3>
+                  <p class="tert">
+                    Ada Nwosu · Zino Capital · asked 5 Oct · waiting 3 days
+                  </p>
+                </div>
+              </div>
               <span class="chip">Document</span>
             </div>
-            <p class="note">"We'd like to see monthly burn against the plan before our IC on the 14th."</p>
+            <p class="note">
+              "We'd like to see monthly burn against the plan before our IC on
+              the 14th."
+            </p>
             <div class="opts">
-              <label class="f">File in<span class="sel">Financials <span aria-hidden="true">▾</span></span></label>
-              <label class="f">They can<span class="sel">View only (watermarked) <span aria-hidden="true">▾</span></span></label>
-              <label class="f">For<span class="sel">30 days <span aria-hidden="true">▾</span></span></label>
-              <div class="drop">Drop the file here, or <u>choose a file</u>. Only Zino Capital will see it.</div>
+              <label class="f"
+                >File in<span class="sel"
+                  >Financials <span aria-hidden="true">▾</span></span
+                ></label
+              >
+              <label class="f"
+                >They can<span class="sel"
+                  >View only (watermarked)
+                  <span aria-hidden="true">▾</span></span
+                ></label
+              >
+              <label class="f"
+                >For<span class="sel"
+                  >30 days <span aria-hidden="true">▾</span></span
+                ></label
+              >
+              <div class="drop">
+                Drop the file here, or <u>choose a file</u>. Only Zino Capital
+                will see it.
+              </div>
             </div>
-            <div class="btns"><span class="btn primary">Upload and share</span><span class="btn">Share a document you have</span><span class="btn quiet">Decline</span></div>
+            <div class="btns">
+              <span class="btn primary">Upload and share</span
+              ><span class="btn">Share a document you have</span
+              ><span class="btn quiet">Decline</span>
+            </div>
           </article>
 
           <article class="card" aria-label="Questions from Zino Capital">
             <div class="row">
-              <div class="who"><span class="av">ZC</span><div><h3>2 questions from Zino Capital</h3><p class="tert">From "Assumptions to test" · asked 6 Oct</p></div></div>
+              <div class="who">
+                <span class="av">ZC</span>
+                <div>
+                  <h3>2 questions from Zino Capital</h3>
+                  <p class="tert">From "Assumptions to test" · asked 6 Oct</p>
+                </div>
+              </div>
               <span class="chip">Questions</span>
             </div>
-            <ol class="list" style="margin-top:12px">
+            <ol class="list" style="margin-top: 12px">
               <li>
-                <p><strong>1.</strong> How many of the 140 SME customers paid in each of the last three months?</p>
-                <p class="tert">About: Paying customers · Pitch deck, slide 7</p>
-                <textarea aria-label="Your answer">118 paid in July, 124 in August and 131 in September. The rest are on a 60-day trial.</textarea>
-                <div class="btns" style="margin-top:8px"><span class="btn">Attach evidence</span><span class="chip">Sept revenue export.xlsx ✕</span></div>
-                <div class="btns"><span class="btn primary">Send answer</span><span class="tert" style="align-self:center">Recorded as your claim, supported by the file. Zino Capital is told.</span></div>
+                <p>
+                  <strong>1.</strong> How many of the 140 SME customers paid in
+                  each of the last three months?
+                </p>
+                <p class="tert">
+                  About: Paying customers · Pitch deck, slide 7
+                </p>
+                <textarea aria-label="Your answer">
+118 paid in July, 124 in August and 131 in September. The rest are on a 60-day trial.</textarea>
+                <div class="btns" style="margin-top: 8px">
+                  <span class="btn">Attach evidence</span
+                  ><span class="chip">Sept revenue export.xlsx ✕</span>
+                </div>
+                <div class="btns">
+                  <span class="btn primary">Send answer</span
+                  ><span class="tert" style="align-self: center"
+                    >Recorded as your claim, supported by the file. Zino Capital
+                    is told.</span
+                  >
+                </div>
               </li>
-              <li style="border-top:1px solid var(--bs);padding-top:12px">
+              <li style="border-top: 1px solid var(--bs); padding-top: 12px">
                 <p><strong>2.</strong> What does the 4% take rate depend on?</p>
                 <p class="tert">About: Take rate · Pitch deck, slide 9</p>
-                <span class="btn" style="margin-top:8px">Answer</span>
+                <span class="btn" style="margin-top: 8px">Answer</span>
               </li>
             </ol>
           </article>
 
           <article class="card" aria-label="Request from Kiln Ventures">
             <div class="row">
-              <div class="who"><span class="av">KV</span><div><h3>Cap table summary</h3><p class="tert">Tomi Bello · Kiln Ventures · asked 7 Oct · from your data room</p></div></div>
+              <div class="who">
+                <span class="av">KV</span>
+                <div>
+                  <h3>Cap table summary</h3>
+                  <p class="tert">
+                    Tomi Bello · Kiln Ventures · asked 7 Oct · from your data
+                    room
+                  </p>
+                </div>
+              </div>
               <span class="chip info">In data room · Cap table</span>
             </div>
-            <div class="btns"><span class="btn primary">Share for 30 days</span><span class="btn">Change level</span><span class="btn quiet">Decline</span></div>
+            <div class="btns">
+              <span class="btn primary">Share for 30 days</span
+              ><span class="btn">Change level</span
+              ><span class="btn quiet">Decline</span>
+            </div>
           </article>
         </div>
       </section>
 
       <!-- 2: DATA ROOM with intersection -->
       <section data-view="dataroom">
-        <div class="row" style="margin-bottom:12px">
-          <div><h2>Data room</h2><p class="muted">What investors can see, folder by folder.</p></div>
+        <div class="row" style="margin-bottom: 12px">
+          <div>
+            <h2>Data room</h2>
+            <p class="muted">What investors can see, folder by folder.</p>
+          </div>
           <span class="btn primary">Upload files</span>
         </div>
-        <div class="card" style="margin-bottom:16px"><p><strong>9 of 14</strong> recommended for a seed round</p><p class="tert">Still to add: financial model, tax clearance, data protection registration</p></div>
-        <div class="folder">
-          <div class="row"><h3>Financials <span class="tert">3</span></h3><span class="btn quiet">Who can see this folder</span></div>
-          <div class="doc"><div class="who"><span class="icon">XLS</span><div><p>Management accounts Oct 2025–Sep 2026</p><p class="tert">Only people you choose · shared with 1</p></div></div><div class="who"><span class="chip info">Requested by Zino Capital · shared</span><span class="btn">Access</span></div></div>
-          <div class="doc"><div class="who"><span class="icon">PDF</span><div><p>Unit economics</p><p class="tert">Listed, opens on approval · opened by 2</p></div></div><div class="who"><span class="btn">Access</span></div></div>
+        <div class="card" style="margin-bottom: 16px">
+          <p><strong>9 of 14</strong> recommended for a seed round</p>
+          <p class="tert">
+            Still to add: financial model, tax clearance, data protection
+            registration
+          </p>
         </div>
         <div class="folder">
-          <div class="row"><h3>Cap table and equity <span class="tert">2</span></h3><span class="btn quiet">Who can see this folder</span></div>
-          <div class="doc"><div class="who"><span class="icon">PDF</span><div><p>Cap table summary</p><p class="tert">Listed, opens on approval</p></div></div><div class="who"><span class="chip acc">Requested by Kiln Ventures · open</span><span class="btn">Access</span></div></div>
+          <div class="row">
+            <h3>Financials <span class="tert">3</span></h3>
+            <span class="btn quiet">Who can see this folder</span>
+          </div>
+          <div class="doc">
+            <div class="who">
+              <span class="icon">XLS</span>
+              <div>
+                <p>Management accounts Oct 2025–Sep 2026</p>
+                <p class="tert">Only people you choose · shared with 1</p>
+              </div>
+            </div>
+            <div class="who">
+              <span class="chip info">Requested by Zino Capital · shared</span
+              ><span class="btn">Access</span>
+            </div>
+          </div>
+          <div class="doc">
+            <div class="who">
+              <span class="icon">PDF</span>
+              <div>
+                <p>Unit economics</p>
+                <p class="tert">Listed, opens on approval · opened by 2</p>
+              </div>
+            </div>
+            <div class="who"><span class="btn">Access</span></div>
+          </div>
+        </div>
+        <div class="folder">
+          <div class="row">
+            <h3>Cap table and equity <span class="tert">2</span></h3>
+            <span class="btn quiet">Who can see this folder</span>
+          </div>
+          <div class="doc">
+            <div class="who">
+              <span class="icon">PDF</span>
+              <div>
+                <p>Cap table summary</p>
+                <p class="tert">Listed, opens on approval</p>
+              </div>
+            </div>
+            <div class="who">
+              <span class="chip acc">Requested by Kiln Ventures · open</span
+              ><span class="btn">Access</span>
+            </div>
+          </div>
         </div>
       </section>
 
       <!-- 3: ACCESS EDITOR -->
       <section data-view="access">
         <div class="scrim"></div>
-        <aside class="sheet" role="dialog" aria-label="Who can see Management accounts">
+        <aside
+          class="sheet"
+          role="dialog"
+          aria-label="Who can see Management accounts"
+        >
           <p class="tert">Financials</p>
           <h2>Management accounts Oct 2025–Sep 2026</h2>
-          <h3 style="margin:16px 0 8px">Who can see it</h3>
-          <div class="list" style="gap:8px">
-            <div class="radio"><span class="dot"></span><div><p>Only my team</p><p class="tert">People in Ledgerline.</p></div></div>
-            <div class="radio on"><span class="dot"></span><div><p>Only investors I choose</p><p class="tert">Nobody else sees the title.</p></div></div>
-            <div class="radio"><span class="dot"></span><div><p>Listed; opens when I approve</p><p class="tert">Investors who can find you see the title and can ask.</p></div></div>
-            <div class="radio"><span class="dot"></span><div><p>Investors on Capital Q who can find us</p><p class="tert">They can open it.</p></div></div>
+          <h3 style="margin: 16px 0 8px">Who can see it</h3>
+          <div class="list" style="gap: 8px">
+            <div class="radio">
+              <span class="dot"></span>
+              <div>
+                <p>Only my team</p>
+                <p class="tert">People in Ledgerline.</p>
+              </div>
+            </div>
+            <div class="radio on">
+              <span class="dot"></span>
+              <div>
+                <p>Only investors I choose</p>
+                <p class="tert">Nobody else sees the title.</p>
+              </div>
+            </div>
+            <div class="radio">
+              <span class="dot"></span>
+              <div>
+                <p>Listed; opens when I approve</p>
+                <p class="tert">
+                  Investors who can find you see the title and can ask.
+                </p>
+              </div>
+            </div>
+            <div class="radio">
+              <span class="dot"></span>
+              <div>
+                <p>Investors on Capital Q who can find us</p>
+                <p class="tert">They can open it.</p>
+              </div>
+            </div>
           </div>
-          <details style="margin-top:8px"><summary class="tert">4 more scopes aren't offered for company documents</summary>
-            <ul class="hist"><li>Only me: documents belong to the company.</li><li>Founders only: not separate from your team yet.</li><li>An investor's private notes: theirs, not yours.</li><li>Anyone on the web: documents never get a public link.</li></ul></details>
-          <h3 style="margin:20px 0 4px">People with access</h3>
+          <details style="margin-top: 8px">
+            <summary class="tert">
+              4 more scopes aren't offered for company documents
+            </summary>
+            <ul class="hist">
+              <li>Only me: documents belong to the company.</li>
+              <li>Founders only: not separate from your team yet.</li>
+              <li>An investor's private notes: theirs, not yours.</li>
+              <li>Anyone on the web: documents never get a public link.</li>
+            </ul>
+          </details>
+          <h3 style="margin: 20px 0 4px">People with access</h3>
           <ul class="grants">
-            <li><div><p>Zino Capital</p><p class="tert">View only, watermarked · until 4 Nov</p></div><div class="who"><span class="btn quiet">Change</span><span class="btn">Revoke</span></div></li>
-            <li><div><p>Kiln Ventures</p><p class="tert">View and download · until 21 Oct</p></div><div class="who"><span class="btn quiet">Change</span><span class="btn">Revoke</span></div></li>
+            <li>
+              <div>
+                <p>Zino Capital</p>
+                <p class="tert">View only, watermarked · until 4 Nov</p>
+              </div>
+              <div class="who">
+                <span class="btn quiet">Change</span
+                ><span class="btn">Revoke</span>
+              </div>
+            </li>
+            <li>
+              <div>
+                <p>Kiln Ventures</p>
+                <p class="tert">View and download · until 21 Oct</p>
+              </div>
+              <div class="who">
+                <span class="btn quiet">Change</span
+                ><span class="btn">Revoke</span>
+              </div>
+            </li>
           </ul>
-          <div class="opts" style="grid-template-columns:1fr 1fr">
-            <label class="f" style="grid-column:1/-1">Add an investor<span class="sel">Harbour Lane Partners <span aria-hidden="true">▾</span></span></label>
-            <label class="f">They can<span class="sel">View only <span aria-hidden="true">▾</span></span></label>
-            <label class="f">For<span class="sel">30 days <span aria-hidden="true">▾</span></span></label>
+          <div class="opts" style="grid-template-columns: 1fr 1fr">
+            <label class="f" style="grid-column: 1/-1"
+              >Add an investor<span class="sel"
+                >Harbour Lane Partners <span aria-hidden="true">▾</span></span
+              ></label
+            >
+            <label class="f"
+              >They can<span class="sel"
+                >View only <span aria-hidden="true">▾</span></span
+              ></label
+            >
+            <label class="f"
+              >For<span class="sel"
+                >30 days <span aria-hidden="true">▾</span></span
+              ></label
+            >
           </div>
           <div class="btns"><span class="btn primary">Share</span></div>
-          <h3 style="margin:20px 0 4px">History</h3>
-          <ul class="hist"><li>8 Oct · Tobenna shared with Zino Capital, view only, 30 days</li><li>6 Oct · Tobenna revoked Harbour Lane Partners</li><li>2 Oct · Funmilayo changed it to Only investors I choose</li></ul>
+          <h3 style="margin: 20px 0 4px">History</h3>
+          <ul class="hist">
+            <li>
+              8 Oct · Tobenna shared with Zino Capital, view only, 30 days
+            </li>
+            <li>6 Oct · Tobenna revoked Harbour Lane Partners</li>
+            <li>2 Oct · Funmilayo changed it to Only investors I choose</li>
+          </ul>
         </aside>
       </section>
 
       <!-- INVESTOR SIDE -->
       <section data-view="investor">
         <p class="tert">Ledgerline · company profile (investor)</p>
-        <h2 style="margin-top:4px">Your requests</h2>
-        <ul class="grants" style="margin-bottom:24px">
-          <li><div><p>Management accounts, last 12 months</p><p class="tert">Asked 5 Oct</p></div><span class="chip pos">Shared · until 4 Nov</span></li>
-          <li><div><p>Customer contracts</p><p class="tert">Asked 3 Oct · "We'll share these after a term sheet."</p></div><span class="chip">Declined</span></li>
-          <li><div><p>Cap table summary</p><p class="tert">Asked 7 Oct</p></div><span class="chip acc">Requested</span></li>
+        <h2 style="margin-top: 4px">Your requests</h2>
+        <ul class="grants" style="margin-bottom: 24px">
+          <li>
+            <div>
+              <p>Management accounts, last 12 months</p>
+              <p class="tert">Asked 5 Oct</p>
+            </div>
+            <span class="chip pos">Shared · until 4 Nov</span>
+          </li>
+          <li>
+            <div>
+              <p>Customer contracts</p>
+              <p class="tert">
+                Asked 3 Oct · "We'll share these after a term sheet."
+              </p>
+            </div>
+            <span class="chip">Declined</span>
+          </li>
+          <li>
+            <div>
+              <p>Cap table summary</p>
+              <p class="tert">Asked 7 Oct</p>
+            </div>
+            <span class="chip acc">Requested</span>
+          </li>
         </ul>
         <h2>Assumptions to test</h2>
-        <div class="board" style="margin-top:12px">
-          <div class="col"><h3>Evidenced · 1</h3><div class="card"><p>Paying customers: 131 SMEs</p><p class="tert">Founder's claim · supported by a document</p><div class="ans"><p class="tert">Founder's answer, 8 Oct</p><p>118 paid in July, 124 in August and 131 in September.</p><p class="tert">Sept revenue export.xlsx</p></div></div></div>
-          <div class="col"><h3>Claimed · 3</h3><div class="card"><p>Take rate 4%</p><p class="tert">Founder's claim · self-reported</p><p class="tert" style="margin-top:6px">Your question: waiting for an answer</p></div></div>
-          <div class="col"><h3>Not known yet · 2</h3><div class="card"><p>Net revenue retention</p><p class="tert">Not in the deck</p></div></div>
+        <div class="board" style="margin-top: 12px">
+          <div class="col">
+            <h3>Evidenced · 1</h3>
+            <div class="card">
+              <p>Paying customers: 131 SMEs</p>
+              <p class="tert">Founder's claim · supported by a document</p>
+              <div class="ans">
+                <p class="tert">Founder's answer, 8 Oct</p>
+                <p>118 paid in July, 124 in August and 131 in September.</p>
+                <p class="tert">Sept revenue export.xlsx</p>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <h3>Claimed · 3</h3>
+            <div class="card">
+              <p>Take rate 4%</p>
+              <p class="tert">Founder's claim · self-reported</p>
+              <p class="tert" style="margin-top: 6px">
+                Your question: waiting for an answer
+              </p>
+            </div>
+          </div>
+          <div class="col">
+            <h3>Not known yet · 2</h3>
+            <div class="card">
+              <p>Net revenue retention</p>
+              <p class="tert">Not in the deck</p>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -251,11 +820,15 @@
       const view = params.get("view") ?? "requested";
       document.documentElement.dataset.theme = params.get("theme") ?? "light";
       for (const s of document.querySelectorAll("[data-view]"))
-        s.hidden = !(s.dataset.view === view || (view === "access" && s.dataset.view === "dataroom"));
+        s.hidden = !(
+          s.dataset.view === view ||
+          (view === "access" && s.dataset.view === "dataroom")
+        );
       const tab = view === "access" ? "dataroom" : view;
       for (const t of document.querySelectorAll("[data-tab]"))
         t.setAttribute("aria-selected", String(t.dataset.tab === tab));
-      if (view === "investor") document.querySelector("[data-founder]").hidden = true;
+      if (view === "investor")
+        document.querySelector("[data-founder]").hidden = true;
     </script>
   </body>
 </html>

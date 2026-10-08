@@ -5,7 +5,7 @@
 - Why included: Approved job runs fire-and-forget (void jobs.run); no resume after restart.
 
 ```ts
-  260  
+  260
   261  export function createWorkforceJobActions(dependencies: {
   262    /** The jobs runner for one approver, over their own ports. */
   263    readonly jobsFor: (actor: ActorContext) => WorkforceJobs;

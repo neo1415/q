@@ -6,7 +6,7 @@
 
 ```ts
     1  import { randomUUID } from "node:crypto";
-    2  
+    2
     3  import {
     4    CorrelationIdSchema,
     5    QConversationIdSchema,
@@ -24,9 +24,9 @@
    17    type ActorContext,
    18    type ActorContextResolver,
    19  } from "@capital-q/security";
-   20  
+   20
    21  import type { InstructionRow, InstructionStore } from "./store.js";
-   22  
+   22
    23  /**
    24   * An ASK step of a standing instruction (ADR 0043): the same `app.<name>`
    25   * card the person's own request would prepare, in the instruction's own Q
@@ -36,7 +36,7 @@
    29   * gate, which re-verifies the approval and the person's authority now.
    30   */
    31  export const INSTRUCTION_ORCHESTRATION_VERSION = "q-instruction-v1";
-   32  
+   32
    33  export function createInstructionAsk(dependencies: {
    34    readonly runtime: Pick<QRuntimeService, "createRun">;
    35    readonly orchestration: Pick<
@@ -129,7 +129,7 @@
   122      }
   123    };
   124  }
-  125  
+  125
   126  /**
   127   * The person a standing instruction acts as, resolved NOW through the same
   128   * resolver a request uses: a revoked membership or a disabled account means

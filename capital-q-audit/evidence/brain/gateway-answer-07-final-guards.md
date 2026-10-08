@@ -28,7 +28,7 @@
  3660              return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
  3661            }
  3662          }
- 3663  
+ 3663
  3664          // They asked about their own records and Capital Q's context was
  3665          // not enough, so the answer draws on the public web: said out
  3666          // loud as a change of source, never silently (CQ-QX-005).
@@ -49,7 +49,7 @@
  3681            }
  3682            analyst = final.output.value;
  3683          }
- 3684  
+ 3684
  3685          // The last surface before a person reads it (CQ-Q-023). Capital Q
  3686          // has no deterministic recommendation factors yet, so any sentence
  3687          // explaining why something was recommended, ranked or matched was

@@ -236,6 +236,16 @@ export type QActionService = {
     /** A code, e.g. NEWER_MESSAGE_FROM_THEM. */
     readonly reason: string;
   }) => Promise<boolean>;
+  /**
+   * Recovery D2 (audit D-01): expires every PENDING approval past its
+   * `expiresAt`, with its action, eagerly -- not only when someone tries
+   * to decide it -- so work waiting on it (a standing instruction) sees
+   * the card lapsed and can redraft or tell the person. Each in its own
+   * short transaction, re-checked under lock. Returns how many expired.
+   */
+  readonly expireLapsed?: (input?: {
+    readonly limit?: number | undefined;
+  }) => Promise<number>;
   /** Replace a pending proposal's payload; voids the old approval (BIZ-007). */
   readonly revise: (
     command: ReviseQApprovalCommand,
@@ -2168,10 +2178,58 @@ export function createQActionService(
     return live?.id ?? actionId;
   };
 
+  const expireLapsed: NonNullable<QActionService["expireLapsed"]> = async (
+    input,
+  ) => {
+    const list = repositories.approvals.listLapsed;
+    if (list === undefined) return 0;
+    const now = clock.now();
+    const lapsed = await list(sql, {
+      now,
+      limit: Math.min(Math.max(input?.limit ?? 100, 1), 500),
+    });
+    let expired = 0;
+    for (const one of lapsed) {
+      try {
+        const done = await transactions.run(async (tx) => {
+          const approval = await repositories.approvals.lockById(
+            tx,
+            one.tenantId,
+            one.approvalId,
+          );
+          // Decided meanwhile, or (clock skew) not yet lapsed: leave it.
+          if (
+            approval === null ||
+            approval.status !== "PENDING" ||
+            approvalIsOpen(approval, now)
+          ) {
+            return false;
+          }
+          const action = await repositories.actions.lockById(
+            tx,
+            approval.tenantId,
+            approval.actionId,
+          );
+          if (action === null) return false;
+          await expire(tx, approval, action);
+          return true;
+        });
+        if (done) expired += 1;
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, approvalId: one.approvalId },
+          "lapsed approval not expired",
+        );
+      }
+    }
+    return expired;
+  };
+
   return {
     propose,
     revise,
     supersedeStale,
+    expireLapsed,
     readProposal,
     currentRevision,
     getApproval,

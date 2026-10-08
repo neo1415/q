@@ -1,9 +1,12 @@
 import { answerCardsBlock, type ModelAnswerCardsLike } from "./answer-cards.js";
 import { randomUUID } from "node:crypto";
 
+import { RunRead, type ReadInvestor } from "./card-subjects.js";
 import {
   QFindingIdSchema,
-  QResultBlocksSchema,
+  chartableSeries,
+  parseQResultBlocks,
+  type QResultBlockDrop,
   type PermittedContextPlan,
   type QConfidenceLevel,
   type QFindingType,
@@ -84,6 +87,12 @@ export type AnalystResultLike = {
       }
     | null
     | undefined;
+  /**
+   * E4: how the model would lay the answer out ("MAP", "TABLE", ...),
+   * when the analyst schema carries it (requested of workstream B). The
+   * kind is the model's choice; the content never is.
+   */
+  readonly visual?: string | undefined;
 };
 
 const FINDING_TYPES = new Set<string>([
@@ -319,6 +328,11 @@ export function couldNotAnswer(result: AnalystResultLike): boolean {
 export function analystResultBlocks(input: {
   readonly result: AnalystResultLike;
   readonly subjects: readonly QSubjectRef[];
+  /** E4: what this run's tools returned (investors, places); absent: none read. */
+  readonly read?: RunRead | undefined;
+  /** E3: blocks the contract refused, for the caller to log. */
+  readonly onDropped?:
+    ((dropped: readonly QResultBlockDrop[]) => void) | undefined;
   /** Overridable so a test can pin the ids it asserts on. */
   readonly findingId?: ((index: number) => string) | undefined;
 }): QResultBlock[] | undefined {
@@ -419,12 +433,165 @@ export function analystResultBlocks(input: {
 
   blocks.push(...subjectBlocks(input.subjects));
 
+  // E4: what the model asked to be laid out, built only from this run's
+  // own reads (never its words). Nothing read, nothing drawn.
+  if (input.read !== undefined) {
+    const visual = visualBlock(input.result.visual, input.read);
+    if (visual !== null) blocks.push(visual);
+  }
+
   if (blocks.length === 0) {
     return undefined;
   }
   // Parsed rather than asserted: a block that does not satisfy the public
   // contract must not reach a client, and the answer is still good text
-  // without it.
-  const parsed = QResultBlocksSchema.safeParse(blocks);
-  return parsed.success ? [...parsed.data] : undefined;
+  // without it. E3 (audit E-07): block by block, so one bad block costs
+  // only itself, and the drop is reported rather than silent.
+  const parsed = parseQResultBlocks(blocks);
+  if (parsed.dropped.length > 0) input.onDropped?.(parsed.dropped);
+  return parsed.blocks.length === 0 ? undefined : parsed.blocks;
+}
+
+// ---------------------------------------------------------------------------
+// E4: tables, maps, timelines and charts, from validated data only.
+
+export const Q_VISUAL_KINDS = ["MAP", "TABLE", "TIMELINE", "CHART"] as const;
+export type QVisualKind = (typeof Q_VISUAL_KINDS)[number];
+
+function investorsOf(read: RunRead): readonly ReadInvestor[] {
+  return [...read.investors.values()].slice(0, 8);
+}
+
+/** Where the run's investors are, as they publish it. */
+export function investorsMapBlock(
+  investors: readonly ReadInvestor[],
+): QResultBlock | null {
+  if (!investors.some((investor) => investor.country !== null)) return null;
+  return {
+    kind: "MAP",
+    title: "Where they're based",
+    basis: "Head-office country, as each investor publishes it on Capital Q.",
+    places: investors.slice(0, 20).map((investor) => ({
+      label: investor.name.slice(0, 80),
+      countryCode: investor.country,
+      subject: {
+        kind: "INVESTOR_ORGANISATION",
+        investorOrganisationId: investor.investorOrganisationId,
+      },
+      note: null,
+    })),
+  };
+}
+
+/**
+ * The run's investors side by side, each column headed by its name and
+ * opening its profile; rows are what they publish. An unread fact is an
+ * empty cell ("not known"), never a guess.
+ */
+export function investorsTableBlock(
+  investors: readonly ReadInvestor[],
+): QResultBlock | null {
+  if (investors.length < 2) return null;
+  const columns = investors.slice(0, 8);
+  const rows = [
+    { label: "Based in", cells: columns.map((one) => one.country ?? "") },
+    {
+      label: "Why they fit (what they publish)",
+      cells: columns.map((one) => one.basis.join("; ").slice(0, 500)),
+    },
+  ];
+  return {
+    kind: "TABLE",
+    title: "Side by side",
+    columns: columns.map((one) => ({
+      label: one.name.slice(0, 80),
+      subject: {
+        kind: "INVESTOR_ORGANISATION",
+        investorOrganisationId: one.investorOrganisationId,
+      },
+    })),
+    rows,
+  };
+}
+
+/** Events in time order, oldest first; undated events are not placed. */
+export function timelineBlock(input: {
+  readonly title: string;
+  readonly events: readonly {
+    readonly at: string;
+    readonly label: string;
+    readonly note?: string | null | undefined;
+    readonly subject?: QSubjectRef | null | undefined;
+  }[];
+}): QResultBlock | null {
+  const dated = input.events
+    .filter((event) => Number.isFinite(Date.parse(event.at)))
+    .toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at))
+    .slice(-20);
+  if (dated.length === 0) return null;
+  return {
+    kind: "TIMELINE",
+    title: input.title,
+    events: dated.map((event) => ({
+      at: event.at,
+      label: event.label.slice(0, 120),
+      note: event.note?.slice(0, 240) ?? null,
+      subject: event.subject ?? null,
+    })),
+  };
+}
+
+/**
+ * A chart from figures that carry their own standing. A series that is
+ * not chartable (an inference, an estimate, a bare self-report) is left
+ * out rather than drawn as if it were fact; none left, no chart.
+ */
+export function chartBlock(input: {
+  readonly chart: "BAR" | "LINE";
+  readonly title: string;
+  readonly unit: string;
+  readonly currency: string | null;
+  readonly series: readonly {
+    readonly label: string;
+    readonly truthClass: TruthClass;
+    readonly evidenceStatus: EvidenceStatus;
+    readonly source: string;
+    readonly points: readonly {
+      readonly label: string;
+      readonly value: number;
+    }[];
+  }[];
+}): QResultBlock | null {
+  const series = input.series
+    .filter(chartableSeries)
+    .filter((one) => one.points.every((point) => Number.isFinite(point.value)))
+    .slice(0, 4);
+  if (series.length === 0) return null;
+  return {
+    kind: "CHART",
+    chart: input.chart,
+    title: input.title,
+    unit: input.unit,
+    currency: input.currency,
+    series: series.map((one) => ({
+      label: one.label,
+      truthClass: one.truthClass,
+      evidenceStatus: one.evidenceStatus,
+      source: one.source,
+      points: one.points.slice(0, 24).map((point) => ({ ...point })),
+    })),
+  };
+}
+
+/** The block the model asked for, from what the run read; null when none fits. */
+function visualBlock(
+  hint: string | undefined,
+  read: RunRead,
+): QResultBlock | null {
+  if (hint === "MAP") return investorsMapBlock(investorsOf(read));
+  if (hint === "TABLE") return investorsTableBlock(investorsOf(read));
+  // TIMELINE and CHART need dated events or evidenced figures, which no
+  // run read carries yet; nothing is drawn rather than something made up
+  // (docs/recovery/specs/E-rich-ui-promises.md §3.3).
+  return null;
 }

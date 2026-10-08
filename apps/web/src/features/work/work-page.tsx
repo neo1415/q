@@ -20,6 +20,7 @@ import type {
   QWorkDto,
   QWorkSuggestionDto,
   WorkforceJobDetailDto,
+  WorkforceJobSummaryDto,
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { Button, IconButton } from "@capital-q/ui/button";
@@ -51,11 +52,21 @@ import {
 } from "@/features/q/actions";
 import { EntityAvatar, type EntityKind } from "@/features/entity/entity-avatar";
 import { EmailDraftEditor } from "@/features/integrations/email-draft-editor";
+import {
+  QControl,
+  useQControl,
+  useQControlGroup,
+} from "@/features/q/control/q-control";
 import { useQSessionOptional } from "@/features/q/q-session";
 
 import { DecisionQueue, DoneForYou, useDismissedHeld } from "./decision-queue";
 import { decisionGroups } from "./decisions";
-import { groupNotices, type NoticeGroup } from "./notice-groups";
+import {
+  groupNotices,
+  summarisesCards,
+  type NoticeGroup,
+} from "./notice-groups";
+import { jobLine, jobsInProgress } from "./job-state";
 import { readPlan } from "./plan-words";
 import type { WorkforceView } from "./workforce-actions";
 import { WorkforceCost } from "./workforce-cost";
@@ -78,6 +89,7 @@ import {
   preparedAction,
   setDelegationAction,
   setPausedAction,
+  stopJobAction,
   type Prepared,
 } from "./work-page-actions";
 
@@ -151,8 +163,24 @@ export function WorkPage({
   const dismissedHeld = useDismissedHeld();
   // The Work count in the navigation is these notices (founder 2026-10-05:
   // "it says 2 things, but the page says nothing"): they are listed here.
-  const notices = groupNotices(useNotices().items ?? []).needsYou;
+  // D-13: a notice that only summarises the cards below is not a second
+  // thing waiting on them.
+  const notices = groupNotices(useNotices().items ?? []).needsYou.filter(
+    // (When the cards could not be read, the summary is all they have.)
+    (group) => approvals === null || !summarisesCards(group.notice),
+  );
   const [view, setView] = useState<WorkView>(initialView ?? "work");
+  // Recovery D6 / C: the page's own controls, by literal ids, for Q.
+  const viewsRef = useRef<HTMLElement>(null);
+  useQControlGroup({
+    kind: "TAB",
+    ref: viewsRef,
+    ids: {
+      "tab.work-team": '[data-work-view="team"]',
+      "tab.work-cost": '[data-work-view="cost"]',
+      "tab.work-main": '[data-work-view="work"]',
+    },
+  });
   const live = useWorkforceLive(
     workforce,
     view === "team" || view === "work",
@@ -192,6 +220,7 @@ export function WorkPage({
     >
       {hasTeam ? (
         <nav
+          ref={viewsRef}
           aria-label="More about Q’s work"
           className="-mt-2 -mb-4 flex items-center gap-1"
           data-work-views
@@ -199,6 +228,7 @@ export function WorkPage({
           {view === "work" ? null : (
             <button
               type="button"
+              data-work-view="work"
               onClick={() => setView("work")}
               className="inline-flex min-h-11 items-center px-2 cq-label text-(--cq-text-primary) hover:underline"
             >
@@ -220,6 +250,7 @@ export function WorkPage({
             <button
               key={key}
               type="button"
+              data-work-view={key}
               aria-pressed={view === key}
               onClick={() => setView(view === key ? "work" : key)}
               className={cx(
@@ -237,34 +268,36 @@ export function WorkPage({
       {view === "work" ? (
         <>
           <TaskComposer />
-          <DecisionQueue
-            groups={groups}
-            jobs={jobs}
-            done={done?.items ?? []}
-            renderPlan={(approvalId, onDone) => (
-              <>
-                <ApprovalPlan
-                  approvalId={approvalId}
-                  initialView={viewMap.get(approvalId)}
-                  onDone={onDone}
-                  onNotNow={() => {}}
-                  hideNotNow
+          <QControl id="section.work-needs-you" kind="SECTION">
+            <DecisionQueue
+              groups={groups}
+              jobs={jobs}
+              done={done?.items ?? []}
+              renderPlan={(approvalId, onDone) => (
+                <>
+                  <ApprovalPlan
+                    approvalId={approvalId}
+                    initialView={viewMap.get(approvalId)}
+                    onDone={onDone}
+                    onNotNow={() => {}}
+                    hideNotNow
+                  />
+                  <DeclineLink approvalId={approvalId} onDeclined={onDone} />
+                </>
+              )}
+              onDecided={decided}
+              extraCount={timeLanes.length + notices.length}
+              extra={
+                <NeedsYou
+                  approvals={[]}
+                  lanes={timeLanes}
+                  notices={notices}
+                  onDecided={() => {}}
+                  embedded
                 />
-                <DeclineLink approvalId={approvalId} onDeclined={onDone} />
-              </>
-            )}
-            onDecided={decided}
-            extraCount={timeLanes.length + notices.length}
-            extra={
-              <NeedsYou
-                approvals={[]}
-                lanes={timeLanes}
-                notices={notices}
-                onDecided={() => {}}
-                embedded
-              />
-            }
-          />
+              }
+            />
+          </QControl>
           {approvals === null ? (
             <p
               className="-mt-4 cq-body-sm text-(--cq-text-secondary)"
@@ -282,8 +315,17 @@ export function WorkPage({
               setCards((was) => was.filter((card) => card.key !== key));
             }}
           />
-          <DoneForYou initial={done} jobs={jobs} />
-          <InProgress items={running} failed={work === null} jobs={jobs} />
+          <QControl id="section.work-done" kind="SECTION">
+            <DoneForYou initial={done} jobs={jobs} now={now} />
+          </QControl>
+          <QControl id="section.work-in-progress" kind="SECTION">
+            <InProgress
+              items={running}
+              failed={work === null}
+              jobs={jobs}
+              now={now}
+            />
+          </QControl>
         </>
       ) : null}
       {hasTeam && view === "team" ? (
@@ -334,18 +376,24 @@ function InProgress({
   items,
   failed,
   jobs,
+  now,
 }: {
   readonly items: readonly QWorkDto[];
   readonly failed: boolean;
   readonly jobs: readonly WorkforceJobDetailDto[];
+  /** The page's clock (render stays pure). */
+  readonly now: number;
 }) {
-  const tasks = jobs.filter(
-    (one) =>
-      one.job.source === "JOB" &&
-      (one.job.status === "RUNNING" ||
-        one.job.status === "PLANNING" ||
-        one.job.status === "HELD"),
-  );
+  // Recovery D6: the durable work state -- running, waiting, or stopped
+  // this week with why -- read from the same fields Q reads.
+  const tasks = jobsInProgress(jobs, now);
+  const listRef = useRef<HTMLUListElement>(null);
+  useQControl({
+    id: "list.work-jobs",
+    kind: "LIST",
+    ref: listRef,
+    count: tasks.length,
+  });
   return (
     <section aria-labelledby="work-running" data-work-running>
       <h2
@@ -370,33 +418,75 @@ function InProgress({
         <div className="mt-3">
           <Running items={items} failed={false} bare />
           {tasks.length === 0 ? null : (
-            <ul className="border-t border-(--cq-border-subtle)">
+            <ul ref={listRef} className="border-t border-(--cq-border-subtle)">
               {tasks.map((one) => (
-                <li
-                  key={one.job.id}
-                  className="flex min-h-14 flex-col justify-center border-b border-(--cq-border-subtle) py-2"
-                  data-work-job={one.job.id}
-                >
-                  <p className="m-0 truncate cq-body-sm font-medium text-(--cq-text-primary)">
-                    {one.job.goal}
-                  </p>
-                  <p className="m-0 cq-label font-normal text-(--cq-text-tertiary)">
-                    {one.job.status === "HELD"
-                      ? "Waiting for you"
-                      : one.job.status === "PLANNING"
-                        ? "Planning"
-                        : "Working"}
-                    {one.job.drafts > 0
-                      ? ` · ${String(one.job.drafts)} ${one.job.drafts === 1 ? "draft" : "drafts"}`
-                      : ""}
-                  </p>
-                </li>
+                <JobRow key={one.job.id} job={one.job} />
               ))}
             </ul>
           )}
         </div>
       )}
     </section>
+  );
+}
+
+/** One job: its real state, why it stopped, and "Stop this job". */
+function JobRow({ job }: { readonly job: WorkforceJobSummaryDto }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [said, setSaid] = useState<string | null>(null);
+  const line = jobLine(job);
+  const stop = () =>
+    startTransition(async () => {
+      const result = await stopJobAction(job.id).catch(() => null);
+      if (result?.ok === true) {
+        setSaid("Stopped. No further step starts.");
+        router.refresh();
+      } else {
+        setSaid("Q couldn't stop that job. It may have just finished.");
+      }
+    });
+  return (
+    <li
+      className="flex min-h-14 items-center gap-3 border-b border-(--cq-border-subtle) py-2"
+      data-work-job={job.id}
+      data-work-state={job.workState ?? job.status}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="m-0 truncate cq-body-sm font-medium text-(--cq-text-primary)">
+          {job.goal}
+        </p>
+        <p className="m-0 cq-label font-normal text-(--cq-text-tertiary)">
+          {line.state}
+          {job.drafts > 0
+            ? ` · ${String(job.drafts)} ${job.drafts === 1 ? "draft" : "drafts"}`
+            : ""}
+        </p>
+        {line.why === null ? null : (
+          <p className="m-0 cq-body-sm text-(--cq-text-secondary)">
+            {line.why}
+          </p>
+        )}
+        {said === null ? null : (
+          <p
+            className="m-0 cq-body-sm text-(--cq-text-secondary)"
+            role="status"
+          >
+            {said}
+          </p>
+        )}
+      </div>
+      {line.stoppable && said === null ? (
+        <Button
+          variant="secondary"
+          onClick={stop}
+          disabled={pending}
+          aria-label={`Stop this job: ${job.goal.slice(0, 80)}`}
+        >
+          {pending ? "Stopping…" : "Stop"}
+        </Button>
+      ) : null}
+    </li>
   );
 }
 

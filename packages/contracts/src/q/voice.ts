@@ -8,6 +8,7 @@ import { QVoicePresenceSchema } from "./presence.js";
 import { QScreenContextSchema, QViewingMomentSchema } from "./request.js";
 import { QSilenceBeatSchema } from "./silence-ladder.js";
 import { QSubjectRefsSchema } from "./subject.js";
+import { QFailureClassSchema, QTurnDispositionSchema } from "./turn.js";
 import { QClientActionIntentSchema } from "./ui-intent.js";
 
 /**
@@ -437,6 +438,16 @@ export const QVoiceDuplexToolResultSchema = z
     approvalPending: z.boolean(),
     /** BACKCHANNEL: the line's new listening level, applied at once. */
     listening: QVoiceListeningLevelSchema.optional(),
+    /**
+     * Q chose to say nothing (C-01, audit 2026-10-08): the same flag the
+     * heard result carries. Missing here, a silent ask_q the model called
+     * failed the strict parse and the voice said "that did not get through".
+     */
+    silent: z.boolean().optional(),
+    /** RECOVERY-2026-10: how this turn ended on the server (A4). */
+    disposition: QTurnDispositionSchema.optional(),
+    /** FAILED only: why, for diagnostics; the person hears plain words. */
+    failure: QFailureClassSchema.optional(),
   })
   .strict();
 export type QVoiceDuplexToolResult = z.infer<
@@ -482,6 +493,15 @@ export const QVoiceDuplexHeardResultSchema = z.discriminatedUnion("route", [
        * (live 2026-10-08: "could you give me a bit more detail?").
        */
       silent: z.boolean().optional(),
+      /** RECOVERY-2026-10: how this turn ended on the server (A4). */
+      disposition: QTurnDispositionSchema.optional(),
+      /** FAILED only: why, for diagnostics. */
+      failure: QFailureClassSchema.optional(),
+      /**
+       * SIDEBAND: the server already put the answer on the call and asked
+       * the voice to say it; the browser must not send it again.
+       */
+      delivered: z.literal("SERVER").optional(),
     })
     .strict(),
   z.object({ route: z.literal("SMALLTALK") }).strict(),
@@ -503,6 +523,45 @@ export const QVoiceDuplexSaidSchema = z
   })
   .strict();
 export type QVoiceDuplexSaid = z.infer<typeof QVoiceDuplexSaidSchema>;
+
+/**
+ * POST (RECOVERY A4): how one turn on the line ended, with its timings,
+ * for the server's per-turn log. Ids and milliseconds only, never words.
+ */
+export const Q_VOICE_DUPLEX_OUTCOME_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/outcome" as const;
+export const qVoiceDuplexOutcomePath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/outcome`;
+const TurnMsSchema = z.number().int().min(0).max(600_000);
+export const QVoiceDuplexTurnReportSchema = z
+  .object({
+    turnId: z.string().regex(/^turn_[A-Za-z0-9_-]{8,64}$/),
+    disposition: QTurnDispositionSchema,
+    failure: QFailureClassSchema.optional(),
+    /** End of their turn to Q's first audio. */
+    firstAudioMs: TurnMsSchema.optional(),
+    /** The heard relay's round trip. */
+    relayMs: TurnMsSchema.optional(),
+  })
+  .strict();
+export type QVoiceDuplexTurnReport = z.infer<
+  typeof QVoiceDuplexTurnReportSchema
+>;
+
+/**
+ * POST (RECOVERY A8, SIDEBAND): the realtime call's id, from the SDP
+ * answer's Location header, so the server can attach to the call. Only
+ * acted on when the sideband is on; the id alone grants nothing without
+ * the server's own provider key.
+ */
+export const Q_VOICE_DUPLEX_ATTACH_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/duplex/attach" as const;
+export const qVoiceDuplexAttachPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/duplex/attach`;
+export const QVoiceDuplexAttachSchema = z
+  .object({ callId: z.string().regex(/^rtc_[A-Za-z0-9_-]{1,120}$/) })
+  .strict();
+export type QVoiceDuplexAttach = z.infer<typeof QVoiceDuplexAttachSchema>;
 
 const TokenCountSchema = z.number().int().min(0).max(2_000_000);
 
@@ -718,6 +777,12 @@ export const QVoiceTurnStateSchema = z
      * `navigate`. Absent or null when none.
      */
     clientAction: QClientActionIntentSchema.nullable().optional(),
+    /**
+     * RECOVERY-2026-10 (C2): every client action the answer carried, in
+     * its order ("open Capital, the readiness tab, scroll to the risks").
+     * The screen performs them in order; `clientAction` is the latest.
+     */
+    clientActions: z.array(QClientActionIntentSchema).max(12).optional(),
     /** FORM: the interview leaves the person with the form. CHAT: the voice ends and the typed thread stays. */
     handoff: z.enum(["FORM", "CHAT"]).nullable(),
     degraded: z.boolean(),
@@ -728,6 +793,160 @@ export const QVoiceTurnStateSchema = z
     conversationId: QConversationIdSchema.optional(),
     /** PRESENCE: the latest spoken answer's gestures, played once per answer. */
     presence: QVoicePresenceSchema.optional(),
+    /**
+     * RECOVERY A4 (standard line): how the latest turn ended, numbered so
+     * the screen shows each once. A turn Q chose not to answer (IGNORED)
+     * is shown instead of a silent "Thinking".
+     */
+    outcome: z
+      .object({
+        seq: z.number().int().min(1),
+        disposition: QTurnDispositionSchema,
+        failure: QFailureClassSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type QVoiceTurnState = z.infer<typeof QVoiceTurnStateSchema>;
+
+// ---------------------------------------------------------------------------
+// Decision cards on either voice line (RECOVERY A, audit E-03)
+
+function cardWords(transcript: string): readonly string[] {
+  return transcript
+    .toLowerCase()
+    .replace(/[’`]/g, "'")
+    .replace(/[^a-z0-9'\s-]+/g, " ")
+    .split(/[\s-]+/)
+    .map((w) => w.replace(/^'+|'+$/g, ""))
+    .filter((w) => w.length > 0);
+}
+
+/**
+ * RECOVERY A3 (C-03/B-01, founder live 2026-10-08): with a card in focus,
+ * only a reply about the card is the card's. "Find anything that needs my
+ * attention" (6 words) went to the voice model and decide_card because
+ * every utterance of twelve words or fewer did. A card reply names what
+ * to do with the card; a question or a request for something else is Q's.
+ */
+const CARD_VERBS = new Set([
+  "send",
+  "sent",
+  "approve",
+  "approved",
+  "go",
+  "yes",
+  "yeah",
+  "yep",
+  "ok",
+  "okay",
+  "sure",
+  "no",
+  "nope",
+  "skip",
+  "later",
+  "dismiss",
+  "ignore",
+  "drop",
+  "cancel",
+  "edit",
+  "change",
+  "rewrite",
+  "redo",
+  "warmer",
+  "shorter",
+  "longer",
+  "softer",
+  "friendlier",
+  "formal",
+  "casual",
+  "book",
+  "schedule",
+  "reschedule",
+  "accept",
+  "decline",
+  "next",
+  "previous",
+  "moving",
+  "retry",
+  "again",
+  "snooze",
+  "remind",
+  "leave",
+  "keep",
+  "pass",
+]);
+const CARD_PHRASES = ["not now", "move on", "do it", "that one", "this one"];
+/** Opening words of a question or of a request for something else. */
+const ELSEWHERE = new Set([
+  "what",
+  "what's",
+  "whats",
+  "why",
+  "how",
+  "who",
+  "who's",
+  "which",
+  "where",
+  "find",
+  "show",
+  "open",
+  "tell",
+  "explain",
+  "read",
+  "give",
+  "search",
+  "look",
+  "check",
+  "take",
+  "anything",
+  "is",
+  "are",
+  "does",
+  "do",
+]);
+
+/** True when the words are a reply about the decision card in focus. */
+export function isQVoiceCardReply(transcript: string): boolean {
+  const said = cardWords(transcript);
+  if (said.length === 0 || said.length > 12) return false;
+  const first = said[0] ?? "";
+  // "do it" is a reply; "do they fit?" is not.
+  const joined = ` ${said.join(" ")} `;
+  if (ELSEWHERE.has(first) && !joined.startsWith(" do it ")) return false;
+  if (CARD_PHRASES.some((phrase) => joined.includes(` ${phrase} `))) {
+    return true;
+  }
+  return said.some((w) => CARD_VERBS.has(w));
+}
+
+/**
+ * POST: the standard line's side of the screen's decision cards. FOCUS:
+ * whether a card is in focus now (a reply about it is the card's).
+ * VERDICT: the browser read the person's words against the card in focus
+ * with the card's own code; `handled` when they decided it, with the
+ * outcome's facts for Q to say. Owner only; facts are data, never
+ * instructions, and bounded.
+ */
+export const Q_VOICE_CARD_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/card" as const;
+export const qVoiceCardPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/card`;
+export const QVoiceCardUpdateSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("FOCUS"), inFocus: z.boolean() }).strict(),
+  z
+    .object({
+      kind: z.literal("VERDICT"),
+      words: z.string().min(1).max(700),
+      handled: z.boolean(),
+      outcome: z
+        .record(z.string().max(40), z.unknown())
+        .refine((value) => JSON.stringify(value).length <= 6_000, {
+          message: "outcome too large",
+        })
+        .optional(),
+    })
+    .strict(),
+]);
+export type QVoiceCardUpdate = z.infer<typeof QVoiceCardUpdateSchema>;

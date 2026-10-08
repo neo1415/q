@@ -17,7 +17,7 @@ import {
   QViewingMomentSchema,
   QVisibleStageSchema,
   UtcTimestampSchema,
-  QResultBlocksSchema,
+  parseQResultBlocks,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 import {
@@ -173,7 +173,9 @@ const MessageRow = z.object({
     .unknown()
     .nullable()
     .transform((value) =>
-      value === null ? undefined : QResultBlocksSchema.safeParse(value).data,
+      // RECOVERY E-07: a stored answer keeps its valid blocks when one is
+      // invalid (e.g. written before a contract change), never loses all.
+      value === null ? undefined : parseQResultBlocks(value).blocks,
     ),
   provider_message_ref: z.string().nullable(),
   created_at: Timestamp,
@@ -550,7 +552,10 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         const blocks =
           input.blocks === undefined || input.blocks.length === 0
             ? null
-            : (QResultBlocksSchema.safeParse(input.blocks).data ?? null);
+            : (() => {
+                const valid = parseQResultBlocks(input.blocks).blocks;
+                return valid.length === 0 ? null : valid;
+              })();
         const rows = await tx.sql`
           insert into q_runtime.conversation_messages
             (id, tenant_id, conversation_id, run_id, role, content, result_blocks,

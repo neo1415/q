@@ -1,3 +1,4 @@
+import type { DatabaseHealth } from "@capital-q/database";
 import type { OwnUsage } from "./composition/usage.js";
 import { registerUsageRoutes } from "./http/usage.js";
 import { registerBriefingCommandRoutes } from "./http/briefing-command.js";
@@ -33,6 +34,10 @@ import { registerProblemHandling } from "./http/problem-handler.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
 import type { QRoomFeed } from "./room/feed.js";
 import { registerQRoomRoutes } from "./room/routes.js";
+import {
+  registerUiActReceiptRoutes,
+  type UiActReceiptLedger,
+} from "./http/ui-act-receipts.js";
 import {
   registerQArtifactRoutes,
   type QArtifactRoutesDependencies,
@@ -81,6 +86,10 @@ import {
   type StandingRoutesDependencies,
 } from "./http/standing.js";
 import {
+  registerAttentionRoutes,
+  type AttentionRoutesDependencies,
+} from "./http/q-attention.js";
+import {
   registerDailyRoutes,
   type DailyRoutesDependencies,
 } from "./http/daily.js";
@@ -111,6 +120,7 @@ import {
   registerQVoiceRoutes,
   type QVoiceRoutesDependencies,
 } from "./voice/routes.js";
+import { createVoiceCardTurns } from "./voice/card-turns.js";
 import { registerVoiceThinkRoute } from "./voice/think.js";
 import type { PresenceTrigger } from "./voice/presence-trigger.js";
 import { registerQInterviewRoute } from "./voice/interview-route.js";
@@ -142,6 +152,12 @@ export type QApiSecurityDependencies = {
  * without a database.
  */
 export type QApiModules = {
+  /**
+   * What /health/ready checks (audit DEF-A4). Absent: readiness reports the
+   * database NOT_CHECKED and stays 200, as it was before probes existed.
+   */
+  readonly healthProbes?:
+    { readonly database: () => Promise<DatabaseHealth> } | undefined;
   /**
    * Why an investor is seeing a company (CQ-REC-007). It lives here
    * rather than beside the slate itself because the natural-language
@@ -190,6 +206,8 @@ export type QApiModules = {
   // end BILLING-2 block
   /** Q's standing with each person: personality and patience. */
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
+  /** RECOVERY B1: what needs the person, every source (unread ≠ empty). */
+  readonly attention?: AttentionRoutesDependencies["attention"] | undefined;
   // DAILY block: The Q Daily, the person's own editions and preferences.
   readonly daily?: DailyRoutesDependencies["daily"] | undefined;
   /** Q in a meeting: bring it to a call, read its notes. */
@@ -225,6 +243,11 @@ export type QApiModules = {
    * absent means no room route and nothing published.
    */
   readonly room?: QRoomFeed | undefined;
+  /**
+   * RECOVERY-2026-10 (C): receipts of Q's UI acts from the person's screen;
+   * absent means no receipt route.
+   */
+  readonly uiActReceipts?: UiActReceiptLedger | undefined;
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
   readonly qActions?: QApprovalRoutesDependencies["qActions"] | undefined;
   /** What runs an approved action: resume, or the gate when the run cannot resume. */
@@ -381,6 +404,14 @@ export function createApp(
         room: modules.room,
       });
     }
+    if (modules.uiActReceipts !== undefined) {
+      registerUiActReceiptRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        receipts: modules.uiActReceipts,
+      });
+    }
     // A person's conversations (ADR 0012): the same owner rule, the
     // same personal-context allowance, read back from the runtime.
     registerQConversationRoutes(app, {
@@ -486,6 +517,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       errands: modules.errands,
+    });
+  }
+  // RECOVERY B1: what needs the person, every source, for every surface.
+  if (modules.attention !== undefined && security.resolver !== undefined) {
+    registerAttentionRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      attention: modules.attention,
     });
   }
   // DAILY block: The Q Daily (the person's own editions and preferences).
@@ -672,7 +711,10 @@ export function createApp(
         "q-api: the Q voice routes require an actor context resolver",
       );
     }
+    const voiceCards = createVoiceCardTurns();
     registerQVoiceRoutes(app, {
+      // E-03: one registry for the card route and the think route.
+      cards: voiceCards,
       authenticator: security.authenticator,
       resolver: security.resolver,
       identity: security.identity,
@@ -738,6 +780,9 @@ export function createApp(
         bindings: modules.voice.bindings,
         turn: modules.voice.turn,
         logger: modules.voice.logger,
+        // RECOVERY A4: each turn's disposition, for the screen.
+        board: modules.voice.board,
+        cards: voiceCards,
       });
     }
   }
@@ -758,16 +803,39 @@ export function createApp(
   }
 
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the
-  // process is alive and performs no dependency checks; readiness will grow to
-  // cover configuration and critical initialisation as those are introduced.
+  // process is alive and performs no dependency checks. Readiness asks the
+  // database (audit DEF-A4): Railway's healthcheck gates a deploy's cut-over
+  // on it, and a static "ok" let a release go live with no database. The
+  // answer names the failure kind only, never a host, version or message.
   app.get("/health/live", () => ({ status: "ok", service: SERVICE_NAME }));
 
-  app.get("/health/ready", () => ({
-    status: "ok",
-    service: SERVICE_NAME,
-    environment: config.runtime.deploymentEnvironment,
-    contracts: CONTRACTS_VERSION,
-  }));
+  app.get("/health/ready", async (_request, reply) => {
+    const database =
+      modules.healthProbes === undefined
+        ? undefined
+        : await modules.healthProbes.database();
+    const body = {
+      service: SERVICE_NAME,
+      environment: config.runtime.deploymentEnvironment,
+      contracts: CONTRACTS_VERSION,
+      checks: {
+        database:
+          database === undefined
+            ? "NOT_CHECKED"
+            : database.reachable
+              ? "OK"
+              : database.failure,
+      },
+    };
+    if (database !== undefined && !database.reachable) {
+      logger.warn(
+        { check: "database", failure: database.failure },
+        "not ready",
+      );
+      return reply.code(503).send({ status: "unavailable", ...body });
+    }
+    return { status: "ok", ...body };
+  });
 
   return { app, logger, streams };
 }

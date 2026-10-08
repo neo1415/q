@@ -9,7 +9,18 @@ import {
   PERSON_ACTIONS,
   qCapabilityId,
 } from "@capital-q/app-actions";
-import { Q_CAPABILITIES } from "@capital-q/q-tools";
+import {
+  Q_CAPABILITIES,
+  Q_CONTROL_CATALOG,
+  Q_CONTROL_KIND_ACTS,
+} from "@capital-q/q-tools";
+
+import {
+  collectControls,
+  generatedFiles,
+  kindActs,
+  REPO_ROOT,
+} from "../../../scripts/capability-parity/lib.mjs";
 
 /**
  * R20/R33 parity: every HTTP route a person's action reaches, in the
@@ -640,6 +651,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/standing.ts PUT Q_STANDING_PERSONALITY_PATH": cap(
     "tool.set_q_personality",
   ),
+  // RECOVERY B1: the same reader as Q's what_needs_me.
+  "q-api/http/q-attention.ts GET Q_ATTENTION_PATH": cap("tool.what_needs_me"),
   // BILLING-2 block (ADR 0036)
   "q-api/http/readiness-blueprint.ts POST Q_READINESS_BLUEPRINTS_PATH": exempt(
     "the plan-gated Readiness Blueprint (Pro), built by code from the free diagnosis Q already reads with read_my plan; the sequencing is the page's, the steps are Q's read",
@@ -759,6 +772,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/q-mcp.ts POST Q_MCP_PATH": exempt(
     "the MCP connector surface: an external client calling Q's tools, not a person's action",
   ),
+  // RECOVERY-2026-10 (C2): the screen's receipts of Q's own UI acts.
+  "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST Q_RUNS_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts GET runPath": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_MESSAGES_SUFFIX}`": Q_TRANSPORT,
@@ -776,6 +791,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/voice/routes.ts POST Q_VOICE_SPEECH_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SPEAK_RELAY_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SESSIONS_PATH": Q_TRANSPORT,
+  // RECOVERY A12: a card's focus and its voice verdict on the standard line.
+  "q-api/voice/routes.ts POST Q_VOICE_CARD_PATH": Q_TRANSPORT,
   // DUPLEX: the full-duplex line's tool relay, usage report and end.
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH": Q_TRANSPORT,
@@ -789,6 +806,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // Q for it) and what the voice said (the line's transcript).
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_HEARD_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_SAID_PATH": Q_TRANSPORT,
+  // RECOVERY-2026-10 (A4, A8): a voice turn's terminal outcome, and the
+  // server's sideband attach to the realtime call -- the line's transport.
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_OUTCOME_PATH": Q_TRANSPORT,
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_ATTACH_PATH": Q_TRANSPORT,
   "q-api/voice/think.ts POST dependencies.path": Q_TRANSPORT,
   "q-api/voice/think.ts POST `${dependencies.path}/chat/completions`":
     Q_TRANSPORT,
@@ -1068,6 +1089,12 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_NARRATION_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_HEARD_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_SAID_PATH",
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_OUTCOME_PATH",
+  "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_ATTACH_PATH",
+  "q-api/voice/routes.ts POST Q_VOICE_CARD_PATH",
+  // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
+  // conversation's own transport, never a person's action.
+  "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",
 ]);
 
 /**
@@ -1088,6 +1115,53 @@ const HELD_RETRY: ReadonlySet<string> = new Set([
 const READS_BY_POST: ReadonlySet<string> = new Set([
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH",
 ]);
+
+/**
+ * RECOVERY-2026-10 (C6): page controls get the same rule as routes. Every
+ * control a page registers (a literal id, or a PageSection/SettingsCard)
+ * is in the generated catalog operate_screen resolves against, with a Q
+ * capability whose acts cover its kind; the catalog and the Capability
+ * Parity Matrix on disk are current. A new control Q cannot operate --
+ * or a stale row -- fails here.
+ */
+describe("every page control is something Q can operate (RECOVERY C6)", () => {
+  // The repository root as the generator finds it, whatever the cwd.
+  const ROOT = REPO_ROOT;
+
+  it("the catalog lists exactly the controls registered in source", () => {
+    const registered = collectControls(ROOT).map((control) => control.id);
+    expect(registered.length).toBeGreaterThan(50);
+    expect(Q_CONTROL_CATALOG.map((control) => control.id)).toEqual(registered);
+  });
+
+  it("every control has a Q capability whose acts cover its kind", () => {
+    expect(CAPABILITY_IDS.has("tool.operate_screen")).toBe(true);
+    const web = kindActs(ROOT);
+    for (const control of Q_CONTROL_CATALOG) {
+      const acts = Q_CONTROL_KIND_ACTS[control.kind];
+      expect(acts.length, control.id).toBeGreaterThan(0);
+      // The server refuses exactly what the screen cannot do, and no more.
+      expect([...acts], control.id).toEqual(web[control.kind]);
+    }
+  });
+
+  it("the catalog and the matrix on disk are what the generator writes", async () => {
+    // The generator's own function: same order, same root, same format.
+    const files = await generatedFiles(
+      ROOT,
+      [...APP_ACTIONS, ...PERSON_ACTIONS],
+      qCapabilityId,
+    );
+    expect(
+      readFileSync(files.catalog.file, "utf8"),
+      "run node scripts/capability-parity/generate.mjs",
+    ).toBe(files.catalog.text);
+    expect(
+      readFileSync(files.matrix.file, "utf8"),
+      "run node scripts/capability-parity/generate.mjs",
+    ).toBe(files.matrix.text);
+  });
+});
 
 describe("every route and page is something Q can do, or exempt with a reason (R20/R33)", () => {
   it("every API route call site is classified", () => {

@@ -19,16 +19,16 @@
    12   * Nothing here decides anything: the decider is the card sequence's own
    13   * code, the same one the buttons use.
    14   */
-   15  
+   15
    16  export type CardDecider = (input: {
    17    /** What the voice model passed as their words. */
    18    readonly words: string;
    19    /** The provider's transcript of their own last turn, when it came. */
    20    readonly heard: string | null;
    21  }) => Promise<Readonly<Record<string, unknown>>>;
-   22  
+   22
    23  let decider: CardDecider | null = null;
-   24  
+   24
    25  /** The one decider for this page; returns its unregister. */
    26  export function registerCardDecider(next: CardDecider): () => void {
    27    decider = next;
@@ -36,7 +36,7 @@
    29      if (decider === next) decider = null;
    30    };
    31  }
-   32  
+   32
    33  /** The tool's output for a `decide_card` call, or null with no cards. */
    34  export async function decideCardByVoice(
    35    rawArguments: string,
@@ -60,12 +60,12 @@
    53    }
    54    return JSON.stringify(await current({ words, heard }));
    55  }
-   56  
+   56
    57  type NoteListener = (note: string, respond: boolean) => void;
    58  const listeners = new Set<NoteListener>();
    59  /** What a line opened now should know about the screen (the card in focus). */
    60  let standing: string | null = null;
-   61  
+   61
    62  /** An open line listens for notes while it is up. */
    63  export function onLineNote(listener: NoteListener): () => void {
    64    listeners.add(listener);
@@ -75,22 +75,22 @@
    68      listeners.delete(listener);
    69    };
    70  }
-   71  
+   71
    72  /** The note every newly opened line gets; null when nothing is in focus. */
    73  export function setStandingNote(note: string | null): void {
    74    standing = note;
    75  }
-   76  
+   76
    77  /** VOICE-BRAIN: a decision card is in focus now (its reply is the card's). */
    78  export function cardInFocus(): boolean {
    79    return decider !== null && standing !== null;
    80  }
-   81  
+   81
    82  /** Whether a line that can take notes is open now. */
    83  export function lineTakesNotes(): boolean {
    84    return listeners.size > 0;
    85  }
-   86  
+   86
    87  /** A note to the open line, if any; `respond`: Q says something now. */
    88  export function noteToLine(note: string, respond: boolean): boolean {
    89    for (const listener of listeners) listener(note, respond);
@@ -105,13 +105,13 @@
 - Why included: Who sets the standing note and the decider.
 
 ```ts
-  750  
+  750
   751    // The open line knows which card is in focus; a line opened later too.
   752    useEffect(() => {
   753      setStandingNote(active ? focusNote(data.cards, state) : null);
   754      return () => setStandingNote(null);
   755    }, [active, data.cards, state]);
-  756  
+  756
   757    // Spoken replies: the person's own words, read by the same code as the
   758    // buttons (never the model's say-so); anything else they say about the
   759    // cards is read from their own transcript into the same verbs.
@@ -148,4 +148,3 @@
   790              situation:
   791                "That isn't about the cards. Pass their words to ask_q; the cards stay on screen.",
 ```
-

@@ -12,6 +12,8 @@ import {
   Q_VOICE_SESSIONS_PATH,
   Q_VOICE_SPEECH_PATH,
   Q_VOICE_SCREEN_PATH,
+  Q_VOICE_CARD_PATH,
+  QVoiceCardUpdateSchema,
   Q_VOICE_TURN_PATH,
   QVoiceScreenUpdateSchema,
   QVoiceTurnStateSchema,
@@ -61,6 +63,7 @@ import {
   type SpeechSynthesisPort,
   type SpeechThrottle,
 } from "./synthesis.js";
+import type { VoiceCardTurns } from "./card-turns.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
 import {
@@ -148,6 +151,8 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly apiBaseUrl?: string | undefined;
   /** The turn board, for the screen to read what Q is asking. */
   readonly board?: VoiceTurnBoard | undefined;
+  /** E-03: decision cards on the standard line (shared with think). */
+  readonly cards?: VoiceCardTurns | undefined;
   /** Q's first minute with a new person. */
   readonly welcome?: WelcomeHost | undefined;
   /** One-way synthesis, when composed: Q reads a line, nothing listens. */
@@ -300,6 +305,52 @@ export function registerQVoiceRoutes(
       // R18: the pitch moment on screen, for spoken turns; replaced (or
       // cleared) by every update, so a moved-on card never lingers.
       binding.thread.viewing = viewing;
+      return reply.code(204).send();
+    },
+  );
+
+  /**
+   * E-03: the standard line's side of the screen's decision cards: which
+   * card is in focus, and the browser's verdict on a spoken reply (decided
+   * by the card's own code under this person's session). Owner only.
+   */
+  app.post(
+    Q_VOICE_CARD_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const params = request.params as { voiceSessionId?: string };
+      const binding = await ownLine(request, params.voiceSessionId ?? "");
+      const cards = dependencies.cards;
+      if (
+        binding === null ||
+        binding.actor.userId !== actor.userId ||
+        cards === undefined
+      ) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not found",
+          status: 404,
+          detail: "No such voice session.",
+        });
+      }
+      const update = QVoiceCardUpdateSchema.safeParse(request.body);
+      if (!update.success) {
+        return reply.code(400).send({
+          type: "about:blank",
+          title: "Bad request",
+          status: 400,
+          detail: "That is not a card update.",
+        });
+      }
+      if (update.data.kind === "FOCUS") {
+        cards.setFocus(binding.voiceSessionId, update.data.inFocus);
+      } else {
+        cards.resolve(binding.voiceSessionId, update.data.words, {
+          handled: update.data.handled,
+          outcome: update.data.outcome,
+        });
+      }
       return reply.code(204).send();
     },
   );
@@ -935,6 +986,16 @@ export function registerQVoiceRoutes(
     registerDuplexVoiceRoutes(app, {
       broker: dependencies.duplex,
       withContext,
+      // A11 (C-16): a line this instance does not hold is adopted from the
+      // sealed binding the browser presents; the token alone authorises
+      // nothing (the route's actor must be its owner).
+      restore: async (request) => {
+        const presented = request.headers[Q_VOICE_SESSION_TOKEN_HEADER];
+        if (typeof presented !== "string" || presented.length === 0) {
+          return null;
+        }
+        return dependencies.bindings.restore(presented);
+      },
     });
   }
 }

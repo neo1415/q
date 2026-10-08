@@ -44,11 +44,11 @@ Why included: Conditions under which hosted staging may route any sensitivity to
    37   * back to the strict path, which is the behaviour every existing
    38   * deployment already has.
    39   */
-   40  
+   40
    41  const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
    42  /** Environments that attest through a loopback database on the operator's own machine. */
    43  const LOOPBACK_ENVIRONMENTS = new Set(["local", "test"]);
-   44  
+   44
    45  /**
    46   * The Supabase project a connection string belongs to.
    47   *
@@ -79,7 +79,7 @@ Why included: Conditions under which hosted staging may route any sensitivity to
    72    if (fromUser?.[1] !== undefined) return fromUser[1].toLowerCase();
    73    return null;
    74  }
-   75  
+   75
    76  /**
    77   * Proof, held by the composition root, that this process may honour a
    78   * SYNTHETIC_DEMO posture. Constructed only by the factory below, which is
@@ -90,7 +90,7 @@ Why included: Conditions under which hosted staging may route any sensitivity to
    83    /** The conditions that were checked, for the startup log and the postflight. */
    84    readonly attestation: readonly string[];
    85  };
-   86  
+   86
    87  /** The operator asked for synthetic-demo routing where it cannot hold. */
    88  export class SyntheticDemoRoutingRefusedError extends Error {
    89    constructor(reason: string) {
@@ -98,7 +98,7 @@ Why included: Conditions under which hosted staging may route any sensitivity to
    91      this.name = "SyntheticDemoRoutingRefusedError";
    92    }
    93  }
-   94  
+   94
    95  export type SyntheticDemoRoutingOptions = {
    96    /**
    97     * The operator's explicit opt-in for this deployment. False, or absent,
@@ -136,7 +136,7 @@ Why included: Conditions under which hosted staging may route any sensitivity to
   129    /** `SUPABASE_URL`, for the project this process is actually using. */
   130    readonly supabaseUrl?: string | undefined;
   131  };
-  132  
+  132
   133  /**
   134   * Null when the operator has not opted in — the ordinary answer, and not an
   135   * error. Throws when the operator HAS opted in somewhere the claim cannot
@@ -159,16 +159,16 @@ Why included: Conditions under which hosted staging may route any sensitivity to
   152        `a synthetic-demo attestation cannot hold in ${options.environment}`,
   153      );
   154    }
-  155  
+  155
   156    if (!options.operatorEnabled) return null;
-  157  
+  157
   158    let host: string;
   159    try {
   160      host = new URL(options.databaseUrl).hostname;
   161    } catch {
   162      throw new SyntheticDemoRoutingRefusedError("database URL is not parseable");
   163    }
-  164  
+  164
   165    /**
   166     * Hosted staging (QX-004 §0.3).
   167     *
@@ -220,7 +220,7 @@ Why included: Conditions under which hosted staging may route any sensitivity to
   213        ]),
   214      };
   215    }
-  216  
+  216
   217    if (
   218      options.environment === undefined ||
   219      !LOOPBACK_ENVIRONMENTS.has(options.environment)
@@ -246,4 +246,3 @@ Why included: Conditions under which hosted staging may route any sensitivity to
   239    };
   240  }
 ```
-

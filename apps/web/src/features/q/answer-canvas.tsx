@@ -27,6 +27,7 @@ import {
   fitWords,
   LEVEL_WORD,
 } from "./answer-canvas-logic";
+import { MapBody } from "./blocks/data-blocks";
 import { openSubjectPage, subjectPagePath } from "./client-actions";
 
 /**
@@ -45,6 +46,7 @@ const loadFeatures = () =>
   import("./answer-canvas-motion").then((module) => module.default);
 
 const WIDE_QUERY = "(min-width: 761px)";
+const BASIS_LABEL = "Why they fit (from what they publish)";
 function subscribeWide(onChange: () => void): () => void {
   if (typeof window.matchMedia !== "function") return () => undefined;
   const query = window.matchMedia(WIDE_QUERY);
@@ -238,6 +240,26 @@ function AnswerCard({
                 {`From ${String(card.sourceCount)} ${card.sourceCount === 1 ? "source" : "sources"}`}
               </span>
             ) : null}
+            {card.fitBasis === undefined ||
+            card.fitBasis.length === 0 ? null : (
+              // E4 (Q.05): why they fit, from what they publish (code, from
+              // the run's own reads; never a private mandate).
+              <div className="flex flex-col gap-1" data-ac-fit-basis>
+                <p className="cq-caption m-0 text-(--cq-text-tertiary)">
+                  {BASIS_LABEL}
+                </p>
+                <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                  {card.fitBasis.map((line) => (
+                    <li
+                      key={line}
+                      className="cq-body-sm text-(--cq-text-secondary)"
+                    >
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {card.view === null ? null : (
               <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
                 <span className="text-(--cq-text-primary)">Q’s view: </span>
@@ -312,6 +334,10 @@ function CompareTable({
   const cards = block.cards;
   const labels = cards[0]?.measures.map((measure) => measure.label) ?? [];
   const hasView = cards.some((card) => card.view !== null);
+  // E4 (Q.05): why each fits, from what they publish (code-written).
+  const hasBasis = cards.some(
+    (card) => card.fitBasis !== undefined && card.fitBasis.length > 0,
+  );
   const cell = (index: number) => (index === focus ? "on" : undefined);
   return (
     <div className="cq-ac-compare" data-ac-compare>
@@ -425,6 +451,27 @@ function CompareTable({
                 </tr>,
               ]
             : null}
+          {hasBasis
+            ? [
+                <tr key="basis-label" className="label" aria-hidden="true">
+                  <td colSpan={cards.length}>{BASIS_LABEL}</td>
+                </tr>,
+                <tr key="basis" data-ac-fit-basis>
+                  <th scope="row">{BASIS_LABEL}</th>
+                  {cards.map((card, index) => (
+                    <td
+                      key={card.key}
+                      className={cell(index)}
+                      data-hue={String(card.hue)}
+                    >
+                      {card.fitBasis === undefined || card.fitBasis.length === 0
+                        ? "Nothing published read"
+                        : card.fitBasis.join("; ")}
+                    </td>
+                  ))}
+                </tr>,
+              ]
+            : null}
         </tbody>
       </table>
     </div>
@@ -530,6 +577,15 @@ export function AnswerCanvas({
                 />
               ))}
             </AnimatePresence>
+          </div>
+        )}
+        {block.map === undefined ? null : (
+          // E4: where the cards' subjects are, from the run's reads.
+          <div className="cq-ac-map" data-ac-map>
+            <p className="cq-body-sm m-0 font-semibold text-(--cq-text-primary)">
+              {block.map.title}
+            </p>
+            <MapBody map={block.map} />
           </div>
         )}
         {showFollowUps &&

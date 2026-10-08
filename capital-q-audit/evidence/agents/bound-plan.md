@@ -12,12 +12,12 @@
    60    readonly budgetUsd: number;
    61    readonly maxSteps?: number | undefined;
    62  };
-   63  
+   63
    64  export const MAX_JOB_STEPS = 12;
-   65  
+   65
    66  /** Roles that only work on drafts: no tools needed to be useful. */
    67  const DRAFT_ROLES: ReadonlySet<AgentRole> = new Set(["WRITER", "REVIEWER"]);
-   68  
+   68
    69  export function boundPlan(
    70    steps: readonly ProposedStep[],
    71    bounds: PlanBounds,

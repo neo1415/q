@@ -9,9 +9,9 @@
   638    /** The last investigation, for developer smokes and evals. Never a public path. */
   639    readonly lastResult: () => CompanyIntelligenceResult | null;
   640  };
-  641  
+  641
   642  const ANSWER_LIMIT_CHARS = 32_000;
-  643  
+  643
   644  /**
   645   * How much of the conversation the specialist reads (CQ-QX-007 H3a).
   646   * Enough to carry a correction made a few turns back; bounded so a long
@@ -19,7 +19,7 @@
   648   */
   649  const CONVERSATION_TURNS_MAX = 12;
   650  const CONVERSATION_TURN_CHARS_MAX = 4_000;
-  651  
+  651
   652  /** The conversation before this message, as the prompt's DATA. */
   653  export function earlierTurns(
   654    history: readonly QConversationMessage[],
@@ -40,7 +40,7 @@
   669      )
   670      .slice(-CONVERSATION_TURNS_MAX);
   671  }
-  672  
+  672
   673  /**
   674   * What a person reads when the specialist could not produce findings.
   675   *
@@ -65,7 +65,7 @@
   694        return "I stopped before finishing that analysis.";
   695    }
   696  }
-  697  
+  697
   698  /**
   699   * A last-resort answer built from findings alone, for the case where the
   700   * model produced findings but no usable prose.
@@ -96,7 +96,7 @@
   725      ? "I don't have enough information about this company to say anything useful yet."
   726      : lines.join("\n").trim();
   727  }
-  728  
+  728
   729  export function createSpecialistQAnswer(
   730    dependencies: SpecialistQAnswerDependencies,
   731  ): SpecialistQAnswer {
@@ -111,7 +111,7 @@
   740      turns,
   741    } = dependencies;
   742    let last: CompanyIntelligenceResult | null = null;
-  743  
+  743
   744    /**
   745     * The conversation core's state per conversation (CQ-QX-005): what has
   746     * failed and how often. In memory and bounded — it is conversational
@@ -193,7 +193,7 @@
   822    };
   823    /** A failed run's notice, held until the orchestrator reads it once. */
   824    const notices = new Map<string, string>();
-  825  
+  825
   826    /** Which subsystem a failed answer failed in, for the ledger. */
   827    const operationOf = (
   828      code: Extract<QAnswerOutcome, { kind: "FAILED" }>["diagnosticCode"],
@@ -220,7 +220,7 @@
   849          return null;
   850      }
   851    };
-  852  
+  852
   853    /** Approved progress only; best effort, never a reason to fail the answer. */
   854    async function showStage(
   855      request: QAnswerRequest,
@@ -242,7 +242,7 @@
   871        );
   872      }
   873    }
-  874  
+  874
   875    /** A Q message and its durable completion event, committed together. */
   876    async function recordAnswer(
   877      request: QAnswerRequest,
@@ -282,7 +282,7 @@
   911        promptBundleVersion: "none",
   912      };
   913    }
-  914  
+  914
   915    /**
   916     * "Make me a deck on X", done rather than described (CQ-QACT-002).
   917     *

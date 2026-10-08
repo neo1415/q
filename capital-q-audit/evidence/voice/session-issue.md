@@ -114,7 +114,7 @@
   862          throw new VoiceSessionLimitError();
   863        }
   864        started.add(1, { voice });
-  865  
+  865
   866        // DUPLEX: offered on top of the standard line, never instead of it.
   867        // Any failure here is silent: the person gets the standard line.
   868        let duplex: QVoiceDuplexCredential | undefined;
@@ -146,7 +146,7 @@
   894            request.log.warn({ err: error }, "duplex voice unavailable");
   895          }
   896        }
-  897  
+  897
   898        // Identifiers only: never the token, never the bearer.
   899        request.log.info(
   900          {
@@ -182,4 +182,3 @@
   930          );
   931      },
 ```
-

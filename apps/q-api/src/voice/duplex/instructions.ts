@@ -18,7 +18,7 @@ export const ASK_Q_TOOL_NAME = "ask_q" as const;
 export const ASK_Q_TOOL: ModelToolDefinition = {
   name: ASK_Q_TOOL_NAME,
   description:
-    "Bring what the person said to Q's analysis and records. Use it for anything about their company, investors, relationships, documents (opening, reading or showing a deck, data room file or one-pager), records, numbers, the app or what Q can do, or any change or action, and to pass on their yes or no when Q asked whether to go ahead. Returns either `say` (an answer to say faithfully) or `facts` with `mustSay` (an answer to say in your own words from those facts).",
+    "Bring what the person said to Q's analysis and records. Use it for anything about their company, investors, relationships, documents (opening, reading or showing a deck, data room file or one-pager), records, numbers, the app or what Q can do, or any change or action, and to pass on their yes or no when Q asked whether to go ahead. Returns either `say` (Q's answer, to say in natural speech without changing its substance) or `facts` with `mustSay` (an answer to say in your own words from those facts).",
   inputJsonSchema: {
     type: "object",
     properties: {
@@ -110,7 +110,7 @@ You are Q's voice on this line. You do not know anything about this person, thei
 - Never say you cannot do something: never "I can't open files", "I can't see your screen", "I don't have access to your documents" or "I'm just a voice". Q opens, reads and shows their documents, data room, deck and records; a question about what you can do also goes to ask_q.
 - For anything substantive, call ask_q with the person's own words.
 - When it returns facts (speakInYourOwnWords), say the answer in your own words from those facts, following SPEAKING FROM FACTS below. Its example shows the content, never the wording: do not read it out.
-- When it returns say, say that faithfully, in natural speech and in the first person ("I've reached out to…"). Do not shorten it so far that meaning changes.
+- When it returns say, say it the way you would on a call, in the first person ("I've reached out to…"): natural phrasing, contractions, your own rhythm. Keep every fact, figure, name and commitment exactly; never change what it means. When it is long, say its point and the two or three facts that matter most, then say the rest is on their screen.
 - Either way, never add facts, figures, names or opinions it did not give you.
 - When ask_q's result says something waits for their approval, say it and tell them it is on their screen to approve; when they answer yes or no, pass their words to ask_q. You never approve, send, save or change anything yourself.
 - ask_q is how you see their records, show cards, open pages and scroll the screen: for any of that, call ask_q with their words. Never say you cannot see their preferences, show something or move the screen.
@@ -210,7 +210,9 @@ export function duplexInstructions(input: {
   parts.push(
     input.firstMessage === undefined
       ? "Wait for the person to speak first."
-      : `Open by saying exactly this, then listen: "${input.firstMessage.replace(/"/g, "'")}"`,
+      : // C-17 (founder: "it sounds mechanical"): the opener's content,
+        // in Q's own natural voice; never read out word for word.
+        `Open by saying this in your own natural voice, keeping every name and fact and adding nothing, then listen: "${input.firstMessage.replace(/"/g, "'")}"`,
   );
   return parts.join("\n");
 }

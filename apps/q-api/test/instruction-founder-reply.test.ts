@@ -25,7 +25,11 @@ import {
   transcriptOf,
   type ThreadRead,
 } from "../src/composition/instructions/quarantine.js";
-import type { InstructionRow } from "../src/composition/instructions/store.js";
+import type {
+  InstructionRow,
+  LapsedCard,
+  WaitingCard,
+} from "../src/composition/instructions/store.js";
 import type { OutwardReview } from "../src/composition/workforce/review.js";
 import { createInstructionTriggers } from "../src/composition/instructions/triggers.js";
 
@@ -215,6 +219,12 @@ function world(
   plans: readonly InstructionPlan[],
   read = threadRead(),
   review?: OutwardReview,
+  extra: {
+    readonly now?: Date;
+    readonly waitingCards?: readonly WaitingCard[];
+    readonly lapsedCards?: readonly LapsedCard[];
+    readonly awaitingAnswer?: ReadonlySet<string>;
+  } = {},
 ) {
   const row: InstructionRow = {
     id: randomUUID(),
@@ -268,7 +278,15 @@ function world(
         notices.push(notice);
         return Promise.resolve(true);
       },
+      waitingCards: () => Promise.resolve(extra.waitingCards ?? []),
+      lapsedCards: () => Promise.resolve(extra.lapsedCards ?? []),
     },
+    ...(extra.awaitingAnswer === undefined
+      ? {}
+      : {
+          awaitingAnswer: () =>
+            Promise.resolve(extra.awaitingAnswer ?? new Set<string>()),
+        }),
     actions: [CHAT, BOOK],
     ports: {},
     actorFor: () => Promise.resolve(actor),
@@ -287,7 +305,7 @@ function world(
       cards.push({ actionType: card.actionType, words: card.words });
       return Promise.resolve({ qActionId: randomUUID() });
     },
-    now: () => FIRED_AT,
+    now: () => extra.now ?? FIRED_AT,
     autoEnabled: true,
     ...(review === undefined ? {} : { review }),
   });
@@ -551,5 +569,170 @@ describe("a reply the reviewer holds just under the bar (11:01 kick, job 6a3fae2
     expect(
       steps.find((step) => step.reasonCode === "REPLY_WAITING")?.words,
     ).toContain("(BELOW_THE_BAR)");
+  });
+});
+
+describe("recovery D-01: a card the person never answered (the 21-hour scenario)", () => {
+  // Zino wrote; Q's reply became a card at ASKED_AT (a near miss). The
+  // person never answered. Before: at +24 h the card vanished from Needs
+  // you while the engine still held Zino as "asked" -- no redraft, no
+  // notice, "plan none of these again", for good.
+  const ASKED_AT = new Date("2026-10-08T11:19:00Z");
+  const APPROVAL = randomUUID();
+  const ACTION = randomUUID();
+  const hours = (count: number) =>
+    new Date(ASKED_AT.getTime() + count * 3_600_000);
+  const card: WaitingCard = {
+    action: "chat.message.send",
+    relationship_id: REL,
+    words: "Reply to Zino Aviation about how regulated firms evaluate it.",
+    created_at: ASKED_AT,
+    approval_id: APPROVAL,
+    expires_at: hours(24),
+    body: NO_CALL.argumentsJson,
+  };
+
+  it("at +21 h the card still waits: Zino is not drafted again, and the person gets one REPLY_WAITING notice saying when it lapses", async () => {
+    ran.length = 0;
+    const first = world([plan()], threadRead(), undefined, {
+      now: hours(21),
+      waitingCards: [card],
+      awaitingAnswer: new Set([REL]),
+    });
+    const result = await first.engine.fire(first.row.id, "sched-21h-0001");
+    expect(result.outcome).toBe("RAN");
+    expect(first.cards).toEqual([]);
+    expect(ran).toEqual([]);
+    const waiting = first.steps.filter(
+      (step) => step.reasonCode === "REPLY_WAITING",
+    );
+    expect(waiting).toHaveLength(1);
+    expect(waiting[0]?.words).toContain("needed your yes for 21 hours");
+    expect(waiting[0]?.words).toContain("lapses at 11:19 UTC on 2026-10-09");
+    expect(first.notices).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: `card-waiting:${APPROVAL}`,
+          priority: "NEEDS_YOU",
+        }),
+      ]),
+    );
+    // The planner was told the card waits (it is still the person's).
+    expect(first.seenPeople.length).toBeGreaterThan(0);
+    // A second firing an hour later does not notify again.
+    const again = await first.engine.fire(first.row.id, "sched-22h-0001");
+    expect(again.outcome).toBe("RAN");
+    expect(
+      first.notices.filter(
+        (notice) => notice.key === `card-waiting:${APPROVAL}`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("before the sweep has run, a card past its lapse no longer waits: Zino is drafted again", async () => {
+    ran.length = 0;
+    // The store's waitingCards filters lapsed approvals itself; this one
+    // reports it anyway, to prove the engine does not trust it blindly.
+    const late = world([plan(WITH_CALL)], threadRead(), undefined, {
+      now: hours(25),
+      waitingCards: [card],
+    });
+    await late.engine.fire(late.row.id, "sched-25h-0001");
+    expect(late.cards).toEqual([
+      expect.objectContaining({ actionType: "app.chat.message.send" }),
+    ]);
+  });
+
+  it("at +25 h, after the sweep expired it, the person is told once and Q writes to Zino again", async () => {
+    ran.length = 0;
+    const after = world([plan(WITH_CALL)], threadRead(), undefined, {
+      now: hours(25),
+      lapsedCards: [
+        {
+          q_action_id: ACTION,
+          relationship_id: REL,
+          words: card.words,
+          lapsed_at: hours(24),
+        },
+      ],
+    });
+    const result = await after.engine.fire(after.row.id, "sched-25h-0002");
+    expect(result.outcome).toBe("RAN");
+    // Never "plan none of these again" for a lapsed card.
+    expect(after.planned.join("\n")).not.toContain("plan none of these again");
+    // A new card for Zino (the reply proposes a call, so it is theirs).
+    expect(after.cards).toEqual([
+      expect.objectContaining({ actionType: "app.chat.message.send" }),
+    ]);
+    const lapsed = after.steps.filter(
+      (step) => step.reasonCode === "CARD_LAPSED",
+    );
+    expect(lapsed).toHaveLength(1);
+    expect(after.notices).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: `lapsed:${ACTION}`,
+          priority: "NEEDS_YOU",
+        }),
+      ]),
+    );
+    // Said once: the next firing does not repeat it.
+    await after.engine.fire(after.row.id, "sched-26h-0001");
+    expect(
+      after.notices.filter((n) => n.key === `lapsed:${ACTION}`),
+    ).toHaveLength(1);
+  });
+});
+
+describe("recovery D-05: a planner failure retries soon and is visible", () => {
+  it("records a PLANNER_UNAVAILABLE note, and the trigger defers the next firing by minutes, not a cadence", async () => {
+    const down = world([]);
+    const deferred: { id: string; minutes: number }[] = [];
+    const triggers = createInstructionTriggers({
+      store: {
+        claimDue: () =>
+          Promise.resolve([{ id: down.row.id, claimed_at: FIRED_AT }]),
+        defer: (id, minutes) => {
+          deferred.push({ id, minutes });
+          return Promise.resolve();
+        },
+        wakeFor: () => Promise.resolve(0),
+      },
+      engine: () => down.engine,
+      expireLapsed: () => Promise.resolve(1),
+    });
+    await triggers.sweep();
+    expect(deferred).toEqual([{ id: down.row.id, minutes: 10 }]);
+    expect(
+      down.steps.some((step) => step.reasonCode === "PLANNER_UNAVAILABLE"),
+    ).toBe(true);
+  });
+
+  it("a firing that throws is retried soon and the person is told", async () => {
+    const row = world([]).row;
+    const deferred: number[] = [];
+    const notices: string[] = [];
+    const triggers = createInstructionTriggers({
+      store: {
+        claimDue: () => Promise.resolve([{ id: row.id, claimed_at: FIRED_AT }]),
+        defer: (_id, minutes) => {
+          deferred.push(minutes);
+          return Promise.resolve();
+        },
+        wakeFor: () => Promise.resolve(0),
+        instruction: () => Promise.resolve(row),
+        notify: (notice) => {
+          notices.push(notice.title);
+          return Promise.resolve(true);
+        },
+      },
+      engine: () =>
+        ({
+          fire: () => Promise.reject(new Error("boom")),
+        }) as unknown as ReturnType<typeof createInstructionEngine>,
+    });
+    await triggers.sweep();
+    expect(deferred).toEqual([10]);
+    expect(notices).toEqual(["Q's work on your instruction hit a problem"]);
   });
 });

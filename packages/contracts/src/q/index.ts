@@ -311,6 +311,19 @@ export {
   type QVoiceDuplexRejoin,
   QVoiceDuplexRejoinResultSchema,
   type QVoiceDuplexRejoinResult,
+  Q_VOICE_DUPLEX_OUTCOME_PATH,
+  qVoiceDuplexOutcomePath,
+  QVoiceDuplexTurnReportSchema,
+  type QVoiceDuplexTurnReport,
+  Q_VOICE_DUPLEX_ATTACH_PATH,
+  qVoiceDuplexAttachPath,
+  QVoiceDuplexAttachSchema,
+  type QVoiceDuplexAttach,
+  isQVoiceCardReply,
+  Q_VOICE_CARD_PATH,
+  qVoiceCardPath,
+  QVoiceCardUpdateSchema,
+  type QVoiceCardUpdate,
 } from "./voice.js";
 
 export {
@@ -447,6 +460,19 @@ export {
   QUncertaintyBlockSchema,
   type QResultBlock,
   type QResultBlockKind,
+  // RECOVERY-2026-10 E3/E4
+  Q_RESULT_CHART_POINTS_MAX,
+  Q_RESULT_CHART_SERIES_MAX,
+  Q_TABLE_COLUMNS_MAX,
+  Q_TABLE_ROWS_MAX,
+  Q_TIMELINE_EVENTS_MAX,
+  QChartBlockSchema,
+  QMapBlockSchema,
+  QTableBlockSchema,
+  QTimelineBlockSchema,
+  chartableSeries,
+  parseQResultBlocks,
+  type QResultBlockDrop,
 } from "./result-block.js";
 
 export {
@@ -469,6 +495,13 @@ export {
   type QAnswerCardMeasure,
   type QAnswerCardsBlock,
   type QAnswerCardsShape,
+  // RECOVERY-2026-10 E4
+  Q_ANSWER_CARD_FIT_BASIS_MAX,
+  Q_MAP_PLACES_MAX,
+  QMapPlaceSchema,
+  QMapSpecSchema,
+  type QMapPlace,
+  type QMapSpec,
 } from "./answer-cards.js";
 
 export {
@@ -1133,3 +1166,5 @@ export * from "./turn.js";
 export * from "./ui-act.js";
 export * from "./attention.js";
 export * from "./agent-capability.js";
+// RECOVERY-2026-10 workstream C: UI act receipts (export requested of the lead).
+export * from "./ui-act-receipts.js";

@@ -6,7 +6,7 @@
 
 ```ts
   140    };
-  141  
+  141
   142    async function execute(
   143      proposal: QToolProposal,
   144      context: QToolExecutionContext,
@@ -246,7 +246,7 @@
   378        },
   379      );
   380    }
-  381  
+  381
   382    return {
   383      offer: (context) => {
   384        const ranked = registry.ranked(context);

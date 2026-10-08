@@ -30,14 +30,14 @@
    23    BriefingCommandResultDto,
    24    NamedPicture,
    25  } from "@capital-q/contracts";
-   26  
+   26
    27  /**
    28   * The arrival briefing as the page shows and Q says it (Zino, 2026-10-08):
    29   * a greeting by their clock, a lowdown from what was recorded, then the
    30   * decisions one at a time. Pure, so every rule here is a test; the reads
    31   * are in arrival-actions.ts, the sequence itself in q-core.
    32   */
-   33  
+   33
    34  /** One decision, with the exact content its verbs act on. */
    35  export type ArrivalCard = {
    36    readonly key: string;
@@ -61,7 +61,7 @@
    54    readonly canDecide: boolean;
    55    readonly at: string;
    56  };
-   57  
+   57
    58  export type ArrivalData = {
    59    readonly firstName: string | null;
    60    /** Their own zone from Capital Q; null: the browser's is used. */
@@ -77,7 +77,7 @@
    70     */
    71    readonly waiting?: readonly string[] | undefined;
    72  };
-   73  
+   73
    74  export function sequenceCardOf(card: ArrivalCard): SequenceCard {
    75    return {
    76      key: card.key,
@@ -89,7 +89,7 @@
    82      canDecide: card.canDecide,
    83    };
    84  }
-   85  
+   85
    86  export function decisionFactsOf(card: ArrivalCard): DecisionCardFacts {
    87    return {
    88      kind: card.kind,
@@ -99,7 +99,7 @@
    92      summary: card.summary,
    93    };
    94  }
-   95  
+   95
    96  /** The zone to greet by: theirs when Capital Q holds a valid one. */
    97  export function zoneFor(
    98    data: Pick<ArrivalData, "timeZone">,
@@ -108,7 +108,7 @@
   101    if (isTimeZone(data.timeZone)) return data.timeZone;
   102    return isTimeZone(browserZone) ? browserZone : null;
   103  }
-  104  
+  104
   105  export type ArrivalWords = {
   106    readonly greeting: string;
   107    readonly lowdown: string;
@@ -120,11 +120,11 @@
   113    /** Everything Q says first, on voice. */
   114    readonly spoken: string;
   115  };
-  116  
+  116
   117  /** "Zino Aviation is waiting for a reply" -> "Zino Aviation". */
   118  const WAITING_NAME =
   119    /^(.+?) (?:is waiting for (?:a|your) reply|sent you a message|wrote back|replied)\b/u;
-  120  
+  120
   121  /**
   122   * Notices still waiting on them, said once per name (live 2026-10-08:
   123   * "Zino Aviation wrote back. Zino Aviation is waiting for a reply. Zino
@@ -161,7 +161,7 @@
   154    parts.push(...others.slice(0, 2));
   155    return parts.length === 0 ? null : parts.join(" ");
   156  }
-  157  
+  157
   158  /** What Q says on arrival, from the data alone. */
   159  export function arrivalWords(
   160    data: ArrivalData,
@@ -223,7 +223,7 @@
 - Why included: arrivalGreeting/lowdownOf: deterministic greeting and lowdown from counts (sent/booked/interest/replies/matches/held); no company-match or opinion content.
 
 ```
-   50  
+   50
    51  /** "Good afternoon, Zino." -- or, after 22:00, a late-hours hello. */
    52  export function arrivalGreeting(input: {
    53    readonly firstName: string | null;
@@ -245,17 +245,17 @@
    69          : `Hi ${named}, you're up late.`;
    70    }
    71  }
-   72  
+   72
    73  // ---------------------------------------------------------------------------
    74  // The lowdown: what the agents did since the person was last here.
-   75  
+   75
    76  /** One kind of thing done or received, with the names it touched. */
    77  export type ActivityCount = {
    78    readonly n: number;
    79    /** The other side's names, newest first, at most a few. */
    80    readonly names: readonly string[];
    81  };
-   82  
+   82
    83  /**
    84   * What was recorded since their last visit. A field that could not be read
    85   * is absent and says nothing; it is never read as zero.
@@ -274,7 +274,7 @@
    98    /** New relationships (matches, interest from the other side). */
    99    readonly matches?: ActivityCount | undefined;
   100  };
-  101  
+  101
   102  export type ArrivalFacts = {
   103    readonly activity: ArrivalActivity;
   104    /** Decisions waiting on them now (approvals and held drafts). */
@@ -282,7 +282,7 @@
   106    /** Hours since their last visit; null when this is the first one known. */
   107    readonly hoursAway: number | null;
   108  };
-  109  
+  109
   110  export type Lowdown = {
   111    /** Nothing happened and nothing waits. */
   112    readonly quiet: boolean;
@@ -291,7 +291,7 @@
   115    /** Names and counts any spoken version must carry. */
   116    readonly mustSay: readonly string[];
   117  };
-  118  
+  118
   119  const NUMBER_WORDS = [
   120    "no",
   121    "one",
@@ -305,22 +305,22 @@
   129    "nine",
   130    "ten",
   131  ] as const;
-  132  
+  132
   133  function count(n: number): string {
   134    return NUMBER_WORDS[n] ?? String(n);
   135  }
-  136  
+  136
   137  function list(names: readonly string[]): string {
   138    if (names.length <= 1) return names[0] ?? "";
   139    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] ?? ""}`;
   140  }
-  141  
+  141
   142  function capitalised(text: string): string {
   143    return text.length === 0
   144      ? text
   145      : `${text[0]?.toUpperCase() ?? ""}${text.slice(1)}`;
   146  }
-  147  
+  147
   148  /** A small, stable choice: the same facts get the same words. */
   149  export function arrivalSeed(text: string): number {
   150    let hash = 2166136261;
@@ -330,20 +330,20 @@
   154    }
   155    return hash >>> 0;
   156  }
-  157  
+  157
   158  function pick<T>(options: readonly T[], seed: number, salt = 0): T {
   159    const chosen = options[(seed + salt * 7919) % options.length];
   160    if (chosen === undefined) throw new Error("pick from an empty list");
   161    return chosen;
   162  }
-  163  
+  163
   164  /** Named when one or two, counted otherwise. */
   165  function who(item: ActivityCount, one: string, many: string): string {
   166    const names = item.names.slice(0, 2);
   167    if (item.n <= 2 && names.length === item.n) return list(names);
   168    return item.n === 1 ? one : `${count(item.n)} ${many}`;
   169  }
-  170  
+  170
   171  function did(activity: ArrivalActivity): string[] {
   172    const parts: string[] = [];
   173    const sent = activity.sent;
@@ -372,7 +372,7 @@
   196    }
   197    return parts;
   198  }
-  199  
+  199
   200  function news(activity: ArrivalActivity): string[] {
   201    const parts: string[] = [];
   202    const replies = activity.replies;
@@ -405,7 +405,7 @@
   229    }
   230    return parts;
   231  }
-  232  
+  232
   233  function needs(decisions: number, seed: number): string | null {
   234    if (decisions <= 0) return null;
   235    if (decisions === 1) {
@@ -420,7 +420,7 @@
   244      3,
   245    );
   246  }
-  247  
+  247
   248  /**
   249   * The lowdown, from recorded facts: what Q did, what came in, and how many
   250   * decisions wait. Quiet when nothing happened and nothing waits.
@@ -488,10 +488,10 @@
   303    }
   304    return { quiet: false, text: sentences.join(" "), mustSay };
   305  }
-  306  
+  306
   307  // ---------------------------------------------------------------------------
   308  // One decision card, as Q puts it to the person.
-  309  
+  309
   310  export type DecisionCardFacts = {
   311    /** Approval or a draft Q held back. */
   312    readonly kind: "APPROVAL" | "HELD";
@@ -504,7 +504,7 @@
   319    /** The card's own plain-language summary. */
   320    readonly summary: string;
   321  };
-  322  
+  322
   323  /** The first sentence, clipped to about twenty words. */
   324  export function gistOf(text: string, maxWords = 20): string {
   325    const flat = text.replace(/\s+/gu, " ").trim();
@@ -514,7 +514,7 @@
   329      ? first
   330      : `${words.slice(0, maxWords).join(" ")}…`;
   331  }
-  332  
+  332
   333  const COUNT_WORDS = [
   334    "",
   335    "One thing",
@@ -524,13 +524,13 @@
   339    "Five things",
   340    "Six things",
   341  ] as const;
-  342  
+  342
   343  const WEEKDAY =
   344    /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|this week|next week)\b/iu;
   345  const MEETING =
   346    /\b(call|meet|meeting|chat|catch up|catch-up|zoom|coffee|\d+ ?min(?:ute)?s)\b/iu;
   347  const DECK = /\b(deck|pitch deck|attached|attachment|data ?room|one-pager)\b/iu;
-  348  
+  348
   349  /** One card in a few words, from its facts alone (never invented). */
   350  function cardGist(card: DecisionCardFacts): string {
   351    const name = card.counterpart ?? "someone";
@@ -556,7 +556,7 @@
   371    if (said.length > 0) return `${name} wrote back`;
   372    return `a message to ${name} is ready`;
   373  }
-  374  
+  374
   375  /**
   376   * Every pending card in one sentence, up front (Zino, 2026-10-08: "Q
   377   * actually gives a summary of all the cards"): "Three things: the Spheros
@@ -577,9 +577,9 @@
   392          : `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1) ?? ""}`;
   393    return `${count}: ${list}.`;
   394  }
-  395  
+  395
   396  const ORDINALS = ["First", "Next", "Then", "After that"] as const;
-  397  
+  397
   398  /**
   399   * What Q says to put one card to the person, and asks; one question, then
   400   * stop. `position` is 1-based.
@@ -611,4 +611,3 @@
   426    const said =
   427      card.theySaid === null
 ```
-

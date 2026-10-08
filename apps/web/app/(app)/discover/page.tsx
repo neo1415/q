@@ -28,6 +28,7 @@ import { DiscoverTabs } from "@/features/discover/discover-tabs";
 import { InvestorFeedScreen } from "@/features/discover/investor-feed-screen";
 import { NetworkVideos } from "@/features/discover/network/network-videos";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Discover" };
@@ -222,21 +223,25 @@ export default async function DiscoverPage({
   const tabs = (
     <div className="flex flex-wrap items-end justify-between gap-3 border-b border-(--cq-border-subtle)">
       <nav aria-label="What to discover" className="flex gap-6">
-        <Link
-          href="/discover"
-          aria-current={founders ? undefined : "page"}
-          className={tabClass(!founders)}
-        >
-          Investors
-        </Link>
-        <Link
-          href="/discover?tab=founders"
-          aria-current={founders ? "page" : undefined}
-          className={tabClass(founders)}
-          data-discover-founders-tab
-        >
-          Founders&apos; videos
-        </Link>
+        <QControl id="tab.investors" kind="TAB">
+          <Link
+            href="/discover"
+            aria-current={founders ? undefined : "page"}
+            className={tabClass(!founders)}
+          >
+            Investors
+          </Link>
+        </QControl>
+        <QControl id="tab.founders" kind="TAB">
+          <Link
+            href="/discover?tab=founders"
+            aria-current={founders ? "page" : undefined}
+            className={tabClass(founders)}
+            data-discover-founders-tab
+          >
+            Founders&apos; videos
+          </Link>
+        </QControl>
       </nav>
       {/* Interest already addressed to the company (CQ-NET-011). */}
       <Link
@@ -294,11 +299,13 @@ export default async function DiscoverPage({
             total={slate.items.length}
             label={`${String(slate.items.length)} investors`}
           />
-          <DiscoverInvestors
-            items={slate.items}
-            notes={slate.notes}
-            gates={gates}
-          />
+          <QControl id="list.investors" kind="LIST">
+            <DiscoverInvestors
+              items={slate.items}
+              notes={slate.notes}
+              gates={gates}
+            />
+          </QControl>
         </>
       )}
     </PageContainer>

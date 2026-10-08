@@ -46,7 +46,7 @@
   178      [approvals, gone, viewMap, jobs, now, dismissedHeld, done],
   179    );
   180    const decided = (key: string) => setGone((was) => new Set([...was, key]));
-  181  
+  181
   182    return (
   183      <div
   184        className={cx(

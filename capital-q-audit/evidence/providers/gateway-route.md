@@ -29,7 +29,7 @@ Why included: Single inference boundary: per-attempt ledger write, retry/fallbac
   267        );
   268      }
   269    }
-  270  
+  270
 ```
 
 ## `packages/model-gateway/src/gateway.ts` lines 495-520
@@ -59,7 +59,7 @@ Why included: Single inference boundary: per-attempt ledger write, retry/fallbac
   516            errorCode: failureClass,
   517            correlationId: request.attribution.correlationId,
   518          });
-  519  
+  519
   520          const result = failureClass ?? "success";
 ```
 
@@ -128,7 +128,7 @@ Why included: Single inference boundary: per-attempt ledger write, retry/fallbac
   708        },
   709        policy,
   710      );
-  711  
+  711
   712      if (plan.eligible.length === 0) {
   713        const onlyCost = plan.decisions.every(
   714          (d) =>
@@ -165,7 +165,7 @@ Why included: Single inference boundary: per-attempt ledger write, retry/fallbac
   745          },
   746        );
   747      }
-  748  
+  748
   749      const attempts: ModelAttemptRecord[] = [];
   750      let spentUsd = 0;
   751      let lastFailure: ModelFailureClass | undefined;
@@ -177,7 +177,7 @@ Why included: Single inference boundary: per-attempt ledger write, retry/fallbac
   757       * attempt does not depend on what that attempt turns out to be.
   758       */
   759      const room: { ranOut: boolean } = { ranOut: false };
-  760  
+  760
 ```
 
 ## `packages/model-gateway/src/gateway.ts` lines 776-916
@@ -332,7 +332,7 @@ Why included: Single inference boundary: per-attempt ledger write, retry/fallbac
  1061  type Attempted<T> = AttemptOutcome<T> & {
  1062    readonly record: ModelAttemptRecord;
  1063  };
- 1064  
+ 1064
  1065  /**
  1066   * A hedged first attempt (L1 latency sweep, 2026-10-06).
  1067   *
@@ -423,4 +423,3 @@ Why included: Single inference boundary: per-attempt ledger write, retry/fallbac
  1152    return { outcome: a, served: input.firstCandidate, extra: [b.record] };
  1153  }
 ```
-

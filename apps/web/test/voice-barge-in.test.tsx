@@ -130,8 +130,11 @@ vi.mock("../src/features/voice/provider/pcm-player", () => ({
   PcmPlayer: FakePlayer,
 }));
 
-const { useDeepgramVoiceSession } =
-  await import("../src/features/voice/provider/deepgram-session");
+const {
+  useDeepgramVoiceSession,
+  THINKING_GIVE_UP_MS,
+  STANDARD_TIMEOUT_NOTICE,
+} = await import("../src/features/voice/provider/deepgram-session");
 
 const CREDENTIAL = {
   voiceSessionId: "00000000-0000-4000-8000-000000000001",
@@ -557,5 +560,32 @@ describe("no silent dead starts", () => {
       await vi.advanceTimersByTimeAsync(4_500);
     });
     expect(String(onError.mock.calls[0]?.[0])).toMatch(/microphone/i);
+  });
+});
+
+describe("the standard line never gives up silently (RECOVERY A4)", () => {
+  it("says on screen that no answer came, once the Thinking watchdog fires", async () => {
+    const onTurnOutcome = vi.fn();
+    const hook = renderHook(() => useDeepgramVoiceSession({ onTurnOutcome }));
+    await act(async () => {
+      await hook.result.current.start({ credential: CREDENTIAL });
+    });
+    const session = FakeSession.last;
+    if (session === null) throw new Error("not started");
+    act(() => {
+      session.emit("connected");
+      session.emit("settings-applied");
+      session.emit("agent-thinking");
+    });
+    expect(hook.result.current.state).toBe("THINKING");
+    act(() => {
+      vi.advanceTimersByTime(THINKING_GIVE_UP_MS + 10);
+    });
+    expect(hook.result.current.state).toBe("LISTENING");
+    expect(onTurnOutcome).toHaveBeenCalledWith({
+      disposition: "FAILED",
+      failure: "TIMEOUT",
+      notice: STANDARD_TIMEOUT_NOTICE,
+    });
   });
 });

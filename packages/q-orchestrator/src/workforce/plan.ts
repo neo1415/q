@@ -1,22 +1,31 @@
+import type { QAgentExecutor, QAgentRole } from "@capital-q/contracts";
+
+import {
+  STORED_ROLE,
+  isQAgentRole,
+  registeredExecutors,
+  roleTitle,
+} from "./executors.js";
 import {
   AGENT_REGISTRY,
-  ALL_ROLE_TOOLS,
+  AGENT_ROLES,
   OUTWARD_TOOLS,
-  isAgentRole,
   type AgentRole,
 } from "./registry.js";
 
 /**
- * The lead Q's plan, bounded by code (founder brief J1, J4).
+ * The lead Q's plan, bounded by code (founder brief J1, J4; recovery D1).
  *
- * A model proposes the steps; this decides which may run. A step keeps
- * only tools that are (a) real, (b) its role's, or for an ad-hoc agent any
- * role's, and (c) in what the person allowed for this job. A step whose
- * tools are all refused, that waits on a step that does not exist or was
- * refused, or that does not fit in the job's budget, is refused with the
- * reason, and the person sees it. Nothing here widens a grant: the grant
- * and the approval engine still decide every consequential action when it
- * runs.
+ * A model proposes the steps; this decides which may run. A step's role
+ * must have an executor registered in this deployment (`executors.ts`); it
+ * keeps only tools that are its executor's and in what the person allowed
+ * for this job. A step whose role has no executor, whose tools are all
+ * refused, that waits on a step that does not exist or was refused, or that
+ * does not fit in the job's budget, is refused with the reason. A plan with
+ * any refused step is not offered for approval at all (`planIsValid`): a
+ * partial plan approved as if whole is how jobs silently never sent (D-02).
+ * Nothing here widens a grant: the grant and the approval engine still
+ * decide every consequential action when it runs.
  */
 
 export type ProposedStep = {
@@ -30,14 +39,17 @@ export type ProposedStep = {
 
 export type BoundStep = {
   readonly key: string;
+  /** The role as stored on the workforce tables and the approved payload. */
   readonly role: AgentRole;
-  /** The spawned agent's name (AD_HOC), else the role's title. */
+  /** The registered executor that carries it out; null only for an older approved step no executor covers. */
+  readonly executor: QAgentRole | null;
+  /** The role's title, which the person sees. */
   readonly agentName: string;
   readonly goal: string;
   readonly tools: readonly string[];
   readonly dependsOn: readonly string[];
   readonly budgetUsd: number;
-  /** It sends something outward: the writer and reviewer run first. */
+  /** It reaches the other side: every draft is written and reviewed inside. */
   readonly outward: boolean;
   readonly spawned: boolean;
 };
@@ -45,6 +57,8 @@ export type BoundStep = {
 export const STEP_REFUSALS = [
   "UNKNOWN_ROLE",
   "LEAD_IS_NOT_A_STEP",
+  /** A real role with no executor here (incl. WRITER and REVIEWER, which run inside the sender). */
+  "NO_EXECUTOR",
   "NO_PERMITTED_TOOL",
   "WAITS_ON_MISSING_STEP",
   "DUPLICATE_KEY",
@@ -59,12 +73,12 @@ export type PlanBounds = {
   /** What the whole job may spend, USD. */
   readonly budgetUsd: number;
   readonly maxSteps?: number | undefined;
+  /** The executors registered here; default: those needing no provider. */
+  readonly executors?:
+    Readonly<Partial<Record<QAgentRole, QAgentExecutor>>> | undefined;
 };
 
 export const MAX_JOB_STEPS = 12;
-
-/** Roles that only work on drafts: no tools needed to be useful. */
-const DRAFT_ROLES: ReadonlySet<AgentRole> = new Set(["WRITER", "REVIEWER"]);
 
 export function boundPlan(
   steps: readonly ProposedStep[],
@@ -77,6 +91,8 @@ export function boundPlan(
   }[];
   readonly budgetUsd: number;
 } {
+  const executors =
+    bounds.executors ?? registeredExecutors({ research: false });
   const kept: BoundStep[] = [];
   const refused: { key: string; reason: StepRefusal }[] = [];
   const keys = new Set<string>();
@@ -91,25 +107,35 @@ export function boundPlan(
       continue;
     }
     keys.add(step.key);
-    if (!isAgentRole(step.role)) {
-      refuse("UNKNOWN_ROLE");
+    if (step.role === "LEAD") {
+      refuse("LEAD_IS_NOT_A_STEP");
+      continue;
+    }
+    if (!isQAgentRole(step.role)) {
+      // An old roster name (WRITER, REVIEWER, AD_HOC ...) is a real role
+      // with no executor; anything else is not a role at all.
+      refuse(
+        (AGENT_ROLES as readonly string[]).includes(step.role)
+          ? "NO_EXECUTOR"
+          : "UNKNOWN_ROLE",
+      );
       continue;
     }
     const role = step.role;
-    if (role === "LEAD") {
-      refuse("LEAD_IS_NOT_A_STEP");
+    const executor = executors[role];
+    if (executor === undefined) {
+      refuse("NO_EXECUTOR");
       continue;
     }
     if (kept.length >= maxSteps) {
       refuse("TOO_MANY_STEPS");
       continue;
     }
-    const roleTools: ReadonlySet<string> =
-      role === "AD_HOC" ? ALL_ROLE_TOOLS : new Set(AGENT_REGISTRY[role].tools);
+    const own = new Set(executor.tools);
     const tools = [...new Set(step.tools)].filter(
-      (tool) => roleTools.has(tool) && bounds.permitted.has(tool),
+      (tool) => own.has(tool) && bounds.permitted.has(tool),
     );
-    if (tools.length === 0 && !DRAFT_ROLES.has(role)) {
+    if (tools.length === 0) {
       refuse("NO_PERMITTED_TOOL");
       continue;
     }
@@ -118,7 +144,8 @@ export function boundPlan(
       refuse("WAITS_ON_MISSING_STEP");
       continue;
     }
-    const budgetUsd = AGENT_REGISTRY[role].budgetUsd;
+    const stored = STORED_ROLE[role];
+    const budgetUsd = AGENT_REGISTRY[stored].budgetUsd;
     if (spent + budgetUsd > bounds.budgetUsd + 1e-9) {
       refuse("OVER_BUDGET");
       continue;
@@ -126,18 +153,38 @@ export function boundPlan(
     spent += budgetUsd;
     kept.push({
       key: step.key,
-      role,
-      agentName:
-        role === "AD_HOC"
-          ? (step.agentName ?? "Agent").slice(0, 60)
-          : AGENT_REGISTRY[role].title,
+      role: stored,
+      executor: role,
+      agentName: roleTitle(role),
       goal: step.goal,
       tools,
       dependsOn: [...step.dependsOn],
       budgetUsd,
-      outward: tools.some((tool) => OUTWARD_TOOLS.has(tool)),
-      spawned: role === "AD_HOC",
+      outward: executor.outward && tools.some((tool) => isOutwardTool(tool)),
+      spawned: false,
     });
   }
   return { steps: kept, refused, budgetUsd: spent };
+}
+
+/** Tools that reach another person, beyond the messaging ones. */
+const OUTWARD_ACTIONS: ReadonlySet<string> = new Set([
+  "relationship.interest.express",
+  "schedule.meeting.book",
+]);
+
+function isOutwardTool(tool: string): boolean {
+  return OUTWARD_TOOLS.has(tool) || OUTWARD_ACTIONS.has(tool);
+}
+
+/**
+ * Whether a bounded plan may be offered for approval: at least one step,
+ * and no step refused. A refused step means the plan the model wrote is not
+ * the plan that would run, so the person is never asked to approve it.
+ */
+export function planIsValid(bound: {
+  readonly steps: readonly BoundStep[];
+  readonly refused: readonly unknown[];
+}): boolean {
+  return bound.steps.length > 0 && bound.refused.length === 0;
 }

@@ -7,7 +7,7 @@
 ```ts
   720      : `This conversation is about: ${lines.join("; ")}. Use these identifiers, exactly as given, when a tool needs one.`;
   721  }
-  722  
+  722
   723  /**
   724   * What the model is told when the plan grants GENERAL_MODEL_KNOWLEDGE.
   725   *
@@ -21,7 +21,7 @@
   733   */
   734  const GENERAL_KNOWLEDGE_NOTE =
   735    "A question that is not about a particular company, investor or person on Capital Q — the world, a market, a term, a public fact, how something normally works — you answer outright, briefly, from what you know. Give the actual answer first. Never reply with only a remark about where the answer comes from, never refuse it, and never describe your scope or your access. You may add a short note that it is general knowledge rather than something Capital Q holds, and if it may have changed since you learned it, say so. It is never evidence about a subject and never grounds for a conclusion about one.";
-  736  
+  736
   737  /**
   738   * What Q can do with a request to change the profile (ADR 0011). A note,
   739   * not a template edit: the pinned prompt stays as published, and this
@@ -30,14 +30,14 @@
   742   */
   743  export const PROFILE_UPDATE_NOTE =
   744    "If they ask in this message to change a field of their own company profile (company name, legal name, website, founded date, HQ country or city, stage, short or full description) AND give the new value, put it in profileUpdates: field, value in the field's own form, their exact words as quote. No value given: ask for it, propose nothing. What YOU call THEM (their own name) is not a company field: it goes in displayName, never in profileUpdates. Never say the profile cannot be changed here, or that it was changed or prepared; Capital Q says that.";
-  745  
+  745
   746  /**
   747   * The person's own name is theirs to change wherever they are, not only
   748   * in a conversation about a company, so this note travels on every run.
   749   */
   750  export const DISPLAY_NAME_NOTE =
   751    "If they ask in this message to be called something else or to change their own name on Capital Q AND give the new name, put it in displayName with their exact words as quote; never say it was changed or prepared. No new name given: ask for it.";
-  752  
+  752
   753  /**
   754   * A reading that would clear a field is kept only when the person's own
   755   * quoted words say so. Live, "change the name in my profile" with no new
@@ -53,10 +53,10 @@
   765    readonly quote: string;
   766    readonly tenantId: string;
   767  }) => Promise<"YES" | "NO" | "UNSURE" | null>;
-  768  
+  768
   769  export const CLEAR_QUESTION =
   770    "Do these words ask Capital Q to clear, remove or delete this value from their profile, leaving it empty?";
-  771  
+  771
   772  export async function clearsOnPurpose(
   773    update: {
   774      readonly value: string | null;
@@ -71,7 +71,7 @@
   783      (await check({ quote: update.quote, tenantId }).catch(() => null)) === "YES"
   784    );
   785  }
-  786  
+  786
   787  /**
   788   * Capital Q could not read this turn (the reader's model was unavailable
   789   * twice). Trusted text: what the run can and cannot do, never a script.
@@ -88,7 +88,7 @@
   800   */
   801  export const NEXT_STEP_NOTE =
   802    'HOW YOU END A REPLY: when you did or found something, end with one short line on what was done (only what a tool did in this turn; whether a change is saved, approved or waiting is Capital Q\'s to say, never yours) and then the single most useful next step for them, offered as a question ("Want me to draft the intro to Ada?"), never as a statement. Offer only what your tools or Capital Q can do; one offer, never a list; no offer when they are just chatting, closing, or you already offered it. When their latest words accept the offer in your last reply (yes, go ahead, do it, please), do exactly that now with the matching tool, preparing it for their one-tap approval where it acts; never ask them to say it again, and never say it is done before a tool has done it. Never promise to do something later ("I\'ll check", "I\'ll look into it"): do it now with a tool, or offer it as a question.';
-  803  
+  803
   804  /**
   805   * Answer what they mean, not only what they literally asked (founder
   806   * report 2026-10-01: "am I interested in this company?" got "there is no
@@ -99,7 +99,7 @@
   811   */
   812  export const LIKELY_INTENT_NOTE =
   813    "ANSWER WHAT THEY MEAN: their own standing is among the facts (list_my_relationships, get_investor_mandate tell more); never say you do not know their own activity. When the literal answer is no or nothing recorded, say so in a clause, then what their record does show (a save or pass is not interest); with a company in view and their mandate known, one sentence on fit naming the deciding criterion (stage, sector, geography, cheque); then offer, as a question, the action that moves it (express interest, save).";
-  814  
+  814
   815  /**
   816   * Expressive requests (founder report 2026-10-01: "laugh" was answered
   817   * with a bare emoji). Q does the thing as a person would -- in words, and
@@ -108,7 +108,7 @@
   820   */
   821  export const EXPRESSIVE_NOTE =
   822    'ASKED TO LAUGH, CLAP, WHISPER OR SOUND EXCITED: do it as a person would, in words (a laugh as "Ha!" plus one short warm line of your own, never the laugh alone), with the matching gesture (LAUGH, CLAP, EXCLAIM); never a bare emoji, never describe it instead.';
-  823  
+  823
   824  /**
   825   * What Q calls the person (founder live 2026-10-01: a name said to someone
   826   * else in the room, "Neo, n e u", was remembered and Q called the founder
@@ -117,7 +117,7 @@
   829   */
   830  export const NAME_NOTE =
   831    "Call them only by the name given first here: a name in memory or said in the conversation never replaces it (a new name is a displayName for their confirmation).";
-  832  
+  832
   833  /**
   834   * Their day and record (founder demo 2026-10-02): "my tasks for today"
   835   * got "I don't have a task list" while the facts held their calls,
@@ -125,7 +125,7 @@
   837   */
   838  export const OWN_DAY_NOTE =
   839    "Their tasks, day, agenda or what's next mean their own day among the facts (calls, reminders, approvals, Q's work), told in their time; how they are doing or their rehearsals means their last rehearsals there (get_my_results for more). Never say a record is unavailable when it is among the facts. If their time zone is not known, say times as UTC once, ask which city they are in, and offer to save it (update_my_profile, timeZone).";
-  840  
+  840
   841  /**
   842   * Saving is not verifying (ADR-001; founder live 2026-10-02: "regardless
   843   * of whether it is verified, I give you permission" was argued with).
@@ -135,10 +135,10 @@
   847   */
   848  export const SAVE_NOT_VERIFY_NOTE =
   849    'SAVING IS NOT VERIFYING: when they authorise saving details you found, in any words, prepare one update_company_profile (or update_investor_profile) with every found field now and say once: "I\'ll save these as your stated company details (not independently verified)." A conflicting field: use the best-supported value and name the other in one line. Never argue about verification once they have said to save.';
-  850  
+  850
   851  export const TURN_UNREAD_NOTE =
   852    "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
-  853  
+  853
   854  /**
   855   * They asked for this answer as a document (Q_REPORT, founder live
   856   * 2026-09-28 #1). Capital Q files the answer with a PDF after it is
@@ -153,10 +153,10 @@
   865   */
   866  export const SPOKEN_TURN_NOTE =
   867    "SPOKEN TURN: this answer is said aloud on a live call. answer: at most three short spoken sentences (about 60 words), first person, the direct answer to what they asked first, contractions, no lists, headings or markdown. A list, scores or a comparison go in answerCards; the words give the gist and the best one or two by name, then say they're on screen. At most three findings. Never read a list aloud.";
-  868  
+  868
   869  export const WRITING_DOCUMENT_NOTE =
   870    "THEY ASKED FOR THIS AS A DOCUMENT. Your answer IS the document's text: write the piece itself, in full, with a short heading line (# Title) and section headings where they help. Capital Q files your answer as their document with a PDF download right after you finish and shows its card, so never say you cannot make a PDF or document, never describe the document instead of writing it, and never say it is already attached.";
-  871  
+  871
   872  /**
   873   * A series of questions the person asked for (R35), as trusted text: the
   874   * step was decided by the conversation core from the turn's reading, so
@@ -178,7 +178,7 @@
   890        return `THEY ASKED YOU TO STOP THE QUESTIONS ${about}. Stop: acknowledge in a few words and ask none of the remaining questions.`;
   891    }
   892  }
-  893  
+  893
   894  function isKnownZone(zone: string): boolean {
   895    try {
   896      new Intl.DateTimeFormat("en-US", { timeZone: zone });
@@ -187,7 +187,7 @@
   899      return false;
   900    }
   901  }
-  902  
+  902
   903  export function environmentNoteParts(
   904    facts: readonly AuthorisedFact[],
   905    tools: readonly QOfferedTool[] = [],
@@ -349,7 +349,7 @@
  1061      turn: "",
  1062    };
  1063  }
- 1064  
+ 1064
  1065  /**
  1066   * The notes in two parts (COMPANY_ANALYST v16, prompt-cache order): what is
  1067   * the same from turn to turn for this person (steady guidance, who is
@@ -360,22 +360,22 @@
  1072    readonly standing: string;
  1073    readonly turn: string;
  1074  };
- 1075  
+ 1075
  1076  export function joinedNoteParts(parts: QEnvironmentNoteParts): string {
  1077    return joinedNotes(parts);
  1078  }
- 1079  
+ 1079
  1080  function joinedNotes(parts: QEnvironmentNoteParts): string {
  1081    return [parts.standing, parts.turn]
  1082      .filter((part) => part.length > 0)
  1083      .join(" ");
  1084  }
- 1085  
+ 1085
  1086  /** The notes as one string, in the charter (COMPANY_ANALYST up to v15). */
  1087  export function environmentNotesFor(
  1088    ...args: Parameters<typeof environmentNoteParts>
  1089  ): string {
  1090    return joinedNotes(environmentNoteParts(...args));
  1091  }
- 1092  
+ 1092
 ```

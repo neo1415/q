@@ -56,7 +56,7 @@ Why included: Decides which models a request may reach; SYNTHETIC_DEMO bypasses 
    91        return "CONFIDENTIAL";
    92    }
    93  }
-   94  
+   94
    95  export type EligibleCandidate = {
    96    readonly candidateIndex: number;
    97    readonly provider: ProviderRecord;
@@ -65,13 +65,13 @@ Why included: Decides which models a request may reach; SYNTHETIC_DEMO bypasses 
   100    readonly estimatedInputTokens: number;
   101    readonly estimatedAttemptCostUsd: number;
   102  };
-  103  
+  103
   104  export type RoutePlan = {
   105    readonly policy: RoutingPolicyRecord;
   106    readonly decisions: readonly ModelCandidateDecision[];
   107    readonly eligible: readonly EligibleCandidate[];
   108  };
-  109  
+  109
   110  /**
   111   * The active policy for a task class whose sensitivity class covers the
   112   * request: the most specific (lowest) covering ceiling, highest version.
@@ -117,7 +117,7 @@ Why included: Decides which models a request may reach; SYNTHETIC_DEMO bypasses 
   226    const modelIds = [...policy.preferredModels, ...policy.fallbackModels];
   227    const decisions: ModelCandidateDecision[] = [];
   228    const eligible: EligibleCandidate[] = [];
-  229  
+  229
   230    modelIds.forEach((modelId, candidateIndex) => {
   231      const model = catalog.modelById.get(modelId);
   232      if (model === undefined) {
@@ -141,7 +141,7 @@ Why included: Decides which models a request may reach; SYNTHETIC_DEMO bypasses 
   250          reason,
   251        });
   252      };
-  253  
+  253
   254      if (provider === undefined || provider.status !== "ACTIVE") {
   255        decide("PROVIDER_DISABLED");
   256        return;
@@ -268,8 +268,7 @@ Why included: Decides which models a request may reach; SYNTHETIC_DEMO bypasses 
   377        estimatedAttemptCostUsd: estimate.amount,
   378      });
   379    });
-  380  
+  380
   381    return { policy, decisions, eligible };
   382  }
 ```
-

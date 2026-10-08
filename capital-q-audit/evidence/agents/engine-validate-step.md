@@ -39,7 +39,7 @@
   638    if (!parsed.success) {
   639      return { verdict: "REFUSED", code: "BAD_ARGUMENTS", relationshipId: null };
   640    }
-  641  
+  641
   642    // Who it concerns: only people this grant covers.
   643    const relationshipId =
   644      typeof args.data["relationshipId"] === "string"
@@ -91,7 +91,7 @@
   690          person.counterpartId === companyId,
   691      )?.relationshipId ??
   692      null;
-  693  
+  693
   694    // Founder rule: nothing but interest before they accept -- not sent,
   695    // not offered as a card.
   696    if (
@@ -104,7 +104,7 @@
   703        relationshipId: subject,
   704      };
   705    }
-  706  
+  706
   707    // What Q writes is checked before it is sent or asked (QA run 8a1d57b9):
   708    // a card with a generic message is no better than sending one.
   709    let factReply = false;
@@ -164,7 +164,7 @@
   763      }
   764      factReply = checked.factReply;
   765    }
-  766  
+  766
   767    // ADR 0050: consider the moment before any message, whatever the mode:
   768    // a held or softened step never reaches a card or the chat.
   769    let considered: OutreachConsideration = { decision: "PROCEED" };
@@ -199,7 +199,7 @@
   798          ? "THEY_DECLINED"
   799          : considered.code
   800        : null;
-  801  
+  801
   802    const ask = (code: string): StepVerdict => ({
   803      verdict: "ASK",
   804      action,
@@ -358,7 +358,7 @@
   957      code: null,
   958    };
   959  }
-  960  
+  960
   961  /**
   962   * ADR 0050: the consider step for one planned message. What kind of
   963   * message it is comes from the conversation itself (code's pace, else the

@@ -333,6 +333,23 @@ export {
   type TurnAppAction,
 } from "./app-action-turn.js";
 export { createToolReadinessLead } from "./readiness-lead.js";
+export {
+  readCoreSnapshot,
+  type ConversationCoreScope,
+  type ConversationCoreSnapshot,
+  type ConversationCoreStore,
+} from "./conversation-core.js";
+export {
+  focusFromHistory,
+  listsFromHistory,
+  listsFromManifest,
+  referenceAskOf,
+  resolutionNote,
+  resolveReference,
+  type ConversationEntity,
+  type ReferenceAsk,
+  type ResolvedReference,
+} from "./conversation-entities.js";
 
 export {
   createToolOpenRecordPort,

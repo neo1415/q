@@ -6,7 +6,7 @@
 
 ```ts
     1  "use server";
-    2  
+    2
     3  import {
     4    endQVoiceDuplex,
     5    rejoinQVoiceDuplex,
@@ -29,9 +29,9 @@
    22    type QVoiceDuplexToolResult,
    23    type QVoiceDuplexUsageResult,
    24  } from "@capital-q/contracts";
-   25  
+   25
    26  import { getSessionAccessToken } from "@/auth/session";
-   27  
+   27
    28  /**
    29   * DUPLEX: the full-duplex line's relays to the Q API, as server actions,
    30   * so the person's own session authorises each one exactly as every other
@@ -39,7 +39,7 @@
    32   * then ends and the standard voice takes over, which is the whole of the
    33   * failure handling a person ever sees.
    34   */
-   35  
+   35
    36  async function sessionFor() {
    37    const { qApiBaseUrl } = loadWebServerConfig();
    38    if (qApiBaseUrl === undefined) return null;
@@ -47,7 +47,7 @@
    40    if (accessToken === null) return null;
    41    return { baseUrl: qApiBaseUrl, accessToken };
    42  }
-   43  
+   43
    44  export async function relayDuplexToolAction(
    45    rawVoiceSessionId: unknown,
    46    rawCall: unknown,
@@ -63,7 +63,7 @@
    56      return null;
    57    }
    58  }
-   59  
+   59
    60  /** VOICE-BRAIN: a finished turn of theirs; the server decides who answers. */
    61  export async function sendDuplexHeardAction(
    62    rawVoiceSessionId: unknown,
@@ -80,7 +80,7 @@
    73      return null;
    74    }
    75  }
-   76  
+   76
    77  /** VOICE-BRAIN: what the voice said, for the line's transcript. */
    78  export async function sendDuplexSaidAction(
    79    rawVoiceSessionId: unknown,
@@ -97,7 +97,7 @@
    90      // The transcript is kept beside the line, never in its way.
    91    }
    92  }
-   93  
+   93
    94  export async function reportDuplexUsageAction(
    95    rawVoiceSessionId: unknown,
    96    rawReport: unknown,
@@ -113,7 +113,7 @@
   106      return null;
   107    }
   108  }
-  109  
+  109
   110  /** I1: a fresh realtime call for the same line after a drop. */
   111  export async function rejoinDuplexAction(
   112    rawVoiceSessionId: unknown,
@@ -130,7 +130,7 @@
   123      return null;
   124    }
   125  }
-  126  
+  126
   127  export async function endDuplexAction(
   128    rawVoiceSessionId: unknown,
   129    rawReason: unknown,
@@ -158,4 +158,3 @@
   151    }
   152  }
 ```
-

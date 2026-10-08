@@ -9,7 +9,7 @@
     2    DraftIntegrityRuleV2,
     3    DraftRubricCriterion,
     4  } from "@capital-q/q-core";
-    5  
+    5
     6  /**
     7   * The writer → reviewer loop (founder brief J2, 2026-10-06).
     8   *
@@ -24,9 +24,9 @@
    17   * failure is never averaged away, and a reviewer that cannot be reached
    18   * holds the draft: nothing outward goes ungraded.
    19   */
-   20  
+   20
    21  export const RUBRIC_VERSION = "workforce-rubric/v1" as const;
-   22  
+   22
    23  /** Weights out of 100. The person's own style counts as much as warmth. */
    24  export const RUBRIC_WEIGHTS: Readonly<Record<DraftRubricCriterion, number>> = {
    25    WARM_OPENING: 15,
@@ -36,13 +36,13 @@
    29    READS_SIGNALS: 15,
    30    PERSONAL_STYLE: 15,
    31  };
-   32  
+   32
    33  export type ReviewPolicy = {
    34    /** The least score, out of 100, a draft needs to pass. */
    35    readonly threshold: number;
    36    readonly maxRedrafts: number;
    37  };
-   38  
+   38
    39  /**
    40   * At most two rounds: the first draft and one redraft from the fix list
    41   * (Zino, 2026-10-08: "Draft 1 below the bar 6.0/7.5" over and over). A
@@ -50,12 +50,12 @@
    43   * whatever a job's stored `maxRedrafts` says.
    44   */
    45  export const REVIEW_ROUNDS_MAX = 2;
-   46  
+   46
    47  export const DEFAULT_REVIEW_POLICY: ReviewPolicy = {
    48    threshold: 75,
    49    maxRedrafts: REVIEW_ROUNDS_MAX - 1,
    50  };
-   51  
+   51
    52  /** The reviewer's sheet, as either prompt version returns it. */
    53  export type ReviewSheet = {
    54    readonly criteria: readonly {
@@ -70,7 +70,7 @@
    63    }[];
    64    readonly feedback: string;
    65  };
-   66  
+   66
    67  export type Grade = {
    68    readonly score: number;
    69    readonly passed: boolean;
@@ -82,10 +82,10 @@
    75    /** Code's thread-consistency fixes; any one fails the draft. */
    76    readonly threadProblems?: readonly string[] | undefined;
    77  };
-   78  
+   78
    79  const NOTE_MAX = 300;
    80  const FEEDBACK_MAX = 1_000;
-   81  
+   81
    82  function firstOf<T, K>(items: readonly T[], key: (item: T) => K): T[] {
    83    const seen = new Set<K>();
    84    return items.filter((item) => {
@@ -95,7 +95,7 @@
    88      return true;
    89    });
    90  }
-   91  
+   91
    92  /**
    93   * One score from the reviewer's grades. A criterion the reviewer did not
    94   * grade counts as 0 (unknown is not a pass); a rule it did not check
@@ -151,7 +151,7 @@
   144      feedback: review.feedback.slice(0, FEEDBACK_MAX),
   145    };
   146  }
-  147  
+  147
   148  /**
   149   * The writer's fix list, concrete and numbered: code's thread fixes
   150   * first, then each failed integrity rule's note, then each criterion the
@@ -183,7 +183,7 @@
   176      .join("\n")
   177      .slice(0, 2_000);
   178  }
-  179  
+  179
   180  export type ReviewLoopPorts = {
   181    /** The reviewer. Null: unavailable or unreadable. */
   182    readonly review: (body: string) => Promise<ReviewSheet | null>;
@@ -227,7 +227,7 @@
   220        }) => Promise<void>)
   221      | undefined;
   222  };
-  223  
+  223
   224  export const HOLD_REASONS = [
   225    "BELOW_BAR",
   226    "INTEGRITY",
@@ -238,7 +238,7 @@
   231    "THREAD_MISMATCH",
   232  ] as const;
   233  export type HoldReason = (typeof HOLD_REASONS)[number];
-  234  
+  234
   235  export type ReviewOutcome =
   236    | {
   237        readonly verdict: "PASSED";
@@ -261,7 +261,7 @@
   254         */
   255        readonly nearMiss?: true | undefined;
   256      };
-  257  
+  257
   258  async function quietly<T>(work: () => Promise<T>, fallback: T): Promise<T> {
   259    try {
   260      return await work();
@@ -269,7 +269,7 @@
   262      return fallback;
   263    }
   264  }
-  265  
+  265
   266  export async function writeWithReview(
   267    first: string,
   268    ports: ReviewLoopPorts,

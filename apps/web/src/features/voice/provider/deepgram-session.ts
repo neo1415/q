@@ -1,5 +1,7 @@
 "use client";
 
+import { postCardUpdate } from "./duplex-relays";
+import { standardLineCards, type StandardLineCards } from "./standard-cards";
 import type { AgentMicrophone as AgentMicrophoneClass } from "@deepgram/agents";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -59,6 +61,9 @@ const SETTINGS_WITHIN_MS = 10_000;
 const SPEECH_WITHIN_MS = 10_000;
 /** "Thinking" with no reply at all gives way to listening after this. */
 export const THINKING_GIVE_UP_MS = 14_000;
+/** What the person sees when no reply came at all (RECOVERY A4). */
+export const STANDARD_TIMEOUT_NOTICE =
+  "I didn't get an answer to that one. Ask me again?";
 /** A working microphone produces frames continuously, silence included. */
 const FRAMES_WITHIN_MS = 4_000;
 /**
@@ -133,6 +138,16 @@ export function useDeepgramVoiceSession(
   events: VoiceSessionEvents = {},
 ): VoiceSessionClient {
   const [state, setState] = useState<VoiceState>("IDLE");
+  // The watchdog reads the current state without a side effect in an
+  // updater (RECOVERY A4).
+  /** E-03: the page's decision cards on this line, while it is up. */
+  const cardsRef = useRef<StandardLineCards | null>(null);
+  const stateRef = useRef<VoiceState>("IDLE");
+  useEffect(() => {
+    stateRef.current = state;
+    // E-03: a note held while Q was busy is said once the line is quiet.
+    if (state === "LISTENING") cardsRef.current?.quiet();
+  }, [state]);
   const [connected, setConnected] = useState(false);
   const [transcript, setTranscript] = useState<readonly VoiceTranscriptLine[]>(
     [],
@@ -179,6 +194,8 @@ export function useDeepgramVoiceSession(
   const injectedRef = useRef<{ text: string; at: number }[]>([]);
 
   const teardown = useCallback(() => {
+    cardsRef.current?.stop();
+    cardsRef.current = null;
     const live = liveRef.current;
     liveRef.current = null;
     if (live === null) return;
@@ -361,9 +378,15 @@ export function useDeepgramVoiceSession(
         thinkingWatch = window.setTimeout(() => {
           thinkingWatch = null;
           if (liveRef.current !== live) return;
-          setState((current) =>
-            current === "THINKING" ? "LISTENING" : current,
-          );
+          if (stateRef.current !== "THINKING") return;
+          setState("LISTENING");
+          // RECOVERY A4: never a silent give-up; the screen says so
+          // (unless the server already said how the turn ended).
+          eventsRef.current.onTurnOutcome?.({
+            disposition: "FAILED",
+            failure: "TIMEOUT",
+            notice: STANDARD_TIMEOUT_NOTICE,
+          });
         }, THINKING_GIVE_UP_MS);
       };
       let lineUp = false;
@@ -386,6 +409,26 @@ export function useDeepgramVoiceSession(
         setState((current) =>
           current === "CONNECTING" ? "LISTENING" : current,
         );
+        // E-03: the page's cards reach this line as they reach the duplex
+        // one: focus to the server, spoken replies decided by the card's
+        // code, and notes that ask Q to speak said when the line is quiet.
+        cardsRef.current?.stop();
+        cardsRef.current = standardLineCards({
+          post: (update) =>
+            postCardUpdate(
+              credential.voiceSessionId,
+              credential.sessionToken,
+              update,
+            ),
+          speak: (line) => {
+            if (liveRef.current !== live) return;
+            live.session.injectAgentMessage(line);
+            expectSpeech();
+          },
+          canSpeak: () =>
+            liveRef.current === live && stateRef.current === "LISTENING",
+          isCardReply: wire.isQVoiceCardReply,
+        });
         // Q speaks first on an explicit start; that greeting has to be heard.
         if (greeting) expectSpeech();
       });
@@ -435,6 +478,8 @@ export function useDeepgramVoiceSession(
           }
         }
         addLine(role, content);
+        // E-03: a reply about the card in focus is the card's to decide.
+        if (role === "user") cardsRef.current?.heard(content);
         // The swarm and the page pointer follow what Q says, as it says it.
         if (role === "q") announceQSaid(content);
         if (role === "user") {

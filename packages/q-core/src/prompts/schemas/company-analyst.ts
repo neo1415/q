@@ -522,6 +522,22 @@ export type CompanyAnalystV19Result = z.infer<
 >;
 export const COMPANY_ANALYST_V19_SCHEMA_VERSION = 19;
 
+/**
+ * v22 (RECOVERY-2026-10, workstream E's request): how the answer would be
+ * best seen. The model chooses only the kind; Capital Q draws it from what
+ * the run read (model-gateway result-blocks), never from the model's
+ * words, and draws nothing when no read supports it.
+ */
+export const ANALYST_VISUALS = ["MAP", "CHART", "TABLE", "TIMELINE"] as const;
+export const CompanyAnalystV22ResultSchema =
+  CompanyAnalystV19ResultSchema.extend({
+    visual: z.enum(ANALYST_VISUALS).nullable().default(null),
+  }).strict();
+export type CompanyAnalystV22Result = z.infer<
+  typeof CompanyAnalystV22ResultSchema
+>;
+export const COMPANY_ANALYST_V22_SCHEMA_VERSION = 22;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 
@@ -538,7 +554,7 @@ export const CompanyAnalystV4VariablesSchema =
      * Capital Q, carried in the task's tail instead of the charter; steady
      * guidance stays in the charter. Trusted. Older versions do not read it.
      */
-    turnNotes: z.string().max(9_000).default(""),
+    turnNotes: z.string().max(9_400).default(""),
   }).strict();
 export type CompanyAnalystV4Variables = z.infer<
   typeof CompanyAnalystV4VariablesSchema

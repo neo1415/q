@@ -34,9 +34,19 @@ import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { ViewTransition } from "@/components/view-transition";
 import type { Briefing } from "@/features/home/briefing";
-import { arrivalPending } from "@/features/briefing/arrival-store";
+import { noticeOf } from "@/features/q/control/q-control-runtime";
+import { onUiActReport } from "@/features/q/ui-act-controller";
+import {
+  arrivalSpoken,
+  markArrivalSaid,
+} from "@/features/briefing/arrival-store";
 import { voiceBriefing } from "@/features/briefing/arrival-voice";
-import { ArrivalRoom, useRoomSlots } from "@/features/briefing/arrival-room";
+import {
+  ArrivalRoom,
+  RoomBelow,
+  StageModeProvider,
+  useRoomSlots,
+} from "@/features/briefing/arrival-room";
 import { decideBriefing } from "@/features/home/briefing-gate";
 import {
   DECK_OFFER_QUESTION,
@@ -151,41 +161,33 @@ export type QConversationPanelProps = {
   readonly welcomeLead?: string | undefined;
   /** Q's briefing (R35), streamed from the server; said only with voice on. */
   readonly briefing?: Promise<Briefing | null> | undefined;
+  /**
+   * RECOVERY-2026-10 E1 (audit E-01): a layer of the stage that lives as
+   * long as the page (the arrival's cards). Rendered once, beside the
+   * welcome and conversation branches rather than in either, so it keeps
+   * its state, and its cards stay beside Q, once the conversation starts.
+   */
+  readonly stageLayer?: ReactNode | undefined;
 };
 
-/** How long voice waits for a briefing still on its way before greeting. */
-const BRIEFING_WAIT_MS = 1_500;
-
 /**
- * The welcome as spoken, with the briefing said after the greeting when
- * this page gives one: "Welcome back, Ada. One thing needs you. …
- * Where would you like to start?" Plain and brief; no briefing, no change.
+ * The welcome as said now, never waited for (RECOVERY-2026-10 E-05: a
+ * typed question or a Talk press waited up to ~5.5 s on the briefing's
+ * reads, with nothing on screen). The arrival's words when they are
+ * ready; else the R35 briefing after the greeting when it has already
+ * landed; else the plain welcome. A briefing that lands later reaches an
+ * open line from the stage layer (arrival-stage.tsx).
  */
-async function spokenWelcome(
-  welcomeLine: string,
-  welcomeLead: string | undefined,
-  briefing: Promise<Briefing | null> | undefined,
-): Promise<string> {
-  // The arrival briefing (2026-10-08), when this page gives one: greeting
-  // by their clock, the lowdown, and the first card put to them.
-  for (let waited = 0; arrivalPending() && waited < BRIEFING_WAIT_MS;) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    waited += 100;
-  }
-  // A call always opens with the briefing, read now if this page load did
-  // not give it (live 2026-10-08: a call opened with the generic welcome).
-  const arrival = await voiceBriefing().catch(() => null);
-  if (arrival !== null) return arrival;
-  if (briefing === undefined) return welcomeLine;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), BRIEFING_WAIT_MS);
-  });
-  const given = decideBriefing(
-    await Promise.race([briefing.catch(() => null), late]),
-  );
-  clearTimeout(timer);
-  if (given === null) return welcomeLine;
+export function welcomeNow(input: {
+  readonly arrival: string | null;
+  readonly welcomeLine: string;
+  readonly welcomeLead: string | undefined;
+  readonly briefing: Briefing | null;
+}): string {
+  if (input.arrival !== null) return input.arrival;
+  const given = decideBriefing(input.briefing);
+  if (given === null) return input.welcomeLine;
+  const { welcomeLine, welcomeLead } = input;
   if (welcomeLead !== undefined && welcomeLine.startsWith(welcomeLead)) {
     return `${welcomeLead} ${given.spoken}${welcomeLine.slice(welcomeLead.length)}`;
   }
@@ -301,6 +303,7 @@ export function QConversationPanel({
   welcomeLead,
   briefing,
   openBoard = false,
+  stageLayer,
 }: QConversationPanelProps) {
   const session = useQSession();
   const { q, turns, voice, spoken, spokenOnly, presence } = session;
@@ -370,29 +373,46 @@ export function QConversationPanel({
 
   // --- Talking --------------------------------------------------------------
 
+  // The R35 briefing once it has landed: read synchronously, never awaited.
+  const [landedBriefing, setLandedBriefing] = useState<Briefing | null>(null);
+  useEffect(() => {
+    let live = true;
+    void briefing
+      ?.then((given) => {
+        if (live) setLandedBriefing(given);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [briefing]);
+  const openingWords = useCallback((): string | undefined => {
+    if (welcomeLine === undefined) return undefined;
+    const arrival = arrivalSpoken();
+    markArrivalSaid(arrival !== null);
+    return welcomeNow({
+      arrival,
+      welcomeLine,
+      welcomeLead,
+      briefing: landedBriefing,
+    });
+  }, [welcomeLine, welcomeLead, landedBriefing]);
+
   const sessionTalk = session.talk;
   const talk = useCallback(async () => {
     rememberEnded(false);
     // Over a welcome still on screen, Q says that welcome and nothing
-    // before it: one greeting, not the page's and then the call's.
-    // The greeting is a nicety: if it cannot be put together, Q still
-    // answers the press with the plain welcome (founder report 2026-09-30:
-    // "I keep clicking Talk with Q and nothing happens").
-    const greeting =
-      welcomeLine !== undefined && turns.length === 0 && spoken.length === 0
-        ? await spokenWelcome(welcomeLine, welcomeLead, briefing).catch(
-            () => welcomeLine,
-          )
-        : undefined;
+    // before it: one greeting, not the page's and then the call's. E-05:
+    // the line opens at once with what is ready now; a call is the person
+    // asking to be briefed, so the briefing is read (not awaited) and the
+    // stage hands it to the line when it lands.
+    const fresh = turns.length === 0 && spoken.length === 0;
+    const greeting = fresh ? openingWords() : undefined;
+    if (fresh && arrivalSpoken() === null) {
+      void voiceBriefing().catch(() => null);
+    }
     await sessionTalk(greeting === undefined ? undefined : { greeting });
-  }, [
-    sessionTalk,
-    welcomeLine,
-    welcomeLead,
-    briefing,
-    turns.length,
-    spoken.length,
-  ]);
+  }, [sessionTalk, openingWords, turns.length, spoken.length]);
 
   const endVoice = voice.end;
   const end = useCallback(() => {
@@ -615,6 +635,12 @@ export function QConversationPanel({
     q.state.failure === null;
 
   const room = useRoomSlots();
+  // E1: the cards step aside (one line below Q) while an answer holds the
+  // centre or the thread is the view; beside Q otherwise.
+  const stageMode =
+    conversing && (!bigPresence || objectShown || showingCards)
+      ? ("STRIP" as const)
+      : ("FULL" as const);
   const stateLabel = voice.active
     ? client.muted
       ? "Muted"
@@ -661,14 +687,11 @@ export function QConversationPanel({
     welcomeLine !== undefined && turns.length === 0 && spoken.length === 0;
   const qAsk = useCallback(
     async (text: string) => {
-      const opening = welcomeShown
-        ? await spokenWelcome(welcomeLine, welcomeLead, briefing).catch(
-            () => welcomeLine,
-          )
-        : undefined;
+      // E-05: sent at once; the opening is whatever is composed now.
+      const opening = welcomeShown ? openingWords() : undefined;
       await rawAsk(text, opening === undefined ? undefined : { opening });
     },
-    [rawAsk, welcomeShown, welcomeLine, welcomeLead, briefing],
+    [rawAsk, welcomeShown, openingWords],
   );
   // Q room W5 (R8): a founder said yes to the onboarding deck offer;
   // once they are here and Q is connected, ask for it, once.
@@ -698,8 +721,31 @@ export function QConversationPanel({
 
   // Notices that belong wherever the conversation is: the stage before it
   // starts, the end of the thread once it has.
+  // C2/C3 receipts, in the conversation too (the shell's toast is the
+  // live announcement; this line stays with the exchange until the next
+  // turn, so "it didn't happen" is not lost after six seconds).
+  const [actNotice, setActNotice] = useState<string | null>(null);
+  useEffect(
+    () => onUiActReport((report) => setActNotice(noticeOf(report))),
+    [],
+  );
+  const lastTurnId = turns.at(-1)?.id ?? null;
+  const [actTurn, setActTurn] = useState(lastTurnId);
+  if (actTurn !== lastTurnId) {
+    setActTurn(lastTurnId);
+    setActNotice(null);
+  }
+
   const notices = (
     <>
+      {actNotice === null ? null : (
+        <p
+          className="cq-caption m-0 text-(--cq-text-secondary)"
+          data-q-act-notice
+        >
+          {actNotice}
+        </p>
+      )}
       {q.transport === "RECONNECTING" ? (
         <p className="cq-caption text-(--cq-text-secondary)">
           {describeQStreamTransport(q.transport)} Your conversation is saved.
@@ -916,34 +962,17 @@ export function QConversationPanel({
           >
             {conversing ? (
               <div
-                className={`mx-auto flex w-full flex-col gap-5 py-6 transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-[1180px]" : "max-w-2xl"}`}
+                className={`mx-auto flex w-full flex-col gap-5 py-6 transition-[max-width] duration-(--cq-motion-slow) ease-(--cq-ease) motion-reduce:transition-none ${showingCards ? "max-w-[1180px]" : room.filled && stageMode === "FULL" ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"}`}
                 data-q-cards-layout={showingCards ? "aside" : undefined}
               >
                 {bigPresence ? (
-                  <QPresenceStage
-                    live={voice.active}
-                    onBoardLanded={onBoardLanded}
-                    onPin={boardMarks.pin}
-                    presence={(compact, mini) =>
-                      mini === true ? (
-                        <ViewTransition
-                          name="q-aperture"
-                          share="cq-q-morph"
-                          default="none"
-                        >
-                          <QAperture
-                            state={presence.state}
-                            size={44}
-                            inputLevel={client.inputLevel}
-                            outputLevel={client.outputLevel}
-                            showing={showingCards}
-                          />
-                        </ViewTransition>
-                      ) : (
-                        <div
-                          className="flex flex-col items-center gap-2 pt-2"
-                          data-q-presence="stage"
-                        >
+                  <ArrivalRoom wide>
+                    <QPresenceStage
+                      live={voice.active}
+                      onBoardLanded={onBoardLanded}
+                      onPin={boardMarks.pin}
+                      presence={(compact, mini) =>
+                        mini === true ? (
                           <ViewTransition
                             name="q-aperture"
                             share="cq-q-morph"
@@ -951,104 +980,123 @@ export function QConversationPanel({
                           >
                             <QAperture
                               state={presence.state}
-                              size={compact ? 64 : 200}
+                              size={44}
                               inputLevel={client.inputLevel}
                               outputLevel={client.outputLevel}
-                              stage
-                              showing={compact || showingCards}
+                              showing={showingCards}
                             />
                           </ViewTransition>
-                          {!compact &&
-                          thread.length > latestExchange(thread).length ? (
-                            <button
-                              type="button"
-                              className="cq-stage-quiet"
-                              onClick={() => chooseView("chat")}
+                        ) : (
+                          <div
+                            className="flex flex-col items-center gap-2 pt-2"
+                            data-q-presence="stage"
+                          >
+                            <ViewTransition
+                              name="q-aperture"
+                              share="cq-q-morph"
+                              default="none"
                             >
-                              Earlier in this conversation
-                            </button>
-                          ) : null}
-                        </div>
-                      )
-                    }
-                    onShowingChange={setObjectShown}
-                    turns={turns}
-                    captions={captions}
-                    caption={
-                      <ol
-                        className="flex w-full flex-col gap-5"
-                        aria-label="Conversation"
+                              <QAperture
+                                state={presence.state}
+                                size={compact ? 64 : 200}
+                                inputLevel={client.inputLevel}
+                                outputLevel={client.outputLevel}
+                                stage
+                                showing={compact || showingCards}
+                              />
+                            </ViewTransition>
+                            {!compact &&
+                            thread.length > latestExchange(thread).length ? (
+                              <button
+                                type="button"
+                                className="cq-stage-quiet"
+                                onClick={() => chooseView("chat")}
+                              >
+                                Earlier in this conversation
+                              </button>
+                            ) : null}
+                          </div>
+                        )
+                      }
+                      onShowingChange={setObjectShown}
+                      turns={turns}
+                      captions={captions}
+                      caption={
+                        <ol
+                          className="flex w-full flex-col gap-5"
+                          aria-label="Conversation"
 
-                        data-q-thread
-                      >
-                        {latestExchange(thread).map((line) =>
-                          line.role === "person" ? (
+                          data-q-thread
+                        >
+                          {latestExchange(thread).map((line) =>
+                            line.role === "person" ? (
+                              <li
+                                key={line.id}
+                                className="flex flex-col"
+                                data-q-row="person"
+                              >
+                                <p className="cq-q-bubble cq-body">
+                                  <span className="sr-only">You: </span>
+                                  {line.text}
+                                </p>
+                                <HideFromQ
+                                  conversationId={q.conversationId}
+                                  messageId={line.id}
+                                />
+                              </li>
+                            ) : (
+                              <li
+                                key={line.id}
+                                className="flex flex-col"
+                                data-q-row="q"
+                              >
+                                <span className="sr-only">Q: </span>
+                                {line.turn === undefined ? (
+                                  <QMarkdown
+                                    text={line.text}
+                                    className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-primary)"
+                                  />
+                                ) : (
+                                  <QAnswer
+                                    turn={line.turn}
+                                    mark={false}
+                                    onAsk={sayOrAsk}
+                                    onOpenArtifact={showArtifact}
+                                  />
+                                )}
+                              </li>
+                            ),
+                          )}
+                          {liveIsPerson ? (
                             <li
-                              key={line.id}
+                              key={live.id}
                               className="flex flex-col"
                               data-q-row="person"
                             >
-                              <p className="cq-q-bubble cq-body">
-                                <span className="sr-only">You: </span>
-                                {line.text}
+                              <p
+                                className="cq-q-bubble is-live cq-body"
+                                data-q-live-line
+                              >
+                                <span className="sr-only">You, speaking: </span>
+                                {live.text}
                               </p>
-                              <HideFromQ
-                                conversationId={q.conversationId}
-                                messageId={line.id}
-                              />
                             </li>
-                          ) : (
-                            <li
-                              key={line.id}
-                              className="flex flex-col"
-                              data-q-row="q"
-                            >
-                              <span className="sr-only">Q: </span>
-                              {line.turn === undefined ? (
-                                <QMarkdown
-                                  text={line.text}
-                                  className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-primary)"
-                                />
-                              ) : (
-                                <QAnswer
-                                  turn={line.turn}
-                                  mark={false}
-                                  onAsk={sayOrAsk}
-                                  onOpenArtifact={showArtifact}
-                                />
-                              )}
-                            </li>
-                          ),
-                        )}
-                        {liveIsPerson ? (
-                          <li
-                            key={live.id}
-                            className="flex flex-col"
-                            data-q-row="person"
-                          >
-                            <p
-                              className="cq-q-bubble is-live cq-body"
-                              data-q-live-line
-                            >
-                              <span className="sr-only">You, speaking: </span>
-                              {live.text}
-                            </p>
-                          </li>
-                        ) : null}
-                      </ol>
-                    }
-                    waiting={
-                      boardDocked ? null : (
-                        <QNow
-                          session={session}
-                          onAct={sayOrAsk}
-                          quietWhenIdle
-                        />
-                      )
-                    }
-                    onAsk={sayOrAsk}
-                    onOpenArtifact={showArtifact}
-                  />
+                          ) : null}
+                        </ol>
+                      }
+                      waiting={
+                        boardDocked ? null : (
+                          <QNow
+                            session={session}
+                            onAct={sayOrAsk}
+                            quietWhenIdle
+                          />
+                        )
+                      }
+                      onAsk={sayOrAsk}
+                      onOpenArtifact={showArtifact}
+                    />
+                  </ArrivalRoom>
                 ) : (
                   <ol
                     className="flex w-full flex-col gap-5"
@@ -1158,6 +1206,8 @@ export function QConversationPanel({
                   </div>
                 ) : null}
 
+                {/* E1: the stage layer's place below Q while conversing. */}
+                <RoomBelow />
                 {boardDocked || bigPresence ? null : (
                   <QNow session={session} onAct={sayOrAsk} quietWhenIdle />
                 )}
@@ -1226,6 +1276,9 @@ export function QConversationPanel({
                   </div>
                 ) : null}
 
+                {/* E1: the stage layer's place below Q before the first word. */}
+                <RoomBelow className="max-w-(--cq-layout-narrow)" />
+
                 {showSuggestions ? (
                   <ul
                     aria-label="Suggested questions"
@@ -1261,6 +1314,13 @@ export function QConversationPanel({
                 )}
                 {notices}
               </div>
+            )}
+            {/* E1: the arrival's cards, rendered once whatever the branch,
+                so they outlive the welcome and stay while Q speaks. */}
+            {stageLayer === undefined ? null : (
+              <StageModeProvider value={stageMode}>
+                {stageLayer}
+              </StageModeProvider>
             )}
             <div ref={threadEnd} aria-hidden="true" />
           </div>

@@ -7,7 +7,7 @@ Why included: Rotates multiple free-tier keys on RATE_LIMIT; 10 s deadline floor
 ```ts
   455  /** Gemini refuses a request deadline below this and returns HTTP 400. */
   456  export const GEMINI_MIN_DEADLINE_MS = 10_000;
-  457  
+  457
   458  /**
   459   * The deadline to send Gemini for a caller who will wait `budgetMs`.
   460   *
@@ -22,7 +22,7 @@ Why included: Rotates multiple free-tier keys on RATE_LIMIT; 10 s deadline floor
   469  export function geminiDeadlineMs(budgetMs: number): number {
   470    return Math.max(GEMINI_MIN_DEADLINE_MS, budgetMs);
   471  }
-  472  
+  472
   473  export function createGoogleModelProvider(
   474    options: GoogleModelProviderOptions,
   475  ): ModelProvider {
@@ -32,7 +32,7 @@ Why included: Rotates multiple free-tier keys on RATE_LIMIT; 10 s deadline floor
   479    /** Per key: when it may be tried again. Index into `clients`. */
   480    const blockedUntil = clients.map(() => 0);
   481    let cursor = 0;
-  482  
+  482
   483    /** Keys to try for one request: from the cursor, unblocked first. */
   484    const keyOrder = (now: number): number[] => {
   485      const all = clients.map((_, index) => (cursor + index) % clients.length);
@@ -42,7 +42,7 @@ Why included: Rotates multiple free-tier keys on RATE_LIMIT; 10 s deadline floor
   489        ...all.filter((index) => until(index) > now),
   490      ];
   491    };
-  492  
+  492
   493    /**
   494     * Run one call against the keys in turn.
   495     *
@@ -88,7 +88,7 @@ Why included: Rotates multiple free-tier keys on RATE_LIMIT; 10 s deadline floor
   535        })
   536      );
   537    };
-  538  
+  538
   539    return {
   540      code: GOOGLE_PROVIDER_CODE,
   541      capabilities: () => ({
@@ -112,4 +112,3 @@ Why included: Rotates multiple free-tier keys on RATE_LIMIT; 10 s deadline floor
   559          //
   560          // Floored: see geminiDeadlineMs. The abort signal above is what
 ```
-

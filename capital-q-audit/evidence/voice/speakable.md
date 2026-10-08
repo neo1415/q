@@ -12,7 +12,7 @@
   266      .replace(/ +([.,;:!?])/g, "$1")
   267      .trim();
   268  }
-  269  
+  269
   270  /** Markdown and machine punctuation → plain sentences. */
   271  export function speakable(text: string): string {
   272    return (
@@ -49,7 +49,7 @@
   303        .trim()
   304    );
   305  }
-  306  
+  306
   307  /** Bound a spoken answer to what a listener can take in (§66). */
   308  export function bounded(text: string, max = SPOKEN_MAX_CHARS): string {
   309    if (text.length <= max) {
@@ -69,20 +69,19 @@
   323      ? "The rest is on your screen."
   324      : `${kept} The rest is on your screen.`;
   325  }
-  326  
+  326
   327  /**
   328   * Split text into sentence-sized chunks, so a stream can be spoken as it
   329   * arrives and an interruption loses at most one sentence.
   330   */
   331  const SENTENCE_BOUNDARY = /(?<=[.!?…])\s+(?=[A-Z0-9"'(])/g;
-  332  
+  332
   333  export function sentences(text: string): readonly string[] {
   334    return text
   335      .split(SENTENCE_BOUNDARY)
   336      .map((part) => part.trim())
   337      .filter((part) => part.length > 0);
   338  }
-  339  
+  339
   340  /**
 ```
-

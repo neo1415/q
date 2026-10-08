@@ -5,7 +5,7 @@ Why included: Schema validation, actor/plan match, authorize step, fail-closed.
 ## `packages/q-tools/src/executor.ts` lines 25-40
 
 ```ts
-   25  /**
+25; /**
    26   * The tool execution pipeline (doc 12 §29; doc 15 §50-52):
    27   *
    28   *   model proposes → offered for THIS run? → schema validation of the
@@ -20,7 +20,7 @@ Why included: Schema validation, actor/plan match, authorize step, fail-closed.
    37   * sentence. What is logged: tool, version, status, code, latency, run.
    38   * What is never logged or returned: arguments, results, thrown messages.
    39   */
-   40  
+40;
 ```
 
 ## `packages/q-tools/src/executor.ts` lines 170-260
@@ -118,4 +118,3 @@ Why included: Schema validation, actor/plan match, authorize step, fail-closed.
   259                ),
   260              );
 ```
-

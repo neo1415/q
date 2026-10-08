@@ -1,4 +1,5 @@
 import {
+  UuidSchema,
   WORKFORCE_AGENT_ROLES,
   WORKFORCE_INSTRUCTION_STEP_STATUSES,
   WORKFORCE_TEAM_STATES,
@@ -22,6 +23,7 @@ import type {
   Owner,
   WorkforceStore,
 } from "./store.js";
+import type { AgentWorkQueue, WorkRow } from "./queue.js";
 
 /**
  * The workforce page's reads (founder brief J5, J6): the person's own jobs,
@@ -96,12 +98,47 @@ function money(value: string): string {
   return Number.isFinite(parsed) ? usd(parsed) : ZERO;
 }
 
+/**
+ * Recovery D6: the durable work row's state, why it stopped and where it
+ * came from -- the same fields "open the task that failed" and "why did it
+ * stop" read. Absent before a job was queued (instructions, errands).
+ */
+export function workFields(
+  row: WorkRow | undefined,
+): Pick<WorkforceJobSummaryDto, "workState" | "stoppedBecause" | "trace"> {
+  if (row === undefined) return {};
+  const ids = {
+    ...(isUuid(row.trace.conversationId)
+      ? { conversationId: row.trace.conversationId }
+      : {}),
+    ...(isUuid(row.trace.runId) ? { runId: row.trace.runId } : {}),
+  };
+  const stopped =
+    row.state === "FAILED" ||
+    row.state === "BLOCKED" ||
+    row.state === "CANCELLED" ||
+    row.state === "NEEDS_DECISION" ||
+    row.state === "RECOVERING";
+  return {
+    workState: row.state,
+    ...(stopped && row.reason !== null
+      ? { stoppedBecause: row.reason.slice(0, 500) }
+      : {}),
+    ...(Object.keys(ids).length > 0 ? { trace: ids } : {}),
+  };
+}
+
+const isUuid = (value: string | undefined): value is string =>
+  value !== undefined && UuidSchema.safeParse(value).success;
+
 function summary(
   job: JobRow,
   counts: { agents: number; drafts: number; held: number },
   costUsd: string,
+  work?: WorkRow,
 ): WorkforceJobSummaryDto {
   return {
+    ...workFields(work),
     id: job.id,
     goal: job.goal,
     source: job.source_kind,
@@ -151,8 +188,24 @@ export function createWorkforcePage(dependencies: {
   readonly monthlyLimitUsd?:
     ((owner: Owner) => Promise<number | null>) | undefined;
   readonly now?: (() => Date) | undefined;
+  /** Recovery D6: the durable work rows behind these jobs (the queue's). */
+  readonly work?: Pick<AgentWorkQueue, "forOwner"> | undefined;
 }) {
   const { store } = dependencies;
+
+  /** The work rows behind these jobs; unreadable is simply absent. */
+  async function workOf(
+    owner: Owner,
+    jobIds: readonly string[],
+  ): Promise<ReadonlyMap<string, WorkRow>> {
+    if (dependencies.work === undefined || jobIds.length === 0) {
+      return new Map();
+    }
+    const rows = await dependencies.work
+      .forOwner(owner, jobIds)
+      .catch((): readonly WorkRow[] => []);
+    return new Map(rows.map((row) => [row.job_id, row]));
+  }
 
   async function costsOf(
     owner: Owner,
@@ -214,10 +267,14 @@ export function createWorkforcePage(dependencies: {
       });
       const shown = rows.slice(0, page.limit);
       const { byJob } = await costsOf(owner, shown);
+      const work = await workOf(
+        owner,
+        shown.map((row) => row.id),
+      );
       const last = shown.at(-1);
       return {
         items: shown.map((row) =>
-          summary(row, row, usd(byJob.get(row.id) ?? 0)),
+          summary(row, row, usd(byJob.get(row.id) ?? 0), work.get(row.id)),
         ),
         nextCursor:
           rows.length > page.limit && last !== undefined
@@ -401,6 +458,7 @@ export function createWorkforcePage(dependencies: {
             held: held.length,
           },
           usd(byJob.get(detail.job.id) ?? 0),
+          (await workOf(owner, [detail.job.id])).get(detail.job.id),
         ),
         agents: detail.runs.slice(0, 200).map((run) => ({
           id: run.id,

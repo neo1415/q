@@ -227,7 +227,7 @@
  2076        }
  2077        // Anything else is them carrying on; the question is not asked again.
  2078      }
- 2079  
+ 2079
  2080      // "Change my website to …", "make us visible to investors" are not
  2081      // matched here from the words (ADR 0011/0016, as navigation is not):
  2082      // they reach Q like any turn, Q's reading names the change
@@ -291,7 +291,7 @@
  2140          ? { kind: "SPOKEN", path: "MOVE" }
  2141          : { kind: "INTERRUPTED", path: "MOVE" };
  2142      };
- 2143  
+ 2143
  2144      // "Take me to Discover" is no longer matched here from the words (ADR
  2145      // 0011, R20): it reaches Q like any turn, and the screen follows the
  2146      // navigation block Q's answer carries (askQ), exactly as typed.
@@ -326,4 +326,3 @@
  2175    return handle;
  2176  }
 ```
-

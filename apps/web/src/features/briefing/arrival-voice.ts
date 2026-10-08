@@ -1,5 +1,5 @@
 import { arrivalWords } from "./arrival";
-import { arrivalBriefingAction } from "./arrival-actions";
+import { loadArrival } from "./arrival-browser";
 import { arrivalForVoice } from "./arrival-store";
 
 /** How long a call waits for the briefing's reads before a plain hello. */
@@ -20,10 +20,7 @@ function browserZone(): string | null {
  * when the briefing could not be read in time.
  */
 export async function voiceBriefing(): Promise<string | null> {
-  const data = await arrivalForVoice(
-    (since) => arrivalBriefingAction(since),
-    VOICE_BRIEFING_WAIT_MS,
-  );
+  const data = await arrivalForVoice(loadArrival, VOICE_BRIEFING_WAIT_MS);
   if (data === null) return null;
   return arrivalWords(data, new Date(), browserZone()).spoken;
 }

@@ -62,6 +62,47 @@ export const QAnswerCardMeasureSchema = z
 export type QAnswerCardMeasure = z.infer<typeof QAnswerCardMeasureSchema>;
 
 /** Fit out of 10, computed by code from the known measures. */
+/**
+ * RECOVERY-2026-10 E4: where things are, at country level only (the
+ * platform holds an ISO 3166-1 alpha-2 head-office country and nothing
+ * finer). Shared by the MAP result block and an answer's own map. Places
+ * come from the run's authorised reads, never from a model's words; a
+ * subject whose location is not published is listed as such, never put
+ * on the map.
+ */
+export const Q_MAP_PLACES_MAX = 20;
+export const QMapPlaceSchema = z
+  .object({
+    /** What sits there, as the person may see it ("Apex Capital"). */
+    label: z.string().trim().min(1).max(80),
+    /** ISO 3166-1 alpha-2, upper case; null: not published. */
+    countryCode: z
+      .string()
+      .regex(/^[A-Z]{2}$/u)
+      .nullable(),
+    subject: QSubjectRefSchema.nullable(),
+    /** A few words beside the place ("Head office"). */
+    note: z.string().trim().max(80).nullable(),
+  })
+  .strict();
+export type QMapPlace = z.infer<typeof QMapPlaceSchema>;
+export const QMapSpecSchema = z
+  .object({
+    title: z.string().trim().min(1).max(120),
+    /** Where the places come from, said under the map. */
+    basis: z.string().trim().min(1).max(160),
+    places: z.array(QMapPlaceSchema).min(1).max(Q_MAP_PLACES_MAX),
+  })
+  .strict();
+export type QMapSpec = z.infer<typeof QMapSpecSchema>;
+
+/**
+ * Why a card fits, from what the other side publishes (Q.05): the
+ * discovery reasons and their published gate's criteria, written by code
+ * from a tool's authorised output. Never a private mandate.
+ */
+export const Q_ANSWER_CARD_FIT_BASIS_MAX = 5;
+
 export const QAnswerCardFitSchema = z
   .object({
     score: z.number().min(0).max(10),
@@ -104,6 +145,14 @@ export const QAnswerCardSchema = z
     sourceCount: z.number().int().min(0).max(100),
     /** The resolved record behind the card, when there is one. */
     subject: QSubjectRefSchema.nullable(),
+    /**
+     * E4: why it fits, from what they publish (code, from tool reads).
+     * Absent when nothing published was read.
+     */
+    fitBasis: z
+      .array(z.string().trim().min(1).max(160))
+      .max(Q_ANSWER_CARD_FIT_BASIS_MAX)
+      .optional(),
   })
   .strict();
 export type QAnswerCard = z.infer<typeof QAnswerCardSchema>;
@@ -119,6 +168,11 @@ export const QAnswerCardsBlockSchema = z
     followUps: z
       .array(z.string().trim().min(1).max(120))
       .max(Q_ANSWER_CARD_FOLLOW_UPS_MAX),
+    /**
+     * E4: where the cards' subjects are, when the run read it ("compare
+     * these investors and where they're based"). Absent otherwise.
+     */
+    map: QMapSpecSchema.optional(),
   })
   .strict()
   .refine(

@@ -31,7 +31,7 @@
    40    const stage = workingLabel(q.state);
    41    const nothing = !q.working && approval === null && questions.length === 0;
    42    if (nothing && quietWhenIdle) return null;
-   43  
+   43
    44    return (
    45      <section
    46        aria-label="Now"
@@ -44,7 +44,7 @@
    53            Q isn&apos;t working on anything, and nothing needs you.
    54          </p>
    55        ) : null}
-   56  
+   56
    57        {q.working ? (
    58          <div className="cq-q-now-item" data-q-now-task>
    59            <span className="flex min-w-0 flex-col">
@@ -66,7 +66,7 @@
    75            </button>
    76          </div>
    77        ) : null}
-   78  
+   78
    79        {approval !== null ? (
    80          // What Q has prepared and is waiting on (CQ-Q-008). The server's
    81          // own words for the exact payload the decision binds to; one yes
@@ -111,7 +111,7 @@
   120            </div>
   121          </div>
   122        ) : null}
-  123  
+  123
   124        {questions.map((question) => (
   125          <div
   126            key={question.question}
@@ -167,14 +167,14 @@
   394      return null;
   395    });
   396  }
-  397  
+  397
   398  /** The approvals still waiting on this person (their own, server-read). */
   399  export async function pendingQApprovalsAction(): Promise<
   400    QActionResult<readonly QPendingApproval[]>
   401  > {
   402    return run(async (session) => (await listPendingQApprovals(session)).items);
   403  }
-  404  
+  404
   405  /**
   406   * One approval as its requested approver may read it: what Q would do, to
   407   * whom, and the exact content the decision binds to (design-48: Q's work
@@ -189,7 +189,6 @@
   416    }
   417    return run((session) => getQApproval(session, approvalId.data));
   418  }
-  419  
+  419
   420  export async function rejectQApprovalAction(
 ```
-

@@ -6,19 +6,19 @@
 
 ```
     1  import { z } from "zod";
-    2  
+    2
     3  import type { EventRegistry } from "@capital-q/contracts";
     4  import type {
     5    TransactionContext,
     6    TransactionManager,
     7  } from "@capital-q/database";
-    8  
+    8
     9  import type { EventDispatcher } from "./dispatcher.js";
    10  import {
    11    createOutboxRetryPolicy,
    12    type OutboxRetryPolicy,
    13  } from "./retry-policy.js";
-   14  
+   14
    15  /**
    16   * Moves pending outbox rows onto the queue.
    17   *
@@ -41,12 +41,12 @@
    34   * dispatcher ever targets a broker outside this database, this publisher
    35   * needs leases and a different commit order -- do not paper over that.
    36   */
-   37  
+   37
    38  export const OUTBOX_DEFAULT_BATCH_SIZE = 25;
    39  export const OUTBOX_MAX_BATCH_SIZE = 100;
-   40  
+   40
    41  export type OutboxPublishOutcome = "PUBLISHED" | "FAILED" | "INVALID";
-   42  
+   42
    43  /** Safe to log: identifiers and counters, never payload. */
    44  export type OutboxPublishRecord = {
    45    readonly eventId: string;
@@ -59,7 +59,7 @@
    52    readonly error: string | undefined;
    53    readonly durationMs: number;
    54  };
-   55  
+   55
    56  export type PublishBatchResult = {
    57    readonly claimed: number;
    58    readonly published: number;
@@ -67,20 +67,20 @@
    60    readonly exhausted: number;
    61    readonly records: readonly OutboxPublishRecord[];
    62  };
-   63  
+   63
    64  export type OutboxPublisher = {
    65    readonly publishAvailable: (options?: {
    66      readonly limit?: number | undefined;
    67    }) => Promise<PublishBatchResult>;
    68  };
-   69  
+   69
    70  export type OutboxPublisherOptions = {
    71    readonly transactions: TransactionManager;
    72    readonly registry: EventRegistry;
    73    readonly dispatcher: EventDispatcher;
    74    readonly retryPolicy?: OutboxRetryPolicy | undefined;
    75  };
-   76  
+   76
    77  const ClaimedRowSchema = z.object({
    78    id: z.coerce.number().int(),
    79    event_id: z.string(),
@@ -91,9 +91,9 @@
    84    payload: z.unknown(),
    85  });
    86  type ClaimedRow = z.infer<typeof ClaimedRowSchema>;
-   87  
+   87
    88  const LAST_ERROR_MAX = 500;
-   89  
+   89
    90  /**
    91   * A bounded failure description. Codes are fixed; the detail is a short
    92   * classification, never a driver message (which can embed SQL or values).
@@ -102,7 +102,7 @@
    95    const text = detail === undefined ? code : `${code}: ${detail}`;
    96    return text.length > LAST_ERROR_MAX ? text.slice(0, LAST_ERROR_MAX) : text;
    97  }
-   98  
+   98
    99  function classifyDispatchFailure(error: unknown): string {
   100    if (typeof error === "object" && error !== null && "code" in error) {
   101      const { code } = error;
@@ -112,13 +112,13 @@
   105    }
   106    return error instanceof Error ? error.name : "unknown";
   107  }
-  108  
+  108
   109  export function createOutboxPublisher(
   110    options: OutboxPublisherOptions,
   111  ): OutboxPublisher {
   112    const { transactions, registry, dispatcher } = options;
   113    const policy = options.retryPolicy ?? createOutboxRetryPolicy();
-  114  
+  114
   115    async function markPublished(tx: TransactionContext, row: ClaimedRow) {
   116      await tx.sql`
   117        update events.outbox
@@ -127,7 +127,7 @@
   120               last_error = null
   121         where id = ${row.id}`;
   122    }
-  123  
+  123
   124    async function recordFailure(
   125      tx: TransactionContext,
   126      row: ClaimedRow,
@@ -143,14 +143,14 @@
   136         where id = ${row.id}`;
   137      return { attempt, exhausted: attempt >= policy.maxAttempts };
   138    }
-  139  
+  139
   140    return {
   141      publishAvailable: async (publishOptions = {}) => {
   142        const limit = Math.min(
   143          Math.max(1, publishOptions.limit ?? OUTBOX_DEFAULT_BATCH_SIZE),
   144          OUTBOX_MAX_BATCH_SIZE,
   145        );
-  146  
+  146
   147        return transactions.run(async (tx) => {
   148          const rawRows = await tx.sql`
   149            select o.id, o.event_id, o.tenant_id, o.event_type, o.event_version,
@@ -162,9 +162,9 @@
   155             order by o.id
   156             for update skip locked
   157             limit ${limit}`;
-  158  
+  158
   159          const records: OutboxPublishRecord[] = [];
-  160  
+  160
   161          for (const raw of rawRows) {
   162            const started = Date.now();
   163            const row = ClaimedRowSchema.parse(raw);
@@ -174,7 +174,7 @@
   167              eventVersion: row.event_version,
   168              tenantId: row.tenant_id,
   169            };
-  170  
+  170
   171            // A row that no longer validates against the supported registry is
   172            // a contract defect, not something to guess at. It follows the
   173            // same bounded retry path and then stays visible as stuck work.
@@ -194,7 +194,7 @@
   187              });
   188              continue;
   189            }
-  190  
+  190
   191            // The savepoint confines a failed send to its own row: the batch
   192            // transaction stays usable to record the failure and go on.
   193            try {
@@ -217,7 +217,7 @@
   210              });
   211              continue;
   212            }
-  213  
+  213
   214            await markPublished(tx, row);
   215            records.push({
   216              ...base,
@@ -228,7 +228,7 @@
   221              durationMs: Date.now() - started,
   222            });
   223          }
-  224  
+  224
   225          return {
   226            claimed: records.length,
   227            published: records.filter((r) => r.outcome === "PUBLISHED").length,
@@ -257,7 +257,7 @@
    11  import { PERMISSIONS_EVENTS } from "@capital-q/permissions/events";
    12  import { TAXONOMY_EVENTS } from "@capital-q/taxonomy/events";
    13  import { VERIFICATION_EVENTS } from "@capital-q/verification/events";
-   14  
+   14
    15  /**
    16   * The production event registry the worker validates outbox rows against.
    17   *
@@ -291,9 +291,9 @@
 
 ```
     1  import { randomUUID } from "node:crypto";
-    2  
+    2
     3  import { z } from "zod";
-    4  
+    4
     5  import {
     6    defineEvent,
     7    EventIdSchema,
@@ -307,7 +307,7 @@
    15    type CorrelationId,
    16    type EventDefinition,
    17  } from "@capital-q/contracts";
-   18  
+   18
    19  /**
    20   * Canonical Q action integration events (doc 22 §94-§95 naming; CQ-Q-008
    21   * §80-§81). Owner: the Approval Engine. CONFIDENTIAL: the existence of a
@@ -320,12 +320,12 @@
    28   * run's `q.approval.required` stream event and from the material-action
    29   * audit record, which serve different purposes and are never collapsed.
    30   */
-   31  
+   31
    32  export const Q_ACTION_EVENT_OWNER = "@capital-q/q-actions" as const;
    33  export const Q_ACTION_EVENT_PRODUCER = "capitalq://q-api/q/actions" as const;
-   34  
+   34
    35  const CONSUMERS = ["@capital-q/q", "@capital-q/intelligence"];
-   36  
+   36
    37  const base = {
    38    actionId: UuidSchema,
    39    runId: UuidSchema,
@@ -334,7 +334,7 @@
    42    riskClass: QActionClassSchema,
    43    actionStatus: QActionStatusSchema,
    44  };
-   45  
+   45
    46  export const QActionPreparedEvent = defineEvent({
    47    name: "q.action.prepared",
    48    version: 1,
@@ -347,7 +347,7 @@
    55    description:
    56      "Q proposed a consequential action and an approval was requested from a person. Nothing has executed.",
    57  });
-   58  
+   58
    59  export const QActionApprovedEvent = defineEvent({
    60    name: "q.action.approved",
    61    version: 1,
@@ -360,10 +360,9 @@
    68    description:
    69      "A person approved the exact proposed action. Approval is not execution; nothing has executed yet.",
    70  });
-   71  
+   71
    72  export const QActionRejectedEvent = defineEvent({
    73    name: "q.action.rejected",
    74    version: 1,
    75    owner: Q_ACTION_EVENT_OWNER,
 ```
-

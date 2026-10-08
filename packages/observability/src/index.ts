@@ -46,8 +46,22 @@ export {
   getMeter,
   getTracer,
   TELEMETRY_EXPORT_ENABLED,
+  telemetryExportRequested,
   type ObservabilityRuntime,
+  type TelemetryExportStatus,
+  type TelemetrySdk,
+  type TelemetrySdkLoader,
 } from "./telemetry.js";
+
+export {
+  FAILURE_CLASSES,
+  logQFailure,
+  setFailureSink,
+  type FailureClass,
+  type FailureLogger,
+  type FailureRecord,
+  type FailureSink,
+} from "./failure-log.js";
 
 export {
   LOG_LEVELS,

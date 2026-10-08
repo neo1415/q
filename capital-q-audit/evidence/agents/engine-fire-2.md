@@ -7,7 +7,7 @@
 ```ts
  2000                .material(actor, inScope(grant.data, people))
  2001                .catch(() => null);
- 2002  
+ 2002
  2003        // QA run 8a1d57b9: their question Q may not answer goes to the
  2004        // person at once, quoted (their words reach the person, never the
  2005        // planner), and is noted on /work. Once per message.
@@ -50,14 +50,14 @@
  2042            })
  2043            .catch(() => false);
  2044        }
- 2045  
+ 2045
  2046        await dependencies
  2047          .track?.(
  2048            { tenantId: row.tenant_id, userId: row.user_id },
  2049            { id: row.id, goal: row.goal_text },
  2050          )
  2051          .catch(() => undefined);
- 2052  
+ 2052
  2053        // Tensorgate, 8 Oct: conversations where they wrote last and no one
  2054        // has answered -- matched, not declined, no card of ours waiting, and
  2055        // not a question code already put to the person. Code's read only.
@@ -99,7 +99,7 @@
  2091            ownWords(transcripts.get(id)?.thread),
  2092          ]),
  2093        );
- 2094  
+ 2094
  2095        // Plan; validate; re-plan with the reasons at most twice -- and once
  2096        // more when a plan leaves a waiting reply unanswered (Tensorgate: the
  2097        // second kick's plan came back empty with Zino's message waiting).
@@ -282,7 +282,7 @@
  2274        // "Can't find founders" beside five found, "can't run every weekend"
  2275        // for the instruction that is the schedule): such lines are dropped.
  2276        plan = { ...plan, cannot: realCannots(plan.cannot) };
- 2277  
+ 2277
  2278        // Founder brief J2: the reviewer grades each message before it is
  2279        // sent or offered. A redraft is re-checked by code's own message
  2280        // rules; a draft that never passes becomes a refusal, recorded with

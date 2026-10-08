@@ -16,6 +16,7 @@
  */
 
 import { createFitComposition } from "./composition/fit.js";
+import { createAttentionSources } from "./composition/attention-sources.js";
 import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
 import {
   createPostgresTaxonomyAssignmentRepository,
@@ -103,9 +104,13 @@ import {
 import { createGoogleImageProvider } from "@capital-q/model-gateway/images/google";
 import { createOpenAIImageProvider } from "@capital-q/model-gateway/images/openai";
 import { createRealtimeVoiceGateway } from "@capital-q/model-gateway/realtime";
-import { createOpenAIRealtimeProvider } from "@capital-q/model-gateway/realtime/openai";
+import {
+  createOpenAIRealtimeProvider,
+  createOpenAISidebandConnector,
+} from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
 import { duplexConfigFrom } from "./voice/duplex/config.js";
+import { createDuplexSideband } from "./voice/duplex/sideband.js";
 import { createMemoryListeningStore } from "./voice/duplex/listening.js";
 import { createPostgresDuplexSpend } from "./voice/duplex/spend.js";
 import { createPostgresDuplexTranscriptStore } from "./voice/duplex/transcript.js";
@@ -165,7 +170,13 @@ import {
 import {
   createWorkforcePorts,
   workforceNotifier,
+  workforceResearch,
 } from "./composition/workforce/ports.js";
+import {
+  createPostgresAgentWorkQueue,
+  workforceJobStopPort,
+} from "./composition/workforce/queue.js";
+import { createAgentWorkRunner } from "./composition/workforce/runner.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
 import { createHeldRetry } from "./composition/workforce/held-retry.js";
@@ -180,6 +191,7 @@ import { createInstructionActions } from "./composition/instructions/actions.js"
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
 import {
   createInstructionActor,
+  createOwnerActor,
   createInstructionAsk,
 } from "./composition/instructions/ask.js";
 import {
@@ -248,7 +260,10 @@ import {
   type ModelDataPosture,
   type QViewingMoment,
 } from "@capital-q/contracts";
-import { createRequestDatabaseClient } from "@capital-q/database";
+import {
+  checkDatabaseReadiness,
+  createRequestDatabaseClient,
+} from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createOnboardingNudges,
@@ -315,7 +330,10 @@ import {
   Q_VOICE_WS_PATH,
 } from "@capital-q/contracts";
 import {
+  createDailySpendCap,
   createModelGateway,
+  createPostgresDailySpendReader,
+  parseDailySpendCapUsd,
   createModelProviderRegistry,
   createSyntheticDemoRoutingAllowance,
   createPostgresModelCatalog,
@@ -523,6 +541,11 @@ import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
 import { createElevenLabsPronunciationTeacher } from "./voice/providers/elevenlabs-pronunciation.js";
 import { createVoiceTurnBoard } from "./voice/turn-board.js";
 import { createQRoomFeed } from "./room/feed.js";
+import {
+  createUiActReceiptLedger,
+  receiptFacts,
+  recentUiActReceipts,
+} from "./http/ui-act-receipts.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
@@ -999,6 +1022,25 @@ const modelGateway = timedModelGateway(
     usage: createPostgresModelUsageRepository({ sql: database.sql }),
     health: createProcessLocalProviderHealth(),
     syntheticDemo,
+    // F-D8 (RECOVERY F5): one daily ceiling on everything the ledger
+    // counts, shared with the workers' gateway; unset means no cap.
+    spendCap: (() => {
+      const capUsd = parseDailySpendCapUsd(process.env);
+      return capUsd === undefined
+        ? undefined
+        : createDailySpendCap({
+            capUsd,
+            readSpentSinceUsd: createPostgresDailySpendReader({
+              sql: database.sql,
+            }),
+            onReadFailure: (error) => {
+              logger.warn(
+                { err: error, spendCap: "DAILY_AGGREGATE" },
+                "daily spend cap could not read the ledger; using the last total",
+              );
+            },
+          });
+    })(),
     logger,
   }),
   voiceTimings,
@@ -1454,14 +1496,19 @@ const workforcePortsFor = createWorkforcePorts(
         relationshipId: input.relationshipId,
         request: { kind: "TEXT", body: input.body },
         idempotencyKey: input.idempotencyKey,
+        // Recovery D-07: a job's message is marked as sent by Q.
+        ...(input.qDelegationId === undefined
+          ? {}
+          : { qDelegationId: input.qDelegationId }),
       }),
+    research: workforceResearch(researchComposition.research),
     writeReply: async (input) =>
       (
         await workforceWriter.compose({
           actor: input.actor,
           principalName: input.principalName,
           counterpartName: input.counterpartName,
-          brief: "",
+          brief: input.brief,
           callComing: input.callComing,
           thread: input.thread,
           correlationId: input.correlationId,
@@ -1503,6 +1550,9 @@ const workforceJobBoard = createWorkforceJobBoard({
   calendarConnected: async (actor) =>
     (await schedule.calendarStatus(actor.userId)) === "CONNECTED",
 });
+// Recovery D3: approved jobs as durable, leased work (the runner is
+// composed below, once the actor resolver exists).
+const agentWorkQueue = createPostgresAgentWorkQueue(database.sql);
 // end WORKFORCE block
 const emailBoard = createEmailActionBoard({
   review: outwardReview,
@@ -1887,6 +1937,8 @@ const instructionEngine: { current?: InstructionEngine } = {};
 const instructionTriggers = createInstructionTriggers({
   store: instructionStore,
   engine: () => instructionEngine.current,
+  // Recovery D-01: lapsed approvals expire eagerly, every sweep.
+  expireLapsed: () => qActions.expireLapsed?.() ?? Promise.resolve(0),
   logger,
 });
 setInterval(() => {
@@ -2222,6 +2274,8 @@ const investorGatesPort: InvestorGatesPort = {
   },
 };
 const appActionPorts: OwnReadPorts = {
+  // Recovery D6: "Stop this job", shared by Q and the Work screen.
+  workforceJobs: workforceJobStopPort(agentWorkQueue, workforceStore),
   readiness: readinessService,
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
   gateqInbox,
@@ -2478,6 +2532,9 @@ const qTools = createQTools({
     work: workPort,
     // WORKFORCE block (J1, J4): a job the lead Q plans, one approval.
     jobs: workforceJobBoard.port,
+    // RECOVERY B1: held drafts, stopped jobs, notices, data-room requests,
+    // new matches and Q's activity, for "what needs me".
+    attention: createAttentionSources({ sql: database.sql }),
     // ADMIN block
     results: {
       read: (actor, query) => ownResults.read(actor, resultsWindow(query)),
@@ -2602,8 +2659,10 @@ const qTools = createQTools({
             sql: database.sql,
           })
             .findDiscoverablePitches([companyId])
-            .catch(() => new Map())
-        ).get(companyId);
+            // Typed failure (not an untyped empty Map): an unreadable list
+            // is no pitches, and the lint keeps the read typed.
+            .catch(() => null)
+        )?.get(companyId);
         if (set === undefined) return null;
         const read = await Promise.all(
           [set, ...set.more].slice(0, 5).map(async (pitch) => {
@@ -3208,9 +3267,18 @@ const qActionRegistry = createQActionRegistry([
     meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // WORKFORCE block (J1, J4): a job the lead Q planned, run as approved.
-  ...createWorkforceJobActions({ jobsFor: workforceJobsFor, logger }).map(
-    (definition) =>
-      meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
+  ...createWorkforceJobActions({
+    jobsFor: workforceJobsFor,
+    // Recovery D3: approved jobs are durable work, claimed under a lease.
+    queue: agentWorkQueue,
+    kick: () => {
+      void agentWorkRunner.pass().catch((error: unknown) => {
+        logger.warn({ err: error }, "workforce job runner pass failed");
+      });
+    },
+    logger,
+  }).map((definition) =>
+    meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // ADR 0043: a standing instruction's grant, one approval per version.
   ...createInstructionActions({
@@ -3541,6 +3609,10 @@ const qReceipts: QReceiptPort = {
   },
 };
 const qIntelligence = composeQIntelligence({
+  // RECOVERY (C's request): what came of Q's recent screen acts, from the
+  // receipts ledger (composed further down; read only once turns run).
+  uiActReceipts: (actor) =>
+    receiptFacts(recentUiActReceipts(uiActReceipts, actor)),
   // Voice speculation (latency2): each spoken answer's adoption or
   // cancellation lands on its "voice turn timed" line and the metric.
   speculation: { observe: (event) => voiceTimings.speculated(event) },
@@ -3848,6 +3920,30 @@ const orphanSweep = createOrphanedRunSweep({
   logger,
 });
 await orphanSweep.sweep();
+
+// Recovery D3: the durable workforce runner. It claims approved jobs under a
+// lease, renews it while a job runs and resumes any job a restart left
+// behind once its lease lapses. Jobs finish without anyone connected.
+const agentWorkRunner = createAgentWorkRunner({
+  queue: agentWorkQueue,
+  store: workforceStore,
+  actorFor: (owner, organisationId) =>
+    createOwnerActor({
+      resolver: actorContextResolver,
+      authUserOf: async (userId) =>
+        (
+          await database.sql<{ auth_user_id: string | null }[]>`
+            select auth_user_id from identity.user_profiles where id = ${userId}`
+        )[0]?.auth_user_id ?? null,
+    })(owner.userId, organisationId),
+  jobsFor: workforceJobsFor,
+  logger,
+});
+setInterval(() => {
+  void agentWorkRunner.pass().catch((error: unknown) => {
+    logger.warn({ err: error }, "workforce job runner pass failed");
+  });
+}, 30_000).unref();
 setInterval(
   () => {
     orphanSweep.sweep().catch((error: unknown) => {
@@ -5313,6 +5409,7 @@ const voiceTurnBoard = createVoiceTurnBoard();
 // voice-cards: the person's Q room feed, beside the turn board (same
 // process, same lifetime): every run's answer, whichever path made it.
 const qRoom = createQRoomFeed({ qStream, logger });
+const uiActReceipts = createUiActReceiptLedger();
 const welcomeHost = createWelcomeHost({
   gateway: modelGateway,
   logger,
@@ -5486,6 +5583,17 @@ const duplexBroker =
             }),
         }),
         logger,
+        // RECOVERY A8: the server's own connection to each call, only when
+        // CQ_VOICE_REALTIME_SIDEBAND is on (off by default; not yet
+        // verified on a live call).
+        sideband: (onUsage) =>
+          createDuplexSideband({
+            connect: createOpenAISidebandConnector({
+              apiKey: providerSecrets.openai?.reveal() ?? "",
+            }),
+            logger,
+            onUsage,
+          }),
       })
     : undefined;
 logger.info(
@@ -5521,6 +5629,8 @@ const { app, logger: appLogger } = createApp(
     identity,
   },
   {
+    // RECOVERY F4 (A-04): readiness answers 503 when the database is down.
+    healthProbes: { database: () => checkDatabaseReadiness(database.sql) },
     qRuntime,
     artifacts: qArtifacts.service,
     documentStudio,
@@ -5559,6 +5669,8 @@ const { app, logger: appLogger } = createApp(
     workforce: {
       page: createWorkforcePage({
         store: workforceStore,
+        // Recovery D6: each job's durable work state, why it stopped, trace.
+        work: agentWorkQueue,
         costs: (owner, jobIds) =>
           createPostgresUsageReader(database.sql).workforceCosts(owner, jobIds),
         monthCosts: (owner, at) =>
@@ -5636,6 +5748,8 @@ const { app, logger: appLogger } = createApp(
     readinessBlueprints: readinessService,
     // end BILLING-2 block
     standing: standingStore,
+    // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
+    attention: qTools.attention,
     // DAILY block
     daily: dailyReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },
@@ -5643,6 +5757,8 @@ const { app, logger: appLogger } = createApp(
     continueApproved,
     qStream: { service: qStream },
     room: qRoom,
+    // RECOVERY-2026-10 (C): what came of Q's UI acts on the person's screen.
+    uiActReceipts,
     // Q as an MCP server, only where a deployment turned it on. The same
     // registry and pipeline a run uses; a different modality, no more
     // authority.

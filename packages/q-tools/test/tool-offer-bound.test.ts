@@ -51,6 +51,8 @@ const CORE = [
   "open_page",
   // Founder report 2026-09-30: scroll, go back, open a page's dialog.
   "control_screen",
+  // RECOVERY-2026-10 (C2): any registered control, with a receipt.
+  "operate_screen",
   "set_discover_filters",
   // Q room R4: a card in the room, asked for mid-anything.
   "show",
@@ -59,6 +61,8 @@ const CORE = [
   "approve_pending_proposal",
   "decline_pending_proposal",
   "list_pending_approvals",
+  // RECOVERY-2026-10 B1: "anything need me?" can come mid-anything.
+  "what_needs_me",
   // Setup reminders: "stop reminding me" must work whenever Q has said it.
   "set_onboarding_reminders",
   "continue_onboarding",

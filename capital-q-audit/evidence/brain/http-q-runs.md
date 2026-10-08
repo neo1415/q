@@ -16,7 +16,7 @@
   107        : requireActorContextOrPersonalHook({ ...dependencies, identity });
   108    const service = dependencies.qRuntime;
   109    const runPath = `${Q_RUNS_PATH}/:runId`;
-  110  
+  110
   111    app.post(Q_RUNS_PATH, { onRequest: withContext }, async (request, reply) => {
   112      const actor = getActorContext(request);
   113      const key = idempotencyKey(request, "start a Q request");
@@ -25,7 +25,7 @@
   116        request.body,
   117        "The Q request is not valid.",
   118      );
-  119  
+  119
   120      const correlationId = correlation();
   121      const result = await service.createRun({
   122        actor,
@@ -33,7 +33,7 @@
   124        idempotencyKey: key,
   125        correlationId,
   126      });
-  127  
+  127
   128      // Orchestration begins detached from the request, once per created run
   129      // (a replayed retry never starts it twice). Its outcome is the run's
   130      // canonical lifecycle, read back through GET; an engine failure is
@@ -50,7 +50,7 @@
   141            );
   142          });
   143      }
-  144  
+  144
   145      if (result.created) {
   146        dependencies.room?.watchRun({
   147          actor,
@@ -59,7 +59,7 @@
   150          correlationId,
   151        });
   152      }
-  153  
+  153
   154      // 202: durably accepted, not analysed. A replayed retry gets the same
   155      // handle and the same status, because it is the same logical run.
   156      return withObservabilityContext({ qRunId: result.run.id }, () =>
@@ -70,7 +70,7 @@
   161          .send(CreateQRunResponseSchema.parse(toQRunHandle(result.run))),
   162      );
   163    });
-  164  
+  164
   165    app.get(runPath, { onRequest: withContext }, async (request, reply) => {
   166      const result = await service.getRun({
   167        actor: getActorContext(request),
@@ -80,7 +80,7 @@
   171        .header("Cache-Control", "no-store")
   172        .send(QRunSummarySchema.parse(result.summary));
   173    });
-  174  
+  174
   175    app.post(
   176      `${runPath}${Q_RUN_MESSAGES_SUFFIX}`,
   177      { onRequest: withContext },
@@ -92,7 +92,7 @@
   183          request.body,
   184          "The message is not valid.",
   185        );
-  186  
+  186
   187        const result = await service.appendMessage({
   188          actor,
   189          runId: runIdParam(request),
@@ -100,7 +100,7 @@
   191          idempotencyKey: key,
   192          correlationId: correlation(),
   193        });
-  194  
+  194
   195        // Stored, not answered. Nothing replies until an orchestrator exists.
   196        return reply
   197          .code(result.created ? 201 : 200)
@@ -112,7 +112,7 @@
   203          );
   204      },
   205    );
-  206  
+  206
   207    app.post(
   208      `${runPath}${Q_RUN_CANCEL_SUFFIX}`,
   209      { onRequest: withContext },

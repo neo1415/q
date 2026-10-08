@@ -41,10 +41,9 @@
   133     */
   134    CQ_TEST_MODEL_PROVIDER: z.string().trim().max(32).optional(),
   135  };
-  136  
+  136
   137  export type ModelProviderSecrets = {
   138    /**
   139     * The operator asked this deployment to route attested synthetic demo
   140     * material by doc 15 §62. Not a secret and not authority: the gateway
 ```
-

@@ -47,6 +47,7 @@ export function recordAudienceTool(utterance: string): string | null {
 }
 import {
   type QNavigateDestination,
+  type QPageManifest,
   type QResponseMessage,
   type QResultBlock,
   type QVisibleStage,
@@ -61,6 +62,7 @@ import {
   researchDirectiveFor,
   stepQuestionSequence,
   unclearTurnReply,
+  spokenUnclearReply,
   naturalPlaceLine,
   spokenFactsOf,
   withoutRecommendationClaims,
@@ -111,7 +113,11 @@ import type {
   QSpecialistProbe,
   QSpecialistTurnReading,
 } from "./contracts.js";
-import { actOnHandOver, type QHandOverPort } from "./hand-over.js";
+import {
+  actOnHandOver,
+  type HandOverSubject,
+  type QHandOverPort,
+} from "./hand-over.js";
 import {
   actOnDelegation,
   DELEGATION_CANDIDATE,
@@ -128,6 +134,116 @@ import {
   type LastAction,
   type QOpenRecordPort,
 } from "./references.js";
+import {
+  CORE_LOAD_DEADLINE_MS,
+  loadWithin,
+  readCoreSnapshot,
+  type ConversationCoreScope,
+  type ConversationCoreStore,
+} from "./conversation-core.js";
+import {
+  asksToOperate,
+  controlBindingOf,
+  focusFromHistory,
+  listsFromHistory,
+  listsFromManifest,
+  referenceAskOf,
+  resolutionNote,
+  resolveReference,
+  type ControlBinding,
+  type ReferenceAsk,
+  type ResolvedReference,
+} from "./conversation-entities.js";
+
+/** B6: a reference in the turn, bound to records, with its note. */
+type PointedAt = {
+  readonly ask: ReferenceAsk | null;
+  /** Null: bound to one of the page's controls, said in `note`. */
+  readonly resolved: ResolvedReference | null;
+  readonly note: string;
+  readonly control?: ControlBinding | undefined;
+};
+
+/** B6: "him" / "them" bound to an organisation, as a hand-over subject. */
+function handOverSubjectPointed(
+  pointed: PointedAt | null,
+): HandOverSubject | null {
+  if (pointed === null || pointed.ask?.kind !== "COUNTERPART") return null;
+  if (pointed.resolved?.kind !== "ONE") return null;
+  const entity = pointed.resolved.entity;
+  if (entity.kind === "COMPANY") {
+    return { kind: "COMPANY", companyId: entity.id };
+  }
+  if (entity.kind === "INVESTOR_ORGANISATION") {
+    return { kind: "INVESTOR_ORGANISATION", investorOrganisationId: entity.id };
+  }
+  return null;
+}
+
+/** The reader's [Q context] note with the binding first (it is bounded). */
+function withResolution(
+  note: string | null,
+  pointed: PointedAt | null,
+): string | null {
+  if (pointed === null) return note;
+  const rest = note === null ? "" : note.replace(/^\[Q context\]\s*/u, " ");
+  return `[Q context] ${pointed.note}${rest}`.slice(0, 400);
+}
+
+function pointedAt(
+  text: string,
+  history: readonly QConversationMessage[],
+  manifest: QPageManifest | null | undefined,
+): PointedAt | null {
+  const ask = referenceAskOf(text);
+  if (ask !== null) {
+    const latestQ = [...history].reverse().find((one) => one.role === "Q");
+    const resolved = resolveReference(ask, {
+      page: listsFromManifest(manifest),
+      answers: listsFromHistory(history),
+      answerIsNewest: (latestQ?.blocks ?? []).some(
+        (block) => block.kind === "ANSWER_CARDS",
+      ),
+      focus: focusFromHistory(history),
+    });
+    if (resolved !== null) {
+      return { ask, resolved, note: resolutionNote(ask, resolved) };
+    }
+  }
+  // C's request: the page's own controls ("open the readiness tab", "the
+  // second one" on a list the page registered without record refs).
+  const control = controlBindingOf(text, manifest?.controls);
+  return control === null
+    ? null
+    : { ask, resolved: null, note: control.note, control };
+}
+
+import { randomUUID } from "node:crypto";
+
+/** The act on the page's own control, with a fresh act id for its receipt. */
+function controlActBlock(control: ControlBinding): QResultBlock {
+  return {
+    kind: "UI_INTENT",
+    intent: {
+      kind: "UI_ACT",
+      actId: `uia_${randomUUID().replace(/-/gu, "").slice(0, 24)}`,
+      act: control.act,
+      target: control.target,
+      ...(control.index === undefined ? {} : { index: control.index }),
+    },
+  };
+}
+
+/** What Q says as it works a control (never that it is done: the receipt says). */
+function controlActLine(control: ControlBinding): string {
+  const name = (control.target.split(".").at(-1) ?? "").replace(/-/gu, " ");
+  if (control.act === "SELECT_TAB") return `Opening the ${name} tab.`;
+  if (control.act === "SELECT_ITEM") {
+    return `Opening number ${String(control.index ?? 1)}.`;
+  }
+  if (control.act === "SCROLL_TO") return `Taking you to ${name}.`;
+  return `Working the ${name} control.`;
+}
 import {
   cannotOpenLine,
   cardAt,
@@ -339,6 +455,12 @@ export type SpecialistQAnswerDependencies = {
    * own tools decide, as before.
    */
   readonly handOver?: QHandOverPort | undefined;
+  /**
+   * RECOVERY-2026-10 B3: where the conversation core's state outlives the
+   * process (unclear count, last action, question series, tool focus).
+   * Absent: memory only, as before.
+   */
+  readonly coreState?: ConversationCoreStore | undefined;
   /**
    * Work handed over in general (QA 2026-10-03): prepares a standing
    * instruction. Absent: such a turn is answered as before.
@@ -1675,6 +1797,55 @@ export function createSpecialistQAnswer(
     };
   };
 
+  /** B6: the reference each run's words were bound to, for its answer. */
+  const resolvedInRun = new Map<string, string>();
+  const withReferences = (request: QAnswerRequest): QAnswerRequest => {
+    const note = resolvedInRun.get(request.runId);
+    return note === undefined || request.references !== undefined
+      ? request
+      : { ...request, references: note };
+  };
+  const openPointedRecord = (
+    text: string,
+    pointed: PointedAt,
+    capabilities: readonly QCapability[],
+  ): {
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+  } | null => {
+    if (manifestOf(capabilities).navigate.length === 0) return null;
+    const { ask, resolved } = pointed;
+    if (ask?.kind !== "ORDINAL" || resolved?.kind !== "ONE") return null;
+    // An open request ("open the second one") or a correction of what was
+    // opened ("not that investor, the second one"); "explain the second
+    // one" is a question, answered with the binding as a note instead.
+    if (ordinalOf(text) === null && !ask.correction) return null;
+    // Q's own company cards: the existing card path talks about the card.
+    if (
+      resolved.via === "Q_ANSWER" &&
+      resolved.entity.kind === "COMPANY" &&
+      !ask.correction
+    ) {
+      return null;
+    }
+    const page =
+      resolved.entity.kind === "COMPANY"
+        ? ("COMPANY" as const)
+        : resolved.entity.kind === "INVESTOR_ORGANISATION"
+          ? ("INVESTOR" as const)
+          : null;
+    if (page === null) return null;
+    return {
+      said: openingLine(page, resolved.entity.name ?? undefined),
+      blocks: [
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "OPEN_RECORD_PAGE", page, id: resolved.entity.id },
+        },
+      ],
+    };
+  };
+
   /** Unclear turns in a row, per conversation (bounded with the rest). */
   const unclearInARow = new Map<string, number>();
   /** Runs answering their likely words (TURN_READER v44): never twice. */
@@ -1688,6 +1859,63 @@ export function createSpecialistQAnswer(
   const sequences = new Map<string, QuestionSequence>();
   /** The last turn's tool focus per conversation, bounded like the rest. */
   const focuses = new Map<string, QToolFocus>();
+
+  /**
+   * RECOVERY-2026-10 B3 (audit B-02): the core's state, kept durable when a
+   * store is composed. Read once per conversation per process (memory is
+   * the first read after that); written after every turn. A failed or slow
+   * store leaves the turn on memory, never fails it.
+   */
+  const coreStore = dependencies.coreState;
+  const hydrated = new Set<string>();
+  const scopeOfRun = new Map<string, ConversationCoreScope>();
+  const hydrate = async (scope: ConversationCoreScope): Promise<void> => {
+    if (coreStore === undefined || hydrated.has(scope.conversationId)) return;
+    hydrated.add(scope.conversationId);
+    while (hydrated.size > MAX_CONVERSATIONS) {
+      const oldest = hydrated.values().next().value;
+      if (oldest === undefined) break;
+      hydrated.delete(oldest);
+    }
+    const snapshot = readCoreSnapshot(
+      await loadWithin(coreStore.load(scope), CORE_LOAD_DEADLINE_MS),
+    );
+    if (snapshot === null) return;
+    const id = scope.conversationId;
+    // What this process already knows is newer than the stored copy.
+    if (!unclearInARow.has(id) && snapshot.unclearInARow > 0) {
+      unclearInARow.set(id, snapshot.unclearInARow);
+    }
+    if (!lastActed.has(id) && snapshot.lastAction !== null) {
+      lastActed.set(id, snapshot.lastAction);
+    }
+    if (!sequences.has(id) && snapshot.sequence !== null) {
+      sequences.set(id, snapshot.sequence);
+    }
+    if (!focuses.has(id) && snapshot.focus !== null) {
+      focuses.set(id, snapshot.focus);
+    }
+  };
+  const persistCore = async (runId: string): Promise<void> => {
+    const scope = scopeOfRun.get(runId);
+    scopeOfRun.delete(runId);
+    if (coreStore === undefined || scope === undefined) return;
+    const id = scope.conversationId;
+    await coreStore
+      .save(scope, {
+        v: 1,
+        unclearInARow: unclearInARow.get(id) ?? 0,
+        lastAction: lastActed.get(id) ?? null,
+        sequence: sequences.get(id) ?? null,
+        focus: focuses.get(id) ?? null,
+      })
+      .catch((error: unknown) => {
+        logger?.warn(
+          { err: error, qRunId: runId },
+          "the conversation core's state was not saved; memory keeps it",
+        );
+      });
+  };
   const keepSequence = (
     conversationId: string,
     next: QuestionSequence | null,
@@ -2055,6 +2283,15 @@ export function createSpecialistQAnswer(
     // a list of yes and no words. The two readings are made per turn.
     const decideAfterReading = decide;
     const speculative: { current: Speculation | null } = { current: null };
+    // B3: the core's state as the last turn left it, on whichever instance.
+    const coreScope = { tenantId: request.tenantId, conversationId };
+    scopeOfRun.set(request.runId, coreScope);
+    while (scopeOfRun.size > PREREADS_MAX) {
+      const oldest = scopeOfRun.keys().next().value;
+      if (oldest === undefined) break;
+      scopeOfRun.delete(oldest);
+    }
+    await hydrate(coreScope);
     const outcome = await answerTurnRead(
       request,
       history,
@@ -2070,6 +2307,7 @@ export function createSpecialistQAnswer(
       // adopted): nothing of it is said, stored or done.
       speculative.current?.cancel("ACTED");
     });
+    await persistCore(request.runId);
     // One status per card per answer: a card this turn handed to the
     // engine is named by the engine's own line, never also "still waiting".
     const prepared = preparedThisRun.get(request.runId);
@@ -2179,6 +2417,72 @@ export function createSpecialistQAnswer(
     // What Q showed and last did, for "that one" and "try again".
     const shown = shownItems(history);
     const lastAction = lastActed.get(conversationId) ?? null;
+    // RECOVERY-2026-10 B6: what the words point at ("the second one", "not
+    // that investor, the second one", "compare those two", "go back…",
+    // "book a meeting with him"), bound by code to records on their page,
+    // in Q's lists or in the conversation's focus. Null: not a reference.
+    const pointed = pointedAt(
+      latest.content,
+      history,
+      // The plan's screen: what the firewall kept of the page.
+      request.plan.screen?.manifest,
+    );
+    if (pointed !== null) {
+      resolvedInRun.set(request.runId, pointed.note);
+      while (resolvedInRun.size > PREREADS_MAX) {
+        const oldest = resolvedInRun.keys().next().value;
+        if (oldest === undefined) break;
+        resolvedInRun.delete(oldest);
+      }
+      logger?.info(
+        {
+          qRunId: request.runId,
+          ask: pointed.ask?.kind ?? "CONTROL",
+          via:
+            pointed.resolved === null
+              ? "CONTROL"
+              : pointed.resolved.kind === "ONE"
+                ? pointed.resolved.via
+                : "PAIR",
+        },
+        "q bound a reference",
+      );
+    }
+    // "Open the second one" / "not that investor, the second one": a record
+    // on their page or in Q's list, opened by code. Q's own company cards
+    // keep their richer path below (talked about from the card).
+    const openedByReference =
+      pointed === null
+        ? null
+        : openPointedRecord(latest.content, pointed, capabilities);
+    if (openedByReference !== null) {
+      return recordAnswer(
+        request,
+        conversationId,
+        openedByReference.said,
+        openedByReference.blocks,
+      );
+    }
+    // "Open the readiness tab", "open the second one" on this page: a
+    // control the page registered, worked here by code (before the page
+    // table, which would navigate away). The screen reports a receipt;
+    // the line says what Q is doing, never that it is done.
+    if (pointed?.control !== undefined && asksToOperate(latest.content)) {
+      logger?.info(
+        {
+          qRunId: request.runId,
+          act: pointed.control.act,
+          target: pointed.control.target,
+        },
+        "q is working a control on their page",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        controlActLine(pointed.control),
+        [controlActBlock(pointed.control)],
+      );
+    }
     // A bare screen command ("scroll down", "go back") is done at once in
     // code, like the wake words: it needs no reading, no model and no view
     // of the screen (founder 2026-10-06: Q said it could not scroll
@@ -2277,7 +2581,7 @@ export function createSpecialistQAnswer(
             correlationId: request.correlationId,
             signal: request.signal,
           },
-          referenceNote(shown, lastAction),
+          withResolution(referenceNote(shown, lastAction), pointed),
         ),
       );
     // Read early, beside the firewall (ADR 0035), with the same words, the
@@ -2442,11 +2746,13 @@ export function createSpecialistQAnswer(
     if (read !== null && isUnclearTurn(read)) {
       const before = unclearInARow.get(conversationId) ?? 0;
       unclearInARow.set(conversationId, before + 1);
-      // Spoken, an unclear turn is almost always the room, not the
-      // person: asking "say that again?" to background noise is Q talking
-      // to itself. Typed, it is a real message worth one prompt.
+      // RECOVERY-2026-10 (live T1): a spoken turn reaching here was read as
+      // addressed to Q (speech for the room was marked not-for-Q above and
+      // is the only silent case), so it always gets a short prompt.
+      // Silence lost the turn and let the realtime voice improvise for Q.
+      // Typed: one prompt, then quiet, as before.
       const reply = spoken
-        ? ({ kind: "SILENT" } as const)
+        ? spokenUnclearReply(read, before)
         : unclearTurnReply(read, before);
       logger?.info(
         { qRunId: request.runId, unclearInARow: before + 1, reply: reply.kind },
@@ -2871,7 +3177,7 @@ export function createSpecialistQAnswer(
       const handed = await actOnHandOver(
         dependencies.handOver,
         request,
-        read.handOver,
+        { ...read.handOver, pointed: handOverSubjectPointed(pointed) },
         read.timeWindow ?? null,
       ).catch((error: unknown) => {
         logger?.warn(
@@ -3107,13 +3413,13 @@ export function createSpecialistQAnswer(
       route.ownRecords === true ||
       !specialist.supports(probe)
     ) {
-      return delegate.answer(request);
+      return delegate.answer(withReferences(request));
     }
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
     );
     if (company === undefined || company.kind !== "COMPANY") {
-      return delegate.answer(request);
+      return delegate.answer(withReferences(request));
     }
 
     last = null;

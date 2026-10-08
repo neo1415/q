@@ -6,7 +6,7 @@
 
 ```
     1  import { randomUUID } from "node:crypto";
-    2  
+    2
     3  import {
     4    Q_ROOM_HOLD_MS,
     5    Q_ROOM_KEPT,
@@ -20,7 +20,7 @@
    13  import type { Logger } from "@capital-q/observability";
    14  import type { QRunStreamService } from "@capital-q/q-runtime";
    15  import type { ActorContext } from "@capital-q/security";
-   16  
+   16
    17  /**
    18   * The person's Q room feed (voice-cards, founder 2026-10-08).
    19   *
@@ -44,14 +44,14 @@
    37   * epoch changed starts again. Nothing here is authority; an entry is the
    38   * person's own recorded answer, read back under their own session.
    39   */
-   40  
+   40
    41  export type QRoomPublish = {
    42    readonly runId: string;
    43    readonly conversationId: string | null;
    44    readonly source: QRoomSource;
    45    readonly message: QResponseMessage;
    46  };
-   47  
+   47
    48  export type QRoomFeed = {
    49    readonly epoch: string;
    50    readonly publish: (actor: ActorContext, entry: QRoomPublish) => void;
@@ -77,7 +77,7 @@
    70      readonly correlationId?: CorrelationId | undefined;
    71    }) => void;
    72  };
-   73  
+   73
    74  type Room = {
    75    sequence: number;
    76    readonly entries: QRoomEntry[];
@@ -85,16 +85,16 @@
    78    lastReadAt: number;
    79    readers: number;
    80  };
-   81  
+   81
    82  /** A reader that read within this long still counts as watching. */
    83  const WATCHING_MS = 60_000;
    84  /** A typed run followed for at most this long. */
    85  const WATCH_RUN_MS = 5 * 60_000;
    86  /** Rooms nobody has read or written for this long are forgotten. */
    87  const FORGET_MS = 2 * 60 * 60_000;
-   88  
+   88
    89  const keyOf = (actor: ActorContext) => `${actor.tenantId}:${actor.userId}`;
-   90  
+   90
    91  export function createQRoomFeed(
    92    dependencies: {
    93      readonly qStream?: QRunStreamService | undefined;
@@ -105,7 +105,7 @@
    98    const now = dependencies.now ?? Date.now;
    99    const epoch = randomUUID();
   100    const rooms = new Map<string, Room>();
-  101  
+  101
   102    const roomOf = (actor: ActorContext): Room => {
   103      const key = keyOf(actor);
   104      let room = rooms.get(key);
@@ -127,10 +127,10 @@
   120      }
   121      return room;
   122    };
-  123  
+  123
   124    const after = (room: Room, cursor: number) =>
   125      room.entries.filter((entry) => entry.sequence > cursor);
-  126  
+  126
   127    const publish: QRoomFeed["publish"] = (actor, entry) => {
   128      const room = roomOf(actor);
   129      // One entry per answer: a run's answer published twice (the voice
@@ -154,7 +154,7 @@
   147      room.lastReadAt = Math.max(room.lastReadAt, now());
   148      for (const listener of room.listeners) listener();
   149    };
-  150  
+  150
   151    const watched: QRoomFeed["watched"] = (actor) => {
   152      const room = rooms.get(keyOf(actor));
   153      return (
@@ -162,12 +162,12 @@
   155        (room.readers > 0 || now() - room.lastReadAt < WATCHING_MS)
   156      );
   157    };
-  158  
+  158
   159    return {
   160      epoch,
   161      publish,
   162      watched,
-  163  
+  163
   164      read: async ({
   165        actor,
   166        after: cursorIn,
@@ -210,7 +210,7 @@
   203        }
   204        return answer();
   205      },
-  206  
+  206
   207      watchRun: ({ actor, runId, conversationId, correlationId }) => {
   208        const qStream = dependencies.qStream;
   209        if (qStream === undefined || !watched(actor)) return;
@@ -265,7 +265,7 @@
 
 ```
     1  import type { FastifyInstance } from "fastify";
-    2  
+    2
     3  import {
     4    parseContract,
     5    Q_ROOM_PATH,
@@ -273,7 +273,7 @@
     7    QRoomReadSchema,
     8  } from "@capital-q/contracts";
     9  import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
-   10  
+   10
    11  import {
    12    getActorContext,
    13    requireActorContextHook,
@@ -281,7 +281,7 @@
    15    type ActorContextDependencies,
    16  } from "../security/actor-context.js";
    17  import type { QRoomFeed } from "./feed.js";
-   18  
+   18
    19  /**
    20   * `GET /v1/q/room` (voice-cards): the person's own Q room feed, as a long
    21   * poll. A normal protected request: the actor is resolved on the server,
@@ -300,7 +300,7 @@
    34      identity === undefined
    35        ? requireActorContextHook(dependencies)
    36        : requireActorContextOrPersonalHook({ ...dependencies, identity });
-   37  
+   37
    38    app.get(Q_ROOM_PATH, { onRequest: withContext }, async (request, reply) => {
    39      const query = parseContract(
    40        QRoomReadQuerySchema,
@@ -334,13 +334,13 @@
 
 ```
     1  import { NextResponse } from "next/server";
-    2  
+    2
     3  import { readQRoom } from "@capital-q/api-client";
     4  import { loadWebServerConfig } from "@capital-q/config/web";
     5  import { QRoomReadQuerySchema } from "@capital-q/contracts";
-    6  
+    6
     7  import { getSessionAccessToken } from "@/auth/session";
-    8  
+    8
     9  /**
    10   * voice-cards: the person's Q room feed, for the Q page and every page's
    11   * dock while a voice line is open. A route, not a server action: server
@@ -349,13 +349,13 @@
    14   * authority; the Q API answers with the session's own person's room.
    15   */
    16  export const dynamic = "force-dynamic";
-   17  
+   17
    18  const empty = (status: number) =>
    19    NextResponse.json(
    20      { entries: [], unavailable: true },
    21      { status, headers: { "cache-control": "no-store" } },
    22    );
-   23  
+   23
    24  export async function GET(request: Request): Promise<NextResponse> {
    25    const url = new URL(request.url);
    26    const query = QRoomReadQuerySchema.safeParse(
@@ -383,4 +383,3 @@
    48    }
    49  }
 ```
-

@@ -186,6 +186,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'daily_preferences',        'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'etiquette_guide_versions', 'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'workforce_jobs', 'RLS_REQUIRED', '{SELECT}'),
+  -- RECOVERY D3: the durable agent work queue; owners read their own rows, suite 892.
+  ('q_runtime', 'agent_work_queue', 'RLS_REQUIRED', '{SELECT}'),
   ('q_runtime', 'workforce_agent_runs', 'RLS_REQUIRED', '{SELECT}'),
   ('q_runtime', 'workforce_handoffs', 'RLS_REQUIRED', '{SELECT}'),
   ('q_runtime', 'workforce_drafts', 'RLS_REQUIRED', '{SELECT}'),

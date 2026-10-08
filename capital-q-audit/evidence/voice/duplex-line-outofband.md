@@ -60,11 +60,11 @@
  1862        }
  1863      })();
  1864    }
- 1865  
+ 1865
  1866    #offline(): boolean {
  1867      return this.#env.isOnline?.() === false && this.#env.onOnline !== undefined;
  1868    }
- 1869  
+ 1869
  1870    /**
  1871     * W7: resolves true once the browser is back online, false when the
  1872     * wait no longer matters (the ask_q finished, the line ended) or ran
@@ -98,7 +98,7 @@
  1900        look();
  1901      });
  1902    }
- 1903  
+ 1903
  1904    /** One beat, in fixed words, out of band: nothing enters the conversation. */
  1905    #sayBeat(beat: QSilenceBeat): void {
  1906      if (beat.kind === "TONE") return;
@@ -115,7 +115,7 @@
  1917      });
  1918      this.#updateBusy();
  1919    }
- 1920  
+ 1920
  1921    /** The answer is slow: one short line, from their own request. */
  1922    #fireBridge(request: string): void {
  1923      const listening = this.#credential.listening;
@@ -135,7 +135,7 @@
  1937      });
  1938      this.#updateBusy();
  1939    }
- 1940  
+ 1940
  1941    #sendOutOfBand(
  1942      oob: OutOfBand,
  1943      input: {
@@ -160,7 +160,7 @@
  1962        },
  1963      });
  1964    }
- 1965  
+ 1965
  1966    #outOfBandOf(event: unknown): OutOfBand | undefined {
  1967      const response = field(event, "response");
  1968      const responseId = text(event, "response_id") ?? text(response, "id");
@@ -171,7 +171,7 @@
  1973      const id = text(field(response, "metadata"), "cq_id");
  1974      return id === undefined ? undefined : this.#oob.get(id);
  1975    }
- 1976  
+ 1976
  1977    /** True when the event belonged to a reaction or a bridge. */
  1978    #receiveOutOfBand(type: string, event: unknown): boolean {
  1979      if (
@@ -264,7 +264,7 @@
  2066      }
  2067      return true;
  2068    }
- 2069  
+ 2069
  2070    /** Done and heard (or cut): forget it, and release a held answer. */
  2071    #settle(oob: OutOfBand): void {
  2072      if (!(oob.done && oob.audioDone)) return;
@@ -272,12 +272,12 @@
  2074      this.#updateBusy();
  2075      if (oob.kind === "BRIDGE") this.#releaseAnswer();
  2076    }
- 2077  
+ 2077
  2078    #forget(oob: OutOfBand): void {
  2079      this.#oob.delete(oob.id);
  2080      if (oob.responseId !== null) this.#oobByResponse.delete(oob.responseId);
  2081    }
- 2082  
+ 2082
  2083    #cancel(oob: OutOfBand): void {
  2084      oob.cancelled = true;
  2085      if (oob.responseId !== null) {
@@ -292,7 +292,7 @@
  2094        this.#send({ type: "output_audio_buffer.clear" });
  2095      }
  2096    }
- 2097  
+ 2097
  2098    /** Cut reactions (or all out-of-band speech): the person is talking. */
  2099    #cutOutOfBand(kind: OutOfBand["kind"] | null): void {
  2100      const waiting = this.#awaitingCommit;
@@ -314,7 +314,7 @@
  2116      // A bridge that was cut no longer holds Q's answer back.
  2117      if (bridgeCut) this.#releaseAnswer();
  2118    }
- 2119  
+ 2119
  2120    /** Q's answer waits for a bridge that is still being said. */
  2121    #afterBridge(send: () => void): void {
  2122      let bridging = false;
@@ -330,7 +330,7 @@
  2132      }, BRIDGE_HOLD_MS);
  2133      this.#heldAnswer = { send, timer };
  2134    }
- 2135  
+ 2135
  2136    #releaseAnswer(): void {
  2137      const held = this.#heldAnswer;
  2138      if (held === null) return;
@@ -339,4 +339,3 @@
  2141      held.send();
  2142    }
 ```
-

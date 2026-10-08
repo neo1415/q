@@ -46,6 +46,7 @@ import { COMPANY_ANALYST_V18 } from "./tasks/company-analyst.v18.js";
 import { COMPANY_ANALYST_V19 } from "./tasks/company-analyst.v19.js";
 import { COMPANY_ANALYST_V20 } from "./tasks/company-analyst.v20.js";
 import { COMPANY_ANALYST_V21 } from "./tasks/company-analyst.v21.js";
+import { COMPANY_ANALYST_V22 } from "./tasks/company-analyst.v22.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -117,6 +118,7 @@ import {
   DRAFT_REVIEW_V2,
   DRAFT_REVIEW_V3,
   JOB_PLAN_V1,
+  JOB_PLAN_V2,
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
@@ -394,6 +396,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     COMPANY_ANALYST_V19,
     COMPANY_ANALYST_V20,
     COMPANY_ANALYST_V21,
+    COMPANY_ANALYST_V22,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
     ARTIFACT_REVISION_V3,
@@ -461,6 +464,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DRAFT_REDRAFT_V3,
     REPLY_READER_V1,
     JOB_PLAN_V1,
+    JOB_PLAN_V2,
     ONBOARDING_MOVE_READER_V1,
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,

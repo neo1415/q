@@ -7,7 +7,7 @@
 ```ts
    42  /** A stream comment every few seconds while a turn is still working. */
    43  const KEEP_ALIVE_MS = 5_000;
-   44  
+   44
    45  /**
    46   * The longest a turn may run before this route ends it in Q's own words.
    47   *
@@ -23,7 +23,7 @@
    57    "That one is taking longer than I want to keep you waiting. Ask me again, or ask me something smaller and I'll build up.";
    58  const TURN_CUT_SHORT =
    59    "I'm going to stop there, that was taking too long. Ask me again if you want the rest.";
-   60  
+   60
 ```
 
 # Evidence: apps/q-api/src/voice/think.ts (lines 286-400)
@@ -149,4 +149,3 @@
   399    app.post(dependencies.path, handler);
   400    app.post(`${dependencies.path}/chat/completions`, handler);
 ```
-

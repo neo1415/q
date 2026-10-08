@@ -6,6 +6,8 @@ import { useId, useState, useTransition } from "react";
 
 import type { ReadinessFollowUp } from "@capital-q/contracts";
 
+import { useArrivalStatus } from "@/features/briefing/arrival-store";
+
 import {
   answerQuestionAction,
   setAsideQuestionAction,
@@ -33,10 +35,21 @@ const newKey = () => `fu-${crypto.randomUUID()}`;
 export function FollowUpStack({
   followUps,
   heading = true,
+  unlessOnStage = false,
 }: {
   readonly followUps: readonly ReadinessFollowUp[];
   readonly heading?: boolean | undefined;
+  /**
+   * E1 (Q.01): Home's welcome copy steps back when the arrival's stage
+   * layer already puts these questions beside Q, so they show once.
+   */
+  readonly unlessOnStage?: boolean | undefined;
 }) {
+  const arrival = useArrivalStatus();
+  const onStage =
+    unlessOnStage &&
+    arrival.kind === "READY" &&
+    (arrival.data.questions?.length ?? 0) > 0;
   const router = useRouter();
   const inputId = useId();
   const [pending, startTransition] = useTransition();
@@ -46,6 +59,7 @@ export function FollowUpStack({
   const queue = followUps.filter((item) => !skipped.has(item.questionId));
   const current = queue[0];
 
+  if (onStage) return null;
   if (current === undefined) {
     return (
       <p

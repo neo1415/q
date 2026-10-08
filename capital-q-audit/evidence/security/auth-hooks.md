@@ -15,13 +15,13 @@ Why included: Supabase getUser per request; org selector is a request resolved a
    51    ): void {
    52      void (async () => {
    53        const principal = await dependencies.authenticator.authenticate(request);
-   54  
+   54
    55        if (principal === null) {
    56          throw new AuthenticationRequiredError();
    57        }
-   58  
+   58
    59        request.principal = principal;
-   60  
+   60
    61        // The request id only: an auth subject is not a tenant and is not
    62        // written into log context.
    63        withObservabilityContext({ requestId: request.id }, () => {
@@ -47,24 +47,24 @@ Why included: Supabase getUser per request; org selector is a request resolved a
    88    ): void {
    89      void (async () => {
    90        const principal = await dependencies.authenticator.authenticate(request);
-   91  
+   91
    92        if (principal === null) {
    93          throw new AuthenticationRequiredError();
    94        }
-   95  
+   95
    96        // The only thing a client may influence. A malformed identifier is
    97        // rejected here so obviously bad input never reaches identity lookup.
    98        const rawSelector = request.headers[ORGANISATION_CONTEXT_HEADER];
    99        const selector = parseOrganisationSelector(
   100          typeof rawSelector === "string" ? rawSelector : undefined,
   101        );
-  102  
+  102
   103        if (!selector.ok) {
   104          throw new ActorContextRequiredError(
   105            "The requested organisation context identifier is not valid.",
   106          );
   107        }
-  108  
+  108
   109        // Everything authoritative comes from here. X-Tenant-Id, X-Membership-Id,
   110        // X-Actor-Role and X-Actor-Type are never read: a caller cannot name its
   111        // own tenant, membership, role or actor type.
@@ -72,9 +72,9 @@ Why included: Supabase getUser per request; org selector is a request resolved a
   113          principal,
   114          selection: selector.selection,
   115        });
-  116  
+  116
   117        request.actorContext = context;
-  118  
+  118
   119        // Safe identifiers only, so a log line can be tied to a tenant without
   120        // copying business data into it. The direction is one-way: observability
   121        // is enriched from security context and is never read back as authority.
@@ -102,7 +102,7 @@ Why included: Supabase getUser per request; org selector is a request resolved a
 ## `packages/security/src/postgres/actor-context-resolver.ts` lines 55-131
 
 ```ts
-   55  
+   55
    56    return {
    57      resolveHumanContext: async ({
    58        principal,
@@ -116,7 +116,7 @@ Why included: Supabase getUser per request; org selector is a request resolved a
    66           where p.auth_user_id = ${principal.authUserId}
    67             and p.status = 'active'
    68           limit 1`;
-   69  
+   69
    70        if (profileRows.length === 0) {
    71          return { status: "NO_APPLICATION_IDENTITY" };
    72        }
@@ -125,9 +125,9 @@ Why included: Supabase getUser per request; org selector is a request resolved a
    75          return { status: "INVALID_CONTEXT" };
    76        }
    77        const userId = profile.data.id;
-   78  
+   78
    79        const requested = selection?.organisationId;
-   80  
+   80
    81        const membershipRows =
    82          requested === undefined
    83            ? await sql`
@@ -146,7 +146,7 @@ Why included: Supabase getUser per request; org selector is a request resolved a
    96                   and m.organisation_id = ${requested}
    97                   and m.membership_status = 'active'
    98                 limit 1`;
-   99  
+   99
   100        if (membershipRows.length === 0) {
   101          // Whether the organisation exists, belongs to another tenant, or held
   102          // a membership that has since been revoked is not distinguished.
@@ -157,12 +157,12 @@ Why included: Supabase getUser per request; org selector is a request resolved a
   107                : "CONTEXT_NOT_ACCESSIBLE",
   108          };
   109        }
-  110  
+  110
   111        const membership = MembershipRowSchema.safeParse(membershipRows[0]);
   112        if (!membership.success) {
   113          return { status: "INVALID_CONTEXT" };
   114        }
-  115  
+  115
   116        const context = ActorContextSchema.safeParse({
   117          userId,
   118          tenantId: membership.data.tenant_id,
@@ -174,7 +174,7 @@ Why included: Supabase getUser per request; org selector is a request resolved a
   124        if (!context.success) {
   125          return { status: "INVALID_CONTEXT" };
   126        }
-  127  
+  127
   128        return { status: "RESOLVED", context: context.data };
   129      },
   130    };
@@ -199,34 +199,33 @@ Why included: Supabase getUser per request; org selector is a request resolved a
    65        ? {}
    66        : { global: { fetch: options.fetch } }),
    67    });
-   68  
+   68
    69    return {
    70      authenticate: async (accessToken) => {
    71        if (!looksLikeAccessToken(accessToken)) {
    72          return null;
    73        }
-   74  
+   74
    75        const { data, error } = await client.auth.getUser(accessToken);
-   76  
+   76
    77        if (error !== null || data.user === null) {
    78          return null;
    79        }
-   80  
+   80
    81        const authUserId = AuthUserIdSchema.safeParse(data.user.id);
-   82  
+   82
    83        if (!authUserId.success) {
    84          return null;
    85        }
-   86  
+   86
    87        return { authUserId: authUserId.data };
    88      },
    89    };
    90  }
-   91  
+   91
    92  /**
    93   * Extract a bearer token from an Authorization header value, or `null`.
    94   *
    95   * Only the `Bearer` scheme is recognised (case-insensitive scheme, per RFC
    96   * 9110). Basic, cookies, custom schemes and bare tokens are not authentication.
 ```
-

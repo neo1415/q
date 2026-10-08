@@ -361,3 +361,18 @@ export function readBriefingCommand(
   );
 }
 // end WORKFORCE block
+
+/**
+ * Recovery D6: `POST /v1/q/workforce/jobs/:jobId/stop` (API, the generated
+ * route of the app action `q.work.job.stop`): stop one of their own jobs.
+ * The path is the app action's; it moves to contracts with the lead.
+ */
+export function stopWorkforceJob(session: ApiSession, jobId: string) {
+  return call(
+    session,
+    "POST",
+    `/v1/q/workforce/jobs/${encodeURIComponent(jobId)}/stop`,
+    QWorkAcceptedDtoSchema,
+    { body: {} },
+  );
+}

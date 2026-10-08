@@ -27,7 +27,7 @@
  3088      if (conversationId === undefined || latest === undefined) {
  3089        return { kind: "FAILED", diagnosticCode: "INTERNAL_ERROR" };
  3090      }
- 3091  
+ 3091
  3092      const probe: QSpecialistProbe = {
  3093        capability: request.capability,
  3094        // Their own firm, carried as context for a fit question, is not a
@@ -54,7 +54,7 @@
  3115      if (company === undefined || company.kind !== "COMPANY") {
  3116        return delegate.answer(request);
  3117      }
- 3118  
+ 3118
  3119      last = null;
  3120      // The conversation core's decision for this turn (CQ-QX-005): only a
  3121      // turn read as explicitly asking for public information reads the web.
@@ -86,7 +86,7 @@
  3147        },
  3148      );
  3149      last = result;
- 3150  
+ 3150
  3151      if (result.blocked === "CANCELLED") {
  3152        return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
  3153      }
@@ -174,7 +174,7 @@
  3235        return line === null
  3236          ? ""
  3237          : `
- 3238  
+ 3238
  3239  ${line}`;
  3240      })();
  3241      const content =
@@ -191,7 +191,7 @@
  3252      if (said.length === 0) {
  3253        return { kind: "FAILED", diagnosticCode: "MODEL_PROVIDER_UNAVAILABLE" };
  3254      }
- 3255  
+ 3255
  3256      // The message and its durable completion event commit together
  3257      // (CQ-Q-009 §16-§18), so a client that missed every live delta
  3258      // converges on this text.
@@ -206,7 +206,7 @@
  3267        },
  3268        subjects: askedSubjects(request.subjects, request.plan),
  3269      });
- 3270  
+ 3270
  3271      const blocks: QResultBlock[] | undefined =
  3272        prepared === null
  3273          ? analystBlocks === undefined
@@ -251,7 +251,7 @@
  3312        );
  3313        return stored;
  3314      });
- 3315  
+ 3315
  3316      logger?.debug(
  3317        {
  3318          qRunId: request.runId,
@@ -260,7 +260,7 @@
  3321        },
  3322        "specialist answer recorded",
  3323      );
- 3324  
+ 3324
  3325      return {
  3326        kind: "ANSWERED",
  3327        messageId: message.id,
@@ -268,7 +268,7 @@
  3329        promptBundleVersion: result.telemetry.promptBundleVersion ?? "none",
  3330      };
  3331    };
- 3332  
+ 3332
  3333    return {
  3334      lastResult: () => last,
  3335      answer: answerTurn,
@@ -284,7 +284,7 @@
  3345      },
  3346    };
  3347  }
- 3348  
+ 3348
  3349  /**
  3350   * The few bare screen commands done in code (scroll, top, bottom, back).
  3351   * Deliberately narrow: the whole message must be the command, optionally
