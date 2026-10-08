@@ -690,7 +690,7 @@ describe("bridging a slow answer", () => {
     h.line.close();
   });
 
-  it("asks for one line from their own request when it is slow, and holds the answer until it is said", async () => {
+  it("asks for one line from their own request when it is slow, and cuts it the moment the answer lands (INC-1)", async () => {
     let answer: (value: QVoiceDuplexToolResult) => void = () => undefined;
     const h = lineHarness({
       tool: () =>
@@ -726,12 +726,17 @@ describe("bridging a slow answer", () => {
       ch
         .ofType("response.create")
         .filter((event) => event.response === undefined);
-    expect(mainCreates()).toHaveLength(0);
+    // INC-1 (live 2026-10-08): a bridge never plays over a ready answer.
+    // It is cut, and the answer is asked for at once.
+    expect(ch.ofType("response.cancel")).toContainEqual(
+      expect.objectContaining({ response_id: "resp_br" }),
+    );
+    expect(mainCreates()).toHaveLength(1);
     ch.emit({
       type: "response.done",
-      response: { id: "resp_br", status: "completed", usage: {} },
+      response: { id: "resp_br", status: "cancelled", usage: {} },
     });
-    ch.emit({ type: "output_audio_buffer.stopped", response_id: "resp_br" });
+    ch.emit({ type: "output_audio_buffer.cleared", response_id: "resp_br" });
     await settle();
     expect(mainCreates()).toHaveLength(1);
     expect(h.relays.usage).toHaveBeenCalledWith(

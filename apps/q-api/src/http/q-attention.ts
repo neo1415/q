@@ -3,9 +3,10 @@ import type { FastifyInstance } from "fastify";
 import {
   createProblemDetails,
   PROBLEM_CONTENT_TYPE,
+  Q_ATTENTION_PATH,
   QAttentionReportSchema,
 } from "@capital-q/contracts";
-import { Q_ATTENTION_PATH, type AttentionReader } from "@capital-q/q-tools";
+import type { AttentionReader } from "@capital-q/q-tools";
 
 import {
   getActorContext,

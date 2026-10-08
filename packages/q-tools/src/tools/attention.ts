@@ -42,8 +42,8 @@ import type { ScheduleIntelligencePort } from "./schedule.js";
 
 export const READ_ATTENTION = "attention.read" as const;
 export const READ_ATTENTION_PROVIDER_NAME = "what_needs_me" as const;
-/** Proposed to the lead (B spec §5); moves to contracts once agreed. */
-export const Q_ATTENTION_PATH = "/v1/q/attention" as const;
+/** The route lives in contracts (approved by the lead); kept here as a re-export. */
+export { Q_ATTENTION_PATH } from "@capital-q/contracts";
 
 /** Each source gets this long; a slower one is reported unread. */
 export const ATTENTION_SOURCE_DEADLINE_MS = 2_500;

@@ -24,7 +24,21 @@ import { fitsInOutcome, type RunFit } from "./fit-cards.js";
  * never decides a fit.
  */
 
-export type FitSweepScope = "RELATIONSHIPS" | "SAVED" | "CANDIDATES";
+export type FitSweepScope =
+  | "RELATIONSHIPS"
+  | "SAVED"
+  | "CANDIDATES"
+  /** INC-1: "rank them" -- exactly the companies the last answer showed. */
+  | "PREVIOUS";
+
+/** Words that point back at the set just shown. */
+const REFERS_TO_SHOWN =
+  /\b(?:them|those|these|the\s+(?:same|two|three|four|five|six|seven|eight|nine|ten)(?:\s+(?:companies|ones|startups))?|each\s+of\s+them|all\s+of\s+them|that\s+list|this\s+list)\b/iu;
+
+/** The words point back at what Q just showed ("rank them", "those two"). */
+export function refersToShown(text: string): boolean {
+  return REFERS_TO_SHOWN.test(text.replace(/[’]/gu, "'"));
+}
 
 export type FitSweepAsk = {
   readonly scope: FitSweepScope;
@@ -41,6 +55,11 @@ export type FitSweepAsk = {
    * cards are exactly that many; null when they named no number.
    */
   readonly count: number | null;
+  /**
+   * INC-1: PREVIOUS only -- the canonical company ids the last answer
+   * showed, in its order; the sweep scores exactly these.
+   */
+  readonly within?: readonly string[] | undefined;
 };
 
 const COUNT_WORDS: Readonly<Record<string, number>> = {
@@ -89,10 +108,28 @@ const NOT_PLACES = new Set([
   "Them",
 ]);
 
-/** What set and place a fit question is about; null when it is not one. */
-export function fitSweepAsk(text: string): FitSweepAsk | null {
+/**
+ * What set and place a fit question is about; null when it is not one.
+ * `previous`: the companies the last answer showed, so "rank them" is
+ * those and only those (INC-1, live: it came back with ten).
+ */
+export function fitSweepAsk(
+  text: string,
+  previous: readonly string[] = [],
+): FitSweepAsk | null {
   const words = text.trim();
   if (words.length === 0 || words.length > 400) return null;
+  if (previous.length > 0 && refersToShown(words) && FIT_CUE.test(words)) {
+    const asked = askedCount(words);
+    return {
+      scope: "PREVIOUS",
+      place: null,
+      fitAsked: true,
+      count:
+        asked === null ? previous.length : Math.min(asked, previous.length),
+      within: [...previous],
+    };
+  }
   const relationships = RELATIONSHIP_CUE.test(words);
   const saved = SAVED_CUE.test(words);
   const fitAsked = FIT_CUE.test(words) && SET_CUE.test(words);
@@ -210,7 +247,10 @@ export async function runFitSweep(input: {
       if (!wanted.has(row.id)) wanted.set(row.id, row.name);
     }
   };
-  if (ask.scope === "RELATIONSHIPS") add(own.relationships);
+  if (ask.scope === "PREVIOUS") {
+    // Exactly the companies just shown, each read through its own fit.
+    add((ask.within ?? []).map((id) => ({ id, name: "" })));
+  } else if (ask.scope === "RELATIONSHIPS") add(own.relationships);
   else if (ask.scope === "SAVED") add(own.saved);
   else {
     // Their own candidates as the platform orders them, plus their own

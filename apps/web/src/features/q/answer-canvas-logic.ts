@@ -158,10 +158,15 @@ export function topicMovedOn(
   answerId: string,
 ): boolean {
   const at = turns.findIndex((turn) => turn.id === answerId);
-  const own = answerCardsOf(turns[at]);
-  if (at < 0 || own === null) return false;
+  const first = turns[at];
+  const own = answerCardsOf(first);
+  if (at < 0 || own === null || first?.kind !== "Q") return false;
+  // INC-1: the same run reaching the thread again (room feed, read-back)
+  // is not a later answer; it never moves its own cards off the stage.
+  const run = first.runId ?? first.id;
   for (const turn of turns.slice(at + 1)) {
     if (turn.kind !== "Q" || turn.streaming) continue;
+    if ((turn.runId ?? turn.id) === run) continue;
     if (answerCardsOf(turn) !== null) return true;
     if (focusForSaid(own.cards, turn.text) === null) return true;
   }

@@ -15,7 +15,7 @@ import type { QAnswerCardsBlock } from "@capital-q/contracts";
 
 import { History, ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
 
-import { answerCardsOf, topicMovedOn } from "./answer-canvas-logic";
+import { topicMovedOn } from "./answer-canvas-logic";
 import type { QTurn } from "./conversation";
 import { firstWords } from "./board-timeline";
 import { plainFromMarkdown } from "./markdown";
@@ -32,6 +32,7 @@ import { useWire } from "./use-wire";
 
 /** W7: how long after the stage mounts its likely next code is fetched. */
 const PREFETCH_AFTER_MS = 800;
+import { rememberResults, useResultShelf } from "./result-shelf";
 import {
   answersIn,
   onStage,
@@ -147,7 +148,23 @@ export function QPresenceStage({
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 }) {
   const listId = useId();
-  const items = useMemo(() => shownItems(turns), [turns]);
+  const own = useMemo(() => shownItems(turns), [turns]);
+  // INC-1: every set shown in this tab stays reachable, whatever happens
+  // to the conversation (a reconnect that opens another one, a replayed
+  // arrival). Sets from elsewhere sit before this conversation's own, so
+  // its newest answer still leads; with none of its own yet, the last set
+  // shown stays on the stage rather than vanishing.
+  useEffect(() => {
+    rememberResults(own);
+  }, [own]);
+  const shelf = useResultShelf();
+  const items = useMemo(() => {
+    const runs = new Set(own.map((item) => item.run));
+    const elsewhere = shelf
+      .filter((item) => !runs.has(item.run))
+      .map((item) => ({ ...item, answer: 0 }));
+    return [...elsewhere, ...own];
+  }, [own, shelf]);
   const answers = answersIn(turns);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -205,8 +222,14 @@ export function QPresenceStage({
     shown === null
       ? null
       : (() => {
+          // The set as it was shown (INC-1): from its own blocks, so a later
+          // copy of the run, or a turn no longer in this thread, never
+          // changes or clears it.
           const turn = turns.find((one) => one.id === shown.id);
-          const block = answerCardsOf(turn);
+          const block =
+            shown.blocks.find(
+              (one): one is QAnswerCardsBlock => one.kind === "ANSWER_CARDS",
+            ) ?? null;
           return block === null ? null : { item: shown, block, turn };
         })();
   const [leaving, setLeaving] = useState<{

@@ -19,3 +19,6 @@ export const RENEWING_NOTICE = "Voice reconnected after an update.";
 /** C-10: the line ended itself after a quiet spell. */
 export const IDLE_NOTICE =
   "Voice paused after a quiet spell. Start voice again whenever you want to talk.";
+/** INC-1: the answer was ready but the voice never said it. */
+export const ANSWER_NOT_SPOKEN_NOTICE =
+  "I couldn't say that answer aloud in time; it's on your screen.";

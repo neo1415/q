@@ -352,8 +352,20 @@ async function run(
       },
       firstAudio - 20,
     );
-    toBrowser({ type: "output_audio_buffer.started" }, firstAudio);
+    toBrowser(
+      { type: "output_audio_buffer.started", response_id: id },
+      firstAudio,
+    );
     speakingUntil = Date.now() + firstAudio + seconds * 1_000;
+    // The transcript (the client's confirmation the answer was said).
+    toBrowser(
+      {
+        type: "response.output_audio_transcript.done",
+        response_id: id,
+        transcript: "An answer.",
+      },
+      firstAudio + 300,
+    );
     toBrowser(
       {
         type: "response.done",

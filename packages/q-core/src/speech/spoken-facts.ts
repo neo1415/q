@@ -360,10 +360,9 @@ function recordFallback(
 
 function navigateFallback(place: string, seed: number): string {
   if (/^home$/iu.test(place)) return pick(["Back home.", "Here's home."], seed);
-  return pick(
-    [`Here's ${place}.`, `${capitalised(place)} is up.`, `Over to ${place}.`],
-    seed,
-  );
+  // Never "<place> is up": places are often plural ("your relationships",
+  // "your documents"), and live Q said "Your relationships is up" (INC-1).
+  return pick([`Here's ${place}.`, `Over to ${place}.`], seed);
 }
 
 /**

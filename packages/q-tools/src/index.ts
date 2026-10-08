@@ -101,6 +101,7 @@ export {
   ShowInputSchema,
   type ShowInput,
   matchCounterpart,
+  spokenNameScore,
   nameSimilarity,
   CONTROL_SCREEN,
   OPERATE_SCREEN,

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { FIT_PARAMETERS } from "../http/fit.js";
 import { QSubjectRefSchema } from "./subject.js";
 
 /**
@@ -46,7 +47,11 @@ export type QAnswerCardsShape = z.infer<typeof QAnswerCardsShapeSchema>;
 
 export const Q_ANSWER_CARDS_MAX = 10;
 export const Q_ANSWER_CARD_REASONS_MAX = 3;
-export const Q_ANSWER_CARD_MEASURES_MAX = 8;
+/**
+ * One measure per fit parameter: a profile where all nine apply must not
+ * fail validation and lose its cards (INC-1 review; it was 8).
+ */
+export const Q_ANSWER_CARD_MEASURES_MAX = FIT_PARAMETERS.length;
 export const Q_ANSWER_CARD_FOLLOW_UPS_MAX = 3;
 /** Identity colours: `--cq-card-hue-1` .. `--cq-card-hue-7`. */
 export const Q_ANSWER_CARD_HUES = 7;

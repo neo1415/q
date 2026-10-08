@@ -5,6 +5,7 @@ import {
   Q_UI_ACT_RECEIPTS_PATH,
   QUiActReceiptsRequestSchema,
   QUiActReceiptsResponseSchema,
+  type QNavigationReceipt,
   type QPageManifest,
   type QUiActReport,
 } from "@capital-q/contracts";
@@ -37,13 +38,20 @@ export const UI_ACT_RECEIPTS_PER_PERSON = 32;
 export const UI_ACT_RECEIPT_TTL_MS = 10 * 60_000;
 
 export type StoredUiActReport = QUiActReport & { readonly at: number };
+export type StoredNavigation = QNavigationReceipt & { readonly at: number };
 
 export type UiActReceiptLedger = {
   readonly record: (
     actor: Pick<ActorContext, "tenantId" | "userId">,
     reports: readonly QUiActReport[],
     manifest: QPageManifest | undefined,
+    /** INC-1: Q's moves and whether the router settled on them. */
+    navigations?: readonly QNavigationReceipt[],
   ) => number;
+  /** The person's navigation receipts within the TTL, oldest first. */
+  readonly recentNavigations: (
+    actor: Pick<ActorContext, "tenantId" | "userId">,
+  ) => readonly StoredNavigation[];
   /** The person's receipts within the TTL, oldest first. */
   readonly recent: (
     actor: Pick<ActorContext, "tenantId" | "userId">,
@@ -63,6 +71,7 @@ export function createUiActReceiptLedger(
     string,
     {
       reports: StoredUiActReport[];
+      navigations: StoredNavigation[];
       manifest: { readonly value: QPageManifest; readonly at: number } | null;
     }
   >();
@@ -71,9 +80,13 @@ export function createUiActReceiptLedger(
   const fresh = (at: number) => now() - at <= UI_ACT_RECEIPT_TTL_MS;
 
   return {
-    record: (actor, reports, manifest) => {
+    record: (actor, reports, manifest, navigations = []) => {
       const key = keyOf(actor);
-      const held = people.get(key) ?? { reports: [], manifest: null };
+      const held = people.get(key) ?? {
+        reports: [],
+        navigations: [],
+        manifest: null,
+      };
       const at = now();
       const known = new Set(held.reports.map((one) => one.receipt.actId));
       let accepted = 0;
@@ -87,6 +100,13 @@ export function createUiActReceiptLedger(
       held.reports = held.reports
         .filter((one) => fresh(one.at))
         .slice(-UI_ACT_RECEIPTS_PER_PERSON);
+      for (const navigation of navigations) {
+        held.navigations.push({ ...navigation, at });
+        accepted += 1;
+      }
+      held.navigations = held.navigations
+        .filter((one) => fresh(one.at))
+        .slice(-UI_ACT_RECEIPTS_PER_PERSON);
       if (manifest !== undefined) held.manifest = { value: manifest, at };
       // Refreshed people go to the back; the stalest leave first.
       people.delete(key);
@@ -98,6 +118,10 @@ export function createUiActReceiptLedger(
       }
       return accepted;
     },
+    recentNavigations: (actor) =>
+      (people.get(keyOf(actor))?.navigations ?? []).filter((one) =>
+        fresh(one.at),
+      ),
     recent: (actor) =>
       (people.get(keyOf(actor))?.reports ?? []).filter((one) => fresh(one.at)),
     lastManifest: (actor) => {
@@ -134,6 +158,7 @@ export function registerUiActReceiptRoutes(
         getActorContext(request),
         body.reports,
         body.manifest,
+        body.navigations ?? [],
       );
       return reply
         .code(200)
@@ -165,6 +190,23 @@ export function receiptFacts(
             : "NOT done: it failed on their screen";
     return `${intent.act} ${on}${item}: ${meaning} (${receipt.status}).`;
   });
+}
+
+/**
+ * Q's recent moves as facts for the next turn: where it went and whether
+ * the page actually opened. Routes are ids and fixed segments only.
+ */
+export function navigationFacts(
+  navigations: readonly QNavigationReceipt[],
+  max = 3,
+): readonly string[] {
+  return navigations
+    .slice(-max)
+    .map((navigation) =>
+      navigation.status === "DONE"
+        ? `Opened ${navigation.route} on their screen (DONE).`
+        : `NOT done: ${navigation.expected ?? "the page"} never opened on their screen (FAILED).`,
+    );
 }
 
 /** The person's recent receipts, for whoever composes the next turn. */

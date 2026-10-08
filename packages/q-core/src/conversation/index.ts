@@ -85,6 +85,11 @@ export {
   type ResearchDirective,
 } from "./general-turn.js";
 export {
+  pleasantryOf,
+  pleasantryReply,
+  type PleasantryKind,
+} from "./pleasantry.js";
+export {
   isSpokenUnclearPrompt,
   isUnclearTurn,
   spokenUnclearReply,

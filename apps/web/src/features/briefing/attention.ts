@@ -1,4 +1,5 @@
 import {
+  Q_ATTENTION_PATH,
   QAttentionReportSchema,
   type NotificationDto,
   type QAttentionItem,
@@ -29,8 +30,8 @@ export type AttentionReader = (
   since: string,
 ) => Promise<QAttentionReport | null>;
 
-/** Workstream B's read (q-api `GET /v1/q/attention`; path pending the lead). */
-export const Q_ATTENTION_READ_PATH = "/v1/q/attention";
+/** Workstream B's read (q-api `GET /v1/q/attention`), from contracts. */
+export const Q_ATTENTION_READ_PATH = Q_ATTENTION_PATH;
 
 /**
  * RECOVERY-2026-10 B1: the attention report from the Q API -- the same

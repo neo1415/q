@@ -14,6 +14,7 @@ vi.mock("next/navigation", () => ({
 
 const { QPresenceStage } = await import("../src/features/q/q-presence-stage");
 const { SHOWN_FOR_ANSWERS } = await import("../src/features/q/shown");
+const { clearResultShelf } = await import("../src/features/q/result-shelf");
 
 /**
  * The Q page's presence view (founder request 2026-10-03): Q's presence
@@ -22,7 +23,11 @@ const { SHOWN_FOR_ANSWERS } = await import("../src/features/q/shown");
  * an object back.
  */
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  // INC-1: the per-tab shelf of shown sets is module state.
+  clearResultShelf();
+});
 
 const person = (id: string, text: string): QTurn => ({
   kind: "PERSON",

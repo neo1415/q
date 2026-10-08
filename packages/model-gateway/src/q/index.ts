@@ -121,12 +121,23 @@ export type { QOwnIndex } from "./own-standing.js";
 export { companiesInOutcome } from "./card-subjects.js";
 export { fitAnswerCardsBlock, fitsInOutcome } from "./fit-cards.js";
 export { readinessLeadLines } from "./own-readiness.js";
+export {
+  createSmallTalkReply,
+  type SmallTalkReply,
+  type SmallTalkTurn,
+} from "./small-talk.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { onScreenCompanyFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
 import { manifestFacts, manifestReads } from "./manifest-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
+import {
+  previousCardCompanyIds,
+  tieLine,
+  withFitIntegrity,
+} from "./fit-integrity.js";
+import type { QAnswerCardsBlock } from "@capital-q/contracts";
 import {
   ATTENTION_TOOL_NAME,
   asksWhatNeedsThem,
@@ -1814,7 +1825,8 @@ export function createModelGatewayQAnswer(
       request.writingDocument === true ||
       (request.turnKind !== undefined && request.turnKind !== "QUESTION_TO_Q")
         ? null
-        : fitSweepAsk(latest.content);
+        : // INC-1: "rank them" is the set the last answer showed.
+          fitSweepAsk(latest.content, previousCardCompanyIds(earlier));
     const fitSweep: Promise<FitSweepResult | null> =
       sweepAsk === null
         ? Promise.resolve(null)
@@ -2980,15 +2992,35 @@ export function createModelGatewayQAnswer(
         // Every public page read for this answer travels with it as a
         // structured source (R23, R38): the prose stays answer-first and
         // the provenance is one tap away, never lost.
-        const carried = [
-          ...(given ?? []),
-          ...publicSources.map((source) => ({
-            kind: "PUBLIC_SOURCE" as const,
-            ...publicSourceBlockFields(source),
-          })),
-          ...clientActionBlocks,
-        ];
+        // INC-1: one card per canonical record across every block, exactly
+        // the count asked for, "them" held to the set just shown, and every
+        // score labelled mandate fit with how it was made.
+        const carried = withFitIntegrity(
+          [
+            ...(given ?? []),
+            ...publicSources.map((source) => ({
+              kind: "PUBLIC_SOURCE" as const,
+              ...publicSourceBlockFields(source),
+            })),
+            ...clientActionBlocks,
+          ],
+          {
+            asked: latest.content,
+            previous: previousCardCompanyIds(earlier),
+          },
+        );
         const blocks = carried.length === 0 ? undefined : carried;
+        // A tie is said as a tie, with why (INC-1: three cards at 8.8 read
+        // as a ranking).
+        const ranked = carried.find(
+          (block): block is QAnswerCardsBlock =>
+            block.kind === "ANSWER_CARDS" && block.shape === "RANKED",
+        );
+        const tie = ranked === undefined ? null : tieLine(ranked);
+        content =
+          tie === null || /\btied\b/iu.test(content)
+            ? content
+            : `${content}\n\n${tie}`.slice(0, ANSWER_LIMIT_CHARS);
         // Nothing of a speculative answer is stored until it is adopted.
         if (gate !== null) await gate.ready();
         return transactions.run(async (tx) => {
