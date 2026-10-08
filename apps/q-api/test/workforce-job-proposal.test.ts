@@ -18,7 +18,9 @@ import {
   createWorkforceJobs,
   type WorkforcePorts,
 } from "../src/composition/workforce/jobs.js";
+import { createInMemoryAgentWorkQueue } from "../src/composition/workforce/queue.js";
 import { createOutwardReview } from "../src/composition/workforce/review.js";
+import { createAgentWorkRunner } from "../src/composition/workforce/runner.js";
 import { createInMemoryWorkforceStore } from "../src/composition/workforce/store.js";
 
 /**
@@ -122,9 +124,39 @@ function world(withinLimit = true, plan: JobPlanResultV2 = PLAN) {
     jobsFor,
     withinLimit: () => Promise.resolve(withinLimit),
   });
-  const [definition] = createWorkforceJobActions({ jobsFor });
+  // Recovery D3: approval enqueues; the durable runner carries it out.
+  const queue = createInMemoryAgentWorkQueue();
+  const runner = createAgentWorkRunner({
+    queue,
+    store,
+    actorFor: (owner) =>
+      Promise.resolve(
+        owner.userId === actor.userId
+          ? actor
+          : owner.userId === stranger.userId
+            ? stranger
+            : null,
+      ),
+    jobsFor,
+    workerId: "worker-test",
+  });
+  const [definition] = createWorkforceJobActions({
+    jobsFor,
+    queue,
+    kick: () => {
+      void runner.pass();
+    },
+  });
   if (definition === undefined) throw new Error("no action");
-  return { store, expressed, board, definition, plans: () => plans };
+  return {
+    store,
+    expressed,
+    board,
+    definition,
+    plans: () => plans,
+    queue,
+    runner,
+  };
 }
 
 async function execute(
@@ -171,7 +203,7 @@ describe("a job the lead Q proposes (J1, J4)", () => {
   });
 
   it("runs exactly the approved plan as the approver, never re-planned", async () => {
-    const { board, definition, store, expressed, plans } = world();
+    const { board, definition, store, expressed, plans, queue } = world();
     await board.port.prepare(actor, "run-2", "Find me fits");
     const proposal = await board.proposer.propose({
       runId: "run-2",
@@ -201,6 +233,11 @@ describe("a job the lead Q proposes (J1, J4)", () => {
       source_kind: "JOB",
       source_id: actionId,
     });
+    // D3: the work row reached a terminal state, traceable to its card.
+    await vi.waitFor(() => {
+      expect(queue.rows[0]?.state).toBe("COMPLETED");
+    });
+    expect(queue.rows[0]?.trace).toMatchObject({ actionId });
     expect(plans()).toBe(1);
     expect(expressed.every((one) => one.by === userId)).toBe(true);
     expect(expressed.length).toBeGreaterThan(0);

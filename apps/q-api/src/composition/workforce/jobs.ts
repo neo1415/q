@@ -545,7 +545,11 @@ export function executableJobTools(research: boolean): readonly string[] {
  */
 export type DurableSteps = {
   readonly prior: (stepKey: string) => Promise<PriorRun | null>;
-  readonly record: (stepKey: string, result: StepResult) => Promise<void>;
+  readonly record: (
+    stepKey: string,
+    result: StepResult,
+    runId: string,
+  ) => Promise<void>;
 };
 
 /** The default budget of one job the lead Q proposes, USD. */
@@ -880,7 +884,7 @@ function withDurableResults(
       role,
       async (step: BoundStep, context: Parameters<AgentExecutor>[1]) => {
         const result = await executor(step, context);
-        await durable.record(step.key, result);
+        await durable.record(step.key, result, context.runId);
         return result;
       },
     ]),

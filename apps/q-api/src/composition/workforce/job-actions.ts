@@ -29,6 +29,7 @@ import {
   type PlannedJob,
   type WorkforceJobs,
 } from "./jobs.js";
+import type { AgentWorkQueue } from "./queue.js";
 import type { Owner } from "./store.js";
 
 /**
@@ -299,6 +300,13 @@ export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
 export function createWorkforceJobActions(dependencies: {
   /** The jobs runner for one approver, over their own ports. */
   readonly jobsFor: (actor: ActorContext) => WorkforceJobs;
+  /**
+   * Recovery D3: approved jobs are durable work, claimed under a lease by
+   * the runner, never an unawaited promise inside the approval.
+   */
+  readonly queue: Pick<AgentWorkQueue, "enqueue">;
+  /** Wakes the runner now rather than at its next interval. */
+  readonly kick?: (() => void) | undefined;
   readonly logger?: Logger | undefined;
 }): readonly AnyQActionDefinition[] {
   const { logger } = dependencies;
@@ -342,25 +350,23 @@ export function createWorkforceJobActions(dependencies: {
               budgetUsd: Number(action.payload.budgetUsd),
               source: { kind: "JOB", id: action.actionId },
             });
-            // The job runs past the approval: never inside it (model calls,
-            // messages and bookings are slow and each is idempotent by key).
-            void jobs
-              .run(
-                owner,
-                {
-                  goal: action.payload.goal,
-                  budgetUsd: Number(action.payload.budgetUsd),
-                  source: { kind: "JOB", id: action.actionId },
-                  planned: plannedFrom(action.payload),
-                },
-                filed,
-              )
-              .catch((error: unknown) => {
-                logger?.warn(
-                  { err: error, actionId: action.actionId },
-                  "workforce job did not finish",
-                );
-              });
+            // The job runs past the approval, never inside it: it is
+            // enqueued as durable work (exactly the approved plan, with
+            // where it came from) and a worker claims it under a lease, so
+            // a restart resumes it instead of leaving it RUNNING forever.
+            await dependencies.queue.enqueue(owner, {
+              jobId: filed.jobId,
+              plan: action.payload,
+              trace: {
+                actionId: action.actionId,
+                runId: action.runId,
+                organisationId:
+                  context.approver.organisationId ??
+                  action.organisationId ??
+                  undefined,
+              },
+            });
+            dependencies.kick?.();
             return { outcome: "EXECUTED", result: { jobId: filed.jobId } };
           } catch (error: unknown) {
             logger?.warn(

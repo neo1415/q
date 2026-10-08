@@ -73,9 +73,12 @@ export type JobRecorder = {
 };
 
 export type PriorRun = {
-  readonly runId: string;
+  /** The finished step's own run, when known (hand-offs name it). */
+  readonly runId: string | null;
   readonly status: Exclude<StepStatus, "SKIPPED">;
   readonly summary: string;
+  /** What later steps may read (a shortlist), kept with the job. */
+  readonly outputs?: Readonly<Record<string, unknown>> | undefined;
 };
 
 export type JobRunResult = {
@@ -126,11 +129,15 @@ export async function runJob(input: {
     const before = await recorder.prior?.(jobId, step.key);
     if (before != null && before.status !== "FAILED") {
       // Finished before a restart: its result stands, never redone.
-      runs.set(step.key, before.runId);
-      results.set(step.key, { status: before.status, summary: before.summary });
+      if (before.runId !== null) runs.set(step.key, before.runId);
+      results.set(step.key, {
+        status: before.status,
+        summary: before.summary,
+        outputs: before.outputs,
+      });
       out.push({
         key: step.key,
-        runId: before.runId,
+        runId: before.runId ?? "",
         status: before.status,
         summary: before.summary,
       });
