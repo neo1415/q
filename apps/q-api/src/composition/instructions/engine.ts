@@ -55,7 +55,7 @@ import {
   type ThreadPace,
 } from "./quarantine.js";
 import type { OutwardReview, OutwardVerdict } from "../workforce/review.js";
-import type { InstructionRow, InstructionStore } from "./store.js";
+import type { InstructionRow, InstructionStore, WaitingCard } from "./store.js";
 
 /**
  * The standing-instruction engine (ADR 0043 §4): Q plans; code decides.
@@ -76,6 +76,13 @@ export const MAX_REPLANS = 2;
 export const FANOUT_MAX = 5;
 /** S6: at most this many threads read per firing. */
 export const THREADS_PER_FIRING = 8;
+
+/**
+ * Recovery D-01: a card still waiting on the person this many hours after
+ * it was asked raises a REPLY_WAITING notice (once per card), well before
+ * its approval lapses at 24 h.
+ */
+export const ESCALATE_AFTER_HOURS = 4;
 
 export type InstructionPerson = {
   /** Null for a candidate with no relationship yet (a saved company). */
@@ -1318,7 +1325,10 @@ export type InstructionEngineDependencies = {
     // Optional: a store without it (older doubles) waits on nothing.
     // Without the delegation reads, nothing runs under a delegation.
     Partial<
-      Pick<InstructionStore, "waitingCards" | "delegationOf" | "delegatedSince">
+      Pick<
+        InstructionStore,
+        "waitingCards" | "lapsedCards" | "delegationOf" | "delegatedSince"
+      >
     >;
   readonly actions: readonly AnyAppAction[];
   readonly ports: AppActionPorts;
@@ -1779,6 +1789,115 @@ export function createInstructionEngine(
       .catch(() => false);
   };
 
+  /**
+   * Recovery D-05: a planner that could not answer is said on the Work
+   * page (once a day), and the triggers retry soon instead of waiting a
+   * full cadence in silence.
+   */
+  const plannerDown = async (
+    row: InstructionRow,
+  ): Promise<InstructionFiringResult> => {
+    await note(
+      row,
+      "planner",
+      "I couldn't plan this time: the model I plan with didn't answer. I'll try again in a few minutes.",
+      "PLANNER_UNAVAILABLE",
+    );
+    return empty("PLANNER_UNAVAILABLE");
+  };
+
+  /**
+   * Recovery D-01. A card the person never answered used to park its
+   * conversation for good: after the approval's 24 h it vanished from
+   * Needs you while the engine still held the conversation as "asked".
+   * Now: a lapsed card is said once (and the conversation is drafted
+   * again by this firing), and a card still waiting after
+   * ESCALATE_AFTER_HOURS raises a REPLY_WAITING notice once, saying when
+   * it lapses.
+   */
+  const tellLapsedAndWaiting = async (
+    row: InstructionRow,
+    people: readonly InstructionPerson[],
+    waiting: readonly WaitingCard[],
+    at: Date,
+  ): Promise<void> => {
+    const nameOf = (id: string | null) =>
+      (id === null
+        ? undefined
+        : people.find((person) => person.relationshipId === id)?.name
+      )?.slice(0, 80) ?? "Someone";
+    const lapsed = await Promise.resolve()
+      .then(() => store.lapsedCards?.(row.id) ?? [])
+      .catch(() => []);
+    for (const card of lapsed) {
+      const name = nameOf(card.relationship_id);
+      const words = `Your approval of my message to ${name} lapsed before you answered it, so it wasn't sent. I'll write to them again${card.relationship_id === null ? "" : " if they're still waiting"}.`;
+      const fresh = await store
+        .recordStep({
+          instruction: row,
+          runKey: `lapsed-${card.q_action_id}`.slice(0, 80),
+          stepIndex: 0,
+          action: "q.note",
+          mode: "ASK",
+          status: "NOTED",
+          relationshipId: card.relationship_id,
+          words,
+          reasonCode: "CARD_LAPSED",
+          qActionId: null,
+          idempotencyKey: `instr:${row.id}:lapsed:${card.q_action_id}`,
+        })
+        .catch(() => false);
+      if (fresh) {
+        await store
+          .notify({
+            instruction: row,
+            key: `lapsed:${card.q_action_id}`,
+            priority: "NEEDS_YOU",
+            title: `Your approval for ${name} lapsed`,
+            body: words,
+          })
+          .catch(() => false);
+      }
+    }
+    for (const card of waiting) {
+      if (card.approval_id == null || card.created_at === undefined) continue;
+      const hours = (at.getTime() - card.created_at.getTime()) / 3_600_000;
+      if (hours < ESCALATE_AFTER_HOURS) continue;
+      const name = nameOf(card.relationship_id);
+      const lapses =
+        card.expires_at == null
+          ? ""
+          : ` It lapses at ${card.expires_at.toISOString().slice(11, 16)} UTC on ${card.expires_at.toISOString().slice(0, 10)}; after that I'll write it again.`;
+      const words = `${name} is still waiting: my reply has needed your yes for ${String(Math.floor(hours))} hours.${lapses} Approve it on your Work page, or tell me what to change.`;
+      const fresh = await store
+        .recordStep({
+          instruction: row,
+          runKey: `waiting-${card.approval_id}`.slice(0, 80),
+          stepIndex: 0,
+          action: "q.note",
+          mode: "ASK",
+          status: "NOTED",
+          relationshipId: card.relationship_id,
+          words,
+          reasonCode: "REPLY_WAITING",
+          qActionId: null,
+          idempotencyKey: `instr:${row.id}:card-waiting:${card.approval_id}`,
+        })
+        .catch(() => false);
+      if (fresh) {
+        await store
+          .notify({
+            instruction: row,
+            key: `card-waiting:${card.approval_id}`,
+            priority: "NEEDS_YOU",
+            title: `${name} is waiting for your yes`,
+            body: words,
+          })
+          .catch(() => false);
+      }
+    }
+  };
+
   return {
     fire: async (instructionId, runKey) => {
       // A run key the steps table accepts, before anything acts.
@@ -1854,6 +1973,14 @@ export function createInstructionEngine(
               ? card.relationship_id === null && card.words === words
               : card.relationship_id === relationshipId),
         );
+      // Recovery D-01: a card whose approval has lapsed no longer waits
+      // (whether or not the expiry sweep has marked it yet), so the
+      // conversation is Q's to draft again -- never "already asked".
+      cardsWaiting = cardsWaiting.filter(
+        (card) =>
+          card.expires_at == null || card.expires_at.getTime() > at.getTime(),
+      );
+      await tellLapsedAndWaiting(row, people, cardsWaiting, at);
       const keyOf = (index: number) =>
         `instr:${row.id}:${runKey}:${String(index)}`;
 
@@ -2167,7 +2294,7 @@ export function createInstructionEngine(
           await store.addSpend(row.id, planned.costUsd);
         }
         plan = planned.plan;
-        if (plan === null) return empty("PLANNER_UNAVAILABLE");
+        if (plan === null) return plannerDown(row);
         const sent = new Map(sentBefore);
         const sitting = new Map<string, number>();
         // Each plan's count starts from what was done before this firing.
@@ -2269,7 +2396,7 @@ export function createInstructionEngine(
           .join("\n")
           .slice(0, 3_000);
       }
-      if (plan === null) return empty("PLANNER_UNAVAILABLE");
+      if (plan === null) return plannerDown(row);
       // The engine's own abilities are never a "can't" (QA run 40021ae5:
       // "Can't find founders" beside five found, "can't run every weekend"
       // for the instruction that is the schedule): such lines are dropped.
@@ -2400,6 +2527,11 @@ export function createInstructionEngine(
               // Tensorgate, 8 Oct: a good reply held just under the bar was
               // lost. The best draft code had nothing against goes to the
               // person as their card -- their yes, never sent by Q.
+              // Recovery D2 decision: this holds under delegation too. A
+              // near miss sends on its own only if a delegation scope
+              // explicitly allows near misses; none does today, so the
+              // card (with escalation, and a redraft once it lapses) is
+              // the only path.
               const offered = verdict.action.input.safeParse(
                 withTextBody(verdict.input, outcome.body),
               );
@@ -2832,10 +2964,14 @@ export function createInstructionEngine(
       ) {
         const covered = inScope(grant.data, people).length;
         // Item 3 (Tensorgate): the line says why nothing was done.
-        const allRead = reachable.every(
+        // Recovery D-04: unknown is not "nothing". A conversation this
+        // firing did not read (the per-firing cap, the budget, a reader
+        // failure) is said as not read, never as needing no reply.
+        const unread = reachable.filter(
           (person) =>
-            person.relationshipId !== null && paces.has(person.relationshipId),
-        );
+            person.relationshipId === null || !paces.has(person.relationshipId),
+        ).length;
+        const allRead = unread === 0;
         await note(
           row,
           "quiet",
@@ -2845,8 +2981,10 @@ export function createInstructionEngine(
               ? `Looked at ${String(covered)} ${covered === 1 ? "person" : "people"}: no one has accepted yet, so there's no conversation to answer. I'll look again when someone writes.`
               : allRead
                 ? `Looked at ${String(covered)} ${covered === 1 ? "person" : "people"}: no unanswered messages, so nothing to send right now. I'll look again when someone writes.`
-                : `Looked at ${String(covered)} ${covered === 1 ? "person" : "people"}: nothing needs a reply right now. I'll look again when someone writes.`,
-          "NOTHING_TO_DO",
+                : unread === reachable.length
+                  ? `${String(unread)} not read: I couldn't read any of the ${String(reachable.length)} conversations this time, so I can't say yet whether anyone needs a reply. I'll read them next time.`
+                  : `Read ${String(reachable.length - unread)} of ${String(reachable.length)} conversations: no unanswered messages in those. ${String(unread)} not read this time, so I can't say yet whether they need a reply; I'll read them next time.`,
+          allRead ? "NOTHING_TO_DO" : "NOT_ALL_READ",
         );
       }
 

@@ -1899,6 +1899,8 @@ const instructionEngine: { current?: InstructionEngine } = {};
 const instructionTriggers = createInstructionTriggers({
   store: instructionStore,
   engine: () => instructionEngine.current,
+  // Recovery D-01: lapsed approvals expire eagerly, every sweep.
+  expireLapsed: () => qActions.expireLapsed?.() ?? Promise.resolve(0),
   logger,
 });
 setInterval(() => {

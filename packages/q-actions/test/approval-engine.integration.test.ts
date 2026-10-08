@@ -1124,6 +1124,38 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     }
   });
 
+  it("EAGER EXPIRY (recovery D2, audit D-01): the sweep expires a lapsed card and its action without anyone deciding; an open one is left", async () => {
+    // A one-second TTL: the sweep only ever touches rows already lapsed.
+    const world = await commitWorld({ policy: { approvalTtlMs: 1_000 } });
+    try {
+      const { founder, service, clock } = world;
+      const lapsing = await propose(world, founder, {});
+      clock.advanceMs(2_000);
+      const fresh = await propose(world, founder, {});
+      const expireLapsed = service.expireLapsed;
+      if (expireLapsed === undefined) throw new Error("no sweep");
+      expect(await expireLapsed({ limit: 500 })).toBeGreaterThanOrEqual(1);
+
+      const [approval] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${lapsing.approval.id}`;
+      expect(approval?.status).toBe("EXPIRED");
+      const [action] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.actions where id = ${lapsing.action.id}`;
+      expect(action?.status).toBe("EXPIRED");
+      // The card proposed after the clock moved is still open.
+      const [open] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${fresh.approval.id}`;
+      expect(open?.status).toBe("PENDING");
+      // A second sweep finds nothing more of ours to do, and changes nothing.
+      await expireLapsed({ limit: 500 });
+      const [still] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${lapsing.approval.id}`;
+      expect(still?.status).toBe("EXPIRED");
+    } finally {
+      await cleanup(world);
+    }
+  });
+
   it("CONCURRENCY: approve vs reject, double approve and double execute each settle to one durable truth", async () => {
     const world = await commitWorld();
     try {
