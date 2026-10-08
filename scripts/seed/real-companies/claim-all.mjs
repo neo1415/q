@@ -164,7 +164,8 @@ async function approveAll() {
     return (
       founder !== undefined &&
       c.method === "REGISTRY_DOCUMENT" &&
-      c.requesterName === founder.name
+      // A claimant with no workspace yet has no display name in the queue.
+      (c.requesterName === founder.name || c.requesterName == null)
     );
   });
   if (!apply) {
