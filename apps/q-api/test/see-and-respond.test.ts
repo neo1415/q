@@ -332,7 +332,7 @@ describe("see the camera and the screen in a call", () => {
     expect(seen).not.toContain("unit cost");
   });
 
-  it("keeps cameras on a budget: a gap per call, a longer one per person, a cap", async () => {
+  it("keeps cameras on a budget: a gap per call, a longer one per person, a cap", () => {
     const watch = createCameraWatch({
       minGapMs: 30_000,
       perPersonGapMs: 120_000,
