@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import type {
-  PermittedContextPlan,
-  QAttentionReport,
+import {
+  QResultBlockSchema,
+  type PermittedContextPlan,
+  type QAttentionReport,
 } from "@capital-q/contracts";
 import type {
   QAnswerRequest,
@@ -124,6 +125,7 @@ function build(scene: {
     } as unknown as QConversationMessage,
   ];
   const persisted: string[] = [];
+  const storedBlocks: unknown[] = [];
   const executed: QToolProposal[] = [];
   const report = scene.report ?? REPORT;
   const tools: QToolPort = {
@@ -153,8 +155,12 @@ function build(scene: {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
       listRecentForConversationOfRun: () => Promise.resolve([...messages]),
-      insert: (_tx: unknown, input: { content: string }) => {
+      insert: (
+        _tx: unknown,
+        input: { content: string; blocks?: readonly unknown[] },
+      ) => {
         persisted.push(input.content);
+        storedBlocks.push(...(input.blocks ?? []));
         return Promise.resolve({
           ...messages[0],
           id: randomUUID(),
@@ -202,7 +208,7 @@ function build(scene: {
       maxSensitivity: "PUBLIC",
     } as unknown as PermittedContextPlan,
   } as unknown as QAnswerRequest;
-  return { seam, request, alpha, executed, persisted };
+  return { seam, request, alpha, executed, persisted, storedBlocks };
 }
 
 describe("what needs them, answered from the attention report", () => {
@@ -219,6 +225,19 @@ describe("what needs them, answered from the attention report", () => {
     expect(said).toContain("Send the drafted reply to Halyard Ventures");
     expect(said).toContain("I couldn't check your notices just now");
     expect(said).not.toMatch(/nothing is waiting/iu);
+  });
+
+  // G-R4: the report rides on the answer for the screen, unread included.
+  it("carries the report itself as an ATTENTION block", async () => {
+    const { seam, request, storedBlocks } = build({
+      said: "find anything that needs my attention",
+      turnKind: "QUESTION_TO_Q",
+    });
+    await seam.answer(request);
+    const blocks = QResultBlockSchema.array().parse(storedBlocks);
+    const attention = blocks.filter((block) => block.kind === "ATTENTION");
+    expect(attention).toHaveLength(1);
+    expect(attention[0]).toEqual({ kind: "ATTENTION", report: REPORT });
   });
 
   it("is not read for a request to act", async () => {

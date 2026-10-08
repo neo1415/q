@@ -3141,7 +3141,8 @@ export function createModelGatewayQAnswer(
           request.leadLines === undefined
             ? text
             : `${request.leadLines}\n\n${text}`,
-          [],
+          // G-R4: the report itself, for the screen (items and unread).
+          [{ kind: "ATTENTION", report: attentionReport }],
         );
         logger?.info(
           {
