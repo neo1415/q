@@ -19,9 +19,15 @@ import {
   type OnboardingUnderstanding,
   type QSilenceFocus,
   type QSilenceThread,
+  type QAnswerCard,
   type QSubjectRef,
 } from "@capital-q/contracts";
 import type { QActionService } from "@capital-q/q-actions";
+import {
+  shownCardsOf,
+  spokenFactsOf,
+  type SpokenFacts,
+} from "@capital-q/q-core";
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type {
   QOrchestrator,
@@ -51,6 +57,7 @@ import type { PresenceTrigger } from "./presence-trigger.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
 import type { QTurnReader, QTurnReading } from "@capital-q/model-gateway/q";
 import type { DecisionReader, DecisionReading } from "./decision.js";
+import type { SpokenReplier } from "./spoken-reply.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import {
   anchorCues,
@@ -139,6 +146,12 @@ export type VoiceTurnDependencies = {
    * reading below stands in, as it does when the model does not answer.
    */
   readonly decisions?: DecisionReader | undefined;
+  /**
+   * Says a code-built answer (a fit sweep, a record opened, a page) in
+   * Q's own words from its facts (founder live 2026-10-08). Absent: the
+   * fact-built line is said, never the screen's template.
+   */
+  readonly spokenReply?: SpokenReplier | undefined;
   /**
    * The turn reader, for whether a spoken turn is only about ending the
    * voice conversation (v25 endVoice; founder live 2026-10-02: an
@@ -337,6 +350,10 @@ type LiveRun = {
 const liveRuns = new WeakMap<VoiceSessionBinding, LiveRun>();
 /** ADR 0062: small-talk threads already brought back on this voice session. */
 const smallTalkUsed = new WeakMap<VoiceSessionBinding, Set<string>>();
+/** The cards Q last showed on this line, for "the third one" (newest). */
+const shownCards = new WeakMap<VoiceSessionBinding, readonly QAnswerCard[]>();
+/** What Q last said from facts on this line, so the words vary. */
+const lastFromFacts = new WeakMap<VoiceSessionBinding, string>();
 
 /** About when a person thinking aloud says "hm", and when they hum. */
 /**
@@ -906,6 +923,54 @@ export function createVoiceTurnHandler(
       : { kind: "INTERRUPTED", path: "MOVE" };
   };
 
+  /**
+   * A code-built answer, said from its facts (founder live 2026-10-08):
+   * a voice that speaks in its own words gets the facts; otherwise one
+   * fast rewrite, checked by code, or the fact-built line. Either way
+   * what is returned is what is kept as said.
+   */
+  const fromFacts = async (
+    binding: VoiceSessionBinding,
+    facts: SpokenFacts,
+    asked: string,
+    speaker: VoiceSpeaker,
+    context: { readonly correlationId: string; readonly signal: AbortSignal },
+  ): Promise<string> => {
+    const remember = (said: string) => {
+      lastFromFacts.set(binding, said);
+      return said;
+    };
+    if (speaker.facts !== undefined) {
+      speaker.facts(facts);
+      return remember(facts.fallback);
+    }
+    const replier = dependencies.spokenReply;
+    if (replier === undefined || context.signal.aborted) {
+      return remember(facts.fallback);
+    }
+    const reply = await replier.say({
+      facts,
+      asked,
+      lastSaid: lastFromFacts.get(binding) ?? "",
+      attribution: {
+        tenantId: binding.actor.tenantId,
+        userId: binding.actor.userId,
+        correlationId: context.correlationId,
+      },
+      signal: context.signal,
+    });
+    logger.info(
+      {
+        qVoiceSessionId: binding.voiceSessionId,
+        kind: facts.kind,
+        source: reply.source,
+        issues: reply.issues,
+      },
+      "a code-built answer was said from its facts",
+    );
+    return remember(reply.text);
+  };
+
   const askQ = async (
     binding: VoiceSessionBinding,
     text: string,
@@ -934,6 +999,8 @@ export function createVoiceTurnHandler(
     } = {},
   ): Promise<VoiceTurnOutcome> => {
     const { actor, thread } = binding;
+    // Their words, for the facts of a code-built answer (count asked for).
+    const askedWords = text;
     const correlationId = correlation();
     const subjects: readonly QSubjectRef[] | undefined = thread.subjects;
     const utterance =
@@ -1117,7 +1184,28 @@ export function createVoiceTurnHandler(
               });
             }
             const text = event.data.message.text;
-            if (!streamedDeltas && text !== undefined) {
+            const blocks = event.data.message.blocks ?? [];
+            // Code composed these words for the screen (a fit sweep, a
+            // record opened, a page): the voice says their facts in its
+            // own words instead of reading the template aloud.
+            const facts =
+              !streamedDeltas && text !== undefined
+                ? spokenFactsOf({
+                    asked: askedWords,
+                    text,
+                    blocks,
+                    shown: shownCards.get(binding),
+                  })
+                : null;
+            const cards = shownCardsOf(blocks);
+            if (cards.length > 0) shownCards.set(binding, cards);
+            if (facts !== null) {
+              answerGiven = true;
+              yield await fromFacts(binding, facts, askedWords, speaker, {
+                correlationId,
+                signal,
+              });
+            } else if (!streamedDeltas && text !== undefined) {
               answerGiven = true;
               yield bounded(speakable(text));
             } else if (text !== undefined) {

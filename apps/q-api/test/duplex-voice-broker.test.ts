@@ -17,6 +17,7 @@ import {
 } from "@capital-q/model-gateway/realtime";
 import { OPENAI_REALTIME_MINI_PRICES } from "@capital-q/model-gateway/realtime/openai";
 import { createLogger } from "@capital-q/observability";
+import { spokenFactsOf } from "@capital-q/q-core";
 import {
   quoteOccursIn,
   type MemoryItem,
@@ -42,6 +43,11 @@ import {
   type ActorContext,
 } from "@capital-q/security";
 
+// The founder's live turns (c10b845f), one fixture for every layer.
+import {
+  C10B_FIT_BLOCKS,
+  C10B_TURNS,
+} from "../../../packages/q-core/test/fixtures/voice-c10b845f.js";
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import {
   createDuplexBroker,
@@ -516,6 +522,56 @@ describe("relaying the model's tool calls", () => {
       say: "Heard: How is my raise going?",
     });
     expect(result?.approvalPending).toBe(false);
+  });
+
+  it("hands a code-built answer to the voice as facts to say in its own words (founder live 2026-10-08)", async () => {
+    const facts = spokenFactsOf({
+      asked: C10B_TURNS.topThree.asked,
+      text: C10B_TURNS.topThree.said,
+      blocks: C10B_FIT_BLOCKS,
+    });
+    if (facts === null) throw new Error("no facts");
+    const h = await opened({
+      turn: async (_b, _t, _s, speaker) => {
+        speaker.facts?.(facts);
+        await speaker.speak(facts.fallback);
+        return { kind: "SPOKEN", path: "Q" };
+      },
+    });
+    const result = await h.broker.tool({
+      actor: ACTOR,
+      voiceSessionId: id,
+      call: {
+        callId: "call_f",
+        name: "ask_q",
+        arguments: JSON.stringify({ request: C10B_TURNS.topThree.asked }),
+      },
+    });
+    const output = JSON.parse(result?.output ?? "{}") as Record<
+      string,
+      unknown
+    >;
+    expect(output).toMatchObject({
+      ok: true,
+      speakInYourOwnWords: true,
+      mustSay: [
+        "Halyard Security",
+        "Clearwater Assurance",
+        "Tensorgate",
+        "8.8",
+      ],
+      example: facts.fallback,
+    });
+    expect(output["say"]).toBeUndefined();
+    expect(output["facts"]).toMatchObject({
+      askedFor: 3,
+      tiedTogether: [
+        ["Halyard Security", "Clearwater Assurance", "Tensorgate"],
+      ],
+      moreOnTheSameScore: 4,
+    });
+    // Nothing internal reaches the voice: no ids, no field names of records.
+    expect(result?.output).not.toMatch(/companyId|subject|hue|"key"/u);
   });
 
   it("relays the silence ladder's beats out of band, never into what Q says (ADR 0062)", async () => {

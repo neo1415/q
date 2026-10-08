@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from "node:http";
 
 import type { QSilenceBeat, QVoiceChoice } from "@capital-q/contracts";
+import type { SpokenFacts } from "@capital-q/q-core";
 
 /**
  * The realtime voice provider boundary (doc 11 §17.2 Path B, doc 12
@@ -51,6 +52,14 @@ export type VoiceSpeaker = {
    * line nobody heard).
    */
   readonly deferred?: boolean | undefined;
+  /**
+   * A voice that speaks in its own words (the duplex line's realtime
+   * model): a code-built answer reaches it as facts, and it says them
+   * (founder live 2026-10-08). Absent: the turn says them itself, through
+   * a fast rewrite or the fact-built line. What is handed to `speak`
+   * alongside is the fact-built line, kept as what was said.
+   */
+  readonly facts?: ((facts: SpokenFacts) => void) | undefined;
 };
 
 export type VoiceChannelHandlers = {

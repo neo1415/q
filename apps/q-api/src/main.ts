@@ -537,6 +537,7 @@ import {
   timedVoiceTurns,
 } from "./voice/turn-timing.js";
 import { createDecisionReader } from "./voice/decision.js";
+import { createSpokenReplier } from "./voice/spoken-reply.js";
 import { createPersonProfileUpdateAction } from "./composition/person-profile-action.js";
 import { createInvestorProfileUpdateAction } from "./composition/investor-profile-action.js";
 import { createProfileChangeBoard } from "./composition/profile-change-board.js";
@@ -5179,6 +5180,13 @@ const voiceTurn = timedVoiceTurns(
     continueApproved,
     // And whether it was a yes is read from their words (ADR 0011).
     decisions: createDecisionReader({
+      gateway: modelGateway,
+      logger,
+      dataPosture: demoDataPosture,
+    }),
+    // A code-built answer said in Q's own words, checked against its
+    // facts (founder live 2026-10-08); the fact-built line when late.
+    spokenReply: createSpokenReplier({
       gateway: modelGateway,
       logger,
       dataPosture: demoDataPosture,
