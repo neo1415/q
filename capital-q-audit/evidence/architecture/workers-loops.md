@@ -5,7 +5,7 @@
 - Why included: All worker loops composed in one Promise.all: outbox, pgmq consumers, documents, Gmail poller, schedule/notice/document/daily tickers, embeddings refresh, deck reading, auto-verification.
 
 ```
- 1338  
+ 1338
  1339  // The loops hold the process resident; they return only after abort, at which
  1340  // point the pool is drained and telemetry flushed before exit.
  1341  await Promise.all([
@@ -124,4 +124,3 @@
  1454  await telemetry.shutdown();
  1455  logger.info({}, "worker runtime stopped");
 ```
-

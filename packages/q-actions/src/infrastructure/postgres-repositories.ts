@@ -394,6 +394,19 @@ export function createPostgresQActionRepositories(): QActionRepositories {
           requestedFromUserId: r.requested_from_user_id,
         };
       },
+      listLapsed: async (executor, input) => {
+        const rows = await executor<{ tenant_id: string; id: string }[]>`
+          select p.tenant_id, p.id
+            from q_runtime.approvals p
+           where p.status = 'PENDING'
+             and p.expires_at <= ${input.now.toISOString()}::text::timestamptz
+           order by p.expires_at, p.id
+           limit ${input.limit}`;
+        return rows.map((row) => ({
+          tenantId: TenantIdSchema.parse(row.tenant_id),
+          approvalId: QApprovalIdSchema.parse(row.id),
+        }));
+      },
       listPendingForApprover: async (executor, input) => {
         const rows = await executor`
           select p.id, a.run_id, r.conversation_id, a.summary,

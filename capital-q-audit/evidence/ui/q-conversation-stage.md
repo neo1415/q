@@ -7,7 +7,7 @@
 ```
   156  /** How long voice waits for a briefing still on its way before greeting. */
   157  const BRIEFING_WAIT_MS = 1_500;
-  158  
+  158
   159  /**
   160   * The welcome as spoken, with the briefing said after the greeting when
   161   * this page gives one: "Welcome back, Ada. One thing needs you. …
@@ -53,7 +53,7 @@
 
 ```
   371    // --- Talking --------------------------------------------------------------
-  372  
+  372
   373    const sessionTalk = session.talk;
   374    const talk = useCallback(async () => {
   375      rememberEnded(false);
@@ -77,13 +77,13 @@
   393      turns.length,
   394      spoken.length,
   395    ]);
-  396  
+  396
   397    const endVoice = voice.end;
   398    const end = useCallback(() => {
   399      rememberEnded(true);
   400      void endVoice();
   401    }, [endVoice]);
-  402  
+  402
   403    // Q speaks first: on arrival the line opens by itself where the
   404    // microphone is already this site's, and the person has not ended it in
   405    // this tab. Anywhere else the stage offers Talk, one press away.
@@ -124,7 +124,7 @@
 
 ```
   479    // --- The thread -------------------------------------------------------------
-  480  
+  480
   481    // The live line: what is being said right now, one line that grows in
   482    // place under its id, until the next one starts.
   483    const live = client.transcript.at(-1);
@@ -136,7 +136,7 @@
   489        client.state === "USER_SPEAKING" ||
   490        client.state === "LISTENING" ||
   491        client.state === "THINKING");
-  492  
+  492
   493    const stored: Line[] = turns.map((turn) =>
   494      turn.kind === "PERSON"
   495        ? { id: turn.id, role: "person", text: turn.text }
@@ -163,7 +163,7 @@
   516        : lines.filter(
   517            (line) => !(line.role === "person" && words(line.text) === liveWords),
   518          );
-  519  
+  519
   520    // The newest words are where the eye is: the thread keeps its end in view.
   521    const bodyRef = useRef<HTMLDivElement>(null);
   522    const newest = `${String(lines.length)}:${live?.text ?? ""}:${String(lines.at(-1)?.text.length ?? 0)}`;
@@ -202,7 +202,7 @@
 - Why included: showWelcome requires lines.length===0; qAsk awaits spokenWelcome before the first typed question.
 
 ```
-  596  
+  596
   597    const stage = workingLabel(q.state);
   598    const documentStage =
   599      q.state.stage === "PREPARING_DOCUMENT" ||
@@ -222,7 +222,7 @@
   613      !q.working &&
   614      !q.loading &&
   615      q.state.failure === null;
-  616  
+  616
   617    const room = useRoomSlots();
   618    const stateLabel = voice.active
   619      ? client.muted
@@ -232,7 +232,7 @@
   623        // would read as stale, so the idle label is just Q's name.
   624        (presence.label ??
   625        (connected && lines.length === 0 ? "Ready when you are" : "Q"));
-  626  
+  626
   627    const [historyOpen, setHistoryOpen] = useState(false);
   628    // W7: the sheet's code loads the first time it is opened, then stays.
   629    const [historyUsed, setHistoryUsed] = useState(false);
@@ -251,7 +251,7 @@
   642            anchor.click();
   643            URL.revokeObjectURL(url);
   644          };
-  645  
+  645
   646    // One way to say something to Q from the page: down the open line when
   647    // there is one (answered aloud), otherwise as a question.
   648    // A line that never connected (no microphone) carries nothing: typed
@@ -285,7 +285,7 @@
   676      if (!connected) return;
   677      if (takeAcceptedDeckOffer()) void qAsk(DECK_OFFER_QUESTION);
   678    }, [connected, qAsk]);
-  679  
+  679
   680    const sayOrAsk = useCallback(
   681      (text: string) => {
   682        if (lineOpen) sendText(text);
@@ -302,7 +302,7 @@
 - Why included: Pre-conversation branch: the only place ArrivalRoom (side columns) and the welcome (with the arrival cards) are rendered.
 
 ```
- 1160  
+ 1160
  1161                  {boardDocked || bigPresence ? null : (
  1162                    <QNow session={session} onAct={sayOrAsk} quietWhenIdle />
  1163                  )}
@@ -344,7 +344,7 @@
  1199                      ) : null}
  1200                    </div>
  1201                  </ArrivalRoom>
- 1202  
+ 1202
  1203                  {voice.active ? null : (
  1204                    <button
  1205                      type="button"
@@ -361,7 +361,7 @@
  1216                      {connected ? "Talk with Q" : "Q isn't available right now"}
  1217                    </button>
  1218                  )}
- 1219  
+ 1219
  1220                  {showWelcome ? (
  1221                    <div
  1222                      className="flex w-full flex-col items-center"
@@ -370,7 +370,7 @@
  1225                      {welcome}
  1226                    </div>
  1227                  ) : null}
- 1228  
+ 1228
  1229                  {showSuggestions ? (
  1230                    <ul
  1231                      aria-label="Suggested questions"
@@ -392,13 +392,13 @@
  1247                      ))}
  1248                    </ul>
  1249                  ) : null}
- 1250  
+ 1250
  1251                  {q.loading ? (
  1252                    <p className="cq-body-sm text-(--cq-text-secondary)">
  1253                      Opening your conversation…
  1254                    </p>
  1255                  ) : null}
- 1256  
+ 1256
  1257                  {boardDocked ? null : (
  1258                    <div className="w-full max-w-(--cq-layout-narrow)">
  1259                      <QNow session={session} onAct={sayOrAsk} quietWhenIdle />
@@ -408,4 +408,3 @@
  1263                </div>
  1264              )}
 ```
-

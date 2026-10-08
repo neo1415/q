@@ -5,13 +5,16 @@
 - Only aggregate counts, catalog metadata and fixed error-code prefixes were read. No row contents. Project ref and provider UUIDs left out.
 
 ## Migrations applied vs repository
+
 Query: `select count(*), min(version), max(version) from supabase_migrations.schema_migrations` and a membership check against the 178 file prefixes in `supabase/migrations/`.
+
 ```
 applied=178  first=20260902144606  last=20261220170000
 matching repo files=178  total=178
 ```
 
 ## RLS posture per schema (pg_class.relrowsecurity / relforcerowsecurity, pg_policies)
+
 ```
 schema          tables rls_on forced policies
 ai_ops             5      5     0      0
@@ -37,6 +40,7 @@ taxonomy           8      8     0      0
 ```
 
 ## Roles and live connections
+
 ```
 pg_roles: postgres rolbypassrls=true rolsuper=false; service_role bypassrls=true;
           authenticated/anon bypassrls=false
@@ -47,9 +51,11 @@ pg_stat_activity (client backends) by usename/application_name:
   supabase_admin  (none)/postgres_exporter 2
   supabase_read_only_user mgmt-api        1
 ```
+
 The only pooled application connections are `postgres` via Supavisor (the services use `DATABASE_CONNECTION_MODE=session_pooler`, .railway/railway.ts:91-94). The application's own `application_name` (`capital-q:request`, packages/database/src/internal/postgres.ts:46) is not passed through Supavisor, so the attribution is an inference.
 
 ## Row counts (count(*))
+
 ```
 identity.user_profiles 164        identity.organisations 94
 identity.organisation_memberships 151  identity.tenants 95
@@ -79,6 +85,7 @@ storage.buckets 4
 ```
 
 ## Outbox: unpublished rows
+
 ```
 unpublished=657, all with attempt_count>0
 event_type                 n    oldest      newest      max_attempts  last_error code
@@ -89,4 +96,5 @@ q.action.executed         62  2026-09-26  2026-10-08   10            EVENT_SCHEM
 q.action.execution_failed  7  2026-09-28  2026-10-06   10            EVENT_SCHEMA_INVALID
 published in last 24h: 296; last published 2026-10-08 11:25:04
 ```
+
 Every q.action.* row ever written (321 prepared = all 321 actions) is unpublished.

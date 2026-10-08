@@ -1413,8 +1413,9 @@ export function createErrandRunner(dependencies: {
           prepared,
         );
         const passed = passedBox.verdict;
+        let sent = false;
         if (answer?.reply != null) {
-          const sent = await post(
+          sent = await post(
             actor,
             row,
             `reply:${newest.toISOString()}`,
@@ -1427,14 +1428,30 @@ export function createErrandRunner(dependencies: {
               .catch(() => undefined);
           }
         }
-        await update(row.id, {
-          seenUntil: newest,
-          repliesSent: current.replies_sent + (answer?.reply == null ? 0 : 1),
-          lastStep:
-            answer?.reply == null
-              ? `${row.counterpart_name} wrote.`
-              : `Q answered ${row.counterpart_name}.`,
-        });
+        if (answer?.reply != null && !sent) {
+          // Recovery D-06: the send failed, so nothing is recorded as
+          // answered. Their message stays unseen (the next pass retries
+          // with the same idempotency key, so it can never go twice) and
+          // the person is told once.
+          await update(row.id, {
+            lastStep: `Q couldn't send its reply to ${row.counterpart_name}; it will try again.`,
+          });
+          await tell(
+            row,
+            link,
+            `send-failed:${newest.toISOString()}`,
+            `Q's reply to ${row.counterpart_name} didn't send`,
+            "Q will try again shortly. You can also reply in the chat yourself.",
+          );
+        } else {
+          await update(row.id, {
+            seenUntil: newest,
+            repliesSent: current.replies_sent + (sent ? 1 : 0),
+            lastStep: sent
+              ? `Q answered ${row.counterpart_name}.`
+              : `${row.counterpart_name} wrote.`,
+          });
+        }
         if (answer !== null && answer.forPerson.length > 0) {
           await tell(
             row,

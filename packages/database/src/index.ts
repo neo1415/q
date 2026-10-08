@@ -28,7 +28,11 @@ export {
   createSavepointTransactionManager,
   createTransactionManager,
 } from "./transaction.js";
-export { checkDatabaseHealth, type DatabaseHealth } from "./health.js";
+export {
+  checkDatabaseHealth,
+  checkDatabaseReadiness,
+  type DatabaseHealth,
+} from "./health.js";
 export { decodeJsonbString, jsonbParam } from "./jsonb.js";
 export {
   DATABASE_FAILURE_KINDS,

@@ -6,7 +6,7 @@
 
 ```ts
    14  import type { VoiceTurnHandler } from "./turn.js";
-   15  
+   15
    16  /**
    17   * Where a spoken turn's time goes (CQ-VOICE-010).
    18   *
@@ -39,7 +39,7 @@
    45   * over) and playback in the browser are the provider's and the browser's
    46   * to report. The deployed-stack recipe says where to read them.
    47   */
-   48  
+   48
 ```
 
 # Evidence: apps/q-api/src/voice/turn-timing.ts (lines 362-405)
@@ -94,4 +94,3 @@
   404        timing.end("FAILED");
   405        throw error;
 ```
-

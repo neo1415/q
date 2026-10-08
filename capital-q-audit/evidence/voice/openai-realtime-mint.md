@@ -10,7 +10,7 @@
    28    "https://api.openai.com/v1/realtime/client_secrets";
    29  export const OPENAI_REALTIME_CALLS_URL =
    30    "https://api.openai.com/v1/realtime/calls";
-   31  
+   31
    32  /** USD per million tokens (developers.openai.com/api/docs/pricing, 2026-10-04). */
    33  export const OPENAI_REALTIME_MINI_PRICES: RealtimePrices = {
    34    textInput: 0.6,
@@ -20,7 +20,7 @@
    38    cachedAudioInput: 0.3,
    39    audioOutput: 20,
    40  };
-   41  
+   41
    42  /**
    43   * The input transcription model, and its prices (2026-10-08). On a routed
    44   * line every word Q acts on comes from this transcript, so it is the full
@@ -36,10 +36,10 @@
    54    cachedAudioInput: 6,
    55    audioOutput: 0,
    56  };
-   57  
+   57
    58  /** Q's two voices, in the provider's catalogue. */
    59  const VOICES = { FEMALE: "marin", MALE: "cedar" } as const;
-   60  
+   60
    61  export function createOpenAIRealtimeProvider(options: {
    62    readonly apiKey: string;
    63    readonly fetch?: typeof fetch | undefined;
@@ -133,4 +133,3 @@
   151              },
   152            }),
 ```
-

@@ -78,7 +78,7 @@
  3805    actions: qActionPort,
  3806    logger,
  3807  });
- 3808  
+ 3808
  3809  // Approved actions nobody carried out (live 2026-10-01, 6b04d028): through
  3810  // the same execution gate, as the approver, every two minutes.
  3811  const approvedActionSweep = createApprovedActionSweep({
@@ -98,7 +98,7 @@
  3825        logger.warn({ err: error }, "approved action sweep failed");
  3826      });
  3827  }, APPROVED_ACTION_SWEEP_INTERVAL_MS).unref();
- 3828  
+ 3828
  3829  /**
  3830   * The orchestration boundary. On: an accepted run is orchestrated at once
  3831   * and reaches the composed answer seam. This is a composition decision, not
@@ -106,7 +106,7 @@
  3833   * can honestly do.
  3834   */
  3835  const Q_ORCHESTRATION_AUTOSTART = true;
- 3836  
+ 3836
  3837  // Runs this process was orchestrating when it last stopped have no engine
  3838  // any more. Close them before serving, so a reconnecting client receives one
  3839  // terminal, retryable failure instead of "working" forever (CQ-PRE-REC-001 §8).
@@ -129,7 +129,7 @@
  3856    },
  3857    5 * 60 * 1000,
  3858  ).unref();
- 3859  
+ 3859
  3860  // Q in a meeting (founder direction 2026-09-29): the organiser brings Q to
 ```
 
@@ -160,7 +160,7 @@
  4152    // a lobby and a retry are each seen within a minute.
  4153    60 * 1000,
  4154  ).unref();
- 4155  
+ 4155
 ```
 
 # Excerpt: apps/q-api/src/main.ts lines 4262-4278
@@ -185,7 +185,7 @@
  4274        logger.warn({ err: error }, "errand run failed");
  4275      });
  4276  }, 60 * 1000).unref();
- 4277  
+ 4277
  4278  // AUTO block (ADR 0030): Q's delegated work on LangGraph, checkpointed in
 ```
 
@@ -199,7 +199,7 @@
  4495    }),
  4496    logger,
  4497  });
- 4498  
+ 4498
  4499  setInterval(() => {
  4500    workRuntime.tick().catch((error: unknown) => {
  4501      logger.warn({ err: error }, "q work run failed");
@@ -240,6 +240,5 @@
  4999  };
  5000  setTimeout(runScout, 5 * 60 * 1000).unref();
  5001  setInterval(runScout, 6 * 60 * 60 * 1000).unref();
- 5002  
+ 5002
 ```
-

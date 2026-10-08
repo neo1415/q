@@ -9,9 +9,21 @@ export {
   type AgentRole,
 } from "./registry.js";
 export {
+  ALL_EXECUTORS,
+  STORED_ROLE,
+  UNREGISTERED_ROLE_REASONS,
+  executorRoleOf,
+  executorRosterText,
+  isQAgentRole,
+  registeredExecutors,
+  roleTitle,
+  type ExecutorAvailability,
+} from "./executors.js";
+export {
   MAX_JOB_STEPS,
   STEP_REFUSALS,
   boundPlan,
+  planIsValid,
   type BoundStep,
   type PlanBounds,
   type ProposedStep,
@@ -47,6 +59,7 @@ export {
   type AgentExecutor,
   type JobRecorder,
   type JobRunResult,
+  type PriorRun,
   type StepResult,
   type StepStatus,
 } from "./job-runner.js";

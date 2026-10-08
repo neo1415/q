@@ -29,7 +29,7 @@
  1589      // Their words never came: the voice must hand the turn to Q.
  1590      this.#forceAskQ();
  1591    }
- 1592  
+ 1592
  1593    /** The voice may answer only by passing the turn to Q (ask_q). */
  1594    #forceAskQ(): void {
  1595      if (this.#over) return;
@@ -40,7 +40,7 @@
  1600      });
  1601      this.#touch();
  1602    }
- 1603  
+ 1603
  1604    async #routeHeard(
  1605      words: string,
  1606      itemId: string | null,
@@ -214,7 +214,7 @@
    20    | "Q_SPEAKING"
    21    | "INTERRUPTED"
    22    | "ERROR";
-   23  
+   23
    24  export const VOICE_STATE_LABELS: Readonly<Record<VoiceState, string>> = {
    25    IDLE: "Ready",
    26    CONNECTING: "Connecting",
@@ -225,6 +225,5 @@
    31    INTERRUPTED: "Listening",
    32    ERROR: "Voice paused",
    33  };
-   34  
+   34
 ```
-

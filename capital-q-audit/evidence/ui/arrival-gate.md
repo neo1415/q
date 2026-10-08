@@ -15,21 +15,21 @@
     8   * Decided once per page load and shared, so the Q page and the dock never
     9   * both give it, and the spoken welcome and the screen agree.
    10   */
-   11  
+   11
    12  const SEEN_KEY = "cq.q.last-seen";
    13  const SESSION_KEY = "cq.q.arrived";
-   14  
+   14
    15  /** Away this long, and it is an arrival again. */
    16  export const RETURN_AFTER_MS = 2 * 3_600_000;
    17  /** How often an open, visible page says the person is still here. */
    18  const HEARTBEAT_MS = 60_000;
-   19  
+   19
    20  export type ArrivalGate = {
    21    readonly give: boolean;
    22    /** Their last visit, ISO; null when this browser has none. */
    23    readonly since: string | null;
    24  };
-   25  
+   25
    26  /** Pure: whether this is an arrival, from what the browser remembers. */
    27  export function arrivalGateOf(input: {
    28    readonly now: number;
@@ -45,7 +45,7 @@
    38      since: known ? new Date(seen).toISOString() : null,
    39    };
    40  }
-   41  
+   41
    42  function read(storage: () => Storage, key: string): string | null {
    43    try {
    44      return storage().getItem(key);
@@ -53,7 +53,7 @@
    46      return null;
    47    }
    48  }
-   49  
+   49
    50  function write(storage: () => Storage, key: string, value: string): void {
    51    try {
    52      storage().setItem(key, value);
@@ -61,14 +61,14 @@
    54      // Blocked storage: the briefing is simply given again next time.
    55    }
    56  }
-   57  
+   57
    58  let decided: ArrivalGate | null = null;
    59  let beating = false;
-   60  
+   60
    61  function beat(): void {
    62    write(() => window.localStorage, SEEN_KEY, new Date().toISOString());
    63  }
-   64  
+   64
    65  /**
    66   * This page load's decision. The first call reads the last visit, then
    67   * starts keeping it current; later calls get the same answer.
@@ -109,10 +109,10 @@
   102    }
   103    return decided;
   104  }
-  105  
+  105
   106  type ReturnListener = (gate: ArrivalGate) => void;
   107  const returnListeners = new Set<ReturnListener>();
-  108  
+  108
   109  /** Back on an open page after two hours away: brief again. */
   110  export function onReturn(listener: ReturnListener): () => void {
   111    returnListeners.add(listener);
@@ -120,10 +120,9 @@
   113      returnListeners.delete(listener);
   114    };
   115  }
-  116  
+  116
   117  /** For tests: forget this page load's decision. */
   118  export function resetArrivalGate(): void {
   119    decided = null;
   120  }
 ```
-

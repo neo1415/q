@@ -3,6 +3,7 @@
 These can't be settled from the code alone. Each needs a product decision, production configuration, or access the audit didn't use.
 
 ## Product decisions
+
 1. **Waiting cards.** Should a card that waits (a near-miss draft, or an approval request) escalate, send a holding reply, or be retried? The code's rule today is "nothing outward without a passing score or a yes". The founder expects agents to "answer messages".
 2. **Lapsed approvals.** Should they be expired eagerly so the agent can redraft or notify (D-01)?
 3. **Briefing on screen.** Should the arrival briefing be a persistent layer, with side columns kept while talking, or move into the presence stage once Q speaks (E-01)?
@@ -16,6 +17,7 @@ These can't be settled from the code alone. Each needs a product decision, produ
 11. **WRITER and REVIEWER.** Separate plan steps, or internal to the conversation agent (D-02)?
 
 ## Configuration and infrastructure
+
 12. Production values or presence of: `CQ_VOICE_REALTIME*`, `CQ_VOICE_REALTIME_DAILY_CAP_USD` (default $1 platform-wide), `CQ_INSTRUCTIONS_AUTO`, `CAPITAL_Q_SYNTHETIC_DEMO_ATTESTED`, `CQ_SYNTHETIC_DEMO_ROUTING`, `Q_EMBEDDING_PROVIDER`, `SUPABASE_SECRET_KEY` (on q-api).
 13. Number of q-api replicas and the deploy frequency during calls.
 14. Which branch Railway deploys from: `recovery/2026-09-12` and `recovery/2026-09-12-8y2j4w` are both pushed to.
@@ -26,6 +28,7 @@ These can't be settled from the code alone. Each needs a product decision, produ
 19. Do real customers use the staging project? This decides whether R-F2 is a breach or an accepted demo posture.
 
 ## Not determinable without paid or live calls
+
 20. Real voice latency: first audio and end-to-end per turn. Logs exist ("voice turn timed"), but the audit didn't aggregate them.
 21. Duplex behaviour in a real desktop browser. The sandbox's WebRTC couldn't hold a call.
 22. Actual monthly spend per provider. Deepgram, ElevenLabs, Recall, Tavily, SerpAPI, Bright Data and OpenAI embeddings have no usage ledger.

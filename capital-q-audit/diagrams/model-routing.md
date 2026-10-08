@@ -29,7 +29,7 @@ flowchart TD
     RT --> LEDGER
     IMG[Images] --> GIMG[gemini-3.1-flash-lite-image / gpt-image-1]
     IMG -->|modelId ...022 collides with realtime row| LEDGER
-    EMB[q-embeddings] --> OEMB[OpenAI text-embedding-3-small] 
+    EMB[q-embeddings] --> OEMB[OpenAI text-embedding-3-small]
     EMB -.no ledger.-> X1[ ]
     VOICE[Standard voice line] --> DG[Deepgram flux STT / aura TTS] & EL[ElevenLabs v3 / turbo]
     DG -->|think| QAPI[q-api think endpoint] --> GW

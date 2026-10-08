@@ -9,7 +9,7 @@
    31    readonly kind: QSubjectKind;
    32    readonly relation: SubjectRelation;
    33  };
-   34  
+   34
    35  export function deriveTaskClass(
    36    capability: QCapability,
    37    subjects: readonly SubjectSummary[],
@@ -63,7 +63,7 @@
    85      ? "OWN_COMPANY_QUESTION"
    86      : "COUNTERPARTY_COMPANY_QUESTION";
    87  }
-   88  
+   88
    89  /**
    90   * Subject-bound knowledge a capability may need for a subject kind. The
    91   * owner side and the counterparty side get the same candidates: which of
@@ -135,7 +135,7 @@
   157    }
   158    return [];
   159  }
-  160  
+  160
   161  /** Actor-wide knowledge every task may use. Classification stays on the subject. */
   162  export function actorWideScopeKinds(
   163    capability: QCapability,
@@ -152,7 +152,7 @@
   174          "GENERAL_MODEL_KNOWLEDGE",
   175        ];
   176  }
-  177  
+  177
   178  /**
   179   * The strongest sensitivity a task may carry into reasoning. RESTRICTED
   180   * (identity artefacts) never enters Q (doc 14 §34); preparing an action or

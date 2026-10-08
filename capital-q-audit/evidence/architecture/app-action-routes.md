@@ -40,7 +40,7 @@
   152        .send(unavailable);
   153    }
   154  }
-  155  
+  155
   156  export function registerAppActionRoutes(
   157    app: FastifyInstance,
   158    dependencies: AppActionRoutesDependencies,
@@ -85,12 +85,12 @@
   197      });
   198    }
   199  }
-  200  
+  200
   201  export type PersonActionRoutesDependencies = OnboardingActorDependencies & {
   202    readonly ports: AppActionPorts;
   203    readonly actions?: readonly AnyPersonAction[] | undefined;
   204  };
-  205  
+  205
   206  /**
   207   * Person-scoped routes (ADR 0040): the same generated answer, under the
   208   * onboarding actor, for a person who may have no organisation yet. The
@@ -129,4 +129,3 @@
   241    }
   242  }
 ```
-

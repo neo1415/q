@@ -95,7 +95,12 @@ export type QTurnObjectBlock = Extract<
       | "CLARIFICATION_REQUEST"
       | "ACTION_PROPOSAL"
       | "ARTIFACT_REFERENCE"
-      | "UI_INTENT";
+      | "UI_INTENT"
+      // RECOVERY-2026-10 E4: laid-out data, rendered in the answer.
+      | "TABLE"
+      | "CHART"
+      | "MAP"
+      | "TIMELINE";
   }
 >;
 
@@ -136,6 +141,10 @@ function objectBlocksOf(
       case "CLARIFICATION_REQUEST":
       case "ACTION_PROPOSAL":
       case "ARTIFACT_REFERENCE":
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block

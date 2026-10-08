@@ -26,9 +26,9 @@
    19   * `createPrivilegedDatabaseClient` has no caller outside tests, so no
    20   * deployed service needs that credential.
    21   */
-   22  
+   22
    23  import { defineRailway, github, preserve, project, service } from "railway/iac";
-   24  
+   24
    25  /**
    26   * The integration branch carrying the accepted product state. Railway's
    27   * default branch for this repo is `main`, which is behind; deployment
@@ -36,11 +36,11 @@
    29   * source branch is configuration instead.
    30   */
    31  const INTEGRATION_BRANCH = "recovery/2026-09-12";
-   32  
+   32
    33  /** EU West, Netherlands — the Amsterdam location doc 21 selected. EU data
    34   * residency is a requirement, not a preference (ADR 0001, carried by 0014). */
    35  const EU_REGION = "europe-west4";
-   36  
+   36
    37  /**
    38   * A leaf deployable cannot be built alone: every workspace package resolves
    39   * through `dist`, and `turbo.json` declares `build` with
@@ -72,7 +72,7 @@
    65      "/.nvmrc",
    66    ],
    67  });
-   68  
+   68
    69  /**
    70   * Shared runtime posture.
    71   *
@@ -92,13 +92,13 @@
    85    REGION: "eu-west",
    86    LOG_LEVEL: "info",
    87  } as const;
-   88  
+   88
    89  /** Hosted Supabase is reached through its session pooler. */
    90  const databaseEnv = {
    91    DATABASE_URL: preserve(),
    92    DATABASE_CONNECTION_MODE: "session_pooler",
    93  } as const;
-   94  
+   94
    95  /**
    96   * Model providers. Each is optional and the gateway routes around an
    97   * unconfigured one. `api` needs one because the GateQ applicant interview is
@@ -111,13 +111,13 @@
   104    GROQ_API_KEY: preserve(),
   105    GROQ_API_KEY_2: preserve(),
   106  } as const;
-  107  
+  107
   108  export default defineRailway(() => {
   109    const repo = github("neo1415/q", {
   110      branch: INTEGRATION_BRANCH,
   111      checkSuites: false,
   112    });
-  113  
+  113
   114    /**
   115     * The application API. `PORT` is set explicitly rather than left to
   116     * Railway's injected value so that the private address other services use
@@ -154,7 +154,7 @@
   147        SUPABASE_SECRET_KEY: preserve(),
   148      },
   149    });
-  150  
+  150
   151    /**
   152     * The Q runtime. Its public origin is what the speech provider calls back
   153     * to, which is the ngrok dependency this deployment removes:
@@ -191,7 +191,7 @@
   184        Q_VOICE_EXPRESSIVE: "false",
   185      },
   186    });
-  187  
+  187
   188    /**
   189     * Background workers: outbox publishing and document processing. No public
   190     * domain (doc 21, IDA-033) — nothing about this service is browser-facing.
@@ -222,7 +222,7 @@
   215        SERP_API_KEY: preserve(),
   216      },
   217    });
-  218  
+  218
   219    /**
   220     * The web app. Vercel is still the intended host (ADR 0001, unchanged by
   221     * 0014); this serves staging until Vercel is authenticated.
@@ -267,8 +267,7 @@
   260        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: preserve(),
   261      },
   262    });
-  263  
+  263
   264    return project("Q", { resources: [api, qApi, workers, web] });
   265  });
 ```
-

@@ -129,11 +129,16 @@ export type OutwardReview = {
   ) => Promise<OutwardVerdict>;
   /** A prepared message the writer had nothing honest for: its runs end. */
   readonly abandon: (who: Owner, prepared: PreparedDraft) => Promise<void>;
-  /** What happened to a passed draft: sent by Q, or offered for approval. */
+  /**
+   * What happened to a draft: a passed one sent by Q or offered for
+   * approval; a near miss (recovery D-03) offered as the person's card
+   * (OFFERED, linked to it) or, when no card could be made, HELD. A near
+   * miss is never SENT here.
+   */
   readonly settle: (
     who: Owner,
     verdict: OutwardVerdict,
-    outcome: "SENT" | "OFFERED",
+    outcome: "SENT" | "OFFERED" | "HELD",
     qActionId?: string | null,
   ) => Promise<void>;
 };
@@ -367,7 +372,15 @@ export function createOutwardReview(dependencies: {
               ? "Couldn't grade it."
               : `Scored ${String(outcome.grade.score)} against a bar of ${String(policy.threshold)}.`,
           );
-          if (outcome.verdict === "HELD" && outcome.draftId !== null) {
+          // A near miss handed back for the person's card is settled by
+          // the caller (OFFERED with the card, or HELD): recording HELD
+          // here put one message on Work twice, once with "Send as is"
+          // while its card still waited (audit D-03).
+          if (
+            outcome.verdict === "HELD" &&
+            outcome.draftId !== null &&
+            outcome.nearMiss !== true
+          ) {
             await store.addOutcome(who, {
               jobId: filed.jobId,
               draftId: outcome.draftId,
@@ -403,12 +416,21 @@ export function createOutwardReview(dependencies: {
     settle: async (who, verdict, outcome, qActionId = null) => {
       if (
         store === undefined ||
-        verdict.verdict !== "PASSED" ||
         verdict.jobId === null ||
         verdict.draftId === null
       ) {
         return;
       }
+      const nearMiss = verdict.verdict === "HELD" && verdict.nearMiss === true;
+      // A passed draft is sent or offered; a near miss is offered or held;
+      // anything else was settled when it was reviewed.
+      const allowed =
+        verdict.verdict === "PASSED"
+          ? outcome !== "HELD"
+          : nearMiss && outcome !== "SENT";
+      if (!allowed) return;
+      // OFFERED always names its card, so the page links the two.
+      if (outcome === "OFFERED" && qActionId === null) return;
       const { jobId, draftId } = verdict;
       await quietly(
         () =>
@@ -416,8 +438,8 @@ export function createOutwardReview(dependencies: {
             jobId,
             draftId,
             outcome,
-            reason: null,
-            qActionId,
+            reason: verdict.verdict === "HELD" ? verdict.reason : null,
+            qActionId: outcome === "OFFERED" ? qActionId : null,
           }),
         undefined,
       );

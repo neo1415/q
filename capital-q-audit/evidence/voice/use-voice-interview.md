@@ -171,11 +171,11 @@
   525      },
   526      [holder, voice],
   527    );
-  528  
+  528
   529    useEffect(() => {
   530      talkRef.current = talk;
   531    }, [talk]);
-  532  
+  532
   533    // A surface that goes away takes its line with it, and nothing it
   534    // scheduled (a reconnect) may open another afterwards.
   535    useEffect(() => {
@@ -188,14 +188,14 @@
   542        dropVoiceLine(holder);
   543      };
   544    }, [holder]);
-  545  
+  545
   546    const end = useCallback(async () => {
   547      reset();
   548      // After any open still in progress, so an End pressed while connecting
   549      // is never followed by the line coming up.
   550      await endVoiceLine(holder, () => clientRef.current.end());
   551    }, [holder, reset]);
-  552  
+  552
   553    // While talking, follow what Q is asking; a stale read is dropped.
   554    useEffect(() => {
   555      if (!active || voiceSessionId === null) {
@@ -274,4 +274,3 @@
   628      };
   629    }, [active, voiceSessionId]);
 ```
-

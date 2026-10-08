@@ -19,7 +19,7 @@
  1037      if ((was === "OFF") === (level === "OFF") || !this.#connected) return;
  1038      this.#sendTurnDetection(level);
  1039    }
- 1040  
+ 1040
  1041    /** The provider's turn detector, for this listening level. */
  1042    #sendTurnDetection(level: QVoiceListeningLevel): void {
  1043      this.#send({
@@ -42,7 +42,7 @@
  1060        },
  1061      });
  1062    }
- 1063  
+ 1063
  1064    /**
  1065     * Q speaks first (founder live 2026-10-05: "I listen and it waits for me
  1066     * to talk"). The opening -- the server's, or the question already on
@@ -63,7 +63,7 @@
  1081      this.#events.onState("THINKING");
  1082      this.#touch();
  1083    }
- 1084  
+ 1084
  1085    /**
  1086     * Typed while the line is open: the same turn, answered aloud. Typing is
  1087     * the person taking the turn, so a reply in flight is cut first, exactly
@@ -90,7 +90,7 @@
  1108      this.#events.onState("THINKING");
  1109      this.#touch();
  1110    }
- 1111  
+ 1111
  1112    #channelOpen(channel: RTCDataChannel): Promise<void> {
  1113      if (channel.readyState === "open") return Promise.resolve();
  1114      return new Promise((resolve, reject) => {
@@ -102,7 +102,7 @@
  1120        };
  1121      });
  1122    }
- 1123  
+ 1123
  1124    #withTimeout<T>(work: Promise<T>): Promise<T> {
  1125      return new Promise<T>((resolve, reject) => {
  1126        const timer = this.#env.setTimeout(() => {
@@ -120,7 +120,7 @@
  1138        );
  1139      });
  1140    }
- 1141  
+ 1141
  1142    #send(event: Record<string, unknown>): void {
  1143      const channel = this.#channel;
  1144      if (channel === null || channel.readyState !== "open") return;
@@ -130,7 +130,7 @@
  1148        // A closed channel is noticed by the connection state.
  1149      }
  1150    }
- 1151  
+ 1151
  1152    /** Activity: the idle window starts again. */
  1153    #touch(): void {
  1154      if (this.#idleTimer !== null) this.#env.clearTimeout(this.#idleTimer);
@@ -155,7 +155,7 @@
  1173        this.#events.onEnded("IDLE");
  1174      }, this.#credential.idleMs);
  1175    }
- 1176  
+ 1176
  1177    /**
  1178     * The person may be talking over Q. Founder live 2026-10-07: "sometimes
  1179     * the voice just cuts (not a dropped connection)" -- any VAD start (a
@@ -176,7 +176,7 @@
  1194      }, BARGE_CONFIRM_MS);
  1195      this.#bargePending = { timer };
  1196    }
- 1197  
+ 1197
  1198    /** The sound stopped before it was a turn: Q is heard again. */
  1199    #blipEnded(): void {
  1200      const pending = this.#bargePending;
@@ -188,7 +188,7 @@
  1206        this.#audio.volume = this.#volume;
  1207      }
  1208    }
- 1209  
+ 1209
  1210    /** Q's audio stops now: the person is speaking. */
  1211    #bargeIn(): void {
  1212      if (this.#bargePending !== null) {
@@ -217,13 +217,12 @@
  1235      this.#events.onInterrupted();
  1236      this.#events.onState("USER_SPEAKING");
  1237    }
- 1238  
+ 1238
  1239    #unsilence(): void {
  1240      if (this.#speakingSilenced && this.#audio !== null) {
  1241        this.#audio.volume = this.#volume;
  1242      }
  1243      this.#speakingSilenced = false;
  1244    }
- 1245  
+ 1245
 ```
-

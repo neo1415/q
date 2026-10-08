@@ -11,34 +11,34 @@ Why included: Which keys exist, stale 'diagnostic only' comments, registration, 
    21    "GEMINI_API_KEY2",
    22    "GROQ_API_KEY",
    23  ] as const;
-   24  
+   24
    25  const REDACTED = "[redacted]";
-   26  
+   26
    27  export class ProviderCredential {
    28    readonly #value: string;
-   29  
+   29
    30    constructor(value: string) {
    31      this.#value = value;
    32    }
-   33  
+   33
    34    /** The only way to the value. Call at composition, never in a log path. */
    35    reveal(): string {
    36      return this.#value;
    37    }
-   38  
+   38
    39    toJSON(): string {
    40      return REDACTED;
    41    }
-   42  
+   42
    43    toString(): string {
    44      return REDACTED;
    45    }
-   46  
+   46
    47    [Symbol.for("nodejs.util.inspect.custom")](): string {
    48      return REDACTED;
    49    }
    50  }
-   51  
+   51
    52  /**
    53   * Keys are opaque strings of a vendor's choosing; the only validation that
    54   * does not embed a vendor's format is "present and not obviously blank".
@@ -56,7 +56,7 @@ Why included: Which keys exist, stale 'diagnostic only' comments, registration, 
    66      .max(512, "expected a provider API key")
    67      .optional(),
    68  );
-   69  
+   69
    70  /**
    71   * The operator's opt-in for synthetic-demo model routing (doc 15 §62,
    72   * CQ-REC-007). Off unless set to `true`. Setting it is a claim about the
@@ -72,7 +72,7 @@ Why included: Which keys exist, stale 'diagnostic only' comments, registration, 
    82      z.enum(["true", "false"]),
    83    )
    84    .transform((value) => value === "true");
-   85  
+   85
    86  export const modelProviderEnvShape = {
    87    CQ_SYNTHETIC_DEMO_ROUTING: syntheticDemoRouting,
    88    /**
@@ -183,7 +183,7 @@ Why included: Which keys exist, stale 'diagnostic only' comments, registration, 
   952      : { syntheticProjectRef: providerSecrets.syntheticDemoProjectRef }),
   953    supabaseUrl: config.public.supabaseUrl,
   954  });
-  955  
+  955
   956  /**
   957   * What kind of material this service handles (doc 15 section 62).
   958   *
@@ -194,7 +194,7 @@ Why included: Which keys exist, stale 'diagnostic only' comments, registration, 
   963   */
   964  const demoDataPosture: ModelDataPosture =
   965    syntheticDemo === null ? "REAL_CUSTOMER" : "SYNTHETIC_DEMO";
-  966  
+  966
   967  /**
   968   * The diagnostic route, when a local or test deployment names one
   969   * (QX-004 core gate).
@@ -215,7 +215,7 @@ Why included: Which keys exist, stale 'diagnostic only' comments, registration, 
   984      syntheticDemoPermitted: syntheticDemo !== null,
   985    },
   986  );
-  987  
+  987
   988  /**
   989   * Where each spoken turn's time goes (CQ-VOICE-010): one line per voice
   990   * turn, "voice turn timed". Created before the gateway so that every model
@@ -257,7 +257,7 @@ Why included: Which keys exist, stale 'diagnostic only' comments, registration, 
  1026      ? "no synthetic-demo attestation: every request is a customer's"
  1027      : "synthetic-demo attestation accepted",
  1028  );
- 1029  
+ 1029
  1030  // Controlled public-web research (CQ-Q-RESEARCH-001): the provider exists
 ```
 
@@ -283,13 +283,13 @@ Why included: Which keys exist, stale 'diagnostic only' comments, registration, 
    85    REGION: "eu-west",
    86    LOG_LEVEL: "info",
    87  } as const;
-   88  
+   88
    89  /** Hosted Supabase is reached through its session pooler. */
    90  const databaseEnv = {
    91    DATABASE_URL: preserve(),
    92    DATABASE_CONNECTION_MODE: "session_pooler",
    93  } as const;
-   94  
+   94
    95  /**
    96   * Model providers. Each is optional and the gateway routes around an
    97   * unconfigured one. `api` needs one because the GateQ applicant interview is
@@ -303,4 +303,3 @@ Why included: Which keys exist, stale 'diagnostic only' comments, registration, 
   105    GROQ_API_KEY_2: preserve(),
   106  } as const;
 ```
-

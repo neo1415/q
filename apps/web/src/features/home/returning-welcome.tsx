@@ -130,6 +130,8 @@ export function ReturningWelcome({
       */}
       <ArrivalBriefing
         variant="page"
+        // E1: the cards are the Q stage's layer, which outlives this welcome.
+        cards="stage"
         fallback={
           <div className="flex flex-col items-center gap-2 text-center">
             <h1

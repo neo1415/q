@@ -22,15 +22,15 @@
    15   * The asks are described to models in code's own fixed words; nothing
    16   * here quotes the other side, so the line is trusted where it is used.
    17   */
-   18  
+   18
    19  export type PendingAskKind = "MEETING" | "DOCUMENT" | "QUESTION";
-   20  
+   20
    21  export type PendingAsk = {
    22    readonly kind: PendingAskKind;
    23    /** The thing offered or asked for, by code's vocabulary ("deck"). */
    24    readonly thing: string | null;
    25  };
-   26  
+   26
    27  // Tensorgate, 8 Oct: Zino's "Would you be open to connecting?" is an ask
    28  // to meet; without "connect" here, a redraft re-asking it passed code.
    29  const MEETING =
@@ -39,11 +39,11 @@
    32    /\b(deck|pitch deck|one[- ]pager|memo|data ?room|methodology|materials?|financials|financial model|case stud(?:y|ies))\b/iu;
    33  const OFFER_OR_ASK =
    34    /\b(?:share|send|happy to|glad to|would you like|want|keen to|find|hop on|grab|set up|arrange|book|schedule|can we|could we|shall we|let'?s|are you free|available|availability|time to)\b/iu;
-   35  
+   35
    36  /** A question asked without a question mark ("I'd be interested to hear how"). */
    37  const INDIRECT_QUESTION =
    38    /\b(?:(?:interested|keen|curious) to (?:hear|know|learn|understand)|(?:would|'d) (?:love|like) to (?:hear|know|learn|understand)|curious (?:about|how|whether|what)|tell (?:me|us) (?:more|how|what|about)|wondering (?:how|whether|what|if))\b/iu;
-   39  
+   39
    40  /** Their sentences, split on end punctuation and line breaks. */
    41  function sentences(text: string): readonly string[] {
    42    return text
@@ -51,7 +51,7 @@
    44      .map((one) => one.trim())
    45      .filter((one) => one.length > 0);
    46  }
-   47  
+   47
    48  /**
    49   * What their latest unanswered message(s) leave open. Empty when they
    50   * wrote nothing, or nothing that asks for a response beyond courtesy.
@@ -90,7 +90,7 @@
    83    }
    84    return asks;
    85  }
-   86  
+   86
    87  /** The asks in code's fixed words, for the reviewer and the writer. */
    88  export function asksLine(asks: readonly PendingAsk[]): string {
    89    if (asks.length === 0) return "None.";
@@ -104,18 +104,18 @@
    97      )
    98      .join(" ");
    99  }
-  100  
+  100
   101  /** Asking whether they will connect, after they already offered to meet. */
   102  const RE_ASK_CONNECT =
   103    /\b(?:open to (?:connect(?:ing)?|a (?:call|chat|conversation|meeting)|chat(?:ting)?|speak(?:ing)?|talk(?:ing)?|meet(?:ing)?)|interested in (?:connecting|a call|a chat|meeting)|(?:would|will) you (?:like|be (?:keen|happy|open)) to (?:connect|chat|meet|speak|talk)|(?:could|shall|should|can) we connect|happy to connect|keen to connect|love to connect)\b/iu;
-  104  
+  104
   105  /** Words that take up a call: a time, a day, availability, booking. */
   106  const ADDRESSES_MEETING =
   107    /\b(?:call|meet|meeting|chat|minutes|time|times|slot|slots|calendar|book|booked|invite|available|availability|schedule|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|this week|next week|morning|afternoon|evening|\d{1,2}(?::\d{2})?\s?(?:am|pm)|\d{1,2}:\d{2})\b/iu;
-  108  
+  108
   109  const ADDRESSES_DOCUMENT =
   110    /\b(?:deck|one[- ]pager|memo|data ?room|methodology|materials?|financials|financial model|case stud(?:y|ies)|send (?:it|them|that|this|over)|share (?:it|them|that|this)|document|documents)\b/iu;
-  111  
+  111
   112  /**
   113   * The fixes a draft needs to respond to the thread, as a list for the
   114   * writer; empty when it responds (or nothing is open). Code cannot tell

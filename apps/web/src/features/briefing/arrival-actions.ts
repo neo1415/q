@@ -2,7 +2,12 @@
 
 import { z } from "zod";
 
-import { getQWorkSince, readBriefingCommand } from "@capital-q/api-client";
+import {
+  discoverCompanies,
+  getQWorkSince,
+  listInvestorRelationships,
+  readBriefingCommand,
+} from "@capital-q/api-client";
 import {
   BriefingCommandRequestSchema,
   type BriefingCommandRequest,
@@ -27,16 +32,32 @@ import {
   readQApprovalAction,
   rejectQApprovalAction,
 } from "@/features/q/actions";
-import { qApiSession } from "@/features/q/context";
+import { fitProfilesAction } from "@/features/fit/fit-actions";
+import { ownReadiness } from "@/features/readiness/readiness-data";
+import {
+  apiSession,
+  qApiSession,
+  resolveOwnContext,
+} from "@/features/q/context";
 import { decisionGroups, decisionTitle } from "@/features/work/decisions";
 import { retryHeldAction } from "@/features/work/held-actions";
 import { readPlan } from "@/features/work/plan-words";
 import { groupNotices } from "@/features/work/notice-groups";
 import { listNoticesAction } from "@/features/work/work-actions";
 import { listDoneAction } from "@/features/work/work-page-actions";
-import { loadWorkforceAction } from "@/features/work/workforce-actions";
+import {
+  loadWorkforceAction,
+  type WorkforceView,
+} from "@/features/work/workforce-actions";
 
 import type { ArrivalCard, ArrivalData } from "./arrival";
+import { attentionFromReads, sourceOfNotice } from "./attention";
+import {
+  ARRIVAL_MATCHES_MAX,
+  matchOpinion,
+  newMatchesFor,
+  type ArrivalMatches,
+} from "./matches";
 
 /**
  * The arrival briefing's reads and its one decision path (Zino,
@@ -92,21 +113,103 @@ function activityOf(since: QWorkSinceDto | null): ArrivalActivity | null {
 }
 
 const SinceInput = z.string().datetime({ offset: true }).nullable();
+const BrowserInput = z
+  .object({
+    /** Held drafts this browser dismissed on Work (audit D-E6). */
+    dismissedHeld: z.array(z.string().max(80)).max(200).optional(),
+    /** Companies earlier arrivals showed here; null: none remembered. */
+    seenMatches: z.array(z.string().uuid()).max(200).nullable().optional(),
+  })
+  .strict()
+  .optional();
+export type ArrivalBrowserInput = z.input<typeof BrowserInput>;
+
+/** How far into the slate the arrival looks for new matches. */
+const SLATE_LOOK = 20;
+/** Q.01: the questions put beside Q at once. */
+const QUESTIONS_MAX = 5;
+
+/**
+ * Investors: the new companies in their own slate that fit their mandate,
+ * each with Q's take from its fit profile (one batched read). Null when
+ * the slate could not be read; an empty list when nothing is new.
+ */
+async function readMatches(
+  seen: ReadonlySet<string> | null,
+): Promise<ArrivalMatches | null> {
+  const session = await apiSession();
+  if (session === null) return null;
+  const [slate, relationships] = await Promise.all([
+    discoverCompanies(session, { limit: SLATE_LOOK }).catch(() => null),
+    listInvestorRelationships(session).catch(() => null),
+  ]);
+  if (slate === null) return null;
+  const touched = new Set(
+    (relationships?.items ?? []).map((item) => item.counterpart.id),
+  );
+  // Without the relationships read, "not acted on" cannot be claimed.
+  if (relationships === null) return null;
+  const fresh = newMatchesFor({ items: slate.items, touched, seen });
+  const shown = fresh.slice(0, ARRIVAL_MATCHES_MAX);
+  const fits =
+    shown.length === 0
+      ? null
+      : await fitProfilesAction(shown.map((item) => item.companyId));
+  const profiles = new Map(
+    (fits ?? []).map((fit) => [fit.companyId, fit.profile] as const),
+  );
+  return {
+    label: seen === null ? "NOT_LOOKED_AT" : "SINCE_LAST_VISIT",
+    total: fresh.length,
+    items: shown.map((item) => {
+      const profile = profiles.get(item.companyId) ?? null;
+      return {
+        companyId: item.companyId,
+        name: item.canonicalName,
+        line: item.shortDescription,
+        stage: item.currentStageCode,
+        country: item.headquartersCountry,
+        band: profile?.band ?? null,
+        take: matchOpinion({ profile, reasons: item.reasons }),
+      };
+    }),
+  };
+}
+
+/** What their agents finished in the window, from the jobs read. */
+function jobsDoneOf(
+  workforce: WorkforceView | null,
+  since: string,
+): { readonly n: number; readonly names: readonly string[] } | null {
+  if (workforce === null) return null;
+  const from = Date.parse(since);
+  const done = workforce.jobs.filter(
+    ({ job }) => job.status === "DONE" && Date.parse(job.updatedAt) >= from,
+  );
+  return {
+    n: done.length,
+    names: done.slice(0, 3).map(({ job }) => job.goal.slice(0, 120)),
+  };
+}
 
 /**
  * Everything the briefing needs, read in parallel. A read that fails is
- * absent (null activity, fewer cards), never an error that stops Q.
+ * absent (null activity, fewer cards) and, for what needs them, named as
+ * unread; never an error that stops Q.
  */
 export async function arrivalBriefingAction(
   rawSince: string | null,
+  rawBrowser?: ArrivalBrowserInput,
 ): Promise<ArrivalData | null> {
   const parsed = SinceInput.safeParse(rawSince);
-  if (!parsed.success) return null;
+  const browser = BrowserInput.safeParse(rawBrowser);
+  if (!parsed.success || !browser.success) return null;
   const session = await qApiSession();
   if (session === null) return null;
   const now = Date.now();
   const since = parsed.data ?? new Date(now - 24 * 3_600_000).toISOString();
-  const [account, sinceRead, approvals, workforce, done, notices] =
+  const seenMatches = browser.data?.seenMatches;
+  const [account, sinceRead, approvals, workforce, done, notices, context] =
     await Promise.all([
       accountDetails().catch(() => null),
       getQWorkSince(session, since).catch(() => null),
@@ -114,13 +217,35 @@ export async function arrivalBriefingAction(
       loadWorkforceAction().catch(() => null),
       listDoneAction().catch(() => null),
       listNoticesAction().catch(() => null),
+      resolveOwnContext().catch(() => null),
     ]);
-  const waitingNotices =
+  // Investors only, and after the context is known: the slate is theirs.
+  const matches =
+    context?.kind === "INVESTOR"
+      ? await readMatches(
+          seenMatches === null || seenMatches === undefined
+            ? null
+            : new Set(seenMatches),
+        ).catch(() => null)
+      : undefined;
+  // Founders (Q.01): the questions Q still has for them, answerable here.
+  const questions =
+    context?.kind === "FOUNDER"
+      ? await ownReadiness()
+          .then((readiness) =>
+            readiness === null
+              ? null
+              : readiness.followUps
+                  .filter((item) => item.answerable)
+                  .slice(0, QUESTIONS_MAX),
+          )
+          .catch(() => null)
+      : undefined;
+  const needsYouNotices =
     notices?.ok === true
-      ? groupNotices(notices.value.items).needsYou.map(
-          (group) => group.notice.title,
-        )
-      : [];
+      ? groupNotices(notices.value.items).needsYou.map((group) => group.notice)
+      : null;
+  const waitingNotices = (needsYouNotices ?? []).map((notice) => notice.title);
   const waiting = approvals?.ok === true ? approvals.value : [];
   const read = await Promise.all(
     waiting
@@ -139,6 +264,8 @@ export async function arrivalBriefingAction(
     jobs: workforce?.jobs ?? [],
     now,
     known: done?.ok === true ? done.value.items : undefined,
+    // Dropped on Work stays dropped here (audit D-E6).
+    dismissedHeld: new Set(browser.data?.dismissedHeld ?? []),
   });
   // One card per decision, in the queue's order, bounded.
   const flat = groups
@@ -210,6 +337,31 @@ export async function arrivalBriefingAction(
         : Math.max(0, (now - Date.parse(parsed.data)) / 3_600_000),
     cards,
     waiting: waitingNotices,
+    // E2: one report of what needs them, unread sources named (the
+    // bridge until workstream B's attention read is composed).
+    attention: attentionFromReads({
+      cards: approvals?.ok === true ? cards : null,
+      notices: needsYouNotices,
+      jobs: workforce?.jobs ?? null,
+      newMatches: matches === undefined ? undefined : (matches?.total ?? null),
+      since,
+      now: new Date(now),
+    }),
+    attentionLinks: Object.fromEntries(
+      (needsYouNotices ?? []).flatMap((notice) =>
+        notice.linkPath === null
+          ? []
+          : [
+              [
+                `${sourceOfNotice(notice.kind)}:${notice.id}`.slice(0, 160),
+                notice.linkPath,
+              ],
+            ],
+      ),
+    ),
+    jobsDone: jobsDoneOf(workforce, since),
+    ...(matches === undefined ? {} : { matches }),
+    ...(questions === undefined ? {} : { questions }),
   };
 }
 

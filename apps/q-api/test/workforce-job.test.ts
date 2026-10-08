@@ -48,7 +48,7 @@ type Call = {
 };
 
 /** A scripted model: answers by the task the rendered prompt names. */
-function scriptedGateway(calls: Call[]): ModelGateway {
+function scriptedGateway(calls: Call[], legacyPlan = false): ModelGateway {
   const gateway = {
     execute: (request: {
       taskClass: string;
@@ -70,48 +70,55 @@ function scriptedGateway(calls: Call[]): ModelGateway {
           value = {
             summary:
               "Express interest in matching companies, reply warmly, book calls.",
-            steps: [
-              {
-                key: "watch",
-                role: "MANDATE_WATCHER",
-                agentName: null,
-                goal: "Express interest in every company matching the mandate",
-                tools: ["search_companies", "relationship.interest.express"],
-                dependsOn: [],
-              },
-              {
-                key: "reply",
-                role: "CONVERSATION",
-                agentName: null,
-                goal: "Reply warmly to replies",
-                tools: ["list_messages", "chat.message.send"],
-                dependsOn: ["watch"],
-              },
-              {
-                key: "book",
-                role: "SCHEDULER",
-                agentName: null,
-                goal: "Book calls with those who want one",
-                tools: ["find_meeting_times", "schedule.meeting.book"],
-                dependsOn: ["watch"],
-              },
-              {
-                key: "dig",
-                role: "AD_HOC",
-                agentName: "Database digger",
-                goal: "Look things up directly",
-                tools: ["run_sql"],
-                dependsOn: [],
-              },
-              {
-                key: "research",
-                role: "RESEARCH",
-                agentName: null,
-                goal: "Research each company",
-                tools: ["research_public_web"],
-                dependsOn: [],
-              },
-            ],
+            steps: legacyPlan
+              ? [
+                  // A step no executor here runs (the shape of D-02; a
+                  // WRITER step no longer even parses under JOB_PLAN v2).
+                  {
+                    key: "deck",
+                    role: "DOCUMENTS",
+                    goal: "Make a one-pager",
+                    tools: ["list_my_documents"],
+                    dependsOn: [],
+                  },
+                  {
+                    key: "reply",
+                    role: "CONVERSATION",
+                    goal: "Reply warmly to replies",
+                    tools: ["list_messages", "chat.message.send"],
+                    dependsOn: ["deck"],
+                  },
+                ]
+              : [
+                  {
+                    key: "discover",
+                    role: "DISCOVERY",
+                    goal: "Shortlist every company matching the mandate",
+                    tools: ["search_companies"],
+                    dependsOn: [],
+                  },
+                  {
+                    key: "reach",
+                    role: "OUTREACH",
+                    goal: "Express interest in the shortlist",
+                    tools: ["relationship.interest.express"],
+                    dependsOn: ["discover"],
+                  },
+                  {
+                    key: "reply",
+                    role: "CONVERSATION",
+                    goal: "Reply warmly to replies",
+                    tools: ["list_messages", "chat.message.send"],
+                    dependsOn: ["reach"],
+                  },
+                  {
+                    key: "book",
+                    role: "SCHEDULING",
+                    goal: "Book calls with those who want one",
+                    tools: ["find_meeting_times", "schedule.meeting.book"],
+                    dependsOn: ["reach"],
+                  },
+                ],
             cannot: [],
           };
           break;
@@ -202,6 +209,8 @@ function world() {
     booked: [] as { relationshipId: string; at: string }[],
     notices: [] as string[],
     metered: [] as string[],
+    markers: [] as string[],
+    briefs: [] as string[],
   };
   const ports: WorkforcePorts = {
     principalName: () => Promise.resolve("Ada"),
@@ -233,9 +242,13 @@ function world() {
         ),
       ]),
     // The writer's first draft is too cold: the reviewer sends it back.
-    writeReply: () => Promise.resolve("Dear Sir, noted."),
-    send: (_owner, relationshipId, _key, body) => {
+    writeReply: (_owner, _conversation, _intent, _correlation, brief) => {
+      record.briefs.push(brief ?? "");
+      return Promise.resolve("Dear Sir, noted.");
+    },
+    send: (_owner, relationshipId, _key, body, jobId) => {
       record.sent.push({ relationshipId, body });
+      record.markers.push(jobId ?? "none");
       return Promise.resolve(true);
     },
     freeSlots: () => Promise.resolve(["2026-10-08T10:00:00.000Z"]),
@@ -291,19 +304,17 @@ describe("J9: a job carried out by Q's workforce, end to end", () => {
     });
     if (started.outcome !== "STARTED") throw new Error(started.outcome);
 
-    // The plan, bounded by the grant: no SQL agent, no unpermitted research.
-    expect(started.refused).toEqual([
-      { key: "dig", reason: "NO_PERMITTED_TOOL" },
-      { key: "research", reason: "NO_PERMITTED_TOOL" },
-    ]);
+    // The plan, bounded by the registered executors and the grant.
+    expect(started.refused).toEqual([]);
     expect(started.steps.map((step) => [step.key, step.status])).toEqual([
-      ["watch", "DONE"],
+      ["discover", "DONE"],
+      ["reach", "DONE"],
       ["reply", "DONE"],
       ["book", "DONE"],
     ]);
     expect(record.metered).toEqual([`wf:${started.jobId}`]);
 
-    // Mandate watcher: interest in every match, idempotently keyed.
+    // Outreach: interest in every shortlisted match, idempotently keyed.
     expect(record.interest).toEqual([
       "c-tallyloom|c-tallyloom",
       "c-spheros|c-spheros",
@@ -321,6 +332,10 @@ describe("J9: a job carried out by Q's workforce, end to end", () => {
     ]);
     // A no, read by meaning, is the person's: no reply, a notice.
     expect(record.notices).toEqual(["Chidi may have said no"]);
+    // D-07: the job's message is marked as Q's; D-09: the writer is given
+    // the step's goal as its brief, never an empty one.
+    expect(record.markers).toEqual([started.jobId]);
+    expect(record.briefs).toEqual(["Reply warmly to replies"]);
 
     // Every model call is priced to its job and agent (J6), and the
     // reader is a fast classification.
@@ -368,6 +383,7 @@ describe("J9: a job carried out by Q's workforce, end to end", () => {
       new Set([
         "LEAD",
         "MANDATE_WATCHER",
+        "OUTREACH",
         "CONVERSATION",
         "SCHEDULER",
         "WRITER",
@@ -409,6 +425,37 @@ describe("J9: a job carried out by Q's workforce, end to end", () => {
     const stranger = { tenantId: OWNER.tenantId, userId: randomUUID() };
     expect(await page.detail(stranger, started.jobId)).toBeNull();
     expect((await page.list(stranger, { limit: 20 })).items).toEqual([]);
+  });
+
+  it("refuses the audit's WRITER plan whole: nothing runs, nothing is sent, and the job says why (D-02)", async () => {
+    const calls: Call[] = [];
+    const store = createInMemoryWorkforceStore();
+    const models = createWorkforceModels({
+      gateway: scriptedGateway(calls, true),
+    });
+    const { ports, record } = world();
+    const jobs = createWorkforceJobs({
+      store,
+      models,
+      review: createOutwardReview({ models, store }),
+      ports,
+    });
+    const result = await jobs.start(OWNER, {
+      goal: "Reply to Zino.",
+      permitted: ["list_messages", "chat.message.send"],
+      budgetUsd: 1,
+      source: { kind: "JOB", id: "job-writer" },
+    });
+    expect(result.outcome).toBe("NOT_PLANNED");
+    expect(record.sent).toEqual([]);
+    expect(calls.map((call) => call.task)).toEqual(["JOB_PLAN"]);
+    // The plan prompt never offered WRITER or REVIEWER as roles.
+    const roster = calls[0]?.prompt ?? "";
+    expect(roster).not.toMatch(/- WRITER|- REVIEWER|- AD_HOC/u);
+    expect(roster).toContain("- CONVERSATION");
+    const lead = store.rows.runs.find((run) => run.role === "LEAD");
+    expect(lead?.status).toBe("HELD");
+    expect(lead?.summary).toContain("no agent here can do");
   });
 
   it("holds the job when the plan's agent jobs are used up, and plans nothing", async () => {

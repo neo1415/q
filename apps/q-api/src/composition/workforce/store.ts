@@ -205,6 +205,15 @@ export type WorkforceStore = {
     status: StepStatus,
     summary: string,
   ) => Promise<void>;
+  /**
+   * Recovery D3: a job resumed after a restart ends the step runs the
+   * restart left RUNNING (FAILED, with why); the step runs again.
+   */
+  readonly endInterrupted: (
+    owner: Owner,
+    jobId: string,
+    summary: string,
+  ) => Promise<number>;
   readonly handoff: (
     owner: Owner,
     input: {
@@ -432,6 +441,18 @@ export function createPostgresWorkforceStore(
          where id = ${runId} and tenant_id = ${owner.tenantId}
            and user_id = ${owner.userId} and status = 'RUNNING'`;
     },
+
+    endInterrupted: async (owner, jobId, summary) =>
+      (
+        await sql`
+          update q_runtime.workforce_agent_runs
+             set status = 'FAILED', summary = ${clip(summary, 500)},
+                 ended_at = clock_timestamp()
+           where job_id = ${jobId} and tenant_id = ${owner.tenantId}
+             and user_id = ${owner.userId} and status = 'RUNNING'
+             and role <> 'LEAD'
+           returning id`
+      ).length,
 
     handoff: async (owner, input) => {
       await sql`
@@ -809,6 +830,26 @@ export function createInMemoryWorkforceStore(
         ended_at: null,
       });
       return Promise.resolve(id);
+    },
+    endInterrupted: (owner, jobId, summary) => {
+      let ended = 0;
+      rows.runs.forEach((run, index) => {
+        if (
+          run.job_id === jobId &&
+          run.owner === key(owner) &&
+          run.status === "RUNNING" &&
+          run.role !== "LEAD"
+        ) {
+          rows.runs[index] = {
+            ...run,
+            status: "FAILED",
+            summary: clip(summary, 500),
+            ended_at: now(),
+          };
+          ended += 1;
+        }
+      });
+      return Promise.resolve(ended);
     },
     endRun: (owner, runId, status, summary) => {
       const index = rows.runs.findIndex(

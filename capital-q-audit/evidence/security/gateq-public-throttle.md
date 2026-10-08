@@ -5,7 +5,7 @@ Why included: Only anonymous model-reaching write path; in-process per-session t
 ## `apps/api/src/http/gateq-apply.ts` lines 31-58
 
 ```ts
-   31  /**
+31; /**
    32   * `/v1/gateq/apply` — the public applicant surface (CQ-GATE-002R §2–§5).
    33   *
    34   * Every route here is anonymous. There is no `onRequest` context hook
@@ -69,7 +69,7 @@ Why included: Only anonymous model-reaching write path; in-process per-session t
 ## `packages/gateq-intake/src/domain/throttle.ts` lines 1-34
 
 ```ts
-    1  /**
+1; /**
     2   * How much one guest session may do (CQ-GATE-002S §8).
     3   *
     4   * The applicant surface is the only anonymous write path in the product,
@@ -102,6 +102,5 @@ Why included: Only anonymous model-reaching write path; in-process per-session t
    31   * shared one and a much stronger bound than none. A distributed limiter is
    32   * a real thing to want and it is not this packet.
    33   */
-   34  
+34;
 ```
-

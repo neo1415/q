@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { QWorkStateSchema } from "./agent-capability.js";
+
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 
@@ -95,6 +97,21 @@ export const WorkforceJobSummaryDtoSchema = z
     held: z.number().int().min(0),
     createdAt: UtcTimestampSchema,
     updatedAt: UtcTimestampSchema,
+    /**
+     * RECOVERY D: the durable queue's state for this job (agent-capability
+     * QWorkState), grounded in the queue row; absent before it was queued.
+     */
+    workState: QWorkStateSchema.optional(),
+    /** Why it stopped, when it is FAILED or BLOCKED (plain words). */
+    stoppedBecause: z.string().max(500).optional(),
+    /** Where it came from: the conversation and run that started it. */
+    trace: z
+      .object({
+        conversationId: UuidSchema.optional(),
+        runId: UuidSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type WorkforceJobSummaryDto = z.infer<

@@ -29,12 +29,12 @@ Why included: Only OpenAI text path; hardcoded single model; store:false; SDK re
    55   * requested and none is surfaced, so no chain of thought reaches a
    56   * result; and the key never leaves this process.
    57   */
-   58  
+   58
    59  export const OPENAI_PROVIDER_CODE = "openai";
-   60  
+   60
    61  /** The one model this adapter is permitted to run. */
    62  export const OPENAI_TEST_MODEL = "gpt-5.6-luna";
-   63  
+   63
    64  /**
    65   * The caller's requested effort, as this vendor spells it (CQ-VOICE-010).
    66   *
@@ -53,17 +53,17 @@ Why included: Only OpenAI text path; hardcoded single model; store:false; SDK re
    79    MEDIUM: "medium",
    80    HIGH: "high",
    81  };
-   82  
+   82
    83  export type OpenAIProviderOptions = {
    84    readonly apiKey: string;
    85    /** For tests: a client already built. */
    86    readonly client?: OpenAI | undefined;
    87  };
-   88  
+   88
    89  function isApiError(error: unknown): error is APIError {
    90    return error instanceof APIError;
    91  }
-   92  
+   92
    93  /**
    94   * The account, not the request: nothing will be served until someone tops
    95   * up or raises a limit. Live 2026-10-01: "credit_balance_exhausted" came
@@ -76,7 +76,7 @@ Why included: Only OpenAI text path; hardcoded single model; store:false; SDK re
   102    "billing_hard_limit_reached",
   103    "billing_not_active",
   104  ]);
-  105  
+  105
   106  export function accountExhausted(
   107    status: number | undefined,
   108    vendorErrorCode: string | undefined,
@@ -87,7 +87,7 @@ Why included: Only OpenAI text path; hardcoded single model; store:false; SDK re
   113        ACCOUNT_EXHAUSTED_CODES.has(vendorErrorCode))
   114    );
   115  }
-  116  
+  116
   117  /**
   118   * How a refusal is classed. An exhausted account is PERMANENT for the
   119   * attempt -- no retry on this model; another candidate may answer -- and
@@ -104,7 +104,7 @@ Why included: Only OpenAI text path; hardcoded single model; store:false; SDK re
   130      ? { failureClass: "PERMANENT", accountExhausted: true }
   131      : { failureClass: classify(status), accountExhausted: false };
   132  }
-  133  
+  133
   134  function classify(status: number | undefined): ModelFailureClass {
   135    if (status === 401 || status === 403) return "AUTHENTICATION";
   136    if (status === 429) return "RATE_LIMIT";
@@ -130,7 +130,7 @@ Why included: Only OpenAI text path; hardcoded single model; store:false; SDK re
   348        // The gateway owns retry; the SDK gets one shot.
   349        maxRetries: 0,
   350      });
-  351  
+  351
   352    return {
   353      code: OPENAI_PROVIDER_CODE,
   354      capabilities: () => ({
@@ -184,7 +184,7 @@ Why included: Only OpenAI text path; hardcoded single model; store:false; SDK re
   402              }
   403            : {}),
   404        };
-  405  
+  405
   406        try {
   407          if (context.onTextDelta === undefined) {
   408            const params: ResponseCreateParamsNonStreaming = {
@@ -204,7 +204,7 @@ Why included: Only OpenAI text path; hardcoded single model; store:false; SDK re
   422              providerReference: response.id,
   423            };
   424          }
-  425  
+  425
   426          const params: ResponseCreateParamsStreaming = {
   427            ...shared,
   428            stream: true,
@@ -247,4 +247,3 @@ Why included: Only OpenAI text path; hardcoded single model; store:false; SDK re
   465    };
   466  }
 ```
-

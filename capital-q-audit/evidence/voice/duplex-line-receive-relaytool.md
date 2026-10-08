@@ -174,7 +174,7 @@
  1412          break;
  1413      }
  1414    }
- 1415  
+ 1415
  1416    async #relayTool(event: unknown): Promise<void> {
  1417      const callId = text(event, "call_id");
  1418      const name = text(event, "name");
@@ -294,6 +294,5 @@
  1532        this.#touch();
  1533      });
  1534    }
- 1535  
+ 1535
 ```
-

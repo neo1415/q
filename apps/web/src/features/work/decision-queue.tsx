@@ -40,6 +40,7 @@ import {
   decisionTitle,
   doneGroups,
   draftsLabel,
+  isChatSend,
   threadLines,
   withPage,
   type Decision,
@@ -439,7 +440,7 @@ function DecisionCard({
   const ask = useAskQ();
   const view = item.view;
   const message =
-    view?.action.actionType === "chat.message.send"
+    view != null && isChatSend(view.action.actionType)
       ? readPlan(view.action.preview).quote
       : null;
 

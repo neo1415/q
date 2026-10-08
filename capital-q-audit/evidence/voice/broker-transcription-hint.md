@@ -30,7 +30,7 @@
   238    "relationships",
   239  ] as const;
   240  const TRANSCRIPTION_NAMES_MAX = 40;
-  241  
+  241
   242  export function transcriptionHintFor(input: {
   243    readonly locale?: string | undefined;
   244    readonly vocabulary?: readonly string[] | undefined;
@@ -49,4 +49,3 @@
   257    };
   258  }
 ```
-

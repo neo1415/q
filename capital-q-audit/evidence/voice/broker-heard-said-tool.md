@@ -45,7 +45,7 @@
   853          ...(result.silent === true ? { silent: true } : {}),
   854        };
   855      },
-  856  
+  856
   857      said: ({ actor, voiceSessionId, said }) => {
   858        const line = ownLine(actor, voiceSessionId);
   859        if (line === null) return false;
@@ -106,7 +106,7 @@
   914        line.turn = null;
   915        return true;
   916      },
-  917  
+  917
   918      tool: async ({ actor, voiceSessionId, call, signal }) => {
   919        const line = ownLine(actor, voiceSessionId);
   920        if (line === null) return null;
@@ -116,7 +116,7 @@
   924          return output({ ok: false, error: "The arguments were not valid." });
   925        }
   926        const abort = signal ?? new AbortController().signal;
-  927  
+  927
   928        if (call.name === ASK_Q_TOOL_NAME) {
   929          const request = args.request;
   930          if (typeof request !== "string" || request.trim().length === 0) {
@@ -135,7 +135,7 @@
   943          if (line.turn !== null) line.turn.asked = true;
   944          return askQ(line, request, abort);
   945        }
-  946  
+  946
   947        if (call.name === SET_LISTENING_TOOL_NAME && line.listening) {
   948          // BACKCHANNEL: the level is resolved here, deterministically, and
   949          // applied on the line at once; it is remembered only through the
@@ -178,7 +178,7 @@
   986            listening: level,
   987          };
   988        }
-  989  
+  989
   990        // The card tool is answered in the browser, where the card is; one
   991        // that reaches here had no card in focus to decide.
   992        if (call.name === DECIDE_CARD_TOOL_NAME) {
@@ -188,7 +188,7 @@
   996              "No card is in focus on their screen. Pass their words to ask_q instead.",
   997          });
   998        }
-  999  
+  999
  1000        // Anything else must be a tool this line was offered, and runs only
  1001        // through the registry's pipeline (validate, authorise, bound).
  1002        if (!line.direct.has(call.name)) {
@@ -208,4 +208,3 @@
  1016        );
  1017      },
 ```
-

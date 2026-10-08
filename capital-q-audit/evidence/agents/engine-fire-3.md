@@ -102,7 +102,7 @@
  2434            }),
  2435          );
  2436        }
- 2437  
+ 2437
  2438        let done = 0;
  2439        let asked = 0;
  2440        const askedWords: string[] = [];
@@ -191,7 +191,7 @@
  2523              idempotencyKey: key,
  2524              ...input,
  2525            });
- 2526  
+ 2526
  2527          if (verdict.verdict === "HOLD") {
  2528            // ADR 0050: Q held back; the person sees why, and nothing is
  2529            // replanned around it.

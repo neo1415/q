@@ -6,7 +6,7 @@
 
 ```
     1  import { z } from "zod";
-    2  
+    2
     3  import { UuidSchema } from "../common/ids.js";
     4  import { StageCodeSchema } from "../http/companies.js";
     5  import {
@@ -16,7 +16,7 @@
     9  import { TaxonomyCanonicalCodeSchema } from "../http/taxonomy.js";
    10  import { QEvidenceRefsSchema } from "./evidence-ref.js";
    11  import type { QVoiceChoice, QVoiceDestination } from "./voice.js";
-   12  
+   12
    13  /**
    14   * A known Capital Q UI action Q may suggest (doc 12 §70-71).
    15   *
@@ -51,11 +51,11 @@
    44    "SHOW_CALENDAR_CONNECT",
    45    "DOCUMENT_ACT",
    46  ] as const;
-   47  
+   47
    48  export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
-   49  
+   49
    50  export const QUiIntentKindSchema = z.enum(Q_UI_INTENT_KINDS);
-   51  
+   51
    52  /**
    53   * Sections of the company surface a client knows how to focus. Bounded to
    54   * what the information architecture defines today (doc 17); a section name
@@ -70,19 +70,19 @@
    63    "EVIDENCE",
    64    "DOCUMENTS",
    65  ] as const;
-   66  
+   66
    67  export type QUiCompanySection = (typeof Q_UI_COMPANY_SECTIONS)[number];
-   68  
+   68
    69  export const QUiCompanySectionSchema = z.enum(Q_UI_COMPANY_SECTIONS);
-   70  
+   70
    71  /** Companies in one comparison view. Matches the comparison block bound. */
    72  export const Q_COMPARISON_SUBJECTS_MIN = 2;
    73  export const Q_COMPARISON_SUBJECTS_MAX = 6;
-   74  
+   74
    75  export const QOpenCompanyIntentSchema = z
    76    .object({ kind: z.literal("OPEN_COMPANY"), companyId: UuidSchema })
    77    .strict();
-   78  
+   78
    79  export const QShowComparisonIntentSchema = z
    80    .object({
    81      kind: z.literal("SHOW_COMPARISON"),
@@ -92,7 +92,7 @@
    85        .max(Q_COMPARISON_SUBJECTS_MAX),
    86    })
    87    .strict();
-   88  
+   88
    89  export const QFocusSectionIntentSchema = z
    90    .object({
    91      kind: z.literal("FOCUS_SECTION"),
@@ -100,14 +100,14 @@
    93      section: QUiCompanySectionSchema,
    94    })
    95    .strict();
-   96  
+   96
    97  export const QShowEvidenceIntentSchema = z
    98    .object({
    99      kind: z.literal("SHOW_EVIDENCE"),
   100      evidenceRefs: QEvidenceRefsSchema.min(1),
   101    })
   102    .strict();
-  103  
+  103
   104  /**
   105   * Where a typed request may take the person (CQ-QACT-001): the platform's
   106   * own top-level surfaces, by name. A subset of the spoken destinations, so
@@ -202,7 +202,7 @@
   433  ] as const;
   434  export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
   435  export type QRoomObject = z.infer<typeof QRoomObjectSchema>;
-  436  
+  436
   437  export const QShowInQRoomIntentSchema = z
   438    .object({
   439      kind: z.literal("SHOW_IN_Q_ROOM"),
@@ -251,7 +251,7 @@
   534  ] as const;
   535  export const QScreenActSchema = z.enum(Q_SCREEN_ACTS);
   536  export type QScreenAct = z.infer<typeof QScreenActSchema>;
-  537  
+  537
   538  export const Q_SCREEN_SECTIONS = [
   539    "history",
   540    "commitment",
@@ -263,7 +263,7 @@
   546    "applications",
   547  ] as const;
   548  export const QScreenSectionSchema = z.enum(Q_SCREEN_SECTIONS);
-  549  
+  549
   550  export const QScreenActIntentSchema = z
   551    .object({
   552      kind: z.literal("SCREEN_ACT"),
@@ -272,7 +272,7 @@
   555    })
   556    .strict();
   557  export type QScreenActIntent = z.infer<typeof QScreenActIntentSchema>;
-  558  
+  558
   559  /**
   560   * Q room W3 (R3): the document open in the Q room, worked by asking --
   561   * "next page", "go to page 3", "read it to me", "summarise it",
@@ -294,7 +294,7 @@
   577  export const QDocumentActSchema = z.enum(Q_DOCUMENT_ACTS);
   578  export type QDocumentAct = z.infer<typeof QDocumentActSchema>;
   579  export const Q_DOCUMENT_PAGE_MAX = 10_000;
-  580  
+  580
   581  export const QDocumentActIntentSchema = z
   582    .object({
   583      kind: z.literal("DOCUMENT_ACT"),
@@ -310,7 +310,7 @@
   593      },
   594    );
   595  export type QDocumentActIntent = z.infer<typeof QDocumentActIntentSchema>;
-  596  
+  596
   597  export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   598    QScreenActIntentSchema,
   599    QSetDiscoverFiltersIntentSchema,
@@ -328,7 +328,7 @@
   611    QDocumentActIntentSchema,
   612  ]);
   613  export type QClientActionIntent = z.infer<typeof QClientActionIntentSchema>;
-  614  
+  614
   615  /**
   616   * The model-facing names of the tools that produce a client action, so the
   617   * answer can tell a model these happen at once (not "for approval").
@@ -350,4 +350,3 @@
   633    "control_document",
   634  ] as const;
 ```
-

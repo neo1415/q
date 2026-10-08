@@ -30,7 +30,7 @@
  1583        return NOTHING_REMEMBERED;
  1584      }
  1585    }
- 1586  
+ 1586
  1587    /**
  1588     * The reads a turn needs before the model is asked anything: the
  1589     * conversation, the assembled context, the tools offered, memory, and
@@ -118,7 +118,7 @@
  1671      const prefetchTools = new Set(
  1672        (availableForRun ?? offeredForRun).map((tool) => tool.definition.name),
  1673      );
- 1674  
+ 1674
  1675      /**
  1676       * Their own declared profile, read for them (CQ-QX-007; directive
  1677       * "Home Q doesn't know the person").

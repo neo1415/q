@@ -45,8 +45,15 @@ vi.mock("../src/features/work/work-page-actions", () => ({
   listDoneAction: (cursor: string) => listDone(cursor),
 }));
 
-const { decisionGroups, doneGroups, heldDecisions, threadLines, withPage } =
-  await import("../src/features/work/decisions");
+const {
+  decisionGroups,
+  decisionTitle,
+  doneGroups,
+  heldDecisions,
+  isChatSend,
+  threadLines,
+  withPage,
+} = await import("../src/features/work/decisions");
 const { DecisionQueue, DoneForYou } =
   await import("../src/features/work/decision-queue");
 
@@ -674,5 +681,34 @@ describe("the thread view", () => {
     expect(lines[1]?.byQ?.verdict).toBe(
       "The reviewer passed it (8.4 against a bar of 7.5).",
     );
+  });
+});
+
+describe("a standing instruction's message card (recovery D-15)", () => {
+  it("is a message, like Q's own: app.chat.message.send reads as a reply to send", () => {
+    expect(isChatSend("app.chat.message.send")).toBe(true);
+    expect(isChatSend("chat.message.send")).toBe(true);
+    expect(isChatSend("email.send")).toBe(false);
+    const view = QApprovalViewSchema.parse({
+      ...chatView(APPROVAL_T, REL_T, "Thank you, Zino."),
+      action: {
+        ...chatView(APPROVAL_T, REL_T, "Thank you, Zino.").action,
+        actionType: "app.chat.message.send",
+        summary:
+          "Reply to Zino Aviation about how regulated firms evaluate it.",
+      },
+    });
+    const [group] = decisionGroups({
+      approvals: [
+        pending(APPROVAL_T, "2026-10-07T15:43:31Z", "Reply to Zino Aviation"),
+      ],
+      views: new Map([[APPROVAL_T, view]]),
+      jobs: [],
+      now: NOW,
+    });
+    const item = group?.items[0];
+    if (item === undefined || item.kind !== "APPROVAL")
+      throw new Error("no card");
+    expect(decisionTitle(item)).toBe("Reply ready to send");
   });
 });

@@ -7,10 +7,10 @@ Why included: Policy version, permittedScopeKinds, maxSensitivity logged per pla
 ```ts
    30   * The two are distinct axes and are never flattened into one.
    31   */
-   32  
+   32
    33  /** The deterministic policy generation that produced a plan. Never "latest". */
    34  export const Q_CONTEXT_FIREWALL_POLICY_VERSION = "context-firewall-v2" as const;
-   35  
+   35
    36  /** Context labels: exactly ADR-001's disclosure scopes. No alias vocabulary. */
 ```
 
@@ -18,7 +18,7 @@ Why included: Policy version, permittedScopeKinds, maxSensitivity logged per pla
 
 ```ts
     1  import { Q_CONTEXT_FIREWALL_POLICY_VERSION } from "@capital-q/contracts";
-    2  
+    2
     3  /**
     4   * The policy generation every plan is stamped with (packet §43-44). A
     5   * change to any rule in this package — a scope's default label or
@@ -28,7 +28,7 @@ Why included: Policy version, permittedScopeKinds, maxSensitivity logged per pla
     9   */
    10  export const CONTEXT_FIREWALL_POLICY_VERSION =
    11    Q_CONTEXT_FIREWALL_POLICY_VERSION;
-   12  
+   12
    13  /**
    14   * How long a plan is trusted before retrieval must ask again. A plan is a
    15   * decision at an instant, not a bearer token: membership, shares and
@@ -70,6 +70,5 @@ Why included: Policy version, permittedScopeKinds, maxSensitivity logged per pla
   622        return decision;
   623      },
   624    };
-  625  
+  625
 ```
-

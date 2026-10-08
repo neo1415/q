@@ -25,7 +25,7 @@ export async function FounderNext() {
       <PrivateNote />
       {followUps.length === 0 ? null : (
         <div id="follow-ups">
-          <FollowUpStack followUps={followUps} />
+          <FollowUpStack followUps={followUps} unlessOnStage />
         </div>
       )}
       {next.length === 0 ? null : (

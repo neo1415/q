@@ -64,7 +64,7 @@
   452          typeof (query as { output_format?: unknown }).output_format === "string"
   453            ? (query as { output_format: string }).output_format
   454            : undefined;
-  455  
+  455
   456        /**
   457         * The agent hangs up on Q mid-sentence every time the person speaks
   458         * over it, which is barge-in working, not a fault. Left unhandled
@@ -82,7 +82,7 @@
   470        reply.raw.on("close", () => {
   471          if (!reply.raw.writableFinished) gone.abort();
   472        });
-  473  
+  473
   474        let upstream: Response;
   475        try {
   476          upstream = await speakRelay.stream({
@@ -159,4 +159,3 @@
   547        );
   548      });
 ```
-

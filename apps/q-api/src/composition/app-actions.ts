@@ -212,6 +212,8 @@ export function createAppActionDefinitions(
                 idempotencyKey: `q-action:${approved.idempotencyKey}`,
                 correlationId: context.correlationId,
                 surface: "Q",
+                // Recovery D-07: an approved card's send is marked as Q's.
+                qActionId: approved.actionId,
               },
               approved.payload,
             );

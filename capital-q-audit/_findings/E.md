@@ -3,6 +3,7 @@
 HEAD `520bd123`. Reports: `06-GENERATIVE-UI.md`, `11-UI-UX-ARCHITECTURE.md`. Diagram: `diagrams/rich-response-rendering.md`. Excerpts: `evidence/ui/*.md`.
 
 ## CONFIRMED DEFECTS
+
 (Each is confirmed by static reading. None was reproduced in a browser.)
 
 - **D-E1 — HIGH — Arrival cards and voice card control vanish from the Q page as soon as Q speaks its briefing, or the person types.**
@@ -73,6 +74,7 @@ HEAD `520bd123`. Reports: `06-GENERATIVE-UI.md`, `11-UI-UX-ARCHITECTURE.md`. Dia
   - Verify: the notification priority set in `apps/workers/src/network/startup-alert-watcher.ts` and the column default.
 
 ## OPEN QUESTIONS
+
 - Should the arrival briefing be a persistent stage layer (side columns kept while conversing), or should the cards move into the presence stage's object slot once Q speaks?
 - What source of truth should "needs you" have across arrival, QNow, Work and voice answers (notices vs approvals vs relationship.lastMessage)?
 - Is the standard voice line expected to support card verbs, or is duplex the only supported mode?
@@ -80,6 +82,7 @@ HEAD `520bd123`. Reports: `06-GENERATIVE-UI.md`, `11-UI-UX-ARCHITECTURE.md`. Dia
 - Should chart and map blocks be added to `QResultBlock`, or stay out of scope for V1?
 
 ## EVIDENCE INDEX
+
 - Blocks are a closed typed union → `packages/contracts/src/q/result-block.ts:37-52, 285-309`
 - Model cards get code-computed fit/order and a null subject → `packages/model-gateway/src/q/answer-cards.ts:52-67, 88-132`
 - Company-only subject resolution → `packages/model-gateway/src/q/card-subjects.ts:1-10, 88-100`; `model-gateway/src/q/index.ts:4070-4083`
@@ -109,6 +112,7 @@ HEAD `520bd123`. Reports: `06-GENERATIVE-UI.md`, `11-UI-UX-ARCHITECTURE.md`. Dia
 - Founder→investor finder has location and reasons → `packages/q-tools/src/tools/find-prospective-investors.ts:169-170`
 
 ## COVERAGE
+
 - **Inspected (read):**
   - `features/briefing/*` (all 8 files)
   - `features/home/` (`home-screen`, `returning-welcome`, `returning` greeting/questions, `briefing.ts` types and `pitchItems`, `returning-facts` head)

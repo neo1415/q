@@ -13,7 +13,7 @@
   140    readonly scheduling: boolean;
   141  }): Partial<Record<AgentRole, AgentExecutor>> {
   142    const { owner, ports, models, review } = dependencies;
-  143  
+  143
   144    const has = (tools: readonly string[], tool: string) => tools.includes(tool);
   145    // One reading per message per job: the conversation and the scheduler
   146    // agents act on the same reading, and a reply is classified once.
@@ -21,7 +21,7 @@
   148      string,
   149      Promise<Awaited<ReturnType<WorkforceModels["readReply"]>>>
   150    >();
-  151  
+  151
   152    const watcher: AgentExecutor = async (step, context) => {
   153      if (!has(step.tools, "relationship.interest.express")) {
   154        return { status: "HELD", summary: "Not allowed to express interest." };
@@ -47,7 +47,7 @@
   174        outputs: { expressed },
   175      };
   176    };
-  177  
+  177
   178    /**
   179     * Conversation and scheduling share one pass over open replies: each
   180     * reply is read by meaning, then answered warmly, or offered times, or
@@ -202,7 +202,7 @@
   329              };
   330        return result;
   331      };
-  332  
+  332
   333    return {
   334      MANDATE_WATCHER: watcher,
   335      OUTREACH: watcher,
@@ -210,5 +210,5 @@
   337      SCHEDULER: conversation("SCHEDULE"),
   338    };
   339  }
-  340  
+  340
 ```

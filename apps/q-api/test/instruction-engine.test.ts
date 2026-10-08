@@ -981,14 +981,21 @@ describe("a firing", () => {
     ]);
     const idle = world([{ steps: [], cannot: [] }]);
     await idle.engine.fire(idle.row.id, "run-0015");
+    // Recovery D-04: no thread was read here, so "nothing needs a reply"
+    // would be invented; the note says how many were not read.
     expect([...idle.steps.values()]).toEqual([
       expect.objectContaining({
         status: "NOTED",
-        reasonCode: "NOTHING_TO_DO",
+        reasonCode: "NOT_ALL_READ",
         words:
-          "Looked at 2 people: nothing needs a reply right now. I'll look again when someone writes.",
+          "2 not read: I couldn't read any of the 2 conversations this time, so I can't say yet whether anyone needs a reply. I'll read them next time.",
       }),
     ]);
+    expect(
+      [...idle.steps.values()].some((step) =>
+        String(step.words).includes("nothing needs a reply"),
+      ),
+    ).toBe(false);
   });
 });
 

@@ -113,7 +113,7 @@
   216      },
   217      [addLine],
   218    );
-  219  
+  219
   220    const end = useCallback(async () => {
   221      startsRef.current += 1;
   222      const line = lineRef.current;
@@ -124,24 +124,23 @@
   227      line?.close();
   228      await Promise.resolve();
   229    }, []);
-  230  
+  230
   231    const sendText = useCallback((text: string) => {
   232      const line = lineRef.current;
   233      if (line === null) return;
   234      line.sendText(text);
   235    }, []);
-  236  
+  236
   237    const setMuted = useCallback((next: boolean) => {
   238      setMutedState(next);
   239      lineRef.current?.setMuted(next);
   240    }, []);
-  241  
+  241
   242    const setVolume = useCallback((volume: number) => {
   243      lineRef.current?.setVolume(volume);
   244    }, []);
-  245  
+  245
   246    // Levels are not sampled on this transport; the presence stays calm.
   247    const inputLevel = useCallback(() => 0, []);
   248    const outputLevel = useCallback(() => 0, []);
 ```
-

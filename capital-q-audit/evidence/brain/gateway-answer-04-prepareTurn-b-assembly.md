@@ -239,7 +239,7 @@
  2191     */
  2192    const warming = new Map<string, Promise<PreparedTurn>>();
  2193    const WARMING_MAX = 64;
- 2194  
+ 2194
  2195    return {
  2196      lastObservation: () => last,
  2197      warm: (request: QAnswerRequest): void => {

@@ -20,7 +20,7 @@
    46          ? deepgram
    47          : elevenLabs;
    48    const [pausedAway, setPausedAway] = useState(false);
-   49  
+   49
    50    const start = useCallback(
    51      async (input: VoiceSessionStart) => {
    52        const provider = input.credential.provider ?? "elevenlabs";
@@ -37,7 +37,7 @@
    63      },
    64      [deepgram, duplex, elevenLabs],
    65    );
-   66  
+   66
    67    const transportSetMuted = client.setMuted;
    68    const setMuted = useCallback(
    69      (next: boolean) => {
@@ -47,12 +47,12 @@
    73      },
    74      [transportSetMuted],
    75    );
-   76  
+   76
    77    const live = useRef({ connected: false, muted: false });
    78    useEffect(() => {
    79      live.current = { connected: client.connected, muted: client.muted };
    80    }, [client.connected, client.muted]);
-   81  
+   81
    82    useEffect(() => {
    83      if (typeof document === "undefined") return;
    84      let blurTimer: ReturnType<typeof setTimeout> | null = null;
@@ -86,7 +86,7 @@
   112        window.removeEventListener("focus", onFocus);
   113      };
   114    }, [transportSetMuted]);
-  115  
+  115
   116    /**
   117     * Every transport, not only the one shown: a duplex line that fell back
   118     * inside `start` leaves the standard one current, and an end that
@@ -98,11 +98,10 @@
   124    const end = useCallback(async () => {
   125      await Promise.all([endDuplex(), endDeepgram(), endElevenLabs()]);
   126    }, [endDuplex, endDeepgram, endElevenLabs]);
-  127  
+  127
   128    return useMemo(
   129      () => ({ ...client, start, end, setMuted, pausedAway }),
   130      [client, start, end, setMuted, pausedAway],
   131    );
   132  }
 ```
-

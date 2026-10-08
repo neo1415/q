@@ -20,20 +20,21 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
 
 ## 2. Surfaces that show Q (and their overlap)
 
-| Surface | Where | Component | What it shows |
-|---|---|---|---|
-| Q page / Home | `/home` (`app/(app)/home/page.tsx`) | `HomeScreen` → `QConversationPanel` | presence stage, welcome, thread, Board, composer, voice |
-| Q Dock | every page but `/home` | `features/q-dock/q-dock.tsx:48-70` | minimal / compact pill / stashed; opens the sheet |
-| Q sheet | side panel from the dock | `features/q/q-sheet.tsx` (`QAnswer`, `QNow`, `QBoard`) | the same conversation, compact |
-| Arrival dock | every page but `/home` | `briefing/arrival-dock.tsx:23-56` | compact briefing + one focus card |
-| Answer chip | other pages | `features/q/answer-chip.tsx` | a new answer with cards; opens `/home?board=1` |
-| Work panel (home variant) | `/home` only when **not** a returning/first-run welcome | `home-screen.tsx:268-272` | running delegations |
-| QSection | many pages | `features/q/q-section.tsx` | not UI: tells Q which ids are on screen |
-| FounderNext | `/home` welcome (founders) | `readiness/founder-next.tsx` | Q's follow-up questions + next 3 actions |
-| R35 briefing | `/home` welcome when the arrival is not READY | `home/q-briefing.tsx`, composed by `home/briefing.ts` | up to 5 link cards (approvals, relationships, interest, pitches, setup, calls) |
-| Arrival briefing | `/home` welcome, or the arrival dock elsewhere | `briefing/arrival-briefing.tsx` | greeting, lowdown, decision cards, command bar |
+| Surface                   | Where                                                   | Component                                              | What it shows                                                                  |
+| ------------------------- | ------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Q page / Home             | `/home` (`app/(app)/home/page.tsx`)                     | `HomeScreen` → `QConversationPanel`                    | presence stage, welcome, thread, Board, composer, voice                        |
+| Q Dock                    | every page but `/home`                                  | `features/q-dock/q-dock.tsx:48-70`                     | minimal / compact pill / stashed; opens the sheet                              |
+| Q sheet                   | side panel from the dock                                | `features/q/q-sheet.tsx` (`QAnswer`, `QNow`, `QBoard`) | the same conversation, compact                                                 |
+| Arrival dock              | every page but `/home`                                  | `briefing/arrival-dock.tsx:23-56`                      | compact briefing + one focus card                                              |
+| Answer chip               | other pages                                             | `features/q/answer-chip.tsx`                           | a new answer with cards; opens `/home?board=1`                                 |
+| Work panel (home variant) | `/home` only when **not** a returning/first-run welcome | `home-screen.tsx:268-272`                              | running delegations                                                            |
+| QSection                  | many pages                                              | `features/q/q-section.tsx`                             | not UI: tells Q which ids are on screen                                        |
+| FounderNext               | `/home` welcome (founders)                              | `readiness/founder-next.tsx`                           | Q's follow-up questions + next 3 actions                                       |
+| R35 briefing              | `/home` welcome when the arrival is not READY           | `home/q-briefing.tsx`, composed by `home/briefing.ts`  | up to 5 link cards (approvals, relationships, interest, pitches, setup, calls) |
+| Arrival briefing          | `/home` welcome, or the arrival dock elsewhere          | `briefing/arrival-briefing.tsx`                        | greeting, lowdown, decision cards, command bar                                 |
 
 **Duplicates (UX debt, D-E9):**
+
 - **Three greeting/briefing systems coexist** on the same Home:
   1. `returning.ts` "Welcome back, X. What would you like to work on today?" (`home/returning.ts:115-160`);
   2. the R35 briefing (`home/briefing.ts`, server-composed, link cards);
@@ -48,6 +49,7 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
 ## 3. Key flows
 
 ### 3.1 Q page / Home (founder and investor)
+
 - **Route.** `/home` → `HomePage`: `force-dynamic`; redirects to onboarding if unfinished; reads `?c`, `?new`, `?board` (`app/(app)/home/page.tsx`).
 - **Server composition.** `HomeScreen` (`home-screen.tsx:153-294`) does the following:
   - `resolveOwnContext`.
@@ -74,6 +76,7 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
 - **Auto voice.** If the microphone is already granted and the person did not end the line in this tab, the line opens by itself on arrival (`q-conversation.tsx:403-432`).
 
 ### 3.2 Arrival briefing and the "room" (cards beside Q)
+
 - **Gate** (`arrival-gate.ts`):
   - The briefing is given if this browser session has not had one, or the person has been away ≥2h (`arrival-gate.ts:26-40`).
   - "Since" = `localStorage["cq.q.last-seen"]`, refreshed on load and every 60s while visible (`61-84`).
@@ -88,6 +91,7 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
 - **Later cards.** A new unread `NEEDS_YOU` notice triggers `refreshArrival` (`arrival-briefing.tsx:980-997`). The notice store polls every 60s (`work/notice-store.ts:23, 128`).
 
 ### 3.3 Voice mode UI
+
 - **Entry.** "Talk with Q" (`q-conversation.tsx:1203-1218`), the dock mic, or auto-start.
 - **Start sequence.** `session.talk` → `voice.talk` → `startVoiceSessionAction` → provider client `start` with `firstMessage` (`use-voice-interview.ts:445-524`).
 - **Providers.** `duplex-session.ts` (OpenAI realtime via `duplex-line.ts`, 2234 lines), `deepgram-session.ts` (standard line), `elevenlabs-session.ts`.
@@ -104,11 +108,13 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
   - The card decider exists on duplex only (D-E3).
 
 ### 3.4 Q Dock
+
 - **Component.** `q-dock.tsx` (502 lines): drag/throw anchors, obstacle avoidance (`dock-avoid.ts`), and a context menu for WCAG 2.5.7.
 - **Behaviour.** It opens the Q sheet. The compact pill shows the task stage, mic-live and Stop.
 - **Presence.** On every page but `/home`. `ArrivalDock` floats above it at `bottom-24 right-4` (`arrival-dock.tsx:44-46`) and returns null on `/home` (`arrival-dock.tsx:42`).
 
 ### 3.5 Work, agent activity, Team map
+
 - **Route.** `/work` (`app/(app)/work/page.tsx`): views needs / progress / done / team / cost (`WORK_VIEWS`).
 - **Server reads.** Pending approvals, read ahead in full for 10 (`VIEWS_READ_AHEAD`); `listWorkAction`; `listSuggestionsAction`; `listDoneAction`; `loadWorkforceAction`.
 - **Client.** `WorkPage` (`work/work-page.tsx`, 1827 lines) contains:
@@ -121,27 +127,32 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
 - **Backend actions.** Approve/reject (server actions), `stopWorkAction`, `answerWorkAction`, `setPausedAction`, `setDelegationAction`, `dismissSuggestionAction`, `unsendDoneForYouAction` (`work-actions.ts`, `work-page-actions.ts`).
 
 ### 3.6 Profiles
+
 - **Route.** `/profile` → `ProfileHero`, `ProfileAnswers`, `FounderBackgroundSection`, `ProfileImageEditor`, `QCardSection`, `ProfileTeamSection`, `ThesisSection` (investors), with `QPageSubject` (`app/(app)/profile/page.tsx:16-51`).
 - **Investor organisation page.** `/investors/[id]` → `ProfileHero`, `LooksForSection`, `ConnectionRequest`. A 404 from the API becomes `notFound()` (`investors/[investorOrganisationId]/page.tsx:64`).
 
 ### 3.7 Relationships and chat
+
 - **Routes.** `/relationships` (`RelationshipsIndex`) and `/relationships/{company|investor}/[id]` (`InvestorRelationshipActions`, `CompanyPitch`), plus `/messages`, `/calls` and `/diligence` subpages.
 - **Unavailable.** An unavailable relationship renders `RelationshipUnavailable`, or redirects to the overview (`relationships/company/[companyId]/messages/page.tsx:9, 33`).
 - **Chat.** `RelationshipConversation` → `relationship-chat.tsx` polls the thread cursor every 3s while visible (`chat/relationship-chat.tsx:68, 171-205`). There is no websocket.
 - **Chat actions** (`chat/chat-actions.ts:92-236`): send (with an idempotency key), mark read, unsend, attach, block, report.
 
 ### 3.8 Discover and Explore
+
 - **`/discover`.** Investors get `InvestorFeedScreen` (the company feed, precomputed slate); founders get `DiscoverInvestors`; there are tabs and `NetworkVideos` (`app/(app)/discover/page.tsx:25-31`). Saved, passed and compare subroutes exist.
 - **Q control of the feed.** `SET_DISCOVER_FILTERS` and `SCREEN_ACT` NEXT/PREV/PASS/SAVE (`ui-intent.ts:492-534`).
 - **`/explore`.** `ExploreScreen` + search, with poster authorisation through `authorisePostersAction` (`app/(app)/explore/page.tsx:5-9`).
 
 ### 3.9 Company page and data room
+
 - **`/company/[id]`.** Fold sections, `BackLink`, `QSection`, `QPageSubject` (`app/(app)/company/[companyId]/page.tsx:33-63`). Deep-link tabs (elevator / data room / deck / team) are reachable through `OPEN_RECORD_PAGE` `COMPANY_*` (`ui-intent.ts:295-299`).
 - **Data room.**
   - Founder side: `/documents` with `DocumentsScreen`, `DataRoomTab`, `RequestsInbox` (`app/(app)/documents/page.tsx:15-21`).
   - In-room: `DATA_ROOM` room card and document viewer (`room/document-room.ts`, `q-room-document.tsx`), driven by `DOCUMENT_ACT`.
 
 ### 3.10 Error and permission states
+
 - **Error boundaries.** Only `app/error.tsx` exists. A find for `error.tsx` under `apps/web/app` returns this single file; there is **no `(app)/error.tsx`**.
   - Inference from Next.js semantics: a render error in any signed-in page replaces the whole `(app)` layout. That unmounts `QSessionProvider`, which ends the voice line and drops the in-tab conversation state.
   - The page offers "Try again" / "Go to Home" (`app/error.tsx:24-58`).
@@ -157,6 +168,7 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
 ## 4. The founder's complaint (2026-10-08), answered from the code
 
 ### 4.1 Login greeting and summary — what it is composed from
+
 - **Greeting.** `arrivalGreeting({firstName, now, timeZone})` gives "Good morning/afternoon/evening, Zino." or "Hi Zino, you're up late." (`packages/q-core/src/speech/arrival.ts:50-70`).
   - The zone is the person's profile zone, or else their standing instruction's working-hours zone (`apps/q-api/src/composition/work/page.ts:720-729`), or else the browser's (`briefing/arrival.ts:96-103`).
   - It is deterministic and polite, with no warmth variation beyond these four forms. "Happy to see me" is not expressed.
@@ -177,7 +189,9 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
   - anything about the investor's feed.
 
 ### 4.2 Investors: "new companies matching my mandate, with Q's opinion"
+
 **Not implemented on arrival.**
+
 - No arrival read touches the feed or slate.
 - `matches` means CONNECTED relationships (`work/page.ts:703-719`).
 - The R35 "N pitches that match your mandate" card (`home/briefing.ts:251-265`) is **hidden whenever the arrival is READY** (`returning-welcome.tsx:164-167`). So the better arrival removed the only mandate-match line investors had.
@@ -188,6 +202,7 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
 - Q's opinion would need a new producer: slate delta since the last visit, with per-company fit (`fit.top_candidates` exists, `q-tools/src/tools/fit.ts:46-47`) and a model view under the fit contract.
 
 ### 4.3 Cards by the sides of Q that appear and disappear with what Q is talking about
+
 - **Built.** The side columns (`ArrivalRoom`, `arrival-room.tsx:78-94`). The e2e coverage is a dev harness only (`e2e/q-presence-room.spec.ts:31`, `/dev/briefing?variant=room`).
 - **Breaks on the real page (D-E1)** — static reading, high confidence:
   1. The columns and the welcome render only when `lines.length === 0` (`q-conversation.tsx:523, 608, 1166-1227`).
@@ -201,7 +216,9 @@ Investigator E · HEAD `520bd123` · static, read-only. Companion to `06-GENERAT
 - **"Some below when needed".** On narrow screens the arrival cards go below Q (`arrival-briefing.tsx:923-934`). The answer stage is always centre and below.
 
 ### 4.4 Why it feels like "just listening and not doing anything"
+
 Code-level contributors, in likely order of impact:
+
 1. **D-E1.** Briefing cards and the voice decider vanish when Q starts talking or the person types. Only the voice remains, describing cards that are no longer on screen.
 2. **D-E4.** Turns where Q chooses silence (or the turn reader returns UNCLEAR/SILENT, per the lead's live evidence) show "Thinking" → "Listening" with no words and no "I didn't catch that". Before the lead's v44 fix, the realtime model improvised instead.
 3. **D-E3.** On the standard line (the lead's tests fell back to it), card verbs and screen notes are not wired, so spoken decisions go to Q as ordinary turns.
@@ -210,6 +227,7 @@ Code-level contributors, in likely order of impact:
 6. **Inconsistent reads.** "Nothing is waiting" (Q's answer) vs. the arrival's "Zino Aviation is waiting for your reply": the voice answer used approvals / schedule / q.work / relationships tools (lead's evidence), while the arrival reads notices. Different sources give different truths. This belongs to the brain area; noted for the lead.
 
 ### 4.5 Misleading progress indicators and confusing controls
+
 - **"Listening"** is shown both for a healthy idle line and after a silent or failed turn (`voice/session.ts:27-31`; `duplex-line.ts:1650`).
 - **"Ready when you are"** is the idle label before the first question (`q-conversation.tsx:622-625`), shown even while `spokenWelcome` is still awaiting reads.
 - **`QNow` "Q isn't working on anything, and nothing needs you."** (`q-now.tsx:51-55`) is scoped to the open conversation's approval only. Every caller passes `quietWhenIdle`, so this text currently never renders (all four call sites, grep). Latent.
@@ -220,21 +238,22 @@ Code-level contributors, in likely order of impact:
 
 ## 5. Classification summary (UI flows)
 
-| Flow | Status |
-|---|---|
-| Q page presence/chat, Board, history, composer | IMPLEMENTED |
+| Flow                                                                   | Status                                                                                                                             |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Q page presence/chat, Board, history, composer                         | IMPLEMENTED                                                                                                                        |
 | Arrival briefing (greeting, lowdown, decision cards, verbs, any-words) | IMPLEMENTED (logic) / BROKEN on `/home` once the conversation starts (D-E1) / UNTESTED on the real page (e2e uses the dev harness) |
-| Side columns around Q | PARTIAL: arrival decisions only, pre-conversation only |
-| Investor mandate-match arrival with opinion | NOT IMPLEMENTED |
-| Voice → card decisions | PARTIAL (duplex only) |
-| Answer cards following speech | IMPLEMENTED (centre) |
-| Room cards (`SHOW_IN_Q_ROOM`) | IMPLEMENTED |
-| Charts / maps | ABSENT |
-| Work / Team map live | IMPLEMENTED |
-| Chat | IMPLEMENTED (3s polling) |
-| Segment error boundary for `(app)` | ABSENT (R-E5) |
-| VoicePanel, ActivitySummary | CONFIGURED-UNUSED (dead) |
+| Side columns around Q                                                  | PARTIAL: arrival decisions only, pre-conversation only                                                                             |
+| Investor mandate-match arrival with opinion                            | NOT IMPLEMENTED                                                                                                                    |
+| Voice → card decisions                                                 | PARTIAL (duplex only)                                                                                                              |
+| Answer cards following speech                                          | IMPLEMENTED (centre)                                                                                                               |
+| Room cards (`SHOW_IN_Q_ROOM`)                                          | IMPLEMENTED                                                                                                                        |
+| Charts / maps                                                          | ABSENT                                                                                                                             |
+| Work / Team map live                                                   | IMPLEMENTED                                                                                                                        |
+| Chat                                                                   | IMPLEMENTED (3s polling)                                                                                                           |
+| Segment error boundary for `(app)`                                     | ABSENT (R-E5)                                                                                                                      |
+| VoicePanel, ActivitySummary                                            | CONFIGURED-UNUSED (dead)                                                                                                           |
 
 ## 6. Tests actually run (read-only, providers disabled)
+
 `npx vitest run` on `apps/web/test/arrival-briefing.test.ts`, `arrival-waiting.test.ts`, `returning-welcome.test.tsx`, `q-result-blocks.test.ts`, `room-feed.test.ts` and `q-room.test.ts`: **6 files, 51 tests passed** (with act() warnings). Provider keys were set to `disabled-locally-000000000000`.
 None of these tests mounts `QConversationPanel` with a spoken line together with the arrival briefing, so D-E1 is not covered.

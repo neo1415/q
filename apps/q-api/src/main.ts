@@ -104,9 +104,13 @@ import {
 import { createGoogleImageProvider } from "@capital-q/model-gateway/images/google";
 import { createOpenAIImageProvider } from "@capital-q/model-gateway/images/openai";
 import { createRealtimeVoiceGateway } from "@capital-q/model-gateway/realtime";
-import { createOpenAIRealtimeProvider } from "@capital-q/model-gateway/realtime/openai";
+import {
+  createOpenAIRealtimeProvider,
+  createOpenAISidebandConnector,
+} from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
 import { duplexConfigFrom } from "./voice/duplex/config.js";
+import { createDuplexSideband } from "./voice/duplex/sideband.js";
 import { createMemoryListeningStore } from "./voice/duplex/listening.js";
 import { createPostgresDuplexSpend } from "./voice/duplex/spend.js";
 import { createPostgresDuplexTranscriptStore } from "./voice/duplex/transcript.js";
@@ -166,7 +170,10 @@ import {
 import {
   createWorkforcePorts,
   workforceNotifier,
+  workforceResearch,
 } from "./composition/workforce/ports.js";
+import { createPostgresAgentWorkQueue } from "./composition/workforce/queue.js";
+import { createAgentWorkRunner } from "./composition/workforce/runner.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
 import { createHeldRetry } from "./composition/workforce/held-retry.js";
@@ -181,6 +188,7 @@ import { createInstructionActions } from "./composition/instructions/actions.js"
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
 import {
   createInstructionActor,
+  createOwnerActor,
   createInstructionAsk,
 } from "./composition/instructions/ask.js";
 import {
@@ -249,7 +257,10 @@ import {
   type ModelDataPosture,
   type QViewingMoment,
 } from "@capital-q/contracts";
-import { createRequestDatabaseClient } from "@capital-q/database";
+import {
+  checkDatabaseReadiness,
+  createRequestDatabaseClient,
+} from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createOnboardingNudges,
@@ -316,7 +327,10 @@ import {
   Q_VOICE_WS_PATH,
 } from "@capital-q/contracts";
 import {
+  createDailySpendCap,
   createModelGateway,
+  createPostgresDailySpendReader,
+  parseDailySpendCapUsd,
   createModelProviderRegistry,
   createSyntheticDemoRoutingAllowance,
   createPostgresModelCatalog,
@@ -1000,6 +1014,25 @@ const modelGateway = timedModelGateway(
     usage: createPostgresModelUsageRepository({ sql: database.sql }),
     health: createProcessLocalProviderHealth(),
     syntheticDemo,
+    // F-D8 (RECOVERY F5): one daily ceiling on everything the ledger
+    // counts, shared with the workers' gateway; unset means no cap.
+    spendCap: (() => {
+      const capUsd = parseDailySpendCapUsd(process.env);
+      return capUsd === undefined
+        ? undefined
+        : createDailySpendCap({
+            capUsd,
+            readSpentSinceUsd: createPostgresDailySpendReader({
+              sql: database.sql,
+            }),
+            onReadFailure: (error) => {
+              logger.warn(
+                { err: error, spendCap: "DAILY_AGGREGATE" },
+                "daily spend cap could not read the ledger; using the last total",
+              );
+            },
+          });
+    })(),
     logger,
   }),
   voiceTimings,
@@ -1455,14 +1488,19 @@ const workforcePortsFor = createWorkforcePorts(
         relationshipId: input.relationshipId,
         request: { kind: "TEXT", body: input.body },
         idempotencyKey: input.idempotencyKey,
+        // Recovery D-07: a job's message is marked as sent by Q.
+        ...(input.qDelegationId === undefined
+          ? {}
+          : { qDelegationId: input.qDelegationId }),
       }),
+    research: workforceResearch(researchComposition.research),
     writeReply: async (input) =>
       (
         await workforceWriter.compose({
           actor: input.actor,
           principalName: input.principalName,
           counterpartName: input.counterpartName,
-          brief: "",
+          brief: input.brief,
           callComing: input.callComing,
           thread: input.thread,
           correlationId: input.correlationId,
@@ -1504,6 +1542,9 @@ const workforceJobBoard = createWorkforceJobBoard({
   calendarConnected: async (actor) =>
     (await schedule.calendarStatus(actor.userId)) === "CONNECTED",
 });
+// Recovery D3: approved jobs as durable, leased work (the runner is
+// composed below, once the actor resolver exists).
+const agentWorkQueue = createPostgresAgentWorkQueue(database.sql);
 // end WORKFORCE block
 const emailBoard = createEmailActionBoard({
   review: outwardReview,
@@ -1888,6 +1929,8 @@ const instructionEngine: { current?: InstructionEngine } = {};
 const instructionTriggers = createInstructionTriggers({
   store: instructionStore,
   engine: () => instructionEngine.current,
+  // Recovery D-01: lapsed approvals expire eagerly, every sweep.
+  expireLapsed: () => qActions.expireLapsed?.() ?? Promise.resolve(0),
   logger,
 });
 setInterval(() => {
@@ -3212,9 +3255,18 @@ const qActionRegistry = createQActionRegistry([
     meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // WORKFORCE block (J1, J4): a job the lead Q planned, run as approved.
-  ...createWorkforceJobActions({ jobsFor: workforceJobsFor, logger }).map(
-    (definition) =>
-      meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
+  ...createWorkforceJobActions({
+    jobsFor: workforceJobsFor,
+    // Recovery D3: approved jobs are durable work, claimed under a lease.
+    queue: agentWorkQueue,
+    kick: () => {
+      void agentWorkRunner.pass().catch((error: unknown) => {
+        logger.warn({ err: error }, "workforce job runner pass failed");
+      });
+    },
+    logger,
+  }).map((definition) =>
+    meteredQAction(definition, FEATURE_DELEGATIONS, entitlements),
   ),
   // ADR 0043: a standing instruction's grant, one approval per version.
   ...createInstructionActions({
@@ -3852,6 +3904,30 @@ const orphanSweep = createOrphanedRunSweep({
   logger,
 });
 await orphanSweep.sweep();
+
+// Recovery D3: the durable workforce runner. It claims approved jobs under a
+// lease, renews it while a job runs and resumes any job a restart left
+// behind once its lease lapses. Jobs finish without anyone connected.
+const agentWorkRunner = createAgentWorkRunner({
+  queue: agentWorkQueue,
+  store: workforceStore,
+  actorFor: (owner, organisationId) =>
+    createOwnerActor({
+      resolver: actorContextResolver,
+      authUserOf: async (userId) =>
+        (
+          await database.sql<{ auth_user_id: string | null }[]>`
+            select auth_user_id from identity.user_profiles where id = ${userId}`
+        )[0]?.auth_user_id ?? null,
+    })(owner.userId, organisationId),
+  jobsFor: workforceJobsFor,
+  logger,
+});
+setInterval(() => {
+  void agentWorkRunner.pass().catch((error: unknown) => {
+    logger.warn({ err: error }, "workforce job runner pass failed");
+  });
+}, 30_000).unref();
 setInterval(
   () => {
     orphanSweep.sweep().catch((error: unknown) => {
@@ -5490,6 +5566,17 @@ const duplexBroker =
             }),
         }),
         logger,
+        // RECOVERY A8: the server's own connection to each call, only when
+        // CQ_VOICE_REALTIME_SIDEBAND is on (off by default; not yet
+        // verified on a live call).
+        sideband: (onUsage) =>
+          createDuplexSideband({
+            connect: createOpenAISidebandConnector({
+              apiKey: providerSecrets.openai?.reveal() ?? "",
+            }),
+            logger,
+            onUsage,
+          }),
       })
     : undefined;
 logger.info(
@@ -5525,6 +5612,8 @@ const { app, logger: appLogger } = createApp(
     identity,
   },
   {
+    // RECOVERY F4 (A-04): readiness answers 503 when the database is down.
+    healthProbes: { database: () => checkDatabaseReadiness(database.sql) },
     qRuntime,
     artifacts: qArtifacts.service,
     documentStudio,

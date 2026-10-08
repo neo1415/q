@@ -11,7 +11,7 @@ Why included: Hash recomputed from persisted proposal at approval; deterministic
   313  ): string {
   314    return `q_action:${runId}:${actionId}`;
   315  }
-  316  
+  316
   317  /** The binding envelope of a persisted action; the only input to any hash the engine compares. */
   318  export function envelopeOf(action: QActionRecord) {
   319    return bindingEnvelope({
@@ -52,4 +52,3 @@ Why included: Hash recomputed from persisted proposal at approval; deterministic
  1394                  outcome = "action_not_awaiting";
  1395                  throw new QApprovalAlreadyDecidedError(approval.status);
 ```
-

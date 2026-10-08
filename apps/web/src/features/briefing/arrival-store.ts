@@ -163,6 +163,19 @@ export function arrivalSpoken(): string | null {
   return spoken;
 }
 
+/**
+ * E-05: a call opens at once, with the briefing's words when they are
+ * ready. When they were not, the stage hands them to the line once they
+ * land; this says whether the line already has them.
+ */
+let saidOnLine = false;
+export function markArrivalSaid(said: boolean): void {
+  saidOnLine = said;
+}
+export function arrivalSaidOnLine(): boolean {
+  return saidOnLine;
+}
+
 /** Whether this page load gives a briefing (decided, or about to be). */
 export function arrivalPending(): boolean {
   return status.kind === "PENDING" && started;
@@ -216,4 +229,5 @@ export function resetArrival(): void {
   leftRound = -1;
   greetedRound = -1;
   carried = null;
+  saidOnLine = false;
 }

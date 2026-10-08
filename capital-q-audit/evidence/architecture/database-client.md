@@ -9,11 +9,11 @@
     2    resolveDatabaseUrl,
     3    type DatabaseConfig,
     4  } from "@capital-q/config/database";
-    5  
+    5
     6  import { createPostgresClient } from "./internal/postgres.js";
     7  import { createTransactionManager } from "./transaction.js";
     8  import type { RequestDatabase } from "./types.js";
-    9  
+    9
    10  /**
    11   * Normal server application database access.
    12   *
@@ -36,7 +36,7 @@
    29      config,
    30      "REQUEST",
    31    );
-   32  
+   32
    33    return {
    34      accessClass: "REQUEST",
    35      sql,
@@ -104,7 +104,7 @@
   132  create index grants_resource_idx
   133    on permissions.grants (resource_type, resource_id)
   134    where resource_id is not null;
-  135  
+  135
   136  -- ---------------------------------------------------------------------------
   137  -- private RLS helpers
   138  --
@@ -113,7 +113,7 @@
   141  -- search_path, fully qualified names, EXECUTE only for the policy role. The
   142  -- caller is always derived from auth.uid(); no function takes a user id.
   143  -- ---------------------------------------------------------------------------
-  144  
+  144
   145  create function private.current_app_user_id()
   146  returns uuid
   147  language sql
@@ -126,7 +126,7 @@
   154    where p.auth_user_id = (select auth.uid())
   155      and p.status = 'active'
   156  $$;
-  157  
+  157
   158  create function private.is_tenant_member(target_tenant_id uuid)
   159  returns boolean
   160  language sql
@@ -142,7 +142,7 @@
   170        and m.user_id = (select private.current_app_user_id())
   171    )
   172  $$;
-  173  
+  173
   174  create function private.is_organisation_member(target_organisation_id uuid)
   175  returns boolean
   176  language sql
@@ -158,14 +158,14 @@
   186        and m.user_id = (select private.current_app_user_id())
   187    )
   188  $$;
-  189  
+  189
   190  revoke all on function private.current_app_user_id() from public;
   191  revoke all on function private.is_tenant_member(uuid) from public;
   192  revoke all on function private.is_organisation_member(uuid) from public;
   193  grant execute on function private.current_app_user_id() to authenticated;
   194  grant execute on function private.is_tenant_member(uuid) to authenticated;
   195  grant execute on function private.is_organisation_member(uuid) to authenticated;
-  196  
+  196
   197  -- ---------------------------------------------------------------------------
   198  -- Privileges
   199  --
@@ -179,28 +179,28 @@
 - Why included: The RLS policies themselves; every one is `to authenticated`, i.e. PostgREST callers, not the application's postgres connection.
 
 ```
-  236  
+  236
   237  -- A person reads their own profile only. Raw profiles are not a directory;
   238  -- network-visible professional profiles arrive as their own projection.
   239  create policy user_profiles_select_own
   240    on identity.user_profiles for select to authenticated
   241    using (auth_user_id = (select auth.uid()));
-  242  
+  242
   243  -- Tenant and organisation rows are visible only through an active membership.
   244  create policy tenants_select_member
   245    on identity.tenants for select to authenticated
   246    using (private.is_tenant_member(id));
-  247  
+  247
   248  create policy organisations_select_member
   249    on identity.organisations for select to authenticated
   250    using (private.is_organisation_member(id));
-  251  
+  251
   252  -- Own memberships, including historical ones (attribution, not access).
   253  -- Organisation rosters are served by the server under application authorization.
   254  create policy organisation_memberships_select_own
   255    on identity.organisation_memberships for select to authenticated
   256    using (user_id = (select private.current_app_user_id()));
-  257  
+  257
   258  create policy membership_roles_select_own
   259    on identity.membership_roles for select to authenticated
   260    using (exists (
@@ -208,11 +208,11 @@
   262      where m.id = membership_id
   263        and m.user_id = (select private.current_app_user_id())
   264    ));
-  265  
+  265
   266  create policy user_active_contexts_select_own
   267    on identity.user_active_contexts for select to authenticated
   268    using (user_id = (select private.current_app_user_id()));
-  269  
+  269
   270  -- Reference data. Reading a capability's name grants nothing.
   271  create policy capabilities_select_reference
   272    on permissions.capabilities for select to authenticated using (true);
@@ -220,7 +220,7 @@
   274    on permissions.roles for select to authenticated using (true);
   275  create policy role_capabilities_select_reference
   276    on permissions.role_capabilities for select to authenticated using (true);
-  277  
+  277
   278  -- permissions.grants and identity.tenant_organisations: RLS enabled, no
   279  -- policies. Even a future accidental GRANT yields zero rows.
 ```

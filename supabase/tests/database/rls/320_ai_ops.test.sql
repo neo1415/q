@@ -38,10 +38,10 @@ select ok((select supports_zero_retention from ai_ops.providers where code = 'gr
   'groq zero data retention is recorded as enabled for this organisation');
 select results_eq(
   $$ select model_code from ai_ops.models order by model_code $$,
-  $$ values ('gemini-2.5-flash-image'), ('gemini-3.5-flash'), ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'),
+  $$ values ('gemini-2.5-flash-image'), ('gemini-3.1-flash-lite-image'), ('gemini-3.5-flash'), ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'),
             ('gpt-5.6-luna'), ('gpt-image-1'), ('gpt-realtime-mini'),
             ('openai/gpt-oss-120b'), ('openai/gpt-oss-20b'), ('qwen/qwen3.8-27b') $$,
-  'the ten model ids are seeded, exactly (gpt-realtime-mini for full-duplex voice in 20261203090000, image models gemini-2.5-flash-image and gpt-image-1 in 20261113010000, qwen/qwen3.8-27b joined Groq in 20260918, gpt-5.6-luna in 20261006090000, gemini-3.5-flash in 20261008120000)');
+  'the eleven model ids are seeded, exactly (gemini-3.1-flash-lite-image under its own id in 20261220192000, gpt-realtime-mini for full-duplex voice in 20261203090000, image models gemini-2.5-flash-image and gpt-image-1 in 20261113010000, qwen/qwen3.8-27b joined Groq in 20260918, gpt-5.6-luna in 20261006090000, gemini-3.5-flash in 20261008120000)');
 select is((select count(*)::int from ai_ops.models where sensitivity_ceiling in ('HIGHLY_CONFIDENTIAL', 'RESTRICTED')), 0,
   'no model is cleared above CONFIDENTIAL: the strongest material never leaves through a vendor');
 select is(
@@ -102,9 +102,14 @@ values
    'a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'a4000000-0000-4000-8000-000000000001', 1,
    0, 0, 0, 1200, null, 'UNPRICED', false, 'TIMEOUT', null);
 
-select is((select count(*)::int from ai_ops.model_usage), 2, 'success and failure attempts are both recorded');
+-- Counted within the fixture tenants: a shared local database also holds
+-- rows that integration tests wrote, and those are not this suite's.
+select is((select count(*)::int from ai_ops.model_usage
+            where tenant_id in (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('tenant_b'))), 2,
+  'success and failure attempts are both recorded');
 -- 20261126090000: what a call was for, a closed set; older writers read OTHER.
-select is((select count(*)::int from ai_ops.model_usage where purpose = 'OTHER'), 2,
+select is((select count(*)::int from ai_ops.model_usage where purpose = 'OTHER'
+            and tenant_id in (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('tenant_b'))), 2,
   'a row written without a purpose reads OTHER');
 select throws_ok(
   $$ insert into ai_ops.model_usage (tenant_id, task_class, provider_id, model_id, attempt, latency_ms, cost_basis, success, purpose)

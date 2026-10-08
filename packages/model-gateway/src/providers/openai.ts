@@ -43,10 +43,12 @@ import type {
  * answers reliably makes the core acceptance suite executable, which is
  * the whole reason it is here.
  *
- * It is reachable only where the catalogue lists it AND the deployment
- * has turned the test route on (see `createTestRoutingCatalog`). It is
- * not in any routing policy's own lists, so ordinary traffic cannot
- * reach it, and no browser can ask for it.
+ * That was its origin. Since 20261008130000_ai_ops_openai_primary.sql it
+ * is the PRIMARY text provider: the routing policies name gpt-5.6-luna
+ * first for every task class, with Gemini and Groq as fallbacks, and the
+ * catalogue clears it to CONFIDENTIAL on an asserted zero-retention
+ * agreement. No browser can ask for it; it is reached only through the
+ * gateway's routing.
  *
  * Everything the other adapters are held to holds here. The OpenAI shape
  * is mapped in this file and stops here; the only functions declared are
@@ -147,13 +149,29 @@ export function toInput(messages: readonly ModelMessage[]): {
   readonly instructions: string | undefined;
   readonly input: ResponseInput;
 } {
-  const instructions = messages
-    .filter((message) => message.role === "SYSTEM")
+  // Only the leading system messages are instructions (audit F-D3). A
+  // SYSTEM message added later in the turn can carry fetched, untrusted
+  // text (the research hop's "fetched for you" result); lifting it into
+  // `instructions` gave web content instruction authority. It is said
+  // where it was added, as a marked note in a user message, the way the
+  // Google adapter places it.
+  const leading = messages.findIndex((message) => message.role !== "SYSTEM");
+  const instructions = (leading === -1 ? messages : messages.slice(0, leading))
     .map((message) => message.content)
     .join("\n\n");
   const input: ResponseInput = [];
-  for (const message of messages) {
-    if (message.role === "SYSTEM") continue;
+  for (const [index, message] of messages.entries()) {
+    if (message.role === "SYSTEM") {
+      if (leading !== -1 && index >= leading) {
+        input.push({
+          role: "user",
+          content: [
+            { type: "input_text", text: `[Capital Q note] ${message.content}` },
+          ],
+        });
+      }
+      continue;
+    }
     if (message.role === "USER") {
       input.push({
         role: "user",

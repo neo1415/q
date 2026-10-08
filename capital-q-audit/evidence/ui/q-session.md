@@ -31,7 +31,7 @@
   253        writeToQPageUrl(voiceConversationId);
   254      }
   255    }, [voiceConversationId, pathname]);
-  256  
+  256
   257    /*
   258     * A spoken answer is recorded as a Q message with its result blocks --
   259     * "here's your mandate, download the PDF from the card" -- but it
@@ -89,14 +89,14 @@
   311      [qAbsorb, reread],
   312    );
   313    useQRoomFeed(voice.active, onRoom);
-  314  
+  314
   315    const voiceSpeaking = voice.client.state === "Q_SPEAKING";
   316    const wasSpeaking = useRef(false);
   317    useEffect(() => {
   318      if (wasSpeaking.current && !voiceSpeaking) reread();
   319      wasSpeaking.current = voiceSpeaking;
   320    }, [voiceSpeaking, reread]);
-  321  
+  321
   322    const open = useCallback((next: string | null) => {
   323      setConversationId((current) => {
   324        if (current === next) return current;
@@ -106,7 +106,7 @@
   328        return next;
   329      });
   330    }, []);
-  331  
+  331
   332    const talk = useCallback(
   333      async (options?: { readonly greeting?: string }) => {
   334        const named = conversationIdOf(q.conversationId);
@@ -194,4 +194,3 @@
   456      }
   457    }, [turns, q.loading, act, router, voiceActive, wire]);
 ```
-

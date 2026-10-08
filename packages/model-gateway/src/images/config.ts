@@ -22,7 +22,9 @@ export const IMAGE_MODEL_CONFIG = {
     modelCode: "gemini-3.1-flash-lite-image",
     costPerImageUsd: 0.034,
     providerId: "a1000000-0000-4000-8000-000000000001",
-    modelId: "a2000000-0000-4000-8000-000000000022",
+    // 20261220192000: …022 is gpt-realtime-mini; the image model's own
+    // row was never written under it (audit F-D1).
+    modelId: "a2000000-0000-4000-8000-000000190001",
   },
   openai: {
     modelCode: "gpt-image-1",

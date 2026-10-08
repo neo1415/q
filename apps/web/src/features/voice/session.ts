@@ -1,4 +1,8 @@
-import type { CreateQVoiceSessionResponse } from "@capital-q/contracts";
+import type {
+  CreateQVoiceSessionResponse,
+  QFailureClass,
+  QTurnDisposition,
+} from "@capital-q/contracts";
 
 /**
  * The browser side of the voice channel, as the interview sees it
@@ -92,7 +96,20 @@ export function transcriptLineFor(
   };
 }
 
+/**
+ * RECOVERY A4: how one accepted turn ended, on either line. Every turn
+ * reaches exactly one; `notice` is what the person is shown when it ended
+ * without an answer (never a provider error string).
+ */
+export type VoiceTurnOutcome = {
+  readonly disposition: QTurnDisposition;
+  readonly failure?: QFailureClass | undefined;
+  readonly notice?: string | undefined;
+};
+
 export type VoiceSessionEvents = {
+  /** RECOVERY A4: a turn reached its terminal disposition. */
+  readonly onTurnOutcome?: ((outcome: VoiceTurnOutcome) => void) | undefined;
   /**
    * A completed transcript line from either side. A line whose id was
    * already sent replaces that line (see `upsertLine`).

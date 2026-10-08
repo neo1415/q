@@ -16,7 +16,7 @@
   162  const DECLARED_PROPOSERS: ReadonlySet<string> = new Set(
   163    appActionToolNames(APP_ACTIONS).filter((name) => name.startsWith("propose_")),
   164  );
-  165  
+  165
   166  /** A declared app action's tool: offered when named, on any purpose its scopes allow. */
   167  function declaredAction(record: QToolRecord): boolean {
   168    return (
@@ -24,7 +24,7 @@
   170      DECLARED_PROPOSERS.has(record.definition.providerName)
   171    );
   172  }
-  173  
+  173
   174  export function createQToolRegistry(
   175    definitions: readonly AnyQToolDefinition[],
   176  ): QToolRegistry {
@@ -32,7 +32,7 @@
   178    const byVersion = new Map<string, QToolRecord>();
   179    const activeById = new Map<QToolName, QToolRecord>();
   180    const activeByProviderName = new Map<string, QToolRecord>();
-  181  
+  181
   182    for (const definition of definitions) {
   183      const id = QToolNameSchema.parse(definition.id);
   184      if (!Number.isInteger(definition.version) || definition.version < 1) {
@@ -89,7 +89,7 @@
   235    }
   236    records.sort((a, b) => a.versionId.localeCompare(b.versionId));
   237    Object.freeze(records);
-  238  
+  238
   239    /**
   240     * Relevance, then priority (R33, lead decision 2026-09-27): the core
   241     * first; then the tools that declare fewer purposes, being the more
@@ -153,15 +153,15 @@
   299            a.definition.id.localeCompare(b.definition.id),
   300        );
   301    };
-  302  
+  302
   303    const eligible = (context: QToolExecutionContext): readonly QToolRecord[] =>
   304      ranked(context).slice(0, Math.min(Q_TURN_TOOLS_MAX, MODEL_TOOLS_MAX));
-  305  
+  305
   306    // What the run's purpose and plan allow, exactly as before a turn's focus
   307    // existed, within what one request can carry.
   308    const unfocused = (context: QToolExecutionContext): readonly QToolRecord[] =>
   309      ranked({ ...context, focus: undefined }).slice(0, MODEL_TOOLS_MAX);
-  310  
+  310
   311    // The declared app actions this plan's scopes allow, whatever the purpose
   312    // (lead 2026-10-03: "We've decided not to proceed with Ledgerfold" plans
   313    // as INVESTOR_QUESTION, and relationship_outcome was refused there).
@@ -175,7 +175,7 @@
   321            .map(({ definition }) => definition.providerName),
   322        },
   323      }).filter(declaredAction);
-  324  
+  324
   325    /** The tool's area is one the turn is about. */
   326    const inFocusArea = (
   327      context: QToolExecutionContext,
@@ -184,7 +184,7 @@
   330      const area = TOOL_AREAS.get(providerName);
   331      return area !== undefined && (context.focus?.areas.includes(area) ?? false);
   332    };
-  333  
+  333
   334    const available = (
   335      context: QToolExecutionContext,
   336    ): readonly QToolRecord[] => {
@@ -197,7 +197,7 @@
   343        ),
   344      ];
   345    };
-  346  
+  346
   347    // use_capability reads what this run may use from here, never more.
   348    for (const record of records) {
   349      const bind = (
@@ -212,7 +212,7 @@
   358        })),
   359      );
   360    }
-  361  
+  361
   362    return {
   363      get: (id, version) => byVersion.get(versionIdOf(id, version)),
   364      getActive: (id) => activeById.get(id),

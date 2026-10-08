@@ -5,7 +5,7 @@
 - Why included: awaitingAnswer / waitingCards: no expires_at filter; lapsed (24h) approvals keep a conversation held.
 
 ```ts
-  710  
+  710
   711      /**
   712       * Relationships where a card this instruction asked about still waits
   713       * on the person (proposed or awaiting approval).
@@ -22,7 +22,7 @@
   724             and a.status in ('PROPOSED', 'AWAITING_APPROVAL')`;
   725        return new Set(rows.map((row) => row.relationship_id));
   726      },
-  727  
+  727
   728      /** Q's sent chat messages per relationship under this instruction. */
   729      messagesSent: async (
   730        instructionId: string,
@@ -36,7 +36,7 @@
   738           group by relationship_id`;
   739        return new Map(rows.map((row) => [row.relationship_id, row.sent]));
   740      },
-  741  
+  741
   742      /** The platform's read of what Q did, newest last, for the planner. */
   743      history: async (
   744        instructionId: string,
@@ -51,7 +51,7 @@
   753             order by created_at desc, step_index desc
   754             limit ${limit}`
   755        ).reverse(),
-  756  
+  756
   757      /**
   758       * Cards Q asked under this instruction that still wait on the person
   759       * (founder, 2026-10-06: the same five were drafted again 20 minutes
@@ -72,5 +72,5 @@
   774           where t.instruction_id = ${instructionId} and t.status = 'ASKED'
   775             and a.status in ('PROPOSED', 'AWAITING_APPROVAL')
   776           limit 100`,
-  777  
+  777
 ```

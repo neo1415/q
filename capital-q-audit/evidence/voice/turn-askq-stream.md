@@ -270,4 +270,3 @@
   979      return remember(reply.text);
   980    };
 ```
-

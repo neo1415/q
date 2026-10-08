@@ -15,6 +15,14 @@ export type VoiceTurnBoard = {
     state: Omit<QVoiceTurnState, "sequence">,
   ) => QVoiceTurnState;
   readonly read: (voiceSessionId: string) => QVoiceTurnState;
+  /**
+   * RECOVERY A4: how the latest turn ended, for the screen; numbered on
+   * its own, so it never moves the turn's sequence.
+   */
+  readonly noteOutcome: (
+    voiceSessionId: string,
+    outcome: Omit<NonNullable<QVoiceTurnState["outcome"]>, "seq">,
+  ) => void;
   readonly forget: (voiceSessionId: string) => void;
 };
 
@@ -56,6 +64,15 @@ export function createVoiceTurnBoard(
       return next;
     },
     read: (voiceSessionId) => board.get(voiceSessionId)?.state ?? EMPTY,
+    noteOutcome: (voiceSessionId, outcome) => {
+      prune();
+      const state = board.get(voiceSessionId)?.state ?? EMPTY;
+      const seq = (state.outcome?.seq ?? 0) + 1;
+      board.set(voiceSessionId, {
+        state: { ...state, outcome: { ...outcome, seq } },
+        at: now(),
+      });
+    },
     forget: (voiceSessionId) => {
       board.delete(voiceSessionId);
     },

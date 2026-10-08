@@ -6,20 +6,20 @@
 
 ```
     1  "use client";
-    2  
+    2
     3  import { usePathname } from "next/navigation";
     4  import { useEffect, useState } from "react";
-    5  
+    5
     6  import { useQSessionOptional } from "@/features/q/q-session";
-    7  
+    7
     8  import { ArrivalBriefing } from "./arrival-briefing";
     9  import { useArrivalStatus } from "./arrival-store";
-   10  
+   10
    11  /** The Q page gives the briefing itself; everywhere else, the dock does. */
    12  const Q_PAGE = "/home";
    13  /** After the last card, the dock's line stays this long, then goes. */
    14  const SETTLE_MS = 4_000;
-   15  
+   15
    16  /**
    17   * The compact arrival briefing beside Q's dock on every page but the Q
    18   * page (Zino, 2026-10-08): the greeting and lowdown in a line, the card in
@@ -124,4 +124,3 @@
    69   * pill fits nowhere it shows as the minimal button instead.
    70   */
 ```
-

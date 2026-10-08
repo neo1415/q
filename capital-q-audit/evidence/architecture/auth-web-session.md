@@ -6,13 +6,13 @@
 
 ```
     1  import "server-only";
-    2  
+    2
     3  import { redirect } from "next/navigation";
     4  import { cache } from "react";
-    5  
+    5
     6  import { signInPath } from "./redirect-safety";
     7  import { createServerSupabaseClient } from "./supabase-server";
-    8  
+    8
     9  /**
    10   * "Who is signed in?" for the web application. One answer, server-rendered.
    11   *
@@ -27,7 +27,7 @@
    20    readonly authUserId: string;
    21    readonly email: string | null;
    22  };
-   23  
+   23
    24  /** Memoised per request so a layout and its page share one verification. */
    25  export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
    26    const supabase = await createServerSupabaseClient();
@@ -41,7 +41,7 @@
    34    const email = data?.claims.email;
    35    return { authUserId: sub, email: typeof email === "string" ? email : null };
    36  });
-   37  
+   37
    38  /**
    39   * Require a session or redirect to sign-in. The centralised layout guard:
    40   * pages never write their own `if (!user) redirect(...)`.
@@ -50,14 +50,14 @@
    43    returnTo?: string,
    44  ): Promise<SessionUser> {
    45    const user = await getSessionUser();
-   46  
+   46
    47    if (user === null) {
    48      redirect(signInPath(returnTo));
    49    }
-   50  
+   50
    51    return user;
    52  }
-   53  
+   53
    54  /**
    55   * The current access token, for forwarding to the Capital Q API over a
    56   * server-to-server call. Never rendered, never sent to the browser, never
@@ -78,9 +78,9 @@
 
 ```
     1  import type { NextRequest } from "next/server";
-    2  
+    2
     3  import { handleSessionProxy } from "./src/auth/session-proxy";
-    4  
+    4
     5  /**
     6   * Next.js request proxy: session refresh and route protection, and nothing
     7   * else. The policy lives in src/auth/route-policy.ts; the matcher below is
@@ -89,7 +89,7 @@
    10  export function proxy(request: NextRequest) {
    11    return handleSessionProxy(request);
    12  }
-   13  
+   13
    14  export const config = {
    15    matcher: [
    16      // Exactly the root: who sees the landing (src/auth/landing-route.ts).
@@ -127,4 +127,3 @@
    48    ],
    49  };
 ```
-

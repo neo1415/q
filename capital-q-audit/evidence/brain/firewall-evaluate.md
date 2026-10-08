@@ -18,7 +18,7 @@
   636      if (actor.actorType !== "HUMAN") {
   637        return { outcome: "DENIED", reason: "NON_HUMAN_ACTOR", denied: [] };
   638      }
-  639  
+  639
   640      // 2. Active organisation, explicit. Entity subjects need one; nothing
   641      // picks a membership on the person's behalf.
   642      const needsOrganisation = request.subjects.some((subject) =>
@@ -31,7 +31,7 @@
   649          denied: [],
   650        };
   651      }
-  652  
+  652
   653      // 3. Subjects, each on its own. One that does not resolve for this
   654      // actor ends the request: a request about something the actor may not
   655      // reach gets no plan, and no partial plan can be used to pivot.
@@ -47,7 +47,7 @@
   665        }
   666        subjects.push(resolved.subject);
   667      }
-  668  
+  668
   669      // 4. Task class — derived, never declared.
   670      const taskClass = deriveTaskClass(
   671        request.capability,
@@ -56,7 +56,7 @@
   674          relation: subject.relation,
   675        })),
   676      );
-  677  
+  677
   678      // 5. Candidates: what this task may need at most.
   679      const candidates: Candidate[] = [];
   680      const denied: QDeniedScope[] = [];
@@ -70,7 +70,7 @@
   688        denied.push(...built.denied);
   689      }
   690      candidates.push(...actorWide(actor, request.capability));
-  691  
+  691
   692      // 6-7. Permission layers.
   693      const verdicts = await evaluate(actor, candidates);
   694      let permitted: QAuthorisedKnowledgeScope[] = [];
@@ -81,7 +81,7 @@
   699          denied.push(verdict.denied);
   700        }
   701      }
-  702  
+  702
   703      // 8. Sensitivity ceiling for the task. Inheritance is the plan's
   704      // maxSensitivity below: derived output carries the strongest source.
   705      const ceiling = sensitivityCeiling(taskClass);
@@ -96,7 +96,7 @@
   714        });
   715        return false;
   716      });
-  717  
+  717
   718      // 9. Combination risk.
   719      const relationOf = (scope: QAuthorisedKnowledgeScope): SubjectRelation => {
   720        if (scope.subject === undefined) {
@@ -111,7 +111,7 @@
   729      const combined = applyCombinationRules(permitted, relationOf);
   730      permitted = [...combined.scopes];
   731      denied.push(...combined.denied);
-  732  
+  732
   733      // 5b. Requested labels narrow, never widen.
   734      if (request.requestedLabels !== undefined) {
   735        const requested = new Set(request.requestedLabels);
@@ -127,7 +127,7 @@
   745          return false;
   746        });
   747      }
-  748  
+  748
   749      // 10. A subject with nothing left is a request Q cannot serve at all.
   750      for (const subject of subjects) {
   751        if (!ENTITY_KINDS.has(subject.kind)) {
@@ -145,7 +145,7 @@
   763      if (permitted.length === 0) {
   764        return { outcome: "DENIED", reason: "NO_AUTHORISED_CONTEXT", denied };
   765      }
-  766  
+  766
   767      // 11. The plan.
   768      const evaluatedAt = clock.now();
   769      const revalidateAfter = new Date(

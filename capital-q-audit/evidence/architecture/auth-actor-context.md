@@ -21,7 +21,7 @@
    14    type AuthenticatedPrincipal,
    15  } from "@capital-q/security";
    16  import { withObservabilityContext } from "@capital-q/observability";
-   17  
+   17
    18  /**
    19   * The single mechanism protected routes use to obtain actor context.
    20   *
@@ -29,7 +29,7 @@
    22   * membership itself. If that logic is duplicated per route it will eventually
    23   * be duplicated slightly wrong, and the wrong copy is a cross-tenant bug.
    24   */
-   25  
+   25
    26  /**
    27   * The trusted authentication boundary.
    28   *
@@ -41,12 +41,12 @@
    34      request: FastifyRequest,
    35    ) => Promise<AuthenticatedPrincipal | null>;
    36  };
-   37  
+   37
    38  export type ActorContextDependencies = {
    39    readonly authenticator: RequestAuthenticator;
    40    readonly resolver: ActorContextResolver;
    41  };
-   42  
+   42
    43  declare module "fastify" {
    44    interface FastifyRequest {
    45      /**
@@ -56,7 +56,7 @@
    49      actorContext?: ActorContext;
    50    }
    51  }
-   52  
+   52
    53  /**
    54   * Read the resolved context, or fail closed.
    55   *
@@ -66,14 +66,14 @@
    59   */
    60  export function getActorContext(request: FastifyRequest): ActorContext {
    61    const context = request.actorContext;
-   62  
+   62
    63    if (context === undefined) {
    64      throw new ActorContextRequiredError();
    65    }
-   66  
+   66
    67    return context;
    68  }
-   69  
+   69
    70  /**
    71   * Build the onRequest hook that protects a route.
    72   *
@@ -92,24 +92,24 @@
    85    ): void {
    86      void (async () => {
    87        const principal = await dependencies.authenticator.authenticate(request);
-   88  
+   88
    89        if (principal === null) {
    90          throw new AuthenticationRequiredError();
    91        }
-   92  
+   92
    93        // The only thing a client may influence. A malformed identifier is
    94        // rejected here so obviously bad input never reaches identity lookup.
    95        const rawSelector = request.headers[ORGANISATION_CONTEXT_HEADER];
    96        const selector = parseOrganisationSelector(
    97          typeof rawSelector === "string" ? rawSelector : undefined,
    98        );
-   99  
+   99
   100        if (!selector.ok) {
   101          throw new ActorContextRequiredError(
   102            "The requested organisation context identifier is not valid.",
   103          );
   104        }
-  105  
+  105
   106        // Everything authoritative comes from here. X-Tenant-Id, X-Membership-Id,
   107        // X-Actor-Role and X-Actor-Type are never read: a caller cannot name its
   108        // own tenant, membership, role or actor type.
@@ -117,9 +117,9 @@
   110          principal,
   111          selection: selector.selection,
   112        });
-  113  
+  113
   114        request.actorContext = context;
-  115  
+  115
   116        // Safe identifiers only, so a log line can be tied to a tenant without
   117        // copying business data into it. The direction is one-way: observability
   118        // is enriched from security context and is never read back as authority.
@@ -156,9 +156,9 @@
     3    extractBearerToken,
     4    type AccessTokenAuthenticator,
     5  } from "@capital-q/security/supabase";
-    6  
+    6
     7  import type { RequestAuthenticator } from "./actor-context.js";
-    8  
+    8
     9  /**
    10   * The production RequestAuthenticator: Supabase access token in the
    11   * Authorization header -> verified AuthenticatedPrincipal.
@@ -181,11 +181,11 @@
    28        const token = extractBearerToken(
    29          typeof header === "string" ? header : undefined,
    30        );
-   31  
+   31
    32        if (token === null) {
    33          return Promise.resolve(null);
    34        }
-   35  
+   35
    36        return accessTokens.authenticate(token);
    37      },
    38    };
@@ -212,7 +212,7 @@
   138      });
   139    };
   140  }
-  141  
+  141
   142  /**
   143   * The same hook, for the few routes a person may use before they belong to
   144   * an organisation: the arrival conversation and Q's open thread. An
@@ -288,4 +288,3 @@
   214    };
   215  }
 ```
-

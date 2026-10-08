@@ -10,7 +10,7 @@
    90   * (out of 100; the bar is 75) is offered to the person rather than lost.
    91   */
    92  export const NEAR_MISS_POINTS = 10;
-   93  
+   93
    94  /**
    95   * A message's job, writer and reviewer runs, filed before its first draft
    96   * is written so the writer's own call is priced under the job (J6).
@@ -23,7 +23,7 @@
   103    /** The correlation id the first draft's model call carries. */
   104    readonly correlationId: string;
   105  };
-  106  
+  106
   107  export type OutwardReview = {
   108    /** Files the job and runs before the first draft; null without a store. */
   109    readonly prepare: (
@@ -57,7 +57,7 @@
   137      qActionId?: string | null,
   138    ) => Promise<void>;
   139  };
-  140  
+  140
   141  /** The words a held draft carries back to the person. */
   142  export function heldLine(verdict: OutwardVerdict, counterpart: string): string {
   143    if (verdict.verdict === "PASSED") return "";
@@ -74,7 +74,7 @@
   154      300,
   155    );
   156  }
-  157  
+  157
   158  export function createOutwardReview(dependencies: {
   159    readonly models: Pick<WorkforceModels, "review" | "redraft">;
   160    readonly store?: WorkforceStore | undefined;
@@ -83,7 +83,7 @@
   163  }): OutwardReview {
   164    const { store, logger } = dependencies;
   165    const basePolicy = dependencies.policy ?? DEFAULT_REVIEW_POLICY;
-  166  
+  166
   167    async function quietly<T>(work: () => Promise<T>, fallback: T): Promise<T> {
   168      try {
   169        return await work();
@@ -92,7 +92,7 @@
   172        return fallback;
   173      }
   174    }
-  175  
+  175
   176    async function file(
   177      who: Owner,
   178      source: OutwardSource,
@@ -148,10 +148,10 @@
   228        };
   229      }, null);
   230    }
-  231  
+  231
   232    return {
   233      prepare: (who, source, draft) => file(who, source, draft, undefined),
-  234  
+  234
   235      abandon: async (who, prepared) => {
   236        if (store === undefined) return;
   237        await quietly(async () => {
@@ -164,7 +164,7 @@
   244          );
   245        }, undefined);
   246      },
-  247  
+  247
   248      review: async (who, source, draft, options) => {
   249        // The job, its lead, and this message's writer and reviewer runs.
   250        const filed =
@@ -319,7 +319,7 @@
   399              ...(outcome.nearMiss === true ? { nearMiss: true as const } : {}),
   400            };
   401      },
-  402  
+  402
   403      settle: async (who, verdict, outcome, qActionId = null) => {
   404        if (
   405          store === undefined ||

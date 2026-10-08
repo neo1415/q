@@ -34,7 +34,10 @@ import {
   createPostgresMaterialActionAuditWriter,
   createPostgresSecurityEventWriter,
 } from "@capital-q/audit";
-import { createRequestDatabaseClient } from "@capital-q/database";
+import {
+  checkDatabaseReadiness,
+  createRequestDatabaseClient,
+} from "@capital-q/database";
 import {
   CorrelationIdSchema,
   type AdminUsageDto,
@@ -1967,6 +1970,8 @@ const ORGANISATION_ADMIN = CapabilitySchema.parse("organisation.admin");
 // end BILLING block
 
 const { app, logger } = createApp(config, security, {
+  // RECOVERY F4 (A-04): readiness answers 503 when the database is down.
+  healthProbes: { database: () => checkDatabaseReadiness(database.sql) },
   organisations,
   companies,
   investors,

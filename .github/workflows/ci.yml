@@ -1,16 +1,28 @@
 name: CI
 
-# Baseline quality gate: a clean runner must reproduce the repository's static
-# checks, deterministic tests and build from the committed dependency graph.
-# Deployment, database, E2E and security scanning are deliberately not here --
-# they arrive with the packets that introduce those capabilities.
+# Quality gate: a clean runner must reproduce the repository's static checks,
+# deterministic tests and build from the committed dependency graph, and the
+# database suite (pgTAP) against every migration.
+#
+# Branches (RECOVERY F2, audit F-D6): production deploys from
+# recovery/2026-09-12 and integration happens on recovery/2026-09-12-8y2j4w
+# and build/rec-*, none of which CI used to run on. With Railway's
+# "Wait for CI" (checkSuites: true in .railway/railway.ts) a deploy waits
+# for these jobs on the commit it is about to ship.
 
 on:
   pull_request:
   push:
     branches:
       - main
+      - "recovery/**"
+      - "build/rec-*"
   workflow_dispatch:
+    inputs:
+      e2e:
+        description: "Also run the Playwright e2e job (needs a seeded local stack)"
+        type: boolean
+        default: false
 
 # Read-only. This job checks out code and runs local tooling; it never writes to
 # the repository, publishes, or deploys. Unspecified permissions default to none.
@@ -78,3 +90,90 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  # Every migration from empty, then every pgTAP suite (RLS, grants,
+  # append-only guards, schema guard). The local Supabase stack runs in
+  # Docker on the runner; nothing here reaches a hosted project.
+  database:
+    name: database (pgTAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The pinned Supabase CLI from package.json. Only what pgTAP needs:
+      # Postgres, plus Auth because fixtures create auth.users rows.
+      - name: Start the local database
+        run: >-
+          pnpm exec supabase start
+          -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,storage-api,realtime,postgres-meta,supavisor
+
+      - name: pgTAP
+        run: pnpm exec supabase test db
+
+      - name: Stop the local database
+        if: always()
+        run: pnpm exec supabase stop --no-backup
+
+  # Browser journeys (Playwright, Chromium). Manual only, and documented
+  # rather than proven: it has not yet run on a GitHub runner. playwright.
+  # config.ts starts the built api and web itself (webServer); journeys that
+  # need seeded people (workstream G's scenarios) add their seed step here,
+  # since `pnpm seed:fictional --local-stack` seeds through a running api.
+  # Provider keys are deliberately non-empty disabled values: no live call.
+  e2e:
+    name: e2e (manual)
+    if: github.event_name == 'workflow_dispatch' && inputs.e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      OPENAI_API_KEY: disabled-locally-000000000000
+      GEMINI_API_KEY: disabled-locally-000000000000
+      GROQ_API_KEY: disabled-locally-000000000000
+      ELEVENLABS_API_KEY: disabled-locally-000000000000
+      DEEPGRAM_API_KEY: disabled-locally-000000000000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start the local stack
+        run: pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,postgres-meta,supavisor
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Playwright
+        run: pnpm test:e2e
+
+      - name: Stop the local stack
+        if: always()
+        run: pnpm exec supabase stop --no-backup
