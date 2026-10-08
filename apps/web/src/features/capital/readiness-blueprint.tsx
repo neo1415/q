@@ -126,7 +126,7 @@ export async function ReadinessBlueprintSection({
           {BLUEPRINT_HORIZONS.map((months) => (
             <Link
               key={months}
-              href={`/capital?horizon=${String(months)}#readiness-blueprint`}
+              href={`/capital?tab=plan&horizon=${String(months)}`}
               aria-current={months === horizon ? "page" : undefined}
               scroll={false}
               className={`cq-body-sm inline-flex min-h-11 min-w-20 items-center justify-center rounded-(--cq-radius-sm) px-3 ${

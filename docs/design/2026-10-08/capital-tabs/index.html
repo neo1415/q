@@ -33,79 +33,327 @@
 -->
     <style>
       :root {
-        --cq-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+        --cq-font-sans:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
         --r-md: 12px;
         --r-lg: 16px;
       }
       [data-theme="light"] {
-        --canvas: #f6f4ef; --surface: #fbfaf7; --raised: #fff; --subtle: #f1ede4;
-        --t1: #16140f; --t2: #4f4a40; --t3: #655e51;
-        --bs: #e7e1d5; --b: #d9d1c1; --accent: #8a6a12; --accent-soft: #f3ead2;
-        --gap: #8a4a12; --gap-soft: #f6e6d6; --pos: #2f6b3f; --pos-soft: #e3efe2;
+        --canvas: #f6f4ef;
+        --surface: #fbfaf7;
+        --raised: #fff;
+        --subtle: #f1ede4;
+        --t1: #16140f;
+        --t2: #4f4a40;
+        --t3: #655e51;
+        --bs: #e7e1d5;
+        --b: #d9d1c1;
+        --accent: #8a6a12;
+        --accent-soft: #f3ead2;
+        --gap: #8a4a12;
+        --gap-soft: #f6e6d6;
+        --pos: #2f6b3f;
+        --pos-soft: #e3efe2;
       }
       [data-theme="dark"] {
-        --canvas: #0f0e0b; --surface: #17150f; --raised: #1d1a13; --subtle: #24211a;
-        --t1: #f4efe2; --t2: #c9c0ab; --t3: #a59c87;
-        --bs: #2a261c; --b: #3a3427; --accent: #c9a227; --accent-soft: #2e2714;
-        --gap: #f0a865; --gap-soft: #33230f; --pos: #8fcf9c; --pos-soft: #1d2a1f;
+        --canvas: #0f0e0b;
+        --surface: #17150f;
+        --raised: #1d1a13;
+        --subtle: #24211a;
+        --t1: #f4efe2;
+        --t2: #c9c0ab;
+        --t3: #a59c87;
+        --bs: #2a261c;
+        --b: #3a3427;
+        --accent: #c9a227;
+        --accent-soft: #2e2714;
+        --gap: #f0a865;
+        --gap-soft: #33230f;
+        --pos: #8fcf9c;
+        --pos-soft: #1d2a1f;
       }
-      * { box-sizing: border-box; }
-      body { margin: 0; background: var(--canvas); color: var(--t1); font: 15px/1.5 var(--cq-font-sans); }
-      .wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
-      @media (min-width: 900px) { .wrap { padding: 32px 32px 64px; } }
-      h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
-      h2 { font-size: 18px; margin: 0 0 8px; }
-      h3 { font-size: 15px; margin: 0; }
-      .muted { color: var(--t2); } .tert { color: var(--t3); font-size: 13px; }
-      .tabs { position: sticky; top: 0; z-index: 1; background: var(--canvas); display: flex; gap: 4px;
-        border-bottom: 1px solid var(--bs); overflow-x: auto; scrollbar-width: none; margin: 0 -16px 24px; padding: 0 16px; }
-      .tabs::-webkit-scrollbar { display: none; }
-      .tab { flex: none; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px;
-        color: var(--t2); text-decoration: none; border-bottom: 2px solid transparent; font-weight: 500; white-space: nowrap; }
-      .tab[aria-selected="true"] { color: var(--t1); border-color: var(--accent); font-weight: 600; }
-      .chip { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--subtle); color: var(--t2); font-weight: 500; }
-      .tab[aria-selected="true"] .chip { background: var(--accent-soft); color: var(--t1); }
-      .card { background: var(--raised); border: 1px solid var(--bs); border-radius: var(--r-lg); padding: 20px; }
-      .grid2 { display: grid; gap: 16px; }
-      @media (min-width: 900px) { .grid2 { grid-template-columns: 1.4fr 1fr; } }
-      .big { font-size: 34px; font-weight: 650; font-variant-numeric: tabular-nums; margin: 6px 0 0; }
-      .meter { height: 10px; border-radius: 99px; background: var(--subtle); display: flex; gap: 2px; overflow: hidden; margin: 12px 0 6px; }
-      .meter span { display: block; height: 100%; }
-      ol, ul { list-style: none; margin: 0; padding: 0; }
-      .row { display: grid; grid-template-columns: 24px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--bs); }
-      .row:first-child { border-top: 0; }
-      .n { width: 24px; height: 24px; border-radius: 99px; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--gap-soft); color: var(--gap); }
-      .btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: var(--r-md); border: 1px solid var(--b); color: var(--t1); text-decoration: none; font-weight: 500; background: var(--raised); }
-      .btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
-      [data-theme="dark"] .btn.primary { color: #16140f; }
-      .asks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-      .stack { display: flex; flex-direction: column; gap: 24px; }
-      .board { display: grid; gap: 16px; }
-      @media (min-width: 900px) { .board { grid-template-columns: repeat(3, 1fr); } }
-      .col { background: var(--subtle); border-radius: var(--r-lg); padding: 12px; min-height: 320px; }
-      .col h3 { display: flex; justify-content: space-between; padding: 0 6px 8px; }
-      .pc { background: var(--raised); border: 1px solid var(--bs); border-radius: var(--r-md); padding: 14px; margin-bottom: 10px; }
-      .pill { font-size: 12px; border-radius: 99px; padding: 2px 8px; background: var(--gap-soft); color: var(--gap); }
-      .pill.pos { background: var(--pos-soft); color: var(--pos); }
-      .seg { display: flex; gap: 4px; border: 1px solid var(--b); border-radius: var(--r-md); padding: 4px; margin-bottom: 12px; }
-      .seg b { flex: 1; text-align: center; min-height: 40px; display: grid; place-items: center; border-radius: 8px; font-weight: 500; color: var(--t2); }
-      .seg b.on { background: var(--raised); color: var(--t1); font-weight: 600; }
-      @media (min-width: 900px) { .seg { display: none; } }
-      @media (max-width: 899px) { .col.off { display: none; } }
-      .note { font-size: 13px; color: var(--t3); display: flex; gap: 6px; align-items: center; }
-      section[hidden] { display: none; }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--t1);
+        font: 15px/1.5 var(--cq-font-sans);
+      }
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+      @media (min-width: 900px) {
+        .wrap {
+          padding: 32px 32px 64px;
+        }
+      }
+      h1 {
+        font-size: 28px;
+        margin: 0 0 12px;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 0 0 8px;
+      }
+      h3 {
+        font-size: 15px;
+        margin: 0;
+      }
+      .muted {
+        color: var(--t2);
+      }
+      .tert {
+        color: var(--t3);
+        font-size: 13px;
+      }
+      .tabs {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--canvas);
+        display: flex;
+        gap: 4px;
+        border-bottom: 1px solid var(--bs);
+        overflow-x: auto;
+        scrollbar-width: none;
+        margin: 0 -16px 24px;
+        padding: 0 16px;
+      }
+      .tabs::-webkit-scrollbar {
+        display: none;
+      }
+      .tab {
+        flex: none;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        color: var(--t2);
+        text-decoration: none;
+        border-bottom: 2px solid transparent;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .tab[aria-selected="true"] {
+        color: var(--t1);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .chip {
+        font-size: 12px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--subtle);
+        color: var(--t2);
+        font-weight: 500;
+      }
+      .tab[aria-selected="true"] .chip {
+        background: var(--accent-soft);
+        color: var(--t1);
+      }
+      .card {
+        background: var(--raised);
+        border: 1px solid var(--bs);
+        border-radius: var(--r-lg);
+        padding: 20px;
+      }
+      .grid2 {
+        display: grid;
+        gap: 16px;
+      }
+      @media (min-width: 900px) {
+        .grid2 {
+          grid-template-columns: 1.4fr 1fr;
+        }
+      }
+      .big {
+        font-size: 34px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        margin: 6px 0 0;
+      }
+      .meter {
+        height: 10px;
+        border-radius: 99px;
+        background: var(--subtle);
+        display: flex;
+        gap: 2px;
+        overflow: hidden;
+        margin: 12px 0 6px;
+      }
+      .meter span {
+        display: block;
+        height: 100%;
+      }
+      ol,
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        gap: 12px;
+        padding: 12px 0;
+        border-top: 1px solid var(--bs);
+      }
+      .row:first-child {
+        border-top: 0;
+      }
+      .n {
+        width: 24px;
+        height: 24px;
+        border-radius: 99px;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--gap-soft);
+        color: var(--gap);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: var(--r-md);
+        border: 1px solid var(--b);
+        color: var(--t1);
+        text-decoration: none;
+        font-weight: 500;
+        background: var(--raised);
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: transparent;
+      }
+      [data-theme="dark"] .btn.primary {
+        color: #16140f;
+      }
+      .asks {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+      }
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .board {
+        display: grid;
+        gap: 16px;
+      }
+      @media (min-width: 900px) {
+        .board {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .col {
+        background: var(--subtle);
+        border-radius: var(--r-lg);
+        padding: 12px;
+        min-height: 320px;
+      }
+      .col h3 {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 6px 8px;
+      }
+      .pc {
+        background: var(--raised);
+        border: 1px solid var(--bs);
+        border-radius: var(--r-md);
+        padding: 14px;
+        margin-bottom: 10px;
+      }
+      .pill {
+        font-size: 12px;
+        border-radius: 99px;
+        padding: 2px 8px;
+        background: var(--gap-soft);
+        color: var(--gap);
+      }
+      .pill.pos {
+        background: var(--pos-soft);
+        color: var(--pos);
+      }
+      .seg {
+        display: flex;
+        gap: 4px;
+        border: 1px solid var(--b);
+        border-radius: var(--r-md);
+        padding: 4px;
+        margin-bottom: 12px;
+      }
+      .seg b {
+        flex: 1;
+        text-align: center;
+        min-height: 40px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        font-weight: 500;
+        color: var(--t2);
+      }
+      .seg b.on {
+        background: var(--raised);
+        color: var(--t1);
+        font-weight: 600;
+      }
+      @media (min-width: 900px) {
+        .seg {
+          display: none;
+        }
+      }
+      @media (max-width: 899px) {
+        .col.off {
+          display: none;
+        }
+      }
+      .note {
+        font-size: 13px;
+        color: var(--t3);
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      section[hidden] {
+        display: none;
+      }
     </style>
   </head>
   <body>
     <div class="wrap">
       <h1>Capital</h1>
       <nav class="tabs" role="tablist" aria-label="Capital">
-        <a class="tab" role="tab" data-t="overview" href="?tab=overview">Overview</a>
-        <a class="tab" role="tab" data-t="raise" href="?tab=raise">Raise &amp; rounds <span class="chip">2</span></a>
-        <a class="tab" role="tab" data-t="readiness" href="?tab=readiness">Readiness <span class="chip">3</span></a>
-        <a class="tab" role="tab" data-t="action-plan" href="?tab=action-plan">Action plan <span class="chip">Now 1</span></a>
-        <a class="tab" role="tab" data-t="plan" href="?tab=plan">12-month plan</a>
-        <a class="tab" role="tab" data-t="investors" href="?tab=investors">Investors</a>
+        <a class="tab" role="tab" data-t="overview" href="?tab=overview"
+          >Overview</a
+        >
+        <a class="tab" role="tab" data-t="raise" href="?tab=raise"
+          >Raise &amp; rounds <span class="chip">2</span></a
+        >
+        <a class="tab" role="tab" data-t="readiness" href="?tab=readiness"
+          >Readiness <span class="chip">3</span></a
+        >
+        <a class="tab" role="tab" data-t="action-plan" href="?tab=action-plan"
+          >Action plan <span class="chip">Now 1</span></a
+        >
+        <a class="tab" role="tab" data-t="plan" href="?tab=plan"
+          >12-month plan</a
+        >
+        <a class="tab" role="tab" data-t="investors" href="?tab=investors"
+          >Investors</a
+        >
       </nav>
 
       <section data-p="overview" class="stack">
@@ -113,78 +361,252 @@
           <div class="card">
             <div class="tert">Seed round · SAFE · open since 2 Sep</div>
             <p class="big">USD 420,000</p>
-            <div class="muted">raised of USD 1,500,000, 28% · USD 300,000 confirmed · USD 150,000 pledged</div>
-            <div class="meter"><span style="width:28%;background:var(--accent)"></span><span style="width:20%;background:color-mix(in srgb,var(--accent) 55%,transparent)"></span><span style="width:10%;background:color-mix(in srgb,var(--accent) 25%,transparent)"></span></div>
-            <div style="margin-top:12px"><a class="btn" href="?tab=raise">Open the round · 2 commitments need you</a></div>
+            <div class="muted">
+              raised of USD 1,500,000, 28% · USD 300,000 confirmed · USD 150,000
+              pledged
+            </div>
+            <div class="meter">
+              <span style="width: 28%; background: var(--accent)"></span
+              ><span
+                style="
+                  width: 20%;
+                  background: color-mix(
+                    in srgb,
+                    var(--accent) 55%,
+                    transparent
+                  );
+                "
+              ></span
+              ><span
+                style="
+                  width: 10%;
+                  background: color-mix(
+                    in srgb,
+                    var(--accent) 25%,
+                    transparent
+                  );
+                "
+              ></span>
+            </div>
+            <div style="margin-top: 12px">
+              <a class="btn" href="?tab=raise"
+                >Open the round · 2 commitments need you</a
+              >
+            </div>
           </div>
           <div class="card">
             <h2>What could stop your raise</h2>
             <ol>
-              <li class="row"><span class="n">1</span><div><b>No financial model shared</b><div class="muted">Seed investors ask for 18 months of runway maths first.</div></div></li>
-              <li class="row"><span class="n">2</span><div><b>Cap table not in the data room</b><div class="muted">Asked for before any term sheet.</div></div></li>
-              <li class="row"><span class="n">3</span><div><b>One customer reference</b><div class="muted">Two more turn a claim into evidence.</div></div></li>
+              <li class="row">
+                <span class="n">1</span>
+                <div>
+                  <b>No financial model shared</b>
+                  <div class="muted">
+                    Seed investors ask for 18 months of runway maths first.
+                  </div>
+                </div>
+              </li>
+              <li class="row">
+                <span class="n">2</span>
+                <div>
+                  <b>Cap table not in the data room</b>
+                  <div class="muted">Asked for before any term sheet.</div>
+                </div>
+              </li>
+              <li class="row">
+                <span class="n">3</span>
+                <div>
+                  <b>One customer reference</b>
+                  <div class="muted">Two more turn a claim into evidence.</div>
+                </div>
+              </li>
             </ol>
             <a class="btn" href="?tab=readiness">See readiness</a>
           </div>
         </div>
         <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-            <h2 style="margin:0">Next steps</h2><a class="btn" href="?tab=action-plan">Open the action plan</a>
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              gap: 12px;
+              flex-wrap: wrap;
+            "
+          >
+            <h2 style="margin: 0">Next steps</h2>
+            <a class="btn" href="?tab=action-plan">Open the action plan</a>
           </div>
           <ul>
-            <li class="row"><span class="n">1</span><div><b>Upload your financial model</b> <span class="pill">Now</span><div class="muted">Done when a model covering 18 months is in the data room.</div></div></li>
-            <li class="row"><span class="n">2</span><div><b>Add the cap table</b> <span class="pill">Next</span><div class="muted">Q can prepare it from your round for your approval.</div></div></li>
-            <li class="row"><span class="n">3</span><div><b>Ask two customers for a reference</b> <span class="pill">Next</span><div class="muted">Done when two references are attached.</div></div></li>
+            <li class="row">
+              <span class="n">1</span>
+              <div>
+                <b>Upload your financial model</b> <span class="pill">Now</span>
+                <div class="muted">
+                  Done when a model covering 18 months is in the data room.
+                </div>
+              </div>
+            </li>
+            <li class="row">
+              <span class="n">2</span>
+              <div>
+                <b>Add the cap table</b> <span class="pill">Next</span>
+                <div class="muted">
+                  Q can prepare it from your round for your approval.
+                </div>
+              </div>
+            </li>
+            <li class="row">
+              <span class="n">3</span>
+              <div>
+                <b>Ask two customers for a reference</b>
+                <span class="pill">Next</span>
+                <div class="muted">Done when two references are attached.</div>
+              </div>
+            </li>
           </ul>
         </div>
-        <div class="asks"><a class="btn">Plan this raise</a><a class="btn">Investors who fit</a><a class="btn">Make my pitch deck</a><a class="btn">What's missing?</a></div>
+        <div class="asks">
+          <a class="btn">Plan this raise</a><a class="btn">Investors who fit</a
+          ><a class="btn">Make my pitch deck</a
+          ><a class="btn">What's missing?</a>
+        </div>
       </section>
 
       <section data-p="raise" class="stack" hidden>
         <div class="grid2">
-          <div class="card"><div class="tert">Seed round · SAFE</div><p class="big">USD 420,000</p><div class="muted">raised of USD 1,500,000, 28%</div>
-            <div class="meter"><span style="width:28%;background:var(--accent)"></span><span style="width:20%;background:color-mix(in srgb,var(--accent) 55%,transparent)"></span></div>
-            <div class="asks" style="margin-top:8px"><a class="btn">Record a close</a><a class="btn">Record a tranche</a><a class="btn">History</a></div></div>
-          <div class="card"><h3>Across all rounds</h3><p class="big" style="font-size:26px">USD 670,000</p><div class="muted">raised in 2 rounds</div></div>
+          <div class="card">
+            <div class="tert">Seed round · SAFE</div>
+            <p class="big">USD 420,000</p>
+            <div class="muted">raised of USD 1,500,000, 28%</div>
+            <div class="meter">
+              <span style="width: 28%; background: var(--accent)"></span
+              ><span
+                style="
+                  width: 20%;
+                  background: color-mix(
+                    in srgb,
+                    var(--accent) 55%,
+                    transparent
+                  );
+                "
+              ></span>
+            </div>
+            <div class="asks" style="margin-top: 8px">
+              <a class="btn">Record a close</a
+              ><a class="btn">Record a tranche</a><a class="btn">History</a>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Across all rounds</h3>
+            <p class="big" style="font-size: 26px">USD 670,000</p>
+            <div class="muted">raised in 2 rounds</div>
+          </div>
         </div>
-        <div><h2>Commitments</h2><div class="tert">Needs you · 2</div>
-          <div class="card" style="margin-top:8px"><b>Harbour Ventures</b> · USD 150,000 · stated <div style="margin-top:8px"><a class="btn primary">Confirm the amount</a></div></div></div>
-        <div><h2>Your rounds</h2><div class="card">Pre-seed · closed 2025 · USD 250,000 raised</div></div>
-        <div><h2>Terms</h2><div class="card muted">Valuation cap, discount, pro-rata: the round's terms form.</div></div>
+        <div>
+          <h2>Commitments</h2>
+          <div class="tert">Needs you · 2</div>
+          <div class="card" style="margin-top: 8px">
+            <b>Harbour Ventures</b> · USD 150,000 · stated
+            <div style="margin-top: 8px">
+              <a class="btn primary">Confirm the amount</a>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h2>Your rounds</h2>
+          <div class="card">Pre-seed · closed 2025 · USD 250,000 raised</div>
+        </div>
+        <div>
+          <h2>Terms</h2>
+          <div class="card muted">
+            Valuation cap, discount, pro-rata: the round's terms form.
+          </div>
+        </div>
       </section>
 
       <section data-p="readiness" class="stack" hidden>
         <div class="note">Only your team sees this.</div>
-        <div class="card"><h2>What could stop your raise</h2><div class="muted">The three items, then At a glance and the eight pillars in words, as today.</div></div>
-      </section>
-
-      <section data-p="action-plan" hidden>
-        <div class="note" style="margin-bottom:12px">Built from your readiness gaps. Steps close themselves when Q sees the evidence.</div>
-        <div class="seg"><b class="on">Now 1</b><b>Next 2</b><b>Done 4</b></div>
-        <div class="board">
-          <div class="col"><h3>Now <span class="tert">1</span></h3>
-            <div class="pc"><b>Upload your financial model</b><div class="tert">Financials · You</div><p class="muted" style="margin:6px 0 0">Done when a model covering 18 months is in the data room.</p></div></div>
-          <div class="col off"><h3>Next <span class="tert">2</span></h3>
-            <div class="pc"><b>Add the cap table</b><div class="tert">Raise &amp; documents · Q with your approval</div></div>
-            <div class="pc"><b>Two customer references</b><div class="tert">Traction · You</div></div></div>
-          <div class="col off"><h3>Done <span class="tert">4</span></h3>
-            <div class="pc"><b>Team page complete</b> <span class="pill pos">Closed by evidence</span></div></div>
+        <div class="card">
+          <h2>What could stop your raise</h2>
+          <div class="muted">
+            The three items, then At a glance and the eight pillars in words, as
+            today.
+          </div>
         </div>
       </section>
 
-      <section data-p="plan" hidden><div class="card"><h2>Your 3/6/12-month plan</h2><div class="muted">The Blueprint with its 3 · 6 · 12 switcher (?tab=plan&amp;horizon=12).</div></div></section>
-      <section data-p="investors" hidden><div class="card"><h2>Relationships</h2><div class="muted">Every investor relationship, as on Relationships.</div></div></section>
+      <section data-p="action-plan" hidden>
+        <div class="note" style="margin-bottom: 12px">
+          Built from your readiness gaps. Steps close themselves when Q sees the
+          evidence.
+        </div>
+        <div class="seg"><b class="on">Now 1</b><b>Next 2</b><b>Done 4</b></div>
+        <div class="board">
+          <div class="col">
+            <h3>Now <span class="tert">1</span></h3>
+            <div class="pc">
+              <b>Upload your financial model</b>
+              <div class="tert">Financials · You</div>
+              <p class="muted" style="margin: 6px 0 0">
+                Done when a model covering 18 months is in the data room.
+              </p>
+            </div>
+          </div>
+          <div class="col off">
+            <h3>Next <span class="tert">2</span></h3>
+            <div class="pc">
+              <b>Add the cap table</b>
+              <div class="tert">
+                Raise &amp; documents · Q with your approval
+              </div>
+            </div>
+            <div class="pc">
+              <b>Two customer references</b>
+              <div class="tert">Traction · You</div>
+            </div>
+          </div>
+          <div class="col off">
+            <h3>Done <span class="tert">4</span></h3>
+            <div class="pc">
+              <b>Team page complete</b>
+              <span class="pill pos">Closed by evidence</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section data-p="plan" hidden>
+        <div class="card">
+          <h2>Your 3/6/12-month plan</h2>
+          <div class="muted">
+            The Blueprint with its 3 · 6 · 12 switcher
+            (?tab=plan&amp;horizon=12).
+          </div>
+        </div>
+      </section>
+      <section data-p="investors" hidden>
+        <div class="card">
+          <h2>Relationships</h2>
+          <div class="muted">
+            Every investor relationship, as on Relationships.
+          </div>
+        </div>
+      </section>
     </div>
     <script>
       const q = new URLSearchParams(location.search);
-      document.documentElement.dataset.theme = q.get("theme") === "dark" ? "dark" : "light";
+      document.documentElement.dataset.theme =
+        q.get("theme") === "dark" ? "dark" : "light";
       const tab = q.get("tab") || "overview";
       for (const a of document.querySelectorAll(".tab")) {
         a.setAttribute("aria-selected", String(a.dataset.t === tab));
         a.href = `?tab=${a.dataset.t}&theme=${document.documentElement.dataset.theme}`;
-        if (a.dataset.t === tab) a.scrollIntoView({ inline: "center", block: "nearest" });
+        if (a.dataset.t === tab)
+          a.scrollIntoView({ inline: "center", block: "nearest" });
       }
-      for (const s of document.querySelectorAll("section[data-p]")) s.hidden = s.dataset.p !== tab;
+      for (const s of document.querySelectorAll("section[data-p]"))
+        s.hidden = s.dataset.p !== tab;
     </script>
   </body>
 </html>

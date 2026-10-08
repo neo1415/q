@@ -159,6 +159,13 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "SAVED_COMPARE",
   "REVIEWS",
   "TOP_INVESTORS",
+  // capital-tabs (2026-10-08): a founder's Capital page, by its tabs
+  // (CAPITAL itself opens Overview).
+  "CAPITAL_RAISE",
+  "CAPITAL_READINESS",
+  "CAPITAL_ACTION_PLAN",
+  "CAPITAL_PLAN",
+  "CAPITAL_INVESTORS",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

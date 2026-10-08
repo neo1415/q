@@ -47,6 +47,12 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   SAVED_COMPARE: "/discover/saved/compare",
   REVIEWS: "/reviews",
   TOP_INVESTORS: "/investors/top",
+  // capital-tabs: a founder's Capital page, by its tab.
+  CAPITAL_RAISE: "/capital?tab=raise",
+  CAPITAL_READINESS: "/capital?tab=readiness",
+  CAPITAL_ACTION_PLAN: "/capital?tab=action-plan",
+  CAPITAL_PLAN: "/capital?tab=plan",
+  CAPITAL_INVESTORS: "/capital?tab=investors",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",
