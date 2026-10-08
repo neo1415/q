@@ -126,6 +126,12 @@ import { onScreenDocumentFact } from "./document-fact.js";
 import { manifestFacts, manifestReads } from "./manifest-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
+import {
+  ATTENTION_TOOL_NAME,
+  asksWhatNeedsThem,
+  attentionAnswerText,
+  attentionReportOf,
+} from "./attention-answer.js";
 import { companiesNamedIn, knownCompaniesOf } from "./named-companies.js";
 import {
   ownOnboardingFacts,
@@ -1732,6 +1738,27 @@ export function createModelGatewayQAnswer(
                     outcome.result.ok ? outcome.result.data : null,
                   ),
           }).catch(() => null);
+    // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
+    // source through the attention tool, under this run's plan, beside the
+    // other reads; the answer is then written from it by code. Read only
+    // for their own question, never for a document or an action.
+    const attention: Promise<QToolCallOutcome | null> =
+      request.writingDocument === true ||
+      (request.turnKind !== undefined &&
+        request.turnKind !== "QUESTION_TO_Q") ||
+      !prefetchTools.has(ATTENTION_TOOL_NAME) ||
+      !asksWhatNeedsThem(latest.content)
+        ? Promise.resolve(null)
+        : tools
+            .execute(
+              {
+                callId: "q-attention",
+                name: ATTENTION_TOOL_NAME,
+                arguments: {},
+              },
+              toolContext,
+            )
+            .catch(() => null);
     // The reads below are independent of each other and run side by
     // side; each fills its own facts (speed sweep 2026-10-01: in turn
     // they took ~0.6 s before the model was asked anything).
@@ -2180,6 +2207,7 @@ export function createModelGatewayQAnswer(
       pitchMoment,
       onboardingFacts,
       fitSweep,
+      attention,
     };
   }
   type PreparedTurn = Awaited<ReturnType<typeof prepareTurn>>;
@@ -2286,6 +2314,7 @@ export function createModelGatewayQAnswer(
         pitchMoment,
         onboardingFacts,
         fitSweep,
+        attention,
         counterparty,
       } = prepared;
       // Grows only by what use_capability loads (lead 2026-10-04).
@@ -2900,6 +2929,44 @@ export function createModelGatewayQAnswer(
       // 36 s and "I can't provide mandate scores"): the fits were computed
       // by code beside the reads above, and the answer is the cards plus a
       // short spoken summary, both from those fits -- no model round.
+      // RECOVERY-2026-10 B1 (founder Scenario F, live T3): what needs them
+      // is said from the attention report by code -- every item, and every
+      // source that could not be read named as unread -- so no model can
+      // say "nothing is waiting" while something waits or went unread.
+      const attentionOutcome = await attention;
+      const attentionReport =
+        attentionOutcome !== null && attentionOutcome.result.ok
+          ? attentionReportOf(attentionOutcome.result.data)
+          : null;
+      if (
+        attentionReport !== null &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+      ) {
+        const text = attentionAnswerText(attentionReport);
+        const message = await persistAnswer(
+          request.leadLines === undefined
+            ? text
+            : `${request.leadLines}\n\n${text}`,
+          [],
+        );
+        logger?.info(
+          {
+            qRunId: request.runId,
+            items: attentionReport.items.length,
+            unread: attentionReport.unread,
+            totalMs: Date.now() - startedAt,
+          },
+          "q answered what needs them from the attention report",
+        );
+        return {
+          kind: "ANSWERED",
+          messageId: message.id,
+          modelPolicyVersion: "none",
+          promptBundleVersion: rendered.bundle.bundleVersion,
+        };
+      }
       const sweep = await fitSweep;
       if (
         sweep !== null &&

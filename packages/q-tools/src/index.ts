@@ -330,10 +330,8 @@ export {
 } from "./tools/search-companies.js";
 export { createDefaultQTools, createQTools } from "./default-tools.js";
 export {
-  asksWhatNeedsThem,
   ATTENTION_ITEMS_PER_SOURCE,
   ATTENTION_SOURCE_DEADLINE_MS,
-  attentionAnswerText,
   attentionSourcesFromPorts,
   createAttentionReader,
   createReadAttentionTool,

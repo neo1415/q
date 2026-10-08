@@ -8,9 +8,7 @@ import {
 } from "@capital-q/contracts";
 
 import {
-  asksWhatNeedsThem,
   ATTENTION_ITEMS_PER_SOURCE,
-  attentionAnswerText,
   attentionSourcesFromPorts,
   createDefaultQTools,
   createQToolExecutor,
@@ -299,7 +297,6 @@ describe("the attention report", () => {
         "UNANSWERED_MESSAGE",
       ].sort(),
     );
-    expect(attentionAnswerText(report)).not.toMatch(/nothing is waiting/iu);
   });
 
   it("reports a source slower than its deadline as unread", async () => {
@@ -371,67 +368,9 @@ describe("the attention report", () => {
     expect(report.items.map((item) => item.title)).toEqual([
       "3 new companies match your mandate",
     ]);
-    expect(attentionAnswerText(report)).toContain(
-      "Since then, Q and its agents: 2 replies sent, 1 call booked and 1 draft held for you.",
+    expect(report.activity).toEqual(
+      expect.objectContaining({ repliesSent: 2, callsBooked: 1 }),
     );
-  });
-});
-
-describe("what Q says from the report", () => {
-  it("lists every item, numbered", async () => {
-    const report = await read(fullPorts());
-    const text = attentionAnswerText(report);
-    for (const item of report.items) expect(text).toContain(item.title);
-    expect(text).toMatch(/^\d+ things need you:/u);
-  });
-
-  it("never says nothing is waiting while a source is unread", () => {
-    const text = attentionAnswerText({
-      items: [],
-      activity: null,
-      unread: ["UNANSWERED_MESSAGE", "APPROVAL"],
-      readAt: NOW.toISOString(),
-    });
-    expect(text).not.toMatch(/nothing is waiting on you/iu);
-    expect(text).toContain(
-      "I couldn't check your messages and your approvals just now",
-    );
-  });
-
-  it("says nothing is waiting only when every source was read", () => {
-    expect(
-      attentionAnswerText({
-        items: [],
-        activity: null,
-        unread: [],
-        readAt: NOW.toISOString(),
-      }),
-    ).toMatch(/^Nothing is waiting on you right now/u);
-  });
-});
-
-describe("asking what needs them", () => {
-  it.each([
-    "find anything that needs my attention",
-    "Find anything that needs my attention",
-    "what's waiting for me?",
-    "Is anything waiting on me today?",
-    "what did I miss",
-    "anything I need to deal with?",
-    "who is waiting on me",
-    "catch me up",
-    "what needs me",
-  ])("reads %j as asking", (text) => {
-    expect(asksWhatNeedsThem(text)).toBe(true);
-  });
-
-  it.each([
-    "what needs to happen for the round to close?",
-    "hi Q",
-    "compare those two",
-    "take me to the work page",
-  ])("does not read %j as asking", (text) => {
-    expect(asksWhatNeedsThem(text)).toBe(false);
   });
 });
 
@@ -450,9 +389,7 @@ describe("the what_needs_me tool", () => {
     };
   }
   const executor = createQToolExecutor({
-    registry: createQToolRegistry(
-      createDefaultQTools(fakePorts(fullPorts())),
-    ),
+    registry: createQToolRegistry(createDefaultQTools(fakePorts(fullPorts()))),
   });
   const call = { callId: "c-attention", name: "what_needs_me", arguments: {} };
 
