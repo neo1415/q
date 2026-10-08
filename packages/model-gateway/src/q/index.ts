@@ -4077,6 +4077,9 @@ export function createModelGatewayQAnswer(
           // run to be about. Their own firm, carried as context for a fit
           // question, is not what they asked about (CQ-QX-007).
           subjects: askedSubjects(request.subjects, plan),
+          // RECOVERY E4: investors and places this run's tools returned,
+          // so investor cards and maps name only what was read.
+          read: companiesRead,
         })?.map((block) =>
           block.kind === "ANSWER_CARDS"
             ? withCardSubjects(block, companiesRead)
