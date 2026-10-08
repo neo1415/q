@@ -64,3 +64,17 @@ Severity: **High** means it breaks a core promise, loses data, or is a trust or 
 C-11…C-17 (voice blip handling, a reaction-volume bug, a NULL first conversation_id, the forced-ask paraphrase, in-memory broker, "say exactly this" delivery) · D-10…D-16 · E-08…E-11 (unlinked investor cards, three greeting systems, dead UI code, contract comment drift) · A-10…A-15 (a voice token key derived from `DATABASE_URL` as fallback, mis-declared dependency, duplicated security code, future-dated migrations, docs drift) · F-02 (a pgTAP assertion that passes for the wrong reason).
 
 Brain and memory defects from investigator B are listed in `_findings/B.md` and `03`/`05`. See the addendum at the end of this file once it has been merged.
+
+## Addendum — Q brain and memory (investigator B)
+
+| ID | Sev | Defect | Evidence |
+|---|---|---|---|
+| B-01 | High | A spoken turn read as unclear or not-for-Q gets SILENT. On duplex the realtime model then improvises. This is the 11:13 incident; heardAs reduces it, but the branch remains. | `packages/q-specialists/src/answer.ts:2426-2463` |
+| B-02 | Medium | Conversation-core state ("try again", "same for X", question series, unclear count, tool focus) lives in process `Map`s and is lost on deploy. | `answer.ts:749-822,1679-1717` |
+| B-03 | Medium | `POST /v1/q/runs/:runId/messages` stores a follow-up that nothing ever answers. | `apps/q-api/src/http/q-runs.ts:175-205` |
+| B-04 | Medium | Analytical answers run on NORMAL_DIALOGUE budgets (4,096 output tokens, $0.10, 45 s), so they risk being cut off. | `packages/model-gateway/src/q/index.ts:365-370,425-446` |
+| B-05 | Low/Med | Every turn, a greeting included, pays for the turn reader, prefetch reads and a call offering up to 127 tools. There is no cheap small-talk path. | `answer.ts:1967-2026`; `index.ts:1656-2145` |
+| B-06 | Low | The heardAs path keeps the garbled original in history next to the repaired line. | `answer.ts:2355-2367` |
+| B-07 | Low | The model is told "Tools only read" while `propose_*` tools write. | `index.ts:956` vs `695,802` |
+| B-08 | Low | The graph passes `referenceCount: 0`; the retrieval node's output is unused. | `packages/q-orchestrator/src/graph.ts:341-349,377-380` |
+| B-09 | Info | The pause node is wired but `neverPause`. | `apps/q-api/src/main.ts:3795` |
