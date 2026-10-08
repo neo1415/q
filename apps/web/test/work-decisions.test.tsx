@@ -401,6 +401,7 @@ describe("Done for you", () => {
     });
     render(
       <DoneForYou
+        now={NOW}
         initial={{
           items: [
             doneItem(

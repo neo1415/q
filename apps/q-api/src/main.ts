@@ -171,7 +171,10 @@ import {
   workforceNotifier,
   workforceResearch,
 } from "./composition/workforce/ports.js";
-import { createPostgresAgentWorkQueue } from "./composition/workforce/queue.js";
+import {
+  createPostgresAgentWorkQueue,
+  workforceJobStopPort,
+} from "./composition/workforce/queue.js";
 import { createAgentWorkRunner } from "./composition/workforce/runner.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
@@ -2266,6 +2269,8 @@ const investorGatesPort: InvestorGatesPort = {
   },
 };
 const appActionPorts: OwnReadPorts = {
+  // Recovery D6: "Stop this job", shared by Q and the Work screen.
+  workforceJobs: workforceJobStopPort(agentWorkQueue, workforceStore),
   readiness: readinessService,
   // F4: the GateQ inbox (triage, drafts, star, label, assign, pass, reply).
   gateqInbox,
@@ -5652,6 +5657,8 @@ const { app, logger: appLogger } = createApp(
     workforce: {
       page: createWorkforcePage({
         store: workforceStore,
+        // Recovery D6: each job's durable work state, why it stopped, trace.
+        work: agentWorkQueue,
         costs: (owner, jobIds) =>
           createPostgresUsageReader(database.sql).workforceCosts(owner, jobIds),
         monthCosts: (owner, at) =>

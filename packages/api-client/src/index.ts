@@ -385,6 +385,7 @@ export {
   listQWorkDone,
   dismissQWorkSuggestion,
   setQWorkPaused,
+  stopWorkforceJob,
   setQWorkDelegation,
   subscribePush,
   unsubscribePush,

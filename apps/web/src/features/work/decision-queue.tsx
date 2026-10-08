@@ -34,6 +34,7 @@ import {
   approveQApprovalAction,
   rejectQApprovalAction,
 } from "@/features/q/actions";
+import { QControl } from "@/features/q/control/q-control";
 import { useQSessionOptional } from "@/features/q/q-session";
 
 import {
@@ -49,6 +50,7 @@ import {
   type HeldDecision,
 } from "./decisions";
 import { retryHeldAction, sendHeldAsIsAction } from "./held-actions";
+import { finishedSince } from "./job-state";
 import { readPlan } from "./plan-words";
 import { listDoneAction } from "./work-page-actions";
 import { outOfTen } from "./workforce-view";
@@ -243,17 +245,20 @@ export function DecisionQueue({
           ? "Nothing waits on you. When Q drafts a reply or wants your yes, it shows here first; nothing is sent until you decide."
           : "Nothing below is sent until you decide."}
       </p>
-      {shown.map((group, index) => (
-        <GroupView
-          key={group.key}
-          group={group}
-          jobs={jobs}
-          done={done}
-          readAhead={index < READ_AHEAD}
-          renderPlan={renderPlan}
-          onDecided={onDecided}
-        />
-      ))}
+      {/* Recovery D6 / C: the decisions as one list Q can select from. */}
+      <QControl id="list.work-decisions" kind="LIST" count={groups.length}>
+        {shown.map((group, index) => (
+          <GroupView
+            key={group.key}
+            group={group}
+            jobs={jobs}
+            done={done}
+            readAhead={index < READ_AHEAD}
+            renderPlan={renderPlan}
+            onDecided={onDecided}
+          />
+        ))}
+      </QControl>
       {all || groups.length <= QUEUE_PREVIEW ? null : (
         <MoreButton onClick={() => setAll(true)}>
           Show {groups.length - QUEUE_PREVIEW} more
@@ -949,9 +954,12 @@ export function ThreadPanel({
 export function DoneForYou({
   initial,
   jobs,
+  now,
 }: {
   readonly initial: QWorkDonePageDto | null;
   readonly jobs: readonly WorkforceJobDetailDto[];
+  /** The page's clock, for "this week" (render stays pure). */
+  readonly now: number;
 }) {
   const [items, setItems] = useState<readonly QWorkDoneItemDto[]>(
     initial?.items ?? [],
@@ -973,6 +981,9 @@ export function DoneForYou({
     });
   };
   const groups = doneGroups(items);
+  // Recovery D6: jobs Q finished this week, from the durable work state
+  // (B's attention report replaces this read when it lands).
+  const finished = finishedSince(jobs, now - 7 * 86_400_000);
   return (
     <section aria-labelledby="work-done" data-work-done>
       <h2
@@ -999,6 +1010,28 @@ export function DoneForYou({
         <ul className="mt-3 border-t border-(--cq-border-subtle)">
           {groups.map((group) => (
             <DoneRow key={group.key} group={group} jobs={jobs} done={items} />
+          ))}
+        </ul>
+      )}
+      {finished.length === 0 ? null : (
+        <ul
+          className="mt-3 border-t border-(--cq-border-subtle)"
+          data-work-finished
+        >
+          {finished.map((one) => (
+            <li
+              key={one.job.id}
+              className="border-b border-(--cq-border-subtle) py-2.5"
+              data-work-job={one.job.id}
+            >
+              <p className="m-0 truncate cq-body-sm font-medium text-(--cq-text-primary)">
+                {one.job.goal}
+              </p>
+              <p className="m-0 cq-label font-normal text-(--cq-text-tertiary)">
+                Job done ·{" "}
+                <span suppressHydrationWarning>{ago(one.job.updatedAt)}</span>
+              </p>
+            </li>
           ))}
         </ul>
       )}
