@@ -342,7 +342,8 @@ const COUNT_WORDS = [
 
 const WEEKDAY =
   /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|this week|next week)\b/iu;
-const MEETING = /\b(call|meet|meeting|chat|catch up|catch-up|zoom|coffee)\b/iu;
+const MEETING =
+  /\b(call|meet|meeting|chat|catch up|catch-up|zoom|coffee|\d+ ?min(?:ute)?s)\b/iu;
 const DECK = /\b(deck|pitch deck|attached|attachment|data ?room|one-pager)\b/iu;
 
 /** One card in a few words, from its facts alone (never invented). */

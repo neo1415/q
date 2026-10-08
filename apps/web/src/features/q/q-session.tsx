@@ -25,7 +25,7 @@ import { destinationPath } from "../voice/destinations";
 import { isLineLive, upsertLine, VOICE_STATE_LABELS } from "../voice/session";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import {
-  useVoiceInterview,
+  VoiceInterviewSource,
   type VoiceInterview,
 } from "../voice/use-voice-interview";
 import {
@@ -228,7 +228,9 @@ export function QSessionProvider({
   }, [activeConversation, settledOpen]);
 
   const [spoken, setSpoken] = useState<readonly SpokenLine[]>([]);
-  const voice = useVoiceInterview({
+  // The real voice; a development harness may hold a scripted one.
+  const useVoice = useContext(VoiceInterviewSource);
+  const voice = useVoice({
     onLine: (line) => {
       setSpoken((current) =>
         upsertLine(current, { id: line.id, role: line.role, text: line.text }),

@@ -2,11 +2,14 @@
 
 import { z } from "zod";
 
-import { getQWorkSince } from "@capital-q/api-client";
-import type {
-  ChatThreadDto,
-  QApprovalView,
-  QWorkSinceDto,
+import { getQWorkSince, readBriefingCommand } from "@capital-q/api-client";
+import {
+  BriefingCommandRequestSchema,
+  type BriefingCommandRequest,
+  type BriefingCommandResultDto,
+  type ChatThreadDto,
+  type QApprovalView,
+  type QWorkSinceDto,
 } from "@capital-q/contracts";
 import {
   sameShownMessage,
@@ -330,4 +333,21 @@ export async function decideArrivalCardAction(
         : { ok: false, message: "That didn't go through. Try again." };
     }
   }
+}
+
+/**
+ * The person's own words about the cards on their screen, read into card
+ * verbs (Zino, 2026-10-08). Changes nothing: the card sequence in the
+ * browser runs each verb and checks it against the same words. A failed
+ * read is "unclear", never a guess.
+ */
+export async function readArrivalWordsAction(
+  raw: BriefingCommandRequest,
+): Promise<BriefingCommandResultDto> {
+  const unclear: BriefingCommandResultDto = { actions: [], unclear: true };
+  const parsed = BriefingCommandRequestSchema.safeParse(raw);
+  if (!parsed.success) return unclear;
+  const session = await qApiSession();
+  if (session === null) return unclear;
+  return readBriefingCommand(session, parsed.data).catch(() => unclear);
 }

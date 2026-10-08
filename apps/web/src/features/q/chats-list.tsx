@@ -13,6 +13,7 @@ import {
   archiveQConversationAction,
   listQConversationsAction,
 } from "./actions";
+import { NEW_CHAT_HREF } from "./active-conversation";
 import { Q_CONVERSATIONS_CHANGED_EVENT } from "./use-q-conversation";
 import { formatStamp } from "@/components/date-format";
 
@@ -114,7 +115,7 @@ export function ChatsList({
       (current ?? []).filter((item) => item.conversationId !== conversationId),
     );
     if (active === conversationId) {
-      router.push("/home");
+      router.push(NEW_CHAT_HREF);
     }
   };
 
@@ -149,14 +150,10 @@ export function ChatsList({
           Chats
         </button>
         <Link
-          href="/home"
+          href={NEW_CHAT_HREF}
           aria-label="New chat"
           title="New chat"
           className={buttonClassName("quiet", "compact", "min-h-10")}
-          onClick={() => {
-            // Home with no conversation is a new chat; the route change
-            // is what the panel reads, nothing is reset here.
-          }}
         >
           <Plus
             aria-hidden="true"

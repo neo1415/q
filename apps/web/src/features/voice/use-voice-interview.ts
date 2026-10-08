@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   CreateQVoiceSessionRequest,
@@ -669,5 +669,14 @@ export function useVoiceInterview(
     turn,
   };
 }
+
+/**
+ * Which voice the Q session uses: the real one everywhere in the product.
+ * Only a development harness provides another (a scripted line, so the
+ * browser suite can hold a line open across navigation without a
+ * provider). The value is a hook and never changes within a tree.
+ */
+export const VoiceInterviewSource =
+  createContext<typeof useVoiceInterview>(useVoiceInterview);
 
 export type { VoiceTranscriptLine };

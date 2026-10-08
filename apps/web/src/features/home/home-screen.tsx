@@ -152,10 +152,13 @@ function FirstRunWelcome({ name }: { readonly name: string | null }) {
 
 export async function HomeScreen({
   conversationId = null,
+  fresh = false,
   openBoard = false,
 }: {
   /** The conversation the URL names, resolved on the server. */
   readonly conversationId?: string | null | undefined;
+  /** "New chat" (`?new=1`): a new conversation; a bare /home keeps this tab's. */
+  readonly fresh?: boolean | undefined;
   /** Arrived from the answer chip's Board (C6): open on the Board. */
   readonly openBoard?: boolean | undefined;
 } = {}) {
@@ -278,6 +281,7 @@ export async function HomeScreen({
           connected={qConnected}
           context={surfaceContext(context)}
           conversationId={conversationId}
+          fresh={fresh}
           openBoard={openBoard}
           welcome={welcome}
           welcomeLine={welcomeLine}

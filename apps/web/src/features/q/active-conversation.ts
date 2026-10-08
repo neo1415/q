@@ -86,6 +86,9 @@ export function forgetActiveConversations(): void {
   }
 }
 
+/** "New chat": the Q page with a new conversation (a bare /home keeps this tab's). */
+export const NEW_CHAT_HREF = "/home?new=1";
+
 /** Where Home is for this tab: its open conversation, if it has one. */
 export function homeHref(conversationId: string | null): string {
   return conversationId === null

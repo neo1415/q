@@ -46,6 +46,7 @@ export default async function HomePage({
   return (
     <HomeScreen
       conversationId={conversationId}
+      fresh={params["new"] === "1"}
       openBoard={params["board"] === "1"}
     />
   );

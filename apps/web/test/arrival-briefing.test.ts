@@ -4,6 +4,8 @@ import { startSequence, stepSequence } from "@capital-q/q-core/speech";
 
 import {
   arrivalWords,
+  commandCardsOf,
+  planFromReading,
   readSpokenReply,
   sequenceCardOf,
   voiceOutcome,
@@ -201,5 +203,100 @@ describe("spoken replies are decided by the person's own words", () => {
     expect(seen).toEqual([{ words: "send it", heard: "send it" }]);
     off();
     expect(await decideCardByVoice("{}", null)).toBeNull();
+  });
+});
+
+describe("all of it up front, then any words (Zino, 2026-10-08)", () => {
+  const HELD: ArrivalCard = {
+    ...CARD,
+    key: "00000000-0000-4000-8000-000000000003",
+    kind: "HELD",
+    approvalId: null,
+    draftId: "00000000-0000-4000-8000-000000000003",
+    counterpart: "Spheros",
+    theySaid: null,
+    message: "Hi Ada, would 20 minutes next week work?",
+  };
+  const cards = [HELD, SECOND, CARD];
+
+  it("says every card in one sentence before anything else is asked", () => {
+    const words = arrivalWords(
+      { ...DATA, cards },
+      new Date("2026-10-08T13:00:00Z"),
+      null,
+    );
+    expect(words.summary).toBe(
+      "Three things: the Spheros reply is held, Tensorgate wants a call next week, and Halyard Security wants a call next week.",
+    );
+    expect(words.spoken).toContain(words.summary ?? "-");
+    expect(words.spoken).toMatch(/Tell me what you'd like done/u);
+  });
+
+  it("numbers the cards c1.. in screen order for the reader", () => {
+    expect(commandCardsOf(cards).map((one) => [one.ref, one.to])).toEqual([
+      ["c1", "Spheros"],
+      ["c2", "Tensorgate"],
+      ["c3", "Halyard Security"],
+    ]);
+  });
+
+  it("turns 'send the Tensorgate one but make it warmer, ignore Spheros' into a dismiss, then the rewrite for its own yes", () => {
+    const words = "send the Tensorgate one but make it warmer, ignore Spheros";
+    const plan = planFromReading(
+      {
+        actions: [
+          { ref: "c2", verb: "REWRITE", rewrite: "Warmer: Tuesday works." },
+          { ref: "c1", verb: "DISMISS", rewrite: null },
+        ],
+        unclear: false,
+      },
+      cards,
+      words,
+    );
+    expect(plan.events).toEqual([
+      { type: "FOCUS", key: HELD.key },
+      { type: "COMMAND", command: { kind: "DISMISS" } },
+      { type: "FOCUS", key: SECOND.key },
+      { type: "EDITED", body: "Warmer: Tuesday works." },
+    ]);
+    // Run through the real sequence: nothing goes until the exact-message yes.
+    let state = startSequence(cards.map(sequenceCardOf));
+    const effects: string[] = [];
+    for (const event of plan.events) {
+      const step = stepSequence(state, event);
+      state = step.state;
+      if (step.effect !== null) {
+        effects.push(step.effect.kind);
+        state = stepSequence(state, {
+          type: "SETTLED",
+          key: step.effect.key,
+          ok: true,
+        }).state;
+      }
+    }
+    expect(effects).toEqual(["DISMISS_HELD"]);
+    expect(state.confirming).toEqual({
+      key: SECOND.key,
+      body: "Warmer: Tuesday works.",
+    });
+  });
+
+  it("never sends on a model's say-so when their words don't ask for it", () => {
+    const plan = planFromReading(
+      { actions: [{ ref: "c2", verb: "SEND", rewrite: null }], unclear: false },
+      cards,
+      "don't send the Tensorgate one yet",
+    );
+    expect(plan.events).toEqual([{ type: "FOCUS", key: SECOND.key }]);
+    expect(plan.held[0]).toMatch(/nothing was sent/u);
+    const sends = planFromReading(
+      { actions: [{ ref: "c2", verb: "SEND", rewrite: null }], unclear: false },
+      cards,
+      "send the Tensorgate one",
+    );
+    expect(sends.events).toEqual([
+      { type: "FOCUS", key: SECOND.key },
+      { type: "COMMAND", command: { kind: "APPROVE" } },
+    ]);
   });
 });

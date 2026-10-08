@@ -19,7 +19,8 @@ export const metadata: Metadata = {
  * database or a provider.
  *
  * `?state=quiet` is a day with nothing; `?variant=dock` is the compact
- * version another page shows beside the dock; `?at=<ISO>&tz=<zone>` sets the
+ * version another page shows beside the dock; `?variant=room` is the Q
+ * stage, the cards either side of Q on a wide screen; `?at=<ISO>&tz=<zone>` sets the
  * clock; `?fail=changed` makes approvals come back as changed.
  *
  * Development only; a production build serves it only when
@@ -48,6 +49,7 @@ export default async function BriefingHarnessPage({
       timeZone={one("tz") ?? "Africa/Lagos"}
       fail={one("fail") === "changed"}
       dock={one("variant") === "dock"}
+      room={one("variant") === "room"}
     />
   );
 }

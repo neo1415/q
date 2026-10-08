@@ -34,6 +34,9 @@ import {
   Q_WORKFORCE_OVERVIEW_PATH,
   qWorkforceJobPath,
   qWorkforceDraftRetryPath,
+  Q_BRIEFING_COMMAND_PATH,
+  BriefingCommandResultDtoSchema,
+  type BriefingCommandRequest,
   IDEMPOTENCY_KEY_HEADER,
   WorkforceDraftRetryResultDtoSchema,
   WorkforceJobDetailDtoSchema,
@@ -339,6 +342,22 @@ export function retryWorkforceDraft(
       body: { relationshipId },
       headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
     },
+  );
+}
+/**
+ * `POST /v1/q/briefing/command` (Q API): the person's own words about the
+ * briefing's cards, read into card verbs. Changes nothing by itself.
+ */
+export function readBriefingCommand(
+  session: ApiSession,
+  request: BriefingCommandRequest,
+) {
+  return call(
+    session,
+    "POST",
+    Q_BRIEFING_COMMAND_PATH,
+    BriefingCommandResultDtoSchema,
+    { body: request },
   );
 }
 // end WORKFORCE block

@@ -6,11 +6,25 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
+import {
+  AnimatePresence,
+  domAnimation,
+  LazyMotion,
+  m,
+  useReducedMotion,
+} from "motion/react";
 
+import type {
+  BriefingCommandRequest,
+  BriefingCommandResultDto,
+} from "@capital-q/contracts";
 import {
   focusedCard,
+  parseCardCommand,
   remainingAfterFocus,
   startSequence,
   stepSequence,
@@ -32,7 +46,9 @@ import { dismissHeld } from "@/features/work/decision-queue";
 
 import {
   arrivalWords,
+  commandCardsOf,
   focusNote,
+  planFromReading,
   readSpokenReply,
   sequenceCardOf,
   voiceOutcome,
@@ -42,6 +58,7 @@ import {
 import {
   arrivalBriefingAction,
   decideArrivalCardAction,
+  readArrivalWordsAction,
   type ArrivalDecision,
   type ArrivalDecisionResult,
 } from "./arrival-actions";
@@ -56,9 +73,14 @@ import {
   useArrival,
   type ArrivalLoader,
 } from "./arrival-store";
+import { setRoomFilled, useRoomSlots } from "./arrival-room";
 
 /**
- * Q on arrival (Zino, 2026-10-08; design docs/design/2026-10-08/briefing):
+ * Q on arrival (Zino, 2026-10-08; designs docs/design/2026-10-08/briefing
+ * and q-presence-room): all of it in a sentence up front ("Three things:
+ * ..."), the cards either side of Q on a wide Q page (below it otherwise),
+ * and any words about them, typed or said, read into the same verbs.
+ * Before that:
  * "Good afternoon, Zino.", the lowdown in a sentence or three, then what
  * needs them as cards, one in focus at a time, with the exact message and
  * Approve & send · Edit & send · Dismiss · Later. Spoken replies reach the
@@ -70,6 +92,11 @@ import {
 export type ArrivalDecide = (
   decision: ArrivalDecision,
 ) => Promise<ArrivalDecisionResult>;
+
+/** Reads the person's own words into card verbs (BRIEFING_COMMAND). */
+export type ArrivalReadWords = (
+  request: BriefingCommandRequest,
+) => Promise<BriefingCommandResultDto>;
 
 const NAMED_KIND = {
   PERSON: "person",
@@ -160,18 +187,30 @@ function useSequence(
   cards: readonly ArrivalCard[],
   decide: ArrivalDecide,
   reload: () => void,
+  readWords: ArrivalReadWords,
 ): {
   readonly state: SequenceState;
   readonly status: string | null;
+  readonly reading: boolean;
   readonly send: (
     event: SequenceEvent,
     source: "BUTTON" | "VOICE",
   ) => Promise<Readonly<Record<string, unknown>>>;
+  /**
+   * Any words about the cards (Zino, 2026-10-08): a plain command acts on
+   * the card in focus; anything else is read into card verbs by a model
+   * and each verb is checked against the same words by code.
+   */
+  readonly runWords: (
+    words: string,
+    source: "BUTTON" | "VOICE",
+  ) => Promise<Readonly<Record<string, unknown>> | null>;
 } {
   const [state, setState] = useState(() =>
     startSequence(cards.map(sequenceCardOf)),
   );
   const [status, setStatus] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
   const ref = useRef(state);
   const commit = useCallback((next: SequenceState) => {
     ref.current = next;
@@ -179,7 +218,7 @@ function useSequence(
   }, []);
   const send = useCallback(
     async (event: SequenceEvent, source: "BUTTON" | "VOICE") => {
-      const before = ref.current.focus;
+      const before = focusedCard(ref.current)?.key ?? null;
       const step = stepSequence(ref.current, event);
       commit(step.state);
       let done: string | null = null;
@@ -210,7 +249,8 @@ function useSequence(
         setStatus("That change didn't fit the message. Edit it here instead.");
       }
       // Moved on by a tap while a line is open: Q picks up the next card.
-      if (source === "BUTTON" && ref.current.focus !== before) {
+      const after = focusedCard(ref.current)?.key ?? null;
+      if (source === "BUTTON" && after !== before) {
         const note = focusNote(cards, ref.current);
         if (note !== null) {
           noteToLine(
@@ -228,7 +268,55 @@ function useSequence(
     },
     [cards, commit, decide, reload],
   );
-  return { state, status, send };
+  const runWords = useCallback(
+    async (raw: string, source: "BUTTON" | "VOICE") => {
+      const words = raw.trim().slice(0, 700);
+      if (words.length === 0) return null;
+      const own = parseCardCommand(words);
+      if (own !== null) {
+        return send({ type: "COMMAND", command: own }, source);
+      }
+      // Only what is still on screen, in the order it is shown.
+      const open = ref.current.cards
+        .filter((one) => {
+          const outcome = ref.current.outcomes[one.key];
+          return outcome === undefined || outcome === "LATER";
+        })
+        .map((one) => cards.find((card) => card.key === one.key))
+        .filter((card): card is ArrivalCard => card !== undefined);
+      if (open.length === 0) return null;
+      setReading(true);
+      setStatus(null);
+      const result = await readWords({
+        words,
+        timeZone: browserZone(),
+        cards: commandCardsOf(open),
+      })
+        .catch(() => null)
+        .finally(() => setReading(false));
+      if (result === null || result.unclear) {
+        if (source === "BUTTON") {
+          setStatus(
+            "I couldn't tell which card or what to do. Say it another way, or use the buttons.",
+          );
+        }
+        return null;
+      }
+      const plan = planFromReading(result, open, words);
+      let outcome: Readonly<Record<string, unknown>> = {};
+      for (const event of plan.events) outcome = await send(event, source);
+      if (plan.held.length > 0) {
+        setStatus((now) =>
+          [now, `${plan.held.join(". ")}.`].filter(Boolean).join(" "),
+        );
+      }
+      return plan.held.length === 0
+        ? outcome
+        : { ...outcome, heldBack: plan.held };
+    },
+    [cards, readWords, send],
+  );
+  return { state, status, reading, send, runWords };
 }
 
 function Mark({
@@ -517,10 +605,93 @@ function FocusCard({
   );
 }
 
-/** The cards, one in focus, the rest a count. */
+/** A card not in focus: who and what, one tap to bring it forward. */
+function CardLine({
+  card,
+  onFocus,
+}: {
+  readonly card: ArrivalCard;
+  readonly onFocus: () => void;
+}) {
+  const what =
+    card.kind === "HELD"
+      ? "Held back, not sent"
+      : card.message === null
+        ? card.summary
+        : card.title;
+  return (
+    <button
+      type="button"
+      onClick={onFocus}
+      className="flex min-h-13 w-full items-center gap-2.5 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+      data-arrival-line={card.key}
+    >
+      <Mark card={card} size={28} />
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate cq-body-sm font-semibold text-(--cq-text-primary)">
+          {card.counterpart ?? card.title}
+        </span>
+        <span className="truncate cq-caption text-(--cq-text-secondary)">
+          {what}
+        </span>
+      </span>
+      <span className="sr-only">: bring this one forward</span>
+    </button>
+  );
+}
+
+/** "Tell Q what to do with these": any words, typed (voice says them too). */
+function CommandBar({
+  busy,
+  onWords,
+}: {
+  readonly busy: boolean;
+  readonly onWords: (words: string) => void;
+}) {
+  const [text, setText] = useState("");
+  return (
+    <form
+      className="flex w-full items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) py-1 pr-1 pl-4 focus-within:border-(--cq-border-strong)"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const words = text.trim();
+        if (words.length === 0 || busy) return;
+        setText("");
+        onWords(words);
+      }}
+      data-arrival-command
+    >
+      <label className="sr-only" htmlFor="arrival-command">
+        Tell Q what to do with these
+      </label>
+      <input
+        id="arrival-command"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        maxLength={700}
+        placeholder="Tell Q what to do with these"
+        autoComplete="off"
+        className="min-h-11 min-w-0 flex-1 bg-transparent cq-body-sm text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary)"
+      />
+      <Button
+        type="submit"
+        variant="secondary"
+        disabled={busy || text.trim().length === 0}
+        className="rounded-full"
+      >
+        {busy ? "Reading…" : "Do it"}
+      </Button>
+    </form>
+  );
+}
+
+const EASE = [0.2, 0, 0, 1] as const;
+
+/** The cards, one in focus, the others a line each; around Q when wide. */
 function Sequence({
   data,
   decide,
+  readWords,
   compact,
   nudge,
   round,
@@ -529,6 +700,7 @@ function Sequence({
 }: {
   readonly data: ArrivalData;
   readonly decide: ArrivalDecide;
+  readonly readWords: ArrivalReadWords;
   readonly compact: boolean;
   readonly nudge: boolean;
   readonly round: number;
@@ -536,7 +708,13 @@ function Sequence({
   /** New cards may be waiting (a retry): read the briefing again. */
   readonly reload: () => void;
 }) {
-  const { state, status, send } = useSequence(data.cards, decide, reload);
+  const { state, status, reading, send, runWords } = useSequence(
+    data.cards,
+    decide,
+    reload,
+    readWords,
+  );
+  const reduced = useReducedMotion() === true;
   // What this sequence settled stays settled across pages (arrival-store).
   useEffect(() => {
     for (const key of Object.keys(state.outcomes)) markHandled(key);
@@ -555,40 +733,58 @@ function Sequence({
     if (!active) settledRef.current?.();
   }, [active]);
 
+  // Around Q on a wide Q page; below Q (inline) everywhere else.
+  const room = useRoomSlots();
+  const wide = useWide();
+  const flank =
+    !compact && wide && room.left !== null && room.right !== null && active;
+  useEffect(() => {
+    setRoomFilled(flank);
+    return () => setRoomFilled(false);
+  }, [flank]);
+
   // The open line knows which card is in focus; a line opened later too.
   useEffect(() => {
     setStandingNote(active ? focusNote(data.cards, state) : null);
     return () => setStandingNote(null);
   }, [active, data.cards, state]);
 
-  // Spoken replies to the card in focus: the person's own words, read by
-  // the same code as the buttons (never the model's say-so).
+  // Spoken replies: the person's own words, read by the same code as the
+  // buttons (never the model's say-so); anything else they say about the
+  // cards is read from their own transcript into the same verbs.
   const sendRef = useRef(send);
+  const wordsRef = useRef(runWords);
   useEffect(() => {
     sendRef.current = send;
-  }, [send]);
+    wordsRef.current = runWords;
+  }, [send, runWords]);
   useEffect(() => {
     if (!active) return;
     return registerCardDecider(async ({ words, heard }) => {
-      const reading = readSpokenReply({ words, heard });
-      if (reading.kind === "NOT_A_COMMAND") {
-        return {
-          ok: false,
-          situation:
-            "That isn't a reply to the card. Pass their words to ask_q; the card stays on screen.",
-        };
+      const spoken = readSpokenReply({ words, heard });
+      if (spoken.kind === "COMMAND") {
+        return sendRef.current(
+          { type: "COMMAND", command: spoken.command },
+          "VOICE",
+        );
       }
-      if (reading.kind === "UNSURE") {
-        return {
-          ok: false,
-          situation:
-            "Their words didn't come through clearly as a decision. Nothing was done; ask them to say it again or tap the button.",
-        };
+      // Any other words: only the provider's transcript of the person.
+      const own = heard?.trim() ?? "";
+      if (own.length > 0) {
+        const outcome = await wordsRef.current(own, "VOICE");
+        if (outcome !== null) return outcome;
       }
-      return sendRef.current(
-        { type: "COMMAND", command: reading.command },
-        "VOICE",
-      );
+      return spoken.kind === "UNSURE"
+        ? {
+            ok: false,
+            situation:
+              "Their words didn't come through clearly as a decision. Nothing was done; ask them to say it again or tap the button.",
+          }
+        : {
+            ok: false,
+            situation:
+              "That isn't about the cards. Pass their words to ask_q; the cards stay on screen.",
+          };
     });
   }, [active]);
 
@@ -620,22 +816,67 @@ function Sequence({
       </p>
     );
   }
+
+  const focusCard = (
+    <FocusCard
+      key={`${current.key}-${state.confirming === null ? "a" : "c"}`}
+      card={current}
+      state={state}
+      position={state.focus + 1}
+      total={state.cards.length}
+      compact={compact}
+      send={(event, source) => void send(event, source)}
+    />
+  );
+  // Still to decide, in the order they came: the one in focus is full.
+  const open = data.cards.filter((one) => {
+    const outcome = state.outcomes[one.key];
+    return outcome === undefined || outcome === "LATER";
+  });
+  const item = (one: ArrivalCard, index: number) => (
+    <m.div
+      key={one.key}
+      layout={reduced ? false : "position"}
+      initial={reduced ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+      transition={{ duration: reduced ? 0 : 0.22, ease: EASE }}
+      data-arrival-item={index}
+    >
+      {one.key === current.key ? (
+        focusCard
+      ) : (
+        <CardLine
+          card={one}
+          onFocus={() => void send({ type: "FOCUS", key: one.key }, "BUTTON")}
+        />
+      )}
+    </m.div>
+  );
+  // Left, right, left...: each card keeps its side, so nothing jumps.
+  const sides = { left: [] as ReactNode[], right: [] as ReactNode[] };
+  open.forEach((one) => {
+    const index = data.cards.findIndex((card) => card.key === one.key);
+    (index % 2 === 0 ? sides.left : sides.right).push(item(one, index));
+  });
+
   return (
     <section
       aria-label="Needs you"
       className={cx("flex w-full flex-col", compact ? "gap-2" : "gap-2.5")}
       data-arrival-sequence
+      data-arrival-layout={compact ? "dock" : flank ? "room" : "below"}
     >
       <div className="flex min-h-11 items-center gap-2">
         <h2 className="m-0 cq-body font-semibold text-(--cq-text-primary)">
           {nudge ? "New for you" : "Needs you"}
         </h2>
-        {data.cards.length > 1 ? (
+        {state.cards.length > 1 ? (
           <span
             className="cq-caption text-(--cq-text-tertiary)"
             data-arrival-count
           >
-            {state.focus + 1} of {data.cards.length}
+            {state.focus + 1} of {state.cards.length}
           </span>
         ) : null}
         <Button
@@ -649,28 +890,55 @@ function Sequence({
           Not now
         </Button>
       </div>
-      <div className="relative">
-        {left > 0 ? (
-          <div
-            aria-hidden="true"
-            className="absolute inset-x-3 -bottom-1.5 h-full rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
-          />
-        ) : null}
-        <FocusCard
-          key={`${current.key}-${state.confirming === null ? "a" : "c"}`}
-          card={current}
-          state={state}
-          position={state.focus + 1}
-          total={data.cards.length}
-          compact={compact}
-          send={(event, source) => void send(event, source)}
-        />
-      </div>
+      {compact ? (
+        <div className="relative">
+          {left > 0 ? (
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-3 -bottom-1.5 h-full rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
+            />
+          ) : null}
+          {focusCard}
+        </div>
+      ) : (
+        <LazyMotion features={domAnimation} strict>
+          {flank && room.left !== null && room.right !== null ? (
+            <>
+              {createPortal(
+                <AnimatePresence initial={false}>{sides.left}</AnimatePresence>,
+                room.left,
+              )}
+              {createPortal(
+                <AnimatePresence initial={false}>
+                  {sides.right}
+                </AnimatePresence>,
+                room.right,
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col gap-2.5" data-arrival-below>
+              <AnimatePresence initial={false}>
+                {open.map((one) =>
+                  item(
+                    one,
+                    data.cards.findIndex((card) => card.key === one.key),
+                  ),
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </LazyMotion>
+      )}
+      <CommandBar
+        busy={reading || state.pending !== null}
+        onWords={(words) => void runWords(words, "BUTTON")}
+      />
       <p
         className="m-0 mt-1 cq-caption text-(--cq-text-tertiary)"
         role="status"
         data-arrival-status
       >
+        {reading ? "Q is reading that… " : ""}
         {status === null ? "" : `${status} `}
         {left > 0
           ? `${String(left)} more after this. Anything you leave stays in Needs you on Work.`
@@ -680,9 +948,29 @@ function Sequence({
   );
 }
 
+const WIDE_QUERY = "(min-width: 1024px)";
+function subscribeWide(onChange: () => void): () => void {
+  if (typeof window.matchMedia !== "function") return () => undefined;
+  const query = window.matchMedia(WIDE_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+/** Room for columns either side of Q (Tailwind's lg). */
+function useWide(): boolean {
+  return useSyncExternalStore(
+    subscribeWide,
+    () =>
+      typeof window.matchMedia === "function" &&
+      window.matchMedia(WIDE_QUERY).matches,
+    () => false,
+  );
+}
+
 const defaultLoad: ArrivalLoader = (since) => arrivalBriefingAction(since);
 const defaultDecide: ArrivalDecide = (decision) =>
   decideArrivalCardAction(decision);
+const defaultReadWords: ArrivalReadWords = (request) =>
+  readArrivalWordsAction(request);
 
 /** New decisions later (an agent needs them): a NEEDS_YOU notice arrives. */
 function useLaterCards(load: ArrivalLoader, ready: boolean): void {
@@ -708,6 +996,7 @@ export function ArrivalBriefing({
   fallback = null,
   load = defaultLoad,
   decide = defaultDecide,
+  readWords = defaultReadWords,
   now,
   onSettled,
   onClose,
@@ -721,6 +1010,8 @@ export function ArrivalBriefing({
   readonly fallback?: ReactNode;
   readonly load?: ArrivalLoader;
   readonly decide?: ArrivalDecide;
+  /** Reads their own words into card verbs (the dev harness scripts it). */
+  readonly readWords?: ArrivalReadWords;
   /** The clock (the dev harness fixes it). */
   readonly now?: (() => Date) | undefined;
 }) {
@@ -796,6 +1087,12 @@ export function ArrivalBriefing({
               {words.greeting}
             </span>{" "}
             {words.lowdown}
+            {words.summary === null ? null : (
+              <>
+                {" "}
+                <span data-arrival-summary>{words.summary}</span>
+              </>
+            )}
           </p>
           {onClose === undefined ? null : (
             <Button
@@ -823,6 +1120,14 @@ export function ArrivalBriefing({
           >
             {words.lowdown}
           </p>
+          {words.summary === null ? null : (
+            <p
+              className="cq-body cq-prose text-balance text-(--cq-text-primary)"
+              data-arrival-summary
+            >
+              {words.summary}
+            </p>
+          )}
         </div>
       )}
       {ready.data.cards.length === 0 ? null : (
@@ -830,6 +1135,7 @@ export function ArrivalBriefing({
           key={ready.round}
           data={ready.data}
           decide={decide}
+          readWords={readWords}
           compact={compact}
           nudge={ready.nudge}
           round={ready.round}
