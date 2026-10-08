@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useRef, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 
 import type { KybDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
@@ -12,7 +12,10 @@ import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
 } from "@/features/onboarding-kit/material-actions";
-import { verifyParts } from "@/features/verification/verify-state";
+import {
+  personVerificationOptional,
+  verifyParts,
+} from "@/features/verification/verify-state";
 
 import { submitKybAction, type FormResult } from "./review-actions";
 
@@ -74,6 +77,36 @@ function StandingRow({
   );
 }
 
+/**
+ * For a member the verified organisation confirmed, their own identity is
+ * offered, folded and plainly optional -- never asked for. Anyone else
+ * gets the form as it is.
+ */
+function OptionalIdentity({
+  optional,
+  name,
+  children,
+}: {
+  readonly optional: boolean;
+  readonly name: string;
+  readonly children: ReactNode;
+}) {
+  if (!optional) return <>{children}</>;
+  return (
+    <details className="flex flex-col gap-3" data-identity-optional>
+      <summary className="cq-body-sm flex min-h-11 cursor-pointer items-center text-(--cq-text-primary)">
+        Verify your own identity (optional)
+      </summary>
+      <p className="cq-body-sm mb-4 text-(--cq-text-secondary)">
+        {name} is verified and confirmed you as part of it, so nothing on
+        Capital Q needs this today. Verifying yourself adds your own check
+        beside it.
+      </p>
+      {children}
+    </details>
+  );
+}
+
 async function upload(
   chosen: File,
 ): Promise<{ readonly documentId: string } | null> {
@@ -105,6 +138,7 @@ async function upload(
 export function KybSection({ kyb }: { readonly kyb: KybDto }) {
   const router = useRouter();
   const parts = verifyParts(kyb);
+  const optional = personVerificationOptional(kyb);
   const submission = kyb.submission;
   const auto =
     submission?.status === "SUBMITTED" && submission.source === "AUTO";
@@ -156,12 +190,31 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
         <StandingRow
           who="You"
           standing={kyb.person.standing}
-          words={standingWords(
-            kyb.person.standing,
-            kyb.person.submission?.status === "SUBMITTED",
-            kyb.person.declineReason,
-          )}
+          words={
+            optional && kyb.person.standing === "NOT_REQUESTED"
+              ? "Not verified — optional"
+              : standingWords(
+                  kyb.person.standing,
+                  kyb.person.submission?.status === "SUBMITTED",
+                  kyb.person.declineReason,
+                )
+          }
         />
+        {kyb.person.affiliation !== "CONFIRMED_BY_ORGANISATION" ? null : (
+          // Their place in the organisation, as the organisation confirmed
+          // it -- said in words, with no shield: it is not a verification.
+          <li
+            className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2"
+            data-affiliation="CONFIRMED_BY_ORGANISATION"
+          >
+            <span className="cq-body font-medium text-(--cq-text-primary)">
+              Your place at {name}
+            </span>
+            <span className="cq-body-sm text-(--cq-text-primary)">
+              Confirmed by {name}
+            </span>
+          </li>
+        )}
         <StandingRow
           who={name}
           standing={kyb.standing}
@@ -176,177 +229,182 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
         />
       </ul>
       {!parts.organisation && !parts.person ? null : (
-        <form
-          className="flex max-w-(--cq-layout-narrow) flex-col gap-6"
-          onSubmit={(event) => {
-            event.preventDefault();
-            attempt.current ??= crypto.randomUUID();
-            const key = attempt.current;
-            startTransition(async () => {
-              const sent = async (file: File | null) =>
-                file === null ? { documentId: null } : await upload(file);
-              const organisationDocument = parts.organisation
-                ? await sent(organisationFile)
-                : { documentId: null };
-              const personDocument = parts.person
-                ? await sent(personFile)
-                : { documentId: null };
-              if (organisationDocument === null || personDocument === null) {
-                setResult({
-                  ok: false,
-                  message:
-                    "A document didn't upload. Try again, or send without it.",
+        <OptionalIdentity optional={optional} name={name}>
+          <form
+            className="flex max-w-(--cq-layout-narrow) flex-col gap-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              attempt.current ??= crypto.randomUUID();
+              const key = attempt.current;
+              startTransition(async () => {
+                const sent = async (file: File | null) =>
+                  file === null ? { documentId: null } : await upload(file);
+                const organisationDocument = parts.organisation
+                  ? await sent(organisationFile)
+                  : { documentId: null };
+                const personDocument = parts.person
+                  ? await sent(personFile)
+                  : { documentId: null };
+                if (organisationDocument === null || personDocument === null) {
+                  setResult({
+                    ok: false,
+                    message:
+                      "A document didn't upload. Try again, or send without it.",
+                  });
+                  return;
+                }
+                const outcome = await submitKybAction({
+                  organisation: parts.organisation
+                    ? {
+                        ...organisation,
+                        documentId: organisationDocument.documentId,
+                      }
+                    : null,
+                  person: parts.person
+                    ? { ...person, documentId: personDocument.documentId }
+                    : null,
+                  attemptKey: key,
                 });
-                return;
-              }
-              const outcome = await submitKybAction({
-                organisation: parts.organisation
-                  ? {
-                      ...organisation,
-                      documentId: organisationDocument.documentId,
-                    }
-                  : null,
-                person: parts.person
-                  ? { ...person, documentId: personDocument.documentId }
-                  : null,
-                attemptKey: key,
+                setResult(outcome);
+                if (outcome.ok) {
+                  attempt.current = null;
+                  router.refresh();
+                }
               });
-              setResult(outcome);
-              if (outcome.ok) {
-                attempt.current = null;
-                router.refresh();
-              }
-            });
-          }}
-        >
-          {parts.person ? (
-            <fieldset className="flex flex-col gap-3">
-              <legend className="cq-label mb-2 text-(--cq-text-primary)">
-                You
-              </legend>
-              <Input
-                id={ids.nameOnId}
-                label="Your name as on your ID"
-                autoComplete="name"
-                value={person.nameOnId}
-                onChange={(e) =>
-                  setPerson((current) => ({
-                    ...current,
-                    nameOnId: e.target.value,
-                  }))
-                }
-              />
-              <Input
-                id={ids.role}
-                label={`Your role at ${name}`}
-                description={
-                  kyb.organisationKind === "INVESTOR"
-                    ? "For example: Partner, Principal, Angel."
-                    : "For example: Founder & CEO."
-                }
-                autoComplete="organization-title"
-                value={person.role}
-                onChange={(e) =>
-                  setPerson((current) => ({ ...current, role: e.target.value }))
-                }
-              />
-              <label htmlFor={ids.personFile} className="flex flex-col gap-1">
-                <span className="cq-body-sm text-(--cq-text-primary)">
-                  ID document (optional)
-                </span>
-                <span className="cq-caption text-(--cq-text-secondary)">
-                  A passport or national ID. Kept in your private documents and
-                  seen only by the person at Capital Q who checks it.
-                </span>
-                <input
-                  id={ids.personFile}
-                  type="file"
-                  accept="application/pdf,image/png,image/jpeg"
-                  className="cq-body-sm min-h-11"
-                  onChange={(e) => setPersonFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
-            </fieldset>
-          ) : null}
-          {parts.organisation ? (
-            <fieldset className="flex flex-col gap-3">
-              <legend className="cq-label mb-2 text-(--cq-text-primary)">
-                {name}
-              </legend>
-              {auto ? (
-                <p className="cq-caption text-(--cq-text-secondary)">
-                  Capital Q has already asked from what you&apos;d told us. Add
-                  the registered details and a document to speed it up.
-                </p>
-              ) : null}
-              <Input
-                id={ids.legalName}
-                label="Registered legal name"
-                value={organisation.legalName}
-                onChange={(e) => setOrg("legalName")(e.target.value)}
-              />
-              <Input
-                id={ids.registrationNumber}
-                label="Registration number"
-                value={organisation.registrationNumber}
-                onChange={(e) => setOrg("registrationNumber")(e.target.value)}
-              />
-              <Input
-                id={ids.jurisdictionCode}
-                label="Country of registration"
-                description="2-letter code, e.g. NG, GB, US."
-                maxLength={2}
-                value={organisation.jurisdictionCode}
-                onChange={(e) =>
-                  setOrg("jurisdictionCode")(e.target.value.toUpperCase())
-                }
-              />
-              <Input
-                id={ids.registeredAddress}
-                label="Registered address (optional)"
-                value={organisation.registeredAddress}
-                onChange={(e) => setOrg("registeredAddress")(e.target.value)}
-              />
-              <Input
-                id={ids.websiteUrl}
-                label="Website (optional)"
-                type="url"
-                value={organisation.websiteUrl}
-                onChange={(e) => setOrg("websiteUrl")(e.target.value)}
-              />
-              <label
-                htmlFor={ids.organisationFile}
-                className="flex flex-col gap-1"
-              >
-                <span className="cq-body-sm text-(--cq-text-primary)">
-                  Registration certificate (optional)
-                </span>
-                <span className="cq-caption text-(--cq-text-secondary)">
-                  Your certificate of incorporation or a registry extract. Kept
-                  in your private documents.
-                </span>
-                <input
-                  id={ids.organisationFile}
-                  type="file"
-                  accept="application/pdf,image/png,image/jpeg"
-                  className="cq-body-sm min-h-11"
+            }}
+          >
+            {parts.person ? (
+              <fieldset className="flex flex-col gap-3">
+                <legend className="cq-label mb-2 text-(--cq-text-primary)">
+                  You
+                </legend>
+                <Input
+                  id={ids.nameOnId}
+                  label="Your name as on your ID"
+                  autoComplete="name"
+                  value={person.nameOnId}
                   onChange={(e) =>
-                    setOrganisationFile(e.target.files?.[0] ?? null)
+                    setPerson((current) => ({
+                      ...current,
+                      nameOnId: e.target.value,
+                    }))
                   }
                 />
-              </label>
-            </fieldset>
-          ) : null}
-          <div>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={pending || !ready}
-            >
-              {pending ? "Sending…" : "Send for verification"}
-            </Button>
-          </div>
-        </form>
+                <Input
+                  id={ids.role}
+                  label={`Your role at ${name}`}
+                  description={
+                    kyb.organisationKind === "INVESTOR"
+                      ? "For example: Partner, Principal, Angel."
+                      : "For example: Founder & CEO."
+                  }
+                  autoComplete="organization-title"
+                  value={person.role}
+                  onChange={(e) =>
+                    setPerson((current) => ({
+                      ...current,
+                      role: e.target.value,
+                    }))
+                  }
+                />
+                <label htmlFor={ids.personFile} className="flex flex-col gap-1">
+                  <span className="cq-body-sm text-(--cq-text-primary)">
+                    ID document (optional)
+                  </span>
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    A passport or national ID. Kept in your private documents
+                    and seen only by the person at Capital Q who checks it.
+                  </span>
+                  <input
+                    id={ids.personFile}
+                    type="file"
+                    accept="application/pdf,image/png,image/jpeg"
+                    className="cq-body-sm min-h-11"
+                    onChange={(e) => setPersonFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </fieldset>
+            ) : null}
+            {parts.organisation ? (
+              <fieldset className="flex flex-col gap-3">
+                <legend className="cq-label mb-2 text-(--cq-text-primary)">
+                  {name}
+                </legend>
+                {auto ? (
+                  <p className="cq-caption text-(--cq-text-secondary)">
+                    Capital Q has already asked from what you&apos;d told us.
+                    Add the registered details and a document to speed it up.
+                  </p>
+                ) : null}
+                <Input
+                  id={ids.legalName}
+                  label="Registered legal name"
+                  value={organisation.legalName}
+                  onChange={(e) => setOrg("legalName")(e.target.value)}
+                />
+                <Input
+                  id={ids.registrationNumber}
+                  label="Registration number"
+                  value={organisation.registrationNumber}
+                  onChange={(e) => setOrg("registrationNumber")(e.target.value)}
+                />
+                <Input
+                  id={ids.jurisdictionCode}
+                  label="Country of registration"
+                  description="2-letter code, e.g. NG, GB, US."
+                  maxLength={2}
+                  value={organisation.jurisdictionCode}
+                  onChange={(e) =>
+                    setOrg("jurisdictionCode")(e.target.value.toUpperCase())
+                  }
+                />
+                <Input
+                  id={ids.registeredAddress}
+                  label="Registered address (optional)"
+                  value={organisation.registeredAddress}
+                  onChange={(e) => setOrg("registeredAddress")(e.target.value)}
+                />
+                <Input
+                  id={ids.websiteUrl}
+                  label="Website (optional)"
+                  type="url"
+                  value={organisation.websiteUrl}
+                  onChange={(e) => setOrg("websiteUrl")(e.target.value)}
+                />
+                <label
+                  htmlFor={ids.organisationFile}
+                  className="flex flex-col gap-1"
+                >
+                  <span className="cq-body-sm text-(--cq-text-primary)">
+                    Registration certificate (optional)
+                  </span>
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    Your certificate of incorporation or a registry extract.
+                    Kept in your private documents.
+                  </span>
+                  <input
+                    id={ids.organisationFile}
+                    type="file"
+                    accept="application/pdf,image/png,image/jpeg"
+                    className="cq-body-sm min-h-11"
+                    onChange={(e) =>
+                      setOrganisationFile(e.target.files?.[0] ?? null)
+                    }
+                  />
+                </label>
+              </fieldset>
+            ) : null}
+            <div>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={pending || !ready}
+              >
+                {pending ? "Sending…" : "Send for verification"}
+              </Button>
+            </div>
+          </form>
+        </OptionalIdentity>
       )}
       {result === null ? null : (
         <p

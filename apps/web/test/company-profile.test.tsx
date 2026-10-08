@@ -427,6 +427,25 @@ describe("the profile, for a founder viewing another company", () => {
   });
 });
 
+describe("the profile, for its owner (founder 2026-10-08)", () => {
+  it("asks the owner to add their raise instead of saying it is not shared with them", () => {
+    const base = investorProfile();
+    const owner: CompanyProfileDto = {
+      ...base,
+      viewer: "OWNER",
+      overview:
+        base.overview === null ? null : { ...base.overview, raise: null },
+    };
+    const { container } = renderProfile(owner);
+    expect(container.textContent).not.toContain("Not shared with you");
+    const links = screen.getAllByRole("link", { name: "Add your raise" });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.getAttribute("href")).toBe("/capital?tab=raise");
+    }
+  });
+});
+
 describe("the Elevator tab (A2: replaces Videos)", () => {
   it("signs nothing until Play, then exactly the pressed video, one player at a time", async () => {
     const { container } = renderProfile(investorProfile(), "elevator");

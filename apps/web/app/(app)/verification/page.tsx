@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
@@ -18,6 +19,7 @@ import {
   type VerificationNotice,
 } from "@/features/verification/verification-actions";
 import { VerificationStandings } from "@/features/verification/verification-standings";
+import { personVerificationOptional } from "@/features/verification/verify-state";
 
 export const metadata: Metadata = { title: "Verification" };
 
@@ -67,6 +69,10 @@ export default async function VerificationPage({
         : "/home";
   const session = context.kind === "NONE" ? null : await apiSession();
   const kyb = session === null ? null : await getKyb(session).catch(() => null);
+  // A member the verified organisation confirmed is asked for nothing
+  // (founder 2026-10-08): setup does not stop here for them.
+  const optional = kyb !== null && personVerificationOptional(kyb);
+  if (fromSetup && optional) redirect(skipTo);
   const loaded =
     context.kind === "FOUNDER" && kyb === null
       ? await loadCompanyVerification(context.companyId)
@@ -85,8 +91,16 @@ export default async function VerificationPage({
       {kyb === null ? null : (
         <PageSection
           id="verify"
-          title={`Verify you and ${kyb.organisationName ?? "your organisation"}`}
-          description="Your identity and your organisation's registered details, checked by a person at Capital Q. Verification is not an endorsement."
+          title={
+            optional
+              ? `You and ${kyb.organisationName ?? "your organisation"}`
+              : `Verify you and ${kyb.organisationName ?? "your organisation"}`
+          }
+          description={
+            optional
+              ? `${kyb.organisationName ?? "Your organisation"} is verified and confirmed you as part of it. Nothing more is needed from you. Verification is not an endorsement.`
+              : "Your identity and your organisation's registered details, checked by a person at Capital Q. Verification is not an endorsement."
+          }
         >
           {fromSetup ? (
             <p className="cq-body-sm mb-4 text-(--cq-text-secondary)">
