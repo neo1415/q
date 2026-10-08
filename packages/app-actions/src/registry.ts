@@ -32,6 +32,7 @@ import {
 } from "./actions/gateq-find.js";
 import { READINESS_ACTIONS } from "./actions/readiness.js";
 import { INVESTOR_PROMISE_ACTIONS } from "./actions/investor-promises.js";
+import { DEAL_CLOSE_ACTIONS } from "./actions/deal-close.js";
 
 /**
  * Every declared action (ADR 0040). Append-only by area as areas migrate;
@@ -70,6 +71,8 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...READINESS_ACTIONS,
   // Q.07/Q.02 (2026-10-07): questions to a company; thesis suggestions.
   ...INVESTOR_PROMISE_ACTIONS,
+  // 2026-10-08: deal close -- terms, signed, close, reports, deal status.
+  ...DEAL_CLOSE_ACTIONS,
 ]);
 
 /**

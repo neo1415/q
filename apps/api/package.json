@@ -21,6 +21,7 @@
     "@capital-q/config": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
+    "@capital-q/deck-render": "workspace:*",
     "@capital-q/discovery": "workspace:*",
     "@capital-q/eventing": "workspace:*",
     "@capital-q/evidence": "workspace:*",

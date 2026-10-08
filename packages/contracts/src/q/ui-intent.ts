@@ -691,6 +691,11 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "mark_plan_step",
   "answer_q_question",
   "set_aside_q_question",
+  // Deal close (2026-10-08): filing a report compiled from the record (a
+  // new version; nothing changes on the record), and ticking their own
+  // side's post-close checklist item.
+  "relationship_report",
+  "deal_checklist",
 ] as const;
 
 /**

@@ -20,6 +20,7 @@ import {
   defineAppAction,
   defineAppActionFamily,
   type AnyAppAction,
+  type AppActionContext,
 } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
@@ -94,6 +95,26 @@ const http = {
 
 const succeeded = (out: OutcomeResult) => out.outcome === "OK";
 
+/** A stage report filed with a decision; never fails the decision. */
+async function fileReport(
+  ports: AppActionPorts,
+  context: AppActionContext,
+  relationshipId: string,
+  kind: "PASS" | "MEETING_SUMMARY",
+  key: string,
+): Promise<void> {
+  if (ports.deal === undefined) return;
+  await ports.deal
+    .generateReport({
+      actor: context.actor,
+      relationshipId,
+      kind,
+      idempotencyKey: `${key}:${kind.toLowerCase()}`.slice(0, 200),
+      correlationId: context.correlationId,
+    })
+    .catch(() => undefined);
+}
+
 const PURPOSES: readonly QTaskClass[] = [
   "RELATIONSHIP_QUESTION",
   "ACTION_PREPARATION",
@@ -129,8 +150,8 @@ const PASS = defineAppAction<z.infer<typeof Pass>, OutcomeResult>({
   input: Pass,
   output: z.custom<OutcomeResult>(),
   authorize: servicesDecide,
-  run: (ports, context, input) =>
-    outcomes(ports).pass({
+  run: async (ports, context, input) => {
+    const out = await outcomes(ports).pass({
       actor: context.actor,
       relationshipId: input.relationshipId,
       reasonCode: input.input.reasonCode ?? null,
@@ -138,7 +159,21 @@ const PASS = defineAppAction<z.infer<typeof Pass>, OutcomeResult>({
       shareWithFounder: input.input.shareWithFounder,
       idempotencyKey: input.idempotencyKey,
       correlationId: context.correlationId,
-    }),
+    });
+    // Deal close (2026-10-08): the investor's private pass report is filed
+    // at the pass. Best effort: it never undoes the pass, and can be filed
+    // again from the relationship page.
+    if (out.outcome === "OK" && !out.deduplicated) {
+      await fileReport(
+        ports,
+        context,
+        input.relationshipId,
+        "PASS",
+        input.idempotencyKey,
+      );
+    }
+    return out;
+  },
   targets: (input) => [
     { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
   ],
@@ -290,7 +325,7 @@ const MEETING_OUTCOME = defineAppAction<z.infer<typeof Outcome>, OutcomeResult>(
           return { outcome: "REFUSED", code: "NOT_FOUND" } as const;
         }
       }
-      return outcomes(ports).recordMeetingOutcome({
+      const out = await outcomes(ports).recordMeetingOutcome({
         actor: context.actor,
         relationshipId: input.relationshipId,
         outcome:
@@ -300,6 +335,18 @@ const MEETING_OUTCOME = defineAppAction<z.infer<typeof Outcome>, OutcomeResult>(
         meetingId: input.input.meetingId,
         correlationId: context.correlationId,
       });
+      // Deal close (2026-10-08): the shared meeting summary is filed with
+      // the outcome, keyed by the correlation so a retry files it once.
+      if (out.outcome === "OK" && !out.deduplicated) {
+        await fileReport(
+          ports,
+          context,
+          input.relationshipId,
+          "MEETING_SUMMARY",
+          `meeting-summary:${context.correlationId}`,
+        );
+      }
+      return out;
     },
     targets: (input) => [
       { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
