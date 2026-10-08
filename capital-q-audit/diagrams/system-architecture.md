@@ -76,7 +76,7 @@ flowchart TB
   PUB -- "q.action.* (not in workers registry)" --> STUCK["EVENT_SCHEMA_INVALID x10\n657 rows stuck"]
   Q1 --> H["workers handlers: relationship projection,\nchat/interest/outcome notices, Q work wake,\nnewly-ready company, verification, deck reading"]
   H -- "NOTIFY Q_WORK_WAKE_CHANNEL" --> QW["q-api work runtime / instruction sweep"]
-  subgraph q-api timers
+  subgraph QTIMERS["q-api timers"]
     T1["instruction sweep 60s"]
     T2["approved-action sweep 2m"]
     T3["orphaned-run sweep"]
