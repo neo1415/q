@@ -948,11 +948,10 @@ export async function accessItems(
   if (view === null || view.viewer !== "OWNER") return [];
   const folders = new Map(view.folders.map((f) => [f.code, f.label]));
   const documents = view.documents.slice(0, 40);
+  const requests = ports.founderRequests;
   const access = await Promise.all(
     documents.map((document) =>
-      ports.founderRequests
-        ?.documentAccess(actor, document.documentId)
-        .catch(() => null),
+      requests.documentAccess(actor, document.documentId).catch(() => null),
     ),
   );
   return documents.map((document, index) => {

@@ -1,4 +1,4 @@
-/* global process, console, setTimeout, fetch */
+/* global process, console, setTimeout, fetch, URL, window */
 /**
  * Founder documents, as built (2026-10-08): the real pages over the
  * `/dev/founder-docs` harness's fictional data, from a production build

@@ -336,7 +336,7 @@ function world() {
         );
         const policy = policies[index];
         if (policy === undefined) throw new Error("no policy");
-        policies[index] = { ...policy, revokedAt: NOW } as DisclosurePolicy;
+        policies[index] = { ...policy, revokedAt: NOW };
         return Promise.resolve({
           outcome: "REVOKED",
           policy: policies[index],
@@ -363,7 +363,7 @@ function world() {
         events.push(event.eventType);
         return Promise.resolve({} as never);
       },
-    } as never,
+    },
     audit: {
       record: (_tx: unknown, row: { actionType: string }) => {
         audits.push(row.actionType);

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { CorrelationId } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import {
@@ -55,7 +54,7 @@ describe("investor answer recorder", () => {
       questionId: "00000000-0000-4000-8000-00000000a0f1",
       about: "Paying customers",
       answer: "  131 paid in September.  ",
-      correlationId: "cor_x" as CorrelationId,
+      correlationId: "cor_x",
     });
     expect(sources).toEqual([
       "diligence-question:00000000-0000-4000-8000-00000000a0f1",

@@ -475,8 +475,26 @@ export function AccessSheet({
 
   useEffect(() => {
     if (target === null || initial !== null) return;
-    void load();
-  }, [target, load, initial]);
+    let live = true;
+    const read =
+      target.kind === "DOCUMENT"
+        ? loadDocumentAccessAction(target.documentId).then((out) => {
+            if (!live) return;
+            if (out.ok) setDocumentAccess(out.value);
+            else setMessage(out.message);
+          })
+        : loadFolderAccessAction(companyId, target.folderCode).then((out) => {
+            if (!live) return;
+            if (out.ok) setFolderAccess(out.value);
+            else setMessage(out.message);
+          });
+    read.catch(() => {
+      if (live) setMessage("Access couldn't load. Try again.");
+    });
+    return () => {
+      live = false;
+    };
+  }, [companyId, target, initial]);
 
   const close = () => {
     setDocumentAccess(null);
