@@ -13,7 +13,7 @@
   295    /** Execution claims permitted per action, counting retries of retryable failures. */
   296    readonly maxExecutionAttempts: number;
   297  };
-  298  
+  298
   299  export const DEFAULT_Q_APPROVAL_POLICY: QApprovalPolicy = Object.freeze({
   300    approvalTtlMs: 24 * 60 * 60 * 1000,
   301    maxExecutionAttempts: 3,

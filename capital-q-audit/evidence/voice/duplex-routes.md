@@ -32,7 +32,7 @@
    86          .send(QVoiceDuplexToolResultSchema.parse(result));
    87      },
    88    );
-   89  
+   89
    90    // VOICE-BRAIN: a finished turn of the person's; the server decides who
    91    // answers it, and runs Q for a substantive one.
    92    app.post(
@@ -92,7 +92,7 @@
   428    })
   429    .strict();
   430  export type QVoiceDuplexToolCall = z.infer<typeof QVoiceDuplexToolCallSchema>;
-  431  
+  431
   432  export const QVoiceDuplexToolResultSchema = z
   433    .object({
   434      /** What goes back to the model as the call's output (JSON text). */
@@ -106,7 +106,7 @@
   442  export type QVoiceDuplexToolResult = z.infer<
   443    typeof QVoiceDuplexToolResultSchema
   444  >;
-  445  
+  445
   446  /**
   447   * POST: one finished turn of the person's on a routed duplex line, as the
   448   * provider transcribed it (or as they typed it). The server decides who
@@ -129,7 +129,7 @@
   465    })
   466    .strict();
   467  export type QVoiceDuplexHeard = z.infer<typeof QVoiceDuplexHeardSchema>;
-  468  
+  468
   469  export const Q_VOICE_DUPLEX_ROUTES = ["ASK_Q", "SMALLTALK", "MODEL"] as const;
   470  export const QVoiceDuplexHeardResultSchema = z.discriminatedUnion("route", [
   471    z
@@ -152,4 +152,3 @@
   488    z.object({ route: z.literal("MODEL") }).strict(),
   489  ]);
 ```
-

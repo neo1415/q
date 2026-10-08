@@ -6,7 +6,7 @@ Why included: Two migrations insert different models under the same UUID with ON
 
 ```sql
    23  -- 2. Catalog ---------------------------------------------------------------
-   24  
+   24
    25  insert into ai_ops.models (id, provider_id, model_code, model_family, model_type, status, context_window, max_output_tokens,
    26    supports_tools, supports_structured_output, supports_vision, supports_audio, supports_realtime, supports_prompt_cache, supports_reasoning,
    27    sensitivity_ceiling, quality_class, latency_class, effective_from, metadata) values
@@ -15,7 +15,7 @@ Why included: Two migrations insert different models under the same UUID with ON
    30     'PUBLIC', 'STANDARD', 'REALTIME', '2026-10-04T00:00:00Z',
    31     '{"purpose":"full-duplex voice (CQ_VOICE_REALTIME)","audio_prices_usd_per_million":{"input":10.0,"cached_input":0.30,"output":20.0},"note":"Session minted server-side as an ephemeral client secret; the browser never holds a key. Audio prices live here because model_prices has text columns only.","source_url":"https://developers.openai.com/api/docs/pricing","verified_at":"2026-10-04"}'::jsonb)
    32  on conflict (id) do nothing;
-   33  
+   33
    34  insert into ai_ops.model_prices (id, model_id, pricing_region, currency, input_per_million, cached_input_per_million, output_per_million,
    35    batch_input_per_million, batch_output_per_million, free_tier_description, effective_from, effective_to, source_url, verified_at) values
    36    ('a3000000-0000-4000-8000-000000000022', 'a2000000-0000-4000-8000-000000000022', 'global', 'USD', 0.60, 0.06, 2.40, null, null,
@@ -33,7 +33,7 @@ Why included: Two migrations insert different models under the same UUID with ON
     4  -- gemini-3.1-flash-lite-image (Nano Banana 2 Lite, about $0.034 per 1K
     5  -- image). A new catalog row rather than an edit of the old one: earlier
     6  -- usage rows keep naming the model that actually ran.
-    7  
+    7
     8  insert into ai_ops.models (id, provider_id, model_code, model_family, model_type, status, context_window, max_output_tokens,
     9    supports_tools, supports_structured_output, supports_vision, supports_audio, supports_realtime, supports_prompt_cache, supports_reasoning,
    10    sensitivity_ceiling, quality_class, latency_class, effective_from, metadata) values
@@ -42,7 +42,7 @@ Why included: Two migrations insert different models under the same UUID with ON
    13     'PUBLIC', 'STANDARD', 'SLOW', '2026-10-07T00:00:00Z',
    14     '{"purpose":"document illustrations","note":"Paid key only (image models have no free tier). Prompts carry only a slide title, the document''s one-line description and brand colours; never figures, names or people. Max 6 per document.","cost_usd_per_image":0.034,"verified_at":"2026-10-07"}'::jsonb)
    15  on conflict (id) do nothing;
-   16  
+   16
    17  update ai_ops.models
    18     set status = 'RETIRED'
    19   where id = 'a2000000-0000-4000-8000-000000000021'
@@ -70,7 +70,7 @@ Why included: Two migrations insert different models under the same UUID with ON
    16    readonly providerId: string;
    17    readonly modelId: string;
    18  };
-   19  
+   19
    20  export const IMAGE_MODEL_CONFIG = {
    21    google: {
    22      modelCode: "gemini-3.1-flash-lite-image",
@@ -86,14 +86,14 @@ Why included: Two migrations insert different models under the same UUID with ON
    32      modelId: "a2000000-0000-4000-8000-000000000020",
    33    },
    34  } as const satisfies Readonly<Record<string, ImageModelConfig>>;
-   35  
+   35
    36  /**
    37   * Generated images per deck or document, whatever the budgets allow
    38   * (founder direction 2026-10-06). Stock photos and placeholders fill the
    39   * rest.
    40   */
    41  export const GENERATED_IMAGES_PER_DOCUMENT_MAX = 6;
-   42  
+   42
    43  /**
    44   * How long a billing or quota refusal switches generation off for this
    45   * process. A refused key is not retried picture by picture: the deck
@@ -167,4 +167,3 @@ Why included: Two migrations insert different models under the same UUID with ON
   235                image === undefined ? (failure ?? "TRANSIENT") : undefined,
   236              correlationId: request.attribution.correlationId,
 ```
-

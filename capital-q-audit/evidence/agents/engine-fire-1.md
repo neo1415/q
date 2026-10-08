@@ -78,7 +78,7 @@
  1856          );
  1857        const keyOf = (index: number) =>
  1858          `instr:${row.id}:${runKey}:${String(index)}`;
- 1859  
+ 1859
  1860        // S5: what is left of this month's budget. Below one planning call,
  1861        // the instruction pauses and asks to continue (no call is made).
  1862        // Whole micro-dollars: money is never compared as floats.
@@ -86,7 +86,7 @@
  1864        let left =
  1865          micros(Number(row.budget_usd_month)) -
  1866          micros(Number(row.spent_this_month));
- 1867  
+ 1867
  1868        // S6: their messages, read only through the quarantined extractor,
  1869        // keeping one planning call in reserve.
  1870        const facts = new Map<string, ThreadFacts>();
@@ -141,7 +141,7 @@
  1919            }
  1920          }
  1921        }
- 1922  
+ 1922
  1923        // F24 follow-up (Zino, 7 Oct): a waiting card the conversation has
  1924        // moved past is superseded -- through the Approval Engine, with its
  1925        // history -- and stops counting as waiting, so this firing's planner
@@ -185,7 +185,7 @@
  1963              .catch(() => false);
  1964          }
  1965        }
- 1966  
+ 1966
  1967        // Tensorgate, 8 Oct: code's own reading of each conversation for the
  1968        // message checks -- their latest words' distinctive terms, and the
  1969        // numbers the person's own side already stated there.
@@ -201,7 +201,7 @@
  1979            },
  1980          ]),
  1981        );
- 1982  
+ 1982
  1983        // Live QA (instruction 76d6f281): whether each conversation already
  1984        // holds the person's side's message, read from the chats themselves.
  1985        const covered = inScope(grant.data, people)
@@ -213,7 +213,7 @@
  1991            : await dependencies
  1992                .introduced(actor, covered)
  1993                .catch(() => new Set(covered));
- 1994  
+ 1994
  1995        // What messages may say: read once per firing, as the person.
  1996        const material =
  1997          dependencies.material === undefined

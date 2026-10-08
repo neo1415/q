@@ -150,7 +150,7 @@
  2742              for (const index of indexes) await runStep(index);
  2743            }),
  2744        );
- 2745  
+ 2745
  2746        // Tensorgate, 8 Oct: Zino's reply sat unanswered while the firing
  2747        // said "nothing to do" (every drafted reply was refused, and the last
  2748        // plan was empty). A message from them that this firing neither
@@ -233,7 +233,7 @@
  2825            "NOTHING_TO_DO",
  2826          );
  2827        }
- 2828  
+ 2828
  2829        // S7: what waits on them is a NEEDS_YOU notice at once.
  2830        const waiting = needsYouNotice({
  2831          goal: row.goal_text,
@@ -250,7 +250,7 @@
  2842            })
  2843            .catch(() => false);
  2844        }
- 2845  
+ 2845
  2846        // What no declared action can do: said now, with an alternative.
  2847        for (const [offset, entry] of plan.cannot.entries()) {
  2848          const index = 100 + offset;

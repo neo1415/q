@@ -10,12 +10,14 @@ Status legend: IMPLEMENTED / PARTIAL / CONFIGURED-UNUSED / MOCKED / BROKEN / UNT
 ## 1. Summary
 
 The authorization architecture is real and layered:
+
 - authenticated principal → server-resolved actor context
 - Context Firewall plan → tool registry (validate / authorise / bound)
 - Prepare → Approve → Execute with hash-bound approvals and idempotency keys
 - pgTAP RLS suites for the browser-facing roles
 
 The weak points are elsewhere:
+
 1. **Untrusted public-web content reaches the model in the SYSTEM role.** On the primary OpenAI adapter it is concatenated into `instructions` (§5.1, CONFIRMED).
 2. **RLS is not in the request path of the server processes.** No per-request role or JWT claims are set anywhere, so tenant isolation for app traffic rests on application code (§3, strongly indicated, not verified against the live DB role).
 3. **Hosted model routing may depend on a "synthetic demo" attestation** that sends any sensitivity to UNREVIEWED free-tier Gemini (§6). Real-customer readiness depends on that being off.
@@ -27,12 +29,13 @@ The weak points are elsewhere:
 ## 2. Identity and actor context (IMPLEMENTED)
 
 - **Authentication.** Every protected q-api and api route runs an `onRequest` hook. The Supabase bearer token is verified server-side with `client.auth.getUser(accessToken)`, a network round trip per request (`packages/security/src/supabase/access-token-authenticator.ts:53-96`). No principal → `AuthenticationRequiredError` (`apps/q-api/src/security/authentication.ts:44-70`).
-- **Organisation context.** The `ORGANISATION_CONTEXT_HEADER` selector is treated as a *request*. `actor-context-resolver.ts:55-131` reads only trusted rows:
+- **Organisation context.** The `ORGANISATION_CONTEXT_HEADER` selector is treated as a _request_. `actor-context-resolver.ts:55-131` reads only trusted rows:
   - `identity.user_profiles.status='active'`
   - `organisation_memberships.membership_status='active'`
   - a persisted active context whose membership is still active
 
   An invalid selector fails closed (`apps/q-api/src/security/actor-context.ts:81-140`).
+
 - **Personal context.** A user without an organisation gets `personalActorContext(userId)` only on routes that opt in with `requireActorContextOrPersonalHook` (`actor-context.ts:151-200`).
 - **Route coverage heuristic.** For every route file in `apps/api/src/http`, `apps/q-api/src/http`, voice and room, I counted route registrations and auth references. Every file with routes references an auth hook, signature check or actor getter. This is a heuristic count, not a per-route proof.
   - `apps/q-api/test/route-capability-parity.test.ts` (passes, see 13) maps each route to a capability or an explicit exemption: HEALTH, WEBHOOK, PUBLIC, PLAYER, DOWNLOAD and others (`:36-60`).
@@ -58,7 +61,7 @@ The weak points are elsewhere:
 - **Server connections do not carry the user into Postgres.** I found no `set local role`, `set_config('request.jwt.claims', …)` or equivalent (grep over `packages`, `apps` and `supabase/migrations`; the only "set role" hit is an application column update in `packages/platform-admin/src/team.ts:97`).
   - The runtime connects with `DATABASE_URL`. The repo's own parser expects the Supabase pooled username `postgres.<ref>` (`packages/model-gateway/src/policy/synthetic-demo.ts:69-72`). The docs say "the local stack has no dedicated runtime roles yet" (`packages/config/src/database.ts:126-130`).
   - Consequence (strongly indicated): **RLS does not constrain server-side queries**. Every tenant check for app traffic is application code, the explicit actor and tenant parameters of the repositories. RLS protects only browser and PostgREST access with the publishable key, and the web uses Supabase only for auth (`apps/web/src/auth/supabase-server.ts:25`, `session-proxy.ts:35`).
-  - This is a defence-in-depth gap relative to CLAUDE.md ("Enforce server-side *and* with RLS"). It is UNVERIFIED against the live role attributes; check with `select rolname, rolbypassrls from pg_roles` on the hosted project.
+  - This is a defence-in-depth gap relative to CLAUDE.md ("Enforce server-side _and_ with RLS"). It is UNVERIFIED against the live role attributes; check with `select rolname, rolbypassrls from pg_roles` on the hosted project.
 - **Privileged access class.**
   - `createPrivilegedDatabaseClient` is reachable only through `@capital-q/database/privileged`. It requires `DATABASE_PRIVILEGED_URL` outside local and test, and never falls back (`packages/database/src/privileged.ts:1-45`; `config/src/database.ts:136-175`).
   - Staging docs: "`DATABASE_PRIVILEGED_URL` is deliberately absent everywhere: `createPrivilegedDatabaseClient` has no caller outside tests" (`docs/deployment/staging.md:101-103`).
@@ -103,11 +106,11 @@ TURN_READER v44 tells the model to rewrite garbled speech "by sound" into `heard
 
 ## 6. Model-provider data posture (cross-ref 09)
 
-| Provider | Review status | Ceiling | Evidence |
-|---|---|---|---|
-| Google | UNREVIEWED; free-tier terms "content used to improve Google products" | PUBLIC | `20260907090000…sql:265-267`; `20260926090000` |
-| OpenAI | operator-asserted ZDR | CONFIDENTIAL | `20261006100000…sql:18-35`; realtime raised by founder approval, `20261203100000` |
-| Groq | operator-asserted ZDR | CONFIDENTIAL (unused) | — |
+| Provider | Review status                                                         | Ceiling               | Evidence                                                                          |
+| -------- | --------------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------- |
+| Google   | UNREVIEWED; free-tier terms "content used to improve Google products" | PUBLIC                | `20260907090000…sql:265-267`; `20260926090000`                                    |
+| OpenAI   | operator-asserted ZDR                                                 | CONFIDENTIAL          | `20261006100000…sql:18-35`; realtime raised by founder approval, `20261203100000` |
+| Groq     | operator-asserted ZDR                                                 | CONFIDENTIAL (unused) | —                                                                                 |
 
 - `SYNTHETIC_DEMO` + attestation skips **both** sensitivity checks (`policy/eligibility.ts:295-309`).
   - Hosted staging may attest with `CAPITAL_Q_SYNTHETIC_DEMO_ATTESTED` + project ref (`synthetic-demo.ts:175-215`). Production and preview are refused (`:147-154`).
@@ -129,6 +132,7 @@ TURN_READER v44 tells the model to rewrite garbled speech "by sound" into `heard
   9. bounded result
 
   Arguments, results and thrown messages are never logged. 43 READ_ONLY and 43 SIDE_EFFECT `classification` literals in `q-tools`/`q-api`. The gateway also refuses tool calls naming a tool not offered (`gateway.ts:352-369`). IMPLEMENTED.
+
 - **Approvals.**
   - The payload hash is recomputed from the persisted proposal at approval. A mismatch raises a HIGH security event and refuses (`packages/q-actions/src/application/service.ts:1376-1395`).
   - Idempotency key: `q_action:${runId}:${actionId}` (`service.ts:310-315`).
@@ -166,23 +170,24 @@ TURN_READER v44 tells the model to rewrite garbled speech "by sound" into `heard
   - The gateway logs classes, codes and ids only (`gateway.ts:555-571,940-955`).
 
   I found no transcript or message body in the sampled log calls. This was a sample, not exhaustive.
+
 - **Residual risk.** Many calls log `{ err: error }`, which pino serialises. Database driver errors may carry query text or parameters, and SDK errors may carry request detail. UNVERIFIED.
 - Provider keys are wrapped in `ProviderCredential`, whose `toJSON`, `toString` and inspect return `[redacted]` (`packages/config/src/model-providers.ts:27-50`). The startup log prints only configured/unconfigured and key counts (`:220-233`).
 
 ## 10. Specific risks (ranked)
 
-| # | Risk | Severity | Evidence |
-|---|---|---|---|
-| S1 | Untrusted web excerpts in SYSTEM, i.e. OpenAI `instructions` | High (integrity) | §5.1 |
-| S2 | RLS bypassed by server role; isolation rests on app code | High (defence in depth), unverified | §3 |
-| S3 | SYNTHETIC_DEMO attestation lets any sensitivity reach UNREVIEWED Gemini in hosted staging; docs claim it cannot | High if real users are present | §6; 09 §4 |
-| S4 | Duplex spend and usage are browser-reported; the cap can be undercounted | Medium (cost) | 09 §5.2 |
-| S5 | `voice_line_turns` unowned retention; user-delete restrict | Medium (privacy) | §8 |
-| S6 | GateQ anonymous model path throttled per process only | Medium (cost/abuse) | §2 |
-| S7 | Recall Svix replay within the window; meeting token in URL | Low | §2 |
-| S8 | 4 h voice bearer held in browser-visible agent settings | Low | §2 |
-| S9 | `{err}` logging may leak SQL params or SDK request detail | Low, unverified | §9 |
-| S10 | OpenAI ZDR and Groq ZDR are operator assertions, not verified | Medium (compliance) | §6 |
+| #   | Risk                                                                                                            | Severity                            | Evidence  |
+| --- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------- |
+| S1  | Untrusted web excerpts in SYSTEM, i.e. OpenAI `instructions`                                                    | High (integrity)                    | §5.1      |
+| S2  | RLS bypassed by server role; isolation rests on app code                                                        | High (defence in depth), unverified | §3        |
+| S3  | SYNTHETIC_DEMO attestation lets any sensitivity reach UNREVIEWED Gemini in hosted staging; docs claim it cannot | High if real users are present      | §6; 09 §4 |
+| S4  | Duplex spend and usage are browser-reported; the cap can be undercounted                                        | Medium (cost)                       | 09 §5.2   |
+| S5  | `voice_line_turns` unowned retention; user-delete restrict                                                      | Medium (privacy)                    | §8        |
+| S6  | GateQ anonymous model path throttled per process only                                                           | Medium (cost/abuse)                 | §2        |
+| S7  | Recall Svix replay within the window; meeting token in URL                                                      | Low                                 | §2        |
+| S8  | 4 h voice bearer held in browser-visible agent settings                                                         | Low                                 | §2        |
+| S9  | `{err}` logging may leak SQL params or SDK request detail                                                       | Low, unverified                     | §9        |
+| S10 | OpenAI ZDR and Groq ZDR are operator assertions, not verified                                                   | Medium (compliance)                 | §6        |
 
 ## 11. Not inspected
 

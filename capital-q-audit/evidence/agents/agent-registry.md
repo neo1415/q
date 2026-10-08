@@ -20,7 +20,7 @@
    13   * Tool names are the app's own: consequential app-action names
    14   * (`chat.message.send`, ADR 0040) and Q read tools (`search_companies`).
    15   */
-   16  
+   16
    17  export const AGENT_ROLES = [
    18    "LEAD",
    19    "OUTREACH",
@@ -34,14 +34,14 @@
    27    "AD_HOC",
    28  ] as const;
    29  export type AgentRole = (typeof AGENT_ROLES)[number];
-   30  
+   30
    31  /** Tools whose effect reaches the other side: always written and reviewed. */
    32  export const OUTWARD_TOOLS: ReadonlySet<string> = new Set([
    33    "chat.message.send",
    34    "email.send",
    35    "relationship.connection_request.send",
    36  ]);
-   37  
+   37
    38  export type AgentDefinition = {
    39    readonly role: AgentRole;
    40    /** The name the workforce page shows. */
@@ -51,7 +51,7 @@
    44    /** The most one run of this agent may spend in one job, USD. */
    45    readonly budgetUsd: number;
    46  };
-   47  
+   47
    48  export const AGENT_REGISTRY: Readonly<Record<AgentRole, AgentDefinition>> = {
    49    LEAD: {
    50      role: "LEAD",
@@ -145,16 +145,16 @@
   138      budgetUsd: 0.05,
   139    },
   140  };
-  141  
+  141
   142  /** Every tool any role may use: the ceiling for an ad-hoc agent. */
   143  export const ALL_ROLE_TOOLS: ReadonlySet<string> = new Set(
   144    Object.values(AGENT_REGISTRY).flatMap((agent) => agent.tools),
   145  );
-  146  
+  146
   147  export function isAgentRole(value: string): value is AgentRole {
   148    return (AGENT_ROLES as readonly string[]).includes(value);
   149  }
-  150  
+  150
   151  /** The roster as the lead Q's prompt reads it (trusted, code's words). */
   152  export function rosterText(
   153    permitted: ReadonlySet<string>,

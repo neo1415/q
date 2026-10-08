@@ -13,7 +13,7 @@
   324  }): QResultBlock[] | undefined {
   325    const idFor = input.findingId ?? (() => randomUUID());
   326    const blocks: QResultBlock[] = [];
-  327  
+  327
   328    // The cards lead: they are the answer's shape when the person compared
   329    // things. Copied as written, in the order written; nothing here sorts.
   330    // v17's answer cards replace v12's comparison cards when both came.
@@ -34,7 +34,7 @@
   345        })),
   346      });
   347    }
-  348  
+  348
   349    for (const [index, finding] of withoutContradictedGaps(
   350      input.result.findings ?? [],
   351    ).entries()) {
@@ -72,7 +72,7 @@
   383        },
   384      });
   385    }
-  386  
+  386
   387    // What the supplied context did not establish, and what conflicts in it.
   388    // Both are absence reported as absence — never a low score for anybody.
   389    for (const statement of input.result.missingEvidence ?? []) {
@@ -93,7 +93,7 @@
   404        confidence: DISAGREES,
   405      });
   406    }
-  407  
+  407
   408    // A question back is a card only when Q genuinely could not answer
   409    // (Zino live 2026-10-07: "I'm asking you something but you're giving me
   410    // a card asking me another question"). Beside an answer, the question
@@ -105,9 +105,9 @@
   416        blocks.push({ kind: "CLARIFICATION_REQUEST", question });
   417      }
   418    }
-  419  
+  419
   420    blocks.push(...subjectBlocks(input.subjects));
-  421  
+  421
   422    if (blocks.length === 0) {
   423      return undefined;
   424    }
@@ -147,7 +147,7 @@
    65      of: measures.length,
    66    };
    67  }
-   68  
+   68
    69  function keyOf(name: string, taken: Set<string>): string {
    70    const base =
    71      name
@@ -161,7 +161,7 @@
    79    taken.add(key);
    80    return key;
    81  }
-   82  
+   82
    83  /**
    84   * The block the page renders, or null when the reading cannot make one.
    85   * RANKED is ordered by fit, highest first; equal fits and cards without a
@@ -223,7 +223,7 @@
 ```
     1  import type { QAnswerCardsBlock } from "@capital-q/contracts";
     2  import type { QToolCallOutcome } from "@capital-q/q-runtime";
-    3  
+    3
     4  /**
     5   * The record behind each answer card (R0, Zino live 2026-10-06: every card
     6   * of the day came with subject null, so "Open profile" could never show
@@ -234,9 +234,9 @@
    11   * model. A name matches when it is the same name, letters and digits only;
    12   * a card no tool result names keeps no subject.
    13   */
-   14  
+   14
    15  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
-   16  
+   16
    17  export function nameKey(name: string): string {
    18    return name
    19      .toLowerCase()
@@ -244,7 +244,7 @@
    21      .replace(/\([^)]*\)/gu, " ")
    22      .replace(/[^a-z0-9]+/gu, "");
    23  }
-   24  
+   24
    25  /** Every {company id, name} pair a tool's authorised output carries. */
    26  export function companiesInOutcome(
    27    outcome: Pick<QToolCallOutcome, "result">,
@@ -292,4 +292,3 @@
  4089          const fitsRead = runFits.take(request.runId);
  4090          const builtCards = (modelBlocks ?? []).some(
 ```
-

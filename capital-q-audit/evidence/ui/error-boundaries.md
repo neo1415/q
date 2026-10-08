@@ -6,13 +6,13 @@
 
 ```
     1  "use client";
-    2  
+    2
     3  import { useEffect } from "react";
-    4  
+    4
     5  import { Button, buttonClassName } from "@capital-q/ui/button";
-    6  
+    6
     7  import { StatusPage } from "@/components/status-page";
-    8  
+    8
     9  /**
    10   * A page that failed to render. The commonest cause on a live site is a
    11   * deploy landing mid-visit: the page asks for a script the new build no
@@ -27,7 +27,7 @@
    20      )
    21    );
    22  }
-   23  
+   23
    24  export default function PageError({
    25    error,
    26    reset,
@@ -115,6 +115,5 @@
   738        ) : null}
   739      </>
   740    );
-  741  
+  741
 ```
-

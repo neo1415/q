@@ -55,7 +55,7 @@
   571      if (onVisible !== undefined) this.#unsubscribe.push(onVisible);
   572      return true;
   573    }
-  574  
+  574
   575    async #tryConnect(): Promise<boolean> {
   576      try {
   577        await this.#connect();
@@ -65,7 +65,7 @@
   581        return false;
   582      }
   583    }
-  584  
+  584
   585    /**
   586     * One realtime call on the current credential: a new peer carrying the
   587     * same microphone and playing into the same element. Used by `open` and
@@ -126,7 +126,7 @@
   642      await peer.setRemoteDescription({ type: "answer", sdp });
   643      await this.#withTimeout(this.#channelOpen(channel));
   644    }
-  645  
+  645
   646    /** A call is up: its length limit and its health sampling start. */
   647    #transportUp(): void {
   648      this.#health.restart();
@@ -137,7 +137,7 @@
   653      }, this.#credential.maxSessionMs);
   654      this.#sampleHealth();
   655    }
-  656  
+  656
   657    /** The current call is let go; the microphone and the speaker are kept. */
   658    #dropTransport(): void {
   659      for (const timer of [this.#healthTimer, this.#graceTimer, this.#maxTimer]) {
@@ -172,7 +172,7 @@
   688        // Already closed.
   689      }
   690    }
-  691  
+  691
   692    /**
   693     * The line dropped, or reached its length: a fresh call for the same
   694     * line, without a word about it unless the person would notice. Bounded:
@@ -241,7 +241,7 @@
   757      this.#events.onLinkStatus?.(null);
   758      this.#events.onState("LISTENING");
   759    }
-  760  
+  760
   761    /**
   762     * A rejoined call starts empty: the recent lines go back in, the
   763     * person's as theirs and Q's as Q's (never the person's words as an
@@ -281,7 +281,7 @@
   797      }
   798      if (results.length > 0) this.#send({ type: "response.create" });
   799    }
-  800  
+  800
   801    #remember(role: "user" | "q", text: string): void {
   802      const trimmed = text.trim().slice(0, REPLAY_CHARS);
   803      if (trimmed.length === 0) return;
@@ -289,4 +289,3 @@
   805      if (this.#replay.length > REPLAY_MAX) this.#replay.shift();
   806    }
 ```
-

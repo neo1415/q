@@ -5,7 +5,7 @@ Why included: Direct fetch to OpenAI embeddings; no routing policy/eligibility/l
 ## `packages/q-embeddings/src/infrastructure/openai-provider.ts` lines 18-60
 
 ```ts
-   18  
+   18
    19  /**
    20   * The hosted OpenAI embeddings adapter (Q.02, 2026-10-07).
    21   *
@@ -27,11 +27,11 @@ Why included: Direct fetch to OpenAI embeddings; no routing policy/eligibility/l
    37   * from the two never mix in one search (the store keys every vector by
    38   * configuration and instruction version).
    39   */
-   40  
+   40
    41  export const OPENAI_EMBEDDING_PROVIDER_CODE = "openai" as const;
    42  const PROVIDER = OPENAI_EMBEDDING_PROVIDER_CODE;
    43  const ENDPOINT = "https://api.openai.com/v1/embeddings";
-   44  
+   44
    45  export const OPENAI_TE3_SMALL_1024_CONFIGURATION: EmbeddingConfiguration =
    46    EmbeddingConfigurationSchema.parse({
    47      configurationVersion: "capital-q-openai-te3-small-1024-v1",
@@ -55,7 +55,7 @@ Why included: Direct fetch to OpenAI embeddings; no routing policy/eligibility/l
 ```ts
    20   * quiet addition here.
    21   */
-   22  
+   22
    23  /**
    24   * `openai` (Q.02, 2026-10-07): the hosted adapter, because the TEI runtime
    25   * does not fit the hosting plan. It reuses the reviewed OpenAI model-provider
@@ -64,15 +64,14 @@ Why included: Direct fetch to OpenAI embeddings; no routing policy/eligibility/l
    28   */
    29  export const EMBEDDING_PROVIDERS = ["local-tei", "openai"] as const;
    30  export type EmbeddingProviderSetting = (typeof EMBEDDING_PROVIDERS)[number];
-   31  
+   31
    32  export const EMBEDDING_ENV_NAMES = [
    33    "Q_EMBEDDING_PROVIDER",
    34    "Q_EMBEDDING_BASE_URL",
    35    "Q_EMBEDDING_TIMEOUT_MS",
    36    "Q_EMBEDDING_MAX_BATCH_ITEMS",
    37  ] as const;
-   38  
+   38
    39  /** The laptop runtime. A default only when CAPITAL_Q_ENV is local. */
    40  const LOCAL_BASE_URL = "http://127.0.0.1:8080";
 ```
-

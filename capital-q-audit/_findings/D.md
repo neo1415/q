@@ -148,31 +148,31 @@ Each defect below was confirmed by reading the code path. D-02 was also reproduc
 
 ## EVIDENCE INDEX (conclusion → path:line)
 
-| Conclusion | Evidence |
-|---|---|
-| Threshold 75, 2 rounds, weights | `packages/q-orchestrator/src/workforce/review-loop.ts:24-50` |
-| Near miss within 10 points becomes a card | `apps/q-api/src/composition/workforce/review.ts:92`; `engine.ts:2381-2415` |
-| Cadence default 240, claim before fire | `supabase/migrations/20261123090000_instruction_triggers.sql`; `instructions/store.ts:345-360` |
-| 60 s sweep; autonomy env | `apps/q-api/src/main.ts:1892-1908` |
-| Delegation toggle makes the instruction due now | `apps/api/src/q-work-port.ts:66-79` |
-| Approval TTL 24 h, list hides lapsed cards | `packages/q-actions/src/ports.ts:300`; `postgres-repositories.ts:410` |
-| Engine holds on AWAITING actions regardless of expiry | `instructions/store.ts:715-726`; `engine.ts:726-733` |
-| REPLY_WAITING notice | `engine.ts:2746-2800` |
-| Misleading quiet note | `engine.ts:2811-2824` |
-| Only 4 job executors | `workforce/jobs.ts:333-338` |
-| WRITER blocks a job | `evidence/agents/repro-writer-step.md` |
-| Job fire-and-forget | `workforce/job-actions.ts:305-325` |
-| Errand false success | `errands.ts:1418-1436` |
-| No viaQ on app-action chat send | `app-actions/src/actions/chat.ts:63-76`; `communication/src/service.ts:171-172` |
-| Needs you count formula | `apps/web/src/features/work/decision-queue.tsx:224-228` |
-| Message card only for `chat.message.send` | `decision-queue.tsx:441-444` |
-| Registry lanes and tool cap | `packages/q-tools/src/registry.ts:22-31,191-210` |
-| Tool executor: no timeout or retry | `packages/q-tools/src/executor.ts` (grep: only abort-signal handling) |
-| Duplex offers only `ask_q`, `decide_card` (+listening) | `broker.ts:733-739`; `voice/duplex/instructions.ts:219-234` |
-| `email.send` not an app action | `apps/q-api/src/composition/email-action.ts:45`; `packages/app-actions/src/actions/*` |
-| Research providers and timeouts | `apps/q-api/src/composition/research.ts:254-305`; `q-research/src/providers/*.ts` |
-| Tavus absent | grep `-i tavus` over `apps`, `packages` → only `engine.ts:443` comment |
-| Tests pass (81) | `evidence/agents/tests-run.md` |
+| Conclusion                                             | Evidence                                                                                       |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Threshold 75, 2 rounds, weights                        | `packages/q-orchestrator/src/workforce/review-loop.ts:24-50`                                   |
+| Near miss within 10 points becomes a card              | `apps/q-api/src/composition/workforce/review.ts:92`; `engine.ts:2381-2415`                     |
+| Cadence default 240, claim before fire                 | `supabase/migrations/20261123090000_instruction_triggers.sql`; `instructions/store.ts:345-360` |
+| 60 s sweep; autonomy env                               | `apps/q-api/src/main.ts:1892-1908`                                                             |
+| Delegation toggle makes the instruction due now        | `apps/api/src/q-work-port.ts:66-79`                                                            |
+| Approval TTL 24 h, list hides lapsed cards             | `packages/q-actions/src/ports.ts:300`; `postgres-repositories.ts:410`                          |
+| Engine holds on AWAITING actions regardless of expiry  | `instructions/store.ts:715-726`; `engine.ts:726-733`                                           |
+| REPLY_WAITING notice                                   | `engine.ts:2746-2800`                                                                          |
+| Misleading quiet note                                  | `engine.ts:2811-2824`                                                                          |
+| Only 4 job executors                                   | `workforce/jobs.ts:333-338`                                                                    |
+| WRITER blocks a job                                    | `evidence/agents/repro-writer-step.md`                                                         |
+| Job fire-and-forget                                    | `workforce/job-actions.ts:305-325`                                                             |
+| Errand false success                                   | `errands.ts:1418-1436`                                                                         |
+| No viaQ on app-action chat send                        | `app-actions/src/actions/chat.ts:63-76`; `communication/src/service.ts:171-172`                |
+| Needs you count formula                                | `apps/web/src/features/work/decision-queue.tsx:224-228`                                        |
+| Message card only for `chat.message.send`              | `decision-queue.tsx:441-444`                                                                   |
+| Registry lanes and tool cap                            | `packages/q-tools/src/registry.ts:22-31,191-210`                                               |
+| Tool executor: no timeout or retry                     | `packages/q-tools/src/executor.ts` (grep: only abort-signal handling)                          |
+| Duplex offers only `ask_q`, `decide_card` (+listening) | `broker.ts:733-739`; `voice/duplex/instructions.ts:219-234`                                    |
+| `email.send` not an app action                         | `apps/q-api/src/composition/email-action.ts:45`; `packages/app-actions/src/actions/*`          |
+| Research providers and timeouts                        | `apps/q-api/src/composition/research.ts:254-305`; `q-research/src/providers/*.ts`              |
+| Tavus absent                                           | grep `-i tavus` over `apps`, `packages` → only `engine.ts:443` comment                         |
+| Tests pass (81)                                        | `evidence/agents/tests-run.md`                                                                 |
 
 ## COVERAGE
 

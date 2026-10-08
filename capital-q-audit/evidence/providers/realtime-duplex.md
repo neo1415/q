@@ -11,7 +11,7 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
     4    RealtimeSessionGrant,
     5    RealtimeSessionProvider,
     6  } from "./index.js";
-    7  
+    7
     8  /**
     9   * OpenAI's Realtime API behind the realtime adapter (DUPLEX).
    10   *
@@ -35,7 +35,7 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
    28    "https://api.openai.com/v1/realtime/client_secrets";
    29  export const OPENAI_REALTIME_CALLS_URL =
    30    "https://api.openai.com/v1/realtime/calls";
-   31  
+   31
    32  /** USD per million tokens (developers.openai.com/api/docs/pricing, 2026-10-04). */
    33  export const OPENAI_REALTIME_MINI_PRICES: RealtimePrices = {
    34    textInput: 0.6,
@@ -45,7 +45,7 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
    38    cachedAudioInput: 0.3,
    39    audioOutput: 20,
    40  };
-   41  
+   41
    42  /**
    43   * The input transcription model, and its prices (2026-10-08). On a routed
    44   * line every word Q acts on comes from this transcript, so it is the full
@@ -61,10 +61,10 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
    54    cachedAudioInput: 6,
    55    audioOutput: 0,
    56  };
-   57  
+   57
    58  /** Q's two voices, in the provider's catalogue. */
    59  const VOICES = { FEMALE: "marin", MALE: "cedar" } as const;
-   60  
+   60
    61  export function createOpenAIRealtimeProvider(options: {
    62    readonly apiKey: string;
    63    readonly fetch?: typeof fetch | undefined;
@@ -215,7 +215,7 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
     5   * hard bound: a typo or an absurd value falls back to the default rather
     6   * than lifting a cap, because the provider budget is the founder's own.
     7   */
-    8  
+    8
     9  export type DuplexConfig = {
    10    readonly enabled: boolean;
    11    /** The line hands over to the standard voice after this long. */
@@ -251,7 +251,7 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
    41     */
    42    readonly routeTurns: boolean;
    43  };
-   44  
+   44
    45  export const DUPLEX_DEFAULTS: DuplexConfig = {
    46    enabled: false,
    47    maxSessionMs: 10 * 60 * 1000,
@@ -265,7 +265,7 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
    55    speechSpeed: 0.95,
    56    routeTurns: true,
    57  };
-   58  
+   58
    59  function bounded(
    60    raw: string | undefined,
    61    fallback: number,
@@ -278,7 +278,7 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
    68      ? value
    69      : fallback;
    70  }
-   71  
+   71
    72  export function duplexConfigFrom(
    73    env: Readonly<Record<string, string | undefined>>,
    74  ): DuplexConfig {
@@ -354,7 +354,7 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
 
 ```ts
     1  import type { DatabaseExecutor } from "@capital-q/database";
-    2  
+    2
     3  /**
     4   * Today's full-duplex spend (DUPLEX): the sum of the VOICE_REALTIME rows
     5   * the Model Gateway wrote to ai_ops.model_usage since 00:00 UTC, across
@@ -364,13 +364,13 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
     9  export type DuplexSpendLedger = {
    10    readonly spentTodayUsd: (at: Date) => Promise<number>;
    11  };
-   12  
+   12
    13  export function utcDayStart(at: Date): Date {
    14    return new Date(
    15      Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()),
    16    );
    17  }
-   18  
+   18
    19  export function createPostgresDuplexSpend(
    20    sql: DatabaseExecutor,
    21  ): DuplexSpendLedger {
@@ -403,7 +403,7 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
   650        for (const [id, line] of lines) {
   651          if (line.actor.userId === actor.userId) lines.delete(id);
   652        }
-  653  
+  653
   654        let spent: number;
   655        try {
   656          spent = await spend.spentTodayUsd(new Date(now()));
@@ -415,14 +415,14 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
   662        if (spent + reserved() + config.sessionReserveUsd > config.dailyCapUsd) {
   663          return fallback("CAP_REACHED");
   664        }
-  665  
+  665
 ```
 
 ## `apps/q-api/src/voice/duplex/broker.ts` lines 1017-1068
 
 ```ts
  1017      },
- 1018  
+ 1018
  1019      usage: async ({ actor, voiceSessionId, report }) => {
  1020        const line = ownLine(actor, voiceSessionId);
  1021        if (line === null) return null;
@@ -469,9 +469,8 @@ Why included: gpt-realtime-mini + gpt-4o-transcribe; daily cap sums browser-repo
  1062        }
  1063        return { continue: true };
  1064      },
- 1065  
+ 1065
  1066      narration: async ({ actor, voiceSessionId, after, signal }) => {
  1067        const line = ownLine(actor, voiceSessionId);
  1068        if (line === null) return null;
 ```
-

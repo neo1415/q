@@ -7,7 +7,7 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
 ```ts
   362  /** Calls in total per turn (raised from 6, autopilot P1 2026-10-06). */
   363  export const Q_TOOL_LOOP_MAX_CALLS = 10;
-  364  
+  364
   365  export function taskClassForCapability(
   366    capability: QCapability,
   367  ): ModelTextTaskClass {
@@ -26,7 +26,7 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
   380        return "STRUCTURED_EXTRACTION";
   381    }
   382  }
-  383  
+  383
   384  /** Q's conversational work happens in INVESTOR-facing evaluation or DEBRIEF; never assessment here. */
   385  export function operatingModeForCapability(
   386    capability: QCapability,
@@ -42,7 +42,7 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
   396        return "DEBRIEF";
   397    }
   398  }
-  399  
+  399
   400  /** V1 per-task budgets (doc 12 §49). Data-shaped; a later packet may load them. */
   401  export function budgetForTaskClass(taskClass: ModelTextTaskClass): ModelBudget {
   402    switch (taskClass) {
@@ -99,14 +99,14 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
   453        };
   454    }
   455  }
-  456  
+  456
 ```
 
 ## `packages/model-gateway/src/q/turn-reader.ts` lines 100-130
 
 ```ts
   100  };
-  101  
+  101
   102  /**
   103   * Small and fast: a classification in front of an answer the person is
   104   * waiting for. Two attempts so a single failing provider can fall back.
@@ -120,7 +120,7 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
   112    maxOutputTokens: 1_200,
   113    attemptTimeoutMs: 6_000,
   114  } as const;
-  115  
+  115
   116  /**
   117   * How long the first model gets when a synthetic-demo posture routes the
   118   * read to the fast shared model first and another waits behind it. Measured
@@ -131,7 +131,7 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
   123   * other postures, where the first model is the slower one (p50 ~2 s).
   124   */
   125  export const TURN_READER_FAST_FIRST_ATTEMPT_MS = 2_500;
-  126  
+  126
   127  /**
   128   * The reader's action list budget (HARDEN, 2026-10-02: the app-action
   129   * registry grows toward 60-80 entries). Offered actions are listed first
@@ -202,13 +202,13 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
    44    }
    45    return Math.ceil(chars / 4);
    46  }
-   47  
+   47
    48  const USD_PRECISION = 1e8;
-   49  
+   49
    50  function roundUsd(amount: number): number {
    51    return Math.round(amount * USD_PRECISION) / USD_PRECISION;
    52  }
-   53  
+   53
    54  export function priceUsage(
    55    usage: ModelUsage,
    56    price: ModelPriceRecord | null,
@@ -232,7 +232,7 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
    74      priceSnapshotId: price.id,
    75    };
    76  }
-   77  
+   77
    78  /** The upper bound a single attempt could cost: full output budget spent. */
    79  export function estimateAttemptCost(
    80    inputTokens: number,
@@ -251,9 +251,9 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
 
 ```ts
     1  import type { DatabaseExecutor } from "@capital-q/database";
-    2  
+    2
     3  import type { ModelUsageEntry, ModelUsageRepository } from "../ports.js";
-    4  
+    4
     5  /**
     6   * The append-only usage ledger (doc 13 §56.5; packet §41-42). One row per
     7   * real provider attempt, success or failure, with tokens, latency, cost
@@ -284,4 +284,3 @@ Why included: Budgets, timeouts and task-class mapping for Q answers.
    32    };
    33  }
 ```
-

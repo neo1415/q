@@ -8,7 +8,7 @@
  1536    // -------------------------------------------------------------------
  1537    // VOICE-BRAIN: who answers a turn is the server's decision
  1538    // -------------------------------------------------------------------
- 1539  
+ 1539
  1540    /** The turn detector ended their turn: route it once its words are in. */
  1541    #turnFinished(itemId: string): void {
  1542      const earlier = this.#pendingTurn;
@@ -28,7 +28,7 @@
  1556      this.#pendingTurn = { items, last: itemId, timer };
  1557      this.#tryFlushTurn();
  1558    }
- 1559  
+ 1559
  1560    #tryFlushTurn(): void {
  1561      const pending = this.#pendingTurn;
  1562      if (pending === null) return;
@@ -36,7 +36,7 @@
  1564        this.#flushTurn(false);
  1565      }
  1566    }
- 1567  
+ 1567
  1568    #flushTurn(timedOut: boolean): void {
  1569      const pending = this.#pendingTurn;
  1570      if (pending === null) return;
@@ -61,7 +61,7 @@
  1589      // Their words never came: the voice must hand the turn to Q.
  1590      this.#forceAskQ();
  1591    }
- 1592  
+ 1592
  1593    /** The voice may answer only by passing the turn to Q (ask_q). */
  1594    #forceAskQ(): void {
  1595      if (this.#over) return;
@@ -72,7 +72,7 @@
  1600      });
  1601      this.#touch();
  1602    }
- 1603  
+ 1603
  1604    async #routeHeard(
  1605      words: string,
  1606      itemId: string | null,
@@ -156,9 +156,8 @@
  1684        this.#touch();
  1685      });
  1686    }
- 1687  
+ 1687
  1688    // -------------------------------------------------------------------
  1689    // BACKCHANNEL
  1690    // -------------------------------------------------------------------
 ```
-

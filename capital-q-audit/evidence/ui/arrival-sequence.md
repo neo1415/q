@@ -50,7 +50,7 @@
   737    useEffect(() => {
   738      if (!active) settledRef.current?.();
   739    }, [active]);
-  740  
+  740
   741    // Around Q on a wide Q page; below Q (inline) everywhere else.
   742    const room = useRoomSlots();
   743    const wide = useWide();
@@ -60,13 +60,13 @@
   747      setRoomFilled(flank);
   748      return () => setRoomFilled(false);
   749    }, [flank]);
-  750  
+  750
   751    // The open line knows which card is in focus; a line opened later too.
   752    useEffect(() => {
   753      setStandingNote(active ? focusNote(data.cards, state) : null);
   754      return () => setStandingNote(null);
   755    }, [active, data.cards, state]);
-  756  
+  756
   757    // Spoken replies: the person's own words, read by the same code as the
   758    // buttons (never the model's say-so); anything else they say about the
   759    // cards is read from their own transcript into the same verbs.
@@ -105,7 +105,7 @@
   792            };
   793      });
   794    }, [active]);
-  795  
+  795
   796    // A nudge: a new card while a line is open is mentioned once, gently.
   797    const nudged = useRef(false);
   798    useEffect(() => {
@@ -119,7 +119,7 @@
   806        );
   807      }
   808    }, [nudge, active, data.cards, state]);
-  809  
+  809
   810    if (!active) {
   811      if (state.left) {
   812        return (
@@ -209,7 +209,7 @@
  1062        setArrivalSpoken(words.spoken);
  1063      }
  1064    }, [words, ready]);
- 1065  
+ 1065
  1066    if (ready === null || words === null) return <>{fallback}</>;
  1067    const compact = variant === "dock";
  1068    // On another page, a quiet day says nothing: the dock does not pop up.
@@ -299,4 +299,3 @@
  1152    );
  1153  }
 ```
-

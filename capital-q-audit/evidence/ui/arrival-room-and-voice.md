@@ -6,11 +6,11 @@
 
 ```
     1  "use client";
-    2  
+    2
     3  import { useCallback, useSyncExternalStore, type ReactNode } from "react";
-    4  
+    4
     5  import { cx } from "@capital-q/ui";
-    6  
+    6
     7  /**
     8   * The arrival room (Zino, 2026-10-08: "what if they appeared by the sides
     9   * of the Q -- right and left of Q if there are many; if there's no space,
@@ -18,30 +18,30 @@
    11   * Q's presence; the briefing, wherever it is rendered, puts its cards into
    12   * them on a wide screen and below Q otherwise. Browser-only, per page.
    13   */
-   14  
+   14
    15  type Slots = {
    16    readonly left: HTMLElement | null;
    17    readonly right: HTMLElement | null;
    18    /** The briefing has cards in the columns (the stage widens for them). */
    19    readonly filled: boolean;
    20  };
-   21  
+   21
    22  let slots: Slots = { left: null, right: null, filled: false };
    23  const listeners = new Set<() => void>();
    24  const EMPTY: Slots = { left: null, right: null, filled: false };
-   25  
+   25
    26  function set(next: Partial<Slots>): void {
    27    slots = { ...slots, ...next };
    28    for (const notify of listeners) notify();
    29  }
-   30  
+   30
    31  function subscribe(notify: () => void): () => void {
    32    listeners.add(notify);
    33    return () => {
    34      listeners.delete(notify);
    35    };
    36  }
-   37  
+   37
    38  export function useRoomSlots(): Slots {
    39    return useSyncExternalStore(
    40      subscribe,
@@ -49,12 +49,12 @@
    42      () => EMPTY,
    43    );
    44  }
-   45  
+   45
    46  /** The briefing says whether its cards are in the columns. */
    47  export function setRoomFilled(filled: boolean): void {
    48    if (slots.filled !== filled) set({ filled });
    49  }
-   50  
+   50
    51  /** One column beside Q's presence; empty until the briefing fills it. */
    52  export function RoomSlot({
    53    side,
@@ -77,7 +77,7 @@
    70      />
    71    );
    72  }
-   73  
+   73
    74  /**
    75   * Q's presence with a column either side. The columns take space only
    76   * while the briefing fills them, and only on a wide screen.
@@ -111,10 +111,10 @@
     1  import { arrivalWords } from "./arrival";
     2  import { arrivalBriefingAction } from "./arrival-actions";
     3  import { arrivalForVoice } from "./arrival-store";
-    4  
+    4
     5  /** How long a call waits for the briefing's reads before a plain hello. */
     6  const VOICE_BRIEFING_WAIT_MS = 2_500;
-    7  
+    7
     8  function browserZone(): string | null {
     9    try {
    10      return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
@@ -122,7 +122,7 @@
    12      return null;
    13    }
    14  }
-   15  
+   15
    16  /**
    17   * What Q says first on a new call (Zino, 2026-10-08): the arrival
    18   * briefing (greeting by their clock, what was done, the decisions
@@ -160,16 +160,16 @@
    12   * Nothing here decides anything: the decider is the card sequence's own
    13   * code, the same one the buttons use.
    14   */
-   15  
+   15
    16  export type CardDecider = (input: {
    17    /** What the voice model passed as their words. */
    18    readonly words: string;
    19    /** The provider's transcript of their own last turn, when it came. */
    20    readonly heard: string | null;
    21  }) => Promise<Readonly<Record<string, unknown>>>;
-   22  
+   22
    23  let decider: CardDecider | null = null;
-   24  
+   24
    25  /** The one decider for this page; returns its unregister. */
    26  export function registerCardDecider(next: CardDecider): () => void {
    27    decider = next;
@@ -177,7 +177,7 @@
    29      if (decider === next) decider = null;
    30    };
    31  }
-   32  
+   32
    33  /** The tool's output for a `decide_card` call, or null with no cards. */
    34  export async function decideCardByVoice(
    35    rawArguments: string,
@@ -201,12 +201,12 @@
    53    }
    54    return JSON.stringify(await current({ words, heard }));
    55  }
-   56  
+   56
    57  type NoteListener = (note: string, respond: boolean) => void;
    58  const listeners = new Set<NoteListener>();
    59  /** What a line opened now should know about the screen (the card in focus). */
    60  let standing: string | null = null;
-   61  
+   61
    62  /** An open line listens for notes while it is up. */
    63  export function onLineNote(listener: NoteListener): () => void {
    64    listeners.add(listener);
@@ -216,26 +216,25 @@
    68      listeners.delete(listener);
    69    };
    70  }
-   71  
+   71
    72  /** The note every newly opened line gets; null when nothing is in focus. */
    73  export function setStandingNote(note: string | null): void {
    74    standing = note;
    75  }
-   76  
+   76
    77  /** VOICE-BRAIN: a decision card is in focus now (its reply is the card's). */
    78  export function cardInFocus(): boolean {
    79    return decider !== null && standing !== null;
    80  }
-   81  
+   81
    82  /** Whether a line that can take notes is open now. */
    83  export function lineTakesNotes(): boolean {
    84    return listeners.size > 0;
    85  }
-   86  
+   86
    87  /** A note to the open line, if any; `respond`: Q says something now. */
    88  export function noteToLine(note: string, respond: boolean): boolean {
    89    for (const listener of listeners) listener(note, respond);
    90    return listeners.size > 0;
    91  }
 ```
-

@@ -14,7 +14,7 @@
   442      view?.action.actionType === "chat.message.send"
   443        ? readPlan(view.action.preview).quote
   444        : null;
-  445  
+  445
   446    const approve = () =>
   447      startTransition(async () => {
   448        setStatus(null);
@@ -36,7 +36,7 @@
   464        if (result?.ok === true) onDecided();
   465        else setStatus("That didn't go through. Try again.");
   466      });
-  467  
+  467
   468    // Not a message (a plan, a grant, an email): its own approval view.
   469    if (view === null || message === null) {
   470      return (

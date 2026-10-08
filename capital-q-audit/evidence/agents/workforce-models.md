@@ -6,7 +6,7 @@
 
 ```ts
    56  export type PlanVariables = Omit<JobPlanVariables, Frame>;
-   57  
+   57
    58  const SMALL = {
    59    maxAttempts: 2,
    60    maxEstimatedCostUsd: 0.03,
@@ -25,7 +25,7 @@
    73    maxOutputTokens: 2_000,
    74    attemptTimeoutMs: 60_000,
    75  } as const;
-   76  
+   76
    77  export type WorkforceModels = {
    78    readonly review: (
    79      who: Who,
@@ -48,7 +48,7 @@
    96      variables: PlanVariables,
    97    ) => Promise<JobPlanResult | null>;
    98  };
-   99  
+   99
   100  export function createWorkforceModels(dependencies: {
   101    readonly gateway: ModelGateway;
   102    readonly dataPosture?: ModelDataPosture | undefined;
@@ -58,7 +58,7 @@
   106    readonly purpose?: ModelUsagePurpose | undefined;
   107  }): WorkforceModels {
   108    const registry = createDefaultPromptRegistry();
-  109  
+  109
   110    async function call<V, O>(input: {
   111      readonly task:
   112        "DRAFT_REVIEW" | "DRAFT_REDRAFT" | "REPLY_READER" | "JOB_PLAN";
@@ -123,7 +123,7 @@
   171        return null;
   172      }
   173    }
-  174  
+  174
   175    return {
   176      review: (who, trace, variables) =>
   177        call<ReviewVariables, DraftReviewResultV2>({

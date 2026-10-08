@@ -13,7 +13,7 @@
  4155                  ? CLIENT_ACTION_DONE_LINE
  4156                  : "Understood."
  4157              : `${content}
- 4158  
+ 4158
  4159  I've updated **${revisedArtifact.title}** — that's version ${String(revisedArtifact.currentVersion)}. The previous version is still there, and nothing has been shared or sent.`.trim();
  4160          const message = await persistAnswer(
  4161            reply,

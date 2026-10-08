@@ -15,7 +15,7 @@
   650        for (const [id, line] of lines) {
   651          if (line.actor.userId === actor.userId) lines.delete(id);
   652        }
-  653  
+  653
   654        let spent: number;
   655        try {
   656          spent = await spend.spentTodayUsd(new Date(now()));
@@ -27,7 +27,7 @@
   662        if (spent + reserved() + config.sessionReserveUsd > config.dailyCapUsd) {
   663          return fallback("CAP_REACHED");
   664        }
-  665  
+  665
   666        // The Context Firewall before anything a model sees: the same plan a
   667        // Q answer gets for this person, thread and screen.
   668        const runId = QRunIdSchema.parse(randomUUID());
@@ -50,7 +50,7 @@
   685          capability: "ANSWER",
   686          plan: decision.plan,
   687        };
-  688  
+  688
   689        // Only what the registry offers this plan, and of that only reads.
   690        let offered: readonly QOfferedTool[];
   691        try {
@@ -62,7 +62,7 @@
   697        const direct = offered
   698          .filter((tool) => tool.classification === "READ_ONLY")
   699          .slice(0, config.maxDirectTools);
-  700  
+  700
   701        // BACKCHANNEL: the person's remembered level. A read that fails
   702        // costs the line its memory, never the line: the default applies.
   703        const listens = config.backchannel;
@@ -84,7 +84,7 @@
   719            bridgeInstructions: BRIDGE_INSTRUCTIONS,
   720          };
   721        }
-  722  
+  722
   723        const guided =
   724          binding.thread.welcome === true ||
   725          binding.thread.onboarding !== undefined;
@@ -131,7 +131,7 @@
   766        };
   767        const minted = await gateway.mint(mint);
   768        if (minted.status !== "MINTED") return fallback("MINT_UNAVAILABLE");
-  769  
+  769
   770        const at = now();
   771        lines.set(binding.voiceSessionId, {
   772          voiceSessionId: binding.voiceSessionId,
@@ -178,4 +178,3 @@
   813        };
   814      },
 ```
-

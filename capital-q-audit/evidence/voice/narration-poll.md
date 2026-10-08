@@ -6,9 +6,9 @@
 
 ```ts
     1  import type { QVoiceDuplexNarrationResult } from "@capital-q/contracts";
-    2  
+    2
     3  import { loadWire } from "../../q/wire";
-    4  
+    4
     5  /**
     6   * ADR 0062: one long poll for the silence ladder's beats on a duplex line.
     7   * A route, not a server action (actions run one at a time per client, and
@@ -43,4 +43,3 @@
    36    }
    37  }
 ```
-

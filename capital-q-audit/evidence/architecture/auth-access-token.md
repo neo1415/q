@@ -6,10 +6,10 @@
 
 ```
     1  import { createClient } from "@supabase/supabase-js";
-    2  
+    2
     3  import { AuthUserIdSchema } from "../identity/ids.js";
     4  import type { AuthenticatedPrincipal } from "../identity/principal.js";
-    5  
+    5
     6  /**
     7   * Supabase-backed authentication: access token in, AuthenticatedPrincipal out.
     8   *
@@ -33,14 +33,14 @@
    26      accessToken: string,
    27    ) => Promise<AuthenticatedPrincipal | null>;
    28  };
-   29  
+   29
    30  export type SupabaseAccessTokenAuthenticatorOptions = {
    31    readonly url: string;
    32    readonly publishableKey: string;
    33    /** Injected for tests. Defaults to the global fetch. */
    34    readonly fetch?: typeof fetch | undefined;
    35  };
-   36  
+   36
    37  /**
    38   * Cheap shape gate before any network call. A Supabase access token is a JWT:
    39   * three base64url segments. Bounded so an oversized header cannot be relayed
@@ -48,7 +48,7 @@
    41   */
    42  const ACCESS_TOKEN_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
    43  const MAX_ACCESS_TOKEN_LENGTH = 4096;
-   44  
+   44
    45  export function looksLikeAccessToken(value: string): boolean {
    46    return (
    47      value.length > 0 &&
@@ -56,7 +56,7 @@
    49      ACCESS_TOKEN_PATTERN.test(value)
    50    );
    51  }
-   52  
+   52
    53  export function createSupabaseAccessTokenAuthenticator(
    54    options: SupabaseAccessTokenAuthenticatorOptions,
    55  ): AccessTokenAuthenticator {
@@ -72,30 +72,30 @@
    65        ? {}
    66        : { global: { fetch: options.fetch } }),
    67    });
-   68  
+   68
    69    return {
    70      authenticate: async (accessToken) => {
    71        if (!looksLikeAccessToken(accessToken)) {
    72          return null;
    73        }
-   74  
+   74
    75        const { data, error } = await client.auth.getUser(accessToken);
-   76  
+   76
    77        if (error !== null || data.user === null) {
    78          return null;
    79        }
-   80  
+   80
    81        const authUserId = AuthUserIdSchema.safeParse(data.user.id);
-   82  
+   82
    83        if (!authUserId.success) {
    84          return null;
    85        }
-   86  
+   86
    87        return { authUserId: authUserId.data };
    88      },
    89    };
    90  }
-   91  
+   91
    92  /**
    93   * Extract a bearer token from an Authorization header value, or `null`.
    94   *
@@ -108,16 +108,15 @@
   101    if (authorization === undefined) {
   102      return null;
   103    }
-  104  
+  104
   105    const match = /^\s*Bearer\s+(\S+)\s*$/i.exec(authorization);
-  106  
+  106
   107    if (match === null) {
   108      return null;
   109    }
-  110  
+  110
   111    const token = match[1] ?? "";
-  112  
+  112
   113    return looksLikeAccessToken(token) ? token : null;
   114  }
 ```
-

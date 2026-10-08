@@ -12,7 +12,7 @@
     5   * hard bound: a typo or an absurd value falls back to the default rather
     6   * than lifting a cap, because the provider budget is the founder's own.
     7   */
-    8  
+    8
     9  export type DuplexConfig = {
    10    readonly enabled: boolean;
    11    /** The line hands over to the standard voice after this long. */
@@ -48,7 +48,7 @@
    41     */
    42    readonly routeTurns: boolean;
    43  };
-   44  
+   44
    45  export const DUPLEX_DEFAULTS: DuplexConfig = {
    46    enabled: false,
    47    maxSessionMs: 10 * 60 * 1000,
@@ -62,7 +62,7 @@
    55    speechSpeed: 0.95,
    56    routeTurns: true,
    57  };
-   58  
+   58
    59  function bounded(
    60    raw: string | undefined,
    61    fallback: number,
@@ -75,7 +75,7 @@
    68      ? value
    69      : fallback;
    70  }
-   71  
+   71
    72  export function duplexConfigFrom(
    73    env: Readonly<Record<string, string | undefined>>,
    74  ): DuplexConfig {
@@ -146,4 +146,3 @@
   139    };
   140  }
 ```
-

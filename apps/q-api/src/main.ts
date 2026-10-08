@@ -248,7 +248,10 @@ import {
   type ModelDataPosture,
   type QViewingMoment,
 } from "@capital-q/contracts";
-import { createRequestDatabaseClient } from "@capital-q/database";
+import {
+  checkDatabaseReadiness,
+  createRequestDatabaseClient,
+} from "@capital-q/database";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createOnboardingNudges,
@@ -315,7 +318,10 @@ import {
   Q_VOICE_WS_PATH,
 } from "@capital-q/contracts";
 import {
+  createDailySpendCap,
   createModelGateway,
+  createPostgresDailySpendReader,
+  parseDailySpendCapUsd,
   createModelProviderRegistry,
   createSyntheticDemoRoutingAllowance,
   createPostgresModelCatalog,
@@ -999,6 +1005,25 @@ const modelGateway = timedModelGateway(
     usage: createPostgresModelUsageRepository({ sql: database.sql }),
     health: createProcessLocalProviderHealth(),
     syntheticDemo,
+    // F-D8 (RECOVERY F5): one daily ceiling on everything the ledger
+    // counts, shared with the workers' gateway; unset means no cap.
+    spendCap: (() => {
+      const capUsd = parseDailySpendCapUsd(process.env);
+      return capUsd === undefined
+        ? undefined
+        : createDailySpendCap({
+            capUsd,
+            readSpentSinceUsd: createPostgresDailySpendReader({
+              sql: database.sql,
+            }),
+            onReadFailure: (error) => {
+              logger.warn(
+                { err: error, spendCap: "DAILY_AGGREGATE" },
+                "daily spend cap could not read the ledger; using the last total",
+              );
+            },
+          });
+    })(),
     logger,
   }),
   voiceTimings,
@@ -5521,6 +5546,8 @@ const { app, logger: appLogger } = createApp(
     identity,
   },
   {
+    // RECOVERY F4 (A-04): readiness answers 503 when the database is down.
+    healthProbes: { database: () => checkDatabaseReadiness(database.sql) },
     qRuntime,
     artifacts: qArtifacts.service,
     documentStudio,

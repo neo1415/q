@@ -21,17 +21,17 @@
    70   */
    71  export const MIC_SILENT_MS = 2_000;
    72  const MIC_CHECK_MS = 500;
-   73  
+   73
    74  /**
    75   * How long an injected message may wait for its echo before it is
    76   * forgotten. Long enough for a slow provider, short enough that it cannot
    77   * silence something the person types later in the conversation.
    78   */
    79  const INJECTED_TTL_MS = 30_000;
-   80  
+   80
    81  const INPUT_SAMPLE_RATE = 16_000;
    82  const OUTPUT_SAMPLE_RATE = 24_000;
-   83  
+   83
    84  /**
    85   * Barge-in (acceptance J, 2026-09-24).
    86   *
@@ -312,4 +312,3 @@
   559         * picked back up rather than left reading about it.
   560         *
 ```
-

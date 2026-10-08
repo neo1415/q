@@ -41,7 +41,7 @@ Why included: Recall Svix HMAC with timestamp tolerance (no id dedupe); inbound 
   493      return given.length === expected.length && timingSafeEqual(given, expected);
   494    });
   495  }
-  496  
+  496
   497  export function createRecallStatusWebhook(options: {
   498    readonly secret: string | undefined;
   499    readonly settleBot: (botId: string) => Promise<unknown>;
@@ -72,7 +72,7 @@ Why included: Recall Svix HMAC with timestamp tolerance (no id dedupe); inbound 
    23      token: z.string().min(20).max(200),
    24    })
    25    .passthrough();
-   26  
+   26
    27  export function registerMeetingHostRoutes(
    28    app: FastifyInstance,
    29    dependencies: {
@@ -132,7 +132,7 @@ Why included: Recall Svix HMAC with timestamp tolerance (no id dedupe); inbound 
 ## `apps/api/src/http/inbound-email.ts` lines 70-90
 
 ```ts
-   70  
+   70
    71  /**
    72   * The password from `Authorization: Basic base64(user:password)`, compared
    73   * by digest so the comparison is constant-time whatever the lengths. The
@@ -150,7 +150,7 @@ Why included: Recall Svix HMAC with timestamp tolerance (no id dedupe); inbound 
    85    if (colon < 0) return false;
    86    return timingSafeEqual(digest(decoded.slice(colon + 1)), digest(secret));
    87  }
-   88  
+   88
    89  export function registerInboundEmailRoutes(
    90    app: FastifyInstance,
 ```
@@ -159,7 +159,7 @@ Why included: Recall Svix HMAC with timestamp tolerance (no id dedupe); inbound 
 
 ```ts
   145      });
-  146  
+  146
   147      scope.post(
   148        INBOUND_EMAIL_POSTMARK_PATH,
   149        { bodyLimit: INBOUND_EMAIL_BODY_LIMIT_BYTES },
@@ -195,4 +195,3 @@ Why included: Recall Svix HMAC with timestamp tolerance (no id dedupe); inbound 
   179                requestId: request.id,
   180                detail: "The delivery could not be authenticated.",
 ```
-

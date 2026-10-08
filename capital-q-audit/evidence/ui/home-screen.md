@@ -28,7 +28,7 @@
   173    // back rather than new (CQ-WEB-030).
   174    const unfinished = qConnected ? await resolveUnfinishedSetup() : null;
   175    const arrival = arrivalFor(context, unfinished);
-  176  
+  176
   177    /*
   178      Q's welcome, once, and only before a conversation: an open
   179      conversation is what they came to Home for, and it is not greeted
@@ -100,7 +100,7 @@
   245        );
   246      }
   247    }
-  248  
+  248
   249    return (
   250      <div className="flex min-h-0 flex-1 flex-col">
   251        {/*
@@ -109,7 +109,7 @@
   254          this packet exists to replace. Previous conversations are one
   255          control away (the history control here, the collapsible list in
   256          the sidebar), never a list above the composer.
-  257  
+  257
   258          Deliberately not inside a Suspense boundary (QX-003A): React
   259          reveals a streamed boundary on a requestAnimationFrame, which never
   260          fires in a hidden tab, and Home's whole Q surface stayed blank in a
@@ -184,7 +184,7 @@
    90    const shownCards = putOff
    91      ? cards.filter((card) => card.reminder !== true)
    92      : cards;
-   93  
+   93
    94    const ask = async (card: ReturningCard, prompt: string) => {
    95      if (asking !== null) return;
    96      if (tools !== null) {
@@ -210,7 +210,7 @@
   116      }
   117      router.push(`/home?c=${encodeURIComponent(conversationId)}`);
   118    };
-  119  
+  119
   120    return (
   121      <section
   122        aria-labelledby="returning-headline"
@@ -238,7 +238,7 @@
   144            </div>
   145          }
   146        />
-  147  
+  147
   148        {greeting.leftOff === null || putOff ? null : (
   149          // Q's own last question, as Q asked it: where they left off is
   150          // shown, not paraphrased.
@@ -254,12 +254,12 @@
   160            </blockquote>
   161          </figure>
   162        )}
-  163  
+  163
   164        {/* The arrival briefing carries what waits on them; not said twice. */}
   165        {briefing === undefined || arrived ? null : (
   166          <QBriefing briefing={briefing} />
   167        )}
-  168  
+  168
   169        {shownCards.length > 0 ? (
   170          <ul
   171            ref={cardsRef}
@@ -312,7 +312,7 @@
   218            })}
   219          </ul>
   220        ) : null}
-  221  
+  221
   222        {reminding ? (
   223          <button
   224            type="button"
@@ -326,7 +326,7 @@
   232            Remind me later
   233          </button>
   234        ) : null}
-  235  
+  235
   236        {/* Polite, so a failed ask is read out without taking focus. */}
   237        <p
   238          role="status"
@@ -346,7 +346,7 @@
 - Why included: returningGreeting/questionFor: 'Welcome back, X.' + 'What would you like to work on today?' (the generic opener heard live 11:13).
 
 ```
-  115  
+  115
   116  export function returningGreeting(facts: ReturningFacts): ReturningGreeting {
   117    const name = firstName(facts.name);
   118    const headline = name === null ? "Welcome back." : `Welcome back, ${name}.`;
@@ -354,14 +354,14 @@
   120    const leftOff = welcomeReminds(facts) ? (facts.setup?.pending ?? null) : null;
   121    return { headline, question, leftOff, spoken: `${headline} ${question}` };
   122  }
-  123  
+  123
   124  /** "mandate", "mandate and stage", "mandate, cheque and stage". */
   125  function joinParts(parts: readonly string[]): string {
   126    const lower = parts.map((part) => part.toLowerCase());
   127    if (lower.length <= 1) return lower[0] ?? "";
   128    return `${lower.slice(0, -1).join(", ")} and ${lower.at(-1) ?? ""}`;
   129  }
-  130  
+  130
   131  /**
   132   * Q's question, picked from the one thing most worth saying. Bounded copy
   133   * rather than a model call: it renders instantly, and a claim here is
@@ -393,4 +393,3 @@
   159    return role === "FOUNDER"
   160      ? "What would you like to work on today?"
 ```
-

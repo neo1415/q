@@ -16,9 +16,9 @@
    25   * is not removed: every panel is rendered, hidden, so what the server sent
    26   * is all on the page. Nothing here invents a percentage or a verdict.
    27   */
-   28  
+   28
    29  type Panel = "sources" | "companies" | "investors";
-   30  
+   30
    31  /** What stays in view, and what sits behind a chip. */
    32  export function replyParts(blocks: readonly QTurnObjectBlock[]): {
    33    readonly inline: readonly QTurnObjectBlock[];
@@ -54,11 +54,11 @@
    63    }
    64    return { inline, companies, investors };
    65  }
-   66  
+   66
    67  function counted(one: string, many: string, n: number): string {
    68    return `${n === 1 ? one : many} · ${String(n)}`;
    69  }
-   70  
+   70
    71  export function QAnswer({
    72    turn,
    73    onAsk,
@@ -76,7 +76,7 @@
    85    const [open, setOpen] = useState<Panel | null>(null);
    86    const { inline, companies, investors } = replyParts(turn.blocks);
    87    const sources = evidenceSummary(turn, false);
-   88  
+   88
    89    const chips: { key: Panel; label: string }[] = [];
    90    if (sources !== null) {
    91      chips.push({
@@ -96,7 +96,7 @@
   105        label: counted("Investor", "Investors", investors.length),
   106      });
   107    }
-  108  
+  108
   109    return (
   110      <div
   111        className="cq-q-answer flex w-full max-w-(--cq-layout-reading) flex-col gap-3"
@@ -210,7 +210,7 @@
   289    CAPITAL_PLAN: "Open your 12-month plan",
   290    CAPITAL_INVESTORS: "Open your investors on Capital",
   291  };
-  292  
+  292
   293  function subjectLabel(subject: QSubjectRef): string {
   294    switch (subject.kind) {
   295      case "COMPANY":
@@ -229,7 +229,7 @@
   308        return "Organisation";
   309    }
   310  }
-  311  
+  311
   312  /**
   313   * The shell every result object sits in.
   314   *
@@ -269,7 +269,7 @@
   348      </section>
   349    );
   350  }
-  351  
+  351
   352  export type QResultBlocksProps = {
   353    readonly blocks: readonly QTurnObjectBlock[];
   354    /** Ask Q something about one of these objects, in the same thread. */
@@ -277,7 +277,7 @@
   356    /** Open what Q composed. Absent on a surface with no viewer. */
   357    readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
   358  };
-  359  
+  359
   360  export function QResultBlocks({
   361    blocks,
   362    onAsk,
@@ -291,7 +291,7 @@
   370    if (blocks.length === 0) {
   371      return null;
   372    }
-  373  
+  373
   374    return (
   375      <div className="flex flex-col gap-3" data-q-result-blocks>
   376        {blocks.map((block, index) => {
@@ -331,7 +331,7 @@
   410                  <CompanyAvatar companyId={block.companyId} size={40} />
   411                </QResultCard>
   412              );
-  413  
+  413
   414            case "INVESTOR_REFERENCE":
   415              return (
   416                <QResultCard
@@ -362,15 +362,15 @@
   441                  />
   442                </QResultCard>
   443              );
-  444  
+  444
   445            case "COMPARISON_CARDS":
   446              return <ComparisonCards key={key} block={block} onAsk={onAsk} />;
-  447  
+  447
   448            case "ANSWER_CARDS":
   449              // In the thread and on the Board: the overview, every card
   450              // with its first reason; tapping one opens it.
   451              return <StaticAnswerCards key={key} block={block} onAsk={onAsk} />;
-  452  
+  452
   453            case "COMPARISON":
   454              return (
   455                <QResultCard key={key} label="Side by side">
@@ -428,7 +428,7 @@
   507                  </div>
   508                </QResultCard>
   509              );
-  510  
+  510
   511            case "CLARIFICATION_REQUEST":
   512              return (
   513                <QResultCard
@@ -456,7 +456,7 @@
   535                  }
   536                />
   537              );
-  538  
+  538
   539            case "ACTION_PROPOSAL":
   540              // Shown, never actioned from here. Approval binds to the exact
   541              // payload and lives on the approval control the conversation
@@ -473,7 +473,7 @@
   552                  </p>
   553                </QResultCard>
   554              );
-  555  
+  555
   556            case "ARTIFACT_REFERENCE":
   557              // Something Q composed (QX-003E, R36): one card language for
   558              // the answer and the Board. Older versions stay in the viewer.
@@ -485,7 +485,7 @@
   564                  onAsk={onAsk}
   565                />
   566              );
-  567  
+  567
   568            case "UI_INTENT": {
   569              // Q room R5: suggested times and the connect card, in the room.
   570              if (block.intent.kind === "SHOW_CALENDAR_CONNECT") {
@@ -533,7 +533,7 @@
   612                />
   613              );
   614            }
-  615  
+  615
   616            default:
   617              return null;
   618          }
@@ -576,4 +576,3 @@
    37   * the bundle unchanged.
    38   */
 ```
-

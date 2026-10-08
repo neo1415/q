@@ -17,7 +17,7 @@ Why included: Untrusted web excerpts reach the model's instruction channel (Open
  1362      content: toolResultBody(outcome),
  1363    };
  1364  }
- 1365  
+ 1365
  1366  function toolResultBody(outcome: QToolCallOutcome): string {
  1367    const body = JSON.stringify(
  1368      outcome.result.ok
@@ -26,7 +26,7 @@ Why included: Untrusted web excerpts reach the model's instruction channel (Open
  1371    );
  1372    return body.slice(0, MODEL_TOOL_RESULT_MAX_CHARS - 200);
  1373  }
- 1374  
+ 1374
  1375  /**
  1376   * A lookup CAPITAL Q decided to make, put in front of the model as what it
  1377   * is, rather than dressed up as a function call the model never made.
@@ -122,7 +122,7 @@ Why included: Untrusted web excerpts reach the model's instruction channel (Open
 ## `packages/q-tools/src/tools/research-public-web.ts` lines 125-141
 
 ```ts
-  125  
+  125
   126  const SourceSchema = z
   127    .object({
   128      index: z.number().int().min(1),
@@ -146,7 +146,7 @@ Why included: Untrusted web excerpts reach the model's instruction channel (Open
 ```ts
   223  export const UNTRUSTED_OPEN = "<<<UNTRUSTED_CONTENT";
   224  export const UNTRUSTED_CLOSE = "<<<END_UNTRUSTED_CONTENT>>>";
-  225  
+  225
 ```
 
 ## `packages/q-core/src/prompts/definition.ts` lines 247-288
@@ -169,7 +169,7 @@ Why included: Untrusted web excerpts reach the model's instruction channel (Open
   261      .split("}}")
   262      .join("} }");
   263  }
-  264  
+  264
   265  function formatValue(value: unknown): string {
   266    if (value === undefined || value === null) {
   267      return "(not provided)";
@@ -185,7 +185,7 @@ Why included: Untrusted web excerpts reach the model's instruction channel (Open
   277    // the interview's open-step list alone (CQ-QX-005).
   278    return JSON.stringify(value);
   279  }
-  280  
+  280
   281  export function fenceUntrusted(source: string, value: unknown): string {
   282    return [
   283      `${UNTRUSTED_OPEN} source="${source}">>>`,
@@ -193,6 +193,5 @@ Why included: Untrusted web excerpts reach the model's instruction channel (Open
   285      UNTRUSTED_CLOSE,
   286    ].join("\n");
   287  }
-  288  
+  288
 ```
-

@@ -35,7 +35,7 @@ Why included: Key-name redaction, one level deep; content discipline is by conve
    34    "serviceRoleKey",
    35    "*.serviceRoleKey",
    36  ];
-   37  
+   37
    38  export const REDACTED_PLACEHOLDER = "[redacted]";
 ```
 
@@ -57,15 +57,15 @@ Why included: Key-name redaction, one level deep; content discipline is by conve
   112      base: baseFields(identity),
   113      redact: { paths: REDACTED_PATHS, censor: REDACTED_PLACEHOLDER },
   114    };
-  115  
+  115
   116    const pinoLogger =
   117      options.destination === undefined
   118        ? pino(pinoOptions)
   119        : pino(pinoOptions, options.destination);
-  120  
+  120
   121    return wrap(pinoLogger);
   122  }
-  123  
+  123
   124  /**
   125   * The underlying Pino instance, for frameworks that own their own logging
   126   * (Fastify). This is the single sanctioned place Pino crosses the package
@@ -83,4 +83,3 @@ Why included: Key-name redaction, one level deep; content discipline is by conve
   138    });
   139  }
 ```
-

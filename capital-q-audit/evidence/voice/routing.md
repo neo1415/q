@@ -21,19 +21,19 @@
    14   * any "can you open my deck" -- goes to Q. A miss costs a little latency
    15   * (Q answers small talk); the opposite miss costs the person's trust.
    16   */
-   17  
+   17
    18  export type DuplexTurnRoute = "ASK_Q" | "SMALLTALK" | "MODEL";
-   19  
+   19
    20  /** The routed= value in the per-turn log line and the transcript store. */
    21  export type DuplexRoutedAs = "ask_q" | "smalltalk" | "model_only";
-   22  
+   22
    23  export const routedAs = (route: DuplexTurnRoute): DuplexRoutedAs =>
    24    route === "ASK_Q"
    25      ? "ask_q"
    26      : route === "SMALLTALK"
    27        ? "smalltalk"
    28        : "model_only";
-   29  
+   29
    30  /** Words that, on their own, carry no request (English; any case). */
    31  const TRIVIAL = new Set([
    32    // greetings and address
@@ -114,7 +114,7 @@
   107    "too",
   108    "also",
   109  ]);
-  110  
+  110
   111  /**
   112   * Phrases that are trivial only as a whole: "can", "see" or "it" alone
   113   * belong to real questions ("can you see it?", "open it").
@@ -142,10 +142,10 @@
   135    "thats great",
   136    "thats right",
   137  ] as const;
-  138  
+  138
   139  /** At most this many words for small talk; anything longer is Q's. */
   140  const SMALLTALK_MAX_WORDS = 7;
-  141  
+  141
   142  function words(transcript: string): readonly string[] {
   143    return transcript
   144      .toLowerCase()
@@ -155,7 +155,7 @@
   148      .map((w) => w.replace(/^'+|'+$/g, ""))
   149      .filter((w) => w.length > 0);
   150  }
-  151  
+  151
   152  /** True when the whole utterance is greeting/acknowledgement/filler. */
   153  export function isSmallTalk(transcript: string): boolean {
   154    const said = words(transcript);
@@ -170,7 +170,7 @@
   163      .filter((w) => w.length > 0)
   164      .every((w) => TRIVIAL.has(w));
   165  }
-  166  
+  166
   167  export function routeDuplexTurn(
   168    transcript: string,
   169    situation: {
@@ -189,4 +189,3 @@
   182    return isSmallTalk(transcript) ? "SMALLTALK" : "ASK_Q";
   183  }
 ```
-

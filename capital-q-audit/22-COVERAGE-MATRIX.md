@@ -2,16 +2,17 @@
 
 What was inspected and what wasn't. Assembled from each investigator's COVERAGE section. The lead's live checks are listed in `21-EXECUTION-TRACES.md`.
 
-| Subsystem | Report | Investigator | Depth |
-|---|---|---|---|
-| Repository, architecture, deploy, DB schema, live aggregates | 01, 02, 12 | A | Broad; all package.json files and migrations; aggregate-only live reads |
-| Q brain, prompts, memory/context | 03, 05 | B | answer.ts, gateway index, orchestrator, firewall entry; not: memory learner, routing tables, retrieval SQL, non-typed agents |
-| Voice (duplex and standard) | 04 | C | duplex-line, broker and routes read in full; not: ElevenLabs Speech Engine, onboarding voice, rehearsal |
-| Work, agents, tools, integrations | 07, 08 | D | Instruction engine, workforce, errands, tool registry; not: LangGraph node bodies, Gmail internals |
-| Generative UI, UI/UX | 06, 11 | E | Briefing, Q page, presence stage, result blocks; not: several card bodies, mobile runtime, Lighthouse/axe |
-| Providers, security, tests, observability | 09, 10, 13 | F | Gateway, routing migrations, auth, firewall logging, CI; not: Groq body, admin authz, data room, webhook verifiers (partial) |
+| Subsystem                                                    | Report     | Investigator | Depth                                                                                                                        |
+| ------------------------------------------------------------ | ---------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Repository, architecture, deploy, DB schema, live aggregates | 01, 02, 12 | A            | Broad; all package.json files and migrations; aggregate-only live reads                                                      |
+| Q brain, prompts, memory/context                             | 03, 05     | B            | answer.ts, gateway index, orchestrator, firewall entry; not: memory learner, routing tables, retrieval SQL, non-typed agents |
+| Voice (duplex and standard)                                  | 04         | C            | duplex-line, broker and routes read in full; not: ElevenLabs Speech Engine, onboarding voice, rehearsal                      |
+| Work, agents, tools, integrations                            | 07, 08     | D            | Instruction engine, workforce, errands, tool registry; not: LangGraph node bodies, Gmail internals                           |
+| Generative UI, UI/UX                                         | 06, 11     | E            | Briefing, Q page, presence stage, result blocks; not: several card bodies, mobile runtime, Lighthouse/axe                    |
+| Providers, security, tests, observability                    | 09, 10, 13 | F            | Gateway, routing migrations, auth, firewall logging, CI; not: Groq body, admin authz, data room, webhook verifiers (partial) |
 
 ## Tests actually run during the audit
+
 - **C:** 7 files, 131 tests passed (duplex and voice).
 - **D:** 81 tests passed; WRITER-step repro.
 - **E:** 6 web files, 51 passed.
@@ -21,8 +22,8 @@ What was inspected and what wasn't. Assembled from each investigator's COVERAGE 
 
 ## A — coverage detail
 
-
 Inspected:
+
 - Every `package.json` (apps + 52 packages) and `pnpm-lock.yaml` versions.
 - `.railway/railway.ts`, `render.yaml` header, `docs/deployment/staging.md` (grep), ADR 0014 (first 60 lines), `docs/handoff/session-handoff-2026-10-08.md` (grep).
 - api/q-api route registration across `apps/*/src` (static extraction) and the app-actions registry.
@@ -35,6 +36,7 @@ Inspected:
 - Live: aggregate counts and catalog metadata only.
 
 Not inspected (left to other investigators or out of scope):
+
 - Q answer quality and prompts content, turn reader, specialists' logic, Context Firewall internals, tool authorization per tool.
 - Voice provider adapters' internals beyond selection and persistence, and the web voice UI.
 - Webhook verifiers, billing logic, the discovery/ranking pipeline, the document parser sandbox.
@@ -44,8 +46,8 @@ Not inspected (left to other investigators or out of scope):
 
 ## B — coverage detail
 
-
 **Inspected:**
+
 - `apps/q-api/src/http/q-runs.ts` and `q-conversations.ts`
 - `apps/q-api/src/composition/q-intelligence.ts` (233-556)
 - `main.ts` (3700-3830 and 3252-3282)
@@ -62,6 +64,7 @@ Not inspected (left to other investigators or out of scope):
 - `contracts/src/q/request.ts`, `failure.ts`
 
 **Not inspected:**
+
 - voice routes and the duplex broker
 - the realtime adapter
 - the memory learner and extractor
@@ -77,7 +80,6 @@ No tests were run.
 
 ## C — coverage detail
 
-
 Inspected (read implementation): `apps/web/src/features/voice/{session.ts, voice-line.ts, use-voice-session.ts, use-voice-interview.ts, duplex-actions.ts, line-cards.ts, voice-preference.ts}`, `provider/{duplex-line.ts (all), duplex-session.ts, deepgram-session.ts (all), narration-poll.ts, backchannel.ts (rules, detector), pcm-player.ts (head), pcm-schedule.ts (defaults), agent-socket.ts (constants/buffering)}`; `apps/web/src/features/briefing/arrival-briefing.tsx:740-805`; `apps/q-api/src/voice/duplex/{broker.ts (all), routes.ts, routing.ts, instructions.ts, config.ts, transcript.ts, spend.ts, listening.ts}`; `apps/q-api/src/voice/{routes.ts:380-940, think.ts, turn.ts:668-1453 and 1720-2176, turn-timing.ts (head, wrapper), narration.ts, speech.ts (speakable/bounded), utterance.ts, provider.ts, providers/deepgram.ts, providers/elevenlabs-speak.ts (header/constants)}`; `apps/q-api/src/main.ts:5005-5110, 5375-5500`; `packages/model-gateway/src/realtime/{index.ts, openai.ts}`; `packages/contracts/src/q/voice.ts:395-495`; `packages/q-specialists/src/answer.ts:2325-2470`; `packages/q-core/src/prompts/tasks/spoken-reply.v1.ts:19-47`; `packages/api-client/src/{q.ts:255-300, request.ts}`; Next 16.3.4 `app-router-instance.js` action queue.
 
 Tests run: 7 files / 131 tests passed (duplex broker, duplex routes, transcription hint, turn timing, web duplex, duplex fallback, barge-in). One schema probe.
@@ -85,7 +87,6 @@ Tests run: 7 files / 131 tests passed (duplex broker, duplex routes, transcripti
 Not inspected: ElevenLabs Speech Engine transport (`elevenlabs-session.ts`, `providers/elevenlabs.ts`, `attach.ts`); interview/onboarding voice (`interview-agent.ts`, `interview-steps.ts`, `onboarding-*.ts`); rehearsal; one-way TTS (`use-q-speech.ts`, `synthesis.ts`); `bindings.ts`; `think-gate.ts`; `turn.ts:1-667`, `1604-1720`; `elevenlabs-speak.ts` stream body; `voice-stage.tsx` rendering; the turn reader prompt v44 body; Q answer correctness ("nothing is waiting"); production env and infrastructure.
 
 ## D — coverage detail
-
 
 **Inspected (read in full or in the relevant sections):**
 
@@ -141,8 +142,8 @@ Not inspected: ElevenLabs Speech Engine transport (`elevenlabs-session.ts`, `pro
 
 ## F — coverage detail
 
-
 **Inspected in full or substantially:**
+
 - `packages/model-gateway/src/{gateway,catalog}.ts`
 - `packages/model-gateway/src/policy/{eligibility,synthetic-demo,cost}.ts`
 - `packages/model-gateway/src/providers/openai.ts`; `providers/google.ts` (composition and keys)
@@ -163,6 +164,7 @@ Not inspected: ElevenLabs Speech Engine transport (`elevenlabs-session.ts`, `pro
 - webhook auth (Recall, inbound email, meeting host); GateQ apply throttle
 
 **Not inspected:**
+
 - Groq adapter body
 - q-research provider internals beyond endpoints
 - Cloudflare Stream

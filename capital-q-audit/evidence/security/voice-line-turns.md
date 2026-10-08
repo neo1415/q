@@ -23,7 +23,7 @@ Why included: Both sides of the voice line stored server-only; no purge path; us
    16  -- never a prompt. Retention follows the conversation's messages: a turn
    17  -- linked to a conversation goes when the conversation does (cascade); the
    18  -- conversation_messages copy of a model-only turn is written by q-runtime.
-   19  
+   19
    20  create table q_runtime.voice_line_turns (
    21    id                uuid primary key default gen_random_uuid(),
    22    tenant_id         uuid not null references identity.tenants (id) on delete restrict,
@@ -49,22 +49,22 @@ Why included: Both sides of the voice line stored server-only; no purge path; us
    42                         and length(provider_ref) between 1 and 128)),
    43    spoken_at         timestamptz not null,
    44    created_at        timestamptz not null default clock_timestamp(),
-   45  
+   45
    46    foreign key (conversation_id, tenant_id)
    47      references q_runtime.conversations (id, tenant_id) on delete cascade
    48  );
-   49  
+   49
    50  comment on table q_runtime.voice_line_turns is
    51    'The full-duplex voice line transcript, both sides, with who answered each turn (ask_q, smalltalk, model_only). Owner-private, server-only; never canonical business truth, never a prompt. Retention follows the linked conversation.';
-   52  
+   52
    53  create index voice_line_turns_session_idx
    54    on q_runtime.voice_line_turns (tenant_id, user_id, voice_session_id, spoken_at);
    55  create index voice_line_turns_conversation_idx
    56    on q_runtime.voice_line_turns (conversation_id, spoken_at)
    57    where conversation_id is not null;
-   58  
+   58
    59  alter table q_runtime.voice_line_turns enable row level security;
-   60  
+   60
    61  -- No policies and no client grants (as every q_runtime table): the Q API
    62  -- is the boundary, and it passes every read and write through the actor.
    63  revoke all on q_runtime.voice_line_turns from public, anon, authenticated;
@@ -76,7 +76,7 @@ Why included: Both sides of the voice line stored server-only; no purge path; us
 ```ts
    40  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
    41  const REF = /^[A-Za-z0-9._:-]{1,128}$/;
-   42  
+   42
    43  export function createPostgresDuplexTranscriptStore(dependencies: {
    44    readonly sql: DatabaseExecutor;
    45    readonly mirror: DuplexTranscriptStore["mirror"];
@@ -110,4 +110,3 @@ Why included: Both sides of the voice line stored server-only; no purge path; us
    73      mirror: dependencies.mirror,
    74    };
 ```
-

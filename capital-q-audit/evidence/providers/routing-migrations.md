@@ -5,7 +5,7 @@ Why included: Net routing table is the product of these in timestamp order.
 ## `supabase/migrations/20260907090000_ai_ops_model_gateway.sql` lines 245-329
 
 ```sql
-  245  
+  245
   246  -- ---------------------------------------------------------------------------
   247  -- Seed: the two V1 providers, four verified models, price snapshots and
   248  -- routing policy v1. Operational configuration (packet §12-§19), verified
@@ -23,7 +23,7 @@ Why included: Net routing table is the product of these in timestamp order.
   260  --           INTERNAL. Raising either ceiling is a reviewed data change,
   261  --           never a code change, and never inferred from a working key.
   262  -- ---------------------------------------------------------------------------
-  263  
+  263
   264  insert into ai_ops.providers (id, code, name, status, region_support, privacy_policy_class, supports_zero_retention, supports_byo_key, metadata) values
   265    ('a1000000-0000-4000-8000-000000000001', 'google', 'Google Gemini Developer API', 'ACTIVE', '["global"]'::jsonb,
   266     'UNREVIEWED', false, true,
@@ -31,7 +31,7 @@ Why included: Net routing table is the product of these in timestamp order.
   268    ('a1000000-0000-4000-8000-000000000002', 'groq', 'GroqCloud', 'ACTIVE', '["global"]'::jsonb,
   269     'UNREVIEWED', false, true,
   270     '{"review_status":"UNREVIEWED","note":"Documentation describes no training on inference data and no default retention; the Groq Services Agreement was not verified from a primary document.","terms_url":"https://console.groq.com/docs/models","verified_at":"2026-09-05"}'::jsonb);
-  271  
+  271
   272  insert into ai_ops.models (id, provider_id, model_code, model_family, model_type, status, context_window, max_output_tokens,
   273    supports_tools, supports_structured_output, supports_vision, supports_audio, supports_realtime, supports_prompt_cache, supports_reasoning,
   274    sensitivity_ceiling, quality_class, latency_class, effective_from, metadata) values
@@ -51,7 +51,7 @@ Why included: Net routing table is the product of these in timestamp order.
   288     131072, 65536, true, true, false, false, false, false, true,
   289     'INTERNAL', 'HIGH', 'FAST', '2026-09-05T00:00:00Z',
   290     '{"source_url":"https://console.groq.com/docs/models","verified_at":"2026-09-05","rate_limits":{"tpm":250000,"rpm":1000}}'::jsonb);
-  291  
+  291
   292  insert into ai_ops.model_prices (id, model_id, pricing_region, currency, input_per_million, cached_input_per_million, output_per_million,
   293    batch_input_per_million, batch_output_per_million, free_tier_description, effective_from, effective_to, source_url, verified_at) values
   294    ('a3000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'global', 'USD', 0.30, 0.03, 2.50, 0.15, 1.25,
@@ -69,7 +69,7 @@ Why included: Net routing table is the product of these in timestamp order.
   306    ('a3000000-0000-4000-8000-000000000005', 'a2000000-0000-4000-8000-000000000004', 'global', 'USD', 0.15, null, 0.60, null, null,
   307     'Developer plan rate limits apply; no free-tier price listed.',
   308     '2026-09-05T00:00:00Z', null, 'https://console.groq.com/docs/models', '2026-09-05T00:00:00Z');
-  309  
+  309
   310  -- Routing policy v1 (packet §13): the initial MVP routing hypothesis. Each
   311  -- policy covers every sensitivity up to RESTRICTED; per-candidate
   312  -- eligibility — never the policy — decides what a sensitive request may
@@ -127,7 +127,7 @@ Why included: Net routing table is the product of these in timestamp order.
    30  -- The rows keep their history: the demo-posture metadata is retained with
    31  -- `demo_posture = false` and a restoration note, and the model ceilings
    32  -- return to the value the provider review justifies.
-   33  
+   33
    34  update ai_ops.providers
    35  set
    36    privacy_policy_class = 'UNREVIEWED',
@@ -161,13 +161,13 @@ Why included: Net routing table is the product of these in timestamp order.
    19  -- account, and a working key is not evidence of anything. Raising either
    20  -- is a reviewed data change, never a code change.
    21  -- ---------------------------------------------------------------------------
-   22  
+   22
    23  insert into ai_ops.providers (id, code, name, status, region_support, privacy_policy_class, supports_zero_retention, supports_byo_key, metadata) values
    24    ('a1000000-0000-4000-8000-000000000003', 'openai', 'OpenAI Platform', 'ACTIVE', '["global"]'::jsonb,
    25     'UNREVIEWED', false, true,
    26     '{"review_status":"UNREVIEWED","purpose":"diagnostic-only","note":"Added to isolate Capital Q defects from Gemini/Groq outages during the QX-004 core gate. Not in any routing policy; reachable only through the server-side test route.","terms_url":"https://openai.com/policies/","verified_at":"2026-09-22"}'::jsonb)
    27  on conflict (id) do nothing;
-   28  
+   28
    29  insert into ai_ops.models (id, provider_id, model_code, model_family, model_type, status, context_window, max_output_tokens,
    30    supports_tools, supports_structured_output, supports_vision, supports_audio, supports_realtime, supports_prompt_cache, supports_reasoning,
    31    sensitivity_ceiling, quality_class, latency_class, effective_from, metadata) values
@@ -176,7 +176,7 @@ Why included: Net routing table is the product of these in timestamp order.
    34     'PUBLIC', 'STANDARD', 'FAST', '2026-09-22T00:00:00Z',
    35     '{"purpose":"diagnostic-only","note":"The only OpenAI model the adapter will run; the account holds a few dollars and an expensive model would spend them silently.","verified_at":"2026-09-22"}'::jsonb)
    36  on conflict (id) do nothing;
-   37  
+   37
    38  -- A price, because the gateway refuses a route it cannot cost — "unknown
    39  -- price is not free: with a ceiling to honour, a route we cannot cost is a
    40  -- route we cannot take".
@@ -230,18 +230,18 @@ Why included: Net routing table is the product of these in timestamp order.
    23  -- Not a general provider: the adapter runs one model (gpt-5.6-luna) and
    24  -- refuses every other before opening a socket. Cost is bounded by the
    25  -- policy's own cost ceiling per call.
-   26  
+   26
    27  update ai_ops.providers
    28  set privacy_policy_class = 'NO_TRAINING_ZERO_RETENTION',
    29      supports_zero_retention = true,
    30      metadata = metadata || '{"review_status":"REVIEWED","purpose":"dialogue-fallback","reviewed_at":"2026-09-23","review_basis":"OpenAI API terms: inputs/outputs not used for training; Zero Data Retention offered for eligible API usage. supports_zero_retention records that ZDR is enabled on this organisation.","terms_url":"https://openai.com/policies/"}'::jsonb
    31  where code = 'openai';
-   32  
+   32
    33  update ai_ops.models
    34  set sensitivity_ceiling = 'CONFIDENTIAL',
    35      metadata = metadata || '{"purpose":"dialogue-fallback","ceiling_basis":"ai_ops.providers.privacy_policy_class = NO_TRAINING_ZERO_RETENTION with zero data retention enabled (openai, 2026-09-23)"}'::jsonb
    36  where id = 'a2000000-0000-4000-8000-000000000009';
-   37  
+   37
    38  -- First fallback: tried as soon as the preferred model fails, before the
    39  -- free-tier models. Idempotent: not re-added if already present.
    40  update ai_ops.routing_policies
@@ -282,7 +282,7 @@ Why included: Net routing table is the product of these in timestamp order.
    26  --       gemini-3.5-flash-lite -> gpt-5.6-luna -> gemini-3.5-flash
    27  --   evidence synthesis / comparison / deep investigation:
    28  --       gemini-3.5-flash -> gpt-5.6-luna -> gemini-3.5-flash-lite
-   29  
+   29
    30  insert into ai_ops.models (
    31    id, provider_id, model_code, model_family, model_type, status,
    32    context_window, max_output_tokens, supports_tools, supports_structured_output,
@@ -299,7 +299,7 @@ Why included: Net routing table is the product of these in timestamp order.
    43    from ai_ops.models m
    44   where m.id = 'a2000000-0000-4000-8000-000000000001'
    45  on conflict (id) do nothing;
-   46  
+   46
    47  insert into ai_ops.model_prices (
    48    id, model_id, pricing_region, currency, input_per_million,
    49    cached_input_per_million, output_per_million, free_tier_description,
@@ -311,7 +311,7 @@ Why included: Net routing table is the product of these in timestamp order.
    55    '2026-09-24T00:00:00Z', 'https://ai.google.dev/gemini-api/docs/pricing',
    56    '2026-09-24T00:00:00Z')
    57  on conflict (id) do nothing;
-   58  
+   58
    59  -- Everyday task classes: flash-lite first, OpenAI as the reliable fallback.
    60  update ai_ops.routing_policies
    61     set preferred_models = array['a2000000-0000-4000-8000-000000000001'::uuid],
@@ -320,7 +320,7 @@ Why included: Net routing table is the product of these in timestamp order.
    64   where status = 'ACTIVE'
    65     and code in ('normal_dialogue.v1', 'fast_classification.v1',
    66                  'structured_extraction.v1', 'taxonomy_mapping.v1');
-   67  
+   67
    68  -- Synthesis-class work: the stronger Gemini first.
    69  update ai_ops.routing_policies
    70     set preferred_models = array['a2000000-0000-4000-8000-000000000010'::uuid],
@@ -340,7 +340,7 @@ Why included: Net routing table is the product of these in timestamp order.
     4  --
     5  --   every active policy: gpt-5.6-luna -> gemini-3.5-flash-lite -> gemini-3.5-flash
     6  --   (synthesis-class policies try the stronger Gemini before flash-lite)
-    7  
+    7
     8  update ai_ops.routing_policies
     9     set preferred_models = array['a2000000-0000-4000-8000-000000000009'::uuid],
    10         fallback_models  = array['a2000000-0000-4000-8000-000000000001'::uuid,
@@ -348,7 +348,7 @@ Why included: Net routing table is the product of these in timestamp order.
    12   where status = 'ACTIVE'
    13     and code in ('normal_dialogue.v1', 'fast_classification.v1',
    14                  'structured_extraction.v1', 'taxonomy_mapping.v1');
-   15  
+   15
    16  update ai_ops.routing_policies
    17     set preferred_models = array['a2000000-0000-4000-8000-000000000009'::uuid],
    18         fallback_models  = array['a2000000-0000-4000-8000-000000000010'::uuid,
@@ -369,7 +369,7 @@ Why included: Net routing table is the product of these in timestamp order.
     7  -- them as the fallback without a failure. Every other task class keeps
     8  -- luna first. Data only: the policy row is updated in place, as
     9  -- 20261008130000 did.
-   10  
+   10
    11  update ai_ops.routing_policies
    12     set preferred_models = array['a2000000-0000-4000-8000-000000000001'::uuid],
    13         fallback_models  = array['a2000000-0000-4000-8000-000000000009'::uuid,
@@ -404,18 +404,17 @@ Why included: Net routing table is the product of these in timestamp order.
    21  -- 20260907090000); the new column inherits the table-level grants and the
    22  -- RLS-with-no-policy posture, so no new grant, policy or test surface.
    23  -- Covered by the check constraint and the gateway's catalog parse.
-   24  
+   24
    25  alter table ai_ops.routing_policies
    26    add column hedge_after_ms integer
    27      constraint routing_policies_hedge_after_ms_range
    28        check (hedge_after_ms is null or hedge_after_ms between 100 and 60000);
-   29  
+   29
    30  comment on column ai_ops.routing_policies.hedge_after_ms is
    31    'Milliseconds after which a non-streaming request also asks the next eligible model (hedged request). NULL: no hedge.';
-   32  
+   32
    33  update ai_ops.routing_policies
    34     set hedge_after_ms = 2000
    35   where status = 'ACTIVE'
    36     and code = 'fast_classification.v1';
 ```
-

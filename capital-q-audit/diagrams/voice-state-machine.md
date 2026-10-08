@@ -39,11 +39,11 @@ stateDiagram-v2
 
 Hidden sub-state that matters: `#routeTurns`, `#pendingTurn` (waiting for transcripts), `#toolsInFlight`, `#turnSeq`, `#generation`, `#transport`, `#rejoining`, `#speakingSilenced`, `#dropNextCommit`, `#heldAnswer`. Guards:
 
-| Guard | Bumped by | Checked by |
-|---|---|---|
-| `#generation` | barge-in only (1216) | relayTool (1528-1533), routeHeard (1638), narration (1815), bridge timer (1444) |
-| `#turnSeq` | every routed turn (1611) | routeHeard (1638, 1679) — **not** relayTool |
-| `#transport` | every new peer (596) | relayTool (1508), routeHeard (1654) |
+| Guard         | Bumped by                | Checked by                                                                      |
+| ------------- | ------------------------ | ------------------------------------------------------------------------------- |
+| `#generation` | barge-in only (1216)     | relayTool (1528-1533), routeHeard (1638), narration (1815), bridge timer (1444) |
+| `#turnSeq`    | every routed turn (1611) | routeHeard (1638, 1679) — **not** relayTool                                     |
+| `#transport`  | every new peer (596)     | relayTool (1508), routeHeard (1654)                                             |
 
 ## 2. Standard line (`apps/web/src/features/voice/provider/deepgram-session.ts`)
 

@@ -47,7 +47,7 @@
  3145          offered.length === 0
  3146            ? [...rendered.messages, capabilities, ...workNote]
  3147            : [...rendered.messages, capabilities, ...workNote, TOOLS_FIRST_NOTE];
- 3148  
+ 3148
  3149        if (ownProfileCall !== null) {
  3150          toolCalls.push(ownProfileCall);
  3151        }
@@ -72,15 +72,15 @@
  3170        if (ownProfile !== null || onboardingFacts.length > 0) {
  3171          messages = [...messages, OWN_MANDATE_NOTE];
  3172        }
- 3173  
+ 3173
  3174        type AnswerResult = Awaited<
  3175          ReturnType<typeof gateway.execute<CompanyAnalystV17Result>>
  3176        >;
- 3177  
+ 3177
  3178        try {
  3179          let final: AnswerResult | undefined;
  3180          let analyst: CompanyAnalystV17Result | undefined;
- 3181  
+ 3181
  3182          if (offered.length > 0) {
  3183            took("prepare");
  3184            let rounds = 0;

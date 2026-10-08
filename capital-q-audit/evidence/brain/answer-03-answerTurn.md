@@ -147,7 +147,7 @@
  2099      }
  2100      return outcome;
  2101    };
- 2102  
+ 2102
  2103    const answerTurnRead = async (
  2104      request: QAnswerRequest,
  2105      history: readonly QConversationMessage[],

@@ -11,7 +11,7 @@
    59    }
    60    return null;
    61  }
-   62  
+   62
    63  /** The drafts behind the card an approval binds to. */
    64  export function draftsForApproval(
    65    jobs: readonly WorkforceJobDetailDto[],
@@ -25,10 +25,10 @@
    73    }
    74    return [];
    75  }
-   76  
+   76
    77  /** How long a held draft stays a decision before it is history. */
    78  const HELD_DAYS = 7;
-   79  
+   79
    80  /**
    81   * Held drafts still worth a decision: the latest per counterpart, within
    82   * a week, and not followed by a later message to them that was sent or
@@ -70,7 +70,7 @@
   118    }
   119    return out;
   120  }
-  121  
+  121
   122  /**
   123   * The decision queue: one group per company or person, newest first;
   124   * inside a group, its cards newest first. A group is keyed by the
@@ -124,7 +124,7 @@
   172      group.relationshipId ??= seed.relationshipId;
   173      groups.set(key, group);
   174    };
-  175  
+  175
   176    for (const approval of input.approvals) {
   177      const view = input.views.get(approval.approvalId) ?? null;
   178      const drafts = draftsForApproval(input.jobs, approval.approvalId);
@@ -150,7 +150,7 @@
   198        },
   199      );
   200    }
-  201  
+  201
   202    for (const held of heldDecisions(
   203      input.jobs,
   204      input.now,
@@ -171,7 +171,7 @@
   219      const { name, ...item } = held;
   220      add(key, { name, named: null, relationshipId }, item);
   221    }
-  222  
+  222
   223    return [...groups.values()]
   224      .map((group) => ({
   225        ...group,
@@ -179,7 +179,7 @@
   227      }))
   228      .sort((a, b) => b.at.localeCompare(a.at));
   229  }
-  230  
+  230
   231  export type DoneGroup = {
   232    readonly key: string;
   233    readonly name: string | null;
@@ -189,7 +189,7 @@
   237    /** Newest first. */
   238    readonly items: readonly QWorkDoneItemDto[];
   239  };
-  240  
+  240
   241  /**
   242   * What Q did, per relationship, newest first. Items are read a page at a
   243   * time by cursor; a later page's items join the groups already shown.
