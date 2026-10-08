@@ -169,18 +169,19 @@ export async function recordReceipts(page: Page): Promise<void> {
   navigationsSeen.set(page, navigations);
   const accepted: number[] = [];
   acceptedSeen.set(page, accepted);
-  page.on("response", (response) => {
-    if (
-      response.request().method() !== "POST" ||
-      !response.url().includes("/api/q-ui-acts")
-    )
-      return;
-    void response
-      .json()
-      .then((body: { accepted?: unknown }) => {
-        if (typeof body.accepted === "number") accepted.push(body.accepted);
-      })
-      .catch(() => accepted.push(-response.status()));
+  // The batch is sent with `keepalive`, whose response body Playwright's
+  // response event does not expose; passing it through a route does.
+  await page.route("**/api/q-ui-acts", async (route) => {
+    const response = await route.fetch();
+    try {
+      const body = (await response.json()) as { accepted?: unknown };
+      accepted.push(
+        typeof body.accepted === "number" ? body.accepted : -response.status(),
+      );
+    } catch {
+      accepted.push(-response.status());
+    }
+    await route.fulfill({ response });
   });
   page.on("request", (request) => {
     if (

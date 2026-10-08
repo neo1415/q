@@ -90,18 +90,16 @@ for (const ask of ASKS) {
       ).toHaveAttribute("aria-selected", "true");
     }
     // Server side: a DONE navigation receipt for this route, accepted by q-api.
-    await expect
-      .poll(
-        () =>
-          navigationReceipts(page).navigations.some(
-            (n) => n.status === "DONE" && ask.route.test(n.route ?? ""),
-          ),
-        {
-          timeout: 20_000,
-          message: "a DONE navigation receipt for the landed route",
-        },
-      )
-      .toBe(true);
+    const done = () =>
+      navigationReceipts(page).navigations.some(
+        (n) => n.status === "DONE" && ask.route.test(n.route ?? ""),
+      );
+    for (let i = 0; i < 40 && !done(); i += 1) await page.waitForTimeout(500);
+    // The message names what WAS reported, so a miss is diagnosable.
+    expect(
+      done(),
+      `a DONE navigation receipt for ${String(ask.route)}; seen ${JSON.stringify(navigationReceipts(page))}`,
+    ).toBe(true);
     await expect
       .poll(() => Math.max(0, ...navigationReceipts(page).accepted), {
         timeout: 20_000,
