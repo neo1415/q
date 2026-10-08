@@ -90,3 +90,19 @@ export const MeetingHostResultV2Schema = MeetingHostResultSchema.extend({
   kind: z.enum(MEETING_HOST_KINDS),
 }).strict();
 export type MeetingHostResultV2 = z.infer<typeof MeetingHostResultV2Schema>;
+
+// v3 (founder 2026-10-08): what is shown in the call -- shared screens and,
+// when camera vision is on, cameras -- as Q has seen it, so "Q, what do you
+// make of this slide?" is answered from it. Only what everyone in the call
+// can see; never Q's private take on it.
+export const MeetingHostVariablesV3Schema = MeetingHostVariablesSchema.extend({
+  /** What is shown in the call now, as Q saw it; "" when nothing. UNTRUSTED. */
+  seen: z.string().max(4_000),
+}).strict();
+export type MeetingHostVariablesV3 = z.infer<
+  typeof MeetingHostVariablesV3Schema
+>;
+export const MEETING_HOST_UNTRUSTED_V3 = [
+  ...MEETING_HOST_UNTRUSTED,
+  "seen",
+] as const;

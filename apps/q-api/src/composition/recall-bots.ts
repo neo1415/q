@@ -180,7 +180,13 @@ export const HOST_EVENTS = [
   "transcript.data",
 ] as const;
 
-/** P5: shared-screen (and webcam, dropped) frames, websocket only. */
+/** 2026-10-08: a line's words while it is still being spoken. */
+export const PARTIAL_EVENTS = ["transcript.partial_data"] as const;
+
+/**
+ * P5: per-participant frames, websocket only: shared screens, and webcams
+ * (looked at only when RECALL_CAMERA_VISION=on; otherwise dropped).
+ */
 export const SCREEN_EVENTS = ["video_separate_png.data"] as const;
 
 /** The create-bot body (Recall v1). Exported for tests; no I/O. */
@@ -208,7 +214,15 @@ export function botRequest(input: {
               {
                 type: "webhook",
                 url: hosting.realtimeUrl,
-                events: [...HOST_EVENTS],
+                // 2026-10-08: Recall's own streaming transcription also
+                // sends partial words, so Q starts its answer when the
+                // line ends; captions have no partials (never asked for).
+                events: [
+                  ...HOST_EVENTS,
+                  ...(input.transcriber === "recallai_streaming"
+                    ? PARTIAL_EVENTS
+                    : []),
+                ],
               },
               // P5: per-participant PNG frames (360p, 2 fps) over a
               // websocket, only when Q may look at shared screens; code

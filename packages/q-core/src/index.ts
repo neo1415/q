@@ -434,6 +434,8 @@ export { INVESTOR_TWIN_TURN_V10 } from "./prompts/tasks/investor-twin-turn.v10.j
 export { MEETING_HOST_TURN_V1 } from "./prompts/tasks/meeting-host-turn.v1.js";
 export { MEETING_HOST_TURN_V2 } from "./prompts/tasks/meeting-host-turn.v2.js";
 export { MEETING_SCREEN_NOTE_V1 } from "./prompts/tasks/meeting-screen-note.v1.js";
+export { MEETING_HOST_TURN_V3 } from "./prompts/tasks/meeting-host-turn.v3.js";
+export { MEETING_CAMERA_NOTE_V1 } from "./prompts/tasks/meeting-camera-note.v1.js";
 export {
   MEETING_SCREEN_NOTE_SCHEMA_NAME,
   MEETING_SCREEN_NOTE_SCHEMA_VERSION,
@@ -454,6 +456,9 @@ export {
   MeetingHostResultV2Schema,
   type MeetingHostResultV2,
   type MeetingHostVariables,
+  MEETING_HOST_UNTRUSTED_V3,
+  MeetingHostVariablesV3Schema,
+  type MeetingHostVariablesV3,
 } from "./prompts/schemas/meeting-host.js";
 // end MEET-HOST block
 export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";

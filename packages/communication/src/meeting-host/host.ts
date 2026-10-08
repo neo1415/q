@@ -48,10 +48,15 @@ export type HostContext = {
   readonly endsAt: Date;
   readonly parties: readonly HostParty[];
   /**
-   * P5: Q looks at screens shared in this call (never cameras); said in
-   * the greeting so everyone knows before they share.
+   * P5: Q looks at screens shared in this call; said in the greeting so
+   * everyone knows before they share.
    */
   readonly seesScreens?: boolean;
+  /**
+   * 2026-10-08 (founder): Q also looks at cameras, on a budget, for the
+   * owner's private notes; said in the greeting too. Off unless enabled.
+   */
+  readonly seesCameras?: boolean;
 };
 
 export type CallParticipant = {
@@ -84,6 +89,18 @@ export type HostEvent =
     }
   | {
       readonly kind: "UTTERANCE";
+      readonly participant: CallParticipant;
+      readonly text: string;
+      readonly at: number;
+    }
+  /**
+   * 2026-10-08: a line still being spoken (streaming transcription's
+   * partial words, the whole line so far). Q starts its answer when the
+   * line ends -- Meet's "stopped speaking" or a gap in the words -- rather
+   * than waiting for the final words, which come a beat later.
+   */
+  | {
+      readonly kind: "PARTIAL";
       readonly participant: CallParticipant;
       readonly text: string;
       readonly at: number;
@@ -121,6 +138,10 @@ export type HostAction =
       readonly kind: "COMPOSE";
       readonly speaker: string;
       readonly utterance: string;
+      /** When the line ended (or arrived), for the time-to-answer log. */
+      readonly heardAt?: number;
+      /** Started from partial words, before the final line came. */
+      readonly early?: boolean;
     }
   | {
       readonly kind: "READ_GUEST";
@@ -234,6 +255,13 @@ export type HostLimits = {
   readonly lineHoldMs?: number;
   /** No caption words for this long counts as the end of a turn. */
   readonly wordsGapMs?: number;
+  /**
+   * 2026-10-08: quiet needed before an answer to someone who asked (Q's
+   * own unprompted lines keep quietMs). Short: they asked and stopped.
+   */
+  readonly replyQuietMs?: number;
+  /** A line in progress that addresses Q ends after this long without new words. */
+  readonly partialGapMs?: number;
   /** An answer not said within this long of being ready is dropped. */
   readonly replyStaleMs?: number;
   /** A greeting or introduction not said within this long is dropped. */
@@ -250,6 +278,8 @@ export const DEFAULT_HOST_LIMITS: HostLimits = {
   replyHoldMs: 1_200,
   lineHoldMs: 4_000,
   wordsGapMs: 700,
+  replyQuietMs: 400,
+  partialGapMs: 900,
   replyStaleMs: 15_000,
   lineStaleMs: 30_000,
 };
@@ -266,6 +296,8 @@ export const FRESH_SPEECH_MS = 1_500;
 
 /** P4: how long after a bare "hey q" the person's next line is the request. */
 export const CALL_FOLLOW_MS = 8_000;
+/** 2026-10-08: the final words of a line answered early arrive within this. */
+export const EARLY_MATCH_MS = 10_000;
 /** P4: a bare "hey q" with nothing after it is answered after this. */
 export const BARE_CALL_WAIT_MS = 2_000;
 
@@ -284,6 +316,31 @@ export const HOST_INTRO =
 /** P5: added to the greeting when Q looks at shared screens. */
 export const HOST_SEES_SCREENS =
   "I can also see screens you share, for my own notes; never your cameras.";
+/** 2026-10-08: the consent line when Q also looks at cameras. */
+export const HOST_SEES_SCREENS_AND_CAMERAS =
+  "I can also see shared screens and cameras, for my own private notes.";
+
+function seesLine(context: HostContext): string {
+  if (context.seesScreens !== true) return "";
+  return ` ${context.seesCameras === true ? HOST_SEES_SCREENS_AND_CAMERAS : HOST_SEES_SCREENS}`;
+}
+
+/** A line's words that carry its request (not Q's name, not fillers). */
+function requestWords(text: string): string[] {
+  return spokenWords(text).filter(
+    (w) => !NAME_WORDS.has(w) && !LEAD_FILLERS.has(w),
+  );
+}
+
+/**
+ * 2026-10-08: the final line asks what the partial words already asked
+ * (at most one new word), so the answer started early stands.
+ */
+export function sameRequest(early: string, final: string): boolean {
+  const before = new Set(requestWords(early));
+  const added = requestWords(final).filter((w) => !before.has(w));
+  return added.length <= 1;
+}
 
 /** Asked in the call to leave: Q stays, says why, and the ask is recorded. */
 export const HOST_STAYS =
@@ -553,13 +610,41 @@ export function createMeetingHost(
     limits.replyStaleMs ?? DEFAULT_HOST_LIMITS.replyStaleMs ?? 15_000;
   const lineStaleMs =
     limits.lineStaleMs ?? DEFAULT_HOST_LIMITS.lineStaleMs ?? 30_000;
+  const replyQuietMs =
+    limits.replyQuietMs ?? DEFAULT_HOST_LIMITS.replyQuietMs ?? 400;
+  const partialGapMs =
+    limits.partialGapMs ?? DEFAULT_HOST_LIMITS.partialGapMs ?? 900;
   let lastSpeechAt = 0;
   /** When a person's words last arrived (caption lines, not Meet's flag). */
   let lastWordsAt = 0;
+  /**
+   * 2026-10-08: lines in progress that address Q, per person (the partial
+   * words so far), and the answer started from one before its final words.
+   */
+  const forming = new Map<
+    string,
+    {
+      readonly entry: Present;
+      readonly participant: CallParticipant;
+      readonly text: string;
+      readonly fromCall: boolean;
+      readonly at: number;
+    }
+  >();
+  let early: {
+    readonly participantId: string;
+    readonly text: string;
+    readonly at: number;
+  } | null = null;
   /** The clock as last seen, for lines queued between events. */
   let clock = 0;
   /** The latest question asked while Q was composing an answer. */
-  let pending: { speaker: string; utterance: string } | null = null;
+  let pending: {
+    speaker: string;
+    utterance: string;
+    /** The final words of a line answered early: no "taking the latest". */
+    revision?: boolean;
+  } | null = null;
   /** Questions passed over for a later one since the last answer. */
   let skipped = 0;
   let ackLatest = false;
@@ -640,7 +725,11 @@ export function createMeetingHost(
     const head = outbox[0];
     if (head === undefined || at < busyUntil) return [];
     const roomQuiet =
-      speaking.size === 0 && at - lastSpeechAt >= limits.quietMs;
+      speaking.size === 0 &&
+      at - lastSpeechAt >=
+        (answers(head.why)
+          ? Math.min(replyQuietMs, limits.quietMs)
+          : limits.quietMs);
     // Meet's speaking flag is a hint, not the truth: past the hold, the
     // end of a turn is the words stopping.
     const heldLongEnough =
@@ -720,7 +809,7 @@ export function createMeetingHost(
     const name =
       entry.party === null ? entry.participant.name : entry.party.name;
     queue(
-      `Hi ${firstName(name)}, welcome. ${HOST_INTRO}${context.seesScreens === true ? ` ${HOST_SEES_SCREENS}` : ""}`,
+      `Hi ${firstName(name)}, welcome. ${HOST_INTRO}${seesLine(context)}`,
       "GREET",
     );
   }
@@ -813,7 +902,11 @@ export function createMeetingHost(
   }
 
   /** One question to Q, composed now (one at a time, latest first). */
-  function compose(speaker: string, utterance: string): HostAction[] {
+  function compose(
+    speaker: string,
+    utterance: string,
+    heard: { readonly at?: number; readonly early?: boolean } = {},
+  ): HostAction[] {
     if (calls >= limits.maxModelCalls) {
       queue(HOST_UNAVAILABLE, "REPLY");
       return [];
@@ -822,7 +915,15 @@ export function createMeetingHost(
     composing = true;
     ackLatest = skipped > 0;
     skipped = 0;
-    return [{ kind: "COMPOSE", speaker, utterance }];
+    return [
+      {
+        kind: "COMPOSE",
+        speaker,
+        utterance,
+        ...(heard.at === undefined ? {} : { heardAt: heard.at }),
+        ...(heard.early === true ? { early: true } : {}),
+      },
+    ];
   }
 
   function speakerFor(entry: Present, participant: CallParticipant): string {
@@ -837,28 +938,101 @@ export function createMeetingHost(
     entry: Present,
     participant: CallParticipant,
     text: string,
+    heard: {
+      readonly at?: number;
+      readonly early?: boolean;
+      /** The final words of a line already answered early, differing. */
+      readonly revision?: boolean;
+    } = {},
   ): HostAction[] {
     if (asksQToBreakRules(text)) {
       queue(HOST_REFUSAL, "REFUSE");
       return [];
     }
     const speaker = speakerFor(entry, participant);
+    const revision = heard.revision === true;
     // meet2-64: one answer at a time, and only to the latest question.
     // Asked again while Q is composing: the newer question waits and
     // the older answer is dropped when it comes back.
     if (composing) {
-      pending = { speaker, utterance: text };
-      skipped += 1;
+      pending = { speaker, utterance: text, ...(revision ? { revision } : {}) };
+      if (!revision) skipped += 1;
       return [];
     }
     // An answer still waiting to be said is overtaken by a new question.
     for (let i = outbox.length - 1; i >= 0; i -= 1) {
       if (outbox[i]?.why === "REPLY") {
         outbox.splice(i, 1);
-        skipped += 1;
+        if (!revision) skipped += 1;
       }
     }
-    return compose(speaker, text);
+    return compose(speaker, text, heard);
+  }
+
+  /**
+   * 2026-10-08: the line in progress has ended (Meet's flag or a gap in
+   * its words): Q starts the answer from the words so far.
+   */
+  function startEarly(participantId: string, at: number): HostAction[] {
+    const line = forming.get(participantId);
+    if (line === undefined) return [];
+    forming.delete(participantId);
+    if (line.fromCall) called = null;
+    early = { participantId, text: line.text, at };
+    return addressed(line.entry, line.participant, line.text, {
+      at,
+      early: true,
+    });
+  }
+
+  /** A partial line: remembered when it addresses Q; nothing composed yet. */
+  function hearPartial(event: Extract<HostEvent, { kind: "PARTIAL" }>): void {
+    if (isBot(event.participant)) return;
+    const entry = present.get(event.participant.id);
+    const text = event.text.trim().slice(0, 2_000);
+    if (entry === undefined || text.length === 0 || echoesQ(text, event.at)) {
+      return;
+    }
+    lastWordsAt = Math.max(lastWordsAt, event.at);
+    // Only an ordinary turn: not while one side is being asked about
+    // rescheduling, nor a guest's introduction, nor a line answered already.
+    if (
+      oneSide !== null ||
+      (entry.askedIntro && entry.introducedAs === null) ||
+      (early !== null &&
+        early.participantId === event.participant.id &&
+        event.at - early.at <= EARLY_MATCH_MS)
+    ) {
+      return;
+    }
+    const follows =
+      called !== null &&
+      called.participantId === event.participant.id &&
+      event.at - called.at <= CALL_FOLLOW_MS;
+    if (follows && called !== null) {
+      forming.set(event.participant.id, {
+        entry,
+        participant: event.participant,
+        text:
+          addressedToQ(text) && !onlyCallsQ(text)
+            ? text
+            : `${called.text} ${text}`.slice(0, 2_000),
+        fromCall: true,
+        at: event.at,
+      });
+      return;
+    }
+    if (addressedToQ(text) && !onlyCallsQ(text)) {
+      forming.set(event.participant.id, {
+        entry,
+        participant: event.participant,
+        text,
+        fromCall: false,
+        at: event.at,
+      });
+    } else {
+      forming.delete(event.participant.id);
+    }
   }
 
   function handle(event: HostEvent): HostAction[] {
@@ -918,6 +1092,11 @@ export function createMeetingHost(
       case "SPEECH_OFF":
         speaking.delete(event.participantId);
         lastSpeechAt = Math.max(lastSpeechAt, event.at);
+        // Their line to Q has ended: the answer starts now.
+        out.push(...startEarly(event.participantId, event.at));
+        break;
+      case "PARTIAL":
+        hearPartial(event);
         break;
       case "UTTERANCE": {
         if (isBot(event.participant)) break;
@@ -931,6 +1110,25 @@ export function createMeetingHost(
         // Q just said (its voice echoed through someone's microphone).
         if (entry === undefined || echoesQ(text, event.at)) break;
         lastWordsAt = Math.max(lastWordsAt, event.at);
+        // 2026-10-08: the final words of a line Q began answering early.
+        // The same request: the answer stands (and is not "talked over" by
+        // its own question's final words). Different: the final words are
+        // answered instead, without "taking the latest".
+        forming.delete(event.participant.id);
+        let revision = false;
+        if (
+          early !== null &&
+          early.participantId === event.participant.id &&
+          event.at - early.at <= EARLY_MATCH_MS
+        ) {
+          const same = sameRequest(early.text, text);
+          early = null;
+          if (same) {
+            if (called?.participantId === event.participant.id) called = null;
+            break;
+          }
+          revision = true;
+        }
         // Words from a person over Q's line stop it (meet2-64).
         out.push(...interrupt(event.at));
         if (askedAt !== null && oneSide !== null) {
@@ -950,7 +1148,12 @@ export function createMeetingHost(
               ? text
               : `${called.text} ${text}`.slice(0, 2_000);
           called = null;
-          out.push(...addressed(entry, event.participant, joined));
+          out.push(
+            ...addressed(entry, event.participant, joined, {
+              at: event.at,
+              revision,
+            }),
+          );
           break;
         }
         if (
@@ -980,13 +1183,26 @@ export function createMeetingHost(
           };
           break;
         }
-        out.push(...addressed(entry, event.participant, text));
+        out.push(
+          ...addressed(entry, event.participant, text, {
+            at: event.at,
+            revision,
+          }),
+        );
         break;
       }
       case "TICK": {
+        // 2026-10-08: a line to Q whose words stopped coming has ended,
+        // even when Meet's speaking flag stays on (an open microphone).
+        for (const [participantId, line] of [...forming]) {
+          if (event.at - line.at >= partialGapMs) {
+            out.push(...startEarly(participantId, event.at));
+          }
+        }
         // P4: "hey q" and nothing after it: answered as it was said.
         if (
           called !== null &&
+          !forming.has(called.participantId) &&
           event.at - called.at >= BARE_CALL_WAIT_MS &&
           event.at - lastWordsAt >= wordsGapMs
         ) {
@@ -1001,7 +1217,7 @@ export function createMeetingHost(
         if (!composing && pending !== null) {
           const next = pending;
           pending = null;
-          out.push(...compose(next.speaker, next.utterance));
+          out.push(...compose(next.speaker, next.utterance, { at: event.at }));
         }
         // The hard cap: whatever was said, Q goes.
         if (event.at >= start + policy.hardCapAfterStartMs) {
@@ -1088,7 +1304,7 @@ export function createMeetingHost(
       // A newer question came while this was composed: this answer is
       // stale and goes unsaid; the newer one is composed on the next tick.
       if (pending !== null && why === "REPLY") {
-        skipped += 1;
+        if (pending.revision !== true) skipped += 1;
         return;
       }
       const line = text.trim();

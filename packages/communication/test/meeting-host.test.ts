@@ -241,6 +241,7 @@ describe("meeting host: turn-taking and when Q speaks", () => {
       kind: "COMPOSE",
       speaker: "Tunde Bello",
       utterance: "Q, what's the agenda for today?",
+      heardAt: T0 + 40_000,
     });
     expect(host.phase()).toBe("ADDRESSED");
     // A second addressed line while composing makes no second call.

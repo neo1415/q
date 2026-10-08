@@ -278,9 +278,11 @@ describe("meeting host endpoint", () => {
       kind: "UTTERANCE",
       text: "Q, what's next?",
     });
+    // 2026-10-08: partial words are read (Q starts its answer when the
+    // line ends), as their own kind -- never a line of the record.
     expect(
       hostEventOf(event("transcript.partial_data", 7, "Tunde", "Q"), 1),
-    ).toBeNull();
+    ).toMatchObject({ kind: "PARTIAL", text: "Q" });
     expect(hostEventOf({ event: "bot.status_change" }, 1)).toBeNull();
     expect(hostEventOf("not json", 1)).toBeNull();
   });

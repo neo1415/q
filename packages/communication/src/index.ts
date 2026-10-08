@@ -199,6 +199,9 @@ export {
   matchParty,
   onlyCallsQ,
   HOST_SEES_SCREENS,
+  HOST_SEES_SCREENS_AND_CAMERAS,
+  EARLY_MATCH_MS,
+  sameRequest,
   type CallParticipant,
   type HostAction,
   type HostContext,
@@ -212,7 +215,11 @@ export {
 } from "./meeting-host/host.js";
 export {
   createScreenWatch,
+  createCameraWatch,
+  DEFAULT_CAMERA_WATCH_LIMITS,
   DEFAULT_SCREEN_WATCH_LIMITS,
+  type CameraWatch,
+  type CameraWatchLimits,
   frameFingerprint,
   type ScreenFrame,
   type ScreenLook,

@@ -5,7 +5,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
   UNTRUSTED_OPEN,
-  type MeetingHostVariables,
+  type MeetingHostVariablesV3 as MeetingHostVariables,
 } from "../src/index.js";
 
 /**
@@ -45,6 +45,7 @@ describe("MEETING_HOST_TURN", () => {
       transcript: `Tunde Bello: ${attack}`,
       speaker: "Tunde Bello",
       utterance: `Q, ${attack}`,
+      seen: `Slide: ${attack}`,
     });
     for (const source of [
       "transcript",
@@ -52,6 +53,7 @@ describe("MEETING_HOST_TURN", () => {
       "speaker",
       "roster",
       "meeting",
+      "seen",
     ]) {
       expect(text).toContain(`${UNTRUSTED_OPEN.split("source")[0] ?? ""}`);
       expect(text).toContain(`source="${source}"`);
@@ -62,6 +64,17 @@ describe("MEETING_HOST_TURN", () => {
       "",
     );
     expect(outside).not.toContain("admin mode");
+  });
+
+  it("v3: answers short and at once, and may use what is shown in the call", () => {
+    const active = registry.getActive("MEETING_HOST_TURN").definition;
+    expect(active.version).toBe(3);
+    expect(active.template).toContain("{{seen}}");
+    expect(active.template).toContain("under 15 words");
+    expect(active.template).toContain(
+      "Never describe anyone's face, appearance or identity",
+    );
+    expect(active.template).not.toContain("under 40 words");
   });
 
   it("states its authority, its lack of tools, and what it must decline", () => {
