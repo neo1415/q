@@ -360,6 +360,18 @@ export function InvestorDataRoom({
                             <span>Until {dayMonth(document.accessEndsAt)}</span>
                           )}
                         </p>
+                        {document.declined === undefined ||
+                        document.declined === null ? null : (
+                          <p
+                            className="cq-caption text-(--cq-text-secondary)"
+                            data-room-declined
+                          >
+                            Declined
+                            {document.declined.note === null
+                              ? ". You can ask again."
+                              : `: “${document.declined.note}”`}
+                          </p>
+                        )}
                       </div>
                       {document.access === "OPEN" ? (
                         <button
@@ -578,12 +590,40 @@ function LevelControl({
   );
 }
 
+/** Who asked for a document (2026-10-08): the data room ∩ requests. */
+export type RequestedMark = {
+  readonly who: string;
+  readonly status: "OPEN" | "SHARED" | "DECLINED";
+};
+
+const REQUESTED_WORDS: Readonly<Record<RequestedMark["status"], string>> = {
+  OPEN: "waiting",
+  SHARED: "shared",
+  DECLINED: "declined",
+};
+
 export function OwnerDataRoom({
   companyId,
   view,
+  requested,
+  onAccess,
+  onFolderAccess,
+  inDocuments = false,
 }: {
   readonly companyId: string;
   readonly view: DataRoomOwnerView;
+  /** Documents investors asked for, by document id, with who and where it stands. */
+  readonly requested?:
+    ReadonlyMap<string, readonly RequestedMark[]> | undefined;
+  /** Opens the access editor for one document. */
+  readonly onAccess?: ((document: DataRoomOwnerDocument) => void) | undefined;
+  /** Opens the access editor for a folder. */
+  readonly onFolderAccess?: ((folder: DataRoomFolder) => void) | undefined;
+  /**
+   * On the Documents page: requests are answered on the Requested tab, so
+   * they are pointed to rather than repeated here.
+   */
+  readonly inDocuments?: boolean | undefined;
 }) {
   const [documents, setDocuments] = useState(view.documents);
   const [closed, setClosed] = useState<ReadonlySet<string>>(
@@ -720,7 +760,7 @@ export function OwnerDataRoom({
           </p>
         </div>
         <Link
-          href="/documents"
+          href={inDocuments ? "/documents?tab=mine" : "/documents"}
           className={buttonClassName("primary", "regular")}
         >
           <Upload size={ICON_SIZE.compact} aria-hidden="true" /> Upload files
@@ -767,7 +807,17 @@ export function OwnerDataRoom({
         </div>
       )}
 
-      {waiting.length === 0 ? null : (
+      {waiting.length === 0 ? null : inDocuments ? (
+        <p className="cq-body-sm text-(--cq-text-secondary)" data-room-waiting>
+          {plural(waiting.length, "request")} waiting for you.{" "}
+          <Link
+            href="/documents?tab=requested"
+            className="text-(--cq-text-primary) underline underline-offset-2"
+          >
+            Answer on Requested
+          </Link>
+        </p>
+      ) : (
         <section
           className="flex flex-col gap-3"
           aria-labelledby="waiting-title"
@@ -873,19 +923,42 @@ export function OwnerDataRoom({
             const isOpen = !closed.has(folder.code);
             return (
               <li key={folder.code}>
-                <FolderHeader
-                  folder={folder}
-                  open={isOpen}
-                  detail={`${plural(inFolder.length, "document")}${gaps.length === 0 ? "" : ` · ${String(gaps.length)} usually expected`}`}
-                  onToggle={() =>
-                    setClosed((previous) => {
-                      const next = new Set(previous);
-                      if (next.has(folder.code)) next.delete(folder.code);
-                      else next.add(folder.code);
-                      return next;
-                    })
-                  }
-                />
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <FolderHeader
+                      folder={folder}
+                      open={isOpen}
+                      detail={`${plural(inFolder.length, "document")}${gaps.length === 0 ? "" : ` · ${String(gaps.length)} usually expected`}`}
+                      onToggle={() =>
+                        setClosed((previous) => {
+                          const next = new Set(previous);
+                          if (next.has(folder.code)) next.delete(folder.code);
+                          else next.add(folder.code);
+                          return next;
+                        })
+                      }
+                    />
+                  </div>
+                  {onFolderAccess === undefined ||
+                  inFolder.length === 0 ? null : (
+                    <button
+                      type="button"
+                      onClick={() => onFolderAccess(folder)}
+                      className={buttonClassName(
+                        "quiet",
+                        "compact",
+                        "min-h-11",
+                      )}
+                      data-folder-access={folder.code}
+                    >
+                      <Users size={ICON_SIZE.compact} aria-hidden="true" />
+                      <span className="hidden sm:inline">
+                        Who can see this folder
+                      </span>
+                      <span className="sm:hidden">Access</span>
+                    </button>
+                  )}
+                </div>
                 {isOpen ? (
                   <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)">
                     {inFolder.map((document) => (
@@ -928,6 +1001,22 @@ export function OwnerDataRoom({
                                       : "Not opened yet"}
                               </span>
                             </p>
+                            {(requested?.get(document.documentId) ?? []).map(
+                              (mark) => (
+                                <span
+                                  key={`${mark.who}:${mark.status}`}
+                                  className="cq-caption mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)"
+                                  data-requested-mark={mark.status}
+                                >
+                                  <History
+                                    size={ICON_SIZE.compact}
+                                    aria-hidden="true"
+                                  />
+                                  Requested by {mark.who} ·{" "}
+                                  {REQUESTED_WORDS[mark.status]}
+                                </span>
+                              ),
+                            )}
                           </div>
                         </div>
                         <FolderControl
@@ -942,6 +1031,20 @@ export function OwnerDataRoom({
                           disabled={pending}
                           onChange={(level) => setLevel(document, level)}
                         />
+                        {onAccess === undefined ? null : (
+                          <button
+                            type="button"
+                            onClick={() => onAccess(document)}
+                            className={buttonClassName(
+                              "secondary",
+                              "compact",
+                              "min-h-11",
+                            )}
+                            data-document-access={document.documentId}
+                          >
+                            Access
+                          </button>
+                        )}
                       </li>
                     ))}
                     {gaps.map((item) => (

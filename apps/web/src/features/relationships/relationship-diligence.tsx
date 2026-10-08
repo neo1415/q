@@ -45,8 +45,9 @@ type DiligenceRequest = DiligenceDto["requests"][number];
 type Share = DiligenceDto["shares"][number];
 
 export type RequestStatus = {
-  readonly words: "Requested" | "Shared" | "Viewed" | "Needs a new file";
-  readonly tone: "waiting" | "positive" | "accent";
+  readonly words:
+    "Requested" | "Shared" | "Viewed" | "Needs a new file" | "Declined";
+  readonly tone: "waiting" | "positive" | "accent" | "neutral";
   /** The founder can still answer it. */
   readonly answerable: boolean;
   /** The share that answers it now, if still shared. */
@@ -62,6 +63,15 @@ export function requestStatus(
   request: DiligenceRequest,
   shares: readonly Share[],
 ): RequestStatus {
+  // 2026-10-08: the founder said no, with a note the investor reads.
+  if (request.status === "DECLINED") {
+    return {
+      words: "Declined",
+      tone: "neutral",
+      answerable: false,
+      share: null,
+    };
+  }
   if (request.status !== "FULFILLED" || request.fulfilledBy === null) {
     return {
       words: "Requested",
@@ -89,6 +99,7 @@ const TONES: Readonly<Record<RequestStatus["tone"], string>> = {
   waiting: "bg-(--cq-warning-soft) text-(--cq-text-primary)",
   positive: "bg-(--cq-positive-soft) text-(--cq-text-primary)",
   accent: "bg-(--cq-accent-soft) text-(--cq-text-primary)",
+  neutral: "bg-(--cq-surface-subtle) text-(--cq-text-secondary)",
 };
 
 function newKey(): string {
@@ -332,6 +343,17 @@ export function RelationshipDiligence({
                       {request.note}
                     </p>
                   )}
+                  {request.status === "DECLINED" ? (
+                    <p
+                      className="cq-body-sm text-(--cq-text-secondary)"
+                      data-request-declined
+                    >
+                      {founder ? "You declined" : "They declined"}
+                      {request.declineNote === null
+                        ? "."
+                        : `: “${request.declineNote}”`}
+                    </p>
+                  ) : null}
                   {status.share === null ? null : fileRow(status.share)}
                   {mine && uploading !== null ? (
                     <UploadProgress

@@ -70,7 +70,7 @@ export function FileViewer({
             <p className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
               {file.downloadable ? (
                 <a
-                  href={file.url}
+                  href={file.downloadUrl ?? file.url}
                   download
                   className="inline-flex min-h-11 items-center gap-1.5 underline underline-offset-4"
                 >

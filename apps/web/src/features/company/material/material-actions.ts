@@ -57,6 +57,8 @@ export type OpenedFile = {
   readonly url: string;
   readonly downloadable: boolean;
   readonly watermark: string | null;
+  /** An attachment link when the share includes download (2026-10-08). */
+  readonly downloadUrl?: string | null | undefined;
 };
 
 export async function openDocumentAction(
@@ -80,6 +82,7 @@ export async function openDocumentAction(
         url: link.url,
         downloadable: link.downloadable,
         watermark: link.watermark,
+        downloadUrl: link.downloadUrl ?? null,
       },
     };
   } catch {

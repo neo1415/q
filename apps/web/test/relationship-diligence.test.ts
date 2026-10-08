@@ -25,6 +25,7 @@ const request = (
   requestedAt: "2026-10-03T07:00:00.000Z",
   requestedByName: "Amara Diallo-Benson",
   status,
+  declineNote: null,
   fulfilledBy,
 });
 

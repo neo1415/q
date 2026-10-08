@@ -34,6 +34,13 @@ export type QuestionsRoute =
   /** Not connected: questions can be picked and copied, not sent. */
   | { readonly kind: "NOT_CONNECTED" };
 
+const shortDay = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+
 export function AssumptionsSection({
   board,
   companyName,
@@ -48,9 +55,8 @@ export function AssumptionsSection({
   const [key, setKey] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const questions = board.assumptions
-    .filter((a) => picked.includes(a.id))
-    .map((a) => a.question);
+  const chosen = board.assumptions.filter((a) => picked.includes(a.id));
+  const questions = chosen.map((a) => a.question);
   const full = picked.length >= ASSUMPTION_QUESTIONS_SEND_MAX;
   const text = diligenceQuestionsText(questions);
 
@@ -76,6 +82,12 @@ export function AssumptionsSection({
       const sent = await sendQuestionsAction({
         relationshipId: route.relationshipId,
         questions,
+        // What each is about, so the founder sees it and the board can
+        // show it answered (2026-10-08).
+        about: chosen.map((a) => ({
+          assumptionId: a.id,
+          label: a.label.slice(0, 120),
+        })),
         idempotencyKey: key,
       });
       if (sent.ok) {
@@ -164,6 +176,41 @@ export function AssumptionsSection({
                   {assumption.question}
                 </span>
               </label>
+              {assumption.asked === undefined ? null : assumption.asked
+                  .answer === null ? (
+                <p
+                  className="cq-caption text-(--cq-text-secondary)"
+                  data-assumption-asked="WAITING"
+                >
+                  You asked {companyName} on{" "}
+                  {shortDay(assumption.asked.askedAt)}: waiting for an answer.
+                </p>
+              ) : (
+                <div
+                  className="flex flex-col gap-1 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-3"
+                  data-assumption-asked="ANSWERED"
+                >
+                  <p className="cq-caption text-(--cq-text-tertiary)">
+                    Founder&apos;s answer,{" "}
+                    {shortDay(assumption.asked.answer.answeredAt)} ·{" "}
+                    {assumption.asked.answer.evidenceStatus ===
+                    "DOCUMENT_SUPPORTED"
+                      ? "their claim, with a document"
+                      : "their claim, self-reported"}
+                  </p>
+                  <p className="cq-body-sm text-(--cq-text-primary)">
+                    {assumption.asked.answer.text}
+                  </p>
+                  {assumption.asked.answer.documents.map((document) => (
+                    <p
+                      key={document.documentId}
+                      className="cq-caption text-(--cq-text-secondary)"
+                    >
+                      {document.title} · in their data room for you
+                    </p>
+                  ))}
+                </div>
+              )}
             </li>
           );
         })}
