@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import type { AnyAppAction } from "@capital-q/app-actions";
 import { InstructionGrantSchema } from "@capital-q/contracts";
-import type { InstructionPlan } from "@capital-q/q-core";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
@@ -20,6 +19,7 @@ import {
   investorProfileFacts,
   type InstructionMaterial,
 } from "../src/composition/instructions/material.js";
+import type { InstructionPlan } from "../src/composition/instructions/planner.js";
 import {
   threadPace,
   transcriptOf,
@@ -181,11 +181,11 @@ const CHAT: AnyAppAction = {
     return Promise.resolve({});
   },
 } as unknown as AnyAppAction;
-const BOOK: AnyAppAction = {
+const BOOK = {
   ...CHAT,
   name: "schedule.meeting.book",
   input: z.object({ relationshipId: z.string() }).passthrough(),
-} as unknown as AnyAppAction;
+} as AnyAppAction;
 
 function reply(body: string, asks: "MEETING" | "QUESTION" | "NONE" = "NONE") {
   return {
