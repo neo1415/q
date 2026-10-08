@@ -5483,6 +5483,8 @@ const voiceTurn = timedVoiceTurns(
     qStream,
     interviewAgent,
     board: voiceTurnBoard,
+    // RECOVERY B1 on voice: "what needs me" said from the report's items.
+    attention: (actor) => qTools.attention(actor),
     room: qRoom,
     welcome: welcomeHost,
     pronunciation,

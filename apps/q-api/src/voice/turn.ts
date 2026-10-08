@@ -20,14 +20,20 @@ import {
   type QSilenceFocus,
   type QSilenceThread,
   type QAnswerCard,
+  type QAttentionReport,
+  type QResultBlock,
   type QSubjectRef,
 } from "@capital-q/contracts";
 import type { QActionService } from "@capital-q/q-actions";
 import {
   shownCardsOf,
   spokenFactsOf,
+  spokenFactsOfAttention,
   type SpokenFacts,
 } from "@capital-q/q-core";
+
+/** How long a voice turn waits for the attention report (B1 on voice). */
+const ATTENTION_READ_MS = 2_500;
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type {
   QOrchestrator,
@@ -55,7 +61,11 @@ import {
 import { RIGHT_PERSON_LINE, WRONG_PERSON_LINE } from "./recognise.js";
 import type { PresenceTrigger } from "./presence-trigger.js";
 import type { PronunciationTeacher } from "./pronunciation.js";
-import type { QTurnReader, QTurnReading } from "@capital-q/model-gateway/q";
+import {
+  asksWhatNeedsThem,
+  type QTurnReader,
+  type QTurnReading,
+} from "@capital-q/model-gateway/q";
 import type { DecisionReader, DecisionReading } from "./decision.js";
 import type { SpokenReplier } from "./spoken-reply.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
@@ -160,6 +170,14 @@ export type VoiceTurnDependencies = {
    * fact-built line is said, never the screen's template.
    */
   readonly spokenReply?: SpokenReplier | undefined;
+  /**
+   * RECOVERY B1 on voice: the attention report reader (q-tools
+   * `what_needs_me`), so "what needs my attention" is said from its items
+   * by name, or truthfully as nothing waiting, never as something generic.
+   */
+  readonly attention?:
+    | ((actor: VoiceSessionBinding["actor"]) => Promise<QAttentionReport>)
+    | undefined;
   /**
    * The turn reader, for whether a spoken turn is only about ending the
    * voice conversation (v25 endVoice; founder live 2026-10-02: an
@@ -937,6 +955,54 @@ export function createVoiceTurnHandler(
    * fast rewrite, checked by code, or the fact-built line. Either way
    * what is returned is what is kept as said.
    */
+  /**
+   * RECOVERY B1 on voice: the code-written "what needs you" answer, said
+   * from the attention report's items. Read again here (the run does not
+   * hand its tool result to the voice), and used only when it matches
+   * what the answer on screen says, item for item; otherwise the written
+   * answer itself is spoken. Bounded: a slow read never holds the turn.
+   */
+  const attentionFactsFor = async (
+    binding: VoiceSessionBinding,
+    asked: string,
+    text: string,
+    blocks: readonly QResultBlock[],
+  ): Promise<SpokenFacts | null> => {
+    const read = dependencies.attention;
+    if (read === undefined || blocks.length > 0 || !asksWhatNeedsThem(asked)) {
+      return null;
+    }
+    let report: QAttentionReport | null = null;
+    try {
+      report = await Promise.race([
+        read(binding.actor),
+        new Promise<null>((resolve) => {
+          setTimeout(() => resolve(null), ATTENTION_READ_MS);
+        }),
+      ]);
+    } catch (error: unknown) {
+      logger.warn(
+        { err: error, qVoiceSessionId: binding.voiceSessionId },
+        "voice attention read failed",
+      );
+    }
+    if (report === null) return null;
+    // The spoken facts must be the answer on screen: every item said is
+    // in it, and "nothing" only when it says nothing.
+    const matches =
+      report.items.length === 0
+        ? !/\bneeds? you:/u.test(text)
+        : report.items.slice(0, 3).every((item) => text.includes(item.title));
+    if (!matches) {
+      logger.info(
+        { qVoiceSessionId: binding.voiceSessionId },
+        "voice attention facts did not match the answer: said as written",
+      );
+      return null;
+    }
+    return spokenFactsOfAttention(report);
+  };
+
   const fromFacts = async (
     binding: VoiceSessionBinding,
     facts: SpokenFacts,
@@ -1209,12 +1275,13 @@ export function createVoiceTurnHandler(
             // own words instead of reading the template aloud.
             const facts =
               !streamedDeltas && text !== undefined
-                ? spokenFactsOf({
+                ? (spokenFactsOf({
                     asked: askedWords,
                     text,
                     blocks,
                     shown: shownCards.get(binding),
-                  })
+                  }) ??
+                  (await attentionFactsFor(binding, askedWords, text, blocks)))
                 : null;
             const cards = shownCardsOf(blocks);
             if (cards.length > 0) shownCards.set(binding, cards);
