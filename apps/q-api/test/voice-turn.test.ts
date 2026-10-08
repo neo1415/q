@@ -20,6 +20,14 @@ import {
   type ActorContext,
 } from "@capital-q/security";
 
+import type { SpokenFacts } from "@capital-q/q-core";
+
+// The founder's live turns (c10b845f), one fixture for every layer.
+import {
+  C10B_FIT_BLOCKS,
+  C10B_OPEN_BLOCKS,
+  C10B_TURNS,
+} from "../../../packages/q-core/test/fixtures/voice-c10b845f.js";
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import { createVoiceTurnBoard } from "../src/voice/turn-board.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
@@ -1200,6 +1208,66 @@ describe("a spoken question for Q", () => {
     }
   });
 
+  it("says a code-built answer from its facts, never the template (founder live 2026-10-08, c10b845f)", async () => {
+    const line = binding({
+      conversationId: undefined,
+      subjects: undefined,
+      onboarding: undefined,
+    });
+    const answer = (text: string, blocks: readonly unknown[]) =>
+      fakeStream([
+        event("q.message.completed", {
+          message: {
+            id: "f0000000-0000-4000-8000-000000000031",
+            role: "Q",
+            text,
+            blocks,
+          },
+        }),
+        event("q.run.completed", { status: "COMPLETED" }),
+      ]);
+    // Turn 1, standard line: no rewrite wired, so the fact-built line.
+    const first = fakeSpeaker();
+    await createVoiceTurnHandler({
+      qRuntime: fakeRuntime().service,
+      qStream: answer(C10B_TURNS.topThree.said, C10B_FIT_BLOCKS),
+      logger,
+    })(
+      line,
+      [{ role: "user", content: C10B_TURNS.topThree.asked }],
+      new AbortController().signal,
+      first,
+    );
+    const said = first.spoken.join(" ");
+    expect(said).toContain(
+      "Halyard Security, Clearwater Assurance and Tensorgate",
+    );
+    expect(said).not.toMatch(/top 10|fits best|out of 10|Pros and cons/u);
+
+    // Turn 2, a voice that speaks for itself: it gets Tensorgate's facts,
+    // from the card the first answer showed.
+    const second = fakeSpeaker();
+    const handed: SpokenFacts[] = [];
+    await createVoiceTurnHandler({
+      qRuntime: fakeRuntime().service,
+      qStream: answer(C10B_TURNS.third.said, C10B_OPEN_BLOCKS),
+      logger,
+    })(
+      line,
+      [
+        { role: "user", content: C10B_TURNS.topThree.asked },
+        { role: "agent", content: said },
+        { role: "user", content: C10B_TURNS.third.asked },
+      ],
+      new AbortController().signal,
+      { ...second, facts: (facts: SpokenFacts) => handed.push(facts) },
+    );
+    expect(handed).toHaveLength(1);
+    expect(handed[0]?.kind).toBe("RECORD");
+    expect(handed[0]?.mustSay).toEqual(["Tensorgate", "8.8"]);
+    expect(second.spoken.join(" ")).not.toContain('Opening "Tensorgate"');
+  });
+
   it("carries the screen to the planner, and the screen follows the answer's navigation block, never the words (R21, ADR 0011)", async () => {
     const runtime = fakeRuntime();
     const board = createVoiceTurnBoard();
@@ -1260,7 +1328,10 @@ describe("a spoken question for Q", () => {
     const turn = board.read("vs-1");
     expect(turn.navigate).toBe("DISCOVER");
     expect(turn.clientAction).toEqual({ kind: "SET_THEME", theme: "dark" });
-    expect(speaker.spoken.join(" ")).toContain("Taking you to Discover.");
+    // Said from its facts in Q's own words, never the template (founder
+    // live 2026-10-08).
+    expect(speaker.spoken.join(" ")).toContain("Discover");
+    expect(speaker.spoken.join(" ")).not.toContain("Taking you to");
   });
 
   it("moves nothing when Q's answer carries no navigation, whatever was said", async () => {

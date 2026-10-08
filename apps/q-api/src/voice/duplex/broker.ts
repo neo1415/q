@@ -29,6 +29,8 @@ import type {
 } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 
+import { factsForVoice, type SpokenFacts } from "@capital-q/q-core";
+
 import type { VoiceSessionBinding } from "../bindings.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
 import { withoutWrittenLaugh } from "../providers/speech-markup.js";
@@ -113,6 +115,25 @@ export function forRealtime(said: string): {
   return { say: parts.join(" "), amused };
 }
 const SPOKEN_MAX = 6_000;
+
+/**
+ * What ask_q returns for a code-built answer (founder live 2026-10-08):
+ * the facts to say in the voice's own words, what must be said, the open
+ * door, and a line built from the same facts as an example of their
+ * content (never to be read out).
+ */
+export function askQFactsOutput(
+  facts: SpokenFacts,
+): Readonly<Record<string, unknown>> {
+  return {
+    ok: true,
+    speakInYourOwnWords: true,
+    facts: factsForVoice(facts),
+    mustSay: facts.mustSay,
+    ...(facts.next === null ? {} : { next: facts.next }),
+    example: facts.fallback,
+  };
+}
 
 export type DuplexFallbackReason =
   | "OFF"
@@ -245,8 +266,11 @@ function collectingSpeaker(
   narrate?: (beat: QSilenceBeat) => void,
 ): VoiceSpeaker & {
   readonly said: () => string;
+  /** The facts of a code-built answer, for the voice to say itself. */
+  readonly heldFacts: () => SpokenFacts | null;
 } {
   let text = "";
+  let held: SpokenFacts | null = null;
   const add = (part: string) => {
     if (text.length >= SPOKEN_MAX) return;
     const trimmed = part.trim();
@@ -268,7 +292,13 @@ function collectingSpeaker(
     narrate,
     // Nothing collected here is heard until ask_q returns.
     deferred: true,
+    // Founder live 2026-10-08: the realtime model read code templates
+    // aloud. It is a conversational voice; it gets the facts and speaks.
+    facts: (facts) => {
+      held = facts;
+    },
     said: () => text.slice(0, SPOKEN_MAX),
+    heldFacts: () => held,
   };
 }
 
@@ -566,6 +596,10 @@ export function createDuplexBroker(
           );
           if (outcome.kind === "INTERRUPTED" || abort.aborted) {
             return output({ ok: false, interrupted: true });
+          }
+          const facts = speaker.heldFacts();
+          if (facts !== null) {
+            return output(askQFactsOutput(facts));
           }
           const { say, amused } = forRealtime(said);
           return output(
