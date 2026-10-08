@@ -782,7 +782,7 @@ export const SHOW = "client.q_room.show" as const;
 export const ShowInputSchema = z
   .object({
     object: QRoomObjectSchema.describe(
-      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. Q_DOCUMENT: a document you made for them (their draft deck, one-pager or memo), by its id from its card or list_my_documents, or by its title; with neither, their latest. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name). READINESS / ACTION_PLAN / FOLLOW_UPS: a founder's own readiness (what could stop their raise, each pillar in words), their action plan, or the questions Q still wants answered (no id or name). ASSUMPTIONS / EVIDENCE_BOARD: for an investor, one company's claims they may see, as assumptions to test with questions, or as evidenced / claimed / not known yet (by company id or name). THESIS: an investor's own 'how Q reads your thesis'. SAVED_COMPARISON: an investor's saved companies side by side. INVESTOR_FIT: for a founder, investors by what they publish and their gates (no id or name for these three). READINESS_BLUEPRINT: a founder's own 3/6/12-month plan, each step with the gap it closes (no id or name). INVESTOR_LOOKS_FOR: for a founder, what one investor looks for (their public profile and published gate criteria only, met / not met / not known yet for the founder's company) with 'Draft my application' for the founder to review and send (by investor id or name); use it for 'what does X look for' and 'draft my application to X'.",
+      "COMPANY_PROFILE: a company's profile summary. DATA_ROOM / PITCH_DECK: that company's data room list or pitch deck. Q_DOCUMENT: a document you made for them (their draft deck, one-pager or memo), by its id from its card or list_my_documents, or by its title; with neither, their latest. CHAT_WITH_COMPANY / CHAT_WITH_INVESTOR: the chat with that company or investor organisation. WORK_PLAN: one of Q's work items for them, with its plan. CAPITAL_ROUND: one of their rounds. GATEQ_APPLICATION: one founder's application in their GateQ inbox. SOURCES: the news and web sources this answer read, as cards (no id or name). READINESS / ACTION_PLAN / FOLLOW_UPS: a founder's own readiness (what could stop their raise, each pillar in words), their action plan, or the questions Q still wants answered (no id or name). ASSUMPTIONS / EVIDENCE_BOARD: for an investor, one company's claims they may see, as assumptions to test with questions, or as evidenced / claimed / not known yet (by company id or name). THESIS: an investor's own 'how Q reads your thesis'. SAVED_COMPARISON: an investor's saved companies side by side. INVESTOR_FIT: for a founder, investors by what they publish and their gates (no id or name for these three). READINESS_BLUEPRINT: a founder's own 3/6/12-month plan, each step with the gap it closes (no id or name). INVESTOR_LOOKS_FOR: for a founder, what one investor looks for (their public profile and published gate criteria only, met / not met / not known yet for the founder's company) with 'Draft my application' for the founder to review and send (by investor id or name); use it for 'what does X look for' and 'draft my application to X'. INVESTOR_REQUESTS: for a founder, what investors asked them for (documents and questions, open first; no id or name). DOCUMENT_ACCESS: for a founder, who can see each of their documents (no id or name).",
     ),
     id: z
       .string()
@@ -940,6 +940,21 @@ async function roomRecord(
         named.find((item) => item.id.toLowerCase() === id)?.name ??
         "the investor";
       return { id, title };
+    }
+    case "INVESTOR_REQUESTS":
+    case "DOCUMENT_ACCESS": {
+      // Founder documents: their own company's, server-resolved.
+      const own = await ports.appActions
+        ?.ownCompanyId?.(actor)
+        .catch(() => null);
+      if (own === null || own === undefined) return null;
+      return {
+        id: own.toLowerCase(),
+        title:
+          input.object === "INVESTOR_REQUESTS"
+            ? "What investors asked you for"
+            : "Who can see your documents",
+      };
     }
     case "READINESS_BLUEPRINT": {
       // Q.04: their own company's plan, server-resolved (founder-private).

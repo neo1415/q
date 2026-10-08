@@ -421,6 +421,15 @@ export const Q_ROOM_OBJECTS = [
    */
   "READINESS_BLUEPRINT",
   "INVESTOR_LOOKS_FOR",
+  /**
+   * Founder documents (2026-10-08). INVESTOR_REQUESTS: what investors
+   * asked the founder's company for (documents and questions, each with
+   * its state). DOCUMENT_ACCESS: who can see each of the company's
+   * documents. Both are the founder's own company's, server-resolved (the
+   * id is their own company's).
+   */
+  "INVESTOR_REQUESTS",
+  "DOCUMENT_ACCESS",
 ] as const;
 export const QRoomObjectSchema = z.enum(Q_ROOM_OBJECTS);
 export type QRoomObject = z.infer<typeof QRoomObjectSchema>;

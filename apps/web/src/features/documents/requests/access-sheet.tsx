@@ -437,15 +437,20 @@ export function AccessSheet({
   companyId,
   target,
   onClose,
+  initial = null,
 }: {
   readonly companyId: string;
   readonly target: AccessTarget | null;
   readonly onClose: () => void;
+  /** Already read (the design harness); otherwise read on open. */
+  readonly initial?: DocumentAccessDto | FolderAccessDto | null;
 }) {
   const [documentAccess, setDocumentAccess] =
-    useState<DocumentAccessDto | null>(null);
+    useState<DocumentAccessDto | null>(
+      initial !== null && "grants" in initial ? initial : null,
+    );
   const [folderAccess, setFolderAccess] = useState<FolderAccessDto | null>(
-    null,
+    initial !== null && "investors" in initial ? initial : null,
   );
   const [message, setMessage] = useState<string | null>(null);
 
@@ -463,9 +468,9 @@ export function AccessSheet({
   }, [companyId, target]);
 
   useEffect(() => {
-    if (target === null) return;
+    if (target === null || initial !== null) return;
     void load();
-  }, [target, load]);
+  }, [target, load, initial]);
 
   const close = () => {
     setDocumentAccess(null);
