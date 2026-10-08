@@ -19,6 +19,7 @@ import {
   FOUNDER_DEFINITION_V1,
   FOUNDER_STEP_CONTEXTS,
   FOUNDER_STEPS,
+  FOUNDER_FINANCIAL_WRITE_TARGET,
   FOUNDER_WRITE_TARGETS,
   normaliseWebsite,
   onboardingDefinitionIds,
@@ -85,8 +86,12 @@ describe("Founder Definition v1", () => {
     const providers = new Set(
       createFounderStepContextProviders(noDomain).map((p) => p.key),
     );
+    // v4 adds the financials block's target alongside the v1 set.
     expect([...handlers].sort()).toEqual(
-      Object.values(FOUNDER_WRITE_TARGETS).sort(),
+      [
+        ...Object.values(FOUNDER_WRITE_TARGETS),
+        FOUNDER_FINANCIAL_WRITE_TARGET,
+      ].sort(),
     );
     expect([...providers].sort()).toEqual(
       Object.values(FOUNDER_STEP_CONTEXTS).sort(),
