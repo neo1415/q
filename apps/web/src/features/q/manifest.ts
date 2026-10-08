@@ -6,6 +6,7 @@ import type {
   QPageManifest,
 } from "@capital-q/contracts";
 
+import { manifestControls, subscribeControls } from "./control/registry";
 import { wireNow, type WireContracts } from "./wire";
 import {
   isUuid,
@@ -71,6 +72,10 @@ function changed(): void {
     for (const listener of listeners) listener();
   });
 }
+
+// RECOVERY-2026-10 (C1): a control registering or leaving moves the
+// sequence like a section does, so a receipt's seq reads the new page.
+subscribeControls(changed);
 
 export function subscribeManifest(listener: () => void): () => void {
   listeners.add(listener);
@@ -240,11 +245,13 @@ export function currentManifest(): QPageManifest | undefined {
   const wire = wireNow();
   const shown = [...sections.values()].filter((entry) => !hidden(entry.id));
   const stack = dialogStack();
+  const controls = manifestControls();
   if (
     shown.length === 0 &&
     stack.length === 0 &&
     tab === null &&
-    focus === null
+    focus === null &&
+    controls.length === 0
   ) {
     return undefined;
   }
@@ -271,6 +278,7 @@ export function currentManifest(): QPageManifest | undefined {
     ...(focus === null || (wire === null && !isUuid(focus.id))
       ? {}
       : { focus }),
+    ...(controls.length === 0 ? {} : { controls }),
   };
   if (wire === null) return manifest;
   const parsed = wire.QPageManifestSchema.safeParse(manifest);

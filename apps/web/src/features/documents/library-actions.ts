@@ -104,11 +104,21 @@ export async function loadLibraryPageAction(
   }
 }
 
+/**
+ * RECOVERY-2026-10: the browser's one key for this intent (the same when
+ * it retries), sent as the Idempotency-Key, so the change runs once.
+ */
+const IntentKey = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{8,128}$/)
+  .optional();
+
 const Rename = z
   .object({
     documentId: z.string().uuid(),
     title: z.string().trim().min(1).max(200),
     expectedVersion: z.number().int().min(1),
+    intentKey: IntentKey,
   })
   .strict();
 
@@ -123,10 +133,15 @@ export async function renameDocumentAction(
     return { ok: false, message: "That name didn't save. Try again." };
   }
   try {
-    const out = await renameDocument(current.api, input.data.documentId, {
-      title: input.data.title,
-      expectedVersion: input.data.expectedVersion,
-    });
+    const out = await renameDocument(
+      current.api,
+      input.data.documentId,
+      {
+        title: input.data.title,
+        expectedVersion: input.data.expectedVersion,
+      },
+      input.data.intentKey,
+    );
     return { ok: true, value: { title: out.title, version: out.version } };
   } catch {
     return {
@@ -138,7 +153,11 @@ export async function renameDocumentAction(
 }
 
 const Archive = z
-  .object({ documentId: z.string().uuid(), archived: z.boolean() })
+  .object({
+    documentId: z.string().uuid(),
+    archived: z.boolean(),
+    intentKey: IntentKey,
+  })
   .strict();
 
 /** Delete (archive) or bring back; deleting can always be undone. */
@@ -151,9 +170,12 @@ export async function archiveDocumentAction(
     return { ok: false, message: "That didn't go through. Try again." };
   }
   try {
-    const out = await archiveDocument(current.api, input.data.documentId, {
-      archived: input.data.archived,
-    });
+    const out = await archiveDocument(
+      current.api,
+      input.data.documentId,
+      { archived: input.data.archived },
+      input.data.intentKey,
+    );
     return { ok: true, value: { version: out.version } };
   } catch {
     return { ok: false, message: "That didn't go through. Try again." };

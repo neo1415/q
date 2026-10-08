@@ -236,6 +236,8 @@ describe("the documents library", () => {
     expect(library.archiveDocumentAction).toHaveBeenCalledWith({
       documentId: upload(8).id,
       archived: true,
+      // One key per intent (RECOVERY security fix): a retry runs once.
+      intentKey: expect.stringMatching(/^intent-/u) as unknown,
     });
     expect(await screen.findByText('Deleted "FY25 model".')).toBeTruthy();
     expect(
@@ -245,7 +247,15 @@ describe("the documents library", () => {
     expect(library.archiveDocumentAction).toHaveBeenLastCalledWith({
       documentId: upload(8).id,
       archived: false,
+      intentKey: expect.stringMatching(/^intent-/u) as unknown,
     });
+    // The undo is its own intent, with its own key.
+    const keys = library.archiveDocumentAction.mock.calls.map(([input]) =>
+      typeof input === "object" && input !== null && "intentKey" in input
+        ? input.intentKey
+        : null,
+    );
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("asks Q about a document from its menu, and Q's own documents cannot be deleted here", async () => {

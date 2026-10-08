@@ -5,6 +5,8 @@ import { useRef, useState, type KeyboardEvent } from "react";
 
 import type { DocumentsTab } from "@capital-q/contracts";
 
+import { useQControlGroup } from "@/features/q/control/q-control";
+
 /**
  * The Documents tab bar for founders (2026-10-08; design
  * docs/design/2026-10-08/founder-docs): My documents, Requested, Data room.
@@ -21,6 +23,13 @@ const TABS: readonly { readonly key: DocumentsTab; readonly label: string }[] =
     { key: "data-room", label: "Data room" },
   ];
 
+/** Q's ids for the tabs (literal, for the capability parity matrix). */
+const Q_DOCUMENTS_TABS: Readonly<Record<string, string>> = {
+  "tab.mine": '[data-tab="mine"]',
+  "tab.requested": '[data-tab="requested"]',
+  "tab.data-room": '[data-tab="data-room"]',
+} satisfies Record<`tab.${DocumentsTab}`, string>;
+
 export function documentsTabHref(tab: DocumentsTab): string {
   return tab === "mine" ? "/documents" : `/documents?tab=${tab}`;
 }
@@ -34,6 +43,8 @@ export function DocumentsTabBar({
   readonly counts: Partial<Record<DocumentsTab, string>>;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
+  // RECOVERY-2026-10 (C1): each tab, for Q, by its own data-tab marker.
+  useQControlGroup({ kind: "TAB", ref: listRef, ids: Q_DOCUMENTS_TABS });
   const [pick, setPick] = useState<{
     readonly tab: DocumentsTab;
     readonly from: DocumentsTab;

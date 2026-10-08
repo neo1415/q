@@ -9,7 +9,20 @@ import {
   PERSON_ACTIONS,
   qCapabilityId,
 } from "@capital-q/app-actions";
-import { Q_CAPABILITIES } from "@capital-q/q-tools";
+import {
+  Q_CAPABILITIES,
+  Q_CONTROL_CATALOG,
+  Q_CONTROL_KIND_ACTS,
+} from "@capital-q/q-tools";
+import * as prettier from "prettier";
+
+import {
+  collectControls,
+  kindActs,
+  pageRoutes as pageRoutesOf,
+  renderCatalog,
+  renderMatrix,
+} from "../../../scripts/capability-parity/lib.mjs";
 
 /**
  * R20/R33 parity: every HTTP route a person's action reaches, in the
@@ -759,6 +772,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/q-mcp.ts POST Q_MCP_PATH": exempt(
     "the MCP connector surface: an external client calling Q's tools, not a person's action",
   ),
+  // RECOVERY-2026-10 (C2): the screen's receipts of Q's own UI acts.
+  "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST Q_RUNS_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts GET runPath": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_MESSAGES_SUFFIX}`": Q_TRANSPORT,
@@ -1068,6 +1083,9 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_NARRATION_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_HEARD_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_SAID_PATH",
+  // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
+  // conversation's own transport, never a person's action.
+  "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",
 ]);
 
 /**
@@ -1088,6 +1106,78 @@ const HELD_RETRY: ReadonlySet<string> = new Set([
 const READS_BY_POST: ReadonlySet<string> = new Set([
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH",
 ]);
+
+/**
+ * RECOVERY-2026-10 (C6): page controls get the same rule as routes. Every
+ * control a page registers (a literal id, or a PageSection/SettingsCard)
+ * is in the generated catalog operate_screen resolves against, with a Q
+ * capability whose acts cover its kind; the catalog and the Capability
+ * Parity Matrix on disk are current. A new control Q cannot operate --
+ * or a stale row -- fails here.
+ */
+describe("every page control is something Q can operate (RECOVERY C6)", () => {
+  const ROOT = join(APPS, "..");
+
+  it("the catalog lists exactly the controls registered in source", () => {
+    const registered = collectControls(ROOT).map((control) => control.id);
+    expect(registered.length).toBeGreaterThan(50);
+    expect(Q_CONTROL_CATALOG.map((control) => control.id)).toEqual(registered);
+  });
+
+  it("every control has a Q capability whose acts cover its kind", () => {
+    expect(CAPABILITY_IDS.has("tool.operate_screen")).toBe(true);
+    const web = kindActs(ROOT);
+    for (const control of Q_CONTROL_CATALOG) {
+      const acts = Q_CONTROL_KIND_ACTS[control.kind];
+      expect(acts.length, control.id).toBeGreaterThan(0);
+      // The server refuses exactly what the screen cannot do, and no more.
+      expect([...acts], control.id).toEqual(web[control.kind]);
+    }
+  });
+
+  it("the catalog and the matrix on disk are what the generator writes", async () => {
+    const controls = collectControls(ROOT);
+    const format = async (text: string, file: string) =>
+      prettier.format(text, {
+        ...((await prettier.resolveConfig(file)) ?? {}),
+        filepath: file,
+      });
+    const catalogFile = join(
+      ROOT,
+      "packages/q-tools/src/tools/control-catalog.ts",
+    );
+    expect(readFileSync(catalogFile, "utf8")).toBe(
+      await format(renderCatalog(controls), catalogFile),
+    );
+    const matrixFile = join(ROOT, "docs/recovery/capability-parity.md");
+    const actions = [...APP_ACTIONS, ...PERSON_ACTIONS]
+      .map((action) => ({
+        name: action.name,
+        classification: action.classification,
+        capability: qCapabilityId(action),
+        route:
+          action.http === undefined
+            ? null
+            : `${action.http.method} ${action.http.path}`,
+        does: action.does,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    expect(
+      readFileSync(matrixFile, "utf8"),
+      "run node scripts/capability-parity/generate.mjs",
+    ).toBe(
+      await format(
+        renderMatrix({
+          controls,
+          pages: pageRoutesOf(ROOT),
+          actions,
+          acts: kindActs(ROOT),
+        }),
+        matrixFile,
+      ),
+    );
+  });
+});
 
 describe("every route and page is something Q can do, or exempt with a reason (R20/R33)", () => {
   it("every API route call site is classified", () => {

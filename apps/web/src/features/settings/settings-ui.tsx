@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 
+import { QControl } from "@/features/q/control/q-control";
+
 /**
  * Settings building blocks (P5 redesign): a card per group, rows divided by
  * hairlines inside it (doc 18's panel: no shadow at rest, no nested cards).
@@ -21,22 +23,28 @@ export function SettingsCard({
   readonly children: ReactNode;
 }) {
   const headingId = `${id}-heading`;
+  // RECOVERY-2026-10 (C1): each settings group is a section Q can bring
+  // into view by name ("section.<id>").
   return (
-    <section
-      id={id}
-      aria-labelledby={headingId}
-      className="cq-panel scroll-mt-6 overflow-hidden"
-    >
-      <div className="flex flex-col gap-0.5 border-b border-(--cq-border-subtle) px-5 pt-4 pb-3">
-        <h2 id={headingId} className="cq-title-sm text-(--cq-text-primary)">
-          {title}
-        </h2>
-        {description === undefined ? null : (
-          <p className="cq-body-sm text-(--cq-text-secondary)">{description}</p>
-        )}
-      </div>
-      <dl className="cq-panel-rows">{children}</dl>
-    </section>
+    <QControl id={`section.${id}`} kind="SECTION">
+      <section
+        id={id}
+        aria-labelledby={headingId}
+        className="cq-panel scroll-mt-6 overflow-hidden"
+      >
+        <div className="flex flex-col gap-0.5 border-b border-(--cq-border-subtle) px-5 pt-4 pb-3">
+          <h2 id={headingId} className="cq-title-sm text-(--cq-text-primary)">
+            {title}
+          </h2>
+          {description === undefined ? null : (
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {description}
+            </p>
+          )}
+        </div>
+        <dl className="cq-panel-rows">{children}</dl>
+      </section>
+    </QControl>
   );
 }
 

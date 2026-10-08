@@ -23,7 +23,7 @@ describe("spoken navigation follows Q's answer, never the words (ADR 0011, R20)"
           intent: { kind: "NAVIGATE", destination: "DISCOVER" },
         },
       ]),
-    ).toEqual({ navigate: "DISCOVER", clientAction: null });
+    ).toEqual({ navigate: "DISCOVER", clientAction: null, clientActions: [] });
     expect(
       followOfAnswer([
         { kind: "UI_INTENT", intent: { kind: "SET_THEME", theme: "dark" } },
@@ -31,6 +31,7 @@ describe("spoken navigation follows Q's answer, never the words (ADR 0011, R20)"
     ).toEqual({
       navigate: null,
       clientAction: { kind: "SET_THEME", theme: "dark" },
+      clientActions: [{ kind: "SET_THEME", theme: "dark" }],
     });
   });
 
@@ -56,10 +57,44 @@ describe("spoken navigation follows Q's answer, never the words (ADR 0011, R20)"
     expect(followOfAnswer(undefined)).toEqual({
       navigate: null,
       clientAction: null,
+      clientActions: [],
     });
     expect(
       followOfAnswer([{ kind: "TEXT", text: "Take me to the queue page." }]),
-    ).toEqual({ navigate: null, clientAction: null });
+    ).toEqual({ navigate: null, clientAction: null, clientActions: [] });
+  });
+
+  it("RECOVERY C2: a chain of UI acts keeps every step, in the answer's order", () => {
+    const step = (
+      actId: string,
+      act: "SELECT_TAB" | "SCROLL_TO",
+      target: string,
+    ) => ({
+      kind: "UI_ACT" as const,
+      actId,
+      act,
+      target,
+    });
+    const follow = followOfAnswer([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "CAPITAL" },
+      },
+      {
+        kind: "UI_INTENT",
+        intent: step("uia_step000001", "SELECT_TAB", "tab.readiness"),
+      },
+      {
+        kind: "UI_INTENT",
+        intent: step("uia_step000002", "SCROLL_TO", "section.risks"),
+      },
+    ]);
+    expect(follow.navigate).toBe("CAPITAL");
+    expect(
+      follow.clientActions.map((action) =>
+        action.kind === "UI_ACT" ? action.target : null,
+      ),
+    ).toEqual(["tab.readiness", "section.risks"]);
   });
 });
 
