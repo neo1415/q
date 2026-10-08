@@ -32,7 +32,10 @@ async function openLine(
   await trackMicrophones(page);
   await installDuplexFake(page, mode);
   await page.goto("/home");
-  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+  await page
+    .getByRole("button", { name: /Talk with Q/u })
+    .first()
+    .click();
 }
 
 const notice = (page: Page) => page.locator('[role="status"], [role="alert"]');

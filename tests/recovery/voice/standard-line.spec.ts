@@ -22,8 +22,13 @@ import { CAST } from "../support/stack.js";
 test("a voice line that cannot open says so", async ({ browser }) => {
   const page = await (await contextAs(browser, CAST.founder)).newPage();
   await page.goto("/home");
-  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
-  await expect(page.getByText("I couldn't start voice right now. Try again.")).toBeVisible({
+  await page
+    .getByRole("button", { name: /Talk with Q/u })
+    .first()
+    .click();
+  await expect(
+    page.getByText("I couldn't start voice right now. Try again."),
+  ).toBeVisible({
     timeout: 20_000,
   });
 });
@@ -33,14 +38,21 @@ test("a voice line that cannot open says so", async ({ browser }) => {
  * text beside a Dismiss button, in no live region, so a screen reader is
  * never told the line failed.
  */
-test("the voice failure notice is announced (a live region)", async ({ browser }) => {
+test("the voice failure notice is announced (a live region)", async ({
+  browser,
+}) => {
   awaits(["A4"], "defect G-D7: voice failure notice is not in a live region");
   const page = await (await contextAs(browser, CAST.founder)).newPage();
   await page.goto("/home");
-  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+  await page
+    .getByRole("button", { name: /Talk with Q/u })
+    .first()
+    .click();
   await expect(
     page
-      .locator('[role="alert"], [role="status"], [aria-live="polite"], [aria-live="assertive"]')
+      .locator(
+        '[role="alert"], [role="status"], [aria-live="polite"], [aria-live="assertive"]',
+      )
       .filter({ hasText: "I couldn't start voice right now" }),
   ).toBeVisible({ timeout: 20_000 });
 });
@@ -64,7 +76,10 @@ test.describe("standard voice line", () => {
       },
     ]);
     await page.goto("/home");
-    await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+    await page
+      .getByRole("button", { name: /Talk with Q/u })
+      .first()
+      .click();
     await expect
       .poll(() => line.frames(), { timeout: 30_000 })
       .toBeGreaterThan(10);
@@ -80,7 +95,10 @@ test.describe("standard voice line", () => {
     const page = await (await contextAs(browser, CAST.founder)).newPage();
     const line = await installDeepgramFake(page);
     await page.goto("/home");
-    await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+    await page
+      .getByRole("button", { name: /Talk with Q/u })
+      .first()
+      .click();
     await expect
       .poll(() => line.settings() !== null, { timeout: 30_000 })
       .toBe(true);
@@ -96,7 +114,10 @@ test.describe("standard voice line", () => {
     const page = await (await contextAs(browser, CAST.founder)).newPage();
     const line = await installDeepgramFake(page);
     await page.goto("/home");
-    await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+    await page
+      .getByRole("button", { name: /Talk with Q/u })
+      .first()
+      .click();
     await expect
       .poll(() => line.settings() !== null, { timeout: 30_000 })
       .toBe(true);

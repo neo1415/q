@@ -159,7 +159,10 @@ export function promiseSuite(spec: PromiseSpec): void {
       const line = await installDeepgramFake(page);
       await useScript(rules());
       await page.goto("/home");
-      await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+      await page
+        .getByRole("button", { name: /Talk with Q/u })
+        .first()
+        .click();
       await expect
         .poll(() => line.settings() !== null, { timeout: 60_000 })
         .toBe(true);

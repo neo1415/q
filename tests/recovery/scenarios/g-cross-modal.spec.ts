@@ -46,7 +46,10 @@ test("Scenario G: say it, type the follow-up, say the next: one conversation", a
     },
   ]);
   await page.goto("/home");
-  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+  await page
+    .getByRole("button", { name: /Talk with Q/u })
+    .first()
+    .click();
   await expect
     .poll(() => line.settings() !== null, { timeout: 60_000 })
     .toBe(true);
@@ -107,7 +110,10 @@ test("a typed turn while the line is up is heard by the same conversation", asyn
     },
   ]);
   await page.goto("/home");
-  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+  await page
+    .getByRole("button", { name: /Talk with Q/u })
+    .first()
+    .click();
   await expect(composer(page)).toHaveAttribute("placeholder", /Type instead/u, {
     timeout: 60_000,
   });

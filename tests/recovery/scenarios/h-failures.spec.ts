@@ -228,3 +228,41 @@ test("worker restart mid-job: the job resumes instead of staying RUNNING forever
     )
     .toMatch(/"(COMPLETED|FAILED|NEEDS_DECISION|BLOCKED)"/u);
 });
+
+/**
+ * Defect G-D8. q_runtime.runs.screen has CHECK length(screen::text) <= 512
+ * (supabase/migrations/20261015090000_q_run_screen.sql), but the screen
+ * context the web sends carries the page manifest (QPageManifestSchema,
+ * up to 48 controls once C lands). On a busy page the insert violates
+ * runs_screen_check, q-api logs "unhandled request error" (500) and the
+ * person sees "That didn't go through". Observed on /work with 7 pending
+ * decisions. Every page C registers controls on will hit it.
+ */
+test("asking Q from a busy page (Work with pending decisions) gets an answer, not a 500", async ({
+  browser,
+}) => {
+  awaits(
+    ["C2", "lead"],
+    "defect G-D8: screen context larger than runs_screen_check allows",
+  );
+  // Precondition: several decisions are waiting, so the Work page is busy.
+  for (let i = 0; i < 3; i += 1) await pendingReminderApproval(CAST.founder);
+  await useScript([
+    {
+      name: "busy",
+      when: { task: "COMPANY_ANALYST", user: "busy page check" },
+      reply: answer("Answered from a busy page."),
+    },
+  ]);
+  const context = await contextAs(browser, CAST.founder);
+  const page = await context.newPage();
+  await page.goto("/work");
+  await expect(page.getByText(/Needs you/u).first()).toBeVisible();
+  await send(page, "busy page check");
+  await expect(
+    page
+      .locator('[data-q-answer="settled"]')
+      .filter({ hasText: "Answered from a busy page." }),
+  ).toBeVisible({ timeout: 90_000 });
+  await context.close();
+});

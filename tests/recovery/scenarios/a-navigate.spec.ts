@@ -39,11 +39,36 @@ test.afterAll(async () => {
 });
 
 const SURFACES = [
-  { say: "open discover", destination: "DISCOVER", url: /\/discover/u, heading: /Discover/u },
-  { say: "take me to my documents", destination: "DOCUMENTS", url: /\/documents/u, heading: /Documents/u },
-  { say: "show me relationships", destination: "RELATIONSHIPS", url: /\/relationships/u, heading: /Relationships/u },
-  { say: "go to capital", destination: "CAPITAL", url: /\/capital/u, heading: /Capital/u },
-  { say: "open settings", destination: "SETTINGS", url: /\/settings/u, heading: /Settings/u },
+  {
+    say: "open discover",
+    destination: "DISCOVER",
+    url: /\/discover/u,
+    heading: /Discover/u,
+  },
+  {
+    say: "take me to my documents",
+    destination: "DOCUMENTS",
+    url: /\/documents/u,
+    heading: /Documents/u,
+  },
+  {
+    say: "show me relationships",
+    destination: "RELATIONSHIPS",
+    url: /\/relationships/u,
+    heading: /Relationships/u,
+  },
+  {
+    say: "go to capital",
+    destination: "CAPITAL",
+    url: /\/capital/u,
+    heading: /Capital/u,
+  },
+  {
+    say: "open settings",
+    destination: "SETTINGS",
+    url: /\/settings/u,
+    heading: /Settings/u,
+  },
 ] as const;
 const STARTS = [
   "/home",
@@ -61,7 +86,10 @@ for (const start of STARTS) {
         // Defect G-D5 (baseline fe5579c3): asked from the Q dock on any page
         // but the Q page, Q says "Discover is up." and shows an "Open
         // Discover" card (twice) but the page never changes.
-        awaits(["C3"], "defect G-D5: dock navigation is claimed, not performed");
+        awaits(
+          ["C3"],
+          "defect G-D5: dock navigation is claimed, not performed",
+        );
       }
       await useScript([
         reading("TOOL_REQUEST", {

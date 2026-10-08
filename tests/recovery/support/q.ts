@@ -63,7 +63,10 @@ export async function openQ(page: Page): Promise<void> {
 
 /** Starts the voice line (the Q page shows "Talk with Q" twice: stage and composer). */
 export async function talk(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /Talk with Q/u }).first().click();
+  await page
+    .getByRole("button", { name: /Talk with Q/u })
+    .first()
+    .click();
 }
 
 export function settledAnswers(page: Page): Locator {
@@ -73,6 +76,9 @@ export function settledAnswers(page: Page): Locator {
 /** Types a message to Q and waits for Q's settled answer to it. */
 export async function ask(page: Page, text: string): Promise<Locator> {
   await openQ(page);
+  // The dock loads its history after it opens; count once it has settled,
+  // so an old answer arriving late is not taken for the new one.
+  await page.waitForLoadState("networkidle").catch(() => undefined);
   const before = await settledAnswers(page).count();
   await composer(page).fill(text);
   await composer(page).press("Enter");
