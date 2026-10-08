@@ -1,4 +1,5 @@
 import type { ProfileMaterialPort } from "./tools/profile-material.js";
+import type { AttentionPort } from "./tools/attention.js";
 import type { InvestorGateFitDto } from "@capital-q/contracts";
 
 /** Q.05: published gates for the actor's own (founder) company. */
@@ -518,6 +519,12 @@ export type QToolPorts = {
   readonly jobs?: QJobPort | undefined;
   // DAILY block: The Q Daily, read and set by the person's own Q.
   readonly daily?: QDailyToolPort | undefined;
+  /**
+   * RECOVERY-2026-10 B1: the "what needs you" sources no port above holds
+   * (held drafts, workforce jobs, notices, new matches, data-room
+   * requests, what Q did). Absent members leave their source unread.
+   */
+  readonly attention?: AttentionPort | undefined;
 };
 
 /**

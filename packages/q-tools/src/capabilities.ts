@@ -771,6 +771,11 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "RECORDS",
     "Lists every change waiting for their approval, across their conversations.",
   ),
+  tool(
+    "what_needs_me",
+    "RECORDS",
+    "Lists everything waiting on them (messages to answer, approvals, held drafts, stopped agents, requests, calls, reminders, notices, new matches) and what Q did, naming any source it could not check.",
+  ),
   // ADMIN block
   tool(
     "get_my_results",
