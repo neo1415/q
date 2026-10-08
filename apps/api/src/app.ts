@@ -1,3 +1,4 @@
+import type { DealCloseService } from "@capital-q/network";
 import type { CapitalRoundService } from "@capital-q/capital";
 import type {
   CompanyDeckService,
@@ -39,6 +40,7 @@ import {
   registerCommitmentRoutes,
   type CommitmentRoutesDependencies,
 } from "./http/commitments.js";
+import { registerDealCloseRoutes } from "./http/deal-close.js";
 import {
   registerCapitalObjectiveRoutes,
   type CapitalRoutesDependencies,
@@ -301,6 +303,8 @@ export type ApiModules = {
     CommitmentRoutesDependencies["commitments"] | undefined;
   /** Capital rounds (2026-10-04). Absent: the rounds and the book do not register. */
   readonly capitalRounds?: CapitalRoundService | undefined;
+  /** Deal close (2026-10-08): terms, signed, close, reports. Absent: none registers. */
+  readonly deal?: DealCloseService | undefined;
   // BILLING block (ADR 0034): plans, usage, checkout, the Stripe webhook,
   // and the console's billing controls. Absent: none of it registers and
   // nothing is gated.
@@ -596,6 +600,7 @@ export function createApp(
         ? {}
         : { connections: modules.connections }),
       ...(modules.outcomes === undefined ? {} : { outcomes: modules.outcomes }),
+      ...(modules.deal === undefined ? {} : { deal: modules.deal }),
       ...(modules.commitments === undefined
         ? {}
         : { commitments: modules.commitments }),
@@ -774,6 +779,14 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       readiness: modules.readiness,
+    });
+  }
+
+  if (modules.deal !== undefined) {
+    registerDealCloseRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      deal: modules.deal,
     });
   }
 

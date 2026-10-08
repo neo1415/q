@@ -151,6 +151,9 @@ describe("relationship event registry", () => {
       "document_shared",
       "data_room_access_requested",
       "data_room_access_granted",
+      "deal_terms_recorded",
+      "deal_terms_signed",
+      "deal_closed",
     ]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",

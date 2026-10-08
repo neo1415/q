@@ -77,6 +77,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@capital-q/deck-render':
+        specifier: workspace:*
+        version: link:../../packages/deck-render
       '@capital-q/discovery':
         specifier: workspace:*
         version: link:../../packages/discovery

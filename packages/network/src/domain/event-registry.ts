@@ -595,6 +595,67 @@ export const DataRoomAccessGrantedRelationshipEvent = defineRelationshipEvent({
 });
 
 /**
+ * Deal close (founder, 2026-10-08): the terms both sides see, the signature
+ * against the signed document, and the clean end. Each is shared: both
+ * sides are its subject. The terms, money and documents live on their rows
+ * (network.deal_terms, network.deal_closes); the history carries ids only.
+ * relationship-state.v2 reads them as activity (money already moved the
+ * state to INVESTED on receipt); deal-stage.v1 reads them as stages.
+ */
+const DealSideSchema = z.enum(["INVESTOR", "COMPANY"]);
+
+export const DealTermsRecordedPayloadSchema = z
+  .object({
+    termsId: UuidSchema,
+    version: z.number().int().min(1).max(10_000),
+    side: DealSideSchema,
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_DEAL_TERMS_RECORDED =
+  "deal_terms_recorded" as const;
+export const DealTermsRecordedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_DEAL_TERMS_RECORDED,
+  payloadSchema: DealTermsRecordedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "One side recorded the terms (SAFE, note or priced), or a revision of them. Terms, not money: nothing is raised by terms.",
+});
+
+export const DealTermsSignedPayloadSchema = z
+  .object({
+    termsId: UuidSchema,
+    signedDocumentId: UuidSchema,
+    side: DealSideSchema,
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_DEAL_TERMS_SIGNED =
+  "deal_terms_signed" as const;
+export const DealTermsSignedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_DEAL_TERMS_SIGNED,
+  payloadSchema: DealTermsSignedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The current terms were recorded as signed, against the signed document shared with this relationship. E-signature itself happens elsewhere.",
+});
+
+export const DealClosedPayloadSchema = z
+  .object({
+    closeId: UuidSchema,
+    termsId: UuidSchema,
+    commitmentId: UuidSchema,
+    side: DealSideSchema,
+  })
+  .strict();
+export const RELATIONSHIP_EVENT_DEAL_CLOSED = "deal_closed" as const;
+export const DealClosedRelationshipEvent = defineRelationshipEvent({
+  type: RELATIONSHIP_EVENT_DEAL_CLOSED,
+  payloadSchema: DealClosedPayloadSchema,
+  allowedVisibilityScopes: ["relationship_shared"],
+  description:
+    "The investment closed: signed terms and received money. The relationship's clean end.",
+});
+
+/**
  * Production registry: `discovered` (CQ-NET-001), `interest_expressed`
  * (CQ-NET-010), `connection_accepted` and `interest_declined` (CQ-NET-011).
  */
@@ -629,4 +690,7 @@ export const RELATIONSHIP_EVENT_DEFINITIONS: readonly RelationshipEventDefinitio
     DocumentSharedRelationshipEvent,
     DataRoomAccessRequestedRelationshipEvent,
     DataRoomAccessGrantedRelationshipEvent,
+    DealTermsRecordedRelationshipEvent,
+    DealTermsSignedRelationshipEvent,
+    DealClosedRelationshipEvent,
   ];

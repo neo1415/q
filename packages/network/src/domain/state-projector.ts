@@ -34,6 +34,9 @@ import {
   RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_REQUESTED,
   RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_GRANTED,
   RELATIONSHIP_EVENT_DOCUMENT_SHARED,
+  RELATIONSHIP_EVENT_DEAL_CLOSED,
+  RELATIONSHIP_EVENT_DEAL_TERMS_RECORDED,
+  RELATIONSHIP_EVENT_DEAL_TERMS_SIGNED,
 } from "./event-registry.js";
 
 /**
@@ -334,6 +337,12 @@ const ACTIVITY_TYPES_V2: ReadonlySet<string> = new Set([
   // move; viewing or asking is not interest.
   RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_REQUESTED,
   RELATIONSHIP_EVENT_DATA_ROOM_ACCESS_GRANTED,
+  // Deal close (2026-10-08): terms, signature and close are activity for
+  // the relationship state -- the money's receipt already reads INVESTED.
+  // deal-stage.v1 (deal-stage.ts) reads them as the stage strip.
+  RELATIONSHIP_EVENT_DEAL_TERMS_RECORDED,
+  RELATIONSHIP_EVENT_DEAL_TERMS_SIGNED,
+  RELATIONSHIP_EVENT_DEAL_CLOSED,
 ]);
 
 const KNOWN_TYPES_V2: ReadonlySet<string> = new Set([

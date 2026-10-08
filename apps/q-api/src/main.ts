@@ -285,6 +285,7 @@ import {
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
   createCommitmentService,
+  createDealCloseService,
   createRelationshipOutcomeService,
   createConnectionService,
   createInterestService,
@@ -1270,6 +1271,50 @@ const outcomeService = createRelationshipOutcomeService({
   },
   newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
 });
+/**
+ * Deal close (2026-10-08): Q prepares terms, signature and close for the
+ * person's approval and files reports, through the same Network service as
+ * the relationship page.
+ */
+const dealService = createDealCloseService({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests: interestService,
+  appender: createRelationshipEventAppender({
+    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+  }),
+  outbox: interestServiceOptions.outbox,
+  audit: createPostgresMaterialActionAuditWriter(),
+  outcomes: outcomeService,
+  names: async ({ companyId, investorOrganisationId }) => ({
+    company:
+      (await companies.findCanonicalCompany(CompanyIdSchema.parse(companyId)))
+        ?.canonicalName ?? null,
+    investor:
+      (
+        await investors.findCanonicalInvestorOrganisation(
+          InvestorOrganisationIdSchema.parse(investorOrganisationId),
+        )
+      )?.displayName ?? null,
+  }),
+  meetings: async (actor, relationshipId) =>
+    ((await schedule.listMeetings(actor, relationshipId)) ?? [])
+      .filter(
+        (meeting) =>
+          meeting.status !== "CANCELLED" &&
+          Date.parse(meeting.startsAt) <= Date.now(),
+      )
+      .map((meeting) => ({
+        heldAt: meeting.startsAt,
+        title: meeting.purpose,
+        summary: null,
+      })),
+  newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+});
 // An investor's own inbox of founders' Connection Requests (live
 // 2026-10-02): listed and answered through the Network context's own
 // commands. Q never requests a connection, so the founder-side ports
@@ -2199,6 +2244,7 @@ const appActionPorts: OwnReadPorts = {
   schedule,
   pitchUploads: pitchMedia,
   outcomes: outcomeService,
+  deal: dealService,
   diligence: diligenceService,
   dataRoom: profileMaterial.dataRoom,
   companyDeck: profileMaterial.companyDeck,

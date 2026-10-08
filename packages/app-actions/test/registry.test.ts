@@ -342,6 +342,14 @@ describe("the action registry", () => {
         "apply_thesis_suggestion",
         "CONSEQUENTIAL",
       ],
+      // 2026-10-08: deal close on the ONE relationship.
+      ["relationship.deal.change", "relationship_deal", "CONSEQUENTIAL"],
+      ["relationship.deal.terms", "via:relationship_deal", "CONSEQUENTIAL"],
+      ["relationship.deal.signed", "via:relationship_deal", "CONSEQUENTIAL"],
+      ["relationship.deal.close", "via:relationship_deal", "CONSEQUENTIAL"],
+      ["relationship.report.generate", "relationship_report", "INSTANT"],
+      ["relationship.deal.checklist", "deal_checklist", "INSTANT"],
+      ["relationship.deal.status", "relationship_deal_status", "READ"],
     ]);
   });
 });
@@ -551,6 +559,10 @@ describe("delegation: what Q may do on its own", () => {
     "disclosure.raise.share",
     "relationship.outcome.change",
     "relationship.outcome.pass",
+    "relationship.deal.change",
+    "relationship.deal.terms",
+    "relationship.deal.signed",
+    "relationship.deal.close",
     "relationship.interest.decline",
     "relationship.connection_request.decline",
     "investor.mandate.change",

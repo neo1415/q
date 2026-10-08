@@ -404,6 +404,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     cap("tool.read_my"),
   "api/http/commitments.ts GET NETWORK_MY_COMMITMENTS_PATH":
     cap("tool.read_my"),
+  // 2026-10-08: deal close reads. The stage strip is what Q reads with
+  // relationship_deal_status; a report PDF and the audit CSV are files.
+  "api/http/deal-close.ts GET NETWORK_RELATIONSHIP_DEAL_PATH": cap(
+    "tool.relationship_deal_status",
+  ),
+  "api/http/deal-close.ts GET NETWORK_RELATIONSHIP_REPORT_PDF_PATH": DOWNLOAD,
+  "api/http/deal-close.ts GET NETWORK_RELATIONSHIP_AUDIT_EXPORT_PATH": DOWNLOAD,
   "api/http/commitments.ts GET NETWORK_COMPANY_FUNDRAISING_PATH": exempt(
     "the founder's raise in money, shown on Capital; a Q read tool comes later",
   ),
@@ -809,6 +816,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/q-nav": exempt("development-only page"),
   "/dev/q-nav/work": exempt("development-only page"),
   "/dev/workforce": exempt("development-only page"),
+  "/dev/deal-close": exempt("development-only page"),
   "/dev/gateq-v2": exempt("development-only page"),
   "/dev/canvas": exempt("development-only page"),
   "/dev/founder-docs": exempt("development-only page"),

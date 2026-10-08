@@ -304,4 +304,42 @@ export {
   type CommitmentActivityPayload,
 } from "./domain/event-registry.js";
 
+// Deal close (2026-10-08): terms, signature, close, reports on the ONE
+// relationship; the stage strip is deal-stage.v1's reading of its history.
+export {
+  CLOSE_CHECKLIST,
+  DEAL_STAGES,
+  DEAL_STAGE_VERSION,
+  dealNextSteps,
+  draftPassNote,
+  projectDealStage,
+  postCloseCadence,
+  type DealEnd,
+  type DealStage,
+  type DealStageProjection,
+  type DealStep,
+} from "./domain/deal-stage.js";
+export {
+  compileReport,
+  DEAL_REPORT_COMPILER,
+  moneyText,
+  REPORT_POLICY,
+  reportDate,
+  reportDigest,
+  type ReportFacts,
+} from "./domain/deal-reports.js";
+export {
+  createDealCloseService,
+  type DealCloseService,
+  type DealMeetingNote,
+  type DealRefusal,
+  type DealResult,
+  type ReportResult,
+} from "./application/deal-close.js";
+export {
+  RELATIONSHIP_EVENT_DEAL_CLOSED,
+  RELATIONSHIP_EVENT_DEAL_TERMS_RECORDED,
+  RELATIONSHIP_EVENT_DEAL_TERMS_SIGNED,
+} from "./domain/event-registry.js";
+
 export const PACKAGE_NAME = "@capital-q/network" as const;

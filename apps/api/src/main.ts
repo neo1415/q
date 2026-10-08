@@ -114,6 +114,7 @@ import {
 } from "@capital-q/investors";
 import {
   createCommitmentService,
+  createDealCloseService,
   createRelationshipOutcomeService,
   createConnectionService,
   createInterestService,
@@ -1891,6 +1892,59 @@ const schedule = composeSchedule({
   email: unavailableAppEmailSender,
 });
 
+/**
+ * Deal close (2026-10-08): terms, signature and close on the ONE
+ * relationship, and the reports at every stage, through Network's own
+ * appender, audit and outbox. Names come from the canonical query ports;
+ * meetings from the schedule service, as the asking person sees them.
+ */
+const companyNames = createPostgresCompanyQueryPort({ sql: database.sql });
+const investorNames = createPostgresInvestorOrganisationQueryPort({
+  sql: database.sql,
+});
+const deal = createDealCloseService({
+  sql: database.sql,
+  transactions: database.transactions,
+  interests,
+  appender: createRelationshipEventAppender({
+    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+  }),
+  outbox,
+  audit,
+  outcomes,
+  names: async ({ companyId, investorOrganisationId }) => ({
+    company:
+      (
+        await companyNames.findCanonicalCompany(
+          CompanyIdSchema.parse(companyId),
+        )
+      )?.canonicalName ?? null,
+    investor:
+      (
+        await investorNames.findCanonicalInvestorOrganisation(
+          InvestorOrganisationIdSchema.parse(investorOrganisationId),
+        )
+      )?.displayName ?? null,
+  }),
+  meetings: async (actor, relationshipId) =>
+    ((await schedule.listMeetings(actor, relationshipId)) ?? [])
+      .filter(
+        (meeting) =>
+          meeting.status !== "CANCELLED" &&
+          Date.parse(meeting.startsAt) <= Date.now(),
+      )
+      .map((meeting) => ({
+        heldAt: meeting.startsAt,
+        title: meeting.purpose,
+        summary: null,
+      })),
+  newCorrelationId: () => CorrelationIdSchema.parse(createCorrelationId()),
+});
+
 // BILLING block (ADR 0034): plans and usage, the fee ledger, and Stripe
 // when (and only when) the founder has configured both secrets.
 const entitlements = createEntitlementService({ sql: database.sql });
@@ -2193,6 +2247,7 @@ const { app, logger } = createApp(config, security, {
   commitments,
   capitalRounds,
   outcomes,
+  deal,
   diligence,
   // Overnight A3-A7: data room, pitch deck, founder pages.
   dataRoom: profileMaterial.dataRoom,

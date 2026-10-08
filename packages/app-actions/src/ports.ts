@@ -32,6 +32,7 @@ import type {
   CommitmentService,
   ConnectionService,
   InterestService,
+  DealCloseService,
   RelationshipOutcomeService,
 } from "@capital-q/network";
 import type {
@@ -269,6 +270,18 @@ export type AppActionPorts = {
     | Pick<
         RelationshipOutcomeService,
         "pass" | "pause" | "resume" | "recordMeetingOutcome"
+      >
+    | undefined;
+  /** Deal close (2026-10-08): terms, signature, close, reports. */
+  readonly deal?:
+    | Pick<
+        DealCloseService,
+        | "view"
+        | "recordTerms"
+        | "markSigned"
+        | "close"
+        | "tick"
+        | "generateReport"
       >
     | undefined;
   /** Visibility and shares: the visibility centre the page calls. */

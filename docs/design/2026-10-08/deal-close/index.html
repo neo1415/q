@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deal close (design)</title>
+    <!--
+  Deal close (founder, 2026-10-08): "After a meeting, how do we close deals?
+  How do we end the user journey of the investors and the founders and do it
+  cleanly, and have reports generated at every point."
+
+  Query: ?screen=terms|closed|passed|founder &theme=light|dark
+  Fictional company (Tensorgate) and people only.
+
+  Decisions
+  - ONE relationship page, ONE stage strip, both sides: Met · Diligence ·
+    Soft commit · Terms · Signed · Funds received · Closed. Each reached
+    stage shows its date; the current one is the accent; a passed
+    relationship ends the strip with "Passed" (neutral, never red).
+  - The strip is a reading of the relationship's history (deal-stage.v1),
+    never a stored field: the same history always draws the same strip.
+  - "Next step" panel offers only the moves legal from here, for this side.
+    Each opens an approval card showing the exact payload; changing a field
+    means a new card. Q can prepare any of them ("Q, record the SAFE terms").
+  - Money stays in the existing Commitment card (soft commit, sent,
+    received): we do not duplicate it; the strip links to it.
+  - Reports list: one row per report, kind · version · date · who can see
+    it (Shared with Tensorgate / Only your organisation). Download PDF.
+    Generate again creates version n+1; nothing is overwritten.
+  - Final states: Closed shows "Investment closed" summary + post-close
+    checklist (founder) / portfolio entry (investor); Passed shows the
+    archived note and the respectful message that was sent.
+-->
+    <style>
+      :root {
+        --font:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      }
+      [data-theme="light"] {
+        --canvas: #f6f4ef;
+        --surface: #fbfaf7;
+        --raised: #fff;
+        --subtle: #f1ede4;
+        --t1: #16140f;
+        --t2: #4f4a40;
+        --t3: #655e51;
+        --bs: #e7e1d5;
+        --b: #d9d1c1;
+        --accent: #8a6a12;
+        --accent-soft: #f3ead2;
+        --pos: #2f6b3f;
+        --pos-soft: #e3efe2;
+      }
+      [data-theme="dark"] {
+        --canvas: #0f0e0b;
+        --surface: #17150f;
+        --raised: #1d1a13;
+        --subtle: #24211a;
+        --t1: #f4efe2;
+        --t2: #c9c0ab;
+        --t3: #a59c87;
+        --bs: #2a261c;
+        --b: #3a3427;
+        --accent: #c9a227;
+        --accent-soft: #2e2714;
+        --pos: #8fcf9c;
+        --pos-soft: #1d2a1f;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--t1);
+        font: 15px/1.5 var(--font);
+      }
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+      @media (min-width: 900px) {
+        .wrap {
+          padding: 32px 32px 64px;
+        }
+      }
+      h1 {
+        font-size: 26px;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-size: 17px;
+        margin: 0 0 10px;
+      }
+      .muted {
+        color: var(--t2);
+      }
+      .tert {
+        color: var(--t3);
+        font-size: 13px;
+      }
+      .hero {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: var(--subtle);
+        display: grid;
+        place-items: center;
+        font-weight: 600;
+        color: var(--t2);
+      }
+      /* Stage strip */
+      .strip {
+        list-style: none;
+        margin: 0 0 24px;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(var(--n, 7), minmax(0, 1fr));
+        gap: 6px;
+      }
+      .strip li {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+      .bar {
+        height: 6px;
+        border-radius: 3px;
+        background: var(--bs);
+      }
+      .done .bar {
+        background: var(--t3);
+      }
+      .now .bar {
+        background: var(--accent);
+      }
+      .strip .label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--t2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .now .label {
+        color: var(--t1);
+        font-weight: 600;
+      }
+      .strip .date {
+        font-size: 12px;
+        color: var(--t3);
+      }
+      .final .bar {
+        background: var(--t2);
+      }
+      @media (max-width: 720px) {
+        .strip {
+          grid-template-columns: 1fr;
+          gap: 0;
+          border-left: 2px solid var(--bs);
+          padding-left: 14px;
+        }
+        .strip li {
+          flex-direction: row;
+          justify-content: space-between;
+          padding: 6px 0;
+          position: relative;
+        }
+        .strip .bar {
+          position: absolute;
+          left: -20px;
+          top: 12px;
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+        }
+      }
+      .grid {
+        display: grid;
+        gap: 24px;
+      }
+      @media (min-width: 960px) {
+        .grid {
+          grid-template-columns: minmax(0, 1fr) 22rem;
+        }
+      }
+      .card {
+        background: var(--raised);
+        border: 1px solid var(--bs);
+        border-radius: 16px;
+        padding: 18px;
+      }
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .choices {
+        display: grid;
+        gap: 8px;
+      }
+      .choice {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        min-height: 52px;
+        padding: 10px 14px;
+        border: 1px solid var(--b);
+        border-radius: 12px;
+        background: var(--surface);
+        color: var(--t1);
+        font: inherit;
+        text-align: left;
+      }
+      .choice.primary {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .choice small {
+        display: block;
+        color: var(--t3);
+        font-size: 13px;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 9rem 1fr;
+        gap: 6px 12px;
+        font-size: 14px;
+        margin: 0;
+      }
+      .kv dt {
+        color: var(--t3);
+      }
+      .kv dd {
+        margin: 0;
+      }
+      .approve {
+        border: 1px solid var(--accent);
+        border-radius: 16px;
+        padding: 16px;
+        background: var(--surface);
+      }
+      .approve h3 {
+        margin: 0 0 4px;
+        font-size: 15px;
+      }
+      .btns {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      .btn {
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: 10px;
+        border: 1px solid var(--b);
+        background: var(--raised);
+        color: var(--t1);
+        font: inherit;
+        font-weight: 500;
+      }
+      .btn.primary {
+        background: var(--t1);
+        color: var(--canvas);
+        border-color: var(--t1);
+      }
+      .reports {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .reports li {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-top: 1px solid var(--bs);
+        align-items: center;
+      }
+      .reports li:first-child {
+        border-top: 0;
+      }
+      .vis {
+        font-size: 12px;
+        color: var(--t2);
+        border: 1px solid var(--b);
+        border-radius: 999px;
+        padding: 2px 8px;
+        white-space: nowrap;
+      }
+      .check {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .check li {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        min-height: 44px;
+      }
+      .box {
+        width: 20px;
+        height: 20px;
+        border: 1.5px solid var(--b);
+        border-radius: 5px;
+        flex: none;
+        display: grid;
+        place-items: center;
+        font-size: 13px;
+      }
+      .box.on {
+        background: var(--pos-soft);
+        border-color: var(--pos);
+        color: var(--pos);
+      }
+      .end {
+        border-left: 3px solid var(--t3);
+        padding: 4px 0 4px 14px;
+      }
+      .q {
+        border: 1px solid var(--bs);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: var(--surface);
+      }
+      .q b {
+        color: var(--accent);
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="hero">
+        <div class="avatar" id="av">TG</div>
+        <div>
+          <h1 id="who">Tensorgate</h1>
+          <div class="muted" id="line">
+            Terms are next: Seed SAFE, $250,000 soft commit confirmed.
+          </div>
+        </div>
+      </div>
+
+      <ol class="strip" id="strip" aria-label="Where this deal is"></ol>
+
+      <div class="grid">
+        <div class="stack">
+          <!-- TERMS (investor) -->
+          <section class="card" data-screen="terms">
+            <h2>Next step</h2>
+            <div class="choices">
+              <button class="choice primary">
+                Record the terms
+                <small
+                  >SAFE or term sheet: cap, discount, pro-rata. Both sides see
+                  them.</small
+                ><span>›</span>
+              </button>
+              <button class="choice">
+                Continue diligence
+                <small>3 questions open, 1 document requested</small
+                ><span>›</span>
+              </button>
+              <button class="choice">
+                Decide not to proceed
+                <small>Q drafts a respectful note for you to approve</small
+                ><span>›</span>
+              </button>
+            </div>
+          </section>
+          <section class="approve" data-screen="terms">
+            <h3>Record the terms with Tensorgate</h3>
+            <div class="tert" style="margin-bottom: 10px">
+              Approve exactly this. Changing a field prepares a new card.
+            </div>
+            <dl class="kv">
+              <dt>Instrument</dt>
+              <dd>Post-money SAFE</dd>
+              <dt>Investment</dt>
+              <dd>USD 250,000.00</dd>
+              <dt>Valuation cap</dt>
+              <dd>USD 8,000,000.00 post-money</dd>
+              <dt>Discount</dt>
+              <dd>Not set</dd>
+              <dt>Pro-rata</dt>
+              <dd>Side letter</dd>
+              <dt>Document</dt>
+              <dd>Tensorgate-SAFE-draft-v2.pdf (shared in the data room)</dd>
+            </dl>
+            <div class="btns">
+              <button class="btn primary">Approve and record</button
+              ><button class="btn">Edit</button
+              ><button class="btn">Not now</button>
+            </div>
+          </section>
+
+          <!-- CLOSED (founder) -->
+          <section class="card" data-screen="closed founder">
+            <h2>Investment closed</h2>
+            <p class="muted" style="margin-top: 0">
+              Northwind Ventures invested <b>USD 250,000.00</b> on a post-money
+              SAFE (cap USD 8,000,000.00). Signed 2 Oct, funds received 6 Oct,
+              closed 7 Oct. Counted in Seed round.
+            </p>
+            <h2 style="margin-top: 14px">Investor onboarded</h2>
+            <ul class="check">
+              <li><span class="box on">✓</span>Signed SAFE filed</li>
+              <li>
+                <span class="box on">✓</span>Funds received and counted in Seed
+              </li>
+              <li>
+                <span class="box"></span>Add Northwind to your update list
+              </li>
+              <li>
+                <span class="box"></span>Agree the update cadence (Q suggests
+                monthly for the first 6 months)
+              </li>
+              <li>
+                <span class="box"></span>Note any side-letter rights (pro-rata)
+              </li>
+            </ul>
+          </section>
+
+          <!-- PASSED (investor) -->
+          <section class="card" data-screen="passed">
+            <h2>Where this stands</h2>
+            <div class="end">
+              <div>
+                <b>You decided not to proceed</b> on 5 Oct. Archived, never
+                deleted: the history and reports stay.
+              </div>
+              <div class="tert">
+                Reason (only your organisation): Stage, too early for our fund.
+              </div>
+            </div>
+            <h2 style="margin-top: 16px">The note Tensorgate received</h2>
+            <div class="q">
+              Thank you for the time and the openness through diligence. We've
+              decided not to proceed at this stage: it's earlier than our fund
+              invests. We'd be glad to hear from you as the round comes together
+              at Series A. We wish you and the team every success.
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Reports</h2>
+            <ul class="reports" id="reports"></ul>
+            <div class="btns">
+              <button class="btn">Generate a report</button
+              ><button class="btn">Export audit trail (CSV)</button>
+            </div>
+          </section>
+        </div>
+
+        <aside class="stack">
+          <div class="q">
+            <b>Q</b> · "Where are we with Tensorgate?"<br /><span
+              class="muted"
+              id="qsays"
+              >Soft commit of USD 250,000 confirmed on 29 Sept. Terms are next;
+              a SAFE draft is in the data room. 3 diligence questions are still
+              open.</span
+            >
+          </div>
+          <section class="card" data-screen="terms closed founder">
+            <h2>Commitment</h2>
+            <dl class="kv">
+              <dt>Amount</dt>
+              <dd>USD 250,000.00</dd>
+              <dt>Level</dt>
+              <dd id="lvl">Soft · confirmed</dd>
+              <dt>Round</dt>
+              <dd>Seed (SAFE)</dd>
+            </dl>
+          </section>
+        </aside>
+      </div>
+    </div>
+    <script>
+      const q = new URLSearchParams(location.search);
+      const screen = q.get("screen") ?? "terms";
+      document.documentElement.dataset.theme = q.get("theme") ?? "light";
+      const stages = [
+        "Met",
+        "Diligence",
+        "Soft commit",
+        "Terms",
+        "Signed",
+        "Funds received",
+        "Closed",
+      ];
+      const dates = [
+        "18 Sept",
+        "22 Sept",
+        "29 Sept",
+        "1 Oct",
+        "2 Oct",
+        "6 Oct",
+        "7 Oct",
+      ];
+      const reached = { terms: 3, closed: 7, founder: 7, passed: 2 }[screen];
+      const strip = document.getElementById("strip");
+      stages.forEach((label, i) => {
+        if (screen === "passed" && i >= reached) return;
+        const li = document.createElement("li");
+        const done = i < reached;
+        const now =
+          screen !== "passed" &&
+          i === reached - 1 + (screen === "terms" ? 1 : 0);
+        li.className = now ? "now" : done ? "done" : "";
+        li.innerHTML = `<div class="bar"></div><span class="label">${label}</span><span class="date">${done ? dates[i] : now ? "Next" : ""}</span>`;
+        if (now) li.setAttribute("aria-current", "step");
+        strip.append(li);
+      });
+      if (screen === "passed") {
+        const li = document.createElement("li");
+        li.className = "final now";
+        li.innerHTML = `<div class="bar"></div><span class="label">Passed</span><span class="date">5 Oct</span>`;
+        strip.append(li);
+        strip.style.setProperty("--n", "3");
+      }
+      const reports = {
+        terms: [
+          ["Investment memo", "v1 · 29 Sept", "Only your organisation"],
+          ["Diligence report", "v2 · 28 Sept", "Shared with Tensorgate"],
+          ["Meeting summary", "v1 · 18 Sept", "Shared with Tensorgate"],
+        ],
+        closed: [
+          ["Closing report", "v1 · 7 Oct", "Shared with Northwind"],
+          ["Diligence report", "v2 · 28 Sept", "Shared with Northwind"],
+          ["Meeting summary", "v1 · 18 Sept", "Shared with Northwind"],
+        ],
+        founder: [
+          ["Closing report", "v1 · 7 Oct", "Shared with Northwind"],
+          ["Diligence report", "v2 · 28 Sept", "Shared with Northwind"],
+        ],
+        passed: [
+          ["Pass report", "v1 · 5 Oct", "Only your organisation"],
+          ["Diligence report", "v1 · 24 Sept", "Shared with Tensorgate"],
+          ["Meeting summary", "v1 · 18 Sept", "Shared with Tensorgate"],
+        ],
+      }[screen];
+      document.getElementById("reports").innerHTML = reports
+        .map(
+          ([k, v, s]) =>
+            `<li><div><div>${k}</div><div class="tert">${v}</div></div><div style="display:flex;gap:8px;align-items:center"><span class="vis">${s}</span><button class="btn">PDF</button></div></li>`,
+        )
+        .join("");
+      document.querySelectorAll("[data-screen]").forEach((el) => {
+        el.hidden = !el.dataset.screen.split(" ").includes(screen);
+      });
+      if (screen === "closed" || screen === "founder") {
+        document.getElementById("who").textContent = "Northwind Ventures";
+        document.getElementById("av").textContent = "NV";
+        document.getElementById("line").textContent =
+          "Closed: USD 250,000.00 invested. Final.";
+        document.getElementById("lvl").textContent = "Received 6 Oct";
+        document.getElementById("qsays").textContent =
+          "Closed on 7 Oct: USD 250,000 received on a SAFE. Two onboarding items remain: the update list and cadence.";
+      }
+      if (screen === "passed") {
+        document.getElementById("line").textContent =
+          "Not proceeding. Archived on 5 Oct.";
+        document.getElementById("qsays").textContent =
+          "You passed on 5 Oct (reason: stage). They received your note. Nothing further is open.";
+      }
+    </script>
+  </body>
+</html>

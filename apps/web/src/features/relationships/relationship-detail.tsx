@@ -35,6 +35,7 @@ import { callToRecord } from "./call-to-record";
 import { AskQAboutRelationship } from "./relationship-actions";
 import type { CounterpartProfile } from "./relationship-page-data";
 import { RelationshipCommitment } from "./relationship-commitment";
+import { RelationshipDeal } from "./relationship-deal";
 import { RelationshipErrands } from "./relationship-errands";
 import { RelationshipOutcome } from "./relationship-outcome";
 import { nextStepFor, type NextStep } from "./relationships-view";
@@ -190,6 +191,18 @@ export function RelationshipDetail({
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-8">
+          {relationship === null || !connected ? null : (
+            // Deal close (2026-10-08): the stage strip both sides see, the
+            // next step, the terms, the reports and the final state.
+            <Card title="Deal" id="deal">
+              <RelationshipDeal
+                relationshipId={relationship.relationshipId}
+                counterpart={counterpart}
+                side={side}
+              />
+            </Card>
+          )}
+
           {media === null || media === undefined ? null : (
             <Card title="Pitch" id="pitch">
               {media}

@@ -445,6 +445,7 @@ const FEATURES: Readonly<Partial<Record<keyof AppActionPorts, string>>> = {
   capital: "Your raise",
   capitalRounds: "Rounds",
   commitments: "Commitments",
+  deal: "Deal close",
   chat: "Chat",
   chatSafety: "Blocking and reporting in chat",
   companies: "Company profiles",
