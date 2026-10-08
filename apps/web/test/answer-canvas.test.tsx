@@ -179,7 +179,7 @@ describe("the canvas (C1, C3)", () => {
     ]);
     expect(
       screen.getByRole("img", {
-        name: /Fit 8.6 out of 10, from 5 of 6 measures known/u,
+        name: /Mandate fit 8.6 out of 10, from 5 of 6 measures known/u,
       }),
     ).toBeTruthy();
     expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0);

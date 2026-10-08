@@ -1369,6 +1369,8 @@
     border: none;
     background: none;
     color: var(--cq-stage-text);
+    /* Over the video, the same halo as the caption it opens. */
+    text-shadow: var(--cq-feed-halo);
     font: inherit;
     font-size: 14px;
     font-weight: 600;
@@ -2084,8 +2086,14 @@
       background: var(--cq-app-canvas);
     }
     .cq-feed-info,
-    .cq-feed-more-body {
+    .cq-feed-more-body,
+    .cq-feed-more {
       text-shadow: none;
+    }
+    /* a11y (G, 2026-10-08: serious color-contrast): on the app canvas the
+       toggle reads in the app's own text colour, not the stage's white. */
+    .cq-feed-more {
+      color: var(--cq-text-primary);
     }
     .cq-feed-muted,
     .cq-feed-facts dt,

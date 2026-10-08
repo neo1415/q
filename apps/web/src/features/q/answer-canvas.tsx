@@ -24,7 +24,9 @@ import {
   canvasLayout,
   comparesAsTable,
   fitNumber,
+  fitProvenance,
   fitWords,
+  tieLine,
   LEVEL_WORD,
 } from "./answer-canvas-logic";
 import { MapBody } from "./blocks/data-blocks";
@@ -127,15 +129,19 @@ function AnswerCard({
   state,
   reduced,
   actions,
+  tie = null,
 }: {
   readonly card: QAnswerCard;
   readonly rank: number;
   readonly state: "focus" | "rest";
   readonly reduced: boolean;
   readonly actions: AnswerCardActions;
+  /** G-D17: this card's tie with others on mandate fit, said in words. */
+  readonly tie?: string | null | undefined;
 }) {
   const number = fitNumber(card);
   const words = fitWords(card);
+  const provenance = fitProvenance(card);
   return (
     <m.article
       layout={reduced ? false : "position"}
@@ -175,6 +181,17 @@ function AnswerCard({
           {card.line === null ? null : (
             <p className="cq-ac-line">{card.line}</p>
           )}
+          {provenance === null ? null : (
+            // G-D17: how the mandate fit was made, on the card's face.
+            <p className="cq-ac-line" data-ac-fit-provenance>
+              {provenance}
+            </p>
+          )}
+          {tie === null ? null : (
+            <p className="cq-ac-line" data-ac-fit-tie>
+              {tie}
+            </p>
+          )}
         </button>
         {number === null ? (
           <span aria-hidden="true" />
@@ -188,7 +205,7 @@ function AnswerCard({
               {number}
             </span>
             <span className="of" aria-hidden="true">
-              fit, out of 10
+              mandate fit, out of 10
             </span>
           </div>
         )}
@@ -397,8 +414,19 @@ function CompareTable({
                     aria-label={fitWords(card) ?? undefined}
                   >
                     {card.fit.score.toFixed(1)}
-                    <small>of 10</small>
+                    <small>mandate fit, of 10</small>
                   </div>
+                )}
+                {/* G-D17: how it was made, and a tie said as a tie. */}
+                {fitProvenance(card) === null ? null : (
+                  <small className="block" data-ac-fit-provenance>
+                    {fitProvenance(card)}
+                  </small>
+                )}
+                {tieLine(block, card) === null ? null : (
+                  <small className="block" data-ac-fit-tie>
+                    {tieLine(block, card)}
+                  </small>
                 )}
               </th>
             ))}
@@ -571,6 +599,7 @@ export function AnswerCanvas({
                   key={card.key}
                   card={card}
                   rank={block.cards.indexOf(card) + 1}
+                  tie={tieLine(block, card)}
                   state={card.key === focusKey ? "focus" : "rest"}
                   reduced={reduced}
                   actions={actions}
