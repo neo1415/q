@@ -240,6 +240,7 @@ function world(plans: readonly InstructionPlan[], read = threadRead()) {
   const notices: { key: string; title: string; priority: string }[] = [];
   const cards: { actionType: string; words: string }[] = [];
   const planned: string[] = [];
+  const seenPeople: string[] = [];
   let call = 0;
   const engine = createInstructionEngine({
     store: {
@@ -272,6 +273,7 @@ function world(plans: readonly InstructionPlan[], read = threadRead()) {
     introduced: () => Promise.resolve(new Set([REL])),
     plan: (_who, variables) => {
       planned.push(variables.refusals);
+      seenPeople.push(variables.people);
       const next = plans[Math.min(call, plans.length - 1)] ?? null;
       call += 1;
       return Promise.resolve({ plan: next, costUsd: 0.001 });
@@ -283,7 +285,7 @@ function world(plans: readonly InstructionPlan[], read = threadRead()) {
     now: () => FIRED_AT,
     autoEnabled: true,
   });
-  return { engine, row, steps, notices, cards, planned };
+  return { engine, row, steps, notices, cards, planned, seenPeople };
 }
 
 const plan = (...steps: InstructionPlanStep[]): InstructionPlan => ({
@@ -381,10 +383,15 @@ describe("founder side: Tensorgate's instruction answers Zino (8 Oct)", () => {
       plan(),
     ]);
     await engine.fire(row.id, "sched-founder-3");
-    expect(planned).toHaveLength(3);
+    // Two re-plans with code's reasons, then one more because the plan
+    // left Zino's waiting message unanswered.
+    expect(planned).toHaveLength(4);
+    expect(planned[3]).toContain(
+      "NO REPLY PLANNED: Zino Aviation (relationshipId",
+    );
     const waiting = steps.find((step) => step.reasonCode === "REPLY_WAITING");
     expect(waiting?.words).toBe(
-      "Zino Aviation's message is waiting for a reply. I couldn't answer it on my own: they wrote to you first, and the message introduced you as if they hadn't. Reply in the chat, or tell me what to say and I'll send it.",
+      "Zino Aviation's message is waiting for a reply. I couldn't answer it on my own: they wrote to you first, and the message introduced you as if they hadn't (COLD_OPEN_IN_REPLY). Reply in the chat, or tell me what to say and I'll send it.",
     );
     expect(steps.some((step) => step.reasonCode === "NOTHING_TO_DO")).toBe(
       false,
@@ -423,6 +430,37 @@ describe("founder side: Tensorgate's instruction answers Zino (8 Oct)", () => {
           "Looked at 1 person: no unanswered messages, so nothing to send right now. I'll look again when someone writes.",
       }),
     ]);
+  });
+});
+
+describe("an empty plan with a reply waiting (second kick, 08:56)", () => {
+  it("is re-planned once with code's words naming the waiting reply; the planner sees REPLY WAITING and the founder's own earlier words", async () => {
+    ran.length = 0;
+    const { engine, row, planned, steps, seenPeople } = world([
+      plan(),
+      plan(NO_CALL),
+    ]);
+    await engine.fire(row.id, "sched-founder-6");
+    expect(seenPeople[0]).toContain(
+      'REPLY WAITING: they wrote last and no one has answered: write one REPLY now; your side already said: "Thanks for connecting. Tensorgate is a policy gateway',
+    );
+    // The founder's own words only, never Zino's (S6).
+    expect(seenPeople[0]).not.toContain("hardware enclaves and attesting");
+    expect(planned).toHaveLength(2);
+    expect(planned[1]).toContain("NO REPLY PLANNED");
+    expect(ran).toHaveLength(1);
+    expect(steps.some((step) => step.reasonCode === "REPLY_WAITING")).toBe(
+      false,
+    );
+  });
+
+  it("empty again after the nudge: one nudge only, then the founder is told, with NO_REPLY_PLANNED", async () => {
+    const { engine, row, planned, steps } = world([plan()]);
+    await engine.fire(row.id, "sched-founder-7");
+    expect(planned).toHaveLength(2);
+    expect(
+      steps.find((step) => step.reasonCode === "REPLY_WAITING")?.words,
+    ).toContain("my plan had no reply to them (NO_REPLY_PLANNED)");
   });
 });
 

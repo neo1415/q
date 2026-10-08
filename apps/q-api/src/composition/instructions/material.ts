@@ -1,7 +1,8 @@
 import { STAGE_LADDER, stageInRange } from "@capital-q/discovery";
-import type {
-  InstructionMessageAsk,
-  InstructionQuestionKind,
+import {
+  WOO_WORDS_MAX,
+  type InstructionMessageAsk,
+  type InstructionQuestionKind,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
@@ -527,7 +528,12 @@ export function materialLine(
 // The message check: code decides
 // ---------------------------------------------------------------------------
 
-export const MESSAGE_WORDS_MAX = 65;
+/**
+ * Tensorgate, 8 Oct: this was 65 while the planner (v7) and the woo check
+ * ask for 60-120 words and allow up to 160, so a good 70-word reply was
+ * refused MESSAGE_TOO_LONG on every re-plan. One ceiling: the woo check's.
+ */
+export const MESSAGE_WORDS_MAX = WOO_WORDS_MAX;
 
 export const MESSAGE_PROBLEMS = [
   "UNGROUNDED_MESSAGE",

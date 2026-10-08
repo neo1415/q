@@ -184,7 +184,7 @@ describe("the message check", () => {
   });
 
   it("stays short", () => {
-    expect(first(`${GROUNDED} ${"More words here. ".repeat(15)}`)).toBe(
+    expect(first(`${GROUNDED} ${"More words here. ".repeat(60)}`)).toBe(
       "MESSAGE_TOO_LONG",
     );
   });

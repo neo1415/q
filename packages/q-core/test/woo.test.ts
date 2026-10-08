@@ -75,9 +75,9 @@ describe("the woo check", () => {
 
 describe("the prompts carry it", () => {
   const registry = createDefaultPromptRegistry();
-  it("INSTRUCTION_PLAN v7 is active, with the guidance and the new length", () => {
+  it("INSTRUCTION_PLAN v8 is active, with the guidance and the new length", () => {
     const active = registry.getActive("INSTRUCTION_PLAN").definition;
-    expect(active.version).toBe(7);
+    expect(active.version).toBe(8);
     expect(active.template).toContain(WOO_GUIDANCE);
     expect(active.template).toContain("60-120 words, in their tone");
     expect(active.template).not.toContain("At most 60 words");

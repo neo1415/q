@@ -336,7 +336,7 @@ export const INSTRUCTION_PLAN_V7: PromptDefinition<
   InstructionPlanV4Variables,
   InstructionPlanV5Result
 > = {
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -356,6 +356,60 @@ export const INSTRUCTION_PLAN_V7: PromptDefinition<
     schema: InstructionPlanV5ResultSchema,
   },
   template: PLAN_V7_SOURCE,
+};
+
+/**
+ * v8 (Tensorgate, 2026-10-08): a founder's standing instruction "respond
+ * immediately" left Zino's reply unanswered -- the planner sees only typed
+ * facts ("asks a question"), not the question, so under v7's "when the
+ * answer is not there, write no reply" it planned nothing. Now code marks
+ * each conversation where they wrote last and no one answered (REPLY
+ * WAITING, with the person's own earlier words there), and a waiting reply
+ * is always written: answer what the facts allow, never guess, and say the
+ * person will follow up on the rest. Only a question code already took to
+ * the person (terms, money, an undeclared fact) gets no reply.
+ */
+const PLAN_V8_SOURCE = PLAN_V7_SOURCE.replace(
+  "  - A reply to their question answers only from WHO YOU WRITE AS and the approved topics. Where THEIR PEOPLE gives the answer to use, write it word for word and add nothing else about yourself (no other amount, no other role in a round); you may then ask one question. When the answer is not there, or it is about terms or money, write no reply: code takes that question to them.",
+  "  - Where THEIR PEOPLE says REPLY WAITING, they wrote last and no one has answered: write one REPLY to them in this plan. Thank them, take up what their chat line says they wrote about, give one point from WHO YOU WRITE AS or from what your side already said there (those words and numbers are the person's own; use them as written), and end with one soft offer -- the deck, a short note, or a time where meetings are allowed. A reply to their question answers only from those facts and the approved topics; where THEIR PEOPLE gives the answer to use, write it word for word and add nothing else about yourself. When the detail they asked for is not there, never guess: say {{principalName}} will come back on it, and still reply. Write no reply only where THEIR PEOPLE says their question has gone to the person.",
+)
+  .replace(
+    "  - Every fact you state comes from that material or from WHO YOU WRITE AS. Anything not there stays out; never guess a number.",
+    "  - Every fact you state comes from that material, from WHO YOU WRITE AS, or from what your side already said in that conversation. Anything not there stays out; never guess a number.",
+  )
+  .replace(
+    "- Nothing to do now: empty steps.",
+    "- Nothing to do now: empty steps -- never while a REPLY WAITING stands.",
+  )
+  .replace(
+    "(v7, with request, each cannot's needs and each step's message)",
+    "(v8, with request, each cannot's needs and each step's message)",
+  );
+
+export const INSTRUCTION_PLAN_V8: PromptDefinition<
+  InstructionPlanV4Variables,
+  InstructionPlanV5Result
+> = {
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  effectiveFrom: "2026-10-08",
+  id: "INSTRUCTION_PLAN",
+  version: 8,
+  changeDescription:
+    "Tensorgate 2026-10-08: a waiting reply is always written. Code marks REPLY WAITING per conversation with the person's own earlier words there; the planner answers what the facts allow, never guesses, says the person will follow up on the rest, and writes no reply only where code already took their question to the person. Same variables and output as v7.",
+  variables: {
+    schema: InstructionPlanV4VariablesSchema,
+    untrusted: [...INSTRUCTION_PLAN_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: INSTRUCTION_PLAN_SCHEMA_NAME,
+    schemaVersion: INSTRUCTION_PLAN_V5_SCHEMA_VERSION,
+    schema: InstructionPlanV5ResultSchema,
+  },
+  template: PLAN_V8_SOURCE,
 };
 
 const THREAD_READER = `TASK: INSTRUCTION_THREAD_READER
