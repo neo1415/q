@@ -52,6 +52,7 @@ import { loadAppEmailConfig } from "@capital-q/config/app-email";
 import { loadInboundEmailConfig } from "@capital-q/config/inbound-email";
 import { createOutboxWriter } from "@capital-q/eventing";
 import { connectedCompanies } from "./http/your-companies.js";
+import { createInvestorAnswers } from "./investor-answers.js";
 import { createProfileMaterial } from "./profile-material.js";
 import {
   createCorrelationId,
@@ -1624,8 +1625,9 @@ const diligence = createDiligenceService({
       kind: "DILIGENCE",
       title: input.title,
       body: null,
-      // Straight to the relationship's Diligence tab.
-      target: "DILIGENCE",
+      // A request opens the founder's inbox at it (2026-10-08); a share
+      // opens the investor's Diligence tab.
+      target: input.actingSide === "INVESTOR" ? "DOCUMENTS" : "DILIGENCE",
       key: input.key,
       priority: input.priority,
     }),
@@ -1647,6 +1649,8 @@ const profileMaterial = createProfileMaterial({
     slates.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
   investorMayFind: async (actor, companyId) =>
     (await resolveViewableCompany(actor, companyId)) !== null,
+  // 2026-10-08: a request opens the founder's inbox at that request; an
+  // answer opens the investor's view of the company's data room.
   notify: (input) =>
     createCounterpartNotices(database.sql).notify({
       relationshipId: input.relationshipId,
@@ -1654,10 +1658,26 @@ const profileMaterial = createProfileMaterial({
       kind: "DILIGENCE",
       title: input.title,
       body: null,
-      target: "DILIGENCE",
+      target: input.actingSide === "INVESTOR" ? "DOCUMENTS" : "COMPANY_PROFILE",
       key: input.key,
       priority: input.priority,
     }),
+  notifyRequests: (input) =>
+    createCounterpartNotices(database.sql).notify({
+      relationshipId: input.relationshipId,
+      actingSide: input.actingSide,
+      kind: "DILIGENCE",
+      title: input.title,
+      body: null,
+      target: input.target === "REQUESTS" ? "DOCUMENTS" : "COMPANY_PROFILE",
+      key: input.key,
+      priority: input.priority,
+    }),
+  answers: createInvestorAnswers({
+    sql: database.sql,
+    transactions: database.transactions,
+    evidence,
+  }),
 });
 // Q.03/Q.04/Q.01: the founder's own readiness, action plan and Q's
 // follow-up questions. Founder-private (Context Firewall): the company is
@@ -2170,6 +2190,7 @@ const { app, logger } = createApp(config, security, {
   dataRoom: profileMaterial.dataRoom,
   companyDeck: profileMaterial.companyDeck,
   founderPerson: profileMaterial.founderPerson,
+  founderRequests: profileMaterial.founderRequests,
   // BILLING block (ADR 0034)
   billing: {
     entitlements,

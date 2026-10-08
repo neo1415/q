@@ -8,6 +8,7 @@ import {
   UuidSchema,
   type CompanyDeckView,
   type DataRoomView,
+  type InvestorQuestion,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 import { capability } from "@capital-q/security";
@@ -47,6 +48,17 @@ export type ProfileMaterialPort = {
   ) => Promise<CompanyDeckView | null>;
   /** The actor's own company, from their membership on the server. */
   readonly ownCompanyId: (actor: ActorContext) => Promise<string | null>;
+  /**
+   * 2026-10-08: an investor's own questions to the company and the
+   * founder's answers (null: not an investor). Absent: the board shows no
+   * questions.
+   */
+  readonly askedQuestions?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<readonly InvestorQuestion[] | null>)
+    | undefined;
   /**
    * R0: the data-room documents this person may know exist at a company,
    * as the Data room tab authorises them, with what helps find one by

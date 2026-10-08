@@ -2,6 +2,7 @@ import type { CapitalRoundService } from "@capital-q/capital";
 import type {
   CompanyDeckService,
   DataRoomService,
+  FounderRequestsService,
 } from "@capital-q/permissions";
 import {
   registerCompanyMaterialRoutes,
@@ -291,6 +292,8 @@ export type ApiModules = {
   readonly dataRoom?: DataRoomService | undefined;
   readonly companyDeck?: CompanyDeckService | undefined;
   readonly founderPerson?: CompanyMaterialRoutesDependencies["founderPerson"];
+  /** Founder documents (2026-10-08): requests inbox, access editor, answers. */
+  readonly founderRequests?: FounderRequestsService | undefined;
   /** Post-meeting outcomes (2026-10-02). Absent: those routes do not register. */
   readonly outcomes?: NetworkInterestRoutesDependencies["outcomes"] | undefined;
   /** Spec 6.6.14: commitments and the raise. Absent: those routes do not register. */
@@ -603,6 +606,9 @@ export function createApp(
         ? {}
         : { diligence: modules.diligence }),
       ...(modules.dataRoom === undefined ? {} : { dataRoom: modules.dataRoom }),
+      ...(modules.founderRequests === undefined
+        ? {}
+        : { founderRequests: modules.founderRequests }),
       ...(modules.readiness === undefined
         ? {}
         : { readiness: modules.readiness }),
@@ -784,6 +790,7 @@ export function createApp(
       dataRoom: modules.dataRoom,
       companyDeck: modules.companyDeck,
       founderPerson: modules.founderPerson,
+      founderRequests: modules.founderRequests,
     });
   }
 

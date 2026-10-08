@@ -9,6 +9,7 @@ import {
   type DeckFact,
   type DeckSection,
   type DeckSectionCode,
+  type InvestorQuestion,
 } from "@capital-q/contracts";
 
 /**
@@ -277,4 +278,66 @@ export function assumptionBoardText(
     return `- ${a.sectionLabel} · ${a.label}${a.value === null ? "" : `: ${a.value}`} [${labels}]. Ask: ${a.question}`;
   });
   return [head, ...lines].join("\n");
+}
+
+/**
+ * The reader's own questions and the founder's answers on the board
+ * (founder documents, 2026-10-08). A question sent about an assumption is
+ * shown on it as waiting or answered. An answer is the founder's claim:
+ * an unknown becomes CLAIMED (USER_CLAIM, self-reported), and a claim with
+ * a document attached becomes EVIDENCED (document-supported). Nothing is
+ * ever moved down, and nothing is verified by being answered.
+ */
+export function withAskedQuestions(
+  board: AssumptionBoardDto,
+  questions: readonly InvestorQuestion[],
+): AssumptionBoardDto {
+  // Newest first per assumption: the latest question about it stands.
+  const latest = new Map<string, InvestorQuestion>();
+  for (const question of [...questions].sort((a, b) =>
+    b.askedAt.localeCompare(a.askedAt),
+  )) {
+    if (question.assumptionId === null) continue;
+    const current = latest.get(question.assumptionId);
+    // An answered question outranks a newer one still waiting.
+    if (
+      current === undefined ||
+      (current.answer === null && question.answer !== null)
+    )
+      latest.set(question.assumptionId, question);
+  }
+  if (latest.size === 0) return board;
+  const assumptions = board.assumptions.map((assumption): AssumptionDto => {
+    const question = latest.get(assumption.id);
+    if (question === undefined) return assumption;
+    const answer = question.answer;
+    const asked: NonNullable<AssumptionDto["asked"]> = {
+      questionId: question.questionId,
+      askedAt: question.askedAt,
+      answer:
+        answer === null
+          ? null
+          : {
+              text: answer.text,
+              answeredAt: answer.answeredAt,
+              evidenceStatus: answer.evidenceStatus,
+              documents: answer.documents,
+            },
+    };
+    if (answer === null) return { ...assumption, asked };
+    const supported = answer.evidenceStatus === "DOCUMENT_SUPPORTED";
+    if (assumption.standing === "EVIDENCED") return { ...assumption, asked };
+    if (assumption.standing === "CLAIMED" && !supported)
+      return { ...assumption, asked };
+    return {
+      ...assumption,
+      asked,
+      standing: supported ? "EVIDENCED" : "CLAIMED",
+      truthClass: "USER_CLAIM",
+      evidenceStatus: answer.evidenceStatus,
+      unknownReason: null,
+      value: assumption.value ?? answer.text.slice(0, 300),
+    };
+  });
+  return counted(board.companyId, board.basis, board.readAt, assumptions);
 }

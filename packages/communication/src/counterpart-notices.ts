@@ -37,7 +37,18 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
        * own name, read here from the relationship, never from the caller.
        */
       readonly target:
-        "INBOX" | "CHAT" | "RELATIONSHIP" | "DILIGENCE" | "CAPITAL";
+        | "INBOX"
+        | "CHAT"
+        | "RELATIONSHIP"
+        | "DILIGENCE"
+        | "CAPITAL"
+        /**
+         * 2026-10-08: the founder's Documents inbox, opened at this
+         * request or question set (`key` is its id).
+         */
+        | "DOCUMENTS"
+        /** 2026-10-08: the investor's view of the company (data room, answers). */
+        | "COMPANY_PROFILE";
       readonly key: string;
       readonly priority: "NEEDS_YOU" | "UPDATE";
     }): Promise<number> => {
@@ -50,6 +61,10 @@ export function createCounterpartNotices(sql: DatabaseExecutor) {
                                  else c.canonical_name end), 200),
                ${input.body === null ? null : input.body.slice(0, 1000)},
                case
+                 when ${input.target} = 'DOCUMENTS'
+                   then '/documents?tab=requested&item=' || ${encodeURIComponent(input.key)}
+                 when ${input.target} = 'COMPANY_PROFILE'
+                   then '/company/' || r.company_id::text || '#data-room'
                  when ${input.target} = 'CAPITAL' then '/capital'
                  when ${input.target} = 'INBOX' and ${input.actingSide} = 'INVESTOR' then '/company/interest'
                  when ${input.target} = 'INBOX' then '/investors'
