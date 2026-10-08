@@ -153,13 +153,15 @@ export function renameDocument(
   session: ApiSession,
   documentId: string,
   request: RenameDocumentRequest,
+  /** One key per intent: the same on a retry, so it runs once. */
+  idempotencyKey?: string,
 ) {
   return call(
     session,
     "PATCH",
     `${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}`,
     ManagedDocumentSchema,
-    { body: request },
+    { body: request, headers: intentHeaders(idempotencyKey) },
   );
 }
 
@@ -168,14 +170,22 @@ export function archiveDocument(
   session: ApiSession,
   documentId: string,
   request: ArchiveDocumentRequest,
+  /** One key per intent: the same on a retry, so it runs once. */
+  idempotencyKey?: string,
 ) {
   return call(
     session,
     "POST",
     `${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}${DOCUMENT_ARCHIVE_SEGMENT}`,
     ManagedDocumentSchema,
-    { body: request },
+    { body: request, headers: intentHeaders(idempotencyKey) },
   );
+}
+
+function intentHeaders(
+  key: string | undefined,
+): Readonly<Record<string, string>> | undefined {
+  return key === undefined ? undefined : { [IDEMPOTENCY_KEY_HEADER]: key };
 }
 
 /** P3 `GET /v1/documents/:id/file` — a short-lived link to their own file. */

@@ -39,6 +39,7 @@ import {
   materialUploadTargetAction,
 } from "@/features/onboarding-kit/material-actions";
 import { artifactFileUrl } from "@/features/q/artifact-download";
+import { newIntentKey } from "@/features/q/control/intent-key";
 import { useQControlGroup } from "@/features/q/control/q-control";
 
 import { DECK_AUDIENCE_OPTIONS, deckAudienceDescription } from "./deck-sharing";
@@ -567,25 +568,28 @@ export function DocumentLibrary({
     ask: (item) => askAbout(`About "${item.title}": `),
     remove: (item) => {
       setItems((current) => current.filter((entry) => entry.key !== item.key));
-      void archiveDocumentAction({ documentId: item.id, archived: true }).then(
-        (result) => {
-          if (!result.ok) {
-            setItems((current) => mergePage(current, [item]));
-            setNotice({ text: result.message });
-            return;
-          }
-          setNotice({
-            text: `Deleted "${item.title}".`,
-            undo: () => {
-              setNotice(null);
-              void archiveDocumentAction({
-                documentId: item.id,
-                archived: false,
-              }).then(() => void reload());
-            },
-          });
-        },
-      );
+      void archiveDocumentAction({
+        documentId: item.id,
+        archived: true,
+        intentKey: newIntentKey(),
+      }).then((result) => {
+        if (!result.ok) {
+          setItems((current) => mergePage(current, [item]));
+          setNotice({ text: result.message });
+          return;
+        }
+        setNotice({
+          text: `Deleted "${item.title}".`,
+          undo: () => {
+            setNotice(null);
+            void archiveDocumentAction({
+              documentId: item.id,
+              archived: false,
+              intentKey: newIntentKey(),
+            }).then(() => void reload());
+          },
+        });
+      });
     },
   };
 
@@ -964,6 +968,7 @@ export function DocumentLibrary({
                   ),
                 );
                 void renameDocumentAction({
+                  intentKey: newIntentKey(),
                   documentId: item.id,
                   title,
                   expectedVersion: item.version,

@@ -21,6 +21,11 @@ import {
 import { createCorrelationId } from "@capital-q/observability";
 
 import {
+  createActionReplayGuard,
+  idempotencyKeyOf,
+  type ActionReplayGuard,
+} from "./app-action-replay.js";
+import {
   getActorContext,
   requireActorContextHook,
   type ActorContextDependencies,
@@ -45,6 +50,8 @@ import {
 export type AppActionRoutesDependencies = ActorContextDependencies & {
   readonly ports: AppActionPorts;
   readonly actions?: readonly AnyAppAction[] | undefined;
+  /** One run per Idempotency-Key (app-action-replay.ts); a fresh guard by default. */
+  readonly replay?: ActionReplayGuard | undefined;
   /**
    * A service's own failure as the problem its hand-written route used to
    * answer (the video provider's, for pitch uploads); null: not its kind,
@@ -158,6 +165,7 @@ export function registerAppActionRoutes(
   dependencies: AppActionRoutesDependencies,
 ): void {
   const withContext = requireActorContextHook(dependencies);
+  const replay = dependencies.replay ?? createActionReplayGuard();
   for (const action of dependencies.actions ?? APP_ACTIONS) {
     const http = action.http;
     if (http === undefined) continue;
@@ -175,9 +183,29 @@ export function registerAppActionRoutes(
           ),
           "The request is not valid.",
         );
+        // RECOVERY-2026-10: the screen's own key for this intent (the same
+        // on a retry); a malformed one is refused, never silently replaced.
+        const header = idempotencyKeyOf(request.headers);
+        if (header.kind === "INVALID") {
+          return reply
+            .status(422)
+            .type(PROBLEM_CONTENT_TYPE)
+            .send(
+              createProblemDetails({
+                code: "VALIDATION_FAILED",
+                requestId: request.id,
+                detail:
+                  "The Idempotency-Key must be 8 to 255 printable characters without spaces.",
+              }),
+            );
+        }
+        const intentKey =
+          http.idempotencyKeyOf?.(input) ??
+          (header.kind === "KEY" ? header.key : undefined);
+        const actor = getActorContext(request);
         const context: AppActionContext = {
-          actor: getActorContext(request),
-          idempotencyKey: http.idempotencyKeyOf?.(input) ?? request.id,
+          actor,
+          idempotencyKey: intentKey ?? request.id,
           correlationId: CorrelationIdSchema.parse(createCorrelationId()),
           surface: "SCREEN",
         };
@@ -190,8 +218,38 @@ export function registerAppActionRoutes(
           reply.callNotFound();
           return undefined;
         }
-        return answer(request, reply, dependencies, http, input, () =>
-          action.run(dependencies.ports, context, input),
+        const run = () => action.run(dependencies.ports, context, input);
+        if (intentKey === undefined) {
+          return answer(request, reply, dependencies, http, input, run);
+        }
+        // One run per person, action and key; a retry replays its outcome.
+        const decision = replay.once(
+          `${actor.tenantId}:${actor.userId}:${action.name}`,
+          intentKey,
+          input,
+          run,
+        );
+        if (decision.kind === "CONFLICT") {
+          return reply
+            .status(409)
+            .type(PROBLEM_CONTENT_TYPE)
+            .send(
+              createProblemDetails({
+                code: "IDEMPOTENCY_CONFLICT",
+                requestId: request.id,
+              }),
+            );
+        }
+        if (decision.kind === "REPLAY") {
+          void reply.header("Idempotent-Replayed", "true");
+        }
+        return answer(
+          request,
+          reply,
+          dependencies,
+          http,
+          input,
+          () => decision.outcome,
         );
       },
     });
