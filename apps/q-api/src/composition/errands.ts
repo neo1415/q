@@ -1389,6 +1389,11 @@ export function createErrandRunner(dependencies: {
               "Answer what the other side last asked or said, using only the approved brief.",
             material: brief,
             thread,
+            // Code's thread-consistency check reads what they just wrote.
+            theirLatest: fresh
+              .map((message) => message.text ?? "")
+              .join("\n")
+              .slice(0, 4_000),
           },
           await composer.compose({
             actor,

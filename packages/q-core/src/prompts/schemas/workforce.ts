@@ -134,6 +134,67 @@ export const DraftReviewResultSchema = z
   .strict();
 export type DraftReviewResult = z.infer<typeof DraftReviewResultSchema>;
 
+/**
+ * v2 (Zino, 2026-10-08: Tensorgate offered "the deck, or 20 minutes this
+ * week?" and Q answered "would you be open to connecting?"). The reviewer
+ * now reads what code found still open in their latest message (a meeting,
+ * a document, a question) and checks one more integrity rule,
+ * RESPONDS_TO_THREAD, which is never averaged away.
+ *
+ * Its free text is bounded loosely and cut by code: live 2026-10-06/07 a
+ * note a few characters over 300 refused the whole grade twice
+ * (INVALID_MODEL_OUTPUT on both attempts), and the draft was held as
+ * "couldn't be checked". Code keeps 300 per note and 1,000 of feedback.
+ */
+export const DRAFT_REVIEW_V2_SCHEMA_VERSION = 2;
+
+export const DRAFT_INTEGRITY_RULES_V2 = [
+  ...DRAFT_INTEGRITY_RULES,
+  "RESPONDS_TO_THREAD",
+] as const;
+export type DraftIntegrityRuleV2 = (typeof DRAFT_INTEGRITY_RULES_V2)[number];
+
+export const DraftReviewV2VariablesSchema = DraftReviewVariablesSchema.extend({
+  /**
+   * What their latest message left open, in code's fixed words ("They
+   * offered or asked for a call or a meeting."). Trusted: code wrote it
+   * from the thread; it never quotes them. "None." when nothing is open.
+   */
+  pendingAsks: z.string().max(600),
+}).strict();
+export type DraftReviewV2Variables = z.infer<
+  typeof DraftReviewV2VariablesSchema
+>;
+
+export const DraftReviewResultV2Schema = z
+  .object({
+    criteria: z
+      .array(
+        z
+          .object({
+            criterion: z.enum(DRAFT_RUBRIC_CRITERIA),
+            score: z.number().int().min(0).max(5),
+            note: z.string().trim().max(2_000),
+          })
+          .strict(),
+      )
+      .max(DRAFT_RUBRIC_CRITERIA.length * 2),
+    integrity: z
+      .array(
+        z
+          .object({
+            rule: z.enum(DRAFT_INTEGRITY_RULES_V2),
+            ok: z.boolean(),
+            note: z.string().trim().max(2_000),
+          })
+          .strict(),
+      )
+      .max(DRAFT_INTEGRITY_RULES_V2.length * 2),
+    feedback: z.string().trim().max(4_000),
+  })
+  .strict();
+export type DraftReviewResultV2 = z.infer<typeof DraftReviewResultV2Schema>;
+
 // ---------------------------------------------------------------------------
 // DRAFT_REDRAFT
 // ---------------------------------------------------------------------------

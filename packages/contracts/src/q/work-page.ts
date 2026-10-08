@@ -134,6 +134,13 @@ export const QWorkDoneItemDtoSchema = z
      * relationship), with their logo under the name's scope. Absent: none.
      */
     named: NamedPictureSchema.nullable().optional(),
+    /**
+     * The person's own relationship the step acted in, and the other
+     * side's name, so Work groups what was done per relationship and opens
+     * its thread (Zino, 2026-10-08). Absent from an older server.
+     */
+    relationshipId: UuidSchema.nullable().optional(),
+    counterpartName: z.string().max(200).nullable().optional(),
   })
   .strict();
 export type QWorkDoneItemDto = z.infer<typeof QWorkDoneItemDtoSchema>;

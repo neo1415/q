@@ -227,7 +227,8 @@ describe("writeWithReview", () => {
     expect(outcome.verdict).toBe("PASSED");
     expect(outcome.body).toBe("Hi Ada, I enjoyed reading about Tallyloom.");
     expect(outcome.attempts).toBe(2);
-    expect(feedbacks).toEqual(["Open warmly; no meeting ask yet."]);
+    // The writer gets the reviewer's words as a numbered fix list.
+    expect(feedbacks).toEqual(["1. Open warmly; no meeting ask yet."]);
     expect(handoffs).toEqual(["REVIEWER->WRITER", "WRITER->REVIEWER"]);
   });
 

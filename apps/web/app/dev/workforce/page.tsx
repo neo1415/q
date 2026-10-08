@@ -71,9 +71,11 @@ export default async function WorkforceReviewPage({
             suggestions={[]}
             approvals={[]}
             work={[...all.work]}
-            done={null}
+            done={{ items: [], thisWeek: 0, nextCursor: null }}
             workforce={{ overview: all.overview, jobs: all.jobs }}
-            initialView={view}
+            // Work around decisions (2026-10-08): one page; team and cost
+            // are its secondary views.
+            initialView={view === "team" || view === "cost" ? view : "work"}
             liveReads={false}
           />
         </PageContainer>

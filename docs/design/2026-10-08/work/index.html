@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Work around decisions (design)</title>
+    <!--
+  Work, redesigned around decisions (founder, Zino, 2026-10-08: "a very long
+  list with no pagination ... different drafts and stuff ... so what do I do
+  next?"). Query: ?screen=work|thread &device=phone|desktop &theme=light|dark
+
+  The page answers three questions, in this order:
+    1. Needs you   — a short decision queue: one card per decision, grouped by
+                     company or person, with the exact message and four verbs
+                     (Approve & send · Edit & send · Dismiss · Ask Q). The
+                     writer/reviewer history is one disclosure inside the card
+                     ("How Q wrote this (2 drafts)"), never a top-level row.
+    2. Done for you — what was sent or booked, grouped per relationship,
+                     latest first, cursor "Show more".
+    3. In progress — one line per job, never every draft.
+  The team map and cost stay, as secondary links.
+
+  Research, briefly:
+  - Superhuman / Gmail "Split inbox": a queue you can empty; each row a single
+    decision. We take: the queue, verbs on the row, nothing else above it.
+  - Linear Inbox / GitHub notifications: grouped by subject, newest first,
+    "mark done" removes it. We take: grouping per company, Dismiss.
+  - Intercom Fin "AI answer review": the answer, its sources and a "why" line
+    next to Approve. We take: the "Why" line and the thread check, in words.
+  Fictional people. No scores as percentages; the reviewer's score is shown
+  only inside the disclosure, next to the bar, as it is recorded.
+-->
+    <style>
+      :root {
+        --cq-font-sans:
+          ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue",
+          Arial, sans-serif;
+        --cq-radius-sm: 8px;
+        --cq-radius-md: 12px;
+      }
+      [data-theme="light"] {
+        --cq-canvas: #f6f4ef;
+        --cq-surface: #fbfaf7;
+        --cq-surface-raised: #fff;
+        --cq-surface-subtle: #f1ede4;
+        --cq-surface-sunken: #efebe2;
+        --cq-text-primary: #16140f;
+        --cq-text-secondary: #4f4a40;
+        --cq-text-tertiary: #655e51;
+        --cq-border-subtle: #e7e1d5;
+        --cq-border: #d9d1c1;
+        --cq-border-strong: #8f8673;
+        --cq-accent: #8a6a12;
+        --cq-accent-soft: #f3ead2;
+        --cq-on-accent: #fff;
+        --cq-positive: #2f6b3f;
+        --cq-gap: #8a4a12;
+        --cq-chrome: #16140f;
+        --cq-chrome-text: #f4efe2;
+        --cq-chrome-muted: #bfb6a2;
+      }
+      [data-theme="dark"] {
+        --cq-canvas: #0f0e0b;
+        --cq-surface: #17150f;
+        --cq-surface-raised: #1d1a13;
+        --cq-surface-subtle: #24211a;
+        --cq-surface-sunken: #131109;
+        --cq-text-primary: #f4efe2;
+        --cq-text-secondary: #c9c0ab;
+        --cq-text-tertiary: #a59c87;
+        --cq-border-subtle: #2a261c;
+        --cq-border: #3a3427;
+        --cq-border-strong: #7a715c;
+        --cq-accent: #c9a227;
+        --cq-accent-soft: #2e2714;
+        --cq-on-accent: #16140f;
+        --cq-positive: #8fcf9c;
+        --cq-gap: #f0a865;
+        --cq-chrome: #0b0a08;
+        --cq-chrome-text: #f4efe2;
+        --cq-chrome-muted: #bfb6a2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: var(--cq-font-sans);
+        background: var(--cq-canvas);
+        color: var(--cq-text-primary);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      .frame {
+        display: flex;
+        min-height: 100vh;
+      }
+      .side {
+        width: 232px;
+        flex: none;
+        background: var(--cq-chrome);
+        color: var(--cq-chrome-muted);
+        padding: 20px 14px;
+        font-size: 14px;
+      }
+      .side b {
+        color: var(--cq-chrome-text);
+        font-weight: 600;
+        display: block;
+        margin-bottom: 18px;
+      }
+      .side a {
+        display: block;
+        padding: 8px 10px;
+        border-radius: 8px;
+        color: inherit;
+        text-decoration: none;
+      }
+      .side a.on {
+        background: #ffffff14;
+        color: var(--cq-chrome-text);
+      }
+      main {
+        flex: 1;
+        padding: 28px 16px 64px;
+      }
+      .col {
+        max-width: 720px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+      .phone .side {
+        display: none;
+      }
+      .phone main {
+        padding-top: 16px;
+      }
+      h1 {
+        font-size: 26px;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+      }
+      .head nav {
+        margin-left: auto;
+        display: flex;
+        gap: 4px;
+      }
+      .quiet {
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        text-decoration: none;
+        padding: 10px 8px;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
+      .composer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--cq-border);
+        background: var(--cq-surface-raised);
+        border-radius: 999px;
+        padding: 6px 6px 6px 16px;
+        color: var(--cq-text-tertiary);
+        font-size: 15px;
+      }
+      .composer > span:first-child {
+        flex: 1;
+      }
+      .round {
+        flex: none;
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: var(--cq-text-primary);
+        color: var(--cq-canvas);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+      }
+      h2 {
+        font-size: 17px;
+        font-weight: 600;
+        margin: 0;
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      h2 .n {
+        color: var(--cq-text-tertiary);
+        font-weight: 400;
+        font-variant-numeric: tabular-nums;
+      }
+      .lede {
+        margin: 2px 0 12px;
+        font-size: 13px;
+        color: var(--cq-text-tertiary);
+      }
+      .group {
+        border-top: 1px solid var(--cq-border-subtle);
+        padding: 14px 0 6px;
+      }
+      .who {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .mark {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--cq-surface-subtle);
+        color: var(--cq-text-secondary);
+        flex: none;
+      }
+      .who .name {
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .who .meta {
+        font-size: 13px;
+        color: var(--cq-text-tertiary);
+      }
+      .who .open {
+        margin-left: auto;
+      }
+      .card {
+        background: var(--cq-surface-raised);
+        border: 1px solid var(--cq-border-subtle);
+        border-radius: var(--cq-radius-md);
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .card .what {
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .theirs {
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        border-left: 2px solid var(--cq-border);
+        padding-left: 10px;
+      }
+      .theirs b {
+        font-weight: 500;
+        color: var(--cq-text-tertiary);
+      }
+      blockquote {
+        margin: 0;
+        background: var(--cq-surface-sunken);
+        border-radius: var(--cq-radius-sm);
+        padding: 10px 12px;
+        font-size: 14px;
+        color: var(--cq-text-primary);
+        white-space: pre-wrap;
+      }
+      .why {
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        display: flex;
+        gap: 6px;
+      }
+      .why .tick {
+        color: var(--cq-positive);
+      }
+      .why .warn {
+        color: var(--cq-gap);
+      }
+      .verbs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        align-items: center;
+      }
+      .btn {
+        min-height: 44px;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        background: transparent;
+        color: var(--cq-text-secondary);
+      }
+      .btn.primary {
+        background: var(--cq-text-primary);
+        color: var(--cq-canvas);
+      }
+      .btn.secondary {
+        border-color: var(--cq-border-strong);
+        color: var(--cq-text-primary);
+      }
+      details {
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+      }
+      summary {
+        cursor: pointer;
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        list-style: none;
+      }
+      summary::before {
+        content: "›";
+        display: inline-block;
+        transform: rotate(90deg);
+        color: var(--cq-text-tertiary);
+      }
+      details:not([open]) summary::before {
+        transform: none;
+      }
+      ol.drafts {
+        list-style: none;
+        margin: 4px 0 0;
+        padding: 0 0 0 12px;
+        border-left: 1px solid var(--cq-border-subtle);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      ol.drafts li p {
+        margin: 2px 0 0;
+      }
+      .grade {
+        font-variant-numeric: tabular-nums;
+        color: var(--cq-text-tertiary);
+      }
+      .back {
+        color: var(--cq-gap);
+      }
+      .ok {
+        color: var(--cq-positive);
+      }
+      ul.rows {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      ul.rows > li {
+        border-bottom: 1px solid var(--cq-border-subtle);
+        padding: 10px 0;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .rows .body {
+        flex: 1;
+        min-width: 0;
+      }
+      .rows .t {
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .rows .s {
+        font-size: 13px;
+        color: var(--cq-text-tertiary);
+      }
+      .rows .earlier {
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        margin-top: 2px;
+      }
+      .more {
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 99px;
+        background: var(--cq-accent);
+        margin-top: 7px;
+        flex: none;
+      }
+      .dot.wait {
+        background: transparent;
+        border: 1.5px solid var(--cq-border-strong);
+      }
+      .empty {
+        font-size: 14px;
+        color: var(--cq-text-secondary);
+        padding: 12px 0;
+        border-top: 1px solid var(--cq-border-subtle);
+      }
+      /* thread */
+      .thread {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .msg {
+        max-width: 82%;
+      }
+      .msg .by {
+        font-size: 12px;
+        color: var(--cq-text-tertiary);
+        margin-bottom: 3px;
+      }
+      .msg .bubble {
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 14px;
+        background: var(--cq-surface-raised);
+        border: 1px solid var(--cq-border-subtle);
+      }
+      .msg.us {
+        align-self: flex-end;
+      }
+      .msg.us .bubble {
+        background: var(--cq-surface-subtle);
+      }
+      .because {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        border-left: 2px solid var(--cq-accent);
+        padding-left: 10px;
+      }
+      .because p {
+        margin: 0 0 4px;
+      }
+      .flag {
+        border-left-color: var(--cq-gap);
+      }
+      .ask {
+        font-size: 13px;
+        color: var(--cq-text-secondary);
+        border: 1px dashed var(--cq-border);
+        border-radius: 10px;
+        padding: 10px 12px;
+      }
+      .ask b {
+        color: var(--cq-text-primary);
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame" id="frame">
+      <aside class="side">
+        <b>Capital Q</b>
+        <a>Q</a><a>Discover</a><a>Relationships</a><a class="on">Work</a
+        ><a>Profile</a>
+      </aside>
+      <main><div class="col" id="col"></div></main>
+    </div>
+    <template id="work">
+      <div class="head">
+        <h1>Work</h1>
+        <nav aria-label="More about Q's work">
+          <a class="quiet" href="#">Team map</a
+          ><a class="quiet" href="#">Cost · $1.84</a>
+        </nav>
+      </div>
+      <div class="composer">
+        <span>Give Q a task…</span><span class="round">↑</span>
+      </div>
+
+      <section>
+        <h2>Needs you <span class="n">3</span></h2>
+        <p class="lede">Nothing below is sent until you decide.</p>
+
+        <div class="group">
+          <div class="who">
+            <span class="mark">Tg</span>
+            <div>
+              <div class="name">Tensorgate</div>
+              <div class="meta">Daniel · wrote 1 d ago</div>
+            </div>
+            <a class="quiet open" href="#">Thread</a>
+          </div>
+          <div class="card">
+            <div class="what">Reply to Daniel</div>
+            <div class="theirs">
+              <b>They said</b> “Want the deck, or 20 minutes this week?”
+            </div>
+            <blockquote>
+              Hi Daniel, thanks for the clear note. 20 minutes this week works
+              well, and please do send the deck ahead so I can come prepared.
+              Which time this week suits you? Zino
+            </blockquote>
+            <div class="why">
+              <span class="tick" aria-hidden="true">✓</span
+              ><span
+                >Answers both things they offered: accepts the call and asks for
+                a time, and takes the deck.</span
+              >
+            </div>
+            <div class="verbs">
+              <button class="btn primary">Approve &amp; send</button>
+              <button class="btn secondary">Edit &amp; send</button>
+              <button class="btn">Dismiss</button>
+              <button class="btn">Ask Q</button>
+            </div>
+            <details>
+              <summary>How Q wrote this (2 drafts)</summary>
+              <ol class="drafts">
+                <li>
+                  <span class="back">Draft 1 sent back</span>
+                  <span class="grade">· thread check</span>
+                  <p>
+                    “…Would you be open to connecting?” They had already offered
+                    a call. Fix: accept the call and ask for a time; answer the
+                    deck offer.
+                  </p>
+                </li>
+                <li>
+                  <span class="ok">Draft 2 passed</span>
+                  <span class="grade">· 8.6, bar 7.5</span>
+                  <p>Accepts the call, asks for a time and takes the deck.</p>
+                </li>
+              </ol>
+            </details>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="who">
+            <span class="mark">Ll</span>
+            <div>
+              <div class="name">Ledgerline</div>
+              <div class="meta">Tobenna · wrote 1 d ago</div>
+            </div>
+            <a class="quiet open" href="#">Thread</a>
+          </div>
+          <div class="card">
+            <div class="what">Reply to Tobenna</div>
+            <div class="theirs">
+              <b>They said</b> “Happy to share the deck or find 20 minutes this
+              week if useful.”
+            </div>
+            <blockquote>
+              Hi Tobenna, thank you. Yes to both: please share the deck, and 20
+              minutes this week would be useful. Which day suits you? Zino
+            </blockquote>
+            <div class="why">
+              <span class="tick" aria-hidden="true">✓</span
+              ><span>Takes the deck and the call.</span>
+            </div>
+            <div class="verbs">
+              <button class="btn primary">Approve &amp; send</button>
+              <button class="btn secondary">Edit &amp; send</button>
+              <button class="btn">Dismiss</button>
+              <button class="btn">Ask Q</button>
+            </div>
+            <details><summary>How Q wrote this (1 draft)</summary></details>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="who">
+            <span class="mark">Sp</span>
+            <div>
+              <div class="name">Spheros</div>
+              <div class="meta">First message · not sent</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="what">Q held a first message</div>
+            <div class="why">
+              <span class="warn" aria-hidden="true">!</span
+              ><span
+                >Held after 2 drafts: it still asked two things at once. Read
+                it, send your own, or let it go.</span
+              >
+            </div>
+            <blockquote>
+              Hello Spheros team — the combination of identity verification and
+              B2B SaaS in US fintech stood out to me…
+            </blockquote>
+            <div class="verbs">
+              <button class="btn secondary">Edit &amp; send</button>
+              <button class="btn">Dismiss</button>
+              <button class="btn">Ask Q</button>
+            </div>
+            <details><summary>How Q wrote this (2 drafts)</summary></details>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Done for you <span class="n">4 this week</span></h2>
+        <ul class="rows" style="margin-top: 12px">
+          <li>
+            <span class="mark">Cw</span>
+            <div class="body">
+              <div class="t">Clearwater Assurance</div>
+              <div class="s">
+                Replied to their meeting invitation · yesterday 16:43
+              </div>
+              <div class="earlier">1 earlier: expressed interest · Mon</div>
+            </div>
+            <a class="quiet" href="#">Thread</a>
+          </li>
+          <li>
+            <span class="mark">Sw</span>
+            <div class="body">
+              <div class="t">Shiftwell</div>
+              <div class="s">Booked a call for Thu 14:00 · yesterday 16:43</div>
+              <div class="earlier">2 earlier</div>
+            </div>
+            <a class="quiet" href="#">Thread</a>
+          </li>
+          <li>
+            <span class="mark">Ml</span>
+            <div class="body">
+              <div class="t">Maji Loop</div>
+              <div class="s">Expressed interest · Mon</div>
+            </div>
+            <a class="quiet" href="#">Thread</a>
+          </li>
+        </ul>
+        <a class="more" href="#">Show more</a>
+      </section>
+
+      <section>
+        <h2>In progress <span class="n">2</span></h2>
+        <ul class="rows" style="margin-top: 12px">
+          <li>
+            <span class="dot wait" aria-hidden="true"></span>
+            <div class="body">
+              <div class="t">Reply to founders who accept or write to you</div>
+              <div class="s">
+                Waiting for your working hours · next Mon–Fri 09:00
+              </div>
+            </div>
+          </li>
+          <li>
+            <span class="dot" aria-hidden="true"></span>
+            <div class="body">
+              <div class="t">
+                Express interest when a company fits your mandate
+              </div>
+              <div class="s">Running · looked at 5 today, 1 waits for you</div>
+            </div>
+          </li>
+        </ul>
+      </section>
+    </template>
+
+    <template id="thread">
+      <div class="head">
+        <h1>Tensorgate</h1>
+        <nav><a class="quiet" href="#">Back to Work</a></nav>
+      </div>
+      <p class="lede" style="margin-top: -18px">
+        The conversation, with what Q sent for you and why.
+      </p>
+      <div class="thread">
+        <div class="msg">
+          <div class="by">Daniel · Tensorgate · Tue 18:28</div>
+          <div class="bubble">
+            Thanks for connecting. Tensorgate is a policy gateway for LLM
+            traffic in regulated industries: 4 design partners, 2 converted to
+            $180k contracts, 31m requests served. Raising a $4m seed. Want the
+            deck, or 20 minutes this week? Daniel
+          </div>
+        </div>
+        <div class="msg us">
+          <div class="by">Sent by Q for you · Wed 16:43</div>
+          <div class="bubble">
+            Hello Tensorgate team — thank you for the invitation. Running LLM
+            inference inside hardware enclaves… Would you be open to connecting?
+          </div>
+          <div class="because flag">
+            <p>
+              <b>Why Q sent it:</b> your standing instruction “Reply to founders
+              who accept or write to me”.
+            </p>
+            <p>
+              <b>What it missed:</b> Daniel offered the deck and 20 minutes;
+              this asked whether he was open to connecting. The thread check now
+              stops a reply like this.
+            </p>
+            <details><summary>How Q wrote this (3 drafts)</summary></details>
+          </div>
+        </div>
+        <div class="ask">
+          <b>Waiting for you:</b> a reply that takes the call and the deck.
+          <a class="quiet" href="#">Review it</a>
+        </div>
+      </div>
+    </template>
+    <script>
+      const q = new URLSearchParams(location.search);
+      document.documentElement.dataset.theme = q.get("theme") || "light";
+      if (q.get("device") === "phone") document.body.classList.add("phone");
+      const screen = q.get("screen") || "work";
+      document
+        .getElementById("col")
+        .append(document.getElementById(screen).content.cloneNode(true));
+    </script>
+  </body>
+</html>

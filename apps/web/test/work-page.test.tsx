@@ -58,6 +58,11 @@ const loadWorkforce = vi.fn<() => Promise<unknown>>(() =>
 );
 vi.mock("../src/features/work/workforce-actions", () => ({
   loadWorkforceAction: () => loadWorkforce(),
+  moreWorkforceJobsAction: () => Promise.resolve(null),
+}));
+vi.mock("../src/features/chat/chat-actions", () => ({
+  chatThreadAction: () => Promise.resolve({ ok: false, message: "x" }),
+  sendChatMessageAction: () => Promise.resolve({ ok: false, message: "x" }),
 }));
 
 // What the bell (and the Work count) holds; each test sets its own.
@@ -182,9 +187,14 @@ describe("Work (WORK-58)", () => {
     expect(screen.getByLabelText("Give Q a task")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Talk to Q" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Q suggests" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: /Running/ })).toBeNull();
-    expect(screen.queryByRole("heading", { name: /Needs you/ })).toBeNull();
-    expect(screen.getByText("Nothing running yet.")).toBeTruthy();
+    // Empty states say what happens next (2026-10-08).
+    expect(
+      screen.getByText(/Nothing waits on you\. When Q drafts a reply/u),
+    ).toBeTruthy();
+    expect(screen.getByText(/Nothing done yet\./u)).toBeTruthy();
+    expect(
+      screen.getByText(/Nothing running\. Give Q a task above/u),
+    ).toBeTruthy();
   });
 
   it("a tapped card asks Q once to prepare it, then shows the plan and approves that card", async () => {
@@ -245,7 +255,7 @@ describe("Work (WORK-58)", () => {
     expect(screen.queryByRole("button", { name: /Kazikit/ })).toBeNull();
   });
 
-  it("lists what needs them with a count, and Review opens the exact card", async () => {
+  it("lists what needs them with a count, each card showing its exact content", async () => {
     read.mockResolvedValue({ ok: true, value: view("Hi Ngozi") });
     render(
       <WorkPage
@@ -265,17 +275,20 @@ describe("Work (WORK-58)", () => {
       />,
     );
     const section = screen
-      .getByRole("heading", { name: "Needs you, 1" })
+      .getByRole("heading", { name: /Needs you\s*1/u })
       .closest("section");
     expect(section).not.toBeNull();
-    fireEvent.click(
-      within(section as HTMLElement).getByRole("button", { name: "Review" }),
-    );
     await settle();
-    expect(screen.getByText("Hi Ngozi")).toBeTruthy();
+    // No "Review" tap: the card is open in the queue.
+    expect(within(section as HTMLElement).getByText("Hi Ngozi")).toBeTruthy();
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Approve" }),
+    ).toBeTruthy();
   });
 
-  it("shows the picture of who an approval names, and the icon when there is none", () => {
+  it("shows the picture of who an approval names, and initials when there is none", () => {
+    // The queue reads each card as it shows it.
+    read.mockResolvedValue({ ok: false });
     const LOGO = "https://storage.test/object/sign/cq-profile-images/l?t=1";
     const pending = (named: unknown) =>
       QPendingApprovalSchema.parse({
@@ -321,11 +334,6 @@ describe("Work (WORK-58)", () => {
     expect(
       without.container.querySelector("[data-work-needs-you] img"),
     ).toBeNull();
-    expect(
-      without.container.querySelector(
-        "[data-work-needs-you] [data-entity-avatar]",
-      ),
-    ).toBeNull();
   });
 
   it("shows running work in one line with its spend, and pauses it behind a tap", async () => {
@@ -338,7 +346,9 @@ describe("Work (WORK-58)", () => {
         done={{ items: [], thisWeek: 9, nextCursor: null }}
       />,
     );
-    expect(screen.getByRole("heading", { name: "Running, 1" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: /In progress\s*1/u }),
+    ).toBeTruthy();
     expect(screen.getByText("Working")).toBeTruthy();
     expect(screen.getByText("$1.84")).toBeTruthy();
     expect(screen.getByText("$1.84 this month")).toBeTruthy();
@@ -352,14 +362,16 @@ describe("Work (WORK-58)", () => {
     await settle();
     expect(paused).toHaveBeenCalledWith(instruction.id, true);
     expect(screen.getByText("Paused")).toBeTruthy();
-    // Done is its own view, one tap away, not a section under the rest.
-    const done = screen.getByRole("tab", { name: /Done/ });
-    expect(done.getAttribute("aria-selected")).toBe("false");
+    // One page, in order: what needs them, what was done, what runs.
+    const headings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((one) => one.textContent ?? "");
     expect(
-      screen
-        .getByRole("tab", { name: /In progress/ })
-        .getAttribute("aria-selected"),
-    ).toBe("true");
+      headings.findIndex((one) => one.startsWith("Needs you")),
+    ).toBeLessThan(headings.findIndex((one) => one.startsWith("Done for you")));
+    expect(
+      headings.findIndex((one) => one.startsWith("Done for you")),
+    ).toBeLessThan(headings.findIndex((one) => one.startsWith("In progress")));
   });
 
   it("lays a grant out as what Q does alone and what it asks, keeping the full text", () => {
@@ -373,7 +385,7 @@ describe("Work (WORK-58)", () => {
   });
 });
 
-describe("Work's Team and Cost tabs (P7)", () => {
+describe("Work's team map and cost, secondary (P7, 2026-10-08)", () => {
   it("shows Q's team as a map with every specialist, and the month's cost", async () => {
     globalThis.ResizeObserver ??= class {
       observe() {}
@@ -393,24 +405,28 @@ describe("Work's Team and Cost tabs (P7)", () => {
         workforce={{ overview: fixtures.overview, jobs: fixtures.jobs }}
       />,
     );
-    const team = screen.getByRole("tab", { name: /Team/ });
+    // The decision queue comes first; the map is one tap away.
+    expect(document.querySelectorAll("[data-agent]").length).toBe(0);
+    const team = screen.getByRole("button", { name: "Team map" });
     fireEvent.click(team);
-    expect(team.getAttribute("aria-selected")).toBe("true");
-    const panel = document.getElementById("work-view-team");
-    expect(panel?.hidden).toBe(false);
-    expect(panel?.querySelectorAll("[data-agent]").length).toBe(9);
-    expect(screen.getByRole("status").textContent).toMatch(/Live/u);
+    expect(team.getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelectorAll("[data-agent]").length).toBe(9);
+    expect(
+      screen
+        .getAllByRole("status")
+        .some((one) => /Live/u.test(one.textContent ?? "")),
+    ).toBe(true);
 
-    fireEvent.click(screen.getByRole("tab", { name: /Cost/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Cost/u }));
     expect(screen.getByRole("heading", { name: "By specialist" })).toBeTruthy();
     expect(screen.getByRole("meter", { name: /monthly limit/u })).toBeTruthy();
     // Nothing read from the server during the test.
     expect(loadWorkforce).not.toHaveBeenCalled();
   });
 
-  it("leaves the tabs out where the page has no team", () => {
+  it("leaves the team map and cost out where the page has no team", () => {
     render(<WorkPage suggestions={[]} approvals={[]} work={[]} done={null} />);
-    expect(screen.queryByRole("tab", { name: /Team/ })).toBeNull();
-    expect(screen.queryByRole("tab", { name: /Cost/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Team map" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Cost/u })).toBeNull();
   });
 });

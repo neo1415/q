@@ -20,16 +20,26 @@ export {
 export {
   DEFAULT_REVIEW_POLICY,
   HOLD_REASONS,
+  REVIEW_ROUNDS_MAX,
   RUBRIC_VERSION,
   RUBRIC_WEIGHTS,
+  fixList,
   gradeOf,
   writeWithReview,
+  type ReviewSheet,
   type Grade,
   type HoldReason,
   type ReviewLoopPorts,
   type ReviewOutcome,
   type ReviewPolicy,
 } from "./review-loop.js";
+export {
+  asksLine,
+  pendingAsks,
+  threadProblems,
+  type PendingAsk,
+  type PendingAskKind,
+} from "./thread-consistency.js";
 export {
   executorFor,
   runJob,
