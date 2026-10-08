@@ -7,7 +7,10 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
-import { pendingQApprovalsAction } from "@/features/q/actions";
+import {
+  pendingQApprovalsAction,
+  readQApprovalAction,
+} from "@/features/q/actions";
 import { listWorkAction } from "@/features/work/work-actions";
 import {
   listDoneAction,
@@ -18,6 +21,9 @@ import { WorkPage } from "@/features/work/work-page";
 import { loadWorkforceAction } from "@/features/work/workforce-actions";
 
 export const metadata: Metadata = { title: "Work" };
+
+/** Waiting cards read in full with the page; the rest load when opened. */
+const VIEWS_READ_AHEAD = 10;
 
 /**
  * Work, Q's work page (WORK-58): give Q a task, what Q suggests from the
@@ -37,6 +43,20 @@ async function WorkLists() {
   ]);
   const items = work?.ok === true ? work.value : [];
   const waiting = approvals?.ok === true ? approvals.value : null;
+  // Work around decisions (2026-10-08): the first cards are read in full
+  // here, so each decision shows its exact message without a second tap.
+  const read = await Promise.all(
+    (waiting ?? [])
+      .slice(0, VIEWS_READ_AHEAD)
+      .map((approval) =>
+        readQApprovalAction(approval.approvalId).catch(() => null),
+      ),
+  );
+  const views = Object.fromEntries(
+    read.flatMap((result) =>
+      result?.ok === true ? [[result.value.approvalId, result.value]] : [],
+    ),
+  );
   return (
     <>
       {/* Q room R1: Q's work and what waits for them, by id, for Q. */}
@@ -65,6 +85,7 @@ async function WorkLists() {
       <WorkPage
         suggestions={suggestions?.ok === true ? suggestions.value : null}
         approvals={approvals?.ok === true ? approvals.value : null}
+        views={views}
         work={work?.ok === true ? work.value : null}
         done={done?.ok === true ? done.value : null}
         workforce={workforce}

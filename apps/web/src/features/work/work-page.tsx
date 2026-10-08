@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useTransition,
@@ -19,15 +19,14 @@ import type {
   QWorkDonePageDto,
   QWorkDto,
   QWorkSuggestionDto,
+  WorkforceJobDetailDto,
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { Button, IconButton } from "@capital-q/ui/button";
 import {
   ArrowUp,
-  ArrowUpRight,
   Bell,
   CalendarDays,
-  Check,
   ChevronDown,
   ICON_SIZE,
   ICON_STROKE,
@@ -54,7 +53,10 @@ import { EntityAvatar, type EntityKind } from "@/features/entity/entity-avatar";
 import { EmailDraftEditor } from "@/features/integrations/email-draft-editor";
 import { useQSessionOptional } from "@/features/q/q-session";
 
+import { DecisionQueue, DoneForYou, useDismissedHeld } from "./decision-queue";
+import { decisionGroups } from "./decisions";
 import { groupNotices, type NoticeGroup } from "./notice-groups";
+import { readPlan } from "./plan-words";
 import type { WorkforceView } from "./workforce-actions";
 import { WorkforceCost } from "./workforce-cost";
 import { WorkforcePanel } from "./workforce-panel";
@@ -73,7 +75,6 @@ import {
 } from "./work-actions";
 import {
   dismissSuggestionAction,
-  listDoneAction,
   preparedAction,
   setDelegationAction,
   setPausedAction,
@@ -97,6 +98,11 @@ import {
 type Props = {
   readonly suggestions: readonly QWorkSuggestionDto[] | null;
   readonly approvals: readonly QPendingApproval[] | null;
+  /**
+   * The waiting cards read in full on the server (their exact bound
+   * content), by approval id, so a decision shows its message at once.
+   */
+  readonly views?: Readonly<Record<string, QApprovalView>> | undefined;
   readonly work: readonly QWorkDto[] | null;
   readonly done: QWorkDonePageDto | null;
   /**
@@ -116,9 +122,17 @@ type Props = {
   readonly liveReads?: boolean | undefined;
 };
 
+/**
+ * Work around decisions (Zino, 2026-10-08: "so what do I do next?"). One
+ * page, three answers in order: Needs you (a short decision queue, grouped
+ * per company or person), Done for you (per relationship, newest first)
+ * and In progress (one line per job). Q's team map and its cost stay, one
+ * tap away, never in the way of a decision.
+ */
 export function WorkPage({
   suggestions,
   approvals,
+  views,
   work,
   done,
   prepared,
@@ -133,57 +147,42 @@ export function WorkPage({
       .map((lane) => ({ work: item, lane })),
   );
   const [cards, setCards] = useState(suggestions ?? []);
-  const [pending, setPending] = useState(approvals ?? []);
+  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const dismissedHeld = useDismissedHeld();
   // The Work count in the navigation is these notices (founder 2026-10-05:
   // "it says 2 things, but the page says nothing"): they are listed here.
   const notices = groupNotices(useNotices().items ?? []).needsYou;
-  const nothingElse =
-    running.length === 0 &&
-    pending.length === 0 &&
-    notices.length === 0 &&
-    timeLanes.length === 0 &&
-    (done === null || (done.items.length === 0 && done.thisWeek === 0));
-
-  const needsCount =
-    pending.length + timeLanes.length + notices.length + cards.length;
-  const doneCount = done?.thisWeek ?? 0;
-  // The first screen shows what matters (founder, demo 2026-10-06: the page
-  // "just flows down forever"): what waits on them, else what runs.
-  const [view, setView] = useState<WorkView>(
-    initialView ??
-      (needsCount > 0
-        ? "needs"
-        : running.length > 0 || (workforce?.overview.jobs.open ?? 0) > 0
-          ? "progress"
-          : "done"),
-  );
-  // Q's team, read again while the page is visible (P7): In progress,
-  // Team and Cost share one reader so they never disagree.
+  const [view, setView] = useState<WorkView>(initialView ?? "work");
   const live = useWorkforceLive(
     workforce,
-    view === "team" || view === "progress",
+    view === "team" || view === "work",
     liveReads,
   );
   const now = useClock();
   const team = live.data;
   const hasTeam = workforce !== undefined;
-  const views: readonly (readonly [WorkView, string, number | string])[] = [
-    ["needs", "Needs you", needsCount],
-    ["progress", "In progress", running.length],
-    ["done", "Done", doneCount],
-    ...(hasTeam
-      ? ([
-          ["team", "Team", team === null ? "" : team.overview.jobs.open],
-          ["cost", "Cost", team === null ? "" : usd(team.overview.spentUsd)],
-        ] as const)
-      : []),
-  ];
-  const teamNeedsYou = (team?.overview.jobs.needsYou ?? 0) > 0;
+  const jobs = useMemo(() => team?.jobs ?? [], [team]);
+  const viewMap = useMemo(() => new Map(Object.entries(views ?? {})), [views]);
+  const groups = useMemo(
+    () =>
+      decisionGroups({
+        approvals: (approvals ?? []).filter(
+          (approval) => !gone.has(approval.approvalId),
+        ),
+        views: viewMap,
+        jobs,
+        now,
+        dismissedHeld: new Set([...dismissedHeld, ...gone]),
+        known: done?.items,
+      }),
+    [approvals, gone, viewMap, jobs, now, dismissedHeld, done],
+  );
+  const decided = (key: string) => setGone((was) => new Set([...was, key]));
 
   return (
     <div
       className={cx(
-        "mx-auto flex w-full flex-col gap-5",
+        "mx-auto flex w-full flex-col gap-7",
         // The team map needs the room; reading views keep the measure.
         view === "team" || view === "cost"
           ? "max-w-(--cq-layout-content)"
@@ -191,158 +190,214 @@ export function WorkPage({
       )}
       data-work-page
     >
-      <TaskComposer />
-      <div
-        role="tablist"
-        aria-label="Work"
-        className="sticky top-[calc(var(--cq-header-height)+var(--cq-safe-top))] z-(--cq-z-sticky) -mx-4 flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) bg-(--cq-canvas) px-3 [scrollbar-width:none] lg:top-0 lg:-mx-1 lg:px-1"
-        data-work-views
-      >
-        {views.map(([key, label, count]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            id={`work-tab-${key}`}
-            aria-selected={view === key}
-            aria-controls={`work-view-${key}`}
-            onClick={(event) => {
-              setView(key);
-              event.currentTarget.scrollIntoView({
-                block: "nearest",
-                inline: "nearest",
-              });
-            }}
-            className={cx(
-              "-mb-px flex min-h-11 flex-none items-center gap-1.5 border-b-2 px-2.5 whitespace-nowrap cq-label motion-safe:transition-colors motion-safe:duration-(--cq-motion-fast) lg:px-3",
-              view === key
-                ? "border-(--cq-text-primary) text-(--cq-text-primary)"
-                : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
-            )}
-          >
-            {label}
-            <span
+      {hasTeam ? (
+        <nav
+          aria-label="More about Q’s work"
+          className="-mt-2 -mb-4 flex items-center gap-1"
+          data-work-views
+        >
+          {view === "work" ? null : (
+            <button
+              type="button"
+              onClick={() => setView("work")}
+              className="inline-flex min-h-11 items-center px-2 cq-label text-(--cq-text-primary) hover:underline"
+            >
+              ← Back to Work
+            </button>
+          )}
+          <span className="ml-auto" />
+          {(
+            [
+              ["team", "Team map"],
+              [
+                "cost",
+                team === null
+                  ? "Cost"
+                  : `Cost · ${usd(team.overview.spentUsd)}`,
+              ],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={view === key}
+              onClick={() => setView(view === key ? "work" : key)}
               className={cx(
-                "cq-numeric",
-                key === "team" && teamNeedsYou
-                  ? "font-semibold text-(--cq-accent)"
-                  : "font-normal text-(--cq-text-tertiary)",
+                "inline-flex min-h-11 items-center px-2 cq-label font-normal",
+                view === key
+                  ? "text-(--cq-text-primary) underline underline-offset-4"
+                  : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
               )}
             >
-              {count}
-            </span>
-          </button>
-        ))}
-      </div>
-      {hasTeam &&
-      (view === "team" || view === "progress" || view === "cost") ? (
-        <div className="-mt-3 flex justify-end">
-          <LiveLine live={live} now={now} />
-        </div>
+              {label}
+            </button>
+          ))}
+        </nav>
       ) : null}
-      <div
-        role="tabpanel"
-        id="work-view-needs"
-        aria-labelledby="work-tab-needs"
-        hidden={view !== "needs"}
-        className="flex flex-col gap-7"
-      >
-        <NeedsYou
-          approvals={pending}
-          lanes={timeLanes}
-          notices={notices}
-          onDecided={(id) => {
-            setPending((now) => now.filter((a) => a.approvalId !== id));
-          }}
-        />
-        <Suggestions
-          items={cards}
-          prepared={prepared}
-          failed={suggestions === null}
-          onGone={(key) => {
-            setCards((now) => now.filter((card) => card.key !== key));
-          }}
-        />
-        {needsCount === 0 ? (
-          <p className="cq-body-sm text-(--cq-text-tertiary)">
-            Nothing waits on you.
-          </p>
-        ) : null}
-      </div>
-      <div
-        role="tabpanel"
-        id="work-view-progress"
-        aria-labelledby="work-tab-progress"
-        hidden={view !== "progress"}
-        className="flex flex-col gap-7"
-      >
-        <Running items={running} failed={work === null} />
-        {nothingElse ? (
-          <p className="cq-body-sm text-(--cq-text-tertiary)">
-            Nothing running yet.
-          </p>
-        ) : null}
-        {hasTeam ? (
-          <WorkforcePanel
-            overview={team?.overview ?? null}
-            jobs={team?.jobs ?? null}
-            part="jobs"
+      {view === "work" ? (
+        <>
+          <TaskComposer />
+          <DecisionQueue
+            groups={groups}
+            jobs={jobs}
+            done={done?.items ?? []}
+            renderPlan={(approvalId, onDone) => (
+              <>
+                <ApprovalPlan
+                  approvalId={approvalId}
+                  initialView={viewMap.get(approvalId)}
+                  onDone={onDone}
+                  onNotNow={() => {}}
+                  hideNotNow
+                />
+                <DeclineLink approvalId={approvalId} onDeclined={onDone} />
+              </>
+            )}
+            onDecided={decided}
+            extra={
+              <NeedsYou
+                approvals={[]}
+                lanes={timeLanes}
+                notices={notices}
+                onDecided={() => {}}
+                embedded
+              />
+            }
           />
-        ) : null}
-      </div>
-      {hasTeam ? (
-        <div
-          role="tabpanel"
-          id="work-view-team"
-          aria-labelledby="work-tab-team"
-          hidden={view !== "team"}
-        >
-          {team === null ? (
-            <TeamUnavailable onRetry={live.refresh} />
-          ) : view === "team" ? (
-            <WorkforceTeamView
-              view={team}
-              work={work}
-              now={Math.max(now, live.updatedAt)}
-              onGoTo={setView}
-              onChanged={live.refresh}
-            />
+          {approvals === null ? (
+            <p
+              className="-mt-4 cq-body-sm text-(--cq-text-secondary)"
+              role="status"
+            >
+              What waits for your yes couldn’t load. Nothing is sent without it;
+              try again in a moment.
+            </p>
           ) : null}
-        </div>
+          <Suggestions
+            items={cards}
+            prepared={prepared}
+            failed={suggestions === null}
+            onGone={(key) => {
+              setCards((was) => was.filter((card) => card.key !== key));
+            }}
+          />
+          <DoneForYou initial={done} jobs={jobs} />
+          <InProgress items={running} failed={work === null} jobs={jobs} />
+        </>
       ) : null}
-      {hasTeam ? (
-        <div
-          role="tabpanel"
-          id="work-view-cost"
-          aria-labelledby="work-tab-cost"
-          hidden={view !== "cost"}
-        >
+      {hasTeam && view === "team" ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-end">
+            <LiveLine live={live} now={now} />
+          </div>
           {team === null ? (
             <TeamUnavailable onRetry={live.refresh} />
           ) : (
-            <WorkforceCost overview={team.overview} jobs={team.jobs} />
+            <>
+              <WorkforceTeamView
+                view={team}
+                work={work}
+                now={Math.max(now, live.updatedAt)}
+                onGoTo={(to) => setView(to === "cost" ? "cost" : "work")}
+                onChanged={live.refresh}
+              />
+              <WorkforcePanel
+                overview={team.overview}
+                jobs={team.jobs}
+                nextCursor={team.nextCursor ?? null}
+                part="jobs"
+              />
+            </>
           )}
         </div>
       ) : null}
-      <div
-        role="tabpanel"
-        id="work-view-done"
-        aria-labelledby="work-tab-done"
-        hidden={view !== "done"}
-      >
-        {nothingElse ? (
-          <p className="cq-body-sm text-(--cq-text-tertiary)">
-            Nothing finished yet.
-          </p>
+      {hasTeam && view === "cost" ? (
+        team === null ? (
+          <TeamUnavailable onRetry={live.refresh} />
         ) : (
-          <Done initial={done} defaultOpen />
-        )}
-      </div>
+          <WorkforceCost overview={team.overview} jobs={team.jobs} />
+        )
+      ) : null}
     </div>
   );
 }
 
-type WorkView = "needs" | "progress" | "done" | "team" | "cost";
+type WorkView = "work" | "team" | "cost";
+
+/**
+ * In progress: one line per piece of running work, never every draft.
+ * Standing instructions and outreach come from the work list; a job the
+ * lead Q planned for a task joins them as one line of its own.
+ */
+function InProgress({
+  items,
+  failed,
+  jobs,
+}: {
+  readonly items: readonly QWorkDto[];
+  readonly failed: boolean;
+  readonly jobs: readonly WorkforceJobDetailDto[];
+}) {
+  const tasks = jobs.filter(
+    (one) =>
+      one.job.source === "JOB" &&
+      (one.job.status === "RUNNING" ||
+        one.job.status === "PLANNING" ||
+        one.job.status === "HELD"),
+  );
+  return (
+    <section aria-labelledby="work-running" data-work-running>
+      <h2
+        id="work-running"
+        className="flex items-baseline gap-2 cq-title-sm text-(--cq-text-primary)"
+      >
+        In progress
+        <span className="cq-body font-normal cq-numeric text-(--cq-text-tertiary)">
+          {items.length + tasks.length}
+        </span>
+      </h2>
+      {failed ? (
+        <p className="mt-2 cq-body-sm text-(--cq-text-secondary)" role="status">
+          Q&rsquo;s work couldn&rsquo;t load. Try again in a moment.
+        </p>
+      ) : items.length + tasks.length === 0 ? (
+        <p className="mt-2 cq-body-sm text-(--cq-text-secondary)">
+          Nothing running. Give Q a task above, or ask it to look after
+          something for you, and it shows here as one line.
+        </p>
+      ) : (
+        <div className="mt-3">
+          <Running items={items} failed={false} bare />
+          {tasks.length === 0 ? null : (
+            <ul className="border-t border-(--cq-border-subtle)">
+              {tasks.map((one) => (
+                <li
+                  key={one.job.id}
+                  className="flex min-h-14 flex-col justify-center border-b border-(--cq-border-subtle) py-2"
+                  data-work-job={one.job.id}
+                >
+                  <p className="m-0 truncate cq-body-sm font-medium text-(--cq-text-primary)">
+                    {one.job.goal}
+                  </p>
+                  <p className="m-0 cq-label font-normal text-(--cq-text-tertiary)">
+                    {one.job.status === "HELD"
+                      ? "Waiting for you"
+                      : one.job.status === "PLANNING"
+                        ? "Planning"
+                        : "Working"}
+                    {one.job.drafts > 0
+                      ? ` · ${String(one.job.drafts)} ${one.job.drafts === 1 ? "draft" : "drafts"}`
+                      : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 
 function TeamUnavailable({ onRetry }: { readonly onRetry: () => void }) {
   return (
@@ -602,6 +657,7 @@ function ApprovalPlan({
   onDone,
   onNotNow,
   notNowLabel = "Not now",
+  hideNotNow = false,
 }: {
   readonly approvalId: string;
   /** Already read on the server: shown at once, read again on a revision. */
@@ -610,6 +666,8 @@ function ApprovalPlan({
   readonly onDone: (approved: boolean) => void;
   readonly onNotNow: () => void;
   readonly notNowLabel?: string | undefined;
+  /** In the decision queue, Dismiss sits beside it instead. */
+  readonly hideNotNow?: boolean | undefined;
 }) {
   const [view, setView] = useState<QApprovalView | null>(initialView ?? null);
   const [failed, setFailed] = useState(false);
@@ -739,14 +797,16 @@ function ApprovalPlan({
             Edit
           </Link>
         )}
-        <Button
-          variant="quiet"
-          disabled={pending}
-          onClick={onNotNow}
-          className="text-(--cq-text-secondary)"
-        >
-          {notNowLabel}
-        </Button>
+        {hideNotNow ? null : (
+          <Button
+            variant="quiet"
+            disabled={pending}
+            onClick={onNotNow}
+            className="text-(--cq-text-secondary)"
+          >
+            {notNowLabel}
+          </Button>
+        )}
       </div>
       {message === null ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
@@ -757,44 +817,7 @@ function ApprovalPlan({
   );
 }
 
-/**
- * The bound preview, laid out: a standing instruction's grant names what
- * Q does on its own ("On my own…") and what it asks first ("I ask you
- * first…"); anything else is the content itself (a message), quoted. The
- * rest of a grant stays available under "Full plan", word for word.
- */
-export function readPlan(preview: string | undefined): {
-  readonly quote: string | null;
-  readonly alone: string | null;
-  readonly asks: string | null;
-  readonly rest: string | null;
-} {
-  if (preview === undefined || preview.trim().length === 0) {
-    return { quote: null, alone: null, asks: null, rest: null };
-  }
-  const parts = preview.split(/\n{2,}/u);
-  const find = (prefix: RegExp) => parts.find((part) => prefix.test(part));
-  const alone = find(/^On my own/u);
-  const asks = find(/^I ask you first/u);
-  if (alone === undefined && asks === undefined) {
-    return { quote: preview, alone: null, asks: null, rest: null };
-  }
-  const items = (part: string | undefined) =>
-    part === undefined
-      ? null
-      : part
-          .split("\n")
-          .slice(1)
-          .map((line) => line.replace(/^- /u, "").replace(/\s*\(.*$/u, ""))
-          .filter((line) => line.length > 0)
-          .join(", ") || null;
-  return {
-    quote: null,
-    alone: items(alone),
-    asks: items(asks) ?? "Anything else",
-    rest: preview,
-  };
-}
+export { readPlan } from "./plan-words";
 
 // ---------------------------------------------------------------------------
 // Q suggests
@@ -1115,11 +1138,14 @@ function NeedsYou({
   lanes,
   notices,
   onDecided,
+  embedded = false,
 }: {
   readonly approvals: readonly QPendingApproval[];
   readonly lanes: readonly TimeLane[];
   readonly notices: readonly NoticeGroup[];
   readonly onDecided: (approvalId: string) => void;
+  /** Inside the decision queue: rows only, under its heading. */
+  readonly embedded?: boolean | undefined;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
@@ -1137,8 +1163,14 @@ function NeedsYou({
   const hiddenCount =
     count - shownLanes.length - shownApprovals.length - shownNotices.length;
   return (
-    <section aria-labelledby="work-needs-you" data-work-needs-you>
-      <SectionHead id="work-needs-you" title="Needs you" count={count} />
+    <section
+      aria-labelledby={embedded ? undefined : "work-needs-you"}
+      aria-label={embedded ? "Other things waiting on you" : undefined}
+      data-work-needs-you={embedded ? undefined : true}
+    >
+      {embedded ? null : (
+        <SectionHead id="work-needs-you" title="Needs you" count={count} />
+      )}
       <ul className="border-t border-(--cq-border-subtle)">
         {shownLanes.map(({ work, lane }) => (
           <li key={lane.id} className="border-b border-(--cq-border-subtle)">
@@ -1423,9 +1455,12 @@ function dollars(totalCents: number): string {
 function Running({
   items,
   failed,
+  bare = false,
 }: {
   readonly items: readonly QWorkDto[];
   readonly failed: boolean;
+  /** Rows only, under the In progress heading. */
+  readonly bare?: boolean | undefined;
 }) {
   const [rows, setRows] = useState(items);
   const [all, setAll] = useState(false);
@@ -1444,13 +1479,24 @@ function Running({
   );
   const anySpend = rows.some((item) => item.spend !== null);
   return (
-    <section aria-labelledby="work-running" data-work-running>
-      <SectionHead
-        id="work-running"
-        title="Running"
-        count={rows.length}
-        aside={anySpend ? `${dollars(month)} this month` : undefined}
-      />
+    <section
+      aria-labelledby={bare ? undefined : "work-running-list"}
+      aria-label={bare ? "Running" : undefined}
+    >
+      {bare ? (
+        anySpend ? (
+          <p className="mb-1 text-right cq-label font-normal cq-numeric text-(--cq-text-tertiary)">
+            {dollars(month)} this month
+          </p>
+        ) : null
+      ) : (
+        <SectionHead
+          id="work-running-list"
+          title="Running"
+          count={rows.length}
+          aside={anySpend ? `${dollars(month)} this month` : undefined}
+        />
+      )}
       <ul className="border-t border-(--cq-border-subtle)">
         {(all ? rows : rows.slice(0, GROUP_PREVIEW)).map((item) => (
           <li key={item.id} className="border-b border-(--cq-border-subtle)">
@@ -1757,120 +1803,6 @@ function StateMark({
       />
       {STATE_WORDS[state]}
     </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Done: collapsed by default, paged
-// ---------------------------------------------------------------------------
-
-function Done({
-  initial,
-  defaultOpen = false,
-}: {
-  readonly initial: QWorkDonePageDto | null;
-  readonly defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [items, setItems] = useState(initial?.items ?? []);
-  const [cursor, setCursor] = useState(initial?.nextCursor ?? null);
-  const [pending, startTransition] = useTransition();
-  const more = useCallback(() => {
-    if (cursor === null) return;
-    startTransition(async () => {
-      const result = await listDoneAction(cursor).catch(() => null);
-      if (result?.ok !== true) return;
-      setItems((now) => [...now, ...result.value.items]);
-      setCursor(result.value.nextCursor);
-    });
-  }, [cursor]);
-  if (initial === null) return null;
-  return (
-    <section aria-labelledby="work-done" data-work-done>
-      <h2 id="work-done" className="sr-only">
-        Done
-      </h2>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls="work-done-list"
-        onClick={() => setOpen((now) => !now)}
-        className="flex min-h-13 w-full items-center gap-2 border-y border-(--cq-border-subtle) text-left"
-      >
-        <span className="cq-title-sm text-(--cq-text-primary)">Done</span>
-        <span className="cq-body cq-numeric text-(--cq-text-tertiary)">
-          {initial.thisWeek} this week
-        </span>
-        <ChevronDown
-          aria-hidden="true"
-          size={ICON_SIZE.regular}
-          strokeWidth={ICON_STROKE}
-          className={cx(
-            "ml-auto text-(--cq-text-tertiary) motion-safe:transition-transform motion-safe:duration-(--cq-motion-base)",
-            open && "rotate-180",
-          )}
-        />
-      </button>
-      {open ? (
-        <div id="work-done-list">
-          {items.length === 0 ? (
-            <p className="py-3 cq-body-sm text-(--cq-text-tertiary)">
-              Nothing finished yet.
-            </p>
-          ) : (
-            <ul>
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex min-h-12 items-center gap-3 border-b border-(--cq-border-subtle) py-2"
-                >
-                  {namedMarkShown(item.named, undefined) ? (
-                    <NamedMark named={item.named} size={24} />
-                  ) : (
-                    <Check
-                      aria-hidden="true"
-                      size={16}
-                      strokeWidth={ICON_STROKE}
-                      className="shrink-0 text-(--cq-text-tertiary)"
-                    />
-                  )}
-                  <span className="min-w-0 flex-1 truncate cq-body-sm text-(--cq-text-primary)">
-                    {item.words}
-                  </span>
-                  <span className="shrink-0 cq-label font-normal cq-numeric text-(--cq-text-tertiary)">
-                    {shortAge(item.at)}
-                  </span>
-                  {item.linkPath === null ? null : (
-                    <Link
-                      href={item.linkPath}
-                      aria-label={`Open what this changed: ${item.words}`}
-                      className="flex size-11 shrink-0 items-center justify-center rounded-md text-(--cq-text-tertiary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:size-8"
-                    >
-                      <ArrowUpRight
-                        aria-hidden="true"
-                        size={ICON_SIZE.compact}
-                        strokeWidth={ICON_STROKE}
-                      />
-                    </Link>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          {cursor === null ? null : (
-            <Button
-              variant="quiet"
-              size="compact"
-              disabled={pending}
-              onClick={more}
-              className="mt-2 text-(--cq-text-secondary)"
-            >
-              Show more
-            </Button>
-          )}
-        </div>
-      ) : null}
-    </section>
   );
 }
 

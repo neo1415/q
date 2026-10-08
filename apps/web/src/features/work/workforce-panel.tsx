@@ -23,6 +23,8 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { approveQApprovalAction } from "@/features/q/actions";
 
+import { moreWorkforceJobsAction } from "./workforce-actions";
+
 import {
   costRows,
   dollars,
@@ -71,6 +73,7 @@ export function WorkforcePanel({
   initialTab = "now",
   openDraftId,
   part = "all",
+  nextCursor = null,
 }: {
   readonly overview: WorkforceOverviewDto | null;
   readonly jobs: readonly WorkforceJobDetailDto[] | null;
@@ -82,7 +85,29 @@ export function WorkforcePanel({
   readonly part?: "all" | "jobs" | undefined;
   /** A draft shown open (the design review page renders it this way). */
   readonly openDraftId?: string | undefined;
+  /** Older jobs, read a page at a time by cursor; null: none. */
+  readonly nextCursor?: string | null | undefined;
 }) {
+  const [older, setOlder] = useState<readonly WorkforceJobDetailDto[]>([]);
+  const [cursor, setCursor] = useState<string | null>(nextCursor);
+  const [loading, startLoading] = useTransition();
+  const [moreFailed, setMoreFailed] = useState(false);
+  const more = () => {
+    if (cursor === null) return;
+    startLoading(async () => {
+      const page = await moreWorkforceJobsAction(cursor).catch(() => null);
+      if (page === null) {
+        setMoreFailed(true);
+        return;
+      }
+      setMoreFailed(false);
+      setOlder((was) => {
+        const ids = new Set(was.map((one) => one.job.id));
+        return [...was, ...page.jobs.filter((one) => !ids.has(one.job.id))];
+      });
+      setCursor(page.nextCursor);
+    });
+  };
   const [tab, setTab] = useState<Tab>(initialTab);
   const [reading, setReading] = useState<{
     readonly job: WorkforceJobDetailDto;
@@ -153,7 +178,12 @@ export function WorkforcePanel({
               No jobs yet. Give Q a task above and its team takes it from there.
             </p>
           ) : (
-            jobs.map((job) => (
+            [
+              ...jobs,
+              ...older.filter(
+                (one) => !jobs.some((job) => job.job.id === one.job.id),
+              ),
+            ].map((job) => (
               <JobCard
                 key={job.job.id}
                 job={job}
@@ -162,6 +192,17 @@ export function WorkforcePanel({
                 }}
               />
             ))
+          )}
+          {cursor === null ? null : (
+            <button
+              type="button"
+              onClick={more}
+              disabled={loading}
+              className="inline-flex min-h-11 items-center gap-1 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary) disabled:opacity-60"
+              data-more-jobs
+            >
+              {moreFailed ? "Couldn’t load more. Try again" : "Show older jobs"}
+            </button>
           )}
         </div>
       ) : (
@@ -264,6 +305,9 @@ function StatusIcon({
   }
 }
 
+/** A job's latest steps shown before "Show N earlier steps". */
+const JOB_LINES_PREVIEW = 6;
+
 function JobCard({
   job,
   onRead,
@@ -273,7 +317,17 @@ function JobCard({
 }) {
   const needs = needsYou(job);
   const status = jobStatus(job.job, needs);
-  const lines = job.job.status === "DONE" && !needs ? [] : jobLines(job);
+  const [all, setAll] = useState(false);
+  // Zino, 2026-10-08: the writer's and reviewer's drafts are not rows; each
+  // message's outcome line opens "How Q wrote this" (the draft sheet).
+  const lines = (
+    job.job.status === "DONE" && !needs ? [] : jobLines(job)
+  ).filter(
+    (line) =>
+      line.kind !== "step" ||
+      !(line.key.startsWith("draft:") || line.key.startsWith("grade:")),
+  );
+  const shown = all ? lines : lines.slice(-JOB_LINES_PREVIEW);
   return (
     <article
       className="mb-3 overflow-hidden rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) [contain-intrinsic-size:auto_160px] [content-visibility:auto]"
@@ -300,9 +354,18 @@ function JobCard({
           {status.label}
         </span>
       </div>
-      {lines.length > 0 ? (
+      {lines.length > shown.length ? (
+        <button
+          type="button"
+          onClick={() => setAll(true)}
+          className="min-h-11 w-full border-t border-(--cq-border-subtle) px-4 text-left cq-label font-normal text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+        >
+          Show {lines.length - shown.length} earlier steps
+        </button>
+      ) : null}
+      {shown.length > 0 ? (
         <ol className="m-0 list-none border-t border-(--cq-border-subtle) px-4 pt-1 pb-3">
-          {lines.map((line, index) =>
+          {shown.map((line, index) =>
             line.kind === "handoff" ? (
               <li
                 key={line.key}
@@ -315,7 +378,7 @@ function JobCard({
               <Step
                 key={line.key}
                 line={line}
-                last={index === lines.length - 1}
+                last={index === shown.length - 1}
                 onRead={onRead}
               />
             ),
