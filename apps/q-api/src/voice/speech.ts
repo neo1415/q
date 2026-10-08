@@ -267,14 +267,56 @@ export function withoutStageDirections(text: string): string {
     .trim();
 }
 
+const ORDINALS = [
+  "First",
+  "Second",
+  "Third",
+  "Fourth",
+  "Fifth",
+  "Sixth",
+  "Seventh",
+  "Eighth",
+  "Ninth",
+  "Tenth",
+] as const;
+
+/** What is said where a table was (C-17): never nothing. */
+export const SPOKEN_TABLE = "The table is on your screen.";
+
+/**
+ * A list item, said as one: a numbered item as "First, …", any item
+ * closed with a full stop so items never run together into one sentence
+ * (audit C-17: "Halyard Clearwater Tensorgate" came out as one phrase).
+ */
+function spokenItem(marker: string | undefined, body: string): string {
+  const trimmed = body.trim();
+  if (trimmed.length === 0) return "";
+  const closed = /[.!?:;…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+  const index = marker === undefined ? -1 : Number(marker) - 1;
+  const ordinal = index >= 0 ? ORDINALS[index] : undefined;
+  return ordinal === undefined ? closed : `${ordinal}, ${closed}`;
+}
+
 /** Markdown and machine punctuation → plain sentences. */
 export function speakable(text: string): string {
   return (
     spokenFigures(withoutStageDirections(text))
+      // A table (a header row, a rule and rows) is one sentence pointing
+      // at the screen: dropped whole, a table-only answer became silence
+      // (audit C3).
+      // A lone piped line is not a table: it is dropped, as before.
+      .replace(/(?:^[ \t]*\|.*\|[ \t]*(?:\n|$))+/gm, (table) =>
+        table.trim().split("\n").length >= 2 ? `${SPOKEN_TABLE}\n` : "",
+      )
       // Headings, list bullets, block quotes.
       .replace(/^\s{0,3}#{1,6}\s+/gm, "")
-      .replace(/^\s*[-*+]\s+/gm, "")
-      .replace(/^\s*\d+[.)]\s+/gm, "")
+      .replace(/^[ \t]*[-*+][ \t]+(.*)$/gm, (_line, body: string) =>
+        spokenItem(undefined, body),
+      )
+      .replace(
+        /^[ \t]*(\d+)[.)][ \t]+(.*)$/gm,
+        (_line, n: string, body: string) => spokenItem(n, body),
+      )
       .replace(/^\s*>\s?/gm, "")
       // A callout's marker ("> [!RISK]") is said as its meaning.
       .replace(
@@ -294,8 +336,6 @@ export function speakable(text: string): string {
       // Bracketed citations and source markers.
       .replace(/\s*\((?:public web )?source\s+S\d{1,2}\)/gi, "")
       .replace(/\s*\[(?:S\d{1,2}|\d{1,2})\]/g, "")
-      // Tables become nothing a voice can carry.
-      .replace(/^\s*\|.*\|\s*$/gm, "")
       .replace(/[ \t]+/g, " ")
       // A removed address leaves no orphaned space before punctuation.
       .replace(/ +([.,;:!?])/g, "$1")

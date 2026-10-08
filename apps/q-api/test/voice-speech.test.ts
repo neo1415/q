@@ -5,6 +5,7 @@ import {
   bySentence,
   sentences,
   SPOKEN_MAX_CHARS,
+  SPOKEN_TABLE,
   speakable,
 } from "../src/voice/speech.js";
 
@@ -122,5 +123,29 @@ describe("bySentence", () => {
       ),
     );
     expect(spoken).toEqual(["First sentence."]);
+  });
+});
+
+describe("natural delivery (RECOVERY A10, audit C-17)", () => {
+  it("says a numbered list as first, second, third, each item its own sentence", () => {
+    expect(
+      speakable(
+        "Three fit:\n1. Halyard Security\n2. Clearwater Assurance\n3. Tensorgate",
+      ),
+    ).toBe(
+      "Three fit:\nFirst, Halyard Security.\nSecond, Clearwater Assurance.\nThird, Tensorgate.",
+    );
+  });
+
+  it("closes bullet items so they never run together", () => {
+    expect(speakable("- Halyard\n- Clearwater")).toBe("Halyard.\nClearwater.");
+  });
+
+  it("points at the screen for a table instead of falling silent (audit C3)", () => {
+    const table = "| Investor | Fit |\n| --- | --- |\n| Halyard | 8.8 |";
+    expect(speakable(table)).toBe(SPOKEN_TABLE);
+    expect(speakable(`Here they are.\n${table}\nWant more?`)).toBe(
+      `Here they are.\n${SPOKEN_TABLE}\nWant more?`,
+    );
   });
 });

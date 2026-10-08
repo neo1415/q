@@ -625,3 +625,15 @@ describe("A9 (C-09) and the sideband call id", () => {
     expect(h.relays.attach).toHaveBeenCalledWith("rtc_abc123");
   });
 });
+
+describe("A10 (C-17): natural delivery on the line", () => {
+  it("opens in Q's own voice, never word for word", async () => {
+    const h = harness();
+    await h.line.open();
+    h.line.speakFirst("Hi Ada. Three investors fit your raise.");
+    const opening = JSON.stringify(h.channel().creates().at(-1));
+    expect(opening).not.toMatch(/word for word|exactly this/i);
+    expect(opening).toContain("Hi Ada. Three investors fit your raise.");
+    expect(opening).toContain("Keep every name, fact");
+  });
+});

@@ -47,6 +47,7 @@ import {
   DUPLEX_DEFAULTS,
   duplexConfigFrom,
 } from "../src/voice/duplex/config.js";
+import { duplexInstructions } from "../src/voice/duplex/instructions.js";
 import { registerDuplexVoiceRoutes } from "../src/voice/duplex/routes.js";
 import { routeDuplexTurn } from "../src/voice/duplex/routing.js";
 import {
@@ -760,5 +761,20 @@ describe("A8 SIDEBAND (fake socket; not verified on a live call)", () => {
         onClose: () => undefined,
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("A10 (C-17): natural delivery", () => {
+  it("never tells the voice to read Q's words out word for word", () => {
+    const text = duplexInstructions({
+      firstMessage: "Hi Ada. Three investors fit your raise.",
+      listening: true,
+    });
+    expect(text).not.toMatch(
+      /word for word|say(?:ing)? exactly this|faithfully/i,
+    );
+    // The substance is still bound.
+    expect(text).toContain("Keep every fact, figure, name and commitment");
+    expect(text).toContain("Hi Ada. Three investors fit your raise.");
   });
 });
