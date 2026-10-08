@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { QToolCallOutcome } from "@capital-q/q-runtime";
 
-import type { ModelMessage } from "../src/index.js";
+import type { ModelMessage } from "@capital-q/contracts";
 import { toInput } from "../src/providers/openai.js";
 import { fetchedForYouMessage } from "../src/q/index.js";
 
@@ -38,7 +38,7 @@ function researchOutcome(text: string): QToolCallOutcome {
       },
     },
     latencyMs: 3,
-  } as QToolCallOutcome;
+  };
 }
 
 describe("a page Capital Q fetched for the person", () => {
