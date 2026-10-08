@@ -194,6 +194,13 @@ export type ReviewLoopPorts = {
   readonly consistency?: ((body: string) => readonly string[]) | undefined;
   /** Code found something open in their latest message (RESPONDS_TO_THREAD). */
   readonly threadRule?: boolean | undefined;
+  /**
+   * Tensorgate, 8 Oct: when the loop would hold, the best draft that passed
+   * every code check and integrity rule and scored within this many points
+   * of the bar is handed back as a near miss (HELD, `nearMiss`), for the
+   * caller to offer the person as a card. Absent: no near misses.
+   */
+  readonly nearMissPoints?: number | undefined;
   /** Recording, for the workforce page. Failures never stop the loop. */
   readonly onDraft?:
     | ((draft: {
@@ -241,6 +248,11 @@ export type ReviewOutcome =
       readonly draftId: string | null;
       readonly grade: Grade | null;
       readonly attempts: number;
+      /**
+       * The body is the best code-clean draft, within `nearMissPoints` of
+       * the bar: the person's to approve, never Q's to send.
+       */
+      readonly nearMiss?: true | undefined;
     };
 
 async function quietly<T>(work: () => Promise<T>, fallback: T): Promise<T> {
@@ -259,6 +271,38 @@ export async function writeWithReview(
   let body = first;
   let parent: string | null = null;
   let last: Grade | null = null;
+  // The best draft code had nothing against (no thread problem, no failed
+  // integrity rule), by score: what a hold may still offer the person.
+  let best: {
+    readonly body: string;
+    readonly draftId: string | null;
+    readonly grade: Grade;
+    readonly attempts: number;
+  } | null = null;
+  const held = (
+    outcome: Extract<ReviewOutcome, { verdict: "HELD" }>,
+  ): ReviewOutcome =>
+    best !== null &&
+    ports.nearMissPoints !== undefined &&
+    best.grade.score >= policy.threshold - ports.nearMissPoints
+      ? {
+          verdict: "HELD",
+          reason: outcome.reason,
+          body: best.body,
+          draftId: best.draftId,
+          grade: best.grade,
+          attempts: outcome.attempts,
+          nearMiss: true,
+        }
+      : outcome;
+  /** Code's own problems with a draft: its checks, then the thread's. */
+  const codeProblems = (draft: string): readonly string[] => {
+    const problem = ports.recheck?.(draft) ?? null;
+    return [
+      ...(problem === null ? [] : [problem]),
+      ...(ports.consistency?.(draft) ?? []),
+    ];
+  };
   const maxRedrafts = Math.max(
     0,
     Math.min(policy.maxRedrafts, REVIEW_ROUNDS_MAX - 1),
@@ -274,14 +318,14 @@ export async function writeWithReview(
       : null;
     const review = await ports.review(body).catch(() => null);
     if (review === null) {
-      return {
+      return held({
         verdict: "HELD",
         reason: "REVIEW_UNAVAILABLE",
         body,
         draftId,
         grade: last,
         attempts: attempt,
-      };
+      });
     }
     const graded = gradeOf(review, policy.threshold, {
       threadRule: ports.threadRule,
@@ -304,8 +348,15 @@ export async function writeWithReview(
     if (grade.passed) {
       return { verdict: "PASSED", body, draftId, grade, attempts: attempt };
     }
+    if (
+      problems.length === 0 &&
+      grade.failedIntegrity.length === 0 &&
+      (best === null || grade.score > best.grade.score)
+    ) {
+      best = { body, draftId, grade, attempts: attempt };
+    }
     if (attempt > maxRedrafts) {
-      return {
+      return held({
         verdict: "HELD",
         reason:
           problems.length > 0 ||
@@ -318,7 +369,7 @@ export async function writeWithReview(
         draftId,
         grade,
         attempts: attempt,
-      };
+      });
     }
     await quietly(
       () =>
@@ -330,27 +381,47 @@ export async function writeWithReview(
         }) ?? Promise.resolve(),
       undefined,
     );
-    const next = await ports.redraft(body, fixes).catch(() => null);
+    let next = await ports.redraft(body, fixes).catch(() => null);
     if (next === null || next.trim() === "") {
-      return {
+      return held({
         verdict: "HELD",
         reason: "WRITER_GAVE_UP",
         body,
         draftId,
         grade,
         attempts: attempt,
-      };
+      });
     }
-    const problem = ports.recheck?.(next) ?? null;
-    if (problem !== null) {
-      return {
+    // Tensorgate, 8 Oct: a redraft re-asked "would you be open to
+    // connecting?" -- Zino's own question -- and was graded, held, and the
+    // round spent. Code's checks run on a revision before the reviewer
+    // sees it; one fix from code's own words, then it must be clean.
+    let found = codeProblems(next);
+    if (found.length > 0) {
+      const fixed = await ports
+        .redraft(
+          next,
+          found
+            .map((one, index) => `${String(index + 1)}. ${one}`)
+            .join("\n")
+            .slice(0, 2_000),
+        )
+        .catch(() => null);
+      if (fixed !== null && fixed.trim() !== "") {
+        next = fixed;
+        found = codeProblems(next);
+      }
+    }
+    if (found.length > 0) {
+      const threadOnly = (ports.recheck?.(next) ?? null) === null;
+      return held({
         verdict: "HELD",
-        reason: "CODE_CHECK",
+        reason: threadOnly ? "THREAD_MISMATCH" : "CODE_CHECK",
         body: next,
         draftId,
         grade,
         attempts: attempt + 1,
-      };
+      });
     }
     await quietly(
       () =>

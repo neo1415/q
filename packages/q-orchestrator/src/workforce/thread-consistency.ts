@@ -24,12 +24,18 @@ export type PendingAsk = {
   readonly thing: string | null;
 };
 
+// Tensorgate, 8 Oct: Zino's "Would you be open to connecting?" is an ask
+// to meet; without "connect" here, a redraft re-asking it passed code.
 const MEETING =
-  /\b(?:call|calls|meeting|meet|chat|demo|walkthrough|zoom|video call|catch[- ]up|coffee|\d{1,2}\s?(?:-\s?)?min(?:ute)?s?)\b/iu;
+  /\b(?:call|calls|meeting|meet|chat|demo|walkthrough|zoom|video call|catch[- ]up|coffee|connect|connecting|\d{1,2}\s?(?:-\s?)?min(?:ute)?s?)\b/iu;
 const DOCUMENT =
   /\b(deck|pitch deck|one[- ]pager|memo|data ?room|methodology|materials?|financials|financial model|case stud(?:y|ies))\b/iu;
 const OFFER_OR_ASK =
   /\b(?:share|send|happy to|glad to|would you like|want|keen to|find|hop on|grab|set up|arrange|book|schedule|can we|could we|shall we|let'?s|are you free|available|availability|time to)\b/iu;
+
+/** A question asked without a question mark ("I'd be interested to hear how"). */
+const INDIRECT_QUESTION =
+  /\b(?:(?:interested|keen|curious) to (?:hear|know|learn|understand)|(?:would|'d) (?:love|like) to (?:hear|know|learn|understand)|curious (?:about|how|whether|what)|tell (?:me|us) (?:more|how|what|about)|wondering (?:how|whether|what|if))\b/iu;
 
 /** Their sentences, split on end punctuation and line breaks. */
 function sentences(text: string): readonly string[] {
@@ -64,9 +70,13 @@ export function pendingAsks(
   }
   // A question that is not itself the offer ("Want the deck, or 20
   // minutes?" is the offer, already counted).
+  // Tensorgate, 8 Oct: "I'd be interested to hear how those firms are
+  // evaluating the gateway" asks as surely as a question mark does.
   if (
     all.some(
-      (one) => one.includes("?") && !MEETING.test(one) && !DOCUMENT.test(one),
+      (one) =>
+        (one.includes("?") && !MEETING.test(one) && !DOCUMENT.test(one)) ||
+        INDIRECT_QUESTION.test(one),
     )
   ) {
     asks.push({ kind: "QUESTION", thing: null });

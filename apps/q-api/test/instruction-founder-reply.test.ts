@@ -26,6 +26,7 @@ import {
   type ThreadRead,
 } from "../src/composition/instructions/quarantine.js";
 import type { InstructionRow } from "../src/composition/instructions/store.js";
+import type { OutwardReview } from "../src/composition/workforce/review.js";
 import { createInstructionTriggers } from "../src/composition/instructions/triggers.js";
 
 /**
@@ -210,7 +211,11 @@ const NO_CALL = reply(
   "Thank you, Zino. Regulated firms evaluate the gateway with a pilot on one sensitive workload, checking each enclave attestation before rollout; two design partners converted to $180k contracts. Happy to share the deck if useful.",
 );
 
-function world(plans: readonly InstructionPlan[], read = threadRead()) {
+function world(
+  plans: readonly InstructionPlan[],
+  read = threadRead(),
+  review?: OutwardReview,
+) {
   const row: InstructionRow = {
     id: randomUUID(),
     tenant_id: actor.tenantId,
@@ -284,6 +289,7 @@ function world(plans: readonly InstructionPlan[], read = threadRead()) {
     },
     now: () => FIRED_AT,
     autoEnabled: true,
+    ...(review === undefined ? {} : { review }),
   });
   return { engine, row, steps, notices, cards, planned, seenPeople };
 }
@@ -492,5 +498,58 @@ describe("wake on message: a new investor message runs the founder's instruction
     await triggers.sweep();
     expect(ran).toHaveLength(1);
     expect(Date.now() - started).toBeLessThan(60_000);
+  });
+});
+
+describe("a reply the reviewer holds just under the bar (11:01 kick, job 6a3fae2d)", () => {
+  // Draft d369ae2e, word for word.
+  const DRAFT_1 =
+    "Thanks for the thoughtful note, and for sharing your focus on B2B SaaS and enterprise software. Tensorgate is a policy gateway for LLM traffic in regulated industries: we have four design partners, two converted to $180k contracts, and 31m requests served. We’re raising a $4m seed. Happy to share the deck, and Daniel can come back on anything I can’t answer here. Would 20 minutes this week be useful?";
+  const held = (nearMiss: boolean): OutwardReview => ({
+    prepare: () => Promise.resolve(null),
+    abandon: () => Promise.resolve(),
+    settle: () => Promise.resolve(),
+    review: (_who, _source, _draft, options) => {
+      expect(options?.nearMiss).toBe(true);
+      return Promise.resolve({
+        verdict: "HELD",
+        reason: "BELOW_BAR",
+        body: DRAFT_1,
+        score: 69,
+        feedback: "1. Answer their question first.",
+        jobId: null,
+        draftId: null,
+        ...(nearMiss ? { nearMiss: true as const } : {}),
+      });
+    },
+  });
+
+  it("a near miss becomes Daniel's card with the best draft -- never sent, never lost", async () => {
+    ran.length = 0;
+    const { engine, row, cards, steps } = world(
+      [plan(reply(DRAFT_1, "MEETING"))],
+      threadRead(),
+      held(true),
+    );
+    await engine.fire(row.id, "sched-founder-8");
+    expect(ran).toHaveLength(0);
+    expect(cards).toEqual([
+      expect.objectContaining({ actionType: "app.chat.message.send" }),
+    ]);
+    expect(steps.map((step) => step.reasonCode)).toEqual(["NEAR_THE_BAR"]);
+    expect(steps[0]?.words).toContain("just under your bar");
+  });
+
+  it("a plain hold still tells Daniel, with BELOW_THE_BAR", async () => {
+    const { engine, row, cards, steps } = world(
+      [plan(reply(DRAFT_1, "MEETING"))],
+      threadRead(),
+      held(false),
+    );
+    await engine.fire(row.id, "sched-founder-9");
+    expect(cards).toHaveLength(0);
+    expect(
+      steps.find((step) => step.reasonCode === "REPLY_WAITING")?.words,
+    ).toContain("(BELOW_THE_BAR)");
   });
 });

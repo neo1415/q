@@ -130,7 +130,7 @@ export const DRAFT_REVIEW_V2: PromptDefinition<
 > = {
   id: "DRAFT_REVIEW",
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -221,11 +221,71 @@ export const DRAFT_REDRAFT_V2: PromptDefinition<
 > = {
   ...DRAFT_REDRAFT_V1,
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   effectiveFrom: "2026-10-07",
   changeDescription:
     "Founder 2026-10-07: messages were too direct. The redraft writes relationship-first: a specific opening about the other side, evidence, one soft ask, 60-120 words, no hard sell.",
   template: REDRAFT_TEMPLATE_V2,
+};
+
+/**
+ * v3 (Tensorgate, 2026-10-08): a warm, grounded reply to Zino scored 45
+ * and its redraft re-asked Zino's own "would you be open to connecting?".
+ * The rubric is calibrated for REPLIES: answering their question from the
+ * material, or honestly saying {{principalName}} will cover the detail on
+ * the call, is answering; accepting the call they offered with one concrete
+ * time question is the right ask (the deck offered beside it is the same
+ * ask); taking up what they wrote is a warm, specific opening. Feedback
+ * never sends the writer to ask what they already asked or offered.
+ */
+const REVIEW_TEMPLATE_V3 = REVIEW_TEMPLATE_V2.replace(
+  "- PERSONAL_STYLE: follows the person's own guide, where one is given above, on style and sign-off.",
+  `- PERSONAL_STYLE: follows the person's own guide, where one is given above, on style and sign-off.
+
+ON A REPLY (they wrote last), grade it as a reply, not as outreach:
+- WARM_OPENING: thanking them and taking up what they actually wrote (their point, their question, their interest) is a warm, specific opening: 4 or 5. Leading with their profile instead of what they wrote is weaker.
+- ANSWERS_THEM: their question answered from the material or the conversation scores 4 or 5; answered in part with the rest honestly left to {{principalName}} ("Daniel can walk you through it on a call") scores 4. Repeating facts without touching their question scores 2 or less.
+- ASK_TIMING: where they offered or asked to connect or meet, accepting it with one concrete time question ("would Tuesday or Wednesday next week suit?", "20 minutes this week?") is the right ask: 4 or 5; offering the deck alongside it is part of the same ask, not a second one. Asking whether they are open to connecting, after they asked, scores 1.
+- A reply that answers them, accepts their offer with a time and is grounded is what a thoughtful colleague would send: grade it so.`,
+).replace(
+  'In feedback, give the writer a numbered list of concrete fixes ("1. Accept the call and ask which time suits."), at most five, each one sentence.',
+  'In feedback, give the writer a numbered list of concrete fixes ("1. Accept the call and ask which time suits."), at most five, each one sentence. Never tell the writer to ask them anything they already asked or offered, or to repeat their question back to them.',
+);
+
+export const DRAFT_REVIEW_V3: PromptDefinition<
+  DraftReviewV2Variables,
+  DraftReviewResultV2
+> = {
+  ...DRAFT_REVIEW_V2,
+  version: 3,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-08",
+  changeDescription:
+    "Tensorgate 2026-10-08: the rubric is calibrated for replies (answering or honestly deferring their question, accepting their call offer with one time question, taking up what they wrote) and feedback never asks the writer to re-ask what they asked or offered. Same variables and output as v2.",
+  template: REVIEW_TEMPLATE_V3,
+};
+
+/**
+ * v3 (Tensorgate, 2026-10-08): the redraft answers what they asked and
+ * accepts what they offered; it never hands their own question back.
+ */
+const REDRAFT_TEMPLATE_V3 = REDRAFT_TEMPLATE_V2.replace(
+  "- If no honest message can do what it is for, body is null.",
+  `- On a REPLY: answer their question first, from the material or what {{principalName}}'s side already said in the conversation; where the detail is not there, say {{principalName}} will walk them through it on a call -- never guess. Accept a call or meeting they offered or asked for with one concrete time question. Never ask them what they already asked or offered (never "would you be open to connecting?" after they asked it), and never repeat their question back to them.
+- If no honest message can do what it is for, body is null.`,
+);
+
+export const DRAFT_REDRAFT_V3: PromptDefinition<
+  DraftRedraftVariables,
+  DraftRedraftResult
+> = {
+  ...DRAFT_REDRAFT_V1,
+  version: 3,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-08",
+  changeDescription:
+    "Tensorgate 2026-10-08: on a reply the redraft answers their question (or defers the detail to the person's call, never guessing), accepts their offer with one time question, and never re-asks what they asked or offered. Same variables and output as v2.",
+  template: REDRAFT_TEMPLATE_V3,
 };
 
 const REPLY_READER_TEMPLATE = `TASK: REPLY_READER

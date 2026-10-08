@@ -320,6 +320,8 @@ export const ASK_WORDS: Readonly<Record<string, string>> = {
     "I've sent as many messages on my own today as your delegation allows",
   NOT_REVIEWED: "the reviewer couldn't read it first",
   MEETING_NEEDS_YES: "it proposes a call, and calls are yours to agree",
+  NEAR_THE_BAR:
+    "the reviewer rated it just under your bar, so you should read it first",
 };
 
 // ---------------------------------------------------------------------------
@@ -2376,9 +2378,41 @@ export function createInstructionEngine(
                     verdict.verdict === "ASK" &&
                       verdict.code === "MEETING_NEEDS_YES",
                   ).problem,
+                nearMiss: true,
               },
             );
             graded.set(index, outcome);
+            logger?.info(
+              {
+                instructionId: row.id,
+                relationshipId: subject,
+                verdict: outcome.verdict,
+                reason: outcome.verdict === "HELD" ? outcome.reason : null,
+                nearMiss:
+                  outcome.verdict === "HELD" && outcome.nearMiss === true,
+                score: outcome.score,
+                jobId: outcome.jobId,
+                draftId: outcome.draftId,
+              },
+              "standing instruction draft reviewed",
+            );
+            if (outcome.verdict === "HELD" && outcome.nearMiss === true) {
+              // Tensorgate, 8 Oct: a good reply held just under the bar was
+              // lost. The best draft code had nothing against goes to the
+              // person as their card -- their yes, never sent by Q.
+              const offered = verdict.action.input.safeParse(
+                withTextBody(verdict.input, outcome.body),
+              );
+              if (offered.success) {
+                return {
+                  verdict: "ASK",
+                  action: verdict.action,
+                  input: offered.data,
+                  relationshipId: subject,
+                  code: "NEAR_THE_BAR",
+                };
+              }
+            }
             if (outcome.verdict === "HELD") {
               noteRefusal(subject, "BELOW_THE_BAR");
               return {

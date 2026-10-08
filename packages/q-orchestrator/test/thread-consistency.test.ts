@@ -186,7 +186,9 @@ describe("writer -> reviewer with the thread check", () => {
       "THREAD_MISMATCH",
     );
     expect(outcome.attempts).toBe(2);
-    expect(reviews).toBe(2);
+    // Tensorgate, 8 Oct: code's check runs on the redraft (and on its one
+    // code-fix) before the reviewer: a re-ask never spends a review.
+    expect(reviews).toBe(1);
     // What is recorded for the person is the fix list, not a bare score.
     expect(outcome.grade?.feedback).toContain("open to connecting");
   });
