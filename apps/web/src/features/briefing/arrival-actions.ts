@@ -31,6 +31,8 @@ import { qApiSession } from "@/features/q/context";
 import { decisionGroups, decisionTitle } from "@/features/work/decisions";
 import { retryHeldAction } from "@/features/work/held-actions";
 import { readPlan } from "@/features/work/plan-words";
+import { groupNotices } from "@/features/work/notice-groups";
+import { listNoticesAction } from "@/features/work/work-actions";
 import { listDoneAction } from "@/features/work/work-page-actions";
 import { loadWorkforceAction } from "@/features/work/workforce-actions";
 
@@ -104,13 +106,21 @@ export async function arrivalBriefingAction(
   if (session === null) return null;
   const now = Date.now();
   const since = parsed.data ?? new Date(now - 24 * 3_600_000).toISOString();
-  const [account, sinceRead, approvals, workforce, done] = await Promise.all([
-    accountDetails().catch(() => null),
-    getQWorkSince(session, since).catch(() => null),
-    pendingQApprovalsAction().catch(() => null),
-    loadWorkforceAction().catch(() => null),
-    listDoneAction().catch(() => null),
-  ]);
+  const [account, sinceRead, approvals, workforce, done, notices] =
+    await Promise.all([
+      accountDetails().catch(() => null),
+      getQWorkSince(session, since).catch(() => null),
+      pendingQApprovalsAction().catch(() => null),
+      loadWorkforceAction().catch(() => null),
+      listDoneAction().catch(() => null),
+      listNoticesAction().catch(() => null),
+    ]);
+  const waitingNotices =
+    notices?.ok === true
+      ? groupNotices(notices.value.items).needsYou.map(
+          (group) => group.notice.title,
+        )
+      : [];
   const waiting = approvals?.ok === true ? approvals.value : [];
   const read = await Promise.all(
     waiting
@@ -199,6 +209,7 @@ export async function arrivalBriefingAction(
         ? null
         : Math.max(0, (now - Date.parse(parsed.data)) / 3_600_000),
     cards,
+    waiting: waitingNotices,
   };
 }
 

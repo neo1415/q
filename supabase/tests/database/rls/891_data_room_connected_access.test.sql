@@ -18,9 +18,12 @@ select plan(11);
 
 insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug) values
   ('00000000-0000-4000-8000-0000000089c1', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), 'Gate Co A', 'gate-co-a');
+-- One investor organisation per organisation (unique): a second firm.
+insert into identity.organisations (id, tenant_id, organisation_type, display_name, slug) values
+  ('00000000-0000-4000-8000-0000000089b2', pg_temp.rls_id('tenant_b'), 'investment_firm', 'Gate Firm Two', 'gate-firm-two');
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
   ('00000000-0000-4000-8000-0000000089e1', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), 'VC', 'Gate Capital One'),
-  ('00000000-0000-4000-8000-0000000089e2', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), 'VC', 'Gate Capital Two');
+  ('00000000-0000-4000-8000-0000000089e2', pg_temp.rls_id('tenant_b'), '00000000-0000-4000-8000-0000000089b2', 'VC', 'Gate Capital Two');
 insert into network.relationships (id, tenant_id, company_id, investor_organisation_id, current_state) values
   -- Interest expressed, not accepted.
   ('00000000-0000-4000-8000-000000008901', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-0000000089c1', '00000000-0000-4000-8000-0000000089e1', 'INTEREST_EXPRESSED'),

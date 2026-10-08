@@ -254,6 +254,7 @@ export function WorkPage({
               </>
             )}
             onDecided={decided}
+            extraCount={timeLanes.length + notices.length}
             extra={
               <NeedsYou
                 approvals={[]}

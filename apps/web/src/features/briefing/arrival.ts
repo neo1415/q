@@ -64,6 +64,11 @@ export type ArrivalData = {
   /** Hours since the last visit this browser knows; null: unknown. */
   readonly hoursAway: number | null;
   readonly cards: readonly ArrivalCard[];
+  /**
+   * Notices still waiting on them ("Zino Aviation is waiting for a
+   * reply"), as their titles; absent or empty: none.
+   */
+  readonly waiting?: readonly string[] | undefined;
 };
 
 export function sequenceCardOf(card: ArrivalCard): SequenceCard {
@@ -120,11 +125,24 @@ export function arrivalWords(
     now,
     timeZone: zoneFor(data, browserZone),
   });
-  const lowdown = lowdownOf({
+  const read = lowdownOf({
     activity: data.activity ?? {},
     decisions: data.cards.length,
     hoursAway: data.hoursAway,
   });
+  // Live 2026-10-08: "All quiet; nothing needs you" while an investor's
+  // message waited for a reply. What waits on them is said, never "quiet".
+  const waiting = (data.waiting ?? []).slice(0, 3);
+  const waitingLine =
+    waiting.length === 0
+      ? null
+      : waiting.map((title) => title.replace(/[.!?\s]*$/u, ".")).join(" ");
+  const lowdown =
+    waitingLine === null
+      ? read
+      : read.quiet
+        ? { quiet: false, text: waitingLine }
+        : { quiet: false, text: `${read.text} ${waitingLine}` };
   const first = data.cards[0];
   const firstCard =
     first === undefined

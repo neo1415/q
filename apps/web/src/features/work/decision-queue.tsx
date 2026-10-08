@@ -206,6 +206,7 @@ export function DecisionQueue({
   renderPlan,
   onDecided,
   extra,
+  extraCount = 0,
 }: {
   readonly groups: readonly DecisionGroup[];
   readonly jobs: readonly WorkforceJobDetailDto[];
@@ -216,9 +217,14 @@ export function DecisionQueue({
   readonly onDecided: (key: string) => void;
   /** Other things waiting on them (times to pick, notices), as rows. */
   readonly extra?: ReactNode;
+  /** How many rows `extra` holds: they wait on them too, so they count. */
+  readonly extraCount?: number;
 }) {
   const [all, setAll] = useState(false);
-  const count = groups.reduce((sum, group) => sum + group.items.length, 0);
+  // Live 2026-10-08: "Needs you 0 · Nothing waits on you" above two rows
+  // saying an investor was waiting for a reply.
+  const count =
+    groups.reduce((sum, group) => sum + group.items.length, 0) + extraCount;
   const shown = all ? groups : groups.slice(0, QUEUE_PREVIEW);
   return (
     <section aria-labelledby="work-needs-you" data-work-needs-you>

@@ -17,13 +17,17 @@ import { TURN_READER_V43 } from "./turn-reader.v43.js";
  * nothing, and the voice filled the gap by asking for more detail. The
  * recogniser often turns accented English into foreign-looking words;
  * read by sound, with the conversation and the screen, the request is
- * usually plain. heardAs carries the likely words, so Q answers them.
+ * usually plain. heardAs carries the likely words, so Q answers them. The same call showed
+ * "anything that needs my attention" read as NAVIGATE to Work ("Over to
+ * Work."): what needs them is a question Q answers, not a screen.
  */
 export const V43_UNCLEAR =
   "- UNCLEAR_TRANSCRIPT: the words are noise, a fragment, or cut off so badly that no meaning can be read. Only for words you genuinely cannot read.";
 export const V44_UNCLEAR = `${V43_UNCLEAR} On VOICE, first read the words by sound: the recogniser often turns accented English into words that look foreign or meaningless ("Fidiani inanituma attention" is "find anything that needs my attention"; "sho mi di dek" is "show me the deck"). When they sound like a plausible request to Q that fits RECENT TURNS, their screen or the ACTIONS, read the turn as that request (CONFIDENCE MEDIUM, TRANSCRIPT NOISY) and set heardAs. UNCLEAR_TRANSCRIPT only when nothing plausible sounds like them.`;
 export const V43_TRANSCRIPT_HEAD =
   "TRANSCRIPT (modality: see MODALITY near the end):";
+export const V44_WHAT_NEEDS_THEM = `WHAT NEEDS THEM: asking what needs them, what is waiting for them, what they missed, what is new, or for anything that needs their attention ("find anything that needs my attention", "what's waiting for me?") is QUESTION_TO_Q, question THEIR_OWN_RECORDS: Q tells them what it is. It is NAVIGATE only when they ask to be taken to a screen by name.
+`;
 export const V44_HEARD_AS = `HEARD AS: heardAs is the English words they most likely said, when you read garbled VOICE words by sound; null when the words read as written, and always null for typed words.
 `;
 
@@ -41,7 +45,7 @@ export const TURN_READER_V44: PromptDefinition<
   version: 44,
   status: "ACTIVE",
   changeDescription:
-    "Zino live 2026-10-08: garbled voice words are read by sound before UNCLEAR_TRANSCRIPT; heardAs carries the likely words so Q answers them instead of going silent.",
+    "Zino live 2026-10-08: garbled voice words are read by sound before UNCLEAR_TRANSCRIPT; heardAs carries the likely words so Q answers them instead of going silent; what needs their attention is a question Q answers, not NAVIGATE.",
   effectiveFrom: "2026-10-08",
   output: {
     kind: "STRUCTURED",
@@ -51,5 +55,8 @@ export const TURN_READER_V44: PromptDefinition<
   },
   template: TURN_READER_V43.template
     .replace(V43_UNCLEAR, V44_UNCLEAR)
-    .replace(V43_TRANSCRIPT_HEAD, `${V44_HEARD_AS}${V43_TRANSCRIPT_HEAD}`),
+    .replace(
+      V43_TRANSCRIPT_HEAD,
+      `${V44_WHAT_NEEDS_THEM}${V44_HEARD_AS}${V43_TRANSCRIPT_HEAD}`,
+    ),
 };
