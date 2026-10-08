@@ -2519,7 +2519,7 @@ export class DuplexLine {
     if (this.#userSpeaking) return;
     const oob = this.#newOutOfBand("BRIDGE");
     this.#sendOutOfBand(oob, {
-      instructions: `Say this to the person briefly, in your own natural voice, and nothing else: "${words.replace(/"/g, "'")}"`,
+      instructions: `Repair line, out of band: say these words to the person, briefly and naturally, and nothing else: "${words.replace(/"/g, "'")}"`,
       maxOutputTokens: BRIDGE_MAX_OUTPUT_TOKENS,
       input: [],
     });
