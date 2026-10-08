@@ -23,6 +23,24 @@ FAKE_PORT="${CQ_FAKE_PORT:-3990}"
 DISABLED="disabled-locally-000000000000"
 ALL=(db fake api q-api workers web)
 
+# MOCK (default, CI): no vendor is reachable; the model is fake-vendors.mjs.
+# LIVE (manual, founder-approved budget): real OpenAI (and optionally
+# Deepgram) for this local stack only. Needs, in the operator's shell:
+#   CQ_RECOVERY_MODE=live CQ_LIVE_OPENAI_API_KEY=<a non-production key>
+#   CQ_LIVE_BUDGET_USD=<cap, e.g. 1>  [CQ_LIVE_DEEPGRAM_API_KEY=...]
+#   [CQ_LIVE_PROXY_HOST=<proxy host> when vendors are only reachable via a proxy]
+# The key is exported to the guarded processes only and is never written
+# to the env file, the logs or the repository.
+MODE="${CQ_RECOVERY_MODE:-mock}"
+LIVE_HOSTS="api.openai.com,api.deepgram.com,agent.deepgram.com"
+if [[ "$MODE" == live ]]; then
+  [[ -n "${CQ_LIVE_OPENAI_API_KEY:-}" ]] || { echo "[local-stack] LIVE needs CQ_LIVE_OPENAI_API_KEY"; exit 2; }
+  [[ "${CQ_LIVE_BUDGET_USD:-}" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "[local-stack] LIVE needs CQ_LIVE_BUDGET_USD (the approved cap)"; exit 2; }
+  case "${CQ_LIVE_OPENAI_API_KEY}" in disabled-*) echo "[local-stack] LIVE refused: that is the disabled placeholder"; exit 2;; esac
+elif [[ "$MODE" != mock ]]; then
+  echo "[local-stack] CQ_RECOVERY_MODE is mock or live"; exit 2
+fi
+
 log() { printf '[local-stack] %s\n' "$*"; }
 
 ensure_docker() {
@@ -93,8 +111,39 @@ launch() {
   local name="$1" cwd="$2"; shift 2
   if running "$name"; then log "$name already running (pid $(cat "$(pidfile "$name")"))"; return; fi
   (
+    # A clean environment: a cloud shell carries real credentials (SMTP,
+    # Google, Railway...) that a service would otherwise pick up and use.
+    # Found live: q-api inherited SMTP_API_KEY and tried to send reminder
+    # emails through api.brevo.com (refused by the egress guard).
+    local keep_path="$PATH" keep_home="$HOME" proxy="${HTTPS_PROXY:-}"
+    local live_key="${CQ_LIVE_OPENAI_API_KEY:-}" live_dg="${CQ_LIVE_DEEPGRAM_API_KEY:-}"
+    local live_proxy="${CQ_LIVE_PROXY_HOST:-}" ca="${NODE_EXTRA_CA_CERTS:-}"
+    for var in $(compgen -e); do unset "$var" 2>/dev/null || true; done
+    export PATH="$keep_path" HOME="$keep_home"
+    CQ_LIVE_OPENAI_API_KEY="$live_key"; CQ_LIVE_DEEPGRAM_API_KEY="$live_dg"
+    CQ_LIVE_PROXY_HOST="$live_proxy"
+    if [[ -n "$live_proxy" ]]; then
+      export HTTPS_PROXY="$proxy" NODE_USE_ENV_PROXY=1
+      [[ -n "$ca" ]] && export NODE_EXTRA_CA_CERTS="$ca"
+    fi
     set -a; source "$ENV_FILE"; set +a
-    unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy ALL_PROXY all_proxy
+    if [[ "$MODE" == live ]]; then
+      # LIVE: the operator's key, from their shell only; never in the env file.
+      export OPENAI_API_KEY="$CQ_LIVE_OPENAI_API_KEY"
+      unset OPENAI_BASE_URL
+      [[ -n "${CQ_LIVE_DEEPGRAM_API_KEY:-}" ]] && export DEEPGRAM_API_KEY="$CQ_LIVE_DEEPGRAM_API_KEY"
+      export CQ_EGRESS_ALLOW="$LIVE_HOSTS${CQ_LIVE_PROXY_HOST:+,$CQ_LIVE_PROXY_HOST}"
+      [[ -n "${CQ_LIVE_PROXY_HOST:-}" ]] && export CQ_EGRESS_KEEP_PROXY=1
+      # Realtime on, bounded by its own spend cap and session length.
+      export CQ_VOICE_REALTIME=on
+      export CQ_VOICE_REALTIME_DAILY_CAP_USD="$CQ_LIVE_BUDGET_USD"
+      export CQ_VOICE_REALTIME_MAX_SESSION_SECONDS=120
+      export CQ_SYNTHETIC_DEMO_ROUTING=on
+    else
+      unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy ALL_PROXY all_proxy
+      export CQ_VOICE_REALTIME=on
+    fi
+    unset CQ_LIVE_OPENAI_API_KEY CQ_LIVE_DEEPGRAM_API_KEY
     export NODE_OPTIONS="--import=$ROOT/scripts/recovery/egress-guard.mjs ${NODE_OPTIONS:-}"
     cd "$cwd"
     exec setsid "$@" >>"$RUN/$name.log" 2>&1
@@ -148,10 +197,11 @@ cmd="${1:-status}"; shift || true
 services=("$@"); [[ ${#services[@]} -eq 0 ]] && services=("${ALL[@]}")
 
 case "$cmd" in
-  start) for s in "${services[@]}"; do start_one "$s"; done ;;
+  start) echo "$MODE" >"$RUN/mode"; log "mode: $MODE"; for s in "${services[@]}"; do start_one "$s"; done ;;
   stop)
     for (( i=${#services[@]}-1; i>=0; i-- )); do stop_one "${services[$i]}"; done ;;
   status)
+    log "mode: $(cat "$RUN/mode" 2>/dev/null || echo unknown)"
     docker info >/dev/null 2>&1 && log "docker: up" || log "docker: down"
     for s in fake api q-api workers web; do
       if running "$s"; then log "$s: running (pid $(cat "$(pidfile "$s")"))"; else log "$s: stopped"; fi

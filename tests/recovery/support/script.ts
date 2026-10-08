@@ -42,7 +42,11 @@ const BASELINE = JSON.parse(
 ) as { rules: ScriptRule[] };
 
 /** Q's structured answer, the minimum the answer schema accepts. */
-export function answer(text: string, extra: Record<string, unknown> = {}): ScriptReply {
+export function answer(
+  text: string,
+  extra: Record<string, unknown> = {},
+  delayMs?: number,
+): ScriptReply {
   return {
     json: {
       answer: text,
@@ -50,6 +54,7 @@ export function answer(text: string, extra: Record<string, unknown> = {}): Scrip
       insufficientEvidence: false,
       ...extra,
     },
+    ...(delayMs === undefined ? {} : { delayMs }),
   };
 }
 

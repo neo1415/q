@@ -36,8 +36,21 @@ function destination(args) {
   };
 }
 
+/**
+ * LIVE mode only (local-stack.sh with CQ_RECOVERY_MODE=live): the vendor
+ * hosts the operator approved for this run, e.g. "api.openai.com". Empty in
+ * MOCK mode, which is the default and the CI mode.
+ */
+const ALLOWED = new Set(
+  (process.env.CQ_EGRESS_ALLOW ?? "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter((host) => host.length > 0),
+);
+
 function isLoopback(host) {
   if (LOOPBACK.has(host)) return true;
+  if (ALLOWED.has(host.toLowerCase())) return true;
   return /^127\./u.test(host) || /^::ffff:127\./u.test(host);
 }
 
@@ -65,9 +78,11 @@ net.Socket.prototype.connect = function guardedConnect(...args) {
   return this;
 };
 
-// The agent proxy would turn every vendor call into a loopback-looking
-// connection to the proxy; it must not be used by guarded processes.
-for (const name of [
+// The agent proxy hides the real destination inside a CONNECT, so guarded
+// processes never use it. A LIVE run on a machine that can only reach the
+// vendor through a proxy sets CQ_EGRESS_KEEP_PROXY=1 and lists the proxy
+// host in CQ_EGRESS_ALLOW; the report then says the guard was proxy-wide.
+for (const name of process.env.CQ_EGRESS_KEEP_PROXY === "1" ? [] : [
   "HTTPS_PROXY",
   "HTTP_PROXY",
   "https_proxy",

@@ -35,6 +35,11 @@ export const FAKE_URL = `http://127.0.0.1:${pick("CQ_FAKE_PORT", "3990")}`;
 export const SUPABASE_URL = pick("SUPABASE_URL", "http://127.0.0.1:54321");
 export const SUPABASE_PUBLISHABLE_KEY = pick("SUPABASE_PUBLISHABLE_KEY", "");
 export const RUN_PATH = RUN_DIR;
+/** "mock" or "live": how local-stack.sh started the running stack. */
+export const STACK_MODE = (() => {
+  const file = resolve(RUN_DIR, "mode");
+  return existsSync(file) ? readFileSync(file, "utf8").trim() : "unknown";
+})();
 
 for (const url of [WEB_URL, API_URL, Q_API_URL, SUPABASE_URL]) {
   if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/u.test(url)) {
