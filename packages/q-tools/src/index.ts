@@ -75,6 +75,7 @@ export type {
   OwnDocumentsPort,
   QToolPorts,
   PitchMomentPort,
+  CompanyPitchTranscript,
   RelationshipIntelligencePort,
   OwnRelationship,
   OwnRelationships,
@@ -272,6 +273,10 @@ export {
   viewedPitchIn,
   type GetPitchMomentOutput,
 } from "./tools/pitch-moment.js";
+export {
+  createReadCompanyPitchesTool,
+  READ_COMPANY_PITCHES,
+} from "./tools/pitch-transcripts.js";
 export {
   GET_DISCLOSURE_STATE,
   GetDisclosureStateOutputSchema,

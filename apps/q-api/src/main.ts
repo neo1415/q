@@ -69,6 +69,7 @@ import {
   createMediaService,
   createPostgresDiscoverablePitchQueryPort,
   cuesAround,
+  extractPitchClaims,
   MediaAssetIdSchema,
 } from "@capital-q/media";
 import { MEDIA_EVENTS } from "@capital-q/media/events";
@@ -2498,6 +2499,49 @@ const qTools = createQTools({
               cues: cuesAround(view.cues, query.atMs, query.windowMs),
             }
           : { status: view.status };
+      },
+      // 2026-10-08: every pitch of a company this person may play, with
+      // its transcript and the media context's deterministic reading of
+      // its claims. The discoverable list only names candidates; each
+      // transcript read is the playback rule's own decision, and a pitch
+      // the person may not play is simply absent.
+      forCompany: async (actor, companyId) => {
+        const set = (
+          await createPostgresDiscoverablePitchQueryPort({
+            sql: database.sql,
+          })
+            .findDiscoverablePitches([companyId])
+            .catch(() => new Map())
+        ).get(companyId);
+        if (set === undefined) return null;
+        const read = await Promise.all(
+          [set, ...set.more].slice(0, 5).map(async (pitch) => {
+            const view = await pitchMedia
+              .getPitchTranscriptByPitch({
+                actor,
+                mediaAssetId: pitch.mediaAssetId,
+              })
+              .catch(() => null);
+            if (view === null) return null;
+            const cues = view.status === "AVAILABLE" ? view.cues : [];
+            return {
+              pitchId: pitch.mediaAssetId,
+              title: pitch.title ?? null,
+              status: view.status,
+              cues,
+              claims: extractPitchClaims(cues).map((claim) => ({
+                kind: claim.kind,
+                statement: claim.statement,
+                atMs: claim.atMs,
+                money: claim.money ?? null,
+                stageCode: claim.stageCode ?? null,
+                instrument: claim.instrument ?? null,
+              })),
+            };
+          }),
+        );
+        const pitches = read.filter((pitch) => pitch !== null);
+        return pitches.length === 0 ? null : pitches;
       },
     },
     // BIZ-007: "email the founder", drafted for approval.

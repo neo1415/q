@@ -47,7 +47,7 @@ const EVERY_PORT: QToolPorts = {
   chat: STUB,
   schedule: { dismissReminder: STUB } as never,
   profileChanges: STUB,
-  pitchMoments: STUB,
+  pitchMoments: { momentAround: STUB, forCompany: STUB } as never,
   explore: STUB,
   visibility: STUB,
   pendingProposals: { inConversation: STUB, approve: STUB, decline: STUB },
