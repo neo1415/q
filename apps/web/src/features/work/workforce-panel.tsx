@@ -41,6 +41,7 @@ import {
   type JobLine,
   type StepState,
 } from "./workforce-view";
+import { workStateOf } from "./job-state";
 
 /**
  * Q's team (founder brief J5; approved mockup 2026-10-06 b/workforce): on
@@ -332,6 +333,7 @@ function JobCard({
     <article
       className="mb-3 overflow-hidden rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) [contain-intrinsic-size:auto_160px] [content-visibility:auto]"
       data-job={job.job.id}
+      data-work-state={workStateOf(job.job)}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 py-3 pr-2 pl-4">
         <div className="min-w-0">
@@ -490,6 +492,8 @@ function Step({
     <li
       className="relative grid grid-cols-[22px_30px_minmax(0,1fr)] items-start gap-2.5 py-2 lg:grid-cols-[22px_34px_minmax(0,1fr)_auto]"
       data-step={line.state}
+      data-work-role={line.role}
+      data-work-draft={line.draftId}
     >
       {last ? null : (
         <span
@@ -748,7 +752,11 @@ function DraftCard({
       : markAgainst(draft.body, before?.body ?? null, "add");
   const rules = gradeRules(draft.grade);
   return (
-    <div className="rounded-[14px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-3.5 py-3">
+    <div
+      className="rounded-[14px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-3.5 py-3"
+      data-work-draft={draft.id}
+      data-work-draft-outcome={draft.outcome?.outcome ?? "NONE"}
+    >
       <header className="mb-2 flex items-center justify-between gap-2">
         <strong className="text-[14px] font-semibold">
           Draft {draft.attempt}

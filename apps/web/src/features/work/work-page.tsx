@@ -66,7 +66,7 @@ import {
   summarisesCards,
   type NoticeGroup,
 } from "./notice-groups";
-import { jobLine, jobsInProgress } from "./job-state";
+import { jobLine, jobsInProgress, workStateOf } from "./job-state";
 import { readPlan } from "./plan-words";
 import type { WorkforceView } from "./workforce-actions";
 import { WorkforceCost } from "./workforce-cost";
@@ -450,7 +450,7 @@ function JobRow({ job }: { readonly job: WorkforceJobSummaryDto }) {
     <li
       className="flex min-h-14 items-center gap-3 border-b border-(--cq-border-subtle) py-2"
       data-work-job={job.id}
-      data-work-state={job.workState ?? job.status}
+      data-work-state={workStateOf(job)}
     >
       <div className="min-w-0 flex-1">
         <p className="m-0 truncate cq-body-sm font-medium text-(--cq-text-primary)">

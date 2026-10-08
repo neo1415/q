@@ -81,6 +81,13 @@ export type JobLine =
       readonly state: StepState;
       /** The specialist (or "You"), in plain words. */
       readonly who: string;
+      /**
+       * G-R5: who acted (`data-work-role`): the run's stored role, or
+       * PERSON / COUNTERPART for the person's and the other side's moves.
+       */
+      readonly role?: string | undefined;
+      /** G-R5: the draft it is about, when it is one (`data-work-draft`). */
+      readonly draftId?: string | undefined;
       readonly mono: string;
       readonly tone: "lead" | "you" | "plain";
       readonly title: string;
@@ -174,6 +181,7 @@ export function jobLines(detail: WorkforceJobDetailDto): readonly JobLine[] {
       {
         kind: "step",
         key: `run:${run.id}`,
+        role: run.role,
         state: STATE_OF_RUN[run.status],
         who: nameOf(run),
         mono: ROLE_MONOGRAMS[run.role],
@@ -231,6 +239,8 @@ export function jobLines(detail: WorkforceJobDetailDto): readonly JobLine[] {
       {
         kind: "step",
         key: `draft:${draft.id}`,
+        role: "WRITER",
+        draftId: draft.id,
         state: "done",
         who: ROLE_NAMES.WRITER,
         mono: ROLE_MONOGRAMS.WRITER,
@@ -249,6 +259,8 @@ export function jobLines(detail: WorkforceJobDetailDto): readonly JobLine[] {
         {
           kind: "step",
           key: `grade:${draft.id}`,
+          role: "REVIEWER",
+          draftId: draft.id,
           state: grade.passed ? "done" : "back",
           who: ROLE_NAMES.REVIEWER,
           mono: ROLE_MONOGRAMS.REVIEWER,
@@ -283,6 +295,8 @@ export function jobLines(detail: WorkforceJobDetailDto): readonly JobLine[] {
         {
           kind: "step",
           key: `sent:${draft.id}`,
+          role: "LEAD",
+          draftId: draft.id,
           state: "done",
           who: "Lead Q",
           mono: ROLE_MONOGRAMS.LEAD,
@@ -300,6 +314,8 @@ export function jobLines(detail: WorkforceJobDetailDto): readonly JobLine[] {
         {
           kind: "step",
           key: `held:${draft.id}`,
+          role: "PERSON",
+          draftId: draft.id,
           state: "you",
           who: "You",
           mono: "You",
@@ -321,6 +337,8 @@ export function jobLines(detail: WorkforceJobDetailDto): readonly JobLine[] {
         {
           kind: "step",
           key: `offer:${draft.id}`,
+          role: "PERSON",
+          draftId: draft.id,
           state: "you",
           who: "You",
           mono: "You",
@@ -339,6 +357,8 @@ export function jobLines(detail: WorkforceJobDetailDto): readonly JobLine[] {
         {
           kind: "step",
           key: `expired:${draft.id}`,
+          role: "PERSON",
+          draftId: draft.id,
           state: "back",
           who: "You",
           mono: "You",
@@ -363,6 +383,8 @@ export function jobLines(detail: WorkforceJobDetailDto): readonly JobLine[] {
         {
           kind: "step",
           key: `feedback:${draft.id}:${one.kind}:${one.at}`,
+          role: one.kind === "REPLIED" ? "COUNTERPART" : "PERSON",
+          draftId: draft.id,
           state: "done",
           who:
             one.kind === "REPLIED" ? (draft.counterpartName ?? "They") : "You",

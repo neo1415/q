@@ -615,116 +615,125 @@ function HeldCard({
       }
     });
   return (
-    <Card>
-      <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
-        {decisionTitle(item)}
-      </p>
-      <p className="m-0 flex gap-1.5 cq-body-sm text-(--cq-text-secondary)">
-        <span aria-hidden="true" className="font-semibold text-(--cq-warning)">
-          !
-        </span>
-        <span>{item.reason}</span>
-      </p>
-      {mode === "EDIT" && relationshipId !== null ? (
-        <EditAndSend
-          initial={item.body}
-          relationshipId={relationshipId}
-          onSent={() => {
-            dismissHeld(item.draftId);
-            onDecided();
-          }}
-          onCancel={() => setMode("READ")}
-        />
-      ) : mode === "CONFIRM" && relationshipId !== null ? (
-        <div className="flex flex-col gap-2" data-held-confirm>
-          <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
-            Send this exact message to {name}?
-          </p>
-          <Quote>
-            <span className="sr-only">What will be sent: </span>
-            {item.body}
-          </Quote>
-          <div className="flex flex-wrap items-center gap-1">
-            <Button variant="primary" disabled={pending} onClick={sendAsIs}>
-              Yes, send this
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={pending}
-              onClick={() => setMode("EDIT")}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="quiet"
-              disabled={pending}
-              onClick={() => setMode("READ")}
-              className="text-(--cq-text-secondary)"
-            >
-              Cancel
-            </Button>
-          </div>
-          <p className="m-0 cq-caption text-(--cq-text-tertiary)">
-            Nothing is sent until you say yes. It goes exactly as shown.
-          </p>
-        </div>
-      ) : (
-        <>
-          <Quote>{item.body}</Quote>
-          <div className="flex flex-wrap items-center gap-1" data-held-verbs>
-            {relationshipId === null ? null : (
-              <Button
-                variant="primary"
-                disabled={pending}
-                onClick={() => setMode("CONFIRM")}
-              >
-                Send as is
+    <div
+      className="contents"
+      data-work-draft={item.draftId}
+      data-work-draft-outcome="HELD"
+    >
+      <Card>
+        <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
+          {decisionTitle(item)}
+        </p>
+        <p className="m-0 flex gap-1.5 cq-body-sm text-(--cq-text-secondary)">
+          <span
+            aria-hidden="true"
+            className="font-semibold text-(--cq-warning)"
+          >
+            !
+          </span>
+          <span>{item.reason}</span>
+        </p>
+        {mode === "EDIT" && relationshipId !== null ? (
+          <EditAndSend
+            initial={item.body}
+            relationshipId={relationshipId}
+            onSent={() => {
+              dismissHeld(item.draftId);
+              onDecided();
+            }}
+            onCancel={() => setMode("READ")}
+          />
+        ) : mode === "CONFIRM" && relationshipId !== null ? (
+          <div className="flex flex-col gap-2" data-held-confirm>
+            <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
+              Send this exact message to {name}?
+            </p>
+            <Quote>
+              <span className="sr-only">What will be sent: </span>
+              {item.body}
+            </Quote>
+            <div className="flex flex-wrap items-center gap-1">
+              <Button variant="primary" disabled={pending} onClick={sendAsIs}>
+                Yes, send this
               </Button>
-            )}
-            {relationshipId === null ? null : (
               <Button
                 variant="secondary"
                 disabled={pending}
                 onClick={() => setMode("EDIT")}
               >
-                Edit &amp; send
+                Edit
               </Button>
-            )}
-            <Button
-              variant="quiet"
-              disabled={pending}
-              onClick={retry}
-              className="text-(--cq-text-secondary)"
-            >
-              {pending ? "Q is trying again…" : "Ask Q to try again"}
-            </Button>
-            <Button
-              variant="quiet"
-              disabled={pending}
-              onClick={() => {
-                dismissHeld(item.draftId);
-                onDecided();
-              }}
-              className="text-(--cq-text-secondary)"
-            >
-              Dismiss
-            </Button>
-            <Button
-              variant="quiet"
-              disabled={pending}
-              onClick={() =>
-                setStatus(`Later, then. It stays here until you decide.`)
-              }
-              className="text-(--cq-text-secondary)"
-            >
-              Later
-            </Button>
+              <Button
+                variant="quiet"
+                disabled={pending}
+                onClick={() => setMode("READ")}
+                className="text-(--cq-text-secondary)"
+              >
+                Cancel
+              </Button>
+            </div>
+            <p className="m-0 cq-caption text-(--cq-text-tertiary)">
+              Nothing is sent until you say yes. It goes exactly as shown.
+            </p>
           </div>
-        </>
-      )}
-      <Status text={status} />
-      <Drafts drafts={item.drafts} />
-    </Card>
+        ) : (
+          <>
+            <Quote>{item.body}</Quote>
+            <div className="flex flex-wrap items-center gap-1" data-held-verbs>
+              {relationshipId === null ? null : (
+                <Button
+                  variant="primary"
+                  disabled={pending}
+                  onClick={() => setMode("CONFIRM")}
+                >
+                  Send as is
+                </Button>
+              )}
+              {relationshipId === null ? null : (
+                <Button
+                  variant="secondary"
+                  disabled={pending}
+                  onClick={() => setMode("EDIT")}
+                >
+                  Edit &amp; send
+                </Button>
+              )}
+              <Button
+                variant="quiet"
+                disabled={pending}
+                onClick={retry}
+                className="text-(--cq-text-secondary)"
+              >
+                {pending ? "Q is trying again…" : "Ask Q to try again"}
+              </Button>
+              <Button
+                variant="quiet"
+                disabled={pending}
+                onClick={() => {
+                  dismissHeld(item.draftId);
+                  onDecided();
+                }}
+                className="text-(--cq-text-secondary)"
+              >
+                Dismiss
+              </Button>
+              <Button
+                variant="quiet"
+                disabled={pending}
+                onClick={() =>
+                  setStatus(`Later, then. It stays here until you decide.`)
+                }
+                className="text-(--cq-text-secondary)"
+              >
+                Later
+              </Button>
+            </div>
+          </>
+        )}
+        <Status text={status} />
+        <Drafts drafts={item.drafts} />
+      </Card>
+    </div>
   );
 }
 
