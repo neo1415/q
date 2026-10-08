@@ -319,6 +319,11 @@ export {
   qVoiceDuplexAttachPath,
   QVoiceDuplexAttachSchema,
   type QVoiceDuplexAttach,
+  isQVoiceCardReply,
+  Q_VOICE_CARD_PATH,
+  qVoiceCardPath,
+  QVoiceCardUpdateSchema,
+  type QVoiceCardUpdate,
 } from "./voice.js";
 
 export {

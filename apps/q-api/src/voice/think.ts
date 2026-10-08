@@ -5,7 +5,11 @@ import type { ServerResponse } from "node:http";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
-import type { QFailureClass, QTurnDisposition } from "@capital-q/contracts";
+import {
+  isQVoiceCardReply,
+  type QFailureClass,
+  type QTurnDisposition,
+} from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 
 import type { VoiceSessionBindings } from "./bindings.js";
@@ -15,6 +19,7 @@ import { sentences } from "./speech.js";
 import { createThinkGate, type ThinkGate } from "./think-gate.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "./provider.js";
 import { turnFailureLine, turnSucceeded } from "./turn-failure.js";
+import { spokenCardOutcome, type VoiceCardTurns } from "./card-turns.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
 import type { VoiceTurnHandler } from "./turn.js";
 
@@ -72,6 +77,8 @@ export type VoiceThinkDependencies = {
    * screen (the turn board the browser already polls).
    */
   readonly board?: Pick<VoiceTurnBoard, "noteOutcome"> | undefined;
+  /** E-03: decision cards on screen, decided by the browser's card code. */
+  readonly cards?: VoiceCardTurns | undefined;
 };
 
 /** One response stream to the provider; a turn may move to a newer one. */
@@ -384,8 +391,30 @@ export function registerVoiceThinkRoute(
       // In a burst of re-asks, wait a moment to see whether another
       // follows before creating anything (think-gate.ts).
       const admitted = await gate.admit(line, controller.signal);
+      // E-03: a reply about the decision card in focus is the card's to
+      // decide (in the browser, by the card's own code); Q says what
+      // happened. Anything else, or no verdict in time, is Q's turn.
+      const cards = dependencies.cards;
+      const asked = [...transcript]
+        .reverse()
+        .find((t) => t.role === "user")?.content;
+      const verdict =
+        admitted !== "DROPPED" &&
+        cards !== undefined &&
+        asked !== undefined &&
+        cards.inFocus(binding.voiceSessionId) &&
+        isQVoiceCardReply(asked)
+          ? await cards.verdict(
+              binding.voiceSessionId,
+              asked,
+              controller.signal,
+            )
+          : null;
       if (admitted === "DROPPED") {
         disposition = "SUPERSEDED";
+      } else if (verdict?.handled === true) {
+        await speaker.speak(spokenCardOutcome(verdict.outcome));
+        disposition = "ACTED";
       } else {
         const outcome = await turn(
           binding,

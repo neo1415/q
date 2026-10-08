@@ -112,6 +112,7 @@ import {
   registerQVoiceRoutes,
   type QVoiceRoutesDependencies,
 } from "./voice/routes.js";
+import { createVoiceCardTurns } from "./voice/card-turns.js";
 import { registerVoiceThinkRoute } from "./voice/think.js";
 import type { PresenceTrigger } from "./voice/presence-trigger.js";
 import { registerQInterviewRoute } from "./voice/interview-route.js";
@@ -679,7 +680,10 @@ export function createApp(
         "q-api: the Q voice routes require an actor context resolver",
       );
     }
+    const voiceCards = createVoiceCardTurns();
     registerQVoiceRoutes(app, {
+      // E-03: one registry for the card route and the think route.
+      cards: voiceCards,
       authenticator: security.authenticator,
       resolver: security.resolver,
       identity: security.identity,
@@ -747,6 +751,7 @@ export function createApp(
         logger: modules.voice.logger,
         // RECOVERY A4: each turn's disposition, for the screen.
         board: modules.voice.board,
+        cards: voiceCards,
       });
     }
   }
