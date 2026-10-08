@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import {
   CorrelationIdSchema,
   Q_VOICE_LISTENING_DEFAULT,
+  type QFailureClass,
+  type QTurnDisposition,
   QRunIdSchema,
   type QSilenceBeat,
   type QVoiceDuplexHeard,
@@ -121,6 +123,49 @@ export function forRealtime(said: string): {
   return { say: parts.join(" "), amused };
 }
 const SPOKEN_MAX = 6_000;
+
+/** What the voice says when an ask_q passed its deadline (A8). */
+export const ASK_Q_TOO_LONG =
+  "That one is taking longer than I want to keep you waiting. Ask me again, or ask for a smaller piece and I'll build up.";
+
+type AskQResult = {
+  readonly output: string;
+  readonly approvalPending: boolean;
+  readonly silent?: boolean;
+  readonly disposition: QTurnDisposition;
+  readonly failure?: QFailureClass;
+};
+
+/**
+ * The turn, or null once the signal aborts: a turn handler that does not
+ * honour its signal (a stuck provider call) no longer holds the relay.
+ */
+function turnUntil<T>(
+  work: Promise<T>,
+  signal: AbortSignal,
+): Promise<T | null> {
+  if (signal.aborted) {
+    work.catch(() => undefined);
+    return Promise.resolve(null);
+  }
+  return new Promise<T | null>((resolve, reject) => {
+    const stop = () => {
+      resolve(null);
+    };
+    signal.addEventListener("abort", stop, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", stop);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", stop);
+        if (signal.aborted) resolve(null);
+        else reject(error instanceof Error ? error : new Error("turn failed"));
+      },
+    );
+  });
+}
 
 /**
  * What ask_q returns for a code-built answer (founder live 2026-10-08):
@@ -498,11 +543,7 @@ export function createDuplexBroker(
     line: DuplexLine,
     request: string,
     abort: AbortSignal,
-  ): Promise<{
-    readonly output: string;
-    readonly approvalPending: boolean;
-    readonly silent?: boolean;
-  }> => {
+  ): Promise<AskQResult> => {
     const voiceSessionId = line.voiceSessionId;
     const wake = () => {
       for (const listener of line.listeners) listener();
@@ -520,61 +561,122 @@ export function createDuplexBroker(
     // Each ask_q's beats start fresh; the numbering carries on.
     line.narration.length = 0;
     line.asking += 1;
+    // RECOVERY A8 (C-08): one deadline per ask_q. The turn's own signal
+    // aborts when the caller lets go or the deadline passes, whichever is
+    // first; before, a stuck run held "Thinking" and the relay forever.
+    const deadline = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      deadline.abort();
+    }, config.askDeadlineMs);
+    const onAbort = () => {
+      deadline.abort();
+    };
+    if (abort.aborted) deadline.abort();
+    else abort.addEventListener("abort", onAbort, { once: true });
+    const startedAt = now();
     try {
       const asked: VoiceTranscriptTurn = {
         role: "user",
         content: request.slice(0, ASK_Q_MAX_CHARS),
       };
-      const outcome = await turn(
-        line.binding,
-        // The realtime turn detector already ended their turn: never
-        // held for sounding unfinished.
-        settledTurn([...line.history, asked]),
-        abort,
-        speaker,
+      const outcome = await turnUntil(
+        turn(
+          line.binding,
+          // The realtime turn detector already ended their turn: never
+          // held for sounding unfinished.
+          settledTurn([...line.history, asked]),
+          deadline.signal,
+          speaker,
+        ),
+        deadline.signal,
       );
       const said = speaker.said();
       // What was asked stays on the line's record either way; what Q
       // said, only when it was said.
       line.history.push(asked);
-      if (outcome.kind !== "INTERRUPTED" && !abort.aborted && said !== "") {
+      if (
+        outcome !== null &&
+        outcome.kind !== "INTERRUPTED" &&
+        !deadline.signal.aborted &&
+        said !== ""
+      ) {
         line.history.push({ role: "agent", content: said });
       }
       line.history.splice(
         0,
         Math.max(0, line.history.length - LINE_HISTORY_MAX),
       );
-      if (outcome.kind === "INTERRUPTED" || abort.aborted) {
-        return output({ ok: false, interrupted: true });
+      if (timedOut) {
+        line.awaitingApproval = false;
+        logger.warn(
+          { qVoiceSessionId: voiceSessionId, ms: now() - startedAt },
+          "duplex ask_q passed its deadline",
+        );
+        return {
+          ...output({ ok: false, error: ASK_Q_TOO_LONG }),
+          disposition: "FAILED",
+          failure: "TIMEOUT",
+        };
+      }
+      if (
+        outcome === null ||
+        outcome.kind === "INTERRUPTED" ||
+        deadline.signal.aborted
+      ) {
+        return {
+          ...output({ ok: false, interrupted: true }),
+          disposition: "CANCELLED",
+        };
       }
       const facts = speaker.heldFacts();
       if (facts !== null) {
         line.awaitingApproval = false;
-        return output(askQFactsOutput(facts));
+        return { ...output(askQFactsOutput(facts)), disposition: "ANSWERED" };
       }
       const { say, amused } = forRealtime(said);
       if (say.length === 0) {
         line.awaitingApproval = false;
-        return { ...output({ ok: true, say: "" }, false), silent: true };
+        // Q chose to say nothing (the room, not them): IGNORED, which the
+        // browser shows instead of a silent "Listening".
+        return {
+          ...output({ ok: true, say: "" }, false),
+          silent: true,
+          disposition: "IGNORED",
+        };
       }
       const approvalPending = said.endsWith(APPROVAL_QUESTION);
       line.awaitingApproval = approvalPending;
-      return output(
-        amused
-          ? { ok: true, say, delivery: AMUSED_DELIVERY }
-          : { ok: true, say },
-        approvalPending,
-      );
+      return {
+        ...output(
+          amused
+            ? { ok: true, say, delivery: AMUSED_DELIVERY }
+            : { ok: true, say },
+          approvalPending,
+        ),
+        disposition:
+          approvalPending ||
+          (outcome.kind === "SPOKEN" && outcome.path === "MOVE")
+            ? "ACTED"
+            : "ANSWERED",
+      };
     } catch (error: unknown) {
       logger.warn(
         { err: error, qVoiceSessionId: voiceSessionId },
         "duplex ask_q turn failed",
       );
-      return output({
-        ok: false,
-        error: "That didn't go through on my side.",
-      });
+      return {
+        ...output({
+          ok: false,
+          error: "That didn't go through on my side.",
+        }),
+        disposition: "FAILED",
+        failure: "TOOL_FAILED",
+      };
     } finally {
+      clearTimeout(timer);
+      abort.removeEventListener("abort", onAbort);
       line.asking -= 1;
       wake();
     }
@@ -851,6 +953,8 @@ export function createDuplexBroker(
         output: result.output,
         approvalPending: result.approvalPending,
         ...(result.silent === true ? { silent: true } : {}),
+        disposition: result.disposition,
+        ...(result.failure === undefined ? {} : { failure: result.failure }),
       };
     },
 

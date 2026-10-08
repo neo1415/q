@@ -8,6 +8,7 @@ import { QVoicePresenceSchema } from "./presence.js";
 import { QScreenContextSchema, QViewingMomentSchema } from "./request.js";
 import { QSilenceBeatSchema } from "./silence-ladder.js";
 import { QSubjectRefsSchema } from "./subject.js";
+import { QFailureClassSchema, QTurnDispositionSchema } from "./turn.js";
 import { QClientActionIntentSchema } from "./ui-intent.js";
 
 /**
@@ -437,6 +438,16 @@ export const QVoiceDuplexToolResultSchema = z
     approvalPending: z.boolean(),
     /** BACKCHANNEL: the line's new listening level, applied at once. */
     listening: QVoiceListeningLevelSchema.optional(),
+    /**
+     * Q chose to say nothing (C-01, audit 2026-10-08): the same flag the
+     * heard result carries. Missing here, a silent ask_q the model called
+     * failed the strict parse and the voice said "that did not get through".
+     */
+    silent: z.boolean().optional(),
+    /** RECOVERY-2026-10: how this turn ended on the server (A4). */
+    disposition: QTurnDispositionSchema.optional(),
+    /** FAILED only: why, for diagnostics; the person hears plain words. */
+    failure: QFailureClassSchema.optional(),
   })
   .strict();
 export type QVoiceDuplexToolResult = z.infer<
@@ -482,6 +493,15 @@ export const QVoiceDuplexHeardResultSchema = z.discriminatedUnion("route", [
        * (live 2026-10-08: "could you give me a bit more detail?").
        */
       silent: z.boolean().optional(),
+      /** RECOVERY-2026-10: how this turn ended on the server (A4). */
+      disposition: QTurnDispositionSchema.optional(),
+      /** FAILED only: why, for diagnostics. */
+      failure: QFailureClassSchema.optional(),
+      /**
+       * SIDEBAND: the server already put the answer on the call and asked
+       * the voice to say it; the browser must not send it again.
+       */
+      delivered: z.literal("SERVER").optional(),
     })
     .strict(),
   z.object({ route: z.literal("SMALLTALK") }).strict(),

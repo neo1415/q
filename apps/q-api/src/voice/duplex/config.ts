@@ -40,6 +40,20 @@ export type DuplexConfig = {
    * Q's pipeline. On unless CQ_VOICE_REALTIME_ROUTE_TURNS is "off".
    */
   readonly routeTurns: boolean;
+  /**
+   * RECOVERY A8 (C-08): the longest one ask_q may hold a turn. Past it the
+   * run is aborted and the turn ends FAILED/TIMEOUT with a spoken line,
+   * instead of "Thinking" forever. The silence ladder fills the wait.
+   * CQ_VOICE_REALTIME_ASK_DEADLINE_SECONDS, bounded 8-120.
+   */
+  readonly askDeadlineMs: number;
+  /**
+   * RECOVERY A8: the server attaches to the call over the provider's
+   * sideband and delivers Q's answers itself. Off unless
+   * CQ_VOICE_REALTIME_SIDEBAND is "on": built and tested with fakes, not
+   * yet verified on a live call.
+   */
+  readonly sideband: boolean;
 };
 
 export const DUPLEX_DEFAULTS: DuplexConfig = {
@@ -54,6 +68,8 @@ export const DUPLEX_DEFAULTS: DuplexConfig = {
   backchannel: true,
   speechSpeed: 0.95,
   routeTurns: true,
+  askDeadlineMs: 30_000,
+  sideband: false,
 };
 
 function bounded(
@@ -75,6 +91,7 @@ export function duplexConfigFrom(
   const flag = env.CQ_VOICE_REALTIME?.trim().toLowerCase();
   const backchannel = env.CQ_VOICE_REALTIME_BACKCHANNEL?.trim().toLowerCase();
   const routeTurns = env.CQ_VOICE_REALTIME_ROUTE_TURNS?.trim().toLowerCase();
+  const sideband = env.CQ_VOICE_REALTIME_SIDEBAND?.trim().toLowerCase();
   return {
     enabled: flag === "on" || flag === "true" || flag === "1",
     maxSessionMs:
@@ -131,6 +148,14 @@ export function duplexConfigFrom(
       routeTurns === "false" ||
       routeTurns === "0"
     ),
+    askDeadlineMs:
+      bounded(
+        env.CQ_VOICE_REALTIME_ASK_DEADLINE_SECONDS,
+        DUPLEX_DEFAULTS.askDeadlineMs / 1000,
+        8,
+        120,
+      ) * 1000,
+    sideband: sideband === "on" || sideband === "true" || sideband === "1",
     backchannel: !(
       backchannel === "off" ||
       backchannel === "false" ||
