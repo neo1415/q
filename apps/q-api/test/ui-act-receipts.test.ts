@@ -19,6 +19,7 @@ import { createLogger } from "@capital-q/observability";
 import { registerProblemHandling } from "../src/http/problem-handler.js";
 import {
   createUiActReceiptLedger,
+  navigationFacts,
   receiptFacts,
   recentUiActReceipts,
   registerUiActReceiptRoutes,
@@ -187,6 +188,50 @@ describe("UI act receipts reach the Q API as the person (RECOVERY C2)", () => {
     });
     expect(ledger.lastManifest(ACTOR)?.controls?.[0]?.id).toBe("tab.mandate");
     expect(ledger.lastManifest(STRANGER)).toBeUndefined();
+  });
+
+  it("INC-1: a move to a named record is kept with its settled route, for the person only", async () => {
+    const ledger = createUiActReceiptLedger();
+    const app = await server(ledger, ACTOR);
+    const route = "/relationships/company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70";
+    const response = await app.inject({
+      method: "POST",
+      url: Q_UI_ACT_RECEIPTS_PATH,
+      headers: { authorization: `Bearer ${BEARER}` },
+      payload: {
+        reports: [],
+        navigations: [
+          { status: "DONE", expected: route, route },
+          {
+            status: "FAILED",
+            expected:
+              "/company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70?tab=dataroom",
+          },
+        ],
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ accepted: 2 });
+    const kept = ledger.recentNavigations(ACTOR);
+    expect(kept.map((one) => one.status)).toEqual(["DONE", "FAILED"]);
+    expect(kept[0]).toMatchObject({ status: "DONE", route });
+    expect(ledger.recentNavigations(STRANGER)).toEqual([]);
+    expect(navigationFacts(kept)).toEqual([
+      `Opened ${route} on their screen (DONE).`,
+      "NOT done: /company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70?tab=dataroom never opened on their screen (FAILED).",
+    ]);
+    // A route is ids and fixed segments, never page text.
+    const prose = await app.inject({
+      method: "POST",
+      url: Q_UI_ACT_RECEIPTS_PATH,
+      headers: { authorization: `Bearer ${BEARER}` },
+      payload: {
+        reports: [],
+        navigations: [{ status: "DONE", expected: null, route: "/a page" }],
+      },
+    });
+    expect(prose.statusCode).toBe(422);
+    await app.close();
   });
 
   it("says what happened in code's words, never claiming a missing act as done", () => {

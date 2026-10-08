@@ -13,6 +13,10 @@ import {
   type QUiActIntent,
 } from "@capital-q/contracts";
 
+import {
+  performClientAction,
+  registerClientRouter,
+} from "../src/features/q/client-actions";
 import { QControl } from "../src/features/q/control/q-control";
 import { noticeOf } from "../src/features/q/control/q-control-runtime";
 import { startReceiptReporter } from "../src/features/q/control/receipt-reporter";
@@ -475,6 +479,75 @@ describe("Q's moves are confirmed by the settled route (C3)", () => {
     await vi.advanceTimersByTimeAsync(7_000);
     stop();
     expect(outcomes).toEqual([{ status: "FAILED", expected: "/documents" }]);
+  });
+});
+
+describe("INC-1: opening a named record is confirmed and reported with its route", () => {
+  const SHIFTWELL = "5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70";
+
+  it("OPEN_RECORD_PAGE goes to the relationship's own route; the receipt says DONE only after the router settled there", async () => {
+    noteRoute("/home");
+    window.history.replaceState(null, "", "/home");
+    const pushed: string[] = [];
+    // The app's client router: the route settles a moment after the push.
+    registerClientRouter((path) => {
+      pushed.push(path);
+      setTimeout(() => noteRoute(path), 80);
+    });
+    const sent: unknown[] = [];
+    const stop = startReceiptReporter(currentManifest, (body) => {
+      sent.push(JSON.parse(JSON.stringify(body)));
+      return Promise.resolve();
+    });
+    expect(
+      performClientAction({
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_COMPANY",
+        id: SHIFTWELL,
+      }),
+    ).toBe(true);
+    await vi.waitFor(() => expect(pushed).toHaveLength(1));
+    expect(pushed[0]).toBe(`/relationships/company/${SHIFTWELL}`);
+    // Nothing is reported before the route settles.
+    expect(sent).toEqual([]);
+    await vi.waitFor(() => expect(sent).toHaveLength(1), { timeout: 2_000 });
+    stop();
+    registerClientRouter(null);
+    const report = QUiActReceiptsRequestSchema.parse(sent[0]);
+    expect(report.navigations).toEqual([
+      {
+        status: "DONE",
+        expected: `/relationships/company/${SHIFTWELL}`,
+        route: `/relationships/company/${SHIFTWELL}`,
+      },
+    ]);
+  });
+
+  it("a data room that never opens is reported FAILED, never done", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    noteRoute("/home");
+    window.history.replaceState(null, "", "/home");
+    registerClientRouter(() => undefined);
+    const sent: unknown[] = [];
+    const stop = startReceiptReporter(currentManifest, (body) => {
+      sent.push(JSON.parse(JSON.stringify(body)));
+      return Promise.resolve();
+    });
+    performClientAction({
+      kind: "OPEN_RECORD_PAGE",
+      page: "COMPANY_DATA_ROOM",
+      id: SHIFTWELL,
+    });
+    await vi.advanceTimersByTimeAsync(7_000);
+    stop();
+    registerClientRouter(null);
+    const report = QUiActReceiptsRequestSchema.parse(sent.at(-1));
+    expect(report.navigations).toEqual([
+      {
+        status: "FAILED",
+        expected: `/company/${SHIFTWELL}?tab=dataroom`,
+      },
+    ]);
   });
 });
 
