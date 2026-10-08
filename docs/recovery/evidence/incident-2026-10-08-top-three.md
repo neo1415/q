@@ -44,3 +44,48 @@ The server logged `voice turn timed outcome="SPOKEN"` for turns 2–4 with `ttsR
 ## Fix ownership
 
 A (voice lifecycle), B (follow-up binding, exact counts, score labelling), E (card stability), and G (real-browser regression replaying this sequence on baseline and integration). See TRACKING row INC-1.
+
+## Regression results (workstream G, 2026-10-08/09)
+
+**How it was run.**
+
+- All runs are LOCAL-E2E (MOCK), at $0, in real Chromium (`/opt/pw-browsers/chromium`) against the local stack from `scripts/recovery/local-stack.sh`.
+- The fit answer is code-built (no model). The turn reader is the scripted fake (`scripts/recovery/fake-vendors.mjs`).
+- The duplex line runs on the RTCPeerConnection fake (`tests/recovery/support/duplex-fake.ts`), with its credential minted by the fake (`scripts/recovery/vendor-redirect.mjs`).
+- Investor: `investor.savanna-seed`.
+- Spec: `tests/recovery/scenarios/k-incident-top-three.spec.ts`. Command: `npx playwright test -c tests/recovery/playwright.recovery.config.ts --project=scenarios k-incident l-named pages-load`.
+- Each check reads the DOM and also re-reads the stored conversation message (GET `/v1/q/conversations/:id`; for navigation, the receipt q-api accepted).
+- **Baseline** = production `520bd123`, in its own worktree, run under the same harness against the same local database. That database has 183 migrations, 5 newer than production.
+- **Integration** = `62aba8d6` (integration `9324df74`, including `117d32f6` G-D13 and `56b12fb2` /home).
+
+### Browser-tested (LOCAL-E2E, MOCK model)
+
+| Assertion                                                                                                                      | Baseline 520bd123                     | Integration 9324df74                                                                                                                                                                                                                                     | Waits on          |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| /home loads (founder, investor): no "couldn't load", no TypeError                                                              | GREEN                                 | GREEN (red before `56b12fb2`)                                                                                                                                                                                                                            | —                 |
+| Exactly 3 cards, 3 unique canonical ids, DOM = stored message                                                                  | RED (stored 0: history dropped cards) | GREEN (red before `117d32f6`, G-D13)                                                                                                                                                                                                                     | —                 |
+| Each card labelled **mandate fit**, with "X of Y" and source, and the tie explained                                            | RED                                   | RED. The card shows "8.0 fit, out of 10" and levels (Strong/Partial/Unknown), but no "mandate fit", no "3 of 6", no source and no tie sentence. B's `fit-integrity.ts` puts that wording in `said` and the block title, which the canvas does not render | **E** (render), B |
+| (d) "rank them" keeps the same 3 ids (stored and DOM)                                                                          | RED (stored 0)                        | GREEN                                                                                                                                                                                                                                                    | —                 |
+| (e) After an attention (FINDING) turn the 3 cards stay reachable (stage, Board or history)                                     | GREEN (cards stayed on stage)         | RED: card names hidden after the attention answer; Board shows 0                                                                                                                                                                                         | **E**             |
+| (a) Late result: ≤1 bridge, none after the answer, the answer handed over exactly once, cards arrive                           | RED (cards never arrived on the line) | INTERMITTENT, 2 of 3 runs GREEN. The failing run had no cards after the 4 s relay delay. In passing runs the line sent `[opener, BARE {tool_choice:"none"}, answer]`: one model-worded holding line, then the answer                                     | **A**             |
+| (b)+(c) Two assistant messages for one turn, plus narration while the cards show: at most one answer line, cards stay, 2 turns | RED                                   | RED: no `[data-q-turn-id]` turns rendered                                                                                                                                                                                                                | **A**, G-R3       |
+| (f) Voice final fails: exactly one terminal line or error, terminal disposition, cards stay                                    | RED                                   | RED: no `role=alert/status` line after `response.done failed` plus `error`                                                                                                                                                                               | **A** (A4)        |
+| (g) Reconnect: cards unchanged, no bridge or improvised reply for the old question afterwards                                  | RED                                   | GREEN (red at `117d32f6`: a BARE response after the reconnect)                                                                                                                                                                                           | —                 |
+
+### Named-record navigation (C, the "Shiftwell" pattern; Shiftwell is not in the local world, so Ledgerfold is used)
+
+| Ask                                                                                   | Baseline                                                       | Integration                                                                                                                                                                                                  | Waits on |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| "Take me to Ledgerfold relationship" (route, heading, DONE receipt accepted by q-api) | RED (it lands, but baseline has no receipts)                   | INTERMITTENT, GREEN 2 of 4. `open_page` is sometimes DENIED NOT_AVAILABLE for the investor's own ACCEPTED relationship. One run landed while the receipt said **FAILED** (expected = the route it landed on) | **C**    |
+| "Open Ledgerfold"                                                                     | RED (does not navigate)                                        | GREEN: route, heading, DONE receipt, accepted ≥ 1                                                                                                                                                            | —        |
+| "Show me the data room for Ledgerfold"                                                | RED (lands on the company page, but no Data room tab selected) | RED: `open_page COMPANY_DATA_ROOM` DENIED NOT_AVAILABLE, so the page never moves                                                                                                                             | **C**    |
+| An unknown name is not navigated and not claimed                                      | GREEN                                                          | GREEN                                                                                                                                                                                                        | —        |
+
+### Mocked and unit evidence (not browser)
+
+- Unit: the lead reports `packages/q-runtime/test/message-result-blocks.test.ts` (G-D13) red without the fix and green with it; q-runtime 68/68. G did not rerun it.
+- MOCK-only caveat: the voice rows prove the browser's own lifecycle (what it asks the realtime model to say, and when). They do not prove audio. LIVE stays **LIVE-PENDING** (`scripts/recovery/voice/LIVE-PROCEDURE.md`).
+- Harness fixes during this work (void earlier voice verdicts):
+  - manual browser contexts lacked the microphone grant;
+  - the page fake used `#private` members, which Playwright's transpile could not run.
+  - Before these fixes every MOCK duplex line fell back with CONNECT before reaching product code.
