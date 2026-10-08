@@ -15,6 +15,7 @@ import { cx } from "@capital-q/ui";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { useQControl } from "@/features/q/control/q-control";
 import { Q_SAID_EVENT, saidText } from "@/features/q-swarm/q-said";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { noteToLine } from "@/features/voice/line-cards";
@@ -137,8 +138,11 @@ export function ActivityCard({
 }: {
   readonly lines: readonly string[] | null;
 }) {
+  const ref = useRef<HTMLElement>(null);
+  useQControl({ id: "section.what-i-did", kind: "SECTION", ref });
   return (
     <section
+      ref={ref}
       aria-label="What I did"
       className="flex flex-col gap-2"
       data-arrival-activity
@@ -295,8 +299,25 @@ function MatchesGroup({
 }) {
   const [shown, setShown] = useState<string | null>(null);
   const open = focus ?? shown ?? matches.items[0]?.companyId ?? null;
+  // "Show me the second one": brings that company's card forward here,
+  // as a tap on its line does (opening the profile stays the person's).
+  const ref = useRef<HTMLElement>(null);
+  useQControl({
+    id: "list.new-matches",
+    kind: "LIST",
+    ref,
+    count: matches.items.length,
+    onAct: (intent) => {
+      if (intent.act !== "SELECT_ITEM") return "NOT_APPLICABLE";
+      const target = matches.items[(intent.index ?? 1) - 1];
+      if (target === undefined) return "TARGET_MISSING";
+      setShown(target.companyId);
+      return "DONE";
+    },
+  });
   return (
     <section
+      ref={ref}
       aria-label="New for you"
       className="flex flex-col gap-2"
       data-arrival-matches
@@ -376,6 +397,15 @@ export function ArrivalStage({
   const { askNow } = useGlobalQ();
   const [expanded, setExpanded] = useState(false);
   const data = ready?.data ?? null;
+  // C1 hooks: "scroll to what needs me", "show me Q's questions".
+  const needsRef = useRef<HTMLElement>(null);
+  const questionsRef = useRef<HTMLElement>(null);
+  useQControl({ id: "section.needs-you", kind: "SECTION", ref: needsRef });
+  useQControl({
+    id: "section.q-questions",
+    kind: "SECTION",
+    ref: questionsRef,
+  });
 
   // Words for the late-landing case below; the same words the head says.
   const words = useMemo(
@@ -475,6 +505,8 @@ export function ArrivalStage({
     noteToLine(
       `Your briefing for them just came in: "${words.spoken}" At a natural pause, tell them this in your own words, briefly, then stop.`,
       true,
+      // The standard line says the briefing's own words.
+      words.spoken,
     );
   }, [words, voiceActive, ready?.nudge]);
 
@@ -514,6 +546,7 @@ export function ArrivalStage({
   ) : null;
   const needs = shown.includes("NEEDS_YOU") ? (
     <section
+      ref={needsRef}
       aria-label="Needs you"
       className="flex flex-col gap-2"
       data-arrival-needs
@@ -543,6 +576,7 @@ export function ArrivalStage({
     questions !== null &&
     questions.length > 0 ? (
       <section
+        ref={questionsRef}
         aria-label="Q still wants to know"
         className="flex flex-col gap-2"
         data-arrival-questions

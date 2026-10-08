@@ -34,6 +34,8 @@ import type { ContextScope } from "@capital-q/ui/tokens";
 
 import { ViewTransition } from "@/components/view-transition";
 import type { Briefing } from "@/features/home/briefing";
+import { noticeOf } from "@/features/q/control/q-control-runtime";
+import { onUiActReport } from "@/features/q/ui-act-controller";
 import {
   arrivalSpoken,
   markArrivalSaid,
@@ -719,8 +721,31 @@ export function QConversationPanel({
 
   // Notices that belong wherever the conversation is: the stage before it
   // starts, the end of the thread once it has.
+  // C2/C3 receipts, in the conversation too (the shell's toast is the
+  // live announcement; this line stays with the exchange until the next
+  // turn, so "it didn't happen" is not lost after six seconds).
+  const [actNotice, setActNotice] = useState<string | null>(null);
+  useEffect(
+    () => onUiActReport((report) => setActNotice(noticeOf(report))),
+    [],
+  );
+  const lastTurnId = turns.at(-1)?.id ?? null;
+  const [actTurn, setActTurn] = useState(lastTurnId);
+  if (actTurn !== lastTurnId) {
+    setActTurn(lastTurnId);
+    setActNotice(null);
+  }
+
   const notices = (
     <>
+      {actNotice === null ? null : (
+        <p
+          className="cq-caption m-0 text-(--cq-text-secondary)"
+          data-q-act-notice
+        >
+          {actNotice}
+        </p>
+      )}
       {q.transport === "RECONNECTING" ? (
         <p className="cq-caption text-(--cq-text-secondary)">
           {describeQStreamTransport(q.transport)} Your conversation is saved.
