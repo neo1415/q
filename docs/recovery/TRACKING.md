@@ -11,6 +11,15 @@ The lead updates this at each merge. Implementation, integration, local testing 
 | Local test | NONE / UNIT / LOCAL-DB (integration test against the local Supabase) / LOCAL-E2E (real browser, server state checked) / MOCK (fakes for WebRTC or providers) |
 | Live       | NO / STAGING / PROD. **No live verification is possible until the founder approves a deploy** ($0 budget; no staging DB, per F).                             |
 
+**Integration gates (lead, 2026-10-08):**
+
+- **Unit (`pnpm test`, root vitest) on `56b12fb2`:** 11,332 passed, 7 failed. All 7 were fixed in `2eec8751`, then the affected suites were rerun: 62/62 + 3/3.
+  - 5 came from the lead's security fix 1, whose replay guard shadowed services' own idempotency. Fixed: it now defers to `idempotencyKeyOf`, and a replay answers 200.
+  - 1 was a 5 s timeout under load (no-web-denial; passes alone).
+  - 1 was a wall-clock flake (now on fake timers).
+  - 10 files under `apps/web/e2e` were wrongly collected by vitest (pre-existing since the baseline; now excluded).
+- **ESLint** (`--max-warnings=0`) on all 305 TS/TSX files changed since `520bd123`: clean.
+
 The integration branch contains **all seven workstreams** (F, E, A, D, C, B, G's harness). Still running: **B5 (small talk)** and **G's full run** against the integrated code.
 
 | #     | Capability                                                                                                                                              | WS      | Impl                                                              | Integ                     | Local test                      | Live | Evidence / notes                                                                                                                                                                                                         |
