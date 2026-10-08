@@ -275,6 +275,31 @@ describe("the action registry", () => {
       // F26: one section at a time, and "Read again".
       ["deck.section.review", "review_deck_section", "CONSEQUENTIAL"],
       ["deck.read_again", "read_my_deck_again", "CONSEQUENTIAL"],
+      // Founder documents (2026-10-08): answer requests and questions,
+      // and decide who sees each document; folders from the screen.
+      ["document_request.fulfil", "fulfil_document_request", "CONSEQUENTIAL"],
+      ["document_request.decline", "decline_document_request", "CONSEQUENTIAL"],
+      [
+        "document.access.share",
+        "share_document_with_investor",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "document.access.share_folder",
+        "offer.documents_folder_access",
+        "CONSEQUENTIAL",
+      ],
+      [
+        "document.access.folder_level",
+        "offer.documents_folder_access",
+        "CONSEQUENTIAL",
+      ],
+      ["document.access.revoke", "revoke_document_access", "CONSEQUENTIAL"],
+      [
+        "diligence.question.answer",
+        "answer_investor_question",
+        "CONSEQUENTIAL",
+      ],
       // G1/G2: the team. Q invites and changes roles on a card; the rest
       // is the person's own decision on the Team page.
       ["team.invite", "invite_colleague", "CONSEQUENTIAL"],

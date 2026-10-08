@@ -115,9 +115,7 @@ export type DataRoomRequestRecord = {
   readonly declineNote?: string | null | undefined;
   /** The document the founder uploaded or picked to answer it. */
   readonly fulfilledDocument?:
-    | { readonly documentId: string; readonly title: string }
-    | null
-    | undefined;
+    { readonly documentId: string; readonly title: string } | null | undefined;
 };
 
 /** Structural: `createPostgresDataRoom()` from Evidence satisfies it. */
@@ -1063,9 +1061,7 @@ export function createDataRoomService(dependencies: {
       }
       const attachment =
         download && dependencies.signedAttachment !== undefined
-          ? await dependencies
-              .signedAttachment(document)
-              .catch(() => null)
+          ? await dependencies.signedAttachment(document).catch(() => null)
           : null;
       return {
         url: link.url,

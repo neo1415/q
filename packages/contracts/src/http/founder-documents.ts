@@ -56,9 +56,12 @@ export const DOCUMENT_ACCESS_LEVEL_WORDS: Readonly<
 export const GrantDaysSchema = z
   .number()
   .int()
-  .refine((days) => (DATA_ROOM_GRANT_DAYS as readonly number[]).includes(days), {
-    message: "Choose 7, 14, 30 or 90 days.",
-  });
+  .refine(
+    (days) => (DATA_ROOM_GRANT_DAYS as readonly number[]).includes(days),
+    {
+      message: "Choose 7, 14, 30 or 90 days.",
+    },
+  );
 
 /**
  * The eight ADR-001 scopes in plain words, as a company document's access

@@ -30,7 +30,9 @@ import {
   refusal,
   relationshipTarget,
   type AnyAppAction,
+  type AppActionContext,
 } from "../define.js";
+import type { AppActionPorts } from "../ports.js";
 
 /**
  * Investor promises (2026-10-07), the two consequential steps:
@@ -101,8 +103,82 @@ const SendTool = z
       .describe(
         "The questions, word for word as they picked or approved them (from company_assumptions, or their own).",
       ),
+    about: z
+      .array(
+        z
+          .string()
+          .regex(/^[A-Z_]{3,24}:(\d{1,2}|unknown)$/)
+          .nullable(),
+      )
+      .max(ASSUMPTION_QUESTIONS_SEND_MAX)
+      .optional()
+      .describe(
+        "For each question in order, the company_assumptions id it came from (null for their own question).",
+      ),
   })
   .strict();
+
+/** "TRACTION:1" -> "Traction": what a question is about, in words. */
+const aboutWords = (assumptionId: string) => {
+  const section = assumptionId.split(":")[0] ?? "";
+  const words = section.toLowerCase().replaceAll("_", " ");
+  return words.length === 0
+    ? "Assumption"
+    : words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/** The send itself: a diligence request while in diligence, else one chat message. */
+async function sendQuestions(
+  ports: AppActionPorts,
+  context: AppActionContext,
+  input: SendInput,
+): Promise<SendOut> {
+  const { title, body } = diligenceQuestionsText(input.input.questions);
+  const diligence = ports.diligence ?? portMissing("diligence");
+  const asked = await diligence.request({
+    actor: context.actor,
+    relationshipId: input.relationshipId,
+    title,
+    note: body,
+    idempotencyKey: input.idempotencyKey,
+    correlationId: context.correlationId,
+  });
+  if (asked.outcome === "OK") {
+    return {
+      outcome: "OK",
+      value: { via: "DILIGENCE_REQUEST", id: asked.value.requestId },
+    };
+  }
+  if (asked.code === "NOT_FOUND") {
+    return { outcome: "REFUSED", code: "NOT_FOUND" };
+  }
+  if (asked.code === "INVESTOR_ONLY") {
+    return { outcome: "REFUSED", code: "INVESTOR_ONLY" };
+  }
+  if (asked.code !== "NOT_OPEN") {
+    return { outcome: "REFUSED", code: "NOT_CONNECTED" };
+  }
+  // Not in diligence: one chat message, under the same key, on a
+  // connected relationship only (the chat service refuses otherwise).
+  const chat = ports.chat ?? portMissing("chat");
+  try {
+    const sent = await chat.send({
+      actor: context.actor,
+      relationshipId: input.relationshipId,
+      request: {
+        kind: "TEXT",
+        body: `${input.input.questions.length === 1 ? "A question" : "A few questions"} for you:\n${body}`,
+      },
+      idempotencyKey: `${input.idempotencyKey}:chat`,
+    });
+    return {
+      outcome: "OK",
+      value: { via: "CHAT_MESSAGE", id: sent.message.messageId },
+    };
+  } catch {
+    return { outcome: "REFUSED", code: "NOT_CONNECTED" };
+  }
+}
 
 const SEND_QUESTIONS = defineAppAction<
   SendInput,
@@ -118,51 +194,28 @@ const SEND_QUESTIONS = defineAppAction<
   output: z.custom<SendOut>(),
   authorize: () => Promise.resolve({ ok: true as const }),
   run: async (ports, context, input) => {
-    const { title, body } = diligenceQuestionsText(input.input.questions);
-    const diligence = ports.diligence ?? portMissing("diligence");
-    const asked = await diligence.request({
-      actor: context.actor,
-      relationshipId: input.relationshipId,
-      title,
-      note: body,
-      idempotencyKey: input.idempotencyKey,
-      correlationId: context.correlationId,
-    });
-    if (asked.outcome === "OK") {
-      return {
-        outcome: "OK",
-        value: { via: "DILIGENCE_REQUEST", id: asked.value.requestId },
-      };
+    const out = await sendQuestions(ports, context, input);
+    if (out.outcome === "OK") {
+      // 2026-10-08: each question is recorded for the founder to answer
+      // (their inbox) and for this investor to see answered. Best-effort:
+      // the questions were sent either way.
+      await ports.founderRequests
+        ?.recordQuestions({
+          actor: context.actor,
+          relationshipId: input.relationshipId,
+          sentVia: out.value.via,
+          sentRef: out.value.id,
+          idempotencyKey: input.idempotencyKey,
+          questions: input.input.questions.map((question, index) => ({
+            question: question.trim(),
+            assumptionId: input.input.about?.[index]?.assumptionId ?? null,
+            assumptionLabel: input.input.about?.[index]?.label ?? null,
+          })),
+          correlationId: context.correlationId,
+        })
+        .catch(() => undefined);
     }
-    if (asked.code === "NOT_FOUND") {
-      return { outcome: "REFUSED", code: "NOT_FOUND" };
-    }
-    if (asked.code === "INVESTOR_ONLY") {
-      return { outcome: "REFUSED", code: "INVESTOR_ONLY" };
-    }
-    if (asked.code !== "NOT_OPEN") {
-      return { outcome: "REFUSED", code: "NOT_CONNECTED" };
-    }
-    // Not in diligence: one chat message, under the same key, on a
-    // connected relationship only (the chat service refuses otherwise).
-    const chat = ports.chat ?? portMissing("chat");
-    try {
-      const sent = await chat.send({
-        actor: context.actor,
-        relationshipId: input.relationshipId,
-        request: {
-          kind: "TEXT",
-          body: `${input.input.questions.length === 1 ? "A question" : "A few questions"} for you:\n${body}`,
-        },
-        idempotencyKey: `${input.idempotencyKey}:chat`,
-      });
-      return {
-        outcome: "OK",
-        value: { via: "CHAT_MESSAGE", id: sent.message.messageId },
-      };
-    } catch {
-      return { outcome: "REFUSED", code: "NOT_CONNECTED" };
-    }
+    return out;
   },
   targets: (input) => relationshipTarget(input.relationshipId),
   card: (input, names) => {
@@ -219,7 +272,19 @@ const SEND_QUESTIONS = defineAppAction<
       Promise.resolve({
         relationshipId: tool.relationship,
         idempotencyKey: context.idempotencyKey,
-        input: { questions: tool.questions },
+        input: {
+          questions: tool.questions,
+          ...(tool.about === undefined
+            ? {}
+            : {
+                about: tool.questions.map((_question, index) => {
+                  const id = tool.about?.[index] ?? null;
+                  return id === null
+                    ? null
+                    : { assumptionId: id, label: aboutWords(id) };
+                }),
+              }),
+        },
       }),
   },
 });

@@ -114,7 +114,8 @@ export function createInvestorAnswerRecorder(dependencies: {
       });
       return {
         evidenceItemId: item.id,
-        knowledgeObjectId: result.outcome === "REJECTED" ? null : result.objectId,
+        knowledgeObjectId:
+          result.outcome === "REJECTED" ? null : result.objectId,
       };
     },
   };

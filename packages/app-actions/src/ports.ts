@@ -38,6 +38,7 @@ import type {
   CompanyDeckService,
   DataRoomService,
   DiligenceService,
+  FounderRequestsService,
   VisibilityCentre,
 } from "@capital-q/permissions";
 import type { ActorContext, PersonProfileStore } from "@capital-q/security";
@@ -232,6 +233,26 @@ export type AppActionPorts = {
   /** The data room (overnight A3): levels, requests and answers. */
   readonly dataRoom?:
     | Pick<DataRoomService, "view" | "setLevel" | "requestAccess" | "decide">
+    | undefined;
+  /**
+   * Founder documents (2026-10-08): the requests inbox, answering, the
+   * access editor and investor questions.
+   */
+  readonly founderRequests?:
+    | Pick<
+        FounderRequestsService,
+        | "inbox"
+        | "fulfil"
+        | "decline"
+        | "documentAccess"
+        | "folderAccess"
+        | "share"
+        | "setFolderLevel"
+        | "revoke"
+        | "recordQuestions"
+        | "answer"
+        | "investorQuestions"
+      >
     | undefined;
   /** The pitch-deck tab (overnight A4-A6): the deck, Q's reading, coaching. */
   readonly companyDeck?:

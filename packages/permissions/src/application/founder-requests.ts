@@ -88,10 +88,7 @@ const DAY_MS = 86_400_000;
 const ANSWER_SHARE_DAYS = 30;
 
 export type FounderRequestsRefusal =
-  | "NOT_FOUND"
-  | "ALREADY_ANSWERED"
-  | "NOT_SHAREABLE"
-  | "VERSION_CONFLICT";
+  "NOT_FOUND" | "ALREADY_ANSWERED" | "NOT_SHAREABLE" | "VERSION_CONFLICT";
 
 export type FounderRequestsOutcome<T> =
   | { readonly outcome: "OK"; readonly value: T }
@@ -112,7 +109,12 @@ export type FounderRequestsDependencies = {
   readonly transactions: TransactionManager;
   readonly store: Pick<
     DataRoomStore,
-    "folders" | "documentsOf" | "document" | "requests" | "requestCompany" | "insertDecision"
+    | "folders"
+    | "documentsOf"
+    | "document"
+    | "requests"
+    | "requestCompany"
+    | "insertDecision"
   >;
   readonly dataRoom: Pick<DataRoomService, "setLevel" | "decide">;
   readonly diligenceRequests: Pick<
@@ -170,8 +172,7 @@ export type FounderRequestsDependencies = {
       }
     | undefined;
   readonly notify?:
-    | ((input: FounderRequestsNotice) => Promise<unknown>)
-    | undefined;
+    ((input: FounderRequestsNotice) => Promise<unknown>) | undefined;
   readonly newCorrelationId: () => CorrelationId;
   readonly now?: (() => UtcTimestamp) | undefined;
 };
@@ -404,67 +405,62 @@ export function createFounderRequestsService(
       store.requests(sql, { companyId: company.id }),
       dependencies.diligenceRequests.listForCompany(sql, company.id),
     ]);
-    const fromRoom = roomRequests.map(
-      (request): DocumentRequestItem => ({
-        kind: "DOCUMENT_REQUEST",
-        itemId: request.id,
-        source: "DATA_ROOM",
-        requestId: request.id,
-        relationshipId: request.relationshipId,
-        investorOrganisationName:
-          request.investorOrganisationName ?? nameOf(request.relationshipId),
-        requesterName: request.requestedByName,
-        title: (request.documentTitle ?? "Everything on request").slice(0, 300),
-        note: request.note,
-        requestedAt: request.createdAt,
-        status:
-          request.decision === null
-            ? "OPEN"
-            : request.decision === "APPROVED"
-              ? "SHARED"
-              : "DECLINED",
-        declineNote: request.declineNote ?? null,
-        sharedDocument: request.fulfilledDocument ?? null,
-        accessEndsAt: request.expiresAt,
-        dataRoom: inRoom(
-          request.fulfilledDocument?.documentId ?? request.documentId,
-        ),
-      }),
-    );
+    const fromRoom = roomRequests.map((request): DocumentRequestItem => ({
+      kind: "DOCUMENT_REQUEST",
+      itemId: request.id,
+      source: "DATA_ROOM",
+      requestId: request.id,
+      relationshipId: request.relationshipId,
+      investorOrganisationName:
+        request.investorOrganisationName ?? nameOf(request.relationshipId),
+      requesterName: request.requestedByName,
+      title: (request.documentTitle ?? "Everything on request").slice(0, 300),
+      note: request.note,
+      requestedAt: request.createdAt,
+      status:
+        request.decision === null
+          ? "OPEN"
+          : request.decision === "APPROVED"
+            ? "SHARED"
+            : "DECLINED",
+      declineNote: request.declineNote ?? null,
+      sharedDocument: request.fulfilledDocument ?? null,
+      accessEndsAt: request.expiresAt,
+      dataRoom: inRoom(
+        request.fulfilledDocument?.documentId ?? request.documentId,
+      ),
+    }));
     const fromDiligence = named
       // A send of questions is shown as its questions, not as a request.
       .filter((request) => !vehicles.has(request.id))
-      .map(
-        (request): DocumentRequestItem => ({
-          kind: "DOCUMENT_REQUEST",
-          itemId: request.id,
-          source: "DILIGENCE",
-          requestId: request.id,
-          relationshipId: request.relationshipId,
-          investorOrganisationName: nameOf(request.relationshipId),
-          requesterName: request.requestedByName,
-          title: request.title,
-          note: request.note,
-          requestedAt: request.createdAt,
-          status:
-            request.fulfilment !== null
-              ? "SHARED"
-              : request.decline !== null
-                ? "DECLINED"
-                : "OPEN",
-          declineNote: request.decline?.note ?? null,
-          sharedDocument:
-            request.fulfilment === null
-              ? null
-              : {
-                  documentId: request.fulfilment.documentId,
-                  title:
-                    titles.get(request.fulfilment.documentId) ?? "Document",
-                },
-          accessEndsAt: null,
-          dataRoom: inRoom(request.fulfilment?.documentId),
-        }),
-      );
+      .map((request): DocumentRequestItem => ({
+        kind: "DOCUMENT_REQUEST",
+        itemId: request.id,
+        source: "DILIGENCE",
+        requestId: request.id,
+        relationshipId: request.relationshipId,
+        investorOrganisationName: nameOf(request.relationshipId),
+        requesterName: request.requestedByName,
+        title: request.title,
+        note: request.note,
+        requestedAt: request.createdAt,
+        status:
+          request.fulfilment !== null
+            ? "SHARED"
+            : request.decline !== null
+              ? "DECLINED"
+              : "OPEN",
+        declineNote: request.decline?.note ?? null,
+        sharedDocument:
+          request.fulfilment === null
+            ? null
+            : {
+                documentId: request.fulfilment.documentId,
+                title: titles.get(request.fulfilment.documentId) ?? "Document",
+              },
+        accessEndsAt: null,
+        dataRoom: inRoom(request.fulfilment?.documentId),
+      }));
     return [...fromRoom, ...fromDiligence];
   };
 
@@ -528,9 +524,9 @@ export function createFounderRequestsService(
         readonly title: string;
       };
       if (command.source === "DATA_ROOM") {
-        const found = (await store.requests(sql, { companyId: company.id })).find(
-          (candidate) => candidate.id === command.requestId,
-        );
+        const found = (
+          await store.requests(sql, { companyId: company.id })
+        ).find((candidate) => candidate.id === command.requestId);
         if (found === undefined) return refused("NOT_FOUND");
         if (found.decision !== null) return refused("ALREADY_ANSWERED");
         request = {
@@ -568,7 +564,14 @@ export function createFounderRequestsService(
       }
       const correlationId =
         command.correlationId ?? dependencies.newCorrelationId();
-      if (!(await file(command.actor, document, command.folderCode, correlationId)))
+      if (
+        !(await file(
+          command.actor,
+          document,
+          command.folderCode,
+          correlationId,
+        ))
+      )
         return refused("VERSION_CONFLICT");
       const expiresAt = expiryAfter(command.days);
       const policyId = await grant(command.actor, {
@@ -656,12 +659,18 @@ export function createFounderRequestsService(
       await notifyQuietly({
         relationshipId: request.relationshipId,
         actingSide: "COMPANY",
-        title: `{actor} shared ${document.title} for your request`.slice(0, 200),
+        title: `{actor} shared ${document.title} for your request`.slice(
+          0,
+          200,
+        ),
         key: request.id,
         priority: "NEEDS_YOU",
         target: "PROFILE",
       });
-      return { outcome: "OK", value: { requestId: request.id, status: "SHARED" } };
+      return {
+        outcome: "OK",
+        value: { requestId: request.id, status: "SHARED" },
+      };
     },
 
     /** Declines a request, with an optional note the investor sees. */
@@ -702,8 +711,12 @@ export function createFounderRequestsService(
       const relationship =
         request === null
           ? null
-          : await quietly(dependencies.relationship(request.relationshipId), null);
-      if (request === null || relationship === null) return refused("NOT_FOUND");
+          : await quietly(
+              dependencies.relationship(request.relationshipId),
+              null,
+            );
+      if (request === null || relationship === null)
+        return refused("NOT_FOUND");
       if ((await ownCompany(command.actor, relationship.companyId)) === null)
         return refused("NOT_FOUND");
       if (request.fulfilment !== null || request.decline !== null)
@@ -736,7 +749,10 @@ export function createFounderRequestsService(
       await notifyQuietly({
         relationshipId: request.relationshipId,
         actingSide: "COMPANY",
-        title: `{actor} declined your request for ${request.title}`.slice(0, 200),
+        title: `{actor} declined your request for ${request.title}`.slice(
+          0,
+          200,
+        ),
         key: request.id,
         priority: "UPDATE",
         target: "PROFILE",
@@ -849,6 +865,8 @@ export function createFounderRequestsService(
       readonly companyId?: string | undefined;
       readonly documentId?: string | undefined;
       readonly folderCode?: string | undefined;
+      /** With a document: file it in this data-room folder first. */
+      readonly fileIn?: string | undefined;
       readonly relationshipId: string;
       readonly accessLevel: DocumentAccessLevel;
       readonly days: number;
@@ -883,6 +901,15 @@ export function createFounderRequestsService(
       if (shareable.length === 0) return refused("NOT_SHAREABLE");
       const correlationId =
         command.correlationId ?? dependencies.newCorrelationId();
+      // "Put it in the data room for them": filed first (shared only when new).
+      const one = shareable[0];
+      if (
+        command.documentId !== undefined &&
+        command.fileIn !== undefined &&
+        one !== undefined &&
+        !(await file(command.actor, one, command.fileIn, correlationId))
+      )
+        return refused("VERSION_CONFLICT");
       const expiresAt = expiryAfter(command.days);
       let changed = 0;
       for (const document of shareable) {
@@ -947,7 +974,9 @@ export function createFounderRequestsService(
           documentId: document.documentId,
           level: command.level,
           folderCode: document.folderCode,
-          ...(document.version > 0 ? { expectedVersion: document.version } : {}),
+          ...(document.version > 0
+            ? { expectedVersion: document.version }
+            : {}),
           correlationId: command.correlationId,
         });
         if (set.outcome === "OK") changed += 1;
@@ -995,7 +1024,9 @@ export function createFounderRequestsService(
         readonly assumptionLabel: string | null;
       }[];
       readonly correlationId?: CorrelationId | undefined;
-    }): Promise<FounderRequestsOutcome<{ readonly questionIds: readonly string[] }>> => {
+    }): Promise<
+      FounderRequestsOutcome<{ readonly questionIds: readonly string[] }>
+    > => {
       const [relationship, investor] = await Promise.all([
         quietly(dependencies.relationship(command.relationshipId), null),
         quietly(dependencies.investorOf(command.actor), null),

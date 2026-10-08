@@ -84,6 +84,14 @@ const READ_QUESTIONS: Readonly<Record<OwnReadKind, readonly [string, string]>> =
       "Ask me what you still need to know.",
       "What questions do you still have for me?",
     ],
+    requests: [
+      "What have investors asked me for?",
+      "Which investor questions haven't I answered yet?",
+    ],
+    access: [
+      "Who can see my financials?",
+      "Which investors can open my cap table?",
+    ],
   };
 
 export function parityCases(

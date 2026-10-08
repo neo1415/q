@@ -134,7 +134,11 @@ function world() {
     string,
     { companyId: string; tenantId: string; investorOrganisationId: string }
   > = {
-    [R1]: { companyId: COMPANY, tenantId: TENANT, investorOrganisationId: INV_ORG },
+    [R1]: {
+      companyId: COMPANY,
+      tenantId: TENANT,
+      investorOrganisationId: INV_ORG,
+    },
     [R_OTHER]: {
       companyId: OTHER_COMPANY,
       tenantId: TENANT,
@@ -439,7 +443,11 @@ describe("founder requests: upload and share", () => {
       },
     });
     expect(levels).toEqual([
-      { documentId: UPLOAD.documentId, level: "SHARED_ONLY", folder: "financials" },
+      {
+        documentId: UPLOAD.documentId,
+        level: "SHARED_ONLY",
+        folder: "financials",
+      },
     ]);
     expect(policies[0]).toMatchObject({
       scopeType: "relationship_shared",
@@ -448,7 +456,10 @@ describe("founder requests: upload and share", () => {
       expiresAt: "2026-10-22T09:00:00.000Z",
     });
     expect(events).toEqual(["document_shared"]);
-    expect(notices.at(-1)).toMatchObject({ actingSide: "COMPANY", target: "PROFILE" });
+    expect(notices.at(-1)).toMatchObject({
+      actingSide: "COMPANY",
+      target: "PROFILE",
+    });
 
     const inbox = await service.inbox(founder, COMPANY);
     const item = inbox?.items.find(
@@ -616,11 +627,11 @@ describe("founder requests: questions and answers", () => {
       text: "131 paid in September.",
       truthClass: "USER_CLAIM",
       evidenceStatus: "DOCUMENT_SUPPORTED",
-      documents: [{ documentId: UPLOAD.documentId, title: "Management accounts" }],
+      documents: [
+        { documentId: UPLOAD.documentId, title: "Management accounts" },
+      ],
     });
-    expect(
-      theirs?.find((q) => q.questionId === ids[1])?.answer,
-    ).toBeNull();
+    expect(theirs?.find((q) => q.questionId === ids[1])?.answer).toBeNull();
   });
 
   it("only the relationship's investor asks, and only the company's team answers", async () => {
@@ -736,7 +747,9 @@ describe("founder requests: the access editor", () => {
         days: 7,
       }),
     ).toEqual({ outcome: "REFUSED", code: "NOT_FOUND" });
-    expect(await service.documentAccess(otherFounder, FILED.documentId)).toBeNull();
+    expect(
+      await service.documentAccess(otherFounder, FILED.documentId),
+    ).toBeNull();
     expect(policies).toEqual([]);
   });
 
@@ -754,7 +767,11 @@ describe("founder requests: the access editor", () => {
     ).toEqual({ outcome: "OK", value: { changed: 1 } });
     const folder = await service.folderAccess(founder, COMPANY, "cap_table");
     expect(folder?.investors).toEqual([
-      { relationshipId: R1, investorOrganisationName: "Zino Capital", documents: 1 },
+      {
+        relationshipId: R1,
+        investorOrganisationName: "Zino Capital",
+        documents: 1,
+      },
     ]);
     expect(
       await service.setFolderLevel({
@@ -764,10 +781,12 @@ describe("founder requests: the access editor", () => {
         level: "PRIVATE",
       }),
     ).toEqual({ outcome: "OK", value: { changed: 1 } });
-    expect(documents.find((d) => d.documentId === FILED.documentId)?.level).toBe(
-      "PRIVATE",
-    );
-    expect(await service.folderAccess(otherFounder, COMPANY, "cap_table")).toBeNull();
+    expect(
+      documents.find((d) => d.documentId === FILED.documentId)?.level,
+    ).toBe("PRIVATE");
+    expect(
+      await service.folderAccess(otherFounder, COMPANY, "cap_table"),
+    ).toBeNull();
   });
 });
 
@@ -787,9 +806,27 @@ describe("founder requests: ordering", () => {
       dataRoom: null,
     };
     const items = sortInbox([
-      { ...base, itemId: "a", requestId: "a", requestedAt: "2026-10-07T00:00:00.000Z", status: "SHARED" },
-      { ...base, itemId: "b", requestId: "b", requestedAt: "2026-10-01T00:00:00.000Z", status: "OPEN" },
-      { ...base, itemId: "c", requestId: "c", requestedAt: "2026-10-06T00:00:00.000Z", status: "DECLINED" },
+      {
+        ...base,
+        itemId: "a",
+        requestId: "a",
+        requestedAt: "2026-10-07T00:00:00.000Z",
+        status: "SHARED",
+      },
+      {
+        ...base,
+        itemId: "b",
+        requestId: "b",
+        requestedAt: "2026-10-01T00:00:00.000Z",
+        status: "OPEN",
+      },
+      {
+        ...base,
+        itemId: "c",
+        requestId: "c",
+        requestedAt: "2026-10-06T00:00:00.000Z",
+        status: "DECLINED",
+      },
     ] as never);
     expect(items.map((i) => i.itemId)).toEqual(["b", "a", "c"]);
     expect(inboxCounts(items)).toEqual({ open: 1, answered: 1, declined: 1 });

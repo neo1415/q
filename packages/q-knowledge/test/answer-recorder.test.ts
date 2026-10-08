@@ -27,11 +27,15 @@ describe("investor answer recorder", () => {
       evidence: {
         registerStatementSource: (_a, input) => {
           sources.push(input.externalReference);
-          return Promise.resolve({ id: "00000000-0000-4000-8000-00000000a0b1" });
+          return Promise.resolve({
+            id: "00000000-0000-4000-8000-00000000a0b1",
+          });
         },
         createStatementItem: (_a, input) => {
           expect(input.summary).toBe("131 paid in September.");
-          return Promise.resolve({ id: "00000000-0000-4000-8000-00000000a0c1" });
+          return Promise.resolve({
+            id: "00000000-0000-4000-8000-00000000a0c1",
+          });
         },
       },
       gate: {

@@ -121,7 +121,10 @@ export function createPostgresDiligenceQuestions() {
           readonly assumptionLabel: string | null;
         }[];
       },
-    ): Promise<{ readonly ids: readonly string[]; readonly created: boolean }> => {
+    ): Promise<{
+      readonly ids: readonly string[];
+      readonly created: boolean;
+    }> => {
       let created = false;
       for (const [index, question] of input.questions.entries()) {
         const rows = await tx.sql<{ id: string }[]>`

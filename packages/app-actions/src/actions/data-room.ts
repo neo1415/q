@@ -424,7 +424,9 @@ export const DECIDE_DATA_ROOM_REQUEST = defineAppAction<
       requestId: input.requestId,
       relationshipId: input.relationshipId,
       decision: input.input.decision,
-      ...(input.input.decision === "APPROVE" ? { days: input.input.days } : {}),
+      ...(input.input.decision === "APPROVE"
+        ? { days: input.input.days }
+        : { note: input.input.note ?? null }),
       correlationId: context.correlationId,
     }),
   targets: (input) => relationshipTarget(input.relationshipId ?? ""),
