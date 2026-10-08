@@ -638,11 +638,12 @@ describe("changing it by voice and in Settings", () => {
       '"eagerness":"high"',
     );
     // Q then confirms once, in its own turn.
-    // (A plain response, in the conversation; the event id only lets a
-    // provider error be matched to it, RECOVERY A4.)
+    // (A response in the conversation, told what it is for: the tool's
+    // result, never a bare one the model words as it likes, G-D20.)
     const confirm = h.channel().ofType("response.create").at(-1);
     expect(confirm).toMatchObject({ type: "response.create" });
-    expect(confirm).not.toHaveProperty("response");
+    expect(JSON.stringify(confirm)).toContain("tool result just above");
+    expect(JSON.stringify(confirm)).not.toContain('"conversation":"none"');
     // And it stays quiet afterwards.
     h.channel().emit({ type: "input_audio_buffer.speech_started" });
     for (let i = 0; i < 6; i += 1) {
@@ -704,12 +705,13 @@ describe("bridging a slow answer", () => {
     await vi.advanceTimersByTimeAsync(BRIDGE_AFTER_MS + 50);
     const bridges = h.outOfBand();
     expect(bridges).toHaveLength(1);
-    expect(bridges[0]).toMatchObject({
-      instructions: "BRIDGE RULES",
-      tools: [],
-      tool_choice: "none",
-    });
-    expect(JSON.stringify(bridges[0]?.input)).toContain("Kazikit");
+    // G-D20: a fixed, code-chosen line, never the model's own words, and
+    // the request is not handed to it (it might start to answer).
+    expect(bridges[0]).toMatchObject({ tools: [], tool_choice: "none" });
+    expect(String(bridges[0]?.instructions)).toMatch(
+      /short aside.*exactly these words.*"(?:Pulling that up|Looking now|Checking your records)\."/u,
+    );
+    expect(JSON.stringify(bridges[0])).not.toContain("Kazikit");
     const id = (bridges[0]?.metadata as { cq_id: string }).cq_id;
     ch.emit({
       type: "response.created",
@@ -725,7 +727,11 @@ describe("bridging a slow answer", () => {
     const mainCreates = () =>
       ch
         .ofType("response.create")
-        .filter((event) => event.response === undefined);
+        .filter(
+          (event) =>
+            (event.response as { conversation?: string } | undefined)
+              ?.conversation !== "none",
+        );
     // INC-1 (live 2026-10-08): a bridge never plays over a ready answer.
     // It is cut, and the answer is asked for at once.
     expect(ch.ofType("response.cancel")).toContainEqual(

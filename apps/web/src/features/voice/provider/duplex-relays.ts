@@ -1,5 +1,7 @@
 import type {
   QVoiceCardUpdate,
+  QVoiceScreenUpdate,
+  QVoiceTurnState,
   QVoiceDuplexHeardResult,
   QVoiceDuplexRejoinResult,
   QVoiceDuplexToolResult,
@@ -20,6 +22,84 @@ import type { DuplexRelays } from "./duplex-line";
 /** Past the server's ask_q deadline (30 s), so its own words arrive first. */
 export const ASK_RELAY_DEADLINE_MS = 38_000;
 export const SHORT_RELAY_DEADLINE_MS = 10_000;
+
+/**
+ * G-D19: the voice turn board, read through the same route (a fetch, not
+ * a server action), for either line. `gone` when the server has let the
+ * session go (404), as the old server action reported it.
+ */
+export async function readVoiceTurn(
+  voiceSessionId: string,
+  sessionToken: string | undefined,
+  doFetch: typeof fetch = (url, init) => fetch(url, init),
+): Promise<
+  | { readonly ok: true; readonly value: QVoiceTurnState }
+  | { readonly ok: false; readonly gone?: boolean }
+> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, SHORT_RELAY_DEADLINE_MS);
+  try {
+    const response = await doFetch(
+      `/api/q-voice-duplex/${encodeURIComponent(voiceSessionId)}/turn`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(sessionToken === undefined
+            ? {}
+            : { "x-q-voice-session": sessionToken }),
+        },
+        body: "{}",
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    );
+    if (response.status === 404) return { ok: false, gone: true };
+    if (!response.ok) return { ok: false };
+    // Validated by the route against the contract before it got here.
+    return { ok: true, value: (await response.json()) as QVoiceTurnState };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** G-D19: where the person is now, for the next spoken turn (best effort). */
+export async function sendVoiceScreen(
+  voiceSessionId: string,
+  screen: QVoiceScreenUpdate,
+  sessionToken: string | undefined,
+  doFetch: typeof fetch = (url, init) => fetch(url, init),
+): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, SHORT_RELAY_DEADLINE_MS);
+  try {
+    await doFetch(
+      `/api/q-voice-duplex/${encodeURIComponent(voiceSessionId)}/screen`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(sessionToken === undefined
+            ? {}
+            : { "x-q-voice-session": sessionToken }),
+        },
+        body: JSON.stringify(screen),
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    );
+  } catch {
+    // Q knows the previous screen.
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * E-03: one card update for a standard line (focus, or the verdict on a

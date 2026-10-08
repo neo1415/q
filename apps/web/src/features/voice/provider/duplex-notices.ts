@@ -11,7 +11,7 @@ export const IGNORED_NOTICE =
   "Not answered: that didn't sound meant for me. Say it again if it was.";
 export const TIMEOUT_REPAIR =
   "Sorry, that took too long on my side. Ask me again?";
-export const DELIVERY_REPAIR = "Sorry, I lost my words there. Ask me again?";
+export const DELIVERY_REPAIR = "Sorry, I couldn't say that. Ask me again?";
 /** A11: the line was renewed under a request (a Q update, a restart). */
 export const LOST_TURN_NOTICE =
   "I lost that last request while reconnecting. Say it again?";

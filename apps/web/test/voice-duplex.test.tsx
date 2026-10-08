@@ -977,7 +977,11 @@ describe("the server decides who answers each turn (VOICE-BRAIN)", () => {
       // INC-1: the turn's id, which its `said` confirmation echoes.
       turnId: expect.stringMatching(/^turn_/u) as unknown,
     });
-    expect(h.events.onLine).toHaveBeenCalledWith("user", "Open my pitch deck.");
+    expect(h.events.onLine).toHaveBeenCalledWith(
+      "user",
+      "Open my pitch deck.",
+      expect.stringMatching(/^turn_/u),
+    );
     const sent = h.channel().sent;
     expect(sent.map((e) => (e as { type: string }).type)).toEqual([
       "conversation.item.create",

@@ -68,20 +68,38 @@ export function useDuplexVoiceSession(
   const startsRef = useRef(0);
   const lastLineRef = useRef<VoiceTranscriptLine | null>(null);
 
-  const addLine = useCallback((role: "user" | "q", text: string) => {
-    const trimmed = text.trim();
-    if (trimmed.length === 0) return;
-    const previous = lastLineRef.current;
-    const line = transcriptLineFor(previous, role, trimmed, newId, Date.now());
-    const replacing = line.id === previous?.id ? previous : null;
-    lastLineRef.current = line;
-    setTranscript((current) =>
-      replacing === null
-        ? [...current, line]
-        : current.map((item) => (item.id === replacing.id ? line : item)),
-    );
-    eventsRef.current.onLine?.(line);
-  }, []);
+  const addLine = useCallback(
+    (role: "user" | "q", text: string, turnId?: string) => {
+      const trimmed = text.trim();
+      if (trimmed.length === 0) return;
+      const previous = lastLineRef.current;
+      const built = transcriptLineFor(
+        previous,
+        role,
+        trimmed,
+        newId,
+        Date.now(),
+      );
+      // G-R3: the line carries its turn (the latest, when lines merge).
+      const line =
+        turnId === undefined
+          ? previous !== null &&
+            built.id === previous.id &&
+            previous.turnId !== undefined
+            ? { ...built, turnId: previous.turnId }
+            : built
+          : { ...built, turnId };
+      const replacing = line.id === previous?.id ? previous : null;
+      lastLineRef.current = line;
+      setTranscript((current) =>
+        replacing === null
+          ? [...current, line]
+          : current.map((item) => (item.id === replacing.id ? line : item)),
+      );
+      eventsRef.current.onLine?.(line);
+    },
+    [],
+  );
 
   useEffect(
     () => () => {
@@ -162,6 +180,7 @@ export function useDuplexVoiceSession(
           onTurnOutcome: (outcome) => {
             if (lineRef.current !== line) return;
             eventsRef.current.onTurnOutcome?.({
+              turnId: outcome.turnId,
               disposition: outcome.disposition,
               failure: outcome.failure,
               notice: outcome.notice,

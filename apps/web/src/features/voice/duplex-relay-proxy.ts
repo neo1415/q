@@ -3,6 +3,10 @@ import "server-only";
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   QVoiceCardUpdateSchema,
+  QVoiceScreenUpdateSchema,
+  QVoiceTurnStateSchema,
+  qVoiceScreenPath,
+  qVoiceTurnPath,
   QVoiceDuplexAttachSchema,
   QVoiceDuplexEndSchema,
   QVoiceDuplexHeardResultSchema,
@@ -26,7 +30,7 @@ import {
   qVoiceDuplexToolPath,
   qVoiceDuplexUsagePath,
 } from "@capital-q/contracts";
-import type { z } from "zod";
+import { z } from "zod";
 
 import { getSessionAccessToken } from "@/auth/session";
 
@@ -51,7 +55,12 @@ type Relay = {
   readonly body: z.ZodType;
   /** Null: the Q API answers 204 and so does this. */
   readonly result: z.ZodType | null;
+  /** G-D19: a read (the turn board): GET upstream, no body sent. */
+  readonly method?: "GET" | undefined;
 };
+
+/** A read takes no body: the browser posts `{}`. */
+const NoBodySchema = z.object({}).strict();
 
 const RELAYS: Readonly<Record<string, Relay>> = {
   tool: {
@@ -88,6 +97,22 @@ const RELAYS: Readonly<Record<string, Relay>> = {
   attach: {
     path: qVoiceDuplexAttachPath,
     body: QVoiceDuplexAttachSchema,
+    result: null,
+  },
+  // G-D19 (C-08's last relays): the 1.5 s turn board poll that brings the
+  // turn's cards and moves, and the screen the turn is asked from. As
+  // server actions they queued behind every other action on the page; a
+  // page holding actions back (4 s, G's run) starved the poll and the
+  // voice turn's cards never arrived.
+  turn: {
+    path: qVoiceTurnPath,
+    body: NoBodySchema,
+    result: QVoiceTurnStateSchema,
+    method: "GET",
+  },
+  screen: {
+    path: qVoiceScreenPath,
+    body: QVoiceScreenUpdateSchema,
     result: null,
   },
   // E-03: the standard line's decision cards (focus, spoken verdicts).
@@ -128,18 +153,20 @@ export async function relayDuplex(
     upstream = await doFetch(
       `${qApiBaseUrl.replace(/\/$/, "")}${relay.path(id.data)}`,
       {
-        method: "POST",
+        method: relay.method ?? "POST",
         headers: {
           accept: "application/json",
           authorization: `Bearer ${accessToken}`,
-          "content-type": "application/json",
+          ...(relay.method === "GET"
+            ? {}
+            : { "content-type": "application/json" }),
           ...(token !== null &&
           token.length > 0 &&
           token.length <= SESSION_TOKEN_MAX
             ? { [SESSION_TOKEN_HEADER]: token }
             : {}),
         },
-        body: JSON.stringify(body.data),
+        ...(relay.method === "GET" ? {} : { body: JSON.stringify(body.data) }),
         cache: "no-store",
         // The browser letting go (a barge-in, a closed tab) stops the turn.
         signal: request.signal,
