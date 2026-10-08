@@ -14,14 +14,14 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   DraftRedraftResultSchema,
-  DraftReviewResultSchema,
+  DraftReviewResultV2Schema,
   JobPlanResultSchema,
   renderPrompt,
   ReplyReaderResultSchema,
   type DraftRedraftResult,
   type DraftRedraftVariables,
-  type DraftReviewResult,
-  type DraftReviewVariables,
+  type DraftReviewResultV2,
+  type DraftReviewV2Variables,
   type EtiquettePurpose,
   type JobPlanResult,
   type JobPlanVariables,
@@ -50,7 +50,7 @@ type Frame =
   | "communicationGuidance"
   | "environmentNotes";
 
-export type ReviewVariables = Omit<DraftReviewVariables, Frame>;
+export type ReviewVariables = Omit<DraftReviewV2Variables, Frame>;
 export type RedraftVariables = Omit<DraftRedraftVariables, Frame>;
 export type ReplyVariables = Omit<ReplyReaderVariables, Frame>;
 export type PlanVariables = Omit<JobPlanVariables, Frame>;
@@ -79,7 +79,7 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     variables: ReviewVariables,
-  ) => Promise<DraftReviewResult | null>;
+  ) => Promise<DraftReviewResultV2 | null>;
   readonly redraft: (
     who: Who,
     trace: Trace,
@@ -174,13 +174,13 @@ export function createWorkforceModels(dependencies: {
 
   return {
     review: (who, trace, variables) =>
-      call<ReviewVariables, DraftReviewResult>({
+      call<ReviewVariables, DraftReviewResultV2>({
         task: "DRAFT_REVIEW",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: DraftReviewResultSchema,
+        schema: DraftReviewResultV2Schema,
         budget: SMALL,
         environmentNotes:
           "You are grading, not writing to anyone. Code decides from your grades whether anything is sent.",

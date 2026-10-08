@@ -31,7 +31,10 @@ for (const screen of ["work", "thread"]) {
       const url = `${pathToFileURL(join(here, "index.html")).href}?screen=${screen}&device=${device}&theme=${theme}`;
       await page.goto(url);
       if (screen === "work") {
-        await page.locator("details").first().evaluate((el) => (el.open = true));
+        await page
+          .locator("details")
+          .first()
+          .evaluate((el) => (el.open = true));
       }
       await page.screenshot({
         path: join(out, `${screen}-${device}-${theme}.png`),

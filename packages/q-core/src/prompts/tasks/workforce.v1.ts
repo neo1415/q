@@ -9,8 +9,13 @@ import {
   DRAFT_REVIEW_UNTRUSTED,
   DraftRedraftResultSchema,
   DraftRedraftVariablesSchema,
+  DRAFT_REVIEW_V2_SCHEMA_VERSION,
   DraftReviewResultSchema,
+  DraftReviewResultV2Schema,
+  DraftReviewV2VariablesSchema,
   DraftReviewVariablesSchema,
+  type DraftReviewResultV2,
+  type DraftReviewV2Variables,
   JOB_PLAN_SCHEMA_NAME,
   JOB_PLAN_SCHEMA_VERSION,
   JOB_PLAN_UNTRUSTED,
@@ -81,7 +86,7 @@ export const DRAFT_REVIEW_V1: PromptDefinition<
 > = {
   id: "DRAFT_REVIEW",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -99,6 +104,50 @@ export const DRAFT_REVIEW_V1: PromptDefinition<
     schema: DraftReviewResultSchema,
   },
   template: REVIEW_TEMPLATE,
+};
+
+/**
+ * v2 (Zino, 2026-10-08): the reviewer reads the real conversation and what
+ * code found still open in their latest message, and checks that the draft
+ * responds to it (RESPONDS_TO_THREAD). Notes and feedback are kept short;
+ * the feedback is a numbered fix list the writer can act on.
+ */
+const REVIEW_TEMPLATE_V2 = REVIEW_TEMPLATE.replace(
+  "- HONEST_IDENTITY: does not pretend to be {{principalName}} where the message is marked as sent by Q, and does not claim to be human.",
+  `- HONEST_IDENTITY: does not pretend to be {{principalName}} where the message is marked as sent by Q, and does not claim to be human.
+- RESPONDS_TO_THREAD: on a REPLY, it responds to what their latest message left open (listed below by code): a call or meeting they offered or asked for is accepted with a time proposed or asked for, booked, or declined politely; a document they offered is accepted or declined; their question is answered or honestly deferred. It never asks for something they already offered, and never asks whether they are "open to connecting" after they offered to meet. With nothing open, ok is true.
+
+WHAT THEIR LATEST MESSAGE LEFT OPEN (code read it from the conversation)
+{{pendingAsks}}`,
+).replace(
+  "In feedback, tell the writer concretely what to change, criterion by criterion, in at most a few sentences. Empty when nothing needs to change. Never quote the guides.",
+  'In feedback, give the writer a numbered list of concrete fixes ("1. Accept the call and ask which time suits."), at most five, each one sentence. Empty when nothing needs to change. Keep every note under 200 characters. Never quote the guides.',
+);
+
+export const DRAFT_REVIEW_V2: PromptDefinition<
+  DraftReviewV2Variables,
+  DraftReviewResultV2
+> = {
+  id: "DRAFT_REVIEW",
+  version: 2,
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  changeDescription:
+    "Zino 2026-10-08: drafts ignored the founder's latest message (a meeting and deck offer answered with 'open to connecting?'). The reviewer reads the thread and code's list of open asks and checks RESPONDS_TO_THREAD; feedback is a numbered fix list; free text is bounded by code, not refused.",
+  effectiveFrom: "2026-10-08",
+  variables: {
+    schema: DraftReviewV2VariablesSchema,
+    untrusted: [...DRAFT_REVIEW_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: DRAFT_REVIEW_SCHEMA_NAME,
+    schemaVersion: DRAFT_REVIEW_V2_SCHEMA_VERSION,
+    schema: DraftReviewResultV2Schema,
+  },
+  template: REVIEW_TEMPLATE_V2,
 };
 
 const REDRAFT_TEMPLATE = `TASK: DRAFT_REDRAFT

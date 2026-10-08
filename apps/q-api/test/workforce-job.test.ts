@@ -390,7 +390,7 @@ describe("J9: a job carried out by Q's workforce, end to end", () => {
     expect(detail.drafts[1]?.outcome?.outcome).toBe("SENT");
     expect(detail.drafts[0]?.grade).toMatchObject({
       threshold: 75,
-      maxRedrafts: 2,
+      maxRedrafts: 1,
     });
     expect(
       detail.timeline.some(
@@ -469,8 +469,8 @@ describe("the reviewer on a path's own reply, and learning from approvals", () =
     expect(store.rows.outcomes.map((one) => [one.outcome, one.reason])).toEqual(
       [["HELD", "INTEGRITY"]],
     );
-    // Three attempts, each graded and kept.
-    expect(store.rows.drafts.map((draft) => draft.attempt)).toEqual([1, 2, 3]);
+    // Two rounds at most (Zino, 2026-10-08), each graded and kept.
+    expect(store.rows.drafts.map((draft) => draft.attempt)).toEqual([1, 2]);
   });
 
   it("turns an edit on an offered draft into a what-worked preference through the Write Gate", async () => {
