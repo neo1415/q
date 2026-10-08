@@ -23,6 +23,7 @@ import type {
   BriefingCommandResultDto,
   NamedPicture,
   QAttentionReport,
+  ReadinessFollowUp,
 } from "@capital-q/contracts";
 
 import { attentionLines, unreadWords } from "./attention";
@@ -86,7 +87,24 @@ export type ArrivalData = {
   readonly jobsDone?: ActivityCountLike | null | undefined;
   /** Investors: new companies matching their mandate; null: not read. */
   readonly matches?: ArrivalMatches | null | undefined;
+  /**
+   * Founders (Q.01): the interview questions Q still has, answerable in
+   * place; null: not read; absent: not a founder.
+   */
+  readonly questions?: readonly ReadinessFollowUp[] | null | undefined;
 };
+
+/** "I still have three questions investors will ask you." (Q.01) */
+export function questionsWords(
+  questions: readonly ReadinessFollowUp[] | null | undefined,
+): string | null {
+  if (questions === null || questions === undefined) return null;
+  const n = questions.length;
+  if (n === 0) return null;
+  return n === 1
+    ? "I still have one question investors will ask you; it's on the side when you have a minute."
+    : `I still have ${String(n)} questions investors will ask you; they're on the side when you have a minute.`;
+}
 
 type ActivityCountLike = {
   readonly n: number;
@@ -344,6 +362,7 @@ export function arrivalWords(
         ? [firstCard]
         : [summary, "Tell me what you'd like done with any of them."]),
       matchesLine,
+      questionsWords(data.questions),
     ]
       .filter((part): part is string => part !== null && part.length > 0)
       .join(" "),

@@ -34,6 +34,17 @@ vi.mock("../src/features/briefing/arrival-actions", () => ({
 vi.mock("../src/components/app-shell/global-q", () => ({
   useGlobalQ: () => ({ askNow: vi.fn() }),
 }));
+const answerQuestionAction = vi.fn(() =>
+  Promise.resolve({ ok: true, value: { status: "ANSWERED", remaining: 0 } }),
+);
+vi.mock("../src/features/readiness/readiness-actions", () => ({
+  answerQuestionAction: (...args: unknown[]) =>
+    (answerQuestionAction as (...a: unknown[]) => unknown)(...args),
+  setAsideQuestionAction: vi.fn(() => Promise.resolve({ ok: true })),
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 vi.mock("../src/features/work/notice-store", () => ({
   useNotices: () => ({ items: null }),
 }));
@@ -291,5 +302,55 @@ describe("E2: the arrival says everything, true", () => {
     expect(window.localStorage.getItem("cq.arrival.seen-matches")).toContain(
       uuid(21),
     );
+  });
+});
+
+describe("Q.01: the questions Q still has stay beside Q", () => {
+  it("shows a founder's pending question, answerable in place, before and after Q speaks", async () => {
+    const founder: ArrivalData = {
+      ...DATA,
+      cards: [],
+      attention: undefined,
+      matches: undefined,
+      questions: [
+        {
+          questionId: uuid(31),
+          question: "What is your monthly burn?",
+          why: "Investors ask this first.",
+          reason: "MATERIAL_GAP",
+          pillar: null,
+          readings: [],
+          quickAnswers: ["Under $20k", "$20k to $50k"],
+          typed: "NUMBER",
+          answerable: true,
+          editHref: null,
+          askedAt: "2026-10-07T09:00:00Z",
+        },
+      ],
+    };
+    function FounderPage() {
+      const [conversing, setConversing] = useState(false);
+      return (
+        <div>
+          <button type="button" onClick={() => setConversing(true)}>
+            speak
+          </button>
+          {conversing ? <RoomBelow key="c" /> : <RoomBelow key="w" />}
+          <StageModeProvider value="FULL">
+            <ArrivalStage load={() => Promise.resolve(founder)} />
+          </StageModeProvider>
+        </div>
+      );
+    }
+    render(<FounderPage />);
+    await settle();
+    expect(await screen.findByText("What is your monthly burn?")).toBeTruthy();
+    expect(screen.getByText("Q still wants to know")).toBeTruthy();
+    fireEvent.click(screen.getByText("speak"));
+    await settle();
+    expect(screen.getByText("What is your monthly burn?")).toBeTruthy();
+    fireEvent.click(screen.getByText("Under $20k"));
+    await settle();
+    expect(answerQuestionAction).toHaveBeenCalledTimes(1);
   });
 });

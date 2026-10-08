@@ -33,6 +33,7 @@ import {
   rejectQApprovalAction,
 } from "@/features/q/actions";
 import { fitProfilesAction } from "@/features/fit/fit-actions";
+import { ownReadiness } from "@/features/readiness/readiness-data";
 import {
   apiSession,
   qApiSession,
@@ -125,6 +126,8 @@ export type ArrivalBrowserInput = z.input<typeof BrowserInput>;
 
 /** How far into the slate the arrival looks for new matches. */
 const SLATE_LOOK = 20;
+/** Q.01: the questions put beside Q at once. */
+const QUESTIONS_MAX = 5;
 
 /**
  * Investors: the new companies in their own slate that fit their mandate,
@@ -224,6 +227,19 @@ export async function arrivalBriefingAction(
             ? null
             : new Set(seenMatches),
         ).catch(() => null)
+      : undefined;
+  // Founders (Q.01): the questions Q still has for them, answerable here.
+  const questions =
+    context?.kind === "FOUNDER"
+      ? await ownReadiness()
+          .then((readiness) =>
+            readiness === null
+              ? null
+              : readiness.followUps
+                  .filter((item) => item.answerable)
+                  .slice(0, QUESTIONS_MAX),
+          )
+          .catch(() => null)
       : undefined;
   const needsYouNotices =
     notices?.ok === true
@@ -345,6 +361,7 @@ export async function arrivalBriefingAction(
     ),
     jobsDone: jobsDoneOf(workforce, since),
     ...(matches === undefined ? {} : { matches }),
+    ...(questions === undefined ? {} : { questions }),
   };
 }
 

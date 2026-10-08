@@ -39,6 +39,8 @@ import {
   useArrival,
   type ArrivalLoader,
 } from "./arrival-store";
+import { FollowUpStack } from "@/features/readiness/follow-up-stack";
+
 import { attentionHref, attentionLines, unreadWords } from "./attention";
 import {
   FIT_IS_NOT_QUALITY,
@@ -389,6 +391,8 @@ export function ArrivalStage({
   const hasActivity = activity === null || activity.length > 0;
   const matches = data?.matches ?? null;
   const hasMatches = matches !== null && matches.items.length > 0;
+  const questions = data?.questions ?? null;
+  const hasQuestions = questions !== null && questions.length > 0;
   const attentionShown =
     data?.attention !== null &&
     data?.attention !== undefined &&
@@ -400,9 +404,10 @@ export function ArrivalStage({
     if (data === null) return groups;
     if (hasActivity) groups.push("ACTIVITY");
     if (hasNeeds) groups.push("NEEDS_YOU");
+    if (hasQuestions) groups.push("QUESTIONS");
     if (hasMatches) groups.push("MATCHES");
     return groups;
-  }, [data, hasActivity, hasNeeds, hasMatches]);
+  }, [data, hasActivity, hasNeeds, hasQuestions, hasMatches]);
 
   // Cards that follow speech: a group shows as Q reaches it on a spoken
   // briefing, and a card Q names comes into focus.
@@ -490,10 +495,11 @@ export function ArrivalStage({
     room.rightBottom !== null;
   const besideActivity = beside && shown.includes("ACTIVITY");
   const besideMatches = beside && shown.includes("MATCHES");
+  const besideQuestions = beside && shown.includes("QUESTIONS");
   useEffect(() => {
-    setRoomFilled(besideActivity || besideMatches, "stage");
+    setRoomFilled(besideActivity || besideMatches || besideQuestions, "stage");
     return () => setRoomFilled(false, "stage");
-  }, [besideActivity, besideMatches]);
+  }, [besideActivity, besideMatches, besideQuestions]);
   // Back to FULL: the person's "Show" has done its job.
   const [modeSeen, setModeSeen] = useState(mode);
   if (modeSeen !== mode) {
@@ -531,6 +537,20 @@ export function ArrivalStage({
       {strip ? null : <AttentionList data={data} />}
     </section>
   ) : null;
+  // Q.01: the questions Q still has, answerable in place.
+  const questionsGroup =
+    shown.includes("QUESTIONS") &&
+    questions !== null &&
+    questions.length > 0 ? (
+      <section
+        aria-label="Q still wants to know"
+        className="flex flex-col gap-2"
+        data-arrival-questions
+      >
+        <GroupHead title="Q still wants to know" count={questions.length} />
+        <FollowUpStack followUps={questions} heading={false} />
+      </section>
+    ) : null;
   const matchesGroup =
     shown.includes("MATCHES") && matches !== null ? (
       <MatchesGroup
@@ -548,6 +568,9 @@ export function ArrivalStage({
   if (strip) {
     const parts = [
       hasActivity ? "What I did" : null,
+      hasQuestions && questions !== null
+        ? `Q still wants to know · ${String(questions.length)}`
+        : null,
       hasMatches && matches !== null
         ? `New for you · ${String(matches.total)}`
         : null,
@@ -581,6 +604,7 @@ export function ArrivalStage({
     <div className="flex w-full flex-col gap-5" data-arrival-stage="below">
       {activityCard}
       {needs}
+      {questionsGroup}
       {matchesGroup}
     </div>
   );
@@ -596,6 +620,12 @@ export function ArrivalStage({
         ? createPortal(
             <div data-arrival-stage="beside">{activityCard}</div>,
             room.leftTop,
+          )
+        : null}
+      {room.leftBottom !== null && questionsGroup !== null
+        ? createPortal(
+            <div data-arrival-stage="beside">{questionsGroup}</div>,
+            room.leftBottom,
           )
         : null}
       {room.rightBottom !== null && matchesGroup !== null
