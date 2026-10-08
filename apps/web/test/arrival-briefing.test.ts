@@ -134,9 +134,11 @@ describe("what Q says on arrival", () => {
       null,
     );
     expect(words.quiet).toBe(true);
+    // E2: casual and glad to see them, then the one quiet line.
     expect(words.spoken).toMatch(
-      /^Good afternoon, Zino\. (?:Quiet day, nothing needs you\.|All quiet; nothing needs you\.)$/u,
+      /^Good afternoon, Zino\. (?:Good to see you\.|Nice to have you back\.|Glad you're here\.|Good to have you back\.) (?:Quiet day, nothing needs you\.|All quiet; nothing needs you\.)$/u,
     );
+    expect(words.welcome).not.toBeNull();
     expect(words.firstCard).toBeNull();
   });
 });

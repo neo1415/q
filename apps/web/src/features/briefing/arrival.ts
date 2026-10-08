@@ -22,7 +22,12 @@ import type {
   BriefingCommandRequest,
   BriefingCommandResultDto,
   NamedPicture,
+  QAttentionReport,
 } from "@capital-q/contracts";
+
+import { attentionLines, unreadWords } from "./attention";
+import { greetingSeed, warmGreeting } from "./greeting";
+import { matchesWords, type ArrivalMatches } from "./matches";
 
 /**
  * The arrival briefing as the page shows and Q says it (Zino, 2026-10-08):
@@ -69,7 +74,109 @@ export type ArrivalData = {
    * reply"), as their titles; absent or empty: none.
    */
   readonly waiting?: readonly string[] | undefined;
+  /**
+   * RECOVERY-2026-10 E2: everything that needs them, one report (the lead
+   * contract), with the sources that could not be read. Absent from an
+   * older read; null: the report itself could not be put together.
+   */
+  readonly attention?: QAttentionReport | null | undefined;
+  /** Where each attention line is acted on, by item key (in-app paths). */
+  readonly attentionLinks?: Readonly<Record<string, string>> | undefined;
+  /** What their agents finished in the window; null: not read. */
+  readonly jobsDone?: ActivityCountLike | null | undefined;
+  /** Investors: new companies matching their mandate; null: not read. */
+  readonly matches?: ArrivalMatches | null | undefined;
 };
+
+type ActivityCountLike = {
+  readonly n: number;
+  readonly names: readonly string[];
+};
+
+function namesOf(item: ActivityCountLike, max = 2): string {
+  const names = item.names.slice(0, max);
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+}
+
+/**
+ * The "What I did" card, a line per kind of work, from recorded facts
+ * only (E2). Null when the read failed (the card says it could not
+ * check); empty when nothing was done.
+ */
+export function activityLines(
+  activity: ArrivalActivity | null,
+  jobs: ActivityCountLike | null | undefined,
+): readonly string[] | null {
+  if (activity === null && (jobs === null || jobs === undefined)) return null;
+  const lines: string[] = [];
+  const named = (
+    item: ActivityCountLike | undefined,
+    one: (names: string) => string,
+    many: (n: number) => string,
+  ) => {
+    if (item === undefined || item.n <= 0) return;
+    lines.push(
+      item.n <= 2 && item.names.length >= item.n
+        ? one(namesOf(item))
+        : many(item.n),
+    );
+  };
+  named(
+    activity?.sent,
+    (names) => `Replied to ${names}`,
+    (n) => `Sent ${String(n)} messages for you`,
+  );
+  named(
+    activity?.booked,
+    (names) => `Booked your call with ${names}`,
+    (n) => `Set up ${String(n)} meetings`,
+  );
+  named(
+    activity?.interest,
+    (names) => `Expressed interest in ${names}`,
+    (n) => `Expressed interest in ${String(n)} companies`,
+  );
+  named(
+    activity?.held,
+    (names) => `Held back a message to ${names} for you to read`,
+    (n) => `Held back ${String(n)} messages for you to read`,
+  );
+  named(
+    activity?.replies,
+    (names) => `${names} wrote back`,
+    (n) => `${String(n)} people wrote back`,
+  );
+  named(
+    activity?.matches,
+    (names) => `${names}: a new match`,
+    (n) => `${String(n)} new matches`,
+  );
+  if (jobs !== null && jobs !== undefined && jobs.n > 0) {
+    const first = jobs.names[0];
+    lines.push(
+      jobs.n === 1 && first !== undefined
+        ? `Finished: ${first.replace(/[.\s]+$/u, "")}`
+        : `My agents finished ${String(jobs.n)} jobs`,
+    );
+  }
+  return lines;
+}
+
+/** "My agents finished two jobs: research five fintech investors." */
+export function jobsDoneWords(
+  jobs: ActivityCountLike | null | undefined,
+): string | null {
+  if (jobs === null || jobs === undefined || jobs.n <= 0) return null;
+  const first = jobs.names[0];
+  if (jobs.n === 1) {
+    return first === undefined
+      ? "One of my agents finished its job."
+      : `One of my agents finished: ${first.replace(/[.\s]+$/u, "")}.`;
+  }
+  return `My agents finished ${String(jobs.n)} jobs.`;
+}
 
 export function sequenceCardOf(card: ArrivalCard): SequenceCard {
   return {
@@ -103,8 +210,13 @@ export function zoneFor(
 }
 
 export type ArrivalWords = {
+  /** "Good afternoon, Zino." -- by their clock. */
   readonly greeting: string;
+  /** The warm half ("Good to see you."); null late at night. */
+  readonly welcome: string | null;
   readonly lowdown: string;
+  /** Investors: the new matching companies, all by name; null: none. */
+  readonly matches: string | null;
   readonly quiet: boolean;
   /** The first card, put to them; null with none. */
   readonly firstCard: string | null;
@@ -161,10 +273,19 @@ export function arrivalWords(
   now: Date,
   browserZone: string | null,
 ): ArrivalWords {
+  const zone = zoneFor(data, browserZone);
   const greeting = arrivalGreeting({
     firstName: data.firstName,
     now,
-    timeZone: zoneFor(data, browserZone),
+    timeZone: zone,
+  });
+  // Casual and glad to see them (Zino, 2026-10-08), the same all visit.
+  const warm = warmGreeting({
+    firstName: data.firstName,
+    now,
+    timeZone: zone,
+    hoursAway: data.hoursAway,
+    seed: greetingSeed(`${data.firstName ?? ""}:${now.toDateString()}`),
   });
   const read = lowdownOf({
     activity: data.activity ?? {},
@@ -174,12 +295,24 @@ export function arrivalWords(
   // Live 2026-10-08: "All quiet; nothing needs you" while an investor's
   // message waited for a reply. What waits on them is said, never "quiet".
   const waitingLine = waitingWords(data.waiting ?? [], read.text);
+  const jobsLine = jobsDoneWords(data.jobsDone);
+  // Unknown is not empty (SPEC §4.4): a source that could not be read is
+  // said as such, and never lets the day be called quiet.
+  const unread = data.attention?.unread ?? [];
+  const unreadLine = unreadWords(unread);
+  const told = [
+    read.quiet ? null : read.text,
+    jobsLine,
+    waitingLine,
+    unreadLine,
+  ].filter((part): part is string => part !== null);
   const lowdown =
-    waitingLine === null
+    told.length === 0
       ? read
-      : read.quiet
-        ? { quiet: false, text: waitingLine }
-        : { quiet: false, text: `${read.text} ${waitingLine}` };
+      : read.quiet && unreadLine !== null && told.length === 1
+        ? { quiet: false, text: `Quiet on what I could check. ${unreadLine}` }
+        : { quiet: false, text: told.join(" ") };
+  const matchesLine = matchesWords(data.matches ?? null);
   const first = data.cards[0];
   const firstCard =
     first === undefined
@@ -190,18 +323,27 @@ export function arrivalWords(
     data.cards.length < 2
       ? null
       : summaryOfCards(data.cards.map(decisionFactsOf));
+  // The attention lines no card decides here (a message to answer, a
+  // document requested): named once, after the decisions.
+  const lines =
+    data.attention === null || data.attention === undefined
+      ? []
+      : attentionLines(data.attention);
   return {
     greeting,
+    welcome: warm.slice(greeting.length).trim() || null,
     lowdown: lowdown.text,
-    quiet: lowdown.quiet,
+    quiet: lowdown.quiet && matchesLine === null && lines.length === 0,
     firstCard,
     summary,
+    matches: matchesLine,
     spoken: [
-      greeting,
+      warm,
       lowdown.text,
       ...(summary === null
         ? [firstCard]
         : [summary, "Tell me what you'd like done with any of them."]),
+      matchesLine,
     ]
       .filter((part): part is string => part !== null && part.length > 0)
       .join(" "),
