@@ -15,6 +15,8 @@
  * (Q answers small talk); the opposite miss costs the person's trust.
  */
 
+import { isQVoiceCardReply } from "@capital-q/contracts";
+
 export type DuplexTurnRoute = "ASK_Q" | "SMALLTALK" | "MODEL";
 
 /** The routed= value in the per-turn log line and the transcript store. */
@@ -165,102 +167,10 @@ export function isSmallTalk(transcript: string): boolean {
 }
 
 /**
- * RECOVERY A3 (C-03/B-01, founder live 2026-10-08): with a card in focus,
- * only a reply about the card is the card's. "Find anything that needs my
- * attention" (6 words) went to the voice model and decide_card because
- * every utterance of twelve words or fewer did. A card reply names what
- * to do with the card; a question or a request for something else is Q's.
+ * RECOVERY A3: a reply about the card in focus (shared with the standard
+ * line, so both lines read a card reply the same way).
  */
-const CARD_VERBS = new Set([
-  "send",
-  "sent",
-  "approve",
-  "approved",
-  "go",
-  "yes",
-  "yeah",
-  "yep",
-  "ok",
-  "okay",
-  "sure",
-  "no",
-  "nope",
-  "skip",
-  "later",
-  "dismiss",
-  "ignore",
-  "drop",
-  "cancel",
-  "edit",
-  "change",
-  "rewrite",
-  "redo",
-  "warmer",
-  "shorter",
-  "longer",
-  "softer",
-  "friendlier",
-  "formal",
-  "casual",
-  "book",
-  "schedule",
-  "reschedule",
-  "accept",
-  "decline",
-  "next",
-  "previous",
-  "moving",
-  "retry",
-  "again",
-  "snooze",
-  "remind",
-  "leave",
-  "keep",
-  "pass",
-]);
-const CARD_PHRASES = ["not now", "move on", "do it", "that one", "this one"];
-/** Opening words of a question or of a request for something else. */
-const ELSEWHERE = new Set([
-  "what",
-  "what's",
-  "whats",
-  "why",
-  "how",
-  "who",
-  "who's",
-  "which",
-  "where",
-  "find",
-  "show",
-  "open",
-  "tell",
-  "explain",
-  "read",
-  "give",
-  "search",
-  "look",
-  "check",
-  "take",
-  "anything",
-  "is",
-  "are",
-  "does",
-  "do",
-]);
-
-/** True when the words are a reply about the decision card in focus. */
-export function isCardReply(transcript: string): boolean {
-  const said = words(transcript);
-  if (said.length === 0 || said.length > 12) return false;
-  const first = said[0] ?? "";
-  // "do it" is a reply; "do they fit?" is not.
-  const joined = ` ${said.join(" ")} `;
-  if (ELSEWHERE.has(first) && !joined.startsWith(" do it ")) return false;
-  if (CARD_PHRASES.some((phrase) => joined.includes(` ${phrase} `))) {
-    return true;
-  }
-  return said.some((w) => CARD_VERBS.has(w));
-}
+export const isCardReply = isQVoiceCardReply;
 
 export function routeDuplexTurn(
   transcript: string,

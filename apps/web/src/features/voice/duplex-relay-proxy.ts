@@ -2,6 +2,7 @@ import "server-only";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
+  QVoiceCardUpdateSchema,
   QVoiceDuplexAttachSchema,
   QVoiceDuplexEndSchema,
   QVoiceDuplexHeardResultSchema,
@@ -15,6 +16,7 @@ import {
   QVoiceDuplexUsageReportSchema,
   QVoiceDuplexUsageResultSchema,
   UuidSchema,
+  qVoiceCardPath,
   qVoiceDuplexAttachPath,
   qVoiceDuplexEndPath,
   qVoiceDuplexHeardPath,
@@ -88,6 +90,8 @@ const RELAYS: Readonly<Record<string, Relay>> = {
     body: QVoiceDuplexAttachSchema,
     result: null,
   },
+  // E-03: the standard line's decision cards (focus, spoken verdicts).
+  card: { path: qVoiceCardPath, body: QVoiceCardUpdateSchema, result: null },
 };
 
 const problem = (status: number) =>

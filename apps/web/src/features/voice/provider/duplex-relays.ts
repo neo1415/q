@@ -1,4 +1,5 @@
 import type {
+  QVoiceCardUpdate,
   QVoiceDuplexHeardResult,
   QVoiceDuplexRejoinResult,
   QVoiceDuplexToolResult,
@@ -19,6 +20,59 @@ import type { DuplexRelays } from "./duplex-line";
 /** Past the server's ask_q deadline (30 s), so its own words arrive first. */
 export const ASK_RELAY_DEADLINE_MS = 38_000;
 export const SHORT_RELAY_DEADLINE_MS = 10_000;
+
+/**
+ * E-03: one card update for a standard line (focus, or the verdict on a
+ * spoken reply), through the same route. Best effort: a lost update only
+ * means the turn goes to Q as any other.
+ */
+export async function postCardUpdate(
+  voiceSessionId: string,
+  sessionToken: string | undefined,
+  update: QVoiceCardUpdate,
+  doFetch: typeof fetch = (url, init) => fetch(url, init),
+): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, SHORT_RELAY_DEADLINE_MS);
+  try {
+    await doFetch(
+      `/api/q-voice-duplex/${encodeURIComponent(voiceSessionId)}/card`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(sessionToken === undefined
+            ? {}
+            : { "x-q-voice-session": sessionToken }),
+        },
+        body: JSON.stringify(boundedCardUpdate(update)),
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    );
+  } catch {
+    // The turn goes to Q as any other.
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The contract bounds an outcome at 6,000 characters; keep what matters. */
+function boundedCardUpdate(update: QVoiceCardUpdate): QVoiceCardUpdate {
+  if (update.kind !== "VERDICT" || update.outcome === undefined) return update;
+  if (JSON.stringify(update.outcome).length <= 6_000) return update;
+  const { ok, done, situation, editedMessageOnScreen, nextCard } =
+    update.outcome;
+  const slim: Record<string, unknown> = { ok, done, situation, nextCard };
+  if (typeof editedMessageOnScreen === "string") {
+    slim.editedMessageOnScreen = editedMessageOnScreen.slice(0, 1_500);
+  }
+  return JSON.stringify(slim).length <= 6_000
+    ? { ...update, outcome: slim }
+    : { ...update, outcome: { ok, done } };
+}
 
 export function fetchDuplexRelays(input: {
   readonly voiceSessionId: string;

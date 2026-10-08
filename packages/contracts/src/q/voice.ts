@@ -777,6 +777,12 @@ export const QVoiceTurnStateSchema = z
      * `navigate`. Absent or null when none.
      */
     clientAction: QClientActionIntentSchema.nullable().optional(),
+    /**
+     * RECOVERY-2026-10 (C2): every client action the answer carried, in
+     * its order ("open Capital, the readiness tab, scroll to the risks").
+     * The screen performs them in order; `clientAction` is the latest.
+     */
+    clientActions: z.array(QClientActionIntentSchema).max(12).optional(),
     /** FORM: the interview leaves the person with the form. CHAT: the voice ends and the typed thread stays. */
     handoff: z.enum(["FORM", "CHAT"]).nullable(),
     degraded: z.boolean(),
@@ -803,3 +809,144 @@ export const QVoiceTurnStateSchema = z
   })
   .strict();
 export type QVoiceTurnState = z.infer<typeof QVoiceTurnStateSchema>;
+
+// ---------------------------------------------------------------------------
+// Decision cards on either voice line (RECOVERY A, audit E-03)
+
+function cardWords(transcript: string): readonly string[] {
+  return transcript
+    .toLowerCase()
+    .replace(/[’`]/g, "'")
+    .replace(/[^a-z0-9'\s-]+/g, " ")
+    .split(/[\s-]+/)
+    .map((w) => w.replace(/^'+|'+$/g, ""))
+    .filter((w) => w.length > 0);
+}
+
+/**
+ * RECOVERY A3 (C-03/B-01, founder live 2026-10-08): with a card in focus,
+ * only a reply about the card is the card's. "Find anything that needs my
+ * attention" (6 words) went to the voice model and decide_card because
+ * every utterance of twelve words or fewer did. A card reply names what
+ * to do with the card; a question or a request for something else is Q's.
+ */
+const CARD_VERBS = new Set([
+  "send",
+  "sent",
+  "approve",
+  "approved",
+  "go",
+  "yes",
+  "yeah",
+  "yep",
+  "ok",
+  "okay",
+  "sure",
+  "no",
+  "nope",
+  "skip",
+  "later",
+  "dismiss",
+  "ignore",
+  "drop",
+  "cancel",
+  "edit",
+  "change",
+  "rewrite",
+  "redo",
+  "warmer",
+  "shorter",
+  "longer",
+  "softer",
+  "friendlier",
+  "formal",
+  "casual",
+  "book",
+  "schedule",
+  "reschedule",
+  "accept",
+  "decline",
+  "next",
+  "previous",
+  "moving",
+  "retry",
+  "again",
+  "snooze",
+  "remind",
+  "leave",
+  "keep",
+  "pass",
+]);
+const CARD_PHRASES = ["not now", "move on", "do it", "that one", "this one"];
+/** Opening words of a question or of a request for something else. */
+const ELSEWHERE = new Set([
+  "what",
+  "what's",
+  "whats",
+  "why",
+  "how",
+  "who",
+  "who's",
+  "which",
+  "where",
+  "find",
+  "show",
+  "open",
+  "tell",
+  "explain",
+  "read",
+  "give",
+  "search",
+  "look",
+  "check",
+  "take",
+  "anything",
+  "is",
+  "are",
+  "does",
+  "do",
+]);
+
+/** True when the words are a reply about the decision card in focus. */
+export function isQVoiceCardReply(transcript: string): boolean {
+  const said = cardWords(transcript);
+  if (said.length === 0 || said.length > 12) return false;
+  const first = said[0] ?? "";
+  // "do it" is a reply; "do they fit?" is not.
+  const joined = ` ${said.join(" ")} `;
+  if (ELSEWHERE.has(first) && !joined.startsWith(" do it ")) return false;
+  if (CARD_PHRASES.some((phrase) => joined.includes(` ${phrase} `))) {
+    return true;
+  }
+  return said.some((w) => CARD_VERBS.has(w));
+}
+
+/**
+ * POST: the standard line's side of the screen's decision cards. FOCUS:
+ * whether a card is in focus now (a reply about it is the card's).
+ * VERDICT: the browser read the person's words against the card in focus
+ * with the card's own code; `handled` when they decided it, with the
+ * outcome's facts for Q to say. Owner only; facts are data, never
+ * instructions, and bounded.
+ */
+export const Q_VOICE_CARD_PATH =
+  "/v1/q/voice/sessions/:voiceSessionId/card" as const;
+export const qVoiceCardPath = (voiceSessionId: string) =>
+  `/v1/q/voice/sessions/${encodeURIComponent(voiceSessionId)}/card`;
+export const QVoiceCardUpdateSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("FOCUS"), inFocus: z.boolean() }).strict(),
+  z
+    .object({
+      kind: z.literal("VERDICT"),
+      words: z.string().min(1).max(700),
+      handled: z.boolean(),
+      outcome: z
+        .record(z.string().max(40), z.unknown())
+        .refine((value) => JSON.stringify(value).length <= 6_000, {
+          message: "outcome too large",
+        })
+        .optional(),
+    })
+    .strict(),
+]);
+export type QVoiceCardUpdate = z.infer<typeof QVoiceCardUpdateSchema>;

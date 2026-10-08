@@ -192,6 +192,14 @@ export class AgentSocket {
     this.sendJson({ type: "InjectUserMessage", content });
   }
 
+  /**
+   * E-03: Q says this line now, through the agent's own voice (Deepgram
+   * Voice Agent `InjectAgentMessage`; not yet verified on a live call).
+   */
+  injectAgentMessage(message: string): void {
+    this.sendJson({ type: "InjectAgentMessage", message });
+  }
+
   private receive(socket: WebSocket, data: unknown): void {
     if (data instanceof ArrayBuffer) {
       this.emit("audio", data);

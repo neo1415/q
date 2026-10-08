@@ -4,7 +4,41 @@ import { useEffect, useRef } from "react";
 
 import type { QVoiceTurnState } from "@capital-q/contracts";
 
+import { performClientAction } from "../q/client-actions";
+import { expectNavigation } from "../q/ui-act-controller";
+import { destinationPath } from "./destinations";
 import type { VoiceSessionClient } from "./session";
+
+/**
+ * RECOVERY-2026-10 (C2, with workstream C): a spoken answer's whole chain
+ * of client actions, in order ("open Capital, the readiness tab, scroll
+ * to the risks"), not only the last. A move is announced to the UI-act
+ * controller first, so acts meant for the new page wait for it and their
+ * receipts are confirmed there. Returns the turn left for the caller: its
+ * move (and hand-off), with the actions already performed.
+ */
+export function performTurnChain(
+  turn: QVoiceTurnState,
+  perform: (action: unknown) => boolean = performClientAction,
+  expect: (path?: string) => void = expectNavigation,
+): QVoiceTurnState {
+  const chain =
+    turn.clientActions !== undefined && turn.clientActions.length > 0
+      ? turn.clientActions
+      : turn.clientAction === undefined || turn.clientAction === null
+        ? []
+        : [turn.clientAction];
+  const path = destinationPath(turn.navigate);
+  if (
+    path !== null &&
+    typeof window !== "undefined" &&
+    path !== `${window.location.pathname}${window.location.search}`
+  ) {
+    expect(path);
+  }
+  for (const action of chain) perform(action);
+  return { ...turn, clientAction: null, clientActions: [] };
+}
 
 /**
  * Follow where Q is taking the person.
@@ -53,7 +87,8 @@ export function useFollowTurn(
     if (
       turn.navigate === null &&
       turn.handoff === null &&
-      (turn.clientAction ?? null) === null
+      (turn.clientAction ?? null) === null &&
+      (turn.clientActions?.length ?? 0) === 0
     ) {
       return;
     }
@@ -62,7 +97,7 @@ export function useFollowTurn(
     // above every page, so Q keeps talking while the screen changes under
     // it; only handing back to typing waits for Q to finish the sentence.
     if (turn.handoff === null) {
-      followRef.current(turn);
+      followRef.current(performTurnChain(turn));
       return;
     }
     const at = Date.now();
@@ -78,7 +113,7 @@ export function useFollowTurn(
         state === "Q_SPEAKING" ? SPEAKING_CEILING_MS : SPEECH_CEILING_MS;
       if ((quiet && elapsed >= SPEECH_FLOOR_MS) || elapsed >= ceiling) {
         timer.current = null;
-        followRef.current(turn);
+        followRef.current(performTurnChain(turn));
         return;
       }
       timer.current = window.setTimeout(check, CHECK_MS);
