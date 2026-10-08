@@ -855,6 +855,16 @@ export function workforceTracker(
       maxRedrafts: DEFAULT_REVIEW_POLICY.maxRedrafts,
       rubricVersion: RUBRIC_VERSION,
     });
+    // The lead run of such a job is not work happening: it ends at once,
+    // saying what the job is, so nothing shows "Working" between firings.
+    await store.endRun(
+      owner,
+      filed.leadRunId,
+      "DONE",
+      kind === "INSTRUCTION"
+        ? "Q works on this on your instruction's schedule; each step is recorded here."
+        : "Q works on this under your approval; each step is recorded here.",
+    );
     await store.setJobStatus(
       owner,
       filed.job.id,

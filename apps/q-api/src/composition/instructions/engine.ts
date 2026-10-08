@@ -1429,6 +1429,9 @@ export type InstructionEngineDependencies = {
     | ((
         owner: { readonly tenantId: string; readonly userId: string },
         source: { readonly id: string; readonly goal: string },
+        /** D-11: "END" once a firing is over; HELD while cards wait. */
+        phase?: "START" | "END",
+        waitingOnPerson?: boolean,
       ) => Promise<void>)
     | undefined;
   readonly now?: (() => Date) | undefined;
@@ -3025,6 +3028,16 @@ export function createInstructionEngine(
           idempotencyKey: keyOf(index),
         });
       }
+      // Recovery D-11: the firing is over; the job is DONE, or HELD while
+      // something waits on the person -- never left "Working".
+      await dependencies
+        .track?.(
+          { tenantId: row.tenant_id, userId: row.user_id },
+          { id: row.id, goal: row.goal_text },
+          "END",
+          asked > 0 || cardsWaiting.length > 0 || waitingReplies.length > 0,
+        )
+        .catch(() => undefined);
       return {
         outcome: "RAN",
         done,
