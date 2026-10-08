@@ -99,3 +99,39 @@ describe("what history may not smuggle back", () => {
     expect(Object.keys(reference ?? {})).toEqual(["kind", "companyId"]);
   });
 });
+
+describe("answer cards read back from history (INC-1, G-D13)", () => {
+  it("keeps a stored ANSWER_CARDS block, so cards survive a reload", () => {
+    const card = (key: string) => ({
+      key,
+      name: key,
+      line: null,
+      hue: 1,
+      fit: { score: 8.8, measured: 5, of: 7 },
+      reasons: ["why"],
+      measures: [],
+      view: null,
+      said: null,
+      sourceCount: 0,
+      subject: null,
+      about: null,
+      raise: null,
+    });
+    const message = toQMessage(
+      stored([
+        {
+          kind: "ANSWER_CARDS",
+          shape: "RANKED",
+          title: "Top three on mandate fit",
+          cards: [card("a"), card("b"), card("c")],
+          followUps: [],
+        } as unknown as QResultBlock,
+      ]),
+    );
+    const blocks = message.role === "Q" ? message.blocks : undefined;
+    expect(blocks?.map((b) => b.kind)).toEqual(["ANSWER_CARDS"]);
+    expect(
+      blocks?.[0]?.kind === "ANSWER_CARDS" ? blocks[0].cards.length : 0,
+    ).toBe(3);
+  });
+});

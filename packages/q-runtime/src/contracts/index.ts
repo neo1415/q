@@ -272,7 +272,16 @@ function disclosable(
       // grants nothing, because knowing an identifier has never been
       // permission to see what it names. PUBLIC_SOURCE is a public web
       // page's own public fields (R23), no guarded record.
+      // Answer cards and data blocks too: subject refs (as
+      // COMPANY_REFERENCE), measure levels, a chart's evidence status and
+      // source caption, no evidence identifier. Missing here, history served
+      // them as prose and the cards vanished on reload (INC-1, G-D13).
       case "TEXT":
+      case "ANSWER_CARDS":
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
       case "COMPARISON":
@@ -283,6 +292,11 @@ function disclosable(
       case "ARTIFACT_REFERENCE":
       case "PUBLIC_SOURCE":
         return true;
+      default: {
+        // A new kind fails typecheck here instead of silently vanishing.
+        const unhandled: never = block;
+        return unhandled;
+      }
     }
   });
 }
