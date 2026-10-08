@@ -3,6 +3,8 @@ import type {
   QNavigateDestination,
 } from "@capital-q/contracts";
 
+import { destinationPath } from "@/features/voice/destinations";
+
 import type { QTurn } from "./conversation";
 import { expectNavigation } from "./ui-act-controller";
 import { wireNow } from "./wire";
@@ -64,8 +66,15 @@ export function followOfTurns(
   // An answer that moves AND works the new page ("open Capital, readiness
   // tab") has its UI acts wait for the page it moves to -- they run in
   // order from a queue -- instead of acting on the page being left.
-  if (navigate !== null && actions.some((action) => action.kind === "UI_ACT")) {
-    expectNavigation();
+  // The move itself is confirmed when the router settles on it (or is
+  // reported FAILED), whichever way the caller performs it.
+  const path = destinationPath(navigate);
+  if (
+    path !== null &&
+    typeof window !== "undefined" &&
+    path !== `${window.location.pathname}${window.location.search}`
+  ) {
+    expectNavigation(path);
   }
   return { navigate, actions };
 }

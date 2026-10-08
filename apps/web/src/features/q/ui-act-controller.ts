@@ -101,8 +101,11 @@ export function recentUiActReports(): readonly UiActReport[] {
 // Route trail: where this tab has been, in order (BACK, "the page I was on").
 // ---------------------------------------------------------------------------
 
-let navigationPending: { readonly from: number; readonly at: number } | null =
-  null;
+let navigationPending: {
+  readonly from: number;
+  readonly at: number;
+  readonly expected: string | null;
+} | null = null;
 let lastActivity = 0;
 
 /**
@@ -113,19 +116,60 @@ export function noteRoute(path: string): void {
   const from = routeEpoch();
   noteSettledRoute(path);
   if (routeEpoch() === from) return;
+  const pending = navigationPending;
   navigationPending = null;
   lastActivity = Date.now();
+  // A redirect (an old address) still lands: the route it settled on says where.
+  if (pending !== null) {
+    settleOutcome({ status: "DONE", expected: pending.expected, route: path });
+  }
 }
 
 export { routeTrail };
 
+/** How a move Q made ended: the route the router settled on, or none. */
+export type NavigationOutcome =
+  | {
+      readonly status: "DONE";
+      readonly expected: string | null;
+      readonly route: string;
+    }
+  | { readonly status: "FAILED"; readonly expected: string | null };
+
+const navigationListeners = new Set<(outcome: NavigationOutcome) => void>();
+let navigationTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Heard once per move Q made: settled, or not within the bound. */
+export function onNavigationOutcome(
+  listener: (outcome: NavigationOutcome) => void,
+): () => void {
+  navigationListeners.add(listener);
+  return () => navigationListeners.delete(listener);
+}
+
+function settleOutcome(outcome: NavigationOutcome): void {
+  if (navigationTimer !== null) clearTimeout(navigationTimer);
+  navigationTimer = null;
+  for (const listener of navigationListeners) listener(outcome);
+}
+
 /**
- * A move is on its way (Q's own navigation): the next step waits for the
- * new route, so it never runs on the page being left.
+ * A move is on its way (Q's own navigation, to `path` when known): the
+ * next step waits for the new route, so it never runs on the page being
+ * left, and the move itself is confirmed only when the router settles --
+ * a move that never lands is reported FAILED, never assumed.
  */
-export function expectNavigation(): void {
-  navigationPending = { from: routeEpoch(), at: Date.now() };
+export function expectNavigation(path?: string): void {
+  const expected = path ?? null;
+  navigationPending = { from: routeEpoch(), at: Date.now(), expected };
   lastActivity = Date.now();
+  if (navigationTimer !== null) clearTimeout(navigationTimer);
+  navigationTimer = setTimeout(() => {
+    navigationTimer = null;
+    if (navigationPending?.expected !== expected) return;
+    navigationPending = null;
+    settleOutcome({ status: "FAILED", expected });
+  }, NAVIGATION_WAIT_MS);
 }
 
 function wait(ms: number): Promise<void> {
@@ -302,6 +346,8 @@ export function performUiAct(intent: QUiActIntent): Promise<QUiActReceipt> {
 /** Clears the trail and the ledger (tests). */
 export function resetUiActController(): void {
   resetRouteState();
+  if (navigationTimer !== null) clearTimeout(navigationTimer);
+  navigationTimer = null;
   navigationPending = null;
   lastActivity = 0;
   ledger.length = 0;

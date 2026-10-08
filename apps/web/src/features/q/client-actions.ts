@@ -265,7 +265,7 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
     // RECOVERY-2026-10 (C2): a UI act queued after this move waits for the
     // new page instead of acting on the one being left.
     if (path !== `${window.location.pathname}${window.location.search}`) {
-      expectNavigation();
+      expectNavigation(path);
     }
     if (clientRouterPush !== null) clientRouterPush(path);
     else window.location.assign(path);

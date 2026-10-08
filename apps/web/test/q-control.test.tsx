@@ -28,7 +28,9 @@ import { currentManifest } from "../src/features/q/manifest";
 import {
   expectNavigation,
   noteRoute,
+  onNavigationOutcome,
   performUiAct,
+  type NavigationOutcome,
   recentUiActReports,
   registerUiControl,
   resetUiActController,
@@ -443,6 +445,36 @@ describe("UI acts run through the control's own handler, with a receipt (C2)", (
     const stuck = performUiAct(act_("SCROLL_DOWN"));
     await vi.advanceTimersByTimeAsync(2_000);
     expect((await stuck).status).toBe("FAILED");
+  });
+});
+
+describe("Q's moves are confirmed by the settled route (C3)", () => {
+  it("a move is DONE when the router settles, with the route it landed on", () => {
+    noteRoute("/home");
+    const outcomes: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
+    expectNavigation("/capital?tab=readiness");
+    expect(outcomes).toEqual([]);
+    noteRoute("/capital?tab=readiness");
+    stop();
+    expect(outcomes).toEqual([
+      {
+        status: "DONE",
+        expected: "/capital?tab=readiness",
+        route: "/capital?tab=readiness",
+      },
+    ]);
+  });
+
+  it("a move that never lands is FAILED, never assumed", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    noteRoute("/home");
+    const outcomes: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
+    expectNavigation("/documents");
+    await vi.advanceTimersByTimeAsync(7_000);
+    stop();
+    expect(outcomes).toEqual([{ status: "FAILED", expected: "/documents" }]);
   });
 });
 

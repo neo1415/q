@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { currentManifest } from "../manifest";
 import {
   noteRoute,
+  onNavigationOutcome,
   onUiActReport,
   type UiActReport,
 } from "../ui-act-controller";
@@ -35,15 +36,24 @@ export function QControlRuntime() {
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const stop = onUiActReport((report) => {
-      const text = noticeOf(report);
+    const show = (text: string | null) => {
       if (text === null) return;
       setNotice(text);
       if (timer !== null) clearTimeout(timer);
       timer = setTimeout(() => setNotice(null), NOTICE_MS);
-    });
+    };
+    const stop = onUiActReport((report) => show(noticeOf(report)));
+    // A move Q made that never landed is said too, never left as if done.
+    const stopMoves = onNavigationOutcome((outcome) =>
+      show(
+        outcome.status === "FAILED"
+          ? "Q couldn't open that page. Try again, or open it from the menu."
+          : null,
+      ),
+    );
     return () => {
       stop();
+      stopMoves();
       if (timer !== null) clearTimeout(timer);
     };
   }, []);
