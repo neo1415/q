@@ -1,6 +1,6 @@
 # ADR 0063: What a pitch says is read from its transcript, under the playback rule
 
-Status: Proposed (founder request 2026-10-08, build/video-knowledge). Needs lead confirmation of the Write Gate point below.
+Status: Accepted (2026-10-08, lead, under the founder's standing approval). Facts are computed on read under the video's own playback check and never stored; a stored path needs its own ADR.
 
 ## Context
 
