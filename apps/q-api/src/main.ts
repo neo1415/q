@@ -3718,8 +3718,20 @@ let meetingSpeech:
 // notes. Off unless RECALL_SCREEN_VISION=on (Recall's 4-core bot with
 // separate video costs more per hour; the founder turns it on).
 const meetingScreensOn = process.env.RECALL_SCREEN_VISION === "on";
+// 2026-10-08 (founder): cameras too, on their own budget, for the same
+// private notes; needs screen vision (the same frame stream). Off unless
+// RECALL_CAMERA_VISION=on; the greeting says so when on.
+const meetingCamerasOn =
+  meetingScreensOn && process.env.RECALL_CAMERA_VISION === "on";
 const meetingHost = createMeetingHostRuntime({
   seesScreens: meetingScreensOn,
+  seesCameras: meetingCamerasOn,
+  // What Q can see in the call, for its answers (closures: the vision
+  // side is composed just below).
+  sight: {
+    seen: (meetingId) => meetingScreens.seen(meetingId),
+    frames: (meetingId, speaker) => meetingScreens.frames(meetingId, speaker),
+  },
   enabled:
     process.env.CQ_MEETING_HOST !== "off" &&
     recallBots?.say !== undefined &&
@@ -3798,6 +3810,7 @@ const meetingHost = createMeetingHostRuntime({
 // end MEET-HOST block
 const meetingScreens = createMeetingScreenVision({
   enabled: meetingScreensOn,
+  cameras: meetingCamerasOn,
   publicBase: process.env.Q_API_PUBLIC_URL,
   secret: recallKey,
   store: createPostgresMeetingScreenStore(database.sql),

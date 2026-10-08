@@ -147,7 +147,9 @@ import { INVESTOR_TWIN_TURN_V9 } from "./tasks/investor-twin-turn.v9.js";
 import { INVESTOR_TWIN_TURN_V10 } from "./tasks/investor-twin-turn.v10.js";
 import { MEETING_HOST_TURN_V1 } from "./tasks/meeting-host-turn.v1.js";
 import { MEETING_HOST_TURN_V2 } from "./tasks/meeting-host-turn.v2.js";
+import { MEETING_HOST_TURN_V3 } from "./tasks/meeting-host-turn.v3.js";
 import { MEETING_SCREEN_NOTE_V1 } from "./tasks/meeting-screen-note.v1.js";
+import { MEETING_CAMERA_NOTE_V1 } from "./tasks/meeting-camera-note.v1.js";
 import { REHEARSAL_SCORE_V3 } from "./tasks/rehearsal-score.v3.js";
 import { REHEARSAL_SCORE_V4 } from "./tasks/rehearsal-score.v4.js";
 import { REHEARSAL_SCORE_V5 } from "./tasks/rehearsal-score.v5.js";
@@ -472,7 +474,9 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INVESTOR_TWIN_TURN_V10,
     MEETING_HOST_TURN_V1,
     MEETING_HOST_TURN_V2,
+    MEETING_HOST_TURN_V3,
     MEETING_SCREEN_NOTE_V1,
+    MEETING_CAMERA_NOTE_V1,
     REHEARSAL_SCORE_V3,
     REHEARSAL_SCORE_V4,
     REHEARSAL_SCORE_V5,

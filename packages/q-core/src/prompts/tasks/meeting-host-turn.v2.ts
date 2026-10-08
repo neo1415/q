@@ -25,7 +25,7 @@ export const MEETING_HOST_TURN_V2: PromptDefinition<
 > = {
   ...MEETING_HOST_TURN_V1,
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "ADR 0039 (live 2026-10-02): a request to leave is LEAVE_REQUEST (Q stays, records it; only the organiser removes Q from Capital Q); a request to be quiet is QUIET.",
   effectiveFrom: "2026-10-02",
