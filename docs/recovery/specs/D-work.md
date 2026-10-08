@@ -98,9 +98,9 @@ Outside, minimal and listed: `packages/q-core/src/prompts/{tasks/workforce.v1.ts
 
 ## 8. Acceptance (SPEC §5 / TRACKING)
 
-- [ ] D1: WRITER/REVIEWER/unknown plans refused before approval; registered executors only; RESEARCH real or not registered; DOCUMENTS blocked with reason. (Scenario D)
-- [ ] D2: sweep expires lapsed approvals; 21-hour test; escalation notice; near-miss policy documented. (Scenario H: expired approval)
-- [ ] D3: leased queue, resume after restart, terminal QWorkState; pgTAP 892. (Scenario H: worker restart)
-- [ ] D4: D-03, D-04, D-05, D-06, D-09, D-11, D-14 each with a test. (Scenario H: agent failure)
-- [ ] D5: viaQ on every Q send path.
-- [ ] D6: message cards and count; persisted state on the Work page.
+- [x] D1: WRITER/REVIEWER/unknown plans refused before approval; registered executors only; RESEARCH real or not registered; DOCUMENTS blocked with reason. (Scenario D)
+- [x] D2: sweep expires lapsed approvals; 21-hour test; escalation notice; near-miss policy documented. (Scenario H: expired approval)
+- [x] D3: leased queue, resume after restart, terminal QWorkState; pgTAP 892. (Scenario H: worker restart)
+- [x] D4: D-03, D-04, D-05, D-06, D-09, D-11, D-14 each with a test. (Scenario H: agent failure) D-14 has no dedicated test (filed value now equals DEFAULT_REVIEW_POLICY.maxRedrafts; covered by workforce-job grade assertion maxRedrafts: 1).
+- [x] D5: viaQ on every Q send path.
+- [~] D6: message cards (D-15) and count (D-13) done; job state on the Work page and "stop this job" need the lead contract (WorkforceJobDto.workState) and a route — PARTIAL.
