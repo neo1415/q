@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WorkforceJobStartPayloadSchema } from "@capital-q/contracts";
 import type { AnyQActionDefinition } from "@capital-q/q-actions";
-import type { JobPlanResult } from "@capital-q/q-core";
+import type { JobPlanResultV2 } from "@capital-q/q-core";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
@@ -43,30 +43,43 @@ const stranger = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 
-const PLAN: JobPlanResult = {
+const PLAN: JobPlanResultV2 = {
   summary: "Express interest in companies that fit your mandate.",
   steps: [
     {
       key: "watch",
-      role: "MANDATE_WATCHER",
-      agentName: null,
-      goal: "Express interest in companies that fit",
-      tools: ["search_companies", "relationship.interest.express"],
+      role: "DISCOVERY",
+      goal: "Shortlist companies that fit",
+      tools: ["search_companies"],
       dependsOn: [],
     },
     {
-      key: "dig",
-      role: "AD_HOC",
-      agentName: "Interest helper",
-      goal: "Express interest in one more",
+      key: "reach",
+      role: "OUTREACH",
+      goal: "Express interest in the shortlist",
       tools: ["relationship.interest.express", "email.send"],
+      dependsOn: ["watch"],
+    },
+  ],
+  cannot: [],
+};
+
+/** A plan naming a role with no executor here: never offered (D1). */
+const UNRUNNABLE: JobPlanResultV2 = {
+  summary: "Make a one-pager and send it.",
+  steps: [
+    {
+      key: "deck",
+      role: "DOCUMENTS",
+      goal: "Make a one-pager",
+      tools: ["list_my_documents"],
       dependsOn: [],
     },
   ],
   cannot: [],
 };
 
-function world(withinLimit = true) {
+function world(withinLimit = true, plan: JobPlanResultV2 = PLAN) {
   const store = createInMemoryWorkforceStore();
   const expressed: { by: string; companyId: string; key: string }[] = [];
   let plans = 0;
@@ -91,7 +104,7 @@ function world(withinLimit = true) {
       models: {
         plan: () => {
           plans += 1;
-          return Promise.resolve(PLAN);
+          return Promise.resolve(plan);
         },
         readReply: () => Promise.resolve(null),
       },
@@ -141,11 +154,8 @@ describe("a job the lead Q proposes (J1, J4)", () => {
     expect(prepared.status).toBe("PREPARED");
     if (prepared.status !== "PREPARED") throw new Error("not prepared");
     expect(prepared.plan.steps).toEqual([
-      {
-        who: "Mandate watcher",
-        does: "Express interest in companies that fit",
-      },
-      { who: "Interest helper", does: "Express interest in one more" },
+      { who: "Mandate watcher", does: "Shortlist companies that fit" },
+      { who: "Outreach", does: "Express interest in the shortlist" },
     ]);
     // One plan per turn: asking again in the same run shows the same one.
     expect(
@@ -169,10 +179,10 @@ describe("a job the lead Q proposes (J1, J4)", () => {
     } as unknown as Parameters<typeof board.proposer.propose>[0]);
     if (proposal === null || "refused" in proposal) throw new Error("none");
     const payload = WorkforceJobStartPayloadSchema.parse(proposal.payload);
-    // The helper got only the tools its step needs and the job permits.
+    // Outreach got only its executor's tools that the job permits.
     expect(payload.steps[1]).toMatchObject({
-      role: "AD_HOC",
-      spawned: true,
+      role: "OUTREACH",
+      spawned: false,
       tools: ["relationship.interest.express"],
     });
     expect(plans()).toBe(1);
@@ -196,9 +206,71 @@ describe("a job the lead Q proposes (J1, J4)", () => {
     expect(expressed.length).toBeGreaterThan(0);
     expect(
       store.rows.runs
-        .filter((run) => run.role === "AD_HOC")
-        .map((r) => r.agent_name),
-    ).toEqual(["Interest helper"]);
+        .filter((run) => run.role !== "LEAD")
+        .map((r) => [r.role, r.status]),
+    ).toEqual([
+      ["MANDATE_WATCHER", "DONE"],
+      ["OUTREACH", "DONE"],
+    ]);
+  });
+
+  it("never offers a plan with a step no registered executor can run (D1)", async () => {
+    const { board, plans } = world(true, UNRUNNABLE);
+    const prepared = await board.port.prepare(actor, "run-u", "Make a deck");
+    expect(prepared.status).toBe("NOT_PLANNED");
+    expect(plans()).toBe(1);
+    expect(
+      await board.proposer.propose({
+        runId: "run-u",
+        actor,
+      } as unknown as Parameters<typeof board.proposer.propose>[0]),
+    ).toBeNull();
+  });
+
+  it("runs a plan approved before the registry with its writer and reviewer folded into the sender", () => {
+    const planned = plannedFrom({
+      ownerUserId: userId,
+      goal: "Reply to Zino",
+      summary: "Reply",
+      steps: [
+        {
+          key: "draft",
+          role: "WRITER",
+          agentName: "Writer",
+          goal: "Draft",
+          tools: [],
+          dependsOn: [],
+          budgetUsd: "0.1",
+          spawned: false,
+        },
+        {
+          key: "grade",
+          role: "REVIEWER",
+          agentName: "Reviewer",
+          goal: "Grade",
+          tools: [],
+          dependsOn: ["draft"],
+          budgetUsd: "0.1",
+          spawned: false,
+        },
+        {
+          key: "reply",
+          role: "CONVERSATION",
+          agentName: "Conversation",
+          goal: "Send the reply",
+          tools: ["list_messages", "chat.message.send"],
+          dependsOn: ["grade"],
+          budgetUsd: "0.1",
+          spawned: false,
+        },
+      ],
+      permitted: ["list_messages", "chat.message.send"],
+      budgetUsd: "0.5",
+      cannot: [],
+    });
+    expect(planned.steps).toMatchObject([
+      { key: "reply", executor: "CONVERSATION", dependsOn: [] },
+    ]);
   });
 
   it("never runs a tool the approved grant does not hold", () => {

@@ -1,8 +1,10 @@
+import type { QAgentRole } from "@capital-q/contracts";
+
 import type { BoundStep } from "./plan.js";
 import { AGENT_REGISTRY, type AgentRole } from "./registry.js";
 
 /**
- * Running a bounded plan (founder brief J1, J4, J9).
+ * Running a bounded plan (founder brief J1, J4, J9; recovery D1, D3).
  *
  * The lead Q's run opens the job; each step becomes one agent run, spawned
  * by the lead, in plan order. A step waits for the steps it names; when one
@@ -10,10 +12,11 @@ import { AGENT_REGISTRY, type AgentRole } from "./registry.js";
  * on a guess. Every hand-off (lead to agent, agent to the agent that waits
  * on it) is recorded, so the workforce page shows who did what and why.
  *
- * Executors are ports by role. An ad-hoc agent is run by the executor of a
- * role whose tools cover its own, with only its own tools: the spawn is a
- * narrower agent, never a wider one. No executor for a step's tools means
- * the step goes to the person.
+ * Executors are ports by registered role (`executors.ts`). A step with no
+ * executor goes to the person. A job resumed after a restart skips the
+ * steps that already finished (the recorder's `prior`): every side effect
+ * a step has is idempotent by key, so re-running an interrupted step is
+ * safe, but a finished one is never run twice.
  */
 
 export type StepStatus = "DONE" | "HELD" | "FAILED" | "SKIPPED";
@@ -60,6 +63,19 @@ export type JobRecorder = {
     readonly toRunId: string;
     readonly note: string;
   }) => Promise<void>;
+  /**
+   * D3 (resume): this job's earlier run of a step, when one finished. A
+   * run a restart left RUNNING is ended (FAILED, "interrupted") by the
+   * recorder and reported as null, so the step runs again.
+   */
+  readonly prior?:
+    ((jobId: string, stepKey: string) => Promise<PriorRun | null>) | undefined;
+};
+
+export type PriorRun = {
+  readonly runId: string;
+  readonly status: Exclude<StepStatus, "SKIPPED">;
+  readonly summary: string;
 };
 
 export type JobRunResult = {
@@ -72,30 +88,19 @@ export type JobRunResult = {
   }[];
 };
 
-/** The executor that runs a step: its role's, or for a spawn a covering role's. */
+/** The registered executor that runs a step; null: the person's. */
 export function executorFor(
   step: BoundStep,
-  executors: Partial<Record<AgentRole, AgentExecutor>>,
+  executors: Partial<Record<QAgentRole, AgentExecutor>>,
 ): AgentExecutor | null {
-  if (step.role !== "AD_HOC") return executors[step.role] ?? null;
-  for (const [role, executor] of Object.entries(executors) as [
-    AgentRole,
-    AgentExecutor,
-  ][]) {
-    if (role === "AD_HOC") continue;
-    const tools = new Set(AGENT_REGISTRY[role].tools);
-    if (step.tools.length > 0 && step.tools.every((tool) => tools.has(tool))) {
-      return executor;
-    }
-  }
-  return executors.AD_HOC ?? null;
+  return step.executor === null ? null : (executors[step.executor] ?? null);
 }
 
 export async function runJob(input: {
   readonly jobId: string;
   readonly goal: string;
   readonly steps: readonly BoundStep[];
-  readonly executors: Partial<Record<AgentRole, AgentExecutor>>;
+  readonly executors: Partial<Record<QAgentRole, AgentExecutor>>;
   readonly recorder: JobRecorder;
 }): Promise<JobRunResult> {
   const { recorder, jobId } = input;
@@ -118,6 +123,19 @@ export async function runJob(input: {
     summary: string;
   }[] = [];
   for (const step of input.steps) {
+    const before = await recorder.prior?.(jobId, step.key);
+    if (before != null && before.status !== "FAILED") {
+      // Finished before a restart: its result stands, never redone.
+      runs.set(step.key, before.runId);
+      results.set(step.key, { status: before.status, summary: before.summary });
+      out.push({
+        key: step.key,
+        runId: before.runId,
+        status: before.status,
+        summary: before.summary,
+      });
+      continue;
+    }
     const runId = await recorder.startRun({
       jobId,
       role: step.role,

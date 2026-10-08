@@ -165,6 +165,7 @@ import {
 import {
   createWorkforcePorts,
   workforceNotifier,
+  workforceResearch,
 } from "./composition/workforce/ports.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
@@ -1454,14 +1455,19 @@ const workforcePortsFor = createWorkforcePorts(
         relationshipId: input.relationshipId,
         request: { kind: "TEXT", body: input.body },
         idempotencyKey: input.idempotencyKey,
+        // Recovery D-07: a job's message is marked as sent by Q.
+        ...(input.qDelegationId === undefined
+          ? {}
+          : { qDelegationId: input.qDelegationId }),
       }),
+    research: workforceResearch(researchComposition.research),
     writeReply: async (input) =>
       (
         await workforceWriter.compose({
           actor: input.actor,
           principalName: input.principalName,
           counterpartName: input.counterpartName,
-          brief: "",
+          brief: input.brief,
           callComing: input.callComing,
           thread: input.thread,
           correlationId: input.correlationId,

@@ -2414,6 +2414,14 @@ export function createInstructionEngine(
               }
             }
             if (outcome.verdict === "HELD") {
+              // A near miss that could not become a card is held, on record.
+              await review
+                .settle(
+                  { tenantId: row.tenant_id, userId: row.user_id },
+                  outcome,
+                  "HELD",
+                )
+                .catch(() => undefined);
               noteRefusal(subject, "BELOW_THE_BAR");
               return {
                 verdict: "REFUSED",
@@ -2682,6 +2690,14 @@ export function createInstructionEngine(
             { instructionId: row.id, action: step.action },
             "instruction card not drafted again: one already waits",
           );
+          const unused = graded.get(index);
+          if (unused !== undefined) {
+            await review?.settle(
+              { tenantId: row.tenant_id, userId: row.user_id },
+              unused,
+              "HELD",
+            );
+          }
           return;
         }
         const card = await dependencies
@@ -2700,6 +2716,14 @@ export function createInstructionEngine(
             return null;
           });
         if (card === null) {
+          const unused = graded.get(index);
+          if (unused !== undefined) {
+            await review?.settle(
+              { tenantId: row.tenant_id, userId: row.user_id },
+              unused,
+              "HELD",
+            );
+          }
           await record({
             status: "FAILED",
             mode: "ASK",
