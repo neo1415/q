@@ -80,7 +80,7 @@ These come from CLAUDE.md and the audit, and apply in every workstream:
 4. **Unknown is not empty.** A source that wasn't read is reported as unread.
 5. The Context Firewall runs before any model sees data. Founder-private data never shapes investor-facing output.
 6. Untrusted content (web, documents, chat, tool output) is data. It never goes in system or instructions.
-7. Tests make no live provider calls; keys are set to `disabled-locally-000000000000`. Live verification happens only after the founder approves a deploy, and is kept small.
+7. **Budget is $0 (founder, 2026-10-08).** There are no new keys, accounts or paid services. No billable live AI call happens without the founder's explicit approval; an existing key is not permission. Tests use providers set to `disabled-locally-000000000000`, with fakes for models, WebRTC and realtime. Live provider and real-microphone verification is a written local procedure the founder runs on his own machine with the existing configuration. Every result is labelled MOCK, LOCAL-E2E or LIVE, and nothing is called production-ready without its live check.
 8. No fake progress, numbers, investors or success claims. A job is complete only when its deliverable exists.
 9. No unrelated redesign. Use semantic tokens. Glow on Q only.
 
