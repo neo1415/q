@@ -43,6 +43,8 @@ export type FailureRecord = {
   readonly runId?: string | undefined;
   readonly jobId?: string | undefined;
   readonly correlationId?: string | undefined;
+  /** An outside vendor's HTTP status, when it answered. */
+  readonly vendorStatus?: number | undefined;
   readonly err?: unknown;
 };
 

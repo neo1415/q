@@ -63,6 +63,8 @@ export {
   type FailureSink,
 } from "./failure-log.js";
 
+export { classifyVendorFailure, type VendorFailure } from "./vendor-failure.js";
+
 export {
   LOG_LEVELS,
   type LogContext,

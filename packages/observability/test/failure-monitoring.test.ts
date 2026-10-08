@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Q_FAILURE_CLASSES } from "@capital-q/contracts";
 
 import {
+  classifyVendorFailure,
   createTelemetryRuntime,
   FAILURE_CLASSES,
   logQFailure,
@@ -136,5 +137,49 @@ describe("the opt-in OTLP exporter (F-D7)", () => {
     expect(reported).toHaveLength(1);
     expect(reported[0]).not.toContain("127.0.0.1");
     await expect(runtime.shutdown()).resolves.toBeUndefined();
+  });
+});
+
+describe("classifyVendorFailure (G-D9)", () => {
+  const refused = () =>
+    new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ECONNREFUSED"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+
+  it("a dead socket is UNREACHABLE (NETWORK), even inside an adapter's TRANSIENT wrapper", () => {
+    expect(classifyVendorFailure(refused())).toEqual({
+      kind: "UNREACHABLE",
+      failureClass: "NETWORK",
+      retryable: true,
+    });
+    const wrapped = Object.assign(
+      new Error("openai realtime secret request failed", { cause: refused() }),
+      { name: "ModelProviderFailure", failureClass: "TRANSIENT" },
+    );
+    expect(classifyVendorFailure(wrapped)?.kind).toBe("UNREACHABLE");
+  });
+
+  it("a vendor's own refusal keeps its status and retryability", () => {
+    const refusedKey = Object.assign(new Error("refused"), {
+      name: "ModelProviderFailure",
+      failureClass: "AUTHENTICATION",
+      providerStatus: 401,
+    });
+    expect(classifyVendorFailure(refusedKey)).toEqual({
+      kind: "VENDOR_ERROR",
+      failureClass: "TOOL_UNAVAILABLE",
+      retryable: false,
+      vendorStatus: 401,
+    });
+  });
+
+  it("leaves our own errors alone", () => {
+    expect(classifyVendorFailure(new Error("a bug"))).toBeUndefined();
+    expect(
+      classifyVendorFailure(new TypeError("x is undefined")),
+    ).toBeUndefined();
+    expect(classifyVendorFailure("not an error")).toBeUndefined();
   });
 });
