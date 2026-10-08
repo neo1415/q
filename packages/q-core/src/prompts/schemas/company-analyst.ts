@@ -538,7 +538,7 @@ export const CompanyAnalystV4VariablesSchema =
      * Capital Q, carried in the task's tail instead of the charter; steady
      * guidance stays in the charter. Trusted. Older versions do not read it.
      */
-    turnNotes: z.string().max(9_000).default(""),
+    turnNotes: z.string().max(9_400).default(""),
   }).strict();
 export type CompanyAnalystV4Variables = z.infer<
   typeof CompanyAnalystV4VariablesSchema
