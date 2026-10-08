@@ -437,6 +437,13 @@ const OFFERS: readonly QCapability[] = [
     "The image comes from their own device through the browser's file picker, is positioned by them, and goes straight to storage; removal is on the same screen.",
   ),
   offer(
+    "documents_folder_access",
+    "DOCUMENT",
+    "Share a whole data-room folder with an investor, or set who can see every document in it",
+    "DOCUMENTS",
+    "A folder-wide change is reviewed document by document on the Data room tab's access sheet, where each share and its expiry are listed; Q shares or revokes one document at a time.",
+  ),
+  offer(
     "document_upload",
     "DOCUMENT",
     "Upload a document of their own (a deck, financials) for Q to read",

@@ -295,6 +295,7 @@ export default async function RelationshipsReviewPage({
                 requestedAt: ago(2),
                 requestedByName: "Amara Diallo-Benson",
                 status: founder ? "OPEN" : "FULFILLED",
+                declineNote: null,
                 fulfilledBy: founder
                   ? null
                   : { documentId: doc(1), title: "Pitch deck v3" },
@@ -306,6 +307,7 @@ export default async function RelationshipsReviewPage({
                 requestedAt: ago(48),
                 requestedByName: "Amara Diallo-Benson",
                 status: "FULFILLED",
+                declineNote: null,
                 fulfilledBy: {
                   documentId: doc(2),
                   title: "Cap table Sep 2026",
@@ -321,6 +323,17 @@ export default async function RelationshipsReviewPage({
                       requestedAt: ago(20),
                       requestedByName: "Amara Diallo-Benson",
                       status: "OPEN" as const,
+                      declineNote: null,
+                      fulfilledBy: null,
+                    },
+                    {
+                      requestId: id("9", 4),
+                      title: "Customer contracts",
+                      note: null,
+                      requestedAt: ago(30),
+                      requestedByName: "Amara Diallo-Benson",
+                      status: "DECLINED" as const,
+                      declineNote: "We'll share these after a term sheet.",
                       fulfilledBy: null,
                     },
                   ]),

@@ -475,3 +475,5 @@ export * from "./company-claims.js";
 export * from "./readiness.js";
 // Investor promises (2026-10-07): Q.07, Q.05, Q.10, Q.02.
 export * from "./investor-promises.js";
+// Founder documents (2026-10-08): requests inbox, access editor, answers.
+export * from "./founder-documents.js";

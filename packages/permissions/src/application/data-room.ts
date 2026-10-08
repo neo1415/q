@@ -111,6 +111,11 @@ export type DataRoomRequestRecord = {
   readonly createdAt: string;
   readonly decision: "APPROVED" | "DECLINED" | null;
   readonly expiresAt: string | null;
+  /** A decline's words to the investor (2026-10-08). */
+  readonly declineNote?: string | null | undefined;
+  /** The document the founder uploaded or picked to answer it. */
+  readonly fulfilledDocument?:
+    { readonly documentId: string; readonly title: string } | null | undefined;
 };
 
 /** Structural: `createPostgresDataRoom()` from Evidence satisfies it. */
@@ -168,6 +173,8 @@ export type DataRoomStore = {
       readonly decision: "APPROVED" | "DECLINED";
       readonly expiresAt: string | null;
       readonly userId: string;
+      readonly note?: string | null | undefined;
+      readonly fulfilledDocumentId?: string | null | undefined;
     },
   ) => Promise<boolean>;
   readonly recordView: (
@@ -276,6 +283,8 @@ export function projectForInvestor(
     /** Documents with an open request; "*": everything on request. */
     readonly openRequests: ReadonlySet<string>;
     readonly views: ReadonlyMap<string, string>;
+    /** Documents whose latest request was declined ("*": everything), with the note. */
+    readonly declined?: ReadonlyMap<string, string | null> | undefined;
   },
 ): DataRoomInvestorDocument[] {
   return documents.flatMap((document): DataRoomInvestorDocument[] => {
@@ -289,8 +298,17 @@ export function projectForInvestor(
             context.openRequests.has("*")
           ? "REQUESTED"
           : "REQUESTABLE";
+    const declinedNote =
+      access !== "REQUESTABLE"
+        ? undefined
+        : context.declined?.has(document.documentId)
+          ? context.declined.get(document.documentId)
+          : context.declined?.get("*");
     return [
       {
+        ...(declinedNote === undefined
+          ? {}
+          : { declined: { note: declinedNote } }),
         documentId: document.documentId,
         title: document.title,
         folderCode: document.folderCode,
@@ -382,6 +400,15 @@ export function createDataRoomService(dependencies: {
   readonly signedInline: (
     document: DataRoomDocument,
   ) => Promise<{ readonly url: string; readonly expiresAt: string }>;
+  /**
+   * A short-lived signed ATTACHMENT read, for a share that includes
+   * download (2026-10-08). Absent: nothing is downloadable here.
+   */
+  readonly signedAttachment?:
+    | ((
+        document: DataRoomDocument,
+      ) => Promise<{ readonly url: string; readonly expiresAt: string }>)
+    | undefined;
   /** The reader's own name, for the watermark. */
   readonly nameOf: (actor: ActorContext) => Promise<string | null>;
   readonly appender: RelationshipEventAppender;
@@ -469,10 +496,21 @@ export function createDataRoomService(dependencies: {
         .filter((r) => r.decision === null)
         .map((r) => r.documentId ?? "*"),
     );
+    // Requests come newest first: the first answer per document stands.
+    const declined = new Map<string, string | null>();
+    const answered = new Set<string>();
+    for (const request of requests) {
+      const key = request.documentId ?? "*";
+      if (request.decision === null || answered.has(key)) continue;
+      answered.add(key);
+      if (request.decision === "DECLINED")
+        declined.set(key, request.declineNote ?? null);
+    }
     const visible = projectForInvestor(documents, {
       grants,
       openRequests,
       views,
+      declined,
     });
     const used = new Set(visible.map((document) => document.folderCode));
     return {
@@ -557,6 +595,7 @@ export function createDataRoomService(dependencies: {
               ? "APPROVED"
               : "DECLINED",
         accessEndsAt: request.expiresAt,
+        declineNote: request.declineNote ?? null,
       })),
     };
   };
@@ -781,6 +820,8 @@ export function createDataRoomService(dependencies: {
       readonly relationshipId?: string | undefined;
       readonly decision: "APPROVE" | "DECLINE";
       readonly days?: number | undefined;
+      /** A decline's words to the investor. */
+      readonly note?: string | null | undefined;
       readonly correlationId?: CorrelationId | undefined;
     }): Promise<
       DataRoomOutcome<{
@@ -819,6 +860,7 @@ export function createDataRoomService(dependencies: {
             decision: "DECLINED",
             expiresAt: null,
             userId: command.actor.userId,
+            note: command.note?.trim().slice(0, 1000) || null,
           });
           if (inserted) {
             await dependencies.audit.record(tx, {
@@ -835,12 +877,23 @@ export function createDataRoomService(dependencies: {
           }
           return inserted;
         });
-        return recorded
-          ? {
-              outcome: "OK",
-              value: { requestId: request.id, status: "DECLINED" },
-            }
-          : refused("ALREADY_DECIDED");
+        if (!recorded) return refused("ALREADY_DECIDED");
+        // The investor is told, so a decline never leaves them waiting.
+        await notifyQuietly({
+          relationshipId: request.relationshipId,
+          actingSide: "COMPANY",
+          title:
+            `{actor} declined your request for ${request.documentTitle ?? "their on-request documents"}`.slice(
+              0,
+              200,
+            ),
+          key: request.id,
+          priority: "UPDATE",
+        });
+        return {
+          outcome: "OK",
+          value: { requestId: request.id, status: "DECLINED" },
+        };
       }
 
       const days = command.days ?? 30;
@@ -955,9 +1008,10 @@ export function createDataRoomService(dependencies: {
       ) {
         return null;
       }
+      let download = false;
       if (reader.kind === "INVESTOR") {
         let allowed = document.level === "PUBLIC";
-        if (!allowed && reader.relationshipId !== null) {
+        if (reader.relationshipId !== null) {
           const grants = await grantsOf(reader.relationshipId);
           if (grants.has(document.documentId)) {
             const decision = await dependencies.access.canDisclose({
@@ -965,7 +1019,20 @@ export function createDataRoomService(dependencies: {
               resource: { type: "document", id: document.documentId },
               requestedAccess: "view",
             });
-            allowed = decision.outcome === "ALLOW";
+            allowed = allowed || decision.outcome === "ALLOW";
+            // Download only where a share says so, decided again by the
+            // access service for this person (view never implies download).
+            if (
+              decision.outcome === "ALLOW" &&
+              dependencies.signedAttachment !== undefined
+            ) {
+              const full = await dependencies.access.canDisclose({
+                principal: actorPrincipal(query.actor),
+                resource: { type: "document", id: document.documentId },
+                requestedAccess: "view_download",
+              });
+              download = full.outcome === "ALLOW";
+            }
           }
         }
         if (!allowed) return null;
@@ -992,11 +1059,16 @@ export function createDataRoomService(dependencies: {
           })
           .catch(() => undefined);
       }
+      const attachment =
+        download && dependencies.signedAttachment !== undefined
+          ? await dependencies.signedAttachment(document).catch(() => null)
+          : null;
       return {
         url: link.url,
         expiresAt: link.expiresAt,
-        downloadable: false,
+        downloadable: attachment !== null,
         watermark,
+        ...(attachment === null ? {} : { downloadUrl: attachment.url }),
       };
     },
   };

@@ -105,6 +105,8 @@ function subjectWords(intent: QShowInQRoomIntent): {
     SAVED_COMPARISON: ["compare", "comparison", "saved", "side by side"],
     INVESTOR_FIT: ["investors", "investor", "gate", "gates", "criteria"],
     READINESS_BLUEPRINT: ["plan", "month", "months", "blueprint", "roadmap"],
+    INVESTOR_REQUESTS: ["asked", "request", "requests", "questions", "answer"],
+    DOCUMENT_ACCESS: ["who can see", "access", "shared", "share", "see my"],
     INVESTOR_LOOKS_FOR: [
       "looks for",
       "criteria",
@@ -235,6 +237,10 @@ export function describeCard(intent: QShowInQRoomIntent): string {
       return "investors by what they publish";
     case "READINESS_BLUEPRINT":
       return "your 3/6/12-month plan";
+    case "INVESTOR_REQUESTS":
+      return "what investors asked you for";
+    case "DOCUMENT_ACCESS":
+      return "who can see your documents";
     case "INVESTOR_LOOKS_FOR":
       return `what ${intent.title} looks for`;
   }

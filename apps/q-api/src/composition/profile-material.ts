@@ -24,6 +24,8 @@ import {
 } from "@capital-q/investors";
 import {
   createNetworkService,
+  createPostgresDiligenceQuestions,
+  createPostgresDiligenceRequests,
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
   createRelationshipEventAppender,
@@ -33,11 +35,14 @@ import {
 import {
   createCompanyDeckService,
   createDataRoomService,
+  createFounderRequestsService,
   createPostgresDisclosurePolicyRepository,
   createPostgresProfileMaterialPorts,
   type DataRoomCompany,
   type DisclosureAccessService,
   type DisclosurePolicyManager,
+  type FounderRequestsDependencies,
+  type FounderRequestsNotice,
 } from "@capital-q/permissions";
 import { createCorrelationId } from "@capital-q/observability";
 import {
@@ -61,7 +66,7 @@ export function createProfileMaterial(dependencies: {
   readonly storage: PrivateDocumentDownloadAuthorizer | undefined;
   readonly serveUnscanned: boolean;
   readonly authorization: AuthorizationService;
-  readonly policies: Pick<DisclosurePolicyManager, "grant">;
+  readonly policies: Pick<DisclosurePolicyManager, "grant" | "revoke">;
   readonly access: Pick<DisclosureAccessService, "canDisclose">;
   readonly audit: MaterialActionAuditWriter;
   readonly outbox: OutboxWriter;
@@ -81,6 +86,11 @@ export function createProfileMaterial(dependencies: {
         readonly priority: "NEEDS_YOU" | "UPDATE";
       }) => Promise<unknown>)
     | undefined;
+  /** Founder documents (2026-10-08): the requests inbox's notices. */
+  readonly notifyRequests?:
+    ((input: FounderRequestsNotice) => Promise<unknown>) | undefined;
+  /** An answer recorded through the Knowledge Write Gate; absent: words only. */
+  readonly answers?: FounderRequestsDependencies["answers"];
 }) {
   const { sql } = dependencies;
   const store = createPostgresDataRoom();
@@ -107,6 +117,22 @@ export function createProfileMaterial(dependencies: {
       documentId: document.documentId,
       documentVersionId: document.versionId,
       disposition: "INLINE",
+    });
+    return { url: link.url, expiresAt: link.expiresAt };
+  };
+  // A share that includes download (2026-10-08): the same signed read,
+  // as an attachment.
+  const attachment = async (document: {
+    tenantId: string;
+    documentId: string;
+    versionId: string;
+  }) => {
+    if (downloads === undefined) throw new DocumentNotFoundError();
+    const link = await downloads.authorizeSharedVersion({
+      documentTenantId: document.tenantId,
+      documentId: document.documentId,
+      documentVersionId: document.versionId,
+      disposition: "ATTACHMENT",
     });
     return { url: link.url, expiresAt: link.expiresAt };
   };
@@ -145,6 +171,14 @@ export function createProfileMaterial(dependencies: {
         };
   };
 
+  const appender = createRelationshipEventAppender({
+    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+  });
+
   const dataRoom = createDataRoomService({
     sql,
     transactions: dependencies.transactions,
@@ -180,16 +214,81 @@ export function createProfileMaterial(dependencies: {
         versionId: document.currentVersionId,
       });
     },
+    signedAttachment: (document) => {
+      if (document.currentVersionId === null) throw new DocumentNotFoundError();
+      return attachment({
+        tenantId: document.tenantId,
+        documentId: document.documentId,
+        versionId: document.currentVersionId,
+      });
+    },
     nameOf: (actor) => reads.personName(actor.userId),
-    appender: createRelationshipEventAppender({
-      registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
-      repositories: {
-        relationships: createPostgresRelationshipRepository(),
-        events: createPostgresRelationshipEventRepository(),
-      },
-    }),
+    appender,
     audit: dependencies.audit,
     notify: dependencies.notify,
+    newCorrelationId,
+  });
+
+  /**
+   * Founder documents (2026-10-08): the founder's requests inbox, answers,
+   * and the access editor, on the same rules as the data room: the owner
+   * with disclosure.manage, disclosure policies for every share.
+   */
+  const founderRequests = createFounderRequestsService({
+    sql,
+    transactions: dependencies.transactions,
+    store,
+    dataRoom,
+    diligenceRequests: createPostgresDiligenceRequests(),
+    questions: createPostgresDiligenceQuestions(),
+    company: reads.company,
+    ownerMayManage,
+    relationship: async (relationshipId) => {
+      if (!/^[0-9a-f-]{36}$/i.test(relationshipId)) return null;
+      const rows = await sql<
+        {
+          company_id: string;
+          tenant_id: string;
+          investor_organisation_id: string;
+        }[]
+      >`
+        select company_id, tenant_id, investor_organisation_id
+          from network.relationships where id = ${relationshipId}`;
+      const row = rows[0];
+      return row === undefined
+        ? null
+        : {
+            companyId: row.company_id,
+            tenantId: row.tenant_id,
+            investorOrganisationId: row.investor_organisation_id,
+          };
+    },
+    // Only relationships the company can see: a private discovery by an
+    // investor (investor_private, no shared event yet) is not listed.
+    relationshipsOf: async (companyId) => {
+      const rows = await sql<{ id: string; display_name: string }[]>`
+        select r.id, i.display_name
+          from network.relationships r
+          join core.investor_organisations i on i.id = r.investor_organisation_id
+         where r.company_id = ${companyId}
+           and exists (select 1 from network.relationship_events e
+                        where e.relationship_id = r.id
+                          and e.visibility_scope = 'relationship_shared')
+         order by i.display_name
+         limit 200`;
+      return rows.map((row) => ({
+        relationshipId: row.id,
+        investorOrganisationName: row.display_name,
+      }));
+    },
+    investorOf: dependencies.investorOrganisationFor,
+    relationshipOf: reads.relationshipOf,
+    policies: dependencies.policies,
+    policyRepository,
+    appender,
+    audit: dependencies.audit,
+    answers: dependencies.answers,
+    notify: dependencies.notifyRequests,
     newCorrelationId,
   });
 
@@ -265,5 +364,5 @@ export function createProfileMaterial(dependencies: {
     });
   };
 
-  return { dataRoom, companyDeck, founderPerson };
+  return { dataRoom, companyDeck, founderPerson, founderRequests };
 }

@@ -42,6 +42,11 @@ export function sendDiligenceQuestions(
   relationshipId: string,
   questions: readonly string[],
   idempotencyKey: string,
+  /** Per question, the assumption it came from (2026-10-08); null: their own. */
+  about?: readonly ({
+    readonly assumptionId: string;
+    readonly label: string;
+  } | null)[],
 ) {
   return call(
     session,
@@ -52,7 +57,10 @@ export function sendDiligenceQuestions(
     ),
     SendDiligenceQuestionsResultSchema,
     {
-      body: { questions: [...questions] },
+      body: {
+        questions: [...questions],
+        ...(about === undefined ? {} : { about: [...about] }),
+      },
       headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
     },
   );

@@ -14,6 +14,7 @@ import { ONBOARDING_ACTIONS } from "./actions/onboarding.js";
 import { OUTCOME_ACTIONS } from "./actions/outcomes.js";
 import { DILIGENCE_ACTIONS } from "./actions/diligence.js";
 import { DATA_ROOM_ACTIONS } from "./actions/data-room.js";
+import { FOUNDER_DOCUMENT_ACTIONS } from "./actions/founder-documents.js";
 import { SET_PITCH_SHARING } from "./actions/pitch.js";
 import { PROFILE_IMAGE_ACTIONS } from "./actions/profile-images.js";
 import { PROFILE_AND_RECORDS } from "./actions/records.js";
@@ -57,6 +58,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...WORK_ACTIONS,
   ...GATEQ_ACTIONS,
   ...DATA_ROOM_ACTIONS,
+  ...FOUNDER_DOCUMENT_ACTIONS,
   // G1/G2: the company or firm as a team.
   ...TEAM_ACTIONS,
   ...GATEQ_INBOX_ACTIONS,

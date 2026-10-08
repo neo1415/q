@@ -149,6 +149,16 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // Investor promises (2026-10-07): each screen read is a Q tool too.
   "api/http/company-material.ts GET `${base}${COMPANY_ASSUMPTIONS_SEGMENT}`":
     cap("tool.company_assumptions"),
+  // Founder documents (2026-10-08): the requests inbox and who can see each
+  // document are read_my kinds; an investor's own questions and the
+  // answers ride on the assumptions board.
+  "api/http/company-material.ts GET `${base}${COMPANY_REQUESTS_SEGMENT}`":
+    cap("tool.read_my"),
+  "api/http/company-material.ts GET `${base}${COMPANY_QUESTIONS_SEGMENT}`": cap(
+    "tool.company_assumptions",
+  ),
+  "api/http/company-material.ts GET DOCUMENT_ACCESS_PATH": cap("tool.read_my"),
+  "api/http/company-material.ts GET FOLDER_ACCESS_PATH": cap("tool.read_my"),
   "api/http/gateq.ts GET GATEQ_INVESTOR_GATES_PATH": cap(
     "tool.find_prospective_investors",
   ),
@@ -788,6 +798,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/workforce": exempt("development-only page"),
   "/dev/gateq-v2": exempt("development-only page"),
   "/dev/canvas": exempt("development-only page"),
+  "/dev/founder-docs": exempt("development-only page"),
   "/dev/relationships": exempt("development-only page"),
   "/dev/brand-preview": exempt("development-only page"),
   "/dev/q-cards": exempt("development-only page"),

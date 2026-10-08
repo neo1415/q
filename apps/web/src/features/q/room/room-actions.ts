@@ -4,6 +4,8 @@ import {
   getCapitalLedger,
   getChatThread,
   getCompanyDataRoom,
+  getDocumentAccess,
+  getRequestInbox,
   getCompanyDeck,
   getCompanyProfile,
   getGateqInbox,
@@ -47,6 +49,11 @@ import {
   blueprintNotOnPlanCard,
   looksForCard,
 } from "./plan-investor-cards";
+import {
+  ACCESS_CARD_DOCUMENTS,
+  accessCard,
+  requestsCard,
+} from "./document-cards";
 import { roomCardHref, type RoomCardView } from "./room-card-view";
 
 /**
@@ -207,6 +214,36 @@ async function read(
         };
       }
       return comparisonCard(await getFitCompare(q, ids), href);
+    }
+    // Founder documents (2026-10-08): their own company only.
+    case "INVESTOR_REQUESTS":
+    case "DOCUMENT_ACCESS": {
+      const own = await resolveOwnContext();
+      if (
+        own.kind !== "FOUNDER" ||
+        own.companyId.toLowerCase() !== id.toLowerCase()
+      ) {
+        return null;
+      }
+      if (intent.object === "INVESTOR_REQUESTS") {
+        return requestsCard(
+          await getRequestInbox(session, own.companyId),
+          href,
+        );
+      }
+      const room = await getCompanyDataRoom(session, own.companyId);
+      if (room.viewer !== "OWNER") return null;
+      const listed = room.documents.slice(0, ACCESS_CARD_DOCUMENTS);
+      const access = await Promise.all(
+        listed.map((document) =>
+          getDocumentAccess(session, document.documentId).catch(() => null),
+        ),
+      );
+      return accessCard(
+        room,
+        access.filter((entry) => entry !== null),
+        href,
+      );
     }
     // Q.04: the founder's own plan; the id must be their own company.
     case "READINESS_BLUEPRINT": {

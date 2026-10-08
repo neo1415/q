@@ -20,6 +20,11 @@ export type DiligenceRequestRecord = {
     readonly disclosurePolicyId: string;
     readonly at: string;
   } | null;
+  /** The founder declined it (2026-10-08), with their note. */
+  readonly decline: {
+    readonly note: string | null;
+    readonly at: string;
+  } | null;
 };
 
 type Row = {
@@ -33,6 +38,8 @@ type Row = {
   document_id: string | null;
   disclosure_policy_id: string | null;
   fulfilled_at: Date | null;
+  decline_note: string | null;
+  declined_at: Date | null;
 };
 
 const toRecord = (row: Row): DiligenceRequestRecord => ({
@@ -53,6 +60,10 @@ const toRecord = (row: Row): DiligenceRequestRecord => ({
           disclosurePolicyId: row.disclosure_policy_id,
           at: row.fulfilled_at.toISOString(),
         },
+  decline:
+    row.declined_at === null
+      ? null
+      : { note: row.decline_note, at: row.declined_at.toISOString() },
 });
 
 export function createPostgresDiligenceRequests() {
@@ -62,9 +73,11 @@ export function createPostgresDiligenceRequests() {
                   concat_ws(' ', u.given_name, u.family_name))), '') as requested_by_name,
            q.title, q.note,
            q.created_at, f.document_id, f.disclosure_policy_id,
-           f.created_at as fulfilled_at
+           f.created_at as fulfilled_at,
+           d.note as decline_note, d.created_at as declined_at
       from network.diligence_requests q
       left join network.diligence_fulfilments f on f.request_id = q.id
+      left join network.diligence_request_declines d on d.request_id = q.id
       left join identity.user_profiles u on u.id = q.requested_by_user_id`;
   return {
     /** A new request, or the one this person's key already made. */
@@ -134,6 +147,43 @@ export function createPostgresDiligenceRequests() {
           (request_id, tenant_id, disclosure_policy_id, document_id, fulfilled_by_user_id)
         values (${input.requestId}, ${input.tenantId}, ${input.disclosurePolicyId},
                 ${input.documentId}, ${input.userId})
+        on conflict (request_id) do nothing
+        returning request_id`;
+      return rows.length > 0;
+    },
+    /**
+     * Every request on the company's relationships, newest first (the
+     * founder's inbox, 2026-10-08). The caller decided the company is the
+     * actor's own before this runs.
+     */
+    listForCompany: async (
+      executor: DatabaseExecutor,
+      companyId: string,
+    ): Promise<readonly DiligenceRequestRecord[]> => {
+      const rows = await executor<Row[]>`
+        ${select(executor)}
+         where q.relationship_id in (
+           select r.id from network.relationships r where r.company_id = ${companyId})
+         order by q.created_at desc, q.id
+         limit 200`;
+      return rows.map(toRecord);
+    },
+    /** One answer per request; a second (or one after a share) is a no-op. */
+    decline: async (
+      tx: TransactionContext,
+      input: {
+        readonly requestId: string;
+        readonly tenantId: string;
+        readonly note: string | null;
+        readonly userId: string;
+      },
+    ): Promise<boolean> => {
+      const rows = await tx.sql<{ request_id: string }[]>`
+        insert into network.diligence_request_declines
+          (request_id, tenant_id, note, declined_by_user_id)
+        select ${input.requestId}, ${input.tenantId}, ${input.note}, ${input.userId}
+         where not exists (select 1 from network.diligence_fulfilments f
+                            where f.request_id = ${input.requestId})
         on conflict (request_id) do nothing
         returning request_id`;
       return rows.length > 0;

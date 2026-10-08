@@ -282,6 +282,7 @@ export {
 export {
   assumptionBoardText,
   buildAssumptionBoard,
+  withAskedQuestions,
 } from "./domain/assumptions.js";
 export {
   createPostgresDataRoom,

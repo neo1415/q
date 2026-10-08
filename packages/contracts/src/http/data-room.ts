@@ -100,6 +100,15 @@ export const DataRoomInvestorDocumentSchema = z
     openedAt: UtcTimestampSchema.nullable(),
     /** When their access ends (a grant's expiry); null: no expiry. */
     accessEndsAt: UtcTimestampSchema.nullable(),
+    /**
+     * Their last request for it was declined, with the founder's note
+     * (null: declined without one). Absent: not declined.
+     */
+    declined: z
+      .object({ note: z.string().max(1000).nullable() })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict();
 export type DataRoomInvestorDocument = z.infer<
@@ -177,6 +186,8 @@ export const DataRoomRequestSchema = z
     requestedAt: UtcTimestampSchema,
     status: z.enum(["OPEN", "APPROVED", "DECLINED"]),
     accessEndsAt: UtcTimestampSchema.nullable(),
+    /** A decline's words to the investor. */
+    declineNote: z.string().max(1000).nullable().optional(),
   })
   .strict();
 export type DataRoomRequest = z.infer<typeof DataRoomRequestSchema>;
@@ -244,7 +255,13 @@ export const DecideDataRoomRequestSchema = z.discriminatedUnion("decision", [
         ),
     })
     .strict(),
-  z.object({ decision: z.literal("DECLINE") }).strict(),
+  z
+    .object({
+      decision: z.literal("DECLINE"),
+      /** Optional words the investor sees. */
+      note: z.string().trim().min(1).max(1000).nullable().optional(),
+    })
+    .strict(),
 ]);
 export type DecideDataRoomRequest = z.infer<typeof DecideDataRoomRequestSchema>;
 
@@ -274,6 +291,8 @@ export const DataRoomOpenDtoSchema = z
     downloadable: z.boolean(),
     /** The words of the watermark, when it is view-only. */
     watermark: z.string().max(200).nullable(),
+    /** A short-lived attachment link when their share includes download. */
+    downloadUrl: z.string().url().nullable().optional(),
   })
   .strict();
 export type DataRoomOpenDto = z.infer<typeof DataRoomOpenDtoSchema>;

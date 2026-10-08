@@ -74,6 +74,36 @@ export const AssumptionDtoSchema = z
     restsOn: z.array(z.string().min(1).max(120)).max(3),
     /** A question to ask the founder, in plain words. */
     question: z.string().min(1).max(ASSUMPTION_QUESTION_MAX_LENGTH),
+    /**
+     * The reader's own question about it, sent to the founder (2026-10-08):
+     * waiting, or the founder's answer (their claim, never verified by
+     * being said). Absent: they have not asked.
+     */
+    asked: z
+      .object({
+        questionId: UuidSchema,
+        askedAt: UtcTimestampSchema,
+        answer: z
+          .object({
+            text: z.string().min(1).max(2000),
+            answeredAt: UtcTimestampSchema,
+            evidenceStatus: z.enum(["SELF_REPORTED", "DOCUMENT_SUPPORTED"]),
+            documents: z
+              .array(
+                z
+                  .object({
+                    documentId: UuidSchema,
+                    title: z.string().max(300),
+                  })
+                  .strict(),
+              )
+              .max(5),
+          })
+          .strict()
+          .nullable(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type AssumptionDto = z.infer<typeof AssumptionDtoSchema>;
@@ -116,6 +146,23 @@ export const SendDiligenceQuestionsRequestSchema = z
       .array(z.string().trim().min(3).max(ASSUMPTION_QUESTION_MAX_LENGTH))
       .min(1)
       .max(ASSUMPTION_QUESTIONS_SEND_MAX),
+    /**
+     * For each question, in order, the "Assumptions to test" item it came
+     * from (null: their own question). Absent: none. Lets the founder see
+     * what it is about and the board show it answered.
+     */
+    about: z
+      .array(
+        z
+          .object({
+            assumptionId: AssumptionDtoSchema.shape.id,
+            label: z.string().min(1).max(120),
+          })
+          .strict()
+          .nullable(),
+      )
+      .max(ASSUMPTION_QUESTIONS_SEND_MAX)
+      .optional(),
   })
   .strict();
 export type SendDiligenceQuestionsRequest = z.infer<

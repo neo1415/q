@@ -4,6 +4,7 @@ import type { MediaAsset } from "@capital-q/media";
 import type { ActorContext } from "@capital-q/security";
 
 import { capitalItems } from "./actions/capital-read.js";
+import { accessItems, requestItems } from "./actions/founder-documents.js";
 import { gateqItems } from "./actions/gateq-inbox.js";
 import { readinessItems } from "./actions/readiness.js";
 import { teamItems } from "./actions/team.js";
@@ -45,6 +46,11 @@ export const OWN_READ_KINDS = [
   "readiness",
   "plan",
   "questions",
+  // Founder documents (2026-10-08): what investors asked them for (document
+  // requests and questions, each with its state), and who can see each of
+  // their documents (level in words, investors with access, until when).
+  "requests",
+  "access",
 ] as const;
 export const OwnReadKindSchema = z.enum(OWN_READ_KINDS);
 export type OwnReadKind = z.infer<typeof OwnReadKindSchema>;
@@ -211,6 +217,10 @@ export async function readOwn(
     case "plan":
     case "questions":
       return readinessItems(ports, actor, kind);
+    case "requests":
+      return requestItems(ports, actor);
+    case "access":
+      return accessItems(ports, actor);
   }
 }
 
@@ -228,6 +238,8 @@ const KIND_LABELS: Readonly<Record<OwnReadKind, string>> = {
   readiness: "What could stop their raise, and readiness by pillar",
   plan: "Their action plan",
   questions: "Questions Q still wants answered",
+  requests: "What investors asked them for: documents and questions",
+  access: "Who can see each of their documents",
 };
 
 /**
@@ -239,6 +251,8 @@ const NOT_INDEXED: ReadonlySet<OwnReadKind> = new Set([
   "readiness",
   "plan",
   "questions",
+  // One access read per document: on demand only.
+  "access",
 ]);
 
 /** One kind in the "what exists" index: a count and a few titles with state. */

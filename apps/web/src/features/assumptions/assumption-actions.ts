@@ -34,6 +34,18 @@ const Send = z
       .array(z.string().trim().min(3).max(ASSUMPTION_QUESTION_MAX_LENGTH))
       .min(1)
       .max(ASSUMPTION_QUESTIONS_SEND_MAX),
+    /** Per question, the assumption it came from (2026-10-08). */
+    about: z
+      .array(
+        z
+          .object({
+            assumptionId: z.string().max(40),
+            label: z.string().min(1).max(120),
+          })
+          .nullable(),
+      )
+      .max(ASSUMPTION_QUESTIONS_SEND_MAX)
+      .optional(),
     idempotencyKey: z
       .string()
       .min(8)
@@ -59,6 +71,7 @@ export async function sendQuestionsAction(
       input.data.relationshipId,
       input.data.questions,
       input.data.idempotencyKey,
+      input.data.about,
     );
     return { ok: true, value: { via: sent.via } };
   } catch (error: unknown) {

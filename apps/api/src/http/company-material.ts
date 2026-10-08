@@ -9,7 +9,16 @@ import {
   COMPANY_DECK_OPEN_SEGMENT,
   COMPANY_DECK_SEGMENT,
   COMPANY_FOUNDER_SEGMENT,
+  COMPANY_QUESTIONS_SEGMENT,
+  COMPANY_REQUESTS_SEGMENT,
   CompanyDeckViewSchema,
+  DataRoomCodeSchema,
+  DOCUMENT_ACCESS_PATH,
+  DocumentAccessDtoSchema,
+  FOLDER_ACCESS_PATH,
+  FolderAccessDtoSchema,
+  InvestorQuestionsDtoSchema,
+  RequestInboxDtoSchema,
   DataRoomOpenDtoSchema,
   DataRoomViewSchema,
   FounderPersonDtoSchema,
@@ -20,10 +29,12 @@ import {
 import {
   buildAssumptionBoard,
   DocumentNotFoundError,
+  withAskedQuestions,
 } from "@capital-q/evidence";
 import type {
   CompanyDeckService,
   DataRoomService,
+  FounderRequestsService,
 } from "@capital-q/permissions";
 import type { ActorContext } from "@capital-q/security";
 
@@ -43,6 +54,10 @@ import {
  *   GET /v1/companies/:companyId/deck                              the deck and Q's sections
  *   GET /v1/companies/:companyId/deck/open                         the deck, inline
  *   GET /v1/companies/:companyId/founders/:position                a founder as a person
+ *   GET /v1/companies/:companyId/requests                          the founder's requests inbox
+ *   GET /v1/companies/:companyId/questions                         an investor's own questions
+ *   GET /v1/data-room/documents/:documentId/access                 who can see one document
+ *   GET /v1/companies/:companyId/data-room/folders/:folderCode/access  who can see a folder
  *
  * Each service decides the reader (owner, an investor the pitch rule
  * admits, nobody) and the projection; a reader it refuses gets the same
@@ -58,6 +73,13 @@ export type CompanyMaterialRoutesDependencies = ActorContextDependencies & {
         companyId: string,
         position: number,
       ) => Promise<FounderPersonDto | null>)
+    | undefined;
+  /** Founder documents (2026-10-08). Absent: those reads do not register. */
+  readonly founderRequests?:
+    | Pick<
+        FounderRequestsService,
+        "inbox" | "documentAccess" | "folderAccess" | "investorQuestions"
+      >
     | undefined;
 };
 
@@ -148,10 +170,82 @@ export function registerCompanyMaterialRoutes(
       );
       const board = view === null ? null : buildAssumptionBoard(view);
       if (board === null) throw new DocumentNotFoundError();
+      // Their own questions and the founder's answers (2026-10-08).
+      const asked =
+        (await dependencies.founderRequests
+          ?.investorQuestions(
+            getActorContext(request),
+            uuidParam(request, "companyId"),
+          )
+          .catch(() => null)) ?? [];
       void reply.header("Cache-Control", "no-store");
-      return AssumptionBoardDtoSchema.parse(board);
+      return AssumptionBoardDtoSchema.parse(withAskedQuestions(board, asked));
     },
   );
+
+  const requests = dependencies.founderRequests;
+  if (requests !== undefined) {
+    // The company's own team only; everyone else the same not-found.
+    app.get(
+      `${base}${COMPANY_REQUESTS_SEGMENT}`,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const inbox = await requests.inbox(
+          getActorContext(request),
+          uuidParam(request, "companyId"),
+        );
+        if (inbox === null) throw new DocumentNotFoundError();
+        void reply.header("Cache-Control", "no-store");
+        return RequestInboxDtoSchema.parse(inbox);
+      },
+    );
+    // An investor's own questions to the company, with the answers.
+    app.get(
+      `${base}${COMPANY_QUESTIONS_SEGMENT}`,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const companyId = uuidParam(request, "companyId");
+        const questions = await requests.investorQuestions(
+          getActorContext(request),
+          companyId,
+        );
+        if (questions === null) throw new DocumentNotFoundError();
+        void reply.header("Cache-Control", "no-store");
+        return InvestorQuestionsDtoSchema.parse({ companyId, questions });
+      },
+    );
+    app.get(
+      DOCUMENT_ACCESS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const access = await requests.documentAccess(
+          getActorContext(request),
+          uuidParam(request, "documentId"),
+        );
+        if (access === null) throw new DocumentNotFoundError();
+        void reply.header("Cache-Control", "no-store");
+        return DocumentAccessDtoSchema.parse(access);
+      },
+    );
+    app.get(
+      FOLDER_ACCESS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const folderCode = DataRoomCodeSchema.safeParse(
+          (request.params as Record<string, unknown>)["folderCode"],
+        );
+        if (!folderCode.success) throw new DocumentNotFoundError();
+        const access = await requests.folderAccess(
+          getActorContext(request),
+          uuidParam(request, "companyId"),
+          folderCode.data,
+        );
+        if (access === null) throw new DocumentNotFoundError();
+        void reply.header("Cache-Control", "no-store");
+        return FolderAccessDtoSchema.parse(access);
+      },
+    );
+  }
 
   const founderPerson = dependencies.founderPerson;
   if (founderPerson !== undefined) {

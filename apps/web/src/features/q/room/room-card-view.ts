@@ -70,6 +70,11 @@ export function roomCardHref(intent: QShowInQRoomIntent): string {
       return "/capital#readiness-blueprint";
     case "INVESTOR_LOOKS_FOR":
       return `/investors/${encodeURIComponent(id)}#looks-for`;
+    // Founder documents (2026-10-08): their own Documents tabs.
+    case "INVESTOR_REQUESTS":
+      return "/documents?tab=requested";
+    case "DOCUMENT_ACCESS":
+      return "/documents?tab=data-room";
   }
 }
 
@@ -96,5 +101,7 @@ export const ROOM_OBJECT_WORDS: Readonly<
   SAVED_COMPARISON: "comparison",
   INVESTOR_FIT: "investors",
   READINESS_BLUEPRINT: "plan",
+  INVESTOR_REQUESTS: "requests",
+  DOCUMENT_ACCESS: "access",
   INVESTOR_LOOKS_FOR: "investor",
 };

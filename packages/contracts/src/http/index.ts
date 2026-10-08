@@ -1346,6 +1346,8 @@ export * from "./founder-person.js";
 // Q.07 / Q.02 (2026-10-07): assumptions to test, and how Q reads a thesis.
 export * from "./assumptions.js";
 export * from "./thesis.js";
+// Founder documents (2026-10-08): requests inbox, access editor, answers.
+export * from "./founder-documents.js";
 // end PROFILE block
 
 // Explore (E1-E5, ADR 0055).

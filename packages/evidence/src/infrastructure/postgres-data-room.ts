@@ -62,6 +62,13 @@ export type DataRoomRequestRow = {
   readonly createdAt: string;
   readonly decision: "APPROVED" | "DECLINED" | null;
   readonly expiresAt: string | null;
+  /** A decline's words (2026-10-08). */
+  readonly declineNote?: string | null;
+  /** The document the founder uploaded or picked to answer it. */
+  readonly fulfilledDocument?: {
+    readonly documentId: string;
+    readonly title: string;
+  } | null;
 };
 
 export type DeckExtractionRow = {
@@ -301,6 +308,9 @@ export function createPostgresDataRoom() {
           created_at: Date;
           decision: "APPROVED" | "DECLINED" | null;
           expires_at: Date | null;
+          decline_note: string | null;
+          fulfilled_document_id: string | null;
+          fulfilled_document_title: string | null;
         }[]
       >`
         select r.id, r.tenant_id, r.company_id, r.document_id, d.title as document_title,
@@ -308,12 +318,15 @@ export function createPostgresDataRoom() {
                i.display_name as investor_organisation_name,
                nullif(btrim(coalesce(u.display_name,
                       concat_ws(' ', u.given_name, u.family_name))), '') as requested_by_name,
-               r.note, r.created_at, k.decision, k.expires_at
+               r.note, r.created_at, k.decision, k.expires_at,
+               k.note as decline_note, k.fulfilled_document_id,
+               fd.title as fulfilled_document_title
           from evidence.data_room_access_requests r
           left join evidence.documents d on d.id = r.document_id
           left join core.investor_organisations i on i.id = r.investor_organisation_id
           left join identity.user_profiles u on u.id = r.requested_by_user_id
           left join evidence.data_room_request_decisions k on k.request_id = r.id
+          left join evidence.documents fd on fd.id = k.fulfilled_document_id
          where r.company_id = ${filter.companyId}
            ${filter.relationshipId === undefined ? executor`` : executor`and r.relationship_id = ${filter.relationshipId}`}
          order by r.created_at desc, r.id
@@ -332,6 +345,14 @@ export function createPostgresDataRoom() {
         createdAt: iso(row.created_at),
         decision: row.decision,
         expiresAt: row.expires_at === null ? null : iso(row.expires_at),
+        declineNote: row.decline_note,
+        fulfilledDocument:
+          row.fulfilled_document_id === null
+            ? null
+            : {
+                documentId: row.fulfilled_document_id,
+                title: row.fulfilled_document_title ?? "Document",
+              },
       }));
     },
 
@@ -353,13 +374,17 @@ export function createPostgresDataRoom() {
         readonly decision: "APPROVED" | "DECLINED";
         readonly expiresAt: string | null;
         readonly userId: string;
+        readonly note?: string | null | undefined;
+        readonly fulfilledDocumentId?: string | null | undefined;
       },
     ): Promise<boolean> => {
       const made = await tx.sql<{ request_id: string }[]>`
         insert into evidence.data_room_request_decisions
-          (request_id, tenant_id, decision, expires_at, decided_by_user_id)
+          (request_id, tenant_id, decision, expires_at, decided_by_user_id,
+           note, fulfilled_document_id)
         values (${input.requestId}, ${input.tenantId}, ${input.decision},
-                ${input.expiresAt}::text::timestamptz, ${input.userId})
+                ${input.expiresAt}::text::timestamptz, ${input.userId},
+                ${input.note ?? null}, ${input.fulfilledDocumentId ?? null})
         on conflict (request_id) do nothing
         returning request_id`;
       return made.length > 0;

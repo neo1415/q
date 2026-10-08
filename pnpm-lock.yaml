@@ -134,6 +134,9 @@ importers:
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../../packages/q-core
+      '@capital-q/q-knowledge':
+        specifier: workspace:*
+        version: link:../../packages/q-knowledge
       '@capital-q/q-runtime':
         specifier: workspace:*
         version: link:../../packages/q-runtime

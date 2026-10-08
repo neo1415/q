@@ -406,6 +406,7 @@ import {
   createPostgresEtiquetteGuideStore,
 } from "@capital-q/q-runtime";
 import {
+  createInvestorAnswerRecorder,
   createKnowledgeQueryService,
   createMemoryService,
   createPostgresKnowledgeRepository,
@@ -499,7 +500,10 @@ import {
 import { createInvestorResearch } from "./voice/investor-research.js";
 import { createOnboardingPort } from "./voice/onboarding-port.js";
 import { createPresenceTrigger } from "./voice/presence-trigger.js";
-import { composeResearch } from "./composition/research.js";
+import {
+  composeResearch,
+  createStatementEvidencePort,
+} from "./composition/research.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
 import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
@@ -1675,6 +1679,8 @@ const profileMaterial = createProfileMaterial({
         result.companyId === parsed.data && result.decision === "ELIGIBLE",
     );
   },
+  // 2026-10-08: a request opens the founder's inbox at that request; an
+  // answer opens the investor's view of the company's data room.
   notify: (input) =>
     createCounterpartNotices(database.sql).notify({
       relationshipId: input.relationshipId,
@@ -1682,10 +1688,26 @@ const profileMaterial = createProfileMaterial({
       kind: "DILIGENCE",
       title: input.title,
       body: null,
-      target: "DILIGENCE",
+      target: input.actingSide === "INVESTOR" ? "DOCUMENTS" : "COMPANY_PROFILE",
       key: input.key,
       priority: input.priority,
     }),
+  notifyRequests: (input) =>
+    createCounterpartNotices(database.sql).notify({
+      relationshipId: input.relationshipId,
+      actingSide: input.actingSide,
+      kind: "DILIGENCE",
+      title: input.title,
+      body: null,
+      target: input.target === "REQUESTS" ? "DOCUMENTS" : "COMPANY_PROFILE",
+      key: input.key,
+      priority: input.priority,
+    }),
+  // A founder's answer, recorded as their claim through the Write Gate.
+  answers: createInvestorAnswerRecorder({
+    evidence: createStatementEvidencePort(researchComposition.evidence),
+    gate: researchComposition.gate,
+  }),
 });
 /**
  * Diligence (2026-10-02): Q prepares shares, revokes and requests through
@@ -1734,9 +1756,10 @@ const diligenceService = createDiligenceService({
       kind: "DILIGENCE",
       title: input.title,
       body: null,
-      target: "RELATIONSHIP",
+      // A request opens the founder's inbox at it (2026-10-08).
+      target: input.actingSide === "INVESTOR" ? "DOCUMENTS" : "RELATIONSHIP",
       key: input.key,
-      priority: "UPDATE",
+      priority: input.actingSide === "INVESTOR" ? "NEEDS_YOU" : "UPDATE",
     }),
   newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
 });
@@ -2164,6 +2187,7 @@ const appActionPorts: OwnReadPorts = {
   diligence: diligenceService,
   dataRoom: profileMaterial.dataRoom,
   companyDeck: profileMaterial.companyDeck,
+  founderRequests: profileMaterial.founderRequests,
   diligenceAreas: createOwnDiligence({
     interests: interestService,
     diligence: diligenceService,
@@ -2688,6 +2712,9 @@ const qTools = createQTools({
         profileMaterial.dataRoom.view(actor, companyId),
       deck: (actor, companyId) =>
         profileMaterial.companyDeck.view(actor, companyId),
+      // 2026-10-08: the investor's own questions and the answers, on the board.
+      askedQuestions: (actor, companyId) =>
+        profileMaterial.founderRequests.investorQuestions(actor, companyId),
       ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
       // R0: a document found by meaning, and its text, as the data room
       // authorises them for this person.

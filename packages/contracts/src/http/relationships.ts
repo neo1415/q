@@ -733,7 +733,9 @@ export const DiligenceDtoSchema = z
             requestedAt: UtcTimestampSchema,
             /** Who asked; null when their profile names nobody. */
             requestedByName: z.string().max(200).nullable().default(null),
-            status: z.enum(["OPEN", "FULFILLED"]),
+            status: z.enum(["OPEN", "FULFILLED", "DECLINED"]),
+            /** The founder's note when declined; null otherwise. */
+            declineNote: z.string().max(1000).nullable().default(null),
             fulfilledBy: z
               .object({
                 documentId: UuidSchema,

@@ -122,6 +122,7 @@ function world(options: { readonly diligence?: boolean } = {}) {
         note: input.note,
         createdAt: new Date().toISOString(),
         fulfilment: null,
+        decline: null,
       });
       return Promise.resolve({ id, created: true });
     },

@@ -13,7 +13,11 @@ import {
   type ThesisReadingDto,
 } from "@capital-q/contracts";
 import { fitComparisonText, readThesis } from "@capital-q/discovery";
-import { assumptionBoardText, buildAssumptionBoard } from "@capital-q/evidence";
+import {
+  assumptionBoardText,
+  buildAssumptionBoard,
+  withAskedQuestions,
+} from "@capital-q/evidence";
 import {
   InvestorOrganisationIdSchema,
   toInvestorMandateDto,
@@ -117,9 +121,13 @@ export function createCompanyAssumptionsTool(
         .deck(context.actor, input.companyId)
         .catch(() => null);
       const board = view === null ? null : buildAssumptionBoard(view);
-      return board === null
-        ? deny("NOT_AVAILABLE")
-        : allow("CONFIDENTIAL", board);
+      if (board === null) return deny("NOT_AVAILABLE");
+      // Their own questions and the founder's answers, as the screen shows.
+      const asked =
+        (await port
+          .askedQuestions?.(context.actor, input.companyId)
+          .catch(() => null)) ?? [];
+      return allow("CONFIDENTIAL", withAskedQuestions(board, asked));
     },
     execute: (_input, _context, board) =>
       Promise.resolve({
