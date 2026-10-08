@@ -1036,6 +1036,47 @@ export function QConversationPanel({
               >
                 {bigPresence ? (
                   <ArrivalRoom wide>
+                    {captions ? null : (
+                      // The latest exchange for a screen reader while the
+                      // presence view shows no transcript (audit 06 §9);
+                      // each turn with its id and disposition (G-R3).
+                      // Text only: nothing focusable is hidden here.
+                      <ol className="sr-only" aria-label="Latest exchange">
+                        {latestExchange(thread).map((line) =>
+                          line.role === "person" ? (
+                            <li
+                              key={line.id}
+                              data-q-turn-id={line.id}
+                              data-q-turn-role="USER"
+                            >
+                              You: {line.text}
+                            </li>
+                          ) : (
+                            <li
+                              key={line.id}
+                              data-q-turn-id={line.id}
+                              data-q-turn-role="Q"
+                              data-q-disposition={
+                                line.turn === undefined
+                                  ? "ANSWERED"
+                                  : (dispositionOfTurn(line.turn) ?? undefined)
+                              }
+                            >
+                              Q: {plainFromMarkdown(line.text)}
+                            </li>
+                          ),
+                        )}
+                        {liveIsPerson ? (
+                          <li
+                            key={live.id}
+                            data-q-turn-id={live.id}
+                            data-q-turn-role="USER"
+                          >
+                            You, speaking: {live.text}
+                          </li>
+                        ) : null}
+                      </ol>
+                    )}
                     <QPresenceStage
                       live={voice.active}
                       onBoardLanded={onBoardLanded}
