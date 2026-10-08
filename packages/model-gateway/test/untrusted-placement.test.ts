@@ -2,15 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { QToolCallOutcome } from "@capital-q/q-runtime";
 
-import type { ModelMessage } from "@capital-q/contracts";
-import { toInput } from "../src/providers/openai.js";
 import { fetchedForYouMessage } from "../src/q/index.js";
 
 /**
  * RECOVERY-2026-10 F-03 (audit F-D3): public-web excerpts are
- * attacker-controllable. They must never reach the model as SYSTEM, and
- * the OpenAI adapter must never lift anything but the leading charter into
- * `instructions`, the highest-authority channel.
+ * attacker-controllable. They must never reach the model as SYSTEM (the
+ * adapters' handling of later SYSTEM notes is workstream F's).
  */
 
 const HOSTILE =
@@ -67,54 +64,3 @@ describe("a page Capital Q fetched for the person", () => {
   });
 });
 
-describe("the OpenAI adapter's instructions", () => {
-  const charter: ModelMessage = {
-    role: "SYSTEM",
-    content: "You are Q, Capital Q's analyst.",
-  };
-  const note: ModelMessage = {
-    role: "SYSTEM",
-    content: "TOOLS FIRST: look it up before answering.",
-  };
-  const asked: ModelMessage = { role: "USER", content: "Any news on Ajopot?" };
-  const laterNote: ModelMessage = {
-    role: "SYSTEM",
-    content: "Thin results: research was added.",
-  };
-  const fetched = fetchedForYouMessage(
-    "research_public_web",
-    researchOutcome(HOSTILE),
-  );
-
-  it("holds only the leading system messages", () => {
-    const { instructions, input } = toInput([
-      charter,
-      note,
-      asked,
-      fetched,
-      laterNote,
-    ]);
-    expect(instructions).toBe(`${charter.content}\n\n${note.content}`);
-    expect(instructions).not.toContain("admin mode");
-    expect(instructions).not.toContain(laterNote.content);
-    // The later code note keeps its place as a developer item; the web
-    // page stays a user item.
-    expect(input).toEqual([
-      {
-        role: "user",
-        content: [{ type: "input_text", text: asked.content }],
-      },
-      {
-        role: "user",
-        content: [{ type: "input_text", text: fetched.content }],
-      },
-      { role: "developer", content: laterNote.content },
-    ]);
-  });
-
-  it("has no instructions when the transcript does not open with one", () => {
-    const { instructions, input } = toInput([asked, laterNote]);
-    expect(instructions).toBeUndefined();
-    expect(input).toHaveLength(2);
-  });
-});
