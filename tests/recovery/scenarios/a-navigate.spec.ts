@@ -8,6 +8,7 @@ import {
   expectReceipt,
   operateScreen,
   recordReceipts,
+  send,
 } from "../support/q.js";
 import {
   answer,
@@ -38,19 +39,11 @@ test.afterAll(async () => {
 });
 
 const SURFACES = [
-  { say: "open discover", destination: "DISCOVER", url: /\/discover/u },
-  {
-    say: "take me to my documents",
-    destination: "DOCUMENTS",
-    url: /\/documents/u,
-  },
-  {
-    say: "show me relationships",
-    destination: "RELATIONSHIPS",
-    url: /\/relationships/u,
-  },
-  { say: "go to capital", destination: "CAPITAL", url: /\/capital/u },
-  { say: "open settings", destination: "SETTINGS", url: /\/settings/u },
+  { say: "open discover", destination: "DISCOVER", url: /\/discover/u, heading: /Discover/u },
+  { say: "take me to my documents", destination: "DOCUMENTS", url: /\/documents/u, heading: /Documents/u },
+  { say: "show me relationships", destination: "RELATIONSHIPS", url: /\/relationships/u, heading: /Relationships/u },
+  { say: "go to capital", destination: "CAPITAL", url: /\/capital/u, heading: /Capital/u },
+  { say: "open settings", destination: "SETTINGS", url: /\/settings/u, heading: /Settings/u },
 ] as const;
 const STARTS = [
   "/home",
@@ -64,6 +57,12 @@ for (const start of STARTS) {
   for (const surface of SURFACES) {
     if (surface.url.test(start)) continue;
     test(`from ${start}, "${surface.say}" arrives`, async () => {
+      if (start !== "/home") {
+        // Defect G-D5 (baseline fe5579c3): asked from the Q dock on any page
+        // but the Q page, Q says "Discover is up." and shows an "Open
+        // Discover" card (twice) but the page never changes.
+        awaits(["C3"], "defect G-D5: dock navigation is claimed, not performed");
+      }
       await useScript([
         reading("TOOL_REQUEST", {
           tool: {
@@ -79,8 +78,12 @@ for (const start of STARTS) {
         },
       ]);
       await page.goto(start);
-      await ask(page, surface.say);
-      await expect(page).toHaveURL(surface.url, { timeout: 30_000 });
+      await send(page, surface.say);
+      // The proof is the arrival itself: the URL and the page's own heading.
+      await expect(page).toHaveURL(surface.url, { timeout: 60_000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toHaveText(
+        surface.heading,
+      );
     });
   }
 }

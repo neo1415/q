@@ -51,7 +51,13 @@ export async function openQ(page: Page): Promise<void> {
       .catch(() => false)
   )
     return;
-  await page.getByRole("button", { name: "Ask Q" }).first().click();
+  // Off the Q page, Q is the floating dock ("Q, ready, about …"; ADR 0017).
+  const dock = page.locator("[data-q-dock] [data-q-dock-button]");
+  await (
+    (await dock.isVisible().catch(() => false))
+      ? dock
+      : page.getByRole("button", { name: /^(Ask Q|Q, )/u }).first()
+  ).click();
   await expect(composer(page)).toBeVisible({ timeout: 30_000 });
 }
 
