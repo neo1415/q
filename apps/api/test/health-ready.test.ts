@@ -16,8 +16,9 @@ import { createApp } from "../src/app.js";
 const security = {
   authenticator: { authenticate: () => Promise.resolve(null) },
   resolver: {
-    resolve: () => Promise.resolve({ status: "CONTEXT_REQUIRED" }),
-  } as ActorContextResolver,
+    resolveHumanContext: () =>
+      Promise.resolve({ status: "CONTEXT_REQUIRED" as const }),
+  } satisfies ActorContextResolver,
   identities: {
     lookup: () => Promise.resolve(null),
   } satisfies ApplicationIdentityLookup,
