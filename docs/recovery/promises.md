@@ -1,0 +1,164 @@
+# Promises Q.01–Q.08: the 12-step check (workstream E, 2026-10-08)
+
+Checked against `build/rec-e` (base `fe5579c3`, plus E's commits). The 2026-10-07 promise audit (`docs/strategy/q-promises-2026-10-07.md`) predates about 240 commits, including the readiness package, the plan board, the follow-up stack and the Blueprint generator, so its Q.01/Q.03/Q.04 findings are stale. Every row below was re-read in code.
+
+## How to read this
+
+**Grades** follow SPEC §5:
+
+- VERIFIED LOCALLY: tests were run here with providers disabled.
+- PARTIAL: names the exact gap.
+- BLOCKED: names who unblocks it.
+
+Nothing here is VERIFIED LIVE. There was no deploy, and the hosted counts in the 7 Oct audit (0 deck readings, 0 GateQ criteria, 0 embeddings) were not re-read.
+
+**The 12 steps:**
+
+1. Implementation
+2. Journey
+3. Data
+4. Backend
+5. UI
+6. Text (Q answers it typed)
+7. Voice
+8. Persistence
+9. Authorization
+10. Failure
+11. Test
+12. Grade and gap
+
+**Tests run for this check:**
+
+- 18 files, 142 tests, all passed:
+  - readiness: `packages/readiness/test/{assess,deck-figures,firewall}`, `apps/q-api/test/readiness-blueprint`, `apps/web/test/readiness-render`, `packages/app-actions/test/readiness`, `packages/q-specialists/test/readiness-plan-lead`;
+  - Q.05: `apps/web/test/plan-and-investor-looks-for`, `packages/q-tools/test/find-prospective-investors`, `apps/web/test/gateq-fit`;
+  - fit: `apps/web/test/fit-ui`, `packages/q-tools/test/fit-tools`, `apps/q-api/test/fit-composition`, `packages/discovery/test/fit`, `packages/q-specialists/test/fit-q-view`;
+  - Q.01: `packages/onboarding/test/follow-ups`, `packages/founder-onboarding/test/financial-interview`;
+  - Q.08: `apps/workers/test/deck-reading`.
+- Plus E's own tests (see the report):
+  - `apps/web/test/{arrival-stage,arrival-content,q-data-blocks}`;
+  - `packages/model-gateway/test/q-result-visuals`.
+
+---
+
+## Q.01 Conversationally interviews every business
+
+| Step             | Finding                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 Implementation | Founder interview: `packages/founder-onboarding` (planner, definition F1–F8, and a financial interview, `test/financial-interview.test.ts`). Follow-up questions: `packages/onboarding` (`follow-ups`), surfaced through readiness (`packages/readiness/src/application/service.ts:267-285`, `answerFollowUp`).                                              |
+| 2 Journey        | `/onboarding/founder` (text and voice), then Home. `FounderNext` (`apps/web/src/features/readiness/founder-next.tsx`) shows "Q still wants to know" (`follow-up-stack.tsx`) on the Home welcome.                                                                                                                                                             |
+| 3 Data           | `onboarding.interview_questions` and `onboarding.interview_turns` (migrations `20260915090000_*`, `20261008090000_*`).                                                                                                                                                                                                                                       |
+| 4 Backend        | `GET /v1/readiness` carries the questions. Answering goes through `answerQuestionAction` → readiness service → the follow-up port, which returns `ANSWERED`.                                                                                                                                                                                                 |
+| 5 UI             | Stack with quick answers and a typed answer, plus "Set aside" (`follow-up-stack.tsx:154-196`).                                                                                                                                                                                                                                                               |
+| 6 Text           | Q reads them via `read_my` readiness/questions (commit `5f269fd6`).                                                                                                                                                                                                                                                                                          |
+| 7 Voice          | Same tools on the voice line. The QUESTIONS room object exists (`ui-intent.ts:398-399`).                                                                                                                                                                                                                                                                     |
+| 8 Persistence    | The answer commits through the follow-up port with an idempotency key (`newKey()`).                                                                                                                                                                                                                                                                          |
+| 9 Authorization  | The founder's own company, server-resolved. Readiness is founder-private (`packages/readiness/test/firewall.test.ts`).                                                                                                                                                                                                                                       |
+| 10 Failure       | "Capital Q didn't answer. Try again." is shown in place (`follow-up-stack.tsx:66`).                                                                                                                                                                                                                                                                          |
+| 11 Test          | `follow-ups.test.ts` (4), `financial-interview.test.ts` (15), `readiness-render.test.tsx` (3).                                                                                                                                                                                                                                                               |
+| 12 Grade         | **VERIFIED LOCALLY (core), PARTIAL.** Gaps: (a) the stack sits in the Home welcome, so it leaves once the conversation starts (it is not yet a group in E's stage layer; see Next); (b) "deeper as it learns" contradictions need deck readings (Q.08); (c) it was not re-checked live whether answers now close hosted rows (the audit counted 0 ANSWERED). |
+
+## Q.02 Learns how each investor thinks (outside E's rows; recorded for completeness)
+
+| Step     | Finding                                                                                                                                       |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1–5      | Mandate interview, mandate domain, deterministic slates (`packages/discovery/src/ranking`), fit panel.                                        |
+| 6–7      | `get_investor_mandate`, `fit_profile`, `fit_top_candidates` (`packages/q-tools/test/fit-tools.test.ts`).                                      |
+| 9        | Behaviour never rewrites the mandate (bounded reranker).                                                                                      |
+| 12 Grade | **PARTIAL (not E's).** Semantic fit needs embeddings, which were 0 live (an ops/F item). Learning from Save/Pass as _proposals_ is not built. |
+
+## Q.03 Reveals what could stop the raise (readiness in words, no invented score)
+
+| Step             | Finding                                                                                                                                                                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Implementation | `packages/readiness` (`assess`, `READINESS_RULES_V1`, `nextActions`), deterministic. Deck figures only once confirmed (`deck-figures.test.ts`).                                                                                               |
+| 2 Journey        | Capital → Readiness tab (`apps/web/src/features/capital/capital-screen.tsx`, `case "readiness"`). The Overview has "What could stop your raise" (`StopYourRaise`), and the tab badge counts blockers.                                         |
+| 3 Data           | Profile, claims, documents, deck figures and follow-ups through `createPostgresReadinessStore`.                                                                                                                                               |
+| 4 Backend        | `GET /v1/readiness` (commit `5f269fd6`), a q-api route under actor context.                                                                                                                                                                   |
+| 5 UI             | `ReadinessSection`, with each pillar as **Strong / Developing / Gap / Unknown** in words, each with its own shape (`readiness-status.tsx:8-60`). Unknown is a dashed neutral ring, never a warning tone. There is no score and no percentage. |
+| 6 Text           | `read_my` readiness. "What could stop my raise" answers from the assessment (`readiness-plan-lead.test.ts`).                                                                                                                                  |
+| 7 Voice          | Same tools. The READINESS room object and the `CAPITAL_READINESS` destination exist (`ui-intent.ts:166, 398`).                                                                                                                                |
+| 8 Persistence    | The assessment is computed from records. Basis is hashed (`basisHash`).                                                                                                                                                                       |
+| 9 Authorization  | Founder-only. `firewall.test.ts` shows readiness never feeds investor-facing reads (the release-blocking invariant).                                                                                                                          |
+| 10 Failure       | "Your readiness couldn't load." with retry (`capital-screen.tsx`).                                                                                                                                                                            |
+| 11 Test          | `assess.test.ts` (15), `firewall.test.ts` (1), `readiness-render.test.tsx` (3), `app-actions readiness` (3).                                                                                                                                  |
+| 12 Grade         | **VERIFIED LOCALLY.** The gap is only in the data: deck coaching enriches pillars only once deck readings exist (Q.08).                                                                                                                       |
+
+## Q.04 Turns weaknesses into an action plan
+
+| Step             | Finding                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Implementation | `nextActions` from the assessment. The Blueprint v1 (`buildBlueprint`) is sequenced by code, and its generator is composed (`apps/q-api/src/main.ts:5636`, `readinessBlueprints: readinessService`).                                                                                                                                                                             |
+| 2 Journey        | Capital → Action plan (`ActionPlanBoard`, columns with status, why, and the evidence that closes it), and Capital → Plan (3/6/12 months, `ReadinessBlueprintSection`).                                                                                                                                                                                                           |
+| 3 Data           | Plan-step marks through `markPlanStepAction` (append-oriented marks).                                                                                                                                                                                                                                                                                                            |
+| 4 Backend        | `POST /v1/q/readiness/blueprints`, plan-gated. With a generator composed it returns the plan; **the 501 is never shown**: `NOT_IMPLEMENTED`/`ENTITLEMENT_REQUIRED` fall to the Pro entry (`readiness-blueprint.tsx:79-113`).                                                                                                                                                     |
+| 5 UI             | Plan cards with "Let Q do it" and "Go there" (`action-plan-board.tsx:111-134`).                                                                                                                                                                                                                                                                                                  |
+| 6 Text           | `read_my` plan. "What should I do next" falls back to the plan (commit `5f269fd6`).                                                                                                                                                                                                                                                                                              |
+| 7 Voice          | The ACTION_PLAN, WORK_PLAN and READINESS_BLUEPRINT room objects (`ui-intent.ts:382-423`).                                                                                                                                                                                                                                                                                        |
+| 8 Persistence    | Steps close when Q sees the evidence; marks persist.                                                                                                                                                                                                                                                                                                                             |
+| 9 Authorization  | Founder-only, entitlement-checked at the route (`readiness-blueprint.test.ts`, 7 tests).                                                                                                                                                                                                                                                                                         |
+| 10 Failure       | "Your action plan couldn't load." Without the entitlement, the Pro entry.                                                                                                                                                                                                                                                                                                        |
+| 11 Test          | `readiness-blueprint.test.ts` (7), `plan-and-investor-looks-for.test.ts` (8), `readiness-render.test.tsx`.                                                                                                                                                                                                                                                                       |
+| 12 Grade         | **PARTIAL.** Exact gap: "Let Q do it" asks Q (`useGlobalQ().askNow(action.askQ)`), and Q acts through its own tools with approval. It does **not** create a durable Work delegation (a job with a lease and states). That needs D's executor entry: "delegate this plan step to Work" with an idempotency key. It is requested from D, and E wires the button the day it exists. |
+
+## Q.05 Finds the right investors (for founders)
+
+| Step             | Finding                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 Implementation | `find_prospective_investors` (network-visible public profiles plus published gates; "no investor's private mandate is read", `find-prospective-investors.ts:139`). GateQ gate fit. **E4 (new):** run reads note investors, and answer cards resolve investor subjects with a code-written `fitBasis` and a `map` of published head-office countries (`packages/model-gateway/src/q/card-subjects.ts`). |
+| 2 Journey        | Ask Q: "compare these three investors, where they're based, best fit". The answer cards are laid out side by side (named, "Open profile"), with a "Why they fit (from what they publish)" row and a "Where they're based" map plus list. Founder Discover and `/investors/[id]` "What this investor looks for".                                                                                        |
+| 3 Data           | Public investor profiles (`hqCountry`, ISO alpha-2), published gates.                                                                                                                                                                                                                                                                                                                                  |
+| 4 Backend        | Tool → model gateway. Subjects, basis and map come from the tool's authorised output only. The model's words never cause a subject (`q-result-visuals.test.ts`: "a name the run never read keeps no subject").                                                                                                                                                                                         |
+| 5 UI             | `AnswerCanvas` (card and table layouts), `MapBody` (lazy SVG, list equivalent), named `INVESTOR_REFERENCE` and `COMPARISON` headers (`q-data-blocks.test.tsx`).                                                                                                                                                                                                                                        |
+| 6–7 Text/Voice   | The same answer path for typed and spoken questions (the cards reach the stage through the room feed on voice).                                                                                                                                                                                                                                                                                        |
+| 9 Authorization  | Firewall: public criteria only. Names resolve under the person's own session (`room/reference-names.ts`); a name they may not see stays "Investor".                                                                                                                                                                                                                                                    |
+| 10 Failure       | An unpublished location is listed as "Location not published", never placed. No basis read means no basis row.                                                                                                                                                                                                                                                                                         |
+| 11 Test          | `q-result-visuals.test.ts` (9), `q-data-blocks.test.tsx` (4), `find-prospective-investors.test.ts` (4), `gateq-fit.test.ts` (6).                                                                                                                                                                                                                                                                       |
+| 12 Grade         | **VERIFIED LOCALLY (comparison, map, fit basis), PARTIAL overall.** Gaps: (a) a standalone MAP/TABLE block (when the model asks for one) needs B's `visual` hint and the lead's one-line `read` pass in `model-gateway/src/q/index.ts:4073`; (b) live GateQ had 0 criteria (data, not code).                                                                                                           |
+
+## Q.06 Finds the right opportunities (for investors)
+
+| Step             | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Implementation | Precomputed deterministic slates. Fit profile (9 parameters, UNKNOWN first-class). **E2 (new):** the arrival's "New for you" (`apps/web/src/features/briefing/matches.ts`) shows slate companies not acted on and not shown before, each with a take written by code from its fit profile (`matchOpinion`). Every take ends "That's fit with your mandate, not a judgement of the business." It uses no model, no number and no percentage. |
+| 2 Journey        | Log in → Q says "Four new companies in your feed fit your mandate: …; X fits best …" and the cards show beside Q, with Open and "Ask Q's view".                                                                                                                                                                                                                                                                                             |
+| 3 Data           | `discoverCompanies` (the slate), `listInvestorRelationships` (acted on), `getFitProfiles` (one batched read), and the browser's seen-set (a per-viewer convenience, labelled honestly: "In your feed, not looked at yet" when no seen-set exists).                                                                                                                                                                                          |
+| 4 Backend        | `arrivalBriefingAction` reads matches for investors only. A failed slate read is `null`, so NEW_MATCHES is reported as unread.                                                                                                                                                                                                                                                                                                              |
+| 5 UI             | `MatchCard` and `MatchesGroup` in `arrival-stage.tsx`. Words plus the band in words.                                                                                                                                                                                                                                                                                                                                                        |
+| 6–7 Text/Voice   | `arrivalWords().matches` is part of `spoken`. Workstream A speaks it.                                                                                                                                                                                                                                                                                                                                                                       |
+| 9 Authorization  | The investor's own slate and fit, under their session (ADR 0052).                                                                                                                                                                                                                                                                                                                                                                           |
+| 10 Failure       | Slate unreadable: "I couldn't check your feed just now."                                                                                                                                                                                                                                                                                                                                                                                    |
+| 11 Test          | `arrival-content.test.ts` (take wording, no digits, best fit, honest label), `arrival-stage.test.tsx` (rendered take, no % or /10, seen-set remembered), `discovery fit` (34), `fit-ui` (14).                                                                                                                                                                                                                                               |
+| 12 Grade         | **VERIFIED LOCALLY.** Live gap: semantic fit is off (0 embeddings; ops/F).                                                                                                                                                                                                                                                                                                                                                                  |
+
+## Q.07 Lets investors interview the opportunity within disclosure
+
+| Step             | Finding                                                                                                                                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Implementation | Company Intelligence specialist (`packages/q-specialists/src/company/specialist.ts`), with a firewall-scoped plan before any model call. Documents in the Q room with page cites.                                            |
+| 2–7              | Company profile → Ask Q; text and voice. Fit with Q's view labelled `Q_INFERENCE` (`fit-q-view.test.ts`, 4).                                                                                                                 |
+| 9 Authorization  | Founder-private figures never reach an investor run (the Context Firewall, B's area).                                                                                                                                        |
+| 12 Grade         | **PARTIAL (not changed by E).** Gaps: thin structured data until deck readings exist (Q.08). The "Assumption check" and "Questions for the founder" cards are not built (B for the content, E for the card once B emits it). |
+
+## Q.08 Understands every business the same way (canonical structure, deck readings)
+
+| Step             | Finding                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Implementation | 12 `DECK_SECTIONS`. The worker `deckReading` is composed in `apps/workers/src/main.ts:312`, with a backfill (`apps/workers/src/evidence/deck-reading-backfill.ts`).                                                                                                                                                                                        |
+| 4 Backend        | Founder confirmation goes through the Write Gate before investors see anything.                                                                                                                                                                                                                                                                            |
+| 11 Test          | `apps/workers/test/deck-reading.test.ts` (11) passed.                                                                                                                                                                                                                                                                                                      |
+| 12 Grade         | **BLOCKED for live (F / ops).** The code path is tested, but the audit's live count was 0 readings for 21 decks. Whether the worker's model provider is configured on the deployed workers, and whether the backfill ran, has to be verified on Railway. That is F's readiness and spend area, plus a founder-approved live check. E has no code gap here. |
+
+---
+
+## What E changed for the promises in this pass
+
+- **Arrival (Q.01/Q.03/Q.06 surfaces).** The arrival is a persistent stage layer: What I did, Needs you (a `QAttentionReport` with unread sources) and investor New for you.
+- **Q.05.** Investor subjects, published fit basis and a country map on comparison answers. Named, linked investor references and comparison headers.
+- **All answers.** Partial block validation (one bad block drops only itself, and the drop is reported). TABLE, CHART (evidenced figures only), MAP and TIMELINE contracts and renderers.
+
+## Next (not done in this pass)
+
+1. Q.01: add "Q still wants to know" as a group in the stage layer, so the founder's next question stays beside Q while conversing (today it is in the welcome).
+2. Q.04: the Work delegation button, once D exposes the entry.
+3. Q.07: an "Assumption check" card from disclosed figures, once B emits the data.
