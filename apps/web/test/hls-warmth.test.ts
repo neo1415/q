@@ -124,4 +124,29 @@ describe("a stream's buffer by the controller's tier", () => {
     expect(element.loop).toBe(false);
     detach();
   });
+
+  it("uses the engine where MSE exists even if the browser plays HLS itself", async () => {
+    // Chrome now plays HLS natively, from 240p, around the cache.
+    const element = video();
+    element.canPlayType = () => "maybe";
+    vi.stubGlobal("MediaSource", { isTypeSupported: () => true });
+    const detach = attachHlsOrNativeSource(
+      element,
+      "https://cdn.test/t/manifest/video.m3u8",
+    );
+    await settle();
+    expect(element.getAttribute("src")).toBeNull();
+    detach();
+    vi.unstubAllGlobals();
+  });
+
+  it("leaves HLS to the browser where there is no MSE (the iPhone)", () => {
+    const element = video();
+    element.canPlayType = () => "maybe";
+    const url = "https://cdn.test/t/manifest/video.m3u8";
+    const detach = attachHlsOrNativeSource(element, url);
+    expect(element.getAttribute("src")).toBe(url);
+    expect(created).toHaveLength(0);
+    detach();
+  });
 });

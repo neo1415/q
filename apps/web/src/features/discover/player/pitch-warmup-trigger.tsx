@@ -57,9 +57,6 @@ export function PitchWarmup() {
       void import("hls.js/light").catch(() => undefined);
       const page = await loadSlatePageAction(null, null);
       if (!page.ok || controller.signal.aborted) return;
-      const longSide = Math.round(
-        window.innerHeight * Math.min(2, window.devicePixelRatio || 1),
-      );
       for (const item of page.value.items.slice(0, FIRST)) {
         if (item.pitch === null || controller.signal.aborted) continue;
         const grant = await authorisePlaybackAction(
@@ -71,7 +68,6 @@ export function PitchWarmup() {
           grant.value.playbackUrl,
           item.pitch.mediaAssetId,
           controller.signal,
-          longSide,
         ).catch(() => undefined);
       }
     };

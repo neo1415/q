@@ -1,3 +1,8 @@
+import {
+  pickStartLevel,
+  startingBandwidthEstimate,
+  startLongSide,
+} from "./hls-source";
 import { mediaCacheKey, pageMediaCache, type MediaCache } from "./media-cache";
 
 /**
@@ -15,7 +20,12 @@ import { mediaCacheKey, pageMediaCache, type MediaCache } from "./media-cache";
 /** Fragments warmed per rendition: a few seconds, enough to start. */
 const FRAGMENTS = 2;
 
-type Variant = { readonly height: number; readonly uri: string };
+type Variant = {
+  readonly width: number;
+  readonly height: number;
+  readonly bitrate: number;
+  readonly uri: string;
+};
 
 /** The video renditions and the audio playlist a master playlist names. */
 export function parseMaster(text: string): {
@@ -28,12 +38,15 @@ export function parseMaster(text: string): {
   lines.forEach((line, at) => {
     if (line.startsWith("#EXT-X-STREAM-INF:")) {
       const resolution = /RESOLUTION=(\d+)x(\d+)/.exec(line);
+      const bandwidth = /[:,]BANDWIDTH=(\d+)/.exec(line);
       const uri = lines
         .slice(at + 1)
         .find((next) => next.trim() !== "" && !next.startsWith("#"));
       if (resolution !== null && uri !== undefined) {
         variants.push({
-          height: Math.max(Number(resolution[1]), Number(resolution[2])),
+          width: Number(resolution[1]),
+          height: Number(resolution[2]),
+          bitrate: Number(bandwidth?.[1] ?? "0"),
           uri: uri.trim(),
         });
       }
@@ -45,7 +58,7 @@ export function parseMaster(text: string): {
       audio = /URI="([^"]+)"/.exec(line)?.[1] ?? null;
     }
   });
-  variants.sort((a, b) => a.height - b.height);
+  variants.sort((a, b) => a.bitrate - b.bitrate);
   return { variants, audio };
 }
 
@@ -67,17 +80,16 @@ export function parseMedia(text: string, count = FRAGMENTS): readonly string[] {
 }
 
 /**
- * The two renditions either side of the screen's long side: the player's
- * first rung is one of them on this screen (it is capped to the player's
- * size, which is about the viewport).
+ * The rendition the player will start on (the same pick, hls-source.ts)
+ * and the one below it, in case the player's estimate is lower by then.
  */
 export function renditionsFor(
   variants: readonly Variant[],
   longSide: number,
+  estimate: number,
 ): readonly Variant[] {
-  if (variants.length === 0) return [];
-  const above = variants.findIndex((variant) => variant.height >= longSide);
-  const at = above < 0 ? variants.length - 1 : above;
+  const at = pickStartLevel(variants, longSide, estimate);
+  if (at < 0) return [];
   return variants.slice(Math.max(0, at - 1), at + 1);
 }
 
@@ -104,14 +116,17 @@ export async function warmPitch(
   playbackUrl: string,
   mediaKey: string,
   signal: AbortSignal,
-  longSide: number,
 ): Promise<void> {
   const cache = pageMediaCache();
   if (cache === null) return;
   const master = await text(playbackUrl, signal);
   const { variants, audio } = parseMaster(master);
   const playlists = [
-    ...renditionsFor(variants, longSide).map((variant) => variant.uri),
+    ...renditionsFor(
+      variants,
+      startLongSide(),
+      startingBandwidthEstimate(),
+    ).map((variant) => variant.uri),
     ...(audio === null ? [] : [audio]),
   ].map((uri) => new URL(uri, playbackUrl).href);
   for (const playlist of playlists) {

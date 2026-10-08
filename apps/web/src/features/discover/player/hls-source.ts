@@ -22,6 +22,27 @@ function playsHlsNatively(video: HTMLVideoElement): boolean {
   return video.canPlayType("application/vnd.apple.mpegurl") !== "";
 }
 
+/**
+ * Media Source Extensions with H.264 and AAC: where present, the engine
+ * plays the stream even if the browser also plays HLS natively. Chrome
+ * now does (measured 2026-10-08, Chrome 155): its native player started
+ * every pitch at 240p, refetched on the loop, and bypassed the device
+ * cache. Only where there is no MSE (the iPhone) does the browser's own
+ * player take it.
+ */
+function hasMse(): boolean {
+  if (typeof window === "undefined" || typeof MediaSource === "undefined") {
+    return false;
+  }
+  try {
+    return MediaSource.isTypeSupported(
+      'video/mp4; codecs="avc1.42E01E,mp4a.40.2"',
+    );
+  } catch {
+    return false;
+  }
+}
+
 function looksLikeHls(url: string): boolean {
   try {
     return new URL(url, "https://placeholder.invalid").pathname.endsWith(
@@ -96,6 +117,44 @@ export function setStreamWarmth(
  */
 export const DEFAULT_START_ESTIMATE = 5_000_000;
 
+/** The screen's long side in device pixels (at most 2x), for the first rung. */
+export function startLongSide(): number {
+  if (typeof window === "undefined") return 1280;
+  return Math.round(
+    Math.max(window.innerHeight, window.innerWidth) *
+      Math.min(2, window.devicePixelRatio || 1),
+  );
+}
+
+type Rung = {
+  readonly width: number;
+  readonly height: number;
+  readonly bitrate: number;
+};
+
+/**
+ * The first rendition: the smallest whose long side covers the screen's
+ * (within 10%), among those the estimated bandwidth can carry; the largest
+ * it can carry when none covers it. -1 for no renditions. Pure, shared
+ * with the warm-up so both pick the same rung.
+ */
+export function pickStartLevel(
+  levels: readonly Rung[],
+  longSide: number,
+  estimate: number,
+): number {
+  const order = levels
+    .map((level, at) => ({ level, at }))
+    .sort((a, b) => a.level.bitrate - b.level.bitrate);
+  let best = order[0]?.at ?? -1;
+  for (const { level, at } of order) {
+    if (level.bitrate > estimate) break;
+    best = at;
+    if (Math.max(level.width, level.height) >= longSide * 0.9) return at;
+  }
+  return best;
+}
+
 export function startingBandwidthEstimate(): number {
   if (typeof navigator === "undefined") return DEFAULT_START_ESTIMATE;
   const link: unknown = Reflect.get(navigator, "connection");
@@ -151,14 +210,14 @@ export function recoverStream(video: HTMLVideoElement): boolean {
 /**
  * The adapter the feed uses.
  *
- * Progressive MP4 and native-HLS browsers take the plain path. Only a
- * Chromium/Firefox HLS stream loads the engine, and the detach function
+ * Progressive MP4, and HLS where there is no MSE (the iPhone), take the
+ * plain path. Every other HLS stream loads the engine, and the detach function
  * destroys it — which is what actually cancels the segment fetches it
  * started (doc 20 §236's preload abort). With a media key, the engine's
  * loader reads and fills the pitch media cache (ADR 0063).
  */
 export const attachHlsOrNativeSource: AttachSource = (video, url, mediaKey) => {
-  if (!looksLikeHls(url) || playsHlsNatively(video)) {
+  if (!looksLikeHls(url) || (playsHlsNatively(video) && !hasMse())) {
     video.src = url;
     return () => {
       video.removeAttribute("src");
@@ -189,6 +248,8 @@ export const attachHlsOrNativeSource: AttachSource = (video, url, mediaKey) => {
         // Fetch the first fragment while the media pipeline is still being
         // set up, so a warm card has frame one before it is swiped to.
         startFragPrefetch: true,
+        // Loading starts once the first rung is chosen (MANIFEST_PARSED).
+        autoStartLoad: false,
         // The stage is the size of the viewport; a rendition larger than
         // the element is bytes nobody sees.
         capLevelToPlayerSize: true,
@@ -206,6 +267,20 @@ export const attachHlsOrNativeSource: AttachSource = (video, url, mediaKey) => {
             }),
       });
       engines.set(video, engine.config);
+      // The first rung, chosen here rather than by hls.js (which measured
+      // 240p first, then climbed): the screen's size within the link's
+      // estimate. The warm-up picks the same rung, so its cached start is
+      // the one played. Loading waits for it (autoStartLoad off): hls.js's
+      // own start ran before this handler and began at the lowest rung.
+      engine.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+        const level = pickStartLevel(
+          data.levels,
+          startLongSide(),
+          startingBandwidthEstimate(),
+        );
+        if (level >= 0) engine.startLevel = level;
+        engine.startLoad(-1);
+      });
       // A fatal engine error (a codec this browser cannot decode, a
       // manifest that will not load) never reaches the element on its own:
       // it is said on the element, so the player can show its fallback

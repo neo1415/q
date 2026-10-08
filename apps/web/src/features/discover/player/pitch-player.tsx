@@ -346,18 +346,38 @@ export function PitchPlayer({
     // With sound on and no tap yet, a browser refuses the play outright.
     // Then it plays muted, and the first tap or key anywhere brings the
     // sound back (founder direction 2026-09-29: sound on, like TikTok).
+    //
+    // Any other refusal is the source changing under the request: the
+    // stream engine attaching (a cached engine attaches within a tick)
+    // aborts a play() made just before. That used to leave the pitch on
+    // its first frame, paused, until something re-rendered (measured
+    // 2026-10-08); it now starts as soon as the element can play.
+    let cancelled = false;
+    const retryWhenReady = () => {
+      if (!cancelled && video.paused) void video.play().catch(() => undefined);
+    };
     void video.play().catch((error: unknown) => {
-      if (
-        video.muted ||
-        !(error instanceof DOMException) ||
-        error.name !== "NotAllowedError"
-      ) {
+      if (cancelled) return;
+      const refusedSound =
+        !video.muted &&
+        error instanceof DOMException &&
+        error.name === "NotAllowedError";
+      if (!refusedSound) {
+        if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          retryWhenReady();
+        } else {
+          video.addEventListener("canplay", retryWhenReady, { once: true });
+        }
         return;
       }
       video.muted = true;
       setSoundBlocked(true);
       void video.play().catch(() => undefined);
     });
+    return () => {
+      cancelled = true;
+      video.removeEventListener("canplay", retryWhenReady);
+    };
   }, [intent.autoplay, playbackUrl, hold, startOnRequest]);
 
   // The first gesture after a muted fallback restores the sound the person

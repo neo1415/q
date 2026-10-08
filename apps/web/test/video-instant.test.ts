@@ -11,6 +11,7 @@ import type {
 } from "hls.js";
 
 import { cachingLoader } from "../src/features/discover/player/cached-loader";
+import { pickStartLevel } from "../src/features/discover/player/hls-source";
 import {
   cacheBudget,
   createMediaCache,
@@ -339,21 +340,37 @@ describe("warming the first pitches", () => {
     "stream_t1282_r1.m3u8",
   ].join("\n");
 
-  it("reads the renditions, smallest first, and the audio", () => {
+  it("reads the renditions, cheapest first, and the audio", () => {
     const parsed = parseMaster(master);
     expect(parsed.variants.map((v) => v.height)).toEqual([426, 1282, 1920]);
+    expect(parsed.variants.map((v) => v.bitrate)).toEqual([
+      200000, 500000, 900000,
+    ]);
     expect(parsed.audio).toBe("stream_ta_r1.m3u8");
   });
 
-  it("warms the two renditions either side of the screen", () => {
+  it("warms the rendition the player will start on, and the one below", () => {
     const { variants } = parseMaster(master);
-    expect(renditionsFor(variants, 900).map((v) => v.height)).toEqual([
-      426, 1282,
-    ]);
-    expect(renditionsFor(variants, 4000).map((v) => v.height)).toEqual([
-      1282, 1920,
-    ]);
-    expect(renditionsFor([], 900)).toEqual([]);
+    const heights = (longSide: number, estimate: number) =>
+      renditionsFor(variants, longSide, estimate).map((v) => v.height);
+    expect(heights(1200, 5_000_000)).toEqual([426, 1282]);
+    expect(heights(1800, 5_000_000)).toEqual([1282, 1920]);
+    // The link cannot carry 1080p: the best it can, never a guess above it.
+    expect(heights(1800, 600_000)).toEqual([426, 1282]);
+    expect(renditionsFor([], 900, 5_000_000)).toEqual([]);
+  });
+
+  it("starts on the smallest rung that covers the screen, within the link", () => {
+    const rungs = [
+      { width: 1080, height: 1920, bitrate: 3_000_000 },
+      { width: 240, height: 426, bitrate: 200_000 },
+      { width: 720, height: 1282, bitrate: 1_500_000 },
+    ];
+    expect(pickStartLevel(rungs, 1200, 5_000_000)).toBe(2);
+    expect(pickStartLevel(rungs, 1900, 5_000_000)).toBe(0);
+    expect(pickStartLevel(rungs, 1900, 1_000_000)).toBe(1);
+    expect(pickStartLevel(rungs, 1900, 100_000)).toBe(1);
+    expect(pickStartLevel([], 1900, 5_000_000)).toBe(-1);
   });
 
   it("takes the init segment and the first fragments only", () => {
