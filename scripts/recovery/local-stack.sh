@@ -11,8 +11,11 @@
 # See scripts/recovery/local-stack.md for what each one is and why.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-RUN="${CQ_RECOVERY_RUN_DIR:-$ROOT/.playwright/recovery-stack}"
+HARNESS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# CQ_RECOVERY_ROOT runs another checkout's apps (e.g. the production
+# baseline) under this harness: the guard, fake and env still come from here.
+ROOT="${CQ_RECOVERY_ROOT:-$HARNESS}"
+RUN="${CQ_RECOVERY_RUN_DIR:-$HARNESS/.playwright/recovery-stack}"
 mkdir -p "$RUN"
 ENV_FILE="$RUN/stack.env"
 
@@ -141,10 +144,11 @@ launch() {
       export CQ_SYNTHETIC_DEMO_ROUTING=on
     else
       unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy ALL_PROXY all_proxy
-      export CQ_VOICE_REALTIME=on
+      # Synthetic world only, as the 2026-10-08 incident tenant was.
+      export CQ_VOICE_REALTIME=on CQ_FAKE_VOICE_VENDORS=1 CQ_SYNTHETIC_DEMO_ROUTING=on
     fi
     unset CQ_LIVE_OPENAI_API_KEY CQ_LIVE_DEEPGRAM_API_KEY
-    export NODE_OPTIONS="--import=$ROOT/scripts/recovery/egress-guard.mjs ${NODE_OPTIONS:-}"
+    export NODE_OPTIONS="--import=$HARNESS/scripts/recovery/vendor-redirect.mjs --import=$HARNESS/scripts/recovery/egress-guard.mjs ${NODE_OPTIONS:-}"
     cd "$cwd"
     exec setsid "$@" >>"$RUN/$name.log" 2>&1
   ) &
@@ -169,7 +173,7 @@ start_one() {
       write_env ;;
     fake)
       [[ -f "$ENV_FILE" ]] || write_env
-      launch fake "$ROOT" env CQ_FAKE_PORT="$FAKE_PORT" CQ_FAKE_LOG="$RUN/fake-vendors.ndjson" node scripts/recovery/fake-vendors.mjs
+      launch fake "$HARNESS" env CQ_FAKE_PORT="$FAKE_PORT" CQ_FAKE_LOG="$RUN/fake-vendors.ndjson" node scripts/recovery/fake-vendors.mjs
       wait_http fake "http://127.0.0.1:$FAKE_PORT/__fake/health" 30 ;;
     api)
       launch api "$ROOT/apps/api" env PORT="$API_PORT" node --import ../../scripts/dev-env.mjs src/main.ts
