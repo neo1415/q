@@ -10,12 +10,24 @@ import {
   type ReactNode,
 } from "react";
 
+import { useQControlGroup } from "@/features/q/control/q-control";
+
 import {
   CAPITAL_TABS,
   capitalTabHref,
   tabForHash,
   type CapitalTab,
 } from "./capital-tabs";
+
+/** Q's ids for the tabs (literal, for the capability parity matrix). */
+const Q_CAPITAL_TABS: Readonly<Record<string, string>> = {
+  "tab.overview": '[data-tab="overview"]',
+  "tab.raise": '[data-tab="raise"]',
+  "tab.readiness": '[data-tab="readiness"]',
+  "tab.action-plan": '[data-tab="action-plan"]',
+  "tab.plan": '[data-tab="plan"]',
+  "tab.investors": '[data-tab="investors"]',
+} satisfies Record<`tab.${CapitalTab}`, string>;
 
 /**
  * The Capital tab bar (design: docs/design/2026-10-08/capital-tabs). Each
@@ -37,6 +49,8 @@ export function CapitalTabBar({
 }) {
   const router = useRouter();
   const listRef = useRef<HTMLDivElement>(null);
+  // RECOVERY-2026-10 (C1): each tab, for Q, by its own data-tab marker.
+  useQControlGroup({ kind: "TAB", ref: listRef, ids: Q_CAPITAL_TABS });
   // The underline moves on the tap; the panel follows when the server answers.
   // A pick made while another tab was open; once the server answers with
   // a new active tab, the pick no longer applies.

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 
@@ -12,6 +12,7 @@ import {
   resolveOwnContext,
   resolveQStanding,
 } from "@/features/q/context";
+import { QControlRuntime } from "@/features/q/control/q-control-runtime";
 import type { QSubject } from "@/features/q/q-subject";
 import { QSwarmPointer } from "@/features/q-swarm/q-swarm-pointer";
 import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
@@ -121,6 +122,11 @@ export default async function ApplicationLayout({
         <PitchWarmup />
       ) : null}
       <QSwarmPointer />
+      {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
+          receipts to the Q API, and the notice when an act did not happen. */}
+      <Suspense fallback={null}>
+        <QControlRuntime />
+      </Suspense>
     </AppShell>
   );
 }

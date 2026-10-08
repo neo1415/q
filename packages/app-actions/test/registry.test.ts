@@ -217,7 +217,8 @@ describe("the action registry", () => {
       ["document.upload.cancel", "offer.document_upload", "CONSEQUENTIAL"],
       // P3 documents page.
       ["document.rename", "rename_document", "CONSEQUENTIAL"],
-      ["document.archive", "delete_document", "CONSEQUENTIAL"],
+      // RECOVERY-2026-10: archive (undoable) is named as such; no hard delete.
+      ["document.archive", "archive_document", "CONSEQUENTIAL"],
       [
         "profile_image.upload.start",
         "offer.profile_photo_upload",
@@ -254,10 +255,11 @@ describe("the action registry", () => {
       ["verification.kyb.submit", "offer.kyb_submission", "CONSEQUENTIAL"],
       // ADR 0050: how Q speaks for them.
       ["settings.etiquette_guide.save", "set_my_speaking_guide", "INSTANT"],
+      // RECOVERY-2026-10: removal deletes every version, so Q prepares it.
       [
         "settings.etiquette_guide.remove",
         "remove_my_speaking_guide",
-        "INSTANT",
+        "CONSEQUENTIAL",
       ],
       // WORK-58: Q's work page.
       ["q.work.pause", "legacy:stop_q_work", "INSTANT"],

@@ -9,6 +9,8 @@ import {
   RotateCw,
 } from "@capital-q/ui/icons";
 
+import { QControl } from "@/features/q/control/q-control";
+
 import "../gateq.css";
 
 /**
@@ -29,6 +31,15 @@ const INVESTOR_TABS: readonly (readonly [GateqTab, string])[] = [
   ["find", "Find a startup"],
   ["gate", "Your gate"],
 ];
+
+/** Q's ids for the tabs (literal, for the capability parity matrix). */
+const Q_GATEQ_TABS: Readonly<Record<GateqTab, string>> = {
+  applications: "tab.applications",
+  claim: "tab.claim",
+  inbox: "tab.inbox",
+  find: "tab.find",
+  gate: "tab.gate",
+};
 
 export function GateqChrome({
   role,
@@ -59,16 +70,17 @@ export function GateqChrome({
       </div>
       <nav className="gq-tabs" aria-label="GateQ">
         {tabs.map(([tab, label]) => (
-          <Link
-            key={tab}
-            href={hrefFor(tab)}
-            aria-current={tab === active ? "page" : undefined}
-          >
-            {label}
-            {tab === "inbox" && unread !== undefined && unread > 0 ? (
-              <span className="gq-n">{unread}</span>
-            ) : null}
-          </Link>
+          <QControl key={tab} id={Q_GATEQ_TABS[tab]} kind="TAB">
+            <Link
+              href={hrefFor(tab)}
+              aria-current={tab === active ? "page" : undefined}
+            >
+              {label}
+              {tab === "inbox" && unread !== undefined && unread > 0 ? (
+                <span className="gq-n">{unread}</span>
+              ) : null}
+            </Link>
+          </QControl>
         ))}
       </nav>
       {children}
