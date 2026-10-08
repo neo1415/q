@@ -119,6 +119,13 @@ export type QConversation = {
    * turn's caller knows to read again (P10).
    */
   readonly refresh: () => Promise<boolean>;
+  /**
+   * voice-cards: Q's answer as the room feed delivered it (a run this
+   * page did not start: a spoken one, the duplex line's ask_q). Added to
+   * this conversation once, by message id, unless the stream or the
+   * record already holds it; never guarded on a run being in flight.
+   */
+  readonly absorb: (message: QMessage) => void;
   /** Decide on what Q has prepared and is waiting for (CQ-Q-008). */
   readonly approve: () => Promise<void>;
   readonly decline: () => Promise<void>;
@@ -661,6 +668,25 @@ export function useQConversation(
     return recordSettled(result.value.latestRun);
   }, []);
 
+  const streamedMessages = useRef<readonly QMessage[]>([]);
+  useEffect(() => {
+    streamedMessages.current = runState.messages;
+  }, [runState.messages]);
+  const absorb = useCallback((message: QMessage) => {
+    if (
+      streamedMessages.current.some(
+        (streamed) => streamed.messageId === message.messageId,
+      )
+    ) {
+      return;
+    }
+    setHistory((current) =>
+      current.some((held) => held.messageId === message.messageId)
+        ? current
+        : [...current, message],
+    );
+  }, []);
+
   return {
     state: {
       ...runState,
@@ -693,5 +719,6 @@ export function useQConversation(
     decline,
     revised,
     refresh,
+    absorb,
   };
 }

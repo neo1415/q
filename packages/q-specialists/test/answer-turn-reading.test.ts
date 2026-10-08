@@ -116,6 +116,7 @@ function seam(options: {
   readonly earlier?: readonly {
     readonly role: "USER" | "Q";
     readonly content: string;
+    readonly blocks?: QConversationMessage["blocks"];
   }[];
   /** A typed decision on a waiting change (founder fixture #1). */
   readonly pendingDecisions?: PendingDecisionPort;
@@ -174,6 +175,7 @@ function seam(options: {
         id: randomUUID(),
         role: line.role,
         content: line.content,
+        ...(line.blocks === undefined ? {} : { blocks: line.blocks }),
         createdAt: new Date(Date.now() - (10 - index) * 1000).toISOString(),
       }) as QConversationMessage,
   );
@@ -403,9 +405,100 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     ]);
   });
 
-  it("a screen Capital Q does not have is said not to exist and the nearest offered; nobody is moved (live test 2026-09-27 #5)", async () => {
+  it("opens Explore for 'the explore page' whatever the reader thinks (voice-cards, Zino 2026-10-08)", async () => {
+    const run = seam({
+      said: "Take me to the explore page.",
+      // The live failure: the reader filed it under Discover.
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "DISCOVER",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(0);
+    expect(run.delegated()).toBe(0);
+    expect(run.stored[0]?.content).toBe("Opening Explore.");
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "EXPLORE" },
+      },
+    ]);
+  });
+
+  it("says it can't open a page Capital Q does not have, and moves nobody (voice-cards)", async () => {
     const run = seam({
       said: "take me to the queue page",
+      reading: null,
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(0);
+    expect(run.stored[0]?.content).toBe(
+      "I can't open that yet: there's no \"queue\" page in Capital Q.",
+    );
+    expect(run.stored[0]?.blocks ?? []).toEqual([]);
+  });
+
+  it("opens the third card on screen for 'the third company on the list' (voice-cards)", async () => {
+    const ids = [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+      "33333333-3333-4333-8333-333333333333",
+    ];
+    const card = (name: string, at: number) => ({
+      key: name.toLowerCase(),
+      subject: { kind: "COMPANY" as const, companyId: ids[at] ?? "" },
+      name,
+      line: null,
+      hue: at + 1,
+      reasons: [],
+      measures: [],
+      fit: null,
+      view: null,
+      said: null,
+      sourceCount: 0,
+    });
+    const run = seam({
+      said: "Tell me about the third company on the list.",
+      reading: null,
+      outcomes: [],
+      earlier: [
+        { role: "USER", content: "Show me the top three companies." },
+        {
+          role: "Q",
+          content: "I've scored your top 3 companies against your mandate.",
+          blocks: [
+            {
+              kind: "ANSWER_CARDS",
+              shape: "RANKED",
+              title: "Fit against your mandate",
+              cards: [
+                card("Haly", 0),
+                card("Portside", 1),
+                card("Tensorgate", 2),
+              ],
+              followUps: [],
+            },
+          ] as QConversationMessage["blocks"],
+        },
+      ],
+    });
+    await run.answer.answer(request());
+    expect(run.stored[0]?.content).toBe('Opening "Tensorgate".');
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: ids[2] },
+      },
+    ]);
+  });
+
+  it("a screen Capital Q does not have is said not to exist and the nearest offered; nobody is moved (live test 2026-09-27 #5)", async () => {
+    const run = seam({
+      said: "I'd like the queue page",
       reading: toolReading({
         kind: "NAVIGATE",
         destination: null,
@@ -757,7 +850,7 @@ describe("a turn whose reading fails is never silently answered as chat (B1)", (
       }),
     ];
     const run = seam({
-      said: "take me to discover",
+      said: "let's have a look at discover",
       reading: () => readings.shift() ?? null,
       outcomes: [],
     });
@@ -840,6 +933,21 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "PASSED",
           // WORK-58: Q's work page.
           "WORK",
+          // voice-cards: every remaining page and tab, by its own name.
+          "EXPLORE",
+          "PEOPLE_SEARCH",
+          "WORK_NEEDS",
+          "WORK_PROGRESS",
+          "WORK_DONE",
+          "WORK_TEAM",
+          "WORK_COST",
+          "GATEQ_INBOX",
+          "GATEQ_FIND",
+          "GATEQ_CLAIM",
+          "GATEQ_APPLICATIONS",
+          "SAVED_COMPARE",
+          "REVIEWS",
+          "TOP_INVESTORS",
         ],
         documents: [],
         visibilityChange: false,
@@ -1242,7 +1350,7 @@ describe("a typed yes to a waiting change (founder fixture #1)", () => {
 describe("the turn read early, beside the firewall (ADR 0035)", () => {
   const navigate = () =>
     seam({
-      said: "take me to discover",
+      said: "let's have a look at discover",
       reading: toolReading({
         kind: "NAVIGATE",
         destination: "DISCOVER",
@@ -2120,7 +2228,7 @@ describe("speech that was not for Q is kept out of what Q reads back (founder li
 
   it("marks nothing on an ordinary turn", async () => {
     const run = seam({
-      said: "take me to discover",
+      said: "let's have a look at discover",
       reading: toolReading({
         kind: "NAVIGATE",
         destination: "DISCOVER",

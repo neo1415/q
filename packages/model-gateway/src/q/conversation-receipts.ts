@@ -176,6 +176,20 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   YOUR_COMPANIES: "Your companies on Discover",
   WORK: "Q's work",
   RESULTS: "Results",
+  EXPLORE: "Explore",
+  PEOPLE_SEARCH: "Search",
+  WORK_NEEDS: "Work (Needs you)",
+  WORK_PROGRESS: "Work (In progress)",
+  WORK_DONE: "Work (Done)",
+  WORK_TEAM: "Work (Team)",
+  WORK_COST: "Work (Cost)",
+  GATEQ_INBOX: "their GateQ inbox",
+  GATEQ_FIND: "GateQ Find",
+  GATEQ_CLAIM: "GateQ Claim",
+  GATEQ_APPLICATIONS: "their GateQ applications",
+  SAVED_COMPARE: "Compare",
+  REVIEWS: "Human review",
+  TOP_INVESTORS: "their top three investors",
 };
 
 /** Where the person is, in their terms (R21). */

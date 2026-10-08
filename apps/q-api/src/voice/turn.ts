@@ -52,6 +52,7 @@ import type { PronunciationTeacher } from "./pronunciation.js";
 import type { QTurnReader, QTurnReading } from "@capital-q/model-gateway/q";
 import type { DecisionReader, DecisionReading } from "./decision.js";
 import type { VoiceTurnBoard } from "./turn-board.js";
+import type { QRoomFeed } from "../room/feed.js";
 import {
   anchorCues,
   type SpeechPerformanceBoard,
@@ -119,6 +120,13 @@ export type VoiceTurnDependencies = {
   readonly interviewAgent?: InterviewAgent | undefined;
   /** Where each turn's asking/navigation is posted for the screen. */
   readonly board?: VoiceTurnBoard | undefined;
+  /**
+   * voice-cards: every spoken answer -- standard line or duplex ask_q,
+   * which runs this same handler -- is published to the person's Q room
+   * the moment the run completes it, so the screen renders its cards from
+   * the server, never from what the voice model or a transcript carried.
+   */
+  readonly room?: Pick<QRoomFeed, "publish"> | undefined;
   /** Q's first minute with a new person (welcome sessions). */
   readonly welcome?: WelcomeHost | undefined;
   /** Applies a pronunciation the person corrected. */
@@ -1091,6 +1099,14 @@ export function createVoiceTurnHandler(
             break;
           }
           case "q.message.completed": {
+            // voice-cards: the answer and its blocks go to the person's
+            // room first, before anything is said.
+            dependencies.room?.publish(actor, {
+              runId,
+              conversationId: thread.conversationId ?? null,
+              source: "VOICE",
+              message: event.data.message,
+            });
             // The screen follows Q's answer: a navigation or a client
             // action it carries, after Q has said so (useFollowTurn).
             const follow = followOfAnswer(event.data.message.blocks);

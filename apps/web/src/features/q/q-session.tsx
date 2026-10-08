@@ -12,6 +12,8 @@ import {
   type ReactNode,
 } from "react";
 
+import type { QRoomEntry } from "@capital-q/contracts";
+
 import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
 
@@ -35,6 +37,7 @@ import { followOfTurns } from "./follow-navigation";
 import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
 import { resumableConversation } from "./resume-conversation";
+import { useQRoomFeed } from "./room-feed";
 import { setOpenDocument } from "./screen";
 import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import { useQConversation, type QConversation } from "./use-q-conversation";
@@ -258,6 +261,41 @@ export function QSessionProvider({
     if (voiceSequence === 0) return;
     reread();
   }, [voiceSequence, reread]);
+  /*
+   * voice-cards (Zino live 2026-10-08): the read-back above is a guess
+   * about when and where a spoken answer landed, and on the duplex line it
+   * missed every time. The Q API now publishes each run's answer to the
+   * person's room as it completes, whichever path ran it; while a line is
+   * open this session reads that feed and puts each answer in the thread
+   * at once, keyed by its message, so its cards reach the stage (and the
+   * dock's chip on every other page) from the server itself.
+   */
+  const qAbsorb = q.absorb;
+  const shownConversation = useRef(conversationId);
+  useEffect(() => {
+    shownConversation.current = conversationId;
+  }, [conversationId]);
+  const onRoom = useCallback(
+    (entries: readonly QRoomEntry[]) => {
+      for (const entry of entries) {
+        const named = entry.conversationId;
+        if (named !== null && named !== shownConversation.current) {
+          // Another conversation (a spoken one the page had not opened):
+          // opened, and its record already holds this answer.
+          shownConversation.current = named;
+          setConversationId(named);
+          writeToQPageUrl(named);
+          continue;
+        }
+        qAbsorb(entry.message);
+      }
+      // The record then fills in the question each answer was for.
+      reread();
+    },
+    [qAbsorb, reread],
+  );
+  useQRoomFeed(voice.active, onRoom);
+
   const voiceSpeaking = voice.client.state === "Q_SPEAKING";
   const wasSpeaking = useRef(false);
   useEffect(() => {

@@ -172,6 +172,7 @@ export {
   relayQVoiceDuplexTool,
   reportQVoiceDuplexUsage,
   pollQVoiceDuplexNarration,
+  readQRoom,
   rejoinQVoiceDuplex,
   endQVoiceDuplex,
   getQApproval,

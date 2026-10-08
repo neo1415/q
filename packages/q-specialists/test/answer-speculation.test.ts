@@ -229,7 +229,10 @@ describe("a spoken question answered speculatively (latency2)", () => {
   });
 
   it("cancels it for a navigation: the move is made and nothing of the speculation is said or stored", async () => {
-    const run = seam({ said: "Take me to Discover", reading: NAVIGATE });
+    const run = seam({
+      said: "Let's have a look at Discover",
+      reading: NAVIGATE,
+    });
     const outcome = await run.answer.answer(request());
     expect(outcome.kind).toBe("ANSWERED");
     expect(run.calls).toHaveLength(1);

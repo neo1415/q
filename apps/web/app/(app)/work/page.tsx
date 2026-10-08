@@ -33,7 +33,22 @@ const VIEWS_READ_AHEAD = 10;
  * header never waits on them (design-48: a client action queued behind
  * the shell's own left the page on its skeleton).
  */
-async function WorkLists() {
+/** voice-cards: `/work?view=team` opens that tab (Q's "open the Team tab"). */
+const WORK_VIEWS = ["needs", "progress", "done", "team", "cost"] as const;
+type WorkViewParam = (typeof WORK_VIEWS)[number];
+
+function workViewOf(
+  raw: string | string[] | undefined,
+): WorkViewParam | undefined {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return WORK_VIEWS.find((view) => view === value);
+}
+
+async function WorkLists({
+  view,
+}: {
+  readonly view?: WorkViewParam | undefined;
+}) {
   const [suggestions, approvals, work, done, workforce] = await Promise.all([
     listSuggestionsAction().catch(() => null),
     pendingQApprovalsAction().catch(() => null),
@@ -83,6 +98,8 @@ async function WorkLists() {
         />
       )}
       <WorkPage
+        key={view ?? "default"}
+        initialView={view}
         suggestions={suggestions?.ok === true ? suggestions.value : null}
         approvals={approvals?.ok === true ? approvals.value : null}
         views={views}
@@ -94,12 +111,17 @@ async function WorkLists() {
   );
 }
 
-export default function WorkRoute() {
+export default async function WorkRoute({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ readonly view?: string | string[] }>;
+}) {
+  const view = workViewOf((await searchParams).view);
   return (
     <PageContainer>
       <PageHeader title="Work" />
       <Suspense fallback={<Skeleton lines={6} />}>
-        <WorkLists />
+        <WorkLists view={view} />
       </Suspense>
     </PageContainer>
   );

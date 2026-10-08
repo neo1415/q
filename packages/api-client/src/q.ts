@@ -62,6 +62,9 @@ import {
   Q_ARTIFACT_PLACEHOLDERS_SUFFIX,
   Q_ARTIFACT_PROGRESS_SUFFIX,
   type FillQArtifactPlaceholderRequest,
+  Q_ROOM_PATH,
+  QRoomReadSchema,
+  type QRoomRead,
 } from "@capital-q/contracts";
 
 import { readProblemResponse } from "./problem.js";
@@ -290,6 +293,31 @@ export function rejoinQVoiceDuplex(
     qVoiceDuplexRejoinPath(voiceSessionId),
     QVoiceDuplexRejoinResultSchema,
     { body: input },
+  );
+}
+
+/**
+ * voice-cards: the person's Q room feed -- every run's answer, whichever
+ * path made it -- after `after` (a long poll unless `wait` is false).
+ */
+export function readQRoom(
+  session: ApiSession,
+  input: {
+    readonly after: number;
+    readonly epoch?: string | undefined;
+    readonly wait: boolean;
+  },
+): Promise<QRoomRead> {
+  const query = new URLSearchParams({
+    after: String(input.after),
+    wait: input.wait ? "1" : "0",
+    ...(input.epoch === undefined ? {} : { epoch: input.epoch }),
+  });
+  return call(
+    session,
+    "GET",
+    `${Q_ROOM_PATH}?${query.toString()}`,
+    QRoomReadSchema,
   );
 }
 
