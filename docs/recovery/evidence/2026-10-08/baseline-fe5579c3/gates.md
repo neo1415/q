@@ -1,0 +1,15 @@
+# Release evidence, 2026-10-08
+
+Commit `bb1763fa195bb00f337fe633b1c5342659530612` on `build/rec-g`. Provider keys disabled for every gate. Browser results are MOCK; live voice is LIVE-PENDING (scripts/recovery/voice/LIVE-PROCEDURE.md).
+
+| gate | command | exit | result | seconds | counts (as the tool printed them) |
+|---|---|---|---|---|---|
+| format | `pnpm format:check` | - | NOT RUN | - | - |
+| lint | `pnpm lint` | - | NOT RUN | - | - |
+| typecheck | `pnpm typecheck` | - | NOT RUN | - | - |
+| recovery-typecheck | `npx tsc --noEmit -p tests/recovery/tsconfig.json` | 0 | PASS | 5 | {"errors":0} |
+| unit | `pnpm test` | - | NOT RUN | - | - |
+| pgtap | `npx supabase test db` | - | NOT RUN | - | - |
+| build | `pnpm build` | - | NOT RUN | - | - |
+| recovery | `npx playwright test -c tests/recovery/playwright.recovery.config.ts --project permissions --project scenarios --project voice --project promises --project a11y` | 1 | FAIL | 5546 | {"passed":93,"failed":80,"didNotRun":0,"mode":"MOCK"} |
+| perf | `node scripts/recovery/perf-report.mjs /home/user/q/.claude/worktrees/agent-a0929581068c7d8c9/.playwright/recovery-stack/q-api.log` | 0 | PASS | 0 | {"metrics":3} |
