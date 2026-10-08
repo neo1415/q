@@ -100,6 +100,13 @@ export type KybView = {
     readonly standing: Standing;
     /** An operator's reason when the person's identity was declined. */
     readonly declineReason: string | null;
+    /**
+     * Whether the organisation itself confirmed their place in it (an owner
+     * or admin added them, or approved their request to join). From the
+     * membership record, never a verification claim: identity stays its
+     * own axis.
+     */
+    readonly affiliation: "CONFIRMED_BY_ORGANISATION" | "NOT_CONFIRMED";
     readonly submission: {
       readonly submissionId: string;
       readonly nameOnId: string;
@@ -235,6 +242,16 @@ export function createKybService(dependencies: {
        where tenant_id = ${tenantId} and organisation_id = ${organisationId}
          and user_id = ${userId}
        order by created_at desc limit 1`;
+    // The team service records who added them (an invitation's sender, or
+    // the owner/admin who approved their join request); the person who
+    // set the organisation up has no one, and adding oneself never counts.
+    const [membership] = await executor<{ confirmed: boolean }[]>`
+      select (m.invited_by_user_id is not null
+              and m.invited_by_user_id <> m.user_id) as confirmed
+        from identity.organisation_memberships m
+       where m.tenant_id = ${tenantId} and m.organisation_id = ${organisationId}
+         and m.user_id = ${userId} and m.membership_status = 'active'
+       limit 1`;
     const organisation = await organisationOf(executor, organisationId);
     const personType = personClaimTypeFor(organisation?.kind ?? "COMPANY");
     const claims = await repository.currentForOrganisation(
@@ -262,6 +279,10 @@ export function createKybService(dependencies: {
           personStanding === "REVOKED"
             ? (personClaim?.revocationReason ?? null)
             : null,
+        affiliation:
+          membership?.confirmed === true
+            ? "CONFIRMED_BY_ORGANISATION"
+            : "NOT_CONFIRMED",
         submission:
           identity === undefined
             ? null

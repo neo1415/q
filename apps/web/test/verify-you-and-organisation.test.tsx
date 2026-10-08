@@ -7,6 +7,7 @@ import type { AdminVerificationRowDto, KybDto } from "@capital-q/contracts";
 import { MobileNavigation } from "../src/components/app-shell/mobile-navigation";
 import { verificationGroups } from "../src/features/admin/verification-groups";
 import {
+  personVerificationOptional,
   verifyNudge,
   verifyParts,
 } from "../src/features/verification/verify-state";
@@ -105,6 +106,31 @@ describe("Verify you and <organisation> (ADMIN-4)", () => {
   it("disappears once both the person and the organisation are verified", () => {
     expect(verifyNudge(kyb("VERIFIED", "VERIFIED"))).toBeNull();
     expect(verifyNudge(kyb("VERIFIED", "PENDING"))).not.toBeNull();
+  });
+
+  it("asks nothing of a member the verified organisation confirmed (Tensorgate/Marcus)", () => {
+    const member = (organisation: Standing, person: Standing): KybDto => {
+      const base = kyb(organisation, person);
+      return {
+        ...base,
+        person: { ...base.person, affiliation: "CONFIRMED_BY_ORGANISATION" },
+      };
+    };
+    expect(
+      personVerificationOptional(member("VERIFIED", "NOT_REQUESTED")),
+    ).toBe(true);
+    expect(verifyNudge(member("VERIFIED", "NOT_REQUESTED"))).toBeNull();
+    // Identity stays its own axis: still offered (optionally), never marked.
+    expect(verifyParts(member("VERIFIED", "NOT_REQUESTED")).person).toBe(true);
+    // The organisation not yet verified: the nudge still shows.
+    expect(verifyNudge(member("PENDING", "NOT_REQUESTED"))).not.toBeNull();
+    // Self-declared (the person who set it up, or an older API): unchanged.
+    expect(verifyNudge(kyb("VERIFIED", "NOT_REQUESTED"))?.state).toBe(
+      "NOT_STARTED",
+    );
+    expect(personVerificationOptional(kyb("VERIFIED", "NOT_REQUESTED"))).toBe(
+      false,
+    );
   });
 
   it("sits inside More on a phone, and is gone when there is nothing to show", () => {

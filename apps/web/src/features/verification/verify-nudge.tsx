@@ -1,6 +1,11 @@
 import Link from "next/link";
 
-import { ICON_SIZE, ICON_STROKE, ShieldCheck } from "@capital-q/ui/icons";
+import {
+  ChevronRight,
+  ICON_SIZE,
+  ICON_STROKE,
+  ShieldCheck,
+} from "@capital-q/ui/icons";
 
 import { VERIFY_NUDGE_WORDS, type VerifyNudge } from "./verify-state";
 
@@ -36,8 +41,16 @@ export function VerifyNudgeLink({
         </span>
         <span className="cq-caption truncate text-(--cq-text-secondary)">
           {VERIFY_NUDGE_WORDS[nudge.state]}
+          {nudge.state === "NOT_STARTED" ? " · Start" : ""}
         </span>
       </span>
+      {/* Founder 2026-10-08: it must read as the way into verification. */}
+      <ChevronRight
+        aria-hidden="true"
+        size={ICON_SIZE.compact}
+        strokeWidth={ICON_STROKE}
+        className="ml-auto shrink-0 text-(--cq-text-secondary)"
+      />
     </Link>
   );
 }

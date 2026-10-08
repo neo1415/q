@@ -552,6 +552,18 @@ describe("@capital-q/verification against local PostgreSQL", () => {
         submission: null,
         person: { standing: "NOT_REQUESTED", submission: null },
       });
+      // Their place in the organisation: self-declared until someone else
+      // (an owner or admin) added them -- from the membership, not a claim.
+      expect(other?.person.affiliation).toBe("NOT_CONFIRMED");
+      await world.tx.sql`
+        update identity.organisation_memberships
+           set invited_by_user_id = ${world.adminA.actor.userId}
+         where id = ${world.adminB.membershipId}`;
+      const confirmed = await kyb.current(world.adminB.actor);
+      expect(confirmed?.person).toMatchObject({
+        standing: "NOT_REQUESTED",
+        affiliation: "CONFIRMED_BY_ORGANISATION",
+      });
 
       const [claim] = await world.tx.sql<{ id: string }[]>`
         select claim_id as id from core.kyb_submissions

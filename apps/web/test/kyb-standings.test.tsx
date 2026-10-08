@@ -36,4 +36,36 @@ describe("where verification stands (demo audit 2026-10-03)", () => {
       );
     }
   });
+
+  it("shows a confirmed member's place as confirmed by the company, and their identity as optional", () => {
+    const kyb = KybDtoSchema.parse({
+      standing: "VERIFIED",
+      submission: null,
+      organisationName: "Tensorgate",
+      organisationKind: "COMPANY",
+      person: {
+        standing: "NOT_REQUESTED",
+        declineReason: null,
+        affiliation: "CONFIRMED_BY_ORGANISATION",
+        submission: null,
+      },
+    });
+    const { container } = render(<KybSection kyb={kyb} />);
+    const rows = within(
+      screen.getByRole("list", { name: "Where verification stands" }),
+    ).getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "YouNot verified — optional",
+      "Your place at TensorgateConfirmed by Tensorgate",
+      "TensorgateVerified",
+    ]);
+    // Affiliation is not verification: no shield beside it.
+    expect(rows[1]?.querySelector("svg")).toBeNull();
+    // The identity form is folded away and says it is optional.
+    const folded = container.querySelector("details[data-identity-optional]");
+    expect(folded?.hasAttribute("open")).toBe(false);
+    expect(folded?.querySelector("summary")?.textContent).toBe(
+      "Verify your own identity (optional)",
+    );
+  });
 });

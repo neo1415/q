@@ -503,7 +503,9 @@ export function CompanyProfileView({
                           className="cq-caption block font-normal text-(--cq-text-secondary) underline underline-offset-4"
                           data-raise-source="PITCH_VIDEO"
                         >
-                          {own ? "Said in your pitch, " : "Said in their pitch, "}
+                          {own
+                            ? "Said in your pitch, "
+                            : "Said in their pitch, "}
                           {pitchMoment(overview.raiseFromPitch.atSeconds)}
                         </ProfileTabLink>
                       </>

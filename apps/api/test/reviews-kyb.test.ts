@@ -48,7 +48,12 @@ const VIEW: KybView = {
   submission: null,
   organisationName: "Nixo",
   organisationKind: "COMPANY",
-  person: { standing: "PENDING", declineReason: null, submission: null },
+  person: {
+    standing: "PENDING",
+    declineReason: null,
+    affiliation: "NOT_CONFIRMED",
+    submission: null,
+  },
 };
 
 function security() {

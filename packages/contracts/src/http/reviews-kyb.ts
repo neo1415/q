@@ -183,6 +183,16 @@ export const KybDtoSchema = z
           "REVOKED",
         ]),
         declineReason: z.string().max(500).nullable(),
+        /**
+         * Their place in the organisation, from the membership record --
+         * NOT a verification claim (ADR-001 keeps verification_claims a
+         * separate workflow). CONFIRMED_BY_ORGANISATION: an owner or admin
+         * added them or approved their request to join. Optional so an
+         * older API reads as NOT_CONFIRMED rather than failing.
+         */
+        affiliation: z
+          .enum(["CONFIRMED_BY_ORGANISATION", "NOT_CONFIRMED"])
+          .optional(),
         submission: z
           .object({
             submissionId: UuidSchema,

@@ -14,6 +14,23 @@ export type VerifyParts = {
 };
 
 /**
+ * A member of a VERIFIED organisation whose place in it the organisation
+ * confirmed (an owner or admin added them, or approved their join) is not
+ * asked to verify themselves (founder 2026-10-08: "Tensorgate is verified,
+ * but the member Marcus is still being told to verify"). Their identity is
+ * still its own axis -- it is not marked verified -- it is only offered as
+ * optional, since nothing they do on Capital Q requires it today (doc 15
+ * §7.3 asks for identity OR affiliation checks before contacting
+ * investors; the organisation's confirmation is the affiliation).
+ */
+export function personVerificationOptional(kyb: KybDto): boolean {
+  return (
+    kyb.standing === "VERIFIED" &&
+    kyb.person.affiliation === "CONFIRMED_BY_ORGANISATION"
+  );
+}
+
+/**
  * Which parts the form asks for. A part already verified, or whose details
  * are already with Capital Q, is left out -- so if one is decided, only the
  * other shows. A request Capital Q made on its own (AUTO) still asks for
@@ -47,11 +64,14 @@ export type VerifyNudge = {
 
 /**
  * The shell's quiet reminder. Null once both the person and the
- * organisation are VERIFIED: it disappears by itself.
+ * organisation are VERIFIED: it disappears by itself. Null too for a
+ * member the verified organisation confirmed (personVerificationOptional).
  */
 export function verifyNudge(kyb: KybDto): VerifyNudge | null {
   const standings = [kyb.standing, kyb.person.standing];
   if (standings.every((standing) => standing === "VERIFIED")) return null;
+  // Nothing is asked of them, so the shell asks nothing.
+  if (personVerificationOptional(kyb)) return null;
   const title = `Verify you and ${kyb.organisationName ?? "your organisation"}`;
   if (standings.includes("REVOKED")) return { title, state: "DECLINED" };
   const parts = verifyParts(kyb);
