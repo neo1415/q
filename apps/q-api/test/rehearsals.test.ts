@@ -207,7 +207,9 @@ function memoryStore(): RehearsalStore & {
   return { ...store, rows, counts: state };
 }
 
-function setup(options: { messages?: () => string } = {}) {
+function setup(
+  options: { messages?: () => string; visionTurns?: number } = {},
+) {
   const clock = { at: new Date("2026-10-01T10:05:00Z").getTime() };
   /** Model outages: persona readings and turns that come back empty. */
   const outage = { persona: false, turns: 0, reviews: 0, hang: false };
@@ -421,6 +423,7 @@ function setup(options: { messages?: () => string } = {}) {
     composer,
     now: () => new Date(clock.at),
     turnDeadlineMs: 50,
+    visionTurns: options.visionTurns,
     logger: {
       warn: (fields: Record<string, unknown>, message: string) => {
         warnings.push({ fields, message });
@@ -1092,6 +1095,23 @@ describe("Q sees you on camera, with consent (founder ask 2026-10-01)", () => {
     expect(seen.turnInputs.slice(-2).map((t) => [t.camera, t.screen])).toEqual([
       [true, false],
       [true, false],
+    ]);
+  });
+
+  it("2026-10-08: frames ride with a bounded number of turns per rehearsal (vision budget)", async () => {
+    const { service, seen } = setup({ visionTurns: 3 });
+    const rehearsal = await startWith(service);
+    for (const text of ["One.", "Two.", "Three.", "Four.", "Five."]) {
+      await service.screen(actor(FOUNDER), rehearsal.id, FRAME, "CAMERA");
+      await service.say(actor(FOUNDER), rehearsal.id, { text });
+    }
+    // The test service allows 3 looking turns; the rest are text-only.
+    expect(seen.turnInputs.slice(-5).map((t) => t.camera)).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
     ]);
   });
 

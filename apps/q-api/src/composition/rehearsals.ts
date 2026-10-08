@@ -1328,6 +1328,11 @@ type Frame = { readonly image: RehearsalImage; readonly at: number };
 export const FRAME_TTL_MS = 45_000;
 /** A camera frame is a look at them now: stale after half a minute. */
 export const CAMERA_FRAME_TTL_MS = 30_000;
+/**
+ * 2026-10-08: the vision budget of one rehearsal -- turns that carry a
+ * camera or screen frame (a 30-minute rehearsal has about 40 turns).
+ */
+export const VISION_TURNS_PER_REHEARSAL = 60;
 /** A turn that asks Q to look ("can you see this?") wants a frame this fresh. */
 export const CAMERA_FRESH_MS = 3_500;
 const frameKey = (rehearsalId: string, kind: "SCREEN" | "CAMERA") =>
@@ -1349,9 +1354,12 @@ export function createRehearsalService(dependencies: {
   readonly logger?: Logger | undefined;
   /** The whole turn's deadline (tests shorten it). */
   readonly turnDeadlineMs?: number | undefined;
+  /** Turns a rehearsal may carry frames on (tests lower it). */
+  readonly visionTurns?: number | undefined;
 }): RehearsalService {
   const { store, material, composer, logger } = dependencies;
   const turnDeadlineMs = dependencies.turnDeadlineMs ?? TURN_DEADLINE_MS;
+  const visionTurnsCap = dependencies.visionTurns ?? VISION_TURNS_PER_REHEARSAL;
   const now = dependencies.now ?? (() => new Date());
   const frames = new Map<string, Frame>();
   /** Presence readings as text, per rehearsal; dropped when it finishes. */
@@ -1388,10 +1396,13 @@ export function createRehearsalService(dependencies: {
       ? frame
       : null;
   };
+  /** Turns that carried frames, per rehearsal (the vision budget). */
+  const visionTurns = new Map<string, number>();
   const dropFrames = (rehearsalId: string) => {
     frames.delete(frameKey(rehearsalId, "SCREEN"));
     frames.delete(frameKey(rehearsalId, "CAMERA"));
     consenting.delete(rehearsalId);
+    visionTurns.delete(rehearsalId);
   };
   /** One persona build per viewer and subject at a time. */
   const building = new Map<string, Promise<PersonaRow | null>>();
@@ -1705,7 +1716,13 @@ export function createRehearsalService(dependencies: {
   } | null> {
     const persona = personaOf(row.persona);
     if (persona === null) return null;
-    const screenFrame = peekFrame(row.id, "SCREEN")?.image ?? null;
+    // 2026-10-08: frames ride with at most this many turns a rehearsal
+    // (each is a vision call); past it, the turn is text-only as before.
+    const looked = visionTurns.get(row.id) ?? 0;
+    const mayLook = looked < visionTurnsCap;
+    const screenFrame = mayLook
+      ? (peekFrame(row.id, "SCREEN")?.image ?? null)
+      : null;
     // The latest camera frame stays held (never consumed by a turn): a
     // reply the person spoke over must not cost the next turn its look
     // (founder live 2026-10-02: the camera was on and the played person
@@ -1715,7 +1732,14 @@ export function createRehearsalService(dependencies: {
     const held = peekFrame(row.id, "CAMERA");
     const consent = consenting.has(row.id);
     const at = now().getTime();
-    const cameraFrame = held?.image ?? null;
+    const cameraFrame = mayLook ? (held?.image ?? null) : null;
+    if (screenFrame !== null || cameraFrame !== null) {
+      visionTurns.set(row.id, looked + 1);
+      if (visionTurns.size > 500) {
+        const oldest = visionTurns.keys().next().value;
+        if (oldest !== undefined) visionTurns.delete(oldest);
+      }
+    }
     const themTurns = turns.filter((turn) => turn.from === "THEM").length;
     const seen = presence.get(row.id);
     const look = presenceNote(
@@ -1829,7 +1853,7 @@ export function createRehearsalService(dependencies: {
     // live 2026-10-02 (e53c264f) a second pass without the frame replaced
     // a first that had seen them, and said the camera wasn't shared.
     const later =
-      cameraFrame === null && first.askedToSee && consent
+      cameraFrame === null && first.askedToSee && consent && mayLook
         ? peekFrame(row.id, "CAMERA")
         : null;
     const fresh = later?.image ?? null;
