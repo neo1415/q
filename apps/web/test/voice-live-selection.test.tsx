@@ -49,12 +49,14 @@ class LiveCallUnavailable extends Error {
 }
 const calls: Record<string, unknown>[] = [];
 const typed: string[] = [];
+let slowAnswer: Promise<boolean> | null = null;
 vi.mock("../src/features/voice/live/live-call", () => ({
   LiveCallUnavailable,
-  liveVoiceAvailable: () =>
+  LIVE_AVAILABLE_TIMEOUT_MS: 1_500,
+  askLiveVoice: () =>
     neverAnswers
       ? new Promise<boolean>(() => undefined)
-      : Promise.resolve(available),
+      : (slowAnswer ?? Promise.resolve(available)),
   startLiveCall: (options: Record<string, unknown>) => {
     calls.push(options);
     if (quota) return Promise.reject(new LiveCallUnavailable(429));
@@ -116,6 +118,7 @@ describe("GPT-Live as the product voice", () => {
     opens = true;
     quota = false;
     neverAnswers = false;
+    slowAnswer = null;
     duplexStart.mockClear();
     calls.length = 0;
     typed.length = 0;
@@ -218,7 +221,54 @@ describe("GPT-Live as the product voice", () => {
     expect(statuses).toEqual([]);
   });
 
-  it("a start before the availability answer is in opens the existing line at once (2026-10-09 regression)", async () => {
+  it("an answer that comes later than the bound is kept for the tab, never cached as 'no' (gpt-live.spec start failures)", async () => {
+    vi.useFakeTimers();
+    let land: (value: boolean) => void = () => undefined;
+    slowAnswer = new Promise<boolean>((resolve) => {
+      land = resolve;
+    });
+    const { result } = renderHook(() => useVoiceSession());
+    // The first start waits at most the bound, then opens the existing line.
+    await act(async () => {
+      const starting = result.current.start({ credential: withDuplex });
+      await vi.advanceTimersByTimeAsync(1_500);
+      await starting;
+    });
+    expect(calls).toHaveLength(0);
+    expect(duplexStart).toHaveBeenCalledTimes(1);
+    // The Q API's yes lands at 3 s (as under load on the stack: 1.7-4.1 s).
+    await act(async () => {
+      land(true);
+      await vi.advanceTimersByTimeAsync(1_500);
+    });
+    vi.useRealTimers();
+    // Before the fix this tab stayed on the duplex line for good.
+    await act(async () => {
+      await result.current.start({ credential: withDuplex });
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("an answer still on its way inside the bound is waited for: the start opens GPT-Live", async () => {
+    vi.useFakeTimers();
+    let land: (value: boolean) => void = () => undefined;
+    slowAnswer = new Promise<boolean>((resolve) => {
+      land = resolve;
+    });
+    const { result } = renderHook(() => useVoiceSession());
+    await act(async () => {
+      const starting = result.current.start({ credential: withDuplex });
+      await vi.advanceTimersByTimeAsync(800);
+      land(true);
+      await vi.advanceTimersByTimeAsync(10);
+      await starting;
+    });
+    vi.useRealTimers();
+    expect(calls).toHaveLength(1);
+    expect(duplexStart).toHaveBeenCalledTimes(0);
+  });
+
+  it("a start before the availability answer is in opens the existing line within the bound (2026-10-09 regression)", async () => {
     neverAnswers = true;
     const statuses: (string | null)[] = [];
     const { result } = renderHook(() =>

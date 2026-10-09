@@ -24,6 +24,7 @@ import {
 import { carriedApproval, type CarriedApproval } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
 import { navigationHeard } from "./control/fast-navigation";
+import { noteTypedRun } from "./follow-navigation";
 import { currentScreen, currentViewing } from "./screen";
 import {
   forgetPendingAsk,
@@ -380,6 +381,8 @@ export function useQConversation(
       setConversationIdState(named);
       openRun.current = started.runId;
       setRunId(started.runId);
+      // Started from a typed question (ask, or its resume after a reload).
+      noteTypedRun(started.runId);
       if (isNew && named !== null) {
         // The caller writes it to the URL; that change is ours, not a
         // request to reopen.

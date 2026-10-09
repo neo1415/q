@@ -4498,6 +4498,53 @@ const qSendGuard = createSendGuard({
   readThread: async ({ actor, relationshipId }) =>
     (await chat.readForQ({ actor, relationshipId, limit: 50 })).messages,
 });
+// The sender's approved facts (also the GPT-Live call's background, V part 6).
+const instructionMaterial = createInstructionMaterialReader({
+  ownInvestor: (actor) =>
+    slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
+  ownMandate: async (actor) => {
+    const own =
+      await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+        actor,
+      );
+    if (own === null) return null;
+    const tenantId = TenantIdSchema.parse(actor.tenantId);
+    const organisationId = InvestorOrganisationIdSchema.parse(
+      own.investorOrganisationId,
+    );
+    const first = (
+      await mandates.listActiveMandates(tenantId, organisationId)
+    )[0];
+    return first === undefined
+      ? null
+      : mandates.getMandate(tenantId, organisationId, first.id);
+  },
+  ownCompanyCard: async (actor) => {
+    const companyId = await workOwnCompany(actor);
+    if (companyId === null) return null;
+    return (
+      (await instructionCards.cardsByIds([companyId])).get(companyId) ?? null
+    );
+  },
+  companyCards: async (actor, companyIds) => {
+    const [permitted, cards] = await Promise.all([
+      slateRead.eligibilityPorts.discoverability.permittedToView(
+        { kind: "ACTOR", actor },
+        companyIds,
+      ),
+      instructionCards.cardsByIds(companyIds),
+    ]);
+    return new Map(
+      [...cards].filter(([companyId]) => permitted.get(companyId) === true),
+    );
+  },
+  investorProfile: (actor, investorOrganisationId) =>
+    instructionDiscovery.discoverableInvestor(actor, investorOrganisationId),
+  labels: {
+    code: (code, vocabularyCode) => MANDATE_LABELS.code(code, vocabularyCode),
+    investorType: (code) => MANDATE_LABELS.investorType(code),
+  },
+});
 instructionEngine.current = createInstructionEngine({
   sendGuard: qSendGuard,
   review: outwardReview,
@@ -4538,52 +4585,7 @@ instructionEngine.current = createInstructionEngine({
   // counterpart's network-visible material -- the feed's own cards behind
   // its discoverability check, or an investor's network-visible profile.
   // Never founder-private data.
-  material: createInstructionMaterialReader({
-    ownInvestor: (actor) =>
-      slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
-    ownMandate: async (actor) => {
-      const own =
-        await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
-          actor,
-        );
-      if (own === null) return null;
-      const tenantId = TenantIdSchema.parse(actor.tenantId);
-      const organisationId = InvestorOrganisationIdSchema.parse(
-        own.investorOrganisationId,
-      );
-      const first = (
-        await mandates.listActiveMandates(tenantId, organisationId)
-      )[0];
-      return first === undefined
-        ? null
-        : mandates.getMandate(tenantId, organisationId, first.id);
-    },
-    ownCompanyCard: async (actor) => {
-      const companyId = await workOwnCompany(actor);
-      if (companyId === null) return null;
-      return (
-        (await instructionCards.cardsByIds([companyId])).get(companyId) ?? null
-      );
-    },
-    companyCards: async (actor, companyIds) => {
-      const [permitted, cards] = await Promise.all([
-        slateRead.eligibilityPorts.discoverability.permittedToView(
-          { kind: "ACTOR", actor },
-          companyIds,
-        ),
-        instructionCards.cardsByIds(companyIds),
-      ]);
-      return new Map(
-        [...cards].filter(([companyId]) => permitted.get(companyId) === true),
-      );
-    },
-    investorProfile: (actor, investorOrganisationId) =>
-      instructionDiscovery.discoverableInvestor(actor, investorOrganisationId),
-    labels: {
-      code: (code, vocabularyCode) => MANDATE_LABELS.code(code, vocabularyCode),
-      investorType: (code) => MANDATE_LABELS.investorType(code),
-    },
-  }),
+  material: instructionMaterial,
   plan: createInstructionPlanner({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
@@ -5644,6 +5646,40 @@ const liveBroker =
         // The turn board the voice surface polls: a delegation that moved
         // the screen says so, so the move is followed before it is spoken.
         board: voiceTurnBoard,
+        // Part 6: the call's background, from approved facts only (their
+        // declared mandate or their company's card, as Q's messages may
+        // state them) and their own organisation's name.
+        contextFor: async (actor) => {
+          const organisationId = actor.organisationId;
+          const [material, company, firm] = await Promise.all([
+            instructionMaterial(actor, []),
+            organisationId === undefined ||
+            companies.findOrganisationCompany === undefined
+              ? Promise.resolve(null)
+              : companies
+                  .findOrganisationCompany(actor.tenantId, organisationId)
+                  .catch(() => null),
+            organisationId === undefined
+              ? Promise.resolve(null)
+              : ownInvestorOrganisations
+                  .findByOrganisation(
+                    database.sql,
+                    actor.tenantId,
+                    organisationId,
+                  )
+                  .catch(() => null),
+          ]);
+          return {
+            side: material.sender.side,
+            organisation:
+              material.sender.side === "INVESTOR"
+                ? (firm?.displayName ?? null)
+                : (company?.canonicalName ?? null),
+            facts: material.sender.facts.map(
+              (fact) => `${fact.label}: ${fact.text}`,
+            ),
+          };
+        },
         // Both sides of the line, into voice_line_turns (routed 'live').
         transcripts: createPostgresDuplexTranscriptStore({
           sql: database.sql,

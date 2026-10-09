@@ -8,7 +8,7 @@ import { useElevenLabsVoiceSession } from "./provider/elevenlabs-session";
 import {
   askLiveAvailability,
   forgetLiveAvailability,
-  liveAvailabilityNow,
+  liveAvailabilityFor,
 } from "./live/availability";
 import { releaseVoiceAudio, type VoiceAudioOwner } from "./voice-audio";
 import {
@@ -104,12 +104,13 @@ export function useVoiceSession(
       // switched on for, at every entry point. If it cannot open, the
       // duplex or standard line takes the same credential at once, and
       // the person is told in one line.
-      // Never waited for: an answer not yet in is "not available" for this
-      // start, and the existing line opens at once (2026-10-09 regression).
-      if (allowLive && liveAvailabilityNow() === null) {
-        void askLiveAvailability();
-      }
-      const offered = allowLive && liveAvailabilityNow() === true;
+      // A known answer costs no wait; one still on its way is waited for
+      // at most LIVE_AVAILABLE_TIMEOUT_MS, then the existing line opens
+      // (2026-10-09: a late answer used to read as "no" for the whole tab).
+      const available = allowLive ? await liveAvailabilityFor() : false;
+      // Ended, or started again, while it waited: nothing opens.
+      if (!current()) return;
+      const offered = available === true;
       let quota = false;
       if (offered) {
         setActive("live");

@@ -78,3 +78,53 @@ export function followOfTurns(
   }
   return { navigate, actions };
 }
+
+/**
+ * What this surface follows of the thread's answers. While a voice line is
+ * open, a spoken answer's moves are the voice board's to make, after Q has
+ * said them (they are only marked seen here). An answer to a question this
+ * surface sent by typing is still followed here: the board never carries
+ * it (2026-10-09 stack run, n-founder-strings: "Okay, let me do a quick
+ * rehearsal with these people" was typed while /home's voice line was
+ * open, and its NAVIGATE to Rehearsals was marked seen and never made).
+ */
+export function followOfThread(
+  turns: readonly QTurn[],
+  seen: Set<string>,
+  voice: {
+    readonly active: boolean;
+    /** Runs started in this tab from typed questions (default: all noted). */
+    readonly typedRuns?: ReadonlySet<string> | undefined;
+  },
+): ReturnType<typeof followOfTurns> {
+  if (!voice.active) return followOfTurns(turns, seen);
+  const typedRuns = voice.typedRuns ?? TYPED_RUNS;
+  const typed = followOfTurns(
+    turns.filter(
+      (turn) =>
+        turn.kind !== "Q" ||
+        (turn.runId !== undefined && typedRuns.has(turn.runId)),
+    ),
+    seen,
+  );
+  // The spoken ones: seen, so they are never made here later either.
+  followOfTurns(turns, seen);
+  return typed;
+}
+
+/**
+ * The runs this tab started from typed questions. Module state, so it
+ * outlives the surface that asked (2026-10-09 rerun: the Q page's surface
+ * was set up again as the voice line dropped and came back, and a set held
+ * by the old one was gone when the answer landed). Bounded.
+ */
+const TYPED_RUNS = new Set<string>();
+const TYPED_RUNS_MAX = 50;
+
+export function noteTypedRun(runId: string): void {
+  TYPED_RUNS.add(runId);
+  if (TYPED_RUNS.size > TYPED_RUNS_MAX) {
+    const oldest = TYPED_RUNS.values().next().value;
+    if (oldest !== undefined) TYPED_RUNS.delete(oldest);
+  }
+}
