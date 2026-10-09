@@ -113,6 +113,7 @@ import {
   type DiscoveryAnswer,
 } from "./discover-companies.js";
 import { answerPathOf } from "./answer-path.js";
+import { forModelReading } from "./pending-confirmation.js";
 import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
@@ -638,10 +639,11 @@ export function screenActsNote(facts: readonly string[]): ModelMessage | null {
 
 /**
  * G-D3: what Q says when the only thing to say is the change it prepared;
- * the card (the Approval Engine's) carries the detail. Prepared, never done.
+ * the card (the Approval Engine's, saved after this answer -- K9/G-D23)
+ * carries the detail. Proposed, never "ready" or done.
  */
 export const PREPARED_FOR_APPROVAL_LINE =
-  "I've prepared that for your approval. The details are on the card; nothing happens until you approve it.";
+  "I've proposed that for your approval. The card shows the details once it's saved; nothing happens until you approve it.";
 
 /**
  * C's follow-up: when Q's newest act or move did not land, the answer
@@ -3983,7 +3985,13 @@ export function createModelGatewayQAnswer(
               if (acted !== null && !actedLines.includes(acted)) {
                 actedLines.push(acted);
               }
-              results.push(toolResultMessage(call, outcome));
+              // K9: a staged proposal reads as pending confirmation.
+              results.push(
+                toolResultMessage(
+                  call,
+                  forModelReading(outcome, classificationOf(call.name)),
+                ),
+              );
             }
             messages = [...messages, assistant, ...results];
             if (
