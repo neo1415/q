@@ -23,6 +23,8 @@ export const TEST_CONFIRM_REQUIRED = QActionTypeSchema.parse(
 
 /** The same test action as a setter: a newer card replaces an older one. */
 export const TEST_SETTER = QActionTypeSchema.parse("test.setter");
+/** G-D23: an action on the person's own records, naming no other entity. */
+export const TEST_SELF = QActionTypeSchema.parse("test.self");
 
 export const TestConfirmRequiredPayloadSchema = z
   .object({
@@ -70,6 +72,8 @@ export function createTestConfirmRequiredAction(
   options: {
     readonly actionType?: typeof TEST_CONFIRM_REQUIRED | undefined;
     readonly supersedes?: boolean | undefined;
+    /** G-D23: declares no target (an action on the person's own records). */
+    readonly selfOnly?: boolean | undefined;
   } = {},
 ): {
   readonly definition: AnyQActionDefinition;
@@ -93,12 +97,15 @@ export function createTestConfirmRequiredAction(
       "Records a test note about a company. Test composition only; never registered in production.",
     payload: TestConfirmRequiredPayloadSchema,
     result: TestConfirmRequiredResultSchema,
-    targets: (payload) => [
-      { kind: "COMPANY", companyId: payload.companyId },
-      ...(payload.recipientUserId === undefined
+    targets: (payload) =>
+      options.selfOnly === true
         ? []
-        : [{ kind: "USER" as const, userId: payload.recipientUserId }]),
-    ],
+        : [
+            { kind: "COMPANY", companyId: payload.companyId },
+            ...(payload.recipientUserId === undefined
+              ? []
+              : [{ kind: "USER" as const, userId: payload.recipientUserId }]),
+          ],
     describe: (payload) => ({
       summary: "Q wants to record a test note about this company.",
       preview: payload.note,

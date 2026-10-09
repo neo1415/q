@@ -51,6 +51,7 @@ import {
 import {
   createTestConfirmRequiredAction,
   TEST_CONFIRM_REQUIRED,
+  TEST_SELF,
   TEST_SETTER,
   type TestActionExecutorState,
 } from "../src/testing/index.js";
@@ -243,6 +244,11 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
         createTestConfirmRequiredAction({
           actionType: TEST_SETTER,
           supersedes: true,
+        }).definition,
+        // G-D23: an action on the proposer's own records (no target).
+        createTestConfirmRequiredAction({
+          actionType: TEST_SELF,
+          selfOnly: true,
         }).definition,
       ]),
       authorization: createAuthorizationService(
@@ -1151,6 +1157,33 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       const [still] = await db.sql<{ status: string }[]>`
         select status from q_runtime.approvals where id = ${lapsing.approval.id}`;
       expect(still?.status).toBe("EXPIRED");
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("G-D23: an action on the person's own records (no declared target) is proposed, bound to them, and awaits their approval", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder, service } = world;
+      // Before the fix this threw QActionNotPermittedError: the card the
+      // tool had called PREPARED never existed.
+      const proposed = await propose(world, founder, {}, undefined, TEST_SELF);
+      const [action] = await db.sql<{ status: string; target_refs: unknown }[]>`
+        select status, target_refs from q_runtime.actions where id = ${proposed.action.id}`;
+      expect(action?.status).toBe("AWAITING_APPROVAL");
+      expect(action?.target_refs).toEqual([
+        { kind: "USER", userId: founder.actor.userId },
+      ]);
+      const [approval] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${proposed.approval.id}`;
+      expect(approval?.status).toBe("PENDING");
+      const decided = await service.approve({
+        actor: founder.actor,
+        approvalId: proposed.approval.id,
+        correlationId: CORRELATION(),
+      });
+      expect(decided.view.status).toBe("APPROVED");
     } finally {
       await cleanup(world);
     }

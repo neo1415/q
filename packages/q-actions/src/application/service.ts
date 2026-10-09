@@ -1032,10 +1032,16 @@ export function createQActionService(
     if (!payload.success) {
       throw new QActionNotPermittedError();
     }
-    const targets: readonly QSubjectRef[] = definition.targets(payload.data);
-    if (targets.length === 0) {
-      throw new QActionNotPermittedError();
-    }
+    // G-D23 (2026-10-09): an action on the person's own records (their
+    // profile answer, their settings, their inbox) names no other entity.
+    // Refusing it here dropped every such card after the tool had said
+    // PREPARED, so nothing could ever be approved. Its subject is the
+    // proposer themselves, bound like any target (in the payload hash and
+    // on the action row); the definition's own authorize step below still
+    // decides whether they may take it.
+    const declared: readonly QSubjectRef[] = definition.targets(payload.data);
+    const targets: readonly QSubjectRef[] =
+      declared.length > 0 ? declared : [{ kind: "USER", userId: actor.userId }];
     // The person's authority to take THIS action, now. Approval later never
     // creates what is missing here.
     const authorized = await definition.authorize(payload.data, actor);
