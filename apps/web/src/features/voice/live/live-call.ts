@@ -233,15 +233,31 @@ export async function liveVoiceAvailable(
   doFetch: typeof fetch = fetch.bind(globalThis),
   timeoutMs: number = LIVE_AVAILABLE_TIMEOUT_MS,
 ): Promise<boolean> {
+  return (await askLiveVoice(doFetch, timeoutMs)) ?? false;
+}
+
+/**
+ * The Q API's answer, or null when there is none: a network error, a
+ * failure other than "the line is off" (404), or no answer within
+ * `timeoutMs`. The tab's cached answer (availability.ts) asks again then.
+ */
+export async function askLiveVoice(
+  doFetch: typeof fetch = fetch.bind(globalThis),
+  timeoutMs: number = LIVE_AVAILABLE_TIMEOUT_MS,
+): Promise<boolean | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timedOut = new Promise<boolean>((resolve) => {
+  const timedOut = new Promise<null>((resolve) => {
     timer = setTimeout(() => {
-      resolve(false);
+      resolve(null);
     }, timeoutMs);
   });
   const asked = post<{ available?: unknown }>(doFetch, "available", {}, null)
-    .then((result) => result.available === true)
-    .catch(() => false);
+    .then((result): boolean | null => result.available === true)
+    .catch((error: unknown): boolean | null =>
+      error instanceof LiveCallUnavailable && error.status === 404
+        ? false
+        : null,
+    );
   try {
     return await Promise.race([asked, timedOut]);
   } finally {
