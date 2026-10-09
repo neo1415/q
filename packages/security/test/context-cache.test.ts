@@ -97,9 +97,7 @@ describe("context cache keys (K-security §2)", () => {
       ContextCacheScopeError,
     );
     expect(() =>
-      contextCacheKey(
-        scope({ ...FOUNDER, membershipId: undefined }),
-      ),
+      contextCacheKey(scope({ ...FOUNDER, membershipId: undefined })),
     ).toThrow(ContextCacheScopeError);
   });
 });
