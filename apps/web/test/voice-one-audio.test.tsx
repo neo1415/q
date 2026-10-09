@@ -495,6 +495,8 @@ describe("one voice line produces audio in a tab", () => {
     expect(peers[0]?.closed).toBe(true);
     expect(mic.track.stopped).toBe(true);
     expect(voiceAudioOwner()).toBeNull();
+    // The session created at /open is ended by the Q API at once.
+    expect(relayCalls.some((url) => url.includes("/end/"))).toBe(true);
   });
 
   it("(d) a renewal leaves nothing of the old session playing", async () => {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -23,6 +23,8 @@ import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import {
   createLiveBroker,
   leadTurns,
+  LIVE_INACTIVE_GRACE_MS,
+  LIVE_SWEEP_MS,
   liveMoveOf,
 } from "../src/voice/live/broker.js";
 import { liveContextPackage, referentsOf } from "../src/voice/live/context.js";
@@ -972,7 +974,17 @@ describe("GPT-Live line", () => {
   it("refuses delegations past the hard cap and tells the client to close", async () => {
     const { broker, runs, tick } = setup();
     await open(broker);
-    tick(LIVE_DEFAULTS.maxSessionMs + 1);
+    // A browser that keeps reporting (a long call), past the hard cap but
+    // inside the sweep's grace.
+    for (let at = 0; at < LIVE_DEFAULTS.maxSessionMs; at += 60_000) {
+      tick(60_000);
+      await broker.usage({
+        actor: ACTOR,
+        voiceSessionId: SESSION,
+        report: { seconds: Math.floor((at + 60_000) / 1000) },
+      });
+    }
+    tick(1);
     const result = await ask(broker, "dlg_1", "Top three");
     expect(result).toMatchObject({ ended: true, commentary: null });
     expect(runs).toHaveLength(0);
@@ -1214,5 +1226,151 @@ describe("GPT-Live requests are read whole, and never from nothing (production 2
     });
     expect(long?.length).toBeLessThanOrEqual(1_600);
     expect(liveContextPackage({ facts: null, referents: [] })).toBeNull();
+  });
+});
+
+describe("the provider session is ended from the server (no browser needed)", () => {
+  function closingBroker() {
+    let clock = 9_000_000;
+    let created = 0;
+    const closed: string[] = [];
+    const broker = createLiveBroker({
+      config: { ...LIVE_DEFAULTS, enabled: true },
+      provider: {
+        providerId: "p",
+        modelId: "m",
+        createWebRtcSession: () => {
+          created += 1;
+          return Promise.resolve({
+            sessionId: `live_${String(created)}`,
+            sdp: "v=0 a",
+            model: null,
+          });
+        },
+        closeSession: (id) => {
+          closed.push(id);
+          return Promise.resolve(true);
+        },
+      },
+      firewall: firewall(),
+      turn: () => Promise.resolve({ kind: "SPOKEN", path: "Q" }),
+      spend: { spentTodayUsd: () => Promise.resolve(0) },
+      usage: createInMemoryModelUsageRepository(),
+      providerCeiling: "PUBLIC",
+      syntheticDemo: false,
+      logger,
+      now: () => clock,
+    });
+    return {
+      broker,
+      closed,
+      tick: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+  const flush = async () => {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  };
+
+  it("on /end (a failed connect too), on supersede, and not after the browser saw it close", async () => {
+    const h = closingBroker();
+    await h.broker.open({ binding: binding(), sdp: "v=0 offer" });
+    // A new open replaces it: the old provider session is closed.
+    await h.broker.open({ binding: binding(), sdp: "v=0 offer" });
+    await flush();
+    expect(h.closed).toEqual(["live_1"]);
+    // The browser could not join (connect_failed) or ended: closed.
+    h.broker.end({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      reason: "connect_failed",
+    });
+    await flush();
+    expect(h.closed).toEqual(["live_1", "live_2"]);
+    // A line whose browser saw session.closed (final usage) is not closed again.
+    await h.broker.open({ binding: binding(), sdp: "v=0 offer" });
+    await h.broker.usage({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: { seconds: 20, final: true },
+    });
+    h.broker.end({ actor: ACTOR, voiceSessionId: SESSION, reason: "ended" });
+    await flush();
+    expect(h.closed).toEqual(["live_1", "live_2"]);
+  });
+
+  it("on a timer: an abandoned line and an expired one are closed without anyone asking", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = closingBroker();
+      await h.broker.open({ binding: binding(), sdp: "v=0 offer" });
+      // Past the idle window and its grace with no request at all.
+      h.tick(LIVE_DEFAULTS.idleMs + LIVE_INACTIVE_GRACE_MS + 1);
+      await vi.advanceTimersByTimeAsync(LIVE_SWEEP_MS);
+      await flush();
+      expect(h.closed).toEqual(["live_1"]);
+      expect(h.broker.size()).toBe(0);
+      // A line kept active by its browser still ends at the length cap.
+      await h.broker.open({ binding: binding(), sdp: "v=0 offer" });
+      for (let at = 0; at < LIVE_DEFAULTS.maxSessionMs + 60_000; at += 60_000) {
+        h.tick(60_000);
+        await h.broker.transcript({
+          actor: ACTOR,
+          voiceSessionId: SESSION,
+          report: { segments: [{ role: "USER", text: "still here", at: 1 }] },
+        });
+        await vi.advanceTimersByTimeAsync(LIVE_SWEEP_MS);
+      }
+      await flush();
+      expect(h.closed).toEqual(["live_1", "live_2"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("closing a GPT-Live session over the documented sideband (fake socket)", () => {
+  it("attaches by session id, sends session.close, and confirms on session.closed", async () => {
+    const opened: { url: string; headers: Record<string, string> }[] = [];
+    const sent: string[] = [];
+    const provider = createGptLiveProvider({
+      apiKey: "disabled-locally-000000000000",
+      sideband: (url, headers) => {
+        opened.push({ url, headers: { ...headers } });
+        const listeners = new Map<string, ((event: unknown) => void)[]>();
+        const emit = (type: string, event: unknown) => {
+          for (const listener of listeners.get(type) ?? []) listener(event);
+        };
+        setTimeout(() => {
+          emit("open", {});
+        }, 0);
+        return {
+          readyState: 1,
+          send: (data: string) => {
+            sent.push(data);
+            emit("message", {
+              data: JSON.stringify({
+                type: "session.closed",
+                reason: "close_requested",
+              }),
+            });
+          },
+          close: () => undefined,
+          addEventListener: (type, listener) => {
+            listeners.set(type, [...(listeners.get(type) ?? []), listener]);
+          },
+        };
+      },
+    });
+    expect(await provider.closeSession?.("sess_abc123")).toBe(true);
+    expect(opened[0]?.url).toBe(
+      "wss://api.openai.com/v1/live/sessions/sess_abc123/attach",
+    );
+    expect(opened[0]?.headers["authorization"]).toMatch(/^Bearer /u);
+    expect(sent).toEqual([JSON.stringify({ type: "session.close" })]);
+    // A session id that is not one never reaches the network.
+    expect(await provider.closeSession?.("../../etc")).toBe(false);
+    expect(opened).toHaveLength(1);
   });
 });

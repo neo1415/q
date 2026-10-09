@@ -737,7 +737,19 @@ export async function startLiveCall(
     idleMs = opened.idleMs ?? idleMs;
     background = opened.context ?? background;
     stats = { ...stats, createdModel: opened.model };
-    await pc.setRemoteDescription({ type: "answer", sdp: opened.sdp });
+    try {
+      await pc.setRemoteDescription({ type: "answer", sdp: opened.sdp });
+    } catch (error: unknown) {
+      // The provider session exists (created at /open) but this browser
+      // cannot join it: the Q API ends it now rather than at its sweep.
+      await post(
+        doFetch,
+        `end/${opened.voiceSessionId}`,
+        { reason: "connect_failed" },
+        token,
+      ).catch(() => undefined);
+      throw error;
+    }
     const mine: Connection = {
       pc,
       channel,
