@@ -143,6 +143,11 @@ export type QRunRepository = {
     input: {
       readonly inFlightSilentSince: UtcTimestamp;
       readonly pausedSilentSince: UtcTimestamp;
+      /**
+       * G-D24: an in-flight run whose engine heartbeats is orphaned once
+       * its heartbeat is older than this. Absent: the in-flight window.
+       */
+      readonly engineSilentSince?: UtcTimestamp | undefined;
       readonly limit: number;
     },
   ) => Promise<readonly QRunRecord[]>;
