@@ -14,6 +14,8 @@ import type { QFastNavigationResponse } from "@capital-q/contracts";
 import {
   movedEarlyTo,
   performClientAction,
+  registerShellRouter,
+  setHardLoad,
   registerClientPrefetch,
   registerClientRouter,
   settingsPath,
@@ -27,9 +29,18 @@ import {
   type FastNavigationTransport,
 } from "../src/features/q/control/fast-navigation";
 import { fastMoveLine } from "../src/features/voice/live/live-call";
+import { performTurnChain } from "../src/features/voice/use-follow-turn";
 import {
+  claimVoiceAudio,
+  releaseVoiceAudio,
+} from "../src/features/voice/voice-audio";
+import {
+  expectNavigation,
+  noteRedirect,
   noteRoute,
+  onNavigationOutcome,
   resetUiActController,
+  type NavigationOutcome,
 } from "../src/features/q/ui-act-controller";
 import { loadWire } from "../src/features/q/wire";
 
@@ -302,6 +313,15 @@ describe("GPT-Live transcript sequences", () => {
     expect(fastMoveLine("/discover")).toMatch(/do not ask Q's backend/u);
   });
 
+  it("'open' is said only on the DONE receipt (V, founder live 2026-10-09)", () => {
+    expect(fastMoveLine("/discover", "DONE")).toMatch(/\(confirmed\)/u);
+    for (const receipt of ["FAILED", "PENDING"] as const) {
+      const line = fastMoveLine("/discover", receipt);
+      expect(line).not.toMatch(/\(confirmed\)|already opened/u);
+      expect(line).toMatch(/never say it is open|do not say it is open/u);
+    }
+  });
+
   it("asked again after they moved on, it moves again", async () => {
     stub(server);
     await navigationHeard("open discover");
@@ -309,5 +329,137 @@ describe("GPT-Live transcript sequences", () => {
     noteRoute("/home");
     await navigationHeard("open discover");
     expect(pushed).toEqual(["/discover", "/discover"]);
+  });
+});
+
+/**
+ * Live 2026-10-09 ("most of the stuff I tell it, it says it didn't go
+ * through"): a page that sends them on (Investors -> Discover) is a move
+ * that arrived, never FAILED.
+ */
+describe("a move to a page that redirects", () => {
+  it("is DONE when it lands where that page sent it", () => {
+    const seen: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => seen.push(outcome));
+    expectNavigation("/investors");
+    noteRedirect("/investors", "/discover");
+    noteRoute("/discover");
+    stop();
+    expect(seen).toEqual([
+      { status: "DONE", expected: "/investors", route: "/discover" },
+    ]);
+  });
+
+  it("without the page's word, landing elsewhere is not arrival", () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const seen: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => seen.push(outcome));
+    expectNavigation("/rehearsals");
+    noteRoute("/relationships");
+    vi.advanceTimersByTime(21_000);
+    stop();
+    expect(seen.map((outcome) => outcome.status)).toEqual(["FAILED"]);
+  });
+});
+
+/**
+ * V's GPT-Live bridge waits for a move's receipt before the voice speaks:
+ * a move without one would leave it saying "coming up". Every move gets
+ * one, including the deduped and the already-there.
+ */
+describe("every move gets a receipt", () => {
+  function receipts(): { seen: NavigationOutcome[]; stop: () => void } {
+    const seen: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => seen.push(outcome));
+    return { seen, stop };
+  }
+
+  it("Q's OPEN_RECORD_PAGE after the fast path already opened it: DONE, one push", async () => {
+    stub(server);
+    await navigationHeard("Take me to Shiftwell relationship");
+    const { seen, stop } = receipts();
+    performClientAction({
+      kind: "OPEN_RECORD_PAGE",
+      page: "RELATIONSHIP_COMPANY",
+      id: SHIFTWELL,
+    });
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    stop();
+    expect(seen[0]?.status).toBe("DONE");
+    expect(pushed).toHaveLength(1);
+  });
+
+  it("a voice turn's move to the page they are on: DONE at once", () => {
+    window.history.pushState(null, "", "/discover");
+    noteRoute("/discover");
+    const { seen, stop } = receipts();
+    performTurnChain({
+      sequence: 1,
+      navigate: "DISCOVER",
+      handoff: null,
+    } as unknown as Parameters<typeof performTurnChain>[0]);
+    stop();
+    expect(seen).toEqual([
+      { status: "DONE", expected: "/discover", route: "/discover" },
+    ]);
+  });
+});
+
+/**
+ * V's live test 2026-10-09: a delegated open landed by a HARD RELOAD (the
+ * page's Q session had no router registered at that moment), which ends
+ * the voice call. Moves wait briefly for a router; never a full load
+ * while a call holds the audio.
+ */
+describe("Q's moves never hard-reload while a call is live", () => {
+  const owner = { stop: () => undefined };
+
+  afterEach(() => {
+    releaseVoiceAudio(owner);
+    registerShellRouter(null);
+    setHardLoad(null);
+  });
+
+  it("with no page router, the shell's router moves", async () => {
+    registerClientRouter(null);
+    const shell: string[] = [];
+    registerShellRouter((path) => shell.push(path));
+    await navigationHeard("open discover");
+    expect(shell).toEqual(["/discover"]);
+  });
+
+  it("with no router at all, the move waits and goes once one registers", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    registerClientRouter(null);
+    const loads: string[] = [];
+    setHardLoad((path) => loads.push(path));
+    await navigationHeard("open discover");
+    expect(pushed).toEqual([]);
+    vi.advanceTimersByTime(500);
+    registerClientRouter((path) => pushed.push(path));
+    expect(pushed).toEqual(["/discover"]);
+    vi.advanceTimersByTime(5_000);
+    expect(loads).toEqual([]);
+  });
+
+  it("never a full page load while a voice call holds the audio", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    registerClientRouter(null);
+    await claimVoiceAudio(owner);
+    const loads: string[] = [];
+    setHardLoad((path) => loads.push(path));
+    await navigationHeard("open discover");
+    vi.advanceTimersByTime(5_000);
+    expect(loads).toEqual([]);
+  });
+
+  it("with no call and no router, the last resort still opens the page", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    registerClientRouter(null);
+    const loads: string[] = [];
+    setHardLoad((path) => loads.push(path));
+    await navigationHeard("open discover");
+    vi.advanceTimersByTime(2_500);
+    expect(loads).toEqual(["/discover"]);
   });
 });

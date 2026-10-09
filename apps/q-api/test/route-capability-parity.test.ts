@@ -801,6 +801,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_CANCEL_PATH": Q_TRANSPORT,
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_USAGE_PATH": Q_TRANSPORT,
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_END_PATH": Q_TRANSPORT,
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_TRANSCRIPT_PATH": Q_TRANSPORT,
   "q-api/voice/live/routes.ts GET Q_VOICE_LIVE_PREVIEW_PATH": Q_TRANSPORT,
   "q-api/voice/live/routes.ts GET Q_VOICE_LIVE_AVAILABLE_PATH": Q_TRANSPORT,
   // DUPLEX: the full-duplex line's tool relay, usage report and end.
@@ -1108,6 +1109,7 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_CANCEL_PATH",
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_USAGE_PATH",
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_END_PATH",
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_TRANSCRIPT_PATH",
   // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
   // conversation's own transport, never a person's action.
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",

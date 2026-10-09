@@ -23,6 +23,7 @@ import {
 } from "./voice-line";
 import { IGNORED_NOTICE } from "./provider/duplex-notices";
 import { readVoiceTurn, sendVoiceScreen } from "./provider/duplex-relays";
+import { VOICE_TURN_NOW_EVENT } from "./live/move";
 import { LINE_LOST_NOTICE, RECONNECTING_NOTICE } from "./provider/line-health";
 import type {
   VoiceSessionClient,
@@ -703,7 +704,34 @@ export function useVoiceInterview(
     // is about the card and the moment on screen. The position is sent in
     // five-second steps: enough to find the passage, not a post a second.
     let sentScreen = JSON.stringify(currentScreen());
+    // V (founder live 2026-10-09, "it's not open yet"): a GPT-Live
+    // delegation's result names its move; the board is read at once, not
+    // on the next poll, so the screen moves before the voice speaks.
+    let inFlight = false;
+    let again = false;
+    const now = () => {
+      if (cancelled) return;
+      if (inFlight) {
+        again = true;
+        return;
+      }
+      if (timer !== undefined) clearTimeout(timer);
+      void tick();
+    };
+    window.addEventListener(VOICE_TURN_NOW_EVENT, now);
     const tick = async () => {
+      inFlight = true;
+      try {
+        await readOnce();
+      } finally {
+        inFlight = false;
+      }
+      if (cancelled) return;
+      const soon = again;
+      again = false;
+      timer = setTimeout(() => void tick(), soon ? 0 : TURN_POLL_MS);
+    };
+    const readOnce = async () => {
       const screen = currentScreen();
       const viewing = currentViewing();
       const screenKey = JSON.stringify([
@@ -791,10 +819,10 @@ export function useVoiceInterview(
         });
         return;
       }
-      timer = setTimeout(() => void tick(), TURN_POLL_MS);
     };
     void tick();
     return () => {
+      window.removeEventListener(VOICE_TURN_NOW_EVENT, now);
       cancelled = true;
       if (timer !== undefined) {
         clearTimeout(timer);

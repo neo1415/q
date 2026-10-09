@@ -137,6 +137,9 @@ function microphone() {
   };
 }
 const relayCalls: string[] = [];
+const transcriptPosts: {
+  segments: { role: string; text: string; at: number }[];
+}[] = [];
 const relay: typeof fetch = (input, init) => {
   const url =
     typeof input === "string"
@@ -145,6 +148,14 @@ const relay: typeof fetch = (input, init) => {
         ? input.href
         : input.url;
   relayCalls.push(url);
+  if (url.includes("/transcript/")) {
+    transcriptPosts.push(
+      JSON.parse(typeof init?.body === "string" ? init.body : "{}") as {
+        segments: { role: string; text: string; at: number }[];
+      },
+    );
+    return Promise.resolve(Response.json({ recorded: 1 }));
+  }
   if (url.endsWith("/open")) {
     const body = JSON.parse(
       typeof init?.body === "string" ? init.body : "{}",
@@ -243,6 +254,7 @@ describe("one voice line produces audio in a tab", () => {
     peers.length = 0;
     audios.length = 0;
     relayCalls.length = 0;
+    transcriptPosts.length = 0;
     standardEnds.mockClear();
     standardStarts.mockClear();
   });
@@ -334,6 +346,46 @@ describe("one voice line produces audio in a tab", () => {
       await reopening;
     });
     expect(voiceLineHolder()).toBe(dockHolder);
+  });
+
+  it("keeps the call's final transcript, both sides in order, before the line ends (voice_line_turns)", async () => {
+    const call = await standalone();
+    const channel = peers[0]?.channel;
+    channel?.emit({
+      type: "session.input_transcript.delta",
+      delta: "Open Tensorgate",
+    });
+    channel?.emit({
+      type: "session.delegation.created",
+      delegation: { id: "dlg_t", target: "client" },
+    });
+    channel?.emit({
+      type: "session.output_transcript.delta",
+      delta: "It's coming up now.",
+    });
+    // Interrupted mid-sentence: what it had said is kept too.
+    channel?.emit({ type: "session.input_transcript.delta", delta: "Thanks" });
+    const ending = call.end("ended");
+    channel?.emit({
+      type: "session.closed",
+      reason: "close_requested",
+      usage: { seconds: 2 },
+    });
+    await ending;
+    await call.finished;
+    const segments = transcriptPosts.flatMap((post) => post.segments);
+    expect(segments.map((one) => [one.role, one.text])).toEqual([
+      ["USER", "Open Tensorgate"],
+      ["Q", "It's coming up now."],
+      ["USER", "Thanks"],
+    ]);
+    // Stored before the line is ended on the server (it is gone after).
+    const transcriptAt = relayCalls.findIndex((url) =>
+      url.includes("/transcript/"),
+    );
+    const endAt = relayCalls.findLastIndex((url) => url.includes("/end/"));
+    expect(transcriptAt).toBeGreaterThanOrEqual(0);
+    expect(transcriptAt, relayCalls.join(" ")).toBeLessThan(endAt);
   });
 
   it("(c) a slow GPT-Live open that is ended while connecting never plays, and no fallback starts after the end", async () => {
