@@ -110,6 +110,7 @@ import {
 } from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
 import { createLiveBroker } from "./voice/live/broker.js";
+import { createPostgresLiveSpend } from "./voice/live/spend.js";
 import { liveConfigFrom } from "./voice/live/config.js";
 import { createGptLiveProvider } from "./voice/providers/gpt-live.js";
 import { duplexConfigFrom } from "./voice/duplex/config.js";
@@ -5639,7 +5640,7 @@ const liveBroker =
         }),
         firewall,
         turn: voiceTurn,
-        spend: createPostgresDuplexSpend(database.sql),
+        spend: createPostgresLiveSpend(database.sql),
         usage: createPostgresModelUsageRepository({ sql: database.sql }),
         // ai_ops.providers: openai is UNREVIEWED, as for the duplex line.
         providerCeiling: "PUBLIC",

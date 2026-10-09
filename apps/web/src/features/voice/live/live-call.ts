@@ -103,7 +103,10 @@ export type LiveCallOptions = {
 
 export type LiveCall = {
   readonly voiceSessionId: string;
+  /** Silent and closing when it resolves (see `finished`). */
   readonly end: (reason?: LiveCallEnd) => Promise<void>;
+  /** The session closed (or gave up waiting) and its usage was reported. */
+  readonly finished: Promise<void>;
   readonly typed: (text: string) => void;
   readonly setMuted: (muted: boolean) => void;
   readonly setVolume: (volume: number) => void;
@@ -156,20 +159,32 @@ async function post<T>(
   return (response.status === 204 ? null : await response.json()) as T;
 }
 
-/** Whether this person's voice starts on GPT-Live (the Q API decides). */
+/** Longest the voice start waits to hear whether GPT-Live is on. */
+export const LIVE_AVAILABLE_TIMEOUT_MS = 1_500;
+
+/**
+ * Whether this person's voice starts on GPT-Live (the Q API decides).
+ * Anything but a clear yes is no, at once: a 404 (the line is off), a
+ * network error, or no answer within LIVE_AVAILABLE_TIMEOUT_MS. The voice
+ * start then opens the existing line with no delay and no notice.
+ */
 export async function liveVoiceAvailable(
   doFetch: typeof fetch = fetch.bind(globalThis),
+  timeoutMs: number = LIVE_AVAILABLE_TIMEOUT_MS,
 ): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => {
+      resolve(false);
+    }, timeoutMs);
+  });
+  const asked = post<{ available?: unknown }>(doFetch, "available", {}, null)
+    .then((result) => result.available === true)
+    .catch(() => false);
   try {
-    const result = await post<{ available?: unknown }>(
-      doFetch,
-      "available",
-      {},
-      null,
-    );
-    return result.available === true;
-  } catch {
-    return false;
+    return await Promise.race([asked, timedOut]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -631,8 +646,15 @@ export async function startLiveCall(
     void end("max_length");
   }, maxSessionMs);
 
-  const end = async (reason: LiveCallEnd = "ended") => {
-    if (ended) return;
+  let finished: Promise<void> = Promise.resolve();
+  /**
+   * Silent and closing when it resolves: the speaker and microphone are off
+   * and `session.close` is sent. Waiting for the session's final usage
+   * (up to CLOSE_WAIT_MS) goes on in `finished`, never holding the next
+   * line back.
+   */
+  const end = (reason: LiveCallEnd = "ended"): Promise<void> => {
+    if (ended) return Promise.resolve();
     ended = true;
     // Silent first: the speaker and the microphone stop now; closing the
     // session (and waiting for its final usage) happens after.
@@ -647,6 +669,18 @@ export async function startLiveCall(
       mine.closeRequested = true;
       if (mine.channel.readyState === "open") {
         mine.channel.send(JSON.stringify({ type: "session.close" }));
+      }
+    }
+    finished = finish(mine, reason);
+    return Promise.resolve();
+  };
+
+  const finish = async (
+    mine: Connection | null,
+    reason: LiveCallEnd,
+  ): Promise<void> => {
+    if (mine !== null) {
+      if (mine.channel.readyState === "open") {
         const deadline = performance.now() + CLOSE_WAIT_MS;
         while (!mine.closed && performance.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 200));
@@ -681,6 +715,9 @@ export async function startLiveCall(
       return id ?? "";
     },
     end,
+    get finished() {
+      return finished;
+    },
     typed: (text) => {
       bridge.typed(text);
     },

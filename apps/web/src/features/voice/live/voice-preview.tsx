@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@capital-q/ui/button";
 
 import { startVoiceSessionAction } from "../actions";
 import { useVoiceSession } from "../use-voice-session";
+import {
+  dropVoiceLine,
+  endVoiceLine,
+  openVoiceLine,
+  type VoiceLineHolder,
+} from "../voice-line";
 import type { LiveBridgeState } from "./bridge";
 import { startLiveCall, type LiveCall, type LiveCallStats } from "./live-call";
 
@@ -38,20 +44,43 @@ export function VoicePreview({
   const [bridge, setBridge] = useState<LiveBridgeState | null>(null);
   const [issued, setIssued] = useState<string | null>(null);
   const call = useRef<LiveCall | null>(null);
-  const standard = useVoiceSession({
-    onEnded: (reason) => {
-      setStatus(`Ended (${reason})`);
+  const standard = useVoiceSession(
+    {
+      onEnded: (reason) => {
+        setStatus(`Ended (${reason})`);
+      },
+      onError: (message) => {
+        setStatus(message);
+      },
     },
-    onError: (message) => {
-      setStatus(message);
-    },
-  });
+    // B and C are the existing lines: never GPT-Live here.
+    { live: false },
+  );
 
-  const start = useCallback(async () => {
+  // The preview holds the tab's one voice line like every other surface
+  // (founder 2026-10-09, "two voices"): opening here ends the dock's line
+  // first, and a surface opening a line ends this one first.
+  const releaseRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const [holder] = useState<VoiceLineHolder>(() => ({
+    release: () => releaseRef.current(),
+  }));
+  useEffect(
+    () => () => {
+      dropVoiceLine(holder);
+    },
+    [holder],
+  );
+
+  // Not memoised: it reads the current choice, voice and briefing.
+  const start = async () => {
     setStats(null);
     setBridge(null);
     setIssued(null);
     setStatus("Connecting…");
+    await openVoiceLine(holder, () => open());
+  };
+
+  const open = async () => {
     try {
       if (choice === "A") {
         call.current = await startLiveCall({
@@ -107,13 +136,22 @@ export function VoicePreview({
     } catch (error: unknown) {
       setStatus(error instanceof Error ? error.message : "Could not start.");
     }
-  }, [briefing, choice, standard, voice]);
+  };
 
-  const stop = useCallback(async () => {
-    setStatus("Closing…");
-    if (call.current !== null) await call.current.end("ended");
+  const close = async (reason: "ended" | "superseded") => {
+    const live = call.current;
+    call.current = null;
+    if (live !== null) await live.end(reason);
     else await standard.end();
-  }, [standard]);
+  };
+  useEffect(() => {
+    releaseRef.current = () => close("superseded");
+  });
+
+  const stop = async () => {
+    setStatus("Closing…");
+    await endVoiceLine(holder, () => close("ended"));
+  };
 
   const live =
     status === "Live" || status === "Connecting…" || status === "Closing…";

@@ -7,10 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * two voices talking at the same time"). The browser's WebRTC, microphone
  * and audio graph are faked at their boundary; the line code is real.
  *
- * (a) two voice clients (the app's dock and the preview's line): starting
- *     one stops the other first;
- * (b) a standalone GPT-Live call (the preview's A) and a voice client
- *     (the preview's B/C, or the dock) stop each other, either way round;
+ * (a) two surfaces (the app's dock and the preview's line) hold the tab's
+ *     one voice line: opening one ends the other first;
+ * (b) the preview's standalone GPT-Live call and the dock end each other
+ *     first, either way round, and GPT-Live goes silent at once;
  * (c) a GPT-Live open that is slow: ended while connecting, it closes when
  *     it comes up, and no fallback line is started after the end; a call
  *     that fails mid-connect closes its peer and microphone;
@@ -201,8 +201,17 @@ let slowOpen: Promise<void> | null = null;
 
 const { useVoiceSession } =
   await import("../src/features/voice/use-voice-session");
+const { askLiveAvailability, forgetLiveAvailability } =
+  await import("../src/features/voice/live/availability");
+/** The availability answer is in (it is asked as the surface mounts). */
+const ready = () =>
+  act(async () => {
+    await askLiveAvailability();
+  });
 const { startLiveCall } = await import("../src/features/voice/live/live-call");
 const { voiceAudioOwner } = await import("../src/features/voice/voice-audio");
+const { openVoiceLine, voiceLineHolder } =
+  await import("../src/features/voice/voice-line");
 
 const credential = {
   voiceSessionId: "5f000000-0000-4000-8000-000000000001",
@@ -227,6 +236,7 @@ const audible = () => audios.filter((a) => a.srcObject !== null && !a.muted);
 
 describe("one voice line produces audio in a tab", () => {
   beforeEach(() => {
+    forgetLiveAvailability();
     liveOn = true;
     slowOpen = null;
     failRemote = false;
@@ -250,44 +260,80 @@ describe("one voice line produces audio in a tab", () => {
     await stopping;
   });
 
-  it("(a) starting a second voice client (the preview) stops the dock's line first", async () => {
+  it("(a) the preview opening a line ends the dock's line first (one voice line per tab)", async () => {
     liveOn = false;
     const dock = renderHook(() => useVoiceSession());
-    const preview = renderHook(() => useVoiceSession());
+    const preview = renderHook(() => useVoiceSession({}, { live: false }));
+    // Each surface holds the tab's line the way the app's surfaces do.
+    const dockHolder = { release: () => dock.result.current.end() };
+    const previewHolder = { release: () => preview.result.current.end() };
+    await ready();
     await act(async () => {
-      await dock.result.current.start({ credential });
+      await openVoiceLine(dockHolder, () =>
+        dock.result.current.start({ credential }),
+      );
     });
     expect(standardStarts).toHaveBeenCalledTimes(1);
     standardEnds.mockClear();
-    await act(async () => {
-      await preview.result.current.start({ credential });
+    const order: string[] = [];
+    standardEnds.mockImplementationOnce(() => {
+      order.push("dock ended");
+      return Promise.resolve();
     });
-    // The dock's transports were all ended before the preview's started.
-    expect(standardEnds).toHaveBeenCalled();
-    expect(standardStarts).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await openVoiceLine(previewHolder, async () => {
+        order.push("preview starts");
+        await preview.result.current.start({ credential });
+      });
+    });
+    expect(order).toEqual(["dock ended", "preview starts"]);
+    expect(voiceLineHolder()).toBe(previewHolder);
   });
 
-  it("(b) a standalone GPT-Live call stops a voice client's line, and is stopped by the next one", async () => {
+  it("(b) the preview's standalone GPT-Live call and the dock end each other first, either way round", async () => {
     liveOn = false;
     const dock = renderHook(() => useVoiceSession());
+    const dockHolder = { release: () => dock.result.current.end() };
+    await ready();
     await act(async () => {
-      await dock.result.current.start({ credential });
+      await openVoiceLine(dockHolder, () =>
+        dock.result.current.start({ credential }),
+      );
     });
     standardEnds.mockClear();
-    const call = await standalone();
+    // The preview's A: a standalone GPT-Live call under its own holder.
+    let call: Awaited<ReturnType<typeof standalone>> | null = null;
+    const previewHolder = {
+      release: async () => {
+        await call?.end("superseded");
+      },
+    };
+    await openVoiceLine(previewHolder, async () => {
+      call = await standalone();
+    });
     expect(standardEnds).toHaveBeenCalled();
     peers[0]?.track({ id: "q-voice" });
     expect(audible()).toHaveLength(1);
-    // The other way round: the dock starts again; the call goes silent at
-    // once and closes its session.
-    await act(async () => {
-      await dock.result.current.start({ credential });
+    // The dock opens again: the call goes silent at once and closes its
+    // session (its final usage is still on its way, so not awaited here).
+    const reopening = openVoiceLine(dockHolder, () =>
+      dock.result.current.start({ credential }),
+    );
+    await vi.waitFor(() => {
+      expect(audible()).toHaveLength(0);
     });
-    expect(audible()).toHaveLength(0);
     expect(peers[0]?.channel.sent.some((e) => e.type === "session.close")).toBe(
       true,
     );
-    void call;
+    peers[0]?.channel.emit({
+      type: "session.closed",
+      reason: "close_requested",
+      usage: { seconds: 3 },
+    });
+    await act(async () => {
+      await reopening;
+    });
+    expect(voiceLineHolder()).toBe(dockHolder);
   });
 
   it("(c) a slow GPT-Live open that is ended while connecting never plays, and no fallback starts after the end", async () => {
@@ -297,6 +343,7 @@ describe("one voice line produces audio in a tab", () => {
     });
     const { result } = renderHook(() => useVoiceSession());
     let starting: Promise<void> = Promise.resolve();
+    await ready();
     act(() => {
       starting = result.current.start({ credential });
     });
@@ -361,6 +408,7 @@ describe("one voice line produces audio in a tab", () => {
       usage: { seconds: 5 },
     });
     await ending;
+    await call.finished;
     expect(peers[0]?.closed).toBe(true);
   });
 });
