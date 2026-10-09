@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { QAttentionReport, QStreamEvent } from "@capital-q/contracts";
 import { createLogger } from "@capital-q/observability";
 import {
+  factsForVoice,
   spokenFactsOfAttention,
   spokenFidelityIssues,
   type SpokenFacts,
@@ -127,7 +128,11 @@ const event = (type: string, data: Record<string, unknown>): QStreamEvent =>
     data,
   }) as unknown as QStreamEvent;
 
-function handler(text: string, read: QAttentionReport | (() => never)) {
+function handler(
+  text: string,
+  read: QAttentionReport | (() => never),
+  blocks?: readonly unknown[],
+) {
   const qRuntime = {
     createRun: () =>
       Promise.resolve({
@@ -147,6 +152,7 @@ function handler(text: string, read: QAttentionReport | (() => never)) {
         role: "Q",
         text,
         createdAt: NOW,
+        ...(blocks === undefined ? {} : { blocks }),
       },
     }),
     event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
@@ -181,6 +187,7 @@ async function say(
   text: string,
   read: QAttentionReport | (() => never),
   withFacts = false,
+  options: { blocks?: readonly unknown[]; asked?: string } = {},
 ) {
   const spoken: string[] = [];
   let facts: SpokenFacts | null = null;
@@ -203,9 +210,9 @@ async function say(
         }
       : {}),
   };
-  await handler(text, read)(
+  await handler(text, read, options.blocks)(
     binding(),
-    [{ role: "user", content: ASKED }],
+    [{ role: "user", content: options.asked ?? ASKED }],
     new AbortController().signal,
     speaker,
   );
@@ -242,15 +249,64 @@ describe("'what needs my attention', said from the attention report", () => {
     expect(said).toMatch(/couldn't check your messages/iu);
   });
 
-  it("says the written answer when the report read now does not match it, or the read fails", async () => {
-    const shown = writtenAnswer(TWO);
+  it("never says the written answer when the report does not match it or cannot be read: it points to the screen (V 2026-10-09)", async () => {
+    const shown = writtenAnswer(QUOTING);
     const mismatch = await say(shown, report());
-    expect(mismatch.said).toContain("Zino Aviation is waiting for your reply");
-    expect(mismatch.said).toContain("Halyard Security");
+    expect(mismatch.said).toBe("What needs you is on your screen now.");
     const failed = await say(shown, () => {
       throw new Error("down");
     });
-    expect(failed.said).toContain("Zino Aviation is waiting for your reply");
+    expect(failed.said).toBe("What needs you is on your screen now.");
+    for (const said of [mismatch.said, failed.said]) {
+      expect(said).not.toMatch(/They wrote|lunch on Thursday/u);
+    }
+  });
+});
+
+/** A counterpart's message, quoted in the written answer's note. */
+const QUOTING = report({
+  items: [
+    {
+      key: "msg:2",
+      source: "UNANSWERED_MESSAGE",
+      title: "Spheros is waiting for your reply",
+      note: 'They wrote: "Thanks — can we do lunch on Thursday?"',
+      counterpart: "Spheros",
+      since: NOW,
+      decidable: false,
+    },
+  ],
+});
+
+describe("an attention answer is always said from its facts: names, never message bodies (V 2026-10-09)", () => {
+  it("an answer carrying its ATTENTION block is said from that report, on any question", async () => {
+    const { said, facts } = await say(writtenAnswer(QUOTING), report(), true, {
+      blocks: [{ kind: "ATTENTION", report: QUOTING }],
+      asked: "Anything from Spheros?",
+    });
+    expect(said).toContain("Spheros is waiting for your reply");
+    expect(said).not.toMatch(/They wrote|lunch on Thursday/u);
+    const given = facts as SpokenFacts | null;
+    expect(given?.kind).toBe("ATTENTION");
+    expect(given?.mustSay).toEqual(["Spheros"]);
+    // The duplex and live voices get no item detail that quotes anyone.
+    expect(
+      JSON.stringify(factsForVoice(given ?? spokenFactsOfAttention(QUOTING))),
+    ).not.toMatch(/They wrote|lunch/u);
+  });
+
+  it("a written answer that quotes a message, with no block and another question, is still said from facts", async () => {
+    const { said } = await say(writtenAnswer(QUOTING), QUOTING, false, {
+      asked: "Anything from Spheros?",
+    });
+    expect(said).toContain("Spheros is waiting for your reply");
+    expect(said).not.toMatch(/They wrote|lunch on Thursday/u);
+  });
+
+  it("the attention facts never carry an item's note", () => {
+    const facts = spokenFactsOfAttention(QUOTING);
+    expect(facts.items.every((item) => item.does === null)).toBe(true);
+    expect(JSON.stringify(factsForVoice(facts))).not.toMatch(/They wrote/u);
   });
 });
 
