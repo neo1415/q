@@ -164,6 +164,14 @@ export type QuestionKind = z.infer<typeof QuestionKindSchema>;
  */
 export const DISCOVER_RANKINGS = ["NONE", "FIT", "TOP"] as const;
 
+/** What a prepared-context question is about (K8, TURN_READER v47). */
+export const PREPARED_SUBJECTS = [
+  "MANDATE",
+  "ON_SCREEN_RECORD",
+  "Q_WORK",
+] as const;
+export type PreparedSubject = (typeof PREPARED_SUBJECTS)[number];
+
 export const DiscoverRequestSchema = z
   .object({
     /** Taxonomy codes, lower_snake_case ("fintech", "digital_health"). */
@@ -214,6 +222,14 @@ export const QuestionToQSchema = z
      * out of their words.
      */
     discover: DiscoverRequestSchema.nullable().default(null),
+    /**
+     * K8 (v47): a question about something Q already holds for this turn
+     * -- their own mandate, the record on their screen, Q's own work for
+     * them -- answered from that prepared context without a tool round.
+     * Null for anything else; when the context is missing the full path
+     * answers.
+     */
+    subject: z.enum(PREPARED_SUBJECTS).nullable().default(null),
   })
   .strict();
 export type QuestionToQ = z.infer<typeof QuestionToQSchema>;

@@ -13,7 +13,7 @@ describe("TURN_READER v38", () => {
   it("is followed by v39", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(46);
+    ).toBe(47);
   });
 
   it("names every contract destination exactly once, USAGE included", () => {

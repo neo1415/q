@@ -36,7 +36,7 @@ export const TURN_READER_V46: PromptDefinition<
 > = {
   ...TURN_READER_V45,
   version: 46,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder brief K1 (live 2026-10-09 15:57): companies of a kind on Capital Q is DISCOVER_COMPANIES in any words, with taxonomy sectors, countries, stages, count and ranking, answered from the catalog by code.",
   effectiveFrom: "2026-10-09",

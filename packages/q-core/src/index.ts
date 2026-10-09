@@ -298,6 +298,10 @@ export {
   V46_DISCOVER_FIELDS,
 } from "./prompts/tasks/turn-reader.v46.js";
 export {
+  TURN_READER_V47,
+  V47_SUBJECT,
+} from "./prompts/tasks/turn-reader.v47.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -363,6 +367,9 @@ export {
   TURN_READER_V46_SCHEMA_VERSION,
   TurnReaderV46ResultSchema,
   type TurnReaderV46Result,
+  TURN_READER_V47_SCHEMA_VERSION,
+  TurnReaderV47ResultSchema,
+  type TurnReaderV47Result,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,

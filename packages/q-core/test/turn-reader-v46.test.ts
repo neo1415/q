@@ -17,10 +17,10 @@ import {
  * a kind are DISCOVER_COMPANIES with their structure, never researched.
  */
 describe("TURN_READER v46", () => {
-  it("is the active reader and v45 is deprecated", () => {
+  it("was the active reader; v45 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(46);
+    ).toBe(47);
     expect(TURN_READER_V45.status).toBe("DEPRECATED");
   });
 

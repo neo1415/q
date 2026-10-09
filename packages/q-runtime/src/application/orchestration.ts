@@ -250,6 +250,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly questionKind?: string | undefined;
   /**
+   * K8: the reader read a question about something prepared for this turn
+   * (their mandate, the record on screen, Q's work for them). The router
+   * answers it from that context without a tool round when it is there.
+   */
+  readonly preparedSubject?:
+    "MANDATE" | "ON_SCREEN_RECORD" | "Q_WORK" | undefined;
+  /**
    * K1: a DISCOVER_COMPANIES request as the reader read it ("three
    * fintech companies in Nigeria"). Answered from the catalog by code, fit
    * only when asked for; never the analyst, never the public web.

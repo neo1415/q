@@ -3460,6 +3460,12 @@ export function createSpecialistQAnswer(
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),
+      // K8: a question about a prepared subject.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      read.question?.subject !== undefined &&
+      read.question.subject !== null
+        ? { preparedSubject: read.question.subject }
+        : {}),
       // K1: companies of a kind, with the reader's structure.
       ...(read?.kind === "QUESTION_TO_Q" &&
       read.question?.kind === "DISCOVER_COMPANIES"

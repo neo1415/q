@@ -112,6 +112,7 @@ import {
   type DiscoverAsk,
   type DiscoveryAnswer,
 } from "./discover-companies.js";
+import { answerPathOf } from "./answer-path.js";
 import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
@@ -2580,6 +2581,37 @@ export function createModelGatewayQAnswer(
               (tool) => tool.definition.name !== "research_public_web",
             )
           : offeredForRun;
+      // K8: the cheapest correct path. A question about what is already
+      // prepared for this turn is answered over that context with no tool
+      // round; everything uncertain keeps the full path.
+      const route = answerPathOf({
+        turnKind: request.turnKind,
+        questionKind: request.questionKind,
+        preparedSubject: request.preparedSubject,
+        discover: request.discoverCompanies !== undefined,
+        fit: request.fitQuestion !== undefined,
+        attention: false,
+        writingDocument: request.writingDocument === true,
+        askedAction: request.askedAction !== undefined,
+        researchMode: research?.mode ?? "NEVER",
+        aboutNamedOther: false,
+        prepared: {
+          mandate: ownProfile !== null,
+          onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
+          qWork: ownDay !== null,
+        },
+      });
+      if (route.path === "PREPARED_CONTEXT") offered = [];
+      logger?.info(
+        {
+          qRunId: request.runId,
+          path: route.path,
+          because: route.because,
+          tools: offered.length,
+          sinceStartMs: Date.now() - startedAt,
+        },
+        "q answer path",
+      );
       const offeredByName = new Map(
         offered.map((tool) => [tool.definition.name, tool] as const),
       );

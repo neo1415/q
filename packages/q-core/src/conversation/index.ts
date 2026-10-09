@@ -13,6 +13,8 @@ export {
   QuestionKindSchema,
   QuestionToQSchema,
   DISCOVER_RANKINGS,
+  PREPARED_SUBJECTS,
+  type PreparedSubject,
   DiscoverRequestSchema,
   type DiscoverRequest,
   ReadingConfidenceSchema,

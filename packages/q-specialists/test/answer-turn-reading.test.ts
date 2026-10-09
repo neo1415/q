@@ -637,6 +637,7 @@ const advice: TurnReaderResult = {
     about: [],
     count: null,
     discover: null,
+    subject: null,
   },
   aboutNamedOther: false,
   tool: null,
@@ -666,6 +667,7 @@ describe("a general turn is read before it is answered", () => {
           about: [],
           count: null,
           discover: null,
+          subject: null,
         },
       },
       outcomes: [],
@@ -1140,6 +1142,7 @@ describe("a question about their own record takes the fast path (lead 2026-10-01
       about: [],
       count: null,
       discover: null,
+      subject: null,
     },
   };
 
@@ -3446,6 +3449,7 @@ describe("a stated decision about a relationship is prepared, an opinion is not"
           about: [],
           count: null,
           discover: null,
+          subject: null,
         },
         aboutNamedOther: false,
         tool: null,
