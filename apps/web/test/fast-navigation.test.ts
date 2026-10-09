@@ -307,6 +307,15 @@ describe("GPT-Live transcript sequences", () => {
     expect(fastMoveLine("/discover")).toMatch(/do not ask Q's backend/u);
   });
 
+  it("'open' is said only on the DONE receipt (V, founder live 2026-10-09)", () => {
+    expect(fastMoveLine("/discover", "DONE")).toMatch(/\(confirmed\)/u);
+    for (const receipt of ["FAILED", "PENDING"] as const) {
+      const line = fastMoveLine("/discover", receipt);
+      expect(line).not.toMatch(/\(confirmed\)|already opened/u);
+      expect(line).toMatch(/never say it is open|do not say it is open/u);
+    }
+  });
+
   it("asked again after they moved on, it moves again", async () => {
     stub(server);
     await navigationHeard("open discover");

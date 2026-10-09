@@ -16,6 +16,8 @@ import {
   LiveEndSchema,
   LiveOpenRequestSchema,
   LiveOpenResultSchema,
+  LiveTranscriptReportSchema,
+  LiveTranscriptResultSchema,
   LiveUsageReportSchema,
   LiveUsageResultSchema,
   LiveAvailabilitySchema,
@@ -23,6 +25,7 @@ import {
   Q_VOICE_LIVE_CANCEL_PATH,
   Q_VOICE_LIVE_DELEGATIONS_PATH,
   Q_VOICE_LIVE_END_PATH,
+  Q_VOICE_LIVE_TRANSCRIPT_PATH,
   Q_VOICE_LIVE_PREVIEW_PATH,
   Q_VOICE_LIVE_SESSIONS_PATH,
   Q_VOICE_LIVE_USAGE_PATH,
@@ -206,6 +209,28 @@ export function registerLiveVoiceRoutes(
         .code(200)
         .header("Cache-Control", "no-store")
         .send(LiveUsageResultSchema.parse(result));
+    },
+  );
+
+  app.post(
+    Q_VOICE_LIVE_TRANSCRIPT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const report = parseContract(
+        LiveTranscriptReportSchema,
+        request.body ?? {},
+        "That transcript report is not valid.",
+      );
+      const recorded = await broker.transcript({
+        actor: getActorContext(request),
+        voiceSessionId: params(request).voiceSessionId ?? "",
+        report,
+      });
+      if (recorded === null) return problem(reply, 404, "No such voice line.");
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(LiveTranscriptResultSchema.parse({ recorded }));
     },
   );
 

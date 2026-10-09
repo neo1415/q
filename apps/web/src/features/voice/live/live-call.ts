@@ -8,12 +8,7 @@ import {
   releaseVoiceAudio,
   type VoiceAudioOwner,
 } from "../voice-audio";
-import {
-  followMoveNow,
-  moveNote,
-  receiptListener,
-  type MoveOutcome,
-} from "./move";
+import { noteForMove, receiptListener, type MoveOutcome } from "./move";
 import {
   createLiveBridge,
   type DelegationOutcome,
@@ -157,6 +152,10 @@ export function fastMoveLine(
   }
   return `What they asked for (${path}) is still loading on their screen: do not say it is open; say it is coming up. Do not ask Q's backend for it.`;
 }
+
+/** Transcript segments per report, and how long one may wait for more. */
+const TRANSCRIPT_BATCH = 6;
+const TRANSCRIPT_FLUSH_MS = 5_000;
 
 async function post<T>(
   doFetch: typeof fetch,
@@ -358,20 +357,49 @@ export async function startLiveCall(
     now: () => Date.now(),
     onChange: update,
     opening: options.opening,
-    beforeSpeak: async (outcome) =>
-      outcome.moved === true ? moveNote(await followMoveNow()) : null,
+    beforeSpeak: (outcome) => noteForMove(outcome.move),
   });
 
   // C's fast path: the person's utterance, streamed, then final.
   let utterance: { key: string; text: string } | null = null;
   let utteranceCount = 0;
   let utteranceTimer: ReturnType<typeof setTimeout> | null = null;
+  // V (lead, 2026-10-09: the founder's live lines stored no transcript):
+  // each final segment, both sides, goes to the Q API's voice_line_turns
+  // (routed 'live') in small ordered batches, and the rest before the end.
+  const kept: { role: "USER" | "Q"; text: string; at: number }[] = [];
+  let keepTimer: ReturnType<typeof setTimeout> | null = null;
+  let flushing: Promise<void> = Promise.resolve();
+  const flushTranscript = (): Promise<void> => {
+    if (keepTimer !== null) clearTimeout(keepTimer);
+    keepTimer = null;
+    flushing = flushing.then(async () => {
+      while (id !== null && kept.length > 0) {
+        const segments = kept.splice(0, TRANSCRIPT_BATCH);
+        await post(doFetch, `transcript/${id}`, { segments }, token).catch(
+          () => undefined,
+        );
+      }
+    });
+    return flushing;
+  };
+  const keep = (role: "USER" | "Q", text: string) => {
+    const said = text.trim().slice(0, role === "USER" ? 2_000 : 4_000);
+    if (said.length === 0) return;
+    kept.push({ role, text: said, at: Date.now() });
+    if (kept.length >= TRANSCRIPT_BATCH) void flushTranscript();
+    else
+      keepTimer ??= setTimeout(() => {
+        void flushTranscript();
+      }, TRANSCRIPT_FLUSH_MS);
+  };
   const finishUtterance = () => {
     if (utteranceTimer !== null) clearTimeout(utteranceTimer);
     utteranceTimer = null;
     const done = utterance;
     utterance = null;
     if (done === null) return;
+    keep("USER", done.text);
     options.onTranscript?.({
       key: done.key,
       role: "user",
@@ -445,6 +473,8 @@ export async function startLiveCall(
         const delta = typeof event["delta"] === "string" ? event["delta"] : "";
         lastInputAt = ms;
         lastSpeechAt = performance.now();
+        // Interrupted mid-sentence: what it had said is still kept.
+        if (reply !== null) keep("Q", reply.text);
         reply = null;
         if (utterance === null) {
           utteranceCount += 1;
@@ -653,6 +683,7 @@ export async function startLiveCall(
     if (speaking !== stats.qSpeaking) {
       stats = { ...stats, qSpeaking: speaking };
       if (!speaking && reply !== null) {
+        keep("Q", reply.text);
         options.onTranscript?.({
           key: reply.key,
           role: "q",
@@ -690,6 +721,8 @@ export async function startLiveCall(
     clearTimeout(cap);
     clearInterval(meter);
     finishUtterance();
+    if (reply !== null) keep("Q", reply.text);
+    reply = null;
     const mine = connection;
     if (mine !== null) {
       mine.closeRequested = true;
@@ -721,6 +754,7 @@ export async function startLiveCall(
         closedReason: "no session.closed: usage unconfirmed",
       };
     }
+    await flushTranscript();
     if (id !== null) {
       await post(doFetch, `end/${id}`, { reason }, token).catch(
         () => undefined,

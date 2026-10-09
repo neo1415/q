@@ -1,3 +1,7 @@
+import {
+  QClientActionIntentSchema,
+  QVoiceDestinationSchema,
+} from "@capital-q/contracts";
 import { z } from "zod";
 
 /**
@@ -13,6 +17,8 @@ export const Q_VOICE_LIVE_CANCEL_PATH =
   "/v1/q/voice/live/sessions/:voiceSessionId/delegations/:delegationId/cancel" as const;
 export const Q_VOICE_LIVE_USAGE_PATH =
   "/v1/q/voice/live/sessions/:voiceSessionId/usage" as const;
+export const Q_VOICE_LIVE_TRANSCRIPT_PATH =
+  "/v1/q/voice/live/sessions/:voiceSessionId/transcript" as const;
 export const Q_VOICE_LIVE_END_PATH =
   "/v1/q/voice/live/sessions/:voiceSessionId/end" as const;
 /** Developer preview only: 404 unless the preview gate is open. */
@@ -83,6 +89,20 @@ export const LiveDelegationRequestSchema = z
   .strict();
 export type LiveDelegationRequest = z.infer<typeof LiveDelegationRequestSchema>;
 
+/**
+ * The route move a delegated run made (its NAVIGATE destination and/or its
+ * last route-moving client action): the client maps it to the route it
+ * expects, follows it, and waits for that route's receipt before the
+ * voice speaks.
+ */
+export const LiveMoveSchema = z
+  .object({
+    navigate: QVoiceDestinationSchema.nullable(),
+    action: QClientActionIntentSchema.nullable(),
+  })
+  .strict();
+export type LiveMove = z.infer<typeof LiveMoveSchema>;
+
 export const LiveDelegationResultSchema = z
   .object({
     delegationId: z.string(),
@@ -95,7 +115,7 @@ export const LiveDelegationResultSchema = z
     /** The call is past its length: the client closes it. */
     ended: z.boolean().optional(),
     /** The run moved the screen: follow it, and await its receipt, first. */
-    moved: z.boolean().optional(),
+    move: LiveMoveSchema.optional(),
   })
   .strict();
 export type LiveDelegationResult = z.infer<typeof LiveDelegationResultSchema>;
@@ -112,6 +132,34 @@ export const LiveUsageReportSchema = z
   })
   .strict();
 export type LiveUsageReport = z.infer<typeof LiveUsageReportSchema>;
+
+/**
+ * Final transcript segments of the line, both sides, as the person's
+ * browser heard them from GPT-Live (the audio never passes the Q API).
+ * Stored in q_runtime.voice_line_turns as routed 'live', as the person.
+ */
+export const LiveTranscriptReportSchema = z
+  .object({
+    segments: z
+      .array(
+        z
+          .object({
+            role: z.enum(["USER", "Q"]),
+            text: z.string().min(1).max(4_000),
+            /** When it was said, epoch ms (clamped to the line's life). */
+            at: z.number().int().min(0),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(12),
+  })
+  .strict();
+export type LiveTranscriptReport = z.infer<typeof LiveTranscriptReportSchema>;
+
+export const LiveTranscriptResultSchema = z
+  .object({ recorded: z.number().int().min(0) })
+  .strict();
 
 export const LiveUsageResultSchema = z
   .object({

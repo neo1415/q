@@ -1,3 +1,5 @@
+import type { LiveMove } from "./move";
+
 /**
  * The GPT-Live client delegation bridge (workstream V).
  *
@@ -45,7 +47,7 @@ export type DelegationOutcome = {
   /** Q could not answer; `commentary` then says so truthfully. */
   readonly failed?: boolean | undefined;
   /** Q's run moved the screen (followed before it is spoken). */
-  readonly moved?: boolean | undefined;
+  readonly move?: LiveMove | undefined;
 };
 
 export type DelegationRequest = {

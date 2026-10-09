@@ -1,7 +1,18 @@
+import type {
+  QClientActionIntent,
+  QVoiceDestination,
+} from "@capital-q/contracts";
+
+import {
+  recordPagePath,
+  settingsPath,
+  setupPath,
+} from "../../q/client-actions";
 import {
   onNavigationOutcome,
   type NavigationOutcome,
 } from "../../q/ui-act-controller";
+import { destinationPath } from "../destinations";
 
 /**
  * V (founder live 2026-10-09: Q said "I've opened their page"; the founder:
@@ -22,19 +33,46 @@ export const MOVE_RECEIPT_WAIT_MS = 6_000;
 
 export type MoveOutcome = "DONE" | "FAILED" | "PENDING";
 
+/** The route move a delegated run made (q-api's LiveMove). */
+export type LiveMove = {
+  readonly navigate: QVoiceDestination | null;
+  readonly action: QClientActionIntent | null;
+};
+
 /**
- * Follow a delegated run's move now and wait for its receipt. PENDING:
- * no receipt within the wait (the page is still loading).
+ * The route the screen lands on for a run's move: its last route-moving
+ * action (performed after the destination), else its destination. Null
+ * when it has no route (a data-room document opens in the viewer; an
+ * interview or form destination is a handoff), so no receipt is awaited.
  */
-export function followMoveNow(
-  options: {
-    readonly dispatch?: (() => void) | undefined;
-    readonly subscribe?:
-      | ((listener: (outcome: NavigationOutcome) => void) => () => void)
-      | undefined;
-    readonly waitMs?: number | undefined;
-  } = {},
-): Promise<MoveOutcome> {
+export function movePath(move: LiveMove): string | null {
+  const action = move.action;
+  // Only route moves get a receipt; every other action leaves the route.
+  if (
+    action?.kind === "OPEN_RECORD_PAGE" &&
+    action.page !== "DATA_ROOM_DOCUMENT"
+  ) {
+    return recordPagePath(action.page, action.id);
+  }
+  if (action?.kind === "OPEN_SETUP") return setupPath(action.journey);
+  if (action?.kind === "OPEN_SETTINGS") return settingsPath(action.section);
+  return destinationPath(move.navigate);
+}
+
+/**
+ * Follow a delegated run's move now and wait for the receipt of THIS
+ * move's route (`path`): a receipt for any other route (an earlier move
+ * landing late) never answers it. PENDING: no receipt within the wait
+ * (the page is still loading).
+ */
+export function followMoveNow(options: {
+  readonly path: string;
+  readonly dispatch?: (() => void) | undefined;
+  readonly subscribe?:
+    | ((listener: (outcome: NavigationOutcome) => void) => () => void)
+    | undefined;
+  readonly waitMs?: number | undefined;
+}): Promise<MoveOutcome> {
   const subscribe = options.subscribe ?? onNavigationOutcome;
   return new Promise((resolve) => {
     let settled = false;
@@ -47,20 +85,38 @@ export function followMoveNow(
     };
     // Subscribed before the move is asked for: a fast landing is not missed.
     const stop = subscribe((outcome) => {
-      finish(outcome.status);
+      if (outcome.expected === options.path) finish(outcome.status);
     });
     const timer = setTimeout(() => {
       finish("PENDING");
     }, options.waitMs ?? MOVE_RECEIPT_WAIT_MS);
-    (
-      options.dispatch ??
-      (() => {
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event(VOICE_TURN_NOW_EVENT));
-        }
-      })
-    )();
+    (options.dispatch ?? readTurnNow)();
   });
+}
+
+/** The voice surface reads its board now (a move without a route). */
+export function readTurnNow(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(VOICE_TURN_NOW_EVENT));
+  }
+}
+
+/**
+ * Before a delegated result is spoken: follow its move, and return what
+ * the voice must know from the receipt (null: no route move to report).
+ */
+export async function noteForMove(
+  move: LiveMove | undefined,
+  follow: (path: string) => Promise<MoveOutcome> = (path) =>
+    followMoveNow({ path }),
+): Promise<string | null> {
+  if (move === undefined) return null;
+  const path = movePath(move);
+  if (path === null) {
+    readTurnNow();
+    return null;
+  }
+  return moveNote(await follow(path));
 }
 
 /** What the voice is told about the screen, from the receipt. */
