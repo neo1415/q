@@ -97,11 +97,16 @@ describe("H1 · a reload mid-run reopens the conversation", () => {
     expect(screen.getByText("who's our biggest customer?")).toBeTruthy();
     // Once, under the key the first attempt used, about the same company.
     expect(askQAction).toHaveBeenCalledTimes(1);
+    // The /api/q-ask fallback passes every parameter; the trailing ones
+    // (viewing, screen, opening) are absent on a reload.
     expect(askQAction.mock.calls[0]).toEqual([
       "who's our biggest customer?",
       undefined,
       { companyId: COMPANY },
       KEY,
+      undefined,
+      undefined,
+      undefined,
     ]);
     expect(readPendingAsk()).toBeNull();
   });
