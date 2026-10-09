@@ -132,18 +132,21 @@ const CLOSE_WAIT_MS = 15_000;
 /** How long an end waits for a just-negotiated channel to open, to close it. */
 const CHANNEL_OPEN_WAIT_MS = 5_000;
 
-/** Resolves when the channel opens, closes, or the wait is over. */
-function channelOpened(channel: RTCDataChannel, waitMs: number): Promise<void> {
+/** Its state once it opens, closes, or the wait is over. */
+function channelOpened(
+  channel: RTCDataChannel,
+  waitMs: number,
+): Promise<RTCDataChannelState> {
   return new Promise((resolve) => {
     if (channel.readyState !== "connecting") {
-      resolve();
+      resolve(channel.readyState);
       return;
     }
     const done = () => {
       clearTimeout(timer);
       channel.removeEventListener("open", done);
       channel.removeEventListener("close", done);
-      resolve();
+      resolve(channel.readyState);
     };
     const timer = setTimeout(done, waitMs);
     channel.addEventListener("open", done);
@@ -867,8 +870,10 @@ export async function startLiveCall(
       // Without this the peer was only dropped and session.close never
       // sent (gpt-live.spec "rapid restarts": closes < peers - 1).
       if (mine.channel.readyState === "connecting") {
-        await channelOpened(mine.channel, CHANNEL_OPEN_WAIT_MS);
-        if (mine.channel.readyState === "open") {
+        // Read again after the wait: the channel's state changes under us.
+        if (
+          (await channelOpened(mine.channel, CHANNEL_OPEN_WAIT_MS)) === "open"
+        ) {
           mine.channel.send(JSON.stringify({ type: "session.close" }));
         }
       }
