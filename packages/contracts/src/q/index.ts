@@ -1169,3 +1169,5 @@ export * from "./attention.js";
 export * from "./agent-capability.js";
 // RECOVERY-2026-10 workstream C: UI act receipts (export requested of the lead).
 export * from "./ui-act-receipts.js";
+// RECOVERY-2026-10 workstream C: navigation at the end of the utterance.
+export * from "./fast-navigation.js";

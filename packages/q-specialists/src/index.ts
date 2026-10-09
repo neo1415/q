@@ -362,3 +362,12 @@ export {
   type QOpenRecordPort,
   type ShownItem,
 } from "./references.js";
+// RECOVERY-2026-10 (C): navigation read by code at the end of the utterance.
+export {
+  resolveFastNavigation,
+  resolveNamedRecord,
+  type FastNavigation,
+  type NamedRecordResolution,
+  type OpenRecordIntent,
+} from "./fast-navigation.js";
+export { namedRecordRequestOf } from "./named-record-request.js";

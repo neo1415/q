@@ -15,6 +15,7 @@ import {
   type VoiceState,
   type VoiceTranscriptLine,
 } from "../session";
+import { navigationHeard } from "../../q/control/fast-navigation";
 import { announceQSaid } from "../../q-swarm/q-said";
 import type { AgentSocket } from "./agent-socket";
 import type { PcmPlayer } from "./pcm-player";
@@ -480,6 +481,9 @@ export function useDeepgramVoiceSession(
         addLine(role, content);
         // E-03: a reply about the card in focus is the card's to decide.
         if (role === "user") cardsRef.current?.heard(content);
+        // RECOVERY-2026-10 (C, "stupid fast"): "open X" moves the screen
+        // the moment the words are final, beside Q's turn.
+        if (role === "user") void navigationHeard(content);
         // The swarm and the page pointer follow what Q says, as it says it.
         if (role === "q") announceQSaid(content);
         if (role === "user") {

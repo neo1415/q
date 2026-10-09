@@ -23,6 +23,7 @@ import {
 } from "./actions";
 import { carriedApproval, type CarriedApproval } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
+import { navigationHeard } from "./control/fast-navigation";
 import { currentScreen, currentViewing } from "./screen";
 import {
   forgetPendingAsk,
@@ -413,6 +414,9 @@ export function useQConversation(
       }
       setNotice(null);
       setSubmitting(true);
+      // RECOVERY-2026-10 (C, "stupid fast"): a typed "open X" moves the
+      // screen now, beside the run; the answer does not move it again.
+      void navigationHeard(text);
       const placeholder: PendingTurn = {
         id: crypto.randomUUID(),
         text,

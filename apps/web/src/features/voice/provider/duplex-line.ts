@@ -21,6 +21,10 @@ import type {
 
 import type { VoiceState } from "../session";
 import {
+  navigationHeardFor,
+  navigationHearingDelta,
+} from "../../q/control/fast-navigation";
+import {
   countersOf,
   DISCONNECTED_GRACE_MS,
   HEALTH_SAMPLE_MS,
@@ -1567,10 +1571,23 @@ export class DuplexLine {
         }
         break;
       }
+      // RECOVERY-2026-10 (C): partial words while they speak; read only to
+      // prefetch where they are going, never to move.
+      case "conversation.item.input_audio_transcription.delta": {
+        const itemId = text(event, "item_id");
+        const delta = text(event, "delta");
+        if (itemId !== undefined && delta !== undefined) {
+          navigationHearingDelta(itemId, delta);
+        }
+        break;
+      }
       case "conversation.item.input_audio_transcription.completed": {
         const itemId = text(event, "item_id");
         const said = text(event, "transcript")?.trim() ?? "";
         if (itemId !== undefined && said.length > 0) {
+          // RECOVERY-2026-10 (C, "stupid fast"): "open X" moves the screen
+          // the moment the words are final, beside the routed turn.
+          void navigationHeardFor(itemId, said);
           this.#remember("user", said);
           this.#transcripts.set(itemId, said.slice(0, 600));
           this.#heard.push(said.slice(0, 600));

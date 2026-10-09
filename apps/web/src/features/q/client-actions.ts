@@ -185,6 +185,48 @@ export function registerClientRouter(
   clientRouterPush = push;
 }
 
+/** The app router's prefetch, for a target read while they still speak. */
+let clientRouterPrefetch: ((path: string) => void) | null = null;
+export function registerClientPrefetch(
+  prefetch: ((path: string) => void) | null,
+): void {
+  clientRouterPrefetch = prefetch;
+}
+export function prefetchPath(path: string): void {
+  clientRouterPrefetch?.(path);
+}
+
+/**
+ * RECOVERY-2026-10 (C, "stupid fast"): the move the fast path made at the
+ * end of the sentence. Q's answer about the same sentence arrives seconds
+ * later carrying the same target; it must not move the person a second
+ * time (a duplicate history entry, or a pull back from where they went
+ * since). One sentence makes one move.
+ */
+const EARLY_MOVE_MS = 60_000;
+let earlyMove: { readonly path: string; readonly at: number } | null = null;
+
+/** Whether the fast path already made this move for the latest sentence. */
+export function movedEarlyTo(path: string): boolean {
+  if (earlyMove === null || Date.now() - earlyMove.at > EARLY_MOVE_MS) {
+    return false;
+  }
+  // Consumed: the answer's own move is skipped once, then Q may move again.
+  if (earlyMove.path !== path) return false;
+  earlyMove = null;
+  return true;
+}
+
+/** The fast path's move: at once, confirmed by the settled route. */
+export function moveEarly(path: string): void {
+  earlyMove = { path, at: Date.now() };
+  if (path !== `${window.location.pathname}${window.location.search}`) {
+    expectNavigation(path);
+  }
+  if (clientRouterPush !== null) clientRouterPush(path);
+  else window.location.assign(path);
+}
+
 /** Q's moves on Discover's feed, heard by the feed itself. */
 export const Q_FEED_EVENT = "cq:q-feed";
 
@@ -262,6 +304,8 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   // The Sign out button's own steps: forget which chats were open on this
   // tab, then the server action that ends the session and redirects.
   goTo: (path) => {
+    // The fast path already went there for this sentence: one move.
+    if (movedEarlyTo(path)) return;
     // RECOVERY-2026-10 (C2): a UI act queued after this move waits for the
     // new page instead of acting on the one being left.
     if (path !== `${window.location.pathname}${window.location.search}`) {

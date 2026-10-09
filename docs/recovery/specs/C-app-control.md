@@ -299,3 +299,10 @@ Run each against the local stack as a signed-in founder (or investor where state
 | Document find, open, read, search, download, rename, delete/restore with the exact target | C4; Scenario C        |
 | Forms through app actions, persistence confirmed, approval-bound                          | C5                    |
 | Generated parity matrix; the parity test fails on an uncovered control                    | C6; SPEC §5 matrix    |
+
+## C7. Fast navigation ("stupid fast", founder 2026-10-09)
+
+- Final words (typed submit, standard voice final, duplex `input_audio_transcription.completed`) go to `POST /api/q-navigate`, then q-api `POST /v1/q/navigation/resolve`, beside Q's run. Code only: `pageRequestOf` and `resolveNamedRecord` (the functions the answer uses), the firewall's own plan, and `open_page`'s authorize step. No model, no write.
+- A confident single target moves at once (`moveEarly`: `expectNavigation` plus a confirmed receipt). Q's answer for the same path is skipped once (`movedEarlyTo`, 60 s); later requests move normally.
+- Partials (duplex `.delta`; GPT-Live `session.input_transcript.delta` through `navigationHearingDelta(key, delta)` and `navigationHeardFor(key, text)`) only prefetch. Words taken back ("no wait", "actually", "never mind") and ambiguous or unknown names are left to Q, which asks.
+- Tests: `packages/q-specialists/test/fast-navigation.test.ts`, `apps/q-api/test/fast-navigation.test.ts`, `apps/web/test/fast-navigation.test.ts`.

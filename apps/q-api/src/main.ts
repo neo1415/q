@@ -550,6 +550,7 @@ import {
   receiptFacts,
   recentUiActReceipts,
 } from "./http/ui-act-receipts.js";
+import { createFastNavigation } from "./composition/fast-navigation.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
@@ -838,23 +839,21 @@ const subjects = createQSubjectResolverRegistry([
 // before any retrieval, and again ahead of retrieval on every resume.
 // ADMIN block (ADR 0033): every decision is also logged, codes only, for
 // the operations console's per-run trace. Recording never alters it.
-const firewall = recordingFirewall(
-  createContextFirewall({
-    authorization,
-    disclosure,
-    resolvers: disclosureResolvers,
-    relationshipParties,
-    documents,
-    capital,
-    clock: systemDisclosureClock,
-    logger,
-  }),
-  {
-    sql: database.sql,
-    onRecordError: (error) =>
-      logger.warn({ err: error }, "firewall decision not recorded"),
-  },
-);
+const baseFirewall = createContextFirewall({
+  authorization,
+  disclosure,
+  resolvers: disclosureResolvers,
+  relationshipParties,
+  documents,
+  capital,
+  clock: systemDisclosureClock,
+  logger,
+});
+const firewall = recordingFirewall(baseFirewall, {
+  sql: database.sql,
+  onRecordError: (error) =>
+    logger.warn({ err: error }, "firewall decision not recorded"),
+});
 // end ADMIN block
 
 const repositories = createPostgresQRuntimeRepositories();
@@ -5810,6 +5809,15 @@ const { app, logger: appLogger } = createApp(
     room: qRoom,
     // RECOVERY-2026-10 (C): what came of Q's UI acts on the person's screen.
     uiActReceipts,
+    // RECOVERY-2026-10 (C, "stupid fast"): where a finished sentence goes,
+    // by code alone, before Q has answered. No run, so no run's recorded
+    // firewall decision: the same firewall, unrecorded.
+    fastNavigation: createFastNavigation({
+      firewall: baseFirewall,
+      tools: qTools.port,
+      ownRelationships: errandRelationships.ownRelationships,
+      logger,
+    }),
     // Q as an MCP server, only where a deployment turned it on. The same
     // registry and pipeline a run uses; a different modality, no more
     // authority.

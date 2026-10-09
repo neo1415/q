@@ -43,7 +43,11 @@ import {
 import { resumeQAction } from "./actions";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { turnsFrom, workingLabel, type QTurn } from "./conversation";
-import { performClientAction, registerClientRouter } from "./client-actions";
+import {
+  movedEarlyTo,
+  performClientAction,
+  registerClientRouter,
+} from "./client-actions";
 import { navigationInFlight } from "./ui-act-controller";
 import { followOfTurns } from "./follow-navigation";
 import { QMaterialViewer } from "./material-viewer";
@@ -487,7 +491,8 @@ export function QSessionProvider({
       performClientAction(followed.clientAction);
     }
     const path = destinationPath(followed.navigate);
-    if (path !== null) {
+    // RECOVERY-2026-10 (C): the fast path already went there: one move.
+    if (path !== null && !movedEarlyTo(path)) {
       act();
       router.push(path);
     }
@@ -524,7 +529,7 @@ export function QSessionProvider({
     // R20/R33: the app's own actions the answer carries, done once.
     for (const action of followed.actions) performClientAction(action);
     const path = destinationPath(followed.navigate);
-    if (path !== null) {
+    if (path !== null && !movedEarlyTo(path)) {
       act();
       router.push(path);
     }
