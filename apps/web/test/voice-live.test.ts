@@ -207,16 +207,34 @@ describe("the GPT-Live delegation bridge", () => {
     expect(spoken.map((e) => e.delegation_id)).toEqual(["dlg_2"]);
   });
 
-  it("does not speak what the server marked stale", async () => {
+  it("never speaks a failed nudge while the slow answer is still working, then speaks the slow answer", async () => {
     const h = harness();
-    h.heard("Top three");
+    h.heard("Give me the top three that fit my mandate");
     h.delegation("dlg_1");
     h.advance(400);
-    h.pending.get("dlg_1")?.({ commentary: "Verified.", stale: true });
+    h.heard(" still waiting, can you do it or not");
+    h.delegation("dlg_2");
+    h.advance(400);
+    h.pending.get("dlg_2")?.({
+      commentary: "No verified answer for that.",
+      failed: true,
+    } as never);
     await h.settle();
-    expect(h.sent.every((e) => e.type !== "session.commentary.append")).toBe(
-      true,
+    expect(h.sent.at(-1)).toMatchObject({
+      type: "session.thinking.append",
+      delegation_id: "dlg_2",
+    });
+    expect(h.sent.some((e) => e.type === "session.commentary.append")).toBe(
+      false,
     );
+    h.pending.get("dlg_1")?.({
+      commentary: "Verified: Ajopot, Ledgerfold, Clinicrest.",
+    });
+    await h.settle();
+    expect(h.sent.at(-1)).toMatchObject({
+      type: "session.commentary.append",
+      delegation_id: "dlg_1",
+    });
   });
 
   it("says one natural progress line after about five seconds, never repeated", () => {
@@ -270,7 +288,8 @@ describe("the GPT-Live delegation bridge", () => {
     bridge.handle({ type: "session.started" });
     expect(asked).toEqual([]);
     expect(sent).toHaveLength(1);
-    expect(sent[0]?.type).toBe("session.instructions.append");
+    expect(sent[0]?.type).toBe("session.commentary.append");
+    expect(sent[0]?.delegation_id).toBeNull();
     expect(sent[0]?.content).toContain("never repeat card or screen text");
     expect(sent[0]?.content).toContain("Spheros is waiting");
   });
@@ -336,10 +355,10 @@ describe("the GPT-Live delegation bridge", () => {
       session: { model: "gpt-live-1" },
     });
     expect(sent[0]).toMatchObject({
-      type: "session.instructions.append",
+      type: "session.commentary.append",
       delegation_id: null,
-      content: "Greet them now.",
     });
+    expect(sent[0]?.content).toContain("Greet them now.");
     expect(asked).toEqual(["Brief me."]);
     answer({ commentary: "Verified: two companies tied at the top." });
     for (let i = 0; i < 5; i += 1) await Promise.resolve();

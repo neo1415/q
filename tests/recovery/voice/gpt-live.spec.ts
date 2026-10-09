@@ -78,7 +78,7 @@ test("the Q button opens GPT-Live on /home: greeting, delegation to Q Brain, car
     .poll(async () =>
       (await liveSent(page)).some(
         (e) =>
-          e.type === "session.instructions.append" &&
+          e.type === "session.commentary.append" &&
           (e.content ?? "").includes("Greet them warmly"),
       ),
     )
@@ -165,7 +165,7 @@ test("GPT-Live carries on across a page: the dock on another page opens it too",
   await expect
     .poll(async () =>
       (await liveSent(page)).some(
-        (e) => e.type === "session.instructions.append",
+        (e) => e.type === "session.commentary.append",
       ),
     )
     .toBe(true);

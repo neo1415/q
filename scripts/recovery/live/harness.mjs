@@ -625,6 +625,7 @@ async function runScenario(id) {
   const latencies = [];
   let awaitingFirstAudio = null; // { step, endedAt }
   let currentStep = 0;
+  let lastCommentaryAt = 0;
 
   const ws =
     PROVIDER === "live"
@@ -663,6 +664,7 @@ async function runScenario(id) {
         delegation: event.delegation_id,
         content: event.content,
       });
+      if (event.type === "session.commentary.append") lastCommentaryAt = now();
       send(event);
     },
     delegate: async (req) => {
@@ -960,8 +962,17 @@ async function runScenario(id) {
     if (step.when === "q-done") {
       const before = lastQDeltaAt;
       // Q must have answered the previous turn, then be quiet for 1.5 s.
-      await waitUntil(() => lastQVoicedAt > (userSpeechEndedAt ?? 0), 25000);
+      // (Voice after their words ended, not the tail of what came before.)
+      await waitUntil(
+        () => lastQVoicedAt > (userSpeechEndedAt ?? 0) + 300,
+        25000,
+      );
       await waitUntil(() => qQuietFor() > 1500 && !busyDelegating(), 40000);
+      // A verified result was just handed over: Q says it before they talk.
+      if (lastCommentaryAt > 0 && lastQVoicedAt < lastCommentaryAt) {
+        await waitUntil(() => lastQVoicedAt > lastCommentaryAt, 15000);
+        await waitUntil(() => qQuietFor() > 2000, 40000);
+      }
       // The opening: the hello comes first, the briefing after it lands.
       if (step.answeredDelegations !== undefined) {
         await waitUntil(

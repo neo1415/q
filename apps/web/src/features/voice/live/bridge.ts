@@ -254,8 +254,6 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       .map((turn) => ({ role: turn.role, text: turn.text.trim() }))
       .filter((turn) => turn.text.length > 0);
 
-  const newest = () => order[order.length - 1];
-
   const run = (record: DelegationRecord, fixed?: string) => {
     if (fixed === undefined) {
       record.request = readRequest();
@@ -305,18 +303,31 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     record.answeredAt = deps.now();
     record.commentary = outcome.commentary;
     record.approvalPending = outcome.approvalPending;
-    const newer = order.slice(order.indexOf(record.id) + 1);
-    // Every newer request still waiting on its answer: this verified one
-    // is the freshest they can have, and is spoken (the founder's nudges,
-    // "still waiting…", must never cost them the answer they waited for).
-    const newerPending =
-      newer.length > 0 &&
-      newer.every((id) => {
-        const status = delegations.get(id)?.status;
-        return status === "RUNNING" || status === "WAITING_FOR_WORDS";
-      });
-    const superseded =
-      !newerPending && (outcome.stale === true || newest() !== record.id);
+    const index = order.indexOf(record.id);
+    const statusOf = (id: string) => delegations.get(id)?.status;
+    const working = (id: string) =>
+      statusOf(id) === "RUNNING" || statusOf(id) === "WAITING_FOR_WORDS";
+    const newer = order.slice(index + 1);
+    // Recorded live (2026-10-09): a nudge ("still waiting, can you do it or
+    // not") was delegated too; its empty answer came back first and was
+    // spoken ("I can't confirm…") while the real answer was still working.
+    // A failed answer is never spoken while an earlier request works on.
+    if (outcome.failed === true && order.slice(0, index).some(working)) {
+      record.status = "FAILED";
+      send(
+        "session.thinking.append",
+        record.providerId,
+        `Nothing came back for "${record.request}". Their earlier request is still being worked on: if they are waiting, tell them it is on its way; do not say you can't do it.`,
+      );
+      changed();
+      return;
+    }
+    // Spoken unless a newer request has already been answered: a slow
+    // verified answer is the freshest they can have while the newer ones
+    // still work or came back empty (the founder's nudges must never cost
+    // them the answer they waited for).
+    const superseded = newer.some((id) => statusOf(id) === "SPOKEN");
+    const newerPending = !superseded && newer.length > 0;
     if (outcome.commentary === null || outcome.commentary.length === 0) {
       record.status = superseded ? "SUPERSEDED" : "SPOKEN";
       changed();
@@ -402,15 +413,23 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
           if (opening === undefined || openingStarted) return;
           openingStarted = true;
           if (opening.content !== undefined && opening.content.length > 0) {
-            // Q's own opening, in hand: greeting and lowdown in one go.
+            // Q's own opening, in hand: greeting and lowdown in one go, as
+            // commentary (spoken). Recorded live (2026-10-09), an
+            // instructions append alone did not reliably make the voice
+            // speak first: one take waited 25 s for the person.
             send(
-              "session.instructions.append",
+              "session.commentary.append",
               null,
               `${opening.greeting} Then give them this opening in your own words, naturally. If it is a briefing, summarise it as a colleague would: how much is waiting, the top two or three items by name and what each needs from them. If it asks them something, ask it. Never read it out word for word and never repeat card or screen text. Opening: ${opening.content}`,
             );
             return;
           }
-          send("session.instructions.append", null, opening.greeting);
+          // Spoken now (commentary), not only instructions: see above.
+          send(
+            "session.commentary.append",
+            null,
+            `${opening.greeting} Their briefing is on its way from the backend; do not guess it.`,
+          );
           if (opening.request === undefined) return;
           const record: DelegationRecord = {
             id: OPENING_ID,
