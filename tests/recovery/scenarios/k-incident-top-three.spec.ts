@@ -314,13 +314,11 @@ test.describe("INC-1 top three companies (voice, duplex fake)", () => {
     // A bridge is anything said while Q works: the scripted "short aside",
     // or a BARE response.create (tool_choice none, no instructions) in which
     // the realtime model words its own holding line, as the incident's
-    // "let me find the top three…" was. At most one per turn, and none once
-    // the answer has been handed over.
+    // "let me find the top three…" was. Founder 2026-10-09 (A, for G): no
+    // sound at all while Q works, so none per turn (was at most one), and
+    // none once the answer has been handed over.
     const isBridge = (k: Said) => k === "BRIDGE" || k === "BARE";
-    expect(
-      said.filter(isBridge).length,
-      `bridges: ${what}`,
-    ).toBeLessThanOrEqual(1);
+    expect(said.filter(isBridge).length, `bridges: ${what}`).toBe(0);
     const answerAt = said.indexOf("ANSWER");
     expect(
       answerAt,

@@ -13,7 +13,6 @@ import {
   CorrelationIdSchema,
   QApprovalIdSchema,
   QConversationIdSchema,
-  Q_VOICE_QUESTION_BEAT,
   type CorrelationId,
   type OnboardingSessionView,
   type OnboardingUnderstanding,
@@ -400,7 +399,12 @@ const WRITTEN_LAUGH =
   /^(?:hah?|(?:ha|he|hi|ja)(?:[\s-]?(?:ha|he|hi|ja))+)\s*[!.,\u2026]/iu;
 
 /** The share of questions back that open on a rising "Hm?". */
-const QUESTION_BEAT_SHARE = 0.5;
+/**
+ * Founder 2026-10-09: nothing is said or sounded while Q works. The
+ * silence ladder (ADR 0062) stays in code, off, until a decision to
+ * bring any of it back.
+ */
+export const SPOKEN_SILENCE_LADDER = false;
 /**
  * The utterance the turn in hand is about, until the one run that answers
  * the person's words takes it. A look-up Q starts on its own is not the
@@ -1313,12 +1317,9 @@ export function createVoiceTurnHandler(
             break;
           }
           case "q.input.required":
-            // A rising "Hm?" before a question back, as a person asks
-            // (founder live 2026-09-29: a flat hm thinks, a rising one
-            // asks, a low one acknowledges); on some turns, never all.
-            if (Math.random() < QUESTION_BEAT_SHARE) {
-              yield `${Q_VOICE_QUESTION_BEAT} `;
-            }
+            // Founder 2026-10-09: no scripted filler, no artificial
+            // sounds: the question back is asked as it is (the rising
+            // "Hm?" before it is gone).
             yield event.data.clarification.options === undefined
               ? event.data.clarification.question
               : `${event.data.clarification.question} ${joinOptions(event.data.clarification.options)}?`;
@@ -1447,6 +1448,11 @@ export function createVoiceTurnHandler(
                 speaker.deferred === true && speaker.narrate !== undefined,
               seed: Math.floor(Math.random() * 0x7fffffff),
               signal,
+              // Founder 2026-10-09: no sound at all while Q works -- no
+              // stage lines ("let me put that up"), no hums, no breathing.
+              // The ladder is off on every line; the answer is the first
+              // thing heard.
+              enabled: SPOKEN_SILENCE_LADDER,
             },
           ),
         );
