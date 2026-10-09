@@ -114,6 +114,7 @@ import {
 } from "./discover-companies.js";
 import { answerPathOf } from "./answer-path.js";
 import { forModelReading } from "./pending-confirmation.js";
+import { createSingleFlight } from "./single-flight.js";
 import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
@@ -1688,11 +1689,47 @@ export function createModelGatewayQAnswer(
   // model wrote none (Zino live 2026-10-07).
   const runFits = createRunFits();
   const available = baseTools.available;
+  // K4: identical concurrent reads within a run share one call. Which
+  // tools are reads is the offer's own declaration, per run.
+  const singleFlight = createSingleFlight();
+  const readOnlyByRun = new Map<string, Set<string>>();
+  const noteOffer = (
+    runId: string,
+    offered: readonly QOfferedTool[] | null,
+  ): void => {
+    if (offered === null) return;
+    const names = readOnlyByRun.get(runId) ?? new Set<string>();
+    for (const tool of offered) {
+      if (tool.classification === "READ_ONLY") names.add(tool.definition.name);
+    }
+    readOnlyByRun.set(runId, names);
+    if (readOnlyByRun.size > 256) {
+      const oldest = readOnlyByRun.keys().next().value;
+      if (oldest !== undefined) readOnlyByRun.delete(oldest);
+    }
+  };
   const tools: QToolPort = {
-    offer: (toolContext) => baseTools.offer(toolContext),
-    ...(available === undefined ? {} : { available }),
+    offer: async (toolContext) => {
+      const offered = await baseTools.offer(toolContext);
+      noteOffer(toolContext.runId, offered);
+      return offered;
+    },
+    ...(available === undefined
+      ? {}
+      : {
+          available: async (toolContext) => {
+            const all = await available(toolContext);
+            noteOffer(toolContext.runId, all);
+            return all;
+          },
+        }),
     execute: async (proposal, toolContext) => {
-      const outcome = await baseTools.execute(proposal, toolContext);
+      const outcome = await singleFlight.execute(
+        toolContext.runId,
+        proposal,
+        readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true,
+        () => baseTools.execute(proposal, toolContext),
+      );
       runCompanies.note(toolContext.runId, outcome);
       runFits.note(toolContext.runId, outcome);
       return outcome;
@@ -1828,18 +1865,25 @@ export function createModelGatewayQAnswer(
     };
     // Independent reads, side by side (speed sweep 2026-10-01: they ran
     // one after another, ~0.3 s of a turn's wait).
+    // K4: what each part of context assembly took, for the turn's log.
+    const prepareMs: Record<string, number> = {};
+    const prepareStarted = Date.now();
+    const timed = <T>(name: string, work: Promise<T>): Promise<T> =>
+      work.finally(() => {
+        prepareMs[name] = Date.now() - prepareStarted;
+      });
     const [assembled, profile, offeredForRun, availableForRun, memory] =
       await Promise.all([
-        context.assemble(request),
-        communication.profileFor(request),
-        tools.offer(toolContext),
+        timed("assemble", context.assemble(request)),
+        timed("profile", communication.profileFor(request)),
+        timed("offer", tools.offer(toolContext)),
         // The facts read for every turn are read by code, so a turn's
         // focus (which narrows only what the model is offered) never
         // removes them.
         tools.available === undefined
           ? Promise.resolve(null)
-          : tools.available(toolContext),
-        recallMemory(request, conversationId),
+          : timed("available", tools.available(toolContext)),
+        timed("memory", recallMemory(request, conversationId)),
       ]);
     // The prefetch below reads only tools the run may use; the research
     // filter decided later never touches them.
@@ -2353,20 +2397,22 @@ export function createModelGatewayQAnswer(
       }
     })();
     await Promise.all([
-      mandateRead,
-      relationshipRead,
-      standingDone,
-      indexDone,
-      pitchRead,
-      onboardingRead,
-      companyRead,
-      namedRead,
-      dailyRead,
-      documentRead,
-      pageRead,
-      dayRead,
+      timed("mandate", mandateRead),
+      timed("relationship", relationshipRead),
+      timed("standing", standingDone),
+      timed("index", indexDone),
+      timed("pitch", pitchRead),
+      timed("onboarding", onboardingRead),
+      timed("company", companyRead),
+      timed("named", namedRead),
+      timed("daily", dailyRead),
+      timed("document", documentRead),
+      timed("page", pageRead),
+      timed("day", dayRead),
     ]);
+    prepareMs["reads"] = Date.now() - prepareStarted;
     return {
+      prepareMs,
       history,
       conversationId,
       openDocumentTitle,
@@ -3272,6 +3318,8 @@ export function createModelGatewayQAnswer(
               cards: found.shown,
               toolCalls: found.calls.length,
               modelCalls: 0,
+              sharedReads: singleFlight.takeShared(request.runId),
+              prepareMs: prepared.prepareMs,
               discoverMs: Date.now() - discoverStarted,
               totalMs: Date.now() - startedAt,
             },
@@ -4658,6 +4706,8 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             toolsOffered: offered.length,
             toolCalls: toolCalls.length,
             modelCalls,
+            sharedReads: singleFlight.takeShared(request.runId),
+            prepareMs: prepared.prepareMs,
             totalMs: Date.now() - startedAt,
             phases,
             // How much of the answer the person already had before the
