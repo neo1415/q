@@ -31,7 +31,11 @@ test("Scenario F: what needs my attention names what is waiting, from the attent
   await useScript([
     {
       name: "attention",
-      when: { user: "needs my attention", afterTool: null },
+      when: {
+        task: "COMPANY_ANALYST",
+        user: "needs my attention",
+        afterTool: null,
+      },
       reply: { toolCalls: [{ name: "what_needs_me", arguments: {} }] },
     },
     {
@@ -73,7 +77,7 @@ test("L-01 regression: a model that says 'nothing' cannot hide what the report h
   await useScript([
     {
       name: "nothing",
-      when: { user: "needs my attention" },
+      when: { task: "COMPANY_ANALYST", user: "needs my attention" },
       reply: answer("Nothing is waiting for you."),
     },
   ]);

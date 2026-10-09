@@ -82,6 +82,27 @@ export async function ask(page: Page, text: string): Promise<Locator> {
   const before = await settledAnswers(page).count();
   await composer(page).fill(text);
   await composer(page).press("Enter");
+  // 109b781f+: the Q page's default "Q" view speaks answers on the stage
+  // and shows a "Q / Chat" view toggle once the conversation has a turn;
+  // only the Chat view lists answers as `data-q-answer`. Switch to it, then
+  // wait for the latest answer to settle.
+  const chat = page
+    .getByRole("button", { name: "Chat", exact: true })
+    .filter({ visible: true })
+    .first();
+  const hasChat = await chat
+    .waitFor({ state: "visible", timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (hasChat) {
+    if ((await chat.getAttribute("aria-pressed")) !== "true")
+      await chat.click();
+    await expect(page.locator('[data-q-answer="streaming"]')).toHaveCount(0, {
+      timeout: 120_000,
+    });
+    await expect(settledAnswers(page).last()).toBeVisible({ timeout: 120_000 });
+    return settledAnswers(page).last();
+  }
   await expect(settledAnswers(page)).toHaveCount(before + 1, {
     timeout: 120_000,
   });

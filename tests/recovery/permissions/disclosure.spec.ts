@@ -137,7 +137,7 @@ test("founder-private words never reach the model on an investor's turn (Context
     [
       {
         name: "inv",
-        when: { user: "Ledgerfold's runway" },
+        when: { task: "COMPANY_ANALYST", user: "Ledgerfold's runway" },
         reply: answer(
           "I can only speak to what Ledgerfold has shared with you.",
         ),

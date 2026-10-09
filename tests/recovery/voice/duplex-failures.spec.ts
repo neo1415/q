@@ -36,6 +36,14 @@ async function openLine(
     .getByRole("button", { name: /Talk with Q/u })
     .first()
     .click();
+  // Realtime events sent before the data channel is open are lost: wait
+  // for the line to be up (its End control) unless the test is about it
+  // never coming up.
+  if (mode === "connect") {
+    await expect(
+      page.getByRole("button", { name: /^End/u }).first(),
+    ).toBeVisible({ timeout: 60_000 });
+  }
 }
 
 const notice = (page: Page) => page.locator('[role="status"], [role="alert"]');
@@ -51,10 +59,11 @@ test.describe("duplex voice failures", () => {
       timeout: 60_000,
     });
     await loseMicrophone(page);
-    await expect(notice(page)).toContainText(
-      /microphone|can't hear|cannot hear/iu,
-      { timeout: 15_000 },
-    );
+    await expect(
+      notice(page)
+        .filter({ hasText: /microphone|can't hear|cannot hear/iu })
+        .first(),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("failed transcript: Q asks again instead of going silent (audit B-01)", async ({
@@ -99,10 +108,11 @@ test.describe("duplex voice failures", () => {
     const page = await (await contextAs(browser, CAST.founder)).newPage();
     await openLine(page, "never-answer");
     // DUPLEX_CONNECT_MS = 10 s, one retry: allow both.
-    await expect(notice(page)).toContainText(
-      /standard|reconnect|connection/iu,
-      { timeout: 45_000 },
-    );
+    await expect(
+      notice(page)
+        .filter({ hasText: /standard|reconnect|connection/iu })
+        .first(),
+    ).toBeVisible({ timeout: 45_000 });
   });
 
   test("relay failure: a heard turn whose relay is lost still ends visibly (audit C-08)", async ({
@@ -127,7 +137,7 @@ test.describe("duplex voice failures", () => {
     await useScript([
       {
         name: "pb",
-        when: { user: "playback check" },
+        when: { task: "COMPANY_ANALYST", user: "playback check" },
         reply: answer("Here is the playback answer."),
       },
     ]);
@@ -152,7 +162,7 @@ test.describe("duplex voice failures", () => {
     await useScript([
       {
         name: "slow",
-        when: { user: "slow question" },
+        when: { task: "COMPANY_ANALYST", user: "slow question" },
         reply: answer("The slow answer arrived.", {}, 4_000),
       },
     ]);

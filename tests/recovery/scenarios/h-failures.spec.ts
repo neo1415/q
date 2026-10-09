@@ -29,7 +29,7 @@ test("network loss while sending: a visible failure, then a working retry", asyn
   await useScript([
     {
       name: "ok",
-      when: { user: "after the outage" },
+      when: { task: "COMPANY_ANALYST", user: "after the outage" },
       reply: answer("Back again."),
     },
   ]);

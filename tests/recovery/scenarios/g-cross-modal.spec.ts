@@ -31,17 +31,17 @@ test("Scenario G: say it, type the follow-up, say the next: one conversation", a
   await useScript([
     {
       name: "v1",
-      when: { user: "Savanna Seed" },
+      when: { task: "COMPANY_ANALYST", user: "Savanna Seed" },
       reply: answer("Savanna Seed accepted your interest."),
     },
     {
       name: "t1",
-      when: { user: "what did they invest in" },
+      when: { task: "COMPANY_ANALYST", user: "what did they invest in" },
       reply: answer("They invest at seed in fintech."),
     },
     {
       name: "v2",
-      when: { user: "draft them a thank you" },
+      when: { task: "COMPANY_ANALYST", user: "draft them a thank you" },
       reply: answer("I can draft that for Savanna Seed."),
     },
   ]);
@@ -104,7 +104,7 @@ test("a typed turn while the line is up is heard by the same conversation", asyn
   await useScript([
     {
       name: "typed",
-      when: { user: "typed while talking" },
+      when: { task: "COMPANY_ANALYST", user: "typed while talking" },
       reply: answer("Got your typed note."),
     },
   ]);
