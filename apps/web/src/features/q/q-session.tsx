@@ -54,9 +54,9 @@ import { rereadUntilSettled } from "./voice-reread";
 
 /**
  * The call's first words when the briefing was not read in time: a hello
- * by their clock and a promise of the lowdown, which the stage hands to
- * the line when it lands (E-05). Never "What's on your mind?" (Zino,
- * 2026-10-09: the greeting must be the lowdown, not a question).
+ * by their clock; the stage hands the lowdown to the line when it lands
+ * (E-05). Never "What's on your mind?" (Zino, 2026-10-09: the greeting
+ * must be the lowdown, not a question).
  */
 function briefingOnItsWay(): string {
   let zone: string | null;
@@ -65,7 +65,9 @@ function briefingOnItsWay(): string {
   } catch {
     zone = null;
   }
-  return `${arrivalGreeting({ firstName: null, now: new Date(), timeZone: zone })} One moment, I'm pulling up what's happened since you were last here.`;
+  // Just the hello: the lowdown follows when it lands. No filler line
+  // ("One moment…"; Zino, 2026-10-09) and never a question.
+  return arrivalGreeting({ firstName: null, now: new Date(), timeZone: zone });
 }
 
 /** The briefing's words, or the promise of them; the stage knows which. */
