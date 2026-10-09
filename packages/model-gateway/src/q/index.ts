@@ -143,6 +143,11 @@ export {
   type SmallTalkReply,
   type SmallTalkTurn,
 } from "./small-talk.js";
+export {
+  createTurnSkimmer,
+  type QTurnSkimInput,
+  type QTurnSkimmer,
+} from "./turn-skim.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { onScreenCompanyFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";

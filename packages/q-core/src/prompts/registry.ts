@@ -128,6 +128,7 @@ import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summar
 import { DECK_EXTRACTION_V1 } from "./tasks/deck-extraction.v1.js";
 import { SPOKEN_REPLY_V1 } from "./tasks/spoken-reply.v1.js";
 import { SMALL_TALK_V1 } from "./tasks/small-talk.v1.js";
+import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
 import { BRIEFING_COMMAND_V1 } from "./tasks/briefing-command.v1.js";
 // AUTO block (ADR 0030)
 import {
@@ -540,6 +541,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DECK_EXTRACTION_V1,
     SPOKEN_REPLY_V1,
     SMALL_TALK_V1,
+    TURN_SKIM_V1,
     BRIEFING_COMMAND_V1,
   ];
 

@@ -7,6 +7,7 @@ import {
   createModelGatewayQAnswer,
   createQTurnReader,
   createSmallTalkReply,
+  createTurnSkimmer,
   type QArtifactReviser,
   type QReceiptPort,
   type ClearCheck,
@@ -554,6 +555,15 @@ export function composeQIntelligence(
       ? {}
       : {
           turns: createQTurnReader({
+            gateway,
+            logger,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
+          }),
+          // K fast lane: a short first read races the full one; only a
+          // read-only app query ever acts on it.
+          turnSkim: createTurnSkimmer({
             gateway,
             logger,
             ...(dependencies.dataPosture === undefined

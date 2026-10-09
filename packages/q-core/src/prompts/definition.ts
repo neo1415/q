@@ -111,6 +111,8 @@ export const PROMPT_IDS = [
   "BRIEFING_COMMAND",
   /** RECOVERY-2026-10 B5: small talk, answered in one tool-free call. */
   "SMALL_TALK",
+  /** K (founder brief 2026-10-09): a short first read of a turn, for the fast lane. */
+  "TURN_SKIM",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -176,6 +178,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   MEETING_OUTCOME_READER: "meeting-outcome-reader",
   UTTERANCE_CHECK: "utterance-check",
   SMALL_TALK: "small-talk",
+  TURN_SKIM: "turn-skim",
 };
 
 export type PromptKind = "CHARTER" | "TASK";

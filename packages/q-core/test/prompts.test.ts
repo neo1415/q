@@ -142,6 +142,8 @@ describe("registry", () => {
         "BRIEFING_COMMAND",
         // RECOVERY-2026-10 B5: small talk in one tool-free call.
         "SMALL_TALK",
+        // Founder brief K: the fast lane's short first read.
+        "TURN_SKIM",
         // Founder direction 2026-09-30: founder research during setup.
         "FOUNDER_RESEARCH_READER",
         // AUTO (ADR 0030): Q's delegated work.
