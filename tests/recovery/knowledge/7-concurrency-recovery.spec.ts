@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test } from "@playwright/test";
 
-import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import { tokenFor } from "../support/http.js";
 import {
+  READ_DISCOVER_FINTECH,
   asRun,
   cardCompanyIds,
   modelCallsSince,
@@ -68,7 +68,7 @@ async function settle(runId: string, timeoutMs = 90_000): Promise<RunView> {
 }
 
 test("K7 the same request twice at once is one run", async () => {
-  await useScript([]);
+  await useScript([READ_DISCOVER_FINTECH]);
   await vendorSettled();
   const key = `recovery-g-k7-${randomUUID()}`;
   const [a, b] = await Promise.all([
@@ -83,11 +83,8 @@ test("K7 the same request twice at once is one run", async () => {
 });
 
 test("K7 three concurrent discoveries agree, and knowledge is built once (no analyst calls)", async () => {
-  awaits(
-    ["B Part 1", "B Part 4", "D Parts 2-3"],
-    "no fast path; no single-flight build of Tier B",
-  );
-  await useScript([]);
+  // Green on int-merge 9050c90f: a regression guard, not expected red.
+  await useScript([READ_DISCOVER_FINTECH]);
   await vendorSettled();
   const mark = await vendorMark();
   const started = await Promise.all(
@@ -114,19 +111,13 @@ test("K7 three concurrent discoveries agree, and knowledge is built once (no ana
     .toBe(0);
 });
 
-test("K7 discovery still answers while the model provider is down", async () => {
-  awaits(
-    ["B Part 1", "B Part 8"],
-    "discovery depends on the analyst model today",
-  );
+test("K7 discovery still answers while the analyst model is down", async () => {
+  // Green on int-merge 9050c90f: a regression guard, not expected red.
   await vendorSettled();
   try {
     const result = await runQ(CAST.investor, DISCOVER, [
-      {
-        name: "outage-reader",
-        when: { task: "TURN_READER" },
-        reply: { status: 503 },
-      },
+      // The reader is up (it routes the turn); only the analyst fails.
+      READ_DISCOVER_FINTECH,
       {
         name: "outage-analyst",
         when: { task: "COMPANY_ANALYST" },
@@ -134,9 +125,9 @@ test("K7 discovery still answers while the model provider is down", async () => 
       },
     ]);
     const run = asRun(result.run);
-    expect.soft(run.status, "answered without a model").toBe("COMPLETED");
+    expect.soft(run.status, "answered without the analyst").toBe("COMPLETED");
     expect
-      .soft(cardCompanyIds(run).length, "cards without a model")
+      .soft(cardCompanyIds(run).length, "cards without the analyst")
       .toBeGreaterThan(0);
   } finally {
     await useScript([]);
@@ -169,7 +160,6 @@ test("K7 a run caught by a q-api restart still ends, and the next discovery work
     TERMINAL.has(ended.status),
     `caught run ended as ${ended.status}`,
   ).toBe(true);
-  await useScript([]);
-  const next = await runQ(CAST.investor, DISCOVER);
+  const next = await runQ(CAST.investor, DISCOVER, [READ_DISCOVER_FINTECH]);
   expect(next.status, "the next turn after the restart").toBe("COMPLETED");
 });

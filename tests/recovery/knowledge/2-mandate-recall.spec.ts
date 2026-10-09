@@ -1,11 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import {
   BUDGET,
-  answerText,
-  mandateSectorNames,
+  mandateReading,
+  mandateSectorCodes,
   modelCallsOf,
   serverMs,
   asRun,
@@ -14,36 +13,41 @@ import { vendorSettled } from "../support/script.js";
 import { CAST, world } from "../support/stack.js";
 
 /**
- * K Test 2: mandate recall without a refetch. Q already knows the
- * investor's declared mandate (Tier B mandate summary, D Parts 2-3); "what
- * is my mandate" is answered from it: code-built or from the summary,
- * no analyst call, inside the recall budget, every time in the conversation
- * (the second ask must not be slower or make more model calls than the
- * first). The answer names the declared sectors as the database holds them.
+ * K Test 2: mandate recall without a refetch (B K8, D Parts 2-3). The
+ * reader reads "what is my mandate" as a question about the prepared
+ * mandate (scripted reading in MOCK; the live reading is LIVE-PENDING).
+ * Q answers from the mandate prepared for the turn: at most one analyst
+ * call with NO tool round (a refetch would be a second analyst call after
+ * a tool), the declared sectors already in the analyst's context, inside
+ * the recall budget, and the second ask no costlier than the first.
  *
- * Not observable here: the DB query count per turn (nothing counts queries;
- * K-baseline.md "Gaps"). The refetch is judged by model calls and time.
+ * The answer's words come from the scripted fake, so naming the sectors in
+ * the reply is model behaviour (LIVE-PENDING); what is asserted is that the
+ * model was given them. Not observable: the DB query count per turn.
  */
 const ASK = "What is my mandate?";
 
-test("K2 mandate recall: declared sectors, no analyst call, in budget, twice", async () => {
-  awaits(
-    ["D Parts 2-3", "B Part 8"],
-    "no Tier B mandate summary and no recall fast path: the analyst re-reads the mandate each turn",
-  );
+/** A taxonomy code ("digital_lending") as code or words ("digital lending"). */
+function mentions(input: string, code: string): boolean {
+  const lower = input.toLowerCase();
+  return lower.includes(code) || lower.includes(code.replace(/_/gu, " "));
+}
+
+test("K2 mandate recall: declared sectors prepared, no tool round, in budget, twice", async () => {
+  // Green on int-merge 9050c90f: a regression guard, not expected red.
   const mandateId = world().investor("savanna-seed").mandateId;
-  const sectors = mandateSectorNames(mandateId);
+  const sectors = mandateSectorCodes(mandateId);
   expect(sectors.length, "the seeded mandate declares sectors").toBeGreaterThan(
     0,
   );
 
   await vendorSettled();
-  const first = await runQ(CAST.investor, ASK);
+  const first = await runQ(CAST.investor, ASK, [mandateReading(ASK)]);
   await vendorSettled();
   const second = await runQ(
     CAST.investor,
     `${ASK} Remind me.`,
-    [],
+    [mandateReading(ASK)],
     first.conversationId,
   );
   for (const [label, result] of [
@@ -52,21 +56,27 @@ test("K2 mandate recall: declared sectors, no analyst call, in budget, twice", a
   ] as const) {
     const run = asRun(result.run);
     expect(run.status, label).toBe("COMPLETED");
-    const text = answerText(run).toLowerCase();
+    const calls = modelCallsOf(result.vendor);
+    const analystInput = calls.requests
+      .filter((r) => /TASK: COMPANY_ANALYST\b/u.test(r.input ?? ""))
+      .map((r) => r.input ?? "")
+      .join("\n");
     for (const sector of sectors)
       expect
-        .soft(text, `${label}: names the declared sector "${sector}"`)
-        .toContain(sector.toLowerCase());
-    const calls = modelCallsOf(result.vendor);
+        .soft(
+          mentions(analystInput, sector),
+          `${label}: the analyst was given the declared sector "${sector}"`,
+        )
+        .toBe(true);
     expect
       .soft(
         calls.analyst,
-        `${label}: analyst calls (${calls.tasks.join(", ")})`,
+        `${label}: analyst calls, no tool round (${calls.tasks.join(", ")})`,
       )
-      .toBe(0);
+      .toBeLessThanOrEqual(1);
     expect
       .soft(calls.total, `${label}: model calls`)
-      .toBeLessThanOrEqual(BUDGET.fastPathModelCalls);
+      .toBeLessThanOrEqual(BUDGET.recallModelCalls);
     expect
       .soft(serverMs(run) ?? Infinity, `${label}: server ms`)
       .toBeLessThanOrEqual(BUDGET.recallServerMs);

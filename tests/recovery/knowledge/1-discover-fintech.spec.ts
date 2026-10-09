@@ -5,6 +5,7 @@ import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import {
   BUDGET,
+  READ_DISCOVER_FINTECH,
   answerText,
   cardCompanyIds,
   declaredFintech,
@@ -36,7 +37,7 @@ async function discover(): Promise<{
   calls: ReturnType<typeof modelCallsOf>;
 }> {
   await vendorSettled();
-  const result = await runQ(CAST.investor, ASK);
+  const result = await runQ(CAST.investor, ASK, [READ_DISCOVER_FINTECH]);
   const run = asRun(result.run);
   return { run, ms: serverMs(run), calls: modelCallsOf(result.vendor) };
 }
@@ -57,10 +58,7 @@ function expectFastPath(
 
 test.describe("K1 three fintech companies (API, server state)", () => {
   test("as seeded: up to three declared-fintech cards, unique, code-built, in budget", async () => {
-    awaits(
-      ["B Part 1", "B Part 8", "D Parts 2-3"],
-      "no DISCOVER_COMPANIES fast path: sector discovery falls to the analyst",
-    );
+    // Green on int-merge 9050c90f: a regression guard, not expected red.
     const fintech = declaredFintech();
     expect(
       fintech.length,
@@ -77,16 +75,16 @@ test.describe("K1 three fintech companies (API, server state)", () => {
 
   for (const keep of [0, 1, 2]) {
     test(`${String(keep)} declared fintech: ${String(keep)} card(s), says so honestly, invents none`, async () => {
-      awaits(
-        ["B Part 1", "D Part 5"],
-        "no fast path; and a fixture change reaches Tier B only through D's rebuild (G-R9)",
-      );
+      // Green on int-merge 9050c90f: a regression guard, not expected red.
       const seeded = declaredFintech().length;
       expect(
         seeded,
         "the local seed declares enough fintech companies",
       ).toBeGreaterThanOrEqual(keep);
-      const restore = keepDeclaredFintech(keep);
+      // Keep companies the investor is shown as seeded, so the case tests
+      // the count and honesty, not who is eligible to be seen.
+      const visible = cardCompanyIds((await discover()).run);
+      const restore = keepDeclaredFintech(keep, visible);
       try {
         const remaining = declaredFintech();
         expect(remaining, "the fixture left exactly that many").toHaveLength(
@@ -102,7 +100,9 @@ test.describe("K1 three fintech companies (API, server state)", () => {
         if (keep === 0)
           expect
             .soft(text, "says there are none")
-            .toMatch(/\b(no|none|not find|couldn.t find|zero)\b/iu);
+            .toMatch(
+              /\b(no|none|not find|can.?t find|cannot find|couldn.t find|zero)\b/iu,
+            );
         else
           expect
             .soft(text, "says there are fewer than three")
@@ -123,11 +123,11 @@ test("K1 in the browser: the first card renders inside the budget and matches th
 }) => {
   awaits(
     ["B Part 1", "C Part 5"],
-    "no fast path: cards arrive after the analyst (production p50 11.5 s)",
+    "int-merge 9050c90f: cards are right and code-built (server < 2 s) but render 5-6.6 s after send, over the provisional 3 s browser budget",
   );
   const page = await (await contextAs(browser, CAST.investor)).newPage();
   await page.goto("/home");
-  await useScript([]);
+  await useScript([READ_DISCOVER_FINTECH]);
   await vendorSettled();
   const before = (await newestRun(CAST.investor))?.runId ?? null;
   const mark = await vendorMark();

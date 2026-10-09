@@ -4,7 +4,11 @@ import { expect, test } from "@playwright/test";
 
 import { runQ } from "../support/flows.js";
 import { call } from "../support/http.js";
-import { answerText, asRun } from "../support/knowledge.js";
+import {
+  READ_DISCOVER_FINTECH,
+  answerText,
+  asRun,
+} from "../support/knowledge.js";
 import { answer, vendorSettled } from "../support/script.js";
 import { CAST } from "../support/stack.js";
 
@@ -60,7 +64,7 @@ test("K6 a founder's private words never reach an investor through discovery or 
   // Twice: the second turn is served from whatever the first one warmed.
   for (const turn of ["cold", "warm"]) {
     await vendorSettled();
-    const result = await runQ(CAST.investor, DISCOVER);
+    const result = await runQ(CAST.investor, DISCOVER, [READ_DISCOVER_FINTECH]);
     expect(leaks(result, sentinel), `${turn} discovery`).toEqual([]);
   }
   await vendorSettled();
@@ -78,10 +82,12 @@ test("K6 one investor's private words never reach another investor's turn", asyn
   const sentinel = `OSPREY-${randomUUID().slice(0, 8)}`;
   await sayPrivately(CAST.investor, sentinel);
   await vendorSettled();
-  await runQ(CAST.investor, DISCOVER); // warm with investor A
+  await runQ(CAST.investor, DISCOVER, [READ_DISCOVER_FINTECH]); // warm with investor A
   await vendorSettled();
   for (const ask of [DISCOVER, "What is my mandate?"]) {
-    const result = await runQ(CAST.unrelatedInvestor, ask);
+    const result = await runQ(CAST.unrelatedInvestor, ask, [
+      READ_DISCOVER_FINTECH,
+    ]);
     expect(leaks(result, sentinel), `investor B: "${ask}"`).toEqual([]);
     expect(answerText(asRun(result.run))).not.toContain(sentinel);
     await vendorSettled();
@@ -90,7 +96,7 @@ test("K6 one investor's private words never reach another investor's turn", asyn
 
 test("K6 another tenant cannot read a run or conversation that holds discovery results", async () => {
   await vendorSettled();
-  const mine = await runQ(CAST.investor, DISCOVER);
+  const mine = await runQ(CAST.investor, DISCOVER, [READ_DISCOVER_FINTECH]);
   for (const stranger of [CAST.unrelatedInvestor, CAST.otherFounder]) {
     for (const path of [
       `/v1/q/runs/${mine.runId}`,
