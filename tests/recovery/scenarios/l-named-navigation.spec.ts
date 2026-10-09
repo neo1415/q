@@ -85,9 +85,11 @@ for (const ask of ASKS) {
       NAME,
     );
     if (ask.page === "COMPANY_DATA_ROOM") {
+      // The profile tab bar is links marked aria-current="page", not role=tab
+      // (apps/web/src/features/company/profile-tabs.tsx:177).
       await expect(
-        page.getByRole("tab", { name: /Data room/iu }).first(),
-      ).toHaveAttribute("aria-selected", "true");
+        page.locator('[data-profile-tab="dataroom"]'),
+      ).toHaveAttribute("aria-current", "page");
     }
     // Server side: a DONE navigation receipt for this route, accepted by q-api.
     const done = () =>
