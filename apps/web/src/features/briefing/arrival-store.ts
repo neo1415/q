@@ -77,6 +77,11 @@ export function startArrival(loader: ArrivalLoader): void {
   const gate = decideArrival();
   if (!gate.give) {
     set({ kind: "NONE" });
+    // No cards on this page load, but a call is still the person asking to
+    // be briefed: read it now, quietly, so the call opens with it (live
+    // 2026-10-09: every call after the first opened "What's on your
+    // mind?" because the read took longer than the call waits).
+    prefetchForVoice(loader, gate.since);
   } else {
     void load(loader, gate.since, false);
   }
@@ -106,27 +111,49 @@ export async function arrivalForVoice(
   if (status.kind === "READY") {
     data = status.data;
   } else {
+    const reading =
+      prefetched !== null && Date.now() - prefetched.at < PREFETCH_FRESH_MS
+        ? prefetched.read
+        : loader(decideArrival().since).catch(() => null);
+    prefetched = null;
+    // A read that lands after the call opened is still put on screen; the
+    // stage then hands its words to the line (E-05). It used to be
+    // dropped, so a slow read meant no briefing at all.
+    void reading.then(publishForVoice);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<null>((resolve) => {
       timer = setTimeout(() => resolve(null), timeoutMs);
     });
-    data = await Promise.race([
-      loader(decideArrival().since).catch(() => null),
-      late,
-    ]);
+    data = await Promise.race([reading, late]);
     clearTimeout(timer);
-    // Read again: the page's own load may have landed while this waited.
-    if (data !== null && currentStatus().kind !== "READY") {
-      started = true;
-      round += 1;
-      set({ kind: "READY", data, round, nudge: false });
-    }
   }
   if (data === null) return null;
   return {
     ...data,
     cards: data.cards.filter((card) => !handled.has(card.key)),
   };
+}
+
+/** How long a quietly read briefing still counts as this visit's. */
+const PREFETCH_FRESH_MS = 10 * 60_000;
+let prefetched: {
+  readonly at: number;
+  readonly read: Promise<ArrivalData | null>;
+} | null = null;
+
+function prefetchForVoice(loader: ArrivalLoader, since: string | null): void {
+  prefetched = {
+    at: Date.now(),
+    read: loader(since).catch(() => null),
+  };
+}
+
+/** A briefing read for a call: on screen once, unless one already is. */
+function publishForVoice(data: ArrivalData | null): void {
+  if (data === null || currentStatus().kind === "READY") return;
+  started = true;
+  round += 1;
+  set({ kind: "READY", data, round, nudge: false });
 }
 
 /** New decisions arrived later (an agent needs them): the cards again. */
@@ -230,4 +257,5 @@ export function resetArrival(): void {
   greetedRound = -1;
   carried = null;
   saidOnLine = false;
+  prefetched = null;
 }

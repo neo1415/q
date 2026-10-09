@@ -20,6 +20,7 @@ import type {
 import { arrivalGreeting } from "@capital-q/q-core/speech";
 
 import { voiceBriefing } from "@/features/briefing/arrival-voice";
+import { markArrivalSaid } from "@/features/briefing/arrival-store";
 
 import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
@@ -51,15 +52,27 @@ import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import { useQConversation, type QConversation } from "./use-q-conversation";
 import { rereadUntilSettled } from "./voice-reread";
 
-/** "Good afternoon. What's on your mind?", by the browser's clock. */
-function plainHello(): string {
+/**
+ * The call's first words when the briefing was not read in time: a hello
+ * by their clock and a promise of the lowdown, which the stage hands to
+ * the line when it lands (E-05). Never "What's on your mind?" (Zino,
+ * 2026-10-09: the greeting must be the lowdown, not a question).
+ */
+function briefingOnItsWay(): string {
   let zone: string | null;
   try {
     zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
   } catch {
     zone = null;
   }
-  return `${arrivalGreeting({ firstName: null, now: new Date(), timeZone: zone })} What's on your mind?`;
+  return `${arrivalGreeting({ firstName: null, now: new Date(), timeZone: zone })} One moment, I'm pulling up what's happened since you were last here.`;
+}
+
+/** The briefing's words, or the promise of them; the stage knows which. */
+async function callOpening(): Promise<string> {
+  const briefing = await voiceBriefing().catch(() => null);
+  markArrivalSaid(briefing !== null);
+  return briefing ?? briefingOnItsWay();
 }
 
 /**
@@ -404,10 +417,9 @@ export function QSessionProvider({
                 : {}),
           ...(named === undefined ? {} : { conversationId: named }),
         },
-        // Never "I'm listening" (Zino, 2026-10-08): the arrival briefing
-        // when this page load gives one, else a hello by their clock.
-        firstMessage:
-          greeting ?? (await voiceBriefing().catch(() => null)) ?? plainHello(),
+        // Never "I'm listening" (Zino, 2026-10-08): the arrival briefing,
+        // or, when it is still being read, the promise of it.
+        firstMessage: greeting ?? (await callOpening()),
       });
     },
     [
