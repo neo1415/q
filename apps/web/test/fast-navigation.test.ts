@@ -14,6 +14,8 @@ import type { QFastNavigationResponse } from "@capital-q/contracts";
 import {
   movedEarlyTo,
   performClientAction,
+  registerShellRouter,
+  setHardLoad,
   registerClientPrefetch,
   registerClientRouter,
   settingsPath,
@@ -28,6 +30,10 @@ import {
 } from "../src/features/q/control/fast-navigation";
 import { fastMoveLine } from "../src/features/voice/live/live-call";
 import { performTurnChain } from "../src/features/voice/use-follow-turn";
+import {
+  claimVoiceAudio,
+  releaseVoiceAudio,
+} from "../src/features/voice/voice-audio";
 import {
   expectNavigation,
   noteRedirect,
@@ -396,5 +402,64 @@ describe("every move gets a receipt", () => {
     expect(seen).toEqual([
       { status: "DONE", expected: "/discover", route: "/discover" },
     ]);
+  });
+});
+
+/**
+ * V's live test 2026-10-09: a delegated open landed by a HARD RELOAD (the
+ * page's Q session had no router registered at that moment), which ends
+ * the voice call. Moves wait briefly for a router; never a full load
+ * while a call holds the audio.
+ */
+describe("Q's moves never hard-reload while a call is live", () => {
+  const owner = { stop: () => undefined };
+
+  afterEach(() => {
+    releaseVoiceAudio(owner);
+    registerShellRouter(null);
+    setHardLoad(null);
+  });
+
+  it("with no page router, the shell's router moves", async () => {
+    registerClientRouter(null);
+    const shell: string[] = [];
+    registerShellRouter((path) => shell.push(path));
+    await navigationHeard("open discover");
+    expect(shell).toEqual(["/discover"]);
+  });
+
+  it("with no router at all, the move waits and goes once one registers", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    registerClientRouter(null);
+    const loads: string[] = [];
+    setHardLoad((path) => loads.push(path));
+    await navigationHeard("open discover");
+    expect(pushed).toEqual([]);
+    vi.advanceTimersByTime(500);
+    registerClientRouter((path) => pushed.push(path));
+    expect(pushed).toEqual(["/discover"]);
+    vi.advanceTimersByTime(5_000);
+    expect(loads).toEqual([]);
+  });
+
+  it("never a full page load while a voice call holds the audio", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    registerClientRouter(null);
+    await claimVoiceAudio(owner);
+    const loads: string[] = [];
+    setHardLoad((path) => loads.push(path));
+    await navigationHeard("open discover");
+    vi.advanceTimersByTime(5_000);
+    expect(loads).toEqual([]);
+  });
+
+  it("with no call and no router, the last resort still opens the page", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    registerClientRouter(null);
+    const loads: string[] = [];
+    setHardLoad((path) => loads.push(path));
+    await navigationHeard("open discover");
+    vi.advanceTimersByTime(2_500);
+    expect(loads).toEqual(["/discover"]);
   });
 });

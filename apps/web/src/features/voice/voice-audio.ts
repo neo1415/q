@@ -74,6 +74,14 @@ export function releaseVoiceAudio(owner: VoiceAudioOwner): void {
   }
 }
 
+/**
+ * Whether any voice line holds the tab's audio (a call is live). Q's moves
+ * never fall back to a full page load then: it would end the call (C).
+ */
+export function voiceAudioHeld(): boolean {
+  return current !== null;
+}
+
 /** For tests and diagnostics only. */
 export function voiceAudioOwner(): VoiceAudioOwner | null {
   return current;
