@@ -1,0 +1,155 @@
+import { expect, test } from "@playwright/test";
+
+import { contextAs } from "../support/auth.js";
+import { awaits } from "../support/expected-red.js";
+import { runQ } from "../support/flows.js";
+import {
+  BUDGET,
+  answerText,
+  cardCompanyIds,
+  declaredFintech,
+  keepDeclaredFintech,
+  modelCallsOf,
+  modelCallsSince,
+  newestRun,
+  nextSettledRun,
+  serverMs,
+  asRun,
+  type RunView,
+} from "../support/knowledge.js";
+import { send } from "../support/q.js";
+import { useScript, vendorMark, vendorSettled } from "../support/script.js";
+import { CAST } from "../support/stack.js";
+
+/**
+ * K Test 1: "three fintech companies" (the 2026-10-09 production failure).
+ * The answer is the declared fintech companies the investor may see, as
+ * cards, code-built (Part 1 DISCOVER_COMPANIES fast path, Part 8 router):
+ * no analyst model call, inside the latency budget, and honest when fewer
+ * than three exist (0, 1 and 2 seeded through the harness, never prod).
+ */
+const ASK = "Show me three fintech companies";
+
+async function discover(): Promise<{
+  run: RunView;
+  ms: number | null;
+  calls: ReturnType<typeof modelCallsOf>;
+}> {
+  await vendorSettled();
+  const result = await runQ(CAST.investor, ASK);
+  const run = asRun(result.run);
+  return { run, ms: serverMs(run), calls: modelCallsOf(result.vendor) };
+}
+
+function expectFastPath(
+  calls: ReturnType<typeof modelCallsOf>,
+  ms: number | null,
+): void {
+  expect
+    .soft(calls.analyst, `analyst calls (tasks: ${calls.tasks.join(", ")})`)
+    .toBe(0);
+  expect
+    .soft(calls.total, `model calls (tasks: ${calls.tasks.join(", ")})`)
+    .toBeLessThanOrEqual(BUDGET.fastPathModelCalls);
+  expect.soft(ms, "server ms, createdAt → completedAt").not.toBeNull();
+  expect.soft(ms ?? Infinity).toBeLessThanOrEqual(BUDGET.discoverServerMs);
+}
+
+test.describe("K1 three fintech companies (API, server state)", () => {
+  test("as seeded: up to three declared-fintech cards, unique, code-built, in budget", async () => {
+    awaits(
+      ["B Part 1", "B Part 8", "D Parts 2-3"],
+      "no DISCOVER_COMPANIES fast path: sector discovery falls to the analyst",
+    );
+    const fintech = declaredFintech();
+    expect(
+      fintech.length,
+      "the local seed declares fintech companies",
+    ).toBeGreaterThan(0);
+    const { run, ms, calls } = await discover();
+    expect(run.status).toBe("COMPLETED");
+    const ids = cardCompanyIds(run);
+    expect.soft(ids.length, "cards").toBe(Math.min(3, fintech.length));
+    for (const id of ids)
+      expect.soft(fintech, `card ${id} is declared fintech`).toContain(id);
+    expectFastPath(calls, ms);
+  });
+
+  for (const keep of [0, 1, 2]) {
+    test(`${String(keep)} declared fintech: ${String(keep)} card(s), says so honestly, invents none`, async () => {
+      awaits(
+        ["B Part 1", "D Part 5"],
+        "no fast path; and a fixture change reaches Tier B only through D's rebuild (G-R9)",
+      );
+      const seeded = declaredFintech().length;
+      expect(
+        seeded,
+        "the local seed declares enough fintech companies",
+      ).toBeGreaterThanOrEqual(keep);
+      const restore = keepDeclaredFintech(keep);
+      try {
+        const remaining = declaredFintech();
+        expect(remaining, "the fixture left exactly that many").toHaveLength(
+          keep,
+        );
+        const { run, ms, calls } = await discover();
+        expect(run.status).toBe("COMPLETED");
+        const ids = cardCompanyIds(run);
+        expect.soft(ids.length, "cards").toBe(remaining.length);
+        for (const id of ids) expect.soft(remaining).toContain(id);
+        const text = answerText(run);
+        expect.soft(text.length, "Q says something").toBeGreaterThan(0);
+        if (keep === 0)
+          expect
+            .soft(text, "says there are none")
+            .toMatch(/\b(no|none|not find|couldn.t find|zero)\b/iu);
+        else
+          expect
+            .soft(text, "says there are fewer than three")
+            .toMatch(/\b(only|one|two|1|2)\b/iu);
+        expect
+          .soft(text, "never claims three")
+          .not.toMatch(/\bthree\b|\b3\b/iu);
+        expectFastPath(calls, ms);
+      } finally {
+        restore();
+      }
+    });
+  }
+});
+
+test("K1 in the browser: the first card renders inside the budget and matches the stored run", async ({
+  browser,
+}) => {
+  awaits(
+    ["B Part 1", "C Part 5"],
+    "no fast path: cards arrive after the analyst (production p50 11.5 s)",
+  );
+  const page = await (await contextAs(browser, CAST.investor)).newPage();
+  await page.goto("/home");
+  await useScript([]);
+  await vendorSettled();
+  const before = (await newestRun(CAST.investor))?.runId ?? null;
+  const mark = await vendorMark();
+  const started = Date.now();
+  await send(page, ASK);
+  const first = page.locator("[data-ac-cards] [data-ac-card]").first();
+  await expect(first).toBeVisible({ timeout: 90_000 });
+  const firstCardMs = Date.now() - started;
+  expect
+    .soft(firstCardMs, "send → first card (ms)")
+    .toBeLessThanOrEqual(BUDGET.discoverFirstCardBrowserMs);
+  const dom = await page
+    .locator("[data-ac-cards] [data-ac-card]")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("data-ac-card") ?? ""),
+    );
+  const run = await nextSettledRun(CAST.investor, before);
+  const ids = cardCompanyIds(run);
+  expect.soft(dom.length, "rendered cards = stored cards").toBe(ids.length);
+  expect.soft(ids.length).toBeLessThanOrEqual(3);
+  const calls = await modelCallsSince(mark);
+  expect
+    .soft(calls.analyst, `analyst calls (${calls.tasks.join(", ")})`)
+    .toBe(0);
+});
