@@ -57,6 +57,17 @@ export function VoicePreview({
         call.current = await startLiveCall({
           voice,
           briefingOpening: briefing,
+          fastNavigation: true,
+          ...(briefing
+            ? {
+                opening: {
+                  greeting:
+                    "The call has just connected. Greet them warmly now, in one short natural sentence: no question, no filler. Their briefing is on its way; do not guess it.",
+                  request:
+                    "Brief me: what changed and what needs my attention today?",
+                },
+              }
+            : {}),
           onUpdate: (update) => {
             setStats(update.stats);
             setBridge(update.bridge);

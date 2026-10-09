@@ -56,6 +56,8 @@ export const LiveOpenResultSchema = z
     /** As the provider reported it when the session was created. */
     model: z.string().nullable(),
     maxSessionMs: z.number().int().positive(),
+    /** No speech either way for this long: the client closes the line. */
+    idleMs: z.number().int().positive(),
   })
   .strict();
 export type LiveOpenResult = z.infer<typeof LiveOpenResultSchema>;
@@ -114,7 +116,16 @@ export const LiveUsageResultSchema = z
     recordedSeconds: z.number().int().min(0),
     /** Time left before the hard cap; 0 means close now. */
     remainingMs: z.number().int().min(0),
+    /** Today's voice spend cap is reached: close now. */
+    capReached: z.boolean().optional(),
   })
+  .strict();
+
+export const Q_VOICE_LIVE_AVAILABLE_PATH =
+  "/v1/q/voice/live/available" as const;
+/** Whether this person's voice starts on GPT-Live (server-decided). */
+export const LiveAvailabilitySchema = z
+  .object({ available: z.boolean() })
   .strict();
 
 export const LiveEndSchema = z

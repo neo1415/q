@@ -18,6 +18,8 @@ const FAKE = process.env.CQ_FAKE_VENDOR_ORIGIN ?? "http://127.0.0.1:3990";
 const REDIRECTS = [
   "https://api.openai.com/v1/realtime/client_secrets",
   "https://api.deepgram.com/v1/auth/grant",
+  // V: GPT-Live's WebRTC session creation.
+  "https://api.openai.com/v1/live/sessions",
 ];
 
 if (process.env.CQ_FAKE_VOICE_VENDORS === "1") {
@@ -29,7 +31,14 @@ if (process.env.CQ_FAKE_VOICE_VENDORS === "1") {
         : input instanceof URL
           ? input.href
           : input?.url;
-    const match = REDIRECTS.find((prefix) => href?.startsWith(prefix));
+    // A real GPT-Live key (the developer preview) goes to the real vendor.
+    const realLive =
+      (process.env.CQ_VOICE_LIVE_OPENAI_API_KEY ?? "").length > 0;
+    const match = REDIRECTS.find(
+      (prefix) =>
+        href?.startsWith(prefix) &&
+        !(realLive && prefix.endsWith("/v1/live/sessions")),
+    );
     if (match === undefined) return original(input, init);
     const target = `${FAKE}${new URL(href).pathname}`;
     return typeof input === "string" || input instanceof URL

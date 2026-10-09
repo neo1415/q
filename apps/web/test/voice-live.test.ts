@@ -167,7 +167,26 @@ describe("the GPT-Live delegation bridge", () => {
     });
   });
 
-  it("never speaks a late result over a newer question, but keeps it as quiet context", async () => {
+  it("still speaks a slow answer when the newer request is only waiting (the founder's nudges)", async () => {
+    const h = harness();
+    h.heard("Give me three good examples");
+    h.delegation("dlg_1");
+    h.advance(400);
+    h.heard(" still waiting, can you do it or not");
+    h.delegation("dlg_2");
+    h.advance(400);
+    h.pending.get("dlg_1")?.({
+      commentary: "Verified: Tensorgate, Ledgerline, Tarmacly.",
+      stale: true,
+    });
+    await h.settle();
+    const spoken = h.sent.filter((e) => e.type === "session.commentary.append");
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0]?.delegation_id).toBe("dlg_1");
+    expect(spoken[0]?.content).toContain("Tensorgate, Ledgerline, Tarmacly");
+  });
+
+  it("keeps a late result as quiet context once a newer question has been answered", async () => {
     const h = harness();
     h.heard("Top three companies");
     h.delegation("dlg_1");
@@ -176,21 +195,16 @@ describe("the GPT-Live delegation bridge", () => {
     h.delegation("dlg_2");
     h.advance(400);
     expect(h.asked[1]?.request).toBe("wait, what about the second one?");
+    h.pending.get("dlg_2")?.({ commentary: "Verified: B is second because…" });
+    await h.settle();
     h.pending.get("dlg_1")?.({ commentary: "Verified list: A, B, C." });
     await h.settle();
     expect(h.sent.at(-1)).toMatchObject({
       type: "session.thinking.append",
       delegation_id: "dlg_1",
     });
-    expect(h.sent.some((e) => e.type === "session.commentary.append")).toBe(
-      false,
-    );
-    h.pending.get("dlg_2")?.({ commentary: "Verified: B is second because…" });
-    await h.settle();
-    expect(h.sent.at(-1)).toMatchObject({
-      type: "session.commentary.append",
-      delegation_id: "dlg_2",
-    });
+    const spoken = h.sent.filter((e) => e.type === "session.commentary.append");
+    expect(spoken.map((e) => e.delegation_id)).toEqual(["dlg_2"]);
   });
 
   it("does not speak what the server marked stale", async () => {
@@ -205,15 +219,60 @@ describe("the GPT-Live delegation bridge", () => {
     );
   });
 
-  it("says progress at most once, quietly, and never as filler", () => {
-    const h = harness({ progressAfterMs: 1_000 });
-    h.heard("Research Ajopot");
+  it("says one natural progress line after about five seconds, never repeated", () => {
+    const h = harness({ progressAfterMs: 5_000 });
+    h.heard("Give me three good examples");
     h.delegation("dlg_1");
     h.advance(400);
-    h.advance(5_000);
-    const progress = h.sent.filter((e) => e.type === "session.thinking.append");
+    h.advance(4_000);
+    expect(h.sent).toHaveLength(0);
+    h.advance(30_000);
+    const progress = h.sent.filter(
+      (e) => e.type === "session.commentary.append",
+    );
     expect(progress).toHaveLength(1);
-    expect(progress[0]?.content).toContain("Do not guess");
+    expect(progress[0]?.content).toContain("Give me three good examples");
+    expect(progress[0]?.content).toContain("do not say this again");
+  });
+
+  it("sends typed words straight to Q Brain and speaks the answer", async () => {
+    const h = harness();
+    h.bridge.typed("Open Ajopot");
+    expect(h.asked).toEqual([
+      { delegationId: "typed_1", request: "Open Ajopot" },
+    ]);
+    h.pending.get("typed_1")?.({ commentary: "Verified: Ajopot is open." });
+    await h.settle();
+    expect(h.sent.at(-1)).toMatchObject({
+      type: "session.commentary.append",
+      delegation_id: null,
+    });
+  });
+
+  it("opens with Q's own opening in hand: one instruction, no extra run", () => {
+    const sent: Sent[] = [];
+    const asked: string[] = [];
+    const bridge = createLiveBridge({
+      send: (event) => {
+        sent.push(event);
+      },
+      delegate: (request) => {
+        asked.push(request.request);
+        return Promise.resolve({ commentary: null });
+      },
+      newEventId: () => "e",
+      now: () => 0,
+      opening: {
+        greeting: "Greet Amaka.",
+        content: "Nineteen things need your eyes. Spheros is waiting.",
+      },
+    });
+    bridge.handle({ type: "session.started" });
+    expect(asked).toEqual([]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.type).toBe("session.instructions.append");
+    expect(sent[0]?.content).toContain("never repeat card or screen text");
+    expect(sent[0]?.content).toContain("Spheros is waiting");
   });
 
   it("tells the voice nothing was cancelled until the server confirms", async () => {

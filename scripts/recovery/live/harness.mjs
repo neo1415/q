@@ -223,6 +223,38 @@ const SCENARIOS = {
       { when: "q-done", say: "Okay. Fine. So what should I fix first?" },
     ],
   },
+  // The founder's live test of 2026-10-09, replayed: the opening briefing,
+  // a slow Q Brain answer (delayed to 25 s here, as hosted; labelled), two
+  // nudges while it works, a request to laugh, and a counterpart's name.
+  11: {
+    name: "founder-retest",
+    voice: "onyx",
+    prompt: {
+      role: "investor",
+      names: ["Tensorgate", "Spheros", "Shiftwell", "Ledgerline", "Tarmacly"],
+    },
+    opening: {
+      greeting:
+        "The call has just connected. Greet them warmly now, in one short natural sentence: no question, no filler.",
+      content:
+        "Nineteen things need your eyes. First, Spheros is waiting for your reply: they thanked you and said the rest is on your screen. Then held drafts and unanswered messages: Tensorgate has one waiting, Shiftwell has messaged you, and one approval to send Ledgerline a message.",
+    },
+    slowBackend: { match: "top three", delayMs: 25_000 },
+    steps: [
+      { when: "q-done", say: "Okay, well, what else?" },
+      {
+        when: "q-done",
+        say: "Which ones could I actually invest in? Give me the top three that fit my mandate.",
+      },
+      { when: { afterMs: 8_000 }, say: "Okay, I'm still waiting." },
+      { when: { afterMs: 6_000 }, say: "Still waiting. Can you do it or not?" },
+      { when: "q-done", say: "Ha, nice. Can you laugh for me?" },
+      {
+        when: "q-done",
+        say: "I was actually hoping to do something with Tensorgate.",
+      },
+    ],
+  },
   10: {
     name: "five-minute-conversation",
     capMs: 6 * 60 * 1000,
@@ -607,7 +639,20 @@ async function runScenario(id) {
     if (ws.readyState === 1) ws.send(JSON.stringify(event));
   };
 
-  const backend = BACKEND === "local" ? await localBackend() : offlineBackend;
+  const brain = BACKEND === "local" ? await localBackend() : offlineBackend;
+  // A slow Q Brain, as hosted on 2026-10-09 (23-30 s): the real answer,
+  // held back before it is returned. Labelled in the scenario's JSON.
+  const slow = scenario.slowBackend;
+  const backend =
+    slow === undefined
+      ? brain
+      : async (req) => {
+          const result = await brain(req);
+          if (req.request.toLowerCase().includes(slow.match)) {
+            await sleep(slow.delayMs);
+          }
+          return result;
+        };
   const delegations = [];
   const bridge = createLiveBridge({
     send: (event) => {
@@ -639,9 +684,11 @@ async function runScenario(id) {
     now: () => Date.now(),
     // The call opening, as the app runs it. The attention read answers 500
     // on this branch, so the lowdown is Q's code-built fit ranking.
-    ...(scenario.prompt?.briefingOpening === true
-      ? { opening: openingFor(scenario.prompt.firstName) }
-      : {}),
+    ...(scenario.opening !== undefined
+      ? { opening: scenario.opening }
+      : scenario.prompt?.briefingOpening === true
+        ? { opening: openingFor(scenario.prompt.firstName) }
+        : {}),
   });
 
   // Hard client-side cap, whatever happens.
@@ -1009,6 +1056,7 @@ async function runScenario(id) {
     reportedModel,
     reportedSession: reportedSession === null ? null : "(present)",
     backend: BACKEND,
+    slowBackend: scenario.slowBackend ?? null,
     inputs: "synthetic: gpt-4o-mini-tts, Nigerian English accent instructions",
     wallSeconds: Math.round(now() / 1000),
     billedSeconds: billed,

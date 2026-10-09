@@ -374,6 +374,22 @@ const server = createServer(async (req, res) => {
     });
   }
 
+  // V: GPT-Live's WebRTC session creation (the Q API's SDP exchange). The
+  // answer is a fake SDP: the browser half is faked in the page
+  // (tests/recovery/support/live-fake.ts). Never real audio.
+  if (path === "/v1/live/sessions" && req.method === "POST") {
+    record({
+      vendor: "openai-live",
+      path,
+      instructions: body.session?.instructions ?? null,
+      delegation: body.session?.delegation ?? null,
+    });
+    return send(res, 201, {
+      session: { id: `live_fake_${randomUUID()}`, model: "gpt-live-1" },
+      transport: { sdp: "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=fake-live\r\n" },
+    });
+  }
+
   record({ vendor: "unknown", path, method: req.method });
   return send(res, 404, {
     error: { message: `fake-vendors: no route ${path}` },
