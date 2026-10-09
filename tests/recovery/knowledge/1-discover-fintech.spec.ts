@@ -5,7 +5,7 @@ import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import {
   BUDGET,
-  READ_DISCOVER_FINTECH,
+  DISCOVER_FINTECH_RULES,
   answerText,
   cardCompanyIds,
   declaredFintech,
@@ -37,7 +37,7 @@ async function discover(): Promise<{
   calls: ReturnType<typeof modelCallsOf>;
 }> {
   await vendorSettled();
-  const result = await runQ(CAST.investor, ASK, [READ_DISCOVER_FINTECH]);
+  const result = await runQ(CAST.investor, ASK, DISCOVER_FINTECH_RULES);
   const run = asRun(result.run);
   return { run, ms: serverMs(run), calls: modelCallsOf(result.vendor) };
 }
@@ -126,8 +126,8 @@ test("K1 in the browser: the first card renders inside the budget and matches th
     "int-merge 9050c90f: cards are right and code-built (server < 2 s) but render 5-6.6 s after send, over the provisional 3 s browser budget",
   );
   const page = await (await contextAs(browser, CAST.investor)).newPage();
-  await page.goto("/home");
-  await useScript([READ_DISCOVER_FINTECH]);
+  await page.goto("/home?new=1");
+  await useScript(DISCOVER_FINTECH_RULES);
   await vendorSettled();
   const before = (await newestRun(CAST.investor))?.runId ?? null;
   const mark = await vendorMark();
@@ -152,4 +152,40 @@ test("K1 in the browser: the first card renders inside the budget and matches th
   expect
     .soft(calls.analyst, `analyst calls (${calls.tasks.join(", ")})`)
     .toBe(0);
+});
+
+/**
+ * K1 timing: send → first rendered card, five runs, each in a fresh browser
+ * context and a fresh conversation (/home?new=1; a repeat in the same
+ * conversation measures a different path). Reports nearest-rank p50/p95
+ * as an annotation; asserts the p50 against the provisional budget.
+ */
+test("K1 timing: send → first card, 5 fresh conversations, p50/p95", async ({
+  browser,
+}) => {
+  test.setTimeout(600_000);
+  const samples: number[] = [];
+  for (let i = 0; i < 5; i += 1) {
+    const context = await contextAs(browser, CAST.investor);
+    const page = await context.newPage();
+    await page.goto("/home?new=1");
+    await useScript(DISCOVER_FINTECH_RULES);
+    await vendorSettled();
+    const started = Date.now();
+    await send(page, ASK);
+    await expect(
+      page.locator("[data-ac-cards] [data-ac-card]").first(),
+    ).toBeVisible({ timeout: 90_000 });
+    samples.push(Date.now() - started);
+    await context.close();
+  }
+  const sorted = [...samples].sort((a, b) => a - b);
+  const rank = (p: number) =>
+    sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)] ?? Number.NaN;
+  const line = `samples ${samples.join(", ")}; p50 ${String(rank(0.5))}; p95 ${String(rank(0.95))}`;
+  test.info().annotations.push({ type: "k1-first-card-ms", description: line });
+  console.log(`K1 first card ms: ${line}`);
+  expect
+    .soft(rank(0.5), "p50 send → first card (ms)")
+    .toBeLessThanOrEqual(BUDGET.discoverFirstCardBrowserMs);
 });

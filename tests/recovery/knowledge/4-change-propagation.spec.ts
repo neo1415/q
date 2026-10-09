@@ -111,8 +111,13 @@ test("K4 a mandate change is reflected on the very next turn", async () => {
       .toBeLessThanOrEqual(1);
   } finally {
     await changeSectors(original);
-    expect(mandateSectorNames(mandateId), "original sectors restored").toEqual(
-      original,
-    );
+    // The approved write lands after the approve call returns; poll, as
+    // for the change itself.
+    await expect
+      .poll(() => mandateSectorNames(mandateId), {
+        message: "original sectors restored",
+        timeout: 20_000,
+      })
+      .toEqual(original);
   }
 });
