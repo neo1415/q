@@ -183,7 +183,11 @@ export function keepDeclaredFintech(keep: number): () => void {
        and entity_id in (${list}) and node_id in (select id from f)
      returning id`,
   );
-  const ids = out.split("\n").filter(Boolean).map(assertUuid);
+  // psql prints the RETURNING rows and then the command tag ("UPDATE n").
+  const ids = out
+    .split("\n")
+    .filter((line) => /^[0-9a-f-]{36}$/u.test(line))
+    .map(assertUuid);
   return () => {
     if (ids.length === 0) return;
     localSql(
@@ -198,7 +202,9 @@ export function mandateSectorNames(mandateId: string): string[] {
   const out = localSql(
     `select n.display_name from taxonomy.mandate_preferences p
        join taxonomy.nodes n on n.id = p.node_id
-     where p.mandate_id = '${assertUuid(mandateId)}' and not p.is_exclusion
+       join taxonomy.vocabularies v on v.id = n.vocabulary_id
+     where v.code in ('industry', 'product_category', 'technology')
+       and p.mandate_id = '${assertUuid(mandateId)}' and not p.is_exclusion
      order by n.display_name`,
   );
   return out === "" ? [] : out.split("\n");

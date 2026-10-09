@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
-import { awaits } from "../support/expected-red.js";
 import {
   BUDGET,
   answerText,
@@ -25,12 +24,12 @@ import { CAST, world } from "../support/stack.js";
  * "this company" mean that company: the run is about it (server subjects),
  * the model's context carries it (fake vendor log), and Q does not ask
  * which company. The page's entity is prefetched on navigation, so the
- * turn stays inside the analyst budget.
+ * turn stays inside the analyst budget. Green on e4565008 (C's page
+ * context already holds), so it is a regression guard, not expected red.
  */
 test("K3 'this company' on a company page is that company, without asking", async ({
   browser,
 }) => {
-  awaits(["C Part 5"], "page context and entity prefetch on navigation");
   const company = world().company("ledgerfold");
   const page = await (await contextAs(browser, CAST.investor)).newPage();
   await page.goto(`/company/${company.companyId}`);
