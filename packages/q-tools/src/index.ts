@@ -51,6 +51,8 @@ export {
 export type {
   InvestorFeedCompany,
   InvestorFeedDecision,
+  CompanyCatalogCandidate,
+  CompanyCatalogPort,
   InvestorFeedPort,
   ConversationProposal,
   PendingProposalContext,
@@ -356,6 +358,13 @@ export {
   type ReadAttentionInput,
 } from "./tools/attention.js";
 
+export {
+  createDiscoverCompaniesTool,
+  DISCOVER_COMPANIES,
+  DiscoverCompaniesInputSchema,
+  DiscoverCompaniesOutputSchema,
+  type DiscoverCompaniesOutput,
+} from "./tools/discover-companies.js";
 export {
   createDiscoverySlateTool,
   DISCOVERY_SLATE,

@@ -293,6 +293,11 @@ export {
   V45_STILL_WAITING,
 } from "./prompts/tasks/turn-reader.v45.js";
 export {
+  TURN_READER_V46,
+  V46_DISCOVER,
+  V46_DISCOVER_FIELDS,
+} from "./prompts/tasks/turn-reader.v46.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -355,6 +360,9 @@ export {
   TURN_READER_V45_SCHEMA_VERSION,
   TurnReaderV45ResultSchema,
   type TurnReaderV45Result,
+  TURN_READER_V46_SCHEMA_VERSION,
+  TurnReaderV46ResultSchema,
+  type TurnReaderV46Result,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,

@@ -502,6 +502,7 @@ import {
   createRecordChangeActions,
   createRecordChangeBoard,
 } from "./composition/record-change-actions.js";
+import { createPostgresCompanyCatalog } from "./composition/company-catalog.js";
 import { createExploreToolPort } from "./composition/explore.js";
 import {
   createDiscoveryService,
@@ -2637,6 +2638,9 @@ const qTools = createQTools({
       companies,
       disclosure,
     }),
+    // K1: "three fintech companies" by declared taxonomy; the tool decides
+    // every candidate through disclosure.
+    companyCatalog: createPostgresCompanyCatalog({ sql: database.sql }),
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {
       momentAround: async (actor, query) => {

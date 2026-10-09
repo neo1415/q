@@ -21,6 +21,7 @@ import {
   gateQTool,
   type QToolGate,
 } from "./tools/plan.js";
+import { createDiscoverCompaniesTool } from "./tools/discover-companies.js";
 import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import {
   createFitProfileTool,
@@ -126,6 +127,9 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     createGetInvestorMandateTool(ports),
     createSearchCompaniesTool(ports),
     ...(ports.discovery === undefined ? [] : [createDiscoverySlateTool(ports)]),
+    ...(ports.companyCatalog === undefined
+      ? []
+      : [createDiscoverCompaniesTool(ports)]),
     ...(ports.discovery === undefined
       ? []
       : [createFindProspectiveInvestorsTool(ports)]),

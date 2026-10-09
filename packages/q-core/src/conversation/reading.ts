@@ -137,6 +137,10 @@ export type QualitativeMeaning = z.infer<typeof QualitativeMeaningSchema>;
  * FIT (TURN_READER v45, live 2026-10-09) is which companies on Capital Q
  * they could invest in or fit them best, in any words: answered from the
  * fit computed against their mandate, by code, never from the public web.
+ * DISCOVER_COMPANIES (TURN_READER v46, founder brief K1) is companies of a
+ * kind on Capital Q -- a sector, a country, a stage, a number -- with the
+ * request's structure in `discover`: a catalog read by code, with fit only
+ * when asked for, never the analyst and never the public web.
  */
 export const QUESTION_KINDS = [
   "ADVICE",
@@ -147,9 +151,38 @@ export const QUESTION_KINDS = [
   "REAL_WORLD_EXAMPLE",
   "PUBLIC_FACTS",
   "FIT",
+  "DISCOVER_COMPANIES",
 ] as const;
 export const QuestionKindSchema = z.enum(QUESTION_KINDS);
 export type QuestionKind = z.infer<typeof QuestionKindSchema>;
+
+/**
+ * How a list of companies is ordered. NONE: they asked for none (name
+ * order, said so). FIT: by fit with their mandate ("which suit my
+ * mandate", "strongest fit"). TOP: "top" or "best" without saying on
+ * what: fit when they have a mandate, otherwise Q says what it means.
+ */
+export const DISCOVER_RANKINGS = ["NONE", "FIT", "TOP"] as const;
+
+export const DiscoverRequestSchema = z
+  .object({
+    /** Taxonomy codes, lower_snake_case ("fintech", "digital_health"). */
+    sectors: z.array(z.string().trim().min(1).max(64)).max(8).default([]),
+    /** ISO 3166-1 alpha-2 head-office countries ("NG"). */
+    countries: z
+      .array(z.string().regex(/^[A-Za-z]{2}$/u))
+      .max(8)
+      .default([]),
+    /** Company stage codes ("seed", "series_a"). */
+    stages: z.array(z.string().trim().min(1).max(64)).max(6).default([]),
+    ranking: z.enum(DISCOVER_RANKINGS).default("NONE"),
+    /** They tied it to their mandate ("for my mandate", "suit me"). */
+    mandateRelevant: z.boolean().default(false),
+    /** About companies Q just showed ("those", "of these"). */
+    previous: z.boolean().default(false),
+  })
+  .strict();
+export type DiscoverRequest = z.infer<typeof DiscoverRequestSchema>;
 
 export const QuestionToQSchema = z
   .object({
@@ -175,6 +208,12 @@ export const QuestionToQSchema = z
      * refuses the whole reading; the cards cap it at ten.
      */
     count: z.number().int().min(1).max(100).nullable().default(null),
+    /**
+     * A DISCOVER_COMPANIES request's structure (v46); null for every other
+     * kind. Read with the question, so no code parses sectors or places
+     * out of their words.
+     */
+    discover: DiscoverRequestSchema.nullable().default(null),
   })
   .strict();
 export type QuestionToQ = z.infer<typeof QuestionToQSchema>;

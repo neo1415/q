@@ -81,6 +81,46 @@ export type InvestorFeedDecision = {
   readonly decision: "SAVED" | "PASSED";
 };
 
+/**
+ * K1 (founder brief 2026-10-09): the companies on the network in a sector,
+ * country or stage, by declared taxonomy (confirmed assignments only, a
+ * sector's sub-sectors included). Candidates only: the tool decides each
+ * one through disclosure before anything is returned.
+ */
+export type CompanyCatalogCandidate = {
+  readonly companyId: string;
+  readonly name: string;
+  readonly stageCode: string | null;
+  readonly headquartersCountry: string | null;
+  readonly shortDescription: string | null;
+  /** The declared sectors that matched the ask, by display name. */
+  readonly sectors: readonly string[];
+};
+
+export type CompanyCatalogPort = {
+  readonly find: (
+    actor: ActorContext,
+    query: {
+      /** Taxonomy codes or their aliases, as the reader gave them. */
+      readonly sectors: readonly string[];
+      /** ISO 3166-1 alpha-2, upper case. */
+      readonly countries: readonly string[];
+      readonly stages: readonly string[];
+      readonly limit: number;
+    },
+  ) => Promise<{
+    /** In name order; the actor's own organisation's companies excluded. */
+    readonly candidates: readonly CompanyCatalogCandidate[];
+    /** The sectors asked for that the taxonomy knows, by display name. */
+    readonly sectors: readonly {
+      readonly code: string;
+      readonly name: string;
+    }[];
+    /** Sectors asked for that the taxonomy does not know. */
+    readonly unknownSectors: readonly string[];
+  }>;
+};
+
 export type InvestorFeedPort = {
   /** The first page of the actor's own feed; null when they are not an investor. */
   readonly page: (
@@ -412,6 +452,8 @@ export type QToolPorts = {
    * bypasses them. Absent: the older network discovery answers.
    */
   readonly investorFeed?: InvestorFeedPort | undefined;
+  /** K1: companies by sector, country and stage. Absent: the tool is not offered. */
+  readonly companyCatalog?: CompanyCatalogPort | undefined;
   /** Discovery (doc 19). Absent means the slate tool reports it is unavailable. */
   readonly discovery?: DiscoveryService | undefined;
   /**
