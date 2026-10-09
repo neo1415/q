@@ -103,6 +103,14 @@ import { registerLiveVoiceRoutes } from "./live/routes.js";
  * with a per-session secret, and it speaks a vendor's dialect rather
  * than ours.
  */
+/** G-D21: the line was replaced by the person's own newer one (409). */
+const VOICE_LINE_REPLACED_PROBLEM = {
+  type: "about:blank",
+  title: "Voice moved",
+  status: 409,
+  detail: "This voice line was replaced by a newer one.",
+} as const;
+
 export const Q_VOICE_SPEAK_RELAY_PATH = "/v1/q/voice/speak" as const;
 
 /** What `CreateQVoiceSessionResponseSchema` allows for an opening line. */
@@ -260,6 +268,15 @@ export function registerQVoiceRoutes(
       const params = request.params as { voiceSessionId?: string };
       const id = params.voiceSessionId ?? "";
       const binding = await ownLine(request, id);
+      if (
+        binding === null &&
+        dependencies.bindings.replaced?.(id, actor.userId) === true
+      ) {
+        // G-D21: their own newer line replaced this one (another tab):
+        // that tab stops rather than reopening and replacing it back.
+        request.log.info({ reason: "REPLACED" }, "voice turn state refused");
+        return reply.code(409).send(VOICE_LINE_REPLACED_PROBLEM);
+      }
       if (binding === null || binding.actor.userId !== actor.userId) {
         // The browser reads this as "the line is gone" and reconnects, so
         // which of the two it was decides whether a reconnect loop is the
@@ -1079,6 +1096,8 @@ export function registerQVoiceRoutes(
     registerDuplexVoiceRoutes(app, {
       broker: dependencies.duplex,
       withContext,
+      replaced: (voiceSessionId, userId) =>
+        dependencies.bindings.replaced?.(voiceSessionId, userId) === true,
       // A11 (C-16): a line this instance does not hold is adopted from the
       // sealed binding the browser presents; the token alone authorises
       // nothing (the route's actor must be its owner).

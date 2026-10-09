@@ -109,6 +109,12 @@ export type VoiceSessionBindings = {
   fingerprints(): readonly string[];
   /** Release every binding this person holds: one voice session at a time. */
   releaseFor(userId: string): void;
+  /**
+   * G-D21: this person's line was released because they opened a newer
+   * one (another tab, another device). That tab must stop, not reopen:
+   * two tabs reopening in turn replaced each other without end.
+   */
+  replaced?(voiceSessionId: string, userId: string): boolean;
   release(providerConversationId: string): void;
   /** Bindings held by this person right now (issued or connected). */
   countFor(userId: string): number;
@@ -168,6 +174,20 @@ export function createVoiceSessionBindings(
    * (fingerprint -> when the token would have expired anyway).
    */
   const released = new Map<string, number>();
+  /** G-D21: voice session id -> whose it was, and until when it is said. */
+  const replacedLines = new Map<string, { userId: string; until: number }>();
+  const markReplaced = (binding: VoiceSessionBinding) => {
+    const at = now();
+    replacedLines.set(binding.voiceSessionId, {
+      userId: binding.actor.userId,
+      until: at + 4 * 60 * 60 * 1000,
+    });
+    if (replacedLines.size > VOICE_SESSIONS_MAX * 4) {
+      for (const [key, entry] of replacedLines) {
+        if (entry.until < at) replacedLines.delete(key);
+      }
+    }
+  };
   const forget = (binding: VoiceSessionBinding) => {
     const token = binding.sessionToken ?? binding.thinkToken;
     if (token === undefined) return;
@@ -254,9 +274,16 @@ export function createVoiceSessionBindings(
       for (const [id, binding] of bindings) {
         if (binding.actor.userId === userId) {
           forget(binding);
+          markReplaced(binding);
           bindings.delete(id);
         }
       }
+    },
+    replaced: (voiceSessionId, userId) => {
+      const entry = replacedLines.get(voiceSessionId);
+      return (
+        entry !== undefined && entry.userId === userId && entry.until >= now()
+      );
     },
     byVoiceSessionId: (voiceSessionId) => {
       for (const binding of bindings.values()) {

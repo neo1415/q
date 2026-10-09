@@ -137,6 +137,9 @@ export const RECONNECT_DELAYS_MS = [1_200] as const;
 const STABLE_LINE_MS = 20_000;
 /** How long "switching to standard voice" stays once that voice is up. */
 const LINK_STATUS_LINGER_MS = 4_000;
+/** G-D21: this tab's line was replaced by the person's newer one. */
+export const VOICE_MOVED_NOTICE =
+  "Voice moved to your other window. Start it here again whenever you like.";
 /** A vendor error this recent is what the reconnect shows. */
 const ERROR_KEPT_MS = 2_000;
 /** G-R3: voice turn outcomes kept for the rendered turns. */
@@ -745,6 +748,20 @@ export function useVoiceInterview(
             });
           }
         }
+      } else if (read.replaced === true) {
+        // G-D21: the person opened voice somewhere newer (another tab or
+        // window); the server let this line go for it. This tab stops and
+        // says so; it never reopens (two tabs reopening replaced each
+        // other without end).
+        cancelled = true;
+        personAsked.current = false;
+        const replaced = generation.current;
+        void clientRef.current.end().then(() => {
+          if (generation.current !== replaced) return;
+          endedRef.current("ended");
+          setNotice(VOICE_MOVED_NOTICE);
+        });
+        return;
       } else if (read.gone === true) {
         // The server has let this session go while the socket is still
         // open here. Nothing said into it will ever be answered, so the

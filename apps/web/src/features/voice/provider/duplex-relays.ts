@@ -34,7 +34,12 @@ export async function readVoiceTurn(
   doFetch: typeof fetch = (url, init) => fetch(url, init),
 ): Promise<
   | { readonly ok: true; readonly value: QVoiceTurnState }
-  | { readonly ok: false; readonly gone?: boolean }
+  | {
+      readonly ok: false;
+      readonly gone?: boolean;
+      /** G-D21: the person's own newer line (another tab) replaced it. */
+      readonly replaced?: boolean;
+    }
 > {
   const controller = new AbortController();
   const timer = setTimeout(() => {
@@ -57,6 +62,9 @@ export async function readVoiceTurn(
       },
     );
     if (response.status === 404) return { ok: false, gone: true };
+    if (response.status === 409) {
+      return { ok: false, gone: true, replaced: true };
+    }
     if (!response.ok) return { ok: false };
     // Validated by the route against the contract before it got here.
     return { ok: true, value: (await response.json()) as QVoiceTurnState };
