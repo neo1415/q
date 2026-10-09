@@ -36,3 +36,8 @@ export {
 } from "./application-identity.js";
 
 export { createPostgresPersonProfileStore } from "./person-profile-store.js";
+
+export {
+  createPostgresContextEpochReader,
+  type ContextEpochReader,
+} from "./context-epochs.js";

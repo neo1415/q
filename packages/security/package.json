@@ -16,6 +16,10 @@
     "./supabase": {
       "types": "./dist/supabase/index.d.ts",
       "default": "./dist/supabase/index.js"
+    },
+    "./context-cache": {
+      "types": "./dist/context-cache/index.d.ts",
+      "default": "./dist/context-cache/index.js"
     }
   },
   "main": "./dist/index.js",
