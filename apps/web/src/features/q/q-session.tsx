@@ -44,6 +44,7 @@ import { resumeQAction } from "./actions";
 import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { turnsFrom, workingLabel, type QTurn } from "./conversation";
 import {
+  askedSince,
   movedEarlyTo,
   performClientAction,
   registerClientRouter,
@@ -515,10 +516,21 @@ export function QSessionProvider({
       return;
     }
     if (followedTurns.current === null) {
+      // RECOVERY-2026-10 (C, G-D16): an answer to what they just asked is
+      // not "already there", even when the conversation reloaded as it
+      // landed (the URL naming a new conversation): its move is made.
+      const since = askedSince();
       followedTurns.current = new Set(
-        turns.filter((turn) => turn.kind === "Q").map((turn) => turn.id),
+        turns
+          .filter(
+            (turn) =>
+              turn.kind === "Q" &&
+              (since === null ||
+                (turn.at !== undefined && Date.parse(turn.at) < since - 3_000)),
+          )
+          .map((turn) => turn.id),
       );
-      return;
+      if (since === null) return;
     }
     if (wire === null) return;
     const followed = followOfTurns(turns, followedTurns.current);

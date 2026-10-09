@@ -493,12 +493,19 @@ export async function nameableRecords(
       found.push({ id: item.companyId, name: item.name });
     }
     if (name !== null) {
-      const network = await networkVisibleCompanies(ports, actor, {
-        text: name,
-        limit: 10,
-      }).catch(() => null);
-      for (const item of network?.items ?? []) {
-        found.push({ id: item.id, name: item.canonicalName });
+      // A spoken name's spacing is not the record's (live 2026-10-09:
+      // "Tensor Gate" for Tensorgate): the run-together form is searched
+      // too. The match itself ignores spacing (nameKey).
+      const joined = name.replace(/[\s.-]+/gu, "");
+      const texts = joined === name.trim() ? [name] : [name, joined];
+      for (const text of texts) {
+        const network = await networkVisibleCompanies(ports, actor, {
+          text,
+          limit: 10,
+        }).catch(() => null);
+        for (const item of network?.items ?? []) {
+          found.push({ id: item.id, name: item.canonicalName });
+        }
       }
     }
   } else if (ports.discovery !== undefined) {

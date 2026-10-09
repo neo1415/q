@@ -66,11 +66,9 @@ export function performTurnChain(
         ? []
         : [turn.clientAction];
   const path = destinationPath(turn.navigate);
-  if (
-    path !== null &&
-    typeof window !== "undefined" &&
-    path !== `${window.location.pathname}${window.location.search}`
-  ) {
+  // Every move gets its receipt, even to where they already are (DONE at
+  // once): the GPT-Live voice waits for it before it speaks.
+  if (path !== null && typeof window !== "undefined") {
     watch(path);
     expect(path);
   }

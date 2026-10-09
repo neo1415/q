@@ -4050,3 +4050,50 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     expect(ready.leads).toEqual([undefined]);
   });
 });
+
+/**
+ * RECOVERY-2026-10 (C, live GPT-Live 2026-10-09 14:35-14:47, Zino): the
+ * turn reader moved the screen on statements and negations. Its move is
+ * followed only when the words ask for that page.
+ */
+describe("a reader's move the words do not ask for is not made (live 2026-10-09)", () => {
+  const moves = (blocks: unknown) =>
+    JSON.stringify(blocks ?? []).includes('"kind":"NAVIGATE"');
+
+  it.each([
+    [
+      "I can't really see anything, so you're not I guess that's fi",
+      "DISCOVER",
+    ],
+    ["So no, no, you're alright. I'm on Tensorgate's page, but I", "DISCOVER"],
+    ["Is there a Tensorgate rehearsal here I can open", "RELATIONSHIPS"],
+  ] as const)("%s -> no move to %s", async (said, destination) => {
+    const run = seam({
+      said,
+      reading: toolReading({ kind: "NAVIGATE", destination, visibility: null }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.stored.some((message) => moves(message.blocks))).toBe(false);
+    expect(run.delegated()).toBe(1);
+  });
+
+  it("'Okay, let me do a quick rehearsal with these people' still opens Rehearsals", async () => {
+    const run = seam({
+      said: "Okay, let me do a quick rehearsal with these people",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "REHEARSALS",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "REHEARSALS" },
+      },
+    ]);
+  });
+});

@@ -1,6 +1,10 @@
 import "server-only";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
+import {
+  QClientActionIntentSchema,
+  QVoiceDestinationSchema,
+} from "@capital-q/contracts";
 import { z } from "zod";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -71,6 +75,13 @@ const DelegateResult = z.object({
   approvalPending: z.boolean(),
   failed: z.boolean(),
   ended: z.boolean().optional(),
+  move: z
+    .object({
+      navigate: QVoiceDestinationSchema.nullable(),
+      action: QClientActionIntentSchema.nullable(),
+    })
+    .strict()
+    .optional(),
 });
 const UsageBody = z
   .object({
@@ -96,6 +107,23 @@ const EndBody = z
       .regex(/^[\w.-]+$/u),
   })
   .strict();
+const TranscriptBody = z
+  .object({
+    segments: z
+      .array(
+        z
+          .object({
+            role: z.enum(["USER", "Q"]),
+            text: z.string().min(1).max(4_000),
+            at: z.number().int().min(0),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(12),
+  })
+  .strict();
+const TranscriptResult = z.object({ recorded: z.number().int().min(0) });
 const NoBody = z.object({}).strict();
 const CancelResult = z.object({ cancelled: z.boolean() });
 
@@ -145,6 +173,11 @@ const RELAYS: Readonly<Record<string, Relay>> = {
     path: (id) => `${base}/${id}/usage`,
     body: UsageBody,
     result: UsageResult,
+  },
+  transcript: {
+    path: (id) => `${base}/${id}/transcript`,
+    body: TranscriptBody,
+    result: TranscriptResult,
   },
   end: { path: (id) => `${base}/${id}/end`, body: EndBody, result: null },
 };
