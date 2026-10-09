@@ -1,8 +1,9 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { registerClientPrefetch } from "../client-actions";
 import { currentManifest } from "../manifest";
 import {
   noteRoute,
@@ -32,6 +33,14 @@ export function QControlRuntime() {
   }, [pathname, query]);
 
   useEffect(() => startReceiptReporter(currentManifest), []);
+
+  // The fast path prefetches the page a partial transcript points at, so
+  // the move when the sentence ends costs nothing.
+  const router = useRouter();
+  useEffect(() => {
+    registerClientPrefetch((path) => router.prefetch(path));
+    return () => registerClientPrefetch(null);
+  }, [router]);
 
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {

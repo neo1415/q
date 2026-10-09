@@ -34,6 +34,8 @@ import { registerProblemHandling } from "./http/problem-handler.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
 import type { QRoomFeed } from "./room/feed.js";
 import { registerQRoomRoutes } from "./room/routes.js";
+import type { FastNavigationResolver } from "./composition/fast-navigation.js";
+import { registerFastNavigationRoutes } from "./http/fast-navigation.js";
 import {
   registerUiActReceiptRoutes,
   type UiActReceiptLedger,
@@ -248,6 +250,8 @@ export type QApiModules = {
    * absent means no receipt route.
    */
   readonly uiActReceipts?: UiActReceiptLedger | undefined;
+  /** RECOVERY-2026-10 (C): the fast path's resolver; absent, no route. */
+  readonly fastNavigation?: FastNavigationResolver | undefined;
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
   readonly qActions?: QApprovalRoutesDependencies["qActions"] | undefined;
   /** What runs an approved action: resume, or the gate when the run cannot resume. */
@@ -402,6 +406,14 @@ export function createApp(
         resolver: security.resolver,
         identity: security.identity,
         room: modules.room,
+      });
+    }
+    if (modules.fastNavigation !== undefined) {
+      registerFastNavigationRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        resolve: modules.fastNavigation,
       });
     }
     if (modules.uiActReceipts !== undefined) {

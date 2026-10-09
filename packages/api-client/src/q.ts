@@ -71,6 +71,10 @@ import {
   QRoomReadSchema,
   type QRoomRead,
   Q_UI_ACT_RECEIPTS_PATH,
+  Q_FAST_NAVIGATION_PATH,
+  QFastNavigationResponseSchema,
+  type QFastNavigationRequest,
+  type QFastNavigationResponse,
   QUiActReceiptsResponseSchema,
   type QUiActReceiptsRequest,
   type QUiActReceiptsResponse,
@@ -386,6 +390,23 @@ export function reportQUiActs(
     "POST",
     Q_UI_ACT_RECEIPTS_PATH,
     QUiActReceiptsResponseSchema,
+    { body: input },
+  );
+}
+
+/**
+ * RECOVERY-2026-10 (workstream C): where a finished sentence goes, read by
+ * code as the person, for the screen to move before Q has answered.
+ */
+export function resolveQNavigation(
+  session: ApiSession,
+  input: QFastNavigationRequest,
+): Promise<QFastNavigationResponse> {
+  return call(
+    session,
+    "POST",
+    Q_FAST_NAVIGATION_PATH,
+    QFastNavigationResponseSchema,
     { body: input },
   );
 }

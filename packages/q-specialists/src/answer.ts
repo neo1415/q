@@ -256,14 +256,7 @@ import {
   ordinalOf,
   pageRequestOf,
 } from "./page-request.js";
-import {
-  cannotOpenPartLine,
-  matchOwnCounterpart,
-  namedRecordRequestOf,
-  notFoundLine,
-  pagesFor,
-  whichOneLine,
-} from "./named-record-request.js";
+import { resolveNamedRecord } from "./fast-navigation.js";
 import type { TurnReference } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
@@ -1846,38 +1839,27 @@ export function createSpecialistQAnswer(
   } | null> => {
     const port = dependencies.openRecord;
     if (port === undefined) return null;
-    const asked = namedRecordRequestOf(text);
-    if (asked === null) return null;
-    const side =
-      ownInvestorOrganisationIn(request.plan) !== null ? "INVESTOR" : "FOUNDER";
-    const names = await (
-      dependencies.counterpartNames?.(request) ?? Promise.resolve([])
-    ).catch(() => [] as readonly string[]);
-    const match = matchOwnCounterpart(asked.name, names);
-    if (match.kind === "SEVERAL") {
-      return { said: whichOneLine(match.names), blocks: [], log: "SEVERAL" };
-    }
-    // Their own counterpart by its exact name, else (for a plainly meant
-    // record) the name as said, matched by open_page against what they
-    // can reach: their Saves, feed and the network.
-    if (match.kind === "NONE" && !asked.explicit) return null;
-    const name = match.kind === "ONE" ? match.name : asked.name;
-    for (const page of pagesFor(asked.facet, side)) {
-      const intent = await port.open(request, { page, name }).catch(() => null);
-      if (intent === null) continue;
-      return {
-        said: openingLine(page, name),
-        blocks: [{ kind: "UI_INTENT", intent }],
-        log: `${match.kind === "ONE" ? "OWN" : "REACHABLE"}_${page}`,
-      };
-    }
-    return match.kind === "ONE"
+    // The same resolver the fast path runs at the end of the utterance
+    // (fast-navigation.ts), so the screen and the answer agree on the
+    // target; the screen dedupes the second move.
+    const resolved = await resolveNamedRecord({
+      text,
+      side:
+        ownInvestorOrganisationIn(request.plan) !== null
+          ? "INVESTOR"
+          : "FOUNDER",
+      counterpartNames: () =>
+        dependencies.counterpartNames?.(request) ?? Promise.resolve([]),
+      open: (page, name) => port.open(request, { page, name }),
+    });
+    if (resolved === null) return null;
+    return resolved.kind === "OPEN"
       ? {
-          said: cannotOpenPartLine(asked, name),
-          blocks: [],
-          log: "PART_UNAVAILABLE",
+          said: resolved.said,
+          blocks: [{ kind: "UI_INTENT", intent: resolved.intent }],
+          log: `${resolved.own ? "OWN" : "REACHABLE"}_${resolved.page}`,
         }
-      : { said: notFoundLine(asked, match.near), blocks: [], log: "NOT_FOUND" };
+      : { said: resolved.said, blocks: [], log: resolved.log };
   };
 
   /** B6: the reference each run's words were bound to, for its answer. */

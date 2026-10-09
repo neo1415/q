@@ -176,6 +176,7 @@ export {
   pollQVoiceDuplexNarration,
   readQRoom,
   reportQUiActs,
+  resolveQNavigation,
   rejoinQVoiceDuplex,
   endQVoiceDuplex,
   getQApproval,

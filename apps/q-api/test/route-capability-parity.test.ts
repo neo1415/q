@@ -774,6 +774,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   // RECOVERY-2026-10 (C2): the screen's receipts of Q's own UI acts.
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH": Q_TRANSPORT,
+  // RECOVERY-2026-10 (C): where a finished sentence goes, read by code.
+  "q-api/http/fast-navigation.ts POST Q_FAST_NAVIGATION_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST Q_RUNS_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts GET runPath": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_MESSAGES_SUFFIX}`": Q_TRANSPORT,
@@ -1095,6 +1097,8 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
   // conversation's own transport, never a person's action.
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",
+  // RECOVERY-2026-10 (C): a read by code of where the words go; changes nothing.
+  "q-api/http/fast-navigation.ts POST Q_FAST_NAVIGATION_PATH",
 ]);
 
 /**
