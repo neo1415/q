@@ -81,7 +81,14 @@ async function talkAgain(page: Page): Promise<void> {
     .first();
   await expect(talk.or(end).first()).toBeVisible({ timeout: 15_000 });
   if (await end.isVisible().catch(() => false)) await end.click();
-  await talk.click();
+  // Talk turns into End when the line it opens (or joins, mid-connect)
+  // comes up: a press whose button became End landed (traced 2026-10-09:
+  // "element was detached from the DOM" as the line came up).
+  try {
+    await talk.click({ timeout: 5_000 });
+  } catch {
+    await expect(end).toBeVisible({ timeout: 10_000 });
+  }
 }
 
 test("the Q button opens GPT-Live on /home: greeting, delegation to Q Brain, cards on screen", async ({
