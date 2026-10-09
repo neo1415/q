@@ -34,3 +34,22 @@
 - K2 and K4 restrict sectors to the industry, product_category and technology vocabularies. Geography was excluded.
 - The analyst is a scripted fake, so a red sector-naming check in K2 reflects the fake's canned text until the recall path is code-built.
 - The egress guard refused calls to generativelanguage.googleapis.com, elevenlabs and deepgram from the services. Nothing left the machine.
+
+## Pre-deploy gate: int-merge 9050c90f (B, D, F, V and G merged), 19:00–19:45 UTC
+
+**Label: LOCAL-E2E (MOCK).** Provider keys were `disabled-locally-000000000000` and the egress guard was on. Migrations were applied with `supabase migration up --local --include-all`. `20261220181000_knowledge_projections` had been half-applied earlier by hand (`knowledge.version_seq` already existed), so the local `knowledge` schema was dropped and the migration re-applied. The world was seeded locally. GPT-Live specs ran with `CQ_RECOVERY_GPT_LIVE=1`.
+
+Harness change: the turn reader is a model, so its correct reading is now scripted in MOCK (`DISCOVER_COMPANIES` for "three fintech companies", `subject: MANDATE` for "what is my mandate"). Whether the live reader reads real words this way is LIVE-PENDING. Recall allows reader + 1 analyst call with no tool round, which is B's K8 design.
+
+| Test                                                 | Result                                                                                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| K1 as seeded, and the 0, 1 and 2 cases               | GREEN. Now regression guards.                                                                                                                          |
+| K1 browser first card                                | RED on the provisional 3 s budget: 5.0 and 6.6 s from send to first card, while the server finishes in under 2 s. The cards are correct.               |
+| K2 mandate recall                                    | GREEN. Now a guard.                                                                                                                                    |
+| K3 current page; K6 ×3 security                      | GREEN                                                                                                                                                  |
+| K4 change propagation                                | GREEN. G-D23 no longer reproduces.                                                                                                                     |
+| K5 continuity                                        | EXPECTED RED (C Part 5). Answer cards focus on click and have no link to the company.                                                                  |
+| K7 idempotency, concurrency, analyst outage, restart | GREEN (4/4). G-D24 no longer reproduces.                                                                                                               |
+| l-named-navigation ×4, m-fast-navigation ×3          | GREEN                                                                                                                                                  |
+| n-founder-strings                                    | 5/6 GREEN. "quick rehearsal … still opens Rehearsals" was red once (no /rehearsals within 30 s) and green on a diagnostic rerun: flaky, **G-D25 (C)**. |
+| voice/gpt-live ×7                                    | GREEN with `CQ_RECOVERY_GPT_LIVE=1`. Without that flag all 7 fail their precondition, which is a harness setting and not a product failure.            |
