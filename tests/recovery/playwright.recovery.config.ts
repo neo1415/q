@@ -83,6 +83,8 @@ export default defineConfig({
     { name: "permissions", testDir: "./permissions", use: chromium },
     { name: "promises", testDir: "./promises", use: chromium },
     { name: "a11y", testDir: "./a11y", use: chromium },
+    // Workstream K Tests 1-7 (TRACKING section K).
+    { name: "knowledge", testDir: "./knowledge", use: chromium },
     // Manual only, by the founder on his machine (LIVE-PROCEDURE.md):
     // `--project live` against a stack started with CQ_RECOVERY_MODE=live.
     // In MOCK these refuse to run and are reported LIVE-PENDING.

@@ -64,6 +64,11 @@ export const LiveOpenResultSchema = z
     maxSessionMs: z.number().int().positive(),
     /** No speech either way for this long: the client closes the line. */
     idleMs: z.number().int().positive(),
+    /**
+     * Part 6: the call's background note (approved facts, built by code),
+     * sent to the voice as quiet context at the start of each session.
+     */
+    context: z.string().max(2_000).nullable().optional(),
   })
   .strict();
 export type LiveOpenResult = z.infer<typeof LiveOpenResultSchema>;
@@ -114,6 +119,8 @@ export const LiveDelegationResultSchema = z
     failed: z.boolean(),
     /** The call is past its length: the client closes it. */
     ended: z.boolean().optional(),
+    /** Nothing usable was heard: no Q run; the voice checks with them. */
+    unheard: z.boolean().optional(),
     /** The run moved the screen: follow it, and await its receipt, first. */
     move: LiveMoveSchema.optional(),
   })

@@ -209,13 +209,17 @@ export type AppActionPorts = {
         | "dismissReminder"
         | "confirmHeld"
         | "joinCall"
+        | "organisedMeeting"
       >
     | undefined;
   /** Interest and connection requests: the network services. */
   readonly interests?:
     | Pick<
         InterestService,
-        "expressInterest" | "respondToInterest" | "listIncomingInterest"
+        | "expressInterest"
+        | "respondToInterest"
+        | "listIncomingInterest"
+        | "mayRespondToInterest"
       >
     | undefined;
   readonly connections?:

@@ -23,6 +23,7 @@ import {
 } from "@capital-q/contracts";
 
 import {
+  cardOnlyIf,
   defineAppAction,
   portMissing,
   refusal,
@@ -192,7 +193,14 @@ const CANCEL = defineAppAction<
   does: "Cancels a call they organised, as the schedule screen does; the other side is told.",
   input: Cancel,
   output: serviceResult(),
-  authorize: servicesDecide,
+  // A call they organised that is still on.
+  authorize: cardOnlyIf(async (ports, context, input) => {
+    const meeting = await schedule(ports).organisedMeeting(
+      context.actor,
+      input.meetingId,
+    );
+    return meeting !== null && meeting.status === "SCHEDULED";
+  }, "This is not a call you organised that is still on."),
   run: (ports, context, input) =>
     schedule(ports).cancel({
       actor: context.actor,

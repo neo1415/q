@@ -2,6 +2,7 @@ import type { FastifyRequest } from "fastify";
 import {
   extractBearerToken,
   type AccessTokenAuthenticator,
+  type FreshnessAwareAuthenticator,
 } from "@capital-q/security/supabase";
 
 import type { RequestAuthenticator } from "./actor-context.js";
@@ -18,9 +19,15 @@ import type { RequestAuthenticator } from "./actor-context.js";
  *
  * Only the Authorization header is consulted. A user id in a body, a query
  * string or a custom header is input, never identity.
+ *
+ * SUB-SECOND Phase 4: with a locally verifying authenticator, a request
+ * that changes state (anything but GET, HEAD, OPTIONS) re-checks its
+ * session in the database; a read may use a session check up to 15 s old.
  */
+const READS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 export function createSupabaseRequestAuthenticator(
-  accessTokens: AccessTokenAuthenticator,
+  accessTokens: AccessTokenAuthenticator | FreshnessAwareAuthenticator,
 ): RequestAuthenticator {
   return {
     authenticate: (request: FastifyRequest) => {
@@ -33,7 +40,11 @@ export function createSupabaseRequestAuthenticator(
         return Promise.resolve(null);
       }
 
-      return accessTokens.authenticate(token);
+      return "authenticateWith" in accessTokens
+        ? accessTokens.authenticateWith(token, {
+            freshSession: !READS.has(request.method.toUpperCase()),
+          })
+        : accessTokens.authenticate(token);
     },
   };
 }

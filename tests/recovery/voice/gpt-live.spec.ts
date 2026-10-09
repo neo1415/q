@@ -63,6 +63,34 @@ async function startVoice(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Press for a new line as a person would: on the control that is showing.
+ * While a line is up the stage shows End, not Talk (q-conversation.tsx);
+ * a `.first()` on the Talk name then resolved to a hidden one and the
+ * click waited 30 s (the "rapid restarts" timeouts). End, if showing,
+ * then Talk once it is there.
+ */
+async function talkAgain(page: Page): Promise<void> {
+  const talk = page
+    .getByRole("button", { name: /Talk with Q/u })
+    .filter({ visible: true })
+    .first();
+  const end = page
+    .getByRole("button", { name: /^End/u })
+    .filter({ visible: true })
+    .first();
+  await expect(talk.or(end).first()).toBeVisible({ timeout: 15_000 });
+  if (await end.isVisible().catch(() => false)) await end.click();
+  // Talk turns into End when the line it opens (or joins, mid-connect)
+  // comes up: a press whose button became End landed (traced 2026-10-09:
+  // "element was detached from the DOM" as the line came up).
+  try {
+    await talk.click({ timeout: 5_000 });
+  } catch {
+    await expect(end).toBeVisible({ timeout: 10_000 });
+  }
+}
+
 test("the Q button opens GPT-Live on /home: greeting, delegation to Q Brain, cards on screen", async ({
   browser,
 }) => {
@@ -182,12 +210,7 @@ test("one voice at a time: restarting and starting voice from a second surface n
   await expect.poll(() => audibleNow(page), { timeout: 10_000 }).toBe(1);
   // End and talk again at once, three times: each new line stops the last.
   for (let i = 0; i < 3; i += 1) {
-    const end = page.getByRole("button", { name: /^End/u }).first();
-    if (await end.isVisible().catch(() => false)) await end.click();
-    await page
-      .getByRole("button", { name: /Talk with Q/u })
-      .first()
-      .click();
+    await talkAgain(page);
     await page.waitForTimeout(300);
   }
   // A second surface (the dock, over the page) opens voice too.
@@ -195,10 +218,7 @@ test("one voice at a time: restarting and starting voice from a second surface n
   const briefing = page.getByRole("button", { name: "Close Q's briefing" });
   if (await briefing.isVisible().catch(() => false)) await briefing.click();
   await openQ(page);
-  await page
-    .getByRole("button", { name: /Talk with Q/u })
-    .first()
-    .click();
+  await talkAgain(page);
   await page.waitForTimeout(2_000);
   expect(await audibleNow(page)).toBeLessThanOrEqual(1);
   expect(await maxAudible(page)).toBeLessThanOrEqual(1);
@@ -213,14 +233,7 @@ test("one voice at a time on /home: rapid restarts never overlap", async ({
   await page.goto("/home");
   await startVoice(page);
   await expect.poll(() => audibleNow(page), { timeout: 10_000 }).toBe(1);
-  for (let i = 0; i < 4; i += 1) {
-    const end = page.getByRole("button", { name: /^End/u }).first();
-    if (await end.isVisible().catch(() => false)) await end.click();
-    await page
-      .getByRole("button", { name: /Talk with Q/u })
-      .first()
-      .click();
-  }
+  for (let i = 0; i < 4; i += 1) await talkAgain(page);
   await page.waitForTimeout(3_000);
   expect(await maxAudible(page)).toBeLessThanOrEqual(1);
   // Every superseded GPT-Live session was told to close.

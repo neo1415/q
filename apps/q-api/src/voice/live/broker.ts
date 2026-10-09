@@ -38,7 +38,45 @@ import type {
   LiveTranscriptReport,
   LiveUsageReport,
 } from "./contracts.js";
+import {
+  liveContextPackage,
+  referentsOf,
+  REFERENTS_MAX,
+  type LiveContextFacts,
+} from "./context.js";
+import { heardRequest, spokenWords, UNHEARD_COMMENTARY } from "./heard.js";
 import { livePrompt } from "./prompt.js";
+
+/** The exchange since the previous delegation that Q Brain is shown. */
+const LEAD_TURNS_MAX = 6;
+const LEAD_TURN_MAX_CHARS = 600;
+
+/**
+ * The turns the person and the voice exchanged since the previous
+ * delegation, before this request (a clarifying question and its answer,
+ * the voice saying back what it understood): shown to Q Brain before the
+ * request, so a fragment ("especially across FinTech") is read with what
+ * it answers. Transcriber markers and empty turns are dropped; the
+ * request's own words, at the end of the window, are not repeated.
+ */
+export function leadTurns(
+  context: LiveDelegationRequest["context"],
+  request: string,
+): VoiceTranscriptTurn[] {
+  const turns = (context ?? [])
+    .map((turn) => ({
+      role: turn.role === "q" ? ("agent" as const) : ("user" as const),
+      content: spokenWords(turn.text).slice(0, LEAD_TURN_MAX_CHARS),
+    }))
+    .filter((turn) => turn.content.length > 0);
+  const asked = spokenWords(request);
+  while (turns.length > 0) {
+    const last = turns[turns.length - 1];
+    if (last?.role !== "user" || !asked.includes(last.content)) break;
+    turns.pop();
+  }
+  return turns.slice(-LEAD_TURNS_MAX);
+}
 
 /**
  * The screen move a run recorded on the turn board, when it is a route
@@ -115,6 +153,8 @@ type Delegation = {
 
 type LiveLine = {
   readonly voiceSessionId: string;
+  /** The provider's session (GPT-Live), ended from here if left open. */
+  readonly providerSessionId: string;
   readonly actor: ActorContext;
   readonly binding: VoiceSessionBinding;
   readonly openedAt: number;
@@ -134,6 +174,8 @@ type LiveLine = {
    * a 25 s answer that way (2026-10-09). Queued, every answer lands.
    */
   tail: Promise<unknown>;
+  /** Names Q said on this line, most recent first (the context package). */
+  referents: string[];
 };
 
 export type LiveBroker = {
@@ -203,6 +245,12 @@ export type LiveBrokerDependencies = {
    */
   readonly transcripts?: Pick<DuplexTranscriptStore, "record"> | undefined;
   /**
+   * Part 6: the person's approved background (side, organisation, declared
+   * mandate or company card facts), for the call's context package.
+   */
+  readonly contextFor?:
+    ((actor: ActorContext) => Promise<LiveContextFacts | null>) | undefined;
+  /**
    * The voice turn board (what the turn handler recorded for the line):
    * read after a run, so the delegation's result says whether the run
    * moved the screen, and the client follows it before the voice speaks.
@@ -225,6 +273,15 @@ const SPOKEN_MAX = 6_000;
 const MIN_BILLED_SECONDS = 15;
 /** An unreported line is estimated at wall-clock, at most this past the cap. */
 const GRACE_MS = 30_000;
+/** How often lines are checked for expiry and inactivity (on a timer). */
+export const LIVE_SWEEP_MS = 30_000;
+/**
+ * No request from the browser for this long past the idle window (no usage,
+ * transcript, delegation): the browser is gone (a killed tab, a connect
+ * that failed after /open). A live call posts its transcript every few
+ * seconds of speech, and the browser itself closes after `idleMs` silence.
+ */
+export const LIVE_INACTIVE_GRACE_MS = 2 * 60 * 1000;
 
 /** Q's run, collected: what it said, or the facts of a code-built answer. */
 function collector(id: string): {
@@ -374,15 +431,41 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       },
       "live voice line ended",
     );
+    // The provider session is ended from here too, unless its browser saw
+    // it close (final usage): a superseded, expired, abandoned or failed
+    // line never keeps billing because its browser did not close it.
+    if (!line.finalReported) {
+      void (
+        provider?.closeSession?.(line.providerSessionId) ??
+        Promise.resolve(false)
+      )
+        .then((confirmed) => {
+          logger.info(
+            { qVoiceSessionId: line.voiceSessionId, reason, confirmed },
+            "live voice provider session closed from the server",
+          );
+        })
+        .catch(() => undefined);
+    }
   };
 
   const sweep = () => {
     const at = now();
-    for (const line of lines.values()) {
-      if (at - line.openedAt > config.maxSessionMs + GRACE_MS)
+    for (const line of [...lines.values()]) {
+      if (at - line.openedAt > config.maxSessionMs + GRACE_MS) {
         forget(line, "expired");
+      } else if (
+        at - line.lastActivityAt >
+        config.idleMs + LIVE_INACTIVE_GRACE_MS
+      ) {
+        forget(line, "inactive");
+      }
     }
   };
+  // On a timer too, not only on this person's next request: a line whose
+  // browser is gone is ended (and its provider session closed) in time.
+  const sweeper = setInterval(sweep, LIVE_SWEEP_MS);
+  sweeper.unref();
 
   const ownLine = (actor: ActorContext, voiceSessionId: string) => {
     sweep();
@@ -410,7 +493,12 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   };
 
   /** ONE run of Q Brain for one delegation. */
-  const runQ = (line: LiveLine, id: string, request: string): Delegation => {
+  const runQ = (
+    line: LiveLine,
+    id: string,
+    request: string,
+    lead: readonly VoiceTranscriptTurn[] = [],
+  ): Delegation => {
     const controller = new AbortController();
     let deadline: ReturnType<typeof setTimeout> | undefined;
     const before = line.tail;
@@ -449,7 +537,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         const outcome = await turn(
           line.binding,
           // GPT-Live already ended their turn: never held as unfinished.
-          settledTurn([...line.history, asked]),
+          settledTurn([...line.history, ...lead, asked]),
           controller.signal,
           speaker.speaker,
         );
@@ -472,7 +560,11 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           said,
           approvalPending,
         });
-        line.history.push(asked);
+        line.history.push(...lead, asked);
+        line.referents = [
+          ...referentsOf(facts?.mustSay),
+          ...line.referents,
+        ].slice(0, REFERENTS_MAX);
         const kept = facts?.fallback ?? said;
         if (kept.length > 0)
           line.history.push({ role: "agent", content: kept });
@@ -545,9 +637,16 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       }
       const { actor } = binding;
       sweep();
-      // One live line per person: a new one replaces what was open.
+      // One live line per person: a new one replaces what was open. A
+      // renewal of the same call (same voice session) keeps what Q was
+      // asked and said, and the names discussed.
+      let carried: Pick<LiveLine, "history" | "referents"> | null = null;
       for (const line of [...lines.values()]) {
-        if (line.actor.userId === actor.userId) forget(line, "replaced");
+        if (line.actor.userId !== actor.userId) continue;
+        if (line.voiceSessionId === binding.voiceSessionId) {
+          carried = { history: line.history, referents: line.referents };
+        }
+        forget(line, "replaced");
       }
       let spent: number;
       try {
@@ -613,16 +712,32 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       const at = now();
       lines.set(binding.voiceSessionId, {
         voiceSessionId: binding.voiceSessionId,
+        providerSessionId: created.sessionId,
         actor,
         binding,
         openedAt: at,
         lastActivityAt: at,
-        history: [],
+        history: carried === null ? [] : [...carried.history],
         delegations: new Map(),
         latest: null,
         recordedSeconds: 0,
         finalReported: false,
         tail: Promise.resolve(),
+        referents: carried === null ? [] : [...carried.referents],
+      });
+      // Part 6: the background note for this session (and its renewals).
+      let facts: LiveContextFacts | null = null;
+      try {
+        facts = (await deps.contextFor?.(actor)) ?? null;
+      } catch (error: unknown) {
+        // A failed read costs the call its background, never the call.
+        logger.warn({ err: error }, "live voice context could not be read");
+      }
+      const context = liveContextPackage({
+        firstName,
+        role,
+        facts,
+        referents: carried?.referents ?? [],
       });
       logger.info(
         { qVoiceSessionId: binding.voiceSessionId, model: created.model },
@@ -640,6 +755,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           model: created.model,
           maxSessionMs: config.maxSessionMs,
           idleMs: config.idleMs,
+          context,
         },
       };
     },
@@ -662,11 +778,28 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       // One delegation id, one run: a repeat joins the run in flight.
       let running = line.delegations.get(delegation.delegationId);
       if (running === undefined) {
-        const request = delegation.request.trim().slice(0, 2_000);
+        const request = spokenWords(delegation.request).slice(0, 2_000);
+        // Nothing usable was heard ("(inaudible)", empty, filler): no Q
+        // run is created; the voice checks with the person instead.
+        if (!heardRequest(request)) {
+          logger.info(
+            { qVoiceSessionId: line.voiceSessionId },
+            "live delegation had no usable words: no Q run",
+          );
+          return {
+            delegationId: delegation.delegationId,
+            commentary: UNHEARD_COMMENTARY,
+            stale: false,
+            approvalPending: false,
+            failed: false,
+            unheard: true,
+          };
+        }
         running = runQ(
           line,
           delegation.delegationId,
-          request.length === 0 ? "(inaudible)" : request,
+          request,
+          leadTurns(delegation.context, request),
         );
         line.delegations.set(delegation.delegationId, running);
         line.latest = delegation.delegationId;
@@ -690,6 +823,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     transcript: async ({ actor, voiceSessionId, report }) => {
       const line = ownLine(actor, voiceSessionId);
       if (line === null) return null;
+      line.lastActivityAt = now();
       const store = deps.transcripts;
       if (store === undefined) return 0;
       const at = now();

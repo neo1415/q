@@ -50,7 +50,7 @@ import {
   registerClientRouter,
 } from "./client-actions";
 import { navigationInFlight } from "./ui-act-controller";
-import { followOfTurns } from "./follow-navigation";
+import { followOfThread } from "./follow-navigation";
 import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
 import { resumableConversation } from "./resume-conversation";
@@ -533,11 +533,13 @@ export function QSessionProvider({
       if (since === null) return;
     }
     if (wire === null) return;
-    const followed = followOfTurns(turns, followedTurns.current);
     // While the line is open, a spoken answer's moves are the voice
     // board's to make, after Q has said them; making them here too would
-    // cut the sentence short and open a website twice.
-    if (voiceActive) return;
+    // cut the sentence short and open a website twice. A typed question's
+    // answer is still this surface's (followOfThread).
+    const followed = followOfThread(turns, followedTurns.current, {
+      active: voiceActive,
+    });
     // R20/R33: the app's own actions the answer carries, done once.
     for (const action of followed.actions) performClientAction(action);
     const path = destinationPath(followed.navigate);
