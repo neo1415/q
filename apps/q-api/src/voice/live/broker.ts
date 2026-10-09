@@ -478,6 +478,9 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
               briefingOpening,
               role,
               names,
+              guided:
+                binding.thread.onboarding !== undefined ||
+                binding.thread.welcome === true,
             }),
             voice: config.voices[binding.voice],
           },

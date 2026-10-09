@@ -83,8 +83,22 @@ export type LiveBridgeDependencies = {
    * supersedes it (kept as quiet context, never spoken over them).
    */
   readonly opening?:
-    { readonly greeting: string; readonly request: string } | undefined;
-  /** When a still-running delegation gets its one quiet progress note. */
+    | {
+        readonly greeting: string;
+        /** A Q run for the briefing, spoken when it lands. */
+        readonly request?: string | undefined;
+        /**
+         * Or Q's opening already in hand (the surface's first message, Q's
+         * own verified words): said in the voice's own words at once.
+         */
+        readonly content?: string | undefined;
+      }
+    | undefined;
+  /**
+   * When a still-running delegation gets its one progress line (founder
+   * 2026-10-09: silence while a 25 s answer worked read as "can you do it
+   * or not"). Spoken once, in the voice's own words; never repeated.
+   */
   readonly progressAfterMs?: number | undefined;
   readonly onChange?: ((state: LiveBridgeState) => void) | undefined;
 };
@@ -128,6 +142,11 @@ export type LiveBridge = {
   readonly handle: (event: LiveServerEvent) => void;
   /** Explicit cancel; true only when the server confirmed it. */
   readonly cancel: (delegationId: string) => Promise<boolean>;
+  /**
+   * Typed words while the call is open: straight to Q Brain (the provider
+   * does not hear them), the verified answer spoken like any other.
+   */
+  readonly typed: (text: string) => void;
   readonly state: () => LiveBridgeState;
 };
 
@@ -155,7 +174,7 @@ const defaultTimers: Timers = {
 export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   const timers = deps.timers ?? defaultTimers;
   const settleMs = deps.settleMs ?? 400;
-  const progressAfterMs = deps.progressAfterMs ?? 3_000;
+  const progressAfterMs = deps.progressAfterMs ?? 5_000;
   // The transcript as the provider streamed it, both sides, in turns. A
   // turn changes side when the other side's delta arrives.
   const transcript: { role: "user" | "q"; text: string }[] = [];
@@ -170,6 +189,8 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   let acked = 0;
   const refused: { eventId: string; message: string }[] = [];
   const pendingEvents = new Set<string>();
+  let openingStarted = false;
+  let typedCount = 0;
 
   const changed = () => deps.onChange?.(snapshot());
   const snapshot = (): LiveBridgeState => ({
@@ -249,12 +270,12 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     const progress = timers.setTimeout(() => {
       if (record.status !== "RUNNING" || progressed) return;
       progressed = true;
-      // Quiet context only: the voice decides whether to mention it, in
-      // its own words, and must not guess the result.
+      // One spoken line, in the voice's own words, about what is coming;
+      // never the result, never repeated.
       send(
-        "session.thinking.append",
+        "session.commentary.append",
         record.providerId,
-        `Q's backend is still working on: "${record.request}". No result yet. Do not guess it and do not stall with filler; keep the conversation natural.`,
+        `Q's backend is still working on: "${record.request}". Say once, in a few natural, specific words, what you are getting for them (for example "pulling your best mandate fits now"), then keep the conversation going. Do not guess the result, do not apologise, and do not say this again.`,
       );
     }, progressAfterMs);
     void deps
@@ -284,7 +305,18 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     record.answeredAt = deps.now();
     record.commentary = outcome.commentary;
     record.approvalPending = outcome.approvalPending;
-    const superseded = outcome.stale === true || newest() !== record.id;
+    const newer = order.slice(order.indexOf(record.id) + 1);
+    // Every newer request still waiting on its answer: this verified one
+    // is the freshest they can have, and is spoken (the founder's nudges,
+    // "still waiting…", must never cost them the answer they waited for).
+    const newerPending =
+      newer.length > 0 &&
+      newer.every((id) => {
+        const status = delegations.get(id)?.status;
+        return status === "RUNNING" || status === "WAITING_FOR_WORDS";
+      });
+    const superseded =
+      !newerPending && (outcome.stale === true || newest() !== record.id);
     if (outcome.commentary === null || outcome.commentary.length === 0) {
       record.status = superseded ? "SUPERSEDED" : "SPOKEN";
       changed();
@@ -301,7 +333,13 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       );
     } else {
       record.status = outcome.failed === true ? "FAILED" : "SPOKEN";
-      send("session.commentary.append", record.providerId, outcome.commentary);
+      send(
+        "session.commentary.append",
+        record.providerId,
+        newerPending
+          ? `This answers their earlier request "${record.request}"; if they have since asked for something different, say it briefly. ${outcome.commentary}`
+          : outcome.commentary,
+      );
     }
     changed();
   };
@@ -361,8 +399,19 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
           return;
         case "session.started": {
           const opening = deps.opening;
-          if (opening === undefined || delegations.has(OPENING_ID)) return;
+          if (opening === undefined || openingStarted) return;
+          openingStarted = true;
+          if (opening.content !== undefined && opening.content.length > 0) {
+            // Q's own opening, in hand: greeting and lowdown in one go.
+            send(
+              "session.instructions.append",
+              null,
+              `${opening.greeting} Then give them this opening in your own words, naturally. If it is a briefing, summarise it as a colleague would: how much is waiting, the top two or three items by name and what each needs from them. If it asks them something, ask it. Never read it out word for word and never repeat card or screen text. Opening: ${opening.content}`,
+            );
+            return;
+          }
           send("session.instructions.append", null, opening.greeting);
+          if (opening.request === undefined) return;
           const record: DelegationRecord = {
             id: OPENING_ID,
             providerId: null,
@@ -416,6 +465,25 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       );
       changed();
       return true;
+    },
+    typed: (text) => {
+      const words = text.trim().slice(0, 2_000);
+      if (words.length === 0) return;
+      typedCount += 1;
+      const id = `typed_${String(typedCount)}`;
+      transcript.push({ role: "user", text: words });
+      askedUpTo = transcript.length;
+      boundary = true;
+      const record: DelegationRecord = {
+        id,
+        providerId: null,
+        request: words,
+        status: "RUNNING",
+        createdAt: deps.now(),
+      };
+      delegations.set(id, record);
+      order.push(id);
+      run(record, words);
     },
     state: snapshot,
   };

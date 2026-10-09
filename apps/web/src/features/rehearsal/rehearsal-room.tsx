@@ -280,43 +280,47 @@ export function RehearsalRoom({
     setNotice("The voice line dropped. Reconnect, or keep going by typing.");
   };
 
-  const voice = useVoiceSession({
-    onLine: (line: VoiceTranscriptLine) => {
-      lastActivity.current = Date.now();
-      if (line.role === "user") {
-        setHand(false);
-        nudged.current = false;
-        // They are speaking: a look rides with this turn.
-        void lookRef.current("TURN");
-      }
-      if (line.role === "q" && !line.partial) refresh();
+  const voice = useVoiceSession(
+    {
+      onLine: (line: VoiceTranscriptLine) => {
+        lastActivity.current = Date.now();
+        if (line.role === "user") {
+          setHand(false);
+          nudged.current = false;
+          // They are speaking: a look rides with this turn.
+          void lookRef.current("TURN");
+        }
+        if (line.role === "q" && !line.partial) refresh();
+      },
+      onError: (message) => setNotice(message),
+      onEnded: (reason) => {
+        if (left.current || reason === "ended") return;
+        // A dropped line comes back on its own first (a deploy of the Q API,
+        // a blip in the network): the same rehearsal, resumed without a new
+        // greeting, transcript and turns kept. Only when the retries fail is
+        // the person told, and offered typing (HARDEN P0, 2026-10-02).
+        const heldFor =
+          upSince.current === null ? 0 : Date.now() - upSince.current;
+        upSince.current = null;
+        if (heldFor >= STABLE_LINE_MS) retries.current = 0;
+        const delay = SILENT_RETRY_MS[retries.current];
+        if (delay !== undefined) {
+          retries.current += 1;
+          setVoiceLive("CONNECTING");
+          window.setTimeout(() => {
+            if (left.current) return;
+            void connectNow.current?.(true, { quiet: true }).then((ok) => {
+              if (!ok && !left.current) dropped();
+            });
+          }, delay);
+          return;
+        }
+        dropped();
+      },
     },
-    onError: (message) => setNotice(message),
-    onEnded: (reason) => {
-      if (left.current || reason === "ended") return;
-      // A dropped line comes back on its own first (a deploy of the Q API,
-      // a blip in the network): the same rehearsal, resumed without a new
-      // greeting, transcript and turns kept. Only when the retries fail is
-      // the person told, and offered typing (HARDEN P0, 2026-10-02).
-      const heldFor =
-        upSince.current === null ? 0 : Date.now() - upSince.current;
-      upSince.current = null;
-      if (heldFor >= STABLE_LINE_MS) retries.current = 0;
-      const delay = SILENT_RETRY_MS[retries.current];
-      if (delay !== undefined) {
-        retries.current += 1;
-        setVoiceLive("CONNECTING");
-        window.setTimeout(() => {
-          if (left.current) return;
-          void connectNow.current?.(true, { quiet: true }).then((ok) => {
-            if (!ok && !left.current) dropped();
-          });
-        }, delay);
-        return;
-      }
-      dropped();
-    },
-  });
+    // A rehearsal speaks only as the person Q plays: never GPT-Live.
+    { live: false },
+  );
 
   // The line as it really is: LIVE only while it can carry a turn. A line
   // that dropped falls back to typing (live 2026-10-01: a typed answer went

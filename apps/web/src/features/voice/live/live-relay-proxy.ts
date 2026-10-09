@@ -48,6 +48,7 @@ const OpenResult = z.object({
   provider: z.literal("openai"),
   model: z.string().nullable(),
   maxSessionMs: z.number().int().positive(),
+  idleMs: z.number().int().positive(),
 });
 const DelegateBody = z
   .object({
@@ -84,6 +85,7 @@ const UsageBody = z
 const UsageResult = z.object({
   recordedSeconds: z.number().int().min(0),
   remainingMs: z.number().int().min(0),
+  capReached: z.boolean().optional(),
 });
 const EndBody = z
   .object({
@@ -101,11 +103,31 @@ type Relay = {
   readonly path: (id: string, delegationId: string | null) => string | null;
   readonly body: z.ZodType;
   readonly result: z.ZodType | null;
+  /** A read: GET upstream, no body sent (the browser posts `{}`). */
+  readonly method?: "GET" | undefined;
+  /** Not about one line: no voice session id in the path. */
+  readonly lineless?: boolean | undefined;
 };
+
+const Availability = z.object({ available: z.boolean() });
 
 const base = "/v1/q/voice/live/sessions";
 const RELAYS: Readonly<Record<string, Relay>> = {
-  open: { path: () => base, body: OpenBody, result: OpenResult },
+  open: {
+    path: () => base,
+    body: OpenBody,
+    result: OpenResult,
+    lineless: true,
+  },
+  // Whether this person's voice starts on GPT-Live (the Q API decides:
+  // switched on, and the person allowed).
+  available: {
+    path: () => "/v1/q/voice/live/available",
+    body: NoBody,
+    result: Availability,
+    method: "GET",
+    lineless: true,
+  },
   delegate: {
     path: (id) => `${base}/${id}/delegations`,
     body: DelegateBody,
@@ -172,14 +194,16 @@ export async function relayLive(
     readonly enabled?: () => boolean;
   } = {},
 ): Promise<Response> {
-  // Until the line joins the product UI, only the preview may use it.
-  if (!(options.enabled ?? voicePreviewEnabled)()) return problem(404);
+  // V (2026-10-09): GPT-Live is the product voice for the people the Q API
+  // allows; the Q API's allowlist is the gate, so the relays are open to
+  // any signed-in person and answer whatever the Q API answers.
+  if (!(options.enabled ?? (() => true))()) return problem(404);
   const relay = Object.hasOwn(RELAYS, params.relay)
     ? RELAYS[params.relay]
     : undefined;
   if (relay === undefined) return problem(404);
   const id =
-    params.relay === "open"
+    relay.lineless === true
       ? ""
       : z.string().uuid().safeParse(params.voiceSessionId).data;
   if (id === undefined) return problem(404);
@@ -208,18 +232,20 @@ export async function relayLive(
     upstream = await (options.doFetch ?? fetch)(
       `${qApiBaseUrl.replace(/\/$/, "")}${path}`,
       {
-        method: "POST",
+        method: relay.method ?? "POST",
         headers: {
           accept: "application/json",
           authorization: `Bearer ${accessToken}`,
-          "content-type": "application/json",
+          ...(relay.method === "GET"
+            ? {}
+            : { "content-type": "application/json" }),
           ...(token !== null &&
           token.length > 0 &&
           token.length <= SESSION_TOKEN_MAX
             ? { [SESSION_TOKEN_HEADER]: token }
             : {}),
         },
-        body: JSON.stringify(body.data),
+        ...(relay.method === "GET" ? {} : { body: JSON.stringify(body.data) }),
         cache: "no-store",
       },
     );

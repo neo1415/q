@@ -30,7 +30,16 @@ export type LivePromptInput = {
    * instructions; bounded.
    */
   readonly names?: readonly string[] | undefined;
+  /**
+   * Q leads this call: the onboarding interview or the first-minute
+   * welcome. Every answer the person gives goes to the backend, which owns
+   * the steps and what gets written; the voice never runs the interview.
+   */
+  readonly guided?: boolean | undefined;
 };
+
+const GUIDED = `Guided call:
+This call is Q's guided interview with them (setting up their profile). The backend runs it: it decides each question, records each answer and moves the steps on. Delegate every answer or question they give, even short ones ("yes", "skip", "not sure", a number, a name), and then say the backend's next question in your own words, warmly and briefly. Never ask your own interview questions, never skip ahead, and never say something was saved unless the backend said so.`;
 
 const NAMES_MAX = 40;
 
@@ -111,6 +120,7 @@ export function livePrompt(input: LivePromptInput = {}): string {
     `${STYLE}${language}`,
     ...known,
     ...(input.briefingOpening === true ? [OPENING] : []),
+    ...(input.guided === true ? [GUIDED] : []),
     BACKCHANNEL,
     INTERRUPTION,
     delegation(input.role),
