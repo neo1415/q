@@ -65,6 +65,7 @@ describe("what a reading may do", () => {
           kind: "ADVICE",
           text: "What do you think I should look for?",
           about: [],
+          count: null,
         },
       }),
     );
@@ -221,6 +222,7 @@ describe("the research policy", () => {
           kind: "REAL_WORLD_EXAMPLE",
           text: "Can you give me an example of a real investor similar to me?",
           about: [],
+          count: null,
         },
       }),
       { available: true },
@@ -239,6 +241,7 @@ describe("the research policy", () => {
             kind: "ADVICE",
             text: "What else should I look for?",
             about: [],
+            count: null,
           },
         }),
         { available: true },
@@ -253,6 +256,7 @@ describe("the research policy", () => {
         kind: "THEIR_OWN_RECORDS",
         text: "Based on what you know about me, what fits?",
         about: [],
+        count: null,
       },
     });
     expect(decideResearch(asked, about, { available: true })).toEqual({
@@ -274,6 +278,7 @@ describe("the research policy", () => {
         kind: "REAL_WORLD_EXAMPLE",
         text: "a real example",
         about: [],
+        count: null,
       },
     });
     expect(decideResearch(asked, example, { available: false })).toEqual({

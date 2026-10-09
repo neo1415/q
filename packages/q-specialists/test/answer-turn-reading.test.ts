@@ -631,7 +631,12 @@ const advice: TurnReaderResult = {
   kind: "QUESTION_TO_Q",
   confidence: "HIGH",
   transcript: "CLEAR",
-  question: { kind: "ADVICE", text: "what else should I look for?", about: [] },
+  question: {
+    kind: "ADVICE",
+    text: "what else should I look for?",
+    about: [],
+    count: null,
+  },
   aboutNamedOther: false,
   tool: null,
 };
@@ -658,6 +663,7 @@ describe("a general turn is read before it is answered", () => {
           kind: "REAL_WORLD_EXAMPLE",
           text: "a real investor",
           about: [],
+          count: null,
         },
       },
       outcomes: [],
@@ -1130,6 +1136,7 @@ describe("a question about their own record takes the fast path (lead 2026-10-01
       kind: "THEIR_OWN_RECORDS",
       text: "what do you have on record about my company?",
       about: [],
+      count: null,
     },
   };
 
@@ -3434,6 +3441,7 @@ describe("a stated decision about a relationship is prepared, an opinion is not"
           kind: "ADVICE",
           text: "I'm not sure about Ledgerfold.",
           about: [],
+          count: null,
         },
         aboutNamedOther: false,
         tool: null,
