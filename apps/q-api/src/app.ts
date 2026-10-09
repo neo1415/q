@@ -286,6 +286,7 @@ export type QApiModules = {
         | "welcome"
         | "deepgram"
         | "duplex"
+        | "live"
         | "speech"
         | "speechThrottle"
         | "memory"
@@ -735,6 +736,7 @@ export function createApp(
       openerFacts: modules.voice.openerFacts,
       rehearsals: modules.voice.rehearsals,
       duplex: modules.voice.duplex,
+      live: modules.voice.live,
     });
     /**
      * One Q, whatever the input was (QX-004 core gate).

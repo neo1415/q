@@ -109,6 +109,9 @@ import {
   createOpenAISidebandConnector,
 } from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
+import { createLiveBroker } from "./voice/live/broker.js";
+import { liveConfigFrom } from "./voice/live/config.js";
+import { createGptLiveProvider } from "./voice/providers/gpt-live.js";
 import { duplexConfigFrom } from "./voice/duplex/config.js";
 import { createDuplexSideband } from "./voice/duplex/sideband.js";
 import { createMemoryListeningStore } from "./voice/duplex/listening.js";
@@ -5602,6 +5605,41 @@ const duplexBroker =
           }),
       })
     : undefined;
+/**
+ * V: the GPT-Live line (CQ_VOICE_LIVE, off by default). The voice is
+ * gpt-live-1; every delegation it makes is one run of the same voice turn
+ * handler, so Q Brain stays the authority. Its billed seconds land on the
+ * same VOICE_REALTIME ledger the duplex cap reads.
+ */
+const liveConfig = liveConfigFrom(
+  process.env,
+  config.runtime.deploymentEnvironment,
+);
+const liveBroker =
+  liveConfig.enabled && providerSecrets.openai !== undefined
+    ? createLiveBroker({
+        config: liveConfig,
+        provider: createGptLiveProvider({
+          apiKey: providerSecrets.openai.reveal(),
+        }),
+        firewall,
+        turn: voiceTurn,
+        spend: createPostgresDuplexSpend(database.sql),
+        usage: createPostgresModelUsageRepository({ sql: database.sql }),
+        // ai_ops.providers: openai is UNREVIEWED, as for the duplex line.
+        providerCeiling: "PUBLIC",
+        syntheticDemo: syntheticDemo?.permitted === true,
+        logger,
+      })
+    : undefined;
+logger.info(
+  {
+    enabled: liveBroker !== undefined,
+    maxSessionSeconds: liveConfig.maxSessionMs / 1000,
+    preview: liveConfig.preview,
+  },
+  "live voice composed",
+);
 logger.info(
   {
     enabled: duplexBroker !== undefined,
@@ -5795,6 +5833,20 @@ const { app, logger: appLogger } = createApp(
             welcome: welcomeHost,
             turn: rehearsalVoiceTurn,
             duplex: duplexBroker,
+            live:
+              liveBroker === undefined
+                ? undefined
+                : {
+                    broker: liveBroker,
+                    preview: {
+                      enabled: liveConfig.preview,
+                      providers: () => ({
+                        gptLive: liveBroker.enabled,
+                        realtime: duplexBroker?.enabled === true,
+                        elevenlabs: voiceProvider !== undefined,
+                      }),
+                    },
+                  },
             memory: { termsFor: memoryLearner.termsFor },
             openerFacts: createOpenerFacts({ sql: database.sql }),
             rehearsals: {

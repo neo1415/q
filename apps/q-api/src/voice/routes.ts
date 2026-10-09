@@ -74,6 +74,8 @@ import type { ActorContext } from "@capital-q/security";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 import type { DuplexBroker } from "./duplex/broker.js";
 import { registerDuplexVoiceRoutes } from "./duplex/routes.js";
+import type { LiveBroker } from "./live/broker.js";
+import { registerLiveVoiceRoutes } from "./live/routes.js";
 
 /**
  * `POST /v1/q/voice/sessions` (CQ-Q-VOICE-001 C §31, §34; doc 12 §7.2,
@@ -188,6 +190,19 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
    * line leaves the standard credential exactly as it was.
    */
   readonly duplex?: DuplexBroker | undefined;
+  /**
+   * V: the GPT-Live line, when composed (CQ_VOICE_LIVE). Attaches to a
+   * voice session this route issued; never replaces the standard line.
+   */
+  readonly live?:
+    | {
+        readonly broker: LiveBroker;
+        readonly preview: {
+          readonly enabled: boolean;
+          readonly providers: () => Readonly<Record<string, boolean>>;
+        };
+      }
+    | undefined;
 };
 
 export function registerQVoiceRoutes(
@@ -981,6 +996,19 @@ export function registerQVoiceRoutes(
         );
     },
   );
+
+  if (dependencies.live !== undefined) {
+    registerLiveVoiceRoutes(app, {
+      broker: dependencies.live.broker,
+      withContext,
+      binding: ownLine,
+      // In use from now: kept past the connect window, like a duplex line.
+      connect: (binding) => {
+        dependencies.bindings.connect(binding.providerConversationId);
+      },
+      preview: dependencies.live.preview,
+    });
+  }
 
   if (dependencies.duplex !== undefined) {
     registerDuplexVoiceRoutes(app, {
