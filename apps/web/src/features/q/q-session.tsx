@@ -12,7 +12,11 @@ import {
   type ReactNode,
 } from "react";
 
-import type { QRoomEntry } from "@capital-q/contracts";
+import type {
+  QFailureClass,
+  QRoomEntry,
+  QTurnDisposition,
+} from "@capital-q/contracts";
 import { arrivalGreeting } from "@capital-q/q-core/speech";
 
 import { voiceBriefing } from "@/features/briefing/arrival-voice";
@@ -80,6 +84,16 @@ function plainHello(): string {
  * an input the Q API resolves and authorises again on every run.
  */
 
+/** One voice turn's terminal outcome (G-R3). */
+export type VoiceOutcomeRow = {
+  readonly id: string;
+  readonly disposition: QTurnDisposition;
+  readonly failure: QFailureClass | null;
+  readonly notice: string | null;
+  /** Its place in this session's voice turns (1, 2, …). */
+  readonly seq: number;
+};
+
 export type QSessionValue = {
   readonly connected: boolean;
   /** What the next question is about. */
@@ -91,6 +105,12 @@ export type QSessionValue = {
   readonly spokenOnly: readonly SpokenLine[];
   /** Everything said aloud this session, for the saved transcript. */
   readonly spoken: readonly SpokenLine[];
+  /**
+   * G-R3: how each voice turn ended (RECOVERY A4's terminal outcome),
+   * newest last, with how many lines the thread had then, so the page
+   * shows an unanswered turn until something newer is said.
+   */
+  readonly voiceOutcomes: readonly VoiceOutcomeRow[];
   /** Q's state, from real signals only, with its word and detail. */
   readonly presence: {
     readonly state: QApertureState;
@@ -236,11 +256,33 @@ export function QSessionProvider({
   const [spoken, setSpoken] = useState<readonly SpokenLine[]>([]);
   // The real voice; a development harness may hold a scripted one.
   const useVoice = useContext(VoiceInterviewSource);
+  const [voiceOutcomes, setVoiceOutcomes] = useState<
+    readonly VoiceOutcomeRow[]
+  >([]);
   const voice = useVoice({
     onLine: (line) => {
       setSpoken((current) =>
-        upsertLine(current, { id: line.id, role: line.role, text: line.text }),
+        upsertLine(current, {
+          id: line.id,
+          role: line.role,
+          text: line.text,
+          // G-R3: which voice turn it belongs to (A), for the rendered turn.
+          ...(line.turnId === undefined ? {} : { turnId: line.turnId }),
+        }),
       );
+    },
+    onTurnOutcome: (outcome) => {
+      setVoiceOutcomes((current) => {
+        const seq = (current.at(-1)?.seq ?? 0) + 1;
+        const row: VoiceOutcomeRow = {
+          id: outcome.turnId ?? `voice-turn-${String(seq)}`,
+          seq,
+          disposition: outcome.disposition,
+          failure: outcome.failure ?? null,
+          notice: outcome.notice ?? null,
+        };
+        return [...current, row].slice(-20);
+      });
     },
   });
   // Spoken turns live in a conversation the server names; once it does,
@@ -534,6 +576,7 @@ export function QSessionProvider({
       voice,
       spoken,
       spokenOnly,
+      voiceOutcomes,
       presence: { state, label, detail },
       open,
       talk,
@@ -550,6 +593,7 @@ export function QSessionProvider({
       voice,
       spoken,
       spokenOnly,
+      voiceOutcomes,
       state,
       label,
       detail,

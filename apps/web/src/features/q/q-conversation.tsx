@@ -76,6 +76,12 @@ import { HideFromQ } from "./hide-from-q";
 import { QAnswer } from "./q-answer";
 import { boardTimeline } from "./board-timeline";
 import { QBoardTimeline } from "./q-board-timeline";
+import { useResultShelf, withShelf } from "./result-shelf";
+import {
+  dispositionOfFailure,
+  dispositionOfTurn,
+  outcomeWords,
+} from "./turn-disposition";
 import { useBoardMarks } from "./q-board";
 import { QNow } from "./q-now";
 import { QCanSee } from "./q-can-see";
@@ -267,6 +273,8 @@ type Line = {
   readonly id: string;
   readonly role: "person" | "q";
   readonly text: string;
+  /** G-R3: the voice turn a spoken line belongs to. */
+  readonly turnId?: string | undefined;
   /** The Q turn behind it, when it is a stored answer. */
   readonly turn?: Extract<QTurn, { kind: "Q" }> | undefined;
 };
@@ -278,13 +286,26 @@ type Line = {
 function StageNotice({
   title,
   children,
+  turn,
 }: {
   readonly title: string;
   readonly children: ReactNode;
+  /** G-R3: the turn this notice ends, with its terminal disposition. */
+  readonly turn?:
+    | {
+        readonly id: string;
+        readonly disposition: string;
+        readonly failure: string | null;
+      }
+    | undefined;
 }) {
   return (
     <div
       role="status"
+      data-q-turn-id={turn?.id}
+      data-q-turn-role={turn === undefined ? undefined : "Q"}
+      data-q-disposition={turn?.disposition}
+      data-q-failure={turn?.failure ?? undefined}
       className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 rounded-md border border-(--cq-border) bg-(--cq-surface) px-4 py-3 text-left"
     >
       <span className="cq-label text-(--cq-text-primary)">{title}</span>
@@ -526,10 +547,38 @@ export function QConversationPanel({
       role: line.role === "user" ? ("person" as const) : ("q" as const),
       text: line.text,
       after: line.after,
+      turnId: line.turnId,
     })),
   ).map((line): Line =>
-    "after" in line ? { id: line.id, role: line.role, text: line.text } : line,
+    "after" in line
+      ? {
+          id: line.id,
+          role: line.role,
+          text: line.text,
+          ...(line.turnId === undefined ? {} : { turnId: line.turnId }),
+        }
+      : line,
   );
+  // G-R3: how a rendered turn ended: A's outcome for a voice turn, the
+  // answer's own for a stored one; a spoken Q line was said, so answered.
+  const turnOutcomes = voice.turnOutcomes;
+  const rowDisposition = (line: Line): string | undefined => {
+    const voiced =
+      line.turnId === undefined ? undefined : turnOutcomes?.[line.turnId];
+    if (voiced !== undefined) return voiced.disposition;
+    if (line.role === "person") return undefined;
+    return line.turn === undefined
+      ? "ANSWERED"
+      : (dispositionOfTurn(line.turn) ?? undefined);
+  };
+  const rowFailure = (line: Line): string | undefined => {
+    const voiced =
+      line.turnId === undefined ? undefined : turnOutcomes?.[line.turnId];
+    return voiced?.disposition === "FAILED"
+      ? (voiced.failure ?? undefined)
+      : undefined;
+  };
+
   // While the person is speaking their words are the thread's newest
   // bubble, growing in place; the same words once stored are not shown
   // twice.
@@ -605,11 +654,15 @@ export function QConversationPanel({
   const [boardOpen, setBoardOpen] = useState(openBoard);
   const boardDocked = wide && boardOpen;
   const boardMarks = useBoardMarks(q.conversationId);
+  // G-D18: the Board holds every set shown in this tab, also after a
+  // reconnect moved the page to another conversation.
+  const shelf = useResultShelf();
+  const boardTurns = useMemo(() => withShelf(turns, shelf), [turns, shelf]);
   // C4: what the Board holds, less the answer still on the stage; it
   // counts up as an answer flies into it.
   const boardCount = Math.max(
     0,
-    boardTimeline(turns).filter(
+    boardTimeline(boardTurns).filter(
       (entry) => !boardMarks.dismissed.includes(entry.id),
     ).length - (objectShown ? 1 : 0),
   );
@@ -740,6 +793,26 @@ export function QConversationPanel({
     setActNotice(null);
   }
 
+  // G-R3: the newest voice outcome without an answer, while nothing newer
+  // was said (a new line in the thread takes its place).
+  const lastOutcome = session.voiceOutcomes.at(-1);
+  const [outcomeLines, setOutcomeLines] = useState<{
+    readonly id: string;
+    readonly lines: number;
+  } | null>(null);
+  if (lastOutcome !== undefined && outcomeLines?.id !== lastOutcome.id) {
+    setOutcomeLines({ id: lastOutcome.id, lines: lines.length });
+  }
+  const unanswered =
+    lastOutcome !== undefined &&
+    lastOutcome.disposition !== "ANSWERED" &&
+    lastOutcome.disposition !== "CLARIFIED" &&
+    lastOutcome.disposition !== "ACTED" &&
+    outcomeLines?.id === lastOutcome.id &&
+    outcomeLines.lines === lines.length
+      ? lastOutcome
+      : null;
+
   const notices = (
     <>
       {actNotice === null ? null : (
@@ -756,10 +829,39 @@ export function QConversationPanel({
         </p>
       ) : null}
       {q.state.failure !== null ? (
-        <StageNotice title="Q couldn't finish that">
+        <StageNotice
+          title="Q couldn't finish that"
+          turn={{
+            id: q.state.failure.runId ?? "run-failed",
+            ...dispositionOfFailure(q.state.failure.code),
+          }}
+        >
           {failureMessage(q.state.failure)} {recoveryHint(q.state.failure)}
         </StageNotice>
       ) : null}
+      {/* G-R3: a voice turn that got no answer (IGNORED included) is shown
+          until something newer is said, with its disposition. */}
+      {unanswered === null ? null : (
+        <p
+          role="status"
+          className="cq-body-sm m-0 text-(--cq-text-secondary)"
+          // The turn's own row carries its id when the line put one on the
+          // screen; this line then only says how it ended.
+          data-q-turn-id={
+            lines.some((line) => line.turnId === unanswered.id)
+              ? undefined
+              : unanswered.id
+          }
+          data-q-turn-role="Q"
+          data-q-disposition={unanswered.disposition}
+          data-q-failure={unanswered.failure ?? undefined}
+        >
+          {outcomeWords({
+            disposition: unanswered.disposition,
+            notice: unanswered.notice ?? undefined,
+          })}
+        </p>
+      )}
       {q.notice !== null && q.state.failure === null ? (
         <StageNotice title="That didn't go through">{q.notice}</StageNotice>
       ) : null}
@@ -975,6 +1077,45 @@ export function QConversationPanel({
               >
                 {bigPresence ? (
                   <ArrivalRoom wide>
+                    {captions ? null : (
+                      // The latest exchange for a screen reader while the
+                      // presence view shows no transcript (audit 06 §9);
+                      // each turn with its id and disposition (G-R3).
+                      // Text only: nothing focusable is hidden here.
+                      <ol className="sr-only" aria-label="Latest exchange">
+                        {latestExchange(thread).map((line) =>
+                          line.role === "person" ? (
+                            <li
+                              key={line.id}
+                              data-q-turn-id={line.turnId ?? line.id}
+                              data-q-turn-role="USER"
+                              data-q-disposition={rowDisposition(line)}
+                            >
+                              You: {line.text}
+                            </li>
+                          ) : (
+                            <li
+                              key={line.id}
+                              data-q-turn-id={line.turnId ?? line.id}
+                              data-q-turn-role="Q"
+                              data-q-disposition={rowDisposition(line)}
+                              data-q-failure={rowFailure(line)}
+                            >
+                              Q: {plainFromMarkdown(line.text)}
+                            </li>
+                          ),
+                        )}
+                        {liveIsPerson ? (
+                          <li
+                            key={live.id}
+                            data-q-turn-id={live.id}
+                            data-q-turn-role="USER"
+                          >
+                            You, speaking: {live.text}
+                          </li>
+                        ) : null}
+                      </ol>
+                    )}
                     <QPresenceStage
                       live={voice.active}
                       onBoardLanded={onBoardLanded}
@@ -1042,6 +1183,9 @@ export function QConversationPanel({
                                 key={line.id}
                                 className="flex flex-col"
                                 data-q-row="person"
+                                data-q-turn-id={line.turnId ?? line.id}
+                                data-q-turn-role="USER"
+                                data-q-disposition={rowDisposition(line)}
                               >
                                 <p className="cq-q-bubble cq-body">
                                   <span className="sr-only">You: </span>
@@ -1057,6 +1201,10 @@ export function QConversationPanel({
                                 key={line.id}
                                 className="flex flex-col"
                                 data-q-row="q"
+                                data-q-turn-id={line.turnId ?? line.id}
+                                data-q-turn-role="Q"
+                                data-q-disposition={rowDisposition(line)}
+                                data-q-failure={rowFailure(line)}
                               >
                                 <span className="sr-only">Q: </span>
                                 {line.turn === undefined ? (
@@ -1080,6 +1228,8 @@ export function QConversationPanel({
                               key={live.id}
                               className="flex flex-col"
                               data-q-row="person"
+                              data-q-turn-id={live.id}
+                              data-q-turn-role="USER"
                             >
                               <p
                                 className="cq-q-bubble is-live cq-body"
@@ -1118,6 +1268,9 @@ export function QConversationPanel({
                           key={line.id}
                           className="flex flex-col"
                           data-q-row="person"
+                          data-q-turn-id={line.turnId ?? line.id}
+                          data-q-turn-role="USER"
+                          data-q-disposition={rowDisposition(line)}
                         >
                           <p className="cq-q-bubble cq-body">
                             <span className="sr-only">You: </span>
@@ -1133,6 +1286,10 @@ export function QConversationPanel({
                           key={line.id}
                           className="flex flex-col"
                           data-q-row="q"
+                          data-q-turn-id={line.turnId ?? line.id}
+                          data-q-turn-role="Q"
+                          data-q-disposition={rowDisposition(line)}
+                          data-q-failure={rowFailure(line)}
                         >
                           <span className="sr-only">Q: </span>
                           {line.turn === undefined ? (
@@ -1156,6 +1313,8 @@ export function QConversationPanel({
                         key={live.id}
                         className="flex flex-col"
                         data-q-row="person"
+                        data-q-turn-id={live.id}
+                        data-q-turn-role="USER"
                       >
                         <p
                           className="cq-q-bubble is-live cq-body"
@@ -1443,7 +1602,7 @@ export function QConversationPanel({
               </div>
               <QBoardTimeline
                 conversationId={q.conversationId}
-                turns={turns}
+                turns={boardTurns}
                 onClose={() => setBoardOpen(false)}
                 onShow={(answerId) => {
                   setBoardOpen(false);
@@ -1465,7 +1624,7 @@ export function QConversationPanel({
               <SheetContent side="bottom" title="Board">
                 <QBoardTimeline
                   conversationId={q.conversationId}
-                  turns={turns}
+                  turns={boardTurns}
                   onAsk={(question) => {
                     setBoardOpen(false);
                     sayOrAsk(question);

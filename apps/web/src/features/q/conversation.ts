@@ -100,7 +100,9 @@ export type QTurnObjectBlock = Extract<
       | "TABLE"
       | "CHART"
       | "MAP"
-      | "TIMELINE";
+      | "TIMELINE"
+      // G-R4: what needs the person, as one report.
+      | "ATTENTION";
   }
 >;
 
@@ -145,6 +147,7 @@ function objectBlocksOf(
       case "CHART":
       case "MAP":
       case "TIMELINE":
+      case "ATTENTION":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block
@@ -157,7 +160,6 @@ function objectBlocksOf(
       case "EVIDENCE":
       case "FINDING":
       case "UNCERTAINTY":
-      case "ATTENTION": // G-R4: the prose says it until E's renderer lands
       case "PUBLIC_SOURCE": // carried as the turn's own public sources
         return false;
     }

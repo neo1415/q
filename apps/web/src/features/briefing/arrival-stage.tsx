@@ -144,6 +144,7 @@ export function ActivityCard({
     <section
       ref={ref}
       aria-label="What I did"
+      data-q-control="section.what-i-did"
       className="flex flex-col gap-2"
       data-arrival-activity
     >
@@ -190,6 +191,7 @@ export function AttentionList({ data }: { readonly data: ArrivalData }) {
           key={item.key}
           className="flex min-h-11 items-center gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-1.5"
           data-arrival-attention-item={item.source}
+          data-q-attention-item={item.source}
         >
           <span className="min-w-0 flex-1 cq-body-sm text-(--cq-text-primary)">
             {item.title}
@@ -245,6 +247,7 @@ export function MatchCard({
         focused && "border-(--cq-border-strong) bg-(--cq-surface-subtle)",
       )}
       data-arrival-match={match.companyId}
+      data-q-control-item
       data-focused={focused ? "" : undefined}
     >
       <div className="flex flex-col">
@@ -319,6 +322,7 @@ function MatchesGroup({
     <section
       ref={ref}
       aria-label="New for you"
+      data-q-control="list.new-matches"
       className="flex flex-col gap-2"
       data-arrival-matches
     >
@@ -345,6 +349,7 @@ function MatchesGroup({
             onClick={() => setShown(match.companyId)}
             className="flex min-h-11 w-full items-center gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
             data-arrival-match-line={match.companyId}
+            data-q-control-item
           >
             <span className="min-w-0 flex-1 truncate cq-body-sm font-semibold text-(--cq-text-primary)">
               {match.name}
@@ -548,6 +553,7 @@ export function ArrivalStage({
     <section
       ref={needsRef}
       aria-label="Needs you"
+      data-q-control="section.needs-you"
       className="flex flex-col gap-2"
       data-arrival-needs
     >
@@ -578,6 +584,7 @@ export function ArrivalStage({
       <section
         ref={questionsRef}
         aria-label="Q still wants to know"
+        data-q-control="section.q-questions"
         className="flex flex-col gap-2"
         data-arrival-questions
       >

@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
+import type { QTurn } from "./conversation";
 import type { ShownItem } from "./shown";
 
 /**
@@ -46,6 +47,38 @@ export function useResultShelf(): readonly ShownItem[] {
     () => shelf,
     () => EMPTY,
   );
+}
+
+/**
+ * The thread's turns with the sets shown elsewhere in this tab before
+ * them (G-D18: after a reconnect moved the page to another conversation,
+ * the Board read "0" while the ranked cards were still the person's).
+ * Each shelf set is one settled Q turn of its run; a run the thread holds
+ * itself is never added twice.
+ */
+export function withShelf(
+  turns: readonly QTurn[],
+  kept: readonly ShownItem[],
+): readonly QTurn[] {
+  const runs = new Set(
+    turns.flatMap((turn) => (turn.kind === "Q" ? [turn.runId ?? turn.id] : [])),
+  );
+  const ids = new Set(turns.map((turn) => turn.id));
+  const elsewhere = kept
+    .filter((item) => !runs.has(item.run) && !ids.has(item.id))
+    .map((item): QTurn => ({
+      kind: "Q",
+      id: item.id,
+      runId: item.run,
+      text: "",
+      streaming: false,
+      sourceCount: 0,
+      publicSources: [],
+      findings: [],
+      uncertainties: [],
+      blocks: item.blocks,
+    }));
+  return elsewhere.length === 0 ? turns : [...elsewhere, ...turns];
 }
 
 /** For tests: start over. */

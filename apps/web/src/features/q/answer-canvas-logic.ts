@@ -51,10 +51,48 @@ export function fitNumber(card: QAnswerCard): string | null {
 export function fitWords(card: QAnswerCard): string | null {
   if (card.fit === null) return null;
   const { score, measured, of } = card.fit;
-  const base = `Fit ${score.toFixed(1)} out of 10`;
+  // INC-1 / G-D17: fit with the declared mandate, never a quality score.
+  const base = `Mandate fit ${score.toFixed(1)} out of 10`;
   return measured < of
     ? `${base}, from ${String(measured)} of ${String(of)} measures known`
     : base;
+}
+
+/**
+ * How the card's mandate fit was made, on the card (G-D17): how many of
+ * its measures were known, and what it rests on. No sources is said, never
+ * left blank.
+ */
+export function fitProvenance(card: QAnswerCard): string | null {
+  if (card.fit === null) return null;
+  const known = `${String(card.fit.measured)} of ${String(card.fit.of)} measures known`;
+  const sources =
+    card.sourceCount > 0
+      ? `${String(card.sourceCount)} ${card.sourceCount === 1 ? "source" : "sources"}`
+      : "no source documents yet";
+  return `${known} · ${sources}`;
+}
+
+/** "Tied with Ledgerfold on mandate fit (8.0)": said, never implied by order. */
+export function tieLine(
+  block: QAnswerCardsBlock,
+  card: QAnswerCard,
+): string | null {
+  const fit = card.fit;
+  if (fit === null) return null;
+  const tied = block.cards.filter(
+    (other) =>
+      other.key !== card.key &&
+      other.fit !== null &&
+      other.fit.score.toFixed(1) === fit.score.toFixed(1),
+  );
+  if (tied.length === 0) return null;
+  const names = tied.map((other) => other.name);
+  const who =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+  return `Tied with ${who ?? ""} on mandate fit (${fit.score.toFixed(1)}).`;
 }
 
 /** Comparisons lay out as one table when every card has the same measures. */

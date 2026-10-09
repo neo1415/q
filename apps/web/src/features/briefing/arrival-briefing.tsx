@@ -424,6 +424,7 @@ function FocusCard({
         compact ? "gap-2 p-3" : "gap-3 p-4",
       )}
       data-arrival-card={card.key}
+      data-q-approval-card={card.approvalId ?? undefined}
     >
       <div className="flex min-h-11 items-center gap-2.5">
         <Mark card={card} size={compact ? 28 : 32} />
@@ -898,6 +899,7 @@ export function Sequence({
         className="flex min-h-11 items-center gap-2"
         data-arrival-sequence
         data-arrival-layout="strip"
+        data-q-control="list.arrival-cards"
       >
         <span className="cq-body-sm font-semibold text-(--cq-text-primary)">
           Needs you
@@ -943,6 +945,7 @@ export function Sequence({
       transition={{ duration: reduced ? 0 : 0.22, ease: EASE }}
       data-arrival-item={index}
       data-q-item
+      data-q-control-item
     >
       {one.key === current.key ? (
         focusCard
@@ -969,6 +972,7 @@ export function Sequence({
       aria-label="Needs you"
       className={cx("flex w-full flex-col", compact ? "gap-2" : "gap-2.5")}
       data-arrival-sequence
+      data-q-control="list.arrival-cards"
       data-arrival-layout={compact ? "dock" : flank ? "room" : "below"}
     >
       <div className="flex min-h-11 items-center gap-2">
