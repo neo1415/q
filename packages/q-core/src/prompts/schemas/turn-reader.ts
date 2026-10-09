@@ -642,3 +642,13 @@ export const TurnReaderV44ResultSchema = TurnReaderV40ResultSchema.extend({
   heardAs: z.string().trim().min(1).max(300).nullable().default(null),
 }).strict();
 export type TurnReaderV44Result = z.infer<typeof TurnReaderV44ResultSchema>;
+
+export const TURN_READER_V45_SCHEMA_VERSION = 45;
+
+/**
+ * v45 (live 2026-10-09): the question may be FIT, with the count of
+ * companies it asks for (`QuestionToQSchema.count`). The shape is v44's;
+ * the version marks the reading that may carry them.
+ */
+export const TurnReaderV45ResultSchema = TurnReaderV44ResultSchema;
+export type TurnReaderV45Result = z.infer<typeof TurnReaderV45ResultSchema>;

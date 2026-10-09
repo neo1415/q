@@ -100,7 +100,13 @@ import {
   hasOrphanListItems,
   spokenBeforeCards,
 } from "./fit-cards.js";
-import { fitSweepAsk, runFitSweep, type FitSweepResult } from "./fit-sweep.js";
+import {
+  fitSweepAsk,
+  fitSweepAskOfReading,
+  runFitSweep,
+  type FitSweepAsk,
+  type FitSweepResult,
+} from "./fit-sweep.js";
 import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
@@ -408,7 +414,7 @@ const ANALYSIS_WORDS =
 const COMPARISON_WORDS =
   /\b(?:compare|comparison|versus|vs\.?|side\s+by\s+side|which\s+(?:one\s+|of\s+(?:these|them|those)\s+)?(?:is|are)\s+(?:better|stronger|best))\b/iu;
 /** Reader question kinds whose answers are analysis. */
-const ANALYTICAL_QUESTIONS = new Set(["ADVICE", "OPTIONS", "PROGRESS"]);
+const ANALYTICAL_QUESTIONS = new Set(["ADVICE", "OPTIONS", "PROGRESS", "FIT"]);
 
 /**
  * RECOVERY-2026-10 B4 (audit B-04): the conversational answer's task
@@ -1864,28 +1870,43 @@ export function createModelGatewayQAnswer(
     // with the reads below, through the same tools and plan (fit-sweep.ts).
     // Investors only (fit is against their mandate); never for a document
     // or an action.
-    const sweepAsk =
-      ownInvestor === null ||
-      request.writingDocument === true ||
-      (request.turnKind !== undefined && request.turnKind !== "QUESTION_TO_Q")
-        ? null
-        : // INC-1: "rank them" is the set the last answer showed.
-          fitSweepAsk(latest.content, previousCardCompanyIds(earlier));
+    const sweepable =
+      ownInvestor !== null &&
+      request.writingDocument !== true &&
+      (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q");
+    // INC-1: "rank them" is the set the last answer showed.
+    const shownBefore = previousCardCompanyIds(earlier);
+    const sweepFor = (ask: FitSweepAsk): Promise<FitSweepResult | null> =>
+      runFitSweep({
+        ask,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+        own:
+          standingRead === null
+            ? Promise.resolve(null)
+            : standingRead.then((outcome) =>
+                outcome.result.ok ? outcome.result.data : null,
+              ),
+      }).catch(() => null);
+    const sweepAsk = !sweepable
+      ? null
+      : (fitSweepAsk(latest.content, shownBefore) ??
+        (request.fitQuestion === undefined
+          ? null
+          : fitSweepAskOfReading(request.fitQuestion, shownBefore)));
     const fitSweep: Promise<FitSweepResult | null> =
-      sweepAsk === null
-        ? Promise.resolve(null)
-        : runFitSweep({
-            ask: sweepAsk,
-            tools,
-            context: toolContext,
-            available: prefetchTools,
-            own:
-              standingRead === null
-                ? Promise.resolve(null)
-                : standingRead.then((outcome) =>
-                    outcome.result.ok ? outcome.result.data : null,
-                  ),
-          }).catch(() => null);
+      sweepAsk === null ? Promise.resolve(null) : sweepFor(sweepAsk);
+    // Live 2026-10-09: a FIT reading arrives after a warmed prepare, which
+    // read the words only. The reader's fit question is swept then, from
+    // the same reads, so any wording reaches the computed fit.
+    const sweepForReading = (fitQuestion: {
+      readonly text: string;
+      readonly count: number | null;
+    }): Promise<FitSweepResult | null> =>
+      sweepable
+        ? sweepFor(fitSweepAskOfReading(fitQuestion, shownBefore))
+        : Promise.resolve(null);
     // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
     // source through the attention tool, under this run's plan, beside the
     // other reads; the answer is then written from it by code. Read only
@@ -2355,6 +2376,8 @@ export function createModelGatewayQAnswer(
       pitchMoment,
       onboardingFacts,
       fitSweep,
+      sweptAtPrepare: sweepAsk !== null,
+      sweepForReading,
       attention,
     };
   }
@@ -2461,6 +2484,8 @@ export function createModelGatewayQAnswer(
         pitchMoment,
         onboardingFacts,
         fitSweep,
+        sweptAtPrepare,
+        sweepForReading,
         attention,
         counterparty,
       } = prepared;
@@ -3160,7 +3185,14 @@ export function createModelGatewayQAnswer(
           promptBundleVersion: rendered.bundle.bundleVersion,
         };
       }
-      const sweep = await fitSweep;
+      // The reader's FIT reading decides when the words alone did not
+      // (live 2026-10-09: "three good examples of companies I can invest
+      // in" was researched on the public web for 23-30 s).
+      const sweep =
+        (await fitSweep) ??
+        (request.fitQuestion === undefined || sweptAtPrepare
+          ? null
+          : await sweepForReading(request.fitQuestion));
       if (
         sweep !== null &&
         sweep.ask.fitAsked &&

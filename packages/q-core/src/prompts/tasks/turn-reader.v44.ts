@@ -43,7 +43,7 @@ export const TURN_READER_V44: PromptDefinition<
 > = {
   ...TURN_READER_V43,
   version: 44,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Zino live 2026-10-08: garbled voice words are read by sound before UNCLEAR_TRANSCRIPT; heardAs carries the likely words so Q answers them instead of going silent; what needs their attention is a question Q answers, not NAVIGATE.",
   effectiveFrom: "2026-10-08",

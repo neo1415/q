@@ -134,6 +134,9 @@ export type QualitativeMeaning = z.infer<typeof QualitativeMeaningSchema>;
  * from authorised context first, never silently from the public web.
  * REAL_WORLD_EXAMPLE, PUBLIC_FACTS and (since 2026-09-29) ADVICE may become
  * a research task, only under the policy in `research-policy.ts`.
+ * FIT (TURN_READER v45, live 2026-10-09) is which companies on Capital Q
+ * they could invest in or fit them best, in any words: answered from the
+ * fit computed against their mandate, by code, never from the public web.
  */
 export const QUESTION_KINDS = [
   "ADVICE",
@@ -143,6 +146,7 @@ export const QUESTION_KINDS = [
   "THEIR_OWN_RECORDS",
   "REAL_WORLD_EXAMPLE",
   "PUBLIC_FACTS",
+  "FIT",
 ] as const;
 export const QuestionKindSchema = z.enum(QUESTION_KINDS);
 export type QuestionKind = z.infer<typeof QuestionKindSchema>;
@@ -164,6 +168,13 @@ export const QuestionToQSchema = z
     // bound of six refused the whole reading, four times, and Q said its
     // reasoning service was unreachable (live, H fixture).
     about: z.array(z.string().min(1).max(80)).max(60).default([]),
+    /**
+     * How many companies a FIT question asks for ("give me three"); null
+     * when they named no number. Read with the question, so no code parses
+     * the number out of their words. Bounded loosely so an odd number never
+     * refuses the whole reading; the cards cap it at ten.
+     */
+    count: z.number().int().min(1).max(100).nullable().default(null),
   })
   .strict();
 export type QuestionToQ = z.infer<typeof QuestionToQSchema>;

@@ -3445,6 +3445,14 @@ export function createSpecialistQAnswer(
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),
+      ...(read?.kind === "QUESTION_TO_Q" && read.question?.kind === "FIT"
+        ? {
+            fitQuestion: {
+              text: read.question.text,
+              count: read.question.count ?? null,
+            },
+          }
+        : {}),
       ...(readinessLead === null ? {} : { leadLines: readinessLead }),
       // Only a name the reader was given counts (ADR 0040 parity).
       ...(read?.askedAction === undefined ||

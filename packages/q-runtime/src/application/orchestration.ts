@@ -250,6 +250,14 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    */
   readonly questionKind?: string | undefined;
   /**
+   * A FIT question as the reader read it (live 2026-10-09): their question
+   * in its words -- the earlier ask when this turn only pressed on it
+   * ("still waiting") -- and how many companies it asks for, null when
+   * no number. Answered from the computed fit, never the public web.
+   */
+  readonly fitQuestion?:
+    { readonly text: string; readonly count: number | null } | undefined;
+  /**
    * Lines code composed to open this answer (readiness for "what should I
    * do next?"), said before the model's own words. Absent: none.
    */

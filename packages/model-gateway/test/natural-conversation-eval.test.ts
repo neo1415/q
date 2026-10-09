@@ -233,6 +233,8 @@ async function replay(input: {
   readonly script: readonly FakeBehaviour[];
   readonly fit?: boolean;
   readonly spoken?: boolean;
+  /** What the turn reader read, as the answer seam passes it on. */
+  readonly reading?: Pick<QAnswerRequest, "questionKind" | "fitQuestion">;
 }): Promise<{
   text: string;
   blocks: readonly QResultBlock[];
@@ -322,6 +324,7 @@ async function replay(input: {
     plan: plan(),
     turnKind: "QUESTION_TO_Q",
     ...(input.spoken === true ? { spoken: true } : {}),
+    ...input.reading,
   };
   const outcome = await seam.answer(request);
   expect(outcome.kind).toBe("ANSWERED");
@@ -465,5 +468,66 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
     expect(text).toBe(
       "You've expressed interest in Baridi, Portside, Souqsheet and Maji Loop. Baridi is in Kenya. Portside is in Egypt. The details are on screen.",
     );
+  });
+});
+
+describe("a fit question in any words reaches the computed fit (live 2026-10-09)", () => {
+  // Zino, production 677c9f53, 07:29-07:32 UTC: read as ADVICE and
+  // researched on the public web, 23.2 s and 30.2 s. The turn reader now
+  // reads FIT with its count; the words themselves decide nothing.
+  const ASK = "Give me three good examples of companies I can invest in";
+  const fit = (text: string, count: number | null) => ({
+    questionKind: "FIT",
+    fitQuestion: { text, count },
+  });
+
+  it("answers the reader's FIT from computed fits: exact count, no model, no web", async () => {
+    const started = Date.now();
+    const { text, blocks, modelCalls, executed } = await replay({
+      question: ASK,
+      script: [answer("A slow researched answer.")],
+      reading: fit(ASK, 3),
+    });
+    expect(modelCalls).toBe(0);
+    expect(cardsOf(blocks)).toHaveLength(3);
+    expect(executed).not.toContain("research_public_web");
+    expect(
+      executed.filter((name) => name.startsWith("fit_")).length,
+    ).toBeGreaterThan(0);
+    expect(text).toMatch(/Souqsheet/u);
+    expect(Date.now() - started).toBeLessThan(3_000);
+  });
+
+  it("'still waiting, can you do it or not' re-answers the pending ask, read as it", async () => {
+    const { blocks, modelCalls } = await replay({
+      question: "Still waiting, can you do it or not",
+      script: [answer("A fresh analysis.")],
+      reading: fit(ASK, 3),
+    });
+    expect(modelCalls).toBe(0);
+    expect(cardsOf(blocks)).toHaveLength(3);
+  });
+
+  it("other wordings, with no number, are the same path", async () => {
+    for (const words of [
+      "which ones could I actually invest in",
+      "best companies for me",
+    ]) {
+      const { blocks, modelCalls } = await replay({
+        question: words,
+        script: [answer("A model answer.")],
+        reading: fit(words, null),
+      });
+      expect(modelCalls).toBe(0);
+      expect(cardsOf(blocks).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("without the reader's FIT the same words are not swept by code", async () => {
+    const { modelCalls } = await replay({
+      question: ASK,
+      script: [answer("You could look at Souqsheet.")],
+    });
+    expect(modelCalls).toBeGreaterThan(0);
   });
 });

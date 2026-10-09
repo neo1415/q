@@ -137,17 +137,48 @@ export function fitSweepAsk(
   // the person owns: the cards come with it, the model still answers.
   const listed = relationships && LIST_CUE.test(words) && SET_CUE.test(words);
   if (!fitAsked && !listed) return null;
-  const found = PLACE.exec(words)?.[1]?.trim() ?? null;
-  const place =
-    found === null || NOT_PLACES.has(found.split(/\s+/u)[0] ?? "")
-      ? null
-      : found;
   return {
     scope: relationships ? "RELATIONSHIPS" : saved ? "SAVED" : "CANDIDATES",
-    place,
+    place: placeOf(words),
     fitAsked,
     count: askedCount(words),
   };
+}
+
+function placeOf(words: string): string | null {
+  const found = PLACE.exec(words)?.[1]?.trim() ?? null;
+  return found === null || NOT_PLACES.has(found.split(/\s+/u)[0] ?? "")
+    ? null
+    : found;
+}
+
+/**
+ * A fit question as the turn reader read it (FIT, live 2026-10-09):
+ * "give me three good examples of companies I can invest in" and "best
+ * companies for me" are fit questions in any words, so the reading, not a
+ * list of phrasings, decides that the computed fit answers. The count is
+ * the reader's; the place and "those" are read from the words as above.
+ */
+export function fitSweepAskOfReading(
+  question: { readonly text: string; readonly count: number | null },
+  previous: readonly string[] = [],
+): FitSweepAsk {
+  const words = question.text.trim().slice(0, 400);
+  const count =
+    question.count === null
+      ? null
+      : Math.min(Math.max(question.count, 1), FIT_SWEEP_CARDS_MAX);
+  if (previous.length > 0 && refersToShown(words)) {
+    return {
+      scope: "PREVIOUS",
+      place: null,
+      fitAsked: true,
+      count:
+        count === null ? previous.length : Math.min(count, previous.length),
+      within: [...previous],
+    };
+  }
+  return { scope: "CANDIDATES", place: placeOf(words), fitAsked: true, count };
 }
 
 /** Companies computed at once, at most: the cards hold ten. */

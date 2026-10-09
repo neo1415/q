@@ -86,6 +86,8 @@ const QUESTION_AREAS: Readonly<Record<string, readonly string[]>> = {
   REAL_WORLD_EXAMPLE: ["Research"],
   PUBLIC_FACTS: ["Research"],
   OPTIONS: ["Records"],
+  // Fit against their mandate: the fit tools and their own standing.
+  FIT: ["Records", "Relationships"],
   PROGRESS: ["Records", "Relationships"],
   THEIR_OWN_RECORDS: [
     "Records",
