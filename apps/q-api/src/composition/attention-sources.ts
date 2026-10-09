@@ -53,7 +53,11 @@ export function createAttentionSources(dependencies: {
               row.counterpart_name === null
                 ? "Q held back a draft for you to look at"
                 : `Q held back a draft to ${row.counterpart_name.slice(0, 120)}`,
-            ...(row.reason === null ? {} : { detail: `Why: ${row.reason}` }),
+            ...(row.reason === null
+              ? {}
+              : ({
+                  note: `Why: ${row.reason}`,
+                } satisfies Partial<QAttentionItem>)),
             entity: { kind: "JOB", id: row.job_id },
             ...(row.counterpart_name === null
               ? {}
@@ -108,7 +112,11 @@ export function createAttentionSources(dependencies: {
             key: `notice:${row.id}`,
             source: "NOTICE",
             title: row.title.slice(0, 200),
-            ...(row.body === null ? {} : { detail: row.body.slice(0, 600) }),
+            ...(row.body === null
+              ? {}
+              : ({
+                  note: row.body.slice(0, 600),
+                } satisfies Partial<QAttentionItem>)),
             since: new Date(row.created_at).toISOString(),
             decidable: false,
           }));
@@ -205,7 +213,9 @@ export function createAttentionSources(dependencies: {
               title: `${String(row.n)} new ${row.n === 1 ? "company matches" : "companies match"} your mandate since your last visit`,
               ...(names.length === 0
                 ? {}
-                : { detail: `Including ${names.join(", ").slice(0, 560)}` }),
+                : ({
+                    note: `Including ${names.join(", ").slice(0, 560)}`,
+                  } satisfies Partial<QAttentionItem>)),
               since: new Date(row.published_at ?? since).toISOString(),
               decidable: false,
             },
