@@ -84,6 +84,7 @@ import {
   zoneFromWords,
 } from "@capital-q/q-tools";
 import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
+import { fastLaneOf } from "./fast-lane.js";
 
 import {
   ANSWER_DOCUMENT_ARTIFACT_TYPE,
@@ -259,7 +260,7 @@ import {
   wordsNamePage,
 } from "./page-request.js";
 import { resolveNamedRecord } from "./fast-navigation.js";
-import type { TurnReference } from "@capital-q/q-core";
+import type { TurnReference, TurnSkimResult } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
   startPendingDecision,
@@ -292,6 +293,7 @@ import {
   askedSubjects,
   provenanceLine,
   type QTurnReader,
+  type QTurnSkimmer,
 } from "@capital-q/model-gateway/q";
 
 /**
@@ -451,6 +453,12 @@ export type SpecialistQAnswerDependencies = {
    * and failures carry no notice — the behaviour before the core.
    */
   readonly turns?: QTurnReader | undefined;
+  /**
+   * K fast lane: a short first read beside the turn reader; a HIGH
+   * confidence "companies of a kind" or "fit" is answered by the read-only
+   * app query before the full reading lands. Absent: no fast lane.
+   */
+  readonly turnSkim?: QTurnSkimmer | undefined;
   /**
    * A typed yes or no to a change waiting in this conversation, read and
    * acted on by code through the Approval Engine (pending-decision.ts).
@@ -2027,6 +2035,41 @@ export function createSpecialistQAnswer(
     readonly reading: Promise<Awaited<ReturnType<QTurnReader["read"]>> | null>;
   };
   const prereads = new Map<string, Promise<EarlyReading | null>>();
+  /** K fast lane: the short first read, begun beside the firewall. */
+  const preskims = new Map<
+    string,
+    {
+      readonly messageId: string;
+      readonly skim: Promise<TurnSkimResult | null>;
+    }
+  >();
+  const skimInput = (
+    who: {
+      readonly runId: string;
+      readonly tenantId: string;
+      readonly correlationId: string;
+      readonly actor: { readonly userId: string };
+      readonly signal?: AbortSignal | undefined;
+    },
+    history: readonly QConversationMessage[],
+    latest: QConversationMessage,
+  ) => ({
+    utterance: latest.content,
+    recentTurns: history
+      .filter((message) => message.id !== latest.id)
+      .slice(-2)
+      .map((message) => ({
+        role: message.role === "USER" ? ("USER" as const) : ("Q" as const),
+        text: message.content,
+      })),
+    attribution: {
+      tenantId: who.tenantId,
+      userId: who.actor.userId,
+      qRunId: who.runId,
+      correlationId: who.correlationId,
+    },
+    signal: who.signal,
+  });
   const PREREADS_MAX = 64;
 
   /**
@@ -2101,6 +2144,20 @@ export function createSpecialistQAnswer(
       if (conversationId === undefined || latest === undefined) return null;
       // B5: a pleasantry is answered by code; its reading would be waste.
       if (pleasantryOf(latest.content) !== null) return null;
+      // K fast lane: the short first read starts as early as the reading.
+      if (dependencies.turnSkim !== undefined && !preskims.has(input.runId)) {
+        preskims.set(input.runId, {
+          messageId: latest.id,
+          skim: dependencies.turnSkim
+            .skim(skimInput(input, history, latest))
+            .catch(() => null),
+        });
+        while (preskims.size > PREREADS_MAX) {
+          const oldest = preskims.keys().next().value;
+          if (oldest === undefined) break;
+          preskims.delete(oldest);
+        }
+      }
       const key = lastActions.get(conversationId);
       // A conversation's first turn has no known actions: read later.
       if (key === undefined) return null;
@@ -2415,6 +2472,7 @@ export function createSpecialistQAnswer(
       capabilitiesRead,
       speculative,
       decideAfterReading,
+      () => pending?.waiting() ?? Promise.resolve(false),
     ).finally(() => {
       // A path that never asked: the reading in flight is not wanted.
       if (!concluded) pending?.cancel();
@@ -2463,6 +2521,8 @@ export function createSpecialistQAnswer(
     speculative: { current: Speculation | null },
     /** A waiting change, decided from this turn's reading; a line ends the turn. */
     decide?: (turn: PendingTurnReading | null) => Promise<string | null>,
+    /** K fast lane: whether a change waits on their word; true when unknown. */
+    waitingOnThem: () => Promise<boolean> = () => Promise.resolve(false),
   ): Promise<QAnswerOutcome> => {
     if (turns === undefined) return answerOnce(request);
     const state =
@@ -2722,18 +2782,65 @@ export function createSpecialistQAnswer(
       const oldest = lastActions.keys().next().value;
       if (oldest !== undefined) lastActions.delete(oldest);
     }
-    const ready = early === undefined ? null : await early;
-    const earlyRead =
-      ready !== null &&
-      ready.messageId === latest.id &&
-      ready.actionsKey === actionsKey(actions)
-        ? await ready.reading
-        : null;
+    const readingFirst = (async () => {
+      const ready = early === undefined ? null : await early;
+      const earlyRead =
+        ready !== null &&
+        ready.messageId === latest.id &&
+        ready.actionsKey === actionsKey(actions)
+          ? await ready.reading
+          : null;
+      return earlyRead ?? (await readTurn().catch(() => null));
+    })();
+    // K fast lane: the short first read, begun beside the firewall when it
+    // could be, races the full reading. A HIGH confidence "companies of a
+    // kind" or "fit" is answered by the read-only app query at once; any
+    // other skim, or the full reading arriving first, takes the path below.
+    const preskim = preskims.get(request.runId);
+    preskims.delete(request.runId);
+    const skimmer = dependencies.turnSkim;
+    const skimming =
+      skimmer === undefined ||
+      request.speculation !== undefined ||
+      request.plan.screen?.route === "ONBOARDING" ||
+      sequences.has(conversationId)
+        ? null
+        : preskim !== undefined && preskim.messageId === latest.id
+          ? preskim.skim
+          : skimmer.skim(skimInput(request, history, latest));
+    if (skimming !== null) {
+      const skimStarted = Date.now();
+      const skimmed = await Promise.race([
+        readingFirst.then(() => null),
+        skimming.catch(() => null),
+      ]);
+      const lane = fastLaneOf(skimmed, latest.content);
+      // Never past a change waiting on their word: a yes is not a list.
+      if (lane !== null && !(await waitingOnThem())) {
+        speculative.current?.cancel("KIND");
+        logger?.info(
+          {
+            qRunId: request.runId,
+            lane: lane.questionKind,
+            waitedMs: Date.now() - skimStarted,
+          },
+          "q fast lane",
+        );
+        return delegate.answer({
+          ...request,
+          research: Promise.resolve(NO_RESEARCH),
+          capabilities: manifestOf(capabilities),
+          turnKind: "QUESTION_TO_Q",
+          ...(spoken ? { spoken: true } : {}),
+          ...lane,
+        });
+      }
+    }
     // A reading that failed is tried once more: the gateway has parked the
     // provider that failed, so the second try goes to the fallback model.
     // A request to make something must never be dropped because one model
     // was down (B1, 2026-09-25).
-    let read = earlyRead ?? (await readTurn().catch(() => null));
+    let read = await readingFirst;
     let turnUnread = false;
     if (read === null && request.signal?.aborted !== true) {
       read = await readTurn().catch(() => null);

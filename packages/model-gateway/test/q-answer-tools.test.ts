@@ -700,14 +700,15 @@ describe("answer seam tool loop", () => {
 
   it("bounds rounds and calls, then finishes with one structured call without tools", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
-    // Each round proposes as many calls as a reply may carry; together
+    // Each round proposes as many distinct calls as a reply may carry; together
     // they propose more than the turn's budget.
     const many = (round: string): FakeBehaviour => ({
       kind: "TOOL_CALLS",
       calls: Array.from({ length: MODEL_TOOL_CALLS_MAX }, (_v, i) => ({
         callId: `${round}${String(i)}`,
         name: "get_company",
-        arguments: {},
+        // Distinct reads: identical concurrent ones share a call (K4).
+        arguments: { companyId: `${round}-${String(i)}` },
       })),
     });
     expect(MODEL_TOOL_CALLS_MAX * Q_TOOL_LOOP_MAX_ROUNDS).toBeGreaterThan(

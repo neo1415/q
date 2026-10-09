@@ -516,6 +516,7 @@ import {
   createPostgresCompanyCardPort,
   createPostgresInteractionRepository,
   createCurrentSlateExplanationService,
+  createPostgresCompanyKnowledge,
   createPostgresDiscoveryRepository,
   createPostgresInvestorDecisionReader,
   createRecommendationExplanationService,
@@ -2646,7 +2647,10 @@ const qTools = createQTools({
     }),
     // K1: "three fintech companies" by declared taxonomy; the tool decides
     // every candidate through disclosure.
-    companyCatalog: createPostgresCompanyCatalog({ sql: database.sql }),
+    companyCatalog: createPostgresCompanyCatalog({
+      sql: database.sql,
+      knowledge: createPostgresCompanyKnowledge({ sql: database.sql }),
+    }),
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {
       momentAround: async (actor, query) => {

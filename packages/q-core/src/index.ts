@@ -1335,6 +1335,16 @@ export {
 } from "./prompts/tasks/spoken-reply.v1.js";
 export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
 export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
+export { TURN_SKIM_V1 } from "./prompts/tasks/turn-skim.v1.js";
+export {
+  TURN_SKIM_KINDS,
+  TURN_SKIM_SCHEMA_NAME,
+  TURN_SKIM_SCHEMA_VERSION,
+  TurnSkimResultSchema,
+  TurnSkimVariablesSchema,
+  type TurnSkimResult,
+  type TurnSkimVariables,
+} from "./prompts/schemas/turn-skim.js";
 export {
   SMALL_TALK_SCHEMA_NAME,
   SMALL_TALK_SCHEMA_VERSION,
