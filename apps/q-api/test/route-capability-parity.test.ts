@@ -802,6 +802,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_USAGE_PATH": Q_TRANSPORT,
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_END_PATH": Q_TRANSPORT,
   "q-api/voice/live/routes.ts GET Q_VOICE_LIVE_PREVIEW_PATH": Q_TRANSPORT,
+  "q-api/voice/live/routes.ts GET Q_VOICE_LIVE_AVAILABLE_PATH": Q_TRANSPORT,
   // DUPLEX: the full-duplex line's tool relay, usage report and end.
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH": Q_TRANSPORT,
