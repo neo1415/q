@@ -3460,11 +3460,36 @@ export function createSpecialistQAnswer(
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),
+      // K8: a question about a prepared subject.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      read.question?.subject !== undefined &&
+      read.question.subject !== null
+        ? { preparedSubject: read.question.subject }
+        : {}),
+      // K1: companies of a kind, with the reader's structure.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      read.question?.kind === "DISCOVER_COMPANIES"
+        ? {
+            discoverCompanies: {
+              text: read.question.text,
+              sectors: read.question.discover?.sectors ?? [],
+              countries: (read.question.discover?.countries ?? []).map((code) =>
+                code.toUpperCase(),
+              ),
+              stages: read.question.discover?.stages ?? [],
+              count: read.question.count ?? null,
+              ranking: read.question.discover?.ranking ?? "NONE",
+              mandateRelevant: read.question.discover?.mandateRelevant ?? false,
+              previous: read.question.discover?.previous ?? false,
+            },
+          }
+        : {}),
       ...(read?.kind === "QUESTION_TO_Q" && read.question?.kind === "FIT"
         ? {
             fitQuestion: {
               text: read.question.text,
               count: read.question.count ?? null,
+              previous: read.question.discover?.previous ?? false,
             },
           }
         : {}),

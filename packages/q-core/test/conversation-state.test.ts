@@ -66,6 +66,8 @@ describe("what a reading may do", () => {
           text: "What do you think I should look for?",
           about: [],
           count: null,
+          discover: null,
+          subject: null,
         },
       }),
     );
@@ -223,6 +225,8 @@ describe("the research policy", () => {
           text: "Can you give me an example of a real investor similar to me?",
           about: [],
           count: null,
+          discover: null,
+          subject: null,
         },
       }),
       { available: true },
@@ -242,6 +246,8 @@ describe("the research policy", () => {
             text: "What else should I look for?",
             about: [],
             count: null,
+            discover: null,
+            subject: null,
           },
         }),
         { available: true },
@@ -257,6 +263,8 @@ describe("the research policy", () => {
         text: "Based on what you know about me, what fits?",
         about: [],
         count: null,
+        discover: null,
+        subject: null,
       },
     });
     expect(decideResearch(asked, about, { available: true })).toEqual({
@@ -279,6 +287,8 @@ describe("the research policy", () => {
         text: "a real example",
         about: [],
         count: null,
+        discover: null,
+        subject: null,
       },
     });
     expect(decideResearch(asked, example, { available: false })).toEqual({

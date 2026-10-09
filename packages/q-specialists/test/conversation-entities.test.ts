@@ -556,3 +556,44 @@ describe("binding words to the page's controls", () => {
     ).toBe(false);
   });
 });
+
+describe("the catalog's cards (K1: 'show me three fintech companies')", () => {
+  // The block the DISCOVER_COMPANIES fast path writes: side by side, no fit.
+  const catalogCards: QResultBlock = {
+    kind: "ANSWER_CARDS",
+    shape: "SIDE_BY_SIDE",
+    title: "Fintech companies",
+    followUps: [],
+    cards: [
+      ["Ajopot", AJOPOT],
+      ["Kora", KORA],
+      ["Tensorgate", TENSORGATE],
+    ].map(([name, id], at) => ({
+      key: id ?? "",
+      name: name ?? "",
+      line: "Fintech · seed · Nigeria",
+      about: null,
+      hue: at + 1,
+      fit: null,
+      reasons: ["Declared on Capital Q: Fintech · seed · Nigeria."],
+      measures: [],
+      view: null,
+      said: `${name ?? ""}.`,
+      sourceCount: 0,
+      subject: { kind: "COMPANY", companyId: id ?? "" },
+    })),
+  };
+
+  it("'open the second' is the second company listed", () => {
+    const history = [
+      message("USER", "Show me three fintech companies"),
+      message("Q", "Here are three fintech companies on Capital Q.", [
+        catalogCards,
+      ]),
+    ];
+    expect(one(resolve("open the second", history))).toMatchObject({
+      kind: "COMPANY",
+      id: KORA,
+    });
+  });
+});

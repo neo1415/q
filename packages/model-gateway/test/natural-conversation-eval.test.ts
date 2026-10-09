@@ -136,12 +136,19 @@ function relationshipsData() {
   };
 }
 
-function tools(options: { readonly fit: boolean }): QToolPort & {
+function tools(options: {
+  readonly fit: boolean;
+  readonly mandate?: boolean | undefined;
+}): QToolPort & {
   readonly executed: string[];
 } {
   const executed: string[] = [];
   const list = [
     offered("relationship.own.list", "list_my_relationships"),
+    offered("discovery.companies", "discover_companies"),
+    ...(options.mandate === true
+      ? [offered("investor_mandate.get", "get_investor_mandate")]
+      : []),
     ...(options.fit
       ? [
           offered("fit.profile", "fit_profile", "COMPARING_OPPORTUNITIES"),
@@ -173,6 +180,36 @@ function tools(options: { readonly fit: boolean }): QToolPort & {
       if (proposal.name === "list_my_relationships") {
         return Promise.resolve(
           ok("relationship.own.list", relationshipsData()),
+        );
+      }
+      if (proposal.name === "get_investor_mandate") {
+        return Promise.resolve(
+          ok("investor_mandate.get", {
+            displayName: "Halyard Capital",
+            investorType: "VC",
+            mandates: [],
+          }),
+        );
+      }
+      if (proposal.name === "discover_companies") {
+        // K1: the catalog's fintech companies, in name order.
+        return Promise.resolve(
+          ok("discovery.companies", {
+            companies: (["Portside", "Souqsheet", "Termly"] as const).map(
+              (name) => ({
+                companyId: C[name],
+                name,
+                stageCode: "seed",
+                headquartersCountry: "NG",
+                shortDescription: null,
+                sectors: ["Fintech"],
+              }),
+            ),
+            order: "NAME",
+            sectors: [{ code: "fintech", name: "Fintech" }],
+            unknownSectors: [],
+            truthClass: "USER_CLAIM",
+          }),
         );
       }
       if (proposal.name === "fit_top_candidates") {
@@ -233,12 +270,17 @@ async function replay(input: {
   readonly script: readonly FakeBehaviour[];
   readonly fit?: boolean;
   readonly spoken?: boolean;
+  readonly mandate?: boolean | undefined;
   /** What the turn reader read, as the answer seam passes it on. */
-  readonly reading?: Pick<QAnswerRequest, "questionKind" | "fitQuestion">;
+  readonly reading?: Pick<
+    QAnswerRequest,
+    "questionKind" | "fitQuestion" | "discoverCompanies" | "preparedSubject"
+  >;
 }): Promise<{
   text: string;
   blocks: readonly QResultBlock[];
   modelCalls: number;
+  toolsOffered: number | null;
   executed: readonly string[];
 }> {
   const run = randomUUID();
@@ -300,7 +342,7 @@ async function replay(input: {
       },
     },
   } as unknown as QRuntimeRepositories;
-  const port = tools({ fit: input.fit ?? true });
+  const port = tools({ fit: input.fit ?? true, mandate: input.mandate });
   const seam = createModelGatewayQAnswer({
     gateway,
     repositories,
@@ -332,6 +374,7 @@ async function replay(input: {
     text: messages.at(-1)?.content ?? "",
     blocks: completed.at(-1)?.message?.blocks ?? [],
     modelCalls: alpha.calls.length,
+    toolsOffered: alpha.calls[0]?.request.tools.length ?? null,
     executed: port.executed,
   };
 }
@@ -529,5 +572,67 @@ describe("a fit question in any words reaches the computed fit (live 2026-10-09)
       script: [answer("You could look at Souqsheet.")],
     });
     expect(modelCalls).toBeGreaterThan(0);
+  });
+});
+
+describe("companies of a kind through the answer path (K1, live 2026-10-09 15:57)", () => {
+  it("'show me three fintech companies': three catalog cards, the basis said, no model call", async () => {
+    const started = Date.now();
+    const { text, blocks, modelCalls, executed } = await replay({
+      question: "Show me three fintech companies",
+      script: [answer("Your mandate focuses on fintech across Africa.")],
+      reading: {
+        questionKind: "DISCOVER_COMPANIES",
+        discoverCompanies: {
+          text: "Show me three fintech companies",
+          sectors: ["fintech"],
+          countries: [],
+          stages: [],
+          count: 3,
+          ranking: "NONE",
+          mandateRelevant: false,
+          previous: false,
+        },
+      },
+    });
+    expect(modelCalls).toBe(0);
+    expect(cardsOf(blocks).map((card) => card.name)).toEqual([
+      "Portside",
+      "Souqsheet",
+      "Termly",
+    ]);
+    expect(text).toBe(
+      "Here are three fintech companies on Capital Q: Portside, Souqsheet and Termly. They're listed by name, not ranked. They're on screen.",
+    );
+    expect(executed).not.toContain("research_public_web");
+    expect(Date.now() - started).toBeLessThan(3_000);
+  });
+});
+
+describe("the cheapest correct path (K8)", () => {
+  it("'what is my mandate' with the mandate prepared: one model call, no tool round", async () => {
+    const { modelCalls, toolsOffered } = await replay({
+      question: "what is my mandate?",
+      mandate: true,
+      script: [answer("Halyard Capital invests as a VC; no mandate yet.")],
+      reading: {
+        questionKind: "THEIR_OWN_RECORDS",
+        preparedSubject: "MANDATE",
+      },
+    });
+    expect(modelCalls).toBe(1);
+    expect(toolsOffered).toBe(0);
+  });
+
+  it("the same question with nothing prepared keeps the full path and its tools", async () => {
+    const { toolsOffered } = await replay({
+      question: "what is my mandate?",
+      script: [answer("Let me look.")],
+      reading: {
+        questionKind: "THEIR_OWN_RECORDS",
+        preparedSubject: "MANDATE",
+      },
+    });
+    expect(toolsOffered).toBeGreaterThan(0);
   });
 });

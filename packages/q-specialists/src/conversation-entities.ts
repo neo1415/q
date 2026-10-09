@@ -96,7 +96,7 @@ const KIND_WORDS: readonly [RegExp, EntityKind][] = [
 ];
 
 const ORDINAL_WORD =
-  /\b(?:the\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|1st|2nd|3rd|[4-6]th)\s+(one|investors?|funds?|firms?|compan(?:y|ies)|startups?|documents?|docs?|decks?|cards?|results?|options?|ones?)?\b|\bnumber\s+(one|two|three|four|five|six|\d)\b/iu;
+  /\b(?:the\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|1st|2nd|3rd|[4-6]th)(?:\s+(one|investors?|funds?|firms?|compan(?:y|ies)|startups?|documents?|docs?|decks?|cards?|results?|options?|ones?))?\b|\bnumber\s+(one|two|three|four|five|six|\d)\b/iu;
 
 /** "not that (one|investor)", "no, the other", "wrong one": a correction. */
 const CORRECTION =

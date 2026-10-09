@@ -20,10 +20,10 @@ import {
  * is the unanswered ask again.
  */
 describe("TURN_READER v45", () => {
-  it("is the active reader and v44 is deprecated", () => {
+  it("was the active reader; v44 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(45);
+    ).toBe(47);
     expect(TURN_READER_V44.status).toBe("DEPRECATED");
   });
 

@@ -108,6 +108,12 @@ import {
   type FitSweepResult,
 } from "./fit-sweep.js";
 import {
+  runCompanyDiscovery,
+  type DiscoverAsk,
+  type DiscoveryAnswer,
+} from "./discover-companies.js";
+import { answerPathOf } from "./answer-path.js";
+import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
 } from "./screen-claims.js";
@@ -1911,10 +1917,21 @@ export function createModelGatewayQAnswer(
     const sweepForReading = (fitQuestion: {
       readonly text: string;
       readonly count: number | null;
+      readonly previous?: boolean | undefined;
     }): Promise<FitSweepResult | null> =>
       sweepable
         ? sweepFor(fitSweepAskOfReading(fitQuestion, shownBefore))
         : Promise.resolve(null);
+    // K1: companies of a kind, from the catalog by code, through the same
+    // tools and plan; fit only for an investor and only when asked for.
+    const discoverFor = (ask: DiscoverAsk): Promise<DiscoveryAnswer | null> =>
+      runCompanyDiscovery({
+        ask,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+        investor: ownInvestor !== null,
+      }).catch(() => null);
     // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
     // source through the attention tool, under this run's plan, beside the
     // other reads; the answer is then written from it by code. Read only
@@ -2385,6 +2402,7 @@ export function createModelGatewayQAnswer(
       onboardingFacts,
       fitSweep,
       sweptAtPrepare: sweepAsk !== null,
+      discoverFor,
       sweepForReading,
       attention,
     };
@@ -2493,6 +2511,7 @@ export function createModelGatewayQAnswer(
         onboardingFacts,
         fitSweep,
         sweptAtPrepare,
+        discoverFor,
         sweepForReading,
         attention,
         counterparty,
@@ -2562,6 +2581,37 @@ export function createModelGatewayQAnswer(
               (tool) => tool.definition.name !== "research_public_web",
             )
           : offeredForRun;
+      // K8: the cheapest correct path. A question about what is already
+      // prepared for this turn is answered over that context with no tool
+      // round; everything uncertain keeps the full path.
+      const route = answerPathOf({
+        turnKind: request.turnKind,
+        questionKind: request.questionKind,
+        preparedSubject: request.preparedSubject,
+        discover: request.discoverCompanies !== undefined,
+        fit: request.fitQuestion !== undefined,
+        attention: false,
+        writingDocument: request.writingDocument === true,
+        askedAction: request.askedAction !== undefined,
+        researchMode: research?.mode ?? "NEVER",
+        aboutNamedOther: false,
+        prepared: {
+          mandate: ownProfile !== null,
+          onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
+          qWork: ownDay !== null,
+        },
+      });
+      if (route.path === "PREPARED_CONTEXT") offered = [];
+      logger?.info(
+        {
+          qRunId: request.runId,
+          path: route.path,
+          because: route.because,
+          tools: offered.length,
+          sinceStartMs: Date.now() - startedAt,
+        },
+        "q answer path",
+      );
       const offeredByName = new Map(
         offered.map((tool) => [tool.definition.name, tool] as const),
       );
@@ -3196,14 +3246,62 @@ export function createModelGatewayQAnswer(
           promptBundleVersion: rendered.bundle.bundleVersion,
         };
       }
+      // K1 (live 2026-10-09 15:57): companies of a kind are listed from
+      // the catalog by code; the analyst is never asked to describe cards.
+      // Null (no catalog here): the full path answers.
+      if (
+        request.discoverCompanies !== undefined &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+      ) {
+        const discoverStarted = Date.now();
+        const found = await discoverFor(request.discoverCompanies);
+        if (found !== null) {
+          const message = await persistAnswer(
+            found.text,
+            found.block === null ? [] : [found.block],
+          );
+          logger?.info(
+            {
+              qRunId: request.runId,
+              basis: found.basis,
+              asked: request.discoverCompanies.count,
+              cards: found.shown,
+              toolCalls: found.calls.length,
+              modelCalls: 0,
+              discoverMs: Date.now() - discoverStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered companies of a kind from the catalog",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+      }
       // The reader's FIT reading decides when the words alone did not
       // (live 2026-10-09: "three good examples of companies I can invest
       // in" was researched on the public web for 23-30 s).
+      // K1: "which of those are strongest" over the cards just shown is the
+      // same sweep, over exactly those companies.
+      const readFit =
+        request.fitQuestion ??
+        (request.discoverCompanies?.previous === true
+          ? {
+              text: request.discoverCompanies.text,
+              count: request.discoverCompanies.count,
+              previous: true,
+            }
+          : undefined);
       const sweep =
         (await fitSweep) ??
-        (request.fitQuestion === undefined || sweptAtPrepare
+        (readFit === undefined || sweptAtPrepare
           ? null
-          : await sweepForReading(request.fitQuestion));
+          : await sweepForReading(readFit));
       if (
         sweep !== null &&
         sweep.ask.fitAsked &&

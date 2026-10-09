@@ -88,6 +88,7 @@ const QUESTION_AREAS: Readonly<Record<string, readonly string[]>> = {
   OPTIONS: ["Records"],
   // Fit against their mandate: the fit tools and their own standing.
   FIT: ["Records", "Relationships"],
+  DISCOVER_COMPANIES: ["Records"],
   PROGRESS: ["Records", "Relationships"],
   THEIR_OWN_RECORDS: [
     "Records",

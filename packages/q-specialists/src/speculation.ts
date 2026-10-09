@@ -173,6 +173,7 @@ export function speculationMisfit(input: {
     final.questionKind === "THEIR_OWN_RECORDS" ||
     // A fit question is answered from the computed fit, by code.
     final.fitQuestion !== undefined ||
+    final.discoverCompanies !== undefined ||
     JSON.stringify(final.capabilities) !==
       JSON.stringify(speculative.capabilities)
   ) {

@@ -1159,6 +1159,11 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   ),
   tool("search_companies", "RECORDS", "Searches companies on Capital Q."),
   tool(
+    "discover_companies",
+    "RECORDS",
+    "Lists companies on Capital Q by sector, country or stage.",
+  ),
+  tool(
     "discovery_slate",
     "RECORDS",
     "Reads the companies in their Discover feed.",

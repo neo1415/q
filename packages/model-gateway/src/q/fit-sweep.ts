@@ -160,7 +160,11 @@ function placeOf(words: string): string | null {
  * the reader's; the place and "those" are read from the words as above.
  */
 export function fitSweepAskOfReading(
-  question: { readonly text: string; readonly count: number | null },
+  question: {
+    readonly text: string;
+    readonly count: number | null;
+    readonly previous?: boolean | undefined;
+  },
   previous: readonly string[] = [],
 ): FitSweepAsk {
   const words = question.text.trim().slice(0, 400);
@@ -168,7 +172,10 @@ export function fitSweepAskOfReading(
     question.count === null
       ? null
       : Math.min(Math.max(question.count, 1), FIT_SWEEP_CARDS_MAX);
-  if (previous.length > 0 && refersToShown(words)) {
+  if (
+    previous.length > 0 &&
+    (question.previous === true || refersToShown(words))
+  ) {
     return {
       scope: "PREVIOUS",
       place: null,
