@@ -35,6 +35,14 @@ export {
 } from "./health.js";
 export { decodeJsonbString, jsonbParam } from "./jsonb.js";
 export {
+  countRoundTrip,
+  createRoundTripCounter,
+  currentRoundTripCounter,
+  markRoundTrips,
+  withRoundTripCounter,
+  type RoundTripCounter,
+} from "./round-trips.js";
+export {
   DATABASE_FAILURE_KINDS,
   DatabaseError,
   toDatabaseError,

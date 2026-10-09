@@ -2,6 +2,8 @@ import { MemorySaver, type BaseCheckpointSaver } from "@langchain/langgraph";
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import pg from "pg";
 
+import { countRoundTrip } from "@capital-q/database";
+
 /**
  * Where the engine keeps its working state (doc 12 §10.4; packet §17-18).
  *
@@ -62,6 +64,17 @@ export function createPostgresQCheckpointStore(options: {
   // is fatal to the process. It is swallowed here for that reason alone —
   // the query that needed the client still rejects to its own caller.
   pool.on("error", () => undefined);
+  // SUB-SECOND: checkpoint queries count toward the run's round trips.
+  // Counted when sent, in the caller's async context (no-op outside one).
+  pool.on("connect", (client) => {
+    const query = client.query.bind(client) as (...args: unknown[]) => unknown;
+    (client as { query: (...args: unknown[]) => unknown }).query = (
+      ...args: unknown[]
+    ) => {
+      countRoundTrip();
+      return query(...args);
+    };
+  });
   const saver = new PostgresSaver(pool, undefined, {
     schema: Q_CHECKPOINT_SCHEMA,
   });
