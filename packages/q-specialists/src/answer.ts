@@ -256,6 +256,7 @@ import {
   cardsOnScreen,
   ordinalOf,
   pageRequestOf,
+  wordsNamePage,
 } from "./page-request.js";
 import { resolveNamedRecord } from "./fast-navigation.js";
 import type { TurnReference } from "@capital-q/q-core";
@@ -1636,6 +1637,20 @@ export function createSpecialistQAnswer(
     if (tool.kind === "NAVIGATE" && tool.destination !== null) {
       const destination = tool.destination;
       if (destination === "COMPANY_VISIBILITY" && company === undefined) {
+        return null;
+      }
+      // The reader's move is followed only when their words ask for that
+      // page (live 2026-10-09: statements and negations moved the screen).
+      if (
+        !wordsNamePage(askedIn(history), {
+          kind: "DESTINATION",
+          destination,
+        })
+      ) {
+        logger?.info(
+          { qRunId: request.runId, destination },
+          "q did not move: the words do not ask for that page",
+        );
         return null;
       }
       logger?.info(

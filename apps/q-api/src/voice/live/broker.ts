@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import {
   CorrelationIdSchema,
+  QClientActionIntentSchema,
   QRunIdSchema,
+  QVoiceDestinationSchema,
   sensitivityWithin,
   type ModelSensitivity,
 } from "@capital-q/contracts";
@@ -15,6 +17,7 @@ import type { SpokenFacts } from "@capital-q/q-core";
 import type { VoiceSessionBinding } from "../bindings.js";
 import { askQFactsOutput, forRealtime } from "../duplex/broker.js";
 import type { DuplexSpendLedger } from "../duplex/spend.js";
+import type { DuplexTranscriptStore } from "../duplex/transcript.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
 import {
   GPT_LIVE_USD_PER_SECOND,
@@ -30,10 +33,49 @@ import type { LiveConfig } from "./config.js";
 import type {
   LiveDelegationRequest,
   LiveDelegationResult,
+  LiveMove,
   LiveOpenResult,
+  LiveTranscriptReport,
   LiveUsageReport,
 } from "./contracts.js";
 import { livePrompt } from "./prompt.js";
+
+/**
+ * The screen move a run recorded on the turn board, when it is a route
+ * move the router will give a receipt for: a NAVIGATE destination, or an
+ * OPEN_RECORD_PAGE / OPEN_SETUP / OPEN_SETTINGS action. A data-room
+ * document opens in the viewer where they are (no route, no receipt), so
+ * it is not a move the voice waits on (C's review of 4f1c2219).
+ */
+export function liveMoveOf(board: {
+  readonly navigate: unknown;
+  readonly clientAction?: unknown;
+  readonly clientActions?: readonly unknown[] | undefined;
+}): LiveMove | null {
+  const actions =
+    board.clientActions !== undefined && board.clientActions.length > 0
+      ? board.clientActions
+      : board.clientAction === undefined || board.clientAction === null
+        ? []
+        : [board.clientAction];
+  let action: LiveMove["action"] = null;
+  for (const raw of actions) {
+    const parsed = QClientActionIntentSchema.safeParse(raw);
+    if (!parsed.success) continue;
+    const one = parsed.data;
+    if (
+      (one.kind === "OPEN_RECORD_PAGE" && one.page !== "DATA_ROOM_DOCUMENT") ||
+      one.kind === "OPEN_SETUP" ||
+      one.kind === "OPEN_SETTINGS"
+    ) {
+      // The screen performs them in order: the last one is where it lands.
+      action = one;
+    }
+  }
+  const destination = QVoiceDestinationSchema.safeParse(board.navigate);
+  const navigate = destination.success ? destination.data : null;
+  return navigate === null && action === null ? null : { navigate, action };
+}
 
 /**
  * The GPT-Live line (workstream V). GPT-Live is the voice; Q Brain is the
@@ -134,6 +176,12 @@ export type LiveBroker = {
     readonly voiceSessionId: string;
     readonly reason: string;
   }) => boolean;
+  /** Final transcript segments of the line; null: no such line of theirs. */
+  readonly transcript: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly report: LiveTranscriptReport;
+  }) => Promise<number | null>;
   readonly size: () => number;
 };
 
@@ -149,6 +197,26 @@ export type LiveBrokerDependencies = {
   readonly syntheticDemo: boolean;
   readonly logger: Logger;
   readonly now?: (() => number) | undefined;
+  /**
+   * q_runtime.voice_line_turns (A's duplex write path): both sides of the
+   * line, routed 'live', so what GPT-Live said can be audited.
+   */
+  readonly transcripts?: Pick<DuplexTranscriptStore, "record"> | undefined;
+  /**
+   * The voice turn board (what the turn handler recorded for the line):
+   * read after a run, so the delegation's result says whether the run
+   * moved the screen, and the client follows it before the voice speaks.
+   */
+  readonly board?:
+    | {
+        readonly read: (voiceSessionId: string) => {
+          readonly sequence: number;
+          readonly navigate: unknown;
+          readonly clientAction?: unknown;
+          readonly clientActions?: readonly unknown[] | undefined;
+        };
+      }
+    | undefined;
 };
 
 const HISTORY_MAX = 24;
@@ -376,6 +444,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         deadline = setTimeout(() => {
           controller.abort();
         }, config.delegationDeadlineMs);
+        const sequenceBefore =
+          deps.board?.read(line.voiceSessionId).sequence ?? 0;
         const outcome = await turn(
           line.binding,
           // GPT-Live already ended their turn: never held as unfinished.
@@ -407,7 +477,21 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         if (kept.length > 0)
           line.history.push({ role: "agent", content: kept });
         line.history.splice(0, Math.max(0, line.history.length - HISTORY_MAX));
-        return { delegationId: id, commentary, approvalPending, failed: false };
+        // The run moved the screen (a NAVIGATE or OPEN_RECORD_PAGE intent
+        // on its turn): the client follows it, and waits for the router's
+        // receipt, before the voice says anything about it.
+        const after = deps.board?.read(line.voiceSessionId);
+        const move =
+          after !== undefined && after.sequence > sequenceBefore
+            ? liveMoveOf(after)
+            : null;
+        return {
+          delegationId: id,
+          commentary,
+          approvalPending,
+          failed: false,
+          ...(move !== null ? { move } : {}),
+        };
       } catch (error: unknown) {
         logger.warn(
           { err: error, qVoiceSessionId: line.voiceSessionId },
@@ -601,6 +685,39 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       // Confirmed only once the run has actually let go.
       await running.result;
       return true;
+    },
+
+    transcript: async ({ actor, voiceSessionId, report }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return null;
+      const store = deps.transcripts;
+      if (store === undefined) return 0;
+      const at = now();
+      let recorded = 0;
+      // In order, one at a time: the segments are one conversation.
+      for (const segment of report.segments) {
+        try {
+          await store.record({
+            actor: line.actor,
+            voiceSessionId: line.voiceSessionId,
+            conversationId: line.binding.thread.conversationId ?? null,
+            role: segment.role,
+            content: segment.text,
+            routed: "live",
+            // The browser's clock is input: never before the line, never ahead.
+            spokenAt: new Date(
+              Math.min(at, Math.max(line.openedAt, segment.at)),
+            ),
+          });
+          recorded += 1;
+        } catch (error: unknown) {
+          logger.warn(
+            { err: error, qVoiceSessionId: line.voiceSessionId },
+            "live voice transcript could not be stored",
+          );
+        }
+      }
+      return recorded;
     },
 
     usage: async ({ actor, voiceSessionId, report }) => {

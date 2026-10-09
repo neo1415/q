@@ -15,7 +15,8 @@ export type DuplexTranscriptEntry = {
   readonly conversationId: string | null;
   readonly role: "USER" | "Q";
   readonly content: string;
-  readonly routed: DuplexRoutedAs;
+  /** 'live': a turn of the GPT-Live line (V, 20261221110000). */
+  readonly routed: DuplexRoutedAs | "live";
   readonly typed?: boolean | undefined;
   readonly providerRef?: string | null | undefined;
   readonly spokenAt: Date;

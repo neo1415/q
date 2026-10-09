@@ -5645,6 +5645,14 @@ const liveBroker =
         firewall,
         turn: voiceTurn,
         spend: createPostgresLiveSpend(database.sql),
+        // The turn board the voice surface polls: a delegation that moved
+        // the screen says so, so the move is followed before it is spoken.
+        board: voiceTurnBoard,
+        // Both sides of the line, into voice_line_turns (routed 'live').
+        transcripts: createPostgresDuplexTranscriptStore({
+          sql: database.sql,
+          mirror: () => Promise.resolve(0),
+        }),
         usage: createPostgresModelUsageRepository({ sql: database.sql }),
         // ai_ops.providers: openai is UNREVIEWED, as for the duplex line.
         providerCeiling: "PUBLIC",

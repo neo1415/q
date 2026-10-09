@@ -174,6 +174,44 @@ export function routesMatch(expected: string, actual: string): boolean {
   return true;
 }
 
+/**
+ * Pages that send the person on to another page (`/investors` -> Discover
+ * for a founder): a move to one has arrived when it lands on where that
+ * page sent it. Declared by the redirecting page itself, so a move there
+ * is never reported FAILED -- and "that page didn't open" never said --
+ * for a page that did its job (live 2026-10-09).
+ */
+const redirects = new Map<
+  string,
+  { readonly to: string; readonly at: number }
+>();
+const REDIRECT_FRESH_MS = 60_000;
+
+export function noteRedirect(from: string, to: string): void {
+  redirects.set(pathOf(from), { to, at: Date.now() });
+}
+
+function pathOf(route: string): string {
+  try {
+    return (
+      new URL(route, "http://route.local").pathname.replace(/\/+$/u, "") || "/"
+    );
+  } catch {
+    return route;
+  }
+}
+
+/** The move to `expected` has arrived at `actual` (itself, or where it sent them). */
+export function arrivedAt(expected: string, actual: string): boolean {
+  if (routesMatch(expected, actual)) return true;
+  const sent = redirects.get(pathOf(expected));
+  return (
+    sent !== undefined &&
+    Date.now() - sent.at <= REDIRECT_FRESH_MS &&
+    routesMatch(sent.to, actual)
+  );
+}
+
 /** Where this tab is now, by the router's settled route, else its URL. */
 function landedOn(expected: string | null): string | null {
   const candidates = [
@@ -184,7 +222,7 @@ function landedOn(expected: string | null): string | null {
   ];
   for (const candidate of candidates) {
     if (candidate === null) continue;
-    if (expected === null || routesMatch(expected, candidate)) return candidate;
+    if (expected === null || arrivedAt(expected, candidate)) return candidate;
   }
   return null;
 }
@@ -216,13 +254,13 @@ export function noteRoute(path: string): void {
   const expected = navigationPending?.expected ?? null;
   if (
     navigationPending !== null &&
-    (expected === null || routesMatch(expected, path))
+    (expected === null || arrivedAt(expected, path))
   ) {
     navigationPending = null;
   }
   if (
     move !== null &&
-    (move.expected === null || routesMatch(move.expected, path))
+    (move.expected === null || arrivedAt(move.expected, path))
   ) {
     landed(path);
   }
