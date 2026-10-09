@@ -165,6 +165,9 @@ export function createAppActionDefinitions(
       // A setter's newer card replaces an older one for the same target;
       // an additive action's cards coexist (lead 2026-10-03).
       ...(action.supersedes === true ? { supersedes: true } : {}),
+      ...(action.supersedeKey === undefined
+        ? {}
+        : { supersedeKey: action.supersedeKey }),
       describe: (payload) => action.card(payload),
       describeFor: async (payload, targets, actor) => {
         const [first] = targets;

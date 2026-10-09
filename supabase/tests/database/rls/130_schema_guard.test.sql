@@ -383,7 +383,10 @@ select is(
                             'is_conversation_party',
                             -- 2026-10-02: which side of a relationship the caller is an active member of, for
                             -- network.relationship_passes RLS (search_path '', boolean only, membership-based).
-                            'is_relationship_side_member')),
+                            'is_relationship_side_member',
+                            -- Recovery K: any active membership, for knowledge.company_profiles RLS
+                            -- (network_visible is for participants; search_path '', boolean only).
+                            'is_network_participant')),
   '',
   'the set of SECURITY DEFINER helpers is exactly the reviewed set (new ones are listed on failure)');
 
