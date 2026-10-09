@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import { call } from "../support/http.js";
 import {
-  answerText,
+  mandateReading,
   mandateSectorNames,
   modelCallsOf,
   asRun,
@@ -79,7 +78,7 @@ async function changeSectors(value: readonly string[]): Promise<void> {
 }
 
 test("K4 a mandate change is reflected on the very next turn", async () => {
-  awaits(["D Part 5"], "no event-driven invalidation of the mandate summary");
+  // Green on int-merge 9050c90f: a regression guard, not expected red.
   const mandateId = world().investor("savanna-seed").mandateId;
   const original = mandateSectorNames(mandateId);
   expect(original.length).toBeGreaterThan(0);
@@ -93,19 +92,23 @@ test("K4 a mandate change is reflected on the very next turn", async () => {
       })
       .toEqual(["agritech"]);
     await vendorSettled();
-    const recall = await runQ(CAST.investor, "What is my mandate?");
-    const text = answerText(asRun(recall.run)).toLowerCase();
-    expect.soft(text, "names the new sector").toContain("agritech");
-    for (const old of original.filter((s) => s.toLowerCase() !== "agritech"))
-      expect
-        .soft(text, `no longer names "${old}"`)
-        .not.toContain(old.toLowerCase());
+    const ask = "What is my mandate?";
+    const recall = await runQ(CAST.investor, ask, [mandateReading(ask)]);
+    expect(asRun(recall.run).status).toBe("COMPLETED");
+    // The reply's words are the scripted fake's; what Q prepared for the
+    // model is the server-side truth. (Old sectors are not asserted absent:
+    // memory and history may legitimately still mention them.)
+    const calls = modelCallsOf(recall.vendor);
+    const analystInput = calls.requests
+      .filter((r) => /TASK: COMPANY_ANALYST\b/u.test(r.input ?? ""))
+      .map((r) => (r.input ?? "").toLowerCase())
+      .join("\n");
     expect
-      .soft(
-        modelCallsOf(recall.vendor).analyst,
-        "recall stays code-built after the change",
-      )
-      .toBe(0);
+      .soft(analystInput, "the prepared mandate carries the new sector")
+      .toContain("agritech");
+    expect
+      .soft(calls.analyst, "recall after the change: no tool round")
+      .toBeLessThanOrEqual(1);
   } finally {
     await changeSectors(original);
     expect(mandateSectorNames(mandateId), "original sectors restored").toEqual(

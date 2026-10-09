@@ -1,6 +1,10 @@
 import { call } from "./http.js";
 import { localSql } from "./local-db.js";
-import { vendorRequestsSince, type VendorRequest } from "./script.js";
+import {
+  vendorRequestsSince,
+  type ScriptRule,
+  type VendorRequest,
+} from "./script.js";
 
 /**
  * Workstream K (persistent knowledge and instant answers), Tests 1–7:
@@ -20,8 +24,13 @@ export const BUDGET = {
   /** "three fintech companies": a code-built answer, no analyst model call. */
   discoverServerMs: 2_000,
   discoverFirstCardBrowserMs: 3_000,
-  /** "what is my mandate": recalled from Tier B, no analyst model call. */
+  /**
+   * "what is my mandate": B's K8 design answers from the prepared mandate
+   * with ONE analyst call and no tool round (orchestration.ts
+   * preparedSubject), so recall allows reader + 1 analyst call.
+   */
   recallServerMs: 1_500,
+  recallModelCalls: 2,
   /** Turns that still use the analyst (page and reference questions): server overhead around an instant fake model. */
   analystServerMs: 3_000,
   /** At most one model call (the turn reader) on a fast-path turn. */
@@ -171,9 +180,18 @@ export function declaredFintech(): string[] {
  * projection that only rebuilds on product events (D, Part 5) will not see
  * it; that is G-R9 (a rebuild hook for fixtures), requested from D.
  */
-export function keepDeclaredFintech(keep: number): () => void {
+export function keepDeclaredFintech(
+  keep: number,
+  prefer: readonly string[] = [],
+): () => void {
+  // Keep companies the investor is known to see (prefer) first, so "keep
+  // one" leaves one the investor can actually be shown.
   const all = declaredFintech();
-  const hide = all.slice(keep);
+  const ordered = [
+    ...prefer.filter((id) => all.includes(id)),
+    ...all.filter((id) => !prefer.includes(id)),
+  ];
+  const hide = ordered.slice(keep);
   if (hide.length === 0) return () => undefined;
   const list = hide.map((id) => `'${assertUuid(id)}'`).join(",");
   const out = localSql(
@@ -195,6 +213,19 @@ export function keepDeclaredFintech(keep: number): () => void {
        where id in (${ids.map((id) => `'${id}'`).join(",")})`,
     );
   };
+}
+
+/** The mandate's declared sectors as taxonomy codes (what Q's context carries). */
+export function mandateSectorCodes(mandateId: string): string[] {
+  const out = localSql(
+    `select n.canonical_code from taxonomy.mandate_preferences p
+       join taxonomy.nodes n on n.id = p.node_id
+       join taxonomy.vocabularies v on v.id = n.vocabulary_id
+     where v.code in ('industry', 'product_category', 'technology')
+       and p.mandate_id = '${assertUuid(mandateId)}' and not p.is_exclusion
+     order by n.canonical_code`,
+  );
+  return out === "" ? [] : out.split("\n");
 }
 
 /** The mandate's declared sectors, by display name (to restore after a change). */
@@ -270,3 +301,61 @@ export function asRun(value: unknown): RunView {
     throw new Error("not a Q run body");
   return value as RunView;
 }
+
+/**
+ * The turn reader's reading of a discovery question (TURN_READER v46+,
+ * DISCOVER_COMPANIES). The reader is a model; in MOCK its correct reading
+ * is scripted, and that reading is what the K1 fast path keys on. Whether
+ * the live reader reads real words this way is LIVE-PENDING.
+ */
+export function discoverReading(
+  words: string,
+  count: number | null,
+  sectors: readonly string[],
+): ScriptRule {
+  return {
+    name: "reader-discover",
+    when: { task: "TURN_READER", user: words },
+    reply: {
+      json: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        aboutNamedOther: false,
+        question: {
+          kind: "DISCOVER_COMPANIES",
+          text: words,
+          count,
+          discover: { sectors: [...sectors], ranking: "NONE" },
+        },
+      },
+    },
+  };
+}
+
+/** The reader's reading of a question about their own mandate (v47, K8). */
+export function mandateReading(words: string): ScriptRule {
+  return {
+    name: "reader-mandate",
+    when: { task: "TURN_READER", user: words },
+    reply: {
+      json: {
+        kind: "QUESTION_TO_Q",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        aboutNamedOther: false,
+        question: {
+          kind: "THEIR_OWN_RECORDS",
+          text: words,
+          subject: "MANDATE",
+        },
+      },
+    },
+  };
+}
+
+/** "Show me three fintech companies", read as the live reader should. */
+export const DISCOVER_FINTECH = "Show me three fintech companies";
+export const READ_DISCOVER_FINTECH = discoverReading(DISCOVER_FINTECH, 3, [
+  "fintech",
+]);

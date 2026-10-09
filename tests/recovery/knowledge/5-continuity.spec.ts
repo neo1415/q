@@ -4,6 +4,7 @@ import { contextAs } from "../support/auth.js";
 import { awaits } from "../support/expected-red.js";
 import {
   answerText,
+  READ_DISCOVER_FINTECH,
   cardCompanyIds,
   cardNames,
   modelCallsSince,
@@ -36,6 +37,7 @@ test("K5 references survive navigation in one conversation", async ({
   );
   const page = await (await contextAs(browser, CAST.investor)).newPage();
   await useScript([
+    READ_DISCOVER_FINTECH,
     {
       name: "they",
       when: { task: "COMPANY_ANALYST", user: "raising" },
