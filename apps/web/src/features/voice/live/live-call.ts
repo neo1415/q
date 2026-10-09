@@ -8,6 +8,7 @@ import {
   releaseVoiceAudio,
   type VoiceAudioOwner,
 } from "../voice-audio";
+import { watchSpokenMove } from "../use-follow-turn";
 import { noteForMove, receiptListener, type MoveOutcome } from "./move";
 import {
   boundedContent,
@@ -410,9 +411,11 @@ export async function startLiveCall(
         const receipt = receiptListener();
         const moved = await navigationHeard(request.request);
         if (moved !== null) {
-          return {
-            commentary: fastMoveLine(moved.path, await receipt.for(moved.path)),
-          };
+          const outcome = await receipt.for(moved.path);
+          // R3: still on its way when the voice speaks ("it's coming up"):
+          // its one receipt still reaches the line if it then FAILS.
+          if (outcome === "PENDING") watchSpokenMove(moved.path);
+          return { commentary: fastMoveLine(moved.path, outcome) };
         }
         receipt.stop();
       }

@@ -50,6 +50,7 @@ describe("a delegated move is followed now, and spoken only from its receipt", (
         listeningWhenAsked = r.listening();
         r.emit({
           status: "DONE",
+          intentId: "nav-1",
           expected: PATH,
           route: PATH,
         });
@@ -66,7 +67,12 @@ describe("a delegated move is followed now, and spoken only from its receipt", (
       path: PATH,
       subscribe: failed.subscribe,
       dispatch: () => {
-        failed.emit({ status: "FAILED", expected: PATH });
+        failed.emit({
+          status: "FAILED",
+          intentId: "nav-1",
+          expected: PATH,
+          reason: "NOT_LANDED",
+        });
       },
     });
     expect(await outcome).toBe("FAILED");
@@ -149,17 +155,32 @@ describe("a delegated move is followed now, and spoken only from its receipt", (
       path: PATH,
       subscribe: r.subscribe,
       dispatch: () => {
-        r.emit({ status: "DONE", expected: "/discover", route: "/discover" });
-        r.emit({ status: "FAILED", expected: null });
+        r.emit({
+          status: "DONE",
+          intentId: "nav-1",
+          expected: "/discover",
+          route: "/discover",
+        });
+        r.emit({
+          status: "FAILED",
+          intentId: "nav-2",
+          expected: "/elsewhere",
+          reason: "NOT_LANDED",
+        });
       },
     });
     await vi.advanceTimersByTimeAsync(1_000);
-    r.emit({ status: "DONE", expected: PATH, route: PATH });
+    r.emit({ status: "DONE", intentId: "nav-3", expected: PATH, route: PATH });
     expect(await outcome).toBe("DONE");
     // And the fast path's listener waits for its own path the same way.
     const fast = receipts();
     const listening = receiptListener(fast.subscribe);
-    fast.emit({ status: "DONE", expected: "/discover", route: "/discover" });
+    fast.emit({
+      status: "DONE",
+      intentId: "nav-4",
+      expected: "/discover",
+      route: "/discover",
+    });
     const mine = listening.for(PATH);
     await vi.advanceTimersByTimeAsync(MOVE_RECEIPT_WAIT_MS);
     expect(await mine).toBe("PENDING");

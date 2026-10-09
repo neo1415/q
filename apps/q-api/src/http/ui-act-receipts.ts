@@ -5,6 +5,7 @@ import {
   Q_UI_ACT_RECEIPTS_PATH,
   QUiActReceiptsRequestSchema,
   QUiActReceiptsResponseSchema,
+  type QNavigationFailure,
   type QNavigationReceipt,
   type QPageManifest,
   type QUiActReport,
@@ -100,7 +101,17 @@ export function createUiActReceiptLedger(
       held.reports = held.reports
         .filter((one) => fresh(one.at))
         .slice(-UI_ACT_RECEIPTS_PER_PERSON);
+      const moves = new Set(
+        held.navigations.flatMap((one) =>
+          one.intentId === undefined ? [] : [one.intentId],
+        ),
+      );
       for (const navigation of navigations) {
+        // R3: one receipt per move -- a retried post never counts twice.
+        if (navigation.intentId !== undefined) {
+          if (moves.has(navigation.intentId)) continue;
+          moves.add(navigation.intentId);
+        }
         held.navigations.push({ ...navigation, at });
         accepted += 1;
       }
@@ -205,9 +216,25 @@ export function navigationFacts(
     .map((navigation) =>
       navigation.status === "DONE"
         ? `Opened ${navigation.route} on their screen (DONE).`
-        : `NOT done: ${navigation.expected ?? "the page"} never opened on their screen (FAILED).`,
+        : navigation.reason === undefined
+          ? `NOT done: ${navigation.expected ?? "the page"} never opened on their screen (FAILED).`
+          : `NOT done: ${navigation.expected ?? "the page"} did not open on their screen (FAILED: ${NAVIGATION_FAILURE_MEANING[navigation.reason]}).`,
     );
 }
+
+/**
+ * R3: what each closed failure reason means, for Q's next turn (code's
+ * words; the browser's lifecycle chose the reason).
+ */
+const NAVIGATION_FAILURE_MEANING: Readonly<Record<QNavigationFailure, string>> =
+  {
+    NOT_FOUND: "that page does not exist or is not there for this record",
+    UNAUTHORIZED: "that page is not available to their account",
+    NO_ROUTER: "the screen could not move without ending the call",
+    NOT_LANDED: "the page never finished opening",
+    CONTROL_MISSING: "the page opened but the part asked for is not on it",
+    SUPERSEDED: "a newer move replaced it",
+  };
 
 /** The person's recent receipts, for whoever composes the next turn. */
 export function recentUiActReceipts(
