@@ -19,7 +19,7 @@ import {
 } from "@capital-q/security";
 
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
-import { createLiveBroker } from "../src/voice/live/broker.js";
+import { createLiveBroker, liveMoveOf } from "../src/voice/live/broker.js";
 import { LIVE_DEFAULTS, liveConfigFrom } from "../src/voice/live/config.js";
 import { livePrompt } from "../src/voice/live/prompt.js";
 import {
@@ -207,6 +207,8 @@ const ask = (
     voiceSessionId: SESSION,
     delegation: { delegationId, request },
   });
+
+const TENSORGATE = "0f2a6a0e-4b1c-4c3d-8e5f-6a7b8c9d0e1f";
 
 describe("GPT-Live provider adapter", () => {
   it("posts the SDP offer with the session and client delegation, key in the header only", async () => {
@@ -755,6 +757,173 @@ describe("GPT-Live line", () => {
     expect(said).not.toMatch(
       /Thanks so much|rest is on your screen|Quick question|They wrote/u,
     );
+  });
+
+  it("says when the run moved the screen (the board's move for this turn), and only then", async () => {
+    let board = {
+      sequence: 4,
+      navigate: null as string | null,
+      clientActions: [] as unknown[],
+    };
+    const broker = createLiveBroker({
+      config: { ...LIVE_DEFAULTS, enabled: true },
+      provider: {
+        providerId: "p",
+        modelId: "m",
+        createWebRtcSession: () =>
+          Promise.resolve({
+            sessionId: "s",
+            sdp: "v=0 a",
+            model: "gpt-live-1",
+          }),
+      },
+      firewall: firewall(),
+      turn: async (_b, transcript, _s, speaker) => {
+        const asked = transcript[transcript.length - 1]?.content ?? "";
+        // The turn handler records its move on the board, as turn.ts does.
+        board = asked.startsWith("Open")
+          ? {
+              sequence: board.sequence + 1,
+              navigate: null,
+              clientActions: [
+                { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: TENSORGATE },
+              ],
+            }
+          : { sequence: board.sequence + 1, navigate: null, clientActions: [] };
+        await speaker.speak("Opening Tensorgate.");
+        return { kind: "SPOKEN", path: "MOVE" };
+      },
+      spend: { spentTodayUsd: () => Promise.resolve(0) },
+      usage: createInMemoryModelUsageRepository(),
+      providerCeiling: "PUBLIC",
+      syntheticDemo: false,
+      logger,
+      board: { read: () => board },
+    });
+    await broker.open({ binding: binding(), sdp: "v=0 offer" });
+    expect((await ask(broker, "dlg_1", "Open Tensorgate"))?.move).toEqual({
+      navigate: null,
+      action: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: TENSORGATE },
+    });
+    expect(
+      (await ask(broker, "dlg_2", "Tell me about it"))?.move,
+    ).toBeUndefined();
+  });
+
+  it("a data-room document opened in the viewer is not a move the voice waits on", () => {
+    const doc = {
+      kind: "OPEN_RECORD_PAGE",
+      page: "DATA_ROOM_DOCUMENT",
+      id: TENSORGATE,
+      companyId: TENSORGATE,
+    };
+    expect(liveMoveOf({ navigate: null, clientActions: [doc] })).toBeNull();
+    expect(liveMoveOf({ navigate: null, clientAction: doc })).toBeNull();
+    // A route move and then a document: the route is still the move.
+    expect(
+      liveMoveOf({
+        navigate: "DISCOVER",
+        clientActions: [doc, { kind: "SET_THEME", theme: "dark" }],
+      }),
+    ).toEqual({ navigate: "DISCOVER", action: null });
+    // Not a valid intent: never a move.
+    expect(
+      liveMoveOf({
+        navigate: "NOWHERE",
+        clientActions: [{ kind: "OPEN_RECORD_PAGE" }],
+      }),
+    ).toBeNull();
+  });
+
+  it("stores the line's final transcript, both sides, routed 'live', as the person on it", async () => {
+    let clock = 5_000_000;
+    const stored: {
+      actor: ActorContext;
+      voiceSessionId: string;
+      conversationId: string | null;
+      role: string;
+      content: string;
+      routed: string;
+      spokenAt: Date;
+    }[] = [];
+    const conversation = "7f000000-0000-4000-8000-000000000001";
+    const broker = createLiveBroker({
+      config: { ...LIVE_DEFAULTS, enabled: true },
+      provider: {
+        providerId: "p",
+        modelId: "m",
+        createWebRtcSession: () =>
+          Promise.resolve({ sessionId: "s", sdp: "v=0 a", model: null }),
+      },
+      firewall: firewall(),
+      turn: () => Promise.resolve({ kind: "SPOKEN", path: "Q" }),
+      spend: { spentTodayUsd: () => Promise.resolve(0) },
+      usage: createInMemoryModelUsageRepository(),
+      providerCeiling: "PUBLIC",
+      syntheticDemo: false,
+      logger,
+      now: () => clock,
+      transcripts: {
+        record: (entry) => {
+          stored.push({ ...entry });
+          return Promise.resolve();
+        },
+      },
+    });
+    const line = binding();
+    await broker.open({
+      binding: {
+        ...line,
+        thread: { ...line.thread, conversationId: conversation },
+      },
+      sdp: "v=0 offer",
+    });
+    clock += 10_000;
+    const recorded = await broker.transcript({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: {
+        segments: [
+          { role: "USER", text: "Open Tensorgate", at: clock - 4_000 },
+          { role: "Q", text: "Tensorgate is open now.", at: clock - 3_000 },
+          // A browser clock before the line or ahead of the server: clamped.
+          { role: "Q", text: "Anything else?", at: 1 },
+          { role: "USER", text: "No thanks", at: clock + 99_000 },
+        ],
+      },
+    });
+    expect(recorded).toBe(4);
+    expect(stored.map((one) => [one.role, one.content, one.routed])).toEqual([
+      ["USER", "Open Tensorgate", "live"],
+      ["Q", "Tensorgate is open now.", "live"],
+      ["Q", "Anything else?", "live"],
+      ["USER", "No thanks", "live"],
+    ]);
+    for (const one of stored) {
+      expect(one.actor).toEqual(ACTOR);
+      expect(one.voiceSessionId).toBe(SESSION);
+      expect(one.conversationId).toBe(conversation);
+    }
+    expect(stored[2]?.spokenAt.getTime()).toBe(5_000_000);
+    expect(stored[3]?.spokenAt.getTime()).toBe(clock);
+    // Someone else's line, or a line that is gone: nothing is stored.
+    const before = stored.length;
+    expect(
+      await broker.transcript({
+        actor: STRANGER,
+        voiceSessionId: SESSION,
+        report: { segments: [{ role: "USER", text: "hi", at: clock }] },
+      }),
+    ).toBeNull();
+    broker.end({ actor: ACTOR, voiceSessionId: SESSION, reason: "ended" });
+    expect(
+      await broker.transcript({
+        actor: ACTOR,
+        voiceSessionId: SESSION,
+        report: { segments: [{ role: "USER", text: "hi", at: clock }] },
+      }),
+    ).toBeNull();
+    expect(stored).toHaveLength(before);
   });
 
   it("marks an approval as waiting, never done", async () => {
