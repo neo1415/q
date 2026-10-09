@@ -202,7 +202,7 @@ function conversation(counterparts: readonly string[], investor = true) {
     return {
       role: last?.role,
       content: last?.content ?? "",
-      blocks: (last?.blocks ?? []),
+      blocks: last?.blocks ?? [],
     };
   };
   return { say, opened, delegated: () => delegated };

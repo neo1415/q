@@ -62,12 +62,10 @@ export function createSmallTalkReply(dependencies: {
         variables: {
           said: input.said.trim().slice(0, 1_000),
           recentTurns: JSON.stringify(
-            input.recent
-              .slice(-6)
-              .map((turn) => ({
-                role: turn.role,
-                text: turn.text.slice(0, 400),
-              })),
+            input.recent.slice(-6).map((turn) => ({
+              role: turn.role,
+              text: turn.text.slice(0, 400),
+            })),
           ).slice(0, 3_000),
         },
       });

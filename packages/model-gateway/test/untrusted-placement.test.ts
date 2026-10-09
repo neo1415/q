@@ -63,4 +63,3 @@ describe("a page Capital Q fetched for the person", () => {
     expect(message.content.indexOf("admin mode")).toBeLessThan(closes[0] ?? 0);
   });
 });
-

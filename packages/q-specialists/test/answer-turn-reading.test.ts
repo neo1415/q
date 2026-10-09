@@ -802,7 +802,11 @@ describe("spoken words that were not for Q (founder live 2026-09-29)", () => {
     });
     await run.answer.answer(request());
     expect(run.modalities).toEqual(["VOICE"]);
-    const typed = seam({ said: "what a week it has been", reading: clear(true), outcomes: [] });
+    const typed = seam({
+      said: "what a week it has been",
+      reading: clear(true),
+      outcomes: [],
+    });
     await typed.answer.answer(request());
     expect(typed.modalities).toEqual(["TEXT"]);
   });
@@ -821,7 +825,11 @@ describe("spoken words that were not for Q (founder live 2026-09-29)", () => {
   });
 
   it("still answers a typed turn whatever the reading says about who it was for", async () => {
-    const run = seam({ said: "what a week it has been", reading: clear(false), outcomes: [] });
+    const run = seam({
+      said: "what a week it has been",
+      reading: clear(false),
+      outcomes: [],
+    });
     await run.answer.answer(request());
     expect(run.delegated()).toBe(1);
   });
