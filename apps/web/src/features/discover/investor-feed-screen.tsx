@@ -212,7 +212,7 @@ function InvestorFeed({
     // could page through the whole slate looking for a filtered-out card.
     ...(filters === null ? {} : { positionStore: null }),
   });
-  const { setOpen, open: qOpen } = useGlobalQ();
+  const { setOpen } = useGlobalQ();
   const session = useQSessionOptional();
   // Sound on, like TikTok, every session (ADR 0026, ADR 0064): one
   // policy shared with Explore's viewer (player/sound-policy.ts).
@@ -317,11 +317,12 @@ function InvestorFeed({
   const offTab = useDiscoverTab() !== "FOR_YOU";
   const index = feed.state.index;
   const hold = tabHidden || splashUp || offTab;
-  // While the voice line is open the pitch stays muted, not only while Q
-  // speaks: the microphone heard the video's words as the person's and cut
-  // Q off (live 2026-09-30: runs cancelled mid-"I'm interested").
-  const voiceOpen = session?.voice.active === true;
-  const effectiveMuted = muted || qOpen || qSpeaking || voiceOpen;
+  // Founder, 2026-10-09: pitches are always loud from the start, also with
+  // Q open or the voice line on; only Q's own speech quiets them. (Muting
+  // for the whole open line, added after the microphone heard a pitch on
+  // 2026-09-30, kept them silent all session once voice was always on; a
+  // headset keeps the pitch out of the microphone.)
+  const effectiveMuted = muted || qSpeaking;
 
   // Q's moves on the feed (founder report 2026-09-30: "say next and it
   // goes to the next one... pass should go straight to the next video"):

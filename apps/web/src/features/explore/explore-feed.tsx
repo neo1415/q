@@ -109,7 +109,7 @@ export function ExploreFeed({
   const budget = useFeedBudget();
   const reducedMotion = useReducedMotionPreference();
   const { muted, setMuted } = useFeedSound(reducedMotion);
-  const { askAbout, open: qOpen } = useGlobalQ();
+  const { askAbout } = useGlobalQ();
   const session = useQSessionOptional();
 
   const companies = useMemo(() => items.map(asCompany), [items]);
@@ -185,13 +185,8 @@ export function ExploreFeed({
         sourceFor={sourceFor}
         reducedMotion={reducedMotion}
         hold={false}
-        // Q open, speaking or listening mutes the pitch, as on Discover.
-        muted={
-          muted ||
-          qOpen ||
-          session?.voice.client.state === "Q_SPEAKING" ||
-          session?.voice.active === true
-        }
+        // Loud from the start; only Q's own speech quiets it, as on Discover.
+        muted={muted || session?.voice.client.state === "Q_SPEAKING"}
         onMutedChange={setMuted}
         label={`Pitches related to ${anchor.canonicalName}`}
         nextLabel="Next related pitch"
