@@ -7,6 +7,11 @@ import { useDuplexVoiceSession } from "./provider/duplex-session";
 import { useElevenLabsVoiceSession } from "./provider/elevenlabs-session";
 import { liveVoiceAvailable } from "./live/live-call";
 import {
+  claimVoiceAudio,
+  releaseVoiceAudio,
+  type VoiceAudioOwner,
+} from "./voice-audio";
+import {
   LIVE_FALLBACK_NOTICE,
   useLiveVoiceSession,
 } from "./provider/live-session";
@@ -45,7 +50,20 @@ export function useVoiceSession(
   const elevenLabs = useElevenLabsVoiceSession(events);
   const deepgram = useDeepgramVoiceSession(events);
   const duplex = useDuplexVoiceSession(events);
-  const liveLine = useLiveVoiceSession(events);
+  // ONE line plays per tab (founder 2026-10-09, "two voices at the same
+  // time"): this client claims the tab's audio for all its transports
+  // before any of them starts, which stops every other client's line and
+  // any standalone GPT-Live call first. Stopping this one ends all of its
+  // transports.
+  const endAllRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const startsRef = useRef(0);
+  const [owner] = useState<VoiceAudioOwner>(() => ({
+    stop: () => {
+      startsRef.current += 1;
+      return endAllRef.current();
+    },
+  }));
+  const liveLine = useLiveVoiceSession(events, { audioOwner: owner });
   const [active, setActive] = useState<
     "elevenlabs" | "deepgram" | "duplex" | "live"
   >("elevenlabs");
@@ -75,17 +93,23 @@ export function useVoiceSession(
     async (input: VoiceSessionStart) => {
       const provider = input.credential.provider ?? "elevenlabs";
       setPausedAway(false);
+      const mine = (startsRef.current += 1);
+      await claimVoiceAudio(owner);
+      // Ended, or started again, while something was awaited: this start
+      // opens nothing more (a late fallback would be a second voice).
+      const current = () => startsRef.current === mine;
       // V (founder 2026-10-09): GPT-Live is the voice for the people it is
       // switched on for, at every entry point. If it cannot open, the
       // duplex or standard line takes the same credential at once, and
       // the person is told in one line.
       const offered =
         allowLive && (await (liveAvailable.current ??= liveVoiceAvailable()));
+      if (!current()) return;
       let quota = false;
       if (offered) {
         setActive("live");
         const outcome = await liveLine.start(input);
-        if (outcome === "LIVE") return;
+        if (outcome === "LIVE" || !current()) return;
         quota = outcome === "QUOTA";
         liveAvailable.current = null;
         eventsRef.current.onLinkStatus?.(LIVE_FALLBACK_NOTICE);
@@ -100,12 +124,13 @@ export function useVoiceSession(
       // tried; the standard voice comes up at once.
       if (input.credential.duplex !== undefined && !quota) {
         setActive("duplex");
-        if (await duplex.start(input)) return;
+        if ((await duplex.start(input)) || !current()) return;
       }
+      if (!current()) return;
       setActive(provider);
       await (provider === "deepgram" ? deepgram : elevenLabs).start(input);
     },
-    [deepgram, duplex, elevenLabs, liveLine, allowLive],
+    [deepgram, duplex, elevenLabs, liveLine, allowLive, owner],
   );
 
   const transportSetMuted = client.setMuted;
@@ -166,9 +191,24 @@ export function useVoiceSession(
   const endDeepgram = deepgram.end;
   const endElevenLabs = elevenLabs.end;
   const endLive = liveLine.end;
-  const end = useCallback(async () => {
+  const endTransports = useCallback(async () => {
     await Promise.all([endLive(), endDuplex(), endDeepgram(), endElevenLabs()]);
   }, [endLive, endDuplex, endDeepgram, endElevenLabs]);
+  useEffect(() => {
+    endAllRef.current = endTransports;
+  }, [endTransports]);
+  const end = useCallback(async () => {
+    // An end pressed while a start is still connecting stops that start too.
+    startsRef.current += 1;
+    releaseVoiceAudio(owner);
+    await endTransports();
+  }, [endTransports, owner]);
+  useEffect(
+    () => () => {
+      releaseVoiceAudio(owner);
+    },
+    [owner],
+  );
 
   return useMemo(
     () => ({ ...client, start, end, setMuted, pausedAway }),

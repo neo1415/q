@@ -22,9 +22,40 @@ export async function installLiveFake(page: Page): Promise<void> {
       __cqLivePeers?: number;
     };
     own.__cqLiveSent = [];
+    // Every audio element the page makes, and the most that were ever
+    // audible at once (a stream attached, not muted), sampled every 50 ms.
+    const audioState = window as Window & {
+      __cqAudios?: HTMLAudioElement[];
+      __cqMaxAudible?: number;
+    };
+    audioState.__cqAudios = [];
+    audioState.__cqMaxAudible = 0;
+    const RealAudio = window.Audio;
+    (window as unknown as { Audio: unknown }).Audio = function FakeAudioCtor(
+      src?: string,
+    ) {
+      const element = new RealAudio(src);
+      audioState.__cqAudios?.push(element);
+      return element;
+    };
+    setInterval(() => {
+      const audible = (audioState.__cqAudios ?? []).filter(
+        (a) => a.srcObject !== null && !a.muted,
+      ).length;
+      audioState.__cqMaxAudible = Math.max(
+        audioState.__cqMaxAudible ?? 0,
+        audible,
+      );
+    }, 50);
     own.__cqLivePeers = 0;
-    let channelRef: { dispatch: (data: string) => void } | null = null;
+    let channelRef: {
+      dispatch: (data: string) => void;
+      readyState: RTCDataChannelState;
+    } | null = null;
     own.__cqLiveEmit = (event) => channelRef?.dispatch(JSON.stringify(event));
+    // The page has the answer and is listening: events emitted now arrive.
+    (own as { __cqLiveOpen?: () => boolean }).__cqLiveOpen = () =>
+      channelRef?.readyState === "open";
 
     // Plain members only: Playwright transpiles this function and private
     // members need helpers the page does not have.
@@ -89,6 +120,23 @@ export async function installLiveFake(page: Page): Promise<void> {
         this.connectionState = "connected";
         this.dispatchEvent(new Event("connectionstatechange"));
         setTimeout(() => this.fakeChannel?.open(), 10);
+        // The provider's voice as a real media stream (a quiet tone), so
+        // the page attaches it to its speaker exactly as with GPT-Live.
+        setTimeout(() => {
+          if (this.connectionState === "closed") return;
+          const context = new AudioContext();
+          const destination = context.createMediaStreamDestination();
+          const tone = context.createOscillator();
+          const gain = context.createGain();
+          gain.gain.value = 0.001;
+          tone.connect(gain).connect(destination);
+          tone.start();
+          this.dispatchEvent(
+            Object.assign(new Event("track"), {
+              streams: [destination.stream],
+            }),
+          );
+        }, 30);
         return Promise.resolve();
       }
       close() {
@@ -123,6 +171,24 @@ export async function liveSent(page: Page): Promise<LiveSent[]> {
     () =>
       ((window as Window & { __cqLiveSent?: unknown[] }).__cqLiveSent ??
         []) as LiveSent[],
+  );
+}
+
+/** The most audio elements ever audible at the same time on the page. */
+export async function maxAudible(page: Page): Promise<number> {
+  return page.evaluate(
+    () => (window as Window & { __cqMaxAudible?: number }).__cqMaxAudible ?? 0,
+  );
+}
+
+/** Audio elements audible right now. */
+export async function audibleNow(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      (
+        (window as Window & { __cqAudios?: HTMLAudioElement[] }).__cqAudios ??
+        []
+      ).filter((a) => a.srcObject !== null && !a.muted).length,
   );
 }
 

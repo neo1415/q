@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useQSessionOptional } from "../q/q-session";
 import { playSound } from "../q-sound/sound-engine";
 import { readSoundPreference } from "../q-sound/sound-preference";
+import { voiceAudioOwner, watchVoiceAudio } from "../voice/voice-audio";
 import { voiceLineHolder, watchVoiceLine } from "../voice/voice-line";
 import type { EngineFailure, WakeEngine } from "./engine";
 import { WAKE_GREETING } from "./phrases";
@@ -68,10 +69,20 @@ function usePageVisible(): boolean {
   );
 }
 
+function watchAnyLine(watcher: () => void): () => void {
+  const lines = watchVoiceLine(watcher);
+  const audio = watchVoiceAudio(watcher);
+  return () => {
+    lines();
+    audio();
+  };
+}
+
+/** Any line is up: one a surface holds, or any line playing audio (V). */
 function useLineHeld(): boolean {
   return useSyncExternalStore(
-    watchVoiceLine,
-    () => voiceLineHolder() !== null,
+    watchAnyLine,
+    () => voiceLineHolder() !== null || voiceAudioOwner() !== null,
     () => false,
   );
 }

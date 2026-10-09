@@ -149,7 +149,8 @@ launch() {
       export CQ_VOICE_REALTIME=on CQ_FAKE_VOICE_VENDORS=1 CQ_SYNTHETIC_DEMO_ROUTING=true
       # V, opt-in (CQ_RECOVERY_GPT_LIVE=1): GPT-Live as the product voice,
       # its session creation answered by the fake vendor (no key, no audio).
-      [[ "$fake_gl" == 1 ]] && export CQ_VOICE_LIVE=on
+      # The fake sessions still land on the local ledger: a high local cap.
+      [[ "$fake_gl" == 1 ]] && export CQ_VOICE_LIVE=on CQ_VOICE_PREVIEW=on CQ_VOICE_LIVE_DAILY_CAP_USD=20
       # V (GPT-Live developer preview), opt-in: CQ_LIVE_GPT_LIVE_KEY in the
       # operator's shell. The model stays the fake; only q-api gets the key,
       # and only for the GPT-Live session call (CQ_VOICE_LIVE_OPENAI_API_KEY,

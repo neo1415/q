@@ -2,8 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
 import {
+  audibleNow,
   emitLive,
   installLiveFake,
+  maxAudible,
   livePeers,
   liveSent,
   liveUserSays,
@@ -41,19 +43,20 @@ async function startVoice(page: Page): Promise<void> {
     .first()
     .click();
   await expect.poll(() => livePeers(page), { timeout: 30_000 }).toBe(1);
-  // The data channel opens once the Q API answered the offer.
+  // The data channel opens once the Q API answered the offer; only then is
+  // the page listening for the provider's events.
   await expect
     .poll(
       () =>
-        page.evaluate(() => {
-          const sent = (window as Window & { __cqLiveSent?: unknown[] })
-            .__cqLiveSent;
-          return Array.isArray(sent);
-        }),
-      { timeout: 10_000 },
+        page.evaluate(
+          () =>
+            (
+              window as Window & { __cqLiveOpen?: () => boolean }
+            ).__cqLiveOpen?.() === true,
+        ),
+      { timeout: 30_000 },
     )
     .toBe(true);
-  await page.waitForTimeout(500);
   await emitLive(page, {
     type: "session.started",
     session: { id: "live_fake_e2e", model: "gpt-live-1" },
@@ -166,4 +169,88 @@ test("GPT-Live carries on across a page: the dock on another page opens it too",
       ),
     )
     .toBe(true);
+});
+
+test("one voice at a time: restarting and starting voice from a second surface never leaves two audible", async ({
+  browser,
+}) => {
+  const page = await (await contextAs(browser, CAST.investor)).newPage();
+  await installLiveFake(page);
+  await useScript([READER_QUESTION]);
+  await page.goto("/home");
+  await startVoice(page);
+  await expect.poll(() => audibleNow(page), { timeout: 10_000 }).toBe(1);
+  // End and talk again at once, three times: each new line stops the last.
+  for (let i = 0; i < 3; i += 1) {
+    const end = page.getByRole("button", { name: /^End/u }).first();
+    if (await end.isVisible().catch(() => false)) await end.click();
+    await page
+      .getByRole("button", { name: /Talk with Q/u })
+      .first()
+      .click();
+    await page.waitForTimeout(300);
+  }
+  // A second surface (the dock, over the page) opens voice too.
+  await page.goto("/discover");
+  const briefing = page.getByRole("button", { name: "Close Q's briefing" });
+  if (await briefing.isVisible().catch(() => false)) await briefing.click();
+  await openQ(page);
+  await page
+    .getByRole("button", { name: /Talk with Q/u })
+    .first()
+    .click();
+  await page.waitForTimeout(2_000);
+  expect(await audibleNow(page)).toBeLessThanOrEqual(1);
+  expect(await maxAudible(page)).toBeLessThanOrEqual(1);
+});
+
+test("one voice at a time on /home: rapid restarts never overlap", async ({
+  browser,
+}) => {
+  const page = await (await contextAs(browser, CAST.investor)).newPage();
+  await installLiveFake(page);
+  await useScript([READER_QUESTION]);
+  await page.goto("/home");
+  await startVoice(page);
+  await expect.poll(() => audibleNow(page), { timeout: 10_000 }).toBe(1);
+  for (let i = 0; i < 4; i += 1) {
+    const end = page.getByRole("button", { name: /^End/u }).first();
+    if (await end.isVisible().catch(() => false)) await end.click();
+    await page
+      .getByRole("button", { name: /Talk with Q/u })
+      .first()
+      .click();
+  }
+  await page.waitForTimeout(3_000);
+  expect(await maxAudible(page)).toBeLessThanOrEqual(1);
+  // Every superseded GPT-Live session was told to close.
+  const peers = await page.evaluate(
+    () => (window as Window & { __cqLivePeers?: number }).__cqLivePeers ?? 0,
+  );
+  const closes = await page.evaluate(
+    () =>
+      (
+        (window as Window & { __cqLiveSent?: { type?: string }[] })
+          .__cqLiveSent ?? []
+      ).filter((e) => e.type === "session.close").length,
+  );
+  expect(closes).toBeGreaterThanOrEqual(Math.max(0, peers - 1));
+});
+
+test("the preview's GPT-Live call goes silent the moment it ends, before its session closes", async ({
+  browser,
+}) => {
+  const page = await (await contextAs(browser, CAST.investor)).newPage();
+  await installLiveFake(page);
+  await page.goto("/dev/voice-preview");
+  const opening = page.getByLabel(/Open with the briefing/u);
+  if (await opening.isChecked()) await opening.uncheck();
+  await page.getByRole("button", { name: "Start conversation" }).click();
+  await expect.poll(() => audibleNow(page), { timeout: 15_000 }).toBe(1);
+  await page.getByRole("button", { name: "End call" }).click();
+  // The fake provider never sends session.closed, so the call is still
+  // waiting for its final usage: its speaker must already be off.
+  await page.waitForTimeout(300);
+  expect(await audibleNow(page)).toBe(0);
+  expect(await maxAudible(page)).toBe(1);
 });

@@ -10,6 +10,7 @@ import {
   type LiveCallOptions,
   type LiveTranscript,
 } from "../live/live-call";
+import type { VoiceAudioOwner } from "../voice-audio";
 import type {
   VoiceSessionClient,
   VoiceSessionEvents,
@@ -55,6 +56,8 @@ export function useLiveVoiceSession(
     /** For tests: the call itself (WebRTC is faked at this boundary). */
     readonly startCall?:
       ((options: LiveCallOptions) => Promise<LiveCall>) | undefined;
+    /** The tab's audio claim the call plays under (its voice client's). */
+    readonly audioOwner?: VoiceAudioOwner | undefined;
   } = {},
 ): LiveVoiceClient {
   const [state, setState] = useState<VoiceState>("IDLE");
@@ -125,6 +128,9 @@ export function useLiveVoiceSession(
             ...(opening === undefined ? {} : { content: opening }),
           },
           fastNavigation: true,
+          ...(options.audioOwner === undefined
+            ? {}
+            : { audioOwner: options.audioOwner }),
           onTranscript,
           onUpdate: ({ stats }) => {
             if (startsRef.current !== mine) return;
@@ -166,7 +172,7 @@ export function useLiveVoiceSession(
           : "FAILED";
       }
     },
-    [onTranscript, startCall],
+    [onTranscript, startCall, options.audioOwner],
   );
 
   const end = useCallback(async () => {

@@ -376,6 +376,29 @@ describe("D2 · nothing loads while the toggle is off", () => {
     await vi.waitFor(() => expect(startWakeEngine).toHaveBeenCalledOnce());
   });
 
+  it("on, but a line is playing (a GPT-Live call that holds no surface): not started", async () => {
+    // V (founder 2026-10-09, "two voices"): the wake word heard Q's own
+    // voice on the preview's GPT-Live call and opened a second line.
+    stubSupport(grantedStream);
+    storeWakePreference(true);
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    const { claimVoiceAudio, releaseVoiceAudio } =
+      await import("../src/features/voice/voice-audio");
+    const call = { stop: () => undefined };
+    await claimVoiceAudio(call);
+    render(<WakeWord openQ={vi.fn()} />);
+    await act(() => Promise.resolve());
+    expect(startWakeEngine).not.toHaveBeenCalled();
+    // The call ends: the wake word may listen again.
+    act(() => {
+      releaseVoiceAudio(call);
+    });
+    await vi.waitFor(() => expect(startWakeEngine).toHaveBeenCalledOnce());
+  });
+
   it("on but hidden: not started", async () => {
     stubSupport(grantedStream);
     storeWakePreference(true);

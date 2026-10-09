@@ -3,6 +3,11 @@ import {
   navigationHearingDelta,
 } from "../../q/control/fast-navigation";
 import {
+  claimVoiceAudio,
+  releaseVoiceAudio,
+  type VoiceAudioOwner,
+} from "../voice-audio";
+import {
   createLiveBridge,
   type DelegationOutcome,
   type LiveBridgeState,
@@ -44,7 +49,14 @@ export type LiveCallUpdate = {
 
 /** Why a call ended; the product line maps these to its own events. */
 export type LiveCallEnd =
-  "ended" | "max_length" | "idle" | "cap" | "network" | "provider";
+  | "ended"
+  | "max_length"
+  | "idle"
+  | "cap"
+  | "network"
+  | "provider"
+  /** Another voice line started in this tab: this one stopped first. */
+  | "superseded";
 
 export type LiveTranscript = {
   /** One utterance's id, stable while it grows. */
@@ -79,6 +91,13 @@ export type LiveCallOptions = {
   /** C's fast path: "open X" moves the screen on the final words. */
   readonly fastNavigation?: boolean | undefined;
   readonly microphone?: (() => Promise<MediaStream>) | undefined;
+  /**
+   * The tab's audio claim this call plays under (the product voice session
+   * claims for all its lines). Absent: the call claims for itself, so a
+   * standalone call (the preview) stops every other line, and is stopped
+   * by the next one.
+   */
+  readonly audioOwner?: VoiceAudioOwner | undefined;
 };
 
 export type LiveCall = {
@@ -183,15 +202,40 @@ export async function startLiveCall(
   const doFetch = options.fetch ?? fetch.bind(globalThis);
   const audio = new Audio();
   audio.autoplay = true;
+  // ONE line plays in a tab: a standalone call claims the audio first,
+  // which stops whatever line was playing. Stopping this call silences its
+  // audio at once, before its session is closed.
+  let stopRequested = false;
+  let endLate: ((reason: LiveCallEnd) => Promise<void>) | null = null;
+  const silence = () => {
+    audio.muted = true;
+    audio.srcObject = null;
+  };
+  const self: VoiceAudioOwner = {
+    stop: () => {
+      stopRequested = true;
+      silence();
+      return endLate?.("superseded");
+    },
+  };
+  const owner = options.audioOwner ?? self;
+  if (options.audioOwner === undefined) await claimVoiceAudio(self);
   const context = new AudioContext();
   const output = context.createAnalyser();
   output.fftSize = 512;
   const input = context.createAnalyser();
   input.fftSize = 512;
-  const mic = await (
-    options.microphone ??
-    (() => navigator.mediaDevices.getUserMedia({ audio: true }))
-  )();
+  let mic: MediaStream;
+  try {
+    mic = await (
+      options.microphone ??
+      (() => navigator.mediaDevices.getUserMedia({ audio: true }))
+    )();
+  } catch (error: unknown) {
+    void context.close();
+    if (owner === self) releaseVoiceAudio(self);
+    throw error;
+  }
   context.createMediaStreamSource(mic).connect(input);
   const outBuffer = new Float32Array(output.fftSize);
   const inBuffer = new Float32Array(input.fftSize);
@@ -422,14 +466,32 @@ export async function startLiveCall(
     update();
   };
 
+  let latestPc: RTCPeerConnection | null = null;
   const connect = async (): Promise<Connection> => {
     const pc = new RTCPeerConnection();
+    // The newest peer is the only one that may play or be heard: an older
+    // one (a renewal's predecessor) is already closing.
+    latestPc = pc;
     pc.addEventListener("track", (event) => {
       const [stream] = event.streams;
-      if (stream === undefined) return;
+      // A peer that is not the call's current one, or a call that was
+      // stopped or ended, never reaches the speaker.
+      if (stream === undefined || ended || stopRequested) return;
+      if (latestPc !== pc) return;
       audio.srcObject = stream;
       context.createMediaStreamSource(stream).connect(output);
     });
+    try {
+      return await negotiate(pc);
+    } catch (error: unknown) {
+      // Whatever was set up for a call that did not come up is let go:
+      // a peer left behind could connect later and play.
+      pc.close();
+      throw error;
+    }
+  };
+
+  const negotiate = async (pc: RTCPeerConnection): Promise<Connection> => {
     for (const track of mic.getTracks()) pc.addTrack(track, mic);
     const channel = pc.createDataChannel("oai-events");
     await pc.setLocalDescription(await pc.createOffer());
@@ -470,7 +532,7 @@ export async function startLiveCall(
       closeRequested: false,
     };
     channel.addEventListener("message", (message: MessageEvent<string>) => {
-      if (connection !== mine) return;
+      if (latestPc !== pc) return;
       let event: LiveServerEvent;
       try {
         event = JSON.parse(message.data) as LiveServerEvent;
@@ -513,7 +575,15 @@ export async function startLiveCall(
     update();
   };
 
-  connection = await connect();
+  try {
+    connection = await connect();
+  } catch (error: unknown) {
+    for (const track of mic.getTracks()) track.stop();
+    silence();
+    void context.close();
+    if (owner === self) releaseVoiceAudio(self);
+    throw error;
+  }
 
   // The speaking indicator follows the player, not generation: audio can
   // play after the model has finished producing it.
@@ -545,6 +615,11 @@ export async function startLiveCall(
   const end = async (reason: LiveCallEnd = "ended") => {
     if (ended) return;
     ended = true;
+    // Silent first: the speaker and the microphone stop now; closing the
+    // session (and waiting for its final usage) happens after.
+    silence();
+    for (const track of mic.getTracks()) track.stop();
+    if (owner === self) releaseVoiceAudio(self);
     clearTimeout(cap);
     clearInterval(meter);
     finishUtterance();
@@ -560,8 +635,6 @@ export async function startLiveCall(
       }
       mine.pc.close();
     }
-    for (const track of mic.getTracks()) track.stop();
-    audio.srcObject = null;
     void context.close();
     if (mine !== null && !mine.closed) {
       stats = {
@@ -577,6 +650,11 @@ export async function startLiveCall(
     update();
     options.onEnded(reason);
   };
+
+  endLate = end;
+  // Stopped while it was connecting (another line claimed the audio): it
+  // came up superseded, so it closes now and never plays.
+  if (stopRequested) void end("superseded");
 
   update();
   return {
