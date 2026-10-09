@@ -44,6 +44,7 @@ describe("research is intentional outside the interview too", () => {
             kind: "REAL_WORLD_EXAMPLE",
             text: "a real investor like me?",
             about: [],
+            count: null,
           },
         }),
       ).mode,
@@ -55,6 +56,7 @@ describe("research is intentional outside the interview too", () => {
             kind: "PUBLIC_FACTS",
             text: "any news on Acme?",
             about: [],
+            count: null,
           },
         }),
       ).mode,
@@ -67,6 +69,7 @@ describe("research is intentional outside the interview too", () => {
             kind: "PUBLIC_FACTS",
             text: "search the web for it",
             about: [],
+            count: null,
           },
         }),
       ).mode,
@@ -81,6 +84,7 @@ describe("research is intentional outside the interview too", () => {
             kind: "ADVICE",
             text: "what else should I look for?",
             about: [],
+            count: null,
           },
         }),
       ).mode,
@@ -95,6 +99,7 @@ describe("research is intentional outside the interview too", () => {
             kind: "THEIR_OWN_RECORDS",
             text: "based on what you know about me, what suits me?",
             about: [],
+            count: null,
           },
         }),
       ),
@@ -109,6 +114,7 @@ describe("research is intentional outside the interview too", () => {
             kind: "ADVICE",
             text: "what do you make of Acme?",
             about: [],
+            count: null,
           },
           aboutNamedOther: true,
         }),
@@ -125,7 +131,12 @@ describe("research is intentional outside the interview too", () => {
       expect(directive(read({ kind })).mode, kind).toBe("NEVER");
     }
     const example = read({
-      question: { kind: "REAL_WORLD_EXAMPLE", text: "a real one?", about: [] },
+      question: {
+        kind: "REAL_WORLD_EXAMPLE",
+        text: "a real one?",
+        about: [],
+        count: null,
+      },
     });
     expect(directive(example, false).mode).toBe("NEVER");
     const down = reduceConversation(
@@ -178,6 +189,7 @@ describe("the prospects fallback (gap 1)", () => {
                     kind: "OPTIONS",
                     text: "Who would likely invest in us?",
                     about: [],
+                    count: null,
                   }
                 : null,
           }),
@@ -205,6 +217,7 @@ describe("the prospects fallback (gap 1)", () => {
           kind: "ADVICE",
           text: "Who would invest in us?",
           about: [],
+          count: null,
         },
       }),
       true,
