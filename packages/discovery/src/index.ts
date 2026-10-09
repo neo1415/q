@@ -850,3 +850,23 @@ export {
   type KnowledgeVersionKind,
   type MandateSummary,
 } from "./knowledge/company-knowledge.js";
+
+// The one company read for the raise (R2): every surface renders this.
+export {
+  presentCompanyRaise,
+  type CompanyRaisePolicyInput,
+  type PitchRaiseClaimFact,
+  type RaiseObjectiveFact,
+  type RaiseSharing,
+  type RaiseViewerKind,
+} from "./company-raise/policy.js";
+export {
+  RAISE_BATCH_MAX,
+  RAISE_PITCHES_MAX,
+  createCompanyRaiseReader,
+  sharingFromPolicies,
+  type CompanyRaiseReader,
+  type CompanyRaiseReaderPorts,
+  type RaisePitchCandidate,
+  type RaisePolicyRow,
+} from "./company-raise/reader.js";
