@@ -183,7 +183,10 @@ import {
   ownGatewayIdFrom,
 } from "@capital-q/gateq-intake";
 import {
+  createDailySpendCap,
   createModelGateway,
+  createPostgresDailySpendReader,
+  parseDailySpendCapUsd,
   createModelProviderRegistry,
   createPostgresModelCatalog,
   createPostgresModelUsageRepository,
@@ -636,6 +639,29 @@ if (gateqProviderSecrets.openai !== undefined) {
  * and providers, on the cheap FAST_CLASSIFICATION class. Without a provider
  * nothing is read, and each caller keeps its safe default.
  */
+/**
+ * F-D8 (RECOVERY F5): the same daily ceiling q-api and the workers use, on
+ * the ledger every gateway writes to, so GateQ's calls count against it
+ * too (they bypassed it). Unset means no cap.
+ */
+const gateqSpendCap = (() => {
+  const capUsd = parseDailySpendCapUsd(process.env);
+  if (capUsd === undefined) return undefined;
+  const logger = createLogger(apiServiceIdentity(config), {
+    level: config.observability.logLevel,
+  });
+  return createDailySpendCap({
+    capUsd,
+    readSpentSinceUsd: createPostgresDailySpendReader({ sql: database.sql }),
+    onReadFailure: (error) => {
+      logger.warn(
+        { err: error, spendCap: "DAILY_AGGREGATE" },
+        "daily spend cap could not read the ledger; using the last total",
+      );
+    },
+  });
+})();
+
 const wordsReaders =
   gateqModelProviders.length === 0
     ? undefined
@@ -645,6 +671,7 @@ const wordsReaders =
           registry: createModelProviderRegistry(gateqModelProviders),
           usage: createPostgresModelUsageRepository({ sql: database.sql }),
           health: createProcessLocalProviderHealth(),
+          spendCap: gateqSpendCap,
           syntheticDemo: createSyntheticDemoRoutingAllowance({
             operatorEnabled: gateqProviderSecrets.syntheticDemoRouting,
             environment: config.runtime.deploymentEnvironment,
@@ -695,6 +722,7 @@ const gateqApply =
               registry: createModelProviderRegistry(gateqModelProviders),
               usage: createPostgresModelUsageRepository({ sql: database.sql }),
               health: createProcessLocalProviderHealth(),
+              spendCap: gateqSpendCap,
               // Doc 15 §62: an attestation about the whole deployment,
               // re-checked against environment and database. Never
               // something a request, a header or a hostname can claim.
