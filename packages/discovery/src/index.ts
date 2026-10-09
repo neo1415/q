@@ -838,3 +838,14 @@ export {
   type ExplorePorts,
   type ExploreService,
 } from "./explore/service.js";
+// RECOVERY K (Tier B): prepared business knowledge, through its port only.
+export {
+  KNOWLEDGE_DISCOVER_LIMIT_MAX,
+  createPostgresCompanyKnowledge,
+  type CompanyKnowledge,
+  type CompanyKnowledgePort,
+  type DiscoverCompaniesQuery,
+  type FitSummary,
+  type KnowledgeVersionKind,
+  type MandateSummary,
+} from "./knowledge/company-knowledge.js";
