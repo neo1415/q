@@ -22,3 +22,13 @@ export const IDLE_NOTICE =
 /** INC-1: the answer was ready but the voice never said it. */
 export const ANSWER_NOT_SPOKEN_NOTICE =
   "I couldn't say that answer aloud in time; it's on your screen.";
+/** B-01: the person's words could not be transcribed: asked again, out loud. */
+export const MISHEARD_REPAIR = "Sorry, I didn't catch that. Say it again?";
+/** The microphone track ended (permission revoked, unplugged): said at once. */
+export const MICROPHONE_LOST_NOTICE =
+  "Q lost your microphone. Getting it back…";
+/** ...and it came back on the same line. */
+export const MICROPHONE_BACK_NOTICE = "Microphone back. Q can hear you again.";
+/** ...or it could not be had: Q can't hear the person. */
+export const MICROPHONE_UNAVAILABLE_NOTICE =
+  "Q can't hear you: the microphone isn't available. Check the browser's permission and try again.";

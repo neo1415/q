@@ -183,6 +183,19 @@ test.describe("duplex voice failures", () => {
     const page = await (await contextAs(browser, CAST.founder)).newPage();
     await openLine(page);
     await userSays(page, "item_b", "what is my raise?");
+    // G-D22 (A, 2026-10-09): on a routed line the only response is the one
+    // the line asks for; one created before that is a reply nobody asked
+    // for and is cut on purpose (INC-1 b), which is the cancel this test
+    // used to see. The answer under generation is the line's own.
+    await expect
+      .poll(
+        async () =>
+          (await duplexSent(page)).filter(
+            (event) => event.type === "response.create",
+          ).length,
+        { timeout: 60_000 },
+      )
+      .toBeGreaterThan(0);
     await emitRealtime(page, {
       type: "response.created",
       response: { id: "resp_b" },

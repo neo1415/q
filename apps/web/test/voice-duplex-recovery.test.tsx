@@ -13,6 +13,10 @@ import {
   ANSWER_NOT_SPOKEN_NOTICE,
   BARGE_CONFIRM_MS,
   DuplexLine,
+  MICROPHONE_BACK_NOTICE,
+  MICROPHONE_LOST_NOTICE,
+  MICROPHONE_UNAVAILABLE_NOTICE,
+  MISHEARD_REPAIR,
   IGNORED_NOTICE,
   THINKING_WATCHDOG_MS,
   TIMEOUT_REPAIR,
@@ -118,6 +122,7 @@ function harness(
     readonly credential?: QVoiceDuplexCredential;
     readonly level?: number;
     readonly location?: string;
+    readonly microphone?: () => Promise<MediaStream>;
   } = {},
 ) {
   const peer = new FakePeer();
@@ -129,7 +134,7 @@ function harness(
   const audio = { volume: 1, srcObject: null, autoplay: true };
   const environment: DuplexEnvironment = {
     createPeer: () => peer as unknown as RTCPeerConnection,
-    getMicrophone: () => Promise.resolve(stream),
+    getMicrophone: options.microphone ?? (() => Promise.resolve(stream)),
     fetch: () =>
       Promise.resolve(
         new Response("v=0 answer", {
@@ -182,6 +187,7 @@ function harness(
     onInterrupted: vi.fn<DuplexLineEvents["onInterrupted"]>(),
     onFallback: vi.fn<DuplexLineEvents["onFallback"]>(),
     onEnded: vi.fn<DuplexLineEvents["onEnded"]>(),
+    onLinkStatus: vi.fn<NonNullable<DuplexLineEvents["onLinkStatus"]>>(),
     onTurnOutcome: (outcome: DuplexTurnOutcome) => {
       outcomes.push(outcome);
     },
@@ -715,5 +721,140 @@ describe("G-D20 and INC-1 (b): no free model speech, one line per answer", () =>
         response_id: "resp_dup_1",
       }),
     );
+  });
+});
+
+describe("G voice failure paths, at the line (2026-10-09)", () => {
+  it("B-01: a failed transcription ends FAILED/SPEECH_RECOGNITION at once, and Q asks again", async () => {
+    const h = harness();
+    await h.line.open();
+    h.channel().emit({ type: "input_audio_buffer.speech_started" });
+    h.channel().emit({ type: "input_audio_buffer.speech_stopped" });
+    h.channel().emit({
+      type: "input_audio_buffer.committed",
+      item_id: "item_f",
+    });
+    h.channel().emit({
+      type: "conversation.item.input_audio_transcription.failed",
+      item_id: "item_f",
+      error: { message: "scripted" },
+    });
+    await settle();
+    expect(h.outcomes).toEqual([
+      expect.objectContaining({
+        disposition: "FAILED",
+        failure: "SPEECH_RECOGNITION",
+        notice: MISHEARD_REPAIR,
+      }),
+    ]);
+    // Never handed to the voice to guess at: no ask_q forced, no relay.
+    expect(h.relays.heard).not.toHaveBeenCalled();
+    const creates = h.channel().creates();
+    expect(creates).toHaveLength(1);
+    expect(JSON.stringify(creates[0])).toContain("didn't catch that");
+    expect(creates[0]).toMatchObject({ response: { conversation: "none" } });
+  });
+
+  it("playback lost: the answer it could not say is shown as text, once, on its turn", async () => {
+    const h = harness();
+    await h.line.open();
+    say(h, "item_p", "Who fits?");
+    await settle();
+    expect(h.channel().creates()).toHaveLength(1);
+    // The response is never created and no audio ever starts.
+    vi.advanceTimersByTime(ANSWER_AUDIO_WATCHDOG_MS + 10);
+    await settle();
+    const qLines = h.events.onLine.mock.calls.filter(([role]) => role === "q");
+    expect(qLines).toHaveLength(1);
+    const outcome = h.outcomes.at(-1);
+    expect(qLines[0]?.[1]).toBe("Three investors fit.");
+    expect(qLines[0]?.[2]).toBe(outcome?.turnId);
+    expect(outcome).toMatchObject({
+      disposition: "FAILED",
+      failure: "RESULT_DELIVERY",
+      notice: ANSWER_NOT_SPOKEN_NOTICE,
+    });
+  });
+
+  it("a lost microphone is said at once, and that it is back", async () => {
+    const listeners: (() => void)[] = [];
+    const track = {
+      enabled: true,
+      kind: "audio",
+      readyState: "live",
+      stop: vi.fn(),
+      addEventListener: (_type: string, handler: () => void) => {
+        listeners.push(handler);
+      },
+    };
+    const stream = {
+      getTracks: () => [track],
+      getAudioTracks: () => [track],
+    } as unknown as MediaStream;
+    const h = harness({ microphone: () => Promise.resolve(stream) });
+    // The sender the fresh track goes on.
+    h.peer.addTrack = (() => ({
+      replaceTrack: () => Promise.resolve(),
+    })) as unknown as typeof h.peer.addTrack;
+    await h.line.open();
+    for (const ended of listeners) ended();
+    expect(h.events.onLinkStatus).toHaveBeenCalledWith(MICROPHONE_LOST_NOTICE);
+    await settle();
+    expect(h.events.onLinkStatus).toHaveBeenLastCalledWith(
+      MICROPHONE_BACK_NOTICE,
+    );
+  });
+
+  it("a microphone that cannot be had again is said plainly", async () => {
+    const listeners: (() => void)[] = [];
+    const track = {
+      enabled: true,
+      kind: "audio",
+      readyState: "live",
+      stop: vi.fn(),
+      addEventListener: (_type: string, handler: () => void) => {
+        listeners.push(handler);
+      },
+    };
+    const stream = {
+      getTracks: () => [track],
+      getAudioTracks: () => [track],
+    } as unknown as MediaStream;
+    let calls = 0;
+    const h = harness({
+      microphone: () => {
+        calls += 1;
+        return calls === 1
+          ? Promise.resolve(stream)
+          : Promise.reject(new Error("NotAllowedError"));
+      },
+    });
+    h.peer.addTrack = (() => ({
+      replaceTrack: () => Promise.resolve(),
+    })) as unknown as typeof h.peer.addTrack;
+    await h.line.open();
+    for (const ended of listeners) ended();
+    await settle();
+    expect(h.events.onLinkStatus).toHaveBeenCalledWith(
+      MICROPHONE_UNAVAILABLE_NOTICE,
+    );
+    expect(h.events.onFallback).toHaveBeenCalledWith(
+      expect.objectContaining({ notice: MICROPHONE_UNAVAILABLE_NOTICE }),
+    );
+  });
+
+  it("G-D22: a 200 ms blip while the line's own answer is generated sends no cancel", async () => {
+    const h = harness();
+    await h.line.open();
+    say(h, "item_b", "what is my raise?");
+    await settle();
+    // The response the line asked for, then a cough.
+    expect(h.channel().creates()).toHaveLength(1);
+    h.channel().emit({ type: "response.created", response: { id: "resp_b" } });
+    h.channel().emit({ type: "input_audio_buffer.speech_started" });
+    vi.advanceTimersByTime(200);
+    h.channel().emit({ type: "input_audio_buffer.speech_stopped" });
+    vi.advanceTimersByTime(BARGE_CONFIRM_MS * 2);
+    expect(h.channel().types()).not.toContain("response.cancel");
   });
 });

@@ -91,6 +91,12 @@ export type VoiceInterview = {
      * 2026-10-05). Never a greeting: a reopened line does not welcome.
      */
     readonly lead?: (() => string | null | undefined) | undefined;
+    /**
+     * G-D21: the line reopening by itself (a reconnect, a fallback, a
+     * renewal), never the person. Opens nothing unless the person started
+     * a line in this tab that is still theirs.
+     */
+    readonly automatic?: boolean | undefined;
   }) => Promise<void>;
   readonly end: () => Promise<void>;
   readonly chooseVoice: (voice: QVoiceChoice) => Promise<void>;
@@ -108,14 +114,18 @@ const TURN_POLL_MS = 1_500;
 /**
  * Coming back after a dropped line.
  *
- * Three tries, spaced further apart each time, then a plain sentence and
- * a stop. The previous rule was one attempt per thirty seconds with no
+ * G-D21 (2026-10-09): one try, then a plain sentence and a stop. Only a
+ * line the person started in this tab, that came up, is ever resumed by
+ * itself; three tries were three new sessions nobody asked for.
+ *
+ * Earlier: three tries, spaced further apart each time, then a plain
+ * sentence and a stop. The previous rule was one attempt per thirty seconds with no
  * limit: a line that failed twice in a row left the person reading an
  * error for half a minute, and a line that failed forever retried
  * forever. Attempts reset the moment a session comes up, so an hour of
  * talking with one blip in it is not two blips away from giving up.
  */
-const RECONNECT_DELAYS_MS = [1_200, 3_000, 8_000] as const;
+export const RECONNECT_DELAYS_MS = [1_200] as const;
 /**
  * How long a line has to hold before a drop counts as a fresh blip.
  *
@@ -127,6 +137,8 @@ const RECONNECT_DELAYS_MS = [1_200, 3_000, 8_000] as const;
 const STABLE_LINE_MS = 20_000;
 /** How long "switching to standard voice" stays once that voice is up. */
 const LINK_STATUS_LINGER_MS = 4_000;
+/** A vendor error this recent is what the reconnect shows. */
+const ERROR_KEPT_MS = 2_000;
 /** G-R3: voice turn outcomes kept for the rendered turns. */
 const TURN_OUTCOMES_KEPT = 40;
 /** How long a turn's "not answered" sentence stays on screen (A4). */
@@ -208,6 +220,20 @@ export function useVoiceInterview(
   // A session that drops on its own comes back on the same thread before
   // the person has to do anything.
   const reconnectAttempts = useRef(0);
+  /**
+   * G-D21: the person started the line in this tab (Talk, the wake word,
+   * a voice choice) and has not ended it. Nothing reopens a line without.
+   */
+  const personAsked = useRef(false);
+  /**
+   * INC-1 (g): the conversation the line is in, as the server named it. A
+   * line that reopens by itself stays in it (a new session without it
+   * opened a new conversation, and the cards on screen went with the old).
+   */
+  const lineConversation =
+    useRef<VoiceInterviewThread["conversationId"]>(undefined);
+  /** A vendor error just said, kept on screen while the line comes back. */
+  const lastError = useRef<{ text: string; at: number } | null>(null);
   /** When the current line came up; null while there is none. */
   const upSince = useRef<number | null>(null);
   const talkRef = useRef<VoiceInterview["talk"] | null>(null);
@@ -242,6 +268,15 @@ export function useVoiceInterview(
    */
   const reopening = (): string | undefined =>
     said(leadRef.current?.()) ?? said(lastQLine.current);
+  /** The thread a line reopens on: the conversation it was in (INC-1 g). */
+  const sameConversation = (
+    thread: VoiceInterviewThread,
+  ): VoiceInterviewThread => {
+    const conversationId = lineConversation.current;
+    return conversationId === undefined
+      ? thread
+      : { ...thread, conversationId };
+  };
   /**
    * One handler for a line ending, reachable from the transport's own
    * "ended" and from the poll that notices the server has let a session
@@ -279,8 +314,15 @@ export function useVoiceInterview(
       return;
     }
     reconnectAttempts.current += 1;
-    // A calm word instead of silence while the line comes back.
-    setLinkStatus(RECONNECTING_NOTICE);
+    // A calm word instead of silence while the line comes back; a vendor
+    // error just said stays (it already says Q is reconnecting), so the
+    // person sees what happened rather than a flicker (G: 0/3 visible).
+    const error = lastError.current;
+    setLinkStatus(
+      error !== null && Date.now() - error.at < ERROR_KEPT_MS
+        ? error.text
+        : RECONNECTING_NOTICE,
+    );
     // Silent: a deploy of the Q API or a network blip is picked back up
     // before the person needs to know; only giving up is said (HARDEN P0).
     // `talk` clears the notice as it starts and sets its own on failure.
@@ -294,9 +336,10 @@ export function useVoiceInterview(
       reconnectTimer.current = null;
       if (!mounted.current || generation.current !== scheduledFor) return;
       void again({
-        thread: last.thread,
+        thread: sameConversation(last.thread),
         firstMessage: reopening(),
         resume: true,
+        automatic: true,
       });
     }, delay);
   };
@@ -411,15 +454,17 @@ export function useVoiceInterview(
       // Q carries on speaking first on the standard line: the question it
       // is asking, never a second welcome.
       void again({
-        thread: last.thread,
+        thread: sameConversation(last.thread),
         firstMessage: reopening(),
         resume: true,
+        automatic: true,
         ...(renew ? {} : { duplex: false }),
       }).then(() => {
         if (notice !== null && !weak) setNotice(notice);
       });
     },
     onError: (message) => {
+      lastError.current = { text: message, at: Date.now() };
       setNotice(message);
       events.onError?.(message);
     },
@@ -493,6 +538,9 @@ export function useVoiceInterview(
     setTurn(null);
     lastStart.current = null;
     reconnectAttempts.current = 0;
+    personAsked.current = false;
+    lineConversation.current = undefined;
+    lastError.current = null;
     upSince.current = null;
     duplexOff.current = false;
     renewals.current = 0;
@@ -516,7 +564,14 @@ export function useVoiceInterview(
       resume = false,
       duplex,
       lead,
+      automatic = false,
     }) => {
+      // G-D21: a line reopens by itself only for the person's own line.
+      if (automatic && !personAsked.current) return;
+      if (!automatic) {
+        personAsked.current = true;
+        lineConversation.current = undefined;
+      }
       // This call is now the line the person wants; anything older still
       // on its way (a reconnect timer, an open waiting on the server)
       // stands down when it sees the generation has moved on.
@@ -669,6 +724,9 @@ export function useVoiceInterview(
             ? current
             : read.value,
         );
+        if (read.value.conversationId !== undefined) {
+          lineConversation.current = read.value.conversationId;
+        }
         // RECOVERY A4 (standard line): a turn Q chose not to answer is
         // shown, once, rather than left as a silent "Thinking".
         const outcome = read.value.outcome;
@@ -726,7 +784,7 @@ export function useVoiceInterview(
       // the Q conversation are where they were, on the server. `talk` ends
       // the current line first; Q picks up with the question it is asking.
       await talk({
-        thread: last.thread,
+        thread: sameConversation(last.thread),
         firstMessage: reopening(),
         voice: next,
         resume: true,
