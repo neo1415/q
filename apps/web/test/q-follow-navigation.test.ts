@@ -1,7 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import type { QTurn } from "../src/features/q/conversation";
-import { navigationToFollow } from "../src/features/q/follow-navigation";
+import {
+  followOfThread,
+  navigationToFollow,
+} from "../src/features/q/follow-navigation";
 import { destinationPath } from "../src/features/voice/destinations";
 import { loadWire } from "../src/features/q/wire";
 
@@ -66,5 +69,50 @@ describe("following a navigation Q announced", () => {
     expect(navigationToFollow([qTurn("m2", toDiscover)], seen)).toBe(
       "DISCOVER",
     );
+  });
+});
+
+describe("a typed question's move while a voice line is open (n-founder-strings, 2026-10-09)", () => {
+  const toRehearsals = [
+    {
+      kind: "UI_INTENT" as const,
+      intent: { kind: "NAVIGATE" as const, destination: "REHEARSALS" as const },
+    },
+  ];
+  const answerOf = (id: string, runId: string): QTurn => ({
+    ...(qTurn(id, toRehearsals) as Extract<QTurn, { kind: "Q" }>),
+    runId,
+  });
+
+  it("is made here: the voice board never carries a typed answer", () => {
+    const seen = new Set<string>();
+    const followed = followOfThread([answerOf("m1", "run-typed")], seen, {
+      active: true,
+      typedRuns: new Set(["run-typed"]),
+    });
+    expect(followed.navigate).toBe("REHEARSALS");
+  });
+
+  it("a spoken answer's move is left to the voice board, and never made here later", () => {
+    const seen = new Set<string>();
+    const spoken = [answerOf("m2", "run-spoken")];
+    expect(
+      followOfThread(spoken, seen, { active: true, typedRuns: new Set() })
+        .navigate,
+    ).toBeNull();
+    // The line ends: the spoken answer is not followed a second time.
+    expect(
+      followOfThread(spoken, seen, { active: false, typedRuns: new Set() })
+        .navigate,
+    ).toBeNull();
+  });
+
+  it("with no voice line, every new answer is followed as before", () => {
+    expect(
+      followOfThread([answerOf("m3", "run-spoken")], new Set(), {
+        active: false,
+        typedRuns: new Set(),
+      }).navigate,
+    ).toBe("REHEARSALS");
   });
 });

@@ -78,3 +78,35 @@ export function followOfTurns(
   }
   return { navigate, actions };
 }
+
+/**
+ * What this surface follows of the thread's answers. While a voice line is
+ * open, a spoken answer's moves are the voice board's to make, after Q has
+ * said them (they are only marked seen here). An answer to a question this
+ * surface sent by typing is still followed here: the board never carries
+ * it (2026-10-09 stack run, n-founder-strings: "Okay, let me do a quick
+ * rehearsal with these people" was typed while /home's voice line was
+ * open, and its NAVIGATE to Rehearsals was marked seen and never made).
+ */
+export function followOfThread(
+  turns: readonly QTurn[],
+  seen: Set<string>,
+  voice: {
+    readonly active: boolean;
+    /** Runs this surface started from typed questions. */
+    readonly typedRuns: ReadonlySet<string>;
+  },
+): ReturnType<typeof followOfTurns> {
+  if (!voice.active) return followOfTurns(turns, seen);
+  const typed = followOfTurns(
+    turns.filter(
+      (turn) =>
+        turn.kind !== "Q" ||
+        (turn.runId !== undefined && voice.typedRuns.has(turn.runId)),
+    ),
+    seen,
+  );
+  // The spoken ones: seen, so they are never made here later either.
+  followOfTurns(turns, seen);
+  return typed;
+}
