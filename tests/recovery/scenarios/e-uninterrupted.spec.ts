@@ -32,12 +32,12 @@ test("Scenario E: talk across three pages without the line dropping; interrupt; 
   await useScript([
     {
       name: "long",
-      when: { user: "tell me about my raise" },
+      when: { task: "COMPANY_ANALYST", user: "tell me about my raise" },
       reply: answer("Your raise is two and a half million dollars. ".repeat(6)),
     },
     {
       name: "correct",
-      when: { user: "no, I meant the readiness" },
+      when: { task: "COMPANY_ANALYST", user: "no, I meant the readiness" },
       reply: answer("Your readiness has three open items."),
     },
   ]);

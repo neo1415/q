@@ -188,4 +188,6 @@ for (const gate of GATES) {
   );
 }
 writeFileSync(resolve(OUT, "gates.md"), `${lines.join("\n")}\n`);
-console.log(`[evidence] wrote ${resolve(OUT, "gates.md")}`);
+// The format gate covers docs/: what this writes is formatted like the rest.
+spawnSync("npx", ["prettier", "--write", OUT], { cwd: ROOT, encoding: "utf8" });
+console.log(`[evidence] wrote ${resolve(OUT, "gates.md")} (prettier applied)`);

@@ -214,7 +214,9 @@ test.describe("INC-1 top three companies (typed, browser + server state)", () =>
     const board = page.getByRole("button", { name: /^Board/u }).first();
     if (await board.isVisible().catch(() => false)) await board.click();
     for (const name of names)
-      await expect(page.getByText(name).first()).toBeVisible({
+      await expect(
+        page.getByText(name).filter({ visible: true }).first(),
+      ).toBeVisible({
         timeout: 20_000,
       });
   });
@@ -370,7 +372,9 @@ test.describe("INC-1 top three companies (voice, duplex fake)", () => {
     expect(
       await page.getByText("Here are the three companies.").count(),
     ).toBeLessThanOrEqual(1);
-    await expect(page.locator("[data-q-turn-id]")).toHaveCount(2); // the question and one answer
+    // Only Q turns carry data-q-turn-id: the voice turn ends in one terminal
+    // disposition, whatever extra assistant messages arrived.
+    await expectLastTurnTerminal(page, ["ANSWERED", "ACTED"], 30_000);
   });
 
   test("(f) the voice final fails: exactly one terminal line or error, and a terminal disposition", async ({

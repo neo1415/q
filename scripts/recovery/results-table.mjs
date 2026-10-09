@@ -16,6 +16,7 @@
  *   NOT RUN                skipped, interrupted or never reached
  * Writes results.md and promises.md (promise x step) when --out is given.
  */
+import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -142,5 +143,16 @@ if (out === null) {
   mkdirSync(out, { recursive: true });
   writeFileSync(resolve(out, "results.md"), results);
   writeFileSync(resolve(out, "promises.md"), promisesMd);
+  // The format gate covers docs/: keep what this writes prettier-clean.
+  spawnSync(
+    "npx",
+    [
+      "prettier",
+      "--write",
+      resolve(out, "results.md"),
+      resolve(out, "promises.md"),
+    ],
+    { encoding: "utf8" },
+  );
   console.log(`wrote ${resolve(out, "results.md")} and promises.md`);
 }
