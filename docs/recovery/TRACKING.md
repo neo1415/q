@@ -90,3 +90,22 @@ The integration branch contains **all seven workstreams** (F, E, A, D, C, B, G's
 - **Fixed by the lead since:** G-D13 (history dropped cards, `117d32f6`) and G-D8 (busy pages returned 500, `00770d61`; migration `20261220210000`, local only).
 - **Dispatched:** A (G-D19, G-D20, G-D7, failed-final visibility), B (G-D3, G-R4), C (G-D14, G-D16, G-R1, accessibility), D (G-R5), E (G-D17, G-D18, G-R3, accessibility), F (G-D9). The lead added axe-core as a root devDependency (G-R6).
 - **Environment (G-D11):** real cloud-shell credentials leaked into locally started services. q-api tried to send email via Brevo, and the egress guard refused all 33 attempts, so nothing was sent and nothing was charged. G's stack now starts each service from a clean environment.
+
+## K — Persistent knowledge and instant answers (founder brief 2026-10-09)
+
+**Reproduced failure (production, 15:57–15:58 UTC):** "three fintech companies" over GPT-Live.
+
+- GPT-Live's input transcript came through as `(inaudible)` three times, and those runs got no answer.
+- Only the fragment "especially across FinTech" reached Q Brain, which answered with mandate prose and no cards.
+- Root causes: (1) the delegation request is rebuilt from a failed or fragmented transcript (V); (2) there is no DISCOVER_COMPANIES fast path, so sector discovery falls to the analyst (B).
+
+| Part                                                                                                                                                                                               | Owner | Status     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ---------- |
+| 1 DISCOVER_COMPANIES semantic intent and fast path; 8 fast-path router; 9 act-don't-narrate; 4 context assembly measurement, single-flight, parallel reads; 7 prompt-caching research and ordering | B     | dispatched |
+| 2–3 Tier B projections (company knowledge, mandate and fit summaries, taxonomy and geography indexes); 5 event-driven invalidation and versioning                                                  | D     | dispatched |
+| 5 page context, entity prefetch on navigation, references across navigation, clickable cards                                                                                                       | C     | dispatched |
+| 6 GPT-Live context package, thinking.append updates, no runs from `(inaudible)` or fragments                                                                                                       | V     | dispatched |
+| 11 cache isolation, revocation, cross-tenant tests                                                                                                                                                 | F     | dispatched |
+| 10 baselines and p50/p95; 13 Tests 1–7                                                                                                                                                             | G     | dispatched |
+
+No live provider calls (the founder's credit rule). Tier A/B/C live in existing Postgres and q-knowledge; no new datastore without measured need.
