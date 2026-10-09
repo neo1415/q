@@ -347,6 +347,59 @@ export function pageRequestOf(text: string): PageRequest | null {
   return null;
 }
 
+/**
+ * Whether any sentence asks to go somewhere ("open ...", "take me to ...").
+ * The browser asks the Q API about a record only then (live 2026-10-09:
+ * 204 of 216 reads in twelve minutes were transcript pieces asking for
+ * nothing).
+ */
+export function asksToGo(text: string): boolean {
+  return text
+    .split(/(?<=[.!?])\s+/u)
+    .some((sentence) =>
+      PAGE_VERB.test(withoutLeadIn(sentence).replace(/[.!?]+$/u, "")),
+    );
+}
+
+/** A sentence that says no, or says what they already see. */
+const NOT_A_MOVE =
+  /\b(?:don'?t|do\s+not|not|never|no|can'?t|cannot|won'?t|i'?m\s+(?:on|in|at|looking\s+at)|i\s+am\s+(?:on|in|at|looking\s+at)|i\s+(?:can\s+)?see)\b/iu;
+
+function escaped(words: string): string {
+  return words.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+/**
+ * RECOVERY-2026-10 (C, live 2026-10-09 14:35-14:47): whether the person's
+ * own words name this page in a sentence that asks for it. The turn
+ * reader is a model: it moved "I can't really see anything, so..." and
+ * "I'm on Tensorgate's page, but I..." to Discover, and "Is there a
+ * Tensorgate rehearsal here I can open" to Relationships. A move it reads
+ * is followed only when a sentence names that page (any name in
+ * PAGE_NAMES, singular or plural) and neither says no nor says what they
+ * already see.
+ */
+export function wordsNamePage(text: string, target: PageTarget): boolean {
+  const names = Object.entries(PAGE_NAMES)
+    .filter(([, named]) =>
+      target.kind === "SETTINGS"
+        ? named.kind === "SETTINGS" ||
+          (named.kind === "DESTINATION" && named.destination === "SETTINGS")
+        : named.kind === "DESTINATION" &&
+          named.destination === target.destination,
+    )
+    .map(([name]) => name.replace(/s$/u, ""))
+    .filter((name) => name.length > 1);
+  if (names.length === 0) return false;
+  const named = new RegExp(
+    `\\b(?:${names.map(escaped).join("|")})(?:s|es|'s)?\\b`,
+    "iu",
+  );
+  return text
+    .split(/(?<=[.!?])\s+|\s*[,;]\s*(?:but|so|and)\s+/u)
+    .some((sentence) => named.test(sentence) && !NOT_A_MOVE.test(sentence));
+}
+
 /** What Q says for a page Capital Q does not have. */
 export function cannotOpenLine(named: string): string {
   const plain = named.replace(/[^\p{L}\p{N}\s'&-]/gu, "").slice(0, 60);

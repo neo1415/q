@@ -27,9 +27,14 @@ import {
   type FastNavigationTransport,
 } from "../src/features/q/control/fast-navigation";
 import { fastMoveLine } from "../src/features/voice/live/live-call";
+import { performTurnChain } from "../src/features/voice/use-follow-turn";
 import {
+  expectNavigation,
+  noteRedirect,
   noteRoute,
+  onNavigationOutcome,
   resetUiActController,
+  type NavigationOutcome,
 } from "../src/features/q/ui-act-controller";
 import { loadWire } from "../src/features/q/wire";
 
@@ -309,5 +314,78 @@ describe("GPT-Live transcript sequences", () => {
     noteRoute("/home");
     await navigationHeard("open discover");
     expect(pushed).toEqual(["/discover", "/discover"]);
+  });
+});
+
+/**
+ * Live 2026-10-09 ("most of the stuff I tell it, it says it didn't go
+ * through"): a page that sends them on (Investors -> Discover) is a move
+ * that arrived, never FAILED.
+ */
+describe("a move to a page that redirects", () => {
+  it("is DONE when it lands where that page sent it", () => {
+    const seen: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => seen.push(outcome));
+    expectNavigation("/investors");
+    noteRedirect("/investors", "/discover");
+    noteRoute("/discover");
+    stop();
+    expect(seen).toEqual([
+      { status: "DONE", expected: "/investors", route: "/discover" },
+    ]);
+  });
+
+  it("without the page's word, landing elsewhere is not arrival", () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const seen: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => seen.push(outcome));
+    expectNavigation("/rehearsals");
+    noteRoute("/relationships");
+    vi.advanceTimersByTime(21_000);
+    stop();
+    expect(seen.map((outcome) => outcome.status)).toEqual(["FAILED"]);
+  });
+});
+
+/**
+ * V's GPT-Live bridge waits for a move's receipt before the voice speaks:
+ * a move without one would leave it saying "coming up". Every move gets
+ * one, including the deduped and the already-there.
+ */
+describe("every move gets a receipt", () => {
+  function receipts(): { seen: NavigationOutcome[]; stop: () => void } {
+    const seen: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => seen.push(outcome));
+    return { seen, stop };
+  }
+
+  it("Q's OPEN_RECORD_PAGE after the fast path already opened it: DONE, one push", async () => {
+    stub(server);
+    await navigationHeard("Take me to Shiftwell relationship");
+    const { seen, stop } = receipts();
+    performClientAction({
+      kind: "OPEN_RECORD_PAGE",
+      page: "RELATIONSHIP_COMPANY",
+      id: SHIFTWELL,
+    });
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    stop();
+    expect(seen[0]?.status).toBe("DONE");
+    expect(pushed).toHaveLength(1);
+  });
+
+  it("a voice turn's move to the page they are on: DONE at once", () => {
+    window.history.pushState(null, "", "/discover");
+    noteRoute("/discover");
+    const { seen, stop } = receipts();
+    performTurnChain({
+      sequence: 1,
+      navigate: "DISCOVER",
+      handoff: null,
+    } as unknown as Parameters<typeof performTurnChain>[0]);
+    stop();
+    expect(seen).toEqual([
+      { status: "DONE", expected: "/discover", route: "/discover" },
+    ]);
   });
 });

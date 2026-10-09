@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { noteRedirect } from "@/features/q/ui-act-controller";
+
 /**
  * A founder's investor list is Discover's Investors tab. A server
  * `redirect()` here runs after the shell has started streaming, so Next
@@ -14,6 +16,8 @@ import { useEffect } from "react";
 export function GoToDiscover() {
   const router = useRouter();
   useEffect(() => {
+    // A move Q made to Investors has arrived when Discover opens.
+    noteRedirect("/investors", "/discover");
     router.replace("/discover");
   }, [router]);
   return null;

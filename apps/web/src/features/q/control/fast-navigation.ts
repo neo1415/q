@@ -1,5 +1,6 @@
 import type { QFastNavigationResponse, QUiIntent } from "@capital-q/contracts";
 import {
+  asksToGo,
   pageRequestOf,
   takenBack,
 } from "@capital-q/q-specialists/page-request";
@@ -104,7 +105,7 @@ function readHere(text: string): { path: string | null } | "ASK_SERVER" {
     return { path: null };
   }
   const page = pageRequestOf(said);
-  if (page === null) return "ASK_SERVER";
+  if (page === null) return asksToGo(said) ? "ASK_SERVER" : { path: null };
   if (page.kind === "UNKNOWN") return { path: null };
   return {
     path:

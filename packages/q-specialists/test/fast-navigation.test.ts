@@ -4,8 +4,10 @@ import type { QRecordPage } from "@capital-q/contracts";
 
 import {
   resolveFastNavigation,
+  resolveNamedRecord,
   type OpenRecordIntent,
 } from "../src/fast-navigation.js";
+import { asksToGo, wordsNamePage } from "../src/page-request.js";
 
 /**
  * RECOVERY-2026-10 (C, founder 2026-10-09: "stupid fast"): the code-only
@@ -172,5 +174,78 @@ describe("resolveFastNavigation reads GPT-Live-shaped transcripts", () => {
       kind: "LEAVE_TO_Q",
     });
     expect(opened).toEqual([]);
+  });
+});
+
+/** Live GPT-Live 2026-10-09 14:35-14:47 (Zino), the exact transcript strings. */
+describe("live 2026-10-09 transcript strings", () => {
+  const OWN = ["Tensorgate", "Ledgerfold"];
+
+  it.each([
+    "I can't really see anything, so you're not I guess that's fi",
+    "So no, no, you're alright. I'm on Tensorgate's page, but I",
+    "Is there a Tensorgate rehearsal here I can open",
+    "Take me to the relationship where I can review it then",
+  ])("never moves and quotes nothing: %s", async (text) => {
+    const { input, opened } = reader(OWN, ["Tensorgate"]);
+    expect(await resolveFastNavigation(input(text))).toEqual({
+      kind: "LEAVE_TO_Q",
+    });
+    expect(
+      await resolveNamedRecord({ ...input(text), side: "INVESTOR" }),
+    ).toBeNull();
+    expect(opened).toEqual([]);
+  });
+
+  it.each([
+    "Open Tensor Gate",
+    "open tensor gate.",
+    "Okay, take me to Tensor Gate.",
+  ])("'Tensor Gate' is their Tensorgate: %s", async (text) => {
+    const { input, opened } = reader(OWN, ["Tensorgate"]);
+    expect((await resolveFastNavigation(input(text))).kind).toBe("NAVIGATE");
+    expect(opened[0]?.name).toBe("Tensorgate");
+  });
+
+  it("the deck tab inside a garbled transcript is Tensorgate's deck", async () => {
+    const { input, opened } = reader(OWN, ["Tensorgate"]);
+    const text =
+      "Show me the pitch deck tab for that Yes Tensor gate Tensor gate";
+    const decided = await resolveNamedRecord({
+      ...input(text),
+      side: "INVESTOR",
+    });
+    expect(decided?.kind).toBe("OPEN");
+    expect(opened[0]?.name).toBe("Tensorgate");
+    expect(decided?.said ?? "").not.toMatch(/Yes Tensor gate/u);
+  });
+
+  it("a real name that is none of theirs still gets one truthful line", async () => {
+    const { input } = reader(OWN, []);
+    const decided = await resolveNamedRecord({
+      ...input("Open Nonexistent Holdings"),
+      side: "INVESTOR",
+    });
+    expect(decided?.kind).toBe("ASK");
+  });
+});
+
+describe("wordsNamePage", () => {
+  it.each([
+    ["open discover", "DISCOVER", true],
+    ["Okay, let me do a quick rehearsal with these people", "REHEARSALS", true],
+    ["don't open discover", "DISCOVER", false],
+    ["I'm on the discover page", "DISCOVER", false],
+    ["Is there a Tensorgate rehearsal here I can open", "RELATIONSHIPS", false],
+  ] as const)("%s / %s -> %s", (text, destination, expected) => {
+    expect(wordsNamePage(text, { kind: "DESTINATION", destination })).toBe(
+      expected,
+    );
+  });
+
+  it("asksToGo reads only sentences that ask to go somewhere", () => {
+    expect(asksToGo("Okay, open Tensor Gate.")).toBe(true);
+    expect(asksToGo("I can't really see anything, so you're not")).toBe(false);
+    expect(asksToGo("So no, no, you're alright.")).toBe(false);
   });
 });

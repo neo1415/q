@@ -10,7 +10,9 @@ import {
   matchOwnCounterpart,
   namedRecordRequestOf,
   notFoundLine,
+  ownCounterpartWithin,
   pagesFor,
+  plausibleName,
   whichOneLine,
 } from "./named-record-request.js";
 import { pageRequestOf, takenBack } from "./page-request.js";
@@ -60,11 +62,23 @@ export async function resolveNamedRecord(input: {
   const names = await input
     .counterpartNames()
     .catch(() => [] as readonly string[]);
-  const match = matchOwnCounterpart(asked.name, names);
+  const direct = matchOwnCounterpart(asked.name, names);
+  // Their own counterpart written inside the words (a transcript's spacing,
+  // repeats and fillers around it) is that one record.
+  const within =
+    direct.kind === "NONE" ? ownCounterpartWithin(asked.name, names) : null;
+  const match =
+    within === null ? direct : { kind: "ONE" as const, name: within };
   if (match.kind === "SEVERAL") {
     return { kind: "ASK", said: whichOneLine(match.names), log: "SEVERAL" };
   }
-  if (match.kind === "NONE" && !asked.explicit) return null;
+  // Not one of theirs and not plainly a name: Q answers, nothing is quoted.
+  if (
+    match.kind === "NONE" &&
+    (!asked.explicit || !plausibleName(asked.name))
+  ) {
+    return null;
+  }
   const name = match.kind === "ONE" ? match.name : asked.name;
   for (const page of pagesFor(asked.facet, input.side)) {
     const intent = await input.open(page, name).catch(() => null);

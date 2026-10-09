@@ -233,9 +233,7 @@ export function movedEarlyRecently(path: string, withinMs: number): boolean {
 /** The fast path's move: at once, confirmed by the settled route. */
 export function moveEarly(path: string): void {
   earlyMove = { path, at: Date.now() };
-  if (path !== `${window.location.pathname}${window.location.search}`) {
-    expectNavigation(path);
-  }
+  expectNavigation(path);
   if (clientRouterPush !== null) clientRouterPush(path);
   else window.location.assign(path);
 }
@@ -318,12 +316,12 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   // tab, then the server action that ends the session and redirects.
   goTo: (path) => {
     // The fast path already went there for this sentence: one move.
-    if (movedEarlyTo(path)) return;
     // RECOVERY-2026-10 (C2): a UI act queued after this move waits for the
-    // new page instead of acting on the one being left.
-    if (path !== `${window.location.pathname}${window.location.search}`) {
-      expectNavigation(path);
-    }
+    // new page instead of acting on the one being left. Every move gets its
+    // receipt (the GPT-Live voice waits for it): one already made by the
+    // fast path, or to where they already are, is DONE at once.
+    expectNavigation(path);
+    if (movedEarlyTo(path)) return;
     if (clientRouterPush !== null) clientRouterPush(path);
     else window.location.assign(path);
   },
