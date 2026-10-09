@@ -841,6 +841,7 @@ export {
 // RECOVERY K (Tier B): prepared business knowledge, through its port only.
 export {
   KNOWLEDGE_DISCOVER_LIMIT_MAX,
+  createKnowledgeReconciler,
   createPostgresCompanyKnowledge,
   type CompanyKnowledge,
   type CompanyKnowledgePort,

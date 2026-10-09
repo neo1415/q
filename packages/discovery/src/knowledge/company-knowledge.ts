@@ -389,3 +389,22 @@ export function createPostgresCompanyKnowledge(options: {
     },
   };
 }
+
+/**
+ * Reconciliation for the projections (missed changes, a rule that moved):
+ * refreshes what is missing, stale or out of step, in batches. Versions
+ * move only on a real change, so running it often is harmless.
+ */
+export function createKnowledgeReconciler(options: {
+  readonly sql: DatabaseExecutor;
+  readonly batch?: number | undefined;
+}) {
+  const batch = Math.min(Math.max(options.batch ?? 500, 1), 5_000);
+  return {
+    reconcile: async (): Promise<number> => {
+      const rows = await options.sql<{ touched: number }[]>`
+        select knowledge.reconcile(${batch}) as touched`;
+      return rows[0]?.touched ?? 0;
+    },
+  };
+}

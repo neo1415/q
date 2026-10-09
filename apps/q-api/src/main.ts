@@ -505,6 +505,7 @@ import {
 import { createExploreToolPort } from "./composition/explore.js";
 import {
   createDiscoveryService,
+  createKnowledgeReconciler,
   createInteractionSignalService,
   createPostgresCompanyCardPort,
   createPostgresInteractionRepository,
@@ -3928,6 +3929,25 @@ const orphanSweep = createOrphanedRunSweep({
   logger,
 });
 await orphanSweep.sweep();
+
+// Recovery K: Tier B knowledge is kept current by same-transaction triggers;
+// this reconciles anything missed (a failed refresh, a projection rule that
+// changed), every ten minutes.
+const knowledgeReconciler = createKnowledgeReconciler({ sql: database.sql });
+setInterval(
+  () => {
+    knowledgeReconciler
+      .reconcile()
+      .then((touched) => {
+        if (touched > 0)
+          logger.info({ touched }, "knowledge projections reconciled");
+      })
+      .catch((error: unknown) => {
+        logger.warn({ err: error }, "knowledge reconciliation failed");
+      });
+  },
+  10 * 60 * 1000,
+).unref();
 
 // Recovery D3: the durable workforce runner. It claims approved jobs under a
 // lease, renews it while a job runs and resumes any job a restart left
