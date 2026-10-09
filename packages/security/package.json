@@ -41,6 +41,7 @@
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@supabase/supabase-js": "2.114.0",
+    "jose": "6.2.10",
     "zod": "4.5.4"
   }
 }

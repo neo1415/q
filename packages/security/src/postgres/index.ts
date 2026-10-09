@@ -41,3 +41,5 @@ export {
   createPostgresContextEpochReader,
   type ContextEpochReader,
 } from "./context-epochs.js";
+
+export { createPostgresSessionLiveness } from "./session-liveness.js";

@@ -456,8 +456,12 @@ import {
   createPostgresApplicationIdentityLookup,
   createPostgresAuthorizationPolicySource,
   createPostgresPersonProfileStore,
+  createPostgresSessionLiveness,
 } from "@capital-q/security/postgres";
-import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
+import {
+  createLocalJwtAccessTokenAuthenticator,
+  createSupabaseAccessTokenAuthenticator,
+} from "@capital-q/security/supabase";
 
 import { createApp, SERVICE_NAME } from "./app.js";
 import {
@@ -5699,12 +5703,23 @@ logger.info(
   "voice channel composed",
 );
 
+// SUB-SECOND Phase 4: access tokens are verified here against the
+// project's published ES256 key, and the session is checked in the
+// database (fresh for writes, at most 15 s old for reads), instead of
+// asking the Auth server on every request (~208 ms median, 2-6 s tail).
+// CQ_AUTH_LOCAL_JWT=off restores the Auth-server check.
+const accessTokens =
+  process.env["CQ_AUTH_LOCAL_JWT"]?.trim().toLowerCase() === "off"
+    ? createSupabaseAccessTokenAuthenticator(supabaseAuth)
+    : createLocalJwtAccessTokenAuthenticator({
+        url: supabaseAuth.url,
+        sessions: createPostgresSessionLiveness({ sql: database.sql }),
+        fallback: createSupabaseAccessTokenAuthenticator(supabaseAuth),
+      });
 const { app, logger: appLogger } = createApp(
   config,
   {
-    authenticator: createSupabaseRequestAuthenticator(
-      createSupabaseAccessTokenAuthenticator(supabaseAuth),
-    ),
+    authenticator: createSupabaseRequestAuthenticator(accessTokens),
     resolver: actorContextResolver,
     identity,
   },
