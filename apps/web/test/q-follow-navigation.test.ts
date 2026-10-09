@@ -4,6 +4,7 @@ import type { QTurn } from "../src/features/q/conversation";
 import {
   followOfThread,
   navigationToFollow,
+  noteTypedRun,
 } from "../src/features/q/follow-navigation";
 import { destinationPath } from "../src/features/voice/destinations";
 import { loadWire } from "../src/features/q/wire";
@@ -114,5 +115,16 @@ describe("a typed question's move while a voice line is open (n-founder-strings,
         typedRuns: new Set(),
       }).navigate,
     ).toBe("REHEARSALS");
+  });
+
+  it("a typed run noted in this tab is followed by a surface set up again since (rerun 18:21)", () => {
+    noteTypedRun("run-before-remount");
+    // A fresh surface: its own followed set, no set of its own to pass.
+    const followed = followOfThread(
+      [answerOf("m4", "run-before-remount")],
+      new Set(),
+      { active: true },
+    );
+    expect(followed.navigate).toBe("REHEARSALS");
   });
 });

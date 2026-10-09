@@ -93,20 +93,38 @@ export function followOfThread(
   seen: Set<string>,
   voice: {
     readonly active: boolean;
-    /** Runs this surface started from typed questions. */
-    readonly typedRuns: ReadonlySet<string>;
+    /** Runs started in this tab from typed questions (default: all noted). */
+    readonly typedRuns?: ReadonlySet<string> | undefined;
   },
 ): ReturnType<typeof followOfTurns> {
   if (!voice.active) return followOfTurns(turns, seen);
+  const typedRuns = voice.typedRuns ?? TYPED_RUNS;
   const typed = followOfTurns(
     turns.filter(
       (turn) =>
         turn.kind !== "Q" ||
-        (turn.runId !== undefined && voice.typedRuns.has(turn.runId)),
+        (turn.runId !== undefined && typedRuns.has(turn.runId)),
     ),
     seen,
   );
   // The spoken ones: seen, so they are never made here later either.
   followOfTurns(turns, seen);
   return typed;
+}
+
+/**
+ * The runs this tab started from typed questions. Module state, so it
+ * outlives the surface that asked (2026-10-09 rerun: the Q page's surface
+ * was set up again as the voice line dropped and came back, and a set held
+ * by the old one was gone when the answer landed). Bounded.
+ */
+const TYPED_RUNS = new Set<string>();
+const TYPED_RUNS_MAX = 50;
+
+export function noteTypedRun(runId: string): void {
+  TYPED_RUNS.add(runId);
+  if (TYPED_RUNS.size > TYPED_RUNS_MAX) {
+    const oldest = TYPED_RUNS.values().next().value;
+    if (oldest !== undefined) TYPED_RUNS.delete(oldest);
+  }
 }

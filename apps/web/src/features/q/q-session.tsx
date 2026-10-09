@@ -510,7 +510,6 @@ export function QSessionProvider({
   const wire = useWire();
   // A dropped line makes no moves; the typed answer's are made here.
   const voiceActive = voice.active && isLineLive(voice.client);
-  const typedRuns = q.typedRuns;
   useEffect(() => {
     if (q.loading) {
       followedTurns.current = null;
@@ -540,7 +539,6 @@ export function QSessionProvider({
     // answer is still this surface's (followOfThread).
     const followed = followOfThread(turns, followedTurns.current, {
       active: voiceActive,
-      typedRuns,
     });
     // R20/R33: the app's own actions the answer carries, done once.
     for (const action of followed.actions) performClientAction(action);
@@ -549,7 +547,7 @@ export function QSessionProvider({
       act();
       router.push(path);
     }
-  }, [turns, q.loading, act, router, voiceActive, wire, typedRuns]);
+  }, [turns, q.loading, act, router, voiceActive, wire]);
 
   const [artifactId, setArtifactId] = useState<string | null>(null);
   // R21: the document open in the viewer is part of what is on screen,

@@ -24,6 +24,7 @@ import {
 import { carriedApproval, type CarriedApproval } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
 import { navigationHeard } from "./control/fast-navigation";
+import { noteTypedRun } from "./follow-navigation";
 import { currentScreen, currentViewing } from "./screen";
 import {
   forgetPendingAsk,
@@ -95,8 +96,6 @@ export type QConversation = {
   /** Something that went wrong outside the stream. Plain wording only. */
   readonly notice: string | null;
   readonly runId: string | null;
-  /** Runs this surface started from typed questions (stable, grows). */
-  readonly typedRuns: ReadonlySet<string>;
   /** The conversation this surface is in, once the server has named it. */
   readonly conversationId: string | null;
   /** `viewing`: where in a pitch the person was; sent only when a run starts. */
@@ -186,10 +185,6 @@ export function useQConversation(
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
-  // The runs this surface started from typed questions: their answers'
-  // moves are made here even while a voice line is open (q-session).
-  // One set for the hook's life, grown in place: never a render input.
-  const [typedRuns] = useState(() => new Set<string>());
   const [conversationIdState, setConversationIdState] = useState<string | null>(
     options.conversationId ?? null,
   );
@@ -387,7 +382,7 @@ export function useQConversation(
       openRun.current = started.runId;
       setRunId(started.runId);
       // Started from a typed question (ask, or its resume after a reload).
-      typedRuns.add(started.runId);
+      noteTypedRun(started.runId);
       if (isNew && named !== null) {
         // The caller writes it to the URL; that change is ours, not a
         // request to reopen.
@@ -397,7 +392,7 @@ export function useQConversation(
       }
       follow(started.runId);
     },
-    [follow, runState.messages, typedRuns],
+    [follow, runState.messages],
   );
 
   const awaitingPerson = runState.approval !== null;
@@ -724,7 +719,6 @@ export function useQConversation(
     loading,
     notice,
     runId,
-    typedRuns,
     conversationId: conversationIdState,
     ask,
     stop,
