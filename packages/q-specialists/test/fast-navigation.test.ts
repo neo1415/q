@@ -124,3 +124,53 @@ describe("resolveFastNavigation", () => {
     });
   });
 });
+
+/**
+ * GPT-Live transcripts, as the live line delivered them (2026-10-09): a
+ * spoken lead-in, lower-case names, closing punctuation.
+ */
+describe("resolveFastNavigation reads GPT-Live-shaped transcripts", () => {
+  const OWN = ["Halyard Security", "Ledgerfold"];
+
+  it.each([
+    ["Okay, open discover.", "DISCOVER"],
+    ["Um, so take me to my relationships.", "RELATIONSHIPS"],
+    ["Alright. Open discover", "DISCOVER"],
+    ["okay open settings", "SETTINGS"],
+  ])("a page after a lead-in: %s", async (text, destination) => {
+    const { input } = reader(OWN);
+    expect(await resolveFastNavigation(input(text))).toEqual({
+      kind: "NAVIGATE",
+      intent: { kind: "NAVIGATE", destination },
+    });
+  });
+
+  it.each([
+    "open halyard security.",
+    "Okay, open Halyard Security.",
+    "take me to halyard",
+    "Um, take me to Halyard.",
+    "bring up halyard security",
+  ])("their own record, any casing: %s", async (text) => {
+    const { input, opened } = reader(OWN, ["Halyard Security"]);
+    const decided = await resolveFastNavigation(input(text));
+    expect(decided.kind).toBe("NAVIGATE");
+    expect(opened[0]?.name).toBe("Halyard Security");
+  });
+
+  it("a lower-case name that is none of theirs is never opened early", async () => {
+    const { input, opened } = reader(OWN, ["Halyard Security"]);
+    expect(await resolveFastNavigation(input("open acme widgets"))).toEqual({
+      kind: "LEAVE_TO_Q",
+    });
+    expect(opened).toEqual([]);
+  });
+
+  it("a fragment names nothing", async () => {
+    const { input, opened } = reader(OWN);
+    expect(await resolveFastNavigation(input("Open."))).toEqual({
+      kind: "LEAVE_TO_Q",
+    });
+    expect(opened).toEqual([]);
+  });
+});

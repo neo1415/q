@@ -26,6 +26,7 @@ import {
   setNavigationTransport,
   type FastNavigationTransport,
 } from "../src/features/q/control/fast-navigation";
+import { fastMoveLine } from "../src/features/voice/live/live-call";
 import {
   noteRoute,
   resetUiActController,
@@ -104,6 +105,7 @@ beforeEach(() => {
   prefetched = [];
   registerClientRouter((path) => {
     pushed.push(path);
+    window.history.pushState(null, "", path);
     noteRoute(path);
   });
   registerClientPrefetch((path) => prefetched.push(path));
@@ -233,5 +235,79 @@ describe("time from final words to router.push", () => {
     const timing = await navigationHeard("Take me to Shiftwell relationship");
     expect(timing?.path).toBe(`/relationships/company/${SHIFTWELL}`);
     expect(timing?.ms ?? Infinity).toBeLessThan(400);
+  });
+});
+
+/**
+ * GPT-Live's line (live-call.ts): `session.input_transcript.delta` pieces,
+ * an utterance closed by 900 ms of quiet or by the delegation, and then
+ * the bridge's delegation reading every word since the last one.
+ */
+describe("GPT-Live transcript sequences", () => {
+  function hear(key: string, pieces: readonly string[]): string {
+    for (const piece of pieces) navigationHearingDelta(key, piece);
+    return pieces.join("").trim();
+  }
+
+  it("a page with a lead-in moves at once, from the browser", async () => {
+    const { asked } = stub(server);
+    const said = hear("live_u1", ["Okay", ",", " open", " discover", "."]);
+    const timing = await navigationHeardFor("live_u1", said);
+    expect(timing?.path).toBe("/discover");
+    expect(timing?.ms ?? Infinity).toBeLessThan(150);
+    expect(asked.filter((body) => body.final)).toEqual([]);
+    expect(pushed).toEqual(["/discover"]);
+  });
+
+  it("a request split by a pause ('Open...' / 'Halyard') moves once, whole", async () => {
+    const { asked } = stub((text) =>
+      /^open halyard security\.?$/iu.test(text) ? RELATIONSHIP : LEAVE,
+    );
+    expect(
+      await navigationHeardFor("live_u2", hear("live_u2", ["Open", "..."])),
+    ).toBeNull();
+    const timing = await navigationHeardFor(
+      "live_u3",
+      hear("live_u3", [" halyard", " security."]),
+    );
+    expect(timing?.path).toBe(`/relationships/company/${SHIFTWELL}`);
+    expect(asked.at(-1)).toEqual({
+      text: "Open halyard security.",
+      final: true,
+    });
+    expect(pushed).toHaveLength(1);
+  });
+
+  it("the utterance and then the delegation of the same words: one push", async () => {
+    stub(server);
+    const said = hear("live_u4", ["Take me to", " Shiftwell relationship."]);
+    await navigationHeardFor("live_u4", said);
+    // The bridge's delegation: the same words, read again.
+    const again = await navigationHeard(`Um, ${said}`);
+    expect(again?.path).toBe(`/relationships/company/${SHIFTWELL}`);
+    expect(pushed).toEqual([`/relationships/company/${SHIFTWELL}`]);
+  });
+
+  it("'open discover... no wait' across pieces never moves", async () => {
+    stub(server);
+    const said = hear("live_u5", ["open", " discover", "...", " no", " wait"]);
+    expect(await navigationHeardFor("live_u5", said)).toBeNull();
+    expect(await navigationHeard(said)).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(pushed).toEqual([]);
+  });
+
+  it("the voice is told the page is open, not to ask Q Brain", () => {
+    expect(fastMoveLine("/discover")).toMatch(/already opened/u);
+    expect(fastMoveLine("/discover")).toMatch(/do not ask Q's backend/u);
+  });
+
+  it("asked again after they moved on, it moves again", async () => {
+    stub(server);
+    await navigationHeard("open discover");
+    window.history.pushState(null, "", "/home");
+    noteRoute("/home");
+    await navigationHeard("open discover");
+    expect(pushed).toEqual(["/discover", "/discover"]);
   });
 });

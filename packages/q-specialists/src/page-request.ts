@@ -299,13 +299,28 @@ export function takenBack(text: string): boolean {
 }
 
 /**
+ * Spoken lead-ins before the request itself ("Okay, open discover.", "Um,
+ * so take me to Halyard"). RECOVERY-2026-10 (C, GPT-Live 2026-10-09): voice
+ * transcripts nearly always start with one, and the readers below read the
+ * request from its first word, so every such sentence was left unread.
+ * Only interjections: "can you" / "please" / "hey Q" are read by PAGE_VERB.
+ */
+const LEAD_IN =
+  /^(?:(?:okay|ok|alright|all\s+right|right|so|um+|uh+|erm*|hmm+|yeah|yes|well|now|and|great|cool|perfect|thanks|thank\s+you)\b[\s,.!?;:\-\u2014\u2026]*)+/iu;
+
+/** The words with spoken lead-ins removed. */
+export function withoutLeadIn(text: string): string {
+  return text.trim().replace(LEAD_IN, "").trim();
+}
+
+/**
  * A request to open a page, or null when the words are not one (a record
  * by name, a question, anything else). UNKNOWN only when they named a
  * page ("... page") in plain lower-case words Capital Q has no page for:
  * a proper name ("the Tensorgate page") is a record, for the tools.
  */
 export function pageRequestOf(text: string): PageRequest | null {
-  const said = text.trim().replace(/[.!?]+$/u, "");
+  const said = withoutLeadIn(text).replace(/[.!?]+$/u, "");
   if (said.length === 0 || said.length > 160) return null;
   if (HOME.test(said)) return { kind: "PAGE", target: d("HOME") };
   const verb = PAGE_VERB.exec(said);

@@ -217,6 +217,19 @@ export function movedEarlyTo(path: string): boolean {
   return true;
 }
 
+/**
+ * The fast path moved here moments ago (not consumed): the same request
+ * heard again -- a voice line's utterance and then its delegation -- is
+ * the same move, never a second push.
+ */
+export function movedEarlyRecently(path: string, withinMs: number): boolean {
+  return (
+    earlyMove !== null &&
+    earlyMove.path === path &&
+    Date.now() - earlyMove.at <= withinMs
+  );
+}
+
 /** The fast path's move: at once, confirmed by the settled route. */
 export function moveEarly(path: string): void {
   earlyMove = { path, at: Date.now() };

@@ -1,4 +1,5 @@
 import {
+  navigationHeard,
   navigationHeardFor,
   navigationHearingDelta,
 } from "../../q/control/fast-navigation";
@@ -127,6 +128,15 @@ const SPEAKING_LEVEL = 0.02;
 const UTTERANCE_END_MS = 900;
 const RENEWALS_MAX = 2;
 const CONTEXT_CHARS = 1_600;
+
+/**
+ * What the voice says when the app already moved the screen (C7): the
+ * move is done and confirmed by the page, so it says so, briefly, and
+ * never asks Q's backend for it again.
+ */
+export function fastMoveLine(path: string): string {
+  return `Their screen has already opened what they asked for (${path}). Tell them in a few words that it is open, then carry on; do not ask Q's backend for it.`;
+}
 
 async function post<T>(
   doFetch: typeof fetch,
@@ -274,6 +284,15 @@ export async function startLiveCall(
       if (channel?.readyState === "open") channel.send(JSON.stringify(event));
     },
     delegate: async (request) => {
+      // RECOVERY-2026-10 (C7, live 2026-10-09 "couldn't open pages fast"):
+      // a plain move ("open discover", "take me to Halyard") is the app's
+      // own, in milliseconds; Q Brain is not asked to do it again. The
+      // request is every word since the last delegation, so a request a
+      // pause split in two is read whole here.
+      if (options.fastNavigation === true) {
+        const moved = await navigationHeard(request.request);
+        if (moved !== null) return { commentary: fastMoveLine(moved.path) };
+      }
       if (id === null) throw new LiveCallUnavailable(null);
       const result = await post<DelegationOutcome & { ended?: boolean }>(
         doFetch,

@@ -1,7 +1,7 @@
 import type { QRecordPage } from "@capital-q/contracts";
 import { spokenNameScore } from "@capital-q/q-tools";
 
-import { PAGE_VERB, pageRequestOf } from "./page-request.js";
+import { PAGE_VERB, pageRequestOf, withoutLeadIn } from "./page-request.js";
 
 /**
  * RECOVERY-2026-10 (C, INC-1 live 2026-10-08 19:20-19:22): navigation by a
@@ -114,7 +114,7 @@ function fromObject(object: string): NamedRecordRequest | null {
 export function namedRecordRequestOf(text: string): NamedRecordRequest | null {
   const sentences = text
     .split(/(?<=[.!?])\s+/u)
-    .map((sentence) => sentence.trim().replace(/[.!?]+$/u, ""))
+    .map((sentence) => withoutLeadIn(sentence).replace(/[.!?]+$/u, ""))
     .filter((sentence) => sentence.length > 0 && sentence.length <= 160);
   for (const sentence of [...sentences].reverse()) {
     // A page Capital Q has by that name is the page, not a record.

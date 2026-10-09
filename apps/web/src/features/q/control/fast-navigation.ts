@@ -7,11 +7,13 @@ import {
 import { destinationPath } from "@/features/voice/destinations";
 
 import {
+  movedEarlyRecently,
   moveEarly,
   prefetchPath,
   recordPagePath,
   settingsPath,
 } from "../client-actions";
+import { navigationInFlight } from "../ui-act-controller";
 
 /**
  * RECOVERY-2026-10 (C, founder 2026-10-09: "stupid fast"): the screen moves
@@ -143,6 +145,9 @@ export type FastNavigationTiming = {
   readonly pushMs: number;
 };
 
+/** Within this, a move to where the fast path just went is not repeated. */
+const SAME_MOVE_MS = 10_000;
+
 /**
  * Final words: move now when they plainly name one page or record. Never
  * throws; resolves to the move made, or null when Q's answer decides.
@@ -157,6 +162,17 @@ export async function navigationHeard(
   const here = readHere(text);
   const path = here === "ASK_SERVER" ? await resolve(text, true) : here.path;
   if (path === null) return null;
+  // The same request heard twice (GPT-Live: the utterance, then the
+  // delegation reading the same words) is one move.
+  // Only while the screen is there or still on its way: if they moved
+  // on since, asking again moves again.
+  if (
+    movedEarlyRecently(path, SAME_MOVE_MS) &&
+    (navigationInFlight() ||
+      `${window.location.pathname}${window.location.search}` === path)
+  ) {
+    return { path, ms: Math.round(performance.now() - started), pushMs: 0 };
+  }
   const pushing = performance.now();
   moveEarly(path);
   const timing = {
@@ -214,6 +230,17 @@ export function navigationHearingDelta(key: string, delta: string): void {
   navigationHearing(key, so);
 }
 
+/**
+ * A request cut off after its verb ("open..." then, after a pause, "Halyard
+ * Security"): a voice line that ends an utterance on a quiet gap splits it
+ * in two, and neither half names anything.
+ */
+const DANGLING_VERB =
+  /\b(?:open(?:\s+up)?|take\s+me(?:\s+back)?(?:\s+to)?|go\s+(?:back\s+)?to|pull\s+up|bring\s+up|show\s+me|navigate\s+to|switch\s+to|jump\s+to|head\s+to)[\s,.\-\u2014\u2026]*$/iu;
+/** How long a cut-off verb waits for the rest of its request. */
+const DANGLING_MS = 5_000;
+let dangling: { readonly text: string; readonly at: number } | null = null;
+
 /** Final words of an utterance whose partials were streamed: read, then forgotten. */
 export function navigationHeardFor(
   key: string,
@@ -223,13 +250,26 @@ export function navigationHeardFor(
   const waiting = hearing.get(key);
   if (waiting !== undefined) clearTimeout(waiting);
   hearing.delete(key);
-  return navigationHeard(text);
+  const carried =
+    dangling !== null && Date.now() - dangling.at <= DANGLING_MS
+      ? `${dangling.text} ${text.trim()}`
+      : text.trim();
+  dangling = null;
+  if (DANGLING_VERB.test(carried)) {
+    dangling = {
+      text: carried.replace(/[\s,.\-\u2014\u2026]+$/u, ""),
+      at: Date.now(),
+    };
+    return Promise.resolve(null);
+  }
+  return navigationHeard(carried);
 }
 
 /** Clears what partials resolved (tests). */
 export function resetFastNavigation(): void {
   resolved.clear();
   partials.clear();
+  dangling = null;
   for (const timer of hearing.values()) clearTimeout(timer);
   hearing.clear();
   transport = fetchNavigation;
