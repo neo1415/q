@@ -47,8 +47,15 @@ vi.mock("../src/features/voice/provider/duplex-session", () => ({
 }));
 
 // ---------------------------------------------------------- browser fakes
+let channelsStartConnecting = false;
 class FakeChannel extends EventTarget {
-  readyState: RTCDataChannelState = "open";
+  readyState: RTCDataChannelState = channelsStartConnecting
+    ? "connecting"
+    : "open";
+  open() {
+    this.readyState = "open";
+    this.dispatchEvent(new Event("open"));
+  }
   readonly sent: { type?: string }[] = [];
   send(data: string) {
     this.sent.push(JSON.parse(data) as { type?: string });
@@ -253,6 +260,7 @@ describe("one voice line produces audio in a tab", () => {
     liveOn = true;
     slowOpen = null;
     failRemote = false;
+    channelsStartConnecting = false;
     peers.length = 0;
     audios.length = 0;
     relayCalls.length = 0;
@@ -429,6 +437,27 @@ describe("one voice line produces audio in a tab", () => {
     await ending;
     await call.finished;
     window.history.replaceState(null, "", "/");
+  });
+
+  it("a call ended before its data channel opened still tells the provider session to close (closes < peers - 1)", async () => {
+    channelsStartConnecting = true;
+    const call = await standalone();
+    const channel = peers[0]?.channel;
+    expect(channel?.readyState).toBe("connecting");
+    // Superseded in the moment after the SDP answer, as in rapid restarts.
+    await call.end("superseded");
+    // The channel opens a moment later: the session is told to close.
+    channel?.open();
+    await vi.waitFor(() => {
+      expect(channel?.sent.some((e) => e.type === "session.close")).toBe(true);
+    });
+    channel?.emit({
+      type: "session.closed",
+      reason: "close_requested",
+      usage: { seconds: 1 },
+    });
+    await call.finished;
+    expect(peers[0]?.closed).toBe(true);
   });
 
   it("(c) a slow GPT-Live open that is ended while connecting never plays, and no fallback starts after the end", async () => {

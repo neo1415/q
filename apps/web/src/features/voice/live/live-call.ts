@@ -129,6 +129,27 @@ export class LiveCallUnavailable extends Error {
 const RELAY = "/api/q-voice-live";
 const ICE_TIMEOUT_MS = 10_000;
 const CLOSE_WAIT_MS = 15_000;
+/** How long an end waits for a just-negotiated channel to open, to close it. */
+const CHANNEL_OPEN_WAIT_MS = 5_000;
+
+/** Resolves when the channel opens, closes, or the wait is over. */
+function channelOpened(channel: RTCDataChannel, waitMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    if (channel.readyState !== "connecting") {
+      resolve();
+      return;
+    }
+    const done = () => {
+      clearTimeout(timer);
+      channel.removeEventListener("open", done);
+      channel.removeEventListener("close", done);
+      resolve();
+    };
+    const timer = setTimeout(done, waitMs);
+    channel.addEventListener("open", done);
+    channel.addEventListener("close", done);
+  });
+}
 const SPEAKING_LEVEL = 0.02;
 const UTTERANCE_END_MS = 900;
 const RENEWALS_MAX = 2;
@@ -840,6 +861,17 @@ export async function startLiveCall(
     reason: LiveCallEnd,
   ): Promise<void> => {
     if (mine !== null) {
+      // Ended before the data channel opened (superseded or ended in the
+      // moment after the SDP answer): the provider session already exists
+      // and bills, so it is still told to close once the channel opens.
+      // Without this the peer was only dropped and session.close never
+      // sent (gpt-live.spec "rapid restarts": closes < peers - 1).
+      if (mine.channel.readyState === "connecting") {
+        await channelOpened(mine.channel, CHANNEL_OPEN_WAIT_MS);
+        if (mine.channel.readyState === "open") {
+          mine.channel.send(JSON.stringify({ type: "session.close" }));
+        }
+      }
       if (mine.channel.readyState === "open") {
         const deadline = performance.now() + CLOSE_WAIT_MS;
         while (!mine.closed && performance.now() < deadline) {
