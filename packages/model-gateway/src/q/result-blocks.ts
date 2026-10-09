@@ -92,7 +92,7 @@ export type AnalystResultLike = {
    * when the analyst schema carries it (requested of workstream B). The
    * kind is the model's choice; the content never is.
    */
-  readonly visual?: string | undefined;
+  readonly visual?: string | null | undefined;
 };
 
 const FINDING_TYPES = new Set<string>([
@@ -585,7 +585,7 @@ export function chartBlock(input: {
 
 /** The block the model asked for, from what the run read; null when none fits. */
 function visualBlock(
-  hint: string | undefined,
+  hint: string | null | undefined,
   read: RunRead,
 ): QResultBlock | null {
   if (hint === "MAP") return investorsMapBlock(investorsOf(read));

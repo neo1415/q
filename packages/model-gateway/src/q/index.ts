@@ -44,8 +44,8 @@ import {
   publicSourceBlockFields,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV17Result,
-  CompanyAnalystV17ResultSchema,
+  type CompanyAnalystV22Result,
+  CompanyAnalystV22ResultSchema,
   gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
@@ -270,7 +270,7 @@ const CalendarConnectCarrierSchema = z
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV17Result → Q message + bundle version on the run
+ *   CompanyAnalystV22Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -577,6 +577,14 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
  * Fields of the analyst's reading that are auxiliary to the answer: one in
  * the wrong shape is left out (or null) instead of refusing the answer.
  */
+/**
+ * The schema the analyst's answer is checked against: the one the prompt in
+ * use writes to (COMPANY_ANALYST v22). Pinned by a test, because a lag here
+ * refuses every answer carrying a newer field and re-runs it (live
+ * 2026-10-09: 10-15 s on every turn).
+ */
+export const ANALYST_RESULT_SCHEMA = CompanyAnalystV22ResultSchema;
+
 export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "actionTalk",
   "recommendation",
@@ -1479,7 +1487,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV17Result;
+  readonly result: CompanyAnalystV22Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -2935,9 +2943,12 @@ export function createModelGatewayQAnswer(
         }
       };
 
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV17Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV22Result> = {
         signal: request.signal,
-        schema: CompanyAnalystV17ResultSchema,
+        // The schema the prompt in use (COMPANY_ANALYST v22) writes to: live
+        // 2026-10-09, v17 refused every answer carrying v22's `visual` as an
+        // unknown key, and each refusal re-ran the answer (10-15 s a turn).
+        schema: ANALYST_RESULT_SCHEMA,
         onTextDelta,
         // The analyst's lists are independent readings: one statement with
         // a malformed knowledge key must not throw away the profile change
@@ -3474,12 +3485,12 @@ export function createModelGatewayQAnswer(
       if (screenActs !== null) messages = [...messages, screenActs];
 
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV17Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV22Result>>
       >;
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV17Result | undefined;
+        let analyst: CompanyAnalystV22Result | undefined;
 
         if (offered.length > 0) {
           took("prepare");
@@ -3525,10 +3536,10 @@ export function createModelGatewayQAnswer(
           ) {
             modelCalls += 1;
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV17Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV22Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV17Result>(
+              result = await gateway.execute<CompanyAnalystV22Result>(
                 {
                   ...base,
                   messages,
@@ -3596,7 +3607,7 @@ export function createModelGatewayQAnswer(
              * is not a gap.
              */
             const saidInsteadOfDone = (
-              value: CompanyAnalystV17Result,
+              value: CompanyAnalystV22Result,
               dropped: readonly string[] | undefined,
             ): boolean =>
               (value.actionTalk.length > 0 ||
@@ -3629,7 +3640,7 @@ export function createModelGatewayQAnswer(
              */
             const screenNote = screenSubjectNote(plan.screen);
             const askedWhatScreenShows = (
-              value: CompanyAnalystV17Result,
+              value: CompanyAnalystV22Result,
             ): boolean =>
               screenNote !== null &&
               value.clarifyingQuestions.length > 0 &&
@@ -3686,7 +3697,7 @@ export function createModelGatewayQAnswer(
                */
               const accepted = acceptStructuredOutput(
                 result.output.text,
-                CompanyAnalystV17ResultSchema,
+                ANALYST_RESULT_SCHEMA,
                 {
                   invalidListItems: "DROP",
                   lenientFields: ANALYST_LENIENT_FIELDS,
@@ -3974,7 +3985,7 @@ export function createModelGatewayQAnswer(
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystV17Result>(
+          final = await gateway.execute<CompanyAnalystV22Result>(
             { ...base, messages, output: rendered.output },
             options,
           );

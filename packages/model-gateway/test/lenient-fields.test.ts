@@ -42,3 +42,17 @@ describe("auxiliary fields of an answer", () => {
     ).toBe(false);
   });
 });
+
+describe("the analyst answer schema (live 2026-10-09)", () => {
+  it("is the schema of the prompt in use, so a v22 answer is never refused", async () => {
+    const { COMPANY_ANALYST_V22 } = await import("@capital-q/q-core");
+    const { ANALYST_RESULT_SCHEMA } = await import("../src/q/index.js");
+    // v17 refused every answer that carried v22's `visual` (unknown key)
+    // and re-ran it: 10-15 s on every turn.
+    const output = COMPANY_ANALYST_V22.output;
+    expect(output.kind === "STRUCTURED" ? output.schema : null).toBe(
+      ANALYST_RESULT_SCHEMA,
+    );
+    expect(Object.keys(ANALYST_RESULT_SCHEMA.shape)).toContain("visual");
+  });
+});
