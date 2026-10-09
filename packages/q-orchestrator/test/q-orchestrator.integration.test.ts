@@ -725,6 +725,57 @@ describe("@capital-q/q-orchestrator against local PostgreSQL", () => {
     }
   });
 
+  it("a cancel requested while the answer is written ends CANCELLED, however the answer ends (live a7b44b0a)", async () => {
+    // Voice supersedes a delegation mid-flight: the answer seam is where
+    // "someone else" cancels, and the seam then returns, or throws the
+    // abort it was handed. Either way the run must not stay
+    // CANCEL_REQUESTED (live 2026-10-09: 973 s until the orphan sweep).
+    for (const ending of ["returns", "aborts"] as const) {
+      const world = await commitWorld();
+      try {
+        let runId = "";
+        const answer: QAnswerPort = {
+          answer: async () => {
+            await world.service.cancelRun({
+              actor: world.ownerA.actor,
+              runId: runId as never,
+              correlationId: CORRELATION(),
+            });
+            if (ending === "aborts") {
+              throw new DOMException(
+                "This operation was aborted",
+                "AbortError",
+              );
+            }
+            return { kind: "NOT_CONFIGURED" };
+          },
+        };
+        const engine = orchestrator(world, { answer });
+        const run = await createRun(world);
+        runId = run.id;
+
+        const handle = await engine.start({
+          actor: world.ownerA.actor,
+          runId: run.id,
+          correlationId: CORRELATION(),
+        });
+
+        expect(handle.status).toBe("CANCELLED");
+        const final = await world.service.getRun({
+          actor: world.ownerA.actor,
+          runId: run.id,
+        });
+        expect(final.run.status).toBe("CANCELLED");
+        expect(final.run.failureCode).toBe("RUN_CANCELLED");
+        const stored = await events(run.id);
+        expect(stored.at(-1)?.event_type).toBe("q.run.failed");
+        expect(stored.at(-1)?.payload["status"]).toBe("CANCELLED");
+      } finally {
+        await cleanup(world);
+      }
+    }
+  });
+
   it("fails closed on an unknown or missing orchestration version at resume", async () => {
     const world = await commitWorld();
     try {
