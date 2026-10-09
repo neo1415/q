@@ -5,12 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeepgramVoiceSession } from "./provider/deepgram-session";
 import { useDuplexVoiceSession } from "./provider/duplex-session";
 import { useElevenLabsVoiceSession } from "./provider/elevenlabs-session";
-import { liveVoiceAvailable } from "./live/live-call";
 import {
-  claimVoiceAudio,
-  releaseVoiceAudio,
-  type VoiceAudioOwner,
-} from "./voice-audio";
+  askLiveAvailability,
+  forgetLiveAvailability,
+  liveAvailabilityNow,
+} from "./live/availability";
+import { releaseVoiceAudio, type VoiceAudioOwner } from "./voice-audio";
 import {
   LIVE_FALLBACK_NOTICE,
   useLiveVoiceSession,
@@ -75,9 +75,6 @@ export function useVoiceSession(
         : active === "deepgram"
           ? deepgram
           : elevenLabs;
-  // V: whether this person's voice is GPT-Live, asked once per page and
-  // again only after a call failed to open (the Q API decides).
-  const liveAvailable = useRef<Promise<boolean> | null>(null);
   const eventsRef = useRef(events);
   useEffect(() => {
     eventsRef.current = events;
@@ -85,7 +82,7 @@ export function useVoiceSession(
   // Asked as the surface mounts, so the first voice start does not wait.
   const allowLive = options.live !== false;
   useEffect(() => {
-    if (allowLive) liveAvailable.current ??= liveVoiceAvailable();
+    if (allowLive) void askLiveAvailability();
   }, [allowLive]);
   const [pausedAway, setPausedAway] = useState(false);
 
@@ -94,24 +91,32 @@ export function useVoiceSession(
       const provider = input.credential.provider ?? "elevenlabs";
       setPausedAway(false);
       const mine = (startsRef.current += 1);
-      await claimVoiceAudio(owner);
-      // Ended, or started again, while something was awaited: this start
-      // opens nothing more (a late fallback would be a second voice).
+      // No audio claim here: surfaces that open lines through this client
+      // are serialised by the voice line (`voice-line.ts`), whose release
+      // resets the surface properly. Ending another client's transports
+      // underneath its surface made that surface reconnect, and two
+      // surfaces fought over the line (2026-10-09, k-incident voice red).
+      // Ended, or started again, while GPT-Live was opening: no fallback
+      // line is opened after it (a late fallback would be a second voice).
+      // The duplex and standard path is exactly as it was before GPT-Live.
       const current = () => startsRef.current === mine;
       // V (founder 2026-10-09): GPT-Live is the voice for the people it is
       // switched on for, at every entry point. If it cannot open, the
       // duplex or standard line takes the same credential at once, and
       // the person is told in one line.
-      const offered =
-        allowLive && (await (liveAvailable.current ??= liveVoiceAvailable()));
-      if (!current()) return;
+      // Never waited for: an answer not yet in is "not available" for this
+      // start, and the existing line opens at once (2026-10-09 regression).
+      if (allowLive && liveAvailabilityNow() === null) {
+        void askLiveAvailability();
+      }
+      const offered = allowLive && liveAvailabilityNow() === true;
       let quota = false;
       if (offered) {
         setActive("live");
         const outcome = await liveLine.start(input);
         if (outcome === "LIVE" || !current()) return;
         quota = outcome === "QUOTA";
-        liveAvailable.current = null;
+        forgetLiveAvailability();
         eventsRef.current.onLinkStatus?.(LIVE_FALLBACK_NOTICE);
         setTimeout(() => {
           eventsRef.current.onLinkStatus?.(null);
@@ -124,13 +129,12 @@ export function useVoiceSession(
       // tried; the standard voice comes up at once.
       if (input.credential.duplex !== undefined && !quota) {
         setActive("duplex");
-        if ((await duplex.start(input)) || !current()) return;
+        if (await duplex.start(input)) return;
       }
-      if (!current()) return;
       setActive(provider);
       await (provider === "deepgram" ? deepgram : elevenLabs).start(input);
     },
-    [deepgram, duplex, elevenLabs, liveLine, allowLive, owner],
+    [deepgram, duplex, elevenLabs, liveLine, allowLive],
   );
 
   const transportSetMuted = client.setMuted;

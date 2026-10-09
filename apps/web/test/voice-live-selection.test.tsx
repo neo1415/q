@@ -39,6 +39,7 @@ vi.mock("../src/features/voice/provider/duplex-session", () => ({
 let available = true;
 let opens = true;
 let quota = false;
+let neverAnswers = false;
 class LiveCallUnavailable extends Error {
   readonly status: number | null;
   constructor(status: number | null) {
@@ -50,7 +51,10 @@ const calls: Record<string, unknown>[] = [];
 const typed: string[] = [];
 vi.mock("../src/features/voice/live/live-call", () => ({
   LiveCallUnavailable,
-  liveVoiceAvailable: () => Promise.resolve(available),
+  liveVoiceAvailable: () =>
+    neverAnswers
+      ? new Promise<boolean>(() => undefined)
+      : Promise.resolve(available),
   startLiveCall: (options: Record<string, unknown>) => {
     calls.push(options);
     if (quota) return Promise.reject(new LiveCallUnavailable(429));
@@ -58,6 +62,7 @@ vi.mock("../src/features/voice/live/live-call", () => ({
     return Promise.resolve({
       voiceSessionId: "5f000000-0000-4000-8000-000000000001",
       end: () => Promise.resolve(),
+      finished: Promise.resolve(),
       typed: (text: string) => {
         typed.push(text);
       },
@@ -71,6 +76,13 @@ vi.mock("../src/features/voice/live/live-call", () => ({
 
 const { useVoiceSession } =
   await import("../src/features/voice/use-voice-session");
+const { askLiveAvailability, forgetLiveAvailability } =
+  await import("../src/features/voice/live/availability");
+/** The availability answer is in (it is asked as the surface mounts). */
+const ready = () =>
+  act(async () => {
+    await askLiveAvailability();
+  });
 const { LIVE_FALLBACK_NOTICE } =
   await import("../src/features/voice/provider/live-session");
 
@@ -99,9 +111,11 @@ const withDuplex = {
 
 describe("GPT-Live as the product voice", () => {
   beforeEach(() => {
+    forgetLiveAvailability();
     available = true;
     opens = true;
     quota = false;
+    neverAnswers = false;
     duplexStart.mockClear();
     calls.length = 0;
     typed.length = 0;
@@ -110,6 +124,7 @@ describe("GPT-Live as the product voice", () => {
 
   it("opens every voice start on GPT-Live, attached to the issued session", async () => {
     const { result } = renderHook(() => useVoiceSession());
+    await ready();
     await act(async () => {
       await result.current.start({ credential });
     });
@@ -144,6 +159,7 @@ describe("GPT-Live as the product voice", () => {
         },
       }),
     );
+    await ready();
     await act(async () => {
       await result.current.start({ credential });
     });
@@ -155,6 +171,7 @@ describe("GPT-Live as the product voice", () => {
   it("tries the duplex line after an ordinary GPT-Live failure", async () => {
     opens = false;
     const { result } = renderHook(() => useVoiceSession());
+    await ready();
     await act(async () => {
       await result.current.start({ credential: withDuplex });
     });
@@ -172,6 +189,7 @@ describe("GPT-Live as the product voice", () => {
         },
       }),
     );
+    await ready();
     await act(async () => {
       await result.current.start({ credential: withDuplex });
     });
@@ -181,9 +199,47 @@ describe("GPT-Live as the product voice", () => {
     expect(statuses).toEqual([LIVE_FALLBACK_NOTICE]);
   });
 
+  it("GPT-Live not available: the duplex line opens at once, with no notice", async () => {
+    available = false;
+    const statuses: (string | null)[] = [];
+    const { result } = renderHook(() =>
+      useVoiceSession({
+        onLinkStatus: (status) => {
+          statuses.push(status);
+        },
+      }),
+    );
+    await ready();
+    await act(async () => {
+      await result.current.start({ credential: withDuplex });
+    });
+    expect(calls).toHaveLength(0);
+    expect(duplexStart).toHaveBeenCalledTimes(1);
+    expect(statuses).toEqual([]);
+  });
+
+  it("a start before the availability answer is in opens the existing line at once (2026-10-09 regression)", async () => {
+    neverAnswers = true;
+    const statuses: (string | null)[] = [];
+    const { result } = renderHook(() =>
+      useVoiceSession({
+        onLinkStatus: (status) => {
+          statuses.push(status);
+        },
+      }),
+    );
+    await act(async () => {
+      await result.current.start({ credential: withDuplex });
+    });
+    expect(calls).toHaveLength(0);
+    expect(duplexStart).toHaveBeenCalledTimes(1);
+    expect(statuses).toEqual([]);
+  });
+
   it("uses the standard line, silently, for someone GPT-Live is not on for", async () => {
     available = false;
     const { result } = renderHook(() => useVoiceSession());
+    await ready();
     await act(async () => {
       await result.current.start({ credential });
     });
@@ -193,6 +249,7 @@ describe("GPT-Live as the product voice", () => {
 
   it("never opens GPT-Live where a surface opts out (a rehearsal)", async () => {
     const { result } = renderHook(() => useVoiceSession({}, { live: false }));
+    await ready();
     await act(async () => {
       await result.current.start({ credential });
     });

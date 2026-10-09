@@ -25,6 +25,9 @@ export function createPostgresDuplexSpend(
         select coalesce(sum(cost_usd), 0)::text as usd
           from ai_ops.model_usage
          where purpose = 'VOICE_REALTIME'
+           -- V: GPT-Live's seconds (live_…) have their own cap; they never
+           -- refuse the duplex line to everyone else.
+           and (correlation_id is null or left(correlation_id, 5) <> 'live_')
            and occurred_at >= ${utcDayStart(at).toISOString()}::timestamptz`;
       const usd = Number(rows[0]?.usd ?? "0");
       // A sum that cannot be read as a number is not "nothing spent".
