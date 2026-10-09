@@ -33,6 +33,8 @@ import {
 } from "./company-profile-parts";
 import { countryLabel, stageLabel } from "./declared-labels";
 import { compactMoneyText, moneyText } from "./money-text";
+import { RaiseFact } from "./raise-fact";
+import { raiseWords } from "./raise-words";
 import {
   elevatorHref,
   Fold,
@@ -492,7 +494,36 @@ export function CompanyProfileView({
                     {stageLabel(profile.currentStageCode) ?? "Not declared"}
                   </StripCell>
                   <StripCell term="Raising">
-                    {overview.raise !== null ? (
+                    {overview.raiseView !== undefined ? (
+                      // R2: the server's one raise read, in the same words
+                      // as the Discover card.
+                      own && overview.raiseView.source === "NONE" ? (
+                        <AddYourRaise />
+                      ) : (
+                        <RaiseFact
+                          words={raiseWords(overview.raiseView, own)}
+                          {...(overview.raiseView.pitch === null
+                            ? {}
+                            : {
+                                source: (label: string) => (
+                                  <ProfileTabLink
+                                    tab="elevator"
+                                    fallbackHref={elevatorHref(
+                                      profile.companyId,
+                                    )}
+                                    className="underline underline-offset-4"
+                                    data-raise-source="PITCH_VIDEO"
+                                  >
+                                    {label},{" "}
+                                    {pitchMoment(
+                                      overview.raiseView?.pitch?.atSeconds ?? 0,
+                                    )}
+                                  </ProfileTabLink>
+                                ),
+                              })}
+                        />
+                      )
+                    ) : overview.raise !== null ? (
                       compactMoneyText(overview.raise)
                     ) : overview.raiseFromPitch !== null ? (
                       <>
