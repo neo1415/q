@@ -117,6 +117,8 @@ export type LiveBridgeDependencies = {
 
 export type DelegationStatus =
   | "WAITING_FOR_WORDS"
+  /** Nothing usable was heard: no Q run; the voice checks with them. */
+  | "UNHEARD"
   | "RUNNING"
   | "SPOKEN"
   | "SUPERSEDED"
@@ -133,6 +135,8 @@ export type DelegationRecord = {
   answeredAt?: number | undefined;
   commentary?: string | null | undefined;
   approvalPending?: boolean | undefined;
+  /** The exchange sent with the request (read before the window moves). */
+  context?: DelegationRequest["context"] | undefined;
 };
 
 export type LiveBridgeState = {
@@ -164,8 +168,54 @@ export type LiveBridge = {
 
 /** OpenAI caps each append at 500 tokens; characters are a safe bound. */
 export const LIVE_APPEND_MAX_CHARS = 1_800;
-const CONTEXT_TURNS = 8;
+/** The delegation contract's bound on context turns. */
+const CONTEXT_MAX = 12;
 const SETTLE_MAX_MS = 1_500;
+/**
+ * When the words read so far are only a transcriber marker or filler, how
+ * much longer the bridge waits for the transcript to complete.
+ */
+export const UNHEARD_WAIT_MS = 700;
+
+/*
+ * V (production 2026-10-09 15:57 UTC): GPT-Live's input transcript for the
+ * founder's fintech request came through as "(inaudible)" three times; each
+ * became a Q run with nothing to answer, and then only the fragment
+ * "especially across FinTech" reached Q Brain. A marker, empty text or
+ * filler alone is never a request (q-api checks the same: heard.ts).
+ */
+const MARKER =
+  /[([]\s*(?:inaudible|unintelligible|indistinct|crosstalk|silence|noise|music|laughter|laughs|applause|blank[_ ]audio|no speech|unclear)[^)\]]{0,40}[)\]]/giu;
+/** Hesitations only; "yes", "okay", "mhm" and "uh-huh" can answer Q. */
+const FILLER = new Set([
+  "um",
+  "umm",
+  "uh",
+  "uhh",
+  "er",
+  "erm",
+  "hmm",
+  "hm",
+  "ah",
+  "eh",
+]);
+
+/** The words, without the transcriber's markers. */
+export function spokenWords(text: string): string {
+  return text.replace(MARKER, " ").replace(/\s+/gu, " ").trim();
+}
+
+/** Whether there is anything to ask Q: some word that is not filler. */
+export function heardRequest(text: string): boolean {
+  return spokenWords(text)
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}'-]+/u)
+    .some((word) => word.length > 0 && !FILLER.has(word));
+}
+
+/** What the voice is told when nothing usable was heard. */
+export const UNHEARD_COMMENTARY =
+  "Their words did not reach the backend clearly, so nothing was asked. If you understood them, say back in a few words what you think they want and ask them to confirm; if you did not, ask them naturally to say it again. Do not say anything failed or went wrong.";
 const OPENING_ID = "opening";
 const TRANSCRIPT_KEPT = 60;
 
@@ -244,31 +294,59 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     });
   };
 
-  /** The person's words since the last delegation (falls back to their last turn). */
+  /**
+   * The person's whole utterance window since the last delegation, every
+   * piece of it, without transcriber markers. Only when they said nothing
+   * new at all does it fall back to their last words; a window of
+   * "(inaudible)" is empty, never an older request asked again.
+   */
   const readRequest = (): string => {
-    const words = transcript
+    const window = transcript
       .slice(askedUpTo)
-      .filter((turn) => turn.role === "user")
-      .map((turn) => turn.text.trim())
+      .filter((turn) => turn.role === "user");
+    const words = window
+      .map((turn) => spokenWords(turn.text))
       .filter((text) => text.length > 0);
-    if (words.length > 0) return words.join(" ");
+    if (words.length > 0 || window.length > 0) return words.join(" ");
     for (let i = transcript.length - 1; i >= 0; i -= 1) {
       const turn = transcript[i];
-      if (turn?.role === "user" && turn.text.trim().length > 0)
-        return turn.text.trim();
+      if (turn?.role === "user" && heardRequest(turn.text))
+        return spokenWords(turn.text);
     }
     return "";
   };
 
+  /**
+   * The exchange since the previous delegation, both sides, oldest first
+   * (a clarifying question and its answer, the voice saying back what it
+   * understood): Q Brain already holds everything before it, and its
+   * reader binds a fragment to what it answers.
+   */
   const contextBefore = () =>
     transcript
-      .slice(Math.max(0, transcript.length - CONTEXT_TURNS))
-      .map((turn) => ({ role: turn.role, text: turn.text.trim() }))
+      .slice(askedUpTo)
+      .slice(-CONTEXT_MAX)
+      .map((turn) => ({ role: turn.role, text: spokenWords(turn.text) }))
       .filter((turn) => turn.text.length > 0);
 
   const run = (record: DelegationRecord, fixed?: string) => {
     if (fixed === undefined) {
-      record.request = readRequest();
+      const request = readRequest();
+      if (!heardRequest(request)) {
+        // No Q run on nothing: the voice heard the audio itself, so it
+        // checks with the person. Their next words join this window.
+        record.request = request;
+        record.status = "UNHEARD";
+        send(
+          "session.commentary.append",
+          record.providerId,
+          UNHEARD_COMMENTARY,
+        );
+        changed();
+        return;
+      }
+      record.context = contextBefore();
+      record.request = request;
       askedUpTo = transcript.length;
       boundary = true;
     } else {
@@ -292,7 +370,7 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       .delegate({
         delegationId: record.id,
         request: record.request,
-        context: contextBefore(),
+        context: record.context ?? contextBefore(),
       })
       .then(
         async (outcome) => {
@@ -398,10 +476,18 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     // The delegation can arrive before the last words are transcribed:
     // wait until the input transcript has been quiet for `settleMs`.
     // Bounded: someone who keeps talking does not hold the run back.
+    let settledAt: number | null = null;
     const waitForWords = () => {
       const at = deps.now();
       const quietFor = at - lastInputAt;
       if (quietFor >= settleMs || at - record.createdAt >= SETTLE_MAX_MS) {
+        // Only a marker or filler so far: the transcript may still be
+        // completing. Waited for briefly, never longer than UNHEARD_WAIT_MS.
+        settledAt ??= at;
+        if (!heardRequest(readRequest()) && at - settledAt < UNHEARD_WAIT_MS) {
+          timers.setTimeout(waitForWords, 100);
+          return;
+        }
         run(record);
         return;
       }
