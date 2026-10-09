@@ -86,8 +86,56 @@ export type AppEmailConfig = {
   readonly missing: readonly string[];
 };
 
+/** The credentials that would make a local process send real email. */
+const SENDING_CREDENTIALS = [
+  "SMTP_PASS",
+  "BREVO_API_KEY",
+  "SMTP_API_KEY",
+] as const;
+
+let refusalReported = false;
+
+/**
+ * Recovery G-D11: a cloud shell or a developer's machine can export the
+ * real relay credentials, and a locally started service inherited them and
+ * tried to email through api.brevo.com. On a local deployment (the default
+ * when CAPITAL_Q_ENV is unset) or under NODE_ENV=test, a real sending
+ * credential is refused unless CQ_ALLOW_LOCAL_EMAIL=on: email then falls
+ * back to in-app delivery only, and one stderr line names the variables,
+ * never their values. `disabled-` placeholders are absent already.
+ */
+function refusedLocally(
+  env: EnvironmentInput,
+  parsed: Record<string, unknown>,
+): readonly string[] {
+  const deployment = env["CAPITAL_Q_ENV"]?.trim() || "local";
+  const localish = deployment === "local" || env["NODE_ENV"] === "test";
+  if (!localish || env["CQ_ALLOW_LOCAL_EMAIL"]?.trim() === "on") return [];
+  const refused = SENDING_CREDENTIALS.filter(
+    (name) => parsed[name] !== undefined,
+  );
+  if (refused.length > 0 && !refusalReported) {
+    refusalReported = true;
+    process.stderr.write(
+      `${JSON.stringify({
+        level: "warn",
+        msg: "real email credentials refused in a local or test environment; set CQ_ALLOW_LOCAL_EMAIL=on to send",
+        refused,
+      })}\n`,
+    );
+  }
+  return refused;
+}
+
 export function loadAppEmailConfig(env: EnvironmentInput): AppEmailConfig {
   const parsed = parseConfig("app-email", envSchema, env);
+  if (refusedLocally(env, parsed).length > 0) {
+    return {
+      brevoApi: undefined,
+      smtp: undefined,
+      missing: [...APP_EMAIL_ENV_NAMES],
+    };
+  }
   const missing = APP_EMAIL_ENV_NAMES.filter(
     (name) => parsed[name] === undefined,
   );
