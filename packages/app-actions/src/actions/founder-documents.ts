@@ -37,6 +37,7 @@ import type {
 } from "@capital-q/permissions";
 
 import {
+  cardOnlyIf,
   defineAppAction,
   portMissing,
   refusal,
@@ -591,7 +592,12 @@ const SET_FOLDER_LEVEL = defineAppAction<FolderLevelIn, ChangeOut>({
   does: "Sets every document in one data-room folder to one level: public, on request, shared only or private.",
   input: FolderLevel,
   output: z.custom<ChangeOut>(),
-  authorize: servicesDecide,
+  // Their own company's data room only.
+  authorize: cardOnlyIf(
+    async (ports, context, input) =>
+      (await ports.ownCompanyId?.(context.actor)) === input.companyId,
+    "This is not your company's data room.",
+  ),
   run: (ports, context, input) =>
     service(ports).setFolderLevel({
       actor: context.actor,
@@ -600,8 +606,11 @@ const SET_FOLDER_LEVEL = defineAppAction<FolderLevelIn, ChangeOut>({
       level: input.level,
       correlationId: context.correlationId,
     }),
-  targets: () => [],
+  targets: (input) => [{ kind: "COMPANY", companyId: input.companyId }],
   supersedes: true,
+  // One card per folder: a newer level replaces the older card for the
+  // same folder, never another folder's.
+  supersedeKey: (input) => `${input.companyId}:${input.folderCode}`,
   card: (input) => ({
     summary: "Change who can see this folder",
     preview:

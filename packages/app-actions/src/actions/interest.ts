@@ -27,7 +27,12 @@ import {
   type InterestService,
 } from "@capital-q/network";
 
-import { defineAppAction, portMissing, type AnyAppAction } from "../define.js";
+import {
+  cardOnlyIf,
+  defineAppAction,
+  portMissing,
+  type AnyAppAction,
+} from "../define.js";
 import type { AppActionPorts } from "../ports.js";
 
 /**
@@ -154,7 +159,15 @@ function answerInterest(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
       : "Declines an investor's interest in their company, from the inbox.",
     input: Answer,
     output: serviceResult(),
-    authorize: servicesDecide,
+    // An investor's interest still open, in their own company's inbox.
+    authorize: cardOnlyIf(
+      (ports, context, input) =>
+        interests(ports).mayRespondToInterest({
+          actor: context.actor,
+          interestId: input.interestId,
+        }),
+      "This interest is not open in your inbox.",
+    ),
     run: (ports, context, input) =>
       interests(ports).respondToInterest({
         actor: context.actor,
@@ -308,7 +321,17 @@ function answerConnection(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
       : "Declines a company's Connection Request, from Company requests.",
     input: Answer,
     output: serviceResult(),
-    authorize: servicesDecide,
+    // A request still open in their own investor inbox (the inbox lists
+    // open requests only).
+    authorize: cardOnlyIf(
+      async (ports, context, input) =>
+        (
+          await connections(ports).listConnectionRequests({
+            actor: context.actor,
+          })
+        ).some(({ interest }) => interest.id === input.interestId),
+      "This connection request is not open in your inbox.",
+    ),
     run: (ports, context, input) =>
       connections(ports).respondToConnectionRequest({
         actor: context.actor,
