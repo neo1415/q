@@ -42,8 +42,19 @@ const handled = new Set<string>();
 let leftRound = -1;
 let greetedRound = -1;
 
+const NAME_KEY = "cq.q.first-name";
+
 function set(next: ArrivalStatus): void {
   status = next;
+  // Remembered so a call that opens before the briefing lands can still
+  // greet them by name (a per-browser convenience; blocked storage is fine).
+  if (next.kind === "READY" && next.data.firstName !== null) {
+    try {
+      window.localStorage.setItem(NAME_KEY, next.data.firstName);
+    } catch {
+      // Not remembered; the hello goes without the name.
+    }
+  }
   for (const notify of subscribers) notify();
 }
 
@@ -206,6 +217,15 @@ export function arrivalSaidOnLine(): boolean {
 /** Whether this page load gives a briefing (decided, or about to be). */
 export function arrivalPending(): boolean {
   return status.kind === "PENDING" && started;
+}
+
+/** Their first name as the last briefing in this browser gave it. */
+export function knownFirstName(): string | null {
+  try {
+    return window.localStorage.getItem(NAME_KEY);
+  } catch {
+    return null;
+  }
 }
 
 /** A card decided or put off on this page load. */

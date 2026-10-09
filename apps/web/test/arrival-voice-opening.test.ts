@@ -11,7 +11,7 @@ import type { ArrivalData } from "../src/features/briefing/arrival";
  * at all. These pin the repair: read early, keep a late read, never drop.
  */
 
-const { resetArrival, startArrival, arrivalForVoice } =
+const { resetArrival, startArrival, arrivalForVoice, knownFirstName } =
   await import("../src/features/briefing/arrival-store");
 const { resetArrivalGate } =
   await import("../src/features/briefing/arrival-gate");
@@ -70,5 +70,15 @@ describe("what a call opens with", () => {
     const now = await again(loader, 2_500);
     expect(now?.firstName).toBe("Zino");
     expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it("remembers their name, so a call that opens before the briefing lands still greets them by it", async () => {
+    expect(knownFirstName()).toBeNull();
+    window.sessionStorage.setItem("cq.q.arrived", "1");
+    window.localStorage.setItem("cq.q.last-seen", new Date().toISOString());
+    const loader = vi.fn(() => Promise.resolve(DATA));
+    startArrival(loader);
+    await arrivalForVoice(loader, 2_500);
+    expect(knownFirstName()).toBe("Zino");
   });
 });

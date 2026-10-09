@@ -507,11 +507,20 @@ export function ArrivalStage({
     if (arrivalSaidOnLine() || ready?.nudge === true) return;
     handedLate.current = true;
     markArrivalSaid(true);
+    // The call already greeted them; the lowdown goes on without a second
+    // hello.
+    const warm = [words.greeting, words.welcome]
+      .filter((part): part is string => part !== null)
+      .join(" ");
+    const lowdown = words.spoken.startsWith(warm)
+      ? words.spoken.slice(warm.length).trim()
+      : words.spoken;
+    if (lowdown.length === 0) return;
     noteToLine(
-      `Your briefing for them just came in: "${words.spoken}" At a natural pause, tell them this in your own words, briefly, then stop.`,
+      `Their lowdown just came in (you already greeted them; don't greet again): "${lowdown}" At a natural pause, tell them this in your own words, briefly, then stop.`,
       true,
-      // The standard line says the briefing's own words.
-      words.spoken,
+      // The standard line says the lowdown's own words.
+      lowdown,
     );
   }, [words, voiceActive, ready?.nudge]);
 

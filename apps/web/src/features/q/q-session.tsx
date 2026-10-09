@@ -17,10 +17,13 @@ import type {
   QRoomEntry,
   QTurnDisposition,
 } from "@capital-q/contracts";
-import { arrivalGreeting } from "@capital-q/q-core/speech";
 
 import { voiceBriefing } from "@/features/briefing/arrival-voice";
-import { markArrivalSaid } from "@/features/briefing/arrival-store";
+import {
+  knownFirstName,
+  markArrivalSaid,
+} from "@/features/briefing/arrival-store";
+import { greetingSeed, warmGreeting } from "@/features/briefing/greeting";
 
 import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
@@ -65,9 +68,18 @@ function briefingOnItsWay(): string {
   } catch {
     zone = null;
   }
-  // Just the hello: the lowdown follows when it lands. No filler line
-  // ("One moment…"; Zino, 2026-10-09) and never a question.
-  return arrivalGreeting({ firstName: null, now: new Date(), timeZone: zone });
+  // A warm hello by name, as a person greets someone arriving; the
+  // lowdown follows when it lands. No filler line ("One moment…"; Zino,
+  // 2026-10-09) and never a question.
+  const now = new Date();
+  const firstName = knownFirstName();
+  return warmGreeting({
+    firstName,
+    now,
+    timeZone: zone,
+    hoursAway: null,
+    seed: greetingSeed(`${firstName ?? ""}:${now.toDateString()}`),
+  });
 }
 
 /** The briefing's words, or the promise of them; the stage knows which. */
