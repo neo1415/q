@@ -16,6 +16,8 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import { createSpecialistQAnswer } from "../src/answer.js";
 import {
+  boundedCoreSnapshot,
+  CORE_SNAPSHOT_MAX_CHARS,
   readCoreSnapshot,
   type ConversationCoreStore,
 } from "../src/conversation-core.js";
@@ -254,5 +256,61 @@ describe("what is read back", () => {
     ]) {
       expect(readCoreSnapshot(stored)).toBeNull();
     }
+  });
+});
+
+describe("the snapshot written stays inside the row's bound (live 2026-10-09)", () => {
+  // jsonb's text form puts a space after every ":" and ",": the column
+  // check measures that, not the JSON the server wrote.
+  const jsonbTextLength = (value: unknown) =>
+    JSON.stringify(value).replace(/([:,])/g, "$1 ").length;
+  const wide = {
+    v: 1 as const,
+    unclearInARow: 0,
+    lastAction: {
+      tool: "draft_update",
+      arguments: { body: "x".repeat(3_000) },
+      utterance: "send the update",
+      outcome: "PREPARED" as const,
+    },
+    sequence: null,
+    focus: {
+      areas: Array.from({ length: 40 }, (_, i) => `area_${String(i)}`),
+      tools: Array.from(
+        { length: 200 },
+        (_, i) => `tool_${String(i)}_${"t".repeat(60)}`,
+      ),
+    },
+  };
+
+  it("drops the recomputable tool focus first and keeps the last action", () => {
+    const bounded = boundedCoreSnapshot(wide);
+    expect(bounded.focus).toBeNull();
+    expect(bounded.lastAction).toEqual(wide.lastAction);
+    expect(jsonbTextLength(bounded)).toBeLessThanOrEqual(16_384);
+    expect(readCoreSnapshot(bounded)).not.toBeNull();
+  });
+
+  it("drops the last action when it alone is too large, never writing a partial one", () => {
+    const bounded = boundedCoreSnapshot({
+      ...wide,
+      lastAction: {
+        ...wide.lastAction,
+        arguments: { body: "y".repeat(20_000) },
+      },
+    });
+    expect(bounded.lastAction).toBeNull();
+    expect(JSON.stringify(bounded).length).toBeLessThanOrEqual(
+      CORE_SNAPSHOT_MAX_CHARS,
+    );
+    expect(readCoreSnapshot(bounded)).not.toBeNull();
+  });
+
+  it("leaves a snapshot that fits as it is", () => {
+    const small = {
+      ...wide,
+      focus: { areas: ["capital"], tools: ["what_needs_me"] },
+    };
+    expect(boundedCoreSnapshot(small)).toBe(small);
   });
 });

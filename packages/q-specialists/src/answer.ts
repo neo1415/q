@@ -137,6 +137,7 @@ import {
   type QOpenRecordPort,
 } from "./references.js";
 import {
+  boundedCoreSnapshot,
   CORE_LOAD_DEADLINE_MS,
   loadWithin,
   readCoreSnapshot,
@@ -1967,13 +1968,16 @@ export function createSpecialistQAnswer(
     if (coreStore === undefined || scope === undefined) return;
     const id = scope.conversationId;
     await coreStore
-      .save(scope, {
-        v: 1,
-        unclearInARow: unclearInARow.get(id) ?? 0,
-        lastAction: lastActed.get(id) ?? null,
-        sequence: sequences.get(id) ?? null,
-        focus: focuses.get(id) ?? null,
-      })
+      .save(
+        scope,
+        boundedCoreSnapshot({
+          v: 1,
+          unclearInARow: unclearInARow.get(id) ?? 0,
+          lastAction: lastActed.get(id) ?? null,
+          sequence: sequences.get(id) ?? null,
+          focus: focuses.get(id) ?? null,
+        } as const),
+      )
       .catch((error: unknown) => {
         logger?.warn(
           { err: error, qRunId: runId },

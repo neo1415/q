@@ -100,3 +100,25 @@ export function loadWithin<T>(work: Promise<T>, ms: number): Promise<T | null> {
     if (timer !== undefined) clearTimeout(timer);
   });
 }
+
+/**
+ * The conversation row's bound is 16,384 characters of jsonb text, which
+ * is longer than the JSON written (a space after every ":" and ","). Live
+ * 2026-10-09 a snapshot broke that check and the turn's state was lost.
+ * Kept well under it here: the tool focus goes first (it is recomputed
+ * next turn), then the last action. Never a partial or invalid snapshot.
+ */
+export const CORE_SNAPSHOT_MAX_CHARS = 11_000;
+
+export function boundedCoreSnapshot<S extends ConversationCoreSnapshot>(
+  snapshot: S,
+): S {
+  const fits = (candidate: S) =>
+    JSON.stringify(candidate).length <= CORE_SNAPSHOT_MAX_CHARS &&
+    SnapshotSchema.safeParse({ ...candidate, v: 1 }).success;
+  if (fits(snapshot)) return snapshot;
+  const unfocused: S = { ...snapshot, focus: null };
+  if (fits(unfocused)) return unfocused;
+  const bare: S = { ...unfocused, lastAction: null };
+  return fits(bare) ? bare : { ...bare, sequence: null };
+}

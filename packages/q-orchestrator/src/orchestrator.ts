@@ -87,6 +87,31 @@ function rootCause(error: unknown, depth = 0): unknown {
   return error;
 }
 
+/**
+ * Finishes a cancellation still pending when an invocation ended, and
+ * returns the invocation's outcome as it now stands. The runtime refuses
+ * every end but CANCELLED once a cancel is requested, so without this a
+ * complete or fail made after the request left the run at
+ * CANCEL_REQUESTED for good. A claim another worker holds is that
+ * worker's to settle.
+ */
+export async function settlePendingCancellation(
+  runtime: {
+    readonly readRun: (
+      ref: QRunRef,
+    ) => Promise<Pick<QRunRecord, "status"> | null>;
+    readonly finishCancellation: (ref: QRunRef) => Promise<unknown>;
+  },
+  ref: QRunRef,
+  outcome: string,
+): Promise<string> {
+  if (outcome === "action_in_progress") return outcome;
+  const current = await runtime.readRun(ref);
+  if (current?.status !== "CANCEL_REQUESTED") return outcome;
+  await runtime.finishCancellation(ref);
+  return "cancelled";
+}
+
 function isTerminal(status: QRunRecord["status"]): boolean {
   return (
     status === "COMPLETED" ||
@@ -270,6 +295,14 @@ export function createLangGraphQOrchestrator(
           span.setAttribute("q.duration_ms", Date.now() - startedAt);
           span.end();
         }
+        // INC 2026-10-09 (run a7b44b0a): a cancel requested while the run
+        // worked makes the runtime refuse every end but CANCELLED, so the
+        // complete or fail above returned without moving it and the run
+        // sat at CANCEL_REQUESTED for good (there, the newer delegation's
+        // abort surfaced as an AbortError and took the fail path). Whatever
+        // path ended the invocation, a pending cancellation is finished
+        // here. A claim another worker holds is that worker's to settle.
+        outcome = await settlePendingCancellation(runtime, ref, outcome);
         logger?.info(
           {
             qRunId: ref.runId,
