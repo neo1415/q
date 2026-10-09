@@ -1002,6 +1002,51 @@ export function registerQVoiceRoutes(
       broker: dependencies.live.broker,
       withContext,
       binding: ownLine,
+      // A GPT-Live call that is not attached to a standard session gets its
+      // own binding, built exactly as the session route builds one (the
+      // person's own bearer, a sealed token), without a speech provider.
+      issue: (request, voice) => {
+        const actor = getActorContext(request);
+        const header = request.headers.authorization;
+        const accessToken = extractBearerToken(
+          typeof header === "string" ? header : undefined,
+        );
+        if (accessToken === null) throw new AuthenticationRequiredError();
+        const issuedAt = now();
+        const voiceSessionId = randomUUID();
+        const providerConversationId = `live_${voiceSessionId}`;
+        const thread: VoiceThread = {
+          conversationId: undefined,
+          subjects: undefined,
+          onboarding: undefined,
+        };
+        // One voice session per person at a time, as on every transport.
+        dependencies.bindings.releaseFor(actor.userId);
+        const binding: VoiceSessionBinding = {
+          voiceSessionId,
+          providerConversationId,
+          actor,
+          accessToken,
+          voice,
+          thread,
+          issuedAt,
+          connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,
+          connectedAt: undefined,
+          sessionToken: dependencies.bindings.seal({
+            voiceSessionId,
+            providerConversationId,
+            actor,
+            accessToken,
+            voice,
+            thread,
+            issuedAt,
+          }),
+        };
+        if (!dependencies.bindings.issue(binding)) {
+          throw new VoiceSessionLimitError();
+        }
+        return binding;
+      },
       // In use from now: kept past the connect window, like a duplex line.
       connect: (binding) => {
         dependencies.bindings.connect(binding.providerConversationId);

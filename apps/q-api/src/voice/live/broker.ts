@@ -479,6 +479,9 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         kind: "OPEN",
         result: {
           voiceSessionId: binding.voiceSessionId,
+          ...(binding.sessionToken === undefined
+            ? {}
+            : { sessionToken: binding.sessionToken }),
           sdp: created.sdp,
           provider: "openai",
           model: created.model,

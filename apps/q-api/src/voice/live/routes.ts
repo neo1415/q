@@ -52,6 +52,11 @@ export function registerLiveVoiceRoutes(
       request: FastifyRequest,
       voiceSessionId: string,
     ) => Promise<VoiceSessionBinding | null>;
+    /** A fresh binding for a call not attached to a standard session. */
+    readonly issue: (
+      request: FastifyRequest,
+      voice: "FEMALE" | "MALE",
+    ) => VoiceSessionBinding;
     /** The issued binding is now in use: keep it past the connect window. */
     readonly connect: (binding: VoiceSessionBinding) => void;
     /** Developer preview gate (local deployment AND CQ_VOICE_PREVIEW). */
@@ -75,7 +80,10 @@ export function registerLiveVoiceRoutes(
         "That is not a live voice offer.",
       );
       const actor = getActorContext(request);
-      const binding = await dependencies.binding(request, body.voiceSessionId);
+      const binding =
+        body.voiceSessionId === undefined
+          ? dependencies.issue(request, body.voice ?? "FEMALE")
+          : await dependencies.binding(request, body.voiceSessionId);
       if (
         binding === null ||
         binding.actor.userId !== actor.userId ||
@@ -87,6 +95,9 @@ export function registerLiveVoiceRoutes(
         binding,
         sdp: body.sdp,
         briefingOpening: body.briefingOpening,
+        firstName: body.firstName,
+        role: body.role,
+        locale: body.locale,
       });
       if (opened.kind === "REFUSED") {
         request.log.info({ reason: opened.reason }, "live voice refused");

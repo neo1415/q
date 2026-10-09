@@ -28,8 +28,18 @@ const DelegationIdSchema = z
 
 export const LiveOpenRequestSchema = z
   .object({
-    voiceSessionId: z.string().uuid(),
+    /** A standard voice session to attach to; absent: a line of its own. */
+    voiceSessionId: z.string().uuid().optional(),
+    voice: z.enum(["FEMALE", "MALE"]).optional(),
     sdp: z.string().min(10).max(SDP_MAX),
+    /** For the prompt only (data, never instructions); bounded. */
+    firstName: z.string().trim().min(1).max(40).optional(),
+    role: z.enum(["founder", "investor"]).optional(),
+    locale: z
+      .string()
+      .max(16)
+      .regex(/^[A-Za-z0-9-]+$/u)
+      .optional(),
     /** The call opens with the briefing (warm hello, then the lowdown). */
     briefingOpening: z.boolean().optional(),
   })
@@ -39,6 +49,8 @@ export type LiveOpenRequest = z.infer<typeof LiveOpenRequestSchema>;
 export const LiveOpenResultSchema = z
   .object({
     voiceSessionId: z.string(),
+    /** Restores the line on another instance (x-q-voice-session). */
+    sessionToken: z.string().optional(),
     sdp: z.string(),
     provider: z.literal("openai"),
     /** As the provider reported it when the session was created. */

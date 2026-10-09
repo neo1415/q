@@ -148,6 +148,9 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   const transcript: { role: "user" | "q"; text: string }[] = [];
   // The index of the first transcript turn not yet asked about.
   let askedUpTo = 0;
+  // Words after a delegation read its request start a turn of their own,
+  // even mid-utterance: they belong to the next request, not that one.
+  let boundary = false;
   let lastInputAt = 0;
   const delegations = new Map<string, DelegationRecord>();
   const order: string[] = [];
@@ -169,8 +172,10 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   const append = (role: "user" | "q", delta: string) => {
     if (delta.length === 0) return;
     const last = transcript[transcript.length - 1];
-    if (last !== undefined && last.role === role) last.text += delta;
-    else transcript.push({ role, text: delta });
+    if (last !== undefined && last.role === role && !boundary) {
+      last.text += delta;
+    } else transcript.push({ role, text: delta });
+    boundary = false;
     if (transcript.length > TRANSCRIPT_KEPT) {
       const drop = transcript.length - TRANSCRIPT_KEPT;
       transcript.splice(0, drop);
@@ -220,6 +225,7 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
   const run = (record: DelegationRecord) => {
     record.request = readRequest();
     askedUpTo = transcript.length;
+    boundary = true;
     record.status = "RUNNING";
     changed();
     let progressed = false;

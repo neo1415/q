@@ -16,3 +16,8 @@ The founder authorized this on 2026-10-09, for GPT-Live work only, using the exi
 | 2026-10-09 03:55 | workstream V | Scenario 4 interruption on gpt-live-1 + TTS inputs | 24 | $0.023 | $0.216 |
 | 2026-10-09 03:55 | workstream V | Scenario 5 change-of-mind on gpt-live-1 + TTS inputs | 32 | $0.030 | $0.246 |
 | 2026-10-09 03:56 | workstream V | Scenario 9 frustrated-user on gpt-live-1 + TTS inputs | 49 | $0.044 | $0.290 |
+| 2026-10-09 04:15 | workstream V | Scenario 1 pidgin-greeting on gpt-live-1 | 28 | $0.023 | $0.313 |
+| 2026-10-09 04:15 | workstream V | Scenario 2 humour on gpt-live-1 | 46 | $0.038 | $0.351 |
+| 2026-10-09 04:16 | workstream V | Scenario 3 hesitant-question on gpt-live-1 | 41 | $0.034 | $0.385 |
+| 2026-10-09 04:17 | workstream V | Scenario 9 frustrated-user on gpt-live-1 | 57 | $0.048 | $0.432 |
+| 2026-10-09 04:23 | workstream V | Scenario 10 five-minute-conversation on gpt-live-1 + TTS inputs | 300 | $0.268 | $0.700 |
