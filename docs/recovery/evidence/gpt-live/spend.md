@@ -50,7 +50,7 @@ Live OpenAI calls stopped at the founder's request; the scratch key file has bee
 
 - **Final total: $1.969 (estimated), of the $3.00 cap.** That includes the lead's smoke test ($0.012) and the founder's own 183 s ($0.153). Workstream V's own sessions come to $1.804.
 - **Sessions:**
-  - 31 sessions, one row each: 29 GPT-Live sessions (26 recordings and 3 preview WebRTC sessions) and 4 gpt-realtime-mini baseline sessions. There are 30 GPT-Live sessions if the founder's own is counted.
+  - 33 sessions besides the founder's: 29 GPT-Live sessions (the lead's smoke test, 25 workstream V recordings and 3 preview WebRTC sessions; the first preview row covers two) and 4 gpt-realtime-mini baseline sessions. The founder's own GPT-Live session makes 34.
   - 2 refused requests at $0.
 - **TTS:** inputs were synthesised once per line and cached (rows marked "+ TTS inputs"). Their cost (about $0.015 per minute of audio) is included in those rows.
 - **Basis:** GPT-Live rows use `usage.seconds` from `session.closed`; the three preview rows are unconfirmed (OpenAI's 15 s minimum). Realtime rows are priced from `response.done` token usage. These are estimates: the OpenAI usage dashboard is authoritative.
