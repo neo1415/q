@@ -16,7 +16,8 @@ describe("parseDatabaseConfig", () => {
 
     expect(config.connectionMode).toBe("direct");
     expect(config.poolMax).toBe(5);
-    expect(config.idleTimeoutSeconds).toBe(20);
+    expect(config.idleTimeoutSeconds).toBe(60);
+    expect(config.warmIntervalSeconds).toBe(25);
     expect(config.connectTimeoutSeconds).toBe(10);
     expect(config.statementTimeoutMs).toBe(10_000);
     expect(config.secrets.url).toBe(REQUEST_URL);
@@ -31,6 +32,7 @@ describe("parseDatabaseConfig", () => {
       DATABASE_CONNECTION_MODE: "transaction_pooler",
       DATABASE_POOL_MAX: "12",
       DATABASE_IDLE_TIMEOUT_SECONDS: "5",
+      DATABASE_WARM_INTERVAL_SECONDS: "4",
       DATABASE_CONNECT_TIMEOUT_SECONDS: "3",
       DATABASE_STATEMENT_TIMEOUT_MS: "2500",
       DATABASE_PRIVILEGED_URL: PRIVILEGED_URL,
@@ -41,10 +43,23 @@ describe("parseDatabaseConfig", () => {
     expect(config.connectionMode).toBe("transaction_pooler");
     expect(config.poolMax).toBe(12);
     expect(config.idleTimeoutSeconds).toBe(5);
+    expect(config.warmIntervalSeconds).toBe(4);
     expect(config.connectTimeoutSeconds).toBe(3);
     expect(config.statementTimeoutMs).toBe(2500);
     expect(config.secrets.privilegedUrl).toBe(PRIVILEGED_URL);
     expect(config.secrets.migrationUrl).toBe(MIGRATION_URL);
+  });
+
+  it("refuses a warm ping that is not faster than the idle timeout", () => {
+    const parse = (warm: string) => () =>
+      parseDatabaseConfig({
+        ...BASE_ENV,
+        DATABASE_IDLE_TIMEOUT_SECONDS: "30",
+        DATABASE_WARM_INTERVAL_SECONDS: warm,
+      });
+    expect(parse("30")).toThrow(/DATABASE_WARM_INTERVAL_SECONDS/);
+    expect(parse("29")).not.toThrow();
+    expect(parse("0")).not.toThrow();
   });
 
   it("fails without DATABASE_URL and names the variable, not a value", () => {
