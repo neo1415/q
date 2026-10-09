@@ -46,7 +46,7 @@ const OpenResult = z.object({
   sessionToken: z.string().optional(),
   sdp: z.string(),
   provider: z.literal("openai"),
-  model: z.string(),
+  model: z.string().nullable(),
   maxSessionMs: z.number().int().positive(),
 });
 const DelegateBody = z

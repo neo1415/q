@@ -74,6 +74,16 @@ export type LiveBridgeDependencies = {
   readonly timers?: Timers | undefined;
   /** How long the transcript may settle before the request is read. */
   readonly settleMs?: number | undefined;
+  /**
+   * The call opening (founder 2026-10-09): a warm hello at once, then the
+   * lowdown when Q Brain's briefing lands. GPT-Live does not speak first on
+   * its own (recorded 2026-10-09), so the app starts both: the greeting as
+   * session instructions, the briefing as its own Q run, spoken through
+   * commentary when it arrives. A question of theirs asked before it lands
+   * supersedes it (kept as quiet context, never spoken over them).
+   */
+  readonly opening?:
+    { readonly greeting: string; readonly request: string } | undefined;
   /** When a still-running delegation gets its one quiet progress note. */
   readonly progressAfterMs?: number | undefined;
   readonly onChange?: ((state: LiveBridgeState) => void) | undefined;
@@ -89,6 +99,8 @@ export type DelegationStatus =
 
 export type DelegationRecord = {
   readonly id: string;
+  /** The provider's delegation id; null for the app's own (the opening). */
+  readonly providerId: string | null;
   request: string;
   status: DelegationStatus;
   readonly createdAt: number;
@@ -123,6 +135,7 @@ export type LiveBridge = {
 export const LIVE_APPEND_MAX_CHARS = 1_800;
 const CONTEXT_TURNS = 8;
 const SETTLE_MAX_MS = 1_500;
+const OPENING_ID = "opening";
 const TRANSCRIPT_KEPT = 60;
 
 export function boundedContent(text: string): string {
@@ -222,10 +235,14 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
 
   const newest = () => order[order.length - 1];
 
-  const run = (record: DelegationRecord) => {
-    record.request = readRequest();
-    askedUpTo = transcript.length;
-    boundary = true;
+  const run = (record: DelegationRecord, fixed?: string) => {
+    if (fixed === undefined) {
+      record.request = readRequest();
+      askedUpTo = transcript.length;
+      boundary = true;
+    } else {
+      record.request = fixed;
+    }
     record.status = "RUNNING";
     changed();
     let progressed = false;
@@ -236,7 +253,7 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       // its own words, and must not guess the result.
       send(
         "session.thinking.append",
-        record.id,
+        record.providerId,
         `Q's backend is still working on: "${record.request}". No result yet. Do not guess it and do not stall with filler; keep the conversation natural.`,
       );
     }, progressAfterMs);
@@ -279,12 +296,12 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       record.status = "SUPERSEDED";
       send(
         "session.thinking.append",
-        record.id,
+        record.providerId,
         `Earlier request "${record.request}" (replaced by a newer one; do not answer it now unless asked): ${outcome.commentary}`,
       );
     } else {
       record.status = outcome.failed === true ? "FAILED" : "SPOKEN";
-      send("session.commentary.append", record.id, outcome.commentary);
+      send("session.commentary.append", record.providerId, outcome.commentary);
     }
     changed();
   };
@@ -300,6 +317,7 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
     if (delegations.has(id)) return;
     const record: DelegationRecord = {
       id,
+      providerId: id,
       request: "",
       status: "WAITING_FOR_WORDS",
       createdAt: deps.now(),
@@ -341,6 +359,22 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
         case "session.delegation.created":
           onDelegation(event);
           return;
+        case "session.started": {
+          const opening = deps.opening;
+          if (opening === undefined || delegations.has(OPENING_ID)) return;
+          send("session.instructions.append", null, opening.greeting);
+          const record: DelegationRecord = {
+            id: OPENING_ID,
+            providerId: null,
+            request: opening.request,
+            status: "RUNNING",
+            createdAt: deps.now(),
+          };
+          delegations.set(OPENING_ID, record);
+          order.push(OPENING_ID);
+          run(record, opening.request);
+          return;
+        }
         case "session.commentary.appended":
         case "session.thinking.appended":
         case "session.instructions.appended": {
@@ -377,7 +411,7 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       record.status = "CANCELLED";
       send(
         "session.thinking.append",
-        delegationId,
+        record.providerId,
         `The backend confirmed it stopped: "${record.request}".`,
       );
       changed();

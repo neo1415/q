@@ -32,7 +32,8 @@ export type LiveWebRtcSession = {
   readonly sessionId: string;
   /** The SDP answer for the browser's peer connection. */
   readonly sdp: string;
-  readonly model: string;
+  /** As the provider's create response named it; null when it did not. */
+  readonly model: string | null;
 };
 
 export class LiveProviderError extends Error {
@@ -53,7 +54,7 @@ export class LiveProviderError extends Error {
  */
 export const GPT_LIVE_LEDGER_PROVIDER_ID =
   "a1000000-0000-4000-8000-000000000003";
-export const GPT_LIVE_LEDGER_MODEL_ID = "a2000000-0000-4000-8000-000000000022";
+export const GPT_LIVE_LEDGER_MODEL_ID = "a2000000-0000-4000-8000-000000000023";
 
 export type LiveVoiceProvider = {
   /** Ledger ids (ai_ops), not the provider's names. */
@@ -129,7 +130,9 @@ export function createGptLiveProvider(options: {
       return {
         sessionId: parsed.data.session.id,
         sdp: parsed.data.transport.sdp,
-        model: parsed.data.session.model ?? GPT_LIVE_MODEL,
+        // Never filled in from what we asked for: the preview shows what the
+        // provider reported, or that it reported nothing.
+        model: parsed.data.session.model ?? null,
       };
     },
   };

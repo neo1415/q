@@ -5620,7 +5620,14 @@ const liveBroker =
     ? createLiveBroker({
         config: liveConfig,
         provider: createGptLiveProvider({
-          apiKey: providerSecrets.openai.reveal(),
+          // A local deployment may give the live line a key of its own
+          // (the recovery stack's developer preview), so the rest of q-api
+          // keeps the disabled one and the fake model. Never elsewhere.
+          apiKey:
+            config.runtime.deploymentEnvironment === "local" &&
+            (process.env.CQ_VOICE_LIVE_OPENAI_API_KEY ?? "").length > 0
+              ? (process.env.CQ_VOICE_LIVE_OPENAI_API_KEY ?? "")
+              : providerSecrets.openai.reveal(),
         }),
         firewall,
         turn: voiceTurn,

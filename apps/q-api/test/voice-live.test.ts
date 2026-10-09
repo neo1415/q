@@ -281,6 +281,24 @@ describe("GPT-Live provider adapter", () => {
     expect((failure as Error).message).not.toContain("secret detail");
   });
 
+  it("never fills in a model the provider did not report", async () => {
+    const provider = createGptLiveProvider({
+      apiKey: DISABLED_KEY,
+      fetch: () =>
+        Promise.resolve(
+          Response.json(
+            { session: { id: "live_2" }, transport: { sdp: "v=0 answer sdp" } },
+            { status: 201 },
+          ),
+        ),
+    });
+    const session = await provider.createWebRtcSession({
+      config: { instructions: "x", voice: "marin" },
+      sdp: "v=0 offer sdp",
+    });
+    expect(session.model).toBeNull();
+  });
+
   it("refuses an unreadable answer", async () => {
     const provider = createGptLiveProvider({
       apiKey: DISABLED_KEY,

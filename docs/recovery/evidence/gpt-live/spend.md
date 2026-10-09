@@ -26,3 +26,13 @@ The founder authorized this on 2026-10-09, for GPT-Live work only, using the exi
 | 2026-10-09 04:26 | workstream V | Scenario 3 hesitant-question on gpt-realtime-mini | 22 wall (tokens) | $0.007 | $0.735 |
 | 2026-10-09 04:27 | workstream V | Scenario 4 interruption on gpt-realtime-mini | 39 wall (tokens) | $0.017 | $0.752 |
 | 2026-10-09 04:27 | workstream V | Scenario 5 change-of-mind on gpt-realtime-mini | 39 wall (tokens) | $0.015 | $0.767 |
+| 2026-10-09 04:37 | workstream V | Scenario 6 top-three-delegated on gpt-live-1 + TTS inputs | 41 | $0.036 | $0.803 |
+| 2026-10-09 04:39 | workstream V | Scenario 6 top-three-delegated on gpt-live-1 | 33 | $0.028 | $0.831 |
+| 2026-10-09 04:41 | workstream V | Scenario 0 call-opening-briefing on gpt-live-1 + TTS inputs | 104 | $0.088 | $0.919 |
+| 2026-10-09 04:41 | workstream V | Scenario 7 talk-while-researching on gpt-live-1 + TTS inputs | 33 | $0.030 | $0.949 |
+| 2026-10-09 04:42 | workstream V | Scenario 8 facts-arrive-while-speaking on gpt-live-1 + TTS inputs | 51 | $0.044 | $0.993 |
+| 2026-10-09 04:44 | workstream V | Scenario 0 call-opening-briefing on gpt-live-1 | 37 | $0.031 | $1.024 |
+| 2026-10-09 04:49 | workstream V | Scenario 10 five-minute-conversation on gpt-live-1 | 299 | $0.249 | $1.273 |
+| 2026-10-09 04:46 | workstream V | Preview /dev/voice-preview option A in Chromium, 2 WebRTC sessions created (media never connected: sandbox has no UDP egress) | 30 (unconfirmed: 15 s minimum each, per OpenAI) | $0.025 | $1.298 |
+| 2026-10-09 04:55 | workstream V | Preview option A in Chromium via the proxy (ICE-TCP 443 offered, not reachable through an HTTP proxy): 1 session created, media never connected | 15 (unconfirmed: OpenAI minimum) | $0.013 | $1.311 |
+| 2026-10-09 04:57 | workstream V | Scenario 10 five-minute-conversation on gpt-live-1 | 299 | $0.249 | $1.560 |

@@ -250,6 +250,46 @@ describe("the GPT-Live delegation bridge", () => {
     expect(h.bridge.state().acked).toBe(1);
   });
 
+  it("opens with a greeting at once and speaks the briefing when Q Brain answers", async () => {
+    const sent: Sent[] = [];
+    const asked: string[] = [];
+    let answer: (o: { commentary: string }) => void = () => undefined;
+    const bridge = createLiveBridge({
+      send: (event) => {
+        sent.push(event);
+      },
+      delegate: (request) => {
+        asked.push(request.request);
+        return new Promise((resolve) => {
+          answer = resolve;
+        });
+      },
+      newEventId: () => `e${String(sent.length)}`,
+      now: () => 0,
+      opening: { greeting: "Greet them now.", request: "Brief me." },
+    });
+    bridge.handle({
+      type: "session.started",
+      session: { model: "gpt-live-1" },
+    });
+    bridge.handle({
+      type: "session.started",
+      session: { model: "gpt-live-1" },
+    });
+    expect(sent[0]).toMatchObject({
+      type: "session.instructions.append",
+      delegation_id: null,
+      content: "Greet them now.",
+    });
+    expect(asked).toEqual(["Brief me."]);
+    answer({ commentary: "Verified: two companies tied at the top." });
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    expect(sent.at(-1)).toMatchObject({
+      type: "session.commentary.append",
+      delegation_id: null,
+    });
+  });
+
   it("ignores a delegation for another target", () => {
     const h = harness();
     h.heard("Top three");

@@ -103,6 +103,7 @@ const SCENARIOS = {
     steps: [
       {
         when: "q-done",
+        answeredDelegations: 1,
         say: "Thanks, Q. Okay, tell me more about the first one.",
       },
     ],
@@ -193,7 +194,7 @@ const SCENARIOS = {
     steps: [
       {
         when: "start",
-        say: "Can you check which companies in my feed are raising a seed round right now?",
+        say: "Can you check which companies fit my mandate best right now?",
       },
       {
         when: { afterMs: 2500 },
@@ -208,7 +209,7 @@ const SCENARIOS = {
     steps: [
       {
         when: "start",
-        say: "What needs my attention today? And meanwhile, tell me how you'd run a first call with a founder.",
+        say: "Show me my top five companies. And meanwhile, tell me how you'd run a first call with a founder.",
       },
     ],
   },
@@ -408,6 +409,8 @@ const FILLER = [
   /absolutely!/i,
   /hold on( a)?( sec| second)?/i,
   /bear with me/i,
+  /hang on/i,
+  /pull(ing)? (it|them|that|those) up/i,
 ];
 
 // ------------------------------------------------------------- Q Brain side
@@ -481,6 +484,19 @@ async function localBackend() {
               fit: c.fit?.score ?? null,
             })),
           );
+          // The local stack's model is a scripted fake: a request it has no
+          // rule for is not Q's judgment, and is never handed over as one.
+          if (
+            typeof answer?.text === "string" &&
+            answer.text.startsWith("[scripted vendor]")
+          ) {
+            return {
+              runId: handle.runId,
+              mock: true,
+              failed: true,
+              commentary: `Q's backend has no verified answer for "${request}" in this test setup. The backend returned nothing about their records for this. If the question needs their records, say plainly you can't confirm it right now; if it doesn't, answer it yourself from general knowledge, without claiming anything about their records. Invent nothing.`,
+            };
+          }
           if (run.status === "FAILED" || answer === undefined) {
             return {
               commentary:
@@ -511,6 +527,15 @@ async function localBackend() {
 const offlineBackend = async ({ request }) => ({
   commentary: `Q's backend is not connected in this test call, so nothing about "${request}" could be checked. Say so honestly and briefly, do not invent records, and carry on with what you can discuss without them.`,
 });
+
+// The app's call opening (shared shape with the preview): greet now, brief
+// when Q Brain's answer lands.
+function openingFor(firstName) {
+  return {
+    greeting: `The call has just connected. Greet ${firstName === undefined ? "them" : JSON.stringify(firstName)} warmly now, in one short natural sentence: no question, no filler. Their briefing from the backend is on its way; do not guess it.`,
+    request: "Brief me: which companies fit my mandate best right now?",
+  };
+}
 
 // ------------------------------------------------------------------ session
 async function runScenario(id) {
@@ -605,11 +630,18 @@ async function runScenario(id) {
         startedAt: started,
         runId: outcome.runId ?? null,
         failed: outcome.failed === true,
+        scriptedNoRule: outcome.mock === true,
+        commentary: outcome.commentary,
       });
       return outcome;
     },
     newEventId: () => `cq_${randomUUID().replace(/-/g, "").slice(0, 20)}`,
     now: () => Date.now(),
+    // The call opening, as the app runs it. The attention read answers 500
+    // on this branch, so the lowdown is Q's code-built fit ranking.
+    ...(scenario.prompt?.briefingOpening === true
+      ? { opening: openingFor(scenario.prompt.firstName) }
+      : {}),
   });
 
   // Hard client-side cap, whatever happens.
@@ -883,6 +915,22 @@ async function runScenario(id) {
       // Q must have answered the previous turn, then be quiet for 1.5 s.
       await waitUntil(() => lastQVoicedAt > (userSpeechEndedAt ?? 0), 25000);
       await waitUntil(() => qQuietFor() > 1500 && !busyDelegating(), 40000);
+      // The opening: the hello comes first, the briefing after it lands.
+      if (step.answeredDelegations !== undefined) {
+        await waitUntil(
+          () =>
+            bridge
+              .state()
+              .delegations.filter(
+                (d) =>
+                  d.status !== "WAITING_FOR_WORDS" && d.status !== "RUNNING",
+              ).length >= step.answeredDelegations && qQuietFor() > 1500,
+          60000,
+        );
+        // Q speaks the briefing once it lands: let it, then wait for quiet.
+        await sleep(2500);
+        await waitUntil(() => qQuietFor() > 1500, 40000);
+      }
       void before;
     } else if (
       typeof step.when === "object" &&

@@ -186,7 +186,7 @@ export function VoicePreview({
         <dt>Model (provider-reported)</dt>
         <dd>
           {choice === "A"
-            ? (stats?.reportedModel ?? "waiting for session.started")
+            ? `${stats?.createdModel ?? "—"} (session create, 201) · ${stats?.reportedModel ?? "waiting for session.started"} (session.started)`
             : "not exposed by this line"}
         </dd>
         {choice === "A" ? (

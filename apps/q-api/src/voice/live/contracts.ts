@@ -54,7 +54,7 @@ export const LiveOpenResultSchema = z
     sdp: z.string(),
     provider: z.literal("openai"),
     /** As the provider reported it when the session was created. */
-    model: z.string(),
+    model: z.string().nullable(),
     maxSessionMs: z.number().int().positive(),
   })
   .strict();

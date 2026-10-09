@@ -18,6 +18,8 @@ import {
  */
 
 export type LiveCallStats = {
+  /** As the provider's session-create response (201) named it. */
+  readonly createdModel: string | null;
   /** As the provider's own `session.started` reported it. */
   readonly reportedModel: string | null;
   readonly startedMs: number | null;
@@ -113,7 +115,7 @@ export async function startLiveCall(
     voiceSessionId: string;
     sessionToken?: string;
     sdp: string;
-    model: string;
+    model: string | null;
     maxSessionMs: number;
   }>(
     doFetch,
@@ -133,6 +135,7 @@ export async function startLiveCall(
   await pc.setRemoteDescription({ type: "answer", sdp: opened.sdp });
 
   let stats: LiveCallStats = {
+    createdModel: opened.model,
     reportedModel: null,
     startedMs: null,
     billedSeconds: null,
@@ -176,6 +179,17 @@ export async function startLiveCall(
     newEventId: () => `cq_${crypto.randomUUID().replace(/-/g, "")}`,
     now: () => Date.now(),
     onChange: update,
+    // The call opening (founder 2026-10-09): a warm hello at once, the
+    // lowdown when Q Brain's briefing lands. GPT-Live does not speak first
+    // by itself, so the app starts both.
+    ...(options.briefingOpening
+      ? {
+          opening: {
+            greeting: `The call has just connected. Greet ${options.firstName === undefined ? "them" : JSON.stringify(options.firstName)} warmly now, in one short natural sentence: no question, no filler. Their briefing from the backend is on its way; do not guess it.`,
+            request: "Brief me: what needs my attention today?",
+          },
+        }
+      : {}),
   });
 
   const reportUsage = (seconds: number, final: boolean) =>
