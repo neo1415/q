@@ -21,10 +21,18 @@ export type LiveConfig = {
     readonly MALE: GptLiveVoice;
   };
   /**
-   * The developer voice comparison preview. Only in a local deployment,
-   * and only with CQ_VOICE_PREVIEW "on": never reachable in production.
+   * The developer voice comparison preview: CQ_VOICE_PREVIEW "on" in a
+   * local deployment, or in a deployed one when `allowedUsers` names who
+   * may use it (the founder's listening test, 2026-10-09).
    */
   readonly preview: boolean;
+  /**
+   * Who may open a live line outside a local deployment
+   * (CQ_VOICE_LIVE_USERS, comma-separated user ids). Null in a local
+   * deployment (anyone signed in); elsewhere an empty set refuses everyone,
+   * so switching the line on never opens paid sessions to every account.
+   */
+  readonly allowedUsers: ReadonlySet<string> | null;
 };
 
 export const LIVE_DEFAULTS: LiveConfig = {
@@ -35,6 +43,7 @@ export const LIVE_DEFAULTS: LiveConfig = {
   delegationDeadlineMs: 30_000,
   voices: { FEMALE: "marin", MALE: "cedar" },
   preview: false,
+  allowedUsers: null,
 };
 
 function bounded(
@@ -66,6 +75,12 @@ export function liveConfigFrom(
   env: Readonly<Record<string, string | undefined>>,
   deploymentEnvironment: string,
 ): LiveConfig {
+  const allowedUsers: ReadonlySet<string> = new Set(
+    (env.CQ_VOICE_LIVE_USERS ?? "")
+      .split(",")
+      .map((id) => id.trim().toLowerCase())
+      .filter((id) => /^[0-9a-f-]{36}$/u.test(id)),
+  );
   return {
     enabled: on(env.CQ_VOICE_LIVE),
     maxSessionMs:
@@ -96,6 +111,9 @@ export function liveConfigFrom(
       ),
       MALE: voice(env.CQ_VOICE_LIVE_VOICE_MALE, LIVE_DEFAULTS.voices.MALE),
     },
-    preview: deploymentEnvironment === "local" && on(env.CQ_VOICE_PREVIEW),
+    preview:
+      on(env.CQ_VOICE_PREVIEW) &&
+      (deploymentEnvironment === "local" || allowedUsers.size > 0),
+    allowedUsers: deploymentEnvironment === "local" ? null : allowedUsers,
   };
 }

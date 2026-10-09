@@ -5845,6 +5845,7 @@ const { app, logger: appLogger } = createApp(
                 ? undefined
                 : {
                     broker: liveBroker,
+                    allowedUsers: liveConfig.allowedUsers,
                     preview: {
                       enabled: liveConfig.preview,
                       providers: () => ({

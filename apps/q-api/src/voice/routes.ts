@@ -197,6 +197,8 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
   readonly live?:
     | {
         readonly broker: LiveBroker;
+        /** Who may open a live line; null: anyone signed in (local). */
+        readonly allowedUsers: ReadonlySet<string> | null;
         readonly preview: {
           readonly enabled: boolean;
           readonly providers: () => Readonly<Record<string, boolean>>;
@@ -1000,6 +1002,7 @@ export function registerQVoiceRoutes(
   if (dependencies.live !== undefined) {
     registerLiveVoiceRoutes(app, {
       broker: dependencies.live.broker,
+      allowedUsers: dependencies.live.allowedUsers,
       withContext,
       binding: ownLine,
       // A GPT-Live call that is not attached to a standard session gets its

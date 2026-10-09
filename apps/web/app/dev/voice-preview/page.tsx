@@ -7,7 +7,10 @@ import {
   PageHeader,
   PageSection,
 } from "@/components/app-shell/page-container";
-import { voicePreviewEnabled } from "@/features/voice/live/live-relay-proxy";
+import {
+  voicePreviewAllowed,
+  voicePreviewEnabled,
+} from "@/features/voice/live/live-relay-proxy";
 import { VoicePreview } from "@/features/voice/live/voice-preview";
 
 export const metadata: Metadata = {
@@ -26,6 +29,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function VoicePreviewPage() {
   if (!voicePreviewEnabled()) notFound();
+  // Deployed, only the people the Q API names may see it (CQ_VOICE_LIVE_USERS).
+  const signedInNow = (await getSessionAccessToken()) !== null;
+  if (signedInNow && !(await voicePreviewAllowed())) notFound();
   const signedIn = (await getSessionAccessToken()) !== null;
   const flag = (name: string) => {
     const value = process.env[name]?.trim().toLowerCase();

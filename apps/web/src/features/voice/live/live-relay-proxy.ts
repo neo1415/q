@@ -133,16 +133,23 @@ const problem = (status: number) =>
     { status, headers: { "cache-control": "no-store" } },
   );
 
+const isOn = (value: string | undefined): boolean => {
+  const flag = value?.trim().toLowerCase();
+  return flag === "on" || flag === "1" || flag === "true";
+};
+
 /**
- * The developer voice comparison preview: a local deployment AND an
- * explicit flag. Checked on the server for the page and every relay, so a
- * production build never serves it, whatever the browser sends.
+ * The developer voice comparison preview: an explicit flag, in a local
+ * deployment, or in a deployed one with CQ_VOICE_PREVIEW_DEPLOYED as well
+ * (the founder's listening test, 2026-10-09). Checked on the server for the
+ * page and every relay. Who may use it is the Q API's decision
+ * (CQ_VOICE_LIVE_USERS): everyone else gets a 404 from it.
  */
 export function voicePreviewEnabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-  const flag = env["CQ_VOICE_PREVIEW"]?.trim().toLowerCase();
-  if (flag !== "on" && flag !== "1" && flag !== "true") return false;
+  if (!isOn(env["CQ_VOICE_PREVIEW"])) return false;
+  if (isOn(env["CQ_VOICE_PREVIEW_DEPLOYED"])) return true;
   try {
     return (
       loadWebServerConfig().runtime.deploymentEnvironment === "local" &&
@@ -241,4 +248,29 @@ export async function relayLive(
   return Response.json(parsed.data, {
     headers: { "cache-control": "no-store" },
   });
+}
+
+/**
+ * Whether the Q API lets this person use the preview (its own allowlist
+ * outside a local deployment). Server-side, with their own bearer; any
+ * failure reads as no.
+ */
+export async function voicePreviewAllowed(
+  options: { readonly doFetch?: typeof fetch } = {},
+): Promise<boolean> {
+  const token = await getSessionAccessToken();
+  if (token === null) return false;
+  try {
+    const response = await (options.doFetch ?? fetch)(
+      `${loadWebServerConfig().qApiBaseUrl}/v1/q/voice/live/preview`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(5_000),
+      },
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

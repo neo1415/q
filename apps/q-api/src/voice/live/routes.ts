@@ -59,7 +59,12 @@ export function registerLiveVoiceRoutes(
     ) => VoiceSessionBinding;
     /** The issued binding is now in use: keep it past the connect window. */
     readonly connect: (binding: VoiceSessionBinding) => void;
-    /** Developer preview gate (local deployment AND CQ_VOICE_PREVIEW). */
+    /**
+     * Who may open a live line (LiveConfig.allowedUsers): null means anyone
+     * signed in (a local deployment).
+     */
+    readonly allowedUsers: ReadonlySet<string> | null;
+    /** Developer preview gate (LiveConfig.preview). */
     readonly preview: {
       readonly enabled: boolean;
       readonly providers: () => Readonly<Record<string, boolean>>;
@@ -67,6 +72,13 @@ export function registerLiveVoiceRoutes(
   },
 ): void {
   const { broker, withContext } = dependencies;
+  // Off a local deployment only the named people may open a paid line or
+  // see the preview; everyone else is told there is no such thing.
+  const allowed = (request: FastifyRequest): boolean =>
+    dependencies.allowedUsers === null ||
+    dependencies.allowedUsers.has(
+      getActorContext(request).userId.toLowerCase(),
+    );
   const params = (request: FastifyRequest) =>
     request.params as { voiceSessionId?: string; delegationId?: string };
 
@@ -79,6 +91,8 @@ export function registerLiveVoiceRoutes(
         request.body ?? {},
         "That is not a live voice offer.",
       );
+      if (!allowed(request))
+        return problem(reply, 404, "No such voice session.");
       const actor = getActorContext(request);
       const binding =
         body.voiceSessionId === undefined
@@ -202,11 +216,13 @@ export function registerLiveVoiceRoutes(
     app.get(
       Q_VOICE_LIVE_PREVIEW_PATH,
       { onRequest: withContext },
-      (_request, reply) =>
-        reply
-          .code(200)
-          .header("Cache-Control", "no-store")
-          .send({ providers: dependencies.preview.providers() }),
+      (request, reply) =>
+        allowed(request)
+          ? reply
+              .code(200)
+              .header("Cache-Control", "no-store")
+              .send({ providers: dependencies.preview.providers() })
+          : problem(reply, 404, "Not found."),
     );
   }
 }

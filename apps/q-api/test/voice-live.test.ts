@@ -357,6 +357,28 @@ describe("GPT-Live config", () => {
     );
     expect(liveConfigFrom({}, "local").preview).toBe(false);
   });
+
+  it("outside a local deployment opens only to the named people", () => {
+    const FOUNDER = "a0000000-0000-4000-8000-0000000000f1";
+    // Switched on with nobody named: nobody may open a paid line.
+    const nobody = liveConfigFrom({ CQ_VOICE_LIVE: "on" }, "staging");
+    expect(nobody.allowedUsers?.size).toBe(0);
+    expect(nobody.preview).toBe(false);
+    const named = liveConfigFrom(
+      {
+        CQ_VOICE_LIVE: "on",
+        CQ_VOICE_PREVIEW: "on",
+        CQ_VOICE_LIVE_USERS: ` ${FOUNDER.toUpperCase()} , not-an-id`,
+      },
+      "staging",
+    );
+    expect([...(named.allowedUsers ?? [])]).toEqual([FOUNDER]);
+    expect(named.preview).toBe(true);
+    // A local deployment: anyone signed in, as before.
+    expect(liveConfigFrom({ CQ_VOICE_LIVE: "on" }, "local").allowedUsers).toBe(
+      null,
+    );
+  });
 });
 
 describe("GPT-Live line", () => {
