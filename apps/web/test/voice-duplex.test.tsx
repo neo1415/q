@@ -13,6 +13,7 @@ import {
   BARGE_CONFIRM_MS,
   BARGE_DUCK_GAIN,
   DuplexLine,
+  SPOKEN_WHILE_WORKING,
   usageReportOf,
   type DuplexEnvironment,
   type DuplexLineEvents,
@@ -412,23 +413,21 @@ describe("tool calls and usage", () => {
     });
   });
 
-  it("voices the silence ladder's beats out of band while ask_q works (ADR 0062)", async () => {
+  it("never polls or voices the silence ladder while ask_q works (founder 2026-10-09)", async () => {
     let finish: () => void = () => undefined;
-    const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>((after) =>
-      Promise.resolve(
-        after === 0
-          ? {
-              beats: [
-                { sequence: 1, beat: { kind: "TONE" } },
-                {
-                  sequence: 2,
-                  beat: { kind: "STAGE_LINE", text: "Looking at the deck…" },
-                },
-              ],
-              idle: false,
-            }
-          : { beats: [], idle: true },
-      ),
+    // A relay with beats ready: none of them may be said, however long Q
+    // works (no stage lines, no tones, no hums).
+    const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() =>
+      Promise.resolve({
+        beats: [
+          { sequence: 1, beat: { kind: "TONE" } },
+          {
+            sequence: 2,
+            beat: { kind: "STAGE_LINE", text: "Looking at the deck…" },
+          },
+        ],
+        idle: false,
+      }),
     );
     const h = harness({
       narration,
@@ -449,226 +448,22 @@ describe("tool calls and usage", () => {
       name: "ask_q",
       arguments: JSON.stringify({ request: "Look at the deck." }),
     });
-    await settle();
-    expect(narration).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(700);
-    await settle();
-    expect(narration).toHaveBeenCalledWith(0);
-    const spoken = h
-      .channel()
-      .sent.filter(
-        (event) =>
-          (event as { type?: string }).type === "response.create" &&
-          JSON.stringify(event).includes("Looking at the deck"),
-      );
-    expect(spoken).toHaveLength(1);
-    // Out of band, no tools: nothing it says enters the conversation.
-    expect(spoken[0]).toMatchObject({
-      response: { conversation: "none", tools: [], tool_choice: "none" },
-    });
-    // W4b: what the beat said comes back as a transcript; it is never a
-    // line of the visible (or saved) conversation.
-    const metadata = (spoken[0] as { response: { metadata: unknown } }).response
-      .metadata;
-    h.channel().emit({
-      type: "response.created",
-      response: { id: "resp_beat", metadata },
-    });
-    h.channel().emit({
-      type: "response.output_audio_transcript.done",
-      response_id: "resp_beat",
-      transcript: "Looking at the deck…",
-    });
-    h.channel().emit({
-      type: "response.done",
-      response: { id: "resp_beat", status: "completed", metadata },
-    });
-    await settle();
-    expect(
-      h.events.onLine.mock.calls.some(
-        ([role, said]) => role === "q" && said.includes("Looking at the deck"),
-      ),
-    ).toBe(false);
-    finish();
-    await settle();
-  });
-
-  it("reconnects the narration poll after a dropped connection, and says one bridge for the turn (R9, INC-1)", async () => {
-    let finish: () => void = () => undefined;
-    const beat = (sequence: number, text: string) => ({
-      sequence,
-      beat: { kind: "STAGE_LINE" as const, text },
-    });
-    let calls = 0;
-    const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() => {
-      calls += 1;
-      // The network drops: once as nothing, once as a throw.
-      if (calls === 1) return Promise.resolve(null);
-      if (calls === 2) return Promise.reject(new TypeError("Failed to fetch"));
-      // Back: two beats are waiting; one bridge per turn is said (INC-1).
-      return Promise.resolve({
-        beats: [beat(1, "Reading the deck…"), beat(2, "Checking the numbers…")],
-        idle: false,
-      });
-    });
-    const h = harness({
-      narration,
-      tool: () =>
-        new Promise((resolve) => {
-          finish = () => {
-            resolve({
-              output: JSON.stringify({ ok: true, say: "Done." }),
-              approvalPending: false,
-            });
-          };
-        }),
-    });
-    await h.line.open();
-    h.channel().emit({
-      type: "response.function_call_arguments.done",
-      call_id: "call_r",
-      name: "ask_q",
-      arguments: JSON.stringify({ request: "Look at the deck." }),
-    });
-    const said = (words: string) =>
-      h
-        .channel()
-        .sent.filter(
-          (event) =>
-            (event as { type?: string }).type === "response.create" &&
-            JSON.stringify(event).includes(words),
-        ).length;
-    await vi.advanceTimersByTimeAsync(5_000);
-    await settle();
-    expect(narration.mock.calls.map(([after]) => after)).toEqual([0, 0, 0]);
-    expect(said("Reading the deck")).toBe(1);
-    expect(said("Checking the numbers")).toBe(0);
-    // And no more polls for this turn: its one bridge is said.
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(narration).toHaveBeenCalledTimes(3);
-    finish();
-    await settle();
-  });
-
-  it("offline, the narration poll waits for the connection instead of going quiet (W7)", async () => {
-    let finish: () => void = () => undefined;
-    const beat = (sequence: number, text: string) => ({
-      sequence,
-      beat: { kind: "STAGE_LINE" as const, text },
-    });
-    let online = false;
-    const listeners = new Set<() => void>();
-    const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() => {
-      if (!online) return Promise.reject(new TypeError("Failed to fetch"));
-      return Promise.resolve({
-        beats: [beat(1, "Reading the deck…"), beat(2, "Checking the numbers…")],
-        idle: true,
-      });
-    });
-    const h = harness({
-      narration,
-      env: {
-        isOnline: () => online,
-        onOnline: (handler) => {
-          listeners.add(handler);
-          return () => {
-            listeners.delete(handler);
-          };
-        },
-      },
-      tool: () =>
-        new Promise((resolve) => {
-          finish = () => {
-            resolve({
-              output: JSON.stringify({ ok: true, say: "Done." }),
-              approvalPending: false,
-            });
-          };
-        }),
-    });
-    await h.line.open();
-    h.channel().emit({
-      type: "response.function_call_arguments.done",
-      call_id: "call_o",
-      name: "ask_q",
-      arguments: JSON.stringify({ request: "Look at the deck." }),
-    });
-    const said = (words: string) =>
-      h
-        .channel()
-        .sent.filter(
-          (event) =>
-            (event as { type?: string }).type === "response.create" &&
-            JSON.stringify(event).includes(words),
-        ).length;
-    // Well past the old ~5.6 s give-up: one failed poll, then it waits.
     await vi.advanceTimersByTimeAsync(20_000);
     await settle();
-    expect(narration).toHaveBeenCalledTimes(1);
-    expect(listeners.size).toBe(1);
-    // Back online: it polls again at once.
-    online = true;
-    for (const listener of [...listeners]) listener();
-    await vi.advanceTimersByTimeAsync(10);
-    await settle();
-    expect(narration).toHaveBeenCalledTimes(2);
-    expect(listeners.size).toBe(0);
-    expect(said("Reading the deck")).toBe(1);
-    expect(said("Checking the numbers")).toBe(0);
+    expect(SPOKEN_WHILE_WORKING).toBe(false);
+    expect(narration).not.toHaveBeenCalled();
+    expect(h.channel().types()).not.toContain("response.create");
     finish();
     await settle();
-  });
-
-  it("offline wait ends with the ask_q: no poll after the answer (W7)", async () => {
-    let finish: () => void = () => undefined;
-    let calls = 0;
-    const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() => {
-      calls += 1;
-      return calls === 1
-        ? Promise.reject(new TypeError("Failed to fetch"))
-        : Promise.resolve({ beats: [], idle: true });
-    });
-    const listeners = new Set<() => void>();
-    let online = false;
-    const h = harness({
-      narration,
-      env: {
-        isOnline: () => online,
-        onOnline: (handler) => {
-          listeners.add(handler);
-          return () => {
-            listeners.delete(handler);
-          };
-        },
-      },
-      tool: () =>
-        new Promise((resolve) => {
-          finish = () => {
-            resolve({
-              output: JSON.stringify({ ok: true, say: "Done." }),
-              approvalPending: false,
-            });
-          };
-        }),
-    });
-    await h.line.open();
-    h.channel().emit({
-      type: "response.function_call_arguments.done",
-      call_id: "call_p",
-      name: "ask_q",
-      arguments: JSON.stringify({ request: "Look." }),
-    });
-    await vi.advanceTimersByTimeAsync(3_000);
-    await settle();
-    expect(narration).toHaveBeenCalledTimes(1);
-    finish();
-    await settle();
-    await vi.advanceTimersByTimeAsync(2_000);
-    await settle();
-    expect(listeners.size).toBe(0);
-    online = true;
-    await vi.advanceTimersByTimeAsync(2_000);
-    expect(narration).toHaveBeenCalledTimes(1);
+    const creates = h
+      .channel()
+      .sent.filter(
+        (event) => (event as { type?: string }).type === "response.create",
+      );
+    expect(creates).toHaveLength(1);
+    expect(JSON.stringify(creates[0])).toContain("Say this to the person");
+    expect(JSON.stringify(creates[0])).not.toContain("Looking at the deck");
+    expect(narration).not.toHaveBeenCalled();
   });
 
   it("does not speak a tool result the person talked over", async () => {

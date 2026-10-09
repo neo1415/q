@@ -166,6 +166,12 @@ export const ANSWER_AUDIO_WATCHDOG_MS = 12_000;
 export const ANSWER_SPOKEN_WATCHDOG_MS = 90_000;
 /** INC-1: at most this many bridge lines per turn, and none once ready. */
 export const BRIDGES_PER_TURN = 1;
+/**
+ * Founder 2026-10-09: nothing is said or sounded while Q works. Narration
+ * and bridges are off on the duplex line; the answer is the first thing
+ * heard.
+ */
+export const SPOKEN_WHILE_WORKING = false;
 /** How long a blip over Q waits for its words before it is let go (C-11). */
 const BLIP_WORDS_WAIT_MS = 2_500;
 /** Sounds that are not words: a blip of only these is let go. */
@@ -225,16 +231,6 @@ const NOTE_INSTRUCTIONS =
 /** After a noise cut Q: the cut answer carries on. */
 const RESUME_INSTRUCTIONS =
   "Carry on with the answer you were giving, from where you stopped, as Q. Do not repeat what you already said and do not mention the noise.";
-/**
- * G-D20: a bridge is a fixed, code-chosen line, never free model speech.
- * Used when no server narration supplies one; varied, never a promise of
- * a result and never "give me a moment".
- */
-const FIXED_BRIDGES = [
-  "Pulling that up.",
-  "Looking now.",
-  "Checking your records.",
-] as const;
 
 /** How one turn on the line ended (RECOVERY A4), with its timings. */
 export type DuplexTurnOutcome = {
@@ -1749,7 +1745,6 @@ export class DuplexLine {
     turn.responseId = null;
     this.#touch();
     this.#events.onState("THINKING");
-    let bridge: unknown = null;
     // The person's own words, as the model passed them to Q.
     if (name === "ask_q") {
       try {
@@ -1761,27 +1756,10 @@ export class DuplexLine {
             this.#events.onLine("user", words);
           }
           this.#forcedAskQ = false;
-          // ADR 0062: the server's silence ladder fills a slow answer,
-          // in fixed words from Q's real stage; a fast one gets silence.
+          // ADR 0062's ladder is off (founder 2026-10-09): #narrate says
+          // nothing while SPOKEN_WHILE_WORKING is false.
           if (this.#relays.narration !== undefined) {
             this.#narrate(turn);
-          } else if (this.#bridgesAllowed()) {
-            bridge = this.#env.setTimeout(
-              () => {
-                if (
-                  generation === this.#generation &&
-                  this.#turn === turn &&
-                  !turn.answerLanded &&
-                  turn.bridges < BRIDGES_PER_TURN
-                ) {
-                  turn.bridges += 1;
-                  this.#fireBridge(words);
-                }
-              },
-              this.#policy.level === "NATURAL"
-                ? BRIDGE_AFTER_NATURAL_MS
-                : BRIDGE_AFTER_MS,
-            );
           }
         }
       } catch {
@@ -1817,7 +1795,6 @@ export class DuplexLine {
       result = null;
     } finally {
       this.#toolsInFlight -= 1;
-      if (bridge !== null) this.#env.clearTimeout(bridge);
       this.#updateBusy();
     }
     if (this.#over) return;
@@ -2621,12 +2598,6 @@ export class DuplexLine {
     );
   }
 
-  #bridgesAllowed(): boolean {
-    return (
-      this.#credential.listening !== undefined && this.#policy.level !== "OFF"
-    );
-  }
-
   #newOutOfBand(kind: OutOfBand["kind"]): OutOfBand {
     this.#oobCount += 1;
     const oob: OutOfBand = {
@@ -2704,6 +2675,10 @@ export class DuplexLine {
 
   /** ADR 0062: voice the ladder's beats while this ask_q works. */
   #narrate(turn: OpenTurn): void {
+    // Founder 2026-10-09: no sound at all while Q works (no stage lines,
+    // no hums, no breathing). Nothing is polled or said; the at-most-one,
+    // never-after-the-answer rule below stays for any line that remains.
+    if (!SPOKEN_WHILE_WORKING) return;
     const poll = this.#relays.narration;
     if (poll === undefined) return;
     // INC-1: narration belongs to its turn: at most one bridge line, none
@@ -2822,19 +2797,6 @@ export class DuplexLine {
   }
 
   /** The answer is slow: one short line, from their own request. */
-  #fireBridge(_request: string): void {
-    // G-D20: a fixed, code-chosen line, never the model's own words (the
-    // request is not handed to it: a model that sees it may start to
-    // answer, as the incident's "let me find the top three" did).
-    if (!this.#bridgesAllowed() || this.#over) return;
-    this.#bridgeCount += 1;
-    const line =
-      FIXED_BRIDGES[this.#bridgeCount % FIXED_BRIDGES.length] ??
-      FIXED_BRIDGES[0];
-    this.#sayBeat({ kind: "STAGE_LINE", text: line });
-  }
-
-  #bridgeCount = 0;
 
   #sendOutOfBand(
     oob: OutOfBand,

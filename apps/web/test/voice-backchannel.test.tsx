@@ -17,6 +17,7 @@ import {
   BACKCHANNEL_GAIN,
   BRIDGE_AFTER_MS,
   DuplexLine,
+  THINKING_WATCHDOG_MS,
   type DuplexEnvironment,
   type DuplexLineEvents,
   type DuplexRelays,
@@ -691,7 +692,7 @@ describe("bridging a slow answer", () => {
     h.line.close();
   });
 
-  it("asks for one line from their own request when it is slow, and cuts it the moment the answer lands (INC-1)", async () => {
+  it("says nothing while Q works, however slow: the answer is the first thing heard (founder 2026-10-09)", async () => {
     let answer: (value: QVoiceDuplexToolResult) => void = () => undefined;
     const h = lineHarness({
       tool: () =>
@@ -702,52 +703,22 @@ describe("bridging a slow answer", () => {
     await h.line.open();
     const ch = h.channel();
     ch.emit(askQ);
-    await vi.advanceTimersByTimeAsync(BRIDGE_AFTER_MS + 50);
-    const bridges = h.outOfBand();
-    expect(bridges).toHaveLength(1);
-    // G-D20: a fixed, code-chosen line, never the model's own words, and
-    // the request is not handed to it (it might start to answer).
-    expect(bridges[0]).toMatchObject({ tools: [], tool_choice: "none" });
-    expect(String(bridges[0]?.instructions)).toMatch(
-      /short aside.*exactly these words.*"(?:Pulling that up|Looking now|Checking your records)\."/u,
-    );
-    expect(JSON.stringify(bridges[0])).not.toContain("Kazikit");
-    const id = (bridges[0]?.metadata as { cq_id: string }).cq_id;
-    ch.emit({
-      type: "response.created",
-      response: { id: "resp_br", metadata: { cq_kind: "BRIDGE", cq_id: id } },
-    });
-    ch.emit({ type: "output_audio_buffer.started", response_id: "resp_br" });
-    // The answer arrives while the bridge is still being said.
+    // Long past any bridge or ladder threshold, short of the watchdog's
+    // terminal repair: no aside, no hum, no beat.
+    await vi.advanceTimersByTimeAsync(THINKING_WATCHDOG_MS - 1_000);
+    expect(h.outOfBand()).toHaveLength(0);
+    expect(ch.ofType("response.create")).toHaveLength(0);
     answer({
       output: JSON.stringify({ ok: true, say: "They grew." }),
       approvalPending: false,
     });
     await settle();
-    const mainCreates = () =>
-      ch
-        .ofType("response.create")
-        .filter(
-          (event) =>
-            (event.response as { conversation?: string } | undefined)
-              ?.conversation !== "none",
-        );
-    // INC-1 (live 2026-10-08): a bridge never plays over a ready answer.
-    // It is cut, and the answer is asked for at once.
-    expect(ch.ofType("response.cancel")).toContainEqual(
-      expect.objectContaining({ response_id: "resp_br" }),
-    );
-    expect(mainCreates()).toHaveLength(1);
-    ch.emit({
-      type: "response.done",
-      response: { id: "resp_br", status: "cancelled", usage: {} },
-    });
-    ch.emit({ type: "output_audio_buffer.cleared", response_id: "resp_br" });
-    await settle();
-    expect(mainCreates()).toHaveLength(1);
-    expect(h.relays.usage).toHaveBeenCalledWith(
-      expect.objectContaining({ responseId: "resp_br", kind: "BRIDGE" }),
-    );
+    const creates = ch.ofType("response.create");
+    expect(creates).toHaveLength(1);
+    expect(
+      String((creates[0]?.response as { instructions?: string }).instructions),
+    ).toMatch(/^Say this to the person/u);
+    expect(h.outOfBand()).toHaveLength(0);
     h.line.close();
   });
 

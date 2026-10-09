@@ -20,7 +20,10 @@ import {
 
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
-import { createVoiceTurnHandler } from "../src/voice/turn.js";
+import {
+  createVoiceTurnHandler,
+  SPOKEN_SILENCE_LADDER,
+} from "../src/voice/turn.js";
 
 /**
  * No spoken fillers (founder live test 2026-09-27, failure 10; R38).
@@ -180,6 +183,110 @@ describe("nothing is spoken unless it is part of the answer", () => {
       expect(voice.spoken.filter((line) => line.length > 0)).toEqual(answer);
     } finally {
       clock.mockRestore();
+    }
+  });
+});
+
+/** A stream whose events arrive `gapMs` apart on the (fake) clock. */
+function slowStream(
+  events: readonly QStreamEvent[],
+  gapMs: number,
+): QRunStreamService {
+  return {
+    ...stream([]),
+    open: async function* (input) {
+      for (const item of events) {
+        await new Promise((resolve) => setTimeout(resolve, gapMs));
+        if (input.signal.aborted) return;
+        yield { kind: "durable" as const, event: item };
+      }
+      yield { kind: "end" as const, reason: "TERMINAL" as const };
+    },
+  };
+}
+
+describe("no sound at all while Q works (founder 2026-10-09)", () => {
+  it("the silence ladder is off on every line", () => {
+    expect(SPOKEN_SILENCE_LADDER).toBe(false);
+  });
+
+  it("a run that takes over half a minute says nothing until its answer: no stage line, no tone, no hum", async () => {
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "Date",
+      ],
+    });
+    try {
+      const answer = "Halyard Security leads on fit.";
+      const handle = createVoiceTurnHandler({
+        qRuntime: runtime(),
+        qStream: slowStream(
+          [
+            ...Q_VISIBLE_STAGES.map((stage) =>
+              event("q.stage.changed", { stage }),
+            ),
+            event("q.message.delta", { messageId: "m1", text: answer }),
+            event("q.message.completed", {
+              message: {
+                messageId: "m1",
+                runId: RUN_ID,
+                role: "Q",
+                text: answer,
+                createdAt: NOW,
+              },
+            }),
+            event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
+          ],
+          2_000,
+        ),
+        logger,
+      });
+      const voice = speaker();
+      const turn = handle(
+        binding(),
+        [{ role: "user", content: "Who leads my pipeline on fit?" }],
+        new AbortController().signal,
+        voice,
+      );
+      // Every stage, each two seconds apart: well past any ladder rung.
+      await vi.advanceTimersByTimeAsync((Q_VISIBLE_STAGES.length + 4) * 2_000);
+      await turn;
+      expect(voice.spoken.filter((line) => line.length > 0)).toEqual([answer]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a question back is asked as it is: no rising 'Hm?' before it", async () => {
+    // The beat was random on half the turns; pin the draw that said it.
+    const draw = vi.spyOn(Math, "random").mockReturnValue(0);
+    try {
+      const handle = createVoiceTurnHandler({
+        qRuntime: runtime(),
+        qStream: stream([
+          event("q.input.required", {
+            clarification: { question: "Which fund do you mean" },
+          }),
+          event("q.run.completed", { status: "COMPLETED", completedAt: NOW }),
+        ]),
+        logger,
+      });
+      const voice = speaker();
+      await handle(
+        binding(),
+        [{ role: "user", content: "How is the fund doing?" }],
+        new AbortController().signal,
+        voice,
+      );
+      const said = voice.spoken.filter((line) => line.length > 0);
+      expect(said.join(" ")).toContain("Which fund do you mean");
+      expect(said.join(" ")).not.toMatch(/\bhm+\b/iu);
+    } finally {
+      draw.mockRestore();
     }
   });
 });
