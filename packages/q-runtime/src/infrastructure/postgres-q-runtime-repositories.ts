@@ -461,9 +461,22 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         // A run's last sign of life is its newest durable event, else its
         // start, else its creation. A paused run waits on a person and no
         // engine; an in-flight one is held by whichever process runs it.
+        // G-D24: a run whose engine heartbeats is judged by the heartbeat
+        // alone, over the short engine window: a live engine touches it
+        // every few seconds however quiet the run is, so a heartbeat that
+        // stopped means the process is gone. A run no heartbeating engine
+        // ever held keeps the event-silence rule below.
+        const engineSilentSince =
+          input.engineSilentSince ?? input.inFlightSilentSince;
         const rows = await executor`
           ${selectRun(executor)}
            where r.status not in ('COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED')
+             and (
+               (r.engine_heartbeat_at is not null
+                and r.status not in ('AWAITING_INPUT', 'AWAITING_APPROVAL')
+                and r.engine_heartbeat_at < ${engineSilentSince}::timestamptz)
+               or
+             ((r.engine_heartbeat_at is null or r.status in ('AWAITING_INPUT', 'AWAITING_APPROVAL'))
              and coalesce(
                    (select max(e.occurred_at)
                       from q_runtime.run_events e
@@ -475,7 +488,7 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
                        when r.status in ('AWAITING_INPUT', 'AWAITING_APPROVAL')
                          then ${input.pausedSilentSince}::timestamptz
                        else ${input.inFlightSilentSince}::timestamptz
-                     end
+                     end))
            order by r.created_at
            limit ${input.limit}`;
         return rows.map(toRun);

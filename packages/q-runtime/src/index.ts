@@ -220,9 +220,15 @@ export {
 export const PACKAGE_NAME = "@capital-q/q-runtime" as const;
 export {
   createOrphanedRunSweep,
+  ORPHAN_ENGINE_WINDOW_MS,
   type OrphanedRunSweepDependencies,
   type OrphanedRunSweepResult,
 } from "./application/orphaned-runs.js";
+export {
+  createRunEngineHeartbeat,
+  ENGINE_HEARTBEAT_INTERVAL_MS,
+  type RunEngineHeartbeat,
+} from "./application/engine-heartbeat.js";
 // ETIQUETTE block (ADR 0050): a person's own business etiquette guide.
 export {
   createPostgresEtiquetteGuideStore,

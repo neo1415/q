@@ -29,6 +29,12 @@ import { runRef, type QOrchestrationRuntime } from "./orchestration-runtime.js";
  *
  * Because young orphans are now left until they age out, the sweep also
  * runs periodically rather than only at startup.
+ *
+ * G-D24: silence is a slow signal (a live run can be quiet for minutes in
+ * one model call), so a run caught by a restart hung for up to 20 minutes.
+ * An engine now heartbeats the runs it holds (engine-heartbeat.ts); a run
+ * whose heartbeat stopped for `engineWindowMs` (default 60 s) has no engine
+ * anywhere and is failed as RUN_EXPIRED at the next sweep.
  */
 
 export type OrphanedRunSweepDependencies = {
@@ -38,6 +44,8 @@ export type OrphanedRunSweepDependencies = {
   readonly logger?: Logger | undefined;
   /** Silence after which an in-flight run has no engine. Default 15 minutes. */
   readonly inFlightWindowMs?: number | undefined;
+  /** Heartbeat age after which a heartbeating run has no engine. Default 60 s. */
+  readonly engineWindowMs?: number | undefined;
   /** Silence after which a paused run is abandoned. Default 24 hours. */
   readonly pausedWindowMs?: number | undefined;
   readonly now?: (() => Date) | undefined;
@@ -55,6 +63,8 @@ export type OrphanedRunSweepResult = {
 const SWEEP_LIMIT = 500;
 export const ORPHAN_IN_FLIGHT_WINDOW_MS = 15 * 60 * 1000;
 export const ORPHAN_PAUSED_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** Four missed heartbeats (engine-heartbeat.ts beats every 15 s). */
+export const ORPHAN_ENGINE_WINDOW_MS = 60 * 1000;
 
 export function createOrphanedRunSweep(
   dependencies: OrphanedRunSweepDependencies,
@@ -64,12 +74,14 @@ export function createOrphanedRunSweep(
   const inFlightWindow =
     dependencies.inFlightWindowMs ?? ORPHAN_IN_FLIGHT_WINDOW_MS;
   const pausedWindow = dependencies.pausedWindowMs ?? ORPHAN_PAUSED_WINDOW_MS;
+  const engineWindow = dependencies.engineWindowMs ?? ORPHAN_ENGINE_WINDOW_MS;
   return {
     sweep: async (): Promise<OrphanedRunSweepResult> => {
       const at = now().getTime();
       const orphaned = await runs.listStale(sql, {
         inFlightSilentSince: new Date(at - inFlightWindow).toISOString(),
         pausedSilentSince: new Date(at - pausedWindow).toISOString(),
+        engineSilentSince: new Date(at - engineWindow).toISOString(),
         limit: SWEEP_LIMIT,
       });
       let failed = 0;

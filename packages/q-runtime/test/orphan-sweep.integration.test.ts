@@ -58,6 +58,8 @@ describe("the orphaned run sweep, against local PostgreSQL", () => {
       readonly status: string;
       readonly createdMinutesAgo: number;
       readonly lastEventMinutesAgo?: number;
+      /** G-D24: when its engine last said it still holds the run. */
+      readonly heartbeatSecondsAgo?: number;
     },
   ): Promise<string> {
     const id = randomUUID();
@@ -72,6 +74,11 @@ describe("the orphaned run sweep, against local PostgreSQL", () => {
           (tenant_id, run_id, sequence, event_type, payload, occurred_at)
         values (${input.tenantId}, ${id}, 1, 'q.stage.changed', '{}'::jsonb,
                 ${new Date(Date.now() - input.lastEventMinutesAgo * MINUTE)})`;
+    }
+    if (input.heartbeatSecondsAgo !== undefined) {
+      await tx.sql`update q_runtime.runs
+          set engine_heartbeat_at = ${new Date(Date.now() - input.heartbeatSecondsAgo * 1000)}
+        where id = ${id}`;
     }
     return id;
   }
@@ -177,6 +184,77 @@ describe("the orphaned run sweep, against local PostgreSQL", () => {
         expect(failed).not.toContain(justStarted);
         expect(failed).not.toContain(longButAlive);
         expect(failed).not.toContain(paused);
+        checked = true;
+        throw new Rollback();
+      });
+    } catch (error) {
+      if (!(error instanceof Rollback)) throw error;
+    }
+    expect(checked).toBe(true);
+  });
+  it("G-D24: a run whose engine stopped heartbeating is closed within a minute; a live engine in a long call is not", async () => {
+    let checked = false;
+    try {
+      await db.transactions.run(async (tx) => {
+        const tenantId = randomUUID();
+        await tx.sql`insert into identity.tenants (id, name) values (${tenantId}, 'Heartbeat tenant')`;
+        const authUserId = randomUUID();
+        await tx.sql`insert into auth.users (id) values (${authUserId})`;
+        const [profile] = await tx.sql<
+          { id: string }[]
+        >`select id from identity.user_profiles where auth_user_id = ${authUserId}`;
+        if (profile === undefined)
+          throw new Error("profile trigger did not run");
+        const userId = profile.id;
+
+        // Mid-answer when q-api restarted two minutes ago: the K7 case.
+        const caughtByRestart = await insertRun(tx, {
+          tenantId,
+          userId,
+          status: "SYNTHESIS",
+          createdMinutesAgo: 3,
+          lastEventMinutesAgo: 2,
+          heartbeatSecondsAgo: 120,
+        });
+        // Thirty minutes in one model call, but its engine is alive.
+        const liveLongCall = await insertRun(tx, {
+          tenantId,
+          userId,
+          status: "SYNTHESIS",
+          createdMinutesAgo: 30,
+          lastEventMinutesAgo: 30,
+          heartbeatSecondsAgo: 10,
+        });
+        // Paused on a person for an hour; its old heartbeat is irrelevant.
+        const paused = await insertRun(tx, {
+          tenantId,
+          userId,
+          status: "AWAITING_APPROVAL",
+          createdMinutesAgo: 60,
+          lastEventMinutesAgo: 60,
+          heartbeatSecondsAgo: 3600,
+        });
+
+        const failed: { runId: string; code: string }[] = [];
+        const runtime = {
+          fail: (ref: { runId: string }, code: string) => {
+            failed.push({ runId: ref.runId, code });
+            return Promise.resolve({ kind: "ADVANCED" });
+          },
+          expire: () => Promise.resolve({ kind: "ADVANCED" }),
+          finishCancellation: () => Promise.resolve({ kind: "ADVANCED" }),
+        } as unknown as QOrchestrationRuntime;
+
+        await createOrphanedRunSweep({
+          sql: tx.sql,
+          runs: createPostgresQRuntimeRepositories().runs,
+          runtime,
+        }).sweep();
+
+        const ours = new Set([caughtByRestart, liveLongCall, paused]);
+        expect(failed.filter((f) => ours.has(f.runId))).toEqual([
+          { runId: caughtByRestart, code: "RUN_EXPIRED" },
+        ]);
         checked = true;
         throw new Rollback();
       });

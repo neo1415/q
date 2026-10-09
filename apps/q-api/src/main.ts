@@ -426,6 +426,7 @@ import {
   createInvestorOrganisationQSubjectResolver,
   createOrganisationQSubjectResolver,
   createOrphanedRunSweep,
+  createRunEngineHeartbeat,
   createPostgresQRunEventNotifier,
   createPostgresQRuntimeRepositories,
   createQOrchestrationRuntime,
@@ -455,8 +456,12 @@ import {
   createPostgresApplicationIdentityLookup,
   createPostgresAuthorizationPolicySource,
   createPostgresPersonProfileStore,
+  createPostgresSessionLiveness,
 } from "@capital-q/security/postgres";
-import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
+import {
+  createLocalJwtAccessTokenAuthenticator,
+  createSupabaseAccessTokenAuthenticator,
+} from "@capital-q/security/supabase";
 
 import { createApp, SERVICE_NAME } from "./app.js";
 import {
@@ -3859,10 +3864,19 @@ const checkpoints = createPostgresQCheckpointStore({
   connectTimeoutSeconds: checkpointDatabase.connectTimeoutSeconds,
   idleTimeoutSeconds: checkpointDatabase.idleTimeoutSeconds,
 });
-const orchestrationRuntime = createQOrchestrationRuntime({
-  ...runtimeDependencies,
-  repositories,
+// G-D24: the runs this process orchestrates heartbeat, so one caught by a
+// restart or deploy is closed within about a minute and a half (engine
+// window 60 s, sweep every 30 s) instead of hanging in SYNTHESIS.
+const runEngineHeartbeat = createRunEngineHeartbeat({
+  sql: database.sql,
+  runtime: createQOrchestrationRuntime({
+    ...runtimeDependencies,
+    repositories,
+  }),
+  logger,
 });
+runEngineHeartbeat.start();
+const orchestrationRuntime = runEngineHeartbeat.runtime;
 const orchestrator = withLearning(
   createLangGraphQOrchestrator({
     runtime: orchestrationRuntime,
@@ -3958,7 +3972,9 @@ setInterval(
       logger.warn({ err: error }, "orphaned q run sweep failed");
     });
   },
-  5 * 60 * 1000,
+  // G-D24: often enough that an orphan is closed within its engine window
+  // plus this interval; the query is bounded and indexed by status.
+  30 * 1000,
 ).unref();
 
 // Q in a meeting (founder direction 2026-09-29): the organiser brings Q to
@@ -5723,12 +5739,23 @@ logger.info(
   "voice channel composed",
 );
 
+// SUB-SECOND Phase 4: access tokens are verified here against the
+// project's published ES256 key, and the session is checked in the
+// database (fresh for writes, at most 15 s old for reads), instead of
+// asking the Auth server on every request (~208 ms median, 2-6 s tail).
+// CQ_AUTH_LOCAL_JWT=off restores the Auth-server check.
+const accessTokens =
+  process.env["CQ_AUTH_LOCAL_JWT"]?.trim().toLowerCase() === "off"
+    ? createSupabaseAccessTokenAuthenticator(supabaseAuth)
+    : createLocalJwtAccessTokenAuthenticator({
+        url: supabaseAuth.url,
+        sessions: createPostgresSessionLiveness({ sql: database.sql }),
+        fallback: createSupabaseAccessTokenAuthenticator(supabaseAuth),
+      });
 const { app, logger: appLogger } = createApp(
   config,
   {
-    authenticator: createSupabaseRequestAuthenticator(
-      createSupabaseAccessTokenAuthenticator(supabaseAuth),
-    ),
+    authenticator: createSupabaseRequestAuthenticator(accessTokens),
     resolver: actorContextResolver,
     identity,
   },
