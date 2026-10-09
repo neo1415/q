@@ -1,0 +1,560 @@
+import { randomUUID } from "node:crypto";
+
+import {
+  CorrelationIdSchema,
+  QRunIdSchema,
+  sensitivityWithin,
+  type ModelSensitivity,
+} from "@capital-q/contracts";
+import type { ModelUsageRepository } from "@capital-q/model-gateway";
+import { createCorrelationId, type Logger } from "@capital-q/observability";
+import type { ContextFirewallPort } from "@capital-q/q-runtime";
+import type { ActorContext } from "@capital-q/security";
+import type { SpokenFacts } from "@capital-q/q-core";
+
+import type { VoiceSessionBinding } from "../bindings.js";
+import { askQFactsOutput, forRealtime } from "../duplex/broker.js";
+import type { DuplexSpendLedger } from "../duplex/spend.js";
+import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
+import {
+  GPT_LIVE_USD_PER_SECOND,
+  type LiveVoiceProvider,
+} from "../providers/gpt-live.js";
+import {
+  APPROVAL_QUESTION,
+  settledTurn,
+  type VoiceTurnHandler,
+} from "../turn.js";
+import type { LiveConfig } from "./config.js";
+import type {
+  LiveDelegationRequest,
+  LiveDelegationResult,
+  LiveOpenResult,
+  LiveUsageReport,
+} from "./contracts.js";
+import { livePrompt } from "./prompt.js";
+
+/**
+ * The GPT-Live line (workstream V). GPT-Live is the voice; Q Brain is the
+ * authority. Each delegation the voice makes is answered by ONE run of the
+ * same voice turn handler the standard and duplex lines use, so Q's
+ * conversation, cards (by run), navigation, approvals and Work happen
+ * exactly as they do there. The voice only ever receives what that run
+ * verified, to say in its own words.
+ */
+
+export type LiveRefusal =
+  | "OFF"
+  | "REHEARSAL"
+  | "CAP_REACHED"
+  | "LEDGER_UNAVAILABLE"
+  | "DENIED"
+  | "INELIGIBLE"
+  | "PROVIDER_UNAVAILABLE";
+
+export type LiveOpenOutcome =
+  | { readonly kind: "OPEN"; readonly result: LiveOpenResult }
+  | { readonly kind: "REFUSED"; readonly reason: LiveRefusal };
+
+type Delegation = {
+  readonly id: string;
+  readonly request: string;
+  readonly controller: AbortController;
+  result: Promise<Omit<LiveDelegationResult, "stale">>;
+  settled: boolean;
+};
+
+type LiveLine = {
+  readonly voiceSessionId: string;
+  readonly actor: ActorContext;
+  readonly binding: VoiceSessionBinding;
+  readonly openedAt: number;
+  lastActivityAt: number;
+  /** What Q was asked and verified on this line, oldest first (authority). */
+  readonly history: VoiceTranscriptTurn[];
+  readonly delegations: Map<string, Delegation>;
+  /** The newest delegation; older results are returned stale. */
+  latest: string | null;
+  recordedSeconds: number;
+  finalReported: boolean;
+};
+
+export type LiveBroker = {
+  readonly enabled: boolean;
+  readonly maxSessionMs: number;
+  readonly open: (input: {
+    readonly binding: VoiceSessionBinding;
+    readonly sdp: string;
+    readonly briefingOpening?: boolean | undefined;
+    readonly firstName?: string | undefined;
+    readonly locale?: string | undefined;
+    /** What Q's backend can do for them, for the delegation policy. */
+    readonly role?: "founder" | "investor" | undefined;
+  }) => Promise<LiveOpenOutcome>;
+  /** Null when there is no such line for this person. */
+  readonly delegate: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly delegation: LiveDelegationRequest;
+  }) => Promise<LiveDelegationResult | null>;
+  /** True only once the run has actually stopped. Null: no such line. */
+  readonly cancel: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly delegationId: string;
+  }) => Promise<boolean | null>;
+  readonly usage: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly report: LiveUsageReport;
+  }) => Promise<{ recordedSeconds: number; remainingMs: number } | null>;
+  readonly end: (input: {
+    readonly actor: ActorContext;
+    readonly voiceSessionId: string;
+    readonly reason: string;
+  }) => boolean;
+  readonly size: () => number;
+};
+
+export type LiveBrokerDependencies = {
+  readonly config: LiveConfig;
+  readonly provider: LiveVoiceProvider | undefined;
+  readonly firewall: ContextFirewallPort;
+  readonly turn: VoiceTurnHandler;
+  readonly spend: DuplexSpendLedger;
+  readonly usage: ModelUsageRepository;
+  /** OpenAI is UNREVIEWED: PUBLIC unless the deployment is synthetic. */
+  readonly providerCeiling: ModelSensitivity;
+  readonly syntheticDemo: boolean;
+  readonly logger: Logger;
+  readonly now?: (() => number) | undefined;
+};
+
+const HISTORY_MAX = 24;
+const SPOKEN_MAX = 6_000;
+/** Creating a WebRTC session bills this much up front (OpenAI docs). */
+const MIN_BILLED_SECONDS = 15;
+/** An unreported line is estimated at wall-clock, at most this past the cap. */
+const GRACE_MS = 30_000;
+
+/** Q's run, collected: what it said, or the facts of a code-built answer. */
+function collector(id: string): {
+  readonly speaker: VoiceSpeaker;
+  readonly said: () => string;
+  readonly held: () => SpokenFacts | null;
+} {
+  let text = "";
+  let held: SpokenFacts | null = null;
+  const add = (part: string) => {
+    const trimmed = part.trim();
+    if (trimmed.length === 0 || text.length >= SPOKEN_MAX) return;
+    text = text.length === 0 ? trimmed : `${text} ${trimmed}`;
+  };
+  return {
+    speaker: {
+      providerConversationId: id,
+      isOpen: true,
+      speak: async (response) => {
+        if (typeof response === "string") add(response);
+        else for await (const part of response) add(part);
+      },
+      close: () => undefined,
+      // Nothing is heard until the run is done: the voice says it.
+      deferred: true,
+      // ADR 0062's silence ladder is not used: GPT-Live keeps the
+      // conversation going itself; progress goes as quiet context.
+      narrate: () => undefined,
+      facts: (facts) => {
+        held = facts;
+      },
+    },
+    said: () => text.slice(0, SPOKEN_MAX),
+    held: () => held,
+  };
+}
+
+export const LIVE_SPEAK_GUIDE =
+  "Verified by Q's backend. Say it in your own words, as an analyst would: the point first, then what separates the options. Never read it out as a list, never add names or numbers that are not here.";
+
+/** What one run verified, as content for `session.commentary.append`. */
+export function commentaryFor(input: {
+  readonly request: string;
+  readonly facts: SpokenFacts | null;
+  readonly said: string;
+  readonly approvalPending: boolean;
+}): string | null {
+  const asked = `They asked: ${JSON.stringify(input.request.slice(0, 300))}.`;
+  const approval = input.approvalPending
+    ? " Q prepared an action that waits for their approval on screen: say it is ready for them to approve; never say it is done."
+    : "";
+  if (input.facts !== null) {
+    return `${LIVE_SPEAK_GUIDE} ${asked}${approval} Facts: ${JSON.stringify(askQFactsOutput(input.facts))}`;
+  }
+  const { say } = forRealtime(input.said);
+  const words = input.approvalPending
+    ? say.replace(APPROVAL_QUESTION, "").trim()
+    : say;
+  if (words.length === 0)
+    return input.approvalPending ? `${asked}${approval}` : null;
+  return `${LIVE_SPEAK_GUIDE} ${asked}${approval} Q's answer: ${JSON.stringify(words)}`;
+}
+
+export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
+  const { config, provider, firewall, turn, spend, logger } = deps;
+  const now = deps.now ?? Date.now;
+  const lines = new Map<string, LiveLine>();
+  const enabled = config.enabled && provider !== undefined;
+
+  const pastCap = (line: LiveLine, at: number) =>
+    at - line.openedAt > config.maxSessionMs;
+
+  /** Billed seconds onto the shared realtime ledger, once each. */
+  const record = async (line: LiveLine, seconds: number) => {
+    const delta = Math.max(0, Math.floor(seconds) - line.recordedSeconds);
+    if (delta === 0 || provider === undefined) return;
+    line.recordedSeconds += delta;
+    try {
+      await deps.usage.record({
+        tenantId: line.actor.tenantId,
+        userId: line.actor.userId,
+        qRunId: undefined,
+        taskClass: "REALTIME_VOICE",
+        providerId: provider.providerId,
+        modelId: provider.modelId,
+        routingPolicyId: undefined,
+        attempt: 1,
+        inputTokens: 0,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        latencyMs: 0,
+        costUsd: delta * GPT_LIVE_USD_PER_SECOND,
+        costBasis: "ESTIMATED",
+        success: true,
+        errorCode: undefined,
+        correlationId: `live_${line.voiceSessionId}`,
+        purpose: "VOICE_REALTIME",
+      });
+    } catch (error: unknown) {
+      logger.warn({ err: error }, "live voice usage could not be recorded");
+    }
+  };
+
+  const forget = (line: LiveLine, reason: string) => {
+    lines.delete(line.voiceSessionId);
+    for (const delegation of line.delegations.values()) {
+      if (!delegation.settled) delegation.controller.abort();
+    }
+    // A line that never sent its final usage is billed at wall-clock, up
+    // to the cap: unknown spend is not zero spend.
+    if (!line.finalReported) {
+      const elapsed = Math.min(
+        now() - line.openedAt,
+        config.maxSessionMs + GRACE_MS,
+      );
+      void record(line, Math.max(MIN_BILLED_SECONDS, elapsed / 1000));
+    }
+    logger.info(
+      {
+        qVoiceSessionId: line.voiceSessionId,
+        reason,
+        delegations: line.delegations.size,
+        recordedSeconds: line.recordedSeconds,
+      },
+      "live voice line ended",
+    );
+  };
+
+  const sweep = () => {
+    const at = now();
+    for (const line of lines.values()) {
+      if (at - line.openedAt > config.maxSessionMs + GRACE_MS)
+        forget(line, "expired");
+    }
+  };
+
+  const ownLine = (actor: ActorContext, voiceSessionId: string) => {
+    sweep();
+    const line = lines.get(voiceSessionId);
+    if (
+      line === undefined ||
+      line.actor.userId !== actor.userId ||
+      line.actor.tenantId !== actor.tenantId
+    ) {
+      return null;
+    }
+    return line;
+  };
+
+  const reserved = () => {
+    let total = 0;
+    for (const line of lines.values()) {
+      total += Math.max(
+        0,
+        config.sessionReserveUsd -
+          line.recordedSeconds * GPT_LIVE_USD_PER_SECOND,
+      );
+    }
+    return total;
+  };
+
+  /** ONE run of Q Brain for one delegation. */
+  const runQ = (line: LiveLine, id: string, request: string): Delegation => {
+    const controller = new AbortController();
+    const deadline = setTimeout(() => {
+      controller.abort();
+    }, config.delegationDeadlineMs);
+    const speaker = collector(`live_${line.voiceSessionId}`);
+    const asked: VoiceTranscriptTurn = { role: "user", content: request };
+    const startedAt = now();
+    const delegation: Delegation = {
+      id,
+      request,
+      controller,
+      settled: false,
+      result: Promise.resolve({
+        delegationId: id,
+        commentary: null,
+        approvalPending: false,
+        failed: true,
+      }),
+    };
+    delegation.result = (async () => {
+      try {
+        const outcome = await turn(
+          line.binding,
+          // GPT-Live already ended their turn: never held as unfinished.
+          settledTurn([...line.history, asked]),
+          controller.signal,
+          speaker.speaker,
+        );
+        if (controller.signal.aborted || outcome.kind === "INTERRUPTED") {
+          return {
+            delegationId: id,
+            commentary: controller.signal.aborted
+              ? "Q's backend did not finish that in time. Say so plainly and offer to try a smaller piece; do not guess."
+              : null,
+            approvalPending: false,
+            failed: true,
+          };
+        }
+        const said = speaker.said();
+        const facts = speaker.held();
+        const approvalPending = said.endsWith(APPROVAL_QUESTION);
+        const commentary = commentaryFor({
+          request,
+          facts,
+          said,
+          approvalPending,
+        });
+        line.history.push(asked);
+        const kept = facts?.fallback ?? said;
+        if (kept.length > 0)
+          line.history.push({ role: "agent", content: kept });
+        line.history.splice(0, Math.max(0, line.history.length - HISTORY_MAX));
+        return { delegationId: id, commentary, approvalPending, failed: false };
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error, qVoiceSessionId: line.voiceSessionId },
+          "live delegation failed",
+        );
+        return {
+          delegationId: id,
+          commentary:
+            "Q's backend could not complete that. Say so plainly and offer to try again; do not invent an answer.",
+          approvalPending: false,
+          failed: true,
+        };
+      } finally {
+        clearTimeout(deadline);
+        delegation.settled = true;
+        logger.info(
+          {
+            qVoiceSessionId: line.voiceSessionId,
+            ms: now() - startedAt,
+            aborted: controller.signal.aborted,
+          },
+          "live delegation answered",
+        );
+      }
+    })();
+    return delegation;
+  };
+
+  return {
+    enabled,
+    maxSessionMs: config.maxSessionMs,
+    size: () => {
+      sweep();
+      return lines.size;
+    },
+
+    open: async ({
+      binding,
+      sdp,
+      briefingOpening,
+      firstName,
+      locale,
+      role,
+    }) => {
+      if (!enabled || provider === undefined)
+        return { kind: "REFUSED", reason: "OFF" };
+      if (binding.thread.rehearsal !== undefined) {
+        return { kind: "REFUSED", reason: "REHEARSAL" };
+      }
+      const { actor } = binding;
+      sweep();
+      // One live line per person: a new one replaces what was open.
+      for (const line of [...lines.values()]) {
+        if (line.actor.userId === actor.userId) forget(line, "replaced");
+      }
+      let spent: number;
+      try {
+        spent = await spend.spentTodayUsd(new Date(now()));
+      } catch (error: unknown) {
+        logger.warn({ err: error }, "live voice spend ledger unreadable");
+        return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
+      }
+      if (spent + reserved() + config.sessionReserveUsd > config.dailyCapUsd) {
+        return { kind: "REFUSED", reason: "CAP_REACHED" };
+      }
+      // The Context Firewall before any model hears a word: the plan says
+      // what this line may carry, and the provider must be cleared for it.
+      const decision = await firewall.plan({
+        actor,
+        runId: QRunIdSchema.parse(randomUUID()),
+        correlationId: CorrelationIdSchema.parse(createCorrelationId()),
+        capability: "ANSWER",
+        subjects: binding.thread.subjects ?? [],
+        ...(binding.thread.screen === undefined
+          ? {}
+          : { screen: binding.thread.screen }),
+      });
+      if (decision.outcome === "DENIED")
+        return { kind: "REFUSED", reason: "DENIED" };
+      if (
+        !sensitivityWithin(
+          decision.plan.maxSensitivity,
+          deps.providerCeiling,
+        ) &&
+        !deps.syntheticDemo
+      ) {
+        return { kind: "REFUSED", reason: "INELIGIBLE" };
+      }
+      let created;
+      try {
+        created = await provider.createWebRtcSession({
+          config: {
+            instructions: livePrompt({
+              firstName,
+              locale,
+              briefingOpening,
+              role,
+            }),
+            voice: config.voices[binding.voice],
+          },
+          sdp,
+        });
+      } catch (error: unknown) {
+        logger.warn({ err: error }, "live voice session not created");
+        return { kind: "REFUSED", reason: "PROVIDER_UNAVAILABLE" };
+      }
+      const at = now();
+      lines.set(binding.voiceSessionId, {
+        voiceSessionId: binding.voiceSessionId,
+        actor,
+        binding,
+        openedAt: at,
+        lastActivityAt: at,
+        history: [],
+        delegations: new Map(),
+        latest: null,
+        recordedSeconds: 0,
+        finalReported: false,
+      });
+      logger.info(
+        { qVoiceSessionId: binding.voiceSessionId, model: created.model },
+        "live voice line opened",
+      );
+      return {
+        kind: "OPEN",
+        result: {
+          voiceSessionId: binding.voiceSessionId,
+          ...(binding.sessionToken === undefined
+            ? {}
+            : { sessionToken: binding.sessionToken }),
+          sdp: created.sdp,
+          provider: "openai",
+          model: created.model,
+          maxSessionMs: config.maxSessionMs,
+        },
+      };
+    },
+
+    delegate: async ({ actor, voiceSessionId, delegation }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return null;
+      const at = now();
+      line.lastActivityAt = at;
+      if (pastCap(line, at)) {
+        return {
+          delegationId: delegation.delegationId,
+          commentary: null,
+          stale: false,
+          approvalPending: false,
+          failed: true,
+          ended: true,
+        };
+      }
+      // One delegation id, one run: a repeat joins the run in flight.
+      let running = line.delegations.get(delegation.delegationId);
+      if (running === undefined) {
+        const request = delegation.request.trim().slice(0, 2_000);
+        running = runQ(
+          line,
+          delegation.delegationId,
+          request.length === 0 ? "(inaudible)" : request,
+        );
+        line.delegations.set(delegation.delegationId, running);
+        line.latest = delegation.delegationId;
+      }
+      const result = await running.result;
+      return { ...result, stale: line.latest !== delegation.delegationId };
+    },
+
+    cancel: async ({ actor, voiceSessionId, delegationId }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return null;
+      const running = line.delegations.get(delegationId);
+      if (running === undefined) return false;
+      if (running.settled) return false;
+      running.controller.abort();
+      // Confirmed only once the run has actually let go.
+      await running.result;
+      return true;
+    },
+
+    usage: async ({ actor, voiceSessionId, report }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return null;
+      line.lastActivityAt = now();
+      await record(
+        line,
+        report.final === true
+          ? Math.max(MIN_BILLED_SECONDS, report.seconds)
+          : report.seconds,
+      );
+      if (report.final === true) line.finalReported = true;
+      return {
+        recordedSeconds: line.recordedSeconds,
+        remainingMs: Math.max(0, config.maxSessionMs - (now() - line.openedAt)),
+      };
+    },
+
+    end: ({ actor, voiceSessionId, reason }) => {
+      const line = ownLine(actor, voiceSessionId);
+      if (line === null) return false;
+      forget(line, reason);
+      return true;
+    },
+  };
+}

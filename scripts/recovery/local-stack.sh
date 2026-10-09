@@ -121,6 +121,7 @@ launch() {
     local keep_path="$PATH" keep_home="$HOME" proxy="${HTTPS_PROXY:-}"
     local live_key="${CQ_LIVE_OPENAI_API_KEY:-}" live_dg="${CQ_LIVE_DEEPGRAM_API_KEY:-}"
     local live_proxy="${CQ_LIVE_PROXY_HOST:-}" ca="${NODE_EXTRA_CA_CERTS:-}"
+    local live_gl="${CQ_LIVE_GPT_LIVE_KEY:-}"
     for var in $(compgen -e); do unset "$var" 2>/dev/null || true; done
     export PATH="$keep_path" HOME="$keep_home"
     CQ_LIVE_OPENAI_API_KEY="$live_key"; CQ_LIVE_DEEPGRAM_API_KEY="$live_dg"
@@ -146,7 +147,25 @@ launch() {
       unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy ALL_PROXY all_proxy
       # Synthetic world only, as the 2026-10-08 incident tenant was.
       export CQ_VOICE_REALTIME=on CQ_FAKE_VOICE_VENDORS=1 CQ_SYNTHETIC_DEMO_ROUTING=true
+      # V (GPT-Live developer preview), opt-in: CQ_LIVE_GPT_LIVE_KEY in the
+      # operator's shell. The model stays the fake; only q-api gets the key,
+      # and only for the GPT-Live session call (CQ_VOICE_LIVE_OPENAI_API_KEY,
+      # honoured in a local deployment only). Short calls, a small cap.
+      if [[ -n "$live_gl" ]]; then
+        export CQ_VOICE_LIVE=on CQ_VOICE_PREVIEW=on
+        export CQ_VOICE_LIVE_MAX_SESSION_SECONDS=60 CQ_VOICE_LIVE_DAILY_CAP_USD=0.5
+        if [[ "$name" == q-api ]]; then
+          export CQ_VOICE_LIVE_OPENAI_API_KEY="$live_gl"
+          export CQ_EGRESS_ALLOW="api.openai.com${live_proxy:+,$live_proxy}"
+          if [[ -n "$proxy" ]]; then
+            export HTTPS_PROXY="$proxy" NODE_USE_ENV_PROXY=1 CQ_EGRESS_KEEP_PROXY=1
+            export NO_PROXY="127.0.0.1,localhost" no_proxy="127.0.0.1,localhost"
+            [[ -n "$ca" ]] && export NODE_EXTRA_CA_CERTS="$ca"
+          fi
+        fi
+      fi
     fi
+    live_gl=""
     unset CQ_LIVE_OPENAI_API_KEY CQ_LIVE_DEEPGRAM_API_KEY
     export NODE_OPTIONS="--import=$HARNESS/scripts/recovery/vendor-redirect.mjs --import=$HARNESS/scripts/recovery/egress-guard.mjs ${NODE_OPTIONS:-}"
     cd "$cwd"
