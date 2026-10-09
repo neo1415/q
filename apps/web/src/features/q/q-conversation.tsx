@@ -812,6 +812,17 @@ export function QConversationPanel({
     outcomeLines.lines === lines.length
       ? lastOutcome
       : null;
+  // INC-1 (f): one terminal line per turn. The voice's own notice for the
+  // turn is the same sentence as the row above; it is shown once.
+  const voiceNotice =
+    voice.notice !== null &&
+    unanswered !== null &&
+    outcomeWords({
+      disposition: unanswered.disposition,
+      notice: unanswered.notice ?? undefined,
+    }) === voice.notice
+      ? null
+      : voice.notice;
 
   const notices = (
     <>
@@ -865,14 +876,14 @@ export function QConversationPanel({
       {q.notice !== null && q.state.failure === null ? (
         <StageNotice title="That didn't go through">{q.notice}</StageNotice>
       ) : null}
-      {voice.notice !== null ? (
+      {voiceNotice !== null ? (
         <div
           role="status"
           aria-live="polite"
           className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
         >
           <span className="cq-body text-(--cq-text-primary)">
-            {voice.notice}
+            {voiceNotice}
           </span>
           <button
             type="button"

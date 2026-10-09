@@ -84,7 +84,7 @@ afterEach(() => {
 });
 
 describe("voice reconnect budget", () => {
-  it("tries three times after a first-word failure, then stops and says so", async () => {
+  it("tries once after a first-word failure, then stops and says so (G-D21)", async () => {
     const { result } = renderHook(() => useVoiceInterview());
 
     await act(async () => {
@@ -97,7 +97,8 @@ describe("voice reconnect budget", () => {
       });
     }
 
-    expect(startVoiceSessionAction).toHaveBeenCalledTimes(4);
+    // The person's line, and one resume: never a chain of sessions.
+    expect(startVoiceSessionAction).toHaveBeenCalledTimes(2);
     expect(result.current.active).toBe(false);
     expect(result.current.notice).toMatch(/couldn't get the line back/);
   });
@@ -125,7 +126,7 @@ describe("voice reconnect budget", () => {
 });
 
 describe("a dropped line (bad network)", () => {
-  it("says Reconnecting… instead of going silent, and resumes the same conversation", async () => {
+  it("keeps the error on screen while it reconnects, and resumes the same conversation", async () => {
     const conversationId = "7f000000-0000-4000-8000-000000000001";
     const { result } = renderHook(() => useVoiceInterview());
     await act(async () => {
@@ -137,7 +138,9 @@ describe("a dropped line (bad network)", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(result.current.notice).toBe("Reconnecting…");
+    // The vendor error said is what shows, not a flicker of it (G: a
+    // vendor error mid-turn must end visibly).
+    expect(result.current.notice).toBe("Something went wrong with voice.");
     expect(result.current.active).toBe(true);
     // The first retry comes within the recovery window.
     await act(async () => {
@@ -148,6 +151,41 @@ describe("a dropped line (bad network)", () => {
       conversationId,
       resume: true,
     });
+  });
+});
+
+describe("G-D21: nothing reopens a line the person did not start", () => {
+  it("an automatic reopen with no line of the person's opens nothing", async () => {
+    const { result } = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await result.current.talk({
+        thread: {},
+        resume: true,
+        automatic: true,
+      });
+    });
+    expect(startVoiceSessionAction).not.toHaveBeenCalled();
+    expect(result.current.active).toBe(false);
+  });
+
+  it("after the person ends their line, a reopen still pending opens nothing", async () => {
+    const { result } = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await result.current.talk({ thread: {} });
+    });
+    await act(async () => {
+      await result.current.end();
+    });
+    startVoiceSessionAction.mockClear();
+    await act(async () => {
+      await result.current.talk({
+        thread: {},
+        resume: true,
+        automatic: true,
+      });
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(startVoiceSessionAction).not.toHaveBeenCalled();
   });
 });
 

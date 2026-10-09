@@ -34,6 +34,10 @@ import {
   DELIVERY_REPAIR,
   IGNORED_NOTICE,
   LOST_TURN_NOTICE,
+  MICROPHONE_BACK_NOTICE,
+  MICROPHONE_LOST_NOTICE,
+  MICROPHONE_UNAVAILABLE_NOTICE,
+  MISHEARD_REPAIR,
   RENEWING_NOTICE,
   TIMEOUT_REPAIR,
 } from "./duplex-notices";
@@ -195,9 +199,15 @@ export {
   IDLE_NOTICE,
   IGNORED_NOTICE,
   LOST_TURN_NOTICE,
+  MICROPHONE_BACK_NOTICE,
+  MICROPHONE_LOST_NOTICE,
+  MICROPHONE_UNAVAILABLE_NOTICE,
+  MISHEARD_REPAIR,
   RENEWING_NOTICE,
   TIMEOUT_REPAIR,
 } from "./duplex-notices";
+/** How long "Microphone back" stays before the status clears. */
+export const MICROPHONE_BACK_SHOWN_MS = 4_000;
 const NOISE_RESUME =
   "A noise interrupted you; it was not the person speaking. Carry on with your answer from where you stopped, without repeating what you already said and without mentioning the noise.";
 /**
@@ -628,6 +638,8 @@ export class DuplexLine {
   /** The person's items in this turn, for a reaction's context. */
   #turnItems: string[] = [];
   readonly #transcripts = new Map<string, string>();
+  /** B-01: items whose transcription the provider reported as failed. */
+  readonly #misheard = new Set<string>();
   /** The person's last committed audio item (their own words' key). */
   #lastCommitted: string | null = null;
   /** The provider's transcripts of the person's latest turns. */
@@ -1166,6 +1178,8 @@ export class DuplexLine {
     if (typeof track.addEventListener !== "function") return;
     track.addEventListener("ended", () => {
       if (!this.#over && this.#microphone?.getTracks().includes(track)) {
+        // Said at once: Q cannot hear them until a microphone is back.
+        this.#events.onLinkStatus?.(MICROPHONE_LOST_NOTICE);
         void this.#reacquireMicrophone();
       }
     });
@@ -1194,8 +1208,15 @@ export class DuplexLine {
       this.#microphone = fresh;
       this.#watchTrack(track);
       for (const old of previous?.getTracks() ?? []) old.stop();
+      this.#events.onLinkStatus?.(MICROPHONE_BACK_NOTICE);
+      this.#env.setTimeout(() => {
+        if (!this.#over) this.#events.onLinkStatus?.(null);
+      }, MICROPHONE_BACK_SHOWN_MS);
     } catch {
-      this.#fallback("NETWORK", null);
+      // No microphone to be had (permission revoked): said plainly, and
+      // the line is let go to the standard voice, which asks for it again.
+      this.#events.onLinkStatus?.(MICROPHONE_UNAVAILABLE_NOTICE);
+      this.#fallback("NETWORK", MICROPHONE_UNAVAILABLE_NOTICE);
     } finally {
       this.#reacquiring = false;
     }
@@ -1577,7 +1598,19 @@ export class DuplexLine {
         console.warn("[q-voice] transcription failed", { code });
         if (itemId !== undefined && this.#blips.has(itemId)) {
           this.#blipWords(itemId, "");
+          break;
         }
+        // B-01: their turn was not heard. Known now, not after a wait:
+        // Q asks them to say it again (never silence, never a guess).
+        if (itemId !== undefined && !this.#transcripts.has(itemId)) {
+          this.#misheard.add(itemId);
+          if (this.#misheard.size > TURN_ITEMS_MAX) {
+            const oldest = this.#misheard.values().next().value;
+            if (oldest !== undefined) this.#misheard.delete(oldest);
+          }
+          this.#transcripts.set(itemId, "");
+        }
+        this.#tryFlushTurn();
         break;
       }
       case "response.created": {
@@ -1926,6 +1959,10 @@ export class DuplexLine {
       void this.#routeHeard(words, pending.last, false);
       return;
     }
+    if (pending.items.some((id) => this.#misheard.has(id))) {
+      this.#misheardTurn();
+      return;
+    }
     if (!timedOut) {
       // Transcribed as nothing: noise, not a turn. Q stays quiet, unless
       // the noise cut Q's answer: then Q carries on (C-07; the standard
@@ -1945,6 +1982,18 @@ export class DuplexLine {
     }
     // Their words never came: the voice must hand the turn to Q.
     this.#forceAskQ();
+  }
+
+  /**
+   * B-01: a turn whose words the provider could not transcribe ends
+   * FAILED/SPEECH_RECOGNITION at once: shown, and Q asks for it again in
+   * one short line. Never handed to the voice to guess at.
+   */
+  #misheardTurn(): void {
+    if (this.#over) return;
+    this.#turnSeq += 1;
+    const turn = this.#openTurn();
+    this.#failTurn(turn, "SPEECH_RECOGNITION", MISHEARD_REPAIR);
   }
 
   /** The voice may answer only by passing the turn to Q (ask_q). */
@@ -2182,6 +2231,11 @@ export class DuplexLine {
     const running = turn.responseId ?? this.#lastMainResponseId;
     if (this.#responseActive && running !== null) this.#retire(running);
     const line = turn.fallback ?? DELIVERY_REPAIR;
+    // The answer is on the screen as text when it could not be heard
+    // (playback lost, the line down): the notice says so, and it is true.
+    if (turn.fallback !== null) {
+      this.#events.onLine("q", turn.fallback, turn.id);
+    }
     this.#closeTurn(
       "FAILED",
       "RESULT_DELIVERY",
