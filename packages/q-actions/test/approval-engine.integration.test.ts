@@ -52,6 +52,7 @@ import {
   createTestConfirmRequiredAction,
   TEST_CONFIRM_REQUIRED,
   TEST_SELF,
+  TEST_SELF_SETTER,
   TEST_SETTER,
   type TestActionExecutorState,
 } from "../src/testing/index.js";
@@ -249,6 +250,13 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
         createTestConfirmRequiredAction({
           actionType: TEST_SELF,
           selfOnly: true,
+        }).definition,
+        // A setter with no declared target, keyed by the company it sets.
+        createTestConfirmRequiredAction({
+          actionType: TEST_SELF_SETTER,
+          selfOnly: true,
+          supersedes: true,
+          supersedeKey: (payload) => payload.companyId,
         }).definition,
       ]),
       authorization: createAuthorizationService(
@@ -1184,6 +1192,57 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
         correlationId: CORRELATION(),
       });
       expect(decided.view.status).toBe("APPROVED");
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("G-D23 follow-up: a card with no declared target can be revised (same default target)", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder, service } = world;
+      const proposed = await propose(world, founder, {}, undefined, TEST_SELF);
+      const revised = await service.revise({
+        actor: founder.actor,
+        approvalId: proposed.approval.id,
+        correlationId: CORRELATION(),
+        payload: { companyId: COMPANY, note: "Please record this, edited." },
+      });
+      expect(revised.action.id).not.toBe(proposed.action.id);
+      expect(revised.action.targets).toEqual([
+        { kind: "USER", userId: founder.actor.userId },
+      ]);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("G-D23 follow-up: a setter with no declared target replaces only the card for the same resource, never another's", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder } = world;
+      const setter = (payload: Record<string, unknown>) =>
+        propose(world, founder, payload, undefined, TEST_SELF_SETTER);
+      const elsewhere = randomUUID();
+      const first = await setter({
+        companyId: COMPANY,
+        note: "Folder level A.",
+      });
+      // Another resource: both cards wait.
+      const other = await setter({
+        companyId: elsewhere,
+        note: "Folder level B.",
+      });
+      expect(other.superseded ?? []).toEqual([]);
+      const [still] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${first.approval.id}`;
+      expect(still?.status).toBe("PENDING");
+      // The same resource, another value: the newer replaces the older.
+      const again = await setter({
+        companyId: COMPANY,
+        note: "Folder level C.",
+      });
+      expect(again.superseded?.map((one) => one.id)).toEqual([first.action.id]);
     } finally {
       await cleanup(world);
     }
