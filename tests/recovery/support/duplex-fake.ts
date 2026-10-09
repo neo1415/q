@@ -28,6 +28,7 @@ export async function installDuplexFake(
       __cqDuplexEmit?: (event: Record<string, unknown>) => void;
       __cqDuplexPeers?: number;
       __cqDuplexState?: (state: RTCPeerConnectionState) => void;
+      __cqDuplexOpened?: number;
     };
     own.__cqDuplexSent = [];
     own.__cqDuplexPeers = 0;
@@ -49,6 +50,7 @@ export async function installDuplexFake(
       }
       open() {
         if (fakeMode === "channel-never-opens") return;
+        own.__cqDuplexOpened = (own.__cqDuplexOpened ?? 0) + 1;
         this.readyState = "open";
         this.onopen?.();
         this.dispatchEvent(new Event("open"));
@@ -150,6 +152,25 @@ export async function installDuplexFake(
       body: "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=fake-answer\r\n",
     });
   });
+}
+
+/**
+ * Waits until the line's data channel is open. The End control shows as
+ * soon as the session is issued, before the realtime call is up; events
+ * emitted before the channel opens are lost (A 2026-10-09: k-incident (a)
+ * 2 of 3 when its held server actions delayed the call past "End").
+ */
+export async function waitForDuplexChannel(
+  page: Page,
+  timeout = 60_000,
+): Promise<void> {
+  await page.waitForFunction(
+    () =>
+      ((window as Window & { __cqDuplexOpened?: number }).__cqDuplexOpened ??
+        0) > 0,
+    undefined,
+    { timeout },
+  );
 }
 
 /** Emits a realtime server event on the fake data channel. */

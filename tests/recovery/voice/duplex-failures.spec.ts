@@ -7,6 +7,7 @@ import {
   installDuplexFake,
   setPeerState,
   userSays,
+  waitForDuplexChannel,
   type DuplexMode,
 } from "../support/duplex-fake.js";
 import { awaits } from "../support/expected-red.js";
@@ -43,6 +44,7 @@ async function openLine(
     await expect(
       page.getByRole("button", { name: /^End/u }).first(),
     ).toBeVisible({ timeout: 60_000 });
+    await waitForDuplexChannel(page);
   }
 }
 
@@ -61,7 +63,10 @@ test.describe("duplex voice failures", () => {
     await loseMicrophone(page);
     await expect(
       notice(page)
-        .filter({ hasText: /microphone|can't hear|cannot hear/iu })
+        // No apostrophe in the pattern: with `.first()` Playwright serialises
+        // it into a selector and the quote broke the RegExp ("Invalid flags
+        // 'iu >> nth=0'", every run; A 2026-10-09).
+        .filter({ hasText: /microphone|can.t hear|cannot hear/iu })
         .first(),
     ).toBeVisible({ timeout: 15_000 });
   });
@@ -138,7 +143,9 @@ test.describe("duplex voice failures", () => {
       {
         name: "pb",
         when: { task: "COMPANY_ANALYST", user: "playback check" },
-        reply: answer("Here is the playback answer."),
+        // Not "Here is …": Q's screen-claim guard (screen-claims.ts) reads
+        // that as "here it is on your screen" and replaces it (A 2026-10-09).
+        reply: answer("The playback answer is three investors."),
       },
     ]);
     await openLine(page);
@@ -148,7 +155,10 @@ test.describe("duplex voice failures", () => {
       type: "response.created",
       response: { id: "resp_p" },
     });
-    await expect(page.getByText("Here is the playback answer.")).toBeVisible({
+    // The thread row and its live-region twin (data-q-said) both hold it.
+    await expect(
+      page.getByText("The playback answer is three investors.").first(),
+    ).toBeVisible({
       timeout: 30_000,
     });
     await expectLastTurnTerminal(page, ["ANSWERED", "FAILED"], 30_000);
@@ -171,7 +181,10 @@ test.describe("duplex voice failures", () => {
     await setPeerState(page, "disconnected");
     await page.waitForTimeout(2_000);
     await setPeerState(page, "connected");
-    await expect(page.getByText("The slow answer arrived.")).toBeVisible({
+    // The thread row and its live-region twin (data-q-said) both hold it.
+    await expect(
+      page.getByText("The slow answer arrived.").first(),
+    ).toBeVisible({
       timeout: 60_000,
     });
   });
@@ -200,17 +213,25 @@ test.describe("duplex voice failures", () => {
       type: "response.created",
       response: { id: "resp_b" },
     });
-    // A 200 ms blip: below BARGE_CONFIRM_MS, so not an interruption.
-    await emitRealtime(page, {
-      type: "input_audio_buffer.speech_started",
-      item_id: "item_c",
-      audio_start_ms: 0,
-    });
-    await page.waitForTimeout(200);
-    await emitRealtime(page, {
-      type: "input_audio_buffer.speech_stopped",
-      item_id: "item_c",
-      audio_end_ms: 200,
+    // A 200 ms blip: below BARGE_CONFIRM_MS, so not an interruption. Both
+    // events from one in-page timer: two round trips from the runner on a
+    // busy machine were sometimes more than 450 ms apart, which IS a
+    // barge-in (A 2026-10-09: 1 of 3).
+    await page.evaluate(async () => {
+      const emit = (
+        window as Window & { __cqDuplexEmit?: (x: unknown) => void }
+      ).__cqDuplexEmit;
+      emit?.({
+        type: "input_audio_buffer.speech_started",
+        item_id: "item_c",
+        audio_start_ms: 0,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      emit?.({
+        type: "input_audio_buffer.speech_stopped",
+        item_id: "item_c",
+        audio_end_ms: 200,
+      });
     });
     const sent = (await duplexSent(page)).map((event) => event.type);
     expect(sent).not.toContain("response.cancel");

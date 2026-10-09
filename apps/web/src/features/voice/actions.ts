@@ -41,6 +41,8 @@ export type VoiceActionResult<T> =
        * should come back on a fresh one rather than wait.
        */
       readonly gone?: true;
+      /** G-D21: the person's newer line (another tab) has voice now. */
+      readonly replaced?: true;
     };
 
 const failure = (message: string): VoiceActionResult<never> => ({
@@ -50,6 +52,14 @@ const failure = (message: string): VoiceActionResult<never> => ({
 
 function translate(error: unknown): VoiceActionResult<never> {
   if (error instanceof ApiProblemError) {
+    if (error.status === 409) {
+      return {
+        ok: false,
+        message:
+          "Voice moved to your other window. Start it here again whenever you like.",
+        replaced: true,
+      };
+    }
     if (error.status === 401 || error.status === 403) {
       return failure("Your session ended. Sign in again to continue.");
     }

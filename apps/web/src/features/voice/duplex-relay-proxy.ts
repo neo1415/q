@@ -175,8 +175,15 @@ export async function relayDuplex(
   } catch {
     return problem(502);
   }
-  // 404 is "the line is gone" to the browser; anything else is a failure.
-  if (!upstream.ok) return problem(upstream.status === 404 ? 404 : 502);
+  // 404 is "the line is gone" to the browser; 409 that the person's own
+  // newer line replaced it (G-D21); anything else is a failure.
+  if (!upstream.ok) {
+    return problem(
+      upstream.status === 404 || upstream.status === 409
+        ? upstream.status
+        : 502,
+    );
+  }
   if (relay.result === null) {
     return new Response(null, {
       status: 204,

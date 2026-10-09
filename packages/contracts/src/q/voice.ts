@@ -207,6 +207,13 @@ export const CreateQVoiceSessionRequestSchema = z
      */
     resume: z.literal(true).optional(),
     /**
+     * G-D21: the line reopening by itself (a reconnect, a fallback, a
+     * renewal), naming the session it replaces. Refused (409) when the
+     * person has opened a newer line meanwhile (another tab): an old tab
+     * coming back must never take voice from the one in use.
+     */
+    reopens: UuidSchema.optional(),
+    /**
      * REHEARSE: the line carries a rehearsal, so every spoken turn goes to
      * that rehearsal (Q plays the other person) and nothing else. Ownership
      * is checked by the rehearsal service on every turn.

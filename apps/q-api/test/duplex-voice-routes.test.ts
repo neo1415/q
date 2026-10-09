@@ -6,6 +6,7 @@ import {
   qVoiceDuplexEndPath,
   qVoiceDuplexRejoinPath,
   qVoiceDuplexToolPath,
+  qVoiceTurnPath,
 } from "@capital-q/contracts";
 import {
   AuthUserIdSchema,
@@ -169,6 +170,62 @@ describe("the voice session route with duplex", () => {
     const server = await app(undefined);
     const response = await open(server, { duplex: true });
     expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    await server.close();
+  });
+
+  it("G-D21: a line the person's own newer line replaced answers 409, so that tab stops instead of reopening", async () => {
+    const server = await app(
+      fakeBroker(() => Promise.resolve({ kind: "FALLBACK", reason: "OFF" })),
+    );
+    const first = (await open(server)).json<{ voiceSessionId: string }>();
+    const second = (await open(server)).json<{ voiceSessionId: string }>();
+    const read = (id: string) =>
+      server.inject({
+        method: "GET",
+        url: qVoiceTurnPath(id),
+        headers: { authorization: `Bearer ${BEARER}` },
+      });
+    expect((await read(first.voiceSessionId)).statusCode).toBe(409);
+    expect((await read(second.voiceSessionId)).statusCode).toBe(200);
+    const tool = await server.inject({
+      method: "POST",
+      url: qVoiceDuplexToolPath(first.voiceSessionId),
+      headers: { authorization: `Bearer ${BEARER}` },
+      payload: { callId: "c1", name: "ask_q", arguments: "{}" },
+    });
+    expect(tool.statusCode).toBe(409);
+    // A line that never was is still the plain not found.
+    const never = await read("5f000000-0000-4000-8000-000000000009");
+    expect(never.statusCode).toBe(404);
+    await server.close();
+  });
+
+  it("G-D21: an old tab's line reopening by itself never takes voice from a newer one", async () => {
+    const server = await app(
+      fakeBroker(() => Promise.resolve({ kind: "FALLBACK", reason: "OFF" })),
+    );
+    const first = (await open(server)).json<{ voiceSessionId: string }>();
+    // Its own line reopening, nothing newer: allowed.
+    const again = await open(server, {
+      resume: true,
+      reopens: first.voiceSessionId,
+    });
+    expect(again.statusCode).toBe(201);
+    const second = again.json<{ voiceSessionId: string }>();
+    // The person opens voice in another tab...
+    const third = (await open(server)).json<{ voiceSessionId: string }>();
+    // ...and the old tab's reopen is refused, whichever line it names.
+    for (const reopens of [first.voiceSessionId, second.voiceSessionId]) {
+      const stale = await open(server, { resume: true, reopens });
+      expect(stale.statusCode).toBe(409);
+    }
+    // The newer line still has voice.
+    const read = await server.inject({
+      method: "GET",
+      url: qVoiceTurnPath(third.voiceSessionId),
+      headers: { authorization: `Bearer ${BEARER}` },
+    });
+    expect(read.statusCode).toBe(200);
     await server.close();
   });
 
