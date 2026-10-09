@@ -8,6 +8,7 @@ import {
 import { destinationPath } from "@/features/voice/destinations";
 
 import {
+  noteAsked,
   movedEarlyRecently,
   moveEarly,
   prefetchPath,
@@ -157,6 +158,8 @@ export async function navigationHeard(
   text: string,
 ): Promise<FastNavigationTiming | null> {
   if (keyOf(text).length === 0) return null;
+  // Every finished sentence (typed, any voice line) passes here first.
+  noteAsked();
   const started = performance.now();
   // A page read here moves in this same task: no await, so nothing the
   // send queued (a React render, the run's request) goes first.

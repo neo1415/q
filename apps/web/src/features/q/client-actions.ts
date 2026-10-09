@@ -218,6 +218,26 @@ export function movedEarlyTo(path: string): boolean {
 }
 
 /**
+ * RECOVERY-2026-10 (C, G-D16): when the person last asked Q something in
+ * this tab. A conversation that reloads while the answer lands (the Q page
+ * names a new conversation in its URL) must not count that answer as
+ * "already there" and swallow its move.
+ */
+let lastAskedAt: number | null = null;
+const ASKED_FRESH_MS = 120_000;
+
+export function noteAsked(): void {
+  lastAskedAt = Date.now();
+}
+
+/** Since when answers are the person's fresh ones; null when none is. */
+export function askedSince(): number | null {
+  return lastAskedAt !== null && Date.now() - lastAskedAt <= ASKED_FRESH_MS
+    ? lastAskedAt
+    : null;
+}
+
+/**
  * The fast path moved here moments ago (not consumed): the same request
  * heard again -- a voice line's utterance and then its delegation -- is
  * the same move, never a second push.
