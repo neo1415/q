@@ -160,3 +160,56 @@ describe("G-R3: every turn has a terminal disposition", () => {
     ).toBe("Voice dropped.");
   });
 });
+
+describe("G-R4: the attention answer, with what Q could not check", () => {
+  it("renders each item and the unread sources, said and marked", async () => {
+    const { QResultBlocks } = await import("../src/features/q/q-result-blocks");
+    render(
+      <QResultBlocks
+        blocks={[
+          {
+            kind: "ATTENTION",
+            report: {
+              items: [
+                {
+                  key: "UNANSWERED_MESSAGE:1",
+                  source: "UNANSWERED_MESSAGE",
+                  title: "Zino Aviation is waiting for your reply",
+                  since: "2026-10-08T09:00:00Z",
+                  decidable: false,
+                },
+                {
+                  key: "DOCUMENT_REQUEST:2",
+                  source: "DOCUMENT_REQUEST",
+                  title: "Apex asked for your cap table",
+                  note: "Due Friday",
+                  entity: { kind: "COMPANY", id: uuid(7) },
+                  since: "2026-10-08T08:00:00Z",
+                  decidable: false,
+                },
+              ],
+              activity: null,
+              unread: ["MEETING"],
+              readAt: "2026-10-08T10:00:00Z",
+            },
+          },
+        ]}
+      />,
+    );
+    const items = [...document.querySelectorAll("[data-q-attention-item]")];
+    expect(
+      items.map((item) => item.getAttribute("data-q-attention-item")),
+    ).toEqual(["UNANSWERED_MESSAGE", "DOCUMENT_REQUEST"]);
+    expect(items[1]?.querySelector("a")?.getAttribute("href")).toBe(
+      `/company/${uuid(7)}`,
+    );
+    expect(
+      document
+        .querySelector("[data-q-attention-unread]")
+        ?.getAttribute("data-q-attention-unread"),
+    ).toBe("MEETING");
+    expect(
+      document.querySelector("[data-q-attention-unread-line]")?.textContent,
+    ).toBe("I couldn't check meetings just now.");
+  });
+});

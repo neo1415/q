@@ -1099,7 +1099,7 @@ export function QConversationPanel({
                               data-q-turn-id={line.turnId ?? line.id}
                               data-q-turn-role="Q"
                               data-q-disposition={rowDisposition(line)}
- data-q-failure={rowFailure(line)}
+                              data-q-failure={rowFailure(line)}
                             >
                               Q: {plainFromMarkdown(line.text)}
                             </li>
@@ -1204,7 +1204,7 @@ export function QConversationPanel({
                                 data-q-turn-id={line.turnId ?? line.id}
                                 data-q-turn-role="Q"
                                 data-q-disposition={rowDisposition(line)}
- data-q-failure={rowFailure(line)}
+                                data-q-failure={rowFailure(line)}
                               >
                                 <span className="sr-only">Q: </span>
                                 {line.turn === undefined ? (
@@ -1289,7 +1289,7 @@ export function QConversationPanel({
                           data-q-turn-id={line.turnId ?? line.id}
                           data-q-turn-role="Q"
                           data-q-disposition={rowDisposition(line)}
- data-q-failure={rowFailure(line)}
+                          data-q-failure={rowFailure(line)}
                         >
                           <span className="sr-only">Q: </span>
                           {line.turn === undefined ? (
