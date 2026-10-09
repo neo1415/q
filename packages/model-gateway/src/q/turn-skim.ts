@@ -29,6 +29,13 @@ const TURN_SKIM_BUDGET = {
   attemptTimeoutMs: 2_500,
 } as const;
 
+/** The suffix that marks a skim's usage rows (correlation_id ≤ 128). */
+export const TURN_SKIM_CORRELATION_SUFFIX = ":turn-skim";
+
+export function turnSkimCorrelationId(correlationId: string): string {
+  return `${correlationId.slice(0, 128 - TURN_SKIM_CORRELATION_SUFFIX.length)}${TURN_SKIM_CORRELATION_SUFFIX}`;
+}
+
 export type QTurnSkimInput = {
   readonly utterance: string;
   readonly recentTurns: readonly {
@@ -88,7 +95,15 @@ export function createTurnSkimmer(dependencies: {
             budget: TURN_SKIM_BUDGET,
             messages: [...rendered.messages],
             output: rendered.output,
-            attribution: input.attribution,
+            // Its own mark in ai_ops.model_usage (same task class as the
+            // turn reader): the hosted ledger separates the skim's rows by
+            // this suffix on the run's correlation id.
+            attribution: {
+              ...input.attribution,
+              correlationId: turnSkimCorrelationId(
+                input.attribution.correlationId,
+              ),
+            },
           },
           {
             schema: TurnSkimResultSchema,

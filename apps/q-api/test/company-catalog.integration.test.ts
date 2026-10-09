@@ -150,13 +150,7 @@ describe("company catalog against PostgreSQL (K1)", () => {
       stages: [],
       limit: 50,
     });
-    expect(mine(found.candidates)).toEqual([
-      "Atoll Pay",
-      "Banyan Payments",
-      // A candidate only: the tool's disclosure check removes their own
-      // organisation's company (it is not NETWORK_VISIBLE to them).
-      "Frigate Own",
-    ]);
+    expect(mine(found.candidates)).toEqual(["Atoll Pay", "Banyan Payments"]);
     expect(found.sectors).toEqual([{ code: "fintech", name: "Fintech" }]);
     expect(found.unknownSectors).toEqual([]);
   });

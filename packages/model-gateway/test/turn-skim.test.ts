@@ -34,6 +34,7 @@ const SKIM = {
 
 type Recorded = {
   readonly taskClass?: string;
+  readonly attribution?: { readonly correlationId?: string };
   readonly budget?: { readonly maxOutputTokens?: number };
   readonly messages?: readonly { readonly content: string }[];
 };
@@ -76,6 +77,10 @@ describe("the turn skim (K)", () => {
     ).toEqual(SKIM);
     expect(skim.requests).toHaveLength(1);
     expect(skim.requests[0]?.taskClass).toBe("FAST_CLASSIFICATION");
+    // Its own mark in the usage ledger, apart from the turn reader's.
+    expect(skim.requests[0]?.attribution?.correlationId).toBe(
+      "cor_skim:turn-skim",
+    );
 
     const read = recording({
       kind: "QUESTION_TO_Q",

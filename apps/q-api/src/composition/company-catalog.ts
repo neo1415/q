@@ -15,7 +15,8 @@ import { normalizeTaxonomyAlias } from "@capital-q/taxonomy";
  * This only resolves what the reader said into canonical codes -- a
  * sector's code or alias in the industry and product vocabularies, a
  * country's geography node -- and says which sectors the taxonomy does not
- * know. The tool still decides every candidate through disclosure.
+ * know, and removes their own organisation's companies. The tool still
+ * decides every candidate through disclosure.
  */
 
 const SECTOR_VOCABULARIES = ["industry", "product_category"];
@@ -104,21 +105,38 @@ export function createPostgresCompanyCatalog(dependencies: {
         stageCodes: [...query.stages],
         limit: query.limit,
       });
+      // Never their own organisation's company (K1 invariant, proven end to
+      // end): a network-visible company of theirs passes disclosure as
+      // NETWORK_VISIBLE, so it is removed here, by canonical ownership.
+      const own =
+        actor.organisationId === undefined || companies.length === 0
+          ? new Set<string>()
+          : new Set(
+              (
+                await sql<{ id: string }[]>`
+                  select c.id from core.companies c
+                   where c.id = any(${companies.map((c) => c.companyId)}::uuid[])
+                     and c.tenant_id = ${actor.tenantId}
+                     and c.organisation_id = ${actor.organisationId}`
+              ).map((row) => row.id),
+            );
       const named = new Map(sectors.map((s) => [s.code, s.name]));
       return {
-        candidates: companies.map((company) => ({
-          companyId: company.companyId,
-          name: company.name,
-          stageCode: company.stageCode,
-          headquartersCountry: company.countryCode,
-          shortDescription: company.shortDescription,
-          // The asked sectors this company is declared in (a sector's
-          // codes carry its ancestors, so a payments company is fintech).
-          sectors: company.sectorCodes.flatMap((code) => {
-            const name = named.get(code);
-            return name === undefined ? [] : [name];
-          }),
-        })),
+        candidates: companies
+          .filter((company) => !own.has(company.companyId))
+          .map((company) => ({
+            companyId: company.companyId,
+            name: company.name,
+            stageCode: company.stageCode,
+            headquartersCountry: company.countryCode,
+            shortDescription: company.shortDescription,
+            // The asked sectors this company is declared in (a sector's
+            // codes carry its ancestors, so a payments company is fintech).
+            sectors: company.sectorCodes.flatMap((code) => {
+              const name = named.get(code);
+              return name === undefined ? [] : [name];
+            }),
+          })),
         sectors,
         unknownSectors,
       };
