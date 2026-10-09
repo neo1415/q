@@ -8,7 +8,12 @@ import {
   releaseVoiceAudio,
   type VoiceAudioOwner,
 } from "../voice-audio";
-import { followMoveNow, moveNote } from "./move";
+import {
+  followMoveNow,
+  moveNote,
+  receiptListener,
+  type MoveOutcome,
+} from "./move";
 import {
   createLiveBridge,
   type DelegationOutcome,
@@ -138,8 +143,19 @@ const CONTEXT_CHARS = 1_600;
  * move is done and confirmed by the page, so it says so, briefly, and
  * never asks Q's backend for it again.
  */
-export function fastMoveLine(path: string): string {
-  return `Their screen has already opened what they asked for (${path}). Tell them in a few words that it is open, then carry on; do not ask Q's backend for it.`;
+export function fastMoveLine(
+  path: string,
+  receipt: MoveOutcome = "DONE",
+): string {
+  // V (founder live 2026-10-09, "it's not open yet"): "open" is said only
+  // on the router's DONE receipt, never on the push alone.
+  if (receipt === "DONE") {
+    return `Their screen has already opened what they asked for (${path}); it is open on their screen now (confirmed). Tell them in a few words that it is open, then carry on; do not ask Q's backend for it.`;
+  }
+  if (receipt === "FAILED") {
+    return `The app tried to open what they asked for (${path}) and it did NOT open on their screen. Say briefly that it didn't open and offer to try again; never say it is open.`;
+  }
+  return `What they asked for (${path}) is still loading on their screen: do not say it is open; say it is coming up. Do not ask Q's backend for it.`;
 }
 
 async function post<T>(
@@ -306,8 +322,15 @@ export async function startLiveCall(
       // request is every word since the last delegation, so a request a
       // pause split in two is read whole here.
       if (options.fastNavigation === true) {
+        // Listening before the push, so a fast landing is not missed.
+        const receipt = receiptListener();
         const moved = await navigationHeard(request.request);
-        if (moved !== null) return { commentary: fastMoveLine(moved.path) };
+        if (moved !== null) {
+          return {
+            commentary: fastMoveLine(moved.path, await receipt.for(moved.path)),
+          };
+        }
+        receipt.stop();
       }
       if (id === null) throw new LiveCallUnavailable(null);
       const result = await post<DelegationOutcome & { ended?: boolean }>(

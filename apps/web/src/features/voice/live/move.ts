@@ -74,3 +74,58 @@ export function moveNote(outcome: MoveOutcome): string {
       return "The page is still loading on their screen: do not say it is open; say it is coming up.";
   }
 }
+
+/**
+ * The receipt for a move the app makes itself (C's fast path: the screen
+ * is pushed before Q Brain is asked). Listening starts when this is called,
+ * before the move; `for(path)` waits for that path's receipt.
+ */
+export function receiptListener(
+  subscribe: (
+    listener: (outcome: NavigationOutcome) => void,
+  ) => () => void = onNavigationOutcome,
+): {
+  readonly for: (path: string, waitMs?: number) => Promise<MoveOutcome>;
+  readonly stop: () => void;
+} {
+  const seen: NavigationOutcome[] = [];
+  const waiting = new Set<(outcome: NavigationOutcome) => void>();
+  const stop = subscribe((outcome) => {
+    seen.push(outcome);
+    for (const wake of waiting) wake(outcome);
+  });
+  return {
+    stop,
+    for: (path, waitMs = MOVE_RECEIPT_WAIT_MS) =>
+      new Promise<MoveOutcome>((resolve) => {
+        const matches = (outcome: NavigationOutcome) =>
+          outcome.expected === path;
+        const finish = (outcome: MoveOutcome) => {
+          clearTimeout(timer);
+          waiting.delete(wake);
+          stop();
+          resolve(outcome);
+        };
+        const wake = (outcome: NavigationOutcome) => {
+          if (matches(outcome)) finish(outcome.status);
+        };
+        const timer = setTimeout(() => {
+          finish("PENDING");
+        }, waitMs);
+        const earlier = seen.find(matches);
+        if (earlier !== undefined) {
+          finish(earlier.status);
+          return;
+        }
+        // Already there: no move was needed, so no receipt will come.
+        if (
+          typeof window !== "undefined" &&
+          `${window.location.pathname}${window.location.search}` === path
+        ) {
+          finish("DONE");
+          return;
+        }
+        waiting.add(wake);
+      }),
+  };
+}
