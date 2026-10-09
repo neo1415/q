@@ -558,14 +558,16 @@ describe("Q watches the pitch with the person", () => {
     });
   });
 
-  it("keeps the pitch playing, muted, while Q is open", async () => {
+  // Founder, 2026-10-09: pitches are loud from the start, with Q open too;
+  // only Q's own speech quiets them.
+  it("keeps the pitch playing with sound while Q is open", async () => {
     globalQ.open = true;
     const { container } = await renderFeed();
     await waitFor(() => expect(play).toHaveBeenCalled());
     const active = container.querySelector<HTMLVideoElement>(
       "[data-slot-active] video",
     );
-    expect(active?.muted).toBe(true);
+    expect(active?.muted).toBe(false);
     expect(pause).not.toHaveBeenCalled();
   });
 });
