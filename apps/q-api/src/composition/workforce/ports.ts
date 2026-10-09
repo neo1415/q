@@ -5,6 +5,8 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import type { PublicWebResearchService } from "@capital-q/q-research";
 import type { ActorContext } from "@capital-q/security";
 
+import { sendAllowed } from "../instructions/send-guard.js";
+import { threadPace } from "../instructions/quarantine.js";
 import type {
   OpenConversation,
   ResearchFound,
@@ -54,6 +56,7 @@ export type WorkforcePortServices = {
       readonly from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE";
       readonly senderName: string;
       readonly text: string | null;
+      readonly sentAt: string;
     }[];
   }>;
   readonly sendChat: (input: {
@@ -221,6 +224,17 @@ export function createWorkforcePorts(
 
       send: async (owner, relationshipId, idempotencyKey, body, jobId) => {
         if (!mine(owner)) return false;
+        // Recovery (founder 2026-10-09): the hard rule at the send itself.
+        // A job's agent writes only when they wrote last, or once as a
+        // follow-up after the wait; never into a thread it couldn't read.
+        const read = await services
+          .readChat({ actor, relationshipId, limit: 50 })
+          .catch(() => null);
+        const verdict = sendAllowed(
+          read === null || read.blocked ? null : threadPace(read.messages),
+          now(),
+        );
+        if (!verdict.ok) return false;
         await services.sendChat({
           actor,
           relationshipId,

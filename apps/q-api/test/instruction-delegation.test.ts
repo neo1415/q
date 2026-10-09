@@ -114,6 +114,15 @@ const ACTIONS: readonly AnyAppAction[] = [
     "relationship.outcome.change",
     z.object({ relationshipId: z.string(), outcome: z.string() }).strict(),
   ),
+  declared(
+    "schedule.reminder.create",
+    z
+      .object({
+        idempotencyKey: Key,
+        input: z.object({ title: z.string(), dueAt: z.string() }).passthrough(),
+      })
+      .strict(),
+  ),
 ];
 
 const PEOPLE: readonly InstructionPerson[] = [
@@ -142,9 +151,21 @@ function zinoGrant(): InstructionGrant {
       { action: "chat.message.send", mode: "ASK" },
       { action: "schedule.meeting.book", mode: "ASK" },
       { action: "relationship.outcome.change", mode: "ASK" },
+      { action: "schedule.reminder.create", mode: "ASK" },
     ],
   };
 }
+
+const REMIND: InstructionPlanStep = {
+  action: "schedule.reminder.create",
+  argumentsJson: JSON.stringify({
+    idempotencyKey: "model-written-key",
+    input: { title: "Check Ledgerline's reply", dueAt: "2026-10-09T09:00:00Z" },
+  }),
+  topic: null,
+  touchesTermsOrMoney: false,
+  words: "Remind you to check Ledgerline's reply.",
+};
 
 const REPLY =
   "Thank you, Tobenna, and thanks for accepting. Checking each invoice the moment it is created is a smart place to sit. I would be glad to read the deck you offered whenever it suits you.";
@@ -291,6 +312,28 @@ describe("delegated vs asks first (the matrix)", () => {
       { delegation: null },
       "ASK",
     ],
+    // Recovery (founder 2026-10-09): a reminder Q sets for the person
+    // themselves is routine inside the delegation -- no card.
+    // Founder 2026-10-09: a thread this firing could not read is never
+    // written to -- unknown is not "they replied".
+    [
+      "a reply into a thread not read this time",
+      chat(REPLY),
+      { threadsRead: new Set<string>() },
+      "HOLD:NOT_READ",
+    ],
+    [
+      "a reminder for themselves, under delegation",
+      REMIND,
+      {},
+      "AUTO+delegated",
+    ],
+    [
+      "the same reminder with delegation off",
+      REMIND,
+      { delegation: null },
+      "ASK",
+    ],
   ] as const)("%s", (_label, step, options, expected) => {
     expect(verdictOf(check(step, options))).toBe(expected);
   });
@@ -381,7 +424,7 @@ describe("caps", () => {
     ).toBe("HOLD:TOO_SOON_TO_FOLLOW_UP");
   });
 
-  it("never more than two unanswered in a row: then it asks", () => {
+  it("never more than two unanswered in a row: then it waits on them, with no card that comes back daily", () => {
     expect(
       verdictOf(
         check(followUp, {
@@ -392,7 +435,7 @@ describe("caps", () => {
           }),
         }),
       ),
-    ).toBe("ASK:UNANSWERED");
+    ).toBe("HOLD:WAITING_ON_THEM");
   });
 
   it("at most the day's cap on its own, then it asks", () => {
@@ -736,5 +779,35 @@ describe("the switch is the person's own, on their own instruction", () => {
       false,
     );
     expect(other.audited).toEqual([]);
+  });
+});
+
+describe("approvals a typical delegated job asks for, before and after (founder 2026-10-09)", () => {
+  // One firing under delegation: reply to Ledgerline's message, set the
+  // person a reminder to look again, and a reply that touches terms.
+  const steps: readonly [
+    string,
+    InstructionPlanStep,
+    Partial<ValidationContext>,
+  ][] = [
+    ["reply in a live chat", chat(REPLY), {}],
+    ["reminder for themselves", REMIND, {}],
+    ["reply about terms", chat(REPLY, { touchesTermsOrMoney: true }), {}],
+  ];
+  it("asks only for the outward, out-of-scope step (terms); the routine ones run", () => {
+    const after = steps.map(([label, step, options]) => [
+      label,
+      verdictOf(check(step, options)),
+    ]);
+    expect(after).toEqual([
+      ["reply in a live chat", "AUTO+delegated"],
+      // Before this change: "ASK" -- a card for every reminder, delegated or not.
+      ["reminder for themselves", "AUTO+delegated"],
+      ["reply about terms", "ASK:TERMS_OR_MONEY"],
+    ]);
+    // Without the delegation every one of them is the person's card.
+    expect(
+      steps.map(([, step]) => verdictOf(check(step, { delegation: null }))),
+    ).toEqual(["ASK", "ASK", "ASK"]);
   });
 });
