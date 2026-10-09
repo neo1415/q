@@ -2,6 +2,8 @@ import type { EtiquetteGuides } from "@capital-q/q-core";
 import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
+import { createPostgresCompanyKnowledge } from "@capital-q/discovery";
+import { createPostgresContextEpochReader } from "@capital-q/security/postgres";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import {
   createModelGatewayQAnswer,
@@ -66,6 +68,7 @@ import {
 import { createAppActionArgumentReader } from "./app-action-arguments.js";
 import { createPostgresAwaitingActions } from "./awaiting-actions.js";
 import { createPostgresConversationCore } from "./conversation-core-state.js";
+import { createOwnMandateReads } from "./working-snapshot.js";
 import { createAppActionRouter } from "./app-action-router.js";
 import { createProfileGapReader } from "./profile-gap-reader.js";
 
@@ -329,6 +332,12 @@ export function composeQIntelligence(
     sql,
     transactions,
     tools,
+    // K Part 4: their own mandate read, kept per actor (Tier A) while D's
+    // version for it is current; F's scope key, epoch read per request.
+    ownMandateReads: createOwnMandateReads({
+      knowledge: createPostgresCompanyKnowledge({ sql }),
+      epochs: createPostgresContextEpochReader({ sql }),
+    }),
     ...(dependencies.uiActReceipts === undefined
       ? {}
       : { uiActReceipts: dependencies.uiActReceipts }),

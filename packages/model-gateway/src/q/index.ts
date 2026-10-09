@@ -115,6 +115,7 @@ import {
 import { answerPathOf } from "./answer-path.js";
 import { forModelReading } from "./pending-confirmation.js";
 import { createSingleFlight } from "./single-flight.js";
+import { stableToolOrder } from "./tool-order.js";
 import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
@@ -1423,6 +1424,21 @@ export type ModelGatewayQAnswerDependencies = {
    */
   readonly uiActReceipts?:
     ((actor: QAnswerRequest["actor"]) => readonly string[]) | undefined;
+  /**
+   * K Part 4 (Tier A): their own mandate read, as `get_investor_mandate`
+   * returned it, kept per actor under the context-cache scope and served
+   * only while the mandate's version is current. Used only where this
+   * run may read the mandate at all; a miss reads the tool, as before.
+   */
+  readonly ownMandateReads?:
+    | {
+        readonly get: (actor: QAnswerRequest["actor"]) => Promise<unknown>;
+        readonly remember: (
+          actor: QAnswerRequest["actor"],
+          data: unknown,
+        ) => Promise<void>;
+      }
+    | undefined;
   readonly sensitivity?: QAnswerSensitivityPolicy | undefined;
   /**
    * What KIND of material this composition handles (doc 15 §62). Omitted
@@ -2014,6 +2030,27 @@ export function createModelGatewayQAnswer(
           name: "get_investor_mandate",
           arguments: { investorOrganisationId: ownInvestor },
         };
+        // K Part 4: the Tier A copy of this same read, when it is current
+        // (only here, where this run's plan offers the mandate tool).
+        const kept = await (
+          dependencies.ownMandateReads?.get(request.actor) ??
+          Promise.resolve(null)
+        ).catch(() => null);
+        if (kept !== null && kept !== undefined) {
+          const fact = ownProfileFact(kept);
+          if (fact !== null) {
+            ownProfile = fact;
+            ownProfileCall = {
+              toolName: "investor_mandate.get",
+              providerName: call.name,
+              status: "SUCCEEDED",
+              failureCode: null,
+              latencyMs: 0,
+            };
+            prepareMs["mandateFromSnapshot"] = 1;
+            return;
+          }
+        }
         const outcome = await tools.execute(call, toolContext);
         ownProfileCall = {
           toolName: outcome.toolName,
@@ -2024,6 +2061,9 @@ export function createModelGatewayQAnswer(
         };
         if (outcome.result.ok) {
           ownProfile = ownProfileFact(outcome.result.data);
+          await dependencies.ownMandateReads
+            ?.remember(request.actor, outcome.result.data)
+            .catch(() => undefined);
         }
       }
     })();
@@ -3710,7 +3750,8 @@ export function createModelGatewayQAnswer(
                   output: textRound
                     ? ({ kind: "TEXT" } as const)
                     : rendered.output,
-                  tools: offered.map((tool) => tool.definition),
+                  // K7: one stable order, so the cached prefix holds.
+                  tools: stableToolOrder(offered),
                 },
                 options,
               );
