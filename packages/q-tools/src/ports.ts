@@ -109,7 +109,7 @@ export type CompanyCatalogPort = {
       readonly limit: number;
     },
   ) => Promise<{
-    /** In name order; the actor's own organisation's companies excluded. */
+    /** In name order. Candidates only: may include the actor's own organisation's, which the tool's disclosure check removes. */
     readonly candidates: readonly CompanyCatalogCandidate[];
     /** The sectors asked for that the taxonomy knows, by display name. */
     readonly sectors: readonly {
