@@ -41,3 +41,17 @@ The founder authorized this on 2026-10-09, for GPT-Live work only, using the exi
 | 2026-10-09 09:02 | workstream V          | Scenario 11 founder-retest on gpt-live-1                                                                                                        | 89                                              | $0.074               | $1.853        |
 | 2026-10-09 09:07 | workstream V          | Scenario 11 founder-retest on gpt-live-1                                                                                                        | 90                                              | $0.075               | $1.928        |
 | 2026-10-09 11:39 | workstream V          | Scenario 2 humour on gpt-live-1                                                                                                                 | 49                                              | $0.041               | $1.969        |
+| 2026-10-09 08:58 | workstream V          | Scenario 11 attempt: TTS input refused with 429 insufficient_quota (credit exhausted); no session opened                                        | 0                                               | $0.000               | $1.969        |
+| 2026-10-09 08:59 | workstream V          | One TTS request ("Hi.") to read that 429's error type; refused, insufficient_quota                                                              | 0                                               | $0.000               | $1.969        |
+
+## Closed (2026-10-09)
+
+Live OpenAI calls stopped at the founder's request; the scratch key file has been deleted. All further GPT-Live work uses the fake vendor (`scripts/recovery/fake-vendors.mjs`), unless the founder approves a specific call.
+
+- **Final total: $1.969 (estimated), of the $3.00 cap.** That includes the lead's smoke test ($0.012) and the founder's own 183 s ($0.153). Workstream V's own sessions come to $1.804.
+- **Sessions:**
+  - 31 sessions, one row each: 29 GPT-Live sessions (26 recordings and 3 preview WebRTC sessions) and 4 gpt-realtime-mini baseline sessions. There are 30 GPT-Live sessions if the founder's own is counted.
+  - 2 refused requests at $0.
+- **TTS:** inputs were synthesised once per line and cached (rows marked "+ TTS inputs"). Their cost (about $0.015 per minute of audio) is included in those rows.
+- **Basis:** GPT-Live rows use `usage.seconds` from `session.closed`; the three preview rows are unconfirmed (OpenAI's 15 s minimum). Realtime rows are priced from `response.done` token usage. These are estimates: the OpenAI usage dashboard is authoritative.
+- **Row order:** the 04:46 and 04:55 preview rows were logged after the 04:49 recording; the running total is in logging order.
