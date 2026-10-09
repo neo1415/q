@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  LiveCallUnavailable,
   startLiveCall,
   type LiveCall,
   type LiveCallEnd,
@@ -29,8 +30,16 @@ import type {
  * the cards, moves, receipts and approvals exactly as on the other lines.
  */
 
+/**
+ * How a start went. QUOTA: the provider refused for quota or rate (a 429
+ * from session creation), which every OpenAI voice line shares; the caller
+ * then skips the duplex line and opens the standard voice (lead,
+ * 2026-10-09: the demo must degrade to a working voice, not two failures).
+ */
+export type LiveStart = "LIVE" | "FAILED" | "QUOTA";
+
 export type LiveVoiceClient = Omit<VoiceSessionClient, "start"> & {
-  readonly start: (input: VoiceSessionStart) => Promise<boolean>;
+  readonly start: (input: VoiceSessionStart) => Promise<LiveStart>;
 };
 
 /** Said once when a GPT-Live call cannot open and another line takes over. */
@@ -93,7 +102,10 @@ export function useLiveVoiceSession(
   );
 
   const start = useCallback(
-    async ({ credential, firstMessage }: VoiceSessionStart) => {
+    async ({
+      credential,
+      firstMessage,
+    }: VoiceSessionStart): Promise<LiveStart> => {
       const mine = (startsRef.current += 1);
       setTranscript([]);
       setState("CONNECTING");
@@ -141,15 +153,17 @@ export function useLiveVoiceSession(
         came = true;
         if (startsRef.current !== mine) {
           void call.end("ended");
-          return false;
+          return "FAILED";
         }
         callRef.current = call;
         setConnected(true);
         setState("LISTENING");
-        return true;
-      } catch {
+        return "LIVE";
+      } catch (error: unknown) {
         if (!came) setState("IDLE");
-        return false;
+        return error instanceof LiveCallUnavailable && error.status === 429
+          ? "QUOTA"
+          : "FAILED";
       }
     },
     [onTranscript, startCall],

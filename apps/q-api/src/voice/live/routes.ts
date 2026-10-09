@@ -128,7 +128,13 @@ export function registerLiveVoiceRoutes(
       if (opened.kind === "REFUSED") {
         request.log.info({ reason: opened.reason }, "live voice refused");
         // The browser carries on with the standard line on any refusal.
-        return problem(reply, 503, `Live voice unavailable: ${opened.reason}.`);
+        // 429 when the provider is out of quota: the browser then skips
+        // every OpenAI line and opens the standard voice.
+        return problem(
+          reply,
+          opened.reason === "PROVIDER_QUOTA" ? 429 : 503,
+          `Live voice unavailable: ${opened.reason}.`,
+        );
       }
       dependencies.connect(binding);
       return reply

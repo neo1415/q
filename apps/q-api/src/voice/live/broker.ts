@@ -18,6 +18,7 @@ import type { DuplexSpendLedger } from "../duplex/spend.js";
 import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
 import {
   GPT_LIVE_USD_PER_SECOND,
+  LiveProviderError,
   type LiveVoiceProvider,
 } from "../providers/gpt-live.js";
 import {
@@ -50,7 +51,13 @@ export type LiveRefusal =
   | "LEDGER_UNAVAILABLE"
   | "DENIED"
   | "INELIGIBLE"
-  | "PROVIDER_UNAVAILABLE";
+  | "PROVIDER_UNAVAILABLE"
+  /**
+   * The provider refused for quota or rate (429; 2026-10-09 the account
+   * ran out of credit). Every OpenAI voice line shares it, so the client
+   * skips the duplex line and goes straight to the standard voice.
+   */
+  | "PROVIDER_QUOTA";
 
 export type LiveOpenOutcome =
   | { readonly kind: "OPEN"; readonly result: LiveOpenResult }
@@ -488,7 +495,13 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         });
       } catch (error: unknown) {
         logger.warn({ err: error }, "live voice session not created");
-        return { kind: "REFUSED", reason: "PROVIDER_UNAVAILABLE" };
+        return {
+          kind: "REFUSED",
+          reason:
+            error instanceof LiveProviderError && error.status === 429
+              ? "PROVIDER_QUOTA"
+              : "PROVIDER_UNAVAILABLE",
+        };
       }
       const at = now();
       lines.set(binding.voiceSessionId, {

@@ -121,7 +121,7 @@ launch() {
     local keep_path="$PATH" keep_home="$HOME" proxy="${HTTPS_PROXY:-}"
     local live_key="${CQ_LIVE_OPENAI_API_KEY:-}" live_dg="${CQ_LIVE_DEEPGRAM_API_KEY:-}"
     local live_proxy="${CQ_LIVE_PROXY_HOST:-}" ca="${NODE_EXTRA_CA_CERTS:-}"
-    local live_gl="${CQ_LIVE_GPT_LIVE_KEY:-}"
+    local live_gl="${CQ_LIVE_GPT_LIVE_KEY:-}" fake_gl="${CQ_RECOVERY_GPT_LIVE:-}"
     for var in $(compgen -e); do unset "$var" 2>/dev/null || true; done
     export PATH="$keep_path" HOME="$keep_home"
     CQ_LIVE_OPENAI_API_KEY="$live_key"; CQ_LIVE_DEEPGRAM_API_KEY="$live_dg"
@@ -147,6 +147,9 @@ launch() {
       unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy ALL_PROXY all_proxy
       # Synthetic world only, as the 2026-10-08 incident tenant was.
       export CQ_VOICE_REALTIME=on CQ_FAKE_VOICE_VENDORS=1 CQ_SYNTHETIC_DEMO_ROUTING=true
+      # V, opt-in (CQ_RECOVERY_GPT_LIVE=1): GPT-Live as the product voice,
+      # its session creation answered by the fake vendor (no key, no audio).
+      [[ "$fake_gl" == 1 ]] && export CQ_VOICE_LIVE=on
       # V (GPT-Live developer preview), opt-in: CQ_LIVE_GPT_LIVE_KEY in the
       # operator's shell. The model stays the fake; only q-api gets the key,
       # and only for the GPT-Live session call (CQ_VOICE_LIVE_OPENAI_API_KEY,

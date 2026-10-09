@@ -531,6 +531,79 @@ describe("GPT-Live line", () => {
     expect(capped).toMatchObject({ capReached: true, remainingMs: 0 });
   });
 
+  it("says when the provider refused for quota, so the client skips every OpenAI line", async () => {
+    const refusing = (status: number) =>
+      createLiveBroker({
+        config: { ...LIVE_DEFAULTS, enabled: true },
+        provider: {
+          providerId: "p",
+          modelId: "m",
+          createWebRtcSession: () =>
+            Promise.reject(new LiveProviderError("refused", status)),
+        },
+        firewall: firewall(),
+        turn: () => Promise.resolve({ kind: "NOTHING" }),
+        spend: { spentTodayUsd: () => Promise.resolve(0) },
+        usage: createInMemoryModelUsageRepository(),
+        providerCeiling: "PUBLIC",
+        syntheticDemo: false,
+        logger,
+      });
+    expect(await open(refusing(429))).toEqual({
+      kind: "REFUSED",
+      reason: "PROVIDER_QUOTA",
+    });
+    expect(await open(refusing(500))).toEqual({
+      kind: "REFUSED",
+      reason: "PROVIDER_UNAVAILABLE",
+    });
+  });
+
+  it("runs the onboarding interview through its own turn handler, guided", async () => {
+    const instructions: string[] = [];
+    const threads: unknown[] = [];
+    const broker = createLiveBroker({
+      config: { ...LIVE_DEFAULTS, enabled: true },
+      provider: {
+        providerId: "p",
+        modelId: "m",
+        createWebRtcSession: ({ config }) => {
+          instructions.push(config.instructions);
+          return Promise.resolve({
+            sessionId: "s",
+            sdp: "v=0 a",
+            model: "gpt-live-1",
+          });
+        },
+      },
+      firewall: firewall(),
+      // The same handler the standard line uses: an onboarding binding is
+      // routed to the interview there (turn.ts, path INTERVIEW).
+      turn: async (bound, _transcript, _signal, speaker) => {
+        threads.push(bound.thread.onboarding);
+        await speaker.speak("Great. What does your company do?");
+        return { kind: "SPOKEN", path: "INTERVIEW" };
+      },
+      spend: { spentTodayUsd: () => Promise.resolve(0) },
+      usage: createInMemoryModelUsageRepository(),
+      providerCeiling: "PUBLIC",
+      syntheticDemo: false,
+      logger,
+    });
+    const onboarding = {
+      sessionId: "7f000000-0000-4000-8000-000000000001",
+      journeyType: "founder" as const,
+    };
+    await broker.open({
+      binding: { ...binding(), thread: { ...binding().thread, onboarding } },
+      sdp: "v=0 offer",
+    });
+    expect(instructions[0]).toContain("Guided call:");
+    const result = await ask(broker, "dlg_1", "We're called Ledgerfold.");
+    expect(threads).toEqual([onboarding]);
+    expect(result?.commentary).toContain("What does your company do?");
+  });
+
   it("puts the person's names into the session instructions", async () => {
     const { broker, created } = setup();
     await broker.open({

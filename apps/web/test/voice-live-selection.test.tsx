@@ -31,16 +31,30 @@ vi.mock("../src/features/voice/provider/deepgram-session", () => ({
 vi.mock("../src/features/voice/provider/elevenlabs-session", () => ({
   useElevenLabsVoiceSession: () => fake(),
 }));
+const duplexStart = vi.fn(() => Promise.resolve(false));
+vi.mock("../src/features/voice/provider/duplex-session", () => ({
+  useDuplexVoiceSession: () => ({ ...fake(), start: duplexStart }),
+}));
 
 let available = true;
 let opens = true;
+let quota = false;
+class LiveCallUnavailable extends Error {
+  readonly status: number | null;
+  constructor(status: number | null) {
+    super("live voice unavailable");
+    this.status = status;
+  }
+}
 const calls: Record<string, unknown>[] = [];
 const typed: string[] = [];
 vi.mock("../src/features/voice/live/live-call", () => ({
+  LiveCallUnavailable,
   liveVoiceAvailable: () => Promise.resolve(available),
   startLiveCall: (options: Record<string, unknown>) => {
     calls.push(options);
-    if (!opens) return Promise.reject(new Error("live voice unavailable"));
+    if (quota) return Promise.reject(new LiveCallUnavailable(429));
+    if (!opens) return Promise.reject(new LiveCallUnavailable(503));
     return Promise.resolve({
       voiceSessionId: "5f000000-0000-4000-8000-000000000001",
       end: () => Promise.resolve(),
@@ -71,10 +85,24 @@ const credential = {
   provider: "deepgram" as const,
 };
 
+// A credential that also carries a brokered duplex line.
+const withDuplex = {
+  ...credential,
+  duplex: {
+    clientSecret: "ek_fake",
+    callsUrl: "https://realtime.invalid/v1/realtime/calls",
+    expiresAt: "2026-10-09T12:00:00.000Z",
+    maxSessionMs: 600_000,
+    idleMs: 30_000,
+  },
+};
+
 describe("GPT-Live as the product voice", () => {
   beforeEach(() => {
     available = true;
     opens = true;
+    quota = false;
+    duplexStart.mockClear();
     calls.length = 0;
     typed.length = 0;
     standardStart.mockClear();
@@ -120,6 +148,35 @@ describe("GPT-Live as the product voice", () => {
       await result.current.start({ credential });
     });
     expect(calls).toHaveLength(1);
+    expect(standardStart).toHaveBeenCalledTimes(1);
+    expect(statuses).toEqual([LIVE_FALLBACK_NOTICE]);
+  });
+
+  it("tries the duplex line after an ordinary GPT-Live failure", async () => {
+    opens = false;
+    const { result } = renderHook(() => useVoiceSession());
+    await act(async () => {
+      await result.current.start({ credential: withDuplex });
+    });
+    expect(duplexStart).toHaveBeenCalledTimes(1);
+    expect(standardStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the duplex line when OpenAI is out of quota, straight to the standard voice", async () => {
+    quota = true;
+    const statuses: (string | null)[] = [];
+    const { result } = renderHook(() =>
+      useVoiceSession({
+        onLinkStatus: (status) => {
+          statuses.push(status);
+        },
+      }),
+    );
+    await act(async () => {
+      await result.current.start({ credential: withDuplex });
+    });
+    expect(calls).toHaveLength(1);
+    expect(duplexStart).not.toHaveBeenCalled();
     expect(standardStart).toHaveBeenCalledTimes(1);
     expect(statuses).toEqual([LIVE_FALLBACK_NOTICE]);
   });

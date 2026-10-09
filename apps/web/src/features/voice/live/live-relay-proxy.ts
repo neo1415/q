@@ -254,7 +254,11 @@ export async function relayLive(
   }
   if (!upstream.ok) {
     return problem(
-      upstream.status === 404 ? 404 : upstream.status === 503 ? 503 : 502,
+      upstream.status === 404 ||
+        upstream.status === 503 ||
+        upstream.status === 429
+        ? upstream.status
+        : 502,
     );
   }
   if (relay.result === null) {

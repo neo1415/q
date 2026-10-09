@@ -81,9 +81,12 @@ export function useVoiceSession(
       // the person is told in one line.
       const offered =
         allowLive && (await (liveAvailable.current ??= liveVoiceAvailable()));
+      let quota = false;
       if (offered) {
         setActive("live");
-        if (await liveLine.start(input)) return;
+        const outcome = await liveLine.start(input);
+        if (outcome === "LIVE") return;
+        quota = outcome === "QUOTA";
         liveAvailable.current = null;
         eventsRef.current.onLinkStatus?.(LIVE_FALLBACK_NOTICE);
         setTimeout(() => {
@@ -93,7 +96,9 @@ export function useVoiceSession(
       // DUPLEX: the full-duplex line first when the server brokered one;
       // if it does not come up, the standard line on the same credential,
       // at once and without a word to the person.
-      if (input.credential.duplex !== undefined) {
+      // Out of OpenAI quota: the duplex line is OpenAI too, so it is not
+      // tried; the standard voice comes up at once.
+      if (input.credential.duplex !== undefined && !quota) {
         setActive("duplex");
         if (await duplex.start(input)) return;
       }
