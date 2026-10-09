@@ -483,6 +483,7 @@ import {
   createRelationshipActionBoard,
   createRelationshipIntelligencePort,
 } from "./composition/relationship-intelligence.js";
+import { createRelationshipBriefSources } from "./composition/relationship-brief-sources.js";
 import {
   createRevokeShareAction,
   createShareRaiseAction,
@@ -2616,6 +2617,12 @@ const qTools = createQTools({
         ownCompany: runtimeDependencies.ownCompany,
         connections: connectionService,
         latestMessages: latestRelationshipMessages,
+        // R1: the Relationship Brief, over the same services as the screens.
+        briefSources: createRelationshipBriefSources({
+          chat,
+          schedule,
+          diligence: diligenceService,
+        }),
       }),
       // Diligence (2026-10-02): get_relationship names the area's requests
       // and shares, read through the diligence service as the person.

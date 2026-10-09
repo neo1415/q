@@ -196,6 +196,14 @@ export {
   type RelationshipStatus,
 } from "./application/relationship-status.js";
 export {
+  createRelationshipBrief,
+  deriveBriefDecisions,
+  type BriefDiligenceRead,
+  type BriefMeetingRead,
+  type BriefThreadMessage,
+  type RelationshipBriefSources,
+} from "./application/relationship-brief.js";
+export {
   nextStepFor,
   projectorFor,
   projectRelationshipState,

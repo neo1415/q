@@ -437,6 +437,17 @@ export {
   type RelationshipEventSummaryDto,
   type RelationshipSourceType,
 } from "./relationships.js";
+export {
+  RelationshipBriefDecisionSchema,
+  RelationshipBriefMeetingSchema,
+  RelationshipBriefMessageSchema,
+  RelationshipBriefSchema,
+  RelationshipBriefSideSchema,
+  type RelationshipBrief,
+  type RelationshipBriefDecision,
+  type RelationshipBriefMeeting,
+  type RelationshipBriefMessage,
+} from "./relationship-brief.js";
 
 export {
   ListTaxonomyNodesQuerySchema,

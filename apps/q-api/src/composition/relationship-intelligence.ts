@@ -5,6 +5,7 @@ import {
   toRelationshipSummaryDto,
   type ConnectionService,
   type InterestService,
+  type RelationshipBriefSources,
   type RelationshipListing,
 } from "@capital-q/network";
 import type { Logger } from "@capital-q/observability";
@@ -201,9 +202,17 @@ export function createRelationshipIntelligencePort(dependencies: {
         >
       >)
     | undefined;
+  /** The Relationship Brief's readers (R1). Absent: no brief. */
+  readonly briefSources?: RelationshipBriefSources | undefined;
 }): RelationshipIntelligencePort {
-  const { interests, board, ownCompany, connections, latestMessages } =
-    dependencies;
+  const {
+    interests,
+    board,
+    ownCompany,
+    connections,
+    latestMessages,
+    briefSources,
+  } = dependencies;
   // Who wrote last, from the actor's side: never fails the list.
   const withLatest = async (
     side: "INVESTOR" | "COMPANY",
@@ -213,13 +222,17 @@ export function createRelationshipIntelligencePort(dependencies: {
     const latest = await latestMessages(
       items.map((item) => item.relationshipId),
     ).catch(() => null);
-    if (latest === null) return items;
+    // A failed read is marked, never left to look like "no messages" (R1).
+    if (latest === null) {
+      return items.map((item) => ({ ...item, lastMessageRead: "UNAVAILABLE" }));
+    }
     return items.map((item) => {
       const message = latest.get(item.relationshipId);
       return message === undefined
-        ? item
+        ? { ...item, lastMessageRead: "OK" }
         : {
             ...item,
+            lastMessageRead: "OK",
             lastMessage: {
               from: message.side === side ? "YOU" : "THEM",
               at: message.at,
@@ -330,6 +343,16 @@ export function createRelationshipIntelligencePort(dependencies: {
       });
       return status === null ? null : toRelationshipStatusDto(status);
     },
+    ...(briefSources === undefined
+      ? {}
+      : {
+          brief: (actor: ActorContext, relationshipId: string) =>
+            interests.relationshipBrief({
+              actor,
+              relationshipId,
+              sources: briefSources,
+            }),
+        }),
     byRelationship: async (actor, relationshipId) => {
       const view = await interests.relationshipById({ actor, relationshipId });
       return view === null
