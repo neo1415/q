@@ -36,6 +36,14 @@ async function openLine(
     .getByRole("button", { name: /Talk with Q/u })
     .first()
     .click();
+  // Realtime events sent before the data channel is open are lost: wait
+  // for the line to be up (its End control) unless the test is about it
+  // never coming up.
+  if (mode === "connect") {
+    await expect(
+      page.getByRole("button", { name: /^End/u }).first(),
+    ).toBeVisible({ timeout: 60_000 });
+  }
 }
 
 const notice = (page: Page) => page.locator('[role="status"], [role="alert"]');
