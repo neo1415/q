@@ -11,8 +11,8 @@ import {
   liveUserSays,
 } from "../support/live-fake.js";
 import { openQ } from "../support/q.js";
-import { useScript } from "../support/script.js";
-import { CAST } from "../support/stack.js";
+import { answer, useScript } from "../support/script.js";
+import { CAST, world } from "../support/stack.js";
 
 /**
  * V: GPT-Live as the product voice, on the local stack (MOCK). Needs the
@@ -253,4 +253,56 @@ test("the preview's GPT-Live call goes silent the moment it ends, before its ses
   await page.waitForTimeout(300);
   expect(await audibleNow(page)).toBe(0);
   expect(await maxAudible(page)).toBe(1);
+});
+
+test("a delegated 'open' moves the page first, and the voice hears 'confirmed' only after the receipt", async ({
+  browser,
+}) => {
+  const company = world().company("ledgerfold");
+  const say = `Open ${company.name}`;
+  const route = new RegExp(`/company/${company.companyId}`, "u");
+  const page = await (await contextAs(browser, CAST.investor)).newPage();
+  await installLiveFake(page);
+  await useScript([
+    READER_QUESTION,
+    {
+      name: "open",
+      when: { task: "COMPANY_ANALYST", user: say, afterTool: null },
+      reply: {
+        toolCalls: [
+          {
+            name: "open_page",
+            arguments: { page: "COMPANY", name: company.name },
+          },
+        ],
+      },
+    },
+    {
+      name: "after-open",
+      when: { task: "COMPANY_ANALYST", afterTool: "open_page" },
+      reply: answer(`Opening ${company.name}.`),
+    },
+  ]);
+  await page.goto("/home");
+  await page.request.get(`/company/${company.companyId}`);
+  await startVoice(page);
+  await liveUserSays(page, say);
+  await emitLive(page, {
+    type: "session.delegation.created",
+    delegation: { id: "dlg_e2e_open", type: "delegation", target: "client" },
+  });
+  const spoken = async () =>
+    (await liveSent(page)).filter(
+      (e) =>
+        e.type === "session.commentary.append" &&
+        e.delegation_id === "dlg_e2e_open" &&
+        !(e.content ?? "").startsWith("Q's backend is still working"),
+    );
+  // The page moves; until it has, nothing about it is said.
+  await expect(page).toHaveURL(route, { timeout: 60_000 });
+  await expect
+    .poll(async () => (await spoken()).length, { timeout: 30_000 })
+    .toBe(1);
+  const said = (await spoken())[0]?.content ?? "";
+  expect(said).toContain("open on their screen now (confirmed)");
 });

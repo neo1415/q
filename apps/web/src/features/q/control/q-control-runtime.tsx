@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { registerClientPrefetch } from "../client-actions";
+import { registerClientPrefetch, registerShellRouter } from "../client-actions";
 import { currentManifest } from "../manifest";
 import {
   noteRoute,
@@ -39,7 +39,13 @@ export function QControlRuntime() {
   const router = useRouter();
   useEffect(() => {
     registerClientPrefetch((path) => router.prefetch(path));
-    return () => registerClientPrefetch(null);
+    // The tab's own router for Q's moves, whatever page is mounted: a move
+    // never falls back to a full page load (it would end a voice call).
+    registerShellRouter((path) => router.push(path));
+    return () => {
+      registerClientPrefetch(null);
+      registerShellRouter(null);
+    };
   }, [router]);
 
   const [notice, setNotice] = useState<string | null>(null);
