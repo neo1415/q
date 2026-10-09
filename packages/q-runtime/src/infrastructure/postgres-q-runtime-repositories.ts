@@ -516,19 +516,15 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
            where r.id = ${input.runId}
              and r.tenant_id = ${input.tenantId}
              and r.version = ${input.expectedVersion}
-          returning r.actor_user_id`;
-        if (rows.length === 0) {
-          return null;
-        }
-        const { actor_user_id } = z
-          .object({ actor_user_id: UserIdSchema })
-          .parse(rows[0]);
-        return findRunForActor(
-          tx.sql,
-          input.tenantId,
-          actor_user_id,
-          input.runId,
-        );
+          returning r.id, r.tenant_id, r.actor_user_id, r.actor_organisation_id,
+                    r.conversation_id, r.objective, r.capability, r.consequence_class,
+                    r.status, r.subject_refs, r.viewing, r.screen, r.orchestration_version,
+                    r.prompt_bundle_version, r.model_policy_version, r.correlation_id,
+                    r.created_at, r.started_at, r.completed_at, r.failure_code,
+                    r.version, r.last_event_sequence`;
+        // SUB-SECOND: the moved row comes back from the UPDATE itself (the
+        // same columns selectRun reads), not from a second SELECT.
+        return rows.length === 0 ? null : toRun(rows[0]);
       },
       allocateEventSequence: async (tx, tenantId, runId) => {
         // The UPDATE takes the row lock; a second allocator for the same run
@@ -668,20 +664,27 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
 
     runEvents: {
       append: async (tx, input) => {
+        // Wake live readers (CQ-Q-009) in the same statement as the insert
+        // (SUB-SECOND: one round trip, not two). Postgres delivers the
+        // notice on commit, so a rolled-back event is never announced.
+        // Identifiers only: the reader re-reads the row it is told about.
+        // pg_notify sits in the select list over the inserted row, so it
+        // runs exactly once, for exactly that row.
         const rows = await tx.sql`
-          insert into q_runtime.run_events
-            (tenant_id, run_id, sequence, event_type, visible_stage, payload)
-          values (${input.tenantId}, ${input.runId}, ${input.sequence},
-                  ${input.eventType}, ${input.visibleStage},
-                  ${JSON.stringify(input.payload)}::text::jsonb)
-          returning id, tenant_id, run_id, sequence, event_type, visible_stage,
-                    payload, occurred_at`;
-        // Wake live readers (CQ-Q-009). Postgres delivers the notice on
-        // commit, so a rolled-back event is never announced. Identifiers
-        // only: the reader re-reads the row it is told about.
-        await tx.sql`select pg_notify(${Q_RUN_EVENTS_CHANNEL}, ${JSON.stringify(
-          { runId: input.runId, sequence: input.sequence },
-        )})`;
+          with inserted as (
+            insert into q_runtime.run_events
+              (tenant_id, run_id, sequence, event_type, visible_stage, payload)
+            values (${input.tenantId}, ${input.runId}, ${input.sequence},
+                    ${input.eventType}, ${input.visibleStage},
+                    ${JSON.stringify(input.payload)}::text::jsonb)
+            returning id, tenant_id, run_id, sequence, event_type, visible_stage,
+                      payload, occurred_at
+          )
+          select i.*,
+                 pg_notify(${Q_RUN_EVENTS_CHANNEL},
+                           json_build_object('runId', i.run_id, 'sequence', i.sequence)::text)
+                   as notified
+            from inserted i`;
         return toEvent(rows[0]);
       },
       listForRun: async (executor, tenantId, runId, page = {}) => {

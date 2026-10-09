@@ -15,6 +15,7 @@ import type {
 } from "@capital-q/contracts";
 
 type QActionExecuteId = QActionProposalId;
+import { markRoundTrips } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import {
   QRunNotFoundError,
@@ -192,6 +193,18 @@ export function buildQGraph(
    * pause, a resume or an expired plan still revalidates.
    */
   const plannedThisInvocation = new Set<string>();
+  /**
+   * SUB-SECOND: the firewall's evaluation, started beside preflight's
+   * transaction rather than after it. Process memory only; a run whose
+   * preflight fails never uses it.
+   */
+  const earlyPlans = new Map<string, ReturnType<typeof plan>>();
+  /**
+   * SUB-SECOND: runs the firewall node already moved through PLANNING and
+   * RETRIEVAL in one transaction (the pause policy said no pause), so the
+   * retrieval node does not move it again.
+   */
+  const retrievalTaken = new Set<string>();
 
   async function boundary(state: QGraphState): Promise<QRunRecord> {
     const run = await runtime.readRun(ref(state));
@@ -239,19 +252,32 @@ export function buildQGraph(
     state: QGraphState,
     config: RunnableConfig,
   ): Promise<Partial<QGraphState>> => {
-    const run = await boundary(state);
-    if (run.conversationId === null) {
-      throw new Error("q run has no conversation");
-    }
-    assertResumableOrchestrationVersion(run.orchestrationVersion);
+    // SUB-SECOND: the firewall's evaluation starts now, beside this
+    // transaction (it reads policy and grants; it writes nothing). It is
+    // used only if preflight passes; a rejection here is held, not thrown.
+    const planning = plan(state);
+    planning.catch(() => undefined);
+    earlyPlans.set(state.runId, planning);
     // CONTEXT_RESOLUTION and POLICY_CHECK in one transaction, each status
-    // still taken in order (speed sweep 2026-10-01).
-    honour(
-      await runtime.advanceThrough(ref(state), [
-        "CONTEXT_RESOLUTION",
-        "POLICY_CHECK",
-      ]),
-    );
+    // still taken in order (speed sweep 2026-10-01). The checks below read
+    // the run the move locked, instead of a separate read before it: the
+    // move itself refuses a cancelled or ended run.
+    let run: QRunRecord;
+    try {
+      run = honour(
+        await runtime.advanceThrough(ref(state), [
+          "CONTEXT_RESOLUTION",
+          "POLICY_CHECK",
+        ]),
+      );
+      if (run.conversationId === null) {
+        throw new Error("q run has no conversation");
+      }
+      assertResumableOrchestrationVersion(run.orchestrationVersion);
+    } catch (error: unknown) {
+      earlyPlans.delete(state.runId);
+      throw error;
+    }
     // Preflight has passed: the person's own latest turn may be read now,
     // beside the firewall (ADR 0035). Own words and own turns only; the
     // reading is dropped unused if any later stage refuses the run.
@@ -276,7 +302,11 @@ export function buildQGraph(
     // run cancelled or ended since. The run's read and the firewall's
     // evaluation are independent, so they run side by side (latency2): a
     // run that turns out cancelled throws here and its plan is never used.
-    const [, decision] = await Promise.all([boundary(state), plan(state)]);
+    // SUB-SECOND: the evaluation preflight started, else a fresh one. The
+    // move below refuses a cancelled or ended run, so no separate read.
+    const early = earlyPlans.get(state.runId);
+    earlyPlans.delete(state.runId);
+    const decision = await (early ?? plan(state));
     if (decision.outcome === "DENIED") {
       livePlans.delete(state.runId);
       answer.discard?.(state.runId);
@@ -284,17 +314,33 @@ export function buildQGraph(
     }
     livePlans.set(state.runId, decision.plan);
     plannedThisInvocation.add(state.runId);
-    await advance(state, "PLANNING");
+    // When nothing will pause the run, PLANNING and RETRIEVAL are taken in
+    // one transaction (each still checked and in order); the pause node
+    // then passes and retrieval does not move it again.
+    if (await pausePolicy.shouldPause(subjectContext(state))) {
+      await advance(state, "PLANNING");
+    } else {
+      honour(
+        await runtime.advanceThrough(ref(state), ["PLANNING", "RETRIEVAL"]),
+      );
+      retrievalTaken.add(state.runId);
+    }
     return { context: "AUTHORISED", contextPlan: describe(decision.plan) };
   };
 
   // The only node that may interrupt, and it does nothing else.
   const pause = async (state: QGraphState): Promise<Partial<QGraphState>> => {
-    if (!(await pausePolicy.shouldPause(subjectContext(state)))) {
+    // The firewall node already asked and took RETRIEVAL: asking again
+    // could only disagree with the move it made.
+    if (
+      retrievalTaken.has(state.runId) ||
+      !(await pausePolicy.shouldPause(subjectContext(state)))
+    ) {
       return {};
     }
     // A resumed run is planned again, whatever this process remembers.
     plannedThisInvocation.delete(state.runId);
+    retrievalTaken.delete(state.runId);
     interrupt(Q_INTERNAL_PAUSE);
     return {};
   };
@@ -309,7 +355,9 @@ export function buildQGraph(
     // The move itself refuses a cancelled or ended run (honour), so no
     // separate read of the run first. It is awaited before anything is
     // retrieved: retrieval never runs for a run that has ended.
-    await advance(state, "RETRIEVAL");
+    if (!retrievalTaken.delete(state.runId)) {
+      await advance(state, "RETRIEVAL");
+    }
     const held = livePlans.get(state.runId);
     const reusable =
       plannedThisInvocation.has(state.runId) &&
@@ -357,6 +405,7 @@ export function buildQGraph(
     config: RunnableConfig,
   ): Promise<Partial<QGraphState>> => {
     await advance(state, "SYNTHESIS", "PREPARING_ANALYSIS");
+    markRoundTrips("preparing_analysis");
     let current = livePlans.get(state.runId);
     if (current === undefined) {
       const decision = await plan(state);

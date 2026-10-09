@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
     "@capital-q/observability": "workspace:*",
     "@capital-q/q-runtime": "workspace:*",
     "@capital-q/security": "workspace:*",
@@ -38,7 +39,6 @@
     "@capital-q/capital": "workspace:*",
     "@capital-q/companies": "workspace:*",
     "@capital-q/config": "workspace:*",
-    "@capital-q/database": "workspace:*",
     "@capital-q/eventing": "workspace:*",
     "@capital-q/evidence": "workspace:*",
     "@capital-q/investors": "workspace:*",

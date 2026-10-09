@@ -5,6 +5,8 @@ import type {
   DatabaseConfig,
 } from "@capital-q/config/database";
 
+import { countRoundTrip } from "../round-trips.js";
+
 /**
  * The only place in the repository that touches the Postgres.js constructor.
  *
@@ -56,8 +58,12 @@ export function createPostgresClient(
 ): Sql {
   // Lazy: no socket is opened until the first query. Services that want a
   // startup dependency check call the health helper deliberately.
-  return postgres(
-    connectionString,
-    resolvePostgresOptions(config, accessClass),
-  );
+  return postgres(connectionString, {
+    ...resolvePostgresOptions(config, accessClass),
+    // One call per query sent: the per-run round-trip counter (no-op
+    // outside a counted context; never sees parameters it keeps).
+    debug: () => {
+      countRoundTrip();
+    },
+  });
 }
