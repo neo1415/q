@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./page-request": {
+      "types": "./dist/page-request.d.ts",
+      "default": "./dist/page-request.js"
     }
   },
   "main": "./dist/index.js",

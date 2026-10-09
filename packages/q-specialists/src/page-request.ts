@@ -285,6 +285,19 @@ function candidates(key: string): readonly string[] {
   return out;
 }
 
+/** Words that take a request back or put it off: never acted on early. */
+const TAKEN_BACK =
+  /\b(?:no\s+wait|wait|don'?t|do\s+not|not\s+(?:now|yet)|never\s*mind|cancel|stop|actually|hold\s+on|instead|rather)\b/iu;
+
+/**
+ * RECOVERY-2026-10 (C7): the sentence takes its own request back ("open
+ * discover... no wait"). Here, beside the page reader, so the browser and
+ * the Q API read it with the same code.
+ */
+export function takenBack(text: string): boolean {
+  return TAKEN_BACK.test(text);
+}
+
 /**
  * A request to open a page, or null when the words are not one (a record
  * by name, a question, anything else). UNKNOWN only when they named a

@@ -1,4 +1,8 @@
 import type { QFastNavigationResponse, QUiIntent } from "@capital-q/contracts";
+import {
+  pageRequestOf,
+  takenBack,
+} from "@capital-q/q-specialists/page-request";
 
 import { destinationPath } from "@/features/voice/destinations";
 
@@ -86,7 +90,31 @@ const RESOLVED_MAX = 16;
 /** A reading older than this is read again (a relationship may change). */
 const RESOLVED_FRESH_MS = 30_000;
 
+/**
+ * A page by its name needs no one's authority (each page authorises
+ * itself) and no network: read here with the Q API's own reader, so it
+ * moves in the same frame. Only a record by its name goes to the server.
+ * Same order as the server: taken back, then a page, then a record.
+ */
+function readHere(text: string): { path: string | null } | "ASK_SERVER" {
+  const said = text.trim();
+  if (said.length === 0 || said.length > 300 || takenBack(said)) {
+    return { path: null };
+  }
+  const page = pageRequestOf(said);
+  if (page === null) return "ASK_SERVER";
+  if (page.kind === "UNKNOWN") return { path: null };
+  return {
+    path:
+      page.target.kind === "SETTINGS"
+        ? settingsPath(page.target.section)
+        : destinationPath(page.target.destination),
+  };
+}
+
 function resolve(text: string, final: boolean): Promise<string | null> {
+  const here = readHere(text);
+  if (here !== "ASK_SERVER") return Promise.resolve(here.path);
   const key = keyOf(text);
   const known = resolved.get(key);
   if (known !== undefined && Date.now() - known.at < RESOLVED_FRESH_MS) {
@@ -109,8 +137,10 @@ function resolve(text: string, final: boolean): Promise<string | null> {
 
 export type FastNavigationTiming = {
   readonly path: string;
-  /** From the final words to the router push, in the browser. */
+  /** From the final words to the router push call, in the browser. */
   readonly ms: number;
+  /** The push's own synchronous work (the router, not the reader). */
+  readonly pushMs: number;
 };
 
 /**
@@ -122,10 +152,18 @@ export async function navigationHeard(
 ): Promise<FastNavigationTiming | null> {
   if (keyOf(text).length === 0) return null;
   const started = performance.now();
-  const path = await resolve(text, true);
+  // A page read here moves in this same task: no await, so nothing the
+  // send queued (a React render, the run's request) goes first.
+  const here = readHere(text);
+  const path = here === "ASK_SERVER" ? await resolve(text, true) : here.path;
   if (path === null) return null;
+  const pushing = performance.now();
   moveEarly(path);
-  const timing = { path, ms: Math.round(performance.now() - started) };
+  const timing = {
+    path,
+    ms: Math.round(pushing - started),
+    pushMs: Math.round(performance.now() - pushing),
+  };
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent(FAST_NAVIGATION_EVENT, { detail: timing }),

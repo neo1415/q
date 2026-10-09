@@ -364,6 +364,9 @@ importers:
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../../packages/q-core
+      '@capital-q/q-specialists':
+        specifier: workspace:*
+        version: link:../../packages/q-specialists
       '@capital-q/ui':
         specifier: workspace:*
         version: link:../../packages/ui

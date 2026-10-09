@@ -172,12 +172,25 @@ describe("fast navigation at the end of the sentence", () => {
 });
 
 describe("partial words while they speak", () => {
-  it("prefetch only, and never move", async () => {
+  it("a page by name is read in the browser: prefetch only, no server", async () => {
     const { asked } = stub(server);
     navigationHearingDelta("item_1", "open ");
     navigationHearingDelta("item_1", "discover");
     await vi.waitFor(() => expect(prefetched).toEqual(["/discover"]));
-    expect(asked).toEqual([{ text: "open discover", final: false }]);
+    expect(asked).toEqual([]);
+    expect(pushed).toEqual([]);
+  });
+
+  it("a record by name asks the server once, and only prefetches", async () => {
+    const { asked } = stub(server);
+    navigationHearingDelta("item_1b", "Take me to Shiftwell ");
+    navigationHearingDelta("item_1b", "relationship");
+    await vi.waitFor(() =>
+      expect(prefetched).toEqual([`/relationships/company/${SHIFTWELL}`]),
+    );
+    expect(asked).toEqual([
+      { text: "Take me to Shiftwell relationship", final: false },
+    ]);
     expect(pushed).toEqual([]);
   });
 
@@ -195,22 +208,24 @@ describe("partial words while they speak", () => {
 
   it("the final words reuse what the partials resolved", async () => {
     const { asked } = stub(server, 100);
-    navigationHearingDelta("item_3", "open discover");
-    await vi.waitFor(() => expect(prefetched).toEqual(["/discover"]));
-    const timing = await navigationHeardFor("item_3", "Open discover");
-    expect(timing?.path).toBe("/discover");
+    const say = "Take me to Shiftwell relationship";
+    navigationHearingDelta("item_3", say);
+    await vi.waitFor(() => expect(prefetched).toHaveLength(1));
+    const timing = await navigationHeardFor("item_3", say.toLowerCase());
+    expect(timing?.path).toBe(`/relationships/company/${SHIFTWELL}`);
     // One read for the whole utterance: the final reused the partial's.
     expect(asked).toHaveLength(1);
     expect(timing?.ms ?? Infinity).toBeLessThan(50);
-    expect(pushed).toEqual(["/discover"]);
+    expect(pushed).toEqual([`/relationships/company/${SHIFTWELL}`]);
   });
 });
 
 describe("time from final words to router.push", () => {
-  it("page by name: under 150 ms with a 20 ms reader", async () => {
-    stub(server, 20);
+  it("page by name: under 150 ms, with no server round trip", async () => {
+    const { asked } = stub(server, 1_000);
     const timing = await navigationHeard("open discover");
     expect(timing?.ms ?? Infinity).toBeLessThan(150);
+    expect(asked).toEqual([]);
   });
 
   it("named record: under 400 ms with a 200 ms reader", async () => {

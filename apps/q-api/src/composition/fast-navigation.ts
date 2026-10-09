@@ -68,6 +68,14 @@ export function createFastNavigation(dependencies: {
       return plan;
     };
     const asksForRecord = namedRecordRequestOf(text) !== null;
+    // A record: their relationships and the plan are read at once, not one
+    // after the other (the open waits on both).
+    const own = asksForRecord
+      ? (dependencies.ownRelationships?.(actor) ?? Promise.resolve(null)).catch(
+          () => null,
+        )
+      : Promise.resolve(null);
+    if (asksForRecord) void planOf();
     const side =
       asksForRecord &&
       ownInvestorOrganisationIn((await planOf()) ?? { scopes: [] }) !== null
@@ -76,10 +84,8 @@ export function createFastNavigation(dependencies: {
     const decided = await resolveFastNavigation({
       text,
       side,
-      counterpartNames: async () => {
-        const own = await dependencies.ownRelationships?.(actor);
-        return (own?.items ?? []).map((item) => item.counterpart.name);
-      },
+      counterpartNames: async () =>
+        ((await own)?.items ?? []).map((item) => item.counterpart.name),
       open: async (page, name): Promise<OpenRecordIntent | null> => {
         const granted = await planOf();
         if (granted === null) return null;

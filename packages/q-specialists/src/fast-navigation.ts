@@ -13,7 +13,7 @@ import {
   pagesFor,
   whichOneLine,
 } from "./named-record-request.js";
-import { pageRequestOf } from "./page-request.js";
+import { pageRequestOf, takenBack } from "./page-request.js";
 
 /**
  * RECOVERY-2026-10 (C, founder 2026-10-09: "stupid fast"): where the
@@ -90,10 +90,6 @@ export async function resolveNamedRecord(input: {
       };
 }
 
-/** Words that take a request back or put it off: never acted on early. */
-const TAKEN_BACK =
-  /\b(?:no\s+wait|wait|don'?t|do\s+not|not\s+(?:now|yet)|never\s*mind|cancel|stop|actually|hold\s+on|instead|rather)\b/iu;
-
 export type FastNavigation =
   | {
       /** Move now: the screen performs this before Q has answered. */
@@ -121,7 +117,7 @@ export async function resolveFastNavigation(input: {
   ) => Promise<OpenRecordIntent | null>;
 }): Promise<FastNavigation> {
   const text = input.text.trim();
-  if (text.length === 0 || text.length > 300 || TAKEN_BACK.test(text)) {
+  if (text.length === 0 || text.length > 300 || takenBack(text)) {
     return { kind: "LEAVE_TO_Q" };
   }
   const page = pageRequestOf(text);
