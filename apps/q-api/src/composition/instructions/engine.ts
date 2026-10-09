@@ -444,6 +444,12 @@ export type ValidationContext = {
    * (who wrote last, when, how many of theirs are unanswered).
    */
   readonly pace?: ReadonlyMap<string, ThreadPace> | undefined;
+  /**
+   * Recovery (founder 2026-10-09): the conversations this firing really
+   * read. A message to one not read is held: unknown is not "they replied".
+   * Absent (no reader composed), nothing is held for it.
+   */
+  readonly threadsRead?: ReadonlySet<string> | undefined;
   /** ADR 0050: messages to each person already passed in this sitting. */
   readonly sitting?: Map<string, number> | undefined;
   /**
@@ -542,12 +548,29 @@ export function workingDaysBetween(
   }
 }
 
+/**
+ * Recovery (founder 2026-10-09: "agents ask my permission for every little
+ * thing"): steps that only ever reach the person themselves -- a reminder
+ * Q sets for them -- are routine inside an explicit delegation: no card.
+ * Code's list. Everything outward (a message, a meeting, a document, an
+ * outcome or commitment) keeps its own rules below.
+ */
+export const SELF_ONLY_ROUTINE_ACTIONS: readonly string[] = [
+  "schedule.reminder.create",
+];
+
+const selfOnly = (action: AnyAppAction) =>
+  SELF_ONLY_ROUTINE_ACTIONS.includes(action.name);
+
 /** Whether delegation, not the grant, is what lets this step go alone. */
 function delegatedStep(
   action: AnyAppAction,
   subject: string | null,
   context: ValidationContext,
 ): boolean {
+  if (selfOnly(action)) {
+    return context.delegation !== null && context.delegation !== undefined;
+  }
   return (
     context.delegation !== null &&
     context.delegation !== undefined &&
@@ -730,6 +753,19 @@ export function validateStep(
         relationshipId: subject,
       };
     }
+    if (
+      subject !== null &&
+      context.threadsRead !== undefined &&
+      !context.threadsRead.has(subject)
+    ) {
+      return {
+        verdict: "HOLD",
+        code: "NOT_READ",
+        relationshipId: subject,
+        reason:
+          "I couldn't read the conversation this time, so I don't know whether they've replied; I'll read it next time before writing",
+      };
+    }
     if (subject !== null && context.awaiting?.has(subject) === true) {
       return {
         verdict: "HOLD",
@@ -798,6 +834,18 @@ export function validateStep(
       };
     }
   }
+  // Recovery (founder 2026-10-09): two of ours unanswered (the first and
+  // one follow-up) is "waiting on them" -- held, never a card that comes
+  // back every day asking to write a third time.
+  if (considered.decision === "ASK_OWNER" && considered.code === "UNANSWERED") {
+    return {
+      verdict: "HOLD",
+      code: "WAITING_ON_THEM",
+      relationshipId: subject,
+      reason:
+        "waiting on them: your side has written and followed up once, so nothing more goes until they reply",
+    };
+  }
   /** The consider step's hand-over, as the ASK reason code. */
   const ownerCode =
     considered.decision === "ASK_OWNER"
@@ -836,7 +884,9 @@ export function validateStep(
   // AUTO as granted -- but what Q may do alone is fixed in code.
   if (context.request === "PREPARE") return ask("ASKED_TO_PREPARE");
   if (ownerCode !== null) return ask(ownerCode);
-  if (!delegableOnItsOwn(action)) return ask("NOT_DELEGABLE");
+  if (!delegableOnItsOwn(action) && !(delegated && selfOnly(action))) {
+    return ask("NOT_DELEGABLE");
+  }
   // A declared cheque range or role, in code's own words, answering their
   // question about it, is a declared fact, not terms or a commitment (live
   // QA, ASK card f3e411b7): the planner's flag does not make it a card.
@@ -1369,6 +1419,22 @@ export type InstructionEngineDependencies = {
     | undefined;
   /** S6: the quarantined extractor; absent, the planner sees no thread facts. */
   readonly readThread?: QuarantinedThreadReader | undefined;
+  /**
+   * Recovery (founder 2026-10-09): the hard rule at the send itself,
+   * re-reading the live conversation just before Q sends on its own: no
+   * second message while they haven't replied, beyond one follow-up after
+   * the wait (send-guard.ts). Not ok: nothing is sent; the step is held.
+   */
+  readonly sendGuard?:
+    | ((
+        actor: ActorContext,
+        relationshipId: string,
+        hours: InstructionWorkingHours,
+      ) => Promise<
+        | { readonly ok: true }
+        | { readonly ok: false; readonly code: string; readonly reason: string }
+      >)
+    | undefined;
   /**
    * Live QA (instruction 76d6f281): which of these relationships' chats
    * already hold a message from the person's side (by them or by Q, under
@@ -2180,6 +2246,11 @@ export function createInstructionEngine(
         )
         .catch(() => undefined);
 
+      // Recovery: what this firing really read (only with a reader).
+      const threadsRead: ReadonlySet<string> | undefined =
+        dependencies.readThread === undefined
+          ? undefined
+          : new Set([...paces.keys(), ...facts.keys()]);
       // Tensorgate, 8 Oct: conversations where they wrote last and no one
       // has answered -- matched, not declined, no card of ours waiting, and
       // not a question code already put to the person. Code's read only.
@@ -2321,6 +2392,7 @@ export function createInstructionEngine(
             delegation,
             delegatedToday: delegatedNow,
             threads,
+            threadsRead,
           }),
         );
         const refused = verdicts
@@ -2430,6 +2502,7 @@ export function createInstructionEngine(
           awaiting,
           delegation,
           threads,
+          threadsRead,
         };
         const reviewedPlan = plan;
         verdicts = await Promise.all(
@@ -2727,6 +2800,30 @@ export function createInstructionEngine(
             // delegation it acted on (else the standing instruction).
             qDelegationId: verdict.delegationId ?? row.id,
           };
+          if (
+            verdict.action.name === "chat.message.send" &&
+            verdict.relationshipId !== null &&
+            dependencies.sendGuard !== undefined
+          ) {
+            const guard = await dependencies
+              .sendGuard(actor, verdict.relationshipId, grant.data.workingHours)
+              .catch(() => ({
+                ok: false as const,
+                code: "NOT_READ",
+                reason:
+                  "I couldn't check the conversation just now; nothing was sent",
+              }));
+            if (!guard.ok) {
+              await record({
+                status: "NOTED",
+                mode: "ASK",
+                words: `Holding off: ${step.words} -- ${guard.reason}.`,
+                reasonCode: `PACE_${guard.code}`,
+                qActionId: null,
+              });
+              return;
+            }
+          }
           try {
             // The declaration's own authorize step, then its one service
             // call: the same command the person's own button runs.

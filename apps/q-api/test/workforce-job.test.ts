@@ -211,6 +211,7 @@ function world() {
     metered: [] as string[],
     markers: [] as string[],
     briefs: [] as string[],
+    threads: [] as string[],
   };
   const ports: WorkforcePorts = {
     principalName: () => Promise.resolve("Ada"),
@@ -242,8 +243,9 @@ function world() {
         ),
       ]),
     // The writer's first draft is too cold: the reviewer sends it back.
-    writeReply: (_owner, _conversation, _intent, _correlation, brief) => {
+    writeReply: (_owner, conversation, _intent, _correlation, brief) => {
       record.briefs.push(brief ?? "");
+      record.threads.push(conversation.thread);
       return Promise.resolve("Dear Sir, noted.");
     },
     send: (_owner, relationshipId, _key, body, jobId) => {
@@ -336,6 +338,11 @@ describe("J9: a job carried out by Q's workforce, end to end", () => {
     // the step's goal as its brief, never an empty one.
     expect(record.markers).toEqual([started.jobId]);
     expect(record.briefs).toEqual(["Reply warmly to replies"]);
+    // Founder 2026-10-09: the writer reads the thread it answers,
+    // their latest message included, before it drafts.
+    expect(record.threads[0]).toContain(
+      "Ada Obi: Thanks for reaching out! Happy to share more.",
+    );
 
     // Every model call is priced to its job and agent (J6), and the
     // reader is a fast classification.

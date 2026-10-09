@@ -203,6 +203,7 @@ import {
   type InstructionEngine,
 } from "./composition/instructions/engine.js";
 import { createInstructionTriggers } from "./composition/instructions/triggers.js";
+import { createSendGuard } from "./composition/instructions/send-guard.js";
 import { createDelegationAudit } from "./composition/instructions/delegation-audit.js";
 import { createOwnUsage } from "./composition/usage.js";
 import { createInstructionPlanner } from "./composition/instructions/planner.js";
@@ -4489,7 +4490,15 @@ const heldRetry = createHeldRetry({
   logger,
 });
 
+// Recovery (founder 2026-10-09): the hard rule where Q sends on its own --
+// re-read the live conversation; no second message while they haven't
+// replied, beyond one follow-up after three of their working days.
+const qSendGuard = createSendGuard({
+  readThread: async ({ actor, relationshipId }) =>
+    (await chat.readForQ({ actor, relationshipId, limit: 50 })).messages,
+});
 instructionEngine.current = createInstructionEngine({
+  sendGuard: qSendGuard,
   review: outwardReview,
   track: workforceTracker(workforceStore, "INSTRUCTION"),
   // The person's own name for the planner and the reviewer (J2), never

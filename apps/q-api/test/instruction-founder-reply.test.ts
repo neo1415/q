@@ -224,6 +224,12 @@ function world(
     readonly waitingCards?: readonly WaitingCard[];
     readonly lapsedCards?: readonly LapsedCard[];
     readonly awaitingAnswer?: ReadonlySet<string>;
+    readonly sendGuard?: (
+      relationshipId: string,
+    ) => Promise<
+      | { readonly ok: true }
+      | { readonly ok: false; readonly code: string; readonly reason: string }
+    >;
   } = {},
 ) {
   const row: InstructionRow = {
@@ -305,6 +311,13 @@ function world(
       cards.push({ actionType: card.actionType, words: card.words });
       return Promise.resolve({ qActionId: randomUUID() });
     },
+    ...(extra.sendGuard === undefined
+      ? {}
+      : {
+          sendGuard: (_actor: unknown, relationshipId: string) =>
+            extra.sendGuard?.(relationshipId) ??
+            Promise.resolve({ ok: true as const }),
+        }),
     now: () => extra.now ?? FIRED_AT,
     autoEnabled: true,
     ...(review === undefined ? {} : { review }),
@@ -734,5 +747,46 @@ describe("recovery D-05: a planner failure retries soon and is visible", () => {
     await triggers.sweep();
     expect(deferred).toEqual([10]);
     expect(notices).toEqual(["Q's work on your instruction hit a problem"]);
+  });
+});
+
+describe("founder 2026-10-09: no message while they haven't replied -- at the send itself", () => {
+  it("the live thread says waiting on them: nothing is sent, even though the plan and its checks passed", async () => {
+    ran.length = 0;
+    const checked: string[] = [];
+    const { engine, row, steps } = world(
+      [plan(NO_CALL)],
+      threadRead(),
+      undefined,
+      {
+        sendGuard: (relationshipId) => {
+          checked.push(relationshipId);
+          return Promise.resolve({
+            ok: false,
+            code: "WAITING_ON_THEM",
+            reason: "waiting on them",
+          });
+        },
+      },
+    );
+    const result = await engine.fire(row.id, "sched-guard-0001");
+    expect(result).toMatchObject({ outcome: "RAN", done: 0 });
+    expect(checked).toEqual([REL]);
+    expect(ran).toEqual([]);
+    expect(steps.map((step) => step.reasonCode)).toContain(
+      "PACE_WAITING_ON_THEM",
+    );
+  });
+
+  it("the live thread allows it: it goes", async () => {
+    ran.length = 0;
+    const { engine, row } = world([plan(NO_CALL)], threadRead(), undefined, {
+      sendGuard: () => Promise.resolve({ ok: true }),
+    });
+    const result = await engine.fire(row.id, "sched-guard-0002");
+    expect(result).toMatchObject({ outcome: "RAN", done: 1 });
+    expect(ran).toEqual([
+      expect.objectContaining({ name: "chat.message.send" }),
+    ]);
   });
 });
