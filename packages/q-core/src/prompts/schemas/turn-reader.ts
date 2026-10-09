@@ -664,3 +664,9 @@ export const TURN_READER_V47_SCHEMA_VERSION = 47;
 /** v47 (K8): the question may name a prepared subject. Shape is v44's. */
 export const TurnReaderV47ResultSchema = TurnReaderV44ResultSchema;
 export type TurnReaderV47Result = z.infer<typeof TurnReaderV47ResultSchema>;
+
+export const TURN_READER_V48_SCHEMA_VERSION = 48;
+
+/** v48 (K4): the prepared subject may be OWN_COMPANY. Shape is v44's. */
+export const TurnReaderV48ResultSchema = TurnReaderV44ResultSchema;
+export type TurnReaderV48Result = z.infer<typeof TurnReaderV48ResultSchema>;

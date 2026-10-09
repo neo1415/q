@@ -32,7 +32,7 @@ export const TURN_READER_V47: PromptDefinition<
 > = {
   ...TURN_READER_V46,
   version: 47,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder brief K8: the reader names a question about a prepared subject (their mandate, the record on screen, Q's work) so it is answered from prepared context without a tool round.",
   effectiveFrom: "2026-10-09",

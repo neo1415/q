@@ -150,7 +150,7 @@ export {
   type QTurnSkimmer,
 } from "./turn-skim.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
-import { onScreenCompanyFact } from "./company-fact.js";
+import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
 import { manifestFacts, manifestReads } from "./manifest-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
@@ -1439,6 +1439,21 @@ export type ModelGatewayQAnswerDependencies = {
         ) => Promise<void>;
       }
     | undefined;
+  /**
+   * K Part 4 (Tier A): a founder's own company, from their working
+   * snapshot (their own organisation's canonical record, kept per actor
+   * under the context-cache scope while its version is current). Used only
+   * when this run's plan holds that company's profile scope.
+   */
+  readonly ownCompanySnapshot?:
+    | ((actor: QAnswerRequest["actor"]) => Promise<{
+        readonly companyId: string;
+        readonly name: string;
+        readonly shortDescription: string | null;
+        readonly stageCode: string | null;
+        readonly countryCode: string | null;
+      } | null>)
+    | undefined;
   readonly sensitivity?: QAnswerSensitivityPolicy | undefined;
   /**
    * What KIND of material this composition handles (doc 15 §62). Omitted
@@ -2023,6 +2038,18 @@ export function createModelGatewayQAnswer(
     // The reads below are independent of each other and run side by
     // side; each fills its own facts (speed sweep 2026-10-01: in turn
     // they took ~0.6 s before the model was asked anything).
+    // K Part 4: a founder's own company from their Tier A snapshot, as a
+    // fact, only where this run's plan holds that company's profile.
+    let ownCompany: AuthorisedFact | null = null;
+    const ownCompanyRead = (async (): Promise<void> => {
+      if (ownInvestor !== null || dependencies.ownCompanySnapshot === undefined)
+        return;
+      const own = await dependencies
+        .ownCompanySnapshot(request.actor)
+        .catch(() => null);
+      if (own === null) return;
+      ownCompany = ownCompanySnapshotFact(own, plan);
+    })();
     const mandateRead = (async (): Promise<void> => {
       if (ownInvestor !== null && prefetchTools.has("get_investor_mandate")) {
         const call = {
@@ -2443,6 +2470,7 @@ export function createModelGatewayQAnswer(
     })();
     await Promise.all([
       timed("mandate", mandateRead),
+      timed("ownCompany", ownCompanyRead),
       timed("relationship", relationshipRead),
       timed("standing", standingDone),
       timed("index", indexDone),
@@ -2471,6 +2499,7 @@ export function createModelGatewayQAnswer(
       memory,
       ownProfile,
       ownProfileCall,
+      ownCompany,
       ownInvestor,
       relationship,
       relationshipCall,
@@ -2582,6 +2611,7 @@ export function createModelGatewayQAnswer(
         availableForRun,
         memory,
         ownProfile,
+        ownCompany,
         ownProfileCall,
         relationship,
         relationshipCall,
@@ -2692,6 +2722,7 @@ export function createModelGatewayQAnswer(
           mandate: ownProfile !== null,
           onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
           qWork: ownDay !== null,
+          ownCompany: ownCompany !== null,
         },
       });
       if (route.path === "PREPARED_CONTEXT") offered = [];
@@ -2823,6 +2854,7 @@ export function createModelGatewayQAnswer(
         ...(ownReadiness === null ? [] : [ownReadiness]),
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
+        ...(ownCompany === null ? [] : [ownCompany]),
         ...(onScreenCompany === null ? [] : [onScreenCompany]),
         ...namedCompanies,
         ...(onScreenDaily === null ? [] : [onScreenDaily]),

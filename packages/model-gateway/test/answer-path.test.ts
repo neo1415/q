@@ -18,7 +18,12 @@ const input = (overrides: Partial<AnswerPathInput>): AnswerPathInput => ({
   askedAction: false,
   researchMode: "NEVER",
   aboutNamedOther: false,
-  prepared: { mandate: true, onScreenRecord: true, qWork: true },
+  prepared: {
+    mandate: true,
+    onScreenRecord: true,
+    qWork: true,
+    ownCompany: true,
+  },
   ...overrides,
 });
 
@@ -32,6 +37,7 @@ describe("answerPathOf (K8)", () => {
     ["MANDATE", "what is my mandate"],
     ["ON_SCREEN_RECORD", "what company am I looking at"],
     ["Q_WORK", "what have my agents completed"],
+    ["OWN_COMPANY", "what does Capital Q have on my company"],
   ] as const)(
     "B: %s (%s) is answered from prepared context",
     (subject, _words) => {
@@ -51,7 +57,12 @@ describe("answerPathOf (K8)", () => {
       answerPathOf(
         input({
           preparedSubject: "MANDATE",
-          prepared: { mandate: false, onScreenRecord: true, qWork: true },
+          prepared: {
+            mandate: false,
+            onScreenRecord: true,
+            qWork: true,
+            ownCompany: true,
+          },
         }),
       ),
     ).toEqual({ path: "DEEP_ANALYSIS", because: "MANDATE_NOT_READ" });
