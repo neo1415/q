@@ -89,3 +89,23 @@ A (voice lifecycle), B (follow-up binding, exact counts, score labelling), E (ca
   - manual browser contexts lacked the microphone grant;
   - the page fake used `#private` members, which Playwright's transpile could not run.
   - Before these fixes every MOCK duplex line fell back with CONNECT before reaching product code.
+
+### Rerun on integration 109b781f (2026-10-09, LOCAL-E2E MOCK, ×3)
+
+| Assertion                                                              | Baseline 520bd123 | 109b781f (pass/3)                                                | Waits on      |
+| ---------------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------- | ------------- |
+| /home loads (founder and investor)                                     | GREEN             | 3/3                                                              | —             |
+| Exactly 3 cards, 3 unique ids, DOM = stored message                    | RED               | 3/3                                                              | —             |
+| Mandate-fit label, X of Y, source, tie sentence on the cards           | RED               | 3/3 (G-D17 fixed)                                                | —             |
+| (d) "rank them" keeps the 3 ids                                        | RED               | 3/3                                                              | —             |
+| (e) cards reachable after an attention turn                            | GREEN             | 3/3 (G-D18 fixed; spec uses visible-only names, per E)           | —             |
+| (a) late result: bridges                                               | RED               | 3/3. Superseded: A is changing it to "0 narration while working" | A             |
+| (b)+(c) one answer line, cards stay, terminal disposition              | RED               | 3/3                                                              | —             |
+| (f) voice final fails: exactly one terminal line, terminal disposition | RED               | **1/3**                                                          | **A**         |
+| (g) reconnect keeps cards, no stale bridge                             | RED               | **2/3** (flaky)                                                  | **A**/E       |
+| "Take me to Ledgerfold relationship"                                   | RED               | **4/6**                                                          | **C** (G-D16) |
+| "Open Ledgerfold"                                                      | RED               | **3/6**                                                          | **C** (G-D16) |
+| "Show me the data room for Ledgerfold"                                 | RED               | **2/3** (after G's selector fix)                                 | **C** (G-D16) |
+| An unknown name is not navigated or claimed                            | GREEN             | 6/6                                                              | —             |
+
+Reproduction for the reds: `npx playwright test -c tests/recovery/playwright.recovery.config.ts --project=scenarios --repeat-each 3 k-incident l-named`. In every red navigation run the page stays on /home, and q-api logs `client.page.open` as DENIED NOT_AVAILABLE. Mocked and unit evidence is unchanged from the section above.
