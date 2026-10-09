@@ -73,7 +73,7 @@ test.describe("standard voice line", () => {
     await useScript([
       {
         name: "spoken",
-        when: { user: "how much am I raising" },
+        when: { task: "COMPANY_ANALYST", user: "how much am I raising" },
         reply: answer("You are raising two and a half million dollars."),
       },
     ]);
@@ -124,8 +124,12 @@ test.describe("standard voice line", () => {
       .poll(() => line.settings() !== null, { timeout: 30_000 })
       .toBe(true);
     line.error("scripted agent failure");
-    await expect(page.locator('[role="status"], [role="alert"]')).toBeVisible({
-      timeout: 15_000,
-    });
+    // A status that names the failure, not any status on the page.
+    await expect(
+      page
+        .locator('[role="status"], [role="alert"]')
+        .filter({ hasText: /couldn't|lost|went wrong|try again|error/iu })
+        .first(),
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
