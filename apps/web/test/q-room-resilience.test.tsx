@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { QTurn } from "../src/features/q/conversation";
@@ -288,20 +288,33 @@ describe("a room card on a weak network", () => {
         ? Promise.reject(new TypeError("Failed to fetch"))
         : Promise.resolve(VIEW),
     );
-    render(
-      <QRoomStage
-        open={card("r9-online")}
-        note={null}
-        onClose={() => undefined}
-        load={load}
-      />,
-    );
-    await screen.findByText(/Couldn.t load/u, undefined, { timeout: 4_000 });
-    fail = false;
-    act(() => {
-      window.dispatchEvent(new Event("online"));
-    });
-    expect(await screen.findByText("Cap table")).toBeTruthy();
+    const listening = vi.spyOn(window, "addEventListener");
+    try {
+      render(
+        <QRoomStage
+          open={card("r9-online")}
+          note={null}
+          onClose={() => undefined}
+          load={load}
+        />,
+      );
+      await screen.findByText(/Couldn.t load/u, undefined, { timeout: 4_000 });
+      // The failed text commits before the passive effect that subscribes to
+      // `online` runs; under load an event dispatched in that gap was lost.
+      // Wait for the subscription itself, not for time to pass.
+      await waitFor(() => {
+        expect(listening).toHaveBeenCalledWith("online", expect.any(Function));
+      });
+      expect(load).toHaveBeenCalledTimes(2);
+      fail = false;
+      act(() => {
+        window.dispatchEvent(new Event("online"));
+      });
+      expect(await screen.findByText("Cap table")).toBeTruthy();
+      expect(load).toHaveBeenCalledTimes(3);
+    } finally {
+      listening.mockRestore();
+    }
   });
 
   it("a refusal is shown as the answer it is, not retried", async () => {

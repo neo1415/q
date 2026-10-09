@@ -20,7 +20,10 @@ import { createSpokenReplier } from "../src/voice/spoken-reply.js";
  * line. Founder live 2026-10-08, conversation c10b845f.
  */
 
-const logger = createLogger({ service: "test", level: "silent" });
+const logger = createLogger(
+  { serviceName: "q-api-test", environment: "test" },
+  { level: "silent" },
+);
 const ATTRIBUTION = {
   tenantId: "t",
   userId: "u",

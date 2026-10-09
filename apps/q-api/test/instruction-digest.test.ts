@@ -141,6 +141,7 @@ describe("the digest sweep", () => {
         },
       },
       engine: () => ({
+        retryHeld: () => Promise.reject(new Error("not under test")),
         fire: () =>
           Promise.resolve({
             outcome: "RAN",

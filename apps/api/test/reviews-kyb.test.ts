@@ -82,7 +82,9 @@ function security() {
         }),
     },
     // The console resolves the admin as a person (2026-10-08).
-    identities: { lookup: () => Promise.resolve({ userId: USER }) },
+    identities: {
+      lookup: () => Promise.resolve({ userId: USER, displayName: null }),
+    },
   };
 }
 

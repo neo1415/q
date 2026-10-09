@@ -63,6 +63,11 @@ function fakeBroker(
     narration: () => Promise.resolve(null),
     end: () => false,
     size: () => 0,
+    heard: () => Promise.resolve(null),
+    said: () => false,
+    adopt: () => Promise.resolve(false),
+    outcome: () => false,
+    attach: () => false,
   };
 }
 

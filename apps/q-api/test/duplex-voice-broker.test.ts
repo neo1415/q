@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   PermittedContextPlanSchema,
+  QConversationIdSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   type PermittedContextPlan,
   type QSensitivityClass,
@@ -1289,7 +1290,9 @@ describe("the realtime model is the voice, never the brain (VOICE-BRAIN)", () =>
       voiceSessionId: id,
       heard: heard("Open my pitch deck."),
     });
-    line.thread.conversationId = "cb899610-72e5-442a-b99e-7fe8477cbf55";
+    line.thread.conversationId = QConversationIdSchema.parse(
+      "cb899610-72e5-442a-b99e-7fe8477cbf55",
+    );
     expect(
       h.broker.said({
         actor: ACTOR,

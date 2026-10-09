@@ -100,7 +100,11 @@ function reader(options: { denied?: boolean; names?: readonly string[] }) {
       calls.plans += 1;
       return Promise.resolve(
         options.denied === true
-          ? { outcome: "DENIED", reason: "NOT_AUTHORISED", denied: [] }
+          ? {
+              outcome: "DENIED",
+              reason: "NO_AUTHORISED_CONTEXT",
+              denied: [],
+            }
           : { outcome: "AUTHORISED", plan: planFor(request.runId) },
       );
     },
@@ -190,7 +194,13 @@ describe("fast navigation reader (RECOVERY C, stupid fast)", () => {
 
 async function server(resolve: FastNavigationResolver) {
   const app = Fastify();
-  registerProblemHandling(app, createLogger({ level: "silent" }));
+  registerProblemHandling(
+    app,
+    createLogger(
+      { serviceName: "q-api-test", environment: "test" },
+      { level: "silent" },
+    ),
+  );
   registerFastNavigationRoutes(app, {
     authenticator: {
       authenticate: (request) =>

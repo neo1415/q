@@ -12,7 +12,10 @@ import { createBriefingCommandReader } from "../src/composition/briefing-command
  * screen come back; a failed read is "unclear", never a guess.
  */
 
-const logger = createLogger({ service: "test", level: "silent" });
+const logger = createLogger(
+  { serviceName: "q-api-test", environment: "test" },
+  { level: "silent" },
+);
 const who = { tenantId: "t", userId: "u" };
 const CARDS = [
   {

@@ -12,6 +12,7 @@ import {
   TenantIdSchema,
   UserIdSchema,
   type ActorContext,
+  type ActorContextResolution,
 } from "@capital-q/security";
 
 import { createLogger } from "@capital-q/observability";
@@ -70,7 +71,13 @@ function report(
 async function server(receipts: UiActReceiptLedger, as: ActorContext | null) {
   const app = Fastify();
   // The service's own problem responses (401, 400), as app.ts registers.
-  registerProblemHandling(app, createLogger({ level: "silent" }));
+  registerProblemHandling(
+    app,
+    createLogger(
+      { serviceName: "q-api-test", environment: "test" },
+      { level: "silent" },
+    ),
+  );
   registerUiActReceiptRoutes(app, {
     authenticator: {
       // A request without the bearer token is nobody.
@@ -86,10 +93,10 @@ async function server(receipts: UiActReceiptLedger, as: ActorContext | null) {
         ),
     },
     resolver: {
-      resolveHumanContext: () =>
+      resolveHumanContext: (): Promise<ActorContextResolution> =>
         Promise.resolve(
           as === null
-            ? { status: "NO_MEMBERSHIP" as const }
+            ? { status: "CONTEXT_REQUIRED" as const }
             : { status: "RESOLVED" as const, context: as },
         ),
     },

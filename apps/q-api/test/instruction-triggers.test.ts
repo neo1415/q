@@ -53,6 +53,7 @@ describe("instruction triggers", () => {
         wakeFor: () => Promise.resolve(0),
       },
       engine: () => ({
+        retryHeld: () => Promise.reject(new Error("not under test")),
         fire: (id: string, runKey: string) => {
           fired.push([id, runKey]);
           return Promise.resolve(result(id === a ? "RAN" : "OUTSIDE_HOURS"));
@@ -85,7 +86,10 @@ describe("instruction triggers", () => {
         wakeFor: (relationshipId) =>
           Promise.resolve(relationshipId === "rel-known" ? 1 : 0),
       },
-      engine: () => ({ fire: () => Promise.resolve(result("RAN")) }),
+      engine: () => ({
+        fire: () => Promise.resolve(result("RAN")),
+        retryHeld: () => Promise.reject(new Error("not under test")),
+      }),
     });
     expect(await triggers.wake("rel-unknown")).toBe(0);
     expect(swept).toBe(0);
@@ -105,7 +109,10 @@ describe("instruction triggers", () => {
           return Promise.resolve(2);
         },
       },
-      engine: () => ({ fire: () => Promise.resolve(result("RAN")) }),
+      engine: () => ({
+        fire: () => Promise.resolve(result("RAN")),
+        retryHeld: () => Promise.reject(new Error("not under test")),
+      }),
     });
     await triggers.sweep();
     expect(resolved).toBe(1);
@@ -127,7 +134,10 @@ describe("instruction triggers", () => {
           return Promise.resolve(relationshipId === "rel-covered" ? 1 : 0);
         },
       },
-      engine: () => ({ fire: () => Promise.resolve(result("RAN")) }),
+      engine: () => ({
+        fire: () => Promise.resolve(result("RAN")),
+        retryHeld: () => Promise.reject(new Error("not under test")),
+      }),
     });
     expect(await triggers.wakeChat("rel-elsewhere")).toBe(0);
     expect(swept).toBe(0);
@@ -154,7 +164,10 @@ describe("instruction triggers", () => {
           return Promise.resolve(now);
         },
       },
-      engine: () => ({ fire: () => Promise.resolve(result("RAN")) }),
+      engine: () => ({
+        fire: () => Promise.resolve(result("RAN")),
+        retryHeld: () => Promise.reject(new Error("not under test")),
+      }),
     });
     expect(await triggers.catchUpMoves()).toBe(1);
     await triggers.sweep();
@@ -175,7 +188,10 @@ describe("instruction triggers", () => {
           return Promise.resolve(1);
         },
       },
-      engine: () => ({ fire: () => Promise.resolve(result("RAN")) }),
+      engine: () => ({
+        fire: () => Promise.resolve(result("RAN")),
+        retryHeld: () => Promise.reject(new Error("not under test")),
+      }),
     });
     expect(await triggers.wakeNewCompany("company-1")).toBe(1);
     expect(asked).toEqual(["company-1"]);

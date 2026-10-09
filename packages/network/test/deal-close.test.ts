@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { MaterialActionAuditWriter } from "@capital-q/audit";
+import {
+  AuditEventIdSchema,
+  type MaterialActionAuditWriter,
+} from "@capital-q/audit";
 import type {
   DatabaseExecutor,
   TransactionContext,
@@ -274,7 +277,7 @@ function world() {
   const audit: MaterialActionAuditWriter = {
     record: (_tx, input) => {
       audits.push(input);
-      return Promise.resolve(input.auditEventId);
+      return Promise.resolve(AuditEventIdSchema.parse(input.auditEventId));
     },
   };
   const view = (side: "INVESTOR" | "COMPANY"): RelationshipPartyView =>

@@ -111,7 +111,11 @@ function appFor(
       },
       resolver,
       identities: {
-        lookup: () => Promise.resolve({ userId: UserIdSchema.parse(userId) }),
+        lookup: () =>
+          Promise.resolve({
+            userId: UserIdSchema.parse(userId),
+            displayName: null,
+          }),
       },
     },
     {
@@ -649,7 +653,10 @@ describe("account suspension", () => {
         resolver,
         identities: {
           lookup: () =>
-            Promise.resolve({ userId: UserIdSchema.parse(USERS.nobody) }),
+            Promise.resolve({
+              userId: UserIdSchema.parse(USERS.nobody),
+              displayName: null,
+            }),
         },
       },
       {

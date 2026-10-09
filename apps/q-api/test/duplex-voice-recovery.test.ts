@@ -825,7 +825,7 @@ describe("INC-1 (top three, live 2026-10-08): the server side of one turn's life
       // The ladder keeps going while the answer is post-processed
       // (production: narration #2 and #3 after the run completed).
       speaker.narrate?.({ kind: "STAGE_LINE", text: "Bridge 2" });
-      speaker.narrate?.({ kind: "PROGRESS", text: "Bridge 3" });
+      speaker.narrate?.({ kind: "PROGRESS_LINE", text: "Bridge 3" });
       await new Promise<void>((resolve) => {
         finish = resolve;
       });
@@ -886,7 +886,7 @@ describe("INC-1 (top three, live 2026-10-08): the server side of one turn's life
             kept.push({ role: entry.role, content: entry.content });
             return Promise.resolve();
           },
-          mirror: () => Promise.resolve(),
+          mirror: ({ messages }) => Promise.resolve(messages.length),
         },
       },
     );
