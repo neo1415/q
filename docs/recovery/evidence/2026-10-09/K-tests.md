@@ -70,3 +70,10 @@ Harness change: B's fast lane adds a TURN_SKIM model read. The baseline script n
   - It reproduced when run alone.
   - q-api logs both "live voice line opened" and "duplex voice line rejoined/ended FALLBACK".
   - The voice web code and the spec are unchanged since gate 1, where 7/7 passed.
+
+## Gate 2 rerun: int-merge 043ff1da with the GPT-Live flag confirmed, 21:20 UTC
+
+**Label: LOCAL-E2E (MOCK).** The stack printed `gpt-live: 1` at start, from V's marker, so the flag was on. Disabled keys, no live calls. The K specs came from build/rec-g 4959767d.
+
+- **voice/gpt-live: 7/7 green.** G-D26 is closed: it was the stack started without the flag (V).
+- **K1 send → first card, 5 fresh conversations at `/home?new=1`:** 4176, 568, 792, 576, 649 ms, giving **p50 649 ms and p95 4176 ms** (nearest rank). Only the first run, 4.2 s, was slow, which suggests a cold-start cost.
