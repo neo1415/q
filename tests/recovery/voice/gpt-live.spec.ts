@@ -12,7 +12,7 @@ import {
 } from "../support/live-fake.js";
 import { openQ } from "../support/q.js";
 import { answer, useScript } from "../support/script.js";
-import { CAST, world } from "../support/stack.js";
+import { CAST, STACK_GPT_LIVE, world } from "../support/stack.js";
 
 /**
  * V: GPT-Live as the product voice, on the local stack (MOCK). Needs the
@@ -37,11 +37,36 @@ const READER_QUESTION = {
   },
 } as const;
 
+// G-D26: on a stack whose q-api has GPT-Live off, every test here fails in
+// ways that look like product bugs (4 peers, a channel that never opens).
+// Say what is wrong instead.
+test.beforeAll(() => {
+  if (STACK_GPT_LIVE === false) {
+    throw new Error(
+      "The running stack has GPT-Live off. Restart it with CQ_RECOVERY_GPT_LIVE=1 bash scripts/recovery/local-stack.sh start",
+    );
+  }
+});
+
 async function startVoice(page: Page): Promise<void> {
-  await page
+  // Q opens /home's line by itself when the microphone is granted (as it
+  // is here): then End is showing and that line is the one under test.
+  const talk = page
     .getByRole("button", { name: /Talk with Q/u })
-    .first()
-    .click();
+    .filter({ visible: true })
+    .first();
+  const end = page
+    .getByRole("button", { name: /^End/u })
+    .filter({ visible: true })
+    .first();
+  await expect(talk.or(end).first()).toBeVisible({ timeout: 30_000 });
+  if (!(await end.isVisible().catch(() => false))) {
+    try {
+      await talk.click({ timeout: 5_000 });
+    } catch {
+      await expect(end).toBeVisible({ timeout: 10_000 });
+    }
+  }
   await expect.poll(() => livePeers(page), { timeout: 30_000 }).toBe(1);
   // The data channel opens once the Q API answered the offer; only then is
   // the page listening for the provider's events.

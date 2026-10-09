@@ -229,11 +229,20 @@ cmd="${1:-status}"; shift || true
 services=("$@"); [[ ${#services[@]} -eq 0 ]] && services=("${ALL[@]}")
 
 case "$cmd" in
-  start) echo "$MODE" >"$RUN/mode"; log "mode: $MODE"; for s in "${services[@]}"; do start_one "$s"; done ;;
+  start)
+    echo "$MODE" >"$RUN/mode"; log "mode: $MODE"
+    # V (G-D26): whether q-api's GPT-Live line is on, for the specs that
+    # need it (gpt-live.spec fails fast and says so when it is off).
+    for s in "${services[@]}"; do
+      [[ "$s" == q-api ]] && echo "${CQ_RECOVERY_GPT_LIVE:-0}" >"$RUN/gpt-live"
+    done
+    log "gpt-live: $(cat "$RUN/gpt-live" 2>/dev/null || echo unknown)"
+    for s in "${services[@]}"; do start_one "$s"; done ;;
   stop)
     for (( i=${#services[@]}-1; i>=0; i-- )); do stop_one "${services[$i]}"; done ;;
   status)
     log "mode: $(cat "$RUN/mode" 2>/dev/null || echo unknown)"
+    log "gpt-live: $(cat "$RUN/gpt-live" 2>/dev/null || echo unknown)"
     docker info >/dev/null 2>&1 && log "docker: up" || log "docker: down"
     for s in fake api q-api workers web; do
       if running "$s"; then log "$s: running (pid $(cat "$(pidfile "$s")"))"; else log "$s: stopped"; fi

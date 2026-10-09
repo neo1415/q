@@ -42,6 +42,18 @@ export const STACK_MODE = (() => {
   return existsSync(file) ? readFileSync(file, "utf8").trim() : "unknown";
 })();
 
+/**
+ * V (G-D26): whether the running stack's q-api has the GPT-Live line on
+ * (local-stack.sh start with CQ_RECOVERY_GPT_LIVE=1). Off, every voice
+ * start is the duplex or standard line, which the RTCPeerConnection fake
+ * also counts as peers: gpt-live.spec went 0/7 on a stack restarted
+ * without the flag, reading as "4 peers" and "channel never opens".
+ */
+export const STACK_GPT_LIVE = (() => {
+  const file = resolve(RUN_DIR, "gpt-live");
+  return existsSync(file) ? readFileSync(file, "utf8").trim() === "1" : null;
+})();
+
 for (const url of [WEB_URL, API_URL, Q_API_URL, SUPABASE_URL]) {
   if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/u.test(url)) {
     throw new Error(`recovery suite runs on loopback only, refused ${url}`);
