@@ -35,7 +35,7 @@
 - The analyst is a scripted fake, so a red sector-naming check in K2 reflects the fake's canned text until the recall path is code-built.
 - The egress guard refused calls to generativelanguage.googleapis.com, elevenlabs and deepgram from the services. Nothing left the machine.
 
-## Pre-deploy gate: int-merge 9050c90f (B, D, F, V and G merged), 19:00–19:45 UTC
+## Pre-deploy gate: int-merge 9050c90f (B, D, F, V and G merged), 18:57–19:36 UTC
 
 **Label: LOCAL-E2E (MOCK).** Provider keys were `disabled-locally-000000000000` and the egress guard was on. Migrations were applied with `supabase migration up --local --include-all`. `20261220181000_knowledge_projections` had been half-applied earlier by hand (`knowledge.version_seq` already existed), so the local `knowledge` schema was dropped and the migration re-applied. The world was seeded locally. GPT-Live specs ran with `CQ_RECOVERY_GPT_LIVE=1`.
 
