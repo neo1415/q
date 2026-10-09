@@ -183,10 +183,12 @@ describe("the consider step before a message", () => {
     );
   });
 
-  it("hands over after two unanswered messages", () => {
+  // Founder, 2026-10-09: no card every day for a thread that went quiet.
+  // Two of ours unanswered is "waiting on them", held without asking.
+  it("waits on them after two unanswered messages, without asking the person", () => {
     expect(
       verdict({ pace: threadPace([ours(daysAgo(20)), ours(daysAgo(10))]) }),
-    ).toMatchObject({ verdict: "ASK", code: "UNANSWERED" });
+    ).toMatchObject({ verdict: "HOLD", code: "WAITING_ON_THEM" });
   });
 
   it("never writes after a decline without the person, whatever the grant", () => {
