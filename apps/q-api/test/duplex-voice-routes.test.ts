@@ -200,6 +200,35 @@ describe("the voice session route with duplex", () => {
     await server.close();
   });
 
+  it("G-D21: an old tab's line reopening by itself never takes voice from a newer one", async () => {
+    const server = await app(
+      fakeBroker(() => Promise.resolve({ kind: "FALLBACK", reason: "OFF" })),
+    );
+    const first = (await open(server)).json<{ voiceSessionId: string }>();
+    // Its own line reopening, nothing newer: allowed.
+    const again = await open(server, {
+      resume: true,
+      reopens: first.voiceSessionId,
+    });
+    expect(again.statusCode).toBe(201);
+    const second = again.json<{ voiceSessionId: string }>();
+    // The person opens voice in another tab...
+    const third = (await open(server)).json<{ voiceSessionId: string }>();
+    // ...and the old tab's reopen is refused, whichever line it names.
+    for (const reopens of [first.voiceSessionId, second.voiceSessionId]) {
+      const stale = await open(server, { resume: true, reopens });
+      expect(stale.statusCode).toBe(409);
+    }
+    // The newer line still has voice.
+    const read = await server.inject({
+      method: "GET",
+      url: qVoiceTurnPath(third.voiceSessionId),
+      headers: { authorization: `Bearer ${BEARER}` },
+    });
+    expect(read.statusCode).toBe(200);
+    await server.close();
+  });
+
   it("answers a line it does not hold with not found", async () => {
     const server = await app(
       fakeBroker(() => Promise.resolve({ kind: "FALLBACK", reason: "OFF" })),

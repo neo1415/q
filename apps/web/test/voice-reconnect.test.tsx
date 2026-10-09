@@ -220,6 +220,33 @@ describe("G-D21: a line replaced by the person's newer one (another tab)", () =>
   });
 });
 
+describe("G-D21: an old tab reopening never takes voice from a newer one", () => {
+  it("names the line it replaces, and stops when the server says another tab has voice", async () => {
+    const { result } = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await result.current.talk({ thread: {} });
+    });
+    startVoiceSessionAction.mockResolvedValue({
+      ok: false,
+      message:
+        "Voice moved to your other window. Start it here again whenever you like.",
+      replaced: true,
+    });
+    for (let i = 0; i < 3; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+    }
+    expect(startVoiceSessionAction).toHaveBeenCalledTimes(2);
+    expect(startVoiceSessionAction.mock.calls[1]?.[0]).toMatchObject({
+      resume: true,
+      reopens: "00000000-0000-4000-8000-000000000001",
+    });
+    expect(result.current.active).toBe(false);
+    expect(result.current.notice).toMatch(/Voice moved to your other window/u);
+  });
+});
+
 describe("withGreeting", () => {
   const credential = {
     voiceSessionId: "00000000-0000-4000-8000-000000000001",

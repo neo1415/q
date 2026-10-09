@@ -235,6 +235,8 @@ export function useVoiceInterview(
    */
   const lineConversation =
     useRef<VoiceInterviewThread["conversationId"]>(undefined);
+  /** G-D21: the session of this tab's latest line, named by a reopen. */
+  const lineSessionId = useRef<string | null>(null);
   /** A vendor error just said, kept on screen while the line comes back. */
   const lastError = useRef<{ text: string; at: number } | null>(null);
   /** When the current line came up; null while there is none. */
@@ -543,6 +545,7 @@ export function useVoiceInterview(
     reconnectAttempts.current = 0;
     personAsked.current = false;
     lineConversation.current = undefined;
+    lineSessionId.current = null;
     lastError.current = null;
     upSince.current = null;
     duplexOff.current = false;
@@ -571,6 +574,8 @@ export function useVoiceInterview(
     }) => {
       // G-D21: a line reopens by itself only for the person's own line.
       if (automatic && !personAsked.current) return;
+      // The session a reopen replaces (G-D21), read before anything resets.
+      const reopensId = lineSessionId.current;
       if (!automatic) {
         personAsked.current = true;
         lineConversation.current = undefined;
@@ -591,6 +596,9 @@ export function useVoiceInterview(
         lastStart.current = { thread, firstMessage };
         const started = await startVoiceSessionAction({
           ...(resume ? { resume: true } : {}),
+          // G-D21: a line reopening by itself names the one it replaces;
+          // the server refuses it if a newer line (another tab) has voice.
+          ...(automatic && reopensId !== null ? { reopens: reopensId } : {}),
           ...(duplex === false || duplexOff.current ? { duplex: false } : {}),
           ...(thread.welcome === true ? { welcome: true } : {}),
           ...(thread.onboarding === undefined
@@ -615,12 +623,20 @@ export function useVoiceInterview(
         // line is never brought up.
         if (!mounted.current || generation.current !== mine) return;
         if (!started.ok) {
+          if (started.replaced === true) {
+            // Another tab has voice now: this one stops for good.
+            personAsked.current = false;
+            setActive(false);
+            setLinkStatus(null);
+            setLineStatus(null);
+          }
           setNotice(started.message);
           return;
         }
         setVoice(started.value.voice);
         sessionToken.current = started.value.sessionToken;
         setVoiceSessionId(started.value.voiceSessionId);
+        lineSessionId.current = started.value.voiceSessionId;
         setTurn(null);
         setActive(true);
         upSince.current = Date.now();

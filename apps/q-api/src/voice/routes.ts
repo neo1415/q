@@ -655,6 +655,20 @@ export function registerQVoiceRoutes(
         // hook that changed. Fail closed rather than bind without authority.
         throw new AuthenticationRequiredError();
       }
+      // G-D21: an old tab's line reopening by itself never takes voice
+      // from a newer one this person opened meanwhile (another tab).
+      const reopens = input.reopens;
+      if (reopens !== undefined) {
+        const own = dependencies.bindings.byVoiceSessionId(reopens);
+        const stillHeld = own?.actor.userId === actor.userId ? 1 : 0;
+        if (
+          dependencies.bindings.replaced?.(reopens, actor.userId) === true ||
+          dependencies.bindings.countFor(actor.userId) > stillHeld
+        ) {
+          request.log.info({ reason: "REPLACED" }, "voice reopen refused");
+          return reply.code(409).send(VOICE_LINE_REPLACED_PROBLEM);
+        }
+      }
       const deepgram = dependencies.deepgram;
       const elevenLabs = dependencies.provider;
       const transport = deepgram ?? elevenLabs;
