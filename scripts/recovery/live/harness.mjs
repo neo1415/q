@@ -668,7 +668,6 @@ async function runScenario(id) {
             },
           },
         });
-        resolveReady();
       }
     });
     ws.on("message", (raw) => {
@@ -690,6 +689,8 @@ async function runScenario(id) {
         case "session.updated":
           reportedModel = ev.session?.model ?? reportedModel;
           reportedSession = ev.session?.id ?? reportedSession;
+          // B: our session.update has been applied; start the stream.
+          if (ev.type === "session.updated") resolveReady();
           break;
         case "session.output_audio.delta":
         case "response.output_audio.delta": {

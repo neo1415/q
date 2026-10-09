@@ -21,3 +21,8 @@ The founder authorized this on 2026-10-09, for GPT-Live work only, using the exi
 | 2026-10-09 04:16 | workstream V | Scenario 3 hesitant-question on gpt-live-1 | 41 | $0.034 | $0.385 |
 | 2026-10-09 04:17 | workstream V | Scenario 9 frustrated-user on gpt-live-1 | 57 | $0.048 | $0.432 |
 | 2026-10-09 04:23 | workstream V | Scenario 10 five-minute-conversation on gpt-live-1 + TTS inputs | 300 | $0.268 | $0.700 |
+| 2026-10-09 04:25 | workstream V | Scenario 1 pidgin-greeting on gpt-live-1 | 26 | $0.022 | $0.722 |
+| 2026-10-09 04:25 | workstream V | Scenario 1 pidgin-greeting on gpt-realtime-mini | 25 wall (tokens) | $0.006 | $0.728 |
+| 2026-10-09 04:26 | workstream V | Scenario 3 hesitant-question on gpt-realtime-mini | 22 wall (tokens) | $0.007 | $0.735 |
+| 2026-10-09 04:27 | workstream V | Scenario 4 interruption on gpt-realtime-mini | 39 wall (tokens) | $0.017 | $0.752 |
+| 2026-10-09 04:27 | workstream V | Scenario 5 change-of-mind on gpt-realtime-mini | 39 wall (tokens) | $0.015 | $0.767 |
