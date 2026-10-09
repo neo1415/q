@@ -199,6 +199,9 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
         readonly broker: LiveBroker;
         /** Who may open a live line; null: anyone signed in (local). */
         readonly allowedUsers: ReadonlySet<string> | null;
+        /** The names across their relationships (counterparts). */
+        readonly counterparts?:
+          ((actor: ActorContext) => Promise<readonly string[]>) | undefined;
         readonly preview: {
           readonly enabled: boolean;
           readonly providers: () => Readonly<Record<string, boolean>>;
@@ -1005,6 +1008,20 @@ export function registerQVoiceRoutes(
       allowedUsers: dependencies.live.allowedUsers,
       withContext,
       binding: ownLine,
+      // V (founder 2026-10-09, "Tensorgate" heard as "Tensorflow"): the
+      // names this person is likely to say, as every speech transport gets
+      // them, plus their counterparts. Each read is optional and bounded.
+      names: async (request) => {
+        const actor = getActorContext(request);
+        const settle = (read: Promise<readonly string[]> | undefined) =>
+          (read ?? Promise.resolve([])).catch(() => [] as readonly string[]);
+        const [own, remembered, counterparts] = await Promise.all([
+          settle(dependencies.ownNames?.namesFor(actor)),
+          settle(dependencies.memory?.termsFor(actor)),
+          settle(dependencies.live?.counterparts?.(actor)),
+        ]);
+        return [...own, ...counterparts, ...remembered];
+      },
       // A GPT-Live call that is not attached to a standard session gets its
       // own binding, built exactly as the session route builds one (the
       // person's own bearer, a sealed token), without a speech provider.

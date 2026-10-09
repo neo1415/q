@@ -77,6 +77,14 @@ type LiveLine = {
   latest: string | null;
   recordedSeconds: number;
   finalReported: boolean;
+  /**
+   * Delegations run one after another on a line, never over each other.
+   * The voice turn handler supersedes (cancels) the run a line is waiting
+   * on when a new turn starts; on GPT-Live the person's nudges ("still
+   * waiting…") arrive as new delegations, and the founder's live test lost
+   * a 25 s answer that way (2026-10-09). Queued, every answer lands.
+   */
+  tail: Promise<unknown>;
 };
 
 export type LiveBroker = {
@@ -90,6 +98,8 @@ export type LiveBroker = {
     readonly locale?: string | undefined;
     /** What Q's backend can do for them, for the delegation policy. */
     readonly role?: "founder" | "investor" | undefined;
+    /** Names this person is likely to say (their records, counterparts). */
+    readonly names?: readonly string[] | undefined;
   }) => Promise<LiveOpenOutcome>;
   /** Null when there is no such line for this person. */
   readonly delegate: (input: {
@@ -107,7 +117,11 @@ export type LiveBroker = {
     readonly actor: ActorContext;
     readonly voiceSessionId: string;
     readonly report: LiveUsageReport;
-  }) => Promise<{ recordedSeconds: number; remainingMs: number } | null>;
+  }) => Promise<{
+    recordedSeconds: number;
+    remainingMs: number;
+    capReached?: boolean;
+  } | null>;
   readonly end: (input: {
     readonly actor: ActorContext;
     readonly voiceSessionId: string;
@@ -300,9 +314,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   /** ONE run of Q Brain for one delegation. */
   const runQ = (line: LiveLine, id: string, request: string): Delegation => {
     const controller = new AbortController();
-    const deadline = setTimeout(() => {
-      controller.abort();
-    }, config.delegationDeadlineMs);
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    const before = line.tail;
     const speaker = collector(`live_${line.voiceSessionId}`);
     const asked: VoiceTranscriptTurn = { role: "user", content: request };
     const startedAt = now();
@@ -320,6 +333,19 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     };
     delegation.result = (async () => {
       try {
+        // After the delegation before it on this line, whatever its end.
+        await before.catch(() => undefined);
+        if (controller.signal.aborted) {
+          return {
+            delegationId: id,
+            commentary: null,
+            approvalPending: false,
+            failed: true,
+          };
+        }
+        deadline = setTimeout(() => {
+          controller.abort();
+        }, config.delegationDeadlineMs);
         const outcome = await turn(
           line.binding,
           // GPT-Live already ended their turn: never held as unfinished.
@@ -331,7 +357,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           return {
             delegationId: id,
             commentary: controller.signal.aborted
-              ? "Q's backend did not finish that in time. Say so plainly and offer to try a smaller piece; do not guess."
+              ? "That request did not come back from Q's backend. Say plainly it didn't come through and offer to try it again; never invent it."
               : null,
             approvalPending: false,
             failed: true,
@@ -365,7 +391,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           failed: true,
         };
       } finally {
-        clearTimeout(deadline);
+        if (deadline !== undefined) clearTimeout(deadline);
         delegation.settled = true;
         logger.info(
           {
@@ -377,6 +403,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         );
       }
     })();
+    line.tail = delegation.result;
     return delegation;
   };
 
@@ -395,6 +422,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       firstName,
       locale,
       role,
+      names,
     }) => {
       if (!enabled || provider === undefined)
         return { kind: "REFUSED", reason: "OFF" };
@@ -449,6 +477,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
               locale,
               briefingOpening,
               role,
+              names,
             }),
             voice: config.voices[binding.voice],
           },
@@ -470,6 +499,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         latest: null,
         recordedSeconds: 0,
         finalReported: false,
+        tail: Promise.resolve(),
       });
       logger.info(
         { qVoiceSessionId: binding.voiceSessionId, model: created.model },
@@ -486,6 +516,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           provider: "openai",
           model: created.model,
           maxSessionMs: config.maxSessionMs,
+          idleMs: config.idleMs,
         },
       };
     },
@@ -544,9 +575,25 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           : report.seconds,
       );
       if (report.final === true) line.finalReported = true;
+      // The daily cap holds during a line too, not only at its start: past
+      // it the client closes (its seconds are already on today's ledger).
+      let capReached = false;
+      if (report.final !== true) {
+        try {
+          const spent = await spend.spentTodayUsd(new Date(now()));
+          capReached = spent >= config.dailyCapUsd;
+        } catch (error: unknown) {
+          // Unknown spend is not zero spend: the line closes.
+          logger.warn({ err: error }, "live voice spend ledger unreadable");
+          capReached = true;
+        }
+      }
       return {
         recordedSeconds: line.recordedSeconds,
-        remainingMs: Math.max(0, config.maxSessionMs - (now() - line.openedAt)),
+        remainingMs: capReached
+          ? 0
+          : Math.max(0, config.maxSessionMs - (now() - line.openedAt)),
+        ...(capReached ? { capReached: true } : {}),
       };
     },
 

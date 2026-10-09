@@ -5863,6 +5863,11 @@ const { app, logger: appLogger } = createApp(
                 : {
                     broker: liveBroker,
                     allowedUsers: liveConfig.allowedUsers,
+                    counterparts: async (actor: ActorContext) =>
+                      (
+                        (await errandRelationships.ownRelationships?.(actor))
+                          ?.items ?? []
+                      ).map((item) => item.counterpart.name),
                     preview: {
                       enabled: liveConfig.preview,
                       providers: () => ({

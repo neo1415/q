@@ -18,6 +18,8 @@ import {
   LiveOpenResultSchema,
   LiveUsageReportSchema,
   LiveUsageResultSchema,
+  LiveAvailabilitySchema,
+  Q_VOICE_LIVE_AVAILABLE_PATH,
   Q_VOICE_LIVE_CANCEL_PATH,
   Q_VOICE_LIVE_DELEGATIONS_PATH,
   Q_VOICE_LIVE_END_PATH,
@@ -64,6 +66,13 @@ export function registerLiveVoiceRoutes(
      * signed in (a local deployment).
      */
     readonly allowedUsers: ReadonlySet<string> | null;
+    /**
+     * Names this person is likely to say (their records, their
+     * counterparts), for the voice to recognise and pronounce. A failed
+     * read costs the line its names, never the line.
+     */
+    readonly names?:
+      ((request: FastifyRequest) => Promise<readonly string[]>) | undefined;
     /** Developer preview gate (LiveConfig.preview). */
     readonly preview: {
       readonly enabled: boolean;
@@ -112,6 +121,9 @@ export function registerLiveVoiceRoutes(
         firstName: body.firstName,
         role: body.role,
         locale: body.locale,
+        names: await (
+          dependencies.names?.(request) ?? Promise.resolve([])
+        ).catch(() => []),
       });
       if (opened.kind === "REFUSED") {
         request.log.info({ reason: opened.reason }, "live voice refused");
@@ -208,6 +220,23 @@ export function registerLiveVoiceRoutes(
       // Ending a line that already ended is not an error.
       return reply.code(204).send();
     },
+  );
+
+  // Whether this person's voice starts on GPT-Live: the web asks before it
+  // opens any voice line (founder 2026-10-09: GPT-Live is the voice of the
+  // app for the people it is switched on for).
+  app.get(
+    Q_VOICE_LIVE_AVAILABLE_PATH,
+    { onRequest: withContext },
+    (request, reply) =>
+      reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(
+          LiveAvailabilitySchema.parse({
+            available: broker.enabled && allowed(request),
+          }),
+        ),
   );
 
   // Developer-only: which voice lines this local deployment can compare.

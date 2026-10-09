@@ -330,6 +330,9 @@ describe("GPT-Live prompt", () => {
     expect(prompt).toContain("always speak natural, standard English");
     expect(prompt).toContain("Never switch into Pidgin");
     expect(prompt).not.toContain("Call opening:");
+    expect(prompt).toContain("laugh naturally and lightly");
+    expect(prompt).toContain("Never leave them in silence");
+    expect(prompt).toContain("still waiting");
   });
 
   it("opens with a warm hello and the delegated briefing when asked", () => {
@@ -345,7 +348,13 @@ describe("GPT-Live config", () => {
     expect(
       liveConfigFrom({ CQ_VOICE_LIVE_MAX_SESSION_SECONDS: "99999" }, "local")
         .maxSessionMs,
-    ).toBe(180_000);
+    ).toBe(20 * 60_000);
+    expect(
+      liveConfigFrom({ CQ_VOICE_LIVE_MAX_SESSION_SECONDS: "3600" }, "local")
+        .maxSessionMs,
+    ).toBe(60 * 60_000);
+    expect(liveConfigFrom({}, "local").idleMs).toBe(180_000);
+    expect(liveConfigFrom({}, "local").delegationDeadlineMs).toBe(90_000);
     expect(liveConfigFrom({ CQ_VOICE_PREVIEW: "on" }, "local").preview).toBe(
       true,
     );
@@ -424,7 +433,7 @@ describe("GPT-Live line", () => {
     await open(broker);
     const first = ask(broker, "dlg_1", "What are the top three companies?");
     const repeat = ask(broker, "dlg_1", "What are the top three companies?");
-    await Promise.resolve();
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
     expect(runs).toEqual(["What are the top three companies?"]);
     holds[0]?.resolve();
     const [a, b] = await Promise.all([first, repeat]);
@@ -438,18 +447,113 @@ describe("GPT-Live line", () => {
     expect(runs).toHaveLength(1);
   });
 
-  it("returns an older result stale once a newer delegation exists, and keeps its reference", async () => {
+  it("queues a newer delegation behind the running one, so the slow answer is never cancelled", async () => {
     const { broker, runs, holds } = setup({ hold: true });
     await open(broker);
-    const older = ask(broker, "dlg_1", "Top three companies");
+    const older = ask(broker, "dlg_1", "Give me three good examples");
     await Promise.resolve();
-    const newer = ask(broker, "dlg_2", "What about the second one?");
-    await Promise.resolve();
+    const newer = ask(broker, "dlg_2", "Still waiting, can you do it?");
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    // The nudge has not started a run over the slow one.
+    expect(runs).toEqual(["Give me three good examples"]);
     holds[0]?.resolve();
+    const first = await older;
+    expect(first?.failed).toBe(false);
+    expect(first?.commentary).toContain("Give me three good examples");
+    // Marked stale (a newer one exists): the client still speaks it while
+    // the newer one is pending.
+    expect(first?.stale).toBe(true);
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    expect(runs).toEqual([
+      "Give me three good examples",
+      "Still waiting, can you do it?",
+    ]);
     holds[1]?.resolve();
-    expect((await older)?.stale).toBe(true);
     expect((await newer)?.stale).toBe(false);
-    expect(runs).toEqual(["Top three companies", "What about the second one?"]);
+  });
+
+  it("cancels a queued delegation without ever running it", async () => {
+    const { broker, runs, holds } = setup({ hold: true });
+    await open(broker);
+    const first = ask(broker, "dlg_1", "Research Ajopot");
+    await Promise.resolve();
+    const queued = ask(broker, "dlg_2", "Research Ledgerfold");
+    await Promise.resolve();
+    const cancelling = broker.cancel({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegationId: "dlg_2",
+    });
+    holds[0]?.resolve();
+    await first;
+    expect(await cancelling).toBe(true);
+    expect((await queued)?.failed).toBe(true);
+    expect(runs).toEqual(["Research Ajopot"]);
+  });
+
+  it("closes the line when today's spend cap is reached mid-call", async () => {
+    let spent = 0;
+    const usage = createInMemoryModelUsageRepository();
+    const broker = createLiveBroker({
+      config: { ...LIVE_DEFAULTS, enabled: true, dailyCapUsd: 1 },
+      provider: {
+        providerId: "p",
+        modelId: "m",
+        createWebRtcSession: () =>
+          Promise.resolve({
+            sessionId: "s",
+            sdp: "v=0 a",
+            model: "gpt-live-1",
+          }),
+      },
+      firewall: firewall(),
+      turn: () => Promise.resolve({ kind: "NOTHING" }),
+      spend: { spentTodayUsd: () => Promise.resolve(spent) },
+      usage,
+      providerCeiling: "PUBLIC",
+      syntheticDemo: false,
+      logger,
+    });
+    await broker.open({ binding: binding(), sdp: "v=0 offer" });
+    const fine = await broker.usage({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: { seconds: 30 },
+    });
+    expect(fine?.capReached).toBeUndefined();
+    expect(fine?.remainingMs).toBeGreaterThan(0);
+    spent = 1.2;
+    const capped = await broker.usage({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: { seconds: 60 },
+    });
+    expect(capped).toMatchObject({ capReached: true, remainingMs: 0 });
+  });
+
+  it("puts the person's names into the session instructions", async () => {
+    const { broker, created } = setup();
+    await broker.open({
+      binding: binding(),
+      sdp: "v=0 offer",
+      names: ["Tensorgate", "Ledgerline", "Tensorgate"],
+    });
+    expect(created[0]?.instructions).toContain('"Tensorgate", "Ledgerline"');
+  });
+
+  it("never tells the person it ran out of time", async () => {
+    const { broker, tick } = setup({ hold: true });
+    void tick;
+    await open(broker);
+    const result = ask(broker, "dlg_1", "Three examples");
+    await Promise.resolve();
+    await broker.cancel({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegationId: "dlg_1",
+    });
+    const settled = await result;
+    expect(settled?.commentary ?? "").not.toMatch(/in time/i);
   });
 
   it("carries the line's own history into the next run", async () => {
@@ -495,7 +599,7 @@ describe("GPT-Live line", () => {
     const { broker, holds } = setup({ hold: true });
     await open(broker);
     const pending = ask(broker, "dlg_1", "Research Ajopot");
-    await Promise.resolve();
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
     expect(holds).toHaveLength(1);
     const cancelled = await broker.cancel({
       actor: ACTOR,
