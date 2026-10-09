@@ -5,6 +5,7 @@ import type {
 } from "@capital-q/contracts";
 
 import type { QTurn } from "./conversation";
+import { cardsReferredBy } from "./spotlight";
 
 /**
  * The answer canvas's rules, as plain functions (C1-C4).
@@ -206,7 +207,9 @@ export function topicMovedOn(
     if (turn.kind !== "Q" || turn.streaming) continue;
     if ((turn.runId ?? turn.id) === run) continue;
     if (answerCardsOf(turn) !== null) return true;
-    if (focusForSaid(own.cards, turn.text) === null) return true;
+    // Still on these cards when the answer is about one of them: its own
+    // subject references (structured) or, failing those, their names.
+    if (cardsReferredBy(turn, own.cards).length === 0) return true;
   }
   return false;
 }

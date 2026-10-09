@@ -1360,6 +1360,7 @@ export {
   naturalPlaceLine,
   spokenFactsOf,
   spokenFactsOfAttention,
+  spokenFactsOfAttentionOnScreen,
   spokenFidelityIssues,
   spokenList,
   type SpokenFacts,

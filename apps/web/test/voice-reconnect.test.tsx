@@ -16,13 +16,18 @@ import type { VoiceSessionEvents } from "../src/features/voice/session";
  */
 
 const startVoiceSessionAction = vi.fn();
+/** What the turn board read answers; a test may say the line was replaced. */
+let turnRead: { ok: false; gone: boolean; replaced?: boolean } = {
+  ok: false,
+  gone: false,
+};
 // G-D19: the turn board poll and the screen are fetches through the voice
 // route now, not server actions.
 vi.mock("../src/features/voice/provider/duplex-relays", async (original) => ({
   ...(await original<Record<string, unknown>>()),
   readVoiceTurn: (id: string) => {
     void id;
-    return Promise.resolve({ ok: false, gone: false });
+    return Promise.resolve(turnRead);
   },
   sendVoiceScreen: () => Promise.resolve(),
 }));
@@ -37,6 +42,8 @@ vi.mock("../src/features/voice/actions", () => ({
 // The transport stands in for a provider that fails as soon as it starts:
 // one plain sentence, then the line reported dropped.
 let events: VoiceSessionEvents = {};
+/** The provider fails as soon as it starts, unless a test says not. */
+let dropOnStart = true;
 vi.mock("../src/features/voice/use-voice-session", () => ({
   useVoiceSession: (latest: VoiceSessionEvents) => {
     events = latest;
@@ -46,6 +53,7 @@ vi.mock("../src/features/voice/use-voice-session", () => ({
       muted: false,
       transcript: [],
       start: () => {
+        if (!dropOnStart) return Promise.resolve();
         queueMicrotask(() => {
           events.onError?.("Something went wrong with voice.");
           events.onEnded?.("dropped");
@@ -66,6 +74,8 @@ const { useVoiceInterview, withGreeting } =
   await import("../src/features/voice/use-voice-interview");
 
 beforeEach(() => {
+  turnRead = { ok: false, gone: false };
+  dropOnStart = true;
   vi.useFakeTimers();
   startVoiceSessionAction.mockReset();
   startVoiceSessionAction.mockResolvedValue({
@@ -186,6 +196,54 @@ describe("G-D21: nothing reopens a line the person did not start", () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
     expect(startVoiceSessionAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("G-D21: a line replaced by the person's newer one (another tab)", () => {
+  it("stops, says where voice went, and never reopens", async () => {
+    // A line that stays up: the transport does not drop by itself here.
+    dropOnStart = false;
+    const { result } = renderHook(() => useVoiceInterview());
+    turnRead = { ok: false, gone: true, replaced: true };
+    await act(async () => {
+      await result.current.talk({ thread: {} });
+    });
+    startVoiceSessionAction.mockClear();
+    for (let i = 0; i < 4; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+    }
+    expect(startVoiceSessionAction).not.toHaveBeenCalled();
+    expect(result.current.active).toBe(false);
+    expect(result.current.notice).toMatch(/Voice moved to your other window/u);
+  });
+});
+
+describe("G-D21: an old tab reopening never takes voice from a newer one", () => {
+  it("names the line it replaces, and stops when the server says another tab has voice", async () => {
+    const { result } = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await result.current.talk({ thread: {} });
+    });
+    startVoiceSessionAction.mockResolvedValue({
+      ok: false,
+      message:
+        "Voice moved to your other window. Start it here again whenever you like.",
+      replaced: true,
+    });
+    for (let i = 0; i < 3; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+    }
+    expect(startVoiceSessionAction).toHaveBeenCalledTimes(2);
+    expect(startVoiceSessionAction.mock.calls[1]?.[0]).toMatchObject({
+      resume: true,
+      reopens: "00000000-0000-4000-8000-000000000001",
+    });
+    expect(result.current.active).toBe(false);
+    expect(result.current.notice).toMatch(/Voice moved to your other window/u);
   });
 });
 

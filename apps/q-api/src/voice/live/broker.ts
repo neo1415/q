@@ -198,6 +198,29 @@ export const LIVE_SPEAK_GUIDE =
   "Verified by Q's backend. Say it in your own words, as an analyst would: the point first, then what separates the options. Never read it out as a list, never add names or numbers that are not here.";
 
 /** What one run verified, as content for `session.commentary.append`. */
+/**
+ * The voice turn's SPOKEN output for the live line (founder 2026-10-09:
+ * "Spheros thanked you and said the rest is on your screen"): what the
+ * duplex line would say -- the facts' own spoken line and the names it
+ * must say -- never the written answer. An attention item's note quotes
+ * the counterpart's message ("They wrote: …"); it is never handed to the
+ * voice, which paraphrased it. Other kinds keep their item details (fit,
+ * strengths, unknowns) for follow-ups; none of those quote anyone.
+ */
+function spokenCommentary(facts: SpokenFacts, context: string): string {
+  const say = `Say this in your own words: ${JSON.stringify(facts.fallback)}.`;
+  const names =
+    facts.mustSay.length === 0
+      ? ""
+      : ` Mention each of: ${JSON.stringify(facts.mustSay)}.`;
+  const next =
+    facts.next === null ? "" : ` You may offer: ${JSON.stringify(facts.next)}.`;
+  if (facts.kind === "ATTENTION") {
+    return `${LIVE_SPEAK_GUIDE} ${context} ${say}${names}${next} Never quote anyone's message.`;
+  }
+  return `${LIVE_SPEAK_GUIDE} ${context} ${say}${names}${next} Details for follow-up questions: ${JSON.stringify(askQFactsOutput(facts))}`;
+}
+
 export function commentaryFor(input: {
   readonly request: string;
   readonly facts: SpokenFacts | null;
@@ -209,7 +232,7 @@ export function commentaryFor(input: {
     ? " Q prepared an action that waits for their approval on screen: say it is ready for them to approve; never say it is done."
     : "";
   if (input.facts !== null) {
-    return `${LIVE_SPEAK_GUIDE} ${asked}${approval} Facts: ${JSON.stringify(askQFactsOutput(input.facts))}`;
+    return spokenCommentary(input.facts, `${asked}${approval}`);
   }
   const { say } = forRealtime(input.said);
   const words = input.approvalPending

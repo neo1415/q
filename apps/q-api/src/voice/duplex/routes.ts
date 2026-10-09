@@ -65,6 +65,9 @@ export function registerDuplexVoiceRoutes(
     readonly restore?:
       | ((request: FastifyRequest) => Promise<VoiceSessionBinding | null>)
       | undefined;
+    /** G-D21: the person's own newer line replaced this one. */
+    readonly replaced?:
+      ((voiceSessionId: string, userId: string) => boolean) | undefined;
   },
 ): void {
   const { broker, withContext } = dependencies;
@@ -93,6 +96,20 @@ export function registerDuplexVoiceRoutes(
     return adopted ? run() : first;
   };
   const isNull = (value: unknown) => value === null;
+  /**
+   * A line that is not there: 409 when the person's own newer line
+   * replaced it (that tab stops; G-D21), else the usual 404.
+   */
+  const missingLine = (request: FastifyRequest, reply: FastifyReply) =>
+    dependencies.replaced?.(idOf(request.params), actorOf(request).userId) ===
+    true
+      ? reply.code(409).send({
+          type: "about:blank",
+          title: "Voice moved",
+          status: 409,
+          detail: "This voice line was replaced by a newer one.",
+        })
+      : gone(reply);
   const isFalse = (value: boolean) => !value;
 
   app.post(
@@ -120,7 +137,7 @@ export function registerDuplexVoiceRoutes(
           }),
         isNull,
       );
-      if (result === null) return gone(reply);
+      if (result === null) return missingLine(request, reply);
       return reply
         .code(200)
         .header("Cache-Control", "no-store")
@@ -154,7 +171,7 @@ export function registerDuplexVoiceRoutes(
           }),
         isNull,
       );
-      if (result === null) return gone(reply);
+      if (result === null) return missingLine(request, reply);
       return reply
         .code(200)
         .header("Cache-Control", "no-store")
@@ -182,7 +199,7 @@ export function registerDuplexVoiceRoutes(
           }),
         isFalse,
       );
-      if (!known) return gone(reply);
+      if (!known) return missingLine(request, reply);
       return reply.code(204).send();
     },
   );
@@ -206,7 +223,7 @@ export function registerDuplexVoiceRoutes(
           }),
         isNull,
       );
-      if (result === null) return gone(reply);
+      if (result === null) return missingLine(request, reply);
       return reply
         .code(200)
         .header("Cache-Control", "no-store")
@@ -239,7 +256,7 @@ export function registerDuplexVoiceRoutes(
           }),
         isNull,
       );
-      if (result === null) return gone(reply);
+      if (result === null) return missingLine(request, reply);
       return reply
         .code(200)
         .header("Cache-Control", "no-store")
@@ -267,7 +284,7 @@ export function registerDuplexVoiceRoutes(
           }),
         isNull,
       );
-      if (result === null) return gone(reply);
+      if (result === null) return missingLine(request, reply);
       return reply
         .code(200)
         .header("Cache-Control", "no-store")
@@ -295,7 +312,7 @@ export function registerDuplexVoiceRoutes(
           }),
         isFalse,
       );
-      if (!known) return gone(reply);
+      if (!known) return missingLine(request, reply);
       return reply.code(204).send();
     },
   );
@@ -320,7 +337,7 @@ export function registerDuplexVoiceRoutes(
           }),
         isFalse,
       );
-      if (!known) return gone(reply);
+      if (!known) return missingLine(request, reply);
       return reply.code(204).send();
     },
   );

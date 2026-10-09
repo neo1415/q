@@ -87,7 +87,10 @@ test.describe("standard voice line", () => {
       .toBeGreaterThan(10);
     const reply = await line.say("How much am I raising?");
     expect(reply).toContain("two and a half million");
-    await expect(page.getByText(/two and a half million/u)).toBeVisible();
+    // The thread row and its live-region twin (data-q-said) both hold it.
+    await expect(
+      page.getByText(/two and a half million/u).first(),
+    ).toBeVisible();
   });
 
   test("a dropped line reconnects, and says so if it cannot", async ({
@@ -128,7 +131,8 @@ test.describe("standard voice line", () => {
     await expect(
       page
         .locator('[role="status"], [role="alert"]')
-        .filter({ hasText: /couldn't|lost|went wrong|try again|error/iu })
+        // No apostrophe: see duplex-failures.spec.ts (Playwright selector).
+        .filter({ hasText: /couldn.t|lost|went wrong|try again|error/iu })
         .first(),
     ).toBeVisible({ timeout: 15_000 });
   });

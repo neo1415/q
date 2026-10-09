@@ -7,6 +7,7 @@ import {
   installDuplexFake,
   setPeerState,
   userSays,
+  waitForDuplexChannel,
 } from "../support/duplex-fake.js";
 import { awaits } from "../support/expected-red.js";
 import { call } from "../support/http.js";
@@ -292,6 +293,7 @@ async function voiceTopThree(
   await expect(page.getByRole("button", { name: /^End/u }).first()).toBeVisible(
     { timeout: 60_000 },
   );
+  await waitForDuplexChannel(page);
   await userSays(page, "item_top3", ASK);
 }
 

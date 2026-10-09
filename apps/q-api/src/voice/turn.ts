@@ -28,11 +28,14 @@ import {
   shownCardsOf,
   spokenFactsOf,
   spokenFactsOfAttention,
+  spokenFactsOfAttentionOnScreen,
   type SpokenFacts,
 } from "@capital-q/q-core";
 
 /** How long a voice turn waits for the attention report (B1 on voice). */
 const ATTENTION_READ_MS = 2_500;
+/** A written answer quoting a counterpart's message (attention.ts notes). */
+const QUOTED_MESSAGE = /\bThey wrote: "/u;
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type {
   QOrchestrator,
@@ -972,10 +975,20 @@ export function createVoiceTurnHandler(
     text: string,
     blocks: readonly QResultBlock[],
   ): Promise<SpokenFacts | null> => {
-    const read = dependencies.attention;
-    if (read === undefined || blocks.length > 0 || !asksWhatNeedsThem(asked)) {
+    // The answer carries its report (G-R4): that is what is on screen.
+    for (const block of blocks) {
+      if (block.kind === "ATTENTION") {
+        return spokenFactsOfAttention(block.report);
+      }
+    }
+    // V 2026-10-09: an attention answer is always said from its facts,
+    // names only. Its written form quotes counterparts ("They wrote: …").
+    const quotes = QUOTED_MESSAGE.test(text);
+    if (!quotes && (blocks.length > 0 || !asksWhatNeedsThem(asked))) {
       return null;
     }
+    const read = dependencies.attention;
+    if (read === undefined) return spokenFactsOfAttentionOnScreen();
     let report: QAttentionReport | null = null;
     try {
       report = await Promise.race([
@@ -990,7 +1003,7 @@ export function createVoiceTurnHandler(
         "voice attention read failed",
       );
     }
-    if (report === null) return null;
+    if (report === null) return spokenFactsOfAttentionOnScreen();
     // The spoken facts must be the answer on screen: every item said is
     // in it, and "nothing" only when it says nothing.
     const matches =
@@ -998,11 +1011,13 @@ export function createVoiceTurnHandler(
         ? !/\bneeds? you:/u.test(text)
         : report.items.slice(0, 3).every((item) => text.includes(item.title));
     if (!matches) {
+      // Never the written answer (it quotes messages): the items are on
+      // screen, and the voice says so.
       logger.info(
         { qVoiceSessionId: binding.voiceSessionId },
-        "voice attention facts did not match the answer: said as written",
+        "voice attention facts did not match the answer: pointed to the screen",
       );
-      return null;
+      return spokenFactsOfAttentionOnScreen();
     }
     return spokenFactsOfAttention(report);
   };
@@ -1279,13 +1294,20 @@ export function createVoiceTurnHandler(
             // own words instead of reading the template aloud.
             const facts =
               !streamedDeltas && text !== undefined
-                ? (spokenFactsOf({
-                    asked: askedWords,
-                    text,
-                    blocks,
-                    shown: shownCards.get(binding),
-                  }) ??
-                  (await attentionFactsFor(binding, askedWords, text, blocks)))
+                ? blocks.some((block) => block.kind === "ATTENTION")
+                  ? await attentionFactsFor(binding, askedWords, text, blocks)
+                  : (spokenFactsOf({
+                      asked: askedWords,
+                      text,
+                      blocks,
+                      shown: shownCards.get(binding),
+                    }) ??
+                    (await attentionFactsFor(
+                      binding,
+                      askedWords,
+                      text,
+                      blocks,
+                    )))
                 : null;
             const cards = shownCardsOf(blocks);
             if (cards.length > 0) shownCards.set(binding, cards);

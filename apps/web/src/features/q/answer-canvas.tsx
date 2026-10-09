@@ -130,7 +130,10 @@ function AnswerCard({
   reduced,
   actions,
   tie = null,
+  spot = false,
 }: {
+  /** In the spotlight: the one large card (a label says so, not colour alone). */
+  readonly spot?: boolean | undefined;
   readonly card: QAnswerCard;
   readonly rank: number;
   readonly state: "focus" | "rest";
@@ -149,9 +152,13 @@ function AnswerCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
       transition={{ duration: reduced ? 0 : 0.38, ease: [0.23, 1, 0.32, 1] }}
+      // Spotlight: the same card moves between the strip and the spotlight
+      // (reduced motion: no layout animation, the state just changes).
+      {...(reduced ? {} : { layoutId: `cq-ac-${card.key}` })}
       className="cq-ac-card"
       data-state={state}
       data-ac-card={card.key}
+      data-ac-spot={spot ? "" : undefined}
       data-hue={String(card.hue)}
       aria-current={state === "focus" ? "true" : undefined}
     >
@@ -165,6 +172,11 @@ function AnswerCard({
           onClick={() => actions.onFocus?.(rank - 1)}
           aria-expanded={state === "focus"}
         >
+          {spot ? (
+            <span className="cq-ac-spot-label" data-ac-spot-label>
+              In focus
+            </span>
+          ) : null}
           <h3>
             <span className="sr-only">{`Number ${String(rank)}: `}</span>
             {card.name}
@@ -506,6 +518,42 @@ function CompareTable({
   );
 }
 
+/** A card out of the spotlight: small, named, one tap to bring it forward. */
+function StripCard({
+  card,
+  rank,
+  reduced,
+  onFocus,
+}: {
+  readonly card: QAnswerCard;
+  readonly rank: number;
+  readonly reduced: boolean;
+  readonly onFocus?: ((index: number) => void) | undefined;
+}) {
+  const number = fitNumber(card);
+  return (
+    <m.button
+      type="button"
+      {...(reduced ? {} : { layoutId: `cq-ac-${card.key}` })}
+      transition={{ duration: reduced ? 0 : 0.32, ease: [0.23, 1, 0.32, 1] }}
+      className="cq-ac-stripcard"
+      data-hue={String(card.hue)}
+      data-ac-card={card.key}
+      data-ac-strip
+      aria-label={`Bring ${card.name} forward`}
+      onClick={() => onFocus?.(rank - 1)}
+    >
+      <span className="cq-ac-rank" aria-hidden="true">
+        {rank}
+      </span>
+      <span className="cq-ac-stripname">{card.name}</span>
+      {number === null ? null : (
+        <span className="cq-ac-stripfit">{number}</span>
+      )}
+    </m.button>
+  );
+}
+
 export type AnswerCanvasProps = AnswerCardActions & {
   readonly block: QAnswerCardsBlock;
   /** What was asked, above what Q is saying. */
@@ -520,6 +568,11 @@ export type AnswerCanvasProps = AnswerCardActions & {
   readonly onCloseAll?: (() => void) | undefined;
   readonly onFollowUp?: ((question: string) => void) | undefined;
   readonly showFollowUps?: boolean | undefined;
+  /**
+   * The card the conversation is about (spotlight.ts): it is the one large
+   * card and the others shrink to a strip; null or absent: all level.
+   */
+  readonly spotlight?: number | null | undefined;
 };
 
 export function AnswerCanvas({
@@ -532,14 +585,18 @@ export function AnswerCanvas({
   onCloseAll,
   onFollowUp,
   showFollowUps = true,
+  spotlight = null,
   ...actions
 }: AnswerCanvasProps) {
   const wide = useWideCanvas();
   const reduced = useReducedMotion() === true;
   const shown = block.cards.filter((card) => dismissed?.has(card.key) !== true);
-  const focusKey = block.cards[focus]?.key;
   const { layout, tiles } = canvasLayout(shown.length, wide);
   const table = comparesAsTable(block) && shown.length === block.cards.length;
+  const spotKey = spotlight === null ? undefined : block.cards[spotlight]?.key;
+  const spotCard = shown.find((card) => card.key === spotKey);
+  const spot = !table && spotCard !== undefined && shown.length >= 2;
+  const focusKey = spot ? spotKey : block.cards[focus]?.key;
 
   return (
     <LazyMotion features={loadFeatures} strict>
@@ -584,6 +641,44 @@ export function AnswerCanvas({
                 : () => block.cards[0] && actions.onPin?.(block.cards[0])
             }
           />
+        ) : spot ? (
+          // The spotlight: the card the conversation is about, large; the
+          // others a strip of small cards, each one tap from the spotlight.
+          <div
+            className="cq-ac-cards"
+            data-layout="spotlight"
+            data-n={String(shown.length)}
+            data-focus="one"
+            data-spotlight={spotCard.key}
+            data-ac-cards
+          >
+            <div className="cq-ac-spot">
+              <AnswerCard
+                key={spotCard.key}
+                card={spotCard}
+                rank={block.cards.indexOf(spotCard) + 1}
+                tie={tieLine(block, spotCard)}
+                state="focus"
+                reduced={reduced}
+                actions={actions}
+                spot
+              />
+            </div>
+            <ul className="cq-ac-strip" aria-label="The other results">
+              {shown
+                .filter((card) => card.key !== spotCard.key)
+                .map((card) => (
+                  <li key={card.key}>
+                    <StripCard
+                      card={card}
+                      rank={block.cards.indexOf(card) + 1}
+                      reduced={reduced}
+                      onFocus={actions.onFocus}
+                    />
+                  </li>
+                ))}
+            </ul>
+          </div>
         ) : (
           <div
             className="cq-ac-cards"

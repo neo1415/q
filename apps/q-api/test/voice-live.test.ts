@@ -9,6 +9,7 @@ import {
 } from "@capital-q/contracts";
 import { createInMemoryModelUsageRepository } from "@capital-q/model-gateway";
 import { createLogger } from "@capital-q/observability";
+import { spokenFactsOfAttention } from "@capital-q/q-core";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import {
   OrganisationIdSchema,
@@ -332,6 +333,7 @@ describe("GPT-Live prompt", () => {
     expect(prompt).not.toContain("Call opening:");
     expect(prompt).toContain("laugh naturally and lightly");
     expect(prompt).toContain("Never leave them in silence");
+    expect(prompt).toContain("no invented idioms");
     expect(prompt).toContain("still waiting");
   });
 
@@ -688,6 +690,71 @@ describe("GPT-Live line", () => {
         delegationId: "dlg_1",
       }),
     ).toBe(false);
+  });
+
+  it("speaks an attention briefing in its spoken form: never a counterpart's quoted message", async () => {
+    const facts = spokenFactsOfAttention({
+      items: [
+        {
+          key: "msg-1",
+          source: "UNANSWERED_MESSAGE",
+          title: "Spheros is waiting for your reply",
+          note: 'They wrote: "Thanks so much, the rest is on your screen"',
+          counterpart: "Spheros",
+          since: "2026-10-09T07:00:00.000Z",
+          decidable: false,
+        },
+        {
+          key: "msg-2",
+          source: "UNANSWERED_MESSAGE",
+          title: "Shiftwell messaged you",
+          note: 'They wrote: "Quick question about the mandate fit"',
+          counterpart: "Shiftwell",
+          since: "2026-10-09T07:00:00.000Z",
+          decidable: false,
+        },
+      ],
+      activity: null,
+      unread: [],
+      readAt: "2026-10-09T07:00:00.000Z",
+    });
+    const broker = createLiveBroker({
+      config: { ...LIVE_DEFAULTS, enabled: true },
+      provider: {
+        providerId: "p",
+        modelId: "m",
+        createWebRtcSession: () =>
+          Promise.resolve({
+            sessionId: "s",
+            sdp: "v=0 a",
+            model: "gpt-live-1",
+          }),
+      },
+      firewall: firewall(),
+      // The voice turn hands a code-built answer to a speaker that speaks
+      // in its own words as facts (turn.ts fromFacts), and the written
+      // answer, quotes and all, as the fact-built line alongside.
+      turn: async (_b, _t, _s, speaker) => {
+        speaker.facts?.(facts);
+        await speaker.speak(
+          'Spheros is waiting for your reply. They wrote: "Thanks so much, the rest is on your screen".',
+        );
+        return { kind: "SPOKEN", path: "Q" };
+      },
+      spend: { spentTodayUsd: () => Promise.resolve(0) },
+      usage: createInMemoryModelUsageRepository(),
+      providerCeiling: "PUBLIC",
+      syntheticDemo: false,
+      logger,
+    });
+    await broker.open({ binding: binding(), sdp: "v=0 offer" });
+    const result = await ask(broker, "dlg_1", "What needs my attention today?");
+    const said = result?.commentary ?? "";
+    expect(said).toContain("Spheros");
+    expect(said).toContain("Shiftwell");
+    expect(said).not.toMatch(
+      /Thanks so much|rest is on your screen|Quick question|They wrote/u,
+    );
   });
 
   it("marks an approval as waiting, never done", async () => {

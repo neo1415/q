@@ -808,13 +808,40 @@ function sentenceOf(text: string): string {
  * title) must be said; the count is what it is; unread sources are said
  * as unchecked. Deterministic; the fallback passes every check.
  */
+/**
+ * An attention answer whose report could not be read for the voice: the
+ * items are on screen; the voice says so and quotes nobody (V, 2026-10-09:
+ * the written answer, with its "They wrote: …" lines, was spoken instead).
+ */
+export function spokenFactsOfAttentionOnScreen(): SpokenFacts {
+  return {
+    version: SPOKEN_FACTS_VERSION,
+    kind: "ATTENTION",
+    requested: null,
+    items: [],
+    ties: [],
+    alsoLevel: 0,
+    others: [],
+    mustSay: [],
+    caveat: null,
+    next: null,
+    onScreen: true,
+    place: null,
+    talkAbout: false,
+    fallback: "What needs you is on your screen now.",
+    unread: [],
+  };
+}
+
 export function spokenFactsOfAttention(report: QAttentionReport): SpokenFacts {
   const said = report.items.slice(0, ATTENTION_SAID_MAX);
   const items: SpokenItem[] = said.map((item) => ({
     name: item.counterpart ?? item.title,
     score: null,
     about: item.title,
-    does: item.note ?? null,
+    // Never the note: it quotes the counterpart's message ("They wrote:
+    // …"), which the voice must not read or paraphrase (names only).
+    does: null,
     strengths: [],
     unknowns: [],
   }));
