@@ -124,6 +124,75 @@
   gap: 10px;
   align-items: start;
 }
+
+/* ---------- The spotlight (Dubai demo, 2026-10-09) ----------
+ * The card the conversation is about is the one large card; the others
+ * shrink to a strip of small, named cards, each one tap from the
+ * spotlight. Focus is said in words ("In focus") and by size, never by
+ * colour alone. Motion moves the cards (layoutId); reduced motion only
+ * changes the state. */
+.cq-ac-cards[data-layout="spotlight"] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cq-ac-spot .cq-ac-card {
+  width: 100%;
+  border-width: 2px;
+}
+.cq-ac-spot-label {
+  display: inline-block;
+  margin-bottom: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cq-text-secondary);
+}
+.cq-ac-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cq-ac-stripcard {
+  display: inline-flex;
+  min-height: 44px;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--hue) 22%, var(--cq-border-subtle));
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.cq-ac-stripcard:hover {
+  border-color: var(--cq-border-strong);
+}
+.cq-ac-stripcard:focus-visible {
+  outline: 2px solid var(--cq-focus-ring);
+  outline-offset: 2px;
+}
+.cq-ac-stripcard .cq-ac-rank {
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+}
+.cq-ac-stripname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.cq-ac-stripfit {
+  color: var(--cq-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
 .cq-ac-card {
   --tint: color-mix(in oklab, var(--hue) 11%, var(--cq-surface-raised));
   position: relative;

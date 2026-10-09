@@ -367,6 +367,7 @@ export function QPresenceStage({
             key={canvas.item.id}
             answerId={canvas.item.id}
             block={canvas.block}
+            turns={turns}
             asked={askedBefore(turns, canvas.item.id)}
             closing={closingLine(canvas.turn)}
             live={live}
