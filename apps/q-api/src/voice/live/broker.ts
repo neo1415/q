@@ -153,6 +153,8 @@ type Delegation = {
 
 type LiveLine = {
   readonly voiceSessionId: string;
+  /** The provider's session (GPT-Live), ended from here if left open. */
+  readonly providerSessionId: string;
   readonly actor: ActorContext;
   readonly binding: VoiceSessionBinding;
   readonly openedAt: number;
@@ -271,6 +273,15 @@ const SPOKEN_MAX = 6_000;
 const MIN_BILLED_SECONDS = 15;
 /** An unreported line is estimated at wall-clock, at most this past the cap. */
 const GRACE_MS = 30_000;
+/** How often lines are checked for expiry and inactivity (on a timer). */
+export const LIVE_SWEEP_MS = 30_000;
+/**
+ * No request from the browser for this long past the idle window (no usage,
+ * transcript, delegation): the browser is gone (a killed tab, a connect
+ * that failed after /open). A live call posts its transcript every few
+ * seconds of speech, and the browser itself closes after `idleMs` silence.
+ */
+export const LIVE_INACTIVE_GRACE_MS = 2 * 60 * 1000;
 
 /** Q's run, collected: what it said, or the facts of a code-built answer. */
 function collector(id: string): {
@@ -420,15 +431,41 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       },
       "live voice line ended",
     );
+    // The provider session is ended from here too, unless its browser saw
+    // it close (final usage): a superseded, expired, abandoned or failed
+    // line never keeps billing because its browser did not close it.
+    if (!line.finalReported) {
+      void (
+        provider?.closeSession?.(line.providerSessionId) ??
+        Promise.resolve(false)
+      )
+        .then((confirmed) => {
+          logger.info(
+            { qVoiceSessionId: line.voiceSessionId, reason, confirmed },
+            "live voice provider session closed from the server",
+          );
+        })
+        .catch(() => undefined);
+    }
   };
 
   const sweep = () => {
     const at = now();
-    for (const line of lines.values()) {
-      if (at - line.openedAt > config.maxSessionMs + GRACE_MS)
+    for (const line of [...lines.values()]) {
+      if (at - line.openedAt > config.maxSessionMs + GRACE_MS) {
         forget(line, "expired");
+      } else if (
+        at - line.lastActivityAt >
+        config.idleMs + LIVE_INACTIVE_GRACE_MS
+      ) {
+        forget(line, "inactive");
+      }
     }
   };
+  // On a timer too, not only on this person's next request: a line whose
+  // browser is gone is ended (and its provider session closed) in time.
+  const sweeper = setInterval(sweep, LIVE_SWEEP_MS);
+  sweeper.unref();
 
   const ownLine = (actor: ActorContext, voiceSessionId: string) => {
     sweep();
@@ -675,6 +712,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       const at = now();
       lines.set(binding.voiceSessionId, {
         voiceSessionId: binding.voiceSessionId,
+        providerSessionId: created.sessionId,
         actor,
         binding,
         openedAt: at,
@@ -785,6 +823,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     transcript: async ({ actor, voiceSessionId, report }) => {
       const line = ownLine(actor, voiceSessionId);
       if (line === null) return null;
+      line.lastActivityAt = now();
       const store = deps.transcripts;
       if (store === undefined) return 0;
       const at = now();
