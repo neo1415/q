@@ -149,6 +149,21 @@ export type LiveBrokerDependencies = {
   readonly syntheticDemo: boolean;
   readonly logger: Logger;
   readonly now?: (() => number) | undefined;
+  /**
+   * The voice turn board (what the turn handler recorded for the line):
+   * read after a run, so the delegation's result says whether the run
+   * moved the screen, and the client follows it before the voice speaks.
+   */
+  readonly board?:
+    | {
+        readonly read: (voiceSessionId: string) => {
+          readonly sequence: number;
+          readonly navigate: unknown;
+          readonly clientAction?: unknown;
+          readonly clientActions?: readonly unknown[] | undefined;
+        };
+      }
+    | undefined;
 };
 
 const HISTORY_MAX = 24;
@@ -376,6 +391,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         deadline = setTimeout(() => {
           controller.abort();
         }, config.delegationDeadlineMs);
+        const sequenceBefore =
+          deps.board?.read(line.voiceSessionId).sequence ?? 0;
         const outcome = await turn(
           line.binding,
           // GPT-Live already ended their turn: never held as unfinished.
@@ -407,7 +424,23 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         if (kept.length > 0)
           line.history.push({ role: "agent", content: kept });
         line.history.splice(0, Math.max(0, line.history.length - HISTORY_MAX));
-        return { delegationId: id, commentary, approvalPending, failed: false };
+        // The run moved the screen (a NAVIGATE or OPEN_RECORD_PAGE intent
+        // on its turn): the client follows it, and waits for the router's
+        // receipt, before the voice says anything about it.
+        const after = deps.board?.read(line.voiceSessionId);
+        const moved =
+          after !== undefined &&
+          after.sequence > sequenceBefore &&
+          (after.navigate !== null ||
+            (after.clientAction ?? null) !== null ||
+            (after.clientActions?.length ?? 0) > 0);
+        return {
+          delegationId: id,
+          commentary,
+          approvalPending,
+          failed: false,
+          ...(moved ? { moved: true } : {}),
+        };
       } catch (error: unknown) {
         logger.warn(
           { err: error, qVoiceSessionId: line.voiceSessionId },

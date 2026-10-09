@@ -94,6 +94,8 @@ export const LiveDelegationResultSchema = z
     failed: z.boolean(),
     /** The call is past its length: the client closes it. */
     ended: z.boolean().optional(),
+    /** The run moved the screen: follow it, and await its receipt, first. */
+    moved: z.boolean().optional(),
   })
   .strict();
 export type LiveDelegationResult = z.infer<typeof LiveDelegationResultSchema>;

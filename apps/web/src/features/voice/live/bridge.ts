@@ -44,6 +44,8 @@ export type DelegationOutcome = {
   readonly approvalPending?: boolean | undefined;
   /** Q could not answer; `commentary` then says so truthfully. */
   readonly failed?: boolean | undefined;
+  /** Q's run moved the screen (followed before it is spoken). */
+  readonly moved?: boolean | undefined;
 };
 
 export type DelegationRequest = {
@@ -101,6 +103,14 @@ export type LiveBridgeDependencies = {
    */
   readonly progressAfterMs?: number | undefined;
   readonly onChange?: ((state: LiveBridgeState) => void) | undefined;
+  /**
+   * Runs before a result is spoken. Returns what the voice must know about
+   * the screen (the move's receipt), or null. A run that moved the screen
+   * is followed and its receipt awaited here, so the voice never says a
+   * page is open before it is (founder live 2026-10-09).
+   */
+  readonly beforeSpeak?:
+    ((outcome: DelegationOutcome) => Promise<string | null>) | undefined;
 };
 
 export type DelegationStatus =
@@ -283,9 +293,18 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
         context: contextBefore(),
       })
       .then(
-        (outcome) => {
+        async (outcome) => {
           timers.clearTimeout(progress);
-          settle(record, outcome);
+          const note =
+            deps.beforeSpeak === undefined
+              ? null
+              : await deps.beforeSpeak(outcome).catch(() => null);
+          settle(
+            record,
+            note === null || outcome.commentary === null
+              ? outcome
+              : { ...outcome, commentary: `${note} ${outcome.commentary}` },
+          );
         },
         () => {
           timers.clearTimeout(progress);

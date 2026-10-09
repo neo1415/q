@@ -8,6 +8,7 @@ import {
   releaseVoiceAudio,
   type VoiceAudioOwner,
 } from "../voice-audio";
+import { followMoveNow, moveNote } from "./move";
 import {
   createLiveBridge,
   type DelegationOutcome,
@@ -334,6 +335,8 @@ export async function startLiveCall(
     now: () => Date.now(),
     onChange: update,
     opening: options.opening,
+    beforeSpeak: async (outcome) =>
+      outcome.moved === true ? moveNote(await followMoveNow()) : null,
   });
 
   // C's fast path: the person's utterance, streamed, then final.

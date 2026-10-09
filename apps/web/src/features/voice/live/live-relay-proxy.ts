@@ -71,6 +71,7 @@ const DelegateResult = z.object({
   approvalPending: z.boolean(),
   failed: z.boolean(),
   ended: z.boolean().optional(),
+  moved: z.boolean().optional(),
 });
 const UsageBody = z
   .object({

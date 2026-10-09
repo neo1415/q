@@ -757,6 +757,52 @@ describe("GPT-Live line", () => {
     );
   });
 
+  it("says when the run moved the screen (the board's move for this turn), and only then", async () => {
+    let board = {
+      sequence: 4,
+      navigate: null as string | null,
+      clientActions: [] as unknown[],
+    };
+    const broker = createLiveBroker({
+      config: { ...LIVE_DEFAULTS, enabled: true },
+      provider: {
+        providerId: "p",
+        modelId: "m",
+        createWebRtcSession: () =>
+          Promise.resolve({
+            sessionId: "s",
+            sdp: "v=0 a",
+            model: "gpt-live-1",
+          }),
+      },
+      firewall: firewall(),
+      turn: async (_b, transcript, _s, speaker) => {
+        const asked = transcript[transcript.length - 1]?.content ?? "";
+        // The turn handler records its move on the board, as turn.ts does.
+        board = asked.startsWith("Open")
+          ? {
+              sequence: board.sequence + 1,
+              navigate: null,
+              clientActions: [{ kind: "OPEN_RECORD_PAGE" }],
+            }
+          : { sequence: board.sequence + 1, navigate: null, clientActions: [] };
+        await speaker.speak("Opening Tensorgate.");
+        return { kind: "SPOKEN", path: "MOVE" };
+      },
+      spend: { spentTodayUsd: () => Promise.resolve(0) },
+      usage: createInMemoryModelUsageRepository(),
+      providerCeiling: "PUBLIC",
+      syntheticDemo: false,
+      logger,
+      board: { read: () => board },
+    });
+    await broker.open({ binding: binding(), sdp: "v=0 offer" });
+    expect((await ask(broker, "dlg_1", "Open Tensorgate"))?.moved).toBe(true);
+    expect(
+      (await ask(broker, "dlg_2", "Tell me about it"))?.moved,
+    ).toBeUndefined();
+  });
+
   it("marks an approval as waiting, never done", async () => {
     const { broker } = setup({
       answer: `I've drafted the intro to Savanna Seed. ${APPROVAL_QUESTION}`,
