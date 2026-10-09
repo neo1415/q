@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   PermittedContextPlanSchema,
+  QConversationIdSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   type QSensitivityClass,
 } from "@capital-q/contracts";
@@ -846,7 +847,9 @@ describe("GPT-Live line", () => {
       routed: string;
       spokenAt: Date;
     }[] = [];
-    const conversation = "7f000000-0000-4000-8000-000000000001";
+    const conversation = QConversationIdSchema.parse(
+      "7f000000-0000-4000-8000-000000000001",
+    );
     const broker = createLiveBroker({
       config: { ...LIVE_DEFAULTS, enabled: true },
       provider: {
