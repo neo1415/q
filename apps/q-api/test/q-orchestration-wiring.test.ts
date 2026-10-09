@@ -70,6 +70,7 @@ function runtime(created: boolean): QRuntimeService {
     getConversation: notUnderTest,
     archiveConversation: notUnderTest,
     hideConversationMessage: notUnderTest,
+    recordSpokenExchange: notUnderTest,
   };
 }
 

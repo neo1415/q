@@ -793,6 +793,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/voice/routes.ts POST Q_VOICE_SESSIONS_PATH": Q_TRANSPORT,
   // RECOVERY A12: a card's focus and its voice verdict on the standard line.
   "q-api/voice/routes.ts POST Q_VOICE_CARD_PATH": Q_TRANSPORT,
+  // RECOVERY V: the GPT-Live line (session, delegation, usage, end).
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_SESSIONS_PATH": Q_TRANSPORT,
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_DELEGATIONS_PATH": Q_TRANSPORT,
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_CANCEL_PATH": Q_TRANSPORT,
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_USAGE_PATH": Q_TRANSPORT,
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_END_PATH": Q_TRANSPORT,
+  "q-api/voice/live/routes.ts GET Q_VOICE_LIVE_PREVIEW_PATH": Q_TRANSPORT,
   // DUPLEX: the full-duplex line's tool relay, usage report and end.
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH": Q_TRANSPORT,
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH": Q_TRANSPORT,
@@ -835,6 +842,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/work": exempt("development-only page"),
   "/dev/briefing": exempt("development-only page"),
   "/dev/q-nav": exempt("development-only page"),
+  "/dev/voice-preview": exempt("development-only page (local env + flag)"),
   "/dev/q-nav/work": exempt("development-only page"),
   "/dev/workforce": exempt("development-only page"),
   "/dev/deal-close": exempt("development-only page"),
@@ -1092,6 +1100,11 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_OUTCOME_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_ATTACH_PATH",
   "q-api/voice/routes.ts POST Q_VOICE_CARD_PATH",
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_SESSIONS_PATH",
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_DELEGATIONS_PATH",
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_CANCEL_PATH",
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_USAGE_PATH",
+  "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_END_PATH",
   // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
   // conversation's own transport, never a person's action.
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",
