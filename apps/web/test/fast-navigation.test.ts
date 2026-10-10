@@ -13,6 +13,7 @@ import type { QFastNavigationResponse } from "@capital-q/contracts";
 
 import {
   movedEarlyTo,
+  noteAsked,
   performClientAction,
   registerShellRouter,
   setHardLoad,
@@ -28,6 +29,7 @@ import {
   setNavigationTransport,
   type FastNavigationTransport,
 } from "../src/features/q/control/fast-navigation";
+import { lastNavigationTo } from "../src/features/q/control/navigation-lifecycle";
 import { fastMoveLine } from "../src/features/voice/live/live-call";
 import { performTurnChain } from "../src/features/voice/use-follow-turn";
 import {
@@ -176,9 +178,10 @@ describe("fast navigation at the end of the sentence", () => {
     await navigationHeard("open privacy settings");
     performClientAction({ kind: "OPEN_SETTINGS", section: "privacy" });
     await new Promise((resolve) => setTimeout(resolve, 20));
-    // A later, separate request to the same page moves again.
+    // A later, separate request (a new sentence) to the same page moves again.
     window.history.replaceState(null, "", "/home");
     noteRoute("/home");
+    noteAsked();
     performClientAction({ kind: "OPEN_SETTINGS", section: "privacy" });
     await vi.waitFor(() => expect(pushed).toEqual([PRIVACY, PRIVACY]));
   });
@@ -382,18 +385,23 @@ describe("every move gets a receipt", () => {
     return { seen, stop };
   }
 
-  it("Q's OPEN_RECORD_PAGE after the fast path already opened it: DONE, one push", async () => {
+  it("G2-D2: Q's OPEN_RECORD_PAGE after the fast path already opened it: that receipt, no second move", async () => {
     stub(server);
     await navigationHeard("Take me to Shiftwell relationship");
+    const path = `/relationships/company/${SHIFTWELL}`;
+    expect(lastNavigationTo(path)?.phase).toBe("VERIFIED");
+    const fastId = lastNavigationTo(path)?.intentId;
     const { seen, stop } = receipts();
     performClientAction({
       kind: "OPEN_RECORD_PAGE",
       page: "RELATIONSHIP_COMPANY",
       id: SHIFTWELL,
     });
-    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     stop();
-    expect(seen[0]?.status).toBe("DONE");
+    // The same sentence's move: its one receipt stands (nav-X-1), no nav-X-2.
+    expect(seen).toEqual([]);
+    expect(lastNavigationTo(path)?.intentId).toBe(fastId);
     expect(pushed).toHaveLength(1);
   });
 

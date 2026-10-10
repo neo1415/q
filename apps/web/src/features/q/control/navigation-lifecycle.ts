@@ -82,6 +82,12 @@ export type NavigationRequest = {
   readonly intentId?: string | undefined;
   /** A control the new page must register (e.g. `tab.readiness`). */
   readonly control?: string | undefined;
+  /**
+   * The turn (one sentence of the person's) that asked; the current turn
+   * (`beginNavigationTurn`) when absent. Within one turn a move that
+   * already VERIFIED is satisfied by that receipt (G2-D2).
+   */
+  readonly turn?: string | undefined;
 };
 
 export type NavigationHandle = {
@@ -124,6 +130,7 @@ export function navigationFailureMessage(reason: NavigationFailure): string {
 
 type Entry = {
   state: NavigationState;
+  readonly turn: string | null;
   readonly handle: NavigationHandle;
   readonly resolve: (outcome: NavigationOutcome) => void;
   readonly timers: Set<ReturnType<typeof setTimeout>>;
@@ -135,6 +142,43 @@ type Entry = {
 const ledger = new Map<string, Entry>();
 let active: Entry | null = null;
 let sequence = 0;
+/**
+ * G2-D2 (gate on build/int-rc): one sentence ran the same move twice -- the
+ * fast path VERIFIED it, then Q's answer for that sentence (70-800 ms
+ * later) asked again with a fresh id, so q-api and the thread got a second
+ * receipt. Joining only covered moves still in flight. A move is now tied
+ * to the turn that asked for it; a later turn is a new move.
+ */
+let currentTurn: string | null = null;
+
+/** The person finished a sentence: moves asked from now on are its own. */
+export function beginNavigationTurn(turn?: string): string {
+  sequence += 1;
+  currentTurn = turn ?? `turn-${TAB}-${String(sequence)}`;
+  return currentTurn;
+}
+
+/** This turn's VERIFIED move to the same place, if it already landed. */
+function landedThisTurn(
+  turn: string | null,
+  path: string,
+  control: string | undefined,
+): Entry | null {
+  if (turn === null) return null;
+  let found: Entry | null = null;
+  for (const entry of ledger.values()) {
+    if (
+      entry.turn === turn &&
+      entry.state.phase === "VERIFIED" &&
+      routesMatch(entry.state.expected, path) &&
+      routesMatch(path, entry.state.expected) &&
+      entry.state.control === control
+    ) {
+      found = entry;
+    }
+  }
+  return found;
+}
 /**
  * R3 (stack run 2026-10-10, l-named-navigation): ids were `nav-<n>` per
  * tab, and q-api keeps one receipt per id per person -- so every new tab's
@@ -380,6 +424,11 @@ export function requestNavigation(
   ) {
     return active.handle;
   }
+  const turn = request.turn ?? currentTurn;
+  // The same turn asking for the move it already made: that receipt, no
+  // second push and no second outcome.
+  const landed = landedThisTurn(turn, request.path, request.control);
+  if (landed !== null) return landed.handle;
   sequence += 1;
   const intentId = request.intentId ?? `nav-${TAB}-${String(sequence)}`;
   let resolve: (outcome: NavigationOutcome) => void = () => undefined;
@@ -393,6 +442,7 @@ export function requestNavigation(
       phase: "REQUESTED",
       ...(request.control === undefined ? {} : { control: request.control }),
     },
+    turn,
     handle: { intentId, state: () => entry.state, settled },
     resolve,
     timers: new Set(),
@@ -449,4 +499,5 @@ export function resetNavigationLifecycle(): void {
   ledger.clear();
   active = null;
   sequence = 0;
+  currentTurn = null;
 }

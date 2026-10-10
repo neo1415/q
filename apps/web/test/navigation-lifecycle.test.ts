@@ -11,6 +11,7 @@ import {
   resetAppRoutes,
 } from "../src/features/q/control/app-routes";
 import {
+  beginNavigationTurn,
   CONTROL_WAIT_MS,
   NAVIGATION_RETRY_MS,
   NAVIGATION_WAIT_MS,
@@ -191,6 +192,36 @@ describe("the lifecycle", () => {
     expect(await three.settled).toEqual(await one.settled);
     expect(pushes).toEqual(["/discover"]);
     expect(outcomes).toHaveLength(1);
+  });
+
+  it("G2-D2: the same turn asking for the path it just VERIFIED gets that receipt, no second execution", async () => {
+    const fast = requestNavigation({ path: "/discover", turn: "utt-7" });
+    land("/discover");
+    await fast.settled;
+    // Q's answer for the same sentence, 70-800 ms later.
+    const answer = requestNavigation({ path: "/discover", turn: "utt-7" });
+    expect(answer.intentId).toBe(fast.intentId);
+    expect(await answer.settled).toEqual(await fast.settled);
+    expect(pushes).toEqual(["/discover"]);
+    expect(outcomes).toHaveLength(1);
+    // A later turn asking again is a new move.
+    const later = requestNavigation({ path: "/discover", turn: "utt-8" });
+    expect(later.intentId).not.toBe(fast.intentId);
+  });
+
+  it("G2-D2: without a named turn, the sentence the person last finished is the turn", async () => {
+    beginNavigationTurn();
+    const fast = requestNavigation({ path: "/capital" });
+    land("/capital");
+    await fast.settled;
+    expect(requestNavigation({ path: "/capital" }).intentId).toBe(
+      fast.intentId,
+    );
+    expect(outcomes).toHaveLength(1);
+    beginNavigationTurn();
+    expect(requestNavigation({ path: "/capital" }).intentId).not.toBe(
+      fast.intentId,
+    );
   });
 
   it("an id it makes itself is unique beyond this tab (q-api dedupes per person)", async () => {

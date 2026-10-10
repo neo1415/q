@@ -13,7 +13,11 @@ import { storeVoicePreference } from "@/features/voice/voice-preference";
 
 import { forgetActiveConversations } from "./active-conversation";
 import { loadWire, wireNow, type WireContracts } from "./wire";
-import { arrivedAt, lastNavigationTo } from "./control/navigation-lifecycle";
+import {
+  arrivedAt,
+  beginNavigationTurn,
+  lastNavigationTo,
+} from "./control/navigation-lifecycle";
 import { currentRoute } from "./control/route-state";
 import { performUiAct, requestMove } from "./ui-act-controller";
 
@@ -228,6 +232,9 @@ const ASKED_FRESH_MS = 120_000;
 
 export function noteAsked(): void {
   lastAskedAt = Date.now();
+  // G2-D2: this sentence's moves (fast path, Q's answer, the voice board)
+  // are one move; the next sentence's are new ones.
+  beginNavigationTurn();
 }
 
 /** Since when answers are the person's fresh ones; null when none is. */
