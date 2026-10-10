@@ -1,3 +1,8 @@
+import {
+  hasArabicScript,
+  romanizeArabic,
+  scorePersonNames,
+} from "@capital-q/q-core/names";
 import type {
   ExternalPersonConfidence,
   IdentityCandidate,
@@ -161,14 +166,33 @@ function namesAnySpelling(text: string, spec: PersonSpec): boolean {
 }
 
 /**
+ * A profile's own name against the name asked for, through the shared
+ * multilingual name scorer: "Shadi Kishta" and "Shadi Qishta" agree, and
+ * a given name alone identifies nobody (the scorer says so).
+ */
+function profileNameAgrees(profileName: string, spec: PersonSpec): boolean {
+  if (namesAnySpelling(profileName, spec)) return true;
+  return allSpellings(spec).some((spelling) => {
+    const match = scorePersonNames(spelling, profileName);
+    return (
+      !match.partial &&
+      (match.grade === "CANONICAL" || match.grade === "VARIANT")
+    );
+  });
+}
+
+/**
  * A small local variant hook until the multilingual name module lands:
  * diacritics folded, and the Arabic-origin q/k alternation ("Qishta" and
  * "Kishta") that a profile may use. Never more than three variants.
  */
 export function basicNameVariants(name: string): readonly string[] {
-  const folded = strip(name).trim();
   const out = new Set<string>();
-  if (folded !== name.trim()) out.add(folded);
+  // An Arabic-script name is searched in its Latin romanisation too.
+  const latin = hasArabicScript(name) ? romanizeArabic(name).trim() : name;
+  if (latin !== name.trim() && latin.length > 0) out.add(latin);
+  const folded = strip(latin).trim();
+  if (folded !== latin.trim()) out.add(folded);
   if (/q/iu.test(folded)) {
     out.add(folded.replace(/q/gu, "k").replace(/Q/gu, "K"));
   }
@@ -232,6 +256,7 @@ function looksLikeOrganisation(part: string): boolean {
  */
 export function profileFactsOf(hit: PublicWebSearchHit): ProfileFacts {
   const title = (hit.title ?? "")
+    .replace(/[\u200e\u200f\u202a-\u202e]/gu, "")
     .replace(/\s*[|·]\s*linkedin.*$/iu, "")
     .replace(/\s+on linkedin.*$/iu, "")
     .trim();
@@ -244,19 +269,25 @@ export function profileFactsOf(hit: PublicWebSearchHit): ProfileFacts {
   let organization: string | null = null;
   if (parts.length >= 3) {
     role = parts[1] ?? null;
-    organization = parts.slice(2).join(" - ");
+    const rest = parts.slice(2).join(" - ");
+    organization = /^\d+\s*(?:years?|yrs?|months?)/iu.test(rest) ? null : rest;
   } else if (parts.length === 2) {
     const second = parts[1] ?? "";
     if (looksLikeOrganisation(second)) organization = second;
     else role = second;
   }
-  const snippet = hit.snippet;
+  const snippet = hit.snippet.replace(/[\u200e\u200f\u202a-\u202e]/gu, "");
   const location =
     /location:\s*([^·|\n]+)/iu.exec(snippet)?.[1]?.trim() ??
     /^\s*([\p{L}.' -]+,\s*[\p{L}.' -]+)\s*·/u.exec(snippet)?.[1]?.trim() ??
     null;
   const experience = /experience:\s*([^·|\n]+)/iu.exec(snippet)?.[1]?.trim();
-  if (organization === null && experience !== undefined) {
+  // "Experience: 25 years 3 months" is a duration, not an employer.
+  if (
+    organization === null &&
+    experience !== undefined &&
+    !/^\d+\s*(?:\+\s*)?(?:years?|yrs?|months?|mos?)\b/iu.test(experience)
+  ) {
     organization = experience;
   }
   return {
@@ -316,7 +347,9 @@ function orgReading(
   if (significant.some((word) => containsPhrase(haystack, word))) {
     return "MATCH";
   }
-  return statedOrg !== null ? "CONTRADICTED" : "UNKNOWN";
+  // People change employers and profiles lag: a different organisation is
+  // "not confirmed", never evidence of a different person.
+  return "UNKNOWN";
 }
 
 function slugNamesPerson(profileKey: string, spec: PersonSpec): boolean {
@@ -354,12 +387,12 @@ export function rankCandidates(
     const facts = profileFactsOf(sourced.hit);
     const text = `${sourced.hit.title ?? ""} ${sourced.hit.snippet}`;
     const named =
-      (facts.name !== null && namesAnySpelling(facts.name, spec)) ||
+      (facts.name !== null && profileNameAgrees(facts.name, spec)) ||
       slugNamesPerson(profile.key, spec) ||
       namesAnySpelling(text, spec);
     // A profile whose title names someone else is not this person.
     if (!named) continue;
-    if (facts.name !== null && !namesAnySpelling(facts.name, spec)) continue;
+    if (facts.name !== null && !profileNameAgrees(facts.name, spec)) continue;
     const existing = drafts.get(profile.key);
     if (existing === undefined) {
       drafts.set(profile.key, {
@@ -547,6 +580,11 @@ export function decideIdentity(
       uncertainty: uncertaintyOf(spec, weak),
     };
   }
+  // A name alone is never an identity (the shared name rule: one candidate
+  // needs a corroborating clue): show who was found and ask for one.
+  if (spec.place === null && spec.organization === null && spec.role === null) {
+    return { kind: "AMBIGUOUS", candidates: viable.slice(0, 4) };
+  }
   const rivals = viable.slice(1).filter((c) => {
     if (c.profileUrl === null && top.profileUrl !== null) return false;
     // A rival dominated on the member's anchors is a namesake, not a doubt.
@@ -616,6 +654,12 @@ export function clarifyingQuestionFor(
   ].filter((v): v is string => v !== null);
   const how =
     asks.length > 0 ? `their ${asks.join(" or ")}` : "one more detail";
+  if (candidates.length === 1) {
+    return `I found one person called ${spec.name}: ${parts[0] ?? ""}. Is that them - or give me ${how}?`.slice(
+      0,
+      240,
+    );
+  }
   return `I found ${candidates.length} people called ${spec.name}: ${parts.join("; ")}. Which one - or give me ${how}?`.slice(
     0,
     240,

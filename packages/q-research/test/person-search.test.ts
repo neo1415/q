@@ -209,6 +209,41 @@ describe("identity ranking", () => {
   });
 });
 
+describe("live-observed shapes (2026-10-10)", () => {
+  const LIVE: PublicWebSearchHit = {
+    url: "https://qa.linkedin.com/in/shadi-qishta-282453a",
+    title:
+      "Shadi Qishta\u200f - \u200fC-Suite executive with expertise in Finance - 25 years 3 months",
+    snippet: "Doha, Qatar · Experience: 25 years 3 months · Education: AUB",
+    publishedAt: null,
+    relevance: 0.9,
+  };
+  it("does not read a duration as an employer, and a stated employer mismatch is not a contradiction", () => {
+    const withOrg: PersonSpec = { ...spec, organization: "Midmac" };
+    const [candidate] = rankCandidates(withOrg, [
+      { provider: "tavily", hit: LIVE },
+    ]);
+    expect(candidate?.organization).toBeNull();
+    expect(candidate?.confidence).not.toBe("WEAK");
+    expect(candidate?.placeMatch).toBe("MATCH");
+  });
+  it("a name alone is never an identity: one candidate still gets a clarifying question", () => {
+    const nameOnly: PersonSpec = { ...spec, place: null };
+    const decision = decideIdentity(
+      nameOnly,
+      rankCandidates(nameOnly, [{ provider: "tavily", hit: SHADI }]),
+    );
+    expect(decision.kind).toBe("AMBIGUOUS");
+  });
+  it("matches a transliterated profile name through the shared name scorer", () => {
+    const hit = {
+      ...SHADI,
+      title: "Shadi Kishta - Finance Director | LinkedIn",
+    };
+    expect(rankCandidates(spec, [{ provider: "tavily", hit }])).toHaveLength(1);
+  });
+});
+
 describe("fast person search under a deadline", () => {
   it("returns an identity card from a fake index and validates against the contract", async () => {
     const search = createPersonSearch({
@@ -307,7 +342,7 @@ describe("fast person search under a deadline", () => {
       ],
     }).search(command);
     const elapsed = Date.now() - started;
-    expect(elapsed).toBeGreaterThanOrEqual(2_400);
+    expect(elapsed).toBeGreaterThanOrEqual(2_900);
     expect(elapsed).toBeLessThan(5_300);
     expect(run.result.outcome).toBe("UNAVAILABLE");
   }, 10_000);

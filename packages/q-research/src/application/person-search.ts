@@ -39,7 +39,7 @@ import {
 
 export const PERSON_SEARCH_BUDGET = {
   /** Each provider call's own deadline. */
-  perCallMs: 2_500,
+  perCallMs: 3_000,
   /** The whole search, including ranking. */
   overallMs: 5_000,
   /** Queries planned for one person. */
