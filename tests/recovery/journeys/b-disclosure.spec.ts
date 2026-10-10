@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
-import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import { call } from "../support/http.js";
 import { answer, type ScriptRule } from "../support/script.js";
@@ -114,6 +113,9 @@ async function raiseOnScreen(scope: ReturnType<Page["locator"]>) {
     source: await fact.getAttribute("data-raise-fact"),
     exact:
       (await amount.count()) === 0 ? null : await amount.getAttribute("title"),
+    // The figure as shown; the profile also links the label to the pitch
+    // moment ("From their pitch, 0:06"), which the card does not carry.
+    shown: (await amount.count()) === 0 ? null : await amount.innerText(),
     text: (await fact.innerText()).replace(/\s+/gu, " ").trim(),
   };
 }
@@ -169,11 +171,6 @@ for (const key of ["mizan", "disclosed", "neither"] as const) {
   test(`B ${key}: Discover card = profile = Q's figure and source, for one investor`, async ({
     browser,
   }) => {
-    if (key === "mizan")
-      awaits(
-        ["G2-SEED"],
-        "the local seed has no playable pitch whose transcript states a raise (every raiseView is NONE), so no Mizan-shape company exists",
-      );
     if (key === "disclosed")
       unshare = await shareRaiseWithNetwork(
         founderOf(DISCLOSER),
@@ -211,8 +208,9 @@ for (const key of ["mizan", "disclosed", "neither"] as const) {
 
     expect.soft(card.source, "card source").toBe(view.source);
     expect.soft(profile.source, "profile source").toBe(view.source);
-    expect.soft(card.text, "card words = profile words").toBe(profile.text);
+    expect.soft(card.shown, "card figure = profile figure").toBe(profile.shown);
     expect.soft(card.text).toContain(want);
+    expect.soft(profile.text).toContain(want);
     expect.soft(card.exact, "card exact figure").toBe(exact);
     expect.soft(profile.exact, "profile exact figure").toBe(exact);
     if (key === "mizan" && db.amount !== null && db.currency !== null) {
@@ -239,10 +237,6 @@ for (const key of ["mizan", "disclosed", "neither"] as const) {
 test("B other tenant: a founder of another company sees nothing of the Mizan-shape private figure", async ({
   browser,
 }) => {
-  awaits(
-    ["G2-SEED"],
-    "no Mizan-shape company in the local seed (no pitch transcript states a raise)",
-  );
   const shape = (await shapes()).mizan;
   expect(shape, "the seed has a Mizan-shape company").toBeDefined();
   if (shape?.db.amount == null || shape.db.currency === null) return;
