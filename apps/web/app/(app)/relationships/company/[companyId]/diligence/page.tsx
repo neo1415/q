@@ -10,10 +10,8 @@ import {
   DiligenceUnavailable,
   RelationshipDiligence,
 } from "@/features/relationships/relationship-diligence";
-import {
-  loadInvestorSideRelationship,
-  messageCountOf,
-} from "@/features/relationships/relationship-page-data";
+import { messageCountOf } from "@/features/relationships/brief-lines";
+import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
 
 export const metadata: Metadata = { title: "Diligence" };
 export const dynamic = "force-dynamic";

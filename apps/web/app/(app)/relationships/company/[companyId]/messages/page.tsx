@@ -7,10 +7,8 @@ import { QSection } from "@/features/q/q-section";
 import { QPageSubject } from "@/features/q/q-subject";
 import { RelationshipConversation } from "@/features/relationships/relationship-conversation";
 import { RelationshipUnavailable } from "@/features/relationships/relationship-detail";
-import {
-  loadInvestorSideRelationship,
-  messageCountOf,
-} from "@/features/relationships/relationship-page-data";
+import { messageCountOf } from "@/features/relationships/brief-lines";
+import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
 
 export const metadata: Metadata = { title: "Messages" };
 export const dynamic = "force-dynamic";

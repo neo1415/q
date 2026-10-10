@@ -118,17 +118,6 @@ async function meetingsFor(
     .catch(() => ({ meetings: [], meetingsRead: false }));
 }
 
-/**
- * The Messages tab's count: the brief's, over the whole history (R1); the
- * thread's first page only when the brief could not be read.
- */
-export function messageCountOf(loaded: {
-  readonly brief: RelationshipBrief | null;
-  readonly thread: ChatThreadDto | null;
-}): number {
-  return loaded.brief?.messages.count ?? loaded.thread?.messages.length ?? 0;
-}
-
 async function diligenceFor(
   session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
   relationship: RelationshipStatusDto | null,

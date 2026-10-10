@@ -9,10 +9,8 @@ import {
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
 import { RelationshipTimeline } from "@/features/relationships/relationship-timeline";
-import {
-  loadInvestorSideRelationship,
-  messageCountOf,
-} from "@/features/relationships/relationship-page-data";
+import { messageCountOf } from "@/features/relationships/brief-lines";
+import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 
 export const metadata: Metadata = { title: "Calls" };

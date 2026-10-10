@@ -1,4 +1,4 @@
-import type { RelationshipBrief } from "@capital-q/contracts";
+import type { ChatThreadDto, RelationshipBrief } from "@capital-q/contracts";
 
 import { formatRelationshipDate } from "./relationship-words";
 
@@ -72,4 +72,15 @@ export function briefLines(
   }
 
   return lines;
+}
+
+/**
+ * The Messages tab's count: the brief's, over the whole history (R1); the
+ * thread's first page only when the brief could not be read.
+ */
+export function messageCountOf(loaded: {
+  readonly brief: RelationshipBrief | null;
+  readonly thread: ChatThreadDto | null;
+}): number {
+  return loaded.brief?.messages.count ?? loaded.thread?.messages.length ?? 0;
 }
