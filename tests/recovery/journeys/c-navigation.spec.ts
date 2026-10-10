@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
-import { awaits } from "../support/expected-red.js";
 import {
   emitLive,
   installLiveFake,
@@ -272,11 +271,6 @@ test.describe("C with GPT-Live connected (MOCK)", () => {
     test(`C voice, from ${start}: a delegated record move is confirmed to the voice only after VERIFIED`, async ({
       browser,
     }) => {
-      if (start === "/home")
-        awaits(
-          ["G2-D2"],
-          "product (gate cd52c0ea): one DONE now, but after the typed matrix /home resumes that conversation and re-asks its earlier answers' moves on load (6 SUPERSEDED, no push, before the line opens)",
-        );
       const say = `Open ${investorName}`;
       const path = RECORD_PATH;
       const page = await (await contextAs(browser, CAST.founder)).newPage();
