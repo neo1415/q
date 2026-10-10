@@ -300,7 +300,7 @@ export const ExternalSimulationDtoSchema = z
       .array(
         z
           .object({
-            quote: z.string().max(280),
+            quote: z.string().max(300),
             sourceLabel: z.string().max(200),
             sourceUrl: z.string().url().max(2048),
           })

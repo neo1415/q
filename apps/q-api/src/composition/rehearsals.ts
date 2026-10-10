@@ -1829,7 +1829,7 @@ export function createRehearsalService(dependencies: {
             : scenarioFor({
                 displayName: record.subject.displayName,
                 nameVariants: record.subject.nameVariants,
-                entityKind: record.presentation?.entityKind,
+                entityKind: record.subject.entityKind,
               }),
       }),
     };

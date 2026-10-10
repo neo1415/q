@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ExternalPersonSubjectSchema,
+  PersonBriefSchema,
   type ExternalPersonSubject,
 } from "@capital-q/contracts";
 
@@ -19,8 +20,12 @@ const mk = (
   displayName: string,
   role: string | null,
   organization: string | null,
+  entityKind: "PERSON" | "ORGANIZATION" | "GOVERNMENT_AGENCY" = "PERSON",
+  extra: Record<string, unknown> = {},
 ): ExternalPersonSubject =>
   ExternalPersonSubjectSchema.parse({
+    entityKind,
+    ...extra,
     externalPersonId: `00000000-0000-4000-8000-0000000c000${String(n)}`,
     displayName,
     nameVariants: [displayName],
@@ -40,7 +45,7 @@ const FIVE = [
     id: "SHADI_QISHTA",
   },
   {
-    s: mk(2, "QInvest LLC", null, "QInvest LLC"),
+    s: mk(2, "QInvest LLC", null, "QInvest LLC", "ORGANIZATION"),
     kind: "ORGANIZATION" as const,
     id: "QINVEST",
   },
@@ -50,12 +55,12 @@ const FIVE = [
     id: "MUHANNAD_TASLAQ",
   },
   {
-    s: mk(4, "Invest Qatar", null, "Invest Qatar"),
+    s: mk(4, "Invest Qatar", null, "Invest Qatar", "GOVERNMENT_AGENCY"),
     kind: "GOVERNMENT_AGENCY" as const,
     id: "INVEST_QATAR",
   },
   {
-    s: mk(5, "AlRayan Investment", null, "AlRayan Investment"),
+    s: mk(5, "AlRayan Investment", null, "AlRayan Investment", "ORGANIZATION"),
     kind: "ORGANIZATION" as const,
     id: "ALRAYAN_INVESTMENT",
   },
@@ -176,7 +181,6 @@ describe("the Qatar five are five different rehearsals", () => {
         {
           subject: f.s,
           brief: null,
-          presentation: { entityKind: f.kind, image: null, quotes: [] },
         },
         [],
       ),
@@ -231,42 +235,75 @@ describe("the Qatar five are five different rehearsals", () => {
 });
 
 describe("display data", () => {
-  it("passes only our stored asset url and source quotes through to the screen", () => {
-    const f = FIVE[0];
-    if (f === undefined) throw new Error("fixture");
-    const sim = externalSimulation(
-      {
-        subject: f.s,
-        brief: null,
-        presentation: {
-          entityKind: "PERSON",
-          image: {
-            assetUrl: "https://assets.example.test/shadi.jpg",
-            attribution: "Official profile",
-          },
-          quotes: [
-            {
-              quote: "Watch what people spend.",
-              sourceLabel: "S03",
-              sourceUrl: "https://example.org/s3",
-            },
-          ],
-        },
+  it("passes only our stored asset url and sourced quotes through to the screen, never into the voice", () => {
+    const subject = mk(1, "Shadi Qishta", null, null, "PERSON", {
+      image: {
+        status: "ATTACHED",
+        assetUrl: "https://assets.example.test/shadi.jpg",
+        attribution: "Official profile",
+        licenseNote: "Permission on file",
       },
-      [],
-    );
+      quotes: [
+        {
+          text: "Watch what people spend, and everything else follows.",
+          sourceId: "S03",
+          speaker: "Shadi Qishta",
+          date: null,
+          use: "SOURCE_QUOTE_ONLY",
+        },
+        {
+          text: "A quote whose source is not stored.",
+          sourceId: "S99",
+          speaker: "Shadi Qishta",
+          date: null,
+          use: "SOURCE_QUOTE_ONLY",
+        },
+      ],
+    });
+    const brief = PersonBriefSchema.parse({
+      externalPersonId: subject.externalPersonId,
+      version: 1,
+      builtAt: "2026-10-10",
+      freshUntil: "2026-11-10",
+      sources: [
+        {
+          id: "S03",
+          url: "https://example.org/s3",
+          domain: "example.org",
+          title: "Profile",
+          publishedAt: null,
+          retrievedAt: "2026-10-10",
+          provider: "seed",
+        },
+      ],
+      assertions: [],
+    });
+    const sim = externalSimulation({ subject, brief }, []);
     expect(sim.imageUrl).toBe("https://assets.example.test/shadi.jpg");
-    expect(sim.quotes?.[0]?.quote).toBe("Watch what people spend.");
-    // Quotes never reach the voice.
+    // Only the quote with a stored source is shown.
+    expect(sim.quotes).toEqual([
+      {
+        quote: "Watch what people spend, and everything else follows.",
+        sourceLabel: "Profile",
+        sourceUrl: "https://example.org/s3",
+      },
+    ]);
     const built = buildExternalPersona({
-      subject: f.s,
-      brief: null,
+      subject,
+      brief,
       founder,
       readBy: 1,
-      entityKind: "PERSON",
     });
+    expect(externalLiveInstructions({ subject, built, founder })).not.toContain(
+      "Watch what people spend",
+    );
+  });
+
+  it("shows no image when none is attached", () => {
+    const f = FIVE[1];
+    if (f === undefined) throw new Error("fixture");
     expect(
-      externalLiveInstructions({ subject: f.s, built, founder }),
-    ).not.toContain("Watch what people spend");
+      externalSimulation({ subject: f.s, brief: null }, []).imageUrl,
+    ).toBeNull();
   });
 });

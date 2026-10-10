@@ -130,11 +130,6 @@ describe("external-person rehearsal (Postgres)", () => {
         const v1: ExternalSubjectRecord = {
           subject: subjectOf(1),
           brief: briefOf(1, "founder conviction"),
-          presentation: {
-            entityKind: "PERSON",
-            image: null,
-            quotes: [],
-          },
         };
         await subjects.save(me, v1);
         await subjects.save(me, v1); // idempotent
@@ -170,7 +165,6 @@ describe("external-person rehearsal (Postgres)", () => {
           subjects.save(me, {
             subject: subjectOf(v),
             brief: briefOf(v, topic),
-            presentation: null,
           });
         await save(1, "founder conviction");
 
@@ -307,7 +301,6 @@ describe("external-person rehearsal (Postgres)", () => {
         await subjects.save(me, {
           subject: subjectOf(1),
           brief: briefOf(1, "founder conviction"),
-          presentation: { entityKind: "PERSON", image: null, quotes: [] },
         });
         const publicWeb = vi.fn(() =>
           Promise.resolve({ text: "", sources: [] }),

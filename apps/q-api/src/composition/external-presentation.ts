@@ -27,8 +27,8 @@ export function externalSimulation(
   record: ExternalSubjectRecord,
   sources: readonly QPersonaSourceDto[],
 ): ExternalSimulationDto {
-  const { subject, brief, presentation } = record;
-  const entityKind = presentation?.entityKind ?? "PERSON";
+  const { subject, brief } = record;
+  const entityKind = subject.entityKind;
   const scenario = scenarioFor({
     displayName: subject.displayName,
     nameVariants: subject.nameVariants,
@@ -62,15 +62,27 @@ export function externalSimulation(
     disclaimer: `${title}. ${EXTERNAL_REHEARSAL_LABEL}. It is not the real ${entityKind === "PERSON" ? "person" : "organisation or any of its staff"} and does not predict what they would say.`,
     entityKind,
     // Only our own stored asset: the card saves an https asset URL it holds.
-    imageUrl: presentation?.image?.assetUrl ?? null,
-    imageAttribution: presentation?.image?.attribution ?? null,
+    imageUrl:
+      subject.image.status === "ATTACHED" ? subject.image.assetUrl : null,
+    imageAttribution:
+      subject.image.status === "ATTACHED" ? subject.image.attribution : null,
     headline: headline === "" ? null : headline,
     description: line === undefined ? null : plain(line.text, 240),
-    quotes: (presentation?.quotes ?? []).map((q) => ({
-      quote: q.quote,
-      sourceLabel: q.sourceLabel,
-      sourceUrl: q.sourceUrl,
-    })),
+    quotes: subject.quotes.flatMap((quote) => {
+      // A quote is shown only with the stored source it came from.
+      const source = (brief?.sources ?? []).find(
+        (s) => s.id === quote.sourceId,
+      );
+      return source === undefined || !source.url.startsWith("https://")
+        ? []
+        : [
+            {
+              quote: plain(quote.text, 300),
+              sourceLabel: plain(source.title ?? source.domain, 200),
+              sourceUrl: source.url,
+            },
+          ];
+    }),
     sources: sources
       .filter((s): s is QPersonaSourceDto & { url: string } => s.url !== null)
       .slice(0, 12)

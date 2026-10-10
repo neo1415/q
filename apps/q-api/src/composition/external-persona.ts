@@ -196,7 +196,7 @@ export function buildExternalPersona(input: {
   const scenario = scenarioFor({
     displayName: subject.displayName,
     nameVariants: subject.nameVariants,
-    entityKind: input.entityKind,
+    entityKind: input.entityKind ?? subject.entityKind,
   });
   const family =
     scenario.id === "GENERIC_PERSON" ? roleFamilyOf(subject) : scenario.family;

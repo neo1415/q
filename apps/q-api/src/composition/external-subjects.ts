@@ -16,41 +16,8 @@ import { z } from "zod";
  * fact and no founder-private data is stored in it.
  */
 
-/**
- * What the rehearsal screen shows beside the persona, saved with the brief:
- * the entity kind, our own stored portrait or logo (permitted for use), and
- * public source quotes. Quotes are display-only; they are never given to the
- * voice as the entity's words.
- */
-export const ExternalPresentationSchema = z
-  .object({
-    entityKind: z.enum(["PERSON", "ORGANIZATION", "GOVERNMENT_AGENCY"]),
-    image: z
-      .object({
-        assetUrl: z.string().url().max(2048).startsWith("https://"),
-        attribution: z.string().max(200).nullable(),
-      })
-      .strict()
-      .nullable(),
-    quotes: z
-      .array(
-        z
-          .object({
-            quote: z.string().trim().min(3).max(280),
-            sourceLabel: z.string().max(200),
-            sourceUrl: z.string().url().max(2048).startsWith("https://"),
-          })
-          .strict(),
-      )
-      .max(3),
-  })
-  .strict();
-export type ExternalPresentation = z.infer<typeof ExternalPresentationSchema>;
-
 export type ExternalSubjectRecord = {
   readonly subject: ExternalPersonSubject;
-  /** null when the identity card carries none (a person, no portrait). */
-  readonly presentation: ExternalPresentation | null;
   /** null while no brief exists: thin evidence, a role simulation. */
   readonly brief: PersonBrief | null;
 };
@@ -68,7 +35,7 @@ export type ExternalSubjectStore = {
   ) => Promise<void>;
 };
 
-type Raw = { subject: unknown; brief: unknown; presentation: unknown };
+type Raw = { subject: unknown; brief: unknown };
 
 export function createPostgresExternalSubjectStore(
   sql: DatabaseExecutor,
@@ -79,7 +46,7 @@ export function createPostgresExternalSubjectStore(
     latest: async (actor, externalPersonId) => {
       if (!uuid.safeParse(externalPersonId).success) return null;
       const rows = await sql<Raw[]>`
-        select subject, brief, presentation from q_runtime.rehearsal_external_subjects
+        select subject, brief from q_runtime.rehearsal_external_subjects
          where viewer_user_id = ${actor.userId} and tenant_id = ${actor.tenantId}
            and external_person_id = ${externalPersonId}
          order by brief_version desc limit 1`;
@@ -90,16 +57,8 @@ export function createPostgresExternalSubjectStore(
       if (!subject.success) return null;
       const brief =
         row.brief === null ? null : PersonBriefSchema.safeParse(row.brief);
-      const presentation =
-        row.presentation === null
-          ? null
-          : ExternalPresentationSchema.safeParse(row.presentation);
       return {
         subject: subject.data,
-        presentation:
-          presentation === null || !presentation.success
-            ? null
-            : presentation.data,
         brief: brief === null || !brief.success ? null : brief.data,
       };
     },
@@ -107,18 +66,13 @@ export function createPostgresExternalSubjectStore(
       const subject = ExternalPersonSubjectSchema.parse(record.subject);
       const brief =
         record.brief === null ? null : PersonBriefSchema.parse(record.brief);
-      const presentation =
-        record.presentation === null
-          ? null
-          : ExternalPresentationSchema.parse(record.presentation);
       await sql`
         insert into q_runtime.rehearsal_external_subjects
           (tenant_id, viewer_user_id, external_person_id, brief_version,
-           evidence_bundle_id, subject, brief, presentation)
+           evidence_bundle_id, subject, brief)
         values (${actor.tenantId}, ${actor.userId}, ${subject.externalPersonId},
                 ${subject.briefVersion}, ${subject.evidenceBundleId},
-                ${json(subject)}, ${brief === null ? null : json(brief)},
-                ${presentation === null ? null : json(presentation)})
+                ${json(subject)}, ${brief === null ? null : json(brief)})
         on conflict (viewer_user_id, external_person_id, brief_version) do nothing`;
     },
   };

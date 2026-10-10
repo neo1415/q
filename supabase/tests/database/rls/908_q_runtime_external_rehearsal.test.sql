@@ -20,11 +20,10 @@ select plan(15);
 select lives_ok(
   $$ insert into q_runtime.rehearsal_external_subjects
        (id, tenant_id, viewer_user_id, external_person_id, brief_version, evidence_bundle_id,
-        subject, brief, presentation)
+        subject, brief)
      values ('00000000-0000-4000-8000-0000000908a1', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'),
              '00000000-0000-4000-8000-0000000908f1', 1, '00000000-0000-4000-8000-0000000908b1',
-             '{"displayName":"Person One"}', '{"version":1}',
-             '{"entityKind":"PERSON","image":null,"quotes":[]}') $$,
+             '{"displayName":"Person One"}', '{"version":1}') $$,
   'the server freezes user A''s evidence for an external person');
 select lives_ok(
   $$ insert into q_runtime.rehearsal_external_subjects

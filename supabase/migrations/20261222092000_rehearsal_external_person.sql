@@ -35,9 +35,6 @@ create table q_runtime.rehearsal_external_subjects (
   -- no brief exists (thin evidence).
   subject             jsonb not null check (jsonb_typeof(subject) = 'object'),
   brief               jsonb check (brief is null or jsonb_typeof(brief) = 'object'),
-  -- Entity kind, our own stored portrait/logo asset and public source quotes
-  -- (display-only), validated by the server; null when the card has none.
-  presentation        jsonb check (presentation is null or jsonb_typeof(presentation) = 'object'),
   created_at          timestamptz not null default clock_timestamp(),
   unique (viewer_user_id, external_person_id, brief_version)
 );
