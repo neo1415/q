@@ -225,6 +225,27 @@ describe("partial words while they speak", () => {
     expect(pushed).toEqual([`/relationships/company/${SHIFTWELL}`]);
   });
 
+  it("typed self-correction: only the last page named moves, never the first", async () => {
+    const { asked } = stub(server);
+    await navigationHeard("Open Discover, no, actually Rehearsals");
+    expect(pushed).toEqual(["/rehearsals"]);
+    expect(asked).toEqual([]);
+  });
+
+  it("spoken self-correction: interim words prefetch at most; the finalized last target moves", async () => {
+    stub(server);
+    navigationHearingDelta("item_sc", "open discover");
+    await vi.waitFor(() => expect(prefetched).toContain("/discover"));
+    navigationHearingDelta("item_sc", ", no, actually rehearsals");
+    await vi.waitFor(() => expect(prefetched).toContain("/rehearsals"));
+    expect(pushed).toEqual([]);
+    await navigationHeardFor(
+      "item_sc",
+      "Open discover, no, actually rehearsals.",
+    );
+    expect(pushed).toEqual(["/rehearsals"]);
+  });
+
   it("'open discover... no wait' never moves", async () => {
     stub(server);
     navigationHearingDelta("item_2", "open discover");

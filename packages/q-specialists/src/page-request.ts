@@ -295,7 +295,53 @@ const TAKEN_BACK =
  * the Q API read it with the same code.
  */
 export function takenBack(text: string): boolean {
-  return TAKEN_BACK.test(text);
+  const corrected = selfCorrected(text);
+  return corrected.length === 0 || TAKEN_BACK.test(corrected);
+}
+
+/**
+ * Where a self-correction turns ("..., no, actually ...", "... sorry, ...",
+ * "..., I mean ..."): what follows the last one is the request.
+ */
+const CORRECTION =
+  /(?:[\s,.;:!?\u2014\u2026-]+|^)(?:(?:no+|nope)(?:\s*[,.;:!?\u2014\u2026-][\s,.;:!?\u2014\u2026-]*|\s+(?=actually|sorry|i\s+mean))(?:(?:actually|sorry|i\s+mean[t]?)\b)?|actually|sorry|i\s+mean[t]?)\b[\s,.;:!?\u2014\u2026-]*/giu;
+/** "Not Discover, Rehearsals" / "open not discover but rehearsals". */
+const NOT_THIS =
+  /^(?<lead>.*?)\bnot\s+(?:to\s+)?[^,;]+?(?:[,;]\s*|\s+but\s+)(?:but\s+)?(?:to\s+)?(?<rest>\S.*)$/iu;
+
+/**
+ * Founder acceptance (2026-10-10): "Open Discover, no, actually
+ * Rehearsals" moved nowhere. A sentence that corrects itself asks for the
+ * LAST place it names, never the first: the words after the last turn,
+ * carrying the request's verb when they have none of their own ("Open
+ * Rehearsals"). An empty string when nothing follows the turn (taken
+ * back). Unchanged when it does not correct itself.
+ */
+export function selfCorrected(text: string): string {
+  const said = text.trim();
+  let last: { end: number; start: number } | null = null;
+  for (const match of said.matchAll(CORRECTION)) {
+    // A bare "no" turns the sentence only with a pause after it ("No
+    // Limits Capital" is a name), and only after something was asked.
+    if (match.index === 0 && match[0].trim().length === said.length) continue;
+    last = { start: match.index, end: match.index + match[0].length };
+  }
+  let tail: string;
+  if (last !== null && last.start > 0) {
+    tail = said.slice(last.end);
+  } else {
+    const not = NOT_THIS.exec(withoutLeadIn(said));
+    const lead = not?.groups?.["lead"]?.trim() ?? "";
+    if (not === null || (lead.length > 0 && !PAGE_VERB.test(`${lead} x`))) {
+      return said;
+    }
+    tail = not.groups?.["rest"] ?? "";
+  }
+  const request = withoutLeadIn(tail.replace(/[.!?\u2026\s]+$/u, "")).trim();
+  if (request.length === 0) return "";
+  // A take-back after the turn ("no, actually never mind") stays one.
+  if (TAKEN_BACK.test(request)) return request;
+  return PAGE_VERB.test(request) ? request : `Open ${request}`;
 }
 
 /**
@@ -320,7 +366,7 @@ export function withoutLeadIn(text: string): string {
  * a proper name ("the Tensorgate page") is a record, for the tools.
  */
 export function pageRequestOf(text: string): PageRequest | null {
-  const said = withoutLeadIn(text).replace(/[.!?]+$/u, "");
+  const said = withoutLeadIn(selfCorrected(text)).replace(/[.!?]+$/u, "");
   if (said.length === 0 || said.length > 160) return null;
   if (HOME.test(said)) return { kind: "PAGE", target: d("HOME") };
   const verb = PAGE_VERB.exec(said);
@@ -395,7 +441,9 @@ export function wordsNamePage(text: string, target: PageTarget): boolean {
     `\\b(?:${names.map(escaped).join("|")})(?:s|es|'s)?\\b`,
     "iu",
   );
-  return text
+  // A self-correction names only its last place: the model's move to the
+  // one taken back ("Open Discover, no, actually Rehearsals") is not made.
+  return selfCorrected(text)
     .split(/(?<=[.!?])\s+|\s*[,;]\s*(?:but|so|and)\s+/u)
     .some((sentence) => named.test(sentence) && !NOT_A_MOVE.test(sentence));
 }

@@ -2,7 +2,12 @@ import type { QRecordPage } from "@capital-q/contracts";
 import { scoreOrgNames, scorePersonNames } from "@capital-q/q-core/names";
 import { spokenNameScore } from "@capital-q/q-tools";
 
-import { PAGE_VERB, pageRequestOf, withoutLeadIn } from "./page-request.js";
+import {
+  PAGE_VERB,
+  pageRequestOf,
+  selfCorrected,
+  withoutLeadIn,
+} from "./page-request.js";
 
 /**
  * RECOVERY-2026-10 (C, INC-1 live 2026-10-08 19:20-19:22): navigation by a
@@ -114,7 +119,8 @@ function fromObject(object: string): NamedRecordRequest | null {
  * to see the data room for Shiftwell." is the data room).
  */
 export function namedRecordRequestOf(text: string): NamedRecordRequest | null {
-  const sentences = text
+  // A self-correction names only its last place (page-request.ts).
+  const sentences = selfCorrected(text)
     .split(/(?<=[.!?])\s+/u)
     .map((sentence) => withoutLeadIn(sentence).replace(/[.!?]+$/u, ""))
     .filter((sentence) => sentence.length > 0 && sentence.length <= 160);
