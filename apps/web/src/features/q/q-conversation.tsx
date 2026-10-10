@@ -91,6 +91,7 @@ import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
 import { useFollowNewest } from "./follow-newest";
 import { threadInOrder, type SpokenLine } from "./spoken";
 import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
+import { readTypedDraft } from "./control/fast-navigation";
 
 /*
  * Q room W7: what opens on request -- a document Q made, the previous
@@ -1522,7 +1523,9 @@ export function QConversationPanel({
                 </Button>
               ) : null}
             </div>
-            <div className="w-full max-w-2xl">
+            {/* Latency: a record named as they type is resolved and its
+                page prefetched before Send (fast-navigation.ts). */}
+            <div className="w-full max-w-2xl" onInput={readTypedDraft}>
               <QComposer
                 id={COMPOSER_ID}
                 showContext={false}

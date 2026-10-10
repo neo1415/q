@@ -105,6 +105,8 @@ export const ROUTER_WAIT_MS = 2_000;
 /** A named control on the new page: how long it may take to register. */
 export const CONTROL_WAIT_MS = 4_000;
 const POLL_MS = 50;
+/** The first push and one more for a dropped transition; never a loop. */
+const MAX_PUSHES = 2;
 const LEDGER_MAX = 32;
 
 /** The not-found page's marker (app/not-found.tsx). */
@@ -128,15 +130,38 @@ export function navigationFailureMessage(reason: NavigationFailure): string {
   }
 }
 
+/**
+ * Where one move's time went, from the moment it was asked (ms): the first
+ * push to the router, the router committing the route (the page's loading
+ * frame: app/(app)/loading.tsx; its data streams in after), and the
+ * receipt. The typed send->VERIFIED budget is read from these.
+ */
+export type NavigationTiming = {
+  readonly intentId: string;
+  readonly expected: string;
+  readonly status: NavigationOutcome["status"];
+  readonly pushMs: number | null;
+  readonly commitMs: number | null;
+  readonly totalMs: number;
+  readonly pushes: number;
+};
+
+export const NAVIGATION_TIMING_EVENT = "cq:navigation-timing";
+
 type Entry = {
   state: NavigationState;
   readonly turn: string | null;
+  readonly askedAt: number;
+  pushedAt: number | null;
+  committedAt: number | null;
   readonly handle: NavigationHandle;
   readonly resolve: (outcome: NavigationOutcome) => void;
   readonly timers: Set<ReturnType<typeof setTimeout>>;
   readonly cancels: (() => void)[];
   pushed: number;
   verifying: boolean;
+  /** Pushes once more (bounded); set once a router took the first push. */
+  repush: (() => void) | null;
 };
 
 const ledger = new Map<string, Entry>();
@@ -197,6 +222,19 @@ function tabPart(): string {
 }
 
 const phaseListeners = new Set<(state: NavigationState) => void>();
+const timingListeners = new Set<(timing: NavigationTiming) => void>();
+
+/** Each move's timing, once, when it ends (latency budget, tests). */
+export function onNavigationTiming(
+  listener: (timing: NavigationTiming) => void,
+): () => void {
+  timingListeners.add(listener);
+  return () => timingListeners.delete(listener);
+}
+
+function now(): number {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
+}
 const outcomeListeners = new Set<(outcome: NavigationOutcome) => void>();
 
 /** Every phase change, in order (speech gating, tests). */
@@ -246,9 +284,24 @@ function setPhase(entry: Entry, next: Partial<NavigationState>): void {
         };
   entry.resolve(outcome);
   for (const listener of [...outcomeListeners]) listener(outcome);
+  const since = (at: number | null) =>
+    at === null ? null : Math.round(at - entry.askedAt);
+  const timing: NavigationTiming = {
+    intentId: outcome.intentId,
+    expected: outcome.expected,
+    status: outcome.status,
+    pushMs: since(entry.pushedAt),
+    commitMs: since(entry.committedAt),
+    totalMs: Math.round(now() - entry.askedAt),
+    pushes: entry.pushed,
+  };
+  for (const listener of [...timingListeners]) listener(timing);
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent(NAVIGATION_RECEIPT_EVENT, { detail: outcome }),
+    );
+    window.dispatchEvent(
+      new CustomEvent(NAVIGATION_TIMING_EVENT, { detail: timing }),
     );
   }
 }
@@ -377,17 +430,22 @@ function execute(entry: Entry): void {
     }
     const pushOnce = () => {
       entry.pushed += 1;
+      entry.pushedAt ??= now();
       // The router registered now: a remounted shell's, if it changed.
       (routerNow() ?? push)(expected);
+    };
+    entry.repush = () => {
+      if (terminal(entry.state.phase) || entry.verifying) return;
+      if (entry.pushed >= MAX_PUSHES) return;
+      if (landedOn(expected) !== null) return;
+      pushOnce();
     };
     pushOnce();
     // A transition the router dropped (a page rewriting its own URL while
     // the move was on its way) never lands: pushed once more, not reported.
-    later(entry, NAVIGATION_RETRY_MS, () => {
-      if (terminal(entry.state.phase) || entry.verifying) return;
-      if (landedOn(expected) !== null) return;
-      pushOnce();
-    });
+    // Usually that is seen at once (another route commits: noteRoute); the
+    // timer covers a drop nothing reports.
+    later(entry, NAVIGATION_RETRY_MS, () => entry.repush?.());
   });
   entry.cancels.push(cancel);
 }
@@ -449,6 +507,10 @@ export function requestNavigation(
     cancels: [],
     pushed: 0,
     verifying: false,
+    repush: null,
+    askedAt: now(),
+    pushedAt: null,
+    committedAt: null,
   };
   remember(entry);
   for (const listener of [...phaseListeners]) listener(entry.state);
@@ -468,7 +530,16 @@ export function requestNavigation(
 export function navigationNoteRoute(path: string): void {
   const entry = active;
   if (entry === null || entry.state.phase !== "EXECUTING") return;
-  if (arrivedAt(entry.state.expected, path)) verify(entry, path);
+  if (arrivedAt(entry.state.expected, path)) {
+    entry.committedAt ??= now();
+    verify(entry, path);
+    return;
+  }
+  // Latency (typed send->VERIFIED): another route committed while the move
+  // was on its way -- a page rewriting its own URL replaced the router's
+  // transition, so the push was dropped. Pushed again now, not after
+  // NAVIGATION_RETRY_MS of nothing happening.
+  if (entry.pushed > 0) entry.repush?.();
 }
 
 /** A move is on its way and has not landed (or failed) yet. */

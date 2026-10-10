@@ -37,6 +37,7 @@ import { QCanSee } from "./q-can-see";
 import { QBoard } from "./q-board";
 import { viewingOf, type QMoment } from "./q-moment";
 import { useQSession } from "./q-session";
+import { readTypedDraft } from "./control/fast-navigation";
 
 /**
  * Q beside the page: the dock's expanded view of the one conversation
@@ -237,7 +238,12 @@ export function QSheetConversation({
         ) : null}
       </div>
 
-      <div className="sticky bottom-0 z-(--cq-z-sticky) flex flex-col gap-2 bg-(--cq-surface-raised) pt-2 pb-[max(8px,var(--cq-safe-bottom))]">
+      <div
+        className="sticky bottom-0 z-(--cq-z-sticky) flex flex-col gap-2 bg-(--cq-surface-raised) pt-2 pb-[max(8px,var(--cq-safe-bottom))]"
+        // Latency: a record named as they type is resolved and its page
+        // prefetched before Send (fast-navigation.ts).
+        onInput={readTypedDraft}
+      >
         <QComposer
           // A new draft is a new starting point, not an edit of the last.
           key={seed ?? ""}

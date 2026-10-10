@@ -18,8 +18,10 @@ import {
   NOT_FOUND_MARKER,
   onNavigationOutcome,
   onNavigationPhase,
+  onNavigationTiming,
   requestNavigation,
   type NavigationOutcome,
+  type NavigationTiming,
   type NavigationPhase,
 } from "../src/features/q/control/navigation-lifecycle";
 import {
@@ -254,6 +256,38 @@ describe("the lifecycle", () => {
     expect(pushes).toEqual(["/capital", "/capital"]);
     land("/capital");
     await expect(move.settled).resolves.toMatchObject({ status: "DONE" });
+  });
+
+  it("latency: a dropped push is re-pushed the moment another route commits, not 2.5 s later", async () => {
+    const move = requestNavigation({ path: "/capital" });
+    noteRoute("/discover?tab=yours");
+    // At once: the page's own rewrite is the sign the push was dropped.
+    expect(pushes).toEqual(["/capital", "/capital"]);
+    await vi.advanceTimersByTimeAsync(NAVIGATION_RETRY_MS + 10);
+    // The timed retry does not push a third time.
+    expect(pushes).toEqual(["/capital", "/capital"]);
+    land("/capital");
+    await expect(move.settled).resolves.toMatchObject({ status: "DONE" });
+  });
+
+  it("latency: each move reports where its time went (push, route commit, verified)", async () => {
+    const timings: NavigationTiming[] = [];
+    stops.push(onNavigationTiming((t) => timings.push(t)));
+    const move = requestNavigation({ path: "/capital" });
+    await vi.advanceTimersByTimeAsync(120);
+    land("/capital");
+    await move.settled;
+    expect(timings).toHaveLength(1);
+    const [timing] = timings;
+    expect(timing).toMatchObject({
+      intentId: move.intentId,
+      expected: "/capital",
+      status: "DONE",
+      pushes: 1,
+    });
+    expect(timing?.pushMs).toBeLessThan(20);
+    expect(timing?.commitMs).toBeGreaterThanOrEqual(100);
+    expect(timing?.totalMs).toBeGreaterThanOrEqual(timing?.commitMs ?? 0);
   });
 
   it("never landing at all: FAILED NOT_LANDED after the bound, exactly once", async () => {

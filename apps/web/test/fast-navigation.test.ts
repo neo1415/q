@@ -25,6 +25,7 @@ import {
   navigationHeard,
   navigationHeardFor,
   navigationHearingDelta,
+  navigationTyping,
   resetFastNavigation,
   setNavigationTransport,
   type FastNavigationTransport,
@@ -208,6 +209,20 @@ describe("partial words while they speak", () => {
       { text: "Take me to Shiftwell relationship", final: false },
     ]);
     expect(pushed).toEqual([]);
+  });
+
+  it("latency: words being typed resolve and prefetch the record before Send; Send asks nothing more", async () => {
+    const { asked } = stub(server);
+    const say = "Take me to Shiftwell relationship";
+    navigationTyping("Take me to Shift");
+    navigationTyping(say);
+    await vi.waitFor(() =>
+      expect(prefetched).toEqual([`/relationships/company/${SHIFTWELL}`]),
+    );
+    expect(pushed).toEqual([]);
+    await navigationHeard(say);
+    expect(asked).toEqual([{ text: say, final: false }]);
+    expect(pushed).toEqual([`/relationships/company/${SHIFTWELL}`]);
   });
 
   it("'open discover... no wait' never moves", async () => {
