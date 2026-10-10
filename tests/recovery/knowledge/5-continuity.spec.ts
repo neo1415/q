@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
-import { awaits } from "../support/expected-red.js";
 import {
   answerText,
-  READ_DISCOVER_FINTECH,
+  DISCOVER_FINTECH_RULES,
   cardCompanyIds,
   cardNames,
   modelCallsSince,
@@ -31,13 +30,40 @@ import { CAST } from "../support/stack.js";
 test("K5 references survive navigation in one conversation", async ({
   browser,
 }) => {
-  awaits(
-    ["C Part 5", "B Part 1"],
-    "cards are not navigable references yet; and no discovery fast path",
-  );
   const page = await (await contextAs(browser, CAST.investor)).newPage();
+  // The follow-ups are read as plain questions. First, because a rule's
+  // `user` matches the whole prompt, recent turns included: the discovery
+  // readings would otherwise also read "How much are they raising?" (its
+  // prompt quotes "Show me three fintech companies") as a discovery, and
+  // the analyst is never asked (gate cd52c0ea).
+  const followUps = "How much are they raising|Compare the first two";
   await useScript([
-    READ_DISCOVER_FINTECH,
+    {
+      name: "k5-skim-follow-up",
+      when: { task: "TURN_SKIM", user: followUps },
+      reply: {
+        json: {
+          kind: "OTHER",
+          confidence: "HIGH",
+          count: null,
+          discover: null,
+        },
+      },
+    },
+    {
+      name: "k5-reader-follow-up",
+      when: { task: "TURN_READER", user: followUps },
+      reply: {
+        json: {
+          kind: "QUESTION_TO_Q",
+          confidence: "HIGH",
+          transcript: "CLEAR",
+          question: null,
+          aboutNamedOther: false,
+        },
+      },
+    },
+    ...DISCOVER_FINTECH_RULES,
     {
       name: "they",
       when: { task: "COMPANY_ANALYST", user: "raising" },
@@ -49,7 +75,7 @@ test("K5 references survive navigation in one conversation", async ({
       reply: answer("Side by side, on what each has shared."),
     },
   ]);
-  await page.goto("/home");
+  await page.goto("/home?new=1");
   const start = (await newestRun(CAST.investor))?.runId ?? null;
   await send(page, "Show me three fintech companies");
   const cards = page.locator("[data-ac-cards] [data-ac-card]");
@@ -61,8 +87,9 @@ test("K5 references survive navigation in one conversation", async ({
   const firstId = ids[0] ?? "";
   const conversation = listed.conversationId;
 
-  // 1. The card opens its company.
-  await cards.first().click();
+  // 1. The card opens its company: through its Open control (R3 K5; a tap
+  // on the card itself keeps the spotlight, founder-requested).
+  await cards.first().locator("[data-ac-open]").click();
   await expect(page, "the first card opens its company").toHaveURL(
     new RegExp(`/company/${firstId}`, "u"),
     { timeout: 30_000 },

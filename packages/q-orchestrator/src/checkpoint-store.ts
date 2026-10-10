@@ -1,4 +1,12 @@
+import type { RunnableConfig } from "@langchain/core/runnables";
 import { MemorySaver, type BaseCheckpointSaver } from "@langchain/langgraph";
+import {
+  WRITES_IDX_MAP,
+  type ChannelVersions,
+  type Checkpoint,
+  type CheckpointMetadata,
+  type PendingWrite,
+} from "@langchain/langgraph-checkpoint";
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import pg from "pg";
 
@@ -71,18 +79,155 @@ export function createPostgresQCheckpointStore(options: {
     (client as { query: (...args: unknown[]) => unknown }).query = (
       ...args: unknown[]
     ) => {
-      countRoundTrip();
+      countRoundTrip("checkpoint");
       return query(...args);
     };
   });
-  const saver = new PostgresSaver(pool, undefined, {
-    schema: Q_CHECKPOINT_SCHEMA,
-  });
+  const saver = new BatchedPostgresSaver(pool);
   return {
     saver,
     kind: "POSTGRES",
     close: () => saver.end(),
   };
+}
+
+/** `($1, $2, …), ($n+1, …)` for `rows` rows of `width` parameters each. */
+function valuesList(rows: number, width: number, offset = 0): string {
+  return Array.from({ length: rows }, (_, row) => {
+    const cells = Array.from(
+      { length: width },
+      (_, cell) => `$${String(offset + row * width + cell + 1)}`,
+    );
+    return `(${cells.join(", ")})`;
+  }).join(", ");
+}
+
+/**
+ * R5: the library saver writes a checkpoint as BEGIN, one INSERT per
+ * channel blob, the checkpoint row and COMMIT, and a task's writes as
+ * BEGIN, one INSERT per write and COMMIT — each statement a round trip.
+ * Here each is ONE statement (a data-modifying CTE or a multi-row
+ * INSERT): the same rows, the same conflict rules, and a single statement
+ * is atomic on its own, so nothing is lost by dropping BEGIN/COMMIT.
+ * Reads and deletes are the library's own.
+ */
+class BatchedPostgresSaver extends PostgresSaver {
+  readonly #pool: pg.Pool;
+
+  constructor(pool: pg.Pool) {
+    super(pool, undefined, { schema: Q_CHECKPOINT_SCHEMA });
+    this.#pool = pool;
+  }
+
+  override async put(
+    config: RunnableConfig,
+    checkpoint: Checkpoint,
+    metadata: CheckpointMetadata,
+    newVersions: ChannelVersions,
+  ): Promise<RunnableConfig> {
+    const configurable = config.configurable;
+    if (configurable === undefined) {
+      throw new Error(`Missing "configurable" field in "config" param`);
+    }
+    const threadId = String(configurable["thread_id"]);
+    const checkpointNs = String(configurable["checkpoint_ns"] ?? "");
+    const parentId =
+      (configurable["checkpoint_id"] as string | undefined) ?? null;
+    // The library types the dumped metadata as `any`; it is a JSON value.
+    const metadataDump: Promise<unknown> = this._dumpMetadata(metadata);
+    const [blobs, serializedMetadata] = await Promise.all([
+      this._dumpBlobs(
+        threadId,
+        checkpointNs,
+        checkpoint.channel_values,
+        newVersions,
+      ),
+      metadataDump,
+    ]);
+    const blobParams = blobs.flatMap(
+      ([t, ns, channel, version, type, blob]) => [
+        t,
+        ns,
+        channel,
+        version,
+        type,
+        blob === undefined ? null : Buffer.from(blob),
+      ],
+    );
+    const checkpointParams = [
+      threadId,
+      checkpointNs,
+      checkpoint.id,
+      parentId,
+      this._dumpCheckpoint(checkpoint),
+      serializedMetadata,
+    ];
+    const upsertCheckpoint = `insert into ${Q_CHECKPOINT_SCHEMA}.checkpoints
+        (thread_id, checkpoint_ns, checkpoint_id, parent_checkpoint_id, checkpoint, metadata)
+      values ${valuesList(1, 6, blobParams.length)}
+      on conflict (thread_id, checkpoint_ns, checkpoint_id)
+      do update set checkpoint = excluded.checkpoint, metadata = excluded.metadata`;
+    const text =
+      blobs.length === 0
+        ? upsertCheckpoint
+        : `with blobs as (
+             insert into ${Q_CHECKPOINT_SCHEMA}.checkpoint_blobs
+               (thread_id, checkpoint_ns, channel, version, type, blob)
+             values ${valuesList(blobs.length, 6)}
+             on conflict (thread_id, checkpoint_ns, channel, version) do nothing
+           )
+           ${upsertCheckpoint}`;
+    await this.#pool.query(text, [...blobParams, ...checkpointParams]);
+    return {
+      configurable: {
+        thread_id: threadId,
+        checkpoint_ns: checkpointNs,
+        checkpoint_id: checkpoint.id,
+      },
+    };
+  }
+
+  override async putWrites(
+    config: RunnableConfig,
+    writes: PendingWrite[],
+    taskId: string,
+  ): Promise<void> {
+    if (writes.length === 0) return;
+    const configurable = config.configurable ?? {};
+    // The library's rule: special channels overwrite, ordinary ones keep
+    // the first write.
+    const overwrite = writes.every(([channel]) => channel in WRITES_IDX_MAP);
+    const dumped = await this._dumpWrites(
+      String(configurable["thread_id"]),
+      String(configurable["checkpoint_ns"] ?? ""),
+      String(configurable["checkpoint_id"]),
+      taskId,
+      writes,
+    );
+    // One statement may not touch a row twice: where the library would
+    // have written the same index twice in turn, keep what it would have
+    // left (the last on overwrite, the first otherwise).
+    const byIdx = new Map<number, (typeof dumped)[number]>();
+    for (const row of dumped) {
+      if (overwrite || !byIdx.has(row[4])) byIdx.set(row[4], row);
+    }
+    const rows = [...byIdx.values()];
+    const params = rows.flatMap((row) => {
+      const blob = row[7];
+      return [...row.slice(0, 7), Buffer.from(blob)];
+    });
+    await this.#pool.query(
+      `insert into ${Q_CHECKPOINT_SCHEMA}.checkpoint_writes
+         (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, type, blob)
+       values ${valuesList(rows.length, 8)}
+       on conflict (thread_id, checkpoint_ns, checkpoint_id, task_id, idx) ${
+         overwrite
+           ? "do update set channel = excluded.channel, type = excluded.type, blob = excluded.blob"
+           : "do nothing"
+       }`,
+      params,
+    );
+  }
 }
 
 /**

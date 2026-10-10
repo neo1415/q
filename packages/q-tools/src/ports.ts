@@ -14,6 +14,7 @@ import type { ExploreToolPort } from "./tools/explore.js";
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import type { CompanyQueryPort } from "@capital-q/companies";
 import type {
+  CompanyRaiseReader,
   CurrentSlateExplanationService,
   DiscoveryService,
   FitService,
@@ -25,6 +26,7 @@ import type {
 import type {
   IncomingInterestDto,
   PermittedContextPlan,
+  RelationshipBrief,
   RelationshipStatusDto,
   RelationshipSummaryDto,
   VisibilityStateDto,
@@ -147,8 +149,10 @@ export type OwnRelationship = RelationshipSummaryDto & {
    * The latest chat message in the relationship, by side: THEM means the
    * other side wrote last and is waiting for a reply (live 2026-10-08:
    * Q said nothing needed Marcus while Zino Aviation's message waited).
-   * Absent or null: no messages, or not read.
+   * Null with `lastMessageRead` OK: no messages. Absent or UNAVAILABLE
+   * read: not known -- never "no messages" (TensorGate, 2026-10-09).
    */
+  readonly lastMessageRead?: "OK" | "UNAVAILABLE" | undefined;
   readonly lastMessage?:
     | {
         readonly from: "THEM" | "YOU";
@@ -205,6 +209,17 @@ export type RelationshipIntelligencePort = {
         readonly answeredRequests: readonly string[];
         readonly sharedDocuments: readonly string[];
       } | null>)
+    | undefined;
+  /**
+   * The Relationship Brief (R1) of one relationship the actor is a party
+   * to, assembled by the Network context as the actor. Null: not a party
+   * or nothing this side may see. Absent: not composed.
+   */
+  readonly brief?:
+    | ((
+        actor: ActorContext,
+        relationshipId: string,
+      ) => Promise<RelationshipBrief | null>)
     | undefined;
   readonly byRelationship: (
     actor: ActorContext,
@@ -439,6 +454,12 @@ export type QToolPorts = {
   // end ADMIN-3 block
   readonly companies: CompanyQueryPort;
   readonly capital: CapitalObjectiveQueryPort;
+  /**
+   * R2: the one company read for the raise (`raiseFor`), the same the
+   * Discover card and the profile render. Absent: Q says only what the
+   * disclosed objective says, as before.
+   */
+  readonly companyRaise?: CompanyRaiseReader | undefined;
   readonly mandates: InvestorMandateQueryPort;
   readonly investors: InvestorOrganisationQueryPort;
   readonly authorization: AuthorizationService;

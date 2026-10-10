@@ -1,8 +1,10 @@
 import {
+  CompanyRaiseViewSchema,
   FIT_BAND_LABELS,
   FIT_PARAMETER_LABELS,
   FitProfileDtoSchema,
   MoneySchema,
+  type CompanyRaiseView,
   QAnswerCardsBlockSchema,
   fitScoreOutOf10,
   type FitProfileDto,
@@ -37,8 +39,31 @@ export type RunFit = {
   readonly about?: string | null | undefined;
   /** The current raise, only as this reader may see it. */
   readonly raise?: Money | null | undefined;
+  /** R2: the raise as the Discover card and the profile say it. */
+  readonly raiseView?: CompanyRaiseView | undefined;
   readonly profile: FitProfileDto;
 };
+
+/**
+ * The card's raise in words, from the one raise read when the tool carried
+ * it (R2): a pitch claim is said as the company's pitch, never as the
+ * disclosed raise. Without it, the disclosed raise as before.
+ */
+export function cardRaiseWords(
+  fit: Pick<RunFit, "raise" | "raiseView">,
+): string | null {
+  const view = fit.raiseView;
+  if (view === undefined) return raiseWords(fit.raise);
+  if (view.source === "NONE") return null;
+  const words = raiseWords(view.money);
+  if (words === null) return null;
+  return view.source === "PITCH_CLAIM" ? `${words} (from their pitch)` : words;
+}
+
+function raiseViewOf(value: unknown): CompanyRaiseView | undefined {
+  const parsed = CompanyRaiseViewSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
 
 /** The raise as said: "$2 million", "500 million naira". */
 export function raiseWords(raise: Money | null | undefined): string | null {
@@ -95,6 +120,7 @@ export function fitsInOutcome(
     readonly name?: unknown;
     readonly about?: unknown;
     readonly raise?: unknown;
+    readonly raiseView?: unknown;
     readonly profile?: unknown;
     readonly comparison?: { readonly entries?: unknown } | null;
   } | null;
@@ -111,6 +137,7 @@ export function fitsInOutcome(
         line: null,
         about: aboutOf(data.about),
         raise: moneyOf(data.raise),
+        raiseView: raiseViewOf(data.raiseView),
         profile: profile.data,
       },
     ];
@@ -125,6 +152,7 @@ export function fitsInOutcome(
         readonly line?: unknown;
         readonly about?: unknown;
         readonly raise?: unknown;
+        readonly raiseView?: unknown;
         readonly profile?: unknown;
       };
       const profile = FitProfileDtoSchema.safeParse(row.profile);
@@ -136,6 +164,7 @@ export function fitsInOutcome(
           line: typeof row.line === "string" ? row.line : null,
           about: aboutOf(row.about),
           raise: moneyOf(row.raise),
+          raiseView: raiseViewOf(row.raiseView),
           profile: profile.data,
         },
       ];
@@ -231,7 +260,7 @@ function cardOf(fit: RunFit): Omit<QAnswerCard, "key" | "hue"> {
     name: fit.name.slice(0, 80),
     line: (fit.line ?? band).slice(0, 140),
     about: fit.about ?? null,
-    raise: raiseWords(fit.raise),
+    raise: cardRaiseWords(fit),
     fit:
       numeric === null || !Number.isFinite(numeric) || known.length === 0
         ? null

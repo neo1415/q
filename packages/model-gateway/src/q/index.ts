@@ -115,6 +115,7 @@ import {
 import { answerPathOf } from "./answer-path.js";
 import { forModelReading } from "./pending-confirmation.js";
 import { createSingleFlight } from "./single-flight.js";
+import { stableToolOrder } from "./tool-order.js";
 import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
@@ -149,7 +150,7 @@ export {
   type QTurnSkimmer,
 } from "./turn-skim.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
-import { onScreenCompanyFact } from "./company-fact.js";
+import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
 import { manifestFacts, manifestReads } from "./manifest-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
@@ -1423,6 +1424,36 @@ export type ModelGatewayQAnswerDependencies = {
    */
   readonly uiActReceipts?:
     ((actor: QAnswerRequest["actor"]) => readonly string[]) | undefined;
+  /**
+   * K Part 4 (Tier A): their own mandate read, as `get_investor_mandate`
+   * returned it, kept per actor under the context-cache scope and served
+   * only while the mandate's version is current. Used only where this
+   * run may read the mandate at all; a miss reads the tool, as before.
+   */
+  readonly ownMandateReads?:
+    | {
+        readonly get: (actor: QAnswerRequest["actor"]) => Promise<unknown>;
+        readonly remember: (
+          actor: QAnswerRequest["actor"],
+          data: unknown,
+        ) => Promise<void>;
+      }
+    | undefined;
+  /**
+   * K Part 4 (Tier A): a founder's own company, from their working
+   * snapshot (their own organisation's canonical record, kept per actor
+   * under the context-cache scope while its version is current). Used only
+   * when this run's plan holds that company's profile scope.
+   */
+  readonly ownCompanySnapshot?:
+    | ((actor: QAnswerRequest["actor"]) => Promise<{
+        readonly companyId: string;
+        readonly name: string;
+        readonly shortDescription: string | null;
+        readonly stageCode: string | null;
+        readonly countryCode: string | null;
+      } | null>)
+    | undefined;
   readonly sensitivity?: QAnswerSensitivityPolicy | undefined;
   /**
    * What KIND of material this composition handles (doc 15 §62). Omitted
@@ -2007,6 +2038,18 @@ export function createModelGatewayQAnswer(
     // The reads below are independent of each other and run side by
     // side; each fills its own facts (speed sweep 2026-10-01: in turn
     // they took ~0.6 s before the model was asked anything).
+    // K Part 4: a founder's own company from their Tier A snapshot, as a
+    // fact, only where this run's plan holds that company's profile.
+    let ownCompany: AuthorisedFact | null = null;
+    const ownCompanyRead = (async (): Promise<void> => {
+      if (ownInvestor !== null || dependencies.ownCompanySnapshot === undefined)
+        return;
+      const own = await dependencies
+        .ownCompanySnapshot(request.actor)
+        .catch(() => null);
+      if (own === null) return;
+      ownCompany = ownCompanySnapshotFact(own, plan);
+    })();
     const mandateRead = (async (): Promise<void> => {
       if (ownInvestor !== null && prefetchTools.has("get_investor_mandate")) {
         const call = {
@@ -2014,6 +2057,27 @@ export function createModelGatewayQAnswer(
           name: "get_investor_mandate",
           arguments: { investorOrganisationId: ownInvestor },
         };
+        // K Part 4: the Tier A copy of this same read, when it is current
+        // (only here, where this run's plan offers the mandate tool).
+        const kept = await (
+          dependencies.ownMandateReads?.get(request.actor) ??
+          Promise.resolve(null)
+        ).catch(() => null);
+        if (kept !== null && kept !== undefined) {
+          const fact = ownProfileFact(kept);
+          if (fact !== null) {
+            ownProfile = fact;
+            ownProfileCall = {
+              toolName: "investor_mandate.get",
+              providerName: call.name,
+              status: "SUCCEEDED",
+              failureCode: null,
+              latencyMs: 0,
+            };
+            prepareMs["mandateFromSnapshot"] = 1;
+            return;
+          }
+        }
         const outcome = await tools.execute(call, toolContext);
         ownProfileCall = {
           toolName: outcome.toolName,
@@ -2024,6 +2088,9 @@ export function createModelGatewayQAnswer(
         };
         if (outcome.result.ok) {
           ownProfile = ownProfileFact(outcome.result.data);
+          await dependencies.ownMandateReads
+            ?.remember(request.actor, outcome.result.data)
+            .catch(() => undefined);
         }
       }
     })();
@@ -2403,6 +2470,7 @@ export function createModelGatewayQAnswer(
     })();
     await Promise.all([
       timed("mandate", mandateRead),
+      timed("ownCompany", ownCompanyRead),
       timed("relationship", relationshipRead),
       timed("standing", standingDone),
       timed("index", indexDone),
@@ -2431,6 +2499,7 @@ export function createModelGatewayQAnswer(
       memory,
       ownProfile,
       ownProfileCall,
+      ownCompany,
       ownInvestor,
       relationship,
       relationshipCall,
@@ -2542,6 +2611,7 @@ export function createModelGatewayQAnswer(
         availableForRun,
         memory,
         ownProfile,
+        ownCompany,
         ownProfileCall,
         relationship,
         relationshipCall,
@@ -2652,6 +2722,7 @@ export function createModelGatewayQAnswer(
           mandate: ownProfile !== null,
           onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
           qWork: ownDay !== null,
+          ownCompany: ownCompany !== null,
         },
       });
       if (route.path === "PREPARED_CONTEXT") offered = [];
@@ -2783,6 +2854,7 @@ export function createModelGatewayQAnswer(
         ...(ownReadiness === null ? [] : [ownReadiness]),
         ...onboardingFacts,
         ...(ownProfile === null ? [] : [ownProfile]),
+        ...(ownCompany === null ? [] : [ownCompany]),
         ...(onScreenCompany === null ? [] : [onScreenCompany]),
         ...namedCompanies,
         ...(onScreenDaily === null ? [] : [onScreenDaily]),
@@ -3710,7 +3782,8 @@ export function createModelGatewayQAnswer(
                   output: textRound
                     ? ({ kind: "TEXT" } as const)
                     : rendered.output,
-                  tools: offered.map((tool) => tool.definition),
+                  // K7: one stable order, so the cached prefix holds.
+                  tools: stableToolOrder(offered),
                 },
                 options,
               );

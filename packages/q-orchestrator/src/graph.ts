@@ -15,7 +15,7 @@ import type {
 } from "@capital-q/contracts";
 
 type QActionExecuteId = QActionProposalId;
-import { markRoundTrips } from "@capital-q/database";
+import { markRoundTrips, withRoundTripPhase } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import {
   QRunNotFoundError,
@@ -207,7 +207,9 @@ export function buildQGraph(
   const retrievalTaken = new Set<string>();
 
   async function boundary(state: QGraphState): Promise<QRunRecord> {
-    const run = await runtime.readRun(ref(state));
+    const run = await withRoundTripPhase("lifecycle", () =>
+      runtime.readRun(ref(state)),
+    );
     if (run === null) {
       throw new QRunNotFoundError();
     }
@@ -230,20 +232,26 @@ export function buildQGraph(
     to: QRunStatus,
     stage?: QVisibleStage,
   ): Promise<QRunRecord> {
-    return honour(await runtime.advance(ref(state), to, stage));
+    return honour(
+      await withRoundTripPhase("lifecycle", () =>
+        runtime.advance(ref(state), to, stage),
+      ),
+    );
   }
 
   /** Ask the firewall for this run, now. */
   async function plan(state: QGraphState) {
-    return firewall.plan({
-      actor: actorFor(state),
-      runId: state.runId,
-      correlationId: state.correlationId,
-      capability: state.capability,
-      subjects: state.subjects,
-      viewing: state.viewing,
-      screen: state.screen,
-    });
+    return withRoundTripPhase("firewall", () =>
+      firewall.plan({
+        actor: actorFor(state),
+        runId: state.runId,
+        correlationId: state.correlationId,
+        capability: state.capability,
+        subjects: state.subjects,
+        viewing: state.viewing,
+        screen: state.screen,
+      }),
+    );
   }
 
   // Deterministic checks only: the run exists, is executable, carries a
@@ -265,10 +273,12 @@ export function buildQGraph(
     let run: QRunRecord;
     try {
       run = honour(
-        await runtime.advanceThrough(ref(state), [
-          "CONTEXT_RESOLUTION",
-          "POLICY_CHECK",
-        ]),
+        await withRoundTripPhase("lifecycle", () =>
+          runtime.advanceThrough(ref(state), [
+            "CONTEXT_RESOLUTION",
+            "POLICY_CHECK",
+          ]),
+        ),
       );
       if (run.conversationId === null) {
         throw new Error("q run has no conversation");
@@ -281,13 +291,15 @@ export function buildQGraph(
     // Preflight has passed: the person's own latest turn may be read now,
     // beside the firewall (ADR 0035). Own words and own turns only; the
     // reading is dropped unused if any later stage refuses the run.
-    answer.preread?.({
-      runId: state.runId,
-      tenantId: state.tenantId,
-      actor: actorFor(state),
-      correlationId: state.correlationId,
-      signal: config.signal,
-    });
+    withRoundTripPhase("preread", () =>
+      answer.preread?.({
+        runId: state.runId,
+        tenantId: state.tenantId,
+        actor: actorFor(state),
+        correlationId: state.correlationId,
+        signal: config.signal,
+      }),
+    );
     return { preflight: "PASSED" };
   };
 
@@ -321,7 +333,9 @@ export function buildQGraph(
       await advance(state, "PLANNING");
     } else {
       honour(
-        await runtime.advanceThrough(ref(state), ["PLANNING", "RETRIEVAL"]),
+        await withRoundTripPhase("lifecycle", () =>
+          runtime.advanceThrough(ref(state), ["PLANNING", "RETRIEVAL"]),
+        ),
       );
       retrievalTaken.add(state.runId);
     }
@@ -386,9 +400,8 @@ export function buildQGraph(
       );
     }
     livePlans.set(state.runId, decision.plan);
-    const outcome = await retrieval.retrieve(
-      subjectContext(state),
-      decision.plan,
+    const outcome = await withRoundTripPhase("retrieval", () =>
+      retrieval.retrieve(subjectContext(state), decision.plan),
     );
     return {
       context: "AUTHORISED",
@@ -419,17 +432,19 @@ export function buildQGraph(
     // The engine's signal reaches the model call: a cancelled invocation
     // stops waiting on the provider instead of finishing an answer nobody
     // asked for.
-    const outcome = await answer.answer({
-      ...subjectContext(state),
-      actor: actorFor(state),
-      correlationId: state.correlationId,
-      retrieval:
-        state.retrieval === "AUTHORISED_REFERENCES"
-          ? { kind: "AUTHORISED_REFERENCES", referenceCount: 0 }
-          : { kind: "NOT_CONFIGURED" },
-      plan: current,
-      signal: config.signal,
-    });
+    const outcome = await withRoundTripPhase("answer", () =>
+      answer.answer({
+        ...subjectContext(state),
+        actor: actorFor(state),
+        correlationId: state.correlationId,
+        retrieval:
+          state.retrieval === "AUTHORISED_REFERENCES"
+            ? { kind: "AUTHORISED_REFERENCES", referenceCount: 0 }
+            : { kind: "NOT_CONFIGURED" },
+        plan: current,
+        signal: config.signal,
+      }),
+    );
     switch (outcome.kind) {
       case "ANSWERED":
         return {
@@ -465,12 +480,14 @@ export function buildQGraph(
       }
       current = decision.plan;
     }
-    const outcome = await actions.prepare({
-      ...subjectContext(state),
-      actor: actorFor(state),
-      correlationId: state.correlationId,
-      plan: current,
-    });
+    const outcome = await withRoundTripPhase("action", () =>
+      actions.prepare({
+        ...subjectContext(state),
+        actor: actorFor(state),
+        correlationId: state.correlationId,
+        plan: current,
+      }),
+    );
     if (outcome.kind === "NONE") {
       return { action: "NONE", actionId: null, approvalId: null };
     }
@@ -494,14 +511,16 @@ export function buildQGraph(
     }
     interrupt(Q_APPROVAL_PAUSE);
     await boundary(state);
-    const outcome = await actions.executeApproved({
-      actor: actorFor(state),
-      runId: state.runId,
-      tenantId: state.tenantId,
-      correlationId: state.correlationId,
-      actionId: state.actionId as QActionExecuteId,
-      signal: config.signal,
-    });
+    const outcome = await withRoundTripPhase("action", () =>
+      actions.executeApproved({
+        actor: actorFor(state),
+        runId: state.runId,
+        tenantId: state.tenantId,
+        correlationId: state.correlationId,
+        actionId: state.actionId as QActionExecuteId,
+        signal: config.signal,
+      }),
+    );
     switch (outcome.kind) {
       case "EXECUTED":
       case "ALREADY_EXECUTED":

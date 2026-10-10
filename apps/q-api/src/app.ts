@@ -31,6 +31,7 @@ import {
 } from "@capital-q/observability";
 
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerRequestTiming } from "./http/request-timing.js";
 import { registerQConversationRoutes } from "./http/q-conversations.js";
 import type { QRoomFeed } from "./room/feed.js";
 import { registerQRoomRoutes } from "./room/routes.js";
@@ -366,6 +367,7 @@ export function createApp(
   });
 
   registerProblemHandling(app, logger);
+  registerRequestTiming(app);
 
   // Graceful shutdown: no new connections, idle ones closed now, active
   // ones given a bounded grace and then closed, so a deploy never waits

@@ -903,14 +903,15 @@ describe("use_capability: a tool outside the turn's focus, loaded and called in 
     });
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
+    // Sent in one stable name order (K7: the cached prefix holds).
     expect(alpha.calls[0]?.request.tools.map((t) => t.name)).toEqual([
-      "use_capability",
       "get_company",
+      "use_capability",
     ]);
     expect(alpha.calls[1]?.request.tools.map((t) => t.name)).toEqual([
-      "use_capability",
       "get_company",
       "propose_meeting",
+      "use_capability",
     ]);
     expect(executed.map((e) => e.name)).toEqual([
       "use_capability",

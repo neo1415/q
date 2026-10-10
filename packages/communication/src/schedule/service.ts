@@ -352,6 +352,15 @@ export type ScheduleService = {
     actor: ActorContext,
     relationshipId: string,
   ) => Promise<readonly MeetingView[] | null>;
+  /**
+   * R1 batching: each listed relationship's calls as `listMeetings` shows
+   * them, in one read, scoped in SQL to relationships where the person's
+   * organisation is a party (others are absent).
+   */
+  readonly listMeetingsForRelationships: (
+    actor: ActorContext,
+    relationshipIds: readonly string[],
+  ) => Promise<ReadonlyMap<string, readonly MeetingView[]>>;
   readonly upcomingMeetings: (
     actor: ActorContext,
   ) => Promise<readonly MeetingView[]>;
@@ -1309,6 +1318,33 @@ export function createScheduleService(
           // who were not invited see nothing of the link (view() hides it).
           .filter((record) => record.status !== "FAILED")
           .map((record) => viewFor(record, actor.userId))
+      );
+    },
+
+    listMeetingsForRelationships: async (actor, relationshipIds) => {
+      const ids = relationshipIds.filter((id) => UUID.test(id)).slice(0, 50);
+      if (
+        actor.actorType !== "HUMAN" ||
+        actor.organisationId === undefined ||
+        ids.length === 0
+      ) {
+        return new Map();
+      }
+      if (store.listMeetingsForRelationships === undefined) {
+        throw new Error("batched meetings read not composed");
+      }
+      const byRelationship = await store.listMeetingsForRelationships(
+        actor.organisationId,
+        ids,
+        50,
+      );
+      return new Map(
+        [...byRelationship].map(([id, records]) => [
+          id,
+          records
+            .filter((record) => record.status !== "FAILED")
+            .map((record) => viewFor(record, actor.userId)),
+        ]),
       );
     },
 

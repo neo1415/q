@@ -1,5 +1,9 @@
 import type { DatabaseHealth } from "@capital-q/database";
 import type { DealCloseService } from "@capital-q/network";
+import {
+  createRelationshipBriefBatchSources,
+  createRelationshipBriefSources,
+} from "@capital-q/network";
 import type { CapitalRoundService } from "@capital-q/capital";
 import type {
   CompanyDeckService,
@@ -156,6 +160,7 @@ import {
   type OrganisationRoutesDependencies,
 } from "./http/organisations.js";
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerRequestTiming } from "./http/request-timing.js";
 // P5 block: brand theming
 import type { BrandThemeStore } from "@capital-q/platform-admin";
 
@@ -443,6 +448,7 @@ export function createApp(
   });
 
   registerProblemHandling(app, logger);
+  registerRequestTiming(app);
 
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the
   // process is alive and performs no dependency checks. Readiness asks the
@@ -860,6 +866,24 @@ export function createApp(
       outcomes: modules.outcomes,
       diligence: modules.diligence,
       namedPhotos: modules.namedPhotos,
+      // R1: the Relationship Brief over the same services as the screens.
+      // Without chat or schedule composed, those sources read UNAVAILABLE.
+      briefSources:
+        modules.chat !== undefined && modules.schedule !== undefined
+          ? createRelationshipBriefSources({
+              chat: modules.chat,
+              schedule: modules.schedule,
+              diligence: modules.diligence,
+            })
+          : undefined,
+      briefBatchSources:
+        modules.chat !== undefined && modules.schedule !== undefined
+          ? createRelationshipBriefBatchSources({
+              chat: modules.chat,
+              schedule: modules.schedule,
+              diligence: modules.diligence,
+            })
+          : undefined,
     });
   }
 

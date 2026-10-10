@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
+  CQ_TRACE_HEADER,
   LAST_EVENT_ID_HEADER,
   Q_RUN_EVENTS_SUFFIX,
   Q_RUNS_PATH,
@@ -9,6 +10,7 @@ import {
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { getSessionAccessToken } from "@/auth/session";
+import { forwardedTraceId } from "@/features/q/request-trace";
 
 /**
  * The Q run stream, reachable from the browser (CQ-C5-R1 §13, §16).
@@ -78,6 +80,7 @@ export async function GET(
   }
 
   const cursor = lastEventId(request);
+  const trace = await forwardedTraceId();
   let upstream: Response;
   try {
     upstream = await fetch(
@@ -88,6 +91,7 @@ export async function GET(
           accept: Q_SSE_CONTENT_TYPE,
           authorization: `Bearer ${accessToken}`,
           ...(cursor === null ? {} : { [LAST_EVENT_ID_HEADER]: cursor }),
+          ...(trace === undefined ? {} : { [CQ_TRACE_HEADER]: trace }),
         },
         cache: "no-store",
         // The client's abort must reach the Q API, or a closed tab would

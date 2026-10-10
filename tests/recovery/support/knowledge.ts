@@ -30,11 +30,14 @@ export const BUDGET = {
    * preparedSubject), so recall allows reader + 1 analyst call.
    */
   recallServerMs: 1_500,
-  recallModelCalls: 2,
+  recallModelCalls: 3,
   /** Turns that still use the analyst (page and reference questions): server overhead around an instant fake model. */
   analystServerMs: 3_000,
-  /** At most one model call (the turn reader) on a fast-path turn. */
-  fastPathModelCalls: 1,
+  /**
+   * A fast-path turn may make the two small reads (B's TURN_SKIM and the
+   * full TURN_READER, which run together) and no analyst call.
+   */
+  fastPathModelCalls: 2,
 } as const;
 
 export type ModelCalls = {
@@ -356,6 +359,31 @@ export function mandateReading(words: string): ScriptRule {
 
 /** "Show me three fintech companies", read as the live reader should. */
 export const DISCOVER_FINTECH = "Show me three fintech companies";
-export const READ_DISCOVER_FINTECH = discoverReading(DISCOVER_FINTECH, 3, [
-  "fintech",
-]);
+/**
+ * B's fast lane (TURN_SKIM v1) reads the turn first; its HIGH-confidence
+ * DISCOVER_COMPANIES skim is what answers without the full reading.
+ */
+export function discoverSkim(
+  words: string,
+  count: number | null,
+  sectors: readonly string[],
+): ScriptRule {
+  return {
+    name: "skim-discover",
+    when: { task: "TURN_SKIM", user: words },
+    reply: {
+      json: {
+        kind: "DISCOVER_COMPANIES",
+        confidence: "HIGH",
+        count,
+        discover: { sectors: [...sectors], ranking: "NONE" },
+      },
+    },
+  };
+}
+
+/** Skim and full reading of "Show me three fintech companies", as live models should read it. */
+export const DISCOVER_FINTECH_RULES: readonly ScriptRule[] = [
+  discoverSkim(DISCOVER_FINTECH, 3, ["fintech"]),
+  discoverReading(DISCOVER_FINTECH, 3, ["fintech"]),
+];

@@ -228,6 +228,8 @@ export {
   requestConnection,
   expressInterest,
   getOwnInterest,
+  getRelationshipBrief,
+  listRelationshipBriefs,
   getRelationshipWithCompany,
   getRelationshipWithInvestor,
   listCompanyRelationships,

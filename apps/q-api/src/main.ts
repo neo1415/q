@@ -72,6 +72,7 @@ import {
   cuesAround,
   extractPitchClaims,
   MediaAssetIdSchema,
+  firstPitchRaise,
 } from "@capital-q/media";
 import { MEDIA_EVENTS } from "@capital-q/media/events";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
@@ -266,9 +267,11 @@ import {
   type QViewingMoment,
 } from "@capital-q/contracts";
 import {
+  cachedInRun,
   checkDatabaseReadiness,
   createRequestDatabaseClient,
 } from "@capital-q/database";
+import { withRunReadCache } from "./composition/run-read-cache.js";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createOnboardingNudges,
@@ -276,6 +279,7 @@ import {
   createOnboardingService,
   OnboardingSessionIdSchema,
   createOwnOnboardingSummaryReader,
+  type OwnOnboardingSummaryReader,
 } from "@capital-q/onboarding";
 import {
   composeChat,
@@ -304,6 +308,8 @@ import {
 } from "@capital-q/investors";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
+  createRelationshipBriefBatchSources,
+  createRelationshipBriefSources,
   createCommitmentService,
   createDealCloseService,
   createRelationshipOutcomeService,
@@ -480,6 +486,7 @@ import { createConnectionRequestAnswerAction } from "./composition/connection-re
 import { createConnectionRequestSendAction } from "./composition/connection-request-send-action.js";
 import {
   chainProposers,
+  createOwnBriefsReader,
   createRelationshipActionBoard,
   createRelationshipIntelligencePort,
 } from "./composition/relationship-intelligence.js";
@@ -522,6 +529,7 @@ import {
   createRecommendationExplanationService,
   createMaterialChanges,
   createSlateReadPipeline,
+  composeCompanyRaiseReader,
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
 
@@ -866,7 +874,11 @@ const firewall = recordingFirewall(baseFirewall, {
 });
 // end ADMIN block
 
-const repositories = createPostgresQRuntimeRepositories();
+// R5: the run's own conversation reads, once per run (read-your-writes).
+const repositories = withRunReadCache(
+  createPostgresQRuntimeRepositories({ runCacheRoot: database.sql }),
+  database.sql,
+);
 const ownInvestorOrganisations = createPostgresInvestorOrganisationRepository();
 const runtimeDependencies = {
   sql: database.sql,
@@ -891,23 +903,44 @@ const runtimeDependencies = {
         : Promise.resolve(false);
     },
   },
+  // R5: both are read once per run (a run asked up to seven times); a
+  // write by the run to the table drops the entry.
   ownInvestorOrganisation: async (actor: ActorContext) => {
-    if (actor.organisationId === undefined) return null;
-    const found = await ownInvestorOrganisations.findByOrganisation(
-      database.sql,
-      actor.tenantId,
-      actor.organisationId,
+    const organisationId = actor.organisationId;
+    if (organisationId === undefined) return null;
+    const found = await cachedInRun(
+      {
+        aggregate: "own-investor-organisation",
+        tables: ["core.investor_organisations"],
+        actor: `${actor.tenantId}/${organisationId}`,
+        fingerprint: "",
+      },
+      () =>
+        ownInvestorOrganisations.findByOrganisation(
+          database.sql,
+          actor.tenantId,
+          organisationId,
+        ),
     );
     return found === null ? null : found.id;
   },
   // A founder's own company, the default "my company" (CQ-QX-008).
   ownCompany: async (actor: ActorContext) => {
-    if (actor.organisationId === undefined) return null;
-    const found =
-      (await companies.findOrganisationCompany?.(
-        actor.tenantId,
-        actor.organisationId,
-      )) ?? null;
+    const organisationId = actor.organisationId;
+    if (organisationId === undefined) return null;
+    const found = await cachedInRun(
+      {
+        aggregate: "own-company",
+        tables: ["core.companies"],
+        actor: `${actor.tenantId}/${organisationId}`,
+        fingerprint: "",
+      },
+      async () =>
+        (await companies.findOrganisationCompany?.(
+          actor.tenantId,
+          organisationId,
+        )) ?? null,
+    );
     return found === null ? null : found.id;
   },
 };
@@ -1232,6 +1265,39 @@ const pitchMedia = createMediaService({
             ownerOrganisationId: facts.organisationId,
           };
     },
+  },
+});
+// R2: the one company read for the raise, composed exactly as the API's
+// Discover card and profile compose it, so Q says what those screens say.
+const raisePitches = createPostgresDiscoverablePitchQueryPort({
+  sql: database.sql,
+});
+const companyRaise = composeCompanyRaiseReader({
+  sql: database.sql,
+  companies,
+  capital,
+  disclosure,
+  policies: createPostgresDisclosurePolicyRepository(),
+  isInvestor: async (actor) =>
+    (await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+      actor,
+    )) !== null,
+  pitches: () => raisePitches,
+  mayPlay: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    return parsed.success
+      ? pitchMedia.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
+      : false;
+  },
+  pitchRaise: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    if (!parsed.success) return null;
+    const view = await pitchMedia.getPitchTranscript({
+      actor,
+      companyId,
+      mediaAssetId: parsed.data,
+    });
+    return view.status === "AVAILABLE" ? firstPitchRaise(view.cues) : null;
   },
 });
 const recommendationExplanations = createRecommendationExplanationService({
@@ -1886,6 +1952,18 @@ const diligenceService = createDiligenceService({
     }),
   newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
 });
+
+/**
+ * R1 batching: the brief's batch readers over the chat and schedule
+ * services, each scoped in SQL to the actor's own organisation. Replaces
+ * the raw latest-message query, which also returned unsent messages.
+ */
+const relationshipBriefBatchSources = createRelationshipBriefBatchSources({
+  chat,
+  schedule,
+  diligence: diligenceService,
+});
+
 const visibilityCentre = createVisibilityCentre({
   access: permissionsService.access,
   inspect: permissionsService.inspectResourceDisclosure,
@@ -1930,7 +2008,28 @@ const profileFindingsReader = createProfileFindingsReader({
 // Setup reminders (founder directive 2026-09-27): the versioned policy
 // over the person's own setup, keyed by the actor's own user id. Q says it
 // at a natural pause; "later", "stop" and "let's finish it" are tools.
-const onboardingNudges = createOnboardingNudges({ sql: database.sql });
+// Their own onboarding, as Q and the reminders read it: once per run (R5;
+// it was read four times), dropped by any onboarding or mandate write the
+// run makes.
+const ownOnboardingSummaryReads = createOwnOnboardingSummaryReader({
+  sql: database.sql,
+});
+const ownOnboardingSummaries: OwnOnboardingSummaryReader = {
+  read: (userId) =>
+    cachedInRun(
+      {
+        aggregate: "onboarding-summary",
+        tables: ["onboarding.", "core.investor_mandate"],
+        actor: userId,
+        fingerprint: "",
+      },
+      () => ownOnboardingSummaryReads.read(userId),
+    ),
+};
+const onboardingNudges = createOnboardingNudges({
+  sql: database.sql,
+  summaries: ownOnboardingSummaries,
+});
 
 // AUTO block (ADR 0030): "Q, handle it". The store, the approval board
 // its tools prepare on, and the port every Q surface reads it through.
@@ -2580,6 +2679,7 @@ const qTools = createQTools({
     },
     companies,
     capital,
+    companyRaise,
     mandates,
     investors,
     authorization,
@@ -2615,7 +2715,15 @@ const qTools = createQTools({
         board: relationshipBoard,
         ownCompany: runtimeDependencies.ownCompany,
         connections: connectionService,
-        latestMessages: latestRelationshipMessages,
+        // R1: the latest message per relationship from the chat's own
+        // batched read (unsends folded), and the Relationship Brief.
+        briefBatchSources: relationshipBriefBatchSources,
+        // R1: the Relationship Brief, over the same services as the screens.
+        briefSources: createRelationshipBriefSources({
+          chat,
+          schedule,
+          diligence: diligenceService,
+        }),
       }),
       // Diligence (2026-10-02): get_relationship names the area's requests
       // and shares, read through the diligence service as the person.
@@ -2732,12 +2840,20 @@ const qTools = createQTools({
         null,
     }),
     // BIZ-008: calls and reminders, prepared on the chat board.
-    schedule: createScheduleIntelligencePort(schedule, async (actor) =>
-      actor.actorType === "HUMAN"
-        ? ((await people.read(actor.userId).catch(() => null))?.timeZone ??
-          null)
-        : null,
-    ),
+    schedule: {
+      ...createScheduleIntelligencePort(schedule, async (actor) =>
+        actor.actorType === "HUMAN"
+          ? ((await people.read(actor.userId).catch(() => null))?.timeZone ??
+            null)
+          : null,
+      ),
+      // R1: list_schedule's per-relationship calls, from the briefs.
+      relationshipBriefs: createOwnBriefsReader({
+        interests: interestService,
+        ownCompany: runtimeDependencies.ownCompany,
+        sources: relationshipBriefBatchSources,
+      }),
+    },
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
     profileGaps: profileGapsBoard,
@@ -3074,56 +3190,11 @@ const ownRecords = createOwnRecordsPort({
 const qActionRepositories = createPostgresQActionRepositories();
 // Errands (founder direction 2026-09-29): one approval, an exact plan Q
 // carries forward as the relationship moves.
-/**
- * The latest chat message of each relationship, by side (R35, live
- * 2026-10-08). Called only with relationships the actor's own list
- * already returned; text messages only, newest per relationship.
- */
-async function latestRelationshipMessages(
-  relationshipIds: readonly string[],
-): Promise<
-  ReadonlyMap<
-    string,
-    {
-      readonly side: "INVESTOR" | "COMPANY";
-      readonly at: string;
-      readonly body: string;
-    }
-  >
-> {
-  if (relationshipIds.length === 0) return new Map();
-  const rows = await database.sql<
-    {
-      relationship_id: string;
-      sender_side: "INVESTOR" | "COMPANY";
-      created_at: Date;
-      body: string | null;
-    }[]
-  >`
-    select distinct on (c.relationship_id)
-           c.relationship_id, m.sender_side, m.created_at, m.body
-      from communication.conversations c
-      join communication.messages m on m.conversation_id = c.id
-     where c.relationship_id = any(${[...relationshipIds].slice(0, 200)}::uuid[])
-       and m.kind = 'TEXT'
-     order by c.relationship_id, m.created_at desc`;
-  return new Map(
-    rows.map((row) => [
-      row.relationship_id,
-      {
-        side: row.sender_side,
-        at: new Date(row.created_at).toISOString(),
-        body: row.body ?? "",
-      },
-    ]),
-  );
-}
-
 const errandRelationships = createRelationshipIntelligencePort({
   interests: interestService,
   board: relationshipBoard,
   ownCompany: runtimeDependencies.ownCompany,
-  latestMessages: latestRelationshipMessages,
+  briefBatchSources: relationshipBriefBatchSources,
 });
 // ADMIN block: a suspended account resolves to no actor (ADR 0033).
 const actorContextResolver = withSuspension(
@@ -3417,9 +3488,6 @@ void embeddings
 // after every run to propose memories and keep the conversation summary
 // current. Recall is composed into the prompts below; learning is hung on
 // the orchestrator further down.
-const ownOnboardingSummaries = createOwnOnboardingSummaryReader({
-  sql: database.sql,
-});
 const displayNameFor = async (actor: ActorContext): Promise<string | null> => {
   // A profile belongs to a person, not to a tenant: the predicate is the
   // acting user's own id, so this can only ever read the caller's name.

@@ -14,6 +14,7 @@ import {
   SUPABASE_PUBLISHABLE_KEY,
   SUPABASE_URL,
 } from "./stack.js";
+import { recordNavigationTimings } from "./nav-timing.js";
 
 /**
  * Seeded synthetic accounts only (`*@fictional.capitalq.local`). A signed-in
@@ -56,6 +57,7 @@ export async function contextAs(
     ? await browser.newContext({ ...withMic, storageState: state })
     : await browser.newContext(withMic);
   await keepBrowserLocal(context);
+  await recordNavigationTimings(context);
   if (existsSync(state)) return context;
   const page = await context.newPage();
   await signInThroughUi(page, email);

@@ -355,3 +355,25 @@ export function pitchMomentLabel(atMs: number): string {
     ? `${String(hours)}:${String(minutes).padStart(2, "0")}:${seconds}`
     : `${String(minutes)}:${seconds}`;
 }
+
+/**
+ * The first raise with an amount said in these cues, or null (R2). The one
+ * rule every surface uses to read "the raise said in this pitch", so the
+ * Discover card, the profile and Q name the same figure at the same moment.
+ */
+export function firstPitchRaise(cues: readonly TimedCue[]): {
+  readonly atSeconds: number;
+  readonly amount: string;
+  readonly currency: string;
+} | null {
+  for (const claim of extractPitchClaims(cues)) {
+    if (claim.kind === "RAISE" && claim.money !== undefined) {
+      return {
+        atSeconds: Math.floor(claim.atMs / 1000),
+        amount: claim.money.amount,
+        currency: claim.money.currency,
+      };
+    }
+  }
+  return null;
+}

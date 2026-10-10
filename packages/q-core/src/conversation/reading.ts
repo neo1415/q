@@ -169,6 +169,8 @@ export const PREPARED_SUBJECTS = [
   "MANDATE",
   "ON_SCREEN_RECORD",
   "Q_WORK",
+  /** K Part 4 (v48): their own company, as Capital Q holds it. */
+  "OWN_COMPANY",
 ] as const;
 export type PreparedSubject = (typeof PREPARED_SUBJECTS)[number];
 

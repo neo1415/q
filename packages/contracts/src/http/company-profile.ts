@@ -5,6 +5,7 @@ import { MoneySchema } from "../common/money.js";
 import { UtcTimestampSchema } from "../common/time.js";
 
 import { CompanyNetworkFactSchema } from "./companies.js";
+import { CompanyRaiseViewSchema } from "./company-raise.js";
 import { PitchSummaryDtoSchema } from "./media.js";
 
 /**
@@ -191,6 +192,12 @@ export const CompanyProfileOverviewSchema = z
     raiseFromPitch: PitchClaimDtoSchema.nullable().default(null),
     /** OWNER only: the pitch and the declared raise disagree in what shows. */
     pitchRaiseNotice: PitchRaiseNoticeSchema.nullable().default(null),
+    /**
+     * The raise as this reader sees it on every surface (`raiseFor`): the
+     * same answer the Discover card and Q give. `raise` and
+     * `raiseFromPitch` above are derived from it. Absent from older servers.
+     */
+    raiseView: CompanyRaiseViewSchema.optional(),
   })
   .strict();
 export type CompanyProfileOverview = z.infer<

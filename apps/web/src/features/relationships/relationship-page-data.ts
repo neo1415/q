@@ -7,6 +7,7 @@ import {
   getDiligence,
   getDiscoveredInvestor,
   getOwnInterest,
+  getRelationshipBrief,
   getRelationshipWithCompany,
   getRelationshipWithInvestor,
   listRelationshipMeetings,
@@ -21,6 +22,7 @@ import {
   type IncomingInterestDto,
   type MeetingDto,
   type PitchSummaryDto,
+  type RelationshipBrief,
   type RelationshipStatusDto,
 } from "@capital-q/contracts";
 
@@ -80,12 +82,19 @@ type Loaded<Extra> =
       readonly profile: CounterpartProfile;
       /** The first page of messages; null when not open or unreadable. */
       readonly thread: ChatThreadDto | null;
-      /** The relationship's calls (booked, past, cancelled); [] if none. */
+      /** The relationship's calls (booked, past, cancelled); [] if none or unread. */
       readonly meetings: readonly MeetingDto[];
+      /** False: the calls could not be read; `meetings` is then unknown, not empty. */
+      readonly meetingsRead: boolean;
       /** When this was read (request time), for past vs booked calls. */
       readonly readAt: number;
       /** The diligence area once diligence started; null before or unreadable. */
       readonly diligence: DiligenceDto | null;
+      /**
+       * The Relationship Brief (R1), the read Q answers from; null when
+       * nothing is on record or the brief itself could not be read.
+       */
+      readonly brief: RelationshipBrief | null;
       /** Said when nothing is on record that this side can see. */
       readonly absentSentence: string;
     } & Extra);
@@ -93,16 +102,20 @@ type Loaded<Extra> =
 async function meetingsFor(
   session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
   relationship: RelationshipStatusDto | null,
-): Promise<readonly MeetingDto[]> {
+): Promise<{
+  readonly meetings: readonly MeetingDto[];
+  readonly meetingsRead: boolean;
+}> {
   if (
     relationship === null ||
     !isMatchedRelationshipState(relationship.state)
   ) {
-    return [];
+    return { meetings: [], meetingsRead: true };
   }
+  // A failed read is said as such (R1), never shown as "no calls".
   return listRelationshipMeetings(session, relationship.relationshipId)
-    .then((list) => list.items)
-    .catch(() => []);
+    .then((list) => ({ meetings: list.items, meetingsRead: true }))
+    .catch(() => ({ meetings: [], meetingsRead: false }));
 }
 
 async function diligenceFor(
@@ -118,6 +131,16 @@ async function diligenceFor(
     return null;
   }
   return getDiligence(session, relationship.relationshipId).catch(() => null);
+}
+
+async function briefFor(
+  session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
+  relationship: RelationshipStatusDto | null,
+): Promise<RelationshipBrief | null> {
+  if (relationship === null) return null;
+  return getRelationshipBrief(session, relationship.relationshipId).catch(
+    () => null,
+  );
 }
 
 async function threadFor(
@@ -207,8 +230,9 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
             pitch: playable,
           },
     thread: await threadFor(session, relationship),
-    meetings: await meetingsFor(session, relationship),
+    ...(await meetingsFor(session, relationship)),
     diligence: await diligenceFor(session, relationship),
+    brief: await briefFor(session, relationship),
     readAt: Date.now(),
     profile: {
       ...NO_PROFILE,
@@ -289,8 +313,9 @@ export async function loadCompanySideRelationship(
     pending:
       fromThisInvestor.find((item) => item.response === "PENDING") ?? null,
     thread: await threadFor(session, relationship),
-    meetings: await meetingsFor(session, relationship),
+    ...(await meetingsFor(session, relationship)),
     diligence: await diligenceFor(session, relationship),
+    brief: await briefFor(session, relationship),
     readAt: Date.now(),
     profile:
       investor === null

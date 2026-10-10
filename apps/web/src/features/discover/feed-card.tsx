@@ -24,6 +24,8 @@ import {
 
 import { CompanyAvatar, CompanyAvatarLink } from "../company/company-avatar";
 import { moneyText } from "../company/money-text";
+import { RaiseFact } from "../company/raise-fact";
+import { raiseWords } from "../company/raise-words";
 import { countryLabel, stageLabel } from "../company/declared-labels";
 import { ExpressInterest } from "../network/express-interest";
 import { useDockAvoid } from "../q-dock/dock-avoid";
@@ -208,7 +210,10 @@ function CardFacts({
       )}
       <dt>Raising</dt>
       <dd className="cq-numeric">
-        {summary.raise === null ? (
+        {summary.raiseView !== undefined ? (
+          // R2: the server's one raise read, in the profile's own words.
+          <RaiseFact words={raiseWords(summary.raiseView, false)} />
+        ) : summary.raise === null ? (
           <span className="cq-feed-fact-unknown">Not shared with you</span>
         ) : (
           <>

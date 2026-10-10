@@ -255,7 +255,7 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * answers it from that context without a tool round when it is there.
    */
   readonly preparedSubject?:
-    "MANDATE" | "ON_SCREEN_RECORD" | "Q_WORK" | undefined;
+    "MANDATE" | "ON_SCREEN_RECORD" | "Q_WORK" | "OWN_COMPANY" | undefined;
   /**
    * K1: a DISCOVER_COMPANIES request as the reader read it ("three
    * fintech companies in Nigeria"). Answered from the catalog by code, fit

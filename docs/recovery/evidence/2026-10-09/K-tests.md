@@ -53,3 +53,27 @@ Harness change: the turn reader is a model, so its correct reading is now script
 | l-named-navigation ×4, m-fast-navigation ×3          | GREEN                                                                                                                                                  |
 | n-founder-strings                                    | 5/6 GREEN. "quick rehearsal … still opens Rehearsals" was red once (no /rehearsals within 30 s) and green on a diagnostic rerun: flaky, **G-D25 (C)**. |
 | voice/gpt-live ×7                                    | GREEN with `CQ_RECOVERY_GPT_LIVE=1`. Without that flag all 7 fail their precondition, which is a harness setting and not a product failure.            |
+
+## Pre-deploy gate 2: int-merge 649d6099, 20:27–21:02 UTC
+
+**Label: LOCAL-E2E (MOCK).** The stack was started with `CQ_RECOVERY_GPT_LIVE=1`. Provider keys were `disabled-locally-000000000000` and the egress guard was on. No migrations were pending.
+
+Harness change: B's fast lane adds a TURN_SKIM model read. The baseline script now answers OTHER for it, and discovery tests script `DISCOVER_COMPANIES`/HIGH. Budgets now allow two small reads (skim + reader) and still require 0 analyst calls. K1 browser runs use `/home?new=1`, a fresh conversation.
+
+- **Knowledge: 14 of 17 green.**
+  - K1 API ×4, K2, K3, K4, K6 ×3 and K7 ×4 are green. K4's first red was the harness checking the restore before the write landed; it is green with a poll.
+  - Red: K1 browser (3.8 s) and K1 timing, both over the provisional 3 s budget. K5 is still expected red (C Part 5, no card link).
+- **K1 send → first card, 5 fresh conversations:** 6659, 6966, 1104, 3952, 6914 ms, giving **p50 6659 ms and p95 6966 ms** (nearest rank). Server time is under 2 s.
+- **Browser specs:** l-named-navigation 4/4, m-fast-navigation 3/3 and n-founder-strings 6/6 are green. G-D25 did not recur.
+- **voice/gpt-live: 0/7, G-D26.**
+  - Five tests see 4 RTCPeerConnections after a single "Talk with Q" press, where the test expects 1. One is a 30 s timeout, and one finds the data channel not open.
+  - It reproduced when run alone.
+  - q-api logs both "live voice line opened" and "duplex voice line rejoined/ended FALLBACK".
+  - The voice web code and the spec are unchanged since gate 1, where 7/7 passed.
+
+## Gate 2 rerun: int-merge 043ff1da with the GPT-Live flag confirmed, 21:20 UTC
+
+**Label: LOCAL-E2E (MOCK).** The stack printed `gpt-live: 1` at start, from V's marker, so the flag was on. Disabled keys, no live calls. The K specs came from build/rec-g 4959767d.
+
+- **voice/gpt-live: 7/7 green.** G-D26 is closed: it was the stack started without the flag (V).
+- **K1 send → first card, 5 fresh conversations at `/home?new=1`:** 4176, 568, 792, 576, 649 ms, giving **p50 649 ms and p95 4176 ms** (nearest rank). Only the first run, 4.2 s, was slow, which suggests a cold-start cost.
