@@ -11,6 +11,7 @@ import {
   buildExternalPersona,
   claimsToBeRealPerson,
   externalLiveInstructions,
+  externalOpeningLine,
 } from "../src/composition/external-persona.js";
 import { externalSimulation } from "../src/composition/external-presentation.js";
 import { scenarioFor } from "../src/composition/external-scenarios.js";
@@ -305,5 +306,27 @@ describe("display data", () => {
     expect(
       externalSimulation({ subject: f.s, brief: null }, []).imageUrl,
     ).toBeNull();
+  });
+});
+
+describe("opening line by code", () => {
+  it("each of the five opens on its own theme, labelled, with no model", () => {
+    const lines = FIVE.map((f) =>
+      externalOpeningLine({
+        scenario: build(f).scenario,
+        companyName: "Acme Freight",
+      }),
+    );
+    expect(new Set(lines).size).toBe(5);
+    lines.forEach((line, i) => {
+      expect(line).toMatch(/AI rehearsal informed by public sources/u);
+      expect(line).toContain("Acme Freight");
+      expect(line).toContain(
+        build(FIVE[i] as (typeof FIVE)[number]).scenario.openingThemes[0] ?? "",
+      );
+      expect(claimsToBeRealPerson(line, [FIVE[i]?.s.displayName ?? ""])).toBe(
+        false,
+      );
+    });
   });
 });

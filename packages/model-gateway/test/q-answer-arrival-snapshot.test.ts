@@ -24,7 +24,10 @@ import {
   createModelProviderRegistry,
   createStaticModelCatalog,
 } from "../src/index.js";
-import { arrivalFollowUpAnswer } from "../src/q/arrival-answer.js";
+import {
+  arrivalAspectAnswer,
+  arrivalFollowUpAnswer,
+} from "../src/q/arrival-answer.js";
 import { arrivalSnapshotFact } from "../src/q/arrival-fact.js";
 import {
   createModelGatewayQAnswer,
@@ -337,11 +340,13 @@ describe("an arrival follow-up is answered by code, with no tool and no model ro
         {
           ...first,
           key: "other",
-          counterpart: { ...first.counterpart, name: "Halyard" },
+          counterpart: { ...first.counterpart, id: REL, name: "Halyard" },
         },
       ],
     } as ArrivalSnapshot;
-    expect(arrivalFollowUpAnswer("what's the request?", two)).toBeNull();
+    expect(arrivalFollowUpAnswer("what's the request?", two)?.text).toContain(
+      "Which one",
+    );
     expect(
       arrivalFollowUpAnswer("what's the request from Halyard?", two)?.itemKey,
     ).toBe("other");
@@ -441,5 +446,131 @@ describe("unusual phrasings are read by TURN_SKIM and still answered with no too
     const none = skimmed("hello", { kind: "OTHER" });
     await none.seam.answer(none.request);
     expect(none.seen).toHaveLength(0);
+  });
+});
+
+describe("several items from one counterpart are one target (A3)", () => {
+  const first = SNAPSHOT.items[0];
+  if (first === undefined) throw new Error("fixture");
+  const maji = (key: string, since: string, summary: string, extra = {}) => ({
+    ...first,
+    key,
+    since,
+    counterpart: {
+      kind: "INVESTOR_ORGANISATION",
+      id: OTHER,
+      name: "Maji Loop",
+    },
+    facts: {
+      ...first.facts,
+      request: {
+        kind: "CONNECTION_OR_INTEREST",
+        from: "Maji Loop",
+        since,
+        summary,
+      },
+      ...extra,
+    },
+  });
+  const THREE: ArrivalSnapshot = ArrivalSnapshotSchema.parse({
+    ...SNAPSHOT,
+    items: [
+      maji("a", "2026-10-09T10:00:00.000Z", "Maji Loop wants to connect"),
+      maji(
+        "b",
+        "2026-10-10T08:00:00.000Z",
+        "Maji Loop is waiting for your reply",
+      ),
+      maji(
+        "c",
+        "2026-10-08T08:00:00.000Z",
+        "Maji Loop asked for the cap table",
+        {
+          theirLatestMessage: null,
+          meeting: null,
+        },
+      ),
+    ],
+  });
+
+  it("answers by code from the merged facts, most recent request first", async () => {
+    const { seam, request, alpha, executed, persisted } = build(
+      () => THREE,
+      "what's the request?",
+    );
+    await seam.answer(request);
+    expect(alpha.calls).toHaveLength(0);
+    expect(executed).toEqual([]);
+    const said = persisted.join("\n");
+    expect(said.indexOf("waiting for your reply")).toBeLessThan(
+      said.indexOf("wants to connect"),
+    );
+    expect(said).toContain("Also:");
+    expect(said).toContain("asked for the cap table");
+    expect(said).toContain("Could we do Thursday 3pm");
+  });
+
+  it("asks which one only when the counterparts differ", () => {
+    const other = {
+      ...THREE.items[0],
+      key: "z",
+      counterpart: { kind: "INVESTOR_ORGANISATION", id: REL, name: "Halyard" },
+    };
+    const mixed = ArrivalSnapshotSchema.parse({
+      ...THREE,
+      items: [...THREE.items, other],
+    });
+    expect(arrivalFollowUpAnswer("what's the request?", mixed)?.text).toBe(
+      "Which one do you mean: Maji Loop or Halyard?",
+    );
+    expect(
+      arrivalFollowUpAnswer("what's the request from Halyard?", mixed)?.itemKey,
+    ).toBe("z");
+  });
+
+  it("the semantic path merges the counterpart's items too", () => {
+    const answer = arrivalAspectAnswer(THREE, "c", "REQUEST");
+    expect(answer?.text).toContain("waiting for your reply");
+  });
+});
+
+describe("open the conversation (A5)", () => {
+  const pending: ArrivalSnapshot = ArrivalSnapshotSchema.parse({
+    ...SNAPSHOT,
+    items: SNAPSHOT.items.map((item) => ({
+      ...item,
+      hasConversation: false,
+      openPath: `/relationships/investor/${OTHER}`,
+    })),
+  });
+
+  it("says there is no conversation yet and offers the relationship page", async () => {
+    const { seam, request, alpha, executed, persisted } = build(
+      () => pending,
+      "open the conversation",
+    );
+    await seam.answer(request);
+    expect(alpha.calls).toHaveLength(0);
+    expect(executed).toEqual([]);
+    const said = persisted.join("\n");
+    expect(said).toContain("no conversation with TensorGate yet");
+    expect(said).toContain("relationship");
+    expect(said).not.toMatch(/opening|opened the chat/iu);
+  });
+
+  it("with a thread it is left to the navigation (not claimed by this answer)", async () => {
+    const live = ArrivalSnapshotSchema.parse({
+      ...SNAPSHOT,
+      items: SNAPSHOT.items.map((item) => ({ ...item, hasConversation: true })),
+    });
+    const { seam, request, alpha } = build(() => live, "open the conversation");
+    await seam.answer(request);
+    expect(alpha.calls.length).toBeGreaterThan(0);
+  });
+
+  it("the prepared fact tells the model not to claim a chat that does not exist", () => {
+    expect(arrivalSnapshotFact(pending)?.statement).toContain(
+      "no conversation yet",
+    );
   });
 });

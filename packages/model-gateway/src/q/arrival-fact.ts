@@ -110,7 +110,13 @@ function itemLines(item: ArrivalSnapshotItem, index: number): string {
     );
   }
   if (f.note !== null) bits.push(`Note: ${oneLine(f.note, 300)}`);
-  if (item.openPath !== null) bits.push("Their conversation can be opened.");
+  if (item.hasConversation) {
+    bits.push("Their conversation can be opened.");
+  } else if (item.openPath !== null) {
+    bits.push(
+      "There is no conversation yet (not connected): offer the relationship page, never claim to open a chat.",
+    );
+  }
   return bits.join(" ");
 }
 
