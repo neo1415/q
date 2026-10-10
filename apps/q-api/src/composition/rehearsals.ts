@@ -73,6 +73,7 @@ import {
   buildExternalPersona,
   claimsToBeRealPerson,
   externalLiveInstructions,
+  externalOpeningLine,
   identityOf,
   NOT_THE_REAL_PERSON_LINE,
 } from "./external-persona.js";
@@ -2277,6 +2278,28 @@ export function createRehearsalService(dependencies: {
   const viewerOf = (actor: ActorContext) =>
     material.viewer(actor).catch(() => null);
 
+  /** The opening turn of a researched entity's rehearsal, by code alone. */
+  async function codeOpening(
+    actor: ActorContext,
+    id: string,
+    companyName: string,
+  ): ReturnType<typeof replyOrHold> {
+    const record = await external?.subjects.latest(actor, id).catch(() => null);
+    const scenario = scenarioFor({
+      displayName: record?.subject.displayName ?? "",
+      nameVariants: record?.subject.nameVariants ?? [],
+      entityKind: record?.subject.entityKind,
+    });
+    const base = holdingTurn([], "OPENING");
+    return {
+      ...base,
+      result: {
+        ...base.result,
+        line: externalOpeningLine({ scenario, companyName }),
+      },
+    };
+  }
+
   return {
     partners: async (actor) => {
       const viewer = await viewerOf(actor);
@@ -2429,14 +2452,19 @@ export function createRehearsalService(dependencies: {
         createdAt: now(),
         endedAt: null,
       };
-      const opening = await replyOrHold(
-        actor,
-        draft,
-        [],
-        "OPENING",
-        viewer.organisationName,
-        undefined,
-      );
+      // A researched external entity opens by code from its prepared mode:
+      // no model round before the call (the persona was prepared above).
+      const opening =
+        input.kind === "EXTERNAL_PERSON"
+          ? await codeOpening(actor, input.id, viewer.organisationName)
+          : await replyOrHold(
+              actor,
+              draft,
+              [],
+              "OPENING",
+              viewer.organisationName,
+              undefined,
+            );
       const row = await store.insert(actor, {
         id,
         kind: input.kind,
