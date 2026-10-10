@@ -356,6 +356,7 @@ export {
   openTarget,
   referenceNote,
   rehearseWithPersonCard,
+  rehearsalNameOf,
   repeatedAction,
   shownItems,
   type LastAction,

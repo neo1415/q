@@ -121,6 +121,7 @@ import {
 } from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
 import { createExternalRehearsalLatency } from "./composition/external-rehearsal-latency.js";
+import { createExternalEntityFinder } from "./composition/external-entity-finder.js";
 import { createExternalSubjectResolver } from "./composition/external-resolve.js";
 import { createPostgresExternalSubjectStore } from "./composition/external-subjects.js";
 import { createLiveBroker } from "./voice/live/broker.js";
@@ -3791,6 +3792,12 @@ const qIntelligence = composeQIntelligence({
   counterpartNames: createCounterpartNames({
     ownRelationships: errandRelationships.ownRelationships,
     logger,
+  }),
+  // W4: a researched entity reachable by name (prepared seed or their own
+  // research): "take me to Shadi Qishta" shows its identity card.
+  externalEntities: createExternalEntityFinder({
+    known: researchComposition.knownEntities.index,
+    researched: researchComposition.researched,
   }),
   // A typed yes or no to a waiting change, read and acted on by code
   // through the Approval Engine (founder fixture #1).

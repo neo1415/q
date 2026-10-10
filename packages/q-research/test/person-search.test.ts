@@ -183,6 +183,53 @@ describe("identity ranking", () => {
     expect(decision.kind).toBe("AMBIGUOUS");
   });
 
+  it("W4: a city match beats a shared country, so 'the one in Abuja' narrows to that person", () => {
+    const ABUJA: PublicWebSearchHit = {
+      url: "https://ng.linkedin.com/in/ada-obi-1a2b3c",
+      title: "Ada Obi - Banker - First Bank | LinkedIn",
+      snippet: "Location: Abuja, Nigeria · Experience: First Bank",
+      publishedAt: null,
+      relevance: 0.8,
+    };
+    const LAGOS: PublicWebSearchHit = {
+      url: "https://ng.linkedin.com/in/ada-obi-9z8y7x",
+      title: "Ada Obi - Doctor - Lagoon Clinic | LinkedIn",
+      snippet: "Location: Lagos, Nigeria · Experience: Lagoon Clinic",
+      publishedAt: null,
+      relevance: 0.8,
+    };
+    const pool = [
+      { provider: "tavily", hit: LAGOS },
+      { provider: "tavily", hit: ABUJA },
+    ];
+    // A shared country alone: both agree, so they stay ambiguous.
+    const country: PersonSpec = {
+      name: "Ada Obi",
+      place: "Nigeria",
+      country: "Nigeria",
+      organization: null,
+      role: null,
+      variants: [],
+    };
+    expect(decideIdentity(country, rankCandidates(country, pool)).kind).toBe(
+      "AMBIGUOUS",
+    );
+    // City and country given: the city decides.
+    const city: PersonSpec = {
+      ...country,
+      place: "Abuja Nigeria",
+      city: "Abuja",
+    };
+    const ranked = rankCandidates(city, pool);
+    expect(ranked[0]?.location).toContain("Abuja");
+    expect(ranked.map((c) => c.placeScore)).toEqual([2, 1]);
+    const decision = decideIdentity(city, ranked);
+    expect(decision.kind).toBe("MATCHED");
+    if (decision.kind === "MATCHED") {
+      expect(decision.chosen.profileUrl).toContain("1a2b3c");
+    }
+  });
+
   it("never turns an absent location into a mismatch", () => {
     const hit = {
       ...SHADI,
