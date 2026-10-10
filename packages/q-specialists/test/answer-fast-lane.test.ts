@@ -90,6 +90,7 @@ const SKIM_DISCOVER: TurnSkimResult = {
   confidence: "HIGH",
   count: 3,
   discover: DISCOVER,
+  person: null,
 };
 
 function seam(said: string, skim: TurnSkimResult | null) {
@@ -194,6 +195,7 @@ describe("the fast lane (K)", () => {
       confidence: "HIGH",
       count: null,
       discover: null,
+      person: null,
     });
     const started = Date.now();
     await s.answer.answer(request());
@@ -216,7 +218,7 @@ describe("fastLaneOf (K)", () => {
     );
     expect(
       fastLaneOf(
-        { kind: "FIT", confidence: "HIGH", count: 3, discover: null },
+        { kind: "FIT", confidence: "HIGH", count: 3, discover: null, person: null },
         "best companies for me",
       ),
     ).toEqual({

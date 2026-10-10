@@ -165,8 +165,11 @@ export {
 } from "./application/known-entities.js";
 export {
   createPersonLookup,
+  type PersonBriefRequest,
+  type PersonBriefResult,
   type PersonLookup,
   type PersonLookupCommand,
+  type ResearchedEntityReader,
   type PersonLookupOutcome,
 } from "./application/person-lookup.js";
 export {
@@ -180,3 +183,12 @@ export {
   type BriefSource,
   type ProposedAssertion,
 } from "./domain/person-brief.js";
+export {
+  briefFromKnownEntity,
+  createPersonBriefService,
+  type PersonBriefCommand,
+  type PersonBriefOutcome,
+  type PersonBriefSynthesiser,
+  type ResearchedEntityScope,
+  type ResearchedEntityStore,
+} from "./application/person-brief-service.js";
