@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   Q_TASK_CLASSES,
+  RelationshipBriefSchema,
   RelationshipStateV2Schema,
   RELATIONSHIP_NEXT_STEPS,
   UtcTimestampSchema,
@@ -22,6 +23,7 @@ import {
 } from "../definition.js";
 import { actorWideScope, boundScopeFor } from "../plan.js";
 import { findRecordByName } from "./client-actions.js";
+import { briefFacts } from "./relationship-brief-facts.js";
 import { createProposeConnectionRequestTool } from "./connection-request-send.js";
 import {
   closestByName,
@@ -223,6 +225,24 @@ export const GetRelationshipOutputSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * The Relationship Brief (R1): messages, calls, pending decisions,
+     * outstanding requests and shared documents, each source OK or
+     * UNAVAILABLE. Absent: the brief is not composed here.
+     */
+    brief: z
+      .discriminatedUnion("status", [
+        z
+          .object({
+            status: z.literal("OK"),
+            /** Code-written statements of fact; relay them, do not reinterpret. */
+            facts: z.array(z.string().max(400)).max(16),
+            detail: RelationshipBriefSchema,
+          })
+          .strict(),
+        z.object({ status: z.literal("UNAVAILABLE") }).strict(),
+      ])
+      .optional(),
     /** Recorded by Capital Q as it happened: not a claim and not an inference. */
     truthClass: z.literal("VERIFIED"),
     source: z.literal("Capital Q relationship history"),
@@ -266,7 +286,7 @@ function createGetRelationshipTool(
     status: "ACTIVE",
     providerName: "get_relationship",
     description:
-      "Where the person's own side stands with one counterparty on Capital Q: the relationship's state (discovered, interest expressed, connected, declined), when it got there, what happened in order with dates, and the next step for them. Pass companyId when the person is an investor asking about a company, investorOrganisationId when they are a company asking about an investor, or relationshipId when the conversation is about a relationship itself. Call it whenever a question touches their dealings with a specific counterparty. A null relationship means nothing is on record that they can see.",
+      "Where the person's own side stands with one counterparty: the relationship's state and since when, dated milestones, their next step, and the brief: how many chat messages there are and who sent the latest when, calls booked (upcoming, past, cancelled), whose move it is, open diligence requests and shared documents. Pass companyId (investor asking about a company), investorOrganisationId (company asking about an investor) or relationshipId. Call it whenever a question touches their dealings with a specific counterparty, including 'did they reply?', 'what did they say last?', 'did they accept the call?': answer those from brief.facts. A brief source UNAVAILABLE means unknown right now: never say no message was sent or no call was booked unless the brief says so. A null relationship means nothing is on record that they can see.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [
@@ -390,10 +410,31 @@ function createGetRelationshipTool(
           : await relationships
               .diligence(context.actor, grant.status.relationshipId)
               .catch(() => null);
+      // The brief is read after the grant, as the actor, through the
+      // Network context's own party check; a failure is UNAVAILABLE, so a
+      // missing summary is never read as "no messages".
+      const brief: GetRelationshipOutput["brief"] =
+        grant.status === null || relationships.brief === undefined
+          ? undefined
+          : await relationships
+              .brief(context.actor, grant.status.relationshipId)
+              .then((detail): GetRelationshipOutput["brief"] =>
+                detail === null
+                  ? { status: "UNAVAILABLE" }
+                  : {
+                      status: "OK",
+                      facts: [...briefFacts(detail)],
+                      detail: RelationshipBriefSchema.parse(detail),
+                    },
+              )
+              .catch((): GetRelationshipOutput["brief"] => ({
+                status: "UNAVAILABLE",
+              }));
       return {
         yourSide: grant.side,
         counterpart: grant.counterpart,
         relationship: relationshipOut(grant.status),
+        ...(brief === undefined ? {} : { brief }),
         ...(diligence === null
           ? {}
           : {
@@ -915,6 +956,11 @@ export const ListMyRelationshipsOutputSchema = z
               .strict()
               .nullable()
               .default(null),
+            /**
+             * Whether the chat was read. UNAVAILABLE: lastMessage is
+             * unknown, not absent -- never say no message was sent.
+             */
+            messagesRead: z.enum(["OK", "UNAVAILABLE"]).default("UNAVAILABLE"),
           })
           .strict(),
       )
@@ -946,7 +992,7 @@ function createListMyRelationshipsTool(
       core: true,
       providerName: "list_my_relationships",
       description:
-        "Lists the person's own relationships on Capital Q, with each counterparty's name and id: for an investor, every company they expressed interest in and whether it is still awaiting an answer (INTEREST_EXPRESSED), accepted (CONNECTED) or declined, plus the companies they saved or passed on in Discover; for a founder, every investor that expressed interest in their company and where each stands. Each has its state, since when, dated milestones, their next step and the latest chat message (lastMessage.from THEM: they wrote last and are waiting for a reply, which needs the person's attention). Call it whenever they ask about their interests, connections, pipeline, saved companies, 'the companies I'm interested in', messages waiting for them or what needs their attention -- never ask them for names these records already hold. Saving or passing is not interest.",
+        "Lists the person's own relationships on Capital Q, with each counterparty's name and id: for an investor, every company they expressed interest in and whether it is still awaiting an answer (INTEREST_EXPRESSED), accepted (CONNECTED) or declined, plus the companies they saved or passed on in Discover; for a founder, every investor that expressed interest in their company and where each stands. Each has its state, since when, dated milestones, next step and latest chat message (lastMessage.from THEM: they wrote last and await a reply). lastMessage null means no messages only when messagesRead is OK; otherwise the chat is unknown, so call get_relationship. Call it whenever they ask about their interests, connections, pipeline, saved companies, messages waiting for them or what needs their attention; never ask for names these records hold. Saving or passing is not interest.",
       classification: "READ_ONLY",
       riskClass: "SAFE_READ",
       requiredCapabilities: [],
@@ -1016,6 +1062,7 @@ function createListMyRelationshipsTool(
                       at: UtcTimestampSchema.parse(item.lastMessage.at),
                       preview: item.lastMessage.preview.slice(0, 240),
                     },
+              messagesRead: item.lastMessageRead ?? "UNAVAILABLE",
             })),
           saved,
           passed,

@@ -25,6 +25,7 @@ import type {
 import type {
   IncomingInterestDto,
   PermittedContextPlan,
+  RelationshipBrief,
   RelationshipStatusDto,
   RelationshipSummaryDto,
   VisibilityStateDto,
@@ -147,8 +148,10 @@ export type OwnRelationship = RelationshipSummaryDto & {
    * The latest chat message in the relationship, by side: THEM means the
    * other side wrote last and is waiting for a reply (live 2026-10-08:
    * Q said nothing needed Marcus while Zino Aviation's message waited).
-   * Absent or null: no messages, or not read.
+   * Null with `lastMessageRead` OK: no messages. Absent or UNAVAILABLE
+   * read: not known -- never "no messages" (TensorGate, 2026-10-09).
    */
+  readonly lastMessageRead?: "OK" | "UNAVAILABLE" | undefined;
   readonly lastMessage?:
     | {
         readonly from: "THEM" | "YOU";
@@ -205,6 +208,17 @@ export type RelationshipIntelligencePort = {
         readonly answeredRequests: readonly string[];
         readonly sharedDocuments: readonly string[];
       } | null>)
+    | undefined;
+  /**
+   * The Relationship Brief (R1) of one relationship the actor is a party
+   * to, assembled by the Network context as the actor. Null: not a party
+   * or nothing this side may see. Absent: not composed.
+   */
+  readonly brief?:
+    | ((
+        actor: ActorContext,
+        relationshipId: string,
+      ) => Promise<RelationshipBrief | null>)
     | undefined;
   readonly byRelationship: (
     actor: ActorContext,

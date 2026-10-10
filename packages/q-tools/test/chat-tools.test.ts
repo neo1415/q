@@ -54,6 +54,8 @@ function world(
     readonly blocked?: boolean;
     readonly running?: boolean;
     readonly counterpart?: string;
+    /** Rows as communication's readForQ returns them (id, viaQ, envelope). */
+    readonly richRows?: boolean;
   } = {},
 ) {
   const counterpart = options.counterpart ?? "Apex";
@@ -77,6 +79,13 @@ function world(
                   text: "Deck attached",
                   attachmentTitle: null,
                   sentAt: "2026-09-27T09:00:00.000Z",
+                  ...(options.richRows === true
+                    ? {
+                        id: "88888888-0000-4000-8000-0000000000m1",
+                        viaQ: true,
+                        envelope: null,
+                      }
+                    : {}),
                 },
               ],
             }
@@ -139,6 +148,28 @@ const base = (actor: typeof actorA) =>
   ]);
 
 describe("list_messages", () => {
+  // R1 regression (TensorGate, hosted run 77dbcc69, 2026-10-09): the real
+  // port's rows carry id/viaQ/envelope; spreading them failed the strict
+  // output with INVALID_TOOL_OUTPUT on every non-empty thread.
+  it("reads a thread whose rows carry the port's extra fields", async () => {
+    const { executor } = world({ richRows: true });
+    const outcome = await executor.execute(
+      {
+        callId: "c0",
+        name: "list_messages",
+        arguments: { relationshipId: RELATIONSHIP },
+      },
+      contextFor(actorB, relationshipPlan(base(actorB), RELATIONSHIP)),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { messages: [{ from: "OTHER_SIDE", text: "Deck attached" }] },
+    });
+    const data = outcome.result.ok ? outcome.result.data : null;
+    expect(JSON.stringify(data)).not.toContain("envelope");
+  });
+
   it("reads the invoker's own bound thread", async () => {
     const { executor } = world();
     const outcome = await executor.execute(

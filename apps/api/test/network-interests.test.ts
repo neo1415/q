@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 
 import { parseApiConfig } from "@capital-q/config/api";
-import { UtcTimestampSchema } from "@capital-q/contracts";
+import {
+  RelationshipBriefSchema,
+  UtcTimestampSchema,
+  type RelationshipBrief,
+} from "@capital-q/contracts";
 import {
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
@@ -157,6 +161,8 @@ function buildApp(
     readonly noRelationship?: boolean | undefined;
     /** Signed pictures by "TYPE:id"; set, the photo reader is composed. */
     readonly photos?: Readonly<Record<string, string>> | undefined;
+    /** The brief the service answers; null: not a party (R1). */
+    readonly brief?: RelationshipBrief | null | undefined;
   } = {},
 ): {
   readonly app: FastifyInstance;
@@ -232,6 +238,12 @@ function buildApp(
         : Promise.reject(options.failWith);
     },
     relationshipById: () => Promise.reject(new Error("not under test")),
+    relationshipBrief: (query) => {
+      reads.push({ side: "BRIEF", ...query });
+      return options.brief === undefined
+        ? Promise.reject(new Error("not under test"))
+        : Promise.resolve(options.brief);
+    },
     listRelationshipsForInvestor: (query) => {
       reads.push({ side: "INVESTOR_LIST", ...query });
       return options.failWith === undefined
@@ -668,5 +680,60 @@ describe("pictures have the name's scope (founder decision 2026-10-04)", () => {
       expect(response.body).not.toContain("storage.test");
     }
     expect(asked).toEqual([]);
+  });
+});
+
+describe("the Relationship Brief (R1)", () => {
+  const RELATIONSHIP_ID = "88888888-0000-4000-8000-0000000000b1";
+  const BRIEF = RelationshipBriefSchema.parse({
+    relationshipId: RELATIONSHIP_ID,
+    yourSide: "INVESTOR",
+    counterparty: {
+      kind: "COMPANY",
+      id: "88888888-0000-4000-8000-0000000000c1",
+      name: "Tensorgate",
+    },
+    generatedAt: "2026-10-09T23:30:00.000Z",
+    state: null,
+    messages: {
+      count: 12,
+      latest: { status: "UNAVAILABLE", reason: "NOT_COMPOSED" },
+    },
+    meetings: { status: "UNAVAILABLE", reason: "NOT_COMPOSED" },
+    pendingDecisions: { items: [], complete: false },
+    obligations: { status: "UNAVAILABLE", reason: "NOT_COMPOSED" },
+    documents: { status: "UNAVAILABLE", reason: "NOT_COMPOSED" },
+    sourceVersions: {
+      projector: "relationship-state.v2",
+      historySequence: 21,
+      brief: "relationship-brief.v1",
+    },
+  });
+  const get = (app: FastifyInstance) =>
+    app.inject({
+      method: "GET",
+      url: `/v1/network/relationships/${RELATIONSHIP_ID}/brief`,
+    });
+
+  it("answers the brief as the server-resolved actor, uncached", async () => {
+    const { app, reads } = buildApp({ brief: BRIEF });
+    const response = await get(app);
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual(BRIEF);
+    expect(reads).toEqual([
+      expect.objectContaining({
+        side: "BRIEF",
+        actor: CONTEXT,
+        relationshipId: RELATIONSHIP_ID,
+      }),
+    ]);
+  });
+
+  it("a relationship the caller is not a party to is a 404, like one that does not exist", async () => {
+    const { app } = buildApp({ brief: null });
+    const response = await get(app);
+    expect(response.statusCode).toBe(404);
+    expect(JSON.stringify(response.json())).not.toContain("Tensorgate");
   });
 });

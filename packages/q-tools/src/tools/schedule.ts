@@ -9,6 +9,7 @@ import {
   UuidSchema,
   type CalendarBlockReason,
   type PermittedContextPlan,
+  type RelationshipBrief,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
@@ -123,6 +124,13 @@ export type ScheduleIntelligencePort = {
       }
   >;
   /** Their own upcoming calls and open reminders. */
+  /**
+   * R1: the Relationship Brief of each of the person's own relationships,
+   * from one batched read. Null: they have no side. Absent: not composed.
+   */
+  readonly relationshipBriefs?:
+    | ((actor: ActorContext) => Promise<readonly RelationshipBrief[] | null>)
+    | undefined;
   readonly upcoming: (actor: ActorContext) => Promise<{
     readonly meetings: readonly {
       readonly id: string;
@@ -641,9 +649,77 @@ export const ListScheduleOutputSchema = z
         })
         .strict(),
     ),
+    /**
+     * R1: the calls on each of their relationships, from the Relationship
+     * Brief -- including calls a colleague booked and calls recorded as
+     * not having taken place. UNAVAILABLE: unknown, never "no calls".
+     */
+    byRelationship: z
+      .discriminatedUnion("status", [
+        z
+          .object({
+            status: z.literal("OK"),
+            items: z
+              .array(
+                z
+                  .object({
+                    relationshipId: z.string(),
+                    counterpartName: z.string().nullable(),
+                    calls: z.discriminatedUnion("status", [
+                      z
+                        .object({
+                          status: z.literal("OK"),
+                          nextScheduledAt: z.string().nullable(),
+                          lastPastAt: z.string().nullable(),
+                          lastPastDidNotTakePlace: z.boolean(),
+                          cancelled: z.number().int().min(0),
+                        })
+                        .strict(),
+                      z.object({ status: z.literal("UNAVAILABLE") }).strict(),
+                    ]),
+                  })
+                  .strict(),
+              )
+              .max(50),
+          })
+          .strict(),
+        z.object({ status: z.literal("UNAVAILABLE") }).strict(),
+      ])
+      .optional(),
   })
   .strict();
 export type ListScheduleOutput = z.infer<typeof ListScheduleOutputSchema>;
+
+/** One relationship's calls, by code, from its brief (R1). */
+type RelationshipCalls = Extract<
+  NonNullable<ListScheduleOutput["byRelationship"]>,
+  { status: "OK" }
+>["items"][number];
+
+function callsOf(brief: RelationshipBrief): RelationshipCalls {
+  const meetings = brief.meetings;
+  if (meetings.status !== "OK") {
+    return {
+      relationshipId: brief.relationshipId,
+      counterpartName: brief.counterparty.name,
+      calls: { status: "UNAVAILABLE" },
+    };
+  }
+  const past = meetings.items
+    .filter((m) => m.status === "SCHEDULED" && m.timing === "PAST")
+    .at(-1);
+  return {
+    relationshipId: brief.relationshipId,
+    counterpartName: brief.counterparty.name,
+    calls: {
+      status: "OK",
+      nextScheduledAt: meetings.nextScheduled?.startsAt ?? null,
+      lastPastAt: past?.startsAt ?? null,
+      lastPastDidNotTakePlace: past?.noShow === true,
+      cancelled: meetings.items.filter((m) => m.status === "CANCELLED").length,
+    },
+  };
+}
 
 type OwnGrant = { readonly actor: ActorContext };
 
@@ -1029,7 +1105,7 @@ export function createScheduleTools(
       status: "ACTIVE",
       providerName: "list_schedule",
       description:
-        "Reads the person's own upcoming calls (with whom, when, whether they organised it, and the prep brief once it is ready, 24 hours before) and their open reminders.",
+        "Reads the person's own upcoming calls (with whom, when, whether they organised it, and the prep brief once it is ready, 24 hours before) and their open reminders; plus byRelationship: the calls on each of their relationships, including ones a colleague booked and past calls that did not take place. A relationship whose calls are UNAVAILABLE is unknown right now: never say no call was booked for it.",
       classification: "READ_ONLY",
       riskClass: "SAFE_READ",
       requiredCapabilities: [],
@@ -1048,7 +1124,14 @@ export function createScheduleTools(
             : deny<OwnGrant>("NOT_AVAILABLE"),
         ),
       execute: async (_input, _context, grant) => {
-        const own = await schedule.upcoming(grant.actor);
+        const [own, relationshipBriefs] = await Promise.all([
+          schedule.upcoming(grant.actor),
+          schedule.relationshipBriefs === undefined
+            ? Promise.resolve(undefined)
+            : schedule
+                .relationshipBriefs(grant.actor)
+                .catch(() => "FAILED" as const),
+        ]);
         const meetings = own.meetings.slice(0, 20);
         const briefs = await Promise.all(
           meetings.map((meeting, index) =>
@@ -1071,6 +1154,17 @@ export function createScheduleTools(
           reminders: own.reminders.slice(0, 30).map((reminder) => ({
             ...reminder,
           })),
+          ...(relationshipBriefs === undefined || relationshipBriefs === null
+            ? {}
+            : {
+                byRelationship:
+                  relationshipBriefs === "FAILED"
+                    ? { status: "UNAVAILABLE" as const }
+                    : {
+                        status: "OK" as const,
+                        items: relationshipBriefs.slice(0, 50).map(callsOf),
+                      },
+              }),
         };
       },
     }),

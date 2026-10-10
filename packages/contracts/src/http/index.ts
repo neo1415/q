@@ -367,6 +367,7 @@ export {
   isActiveMatchState,
   MEETING_OUTCOMES,
   NETWORK_PASS_REASONS_PATH,
+  NETWORK_RELATIONSHIP_BRIEF_PATH,
   NETWORK_RELATIONSHIP_DILIGENCE_PATH,
   NETWORK_DILIGENCE_SHARES_PATH,
   NETWORK_DILIGENCE_SHARE_REVOKE_PATH,
@@ -437,6 +438,22 @@ export {
   type RelationshipEventSummaryDto,
   type RelationshipSourceType,
 } from "./relationships.js";
+export {
+  RelationshipBriefDecisionSchema,
+  RelationshipBriefMeetingSchema,
+  RelationshipBriefMessageSchema,
+  RelationshipBriefSchema,
+  RelationshipBriefSideSchema,
+  NETWORK_RELATIONSHIP_BRIEFS_PATH,
+  RELATIONSHIP_BRIEFS_MAX,
+  RelationshipBriefListQuerySchema,
+  RelationshipBriefListSchema,
+  type RelationshipBriefList,
+  type RelationshipBrief,
+  type RelationshipBriefDecision,
+  type RelationshipBriefMeeting,
+  type RelationshipBriefMessage,
+} from "./relationship-brief.js";
 
 export {
   ListTaxonomyNodesQuerySchema,

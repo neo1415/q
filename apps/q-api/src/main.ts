@@ -304,6 +304,8 @@ import {
 } from "@capital-q/investors";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
+  createRelationshipBriefBatchSources,
+  createRelationshipBriefSources,
   createCommitmentService,
   createDealCloseService,
   createRelationshipOutcomeService,
@@ -480,6 +482,7 @@ import { createConnectionRequestAnswerAction } from "./composition/connection-re
 import { createConnectionRequestSendAction } from "./composition/connection-request-send-action.js";
 import {
   chainProposers,
+  createOwnBriefsReader,
   createRelationshipActionBoard,
   createRelationshipIntelligencePort,
 } from "./composition/relationship-intelligence.js";
@@ -1886,6 +1889,18 @@ const diligenceService = createDiligenceService({
     }),
   newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
 });
+
+/**
+ * R1 batching: the brief's batch readers over the chat and schedule
+ * services, each scoped in SQL to the actor's own organisation. Replaces
+ * the raw latest-message query, which also returned unsent messages.
+ */
+const relationshipBriefBatchSources = createRelationshipBriefBatchSources({
+  chat,
+  schedule,
+  diligence: diligenceService,
+});
+
 const visibilityCentre = createVisibilityCentre({
   access: permissionsService.access,
   inspect: permissionsService.inspectResourceDisclosure,
@@ -2615,7 +2630,15 @@ const qTools = createQTools({
         board: relationshipBoard,
         ownCompany: runtimeDependencies.ownCompany,
         connections: connectionService,
-        latestMessages: latestRelationshipMessages,
+        // R1: the latest message per relationship from the chat's own
+        // batched read (unsends folded), and the Relationship Brief.
+        briefBatchSources: relationshipBriefBatchSources,
+        // R1: the Relationship Brief, over the same services as the screens.
+        briefSources: createRelationshipBriefSources({
+          chat,
+          schedule,
+          diligence: diligenceService,
+        }),
       }),
       // Diligence (2026-10-02): get_relationship names the area's requests
       // and shares, read through the diligence service as the person.
@@ -2732,12 +2755,20 @@ const qTools = createQTools({
         null,
     }),
     // BIZ-008: calls and reminders, prepared on the chat board.
-    schedule: createScheduleIntelligencePort(schedule, async (actor) =>
-      actor.actorType === "HUMAN"
-        ? ((await people.read(actor.userId).catch(() => null))?.timeZone ??
-          null)
-        : null,
-    ),
+    schedule: {
+      ...createScheduleIntelligencePort(schedule, async (actor) =>
+        actor.actorType === "HUMAN"
+          ? ((await people.read(actor.userId).catch(() => null))?.timeZone ??
+            null)
+          : null,
+      ),
+      // R1: list_schedule's per-relationship calls, from the briefs.
+      relationshipBriefs: createOwnBriefsReader({
+        interests: interestService,
+        ownCompany: runtimeDependencies.ownCompany,
+        sources: relationshipBriefBatchSources,
+      }),
+    },
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
     profileGaps: profileGapsBoard,
@@ -3074,56 +3105,11 @@ const ownRecords = createOwnRecordsPort({
 const qActionRepositories = createPostgresQActionRepositories();
 // Errands (founder direction 2026-09-29): one approval, an exact plan Q
 // carries forward as the relationship moves.
-/**
- * The latest chat message of each relationship, by side (R35, live
- * 2026-10-08). Called only with relationships the actor's own list
- * already returned; text messages only, newest per relationship.
- */
-async function latestRelationshipMessages(
-  relationshipIds: readonly string[],
-): Promise<
-  ReadonlyMap<
-    string,
-    {
-      readonly side: "INVESTOR" | "COMPANY";
-      readonly at: string;
-      readonly body: string;
-    }
-  >
-> {
-  if (relationshipIds.length === 0) return new Map();
-  const rows = await database.sql<
-    {
-      relationship_id: string;
-      sender_side: "INVESTOR" | "COMPANY";
-      created_at: Date;
-      body: string | null;
-    }[]
-  >`
-    select distinct on (c.relationship_id)
-           c.relationship_id, m.sender_side, m.created_at, m.body
-      from communication.conversations c
-      join communication.messages m on m.conversation_id = c.id
-     where c.relationship_id = any(${[...relationshipIds].slice(0, 200)}::uuid[])
-       and m.kind = 'TEXT'
-     order by c.relationship_id, m.created_at desc`;
-  return new Map(
-    rows.map((row) => [
-      row.relationship_id,
-      {
-        side: row.sender_side,
-        at: new Date(row.created_at).toISOString(),
-        body: row.body ?? "",
-      },
-    ]),
-  );
-}
-
 const errandRelationships = createRelationshipIntelligencePort({
   interests: interestService,
   board: relationshipBoard,
   ownCompany: runtimeDependencies.ownCompany,
-  latestMessages: latestRelationshipMessages,
+  briefBatchSources: relationshipBriefBatchSources,
 });
 // ADMIN block: a suspended account resolves to no actor (ADR 0033).
 const actorContextResolver = withSuspension(

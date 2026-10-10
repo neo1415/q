@@ -124,6 +124,7 @@ function factsOf(
     unread,
     followUpDue: digest.followUpDue,
     nextCallAt: digest.nextCall?.startsAt ?? null,
+    callsRead: digest.callsRead,
     lastMessageAt: digest.messages?.last?.sentAt ?? null,
     diligence: digest.diligence ?? null,
   };

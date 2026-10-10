@@ -20,6 +20,7 @@ import type {
   AppendChatMessageInput,
   ChatConversation,
   ChatMessageRow,
+  ChatSide,
   ChatStore,
 } from "./store.js";
 
@@ -89,6 +90,9 @@ function toRow(row: MessageRow): ChatMessageRow {
 }
 
 // The sender's name as a person sees it; never an email address.
+/** Originals per side read for a list card: enough to survive a few unsends. */
+const RECENT_PER_SIDE = 5;
+
 const SELECT_MESSAGE = (sql: DatabaseExecutor) => sql`
   select m.id, m.conversation_id, m.sender_user_id,
          coalesce(nullif(btrim(p.display_name), ''),
@@ -358,6 +362,58 @@ export function createPostgresChatStore(options: {
         select blocker_side from communication.blocks
          where relationship_id = ${relationshipId} and lifted_at is null`;
       return rows.map((row) => row.blocker_side);
+    },
+
+    recentForRelationships: async (organisationId, relationshipIds) => {
+      if (relationshipIds.length === 0) return [];
+      // The party side comes from the canonical rows, as for unread; a
+      // thread where the organisation is neither party never appears.
+      const rows = await sql<
+        (MessageRow & { relationship_id: string; reader_side: ChatSide })[]
+      >`
+        with threads as (
+          -- Every listed party relationship, with its thread when it has
+          -- one: no thread yet is "no messages", answered, not omitted.
+          select c.id, r.id as relationship_id,
+                 case when co.organisation_id = ${organisationId} then 'COMPANY' else 'INVESTOR' end as side
+            from network.relationships r
+            join core.companies co on co.id = r.company_id
+            join core.investor_organisations io on io.id = r.investor_organisation_id
+            left join communication.conversations c on c.relationship_id = r.id
+           where r.id = any(${[...relationshipIds]}::uuid[])
+             and (co.organisation_id = ${organisationId} or io.organisation_id = ${organisationId})
+        ), ranked as (
+          select m.id,
+                 row_number() over (partition by m.conversation_id, m.sender_side
+                                    order by m.created_at desc, m.id desc) as n
+            from communication.messages m
+            join threads t on t.id = m.conversation_id
+           where m.revises_message_id is null
+        ), picked as (
+          select id from ranked where n <= ${RECENT_PER_SIDE}
+        ), message_rows as (
+          ${SELECT_MESSAGE(sql)}
+           where m.id in (select id from picked)
+              or m.revises_message_id in (select id from picked)
+        )
+        select mr.*, t.relationship_id, t.side as reader_side
+          from threads t
+          left join message_rows mr on mr.conversation_id = t.id`;
+      const out = new Map<
+        string,
+        { relationshipId: string; side: ChatSide; rows: ChatMessageRow[] }
+      >();
+      for (const row of rows) {
+        const entry = out.get(row.relationship_id) ?? {
+          relationshipId: row.relationship_id,
+          side: row.reader_side,
+          rows: [],
+        };
+        // No thread, or a thread with nothing picked: the left join's nulls.
+        if (row.id !== null) entry.rows.push(toRow(row));
+        out.set(row.relationship_id, entry);
+      }
+      return [...out.values()];
     },
 
     unreadForOrganisation: async (organisationId, userId) => {

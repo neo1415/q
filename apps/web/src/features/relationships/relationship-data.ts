@@ -2,20 +2,16 @@ import "server-only";
 
 import {
   type ApiSession,
-  getChatThread,
   getCompanyNetworkPreview,
-  getDiligence,
   getDiscoveredInvestor,
   listCompanyRelationships,
   listInvestorRelationships,
-  listRelationshipMeetings,
+  listRelationshipBriefs,
   listReminders,
 } from "@capital-q/api-client";
-import {
-  isMatchedRelationshipState,
-  CHAT_PAGE_MAX,
-  type ChatMessageDto,
-  type RelationshipSummaryDto,
+import type {
+  RelationshipBrief,
+  RelationshipSummaryDto,
 } from "@capital-q/contracts";
 
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
@@ -62,6 +58,7 @@ export type RelationshipDigest = {
   readonly about: string | null;
   readonly chips: readonly string[];
   readonly websiteUrl: string | null;
+  /** Null: the chat could not be read (unknown, never "no messages"). */
   readonly messages: {
     readonly count: number;
     /** The thread holds more than the one page read. */
@@ -74,6 +71,11 @@ export type RelationshipDigest = {
     } | null;
   } | null;
   readonly nextCall: { readonly startsAt: string } | null;
+  /**
+   * Whether the calls were read. False: nextCall is unknown, so the card
+   * must not offer "Book a call" as if none were booked.
+   */
+  readonly callsRead?: boolean | undefined;
   readonly nextReminder: {
     readonly title: string;
     readonly dueAt: string;
@@ -94,17 +96,70 @@ export type RelationshipDigest = {
 /** Cards read in full; beyond this the list still shows state and dates. */
 const DIGEST_LIMIT = 20;
 
-function messagePreview(message: ChatMessageDto): string {
-  if (message.unsent) return "Message unsent";
-  if (message.kind === "VOICE_NOTE") return "Voice note";
-  if (message.kind === "ATTACHMENT") {
-    return message.attachment === null
-      ? "Shared a document"
-      : `Shared ${message.attachment.title}`;
+/**
+ * A card's facts from its Relationship Brief (R1): the same read Q answers
+ * from. An UNAVAILABLE source is null here (unknown), never an empty one.
+ */
+export function digestFacts(
+  brief: RelationshipBrief | undefined,
+  inDiligence: boolean,
+): Pick<
+  RelationshipDigest,
+  "messages" | "nextCall" | "callsRead" | "diligence"
+> {
+  if (brief === undefined) {
+    return {
+      messages: null,
+      nextCall: null,
+      callsRead: false,
+      diligence: null,
+    };
   }
-  return message.body ?? "";
+  const latest = brief.messages.latest;
+  const last = latest.status === "OK" ? latest.message : null;
+  const meetings = brief.meetings;
+  const obligations = brief.obligations;
+  const documents = brief.documents;
+  return {
+    messages:
+      latest.status !== "OK"
+        ? null
+        : {
+            count: brief.messages.count,
+            more: false,
+            last:
+              last === null
+                ? null
+                : {
+                    text: last.preview ?? "",
+                    mine: last.from === "YOU",
+                    senderName: last.senderName,
+                    sentAt: last.sentAt,
+                  },
+          },
+    nextCall:
+      meetings.status === "OK" && meetings.nextScheduled !== null
+        ? { startsAt: meetings.nextScheduled.startsAt }
+        : null,
+    callsRead: meetings.status === "OK",
+    diligence:
+      !inDiligence || obligations.status !== "OK" || documents.status !== "OK"
+        ? null
+        : {
+            openRequests: obligations.openRequests.length,
+            firstOpenTitle: obligations.openRequests[0]?.title ?? null,
+            unopenedShares: documents.items.filter(
+              (d) => d.openedByYourSide === false,
+            ).length,
+          },
+  };
 }
 
+/**
+ * The cards' facts for one page: the briefs in ONE call (R1 batching; it
+ * was a thread, a schedule and a diligence call per relationship), the
+ * reminders in one, and each counterpart's network profile.
+ */
 export async function relationshipDigests(
   context: OwnContext,
   items: readonly RelationshipSummaryDto[],
@@ -112,95 +167,56 @@ export async function relationshipDigests(
   const session = await apiSession();
   if (session === null || items.length === 0) return {};
   const now = Date.now();
-  // Started now, awaited per card: it no longer holds up the other reads.
-  const remindersRead = listReminders(session)
-    .then((list) => list.items)
-    .catch(() => [] as const);
-
-  const entries = await Promise.all(
-    items.slice(0, DIGEST_LIMIT).map(async (item) => {
-      const connected = isMatchedRelationshipState(item.state);
-      const [profile, thread, meetings, diligence] = await Promise.all([
+  const page = items.slice(0, DIGEST_LIMIT);
+  const [briefs, reminders, profiles] = await Promise.all([
+    listRelationshipBriefs(session, {
+      companyId: context.kind === "FOUNDER" ? context.companyId : undefined,
+      relationshipIds: page.map((item) => item.relationshipId),
+    })
+      .then(
+        (list) =>
+          new Map(list.items.map((brief) => [brief.relationshipId, brief])),
+      )
+      .catch(() => new Map<string, RelationshipBrief>()),
+    listReminders(session)
+      .then((list) => list.items)
+      .catch(() => [] as const),
+    Promise.all(
+      page.map((item) =>
         counterpartProfile(session, context, item).catch(() => null),
-        connected
-          ? getChatThread(session, item.relationshipId).catch(() => null)
-          : Promise.resolve(null),
-        connected
-          ? listRelationshipMeetings(session, item.relationshipId)
-              .then((list) => list.items)
-              .catch(() => [] as const)
-          : Promise.resolve([] as const),
-        item.state === "IN_DILIGENCE"
-          ? getDiligence(session, item.relationshipId).catch(() => null)
-          : Promise.resolve(null),
-      ]);
-      const reminders = await remindersRead;
-      const open = (diligence?.requests ?? []).filter(
-        (request) => request.status === "OPEN",
-      );
-      const own = reminders.filter(
-        (reminder) => reminder.relationshipId === item.relationshipId,
-      );
-      const pending = own
-        .filter((reminder) => reminder.status === "PENDING")
-        .toSorted((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
-      const upcomingCall = meetings
-        .filter(
-          (meeting) =>
-            meeting.status !== "CANCELLED" && Date.parse(meeting.endsAt) > now,
-        )
-        .toSorted((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
-        .at(0);
-      const last = thread?.messages.at(-1);
-      const digest: RelationshipDigest = {
-        photoUrl: profile?.photoUrl ?? null,
-        about: profile?.about ?? null,
-        chips: profile?.chips ?? [],
-        websiteUrl: profile?.websiteUrl ?? null,
-        messages:
-          thread === null
-            ? null
-            : {
-                count: thread.messages.length,
-                more: thread.messages.length >= CHAT_PAGE_MAX,
-                last:
-                  last === undefined
-                    ? null
-                    : {
-                        text: messagePreview(last),
-                        mine: last.mine,
-                        senderName: last.senderName,
-                        sentAt: last.sentAt,
-                      },
-              },
-        nextCall:
-          upcomingCall === undefined
-            ? null
-            : { startsAt: upcomingCall.startsAt },
-        nextReminder:
-          pending[0] === undefined
-            ? null
-            : { title: pending[0].title, dueAt: pending[0].dueAt },
-        followUpDue: own.some(
-          (reminder) =>
-            reminder.status === "DELIVERED" ||
-            (reminder.status === "PENDING" &&
-              Date.parse(reminder.dueAt) <= now),
-        ),
-        diligence:
-          diligence === null
-            ? null
-            : {
-                openRequests: open.length,
-                firstOpenTitle: open[0]?.title ?? null,
-                unopenedShares: diligence.shares.filter(
-                  (share) => share.viewedAt === null,
-                ).length,
-              },
-      };
-      return [item.relationshipId, digest] as const;
-    }),
-  );
+      ),
+    ),
+  ]);
+
+  const entries = page.map((item, at) => {
+    const profile = profiles[at] ?? null;
+    const own = reminders.filter(
+      (reminder) => reminder.relationshipId === item.relationshipId,
+    );
+    const pending = own
+      .filter((reminder) => reminder.status === "PENDING")
+      .toSorted((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
+    const digest: RelationshipDigest = {
+      photoUrl: profile?.photoUrl ?? null,
+      about: profile?.about ?? null,
+      chips: profile?.chips ?? [],
+      websiteUrl: profile?.websiteUrl ?? null,
+      ...digestFacts(
+        briefs.get(item.relationshipId),
+        item.state === "IN_DILIGENCE",
+      ),
+      nextReminder:
+        pending[0] === undefined
+          ? null
+          : { title: pending[0].title, dueAt: pending[0].dueAt },
+      followUpDue: own.some(
+        (reminder) =>
+          reminder.status === "DELIVERED" ||
+          (reminder.status === "PENDING" && Date.parse(reminder.dueAt) <= now),
+      ),
+    };
+    return [item.relationshipId, digest] as const;
+  });
   return Object.fromEntries(entries);
 }
 

@@ -28,6 +28,7 @@ export { createPostgresChatSafetyStore } from "./safety-postgres.js";
 export {
   createChatService,
   foldChatRows,
+  type BriefLatestMessage,
   type ChatDocumentPort,
   type ChatDownloadPort,
   type ChatParty,

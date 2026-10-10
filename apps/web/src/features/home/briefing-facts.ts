@@ -8,6 +8,7 @@ import {
   listIncomingInterest,
   listInvestorRelationships,
   listPendingQApprovals,
+  listRelationshipBriefs,
 } from "@capital-q/api-client";
 import type {
   DiscoveryCompanySlateDto,
@@ -16,6 +17,7 @@ import type {
   OnboardingBriefingNudgeResponse,
   QPendingApprovalList,
   QRehearsalPartnersDto,
+  RelationshipBriefList,
   RelationshipListDto,
 } from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
@@ -58,6 +60,16 @@ export type BriefingReads = {
   readonly companyRelationships: (
     companyId: string,
   ) => Promise<RelationshipListDto>;
+  /**
+   * R1: the briefs of the relationships the briefing would speak of, in
+   * one call. Absent or failed: the lines claim nothing about calls.
+   */
+  readonly relationshipBriefs?:
+    | ((query: {
+        readonly companyId?: string | undefined;
+        readonly relationshipIds: readonly string[];
+      }) => Promise<RelationshipBriefList>)
+    | undefined;
   readonly incomingInterest: (
     companyId: string,
   ) => Promise<IncomingInterestListDto>;
@@ -129,6 +141,47 @@ function relationshipFacts(
     state: item.state,
     stateSince: item.stateSince,
   }));
+}
+
+/**
+ * The calls behind each newly connected relationship, from the briefs in
+ * one call (R1). Only the ones the briefing would speak of are asked for.
+ * A brief that came back with its calls unread says so; a read that
+ * failed leaves the facts as they were (nothing claimed about calls).
+ */
+async function withCalls(
+  facts: readonly RelationshipFact[] | undefined,
+  reads: BriefingReads,
+  since: string,
+  companyId: string | undefined,
+): Promise<readonly RelationshipFact[] | undefined> {
+  const read = reads.relationshipBriefs;
+  if (facts === undefined || read === undefined) return facts;
+  const ids = facts
+    .filter(
+      (fact) =>
+        fact.state === "CONNECTED" &&
+        Date.parse(fact.stateSince) >= Date.parse(since),
+    )
+    .map((fact) => fact.relationshipId);
+  if (ids.length === 0) return facts;
+  const briefs = await within(() => read({ companyId, relationshipIds: ids }));
+  if (briefs === undefined) return facts;
+  const byId = new Map(briefs.items.map((b) => [b.relationshipId, b]));
+  return facts.map((fact) => {
+    const brief = byId.get(fact.relationshipId);
+    if (brief === undefined) return fact;
+    return {
+      ...fact,
+      calls:
+        brief.meetings.status === "OK"
+          ? {
+              status: "OK" as const,
+              nextAt: brief.meetings.nextScheduled?.startsAt ?? null,
+            }
+          : { status: "UNAVAILABLE" as const },
+    };
+  });
 }
 
 /** Where each readiness step is done. */
@@ -206,7 +259,12 @@ export async function readBriefingFacts(
         role: "FOUNDER",
         since,
         approvals: approvalFacts(approvals),
-        relationships: relationshipFacts(relationships),
+        relationships: await withCalls(
+          relationshipFacts(relationships),
+          reads,
+          since,
+          companyId,
+        ),
         interest: interest?.items
           .filter((item) => item.response === "PENDING")
           .map((item) => ({
@@ -231,7 +289,12 @@ export async function readBriefingFacts(
         role: "INVESTOR",
         since,
         approvals: approvalFacts(approvals),
-        relationships: relationshipFacts(relationships),
+        relationships: await withCalls(
+          relationshipFacts(relationships),
+          reads,
+          since,
+          undefined,
+        ),
         pitches: slate?.items
           .filter((item) => item.pitch !== null)
           .map((item) => ({
@@ -281,6 +344,7 @@ export async function resolveBriefing(
         investorRelationships: () => listInvestorRelationships(session),
         companyRelationships: (companyId) =>
           listCompanyRelationships(session, companyId),
+        relationshipBriefs: (query) => listRelationshipBriefs(session, query),
         incomingInterest: (companyId) =>
           listIncomingInterest(session, companyId),
         readiness: (companyId) => getMarketplaceReadiness(session, companyId),
