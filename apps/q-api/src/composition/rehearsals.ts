@@ -3,6 +3,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import {
+  ExternalEvaluationBasisSchema,
+  EXTERNAL_REHEARSAL_DISCLAIMER,
+  EXTERNAL_REHEARSAL_LABEL,
   REHEARSAL_HAND_RAISED_SIGNAL,
   REHEARSAL_SILENCE_SIGNAL,
   type RehearsalDifficulty,
@@ -65,6 +68,16 @@ import {
 } from "./rehearsal-temperament.js";
 import { readPersona, readReview, readTurn } from "./rehearsal-readings.js";
 import { questioningNote } from "./rehearsal-archetypes.js";
+import {
+  buildExternalPersona,
+  claimsToBeRealPerson,
+  externalLiveInstructions,
+  identityOf,
+  NOT_THE_REAL_PERSON_LINE,
+} from "./external-persona.js";
+import { externalEvaluationBasis } from "./external-evaluation.js";
+import type { ExternalSubjectStore } from "./external-subjects.js";
+import type { ExternalRehearsalLatency } from "./external-rehearsal-latency.js";
 import {
   newPresenceState,
   presenceNote,
@@ -857,6 +870,36 @@ export type RehearsalService = {
     actor: ActorContext,
     rehearsalId: string,
   ) => Promise<RehearsalResult>;
+  /**
+   * GPT-Live line for a rehearsal with a researched external person: the
+   * prepared persona context as the voice's instructions, built from the
+   * stored sources and the founder's business, with no tools. Null unless
+   * this is the person's own ACTIVE external-person rehearsal.
+   */
+  readonly externalLine: (
+    actor: ActorContext,
+    rehearsalId: string,
+    hints: { readonly firstName?: string | undefined; readonly locale?: string | undefined },
+  ) => Promise<{
+    readonly instructions: string;
+    readonly name: string;
+    readonly voice: "FEMALE" | "MALE";
+    readonly seed: string;
+  } | null>;
+  /**
+   * The transcript of that line, as the browser heard it, kept as the
+   * rehearsal's turns (no model call) so the evaluation can read it.
+   * Returns how many segments were kept.
+   */
+  readonly recordLive: (
+    actor: ActorContext,
+    rehearsalId: string,
+    segments: readonly {
+      readonly role: "USER" | "Q";
+      readonly text: string;
+      readonly at: number;
+    }[],
+  ) => Promise<number | null>;
   /** The latest line the other person said, for a voice line's opening. */
   readonly opening: (
     actor: ActorContext,
@@ -876,7 +919,9 @@ export type RehearsalService = {
 function counterpartRoleOf(
   kind: RehearsalCounterpartKind,
 ): "INVESTOR" | "FOUNDER" {
-  return kind === "INVESTOR_ORGANISATION" ? "INVESTOR" : "FOUNDER";
+  // A researched external person is played as the other side of a founder's
+  // pitch (an investor or a senior professional), never as a founder.
+  return kind === "COMPANY" ? "FOUNDER" : "INVESTOR";
 }
 
 const StoredSourceSchema = z.object({
@@ -994,7 +1039,8 @@ export function provisionalReview(metrics: QRehearsalDto["metrics"]): {
 
 function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
   if (row.scorecard === null || typeof row.scorecard !== "object") return null;
-  const { presence, slides, provisional, ...review } = row.scorecard as Record<
+  const { presence, slides, provisional, externalBasis, ...review } =
+    row.scorecard as Record<
     string,
     unknown
   >;
@@ -1013,6 +1059,7 @@ function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
   }
   const parsed = RehearsalReviewResultSchema.safeParse(review);
   if (!parsed.success) return null;
+  const basis = ExternalEvaluationBasisSchema.safeParse(externalBasis);
   const looks = PresenceSectionSchema.safeParse(presence ?? []);
   const seen = SlidesSectionSchema.safeParse(slides ?? []);
   return {
@@ -1020,6 +1067,7 @@ function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
     score: row.score,
     ...(looks.success && looks.data.length > 0 ? { presence: looks.data } : {}),
     ...(seen.success && seen.data.length > 0 ? { slides: seen.data } : {}),
+    ...(basis.success ? { externalBasis: basis.data } : {}),
   };
 }
 
@@ -1098,6 +1146,14 @@ function toDto(
       ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
       ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
     })),
+    ...(row.counterpartKind === "EXTERNAL_PERSON"
+      ? {
+          simulation: {
+            label: EXTERNAL_REHEARSAL_LABEL,
+            disclaimer: EXTERNAL_REHEARSAL_DISCLAIMER,
+          },
+        }
+      : {}),
     review: reviewDto(row),
     createdAt: row.createdAt.toISOString(),
     endedAt: row.endedAt === null ? null : row.endedAt.toISOString(),
@@ -1356,8 +1412,22 @@ export function createRehearsalService(dependencies: {
   readonly turnDeadlineMs?: number | undefined;
   /** Turns a rehearsal may carry frames on (tests lower it). */
   readonly visionTurns?: number | undefined;
+  /** Rehearsing with a researched external person (public sources only). */
+  readonly external?:
+    | {
+        readonly subjects: ExternalSubjectStore;
+        readonly latency?: ExternalRehearsalLatency | undefined;
+      }
+    | undefined;
 }): RehearsalService {
   const { store, material, composer, logger } = dependencies;
+  const external = dependencies.external;
+  /** A played line that claims to be the real person is never kept. */
+  const guardedLine = (row: RehearsalRow, text: string): string =>
+    row.counterpartKind === "EXTERNAL_PERSON" &&
+    claimsToBeRealPerson(text, [row.counterpartName])
+      ? NOT_THE_REAL_PERSON_LINE
+      : text;
   const turnDeadlineMs = dependencies.turnDeadlineMs ?? TURN_DEADLINE_MS;
   const visionTurnsCap = dependencies.visionTurns ?? VISION_TURNS_PER_REHEARSAL;
   const now = dependencies.now ?? (() => new Date());
@@ -1447,6 +1517,9 @@ export function createRehearsalService(dependencies: {
     kind: RehearsalCounterpartKind,
     id: string,
   ): Promise<BuiltPersona | "NOT_FOUND" | "Q_UNAVAILABLE"> {
+    if (kind === "EXTERNAL_PERSON") {
+      return ensureExternalPersona(actor, viewer, id);
+    }
     const counterpart = await material
       .counterpart(actor, kind, id)
       .catch(() => null);
@@ -1619,6 +1692,102 @@ export function createRehearsalService(dependencies: {
   }
 
   /**
+   * The persona of a researched external person, from code alone and BEFORE
+   * the call: the sourced public brief plus the founder's own business. No
+   * model, no search; reused while neither the brief version nor the
+   * founder's material changes.
+   */
+  async function ensureExternalPersona(
+    actor: ActorContext,
+    viewer: { readonly role: ViewerRole; readonly organisationName: string },
+    id: string,
+  ): Promise<BuiltPersona | "NOT_FOUND" | "Q_UNAVAILABLE"> {
+    if (external === undefined) return "NOT_FOUND";
+    const started = performance.now();
+    const record = await external.subjects.latest(actor, id).catch(() => null);
+    if (record === null) return "NOT_FOUND";
+    const own = await material.ownMaterial(actor).catch(() => NO_MATERIAL);
+    const digest = digestOf([
+      identityOf(record.subject),
+      own.text,
+      viewer.organisationName,
+    ]);
+    const existing = await store.findPersona(actor, "EXTERNAL_PERSON", id);
+    const held =
+      existing === null
+        ? null
+        : CounterpartPersonaStoredSchema.safeParse(existing.profile);
+    const name = record.subject.displayName;
+    if (
+      existing !== null &&
+      held?.success === true &&
+      existing.signalDigest === digest &&
+      (held.data.readBy ?? 0) >= composer.personaVersion
+    ) {
+      external.latency?.record(
+        "persona_preparation_ms",
+        performance.now() - started,
+      );
+      return { row: existing, profile: held.data, name, relationshipId: null };
+    }
+    const built = buildExternalPersona({
+      subject: record.subject,
+      brief: record.brief,
+      founder: {
+        companyName: viewer.organisationName,
+        businessText: own.text,
+      },
+      readBy: composer.personaVersion,
+    });
+    const saved = await store
+      .savePersona(actor, {
+        kind: "EXTERNAL_PERSON",
+        id,
+        name,
+        relationshipId: null,
+        profile: built.persona,
+        sources: built.sources.map((source) => ({
+          kind: "PUBLIC_WEB" as const,
+          label: source.label,
+          url: source.url,
+        })),
+        signalDigest: digest,
+        webReadAt: null,
+      })
+      .catch((error: unknown) => {
+        logger?.warn({ err: error }, "external persona not saved");
+        return null;
+      });
+    if (saved === null) return "Q_UNAVAILABLE";
+    external.latency?.record(
+      "persona_preparation_ms",
+      performance.now() - started,
+    );
+    return { row: saved, profile: built.persona, name, relationshipId: null };
+  }
+
+  /** What code adds to the review of a rehearsal with an external person. */
+  async function externalBasisFor(
+    actor: ActorContext,
+    row: RehearsalRow,
+    turns: readonly Turn[],
+    graded: Pick<RehearsalReviewResult, "dimensions" | "tips">,
+  ): Promise<{ externalBasis?: ReturnType<typeof externalEvaluationBasis> }> {
+    if (row.counterpartKind !== "EXTERNAL_PERSON") return {};
+    const persona = await store
+      .findPersona(actor, row.counterpartKind, row.counterpartId)
+      .catch(() => null);
+    return {
+      externalBasis: externalEvaluationBasis({
+        turns,
+        dimensions: graded.dimensions,
+        tips: graded.tips,
+        sources: publicSources(persona?.sources ?? []),
+      }),
+    };
+  }
+
+  /**
    * The real review, written in the background after a provisional one:
    * a few tries, further apart, then left provisional (still readable).
    */
@@ -1658,7 +1827,10 @@ export function createRehearsalService(dependencies: {
         const graded = ownReview(review, turns, row.userRole);
         await store.completeReview(actor, rehearsalId, {
           score: scoreOf(graded.dimensions),
-          review: withSeen(graded, looks, slides),
+          review: {
+            ...withSeen(graded, looks, slides),
+            ...(await externalBasisFor(actor, row, turns, graded)),
+          },
         });
       })().catch(() => undefined);
     }, delay).unref();
@@ -2111,6 +2283,14 @@ export function createRehearsalService(dependencies: {
             source: t.source,
           })),
           sources: publicSources(built.row.sources),
+          ...(kind === "EXTERNAL_PERSON"
+            ? {
+                simulation: {
+                  label: EXTERNAL_REHEARSAL_LABEL,
+                  disclaimer: EXTERNAL_REHEARSAL_DISCLAIMER,
+                },
+              }
+            : {}),
           refreshedAt: built.row.refreshedAt.toISOString(),
         },
       };
@@ -2192,7 +2372,7 @@ export function createRehearsalService(dependencies: {
         turns: [
           {
             from: "THEM",
-            text: opening.result.line,
+            text: guardedLine(draft, opening.result.line),
             at: now().toISOString(),
             mood: opening.result.mood,
             sawScreen: false,
@@ -2299,7 +2479,7 @@ export function createRehearsalService(dependencies: {
         ...turns,
         {
           from: "THEM",
-          text: result.line,
+          text: guardedLine(row, result.line),
           at: now().toISOString(),
           mood: result.mood,
           sawScreen: answered.sawScreen,
@@ -2405,9 +2585,103 @@ export function createRehearsalService(dependencies: {
         outcome,
         score: scoreOf(graded.dimensions),
         // Text only, written by code from the readings; never an image.
-        review: withSeen(graded, looks, slides),
+        review: {
+          ...withSeen(graded, looks, slides),
+          ...(await externalBasisFor(actor, row, turns, graded)),
+        },
       });
       return okWithHistory(actor, saved ?? (await store.own(actor, row.id)));
+    },
+
+    externalLine: async (actor, rehearsalId, hints) => {
+      const row = await store.own(actor, rehearsalId);
+      if (
+        row === null ||
+        row.counterpartKind !== "EXTERNAL_PERSON" ||
+        row.status !== "ACTIVE" ||
+        row.endedAt !== null ||
+        external === undefined
+      ) {
+        return null;
+      }
+      const viewer = await viewerOf(actor);
+      if (viewer === null) return null;
+      const record = await external.subjects
+        .latest(actor, row.counterpartId)
+        .catch(() => null);
+      if (record === null) return null;
+      const own = await material.ownMaterial(actor).catch(() => NO_MATERIAL);
+      const founder = {
+        companyName: viewer.organisationName,
+        businessText: own.text,
+      };
+      const built = buildExternalPersona({
+        subject: record.subject,
+        brief: record.brief,
+        founder,
+        readBy: composer.personaVersion,
+      });
+      return {
+        instructions: externalLiveInstructions({
+          subject: record.subject,
+          built,
+          founder,
+          firstName: hints.firstName,
+          locale: hints.locale,
+        }),
+        name: row.counterpartName,
+        voice: row.voice ?? "MALE",
+        seed: `${row.counterpartKind}:${row.counterpartId}`,
+      };
+    },
+
+    recordLive: async (actor, rehearsalId, segments) => {
+      const row = await store.own(actor, rehearsalId);
+      if (
+        row === null ||
+        row.counterpartKind !== "EXTERNAL_PERSON" ||
+        row.status !== "ACTIVE" ||
+        row.endedAt !== null
+      ) {
+        return null;
+      }
+      const previous = normaliseTurns(row.turns, row.userRole);
+      const added: Turn[] = segments
+        .map((segment) => ({
+          segment,
+          text: segment.text.trim().slice(0, 4_000),
+        }))
+        .filter(({ text }) => text.length > 0 && !noiseOnly(text))
+        .map(({ segment, text }) =>
+          segment.role === "USER"
+            ? {
+                from: "YOU" as const,
+                text,
+                at: new Date(segment.at).toISOString(),
+                mood: null,
+                sawScreen: false,
+              }
+            : {
+                from: "THEM" as const,
+                text: guardedLine(row, text),
+                at: new Date(segment.at).toISOString(),
+                mood: null,
+                sawScreen: false,
+              },
+        );
+      if (added.length === 0) return 0;
+      const saved = await store.saveTurns(actor, row.id, {
+        turns: [...previous, ...added].slice(-MAX_TURNS),
+        asked: Math.min(
+          80,
+          row.asked +
+            added.filter((t) => t.from === "THEM" && t.text.includes("?"))
+              .length,
+        ),
+        outcome: null,
+        ended: false,
+      });
+      return saved === null ? null : added.length;
     },
 
     opening: async (actor, rehearsalId) => {

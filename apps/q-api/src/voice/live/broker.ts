@@ -14,6 +14,7 @@ import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 import type { SpokenFacts } from "@capital-q/q-core";
 
+import type { ExternalRehearsalLatency } from "../../composition/external-rehearsal-latency.js";
 import type { VoiceSessionBinding } from "../bindings.js";
 import { askQFactsOutput, forRealtime } from "../duplex/broker.js";
 import type { DuplexSpendLedger } from "../duplex/spend.js";
@@ -176,6 +177,12 @@ type LiveLine = {
   tail: Promise<unknown>;
   /** Names Q said on this line, most recent first (the context package). */
   referents: string[];
+  /**
+   * Set on a persona line (a rehearsal with a researched external person):
+   * the voice plays the prepared persona with no tools, nothing is
+   * delegated, and its transcript is kept as the rehearsal's turns.
+   */
+  rehearsalId?: string | undefined;
 };
 
 export type LiveBroker = {
@@ -238,6 +245,29 @@ export type LiveBrokerDependencies = {
   readonly providerCeiling: ModelSensitivity;
   readonly syntheticDemo: boolean;
   readonly logger: Logger;
+  /**
+   * The persona line for a rehearsal with a researched external person.
+   * Absent, or `prepare` answering null (any other rehearsal), a rehearsal
+   * line is refused as before and the standard rehearsal voice carries it.
+   */
+  readonly rehearsalLine?:
+    | {
+        readonly prepare: (
+          actor: ActorContext,
+          rehearsalId: string,
+          hints: {
+            readonly firstName?: string | undefined;
+            readonly locale?: string | undefined;
+          },
+        ) => Promise<{ readonly instructions: string } | null>;
+        readonly record: (
+          actor: ActorContext,
+          rehearsalId: string,
+          segments: LiveTranscriptReport["segments"],
+        ) => Promise<number | null>;
+        readonly latency?: ExternalRehearsalLatency | undefined;
+      }
+    | undefined;
   readonly now?: (() => number) | undefined;
   /**
    * q_runtime.voice_line_turns (A's duplex write path): both sides of the
@@ -632,8 +662,23 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     }) => {
       if (!enabled || provider === undefined)
         return { kind: "REFUSED", reason: "OFF" };
-      if (binding.thread.rehearsal !== undefined) {
-        return { kind: "REFUSED", reason: "REHEARSAL" };
+      // A rehearsal line is GPT-Live only for a researched external person,
+      // from the persona prepared before the call; any other rehearsal
+      // speaks only as the person Q plays, on the standard line.
+      let persona: { readonly instructions: string } | null = null;
+      const rehearsal = binding.thread.rehearsal;
+      if (rehearsal !== undefined) {
+        persona =
+          deps.rehearsalLine === undefined
+            ? null
+            : await deps
+                .rehearsalLine
+                .prepare(binding.actor, rehearsal.rehearsalId, {
+                  firstName,
+                  locale,
+                })
+                .catch(() => null);
+        if (persona === null) return { kind: "REFUSED", reason: "REHEARSAL" };
       }
       const { actor } = binding;
       sweep();
@@ -685,16 +730,19 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       try {
         created = await provider.createWebRtcSession({
           config: {
-            instructions: livePrompt({
-              firstName,
-              locale,
-              briefingOpening,
-              role,
-              names,
-              guided:
-                binding.thread.onboarding !== undefined ||
-                binding.thread.welcome === true,
-            }),
+            instructions:
+              persona !== null
+                ? persona.instructions
+                : livePrompt({
+                    firstName,
+                    locale,
+                    briefingOpening,
+                    role,
+                    names,
+                    guided:
+                      binding.thread.onboarding !== undefined ||
+                      binding.thread.welcome === true,
+                  }),
             voice: config.voices[binding.voice],
           },
           sdp,
@@ -724,11 +772,17 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         finalReported: false,
         tail: Promise.resolve(),
         referents: carried === null ? [] : [...carried.referents],
+        ...(persona === null || rehearsal === undefined
+          ? {}
+          : { rehearsalId: rehearsal.rehearsalId }),
       });
       // Part 6: the background note for this session (and its renewals).
+      // A persona line gets none: its prepared context is the whole of what
+      // it may use, and no record of the founder's rides in on the side.
       let facts: LiveContextFacts | null = null;
       try {
-        facts = (await deps.contextFor?.(actor)) ?? null;
+        facts =
+          persona !== null ? null : ((await deps.contextFor?.(actor)) ?? null);
       } catch (error: unknown) {
         // A failed read costs the call its background, never the call.
         logger.warn({ err: error }, "live voice context could not be read");
@@ -773,6 +827,17 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           approvalPending: false,
           failed: true,
           ended: true,
+        };
+      }
+      // A persona line delegates nothing: no Q run, no tool, no search. The
+      // voice is told there is nothing to add and carries on in character.
+      if (line.rehearsalId !== undefined) {
+        return {
+          delegationId: delegation.delegationId,
+          commentary: null,
+          stale: false,
+          approvalPending: false,
+          failed: false,
         };
       }
       // One delegation id, one run: a repeat joins the run in flight.
@@ -824,6 +889,26 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       const line = ownLine(actor, voiceSessionId);
       if (line === null) return null;
       line.lastActivityAt = now();
+      if (line.rehearsalId !== undefined) {
+        const timings = report.timings;
+        if (timings?.firstAudioMs !== undefined) {
+          deps.rehearsalLine?.latency?.record(
+            "first_audio_ms",
+            timings.firstAudioMs,
+          );
+        }
+        for (const ms of timings?.turnLatencyMs ?? []) {
+          deps.rehearsalLine?.latency?.record("turn_latency_ms", ms);
+        }
+        // The rehearsal keeps the words as its turns, for the evaluation.
+        return (
+          (await deps.rehearsalLine?.record(
+            line.actor,
+            line.rehearsalId,
+            report.segments,
+          )) ?? 0
+        );
+      }
       const store = deps.transcripts;
       if (store === undefined) return 0;
       const at = now();

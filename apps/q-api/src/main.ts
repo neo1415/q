@@ -110,6 +110,8 @@ import {
   createOpenAISidebandConnector,
 } from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
+import { createExternalRehearsalLatency } from "./composition/external-rehearsal-latency.js";
+import { createPostgresExternalSubjectStore } from "./composition/external-subjects.js";
 import { createLiveBroker } from "./voice/live/broker.js";
 import { createPostgresLiveSpend } from "./voice/live/spend.js";
 import { liveConfigFrom } from "./voice/live/config.js";
@@ -4916,7 +4918,17 @@ const contentWords = (value: unknown, out: string[] = []): string[] => {
   }
   return out;
 };
+// Rehearsing with a researched external person: the sourced public brief per
+// viewer (written by the people research), and the latency board the live
+// line and the persona preparation report to.
+const externalSubjects = createPostgresExternalSubjectStore(database.sql);
+const externalRehearsalLatency = createExternalRehearsalLatency(
+  (metric, ms) => {
+    logger.info({ metric, ms }, "external rehearsal latency");
+  },
+);
 const rehearsals = createRehearsalService({
+  external: { subjects: externalSubjects, latency: externalRehearsalLatency },
   store: createPostgresRehearsalStore(database.sql),
   material: {
     viewer: async (actor) => {
@@ -5802,6 +5814,20 @@ const liveBroker =
         providerCeiling: "PUBLIC",
         syntheticDemo: syntheticDemo?.permitted === true,
         logger,
+        // A rehearsal with a researched external person speaks on GPT-Live
+        // from its prepared persona; every other rehearsal is refused here.
+        rehearsalLine: {
+          prepare: async (actor, rehearsalId, hints) => {
+            const line = await rehearsals.externalLine(
+              actor,
+              rehearsalId,
+              hints,
+            );
+            return line === null ? null : { instructions: line.instructions };
+          },
+          record: rehearsals.recordLive,
+          latency: externalRehearsalLatency,
+        },
       })
     : undefined;
 logger.info(

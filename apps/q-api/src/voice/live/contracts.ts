@@ -160,6 +160,21 @@ export const LiveTranscriptReportSchema = z
       )
       .min(1)
       .max(12),
+    /**
+     * Numbers the browser measured on the line, for latency reporting
+     * (a rehearsal with a researched external person): first audio of the
+     * played person, and the gap from the founder's last word to the reply.
+     */
+    timings: z
+      .object({
+        firstAudioMs: z.number().int().min(0).max(120_000).optional(),
+        turnLatencyMs: z
+          .array(z.number().int().min(0).max(120_000))
+          .max(24)
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type LiveTranscriptReport = z.infer<typeof LiveTranscriptReportSchema>;

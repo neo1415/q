@@ -211,6 +211,54 @@ export const REHEARSAL_DIMENSION_NAMES = [
   "PROFESSIONALISM",
 ] as const;
 
+/**
+ * Post-call evaluation of a rehearsal with a researched external person:
+ * the areas a real meeting tests, what was covered, what to improve, and
+ * the public sources it was informed by (the only ones ever cited).
+ */
+export const EXTERNAL_EVALUATION_AREA_NAMES = [
+  "PITCH_CLARITY",
+  "FINANCIALS",
+  "BUSINESS_MODEL",
+  "MARKET_KNOWLEDGE",
+  "DEFENSIBILITY",
+  "ANSWER_QUALITY",
+  "OBJECTION_HANDLING",
+] as const;
+export const ExternalEvaluationBasisSchema = z
+  .object({
+    label: z.string().max(100),
+    disclaimer: z.string().max(300),
+    sources: z
+      .array(
+        z
+          .object({
+            label: z.string().max(200),
+            url: z.string().url().max(2048),
+          })
+          .strict(),
+      )
+      .max(12),
+    areas: z
+      .array(
+        z
+          .object({
+            area: z.enum(EXTERNAL_EVALUATION_AREA_NAMES),
+            covered: z.boolean(),
+            rating: z.string().max(40).nullable(),
+            note: z.string().max(300),
+            youSaid: z.string().max(200).nullable(),
+          })
+          .strict(),
+      )
+      .max(7),
+    beforeTheRealMeeting: z.array(z.string().max(300)).max(8),
+  })
+  .strict();
+export type ExternalEvaluationBasisDto = z.infer<
+  typeof ExternalEvaluationBasisSchema
+>;
+
 export const QRehearsalReviewDtoSchema = z
   .object({
     overall: z.string().max(600),
@@ -282,6 +330,8 @@ export const QRehearsalReviewDtoSchema = z
      * review; Q fills in the real one shortly. No ratings, no score.
      */
     provisional: z.boolean().optional(),
+    /** Only for a researched external person: see ExternalEvaluationBasisSchema. */
+    externalBasis: ExternalEvaluationBasisSchema.optional(),
   })
   .strict();
 export type QRehearsalReviewDto = z.infer<typeof QRehearsalReviewDtoSchema>;
@@ -350,6 +400,11 @@ export const QRehearsalPersonaDtoSchema = z
       )
       .max(8),
     sources: z.array(QPersonaSourceDtoSchema).max(24),
+    /** Present for a researched external person: the simulation's label. */
+    simulation: z
+      .object({ label: z.string().max(100), disclaimer: z.string().max(300) })
+      .strict()
+      .optional(),
     refreshedAt: UtcTimestampSchema,
   })
   .strict();
@@ -388,6 +443,11 @@ export const QRehearsalDtoSchema = z
       })
       .strict(),
     turns: z.array(QRehearsalTurnDtoSchema).max(160),
+    /** Present for a researched external person: the simulation's label. */
+    simulation: z
+      .object({ label: z.string().max(100), disclaimer: z.string().max(300) })
+      .strict()
+      .optional(),
     review: QRehearsalReviewDtoSchema.nullable(),
     createdAt: UtcTimestampSchema,
     endedAt: UtcTimestampSchema.nullable(),
