@@ -282,14 +282,23 @@ export function CompanyProfileView({
     claims.filter((claim) => claim.kind === kind);
   const sayRaise = overview?.raiseFromPitch ?? claimsOf("RAISE")[0] ?? null;
   const traction = claimsOf("TRACTION");
+  // R2: with the one raise read, the line says exactly the card's words.
+  const viewWords =
+    overview?.raiseView === undefined
+      ? null
+      : raiseWords(overview.raiseView, own);
   const raiseSummary = [
-    overview?.raise
-      ? compactMoneyText(overview.raise)
-      : overview?.raiseFromPitch
-        ? `${pitchRaiseText(overview.raiseFromPitch)}, ${pitchSaid}`
-        : own
-          ? "Not added yet"
-          : "Not shared with you",
+    viewWords !== null
+      ? viewWords.amount === null
+        ? viewWords.label
+        : `${viewWords.amount} · ${viewWords.label}`
+      : overview?.raise
+        ? compactMoneyText(overview.raise)
+        : overview?.raiseFromPitch
+          ? `${pitchRaiseText(overview.raiseFromPitch)}, ${pitchSaid}`
+          : own
+            ? "Not added yet"
+            : "Not shared with you",
     investor
       ? overview?.deck
         ? "deck shared with you"

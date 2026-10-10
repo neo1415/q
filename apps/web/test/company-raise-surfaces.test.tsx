@@ -174,8 +174,19 @@ function profileWords(view: CompanyRaiseView): string {
     "[data-profile-key-facts] [data-raise-fact]",
   );
   const words = normalised(fact);
+  // "The raise" line, without the investor's deck note after it.
+  const line = (
+    document.querySelector('[data-overview-fold="company-raise"] summary p')
+      ?.textContent ?? ""
+  ).replace(/ · deck .*$/, "");
   cleanup();
-  return words;
+  return `${words}#${line}`;
+}
+
+/** The card's words as one line: "$4M · From their pitch". */
+function asLine(words: string): string {
+  const [, amount = "", label = ""] = words.split("|");
+  return amount === "" ? label : `${amount} · ${label}`;
 }
 
 /** The amount and the label, without the profile's pitch-moment suffix. */
@@ -192,8 +203,10 @@ function normalised(fact: Element | null): string {
 describe("R2: Discover and the profile say the same raise to the same reader", () => {
   it.each(Object.entries(VIEWS))("%s", (_name, view) => {
     const card = cardWords(view);
-    const profile = profileWords(view);
+    const [profile, line] = profileWords(view).split("#");
     expect(card).toBe(profile);
+    // The profile's "The raise" line says exactly the card's words.
+    expect(line).toBe(asLine(card));
   });
 
   it("labels a pitch claim as the company's pitch, never as a disclosed raise", () => {
@@ -202,5 +215,8 @@ describe("R2: Discover and the profile say the same raise to the same reader", (
       "DISCLOSED_OBJECTIVE|$5M|Disclosed raise",
     );
     expect(cardWords(NONE)).toBe("NONE||Not shared with you");
+    expect(profileWords(PITCH).split("#")[1]).toBe("$4M · From their pitch");
+    expect(profileWords(DISCLOSED).split("#")[1]).toBe("$5M · Disclosed raise");
+    expect(profileWords(NONE).split("#")[1]).toBe("Not shared with you");
   });
 });
