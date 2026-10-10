@@ -16,6 +16,12 @@
  */
 
 import { createFitComposition } from "./composition/fit.js";
+import {
+  createPreparedEntities,
+  createPreparedVersionReader,
+  preparedEntityPrewarmLines,
+  watchPreparedEntities,
+} from "./composition/prepared-entities.js";
 import { createAttentionSources } from "./composition/attention-sources.js";
 import {
   createArrivalSnapshots,
@@ -1135,6 +1141,26 @@ const researchComposition = composeResearch({
   gateway: modelGateway,
   dataPosture: demoDataPosture,
   logger,
+});
+
+// Prepared public research entities (W5), held hot on W2's shared index:
+// a known name costs no web call and no database trip; a change in the
+// store reloads it. A failed load costs the demo pack its instant lookup,
+// never the service; the check retries and a normal search still works.
+const preparedEntities = createPreparedEntities({
+  ...researchComposition.knownEntities,
+  version: createPreparedVersionReader(database.sql),
+});
+await preparedEntities
+  .start()
+  .then((count) => {
+    logger.info({ count }, "prepared research entities loaded");
+  })
+  .catch((error: unknown) => {
+    logger.warn({ err: error }, "prepared research entities not loaded");
+  });
+watchPreparedEntities(preparedEntities, (error) => {
+  logger.warn({ err: error }, "prepared research entities check failed");
 });
 
 // Public presence (CQ-Q-PRESENCE-001): what the web already says about a
@@ -5780,6 +5806,10 @@ const liveBroker =
         // The turn board the voice surface polls: a delegation that moved
         // the screen says so, so the move is followed before it is spoken.
         board: voiceTurnBoard,
+        // W5: names of the prepared public entities, so the voice
+        // recognises them at once (a list, never biographies).
+        preparedEntityLines: () =>
+          preparedEntityPrewarmLines(preparedEntities.all()),
         // Part 6: the call's background, from approved facts only (their
         // declared mandate or their company's card, as Q's messages may
         // state them) and their own organisation's name.

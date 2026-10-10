@@ -278,6 +278,11 @@ export type LiveBrokerDependencies = {
   readonly pronunciations?:
     Pick<PronunciationStore, "hintsFor" | "recordCorrection"> | undefined;
   /**
+   * W5: one compact line per prepared public research entity (name, kind,
+   * one line, stable id), read from memory: no database, no web.
+   */
+  readonly preparedEntityLines?: (() => readonly string[]) | undefined;
+  /**
    * The voice turn board (what the turn handler recorded for the line):
    * read after a run, so the delegation's result says whether the run
    * moved the screen, and the client follows it before the voice speaks.
@@ -874,6 +879,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         referents: carried?.referents ?? [],
         arrival,
         pronunciations,
+        preparedEntities: deps.preparedEntityLines?.() ?? [],
       });
       logger.info(
         { qVoiceSessionId: binding.voiceSessionId, model: created.model },

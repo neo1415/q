@@ -1,4 +1,8 @@
-import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
+import {
+  jsonbParam,
+  type DatabaseExecutor,
+  type TransactionManager,
+} from "@capital-q/database";
 import {
   aliasKeyOf,
   preparedEntityIdFor,
@@ -46,7 +50,7 @@ export function createPostgresKnownEntityStore(dependencies: {
   ): Promise<readonly KnownEntityRecord[]> => {
     if (rows.length === 0) return [];
     const ids = rows.map((row) => row.id);
-    const idsJson = JSON.stringify(ids);
+    const idsJson = jsonbParam(sql, ids);
     const aliases = await sql<{ id: string; alias: string }[]>`
       select external_person_id as id, alias
         from q_runtime.external_entity_aliases
@@ -131,12 +135,12 @@ export function createPostgresKnownEntityStore(dependencies: {
           values (${id}, null, null, ${entity.entityKind}, 'PREPARED_PUBLIC_SEED',
                   ${entity.requiresRefresh}, ${entity.profileKey},
                   ${entity.displayName},
-                  ${JSON.stringify(entity.aliases.slice(0, 24))}::jsonb,
+                  ${jsonbParam(tx.sql, entity.aliases.slice(0, 24))},
                   ${entity.profileUrl}, ${role}, ${entity.organization},
                   ${entity.location}, ${entity.confidence},
-                  ${JSON.stringify(entity.image)}::jsonb,
-                  ${JSON.stringify(entity.quotes)}::jsonb,
-                  ${JSON.stringify(entity.profile)}::jsonb,
+                  ${jsonbParam(tx.sql, entity.image)},
+                  ${jsonbParam(tx.sql, entity.quotes)},
+                  ${jsonbParam(tx.sql, entity.profile)},
                   ${entity.lastResearchedAt}::timestamptz)
           on conflict (profile_key) where tenant_id is null do update set
             entity_kind = excluded.entity_kind,
@@ -182,7 +186,7 @@ export function createPostgresKnownEntityStore(dependencies: {
             insert into q_runtime.external_entity_facts
               (external_person_id, ordinal, claim, source_ids, evidence_class)
             values (${id}, ${ordinal}, ${fact.claim},
-                    array(select jsonb_array_elements_text(${JSON.stringify(fact.sourceIds)}::jsonb)),
+                    array(select jsonb_array_elements_text(${jsonbParam(tx.sql, fact.sourceIds)}::jsonb)),
                     ${fact.evidenceClass})`;
           ordinal += 1;
         }

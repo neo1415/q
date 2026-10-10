@@ -57,6 +57,8 @@ export function arrivalLines(snapshot: ArrivalSnapshot | null): string[] {
   });
 }
 export const PRONUNCIATIONS_MAX = 8;
+const PREPARED_MAX = 8;
+const PREPARED_LINE_MAX_CHARS = 170;
 
 const oneLine = (text: string, max: number): string => {
   const clean = text.replace(/\s+/gu, " ").trim();
@@ -76,6 +78,8 @@ export function liveContextPackage(input: {
    * guides and the person's own corrections, labelled as such.
    */
   readonly pronunciations?: readonly string[] | undefined;
+  /** `preparedEntityPrewarmLines`: one compact line per prepared entity. */
+  readonly preparedEntities?: readonly string[] | undefined;
 }): string | null {
   const lines: string[] = [];
   const side =
@@ -106,6 +110,13 @@ export function liveContextPackage(input: {
       ...facts.map((fact) => `- ${fact}`),
     );
   }
+  // W5: researched public entities Q already knows (name, kind, one line,
+  // stable id). A list to recognise names by, never biographies; the facts
+  // come from Q's own lookup when one is asked about.
+  const prepared = (input.preparedEntities ?? [])
+    .map((line) => oneLine(line, PREPARED_LINE_MAX_CHARS))
+    .filter((line) => line.length > 0)
+    .slice(0, PREPARED_MAX);
   const referents = [
     ...new Set(input.referents.map((name) => oneLine(name, 60))),
   ]
@@ -124,6 +135,13 @@ export function liveContextPackage(input: {
     lines.push(
       "How these names are said or written (use exactly this; never guess another way):",
       ...hints.map((line) => `- ${line}`),
+    );
+  }
+  // Last, so the length cap trims this list before the call's own context.
+  if (prepared.length > 0) {
+    lines.push(
+      "Public people and organisations Q has already researched (names only; ask Q for details):",
+      ...prepared.map((line) => `- ${line}`),
     );
   }
   const arrival = (input.arrival ?? [])
