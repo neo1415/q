@@ -14,6 +14,7 @@ import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 import type { SpokenFacts } from "@capital-q/q-core";
+import { parseNameCorrection } from "@capital-q/q-core/names";
 
 import type { VoiceSessionBinding } from "../bindings.js";
 import { askQFactsOutput, forRealtime } from "../duplex/broker.js";
@@ -47,6 +48,7 @@ import {
   type LiveContextFacts,
 } from "./context.js";
 import { heardRequest, spokenWords, UNHEARD_COMMENTARY } from "./heard.js";
+import type { PronunciationStore } from "./pronunciations.js";
 import { livePrompt } from "./prompt.js";
 
 /** The exchange since the previous delegation that Q Brain is shown. */
@@ -268,6 +270,13 @@ export type LiveBrokerDependencies = {
    */
   readonly arrivalFor?:
     ((actor: ActorContext) => Promise<ArrivalSnapshot | null>) | undefined;
+  /**
+   * W3: verified and user-corrected name pronunciations. Read into the
+   * call's context as a hint list; a spoken correction ("it's pronounced
+   * KISH-ta") is stored for this person.
+   */
+  readonly pronunciations?:
+    Pick<PronunciationStore, "hintsFor" | "recordCorrection"> | undefined;
   /**
    * The voice turn board (what the turn handler recorded for the line):
    * read after a run, so the delegation's result says whether the run
@@ -549,6 +558,31 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     return line;
   };
 
+  /**
+   * W3: "it's pronounced X" / "the name is spelled Y" said on the line is
+   * kept for this person under the name it is about (named in the
+   * sentence, else the one Q said last). It is their word, stored as
+   * theirs; nothing is inferred when no name can be tied to it.
+   */
+  const learnCorrection = async (line: LiveLine, said: string) => {
+    const store = deps.pronunciations;
+    if (store === undefined) return;
+    const correction = parseNameCorrection(spokenWords(said));
+    if (correction === null) return;
+    const name = correction.name ?? line.referents[0] ?? null;
+    if (name === null) return;
+    try {
+      await store.recordCorrection({
+        actor: line.actor,
+        name,
+        kind: correction.kind,
+        value: correction.value,
+      });
+    } catch (error: unknown) {
+      logger.warn({ err: error }, "name correction could not be stored");
+    }
+  };
+
   const reserved = () => {
     let total = 0;
     for (const line of lines.values()) {
@@ -826,12 +860,20 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         // A failed read costs the call its background, never the call.
         logger.warn({ err: error }, "live voice context could not be read");
       }
+      let pronunciations: readonly string[] = [];
+      try {
+        pronunciations = (await deps.pronunciations?.hintsFor(actor)) ?? [];
+      } catch (error: unknown) {
+        // A failed read costs the call its hints, never the call.
+        logger.warn({ err: error }, "live voice pronunciations unreadable");
+      }
       const context = liveContextPackage({
         firstName,
         role,
         facts,
         referents: carried?.referents ?? [],
         arrival,
+        pronunciations,
       });
       logger.info(
         { qVoiceSessionId: binding.voiceSessionId, model: created.model },
@@ -958,6 +1000,9 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
             ),
           });
           recorded += 1;
+          if (segment.role === "USER") {
+            await learnCorrection(line, segment.text);
+          }
         } catch (error: unknown) {
           logger.warn(
             { err: error, qVoiceSessionId: line.voiceSessionId },

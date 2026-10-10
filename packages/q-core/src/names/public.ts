@@ -30,6 +30,11 @@ export {
   type RankOptions,
 } from "./resolve.js";
 export {
+  QATAR_FIVE,
+  seededByKind,
+  type SeededEntity,
+} from "./seeded-aliases.js";
+export {
   repairTranscript,
   type LexiconEntry,
   type Repair,

@@ -251,6 +251,34 @@ describe("wordsNamePage", () => {
   });
 });
 
+describe("W3: romanised and Arabic-world names within their own set", () => {
+  const OWN = [
+    "Shadi Qishta",
+    "Muhannad Taslaq",
+    "QInvest LLC",
+    "AlRayan Investment",
+    "Al Rayan Bank",
+  ];
+
+  it("alternate romanisations reach the one own record", () => {
+    expect(misheardOwnCounterpart("Shady Kishta", OWN)).toBe("Shadi Qishta");
+    expect(misheardOwnCounterpart("Mohannad Taslak", OWN)).toBe(
+      "Muhannad Taslaq",
+    );
+    expect(misheardOwnCounterpart("Al Rayan Investments", OWN)).toBe(
+      "AlRayan Investment",
+    );
+  });
+
+  it("a bank is not the investment arm, and a bare first name guesses nothing", () => {
+    expect(misheardOwnCounterpart("Al Rayan Bank", OWN)).not.toBe(
+      "AlRayan Investment",
+    );
+    expect(misheardOwnCounterpart("Shadi", OWN)).toBeNull();
+    expect(misheardOwnCounterpart("Shadi Karam", OWN)).toBeNull();
+  });
+});
+
 describe("R3: a misheard name, matched only within their own set", () => {
   const OWN = ["Tensorgate", "Shiftwell", "Clearwater Assurance", "Ledgerfold"];
 

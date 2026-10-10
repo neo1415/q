@@ -1,4 +1,5 @@
 import type { QRecordPage } from "@capital-q/contracts";
+import { scoreOrgNames, scorePersonNames } from "@capital-q/q-core/names";
 import { spokenNameScore } from "@capital-q/q-tools";
 
 import { PAGE_VERB, pageRequestOf, withoutLeadIn } from "./page-request.js";
@@ -238,6 +239,38 @@ function sharedStem(a: string, b: string): number {
  *     4-letter stem with what was heard.
  */
 export function misheardOwnCounterpart(
+  spoken: string,
+  names: readonly string[],
+): string | null {
+  return soundMisheard(spoken, names) ?? romanisedOwnCounterpart(spoken, names);
+}
+
+/**
+ * Proper-name intelligence (W3): the same closed set read through Arabic
+ * and alternate romanisations (Qishta/Kishta, Mohammed/Muhammad, Al-/El-,
+ * W.L.L. and Co.). One own name must clear a high bar AND lead every other
+ * by a margin; name evidence alone never picks between two. Closed set
+ * only, so no corroborating clue is needed -- these are their own records.
+ */
+function romanisedOwnCounterpart(
+  spoken: string,
+  names: readonly string[],
+): string | null {
+  const scored = [...new Set(names)]
+    .map((name) => ({
+      name,
+      score: Math.max(
+        scorePersonNames(spoken, name).score,
+        scoreOrgNames(spoken, name).score,
+      ),
+    }))
+    .sort((a, b) => b.score - a.score);
+  const [top, next] = scored;
+  if (top === undefined || top.score < 0.9) return null;
+  return next !== undefined && top.score - next.score < 0.12 ? null : top.name;
+}
+
+function soundMisheard(
   spoken: string,
   names: readonly string[],
 ): string | null {

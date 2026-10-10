@@ -56,6 +56,7 @@ export function arrivalLines(snapshot: ArrivalSnapshot | null): string[] {
     return bits.join("; ");
   });
 }
+export const PRONUNCIATIONS_MAX = 8;
 
 const oneLine = (text: string, max: number): string => {
   const clean = text.replace(/\s+/gu, " ").trim();
@@ -70,6 +71,11 @@ export function liveContextPackage(input: {
   readonly referents: readonly string[];
   /** W1: lines from `arrivalLines`. */
   readonly arrival?: readonly string[] | undefined;
+  /**
+   * W3: how names are said or written, one short line each: verified
+   * guides and the person's own corrections, labelled as such.
+   */
+  readonly pronunciations?: readonly string[] | undefined;
 }): string | null {
   const lines: string[] = [];
   const side =
@@ -108,6 +114,16 @@ export function liveContextPackage(input: {
   if (referents.length > 0) {
     lines.push(
       `Recently discussed on this call (most recent first): ${referents.join(", ")}.`,
+    );
+  }
+  const hints = (input.pronunciations ?? [])
+    .map((line) => oneLine(line, 120))
+    .filter((line) => line.length > 0)
+    .slice(0, PRONUNCIATIONS_MAX);
+  if (hints.length > 0) {
+    lines.push(
+      "How these names are said or written (use exactly this; never guess another way):",
+      ...hints.map((line) => `- ${line}`),
     );
   }
   const arrival = (input.arrival ?? [])
