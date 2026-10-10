@@ -350,17 +350,22 @@ describe("prepared research entities: publicly reported facts", () => {
     expect(facts.every((f) => !f.confirmed)).toBe(true);
     const role = facts.find((f) => f.sourceIds.includes("S06"));
     expect(role?.claim).toMatch(
-      /^Reportedly, per a third-party LinkedIn post \(current role not confirmed\)/u,
+      /^Reportedly, a CEO, Business Ventures role at Midmac/u,
     );
-    expect(facts[2]?.claim).toMatch(
-      /^According to their LinkedIn \(not independently checked\)/u,
-    );
+    expect(facts[2]?.claim).toMatch(/^According to their LinkedIn, /u);
     const qinvest = entities
       .all()
       .find((r) => r.profileKey === "qa-demo-qinvest");
     expect(answerFacts(qinvest as never)[0]?.claim).toMatch(
-      /^Publicly reported/u,
+      /^Reportedly, qatar-based/iu,
     );
+    expect(answerFacts(qinvest as never)[2]?.claim).toMatch(
+      /^QInvest announced/u,
+    );
+    // The hedge is natural speech; "not independently checked" is metadata.
+    expect(
+      JSON.stringify([facts, answerFacts(qinvest as never)]),
+    ).not.toContain("independently");
     const muhannad = entities
       .all()
       .find((r) => r.profileKey === "qa-demo-muhannad-taslaq");
@@ -391,9 +396,7 @@ describe("prepared research entities: publicly reported facts", () => {
       .find((r) => r.profileKey === "qa-demo-shadi-qishta");
     if (shadi === undefined) throw new Error("seed has Shadi");
     const shown = shownQuotes(shadi);
-    expect(shown[0]?.line).toContain(
-      "quoted on their LinkedIn (not independently checked)",
-    );
+    expect(shown[0]?.line).toContain("from their LinkedIn");
     expect(shown[0]?.line).toContain("Watch what people spend");
     expect(JSON.stringify(personaGrounding(shadi))).not.toContain(
       "Watch what people spend",

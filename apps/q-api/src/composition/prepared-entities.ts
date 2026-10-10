@@ -222,16 +222,16 @@ export function preparedEntityPrewarmLines(
 export type AnswerFact = {
   readonly claim: string;
   readonly sourceIds: readonly string[];
-  /** False when it is public but not independently checked: say it softly. */
+  /** False when it is public but not independently checked (metadata, not spoken). */
   readonly confirmed: boolean;
 };
 
 /**
  * What Q and a persona may state about a prepared entity. Public but
  * unconfirmed facts are included; their claim already opens with the soft
- * wording ("According to their LinkedIn (not independently checked): ...")
+ * wording ("According to their LinkedIn, ...", "Reportedly, ...")
  * and `confirmed` is false so a caller can keep the hedge when it
- * paraphrases. A contradicted claim never reaches this list (the loader
+ * paraphrases; "not independently checked" lives only in that flag. A contradicted claim never reaches this list (the loader
  * does not store it as a fact).
  */
 export function answerFacts(record: KnownEntityRecord): readonly AnswerFact[] {
@@ -243,8 +243,8 @@ export function answerFacts(record: KnownEntityRecord): readonly AnswerFact[] {
 }
 
 /**
- * Quotes Q may show, each as a source quote with its label ("quoted on
- * their LinkedIn (not independently checked)"). A persona is never given
+ * Quotes Q may show, each as a source quote with its label ("from their
+ * LinkedIn"). A persona is never given
  * these: they are not its words and it must not speak them as its own.
  */
 export function shownQuotes(
@@ -255,7 +255,7 @@ export function shownQuotes(
     const label =
       Array.isArray(labels) && typeof labels[at] === "string"
         ? labels[at]
-        : "quoted from a public source (not independently checked)";
+        : "from a public source";
     return {
       line: `${record.displayName}, ${label}: "${quote.text}"`,
       sourceId: quote.sourceId,

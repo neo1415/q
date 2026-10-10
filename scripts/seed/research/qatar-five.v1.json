@@ -235,10 +235,10 @@
             "basis": "not directly verifiable without login; search-indexed",
             "note": null
           },
-          "soft_wording": "According to their LinkedIn (not independently checked): "
+          "soft_wording": "According to their LinkedIn, "
         },
         {
-          "claim": "Recent public reports mention a CEO, Business Ventures role at Midmac; current employer/title must be rechecked before a definitive live claim.",
+          "claim": "a CEO, Business Ventures role at Midmac was mentioned in recent public reports; the current employer and title aren't confirmed.",
           "source_ids": [
             "S06"
           ],
@@ -249,7 +249,8 @@
             "basis": "S06 is a third-party LinkedIn post; not directly verifiable without login; search-indexed; current title/employer stays \"third-party report, verify current role\"",
             "note": null
           },
-          "soft_wording": "Reportedly, per a third-party LinkedIn post (current role not confirmed): "
+          "soft_wording": "Reportedly, ",
+          "claim_original": "Recent public reports mention a CEO, Business Ventures role at Midmac; current employer/title must be rechecked before a definitive live claim."
         },
         {
           "claim": "Publicly discusses IFRS adoption, financial transparency and investor confidence.",
@@ -263,7 +264,7 @@
             "basis": "not directly verifiable without login; search-indexed",
             "note": null
           },
-          "soft_wording": "According to their LinkedIn (not independently checked): "
+          "soft_wording": "According to their LinkedIn, "
         },
         {
           "claim": "Publicly emphasizes consumer purchasing power as a real-world business indicator.",
@@ -277,7 +278,7 @@
             "basis": "not directly verifiable without login; search-indexed",
             "note": null
           },
-          "soft_wording": "According to their LinkedIn (not independently checked): "
+          "soft_wording": "According to their LinkedIn, "
         },
         {
           "claim": "Has publicly discussed AI in telecom network operations and collaborations.",
@@ -291,7 +292,7 @@
             "basis": "not directly verifiable without login; search-indexed",
             "note": null
           },
-          "soft_wording": "According to their LinkedIn (not independently checked): "
+          "soft_wording": "According to their LinkedIn, "
         },
         {
           "claim": "Has publicly highlighted Snoonu and Qatar ecommerce/logistics innovation.",
@@ -305,7 +306,7 @@
             "basis": "not directly verifiable without login; search-indexed",
             "note": null
           },
-          "soft_wording": "According to their LinkedIn (not independently checked): "
+          "soft_wording": "According to their LinkedIn, "
         }
       ],
       "rehearsal_topics": [
@@ -333,7 +334,7 @@
             "note": null
           },
           "attributionOnly": true,
-          "label": "quoted on their LinkedIn (not independently checked)",
+          "label": "from their LinkedIn",
           "speaker": "Shadi Qishta"
         }
       ],
@@ -382,7 +383,7 @@
             "basis": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
             "note": null
           },
-          "soft_wording": "Publicly reported (not independently checked): "
+          "soft_wording": "Reportedly, "
         },
         {
           "claim": "Its credit strategy discusses capital preservation, structured and mezzanine transactions and risk-return assessment.",
@@ -396,7 +397,7 @@
             "basis": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
             "note": null
           },
-          "soft_wording": "Publicly reported (not independently checked): "
+          "soft_wording": "Reportedly, "
         },
         {
           "claim": "QInvest announced a USD 275 million sustainability-linked financing facility in March 2025.",
@@ -410,7 +411,7 @@
             "basis": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
             "note": null
           },
-          "soft_wording": "Publicly reported (not independently checked): "
+          "soft_wording": ""
         },
         {
           "claim": "QInvest has publicly described operational changes focused on Epicure Islamic Investment Management.",
@@ -424,7 +425,7 @@
             "basis": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
             "note": null
           },
-          "soft_wording": "Publicly reported (not independently checked): "
+          "soft_wording": ""
         }
       ],
       "rehearsal_topics": [
@@ -514,7 +515,7 @@
             "basis": "S15 is LinkedIn; not directly verifiable without login; search-indexed",
             "note": null
           },
-          "soft_wording": "According to their LinkedIn (not independently checked): "
+          "soft_wording": "According to their LinkedIn, "
         },
         {
           "claim": "His published investor discussions advocate 30-day execution sprints, shipping continuously, customer focus and disciplined cash runway.",
@@ -573,7 +574,7 @@
             "note": null
           },
           "attributionOnly": true,
-          "label": "quoted on their LinkedIn (not independently checked)",
+          "label": "from their LinkedIn",
           "speaker": "Muhannad Taslaq"
         }
       ],

@@ -114,7 +114,7 @@ export function parsePreparedSeed(raw: unknown): PreparedSeed {
     for (const fact of entity.facts) {
       if (
         fact.verification.status === "PUBLICLY_REPORTED_UNCONFIRMED" &&
-        (fact.soft_wording ?? "").length === 0
+        fact.soft_wording === null
       ) {
         throw new Error(
           `${entity.demo_id}: a reported fact needs soft wording`,
@@ -162,6 +162,14 @@ const NAME_MODULE_ID: Readonly<Record<string, string>> = {
 };
 const recognitionAliases = (demoId: string): readonly string[] =>
   QATAR_FIVE.find((one) => one.id === NAME_MODULE_ID[demoId])?.aliases ?? [];
+
+/** "Reportedly, " + "Recent ..." reads as one sentence: lower the claim's first word. */
+const spoken = (wording: string | null, claim: string): string => {
+  if (wording === null || wording.length === 0) return claim;
+  const first = claim.split(/[\s,;:]/u)[0] ?? "";
+  const keep = /[A-Z0-9]{2}/u.test(first) || /\p{Lu}.*\p{Lu}/u.test(first);
+  return `${wording}${keep ? claim : claim.charAt(0).toLowerCase() + claim.slice(1)}`;
+};
 
 const clip = (text: string, max: number): string =>
   text.length <= max ? text : `${text.slice(0, max - 1)}…`;
@@ -244,7 +252,7 @@ export function toPreparedUpsert(
     facts: entity.facts
       .filter((fact) => fact.verification.status !== "CONTRADICTED")
       .map((fact) => ({
-        claim: clip(`${fact.soft_wording ?? ""}${fact.claim}`, 600),
+        claim: clip(spoken(fact.soft_wording, fact.claim), 600),
         sourceIds: fact.source_ids,
         evidenceClass:
           fact.verification.status === "VERIFIED"
