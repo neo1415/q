@@ -428,7 +428,9 @@ export function buildQGraph(
       }
       current = decision.plan;
     }
-    livePlans.delete(state.runId);
+    // S2: the plan stays for the action seam, which reuses it inside its
+    // own revalidateAfter (it used to plan a third time, a full firewall
+    // evaluation, for every answered run whether or not an action followed).
     // The engine's signal reaches the model call: a cancelled invocation
     // stops waiting on the provider instead of finishing an answer nobody
     // asked for.
@@ -468,11 +470,21 @@ export function buildQGraph(
   const actionPrepare = async (
     state: QGraphState,
   ): Promise<Partial<QGraphState>> => {
+    // The answer's plan, while it is inside the time the firewall itself
+    // set (revalidateAfter); an older one, or none, is planned again. A
+    // proposal made here only becomes a card awaiting approval: nothing
+    // executes, and the execution gate re-verifies the actor. Taken out
+    // first, so no path leaves a plan behind.
+    const held = livePlans.get(state.runId);
+    livePlans.delete(state.runId);
     await boundary(state);
     if (state.answer !== "ANSWERED") {
       return { action: "NONE" };
     }
-    let current = livePlans.get(state.runId);
+    let current =
+      held !== undefined && Date.now() < Date.parse(held.revalidateAfter)
+        ? held
+        : undefined;
     if (current === undefined) {
       const decision = await plan(state);
       if (decision.outcome === "DENIED") {

@@ -3,7 +3,7 @@ import {
   marketplaceParticipationOf,
   type CompanyMarketplaceQueryPort,
 } from "@capital-q/companies";
-import type { DatabaseExecutor } from "@capital-q/database";
+import { cachedInRun, type DatabaseExecutor } from "@capital-q/database";
 import {
   InvestorMandateIdSchema,
   InvestorOrganisationIdSchema,
@@ -111,6 +111,40 @@ export function createDomainEligibilityPorts(
     },
   });
 
+  const readActiveMandate = async ({
+    tenantId,
+    investorOrganisationId,
+    mandateId,
+  }: {
+    readonly tenantId: string;
+    readonly investorOrganisationId: string;
+    readonly mandateId: string | null;
+  }): Promise<ActiveMandateLookup> => {
+    const tenant = TenantIdSchema.parse(tenantId);
+    const investor = InvestorOrganisationIdSchema.parse(investorOrganisationId);
+    // Tenant- and organisation-scoped reads only: a mandate id that is
+    // not this investor's resolves as absent, never as somebody else's.
+    if (mandateId !== null) {
+      const pinned = await mandates.getMandate(
+        tenant,
+        investor,
+        InvestorMandateIdSchema.parse(mandateId),
+      );
+      return pinned === null
+        ? { kind: "NONE" }
+        : { kind: "FOUND", mandate: toSnapshot(pinned) };
+    }
+    const active = await mandates.listActiveMandates(tenant, investor);
+    if (active.length === 0) return { kind: "NONE" };
+    if (active.length > 1) return { kind: "AMBIGUOUS" };
+    const [only] = active;
+    if (only === undefined) return { kind: "NONE" };
+    const snapshot = await mandates.getMandate(tenant, investor, only.id);
+    return snapshot === null
+      ? { kind: "NONE" }
+      : { kind: "FOUND", mandate: toSnapshot(snapshot) };
+  };
+
   return {
     companies: {
       findMany: async (companyIds) => {
@@ -164,48 +198,48 @@ export function createDomainEligibilityPorts(
     },
 
     mandates: {
-      activeMandate: async ({
-        tenantId,
-        investorOrganisationId,
-        mandateId,
-      }): Promise<ActiveMandateLookup> => {
-        const tenant = TenantIdSchema.parse(tenantId);
-        const investor = InvestorOrganisationIdSchema.parse(
-          investorOrganisationId,
-        );
-        // Tenant- and organisation-scoped reads only: a mandate id that is
-        // not this investor's resolves as absent, never as somebody else's.
-        if (mandateId !== null) {
-          const pinned = await mandates.getMandate(
-            tenant,
-            investor,
-            InvestorMandateIdSchema.parse(mandateId),
-          );
-          return pinned === null
-            ? { kind: "NONE" }
-            : { kind: "FOUND", mandate: toSnapshot(pinned) };
-        }
-        const active = await mandates.listActiveMandates(tenant, investor);
-        if (active.length === 0) return { kind: "NONE" };
-        if (active.length > 1) return { kind: "AMBIGUOUS" };
-        const [only] = active;
-        if (only === undefined) return { kind: "NONE" };
-        const snapshot = await mandates.getMandate(tenant, investor, only.id);
-        return snapshot === null
-          ? { kind: "NONE" }
-          : { kind: "FOUND", mandate: toSnapshot(snapshot) };
-      },
+      // S2: one turn resolves the same mandate through the feed, the fit and
+      // the standing reads (up to four times, each a mandate, constraints and
+      // preferences read). Once per run, keyed by tenant, investor and pinned
+      // mandate; a write this run makes to a mandate table drops it.
+      activeMandate: (query) =>
+        cachedInRun(
+          {
+            aggregate: "eligibility-active-mandate",
+            tables: [
+              "core.investor_mandates",
+              "core.investor_mandate_constraints",
+              "taxonomy.mandate_preferences",
+            ],
+            actor: `${query.tenantId}/${query.investorOrganisationId}`,
+            fingerprint: query.mandateId ?? "",
+          },
+          () => readActiveMandate(query),
+        ),
     },
 
     investorSubject: {
-      investorOrganisationFor: async (actor) => {
-        if (actor.organisationId === undefined) return null;
-        const found = await investorOrganisations.findByOrganisation(
-          sql,
-          actor.tenantId,
-          actor.organisationId,
+      // S2: the actor's own investor organisation, once per run (the same
+      // reason as `ownInvestorOrganisation` in the composition root).
+      investorOrganisationFor: (actor) => {
+        const organisationId = actor.organisationId;
+        if (organisationId === undefined) return Promise.resolve(null);
+        return cachedInRun(
+          {
+            aggregate: "eligibility-investor-organisation",
+            tables: ["core.investor_organisations"],
+            actor: `${actor.tenantId}/${organisationId}`,
+            fingerprint: "",
+          },
+          async () => {
+            const found = await investorOrganisations.findByOrganisation(
+              sql,
+              actor.tenantId,
+              organisationId,
+            );
+            return found === null ? null : { investorOrganisationId: found.id };
+          },
         );
-        return found === null ? null : { investorOrganisationId: found.id };
       },
     },
 
