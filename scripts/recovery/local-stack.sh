@@ -193,6 +193,8 @@ start_one() {
       for c in supabase_storage_capital-q supabase_realtime_capital-q; do
         docker start "$c" >/dev/null 2>&1 || true
       done
+      # G2 K2: local FAST_CLASSIFICATION routes to the fake vendor's model, not Gemini.
+      docker exec -i supabase_db_capital-q psql -U postgres -v ON_ERROR_STOP=1 -q <"$HARNESS/scripts/recovery/local-routing.sql"
       write_env ;;
     fake)
       [[ -f "$ENV_FILE" ]] || write_env
