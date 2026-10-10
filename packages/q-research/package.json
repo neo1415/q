@@ -21,6 +21,18 @@
       "types": "./dist/providers/serpapi.d.ts",
       "default": "./dist/providers/serpapi.js"
     },
+    "./providers/serper": {
+      "types": "./dist/providers/serper.d.ts",
+      "default": "./dist/providers/serper.js"
+    },
+    "./providers/scrapingbee": {
+      "types": "./dist/providers/scrapingbee.d.ts",
+      "default": "./dist/providers/scrapingbee.js"
+    },
+    "./providers/serp-detect": {
+      "types": "./dist/providers/serp-detect.d.ts",
+      "default": "./dist/providers/serp-detect.js"
+    },
     "./providers/fallback": {
       "types": "./dist/providers/fallback.d.ts",
       "default": "./dist/providers/fallback.js"
@@ -48,6 +60,7 @@
   "dependencies": {
     "@capital-q/contracts": "workspace:*",
     "@capital-q/observability": "workspace:*",
+    "@capital-q/q-core": "workspace:*",
     "@capital-q/security": "workspace:*",
     "@tavily/core": "0.7.11",
     "zod": "4.5.4"

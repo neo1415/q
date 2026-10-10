@@ -16,6 +16,8 @@ import {
   createResearchPublicWebTool,
   RESEARCH_PUBLIC_WEB,
 } from "./tools/research-public-web.js";
+import { createFindPublicEntityTool } from "./tools/find-public-entity.js";
+import { createBriefPublicEntityTool } from "./tools/brief-public-entity.js";
 import {
   createGetMyPlanTool,
   gateQTool,
@@ -151,6 +153,12 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...(ports.profileMaterial === undefined
       ? []
       : [createCompanyAssumptionsTool(ports.profileMaterial)]),
+    ...(ports.people === undefined
+      ? []
+      : [
+          createFindPublicEntityTool({ ...ports, people: ports.people }),
+          createBriefPublicEntityTool({ ...ports, people: ports.people }),
+        ]),
     ...(research === undefined
       ? []
       : [

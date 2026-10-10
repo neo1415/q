@@ -1172,3 +1172,6 @@ export * from "./ui-act-receipts.js";
 // RECOVERY-2026-10 workstream C: navigation at the end of the utterance.
 export * from "./fast-navigation.js";
 export * from "./arrival-snapshot.js";
+
+// W2 (2026-10-10): external person identity card, subject and evidence-classed brief.
+export * from "./external-person.js";

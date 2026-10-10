@@ -158,6 +158,8 @@ export const RESEARCH_PROVIDER_CODES = [
   "tavily",
   "brightdata",
   "serpapi",
+  "serper",
+  "scrapingbee",
   "fake",
 ] as const;
 export type ResearchProviderCode = (typeof RESEARCH_PROVIDER_CODES)[number];

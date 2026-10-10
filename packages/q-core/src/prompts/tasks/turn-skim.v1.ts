@@ -3,9 +3,9 @@ import {
   TURN_SKIM_SCHEMA_NAME,
   TURN_SKIM_SCHEMA_VERSION,
   TURN_SKIM_UNTRUSTED,
-  TurnSkimResultSchema,
+  TurnSkimV1ResultSchema,
   TurnSkimVariablesSchema,
-  type TurnSkimResult,
+  type TurnSkimV1Result,
   type TurnSkimVariables,
 } from "../schemas/turn-skim.js";
 
@@ -39,11 +39,11 @@ WHAT THEY JUST SAID
 
 Respond with a single JSON object matching the TurnSkimResult schema.`;
 
-export const TURN_SKIM_V1: PromptDefinition<TurnSkimVariables, TurnSkimResult> =
+export const TURN_SKIM_V1: PromptDefinition<TurnSkimVariables, TurnSkimV1Result> =
   {
     id: "TURN_SKIM",
     version: 1,
-    status: "ACTIVE",
+    status: "DEPRECATED",
     kind: "TASK",
     taskClass: "FAST_CLASSIFICATION",
     owner: "q-core",
@@ -58,7 +58,7 @@ export const TURN_SKIM_V1: PromptDefinition<TurnSkimVariables, TurnSkimResult> =
       kind: "STRUCTURED",
       schemaName: TURN_SKIM_SCHEMA_NAME,
       schemaVersion: TURN_SKIM_SCHEMA_VERSION,
-      schema: TurnSkimResultSchema,
+      schema: TurnSkimV1ResultSchema,
     },
     template: TEMPLATE,
   };

@@ -82,6 +82,7 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     // MATCH block (ADR 0052): fit with the investor's own mandate.
     fit: port(),
     research: port(),
+    people: port(),
     profiles: port(),
     relationships: port(),
     email: port(),

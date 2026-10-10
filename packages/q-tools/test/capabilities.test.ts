@@ -39,6 +39,7 @@ const EVERY_PORT: QToolPorts = {
   recommendationExplanations: STUB,
   fit: STUB,
   research: STUB,
+  people: STUB,
   profiles: STUB,
   relationships: {
     pendingConnectionRequests: STUB,

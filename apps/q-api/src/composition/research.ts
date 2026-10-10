@@ -22,7 +22,11 @@ import {
   EvidenceSourceIdSchema,
   type EvidenceService,
 } from "@capital-q/evidence";
-import type { QUserStatementRecorder } from "@capital-q/model-gateway/q";
+import type { ModelGateway } from "@capital-q/model-gateway";
+import {
+  createPersonBriefReader,
+  type QUserStatementRecorder,
+} from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import {
   createConversationStatementRecorder,
@@ -32,7 +36,15 @@ import {
   createPostgresKnowledgeRepository,
   type StatementEvidencePort,
 } from "@capital-q/q-knowledge";
+import type { ModelDataPosture } from "@capital-q/contracts";
 import {
+  createKnownEntityIndex,
+  createPersonBriefService,
+  createPersonLookup,
+  createPersonSearch,
+  type KnownEntityIndex,
+  type KnownEntityStore,
+  type PersonLookup,
   createPublicWebResearchService,
   type PublicWebResearchProvider,
   type PublicProfileLookupProvider,
@@ -45,9 +57,14 @@ import {
 } from "@capital-q/q-research/providers/brightdata";
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
-import { createSerpApiResearchProvider } from "@capital-q/q-research/providers/serpapi";
+import { createScrapingBeeResearchProvider } from "@capital-q/q-research/providers/scrapingbee";
+import { createDetectingSerpProvider } from "@capital-q/q-research/providers/serp-detect";
+import { createSerperResearchProvider } from "@capital-q/q-research/providers/serper";
 import { createTavilyResearchProvider } from "@capital-q/q-research/providers/tavily";
 import type { AuthorizationService } from "@capital-q/security";
+
+import { createPostgresKnownEntityStore } from "./known-entities.js";
+import { createPostgresResearchedEntityStore } from "./person-records.js";
 
 /**
  * Controlled public-web research and conversational clarification, composed
@@ -74,6 +91,17 @@ export type ResearchComposition = {
   readonly providerStatus: "configured" | "unconfigured";
   /** The search provider itself, for the scheduled scout's own reads. */
   readonly provider: PublicWebResearchProvider | undefined;
+  /**
+   * W2: find a named person or organisation (a prepared entity instantly,
+   * anyone else through a bounded parallel identity search) and brief them.
+   * Always present: prepared entities need no provider.
+   */
+  readonly people: PersonLookup;
+  /** The prepared-entity store and its warm index (the seed loader writes here). */
+  readonly knownEntities: {
+    readonly store: KnownEntityStore;
+    readonly index: KnownEntityIndex;
+  };
 };
 
 export type ResearchCompositionDependencies = {
@@ -84,6 +112,9 @@ export type ResearchCompositionDependencies = {
   readonly authorization: AuthorizationService;
   readonly secrets: ResearchProviderSecrets;
   readonly logger?: Logger | undefined;
+  /** The model gateway, for the person brief reader; absent: briefs hold only deterministic facts. */
+  readonly gateway?: ModelGateway | undefined;
+  readonly dataPosture?: ModelDataPosture | undefined;
   /** Test seam: a provider instead of the configured vendor. */
   readonly provider?: PublicWebResearchProvider | undefined;
 };
@@ -278,11 +309,27 @@ export function composeResearch(
             apiKey: dependencies.secrets.tavily.reveal(),
           }),
         ]),
+    // SERP_API_KEY has been configured with a Serper.dev key under a
+    // SerpApi name: the detecting provider settles which vendor answers.
     ...(dependencies.secrets.serpApi === undefined
       ? []
       : [
-          createSerpApiResearchProvider({
+          createDetectingSerpProvider({
             apiKey: dependencies.secrets.serpApi.reveal(),
+          }),
+        ]),
+    ...(dependencies.secrets.serper === undefined
+      ? []
+      : [
+          createSerperResearchProvider({
+            apiKey: dependencies.secrets.serper.reveal(),
+          }),
+        ]),
+    ...(dependencies.secrets.scrapingBee === undefined
+      ? []
+      : [
+          createScrapingBeeResearchProvider({
+            apiKey: dependencies.secrets.scrapingBee.reveal(),
           }),
         ]),
   ];
@@ -329,6 +376,122 @@ export function composeResearch(
     },
   };
 
+  // W2: public people search. The individual indexes (not the merged one)
+  // are searched side by side so each is timed and bounded alone.
+  // Ordered by measured accuracy and speed (W2 benchmark): the first takes
+  // every planned query, the rest corroborate the exact one.
+  const PERSON_INDEX_ORDER = [
+    "serper",
+    "serpapi",
+    "tavily",
+    "brightdata",
+    "scrapingbee",
+  ];
+  const personProviders = dependencies.provider
+    ? [dependencies.provider]
+    : [...indexes]
+        .sort(
+          (a, b) =>
+            PERSON_INDEX_ORDER.indexOf(a.code) -
+            PERSON_INDEX_ORDER.indexOf(b.code),
+        )
+        .map((index) => createCachedResearchProvider({ provider: index }));
+  const knownStore = createPostgresKnownEntityStore({ sql, transactions });
+  const knownIndex = createKnownEntityIndex({ store: knownStore });
+  // Warm in the background: until it lands, a lookup is one indexed query.
+  void knownIndex
+    .warm()
+    .then((count) =>
+      logger?.info({ prepared: count }, "prepared research entities warmed"),
+    )
+    .catch((error: unknown) =>
+      logger?.warn(
+        { err: error },
+        "prepared research entities were not warmed",
+      ),
+    );
+  const researched = createPostgresResearchedEntityStore({
+    sql,
+    transactions,
+  });
+  const reader =
+    dependencies.gateway === undefined
+      ? undefined
+      : createPersonBriefReader({
+          gateway: dependencies.gateway,
+          ...(dependencies.dataPosture === undefined
+            ? {}
+            : { dataPosture: dependencies.dataPosture }),
+          ...(logger === undefined ? {} : { logger }),
+        });
+  const briefs = createPersonBriefService({
+    providers: personProviders,
+    store: researched,
+    ...(reader === undefined
+      ? {}
+      : {
+          synthesise: (input) =>
+            reader({
+              subjectName: input.subjectName,
+              entityKind: input.entityKind,
+              sources: input.sources,
+              attribution: input.attribution,
+              ...(input.signal === undefined ? {} : { signal: input.signal }),
+            }),
+        }),
+  });
+  const personSearch = createPersonSearch({ providers: personProviders });
+  const people = createPersonLookup({
+    known: knownIndex,
+    search: {
+      search: async (command) => {
+        const run = await personSearch.search(command);
+        logger?.info(
+          {
+            outcome: run.result.outcome,
+            confidence: run.result.card?.subject.confidence ?? null,
+            elapsedMs: run.result.elapsedMs,
+            budgetExceeded: run.budgetExceeded,
+            queries: run.queries.map((query) => query.kind),
+            calls: run.calls.map((call) => ({
+              provider: call.provider,
+              kind: call.kind,
+              ms: call.latencyMs,
+              outcome: call.outcome,
+              hits: call.hits,
+              failure: call.failureClass,
+            })),
+          },
+          "public person search",
+        );
+        return run;
+      },
+    },
+    researched,
+    briefs,
+    afterWebMatch: async ({ scope, run }) => {
+      const card = run.result.card;
+      if (card === null || run.profileKey === null) return;
+      const saved = await researched.remember(scope, {
+        profileKey: run.profileKey,
+        subject: card.subject,
+        sources: card.sources,
+      });
+      // Background enrichment: the brief is built now and reused by the
+      // member's next question ("research further", "prepare me").
+      await briefs.brief({
+        scope,
+        subject: {
+          ...card.subject,
+          externalPersonId: saved.externalPersonId,
+          evidenceBundleId: saved.evidenceBundleId,
+        },
+        sources: card.sources,
+      });
+    },
+    onError: (error, what) => logger?.warn({ err: error }, `${what} failed`),
+  });
+
   return {
     research,
     profiles,
@@ -337,5 +500,7 @@ export function composeResearch(
     gate,
     providerStatus: provider === undefined ? "unconfigured" : "configured",
     provider,
+    people,
+    knownEntities: { store: knownStore, index: knownIndex },
   };
 }
