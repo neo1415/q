@@ -1,0 +1,781 @@
+{
+  "schema_version": "1.0",
+  "title": "Capital Q — Qatar demo hot-entity research pack",
+  "prepared_as_of": "2026-10-09",
+  "purpose": "5 evidence-backed seed entities for instant identity and rehearsal; never a hardcoded fake model answer",
+  "important_distinctions": [
+    "Exactly 2 PERSON, 2 ORGANIZATION, 1 GOVERNMENT_AGENCY",
+    "Invest Qatar is not itself an ordinary VC fund",
+    "Shadi Qishta executive role is time-sensitive and needs latest authoritative verification",
+    "Organizational rehearsals must use a labeled synthetic role-based representative",
+    "Portrait image URLs are intentionally unset until permitted and verified assets are obtained"
+  ],
+  "runtime_rules": {
+    "lookup": "Preload metadata, identity aliases, concise fact bundle, source IDs, and concise persona plan from local versioned DB or startup hot cache",
+    "fast_path": "0 network calls to internet and ideally 0 database round trips for warm seeded identity resolution; full page availability measured separately",
+    "cold_path": "Use same generic search API for anyone else; bounded parallel multi-source public search with early first candidate",
+    "accuracy": "Do not present speculation as verified fact, and do not invent direct quotations, face or accent",
+    "sources": "References are public sources, subject to URL availability and third-party data-use terms",
+    "consent": "Do not clone real person face or voice; clearly label source-informed simulation"
+  },
+  "sources": {
+    "S01": {
+      "url": "https://www.linkedin.com/in/shadi-qishta-282453a/",
+      "description": "Shadi Qishta public professional profile (search-indexed; direct access may require LinkedIn login)",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S02": {
+      "url": "https://www.linkedin.com/posts/shadi-qishta-282453a_ifrs-transparency-comparability-activity-7282278544791982080-DSln",
+      "description": "Shadi Qishta on IFRS and transparent, comparable financial statements",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S03": {
+      "url": "https://qa.linkedin.com/in/shadi-qishta-282453a",
+      "description": "Shadi Qishta public profile with comments on real purchasing power",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S04": {
+      "url": "https://www.linkedin.com/posts/shadi-qishta-282453a_ai-telecom-technology-activity-7291708172443017216-Z1Hb",
+      "description": "Shadi Qishta on AI, telecom networks and partnerships",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S05": {
+      "url": "https://www.linkedin.com/posts/shadi-qishta-282453a_websummit-snoonu-qatar-activity-7300760342412906497-rBGL",
+      "description": "Shadi Qishta on Snoonu, ecommerce and logistics",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S06": {
+      "url": "https://www.linkedin.com/posts/the-qatari-lens_thearablens-theqatarilens-activity-7498733643109138433-fUsj",
+      "description": "Third-party Shadi Qishta CEO Business Ventures appointment mention; verify current date/title directly before public claim",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S07": {
+      "url": "https://www.qinvest.com/qinvest/about-us/mission-vision-and-values",
+      "description": "QInvest mission, six values and core divisions",
+      "access": "UNVERIFIED",
+      "note": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
+      "fetchedAt": null
+    },
+    "S08": {
+      "url": "https://www.qinvest.com/business-lines/principal-investments/credit-investments",
+      "description": "QInvest credit investment strategy and supported structures",
+      "access": "UNVERIFIED",
+      "note": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
+      "fetchedAt": null
+    },
+    "S09": {
+      "url": "https://www.qinvest.com/qinvest/node/1281",
+      "description": "QInvest USD 275m sustainability-linked facility press statement, March 2025",
+      "access": "UNVERIFIED",
+      "note": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
+      "fetchedAt": null
+    },
+    "S10": {
+      "url": "https://www.linkedin.com/company/qinvest-llc/",
+      "description": "Official QInvest LinkedIn organization profile",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S11": {
+      "url": "https://www.qinvest.com/node/1288?language=en",
+      "description": "QInvest operations changes and Epicure Islamic Investment Management statement",
+      "access": "UNVERIFIED",
+      "note": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
+      "fetchedAt": null
+    },
+    "S12": {
+      "url": "https://www.alchemistaccelerator.com/doha",
+      "description": "Alchemist Doha leadership and investor access",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S13": {
+      "url": "https://www.alchemistaccelerator.com/team",
+      "description": "Alchemist team page listing Muhannad Taslaq as Director of Investments",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S14": {
+      "url": "https://www.linkedin.com/in/muhannadtaslaq/",
+      "description": "Muhannad Taslaq indexed public LinkedIn profile, posts and articles",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S15": {
+      "url": "https://www.linkedin.com/posts/muhannadtaslaq_dear-founders-its-not-a-good-look-to-pitch-activity-7327938415054749696-ndYf",
+      "description": "Muhannad Taslaq own words on startup focus and founder conviction",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S16": {
+      "url": "https://www.gulf-times.com/article/722987/business/founders-must-keep-building-through-crisis-says-doha-based-investor",
+      "description": "Gulf Times report of Muhannad Taslaq webinar, March 28 2026",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S17": {
+      "url": "https://accelerator.tasmu.gov.qa/mentors/muhannad-taslaq/",
+      "description": "TASMU mentor bio and professional history",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S18": {
+      "url": "https://www.invest.qa/en/about-us",
+      "description": "Invest Qatar official role as national investment-promotion agency",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S19": {
+      "url": "https://www.invest.qa/en/media-centre/news-and-articles/invest-qatar-gateway-introduces-new-feature-connecting-startups-to-venture-capital-funds",
+      "description": "Invest Qatar Gateway VC Funding Module 23 June 2026",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S20": {
+      "url": "https://www.invest.qa/en/media-centre/news-and-articles/invest-qatar-aurion-capital-and-lg-nova-engage-to-advance-technology-investments",
+      "description": "Invest Qatar emerging technologies partnership 23 September 2026",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S21": {
+      "url": "https://www.invest.qa/en/sectors-and-opportunities/technology",
+      "description": "Invest Qatar technology-sector investment opportunities",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S22": {
+      "url": "https://www.linkedin.com/company/investqatar/",
+      "description": "Invest Qatar official LinkedIn page",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S23": {
+      "url": "https://www.alrayan.com/en/investment-banking",
+      "description": "AlRayan Investment official overview",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S24": {
+      "url": "https://www.alrayan.com/en/investment-banking/financial-advisory-group",
+      "description": "AlRayan Investment advisory services including capital markets and M&A",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S25": {
+      "url": "https://www.alrayan.com/investment-banking/asset-management-group/about-asset",
+      "description": "AlRayan Investment asset management and Sharia-compliant funds",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    },
+    "S26": {
+      "url": "https://www.linkedin.com/company/al-rayan-investment-llc/",
+      "description": "AlRayan Investment LinkedIn organization profile",
+      "access": "UNVERIFIED",
+      "note": "not directly verifiable without login; search-indexed",
+      "fetchedAt": null
+    },
+    "S27": {
+      "url": "https://www.alrayan.com/investment-banking/team",
+      "description": "AlRayan Investment current public team page; roles can change",
+      "access": "FETCHED",
+      "note": "HTTP 200 plain GET",
+      "fetchedAt": "2026-10-10"
+    }
+  },
+  "entities": [
+    {
+      "demo_id": "qa-demo-shadi-qishta",
+      "name": "Shadi Qishta",
+      "entity_kind": "PERSON",
+      "primary_linkedin": "https://www.linkedin.com/in/shadi-qishta-282453a/",
+      "aliases": [
+        "Shadi Qishta",
+        "Shadi Qishta Doha",
+        "Shadi Qishta Midmac"
+      ],
+      "associated_organization": null,
+      "identity_confidence": "verified public identity",
+      "facts": [
+        {
+          "claim": "Finance/business ventures executive with a public professional profile associated with Doha.",
+          "source_ids": [
+            "S01"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "not directly verifiable without login; search-indexed",
+            "note": null
+          }
+        },
+        {
+          "claim": "Recent public reports mention a CEO, Business Ventures role at Midmac; current employer/title must be rechecked before a definitive live claim.",
+          "source_ids": [
+            "S06"
+          ],
+          "evidence_class": "third-party public report, verify current role",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S06 is a third-party LinkedIn post; not directly verifiable without login; search-indexed; current title/employer stays \"third-party report, verify current role\"",
+            "note": null
+          }
+        },
+        {
+          "claim": "Publicly discusses IFRS adoption, financial transparency and investor confidence.",
+          "source_ids": [
+            "S02"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "not directly verifiable without login; search-indexed",
+            "note": null
+          }
+        },
+        {
+          "claim": "Publicly emphasizes consumer purchasing power as a real-world business indicator.",
+          "source_ids": [
+            "S03"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "not directly verifiable without login; search-indexed",
+            "note": null
+          }
+        },
+        {
+          "claim": "Has publicly discussed AI in telecom network operations and collaborations.",
+          "source_ids": [
+            "S04"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "not directly verifiable without login; search-indexed",
+            "note": null
+          }
+        },
+        {
+          "claim": "Has publicly highlighted Snoonu and Qatar ecommerce/logistics innovation.",
+          "source_ids": [
+            "S05"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "not directly verifiable without login; search-indexed",
+            "note": null
+          }
+        }
+      ],
+      "rehearsal_topics": [
+        "purchasing power and actual addressable demand",
+        "transparent financial statements",
+        "market-fit evidence and profitable unit economics",
+        "AI and telecommunications practical value",
+        "strategic partnerships"
+      ],
+      "rehearsal_question_examples": [
+        "What evidence shows your customers can afford this product and continue paying?",
+        "What data supports your demand projections beyond broad GDP estimates?",
+        "How reliable are your financial reports and how do you audit them?",
+        "Which partner makes your market-entry plan executable?"
+      ],
+      "short_public_quotes": [
+        {
+          "quote": "Watch what people spend, and everything else follows.",
+          "source_id": "S03",
+          "use": "SOURCE_QUOTE_ONLY; never present generated dialogue as his quote",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "not directly verifiable without login; search-indexed",
+            "note": null
+          },
+          "attributionOnly": true
+        }
+      ],
+      "image": {
+        "status": "NOT_ATTACHED",
+        "preferred_source": "official website or public professional profile with permitted usage",
+        "url": null,
+        "attribution": null,
+        "fallback": "branded monogram/official organization logo",
+        "note": "no source explicitly permits portrait reuse; monogram fallback"
+      },
+      "research_status": "PREPARED_PUBLIC_SEED",
+      "last_researched_utc": "2026-10-09",
+      "requires_refresh": true,
+      "arabic_names": [],
+      "pronunciation": []
+    },
+    {
+      "demo_id": "qa-demo-qinvest",
+      "name": "QInvest LLC",
+      "entity_kind": "ORGANIZATION",
+      "primary_linkedin": "https://www.linkedin.com/company/qinvest-llc/",
+      "aliases": [
+        "QInvest",
+        "QInvest LLC",
+        "QINVEST",
+        "Q Invest"
+      ],
+      "associated_organization": "QInvest LLC",
+      "identity_confidence": "verified public identity",
+      "facts": [
+        {
+          "claim": "Qatar-based Islamic investment group with investment banking, principal investments and asset management operations.",
+          "source_ids": [
+            "S07",
+            "S10"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
+            "note": null
+          }
+        },
+        {
+          "claim": "Its credit strategy discusses capital preservation, structured and mezzanine transactions and risk-return assessment.",
+          "source_ids": [
+            "S08"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
+            "note": null
+          }
+        },
+        {
+          "claim": "QInvest announced a USD 275 million sustainability-linked financing facility in March 2025.",
+          "source_ids": [
+            "S09"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
+            "note": null
+          }
+        },
+        {
+          "claim": "QInvest has publicly described operational changes focused on Epicure Islamic Investment Management.",
+          "source_ids": [
+            "S11"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "qinvest.com presents a certificate chain this environment cannot validate (curl 60); TLS verification was not bypassed",
+            "note": null
+          }
+        }
+      ],
+      "rehearsal_topics": [
+        "risk-adjusted returns",
+        "Sharia-compliant deal structuring",
+        "sources and uses of funds",
+        "capital preservation and liquidity",
+        "investment governance",
+        "credible exits"
+      ],
+      "rehearsal_question_examples": [
+        "What exact financing structure are you proposing, and is it Sharia-compliant?",
+        "What evidence supports your return assumptions and downside case?",
+        "What does the exit or repayment mechanism look like?",
+        "Which financing and governance risks remain unresolved?"
+      ],
+      "short_public_quotes": [],
+      "image": {
+        "status": "NOT_ATTACHED",
+        "preferred_source": "official website or public professional profile with permitted usage",
+        "url": null,
+        "attribution": null,
+        "fallback": "branded monogram/official organization logo",
+        "note": "QInvest logo not obtained: qinvest.com TLS chain not verifiable from this environment; monogram fallback"
+      },
+      "research_status": "PREPARED_PUBLIC_SEED",
+      "last_researched_utc": "2026-10-09",
+      "requires_refresh": true,
+      "arabic_names": [],
+      "pronunciation": []
+    },
+    {
+      "demo_id": "qa-demo-muhannad-taslaq",
+      "name": "Muhannad Taslaq",
+      "entity_kind": "PERSON",
+      "primary_linkedin": "https://www.linkedin.com/in/muhannadtaslaq/",
+      "aliases": [
+        "Muhannad Taslaq",
+        "Muhannad Taslaq Alchemist",
+        "Muhannad Taslaq Doha"
+      ],
+      "associated_organization": "Alchemist Doha",
+      "identity_confidence": "verified public identity",
+      "facts": [
+        {
+          "claim": "Director of Investments at Alchemist Doha, stated by Alchemist official team and Doha pages.",
+          "source_ids": [
+            "S12",
+            "S13"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S12 and S13 (fetched) list \"Muhannad Taslaq, Director of Investments\"; S16 (Gulf Times, 2026-03-28) repeats it.",
+            "note": null
+          }
+        },
+        {
+          "claim": "Alchemist Doha helps technology startups in Qatar and emerging markets access investors and scale.",
+          "source_ids": [
+            "S12"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S12: Alchemist Doha supports technology startups across MENA and emerging markets; S13 bio: \"connects investors to help high-potential technology startups across MENA and emerging markets grow\"; S16 describes it as a VC and investment platform for tech startups in Qatar and emerging markets.",
+            "note": null
+          }
+        },
+        {
+          "claim": "His public writing emphasizes founder commitment to a single venture rather than simultaneously pitching multiple ideas.",
+          "source_ids": [
+            "S15"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S15 is LinkedIn; not directly verifiable without login; search-indexed",
+            "note": null
+          }
+        },
+        {
+          "claim": "His published investor discussions advocate 30-day execution sprints, shipping continuously, customer focus and disciplined cash runway.",
+          "source_ids": [
+            "S14",
+            "S16"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S16 (fetched): 30-day sprints, one metric, ship continuously; call top 10 customers; know exact burn rate and \"date of death\". S14 not accessible.",
+            "note": "The word \"runway\" is not used; the equivalent is burn rate and the date the money runs out."
+          }
+        },
+        {
+          "claim": "TASMU describes him as a serial founder/mentor and angel investor.",
+          "source_ids": [
+            "S17"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S17 (fetched): \"Serial Entrepreneur\", \"Angel Investor\", mentor with Alchemist Accelerator.",
+            "note": null
+          }
+        }
+      ],
+      "rehearsal_topics": [
+        "founder conviction",
+        "early traction and customer evidence",
+        "cash burn and runway",
+        "30-day execution plans",
+        "resilience under stress",
+        "founder-market fit"
+      ],
+      "rehearsal_question_examples": [
+        "Are you fully committed to this business, or exploring several unrelated ventures?",
+        "Tell me the strongest signal from a paying customer.",
+        "What is your burn rate and exact runway?",
+        "What will you ship within the next 30 days to validate demand?",
+        "What is your plan if fundraising takes twice as long?"
+      ],
+      "short_public_quotes": [
+        {
+          "quote": "We’re here to back conviction.",
+          "source_id": "S15",
+          "use": "SOURCE_QUOTE_ONLY; do not invent direct quotes",
+          "verification": {
+            "status": "UNVERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "not directly verifiable without login; search-indexed",
+            "note": null
+          },
+          "attributionOnly": true
+        }
+      ],
+      "image": {
+        "status": "NOT_ATTACHED",
+        "preferred_source": "official website or public professional profile with permitted usage",
+        "url": null,
+        "attribution": null,
+        "fallback": "branded monogram/official organization logo",
+        "note": "no source explicitly permits portrait reuse; monogram fallback"
+      },
+      "research_status": "PREPARED_PUBLIC_SEED",
+      "last_researched_utc": "2026-10-09",
+      "requires_refresh": true,
+      "arabic_names": [],
+      "pronunciation": []
+    },
+    {
+      "demo_id": "qa-demo-invest-qatar",
+      "name": "Invest Qatar",
+      "entity_kind": "GOVERNMENT_AGENCY",
+      "primary_linkedin": "https://www.linkedin.com/company/investqatar/",
+      "aliases": [
+        "Invest Qatar",
+        "Investment Promotion Agency Qatar",
+        "IPA Qatar",
+        "InvestQatar"
+      ],
+      "associated_organization": "Invest Qatar",
+      "identity_confidence": "verified public identity",
+      "facts": [
+        {
+          "claim": "Government investment-promotion agency founded in 2019; facilitates foreign investment and Qatar market entry.",
+          "source_ids": [
+            "S18",
+            "S22"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S18 (fetched): \"Established in 2019\", responsible for investment promotion to attract foreign direct investment into Qatar. S22 not read.",
+            "note": null
+          }
+        },
+        {
+          "claim": "Invest Qatar Gateway introduced a VC Funding Module with Qatar Investment Authority to connect startups and participating funds.",
+          "source_ids": [
+            "S19"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S19 (fetched, 23 June 2026): VC Funding Module on the Invest Qatar Gateway, developed with Qatar Investment Authority; startups can view participating funds and submit pitches.",
+            "note": null
+          }
+        },
+        {
+          "claim": "Invest Qatar announced a 2026 technology partnership involving Aurion Capital and LG NOVA.",
+          "source_ids": [
+            "S20"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S20 (fetched, 23 September 2026): strategic engagement with Aurion Capital and LG NOVA to explore opportunities.",
+            "note": "The page describes an exploratory engagement and a framework to explore collaboration, not a signed partnership; say \"engagement\"."
+          }
+        },
+        {
+          "claim": "Its published technology-sector material covers fintech, startup Qatar, AI and digital infrastructure.",
+          "source_ids": [
+            "S21"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S21 (fetched): fintech (Qatar FinTech Hub), Startup Qatar, AI-powered technologies and digital infrastructure/data centres.",
+            "note": null
+          }
+        }
+      ],
+      "rehearsal_topics": [
+        "Qatar market-entry readiness",
+        "local partnerships",
+        "economic diversification",
+        "sector alignment and jobs",
+        "innovation and technology transfer",
+        "funding pathways via partner funds"
+      ],
+      "rehearsal_question_examples": [
+        "Why should your business establish a base in Qatar?",
+        "Which local partners and licensing steps are needed?",
+        "What measurable benefit would your expansion bring to the local ecosystem?",
+        "Which program or participating fund should you apply to?"
+      ],
+      "short_public_quotes": [],
+      "image": {
+        "status": "ATTACHED",
+        "preferred_source": "official website or public professional profile with permitted usage",
+        "url": "/research-entities/qa-demo-invest-qatar.svg",
+        "attribution": "Invest Qatar official site logo, used only to identify the organisation",
+        "fallback": "branded monogram/official organization logo",
+        "path": "apps/web/public/research-entities/qa-demo-invest-qatar.svg",
+        "publicUrl": "/research-entities/qa-demo-invest-qatar.svg",
+        "sourceUrl": "https://www.invest.qa/assets/front/theme/images/page-logo.svg",
+        "retrievedAt": "2026-10-10",
+        "note": "white-fill variant made for dark backgrounds; render on a dark tile",
+        "kind": "ORG_LOGO"
+      },
+      "research_status": "PREPARED_PUBLIC_SEED",
+      "last_researched_utc": "2026-10-09",
+      "requires_refresh": true,
+      "arabic_names": [],
+      "pronunciation": []
+    },
+    {
+      "demo_id": "qa-demo-alrayan",
+      "name": "AlRayan Investment LLC",
+      "entity_kind": "ORGANIZATION",
+      "primary_linkedin": "https://www.linkedin.com/company/al-rayan-investment-llc/",
+      "aliases": [
+        "Al Rayan Investment",
+        "AlRayan Investment",
+        "Al Rayan Investment LLC",
+        "ARI Qatar",
+        "Al Rayan Investments"
+      ],
+      "associated_organization": "AlRayan Investment LLC",
+      "identity_confidence": "verified public identity",
+      "facts": [
+        {
+          "claim": "AlRayan Investment is a Qatar investment and advisory firm established in 2007, wholly owned by AlRayan Bank.",
+          "source_ids": [
+            "S23",
+            "S26"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S23 (fetched): \"Established in 2007 in Qatar\"; \"100%-owned by AlRayan Bank (Masraf AlRayan QPSC)\"; authorised by QFC Regulatory Authority, regulated by QFMA. S26 not read.",
+            "note": null
+          }
+        },
+        {
+          "claim": "Core offerings include equities, sukuk, asset management, M&A and capital markets advisory.",
+          "source_ids": [
+            "S23",
+            "S24"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S23/S24 (fetched): public equities, global sukuk, money markets, asset management, IPOs and sukuk issuance, M&A, strategic advisory; S24 adds capital markets advisory.",
+            "note": null
+          }
+        },
+        {
+          "claim": "Publicly described asset management includes customized Sharia-compliant strategies and GCC market exposure.",
+          "source_ids": [
+            "S25"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S25 (fetched): customised solutions for institutional and HNW investors; special focus on GCC and Turkey.",
+            "note": "Sharia compliance is stated on the page for named funds (AlRayan GCC Fund, AlRayan Qatar ETF) and in S24 for advisory, not for every strategy. The focus is GCC and Turkey."
+          }
+        },
+        {
+          "claim": "Official website publishes leadership and team roles; use the currently verified person only when explicitly selected.",
+          "source_ids": [
+            "S27"
+          ],
+          "evidence_class": "publicly documented",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-10",
+            "basis": "S27 (fetched) publishes an executive team list with roles.",
+            "note": "Roles change; use a named person only when the user selects one."
+          }
+        }
+      ],
+      "rehearsal_topics": [
+        "Sharia-compliant financial structures",
+        "equity/debt and sukuk financing",
+        "financial advisory",
+        "risk appetite and portfolio fit",
+        "corporate valuation and governance"
+      ],
+      "rehearsal_question_examples": [
+        "How does your proposed investment meet Sharia requirements?",
+        "What valuation, financial statements and downside protections support this transaction?",
+        "Why is the proposed financing route appropriate?",
+        "What advisory or partnership support are you actually seeking?"
+      ],
+      "short_public_quotes": [],
+      "image": {
+        "status": "ATTACHED",
+        "preferred_source": "official website or public professional profile with permitted usage",
+        "url": "/research-entities/qa-demo-alrayan.png",
+        "attribution": "AlRayan Investment official site logo, used only to identify the organisation",
+        "fallback": "branded monogram/official organization logo",
+        "path": "apps/web/public/research-entities/qa-demo-alrayan.png",
+        "publicUrl": "/research-entities/qa-demo-alrayan.png",
+        "sourceUrl": "https://www.alrayan.com/img/ari-logo.png",
+        "retrievedAt": "2026-10-10",
+        "kind": "ORG_LOGO"
+      },
+      "research_status": "PREPARED_PUBLIC_SEED",
+      "last_researched_utc": "2026-10-09",
+      "requires_refresh": true,
+      "arabic_names": [
+        {
+          "text": "الريان للاستثمار",
+          "sourceId": "S27",
+          "basis": "page title on the official site (Arabic edition)"
+        }
+      ],
+      "pronunciation": []
+    }
+  ],
+  "seed_version": "qatar-five.v1",
+  "verified_at": "2026-10-10",
+  "verification_method": "plain HTTPS GET of official/public pages (no login, no scraping); LinkedIn not accessed; metadata, URLs, short quotes and derived summaries only"
+}
