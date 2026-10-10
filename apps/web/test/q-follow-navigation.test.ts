@@ -255,3 +255,26 @@ describe("an answer from before this page load never moves (G2 gate cd52c0ea)", 
     expect(followed.navigate).toBe("DISCOVER");
   });
 });
+
+describe("B6 guard: following never takes an answer's cards off the thread", () => {
+  it("seenAtOpen and followOfThread only mark turns seen; every turn and block stays", () => {
+    const turns: QTurn[] = [
+      {
+        ...(qTurn("old", toDiscover) as Extract<QTurn, { kind: "Q" }>),
+        runId: "run-old",
+      },
+      {
+        ...(qTurn("live", [], true) as Extract<QTurn, { kind: "Q" }>),
+        runId: "run-live",
+      },
+    ];
+    const before = structuredClone(turns);
+    const seen = seenAtOpen(turns, Date.now(), new Set(["run-live"]));
+    followOfThread(turns, seen, {
+      active: false,
+      typedRuns: new Set(),
+      liveRuns: new Set(),
+    });
+    expect(turns).toEqual(before);
+  });
+});
