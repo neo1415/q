@@ -28,6 +28,7 @@ import {
   requireQatarStack,
   latestQText,
   sendTimed,
+  toolNamesSince,
   threadText,
   waitForLog,
 } from "./kit.js";
@@ -319,9 +320,11 @@ test("A3 the welcome follow-ups are answered from the snapshot: facts in the mod
         )
         .toMatch(need);
     }
-    expect(produced?.["toolCalls"], "q-api: zero tool calls for the turn").toBe(
-      0,
-    );
+    const names = toolNamesSince(log);
+    console.log(`A3 "${ask.say}" tools finished by code: ${names.join(", ")}`);
+    expect
+      .soft(names, "a follow-up is answered from the snapshot: no tool reads")
+      .toEqual([]);
     turnsLogged.push({
       ask: ask.say,
       toolCalls: produced?.["toolCalls"],

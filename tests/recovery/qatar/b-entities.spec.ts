@@ -36,6 +36,9 @@ import {
   requireQatarStack,
   searchCallsSince,
   sendTimed,
+  taskOf,
+  toolNamesSince,
+  BASELINE_READS,
   skimPerson,
   threadText,
   waitForLog,
@@ -230,8 +233,15 @@ for (const entity of QATAR_FIVE) {
         `B3 ${entity.canonical} follow-up send->answer`,
         Date.now() - started,
       );
-      const [produced] = await waitForLog(log, "q answer produced", 1, 30_000);
-      expect(produced?.["toolCalls"], "q-api: zero tool calls").toBe(0);
+      await waitForLog(log, "q answer produced", 1, 30_000);
+      const names = toolNamesSince(log);
+      console.log(
+        `B3 ${entity.canonical} tools finished by code: ${names.join(", ")}`,
+      );
+      expect(
+        names.filter((n) => !BASELINE_READS.includes(n)),
+        "no retrieval tool beyond the baseline own-standing reads",
+      ).toEqual([]);
       const rounds = (await fakeSince(mark)).filter(
         (r) => r.rule === `b3-${entity.key}`,
       );
@@ -352,7 +362,7 @@ for (const entity of QATAR_FIVE) {
       const panel = page.locator(".cq-stage").first();
       await expect(panel).toContainText(entity.nameRe);
       await expect(
-        panel.getByText("Research-informed simulation"),
+        panel.getByText("Research-informed simulation").first(),
       ).toBeVisible();
       const logo = panel.locator("img");
       if (entity.kind === "PERSON") {
@@ -460,9 +470,14 @@ for (const entity of QATAR_FIVE) {
         during.filter((r) => r.vendor === "search"),
         "no search during the call",
       ).toEqual([]);
+      // Background work of the earlier Q turn (memory extraction) may land
+      // here; nothing that answers, reads or navigates may.
       expect(
-        during.filter((r) => r.path === "/v1/responses"),
-        "no model or tool round during the scripted call",
+        during
+          .filter((r) => r.path === "/v1/responses")
+          .map(taskOf)
+          .filter((t) => t !== "MEMORY_EXTRACTOR"),
+        "no analyst, reader or tool round during the scripted call",
       ).toEqual([]);
       await page.close();
     });

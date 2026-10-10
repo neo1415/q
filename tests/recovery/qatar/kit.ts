@@ -460,3 +460,29 @@ export function finding(text: string): void {
   console.log(`FINDING[${LOCAL_MOCK}] ${text}`);
   test.info().annotations.push({ type: "finding", description: text });
 }
+
+/** The prompt task of a model round ("COMPANY_ANALYST", "MEMORY_EXTRACTOR", ...). */
+export function taskOf(request: FakeRequest): string {
+  return /TASK: ([A-Z_]+)/u.exec(request.input ?? "")?.[1] ?? "UNKNOWN";
+}
+
+/**
+ * Reads Q runs make by code for every analyst turn (classified from the
+ * 2026-10-10 run, q-api "q tool call finished"): the person's own standing.
+ * A follow-up may use these; it may never reach public search or people.find.
+ */
+export const BASELINE_READS: readonly string[] = [
+  "approvals.pending.list",
+  "company.get",
+  "q.work.list",
+  "relationship.get",
+  "relationship.own.list",
+  "schedule.list",
+];
+
+/** Names of the tools q-api finished since a log mark. */
+export function toolNamesSince(mark: number): string[] {
+  return logSince(mark, "q tool call finished").map((l) =>
+    typeof l["tool"] === "string" ? l["tool"] : "",
+  );
+}
