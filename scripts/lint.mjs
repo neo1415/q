@@ -53,6 +53,9 @@ for (const batch of batches) {
   const result = spawnSync(
     process.execPath,
     [
+      // One batch at a time, so a larger heap per process is safe on the
+      // 16 GB CI runner; apps/web's typed program alone nears the 4 GB default.
+      "--max-old-space-size=7168",
       "node_modules/eslint/bin/eslint.js",
       "--max-warnings=0",
       "--no-warn-ignored",
