@@ -112,7 +112,7 @@ import {
   type DiscoverAsk,
   type DiscoveryAnswer,
 } from "./discover-companies.js";
-import { runPersonSearch } from "./person-search-answer.js";
+import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
 export {
   createPersonBriefReader,
   type PersonBriefReaderInput,
@@ -2020,6 +2020,15 @@ export function createModelGatewayQAnswer(
         available: prefetchTools,
         investor: ownInvestor !== null,
       }).catch(() => null);
+    // W2: a named person, company or body, identified from public sources
+    // by the lookup tool under this run's plan; the card is built by code.
+    const personFor = (ask: PersonAsk) =>
+      runPersonSearch({
+        ask,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+      }).catch(() => null);
     // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
     // source through the attention tool, under this run's plan, beside the
     // other reads; the answer is then written from it by code. Read only
@@ -2531,6 +2540,7 @@ export function createModelGatewayQAnswer(
       fitSweep,
       sweptAtPrepare: sweepAsk !== null,
       discoverFor,
+      personFor,
       sweepForReading,
       attention,
     };
@@ -2641,6 +2651,7 @@ export function createModelGatewayQAnswer(
         fitSweep,
         sweptAtPrepare,
         discoverFor,
+        personFor,
         sweepForReading,
         attention,
         counterparty,
@@ -3387,12 +3398,7 @@ export function createModelGatewayQAnswer(
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const personStarted = Date.now();
-        const found = await runPersonSearch({
-          ask: request.personSearch,
-          tools,
-          context: toolContext,
-          available: prefetchTools,
-        });
+        const found = await personFor(request.personSearch);
         if (found !== null) {
           for (const source of found.sources) {
             if (!publicSources.some((known) => known.url === source.url)) {

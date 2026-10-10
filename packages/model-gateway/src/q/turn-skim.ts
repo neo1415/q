@@ -25,7 +25,7 @@ import type { ModelGateway } from "../gateway.js";
 const TURN_SKIM_BUDGET = {
   maxAttempts: 1,
   maxEstimatedCostUsd: 0.01,
-  maxOutputTokens: 260,
+  maxOutputTokens: 160,
   attemptTimeoutMs: 2_500,
 } as const;
 

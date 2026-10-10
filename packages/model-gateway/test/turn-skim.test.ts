@@ -22,6 +22,7 @@ const SKIM = {
   kind: "DISCOVER_COMPANIES",
   confidence: "HIGH",
   count: 3,
+  person: null,
   discover: {
     sectors: ["fintech"],
     countries: ["NG"],
