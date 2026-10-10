@@ -50,7 +50,7 @@ import {
   registerClientRouter,
 } from "./client-actions";
 import { navigationInFlight } from "./ui-act-controller";
-import { followOfThread } from "./follow-navigation";
+import { followOfThread, seenAtOpen } from "./follow-navigation";
 import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
 import { resumableConversation } from "./resume-conversation";
@@ -517,16 +517,7 @@ export function QSessionProvider({
       // not "already there", even when the conversation reloaded as it
       // landed (the URL naming a new conversation): its move is made.
       const since = askedSince();
-      followedTurns.current = new Set(
-        turns
-          .filter(
-            (turn) =>
-              turn.kind === "Q" &&
-              (since === null ||
-                (turn.at !== undefined && Date.parse(turn.at) < since - 3_000)),
-          )
-          .map((turn) => turn.id),
-      );
+      followedTurns.current = seenAtOpen(turns, since);
       if (since === null) return;
     }
     if (wire === null) return;

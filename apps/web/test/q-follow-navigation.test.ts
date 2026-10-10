@@ -1,10 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import type { QTurn } from "../src/features/q/conversation";
+import { createQStreamState } from "@capital-q/api-client";
+
+import { turnsFrom, type QTurn } from "../src/features/q/conversation";
 import {
   followOfThread,
   navigationToFollow,
   noteTypedRun,
+  seenAtOpen,
 } from "../src/features/q/follow-navigation";
 import { destinationPath } from "../src/features/voice/destinations";
 import { loadWire } from "../src/features/q/wire";
@@ -126,5 +129,57 @@ describe("a typed question's move while a voice line is open (n-founder-strings,
       { active: true },
     );
     expect(followed.navigate).toBe("REHEARSALS");
+  });
+});
+
+describe("what is already there when a conversation opens (G2 follow-up)", () => {
+  const SINCE = Date.parse("2026-10-10T10:00:00.000Z");
+  const dated = (id: string, at: string): QTurn => ({
+    ...(qTurn(id, toDiscover) as Extract<QTurn, { kind: "Q" }>),
+    at,
+  });
+
+  it("an answer still streaming from a run this tab never started is already there: /home never bounces", () => {
+    // The person asked something in this tab a minute ago, then opened
+    // Home; Home's conversation has an older run still streaming.
+    const streaming = {
+      ...(qTurn("old-run-msg", [], true) as Extract<QTurn, { kind: "Q" }>),
+      runId: "run-from-elsewhere",
+    };
+    const seen = seenAtOpen([streaming], SINCE, new Set(["run-typed-here"]));
+    expect(seen.has("old-run-msg")).toBe(true);
+    // Its persisted message (same id) lands with a NAVIGATE: not followed.
+    expect(
+      navigationToFollow([qTurn("old-run-msg", toDiscover)], seen),
+    ).toBeNull();
+  });
+
+  it("G-D16 stays: the answer to what they just typed, still streaming at open, is followed", () => {
+    const streaming = {
+      ...(qTurn("fresh-msg", [], true) as Extract<QTurn, { kind: "Q" }>),
+      runId: "run-typed-here",
+    };
+    const seen = seenAtOpen([streaming], SINCE, new Set(["run-typed-here"]));
+    expect(seen.has("fresh-msg")).toBe(false);
+    expect(navigationToFollow([qTurn("fresh-msg", toDiscover)], seen)).toBe(
+      "DISCOVER",
+    );
+  });
+
+  it("persisted answers: older than the question are there, newer are followed; nothing asked, all are there", () => {
+    const old = dated("a", "2026-10-10T09:55:00.000Z");
+    const fresh = dated("b", "2026-10-10T10:00:01.000Z");
+    expect([...seenAtOpen([old, fresh], SINCE, new Set())]).toEqual(["a"]);
+    expect([...seenAtOpen([old, fresh], null, new Set())]).toEqual(["a", "b"]);
+  });
+
+  it("the live turn carries its run, so the rule above can tell", () => {
+    const state = {
+      ...createQStreamState(),
+      runId: "run-1",
+      partial: { messageId: "m-live", text: "Opening Discover" },
+    };
+    const live = turnsFrom(state, []).at(-1);
+    expect(live?.kind === "Q" ? live.runId : null).toBe("run-1");
   });
 });

@@ -348,6 +348,8 @@ export function turnsFrom(
     turns.push({
       kind: "Q",
       id: state.partial.messageId,
+      // The run it belongs to: whether this tab asked it (seenAtOpen).
+      ...(state.runId === null ? {} : { runId: state.runId }),
       text: state.partial.text,
       streaming: true,
       sourceCount: 0,
