@@ -87,6 +87,7 @@ import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 import {
   fastLaneOf,
   knownEntityLaneOf,
+  investorDiscoveryLaneOf,
   type KnownEntityMatcher,
 } from "./fast-lane.js";
 
@@ -2210,9 +2211,10 @@ export function createSpecialistQAnswer(
   };
 
   const instantLaneOf = (utterance: string) =>
-    dependencies.knownEntities === undefined
+    (dependencies.knownEntities === undefined
       ? null
-      : knownEntityLaneOf(utterance, dependencies.knownEntities);
+      : knownEntityLaneOf(utterance, dependencies.knownEntities)) ??
+    investorDiscoveryLaneOf(utterance);
 
   const preread = (input: QPrereadInput): void => {
     if (turns === undefined || prereads.has(input.runId)) return;
@@ -2475,7 +2477,13 @@ export function createSpecialistQAnswer(
       if (instant !== null) {
         const capabilities = await capabilitiesOf(request);
         logger?.info(
-          { qRunId: request.runId, lane: "KNOWN_ENTITY" },
+          {
+            qRunId: request.runId,
+            lane:
+              instant.questionKind === "DISCOVER_INVESTORS"
+                ? "INVESTOR_DISCOVERY"
+                : "KNOWN_ENTITY",
+          },
           "q fast lane",
         );
         return delegate.answer({

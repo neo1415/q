@@ -2011,6 +2011,7 @@ export function createModelGatewayQAnswer(
         // it as a possible arrival follow-up cost a model call (live
         // 2026-10-10: ~0.9 s of a 1.4 s known-entity answer).
         request.personSearch === undefined &&
+        request.discoverInvestors === undefined &&
         request.writingDocument !== true &&
         request.askedAction === undefined &&
         (request.turnKind === undefined ||
@@ -2949,7 +2950,8 @@ export function createModelGatewayQAnswer(
       // lookup tool; if the lookup finds nothing, the wide reads are taken
       // below before the model is asked.
       const personByCode =
-        request.personSearch !== undefined &&
+        (request.personSearch !== undefined ||
+          request.discoverInvestors !== undefined) &&
         request.writingDocument !== true &&
         request.askedAction === undefined &&
         (request.turnKind === undefined ||

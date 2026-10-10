@@ -36,8 +36,25 @@ export type PublicSourcePresentation = {
 
 const TITLE_MAX = 120;
 
-function day(iso: string): string {
-  return iso.slice(0, 10);
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * YYYY-MM-DD, or null when the value is not a date. Providers send dates
+ * as "Oct 3, 2026" or "2 days ago" as well as ISO; slicing the first ten
+ * characters gave "Oct 3, 202", which failed the block contract and lost
+ * the whole answer (live 2026-10-10).
+ */
+function dayOrNull(value: string): string | null {
+  const head = value.trim().slice(0, 10);
+  if (ISO_DAY.test(head)) return head;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return null;
+  const iso = new Date(parsed).toISOString().slice(0, 10);
+  return ISO_DAY.test(iso) ? iso : null;
+}
+
+function day(value: string): string {
+  return dayOrNull(value) ?? new Date().toISOString().slice(0, 10);
 }
 
 function cleanTitle(title: string | null, domain: string): string {
@@ -55,9 +72,7 @@ export function presentPublicSource(
 ): PublicSourcePresentation {
   const title = cleanTitle(source.title, source.domain);
   const publishedOn =
-    source.publishedAt === null || Number.isNaN(Date.parse(source.publishedAt))
-      ? null
-      : day(source.publishedAt);
+    source.publishedAt === null ? null : dayOrNull(source.publishedAt);
   const retrievedOn = day(source.retrievedAt);
   const dateLabel =
     publishedOn === null

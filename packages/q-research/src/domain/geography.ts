@@ -178,6 +178,7 @@ const REGION_WORDS: readonly {
       "arab",
       "arabs",
       "arabic",
+      "arabian",
       "arab world",
       "mena",
       "middle east",
@@ -188,6 +189,7 @@ const REGION_WORDS: readonly {
     ],
     countries: [...GCC, ...LEVANT_AND_NORTH, "SD", "SO"],
   },
+  { words: ["قطر", "قطري"], countries: ["QA"] },
 ];
 
 /**

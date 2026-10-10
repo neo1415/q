@@ -295,3 +295,112 @@ export function knownEntityLaneOf(
   }
   return null;
 }
+
+/**
+ * Investors of a region, asked for without a name ("top three Arab
+ * investors that may be interested in this", "who in the Middle East might
+ * back us? give me 3", "any Gulf money for us?"), recognised by code so the
+ * ask never waits on, or is lost to, a LOW-confidence first read (live
+ * 2026-10-10: one paraphrase fell to the analyst and failed). Needs both an
+ * investor word and a region word, and no action word: "draft an email to
+ * Gulf investors" is a request to write, not to find. Read-only by
+ * construction; the region words travel as said and code maps them.
+ */
+const INVESTOR_INTENT =
+  /\b(?:investors?|vcs?|venture\s+capital(?:ists?)?|funds?|backers?|financiers?|family\s+offices?|angels?|sovereign\s+wealth|(?:gulf|arab|qatari|saudi|emirati)\s+money|money\s+from|capital\s+from|back(?:ing)?\s+(?:us|me|this|our)|fund(?:ing)?\s+(?:us|me|this|our)|invest\s+in\s+(?:us|me|this|our))\b/iu;
+
+const REGION_TERMS: readonly string[] = [
+  "arab world",
+  "arab",
+  "arabs",
+  "arabian",
+  "middle eastern",
+  "middle east",
+  "mideast",
+  "mena",
+  "gcc",
+  "gulf",
+  "khaleeji",
+  "qatari",
+  "qatar",
+  "doha",
+  "saudi",
+  "riyadh",
+  "uae",
+  "emirati",
+  "emirates",
+  "dubai",
+  "abu dhabi",
+  "kuwaiti",
+  "kuwait",
+  "bahraini",
+  "bahrain",
+  "omani",
+  "oman",
+  "egyptian",
+  "egypt",
+  "cairo",
+  "jordanian",
+  "jordan",
+  "lebanese",
+  "lebanon",
+  "moroccan",
+  "morocco",
+  "عربي",
+  "عرب",
+  "الخليج",
+  "خليجي",
+  "قطر",
+];
+
+const ACTION_WORDS =
+  /\b(?:draft|write|email|e-mail|send|message|schedule|book|invite|introduce|intro|connect\s+me|compare|analy[sz]e|report|remind)\b/iu;
+
+const COUNT_WORDS: Readonly<Record<string, number>> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  couple: 2,
+  few: 3,
+};
+
+export function investorDiscoveryLaneOf(utterance: string): FastLane | null {
+  const text = utterance.trim().slice(0, 300);
+  if (text.length === 0 || ACTION_WORDS.test(text)) return null;
+  if (!INVESTOR_INTENT.test(text)) return null;
+  const lower = text.toLowerCase();
+  const regions: string[] = [];
+  for (const term of REGION_TERMS) {
+    const at = new RegExp(
+      `(?:^|[^\\p{L}])${term.replace(/\s+/gu, "\\s+")}(?:$|[^\\p{L}])`,
+      "u",
+    );
+    if (at.test(lower) && !regions.some((r) => r.includes(term))) {
+      regions.push(term);
+    }
+  }
+  if (regions.length === 0) return null;
+  const digit = /\b([1-9])\b/u.exec(text);
+  const word = /\b(one|two|three|four|five|couple|few)\b/iu.exec(text);
+  const said =
+    digit !== null
+      ? Number(digit[1])
+      : word !== null
+        ? COUNT_WORDS[(word[1] ?? "").toLowerCase()]
+        : undefined;
+  return {
+    questionKind: "DISCOVER_INVESTORS",
+    discoverInvestors: {
+      regions,
+      sector: null,
+      stage: null,
+      count: said === undefined ? null : Math.min(said, 5),
+      aboutMyCompany:
+        /\b(?:this|us|our|me|my\s+(?:company|startup|raise|round|deal))\b/iu.test(
+          text,
+        ),
+    },
+  };
+}
