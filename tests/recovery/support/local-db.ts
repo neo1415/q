@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { STACK_GPT_LIVE } from "./stack.js";
 
 /**
  * Test setup against the LOCAL Supabase database only, through the local
@@ -44,8 +45,13 @@ export function expireApproval(approvalId: string): void {
 
 /** Runs scripts/recovery/local-stack.sh (stop/start a service mid-test). */
 export function stack(command: "start" | "stop", service: string): void {
+  // A restarted q-api keeps the line it was started with: without the flag
+  // in this process's env, a mid-test restart turned GPT-Live off for every
+  // later test (G2 gate, 2026-10-10: journeys C voice "GPT-Live off").
+  const gptLive = STACK_GPT_LIVE === true ? { CQ_RECOVERY_GPT_LIVE: "1" } : {};
   execFileSync("bash", ["scripts/recovery/local-stack.sh", command, service], {
     cwd: new URL("../../..", import.meta.url).pathname,
     stdio: "ignore",
+    env: { ...process.env, ...gptLive },
   });
 }

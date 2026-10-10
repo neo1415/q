@@ -3,13 +3,11 @@ import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
-import { awaits } from "../support/expected-red.js";
 import { ask, recordReceipts } from "../support/q.js";
 import {
   answer,
   useScript,
   vendorMark,
-  vendorRequestsSince,
   vendorSettled,
   type ScriptRule,
 } from "../support/script.js";
@@ -17,10 +15,10 @@ import { CAST, world } from "../support/stack.js";
 import {
   READ_QUESTION,
   SKIM_OTHER,
-  bookScheduledCall,
+  scheduledCallFixture,
   dayText,
   factTime,
-  inputAfter,
+  inputAfterSince,
   latestMessage,
   messageEventCount,
   nextScheduledMeeting,
@@ -65,14 +63,14 @@ test.beforeAll(async ({ browser }) => {
   startsAt.setUTCHours(10, 0, 0, 0);
   meeting =
     nextScheduledMeeting(relationship) ??
-    (await bookScheduledCall(CAST.investor, relationship, startsAt));
+    scheduledCallFixture(CAST.founder, relationship, startsAt);
   page = await (await contextAs(browser, CAST.investor)).newPage();
   await watchMoves(page);
   await recordReceipts(page);
 });
 
 test.afterAll(async () => {
-  await page.context().close();
+  await page?.context().close();
 });
 
 function relationshipTurn(
@@ -106,10 +104,6 @@ function relationshipTurn(
 }
 
 test("A1 'what's happening with Ledgerfold?': Q's brief = DB count, latest sender and the call", async () => {
-  awaits(
-    ["R1"],
-    "build/r1-relationship (Relationship Brief in get_relationship) not merged",
-  );
   const count = messageEventCount(relationship);
   const latest = latestMessage(relationship);
   expect(count, "the thread has messages").toBeGreaterThanOrEqual(2);
@@ -147,10 +141,7 @@ test("A1 'what's happening with Ledgerfold?': Q's brief = DB count, latest sende
   const mark = await vendorMark();
   await page.goto("/home");
   const shown = await ask(page, `What's ${words}?`);
-  const read = inputAfter(
-    await vendorRequestsSince(mark),
-    "a-happening-answer",
-  );
+  const read = await inputAfterSince(mark, "a-happening-answer");
   expect(
     read.length,
     "Q's model was handed get_relationship's result",
@@ -173,7 +164,6 @@ test("A1 'what's happening with Ledgerfold?': Q's brief = DB count, latest sende
 });
 
 test("A2 'did they accept the meeting?': the tool says SCHEDULED at the DB's time", async () => {
-  awaits(["R1"], "build/r1-relationship not merged");
   const words = "did they accept the meeting";
   await useScript([
     SKIM_OTHER,
@@ -188,7 +178,7 @@ test("A2 'did they accept the meeting?': the tool says SCHEDULED at the DB's tim
   const mark = await vendorMark();
   await page.goto("/home");
   const shown = await ask(page, `${company.name}: ${words}?`);
-  const read = inputAfter(await vendorRequestsSince(mark), "a-accept-answer");
+  const read = await inputAfterSince(mark, "a-accept-answer");
   expect(read.length, "get_relationship answered").toBeGreaterThan(0);
   expect
     .soft(read)
@@ -202,10 +192,6 @@ test("A2 'did they accept the meeting?': the tool says SCHEDULED at the DB's tim
 });
 
 test("A3 Q opens the conversation: the browser lands on the chat and shows the brief's count", async () => {
-  awaits(
-    ["R1", "R3"],
-    "brief count on the Messages tab and VERIFIED moves not merged",
-  );
   const say = `Open my chat with ${company.name}`;
   const route = `/relationships/company/${company.companyId}/messages`;
   await useScript([
@@ -237,16 +223,21 @@ test("A3 Q opens the conversation: the browser lands on the chat and shows the b
   await expect(page).toHaveURL(new RegExp(`${route}$`, "u"), {
     timeout: 60_000,
   });
-  const tabs = page.getByRole("navigation", { name: "Relationship" });
-  const messagesTab = tabs.getByRole("link", { name: /Messages/u });
-  // Page marker: the Messages tab is the current page.
-  await expect(messagesTab).toHaveAttribute("aria-current", "page");
+  // Page marker: the chat is a full-screen thread (no tab bar of its own).
+  await expect(
+    page.getByRole("log", { name: `Messages with ${company.name}` }),
+  ).toBeVisible();
   const count = messageEventCount(relationship);
-  await expect
-    .soft(messagesTab, "tab badge = DB message_sent count")
-    .toContainText(String(count));
-  // The overview says the same thing Q's brief said.
+  // The overview's tab badge and lines say what Q's brief said.
   await page.goto(`/relationships/company/${company.companyId}`);
+  await expect
+    .soft(
+      page
+        .getByRole("navigation", { name: "Relationship" })
+        .getByRole("link", { name: /Messages/u }),
+      "tab badge = DB message_sent count",
+    )
+    .toContainText(String(count));
   const standing = page.locator("[data-relationship-brief]");
   const latest = latestMessage(relationship);
   await expect
@@ -261,7 +252,6 @@ test("A3 Q opens the conversation: the browser lands on the chat and shows the b
 });
 
 test("A4 Q opens their profile: the browser lands on the company's profile", async () => {
-  awaits(["R3"], "VERIFIED navigation lifecycle not merged");
   const say = `Open ${company.name}'s profile`;
   const route = `/company/${company.companyId}`;
   await useScript([

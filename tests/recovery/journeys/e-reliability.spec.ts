@@ -6,6 +6,7 @@ import { contextAs } from "../support/auth.js";
 import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import { call, isRefusal, tokenFor } from "../support/http.js";
+import { answerText, newestRun, nextSettledRun } from "../support/knowledge.js";
 import { localSql, stack } from "../support/local-db.js";
 import { operateScreen, receipts, recordReceipts, send } from "../support/q.js";
 import { answer, useScript, type ScriptRule } from "../support/script.js";
@@ -34,10 +35,13 @@ import {
  */
 const company = world().company(CAST.founderCompanyKey);
 const investor = world().investor("savanna-seed");
+// The manifest marks names "(fictional)"; the product shows the display name.
+const investorName = investor.name.replace(/ \(fictional\)$/u, "");
+/** Where a founder's "open <their investor>" lands (named-record-request.ts pagesFor). */
+const RECORD_PATH = `/relationships/investor/${investor.investorOrganisationId}`;
 
 test("E1 a q-api restart mid-run: the run ends RUN_EXPIRED with an honest message", async () => {
   test.setTimeout(300_000);
-  awaits(["R3"], "orphan sweep timing on the integrated build is unproven");
   await useScript([
     SKIM_OTHER,
     READ_QUESTION,
@@ -109,7 +113,6 @@ test("E2 a relationship source past its statement timeout: brief UNAVAILABLE, Q 
   browser,
 }) => {
   test.setTimeout(240_000);
-  awaits(["R1"], "build/r1-relationship (UNAVAILABLE sources) not merged");
   const relationship = relationshipId(
     company.companyId,
     investor.investorOrganisationId,
@@ -177,7 +180,6 @@ test("E2 a relationship source past its statement timeout: brief UNAVAILABLE, Q 
 test("E3 a control the page never registers: FAILED / TARGET_MISSING in seconds, never done, never a hang", async ({
   browser,
 }) => {
-  awaits(["R3"], "navigation lifecycle not merged");
   const page = await (await contextAs(browser, CAST.founder)).newPage();
   await recordReceipts(page);
   await useScript([
@@ -195,19 +197,24 @@ test("E3 a control the page never registers: FAILED / TARGET_MISSING in seconds,
     },
   ]);
   await page.goto("/capital");
-  const started = Date.now();
+  const before = (await newestRun(CAST.founder))?.runId ?? null;
   await send(page, "open the imaginary tab");
-  await expect
-    .poll(
-      async () =>
-        (await receipts(page)).find((r) => r.target === "tab.g2-imaginary")
-          ?.status ?? null,
-      { timeout: 30_000, message: "a receipt for the missing control" },
-    )
-    .toMatch(/^(TARGET_MISSING|FAILED)$/u);
-  expect
-    .soft(Date.now() - started, "reported, not timed out")
-    .toBeLessThan(30_000);
+  // Two honest endings: the page reports the control missing (the act
+  // reached it), or Q's named-page reader refuses before acting (G2 gate:
+  // "I can't open that yet: there's no "imaginary" page in Capital Q.").
+  // Either within the turn, never a hang and never "opened".
+  const run = await nextSettledRun(CAST.founder, before, 30_000);
+  const said = answerText(run);
+  const receipt =
+    (await receipts(page)).find((r) => r.target === "tab.g2-imaginary")
+      ?.status ?? null;
+  expect(
+    receipt === "TARGET_MISSING" ||
+      receipt === "FAILED" ||
+      /\b(can.?t|couldn.?t|isn.?t|no)\b/iu.test(said),
+    `receipt ${String(receipt)}, Q said "${said}"`,
+  ).toBe(true);
+  expect.soft(said).not.toMatch(/\bopened\b/iu);
   expect
     .soft(
       (await receipts(page)).some(
@@ -224,11 +231,7 @@ test("E3 a control the page never registers: FAILED / TARGET_MISSING in seconds,
 test("E4 the router remounts mid-move: one execution, one receipt", async ({
   browser,
 }) => {
-  awaits(
-    ["R3"],
-    "navigation lifecycle (module state across remounts) not merged",
-  );
-  const path = `/investors/${investor.investorOrganisationId}`;
+  const path = RECORD_PATH;
   const page = await (await contextAs(browser, CAST.founder)).newPage();
   await watchMoves(page);
   await recordReceipts(page);
@@ -248,7 +251,7 @@ test("E4 the router remounts mid-move: one execution, one receipt", async ({
           {
             name: "open_page",
             arguments: {
-              page: "INVESTOR",
+              page: "RELATIONSHIP_INVESTOR",
               id: investor.investorOrganisationId,
             },
           },
@@ -258,7 +261,7 @@ test("E4 the router remounts mid-move: one execution, one receipt", async ({
     {
       name: "e4-answer",
       when: { task: "COMPANY_ANALYST", afterTool: "open_page" },
-      reply: answer(`Opening ${investor.name}…`),
+      reply: answer(`Opening ${investorName}…`),
     },
   ]);
   // The destination answers slowly, so the move is still EXECUTING while
@@ -268,8 +271,9 @@ test("E4 the router remounts mid-move: one execution, one receipt", async ({
     await new Promise((resolve) => setTimeout(resolve, 3_000));
     await route.fallback();
   });
-  await page.goto("/home");
-  await send(page, `open ${investor.name}, remount journey`);
+  // /discover has the Q dock (the Q page /home has none to remount).
+  await page.goto("/discover");
+  await send(page, `open ${investorName}, remount journey`);
   const dock = page.locator("[data-q-dock] [data-q-dock-button]");
   await expect
     .poll(
@@ -282,8 +286,12 @@ test("E4 the router remounts mid-move: one execution, one receipt", async ({
     )
     .toBeGreaterThan(0);
   for (let i = 0; i < 2; i += 1) {
-    if (await dock.isVisible().catch(() => false)) await dock.click();
-    else await page.keyboard.press("Escape");
+    // The open dock can cover its own button: Escape closes it then.
+    const clicked = await dock
+      .click({ timeout: 3_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!clicked) await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
   }
   await expect(page).toHaveURL(new RegExp(`${path}(\\?|$)`, "u"), {
@@ -326,8 +334,11 @@ test("E4 the router remounts mid-move: one execution, one receipt", async ({
 test("E5 a duplicate intent id: the server counts one receipt", async ({
   browser,
 }) => {
-  awaits(["R3"], "receipt dedupe by intent id not merged");
-  const path = `/investors/${investor.investorOrganisationId}`;
+  awaits(
+    ["G2-D2"],
+    "product: one turn executes the same move twice (fast path, then the answer) once the first is VERIFIED; navigation-lifecycle.ts:373-381 joins only in-flight moves",
+  );
+  const path = RECORD_PATH;
   const page = await (await contextAs(browser, CAST.founder)).newPage();
   await watchMoves(page);
   const posts = captureReceiptPosts(page);
@@ -346,7 +357,7 @@ test("E5 a duplicate intent id: the server counts one receipt", async ({
           {
             name: "open_page",
             arguments: {
-              page: "INVESTOR",
+              page: "RELATIONSHIP_INVESTOR",
               id: investor.investorOrganisationId,
             },
           },
@@ -356,11 +367,11 @@ test("E5 a duplicate intent id: the server counts one receipt", async ({
     {
       name: "e5-answer",
       when: { task: "COMPANY_ANALYST", afterTool: "open_page" },
-      reply: answer(`Opening ${investor.name}…`),
+      reply: answer(`Opening ${investorName}…`),
     },
   ]);
   await page.goto("/home");
-  await send(page, `open ${investor.name}, duplicate journey`);
+  await send(page, `open ${investorName}, duplicate journey`);
   await expect(page).toHaveURL(new RegExp(`${path}(\\?|$)`, "u"), {
     timeout: 60_000,
   });
@@ -399,7 +410,6 @@ test("E5 a duplicate intent id: the server counts one receipt", async ({
 test("E6 insufficient permission: another firm's chat is refused, and Q never opens it", async ({
   browser,
 }) => {
-  awaits(["R3"], "navigation lifecycle not merged");
   const relationship = relationshipId(
     company.companyId,
     investor.investorOrganisationId,

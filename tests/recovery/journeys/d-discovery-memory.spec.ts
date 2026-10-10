@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
-import { awaits } from "../support/expected-red.js";
 import { call } from "../support/http.js";
 import {
+  answerText,
   cardCompanyIds,
   cardNames,
   declaredFintech,
@@ -12,7 +12,7 @@ import {
   newestRun,
   nextSettledRun,
 } from "../support/knowledge.js";
-import { ask } from "../support/q.js";
+import { send } from "../support/q.js";
 import {
   answer,
   useScript,
@@ -42,10 +42,6 @@ const SECOND = "tell me about the second one";
 test("D three fintech cards, away and back, 'the second one' is card 2 with no new discovery", async ({
   browser,
 }) => {
-  awaits(
-    ["K1", "B6"],
-    "reference resolution over the previous cards after navigation is unproven on the integrated build",
-  );
   const eligible = declaredFintech();
   expect(
     eligible.length,
@@ -59,7 +55,8 @@ test("D three fintech cards, away and back, 'the second one' is card 2 with no n
   ]);
   await vendorSettled();
   const before = (await newestRun(CAST.investor))?.runId ?? null;
-  await ask(page, ASK);
+  // Typed like K1: the cards render on the Q stage, not in the Chat view.
+  await send(page, ASK);
   const cards = page.locator("[data-ac-cards] [data-ac-card]");
   await expect(cards.first()).toBeVisible({ timeout: 90_000 });
   const run = await nextSettledRun(CAST.investor, before);
@@ -119,16 +116,29 @@ test("D three fintech cards, away and back, 'the second one' is card 2 with no n
   ]);
   await vendorSettled();
   const mark = await vendorMark();
-  const shown = await ask(page, SECOND);
+  await send(page, SECOND);
   const followUp = await nextSettledRun(CAST.investor, run.runId);
   const calls = await modelCallsSince(mark);
   const seen = await vendorRequestsSince(mark);
+  console.log(
+    `D follow-up: rules ${JSON.stringify(seen.map((r) => r.rule))} answer ${JSON.stringify(answerText(followUp).slice(0, 300))}`,
+  );
 
-  await expect.soft(shown, "Q names card 2").toContainText(secondName);
+  // What Q said, as the server stored it for this turn.
+  const said = answerText(followUp);
+  expect.soft(said, "Q names card 2").toContain(secondName);
   for (const other of ids.filter((id) => id !== second)) {
     const otherName = names.get(other) ?? "";
-    if (otherName !== "") await expect.soft(shown).not.toContainText(otherName);
+    // The shared local database holds several companies named alike (other
+    // suites' fixtures, e.g. eight "Atoll Pay"); a namesake proves nothing.
+    if (otherName !== "" && otherName !== secondName)
+      expect.soft(said).not.toContain(otherName);
   }
+  // Q opened card 2's own page, not a namesake's.
+  if (/opening their page/iu.test(said))
+    await expect.soft(page).toHaveURL(new RegExp(second, "u"), {
+      timeout: 30_000,
+    });
   expect
     .soft(
       seen.filter(
