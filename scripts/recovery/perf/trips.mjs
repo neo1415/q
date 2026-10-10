@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch */
 /**
  * S2: database round trips per Q turn, per path, on the local stack.
  *
