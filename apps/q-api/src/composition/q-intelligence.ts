@@ -20,7 +20,7 @@ import {
   type QOwnOnboardingPort,
   type ModelGatewayQAnswerDependencies,
 } from "@capital-q/model-gateway/q";
-import type { ModelDataPosture } from "@capital-q/contracts";
+import type { ArrivalSnapshot, ModelDataPosture } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
   createEmbeddingService,
@@ -110,6 +110,10 @@ import { MANDATE_LABELS } from "./mandate-labels.js";
 
 export type QIntelligenceDependencies = {
   readonly sql: DatabaseExecutor;
+  /** W1: what Q told them on arrival, prepared for every turn of theirs. */
+  readonly arrivalSnapshot?:
+    ((actor: QAnswerRequest["actor"]) => Promise<ArrivalSnapshot | null>)
+    | undefined;
   /** RECOVERY (C's request): receipt facts of the person's recent UI acts. */
   readonly uiActReceipts?:
     ((actor: QAnswerRequest["actor"]) => readonly string[]) | undefined;
@@ -354,6 +358,9 @@ export function composeQIntelligence(
     ...(dependencies.uiActReceipts === undefined
       ? {}
       : { uiActReceipts: dependencies.uiActReceipts }),
+    ...(dependencies.arrivalSnapshot === undefined
+      ? {}
+      : { arrivalSnapshot: dependencies.arrivalSnapshot }),
     context: evidence.context,
     ...(statements === undefined ? {} : { statements }),
     ...(dependencies.profileUpdates === undefined

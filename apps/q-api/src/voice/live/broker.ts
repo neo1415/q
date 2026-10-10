@@ -8,6 +8,7 @@ import {
   sensitivityWithin,
   type ModelSensitivity,
 } from "@capital-q/contracts";
+import type { ArrivalSnapshot } from "@capital-q/contracts";
 import type { ModelUsageRepository } from "@capital-q/model-gateway";
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
@@ -39,6 +40,7 @@ import type {
   LiveUsageReport,
 } from "./contracts.js";
 import {
+  arrivalLines,
   liveContextPackage,
   referentsOf,
   REFERENTS_MAX,
@@ -250,6 +252,13 @@ export type LiveBrokerDependencies = {
    */
   readonly contextFor?:
     ((actor: ActorContext) => Promise<LiveContextFacts | null>) | undefined;
+  /**
+   * W1: what Q told them on arrival, for the call's context package (the
+   * same snapshot the welcome and Q's turns are given).
+   */
+  readonly arrivalFor?:
+    | ((actor: ActorContext) => Promise<ArrivalSnapshot | null>)
+    | undefined;
   /**
    * The voice turn board (what the turn handler recorded for the line):
    * read after a run, so the delegation's result says whether the run
@@ -727,8 +736,14 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       });
       // Part 6: the background note for this session (and its renewals).
       let facts: LiveContextFacts | null = null;
+      let arrival: string[] = [];
       try {
-        facts = (await deps.contextFor?.(actor)) ?? null;
+        const [read, snapshot] = await Promise.all([
+          deps.contextFor?.(actor) ?? Promise.resolve(null),
+          deps.arrivalFor?.(actor).catch(() => null) ?? Promise.resolve(null),
+        ]);
+        facts = read ?? null;
+        arrival = arrivalLines(snapshot);
       } catch (error: unknown) {
         // A failed read costs the call its background, never the call.
         logger.warn({ err: error }, "live voice context could not be read");
@@ -738,6 +753,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         role,
         facts,
         referents: carried?.referents ?? [],
+        arrival,
       });
       logger.info(
         { qVoiceSessionId: binding.voiceSessionId, model: created.model },
