@@ -158,7 +158,7 @@ describe("the spoken line for a prepared entity", () => {
         ASK(name),
       );
     expect(by("QInvest LLC")).toBe(
-      "QInvest LLC is a Qatar-based Islamic investment group, as publicly reported. Want me to research further or set up a rehearsal?",
+      "QInvest LLC is a Qatar-based Islamic investment group spanning investment banking, principal investments and asset management. Want me to research further or set up a rehearsal?",
     );
     expect(by("Invest Qatar")).toMatch(/^Invest Qatar is Qatar's investment/u);
     expect(by("Muhannad Taslaq")).toMatch(
