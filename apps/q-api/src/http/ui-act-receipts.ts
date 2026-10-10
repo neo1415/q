@@ -171,6 +171,27 @@ export function registerUiActReceiptRoutes(
         body.manifest,
         body.navigations ?? [],
       );
+      // R3: hosted 2026-10-09 the receipts lived only in memory, so a
+      // FAILED move could not be told apart from a late DONE after the
+      // fact. Closed values and route ids only -- never page text.
+      request.log.info(
+        {
+          navigations: (body.navigations ?? []).map((navigation) => ({
+            status: navigation.status,
+            expected: navigation.expected,
+            intentId: navigation.intentId,
+            ...(navigation.status === "DONE"
+              ? { route: navigation.route }
+              : { reason: navigation.reason }),
+          })),
+          acts: body.reports.map(({ intent, receipt }) => ({
+            act: intent.act,
+            status: receipt.status,
+          })),
+          accepted,
+        },
+        "q ui act receipts",
+      );
       return reply
         .code(200)
         .header("Cache-Control", "no-store")

@@ -92,6 +92,14 @@ describe("a delegated move is followed now, and spoken only from its receipt", (
     expect(moveNote("FAILED")).toContain("did NOT open");
     expect(moveNote("FAILED")).toContain("never say it is open");
     expect(moveNote("PENDING")).toContain("do not say it is open");
+    // R3: Q Brain's arrival wording ("Up now: …") is overruled until VERIFIED.
+    expect(moveNote("PENDING")).toContain(
+      "was written before their screen moved",
+    );
+    expect(moveNote("FAILED")).toContain(
+      "was written before their screen moved",
+    );
+    expect(moveNote("DONE")).not.toContain("written before");
   });
 
   it("the bridge waits for the receipt before it hands the result to the voice", async () => {
