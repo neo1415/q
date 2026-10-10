@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, URL, Buffer */
 /**
  * Deploy-time artifact download check (BIZ-001, R1 / R17).
  *

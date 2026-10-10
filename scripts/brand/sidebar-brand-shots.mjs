@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, sessionStorage, performance, Buffer */
 /**
  * Screenshots for the sidebar-groups and brand-assets review (2026-10-07):
  * the sidebar's groups closed and open (desktop and phone's More sheet,

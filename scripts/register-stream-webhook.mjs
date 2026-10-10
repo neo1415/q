@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global AbortSignal, console, fetch, process, URL */
 /**
  * Register the api's Cloudflare Stream webhook URL (CQ-MEDIA-012).
  *

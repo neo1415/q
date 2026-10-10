@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Q eval harness entry (CQ-Q-010 §135).
  *

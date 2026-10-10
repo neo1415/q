@@ -1,4 +1,3 @@
-/* global process, console */
 // Local exploration driver: one Chromium, controlled over 127.0.0.1 only.
 //   POST /login   {email, next}   magic-link sign-in through /auth/callback
 //   POST /run     <js body>       runs `async (page, ctx, lib, h) => { ... }`
@@ -34,7 +33,9 @@ async function fresh() {
   await ctx.addInitScript(() => {
     try {
       sessionStorage.setItem("cq.splash.seen", "1");
-    } catch {}
+    } catch {
+      // Storage can be blocked in a fresh context; the splash then just shows.
+    }
   });
   page = await ctx.newPage();
   page.setDefaultTimeout(30000);

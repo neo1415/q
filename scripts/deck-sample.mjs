@@ -1,4 +1,3 @@
-/* global process, console */
 /**
  * Write a sample deck (QX-004 §5, §6, §7).
  *

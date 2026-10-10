@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Make the local dev founder's company marketplace-ready through the real
  * readiness assessment, with a SYNTHETIC verification seam (CQ-MKT-001 §12).

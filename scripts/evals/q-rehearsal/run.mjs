@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, setTimeout */
 /**
  * Rehearsal eval, text mode (harden-38). A fictional founder rehearses
  * with a fictional investor played by Q through the same HTTP routes the

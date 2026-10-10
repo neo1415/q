@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Knowledge Write Gate smoke (CQ-KNW-002 §49): claim and evidence in,
  * candidate through the deterministic gate, knowledge object out, read back

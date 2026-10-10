@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global console, process, URL */
 /**
  * Read-only: the most recent Q artifacts on the HOSTED staging database
  * (id, type, status, time only; never content). Used to confirm on the

@@ -1,4 +1,3 @@
-/* global console, process */
 // Read-only view of Zino Aviation's relationships with the seeded companies:
 // state, the event trail, and the conversation messages (latest first).
 //   node zino.mjs            summary of every seeded company with a relationship

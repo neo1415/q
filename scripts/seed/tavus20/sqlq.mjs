@@ -1,4 +1,3 @@
-/* global process, console */
 // Read-only inspection: node sqlq.mjs "<select ...>"
 import { sql } from "./lib.mjs";
 const r = await sql(process.argv[2]);

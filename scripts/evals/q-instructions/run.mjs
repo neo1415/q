@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, setTimeout */
 /**
  * Standing-instructions eval (ADR 0043 S9), live, judged by outcomes.
  *

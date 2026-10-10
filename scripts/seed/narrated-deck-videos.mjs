@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global Blob, Buffer, FormData, console, crypto, fetch, process, setTimeout */
 /**
  * R19 / R29: narrated deck videos for the seeded fictional companies.
  *

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, setTimeout, clearTimeout, AbortController, TextDecoder */
 /**
  * Voice eval, text in (harden-36). Every case is a spoken turn without
  * the audio: the same `POST /v1/q/runs` a voice turn makes (capability

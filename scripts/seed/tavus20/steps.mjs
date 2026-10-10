@@ -1,4 +1,3 @@
-/* global console */
 // One company, end to end, as its founder and team would do it in the
 // browser. Every step records ids (never secrets) in seed-state.json and is
 // skipped when already done, so a rerun never duplicates anything.

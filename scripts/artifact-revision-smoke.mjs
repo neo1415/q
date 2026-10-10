@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, URL, crypto, setTimeout */
 /**
  * Developer "Edit with Q" smoke (QX-003F; ADR 0013).
  *

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Chunk rebuild / inspection for one document version (CQ-RAG-001 §76).
  *

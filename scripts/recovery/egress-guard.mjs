@@ -1,4 +1,3 @@
-/* global process, console */
 /**
  * Recovery G: the "no live provider calls" guarantee for the local stack.
  *

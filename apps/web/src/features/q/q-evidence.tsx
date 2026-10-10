@@ -49,8 +49,13 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
       case "ARTIFACT_REFERENCE":
       case "UI_INTENT":
       case "COMPARISON_CARDS":
-        // COMPARISON_CARDS is the answer itself, laid out: never tucked
-        // behind Sources.
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
+      case "ATTENTION":
+        // Laid-out data (E4, G-R4) and COMPARISON_CARDS are the answer
+        // itself, rendered in the thread: never tucked behind Sources.
         visible.push(block);
         break;
       case "ACTION_PROPOSAL":
@@ -65,10 +70,6 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
         // Sources, as before.
         evidence.push(block);
         break;
-      default:
-        // A block kind this build does not know yet (another packet may
-        // add one): kept, behind the disclosure.
-        evidence.push(block);
     }
   }
   return { visible, evidence };

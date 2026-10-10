@@ -1,4 +1,3 @@
-/* global fetch, process, URL */
 // Shared helpers for the tavus-20 seed. Secrets are fetched at runtime from
 // the Supabase management API into this process's memory only; nothing here
 // ever prints or writes a key, password or token.
@@ -198,7 +197,9 @@ export async function call(base, token, method, path, body, idem) {
   let parsed = text;
   try {
     parsed = JSON.parse(text);
-  } catch {}
+  } catch {
+    // Not JSON: keep the raw text as the body.
+  }
   return { status: r.status, body: parsed };
 }
 

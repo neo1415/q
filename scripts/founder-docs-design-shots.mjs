@@ -1,4 +1,3 @@
-/* global process, console, URL */
 /**
  * Founder documents design-review screenshots
  * (docs/design/2026-10-08/founder-docs): every view at phone and desktop,

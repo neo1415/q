@@ -1,4 +1,3 @@
-/* global process, URL, Request */
 /**
  * Recovery G, MOCK mode only: the voice credential calls go to the fake.
  *

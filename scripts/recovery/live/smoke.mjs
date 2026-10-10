@@ -47,7 +47,9 @@ const stop = setTimeout(() => {
   console.log("HARD STOP");
   try {
     ws.send(JSON.stringify({ type: "session.close" }));
-  } catch {}
+  } catch {
+    // Socket already closed; the hard stop only needs to end the run.
+  }
   setTimeout(() => process.exit(2), 5000);
 }, 45000);
 ws.on("open", () => {

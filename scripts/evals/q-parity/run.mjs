@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, URL, setTimeout */
 /**
  * Q parity eval (ADR 0040 §3). For every action declared in the app's
  * action registry, and every read_my kind, it sends the generated

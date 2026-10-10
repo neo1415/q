@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Time and disagreement smoke (CQ-KNW-003 §60): a metric with a history, a
  * definition beside it, a correction and a conflict — against the local

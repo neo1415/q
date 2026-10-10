@@ -1,4 +1,3 @@
-/* global process, console, URL, fetch, TextDecoder */
 /**
  * Hosted interview smoke (QX-004 §0.7, §9, §10).
  *

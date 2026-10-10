@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, URL, crypto */
 /**
  * Give existing synthetic demo accounts the verification marker, and ask
  * Capital Q to verify their founders' companies (CQ-VERIFY-002).

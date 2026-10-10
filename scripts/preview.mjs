@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global console, process, fetch, setTimeout, URL, AbortSignal */
 /**
  * The tester's stack (QX-DEV-001).
  *

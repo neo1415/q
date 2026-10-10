@@ -21,7 +21,9 @@ const ctx = await browser.newContext({
 await ctx.addInitScript(() => {
   try {
     sessionStorage.setItem("cq.splash.seen", "1");
-  } catch {}
+  } catch {
+    // Storage can be blocked in a fresh context; the splash then just shows.
+  }
 });
 const page = await ctx.newPage();
 const t = () => new Date().toISOString();

@@ -230,7 +230,7 @@ describe("an answer that arrives as it is written", () => {
     const { seam, request, published } = build(
       "1. Make the company visible to investors. 2. Upload a pitch deck. Start with visibility today. I can do it now.",
     );
-    await seam.answer({ ...request, leadLines: lead } as QAnswerRequest);
+    await seam.answer({ ...request, leadLines: lead });
     expect(published.map((d) => d.text.trim())).toEqual([
       "Investors can't find your company in Discover yet. What to do next, most important first:",
       "1. Make the company visible to investors.",

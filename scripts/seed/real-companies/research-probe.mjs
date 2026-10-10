@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global console, fetch, process, setTimeout */
 // P13: a SMALL number of LIVE Q runs on the real companies, to see whether
 // Q finds them on the network and what its public-web research says. Each
 // run spends the founder's model and research credits: the cases are capped

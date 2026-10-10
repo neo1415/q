@@ -1,4 +1,3 @@
-/* global URL */
 // node --test scripts/seed/real-companies/plan.test.mjs
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

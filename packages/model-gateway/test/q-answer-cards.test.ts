@@ -96,7 +96,7 @@ describe("answer cards block", () => {
             { name: "B", subtitle: null, points: ["b"] },
           ],
         },
-      } as Parameters<typeof analystResultBlocks>[0]["result"],
+      },
       subjects: [],
     });
     expect(blocks?.[0]?.kind).toBe("ANSWER_CARDS");

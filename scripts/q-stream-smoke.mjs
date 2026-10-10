@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Developer Q stream smoke (CQ-Q-009 §88-§90): a synthetic Q run driven
  * over real HTTP against a local q-api composition — create the run,

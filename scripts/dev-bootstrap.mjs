@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, URL, crypto */
 /**
  * Local synthetic identities for development (CQ-PRE-REC-001 §9).
  *

@@ -1,4 +1,3 @@
-/* global process, console, fetch, setTimeout */
 // Post-deploy live smoke for Q (harden spec §5). At most 10 cheap turns,
 // straight to the q-api (no browser), on a fictional account.
 //

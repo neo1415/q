@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console */
 /**
  * Recovery G: turns the recovery suite's Playwright JSON report into tables
  * a person can read, honestly classified.

@@ -1,4 +1,3 @@
-/* global console, process, fetch, Buffer */
 // Claims each real company for its test founder, then approves the claims as
 // the founder's own platform-admin account (2026-10-08, after the claim-flow
 // fixes F1/F2/F4). Every person here is a test persona on a plus-alias of the

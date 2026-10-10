@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console */
 /**
  * Recovery G: runs the release gates one at a time and writes what happened
  * to docs/recovery/evidence/<date>/ — exact command, exit code, duration,

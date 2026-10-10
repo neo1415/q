@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, URL, crypto, setTimeout */
 /**
  * The recommendation journey, end to end, through the real HTTP API
  * (CQ-REC-007R acceptance).

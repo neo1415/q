@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global Buffer, console */
 /**
  * Capital Q's icons, from one mark (founder direction 2026-10-07: "the
  * favicon in the tab is still the blue stuff... the actual brand colour

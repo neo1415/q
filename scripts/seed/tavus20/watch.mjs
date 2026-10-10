@@ -1,4 +1,3 @@
-/* global console, process */
 // Read-only watch of Zino's agents on the accepted relationships: chat
 // messages, Q actions (and their approvals) and instruction steps since a
 // time. Message bodies are fictional seed conversation, printed trimmed.

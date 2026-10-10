@@ -1,4 +1,3 @@
-/* global console */
 // Read-only: does each founder have their own Q guide saved?
 import * as lib from "./lib.mjs";
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Company Intelligence smoke (CQ-Q-020 §111, §112): four turns of one
  * conversation about a synthetic company, through the real Q path — the

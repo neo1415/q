@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Vector store developer commands (CQ-RAG-003 §78-§79).
  *

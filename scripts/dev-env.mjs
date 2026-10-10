@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Local development preload for the Node services (api, q-api, workers).
  *

@@ -1,4 +1,3 @@
-/* global console, process */
 // Test accounts for the 10 real-company profiles: one founder per company
 // (to claim it through "Find my startup") and three test investors.
 // Created the way the tavus-20 seed creates accounts (confirmed sign-up,

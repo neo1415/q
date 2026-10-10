@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global console, process, URL */
 /**
  * Apply the source-controlled migrations to the hosted Supabase project.
  *

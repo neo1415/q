@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global console, fetch, process, URL */
 /**
  * Hosted migrations over HTTPS (the cloud VM cannot open Postgres ports).
  *

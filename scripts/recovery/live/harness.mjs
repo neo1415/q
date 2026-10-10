@@ -475,7 +475,7 @@ async function localBackend() {
   const token = (await signIn.json()).access_token;
   let conversationId;
   const runs = new Map(); // delegation id -> promise (one id, one run)
-  return async ({ delegationId, request, context }) => {
+  return async ({ delegationId, request }) => {
     if (runs.has(delegationId)) return runs.get(delegationId);
     const work = (async () => {
       const created = await fetch(`${qApi}/v1/q/runs`, {
@@ -1025,7 +1025,9 @@ async function runScenario(id) {
   clearTimeout(hardStop);
   try {
     ws.close();
-  } catch {}
+  } catch {
+    // Socket already closed; nothing left to release.
+  }
 
   // ---------------------------------------------------------------- outputs
   const base = resolve(

@@ -66,7 +66,7 @@ describe("a work-email claim code (P14)", () => {
       },
     });
     const out = await claims.request(
-      { userId: "u1", tenantId: "t9", organisationId: "o9" } as ActorContext,
+      { userId: "u1", tenantId: "t9", organisationId: "o9" },
       "c1",
       {
         method: "WORK_EMAIL",

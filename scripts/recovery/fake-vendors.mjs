@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, Buffer, URL, setTimeout */
 /**
  * Recovery G: a loopback stand-in for the model and voice vendors.
  *

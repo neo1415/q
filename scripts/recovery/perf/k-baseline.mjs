@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch */
 /**
  * Recovery K, Part 10: the instant-answer baseline, per journey, p50/p95.
  *

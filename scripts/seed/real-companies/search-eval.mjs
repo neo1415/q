@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global console, fetch, process, URL */
 // P13 search-quality eval against production data, READ-ONLY.
 //
 //   SUPABASE_ACCESS_TOKEN=... node scripts/seed/real-companies/search-eval.mjs [before|after|both]

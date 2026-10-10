@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Extraction + chunking smoke (CQ-RAG-001 §77).
  *

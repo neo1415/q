@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL, AbortController, setTimeout, clearTimeout */
 /**
  * Which provider carries demo traffic (CQ-REC-007 §15, §46).
  *

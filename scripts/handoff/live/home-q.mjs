@@ -18,7 +18,9 @@ const ctx = await browser.newContext({
 await ctx.addInitScript(() => {
   try {
     sessionStorage.setItem("cq.splash.seen", "1");
-  } catch {}
+  } catch {
+    // Storage can be blocked in a fresh context; the splash then just shows.
+  }
 });
 const page = await ctx.newPage();
 await page.goto(`${WEB}/auth/sign-in`, {
@@ -40,7 +42,6 @@ await page.waitForTimeout(4000);
 console.log("at", page.url());
 const box = page.locator("textarea").first();
 await box.fill(process.env.ASK);
-const t0 = Date.now();
 await box.press("Enter");
 await page.waitForTimeout(40000);
 const text = (

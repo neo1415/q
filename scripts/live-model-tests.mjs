@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Runs the live model smoke suites (CQ-Q-005 §52-53).
  *

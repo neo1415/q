@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Claim interpretation smoke (CQ-KNW-001 §57): a synthetic pitch-deck page
  * through the real Evidence services — proposer → deterministic validation
