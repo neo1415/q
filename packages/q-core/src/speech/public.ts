@@ -43,3 +43,4 @@ export {
   type SequenceState,
   type SequenceStep,
 } from "./card-sequence.js";
+export { movePhaseLine, pendingPlaceOf, type MovePhase } from "./move-line.js";

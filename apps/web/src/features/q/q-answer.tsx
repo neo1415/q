@@ -7,6 +7,7 @@ import { QMark } from "@capital-q/ui/q-mark";
 
 import type { QTurn, QTurnObjectBlock } from "./conversation";
 import { QMarkdown } from "./markdown";
+import { useMoveLine } from "./move-line";
 import { evidenceSummary, QEvidenceBody } from "./q-evidence";
 import { QResultBlocks } from "./q-result-blocks";
 import {
@@ -91,6 +92,8 @@ export function QAnswer({
   const [open, setOpen] = useState<Panel | null>(null);
   const { inline, companies, investors } = replyParts(turn.blocks);
   const sources = evidenceSummary(turn, false);
+  // R3: "Opening X…" until this tab's browser VERIFIED the move.
+  const text = useMoveLine(turn.text, turn.blocks);
 
   const chips: { key: Panel; label: string }[] = [];
   if (sources !== null) {
@@ -120,9 +123,9 @@ export function QAnswer({
       {mark ? (
         <QMark size="sm" state={turn.streaming ? "WORKING" : "IDLE"} />
       ) : null}
-      {turn.text.length > 0 ? (
+      {text.length > 0 ? (
         <QMarkdown
-          text={turn.text}
+          text={text}
           streaming={turn.streaming}
           className="cq-body text-(--cq-text-primary)"
         />
