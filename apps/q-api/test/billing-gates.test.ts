@@ -198,6 +198,8 @@ describe("POST /v1/q/rehearsals", () => {
       list: notUnderTest,
       say: notUnderTest,
       screen: notUnderTest,
+      externalLine: notUnderTest,
+      recordLive: notUnderTest,
       finish: notUnderTest,
       opening: notUnderTest,
     };

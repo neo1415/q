@@ -354,6 +354,11 @@ describe("external-person rehearsal (Postgres)", () => {
         // The text opening needs a model line; this call opens on GPT-Live,
         // so a rehearsal row is inserted as start() would (opening mocked).
         const id = randomUUID();
+        await service.persona(me, "EXTERNAL_PERSON", EXTERNAL_ID);
+        const [built] = await tx.sql<{ id: string; profile: unknown }[]>`
+          select id, profile from q_runtime.persona_profiles
+           where viewer_user_id = ${me.userId}`;
+        if (built === undefined) throw new Error("persona was not built");
         await store.insert(me, {
           id,
           kind: "EXTERNAL_PERSON",
@@ -362,14 +367,8 @@ describe("external-person rehearsal (Postgres)", () => {
           role: "FOUNDER",
           relationshipId: null,
           meetingId: null,
-          personaProfileId: null,
-          persona: (await (async () => {
-            await service.persona(me, "EXTERNAL_PERSON", EXTERNAL_ID);
-            const rows = await tx.sql<{ profile: unknown }[]>`
-              select profile from q_runtime.persona_profiles
-               where viewer_user_id = ${me.userId}`;
-            return rows[0]?.profile;
-          })()) as never,
+          personaProfileId: built.id,
+          persona: built.profile as never,
           voice: "MALE",
           difficulty: "REALISTIC",
           turns: [],
