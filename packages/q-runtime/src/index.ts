@@ -103,6 +103,7 @@ export type {
   QMessageCreationRequestStore,
   QRunCreationRequestStore,
   QRunEventRepository,
+  QRunMoveChain,
   QRunRepository,
   QRunTransition,
   QRuntimeRepositories,
