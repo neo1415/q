@@ -14,8 +14,9 @@ describe("investor discovery wording (live 2026-10-10)", () => {
         regionWords: [said],
         asked: 3,
         outcome: "NONE",
+        aboutMyCompany: true,
       });
-      expect(text).not.toContain(` ${said} investor`);
+      expect(text).toContain(`from the ${shown} region`);
     });
   }
 });
