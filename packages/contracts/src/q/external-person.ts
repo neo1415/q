@@ -167,7 +167,7 @@ export const ExternalPersonSourceSchema = z
     /** ISO date the source states for itself, else null. */
     publishedAt: z.string().max(40).nullable(),
     retrievedAt: z.string().max(40),
-    /** Provider that surfaced it (tavily, serpapi, brightdata). */
+    /** Provider that surfaced it (the search index that found it). */
     provider: z.string().max(40),
   })
   .strict();
@@ -278,10 +278,9 @@ export const PersonBriefAssertionSchema = z
     asOf: z.string().max(40).nullable(),
   })
   .strict()
-  .refine(
-    (a) => a.assertionClass === "UNKNOWN" || a.sourceRefs.length > 0,
-    { message: "an assertion other than UNKNOWN names its source" },
-  );
+  .refine((a) => a.assertionClass === "UNKNOWN" || a.sourceRefs.length > 0, {
+    message: "an assertion other than UNKNOWN names its source",
+  });
 export type PersonBriefAssertion = z.infer<typeof PersonBriefAssertionSchema>;
 
 export const PersonBriefSchema = z

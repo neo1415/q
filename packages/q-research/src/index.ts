@@ -119,3 +119,76 @@ export {
   type ResearchOutcome,
   type ResearchSubject,
 } from "./application/research-service.js";
+
+// W2 (2026-10-10): the fast public person-identity path.
+export {
+  createPersonSearch,
+  externalPersonIdFor,
+  PERSON_SEARCH_BUDGET,
+  planPersonQueries,
+  sourcesOfCandidate,
+  type PersonCallTrace,
+  type PersonQueryKind,
+  type PersonSearchCommand,
+  type PersonSearchDependencies,
+  type PersonSearchRun,
+  type PlannedPersonQuery,
+} from "./application/person-search.js";
+export {
+  allSpellings,
+  basicNameVariants,
+  clarifyingQuestionFor,
+  decideIdentity,
+  linkedInProfileOf,
+  namesPerson,
+  profileFactsOf,
+  rankCandidates,
+  type IdentityDecision,
+  type PersonCandidate,
+  type PersonSpec,
+  type SourcedHit,
+} from "./domain/person-identity.js";
+export {
+  aliasKeyOf,
+  cardFromKnownEntity,
+  createInMemoryKnownEntityStore,
+  createKnownEntityIndex,
+  knownEntityResult,
+  preparedEntityIdFor,
+  type EntityFactRecord,
+  type EntitySourceRecord,
+  type KnownEntityIndex,
+  type KnownEntityRecord,
+  type KnownEntityStore,
+  type KnownLookup,
+  type PreparedEntityUpsert,
+} from "./application/known-entities.js";
+export {
+  createPersonLookup,
+  type PersonBriefRequest,
+  type PersonBriefResult,
+  type PersonLookup,
+  type PersonLookupCommand,
+  type ResearchedEntityReader,
+  type PersonLookupOutcome,
+} from "./application/person-lookup.js";
+export {
+  admitAssertions,
+  BRIEF_FRESH_DAYS,
+  quoteOccursIn,
+  roleContradictions,
+  STALE_AFTER_DAYS,
+  withUnknowns,
+  type AdmissionOutcome,
+  type BriefSource,
+  type ProposedAssertion,
+} from "./domain/person-brief.js";
+export {
+  briefFromKnownEntity,
+  createPersonBriefService,
+  type PersonBriefCommand,
+  type PersonBriefOutcome,
+  type PersonBriefSynthesiser,
+  type ResearchedEntityScope,
+  type ResearchedEntityStore,
+} from "./application/person-brief-service.js";

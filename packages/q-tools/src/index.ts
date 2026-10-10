@@ -715,3 +715,19 @@ export {
   Q_CONTROL_CATALOG,
   type QControlCatalogEntry,
 } from "./tools/control-catalog.js";
+export {
+  createFindPublicEntityTool,
+  FIND_PUBLIC_ENTITY,
+  FindPublicEntityInputSchema,
+  FindPublicEntityOutputSchema,
+  type FindPublicEntityInput,
+  type FindPublicEntityOutput,
+} from "./tools/find-public-entity.js";
+export {
+  BRIEF_PUBLIC_ENTITY,
+  BriefPublicEntityInputSchema,
+  BriefPublicEntityOutputSchema,
+  createBriefPublicEntityTool,
+  type BriefPublicEntityInput,
+  type BriefPublicEntityOutput,
+} from "./tools/brief-public-entity.js";
