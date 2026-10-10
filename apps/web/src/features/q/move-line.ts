@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import {
   QClientActionIntentSchema,
@@ -70,13 +70,16 @@ export function useMoveLine(
   blocks: readonly QResultBlock[],
 ): string {
   const route = routeOfBlocks(blocks);
-  const [state, setState] = useState<NavigationState | null>(() =>
-    route === null ? null : lastNavigationTo(route),
+  const subscribe = useCallback(
+    (changed: () => void) => onNavigationPhase(() => changed()),
+    [],
   );
-  useEffect(() => {
-    if (route === null) return undefined;
-    setState(lastNavigationTo(route));
-    return onNavigationPhase(() => setState(lastNavigationTo(route)));
-  }, [route]);
+  // The ledger keeps each move's state object until its phase changes, so
+  // the snapshot is stable between changes.
+  const state = useSyncExternalStore(
+    subscribe,
+    () => (route === null ? null : lastNavigationTo(route)),
+    () => null,
+  );
   return moveLineOf(text, state);
 }

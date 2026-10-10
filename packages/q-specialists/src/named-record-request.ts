@@ -196,6 +196,77 @@ export function ownCounterpartWithin(
   return found.length === 1 ? (found[0] ?? null) : null;
 }
 
+/** A misheard name's stem must be at least this long… */
+const MISHEARD_STEM_MIN = 5;
+/** …and cover at least this share of both the heard and the real name. */
+const MISHEARD_STEM_SHARE = 0.5;
+
+/**
+ * A consonant skeleton for names heard by speech recognition: the same
+ * sounds spelt differently ("Shyftwel", "Shiftwell") share one key.
+ */
+function phoneticKey(name: string): string {
+  const letters = compact(name)
+    .replace(/ph/gu, "f")
+    .replace(/ck|q/gu, "k")
+    .replace(/c(?=[aou]|$)/gu, "k")
+    .replace(/c/gu, "s")
+    .replace(/z/gu, "s")
+    .replace(/x/gu, "ks")
+    .replace(/w(?=[^aeiou]|$)/gu, "")
+    .replace(/y/gu, "i");
+  const head = letters.slice(0, 1);
+  const rest = letters.slice(1).replace(/[aeiouh]/gu, "");
+  return `${head}${rest}`.replace(/(.)\1+/gu, "$1");
+}
+
+function sharedStem(a: string, b: string): number {
+  let n = 0;
+  while (n < a.length && n < b.length && a[n] === b[n]) n += 1;
+  return n;
+}
+
+/**
+ * R3 (hosted 2026-10-09: "TensorFlow" was heard for the person's own
+ * Tensorgate, the fast path left it to Q, and Q's slower answer opened
+ * it): one of their OWN counterparts a misheard name plainly means. Only
+ * the closed, authorised set passed in -- nothing is searched beyond it --
+ * and only at high confidence, else null (Q's answer asks):
+ *   - the same sound skeleton as exactly one of theirs, or
+ *   - a long shared leading stem (>= 5 letters and half of both names)
+ *     with exactly one of theirs, while no other of theirs shares even a
+ *     4-letter stem with what was heard.
+ */
+export function misheardOwnCounterpart(
+  spoken: string,
+  names: readonly string[],
+): string | null {
+  const heard = compact(spoken);
+  if (heard.length < MISHEARD_STEM_MIN) return null;
+  const own = [...new Set(names)].filter(
+    (name) => compact(name).length >= MISHEARD_STEM_MIN,
+  );
+  const key = phoneticKey(spoken);
+  const sounding =
+    key.length < 4 ? [] : own.filter((name) => phoneticKey(name) === key);
+  if (sounding.length === 1) return sounding[0] ?? null;
+  if (sounding.length > 1) return null;
+  const stems = own.map((name) => ({
+    name,
+    real: compact(name),
+    stem: sharedStem(heard, compact(name)),
+  }));
+  const strong = stems.filter(
+    (one) =>
+      one.stem >= MISHEARD_STEM_MIN &&
+      one.stem >= MISHEARD_STEM_SHARE * one.real.length &&
+      one.stem >= MISHEARD_STEM_SHARE * heard.length,
+  );
+  if (strong.length !== 1) return null;
+  const rivals = stems.filter((one) => one.stem >= 4).length;
+  return rivals === 1 ? (strong[0]?.name ?? null) : null;
+}
+
 /** Words no company or investor name is made of. */
 const NOT_NAME_WORD = new Set([
   "i",

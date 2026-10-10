@@ -248,9 +248,7 @@ describe("a spoken question answered speculatively (latency2)", () => {
     ]);
     expect(run.heard).toEqual([]);
     expect(run.stored).toHaveLength(1);
-    expect(run.stored[0]).toMatch(
-      /^(?:Here's Discover|Discover is up|Over to Discover)\.$/u,
-    );
+    expect(run.stored[0]).toMatch("Opening Discover…");
   });
 
   it("cancels it for a research request and answers on the normal path, said once", async () => {

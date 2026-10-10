@@ -203,10 +203,15 @@ export function createFastNavigation(dependencies: {
           return opening;
         },
       });
+      // R3: how many of their own names the record was matched against
+      // (a LEAVE_TO_Q on hosted could not be told apart from an empty set).
+      const candidates =
+        context === null ? null : ((await context.own)?.items.length ?? 0);
       dependencies.logger?.info(
         {
           outcome: decided.kind,
           record: asksForRecord,
+          candidates,
           prepared: asksForRecord && reused,
           dbRoundTrips: counter.count,
           ms: ms(),
