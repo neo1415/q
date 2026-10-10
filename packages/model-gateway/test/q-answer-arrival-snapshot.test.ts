@@ -362,6 +362,31 @@ describe("an arrival follow-up is answered by code, with no tool and no model ro
   });
 });
 
+describe("a named counterparty the arrival did not mention goes to the normal path (journey A2)", () => {
+  it("never answers about the arrival's counterparty when the turn names another", () => {
+    expect(
+      arrivalFollowUpAnswer(
+        "Ledgerfold: did they accept the meeting?",
+        SNAPSHOT,
+      ),
+    ).toBeNull();
+    expect(
+      arrivalFollowUpAnswer("Did Ledgerfold accept the meeting?", SNAPSHOT),
+    ).toBeNull();
+  });
+
+  it("still answers the arrival's own counterparty, named or pointed at, from the brief's call", () => {
+    for (const said of [
+      "Did they accept the meeting?",
+      "TensorGate: did they accept the meeting?",
+    ]) {
+      expect(arrivalFollowUpAnswer(said, SNAPSHOT)?.text).toContain(
+        "booked for 2026-10-16 15:00 UTC",
+      );
+    }
+  });
+});
+
 describe("unusual phrasings are read by TURN_SKIM and still answered with no tool", () => {
   const WITH_NEXT: ArrivalSnapshot = ArrivalSnapshotSchema.parse({
     ...SNAPSHOT,

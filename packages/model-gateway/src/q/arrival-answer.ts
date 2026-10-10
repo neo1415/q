@@ -127,6 +127,61 @@ export function mergeCounterpartItems(
   };
 }
 
+/** Capitalised words that start a question, never a counterparty's name. */
+const NOT_A_NAME = new Set([
+  "a",
+  "and",
+  "are",
+  "but",
+  "can",
+  "could",
+  "did",
+  "do",
+  "does",
+  "has",
+  "have",
+  "hey",
+  "hi",
+  "how",
+  "i",
+  "is",
+  "it",
+  "ok",
+  "okay",
+  "please",
+  "q",
+  "so",
+  "that",
+  "the",
+  "their",
+  "them",
+  "then",
+  "they",
+  "this",
+  "was",
+  "what",
+  "whats",
+  "when",
+  "where",
+  "who",
+  "why",
+  "will",
+  "would",
+  "yes",
+  "no",
+  "abeg",
+  "wetin",
+]);
+
+/** A proper name in the turn (a capitalised word that is not a question word). */
+function namesSomeoneElse(text: string): boolean {
+  for (const match of text.matchAll(/\b[A-Z][\p{L}'’-]{2,}/gu)) {
+    const word = match[0].toLowerCase().replace(/['’]s?$/u, "");
+    if (!NOT_A_NAME.has(word)) return true;
+  }
+  return false;
+}
+
 type Target =
   | { readonly kind: "ONE"; readonly item: ArrivalSnapshotItem }
   | { readonly kind: "AMBIGUOUS"; readonly names: readonly string[] }
@@ -139,6 +194,11 @@ function target(text: string, snapshot: ArrivalSnapshot): Target {
     const name = group[0]?.counterpart?.name?.toLowerCase();
     return name !== undefined && name.length > 1 && lower.includes(name);
   });
+  // A turn that names someone the snapshot does not hold ("Ledgerfold: did
+  // they accept the meeting?" while Q's arrival spoke of TensorGate) is
+  // about them, not about whoever Q mentioned: the normal path reads
+  // their own brief (R1, int-rc 05e1265f journey A2).
+  if (named.length === 0 && namesSomeoneElse(text)) return { kind: "NONE" };
   const pool = named.length > 0 ? named : groups;
   if (pool.length === 1) {
     return { kind: "ONE", item: mergeCounterpartItems(pool[0] ?? []) };
