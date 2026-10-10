@@ -1996,6 +1996,10 @@ export function createModelGatewayQAnswer(
      */
     const decideArrival = async (): Promise<ArrivalReply | null> => {
       const eligible =
+        // A named lookup is answered by code from the lookup tool; reading
+        // it as a possible arrival follow-up cost a model call (live
+        // 2026-10-10: ~0.9 s of a 1.4 s known-entity answer).
+        request.personSearch === undefined &&
         request.writingDocument !== true &&
         request.askedAction === undefined &&
         (request.turnKind === undefined ||
@@ -2920,7 +2924,17 @@ export function createModelGatewayQAnswer(
           ownCompany: ownCompany !== null,
         },
       });
+      // A named person, company or body is answered by code from the
+      // lookup tool; if the lookup finds nothing, the wide reads are taken
+      // below before the model is asked.
+      const personByCode =
+        request.personSearch !== undefined &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined ||
+          request.turnKind === "QUESTION_TO_Q");
       const withoutWideReads =
+        personByCode ||
         provisionalRoute.path === "APP_QUERY" ||
         (provisionalRoute.path === "PREPARED_CONTEXT" &&
           request.preparedSubject !== "Q_WORK") ||
@@ -3887,7 +3901,10 @@ export function createModelGatewayQAnswer(
       // S2: reaching the model after skipping the wide reads because a code-
       // composed answer was expected (and above did not apply): read them now and prompt with
       // the same facts a turn that always read them would have had.
-      if (withoutWideReads && provisionalRoute.path !== "PREPARED_CONTEXT") {
+      if (
+        withoutWideReads &&
+        (provisionalRoute.path !== "PREPARED_CONTEXT" || personByCode)
+      ) {
         wideReads = await prepared.wide();
         assembled0 = await assemblePrompt(wideReads);
         facts = assembled0.facts;

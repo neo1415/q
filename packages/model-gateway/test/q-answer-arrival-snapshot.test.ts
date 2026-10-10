@@ -481,6 +481,27 @@ describe("unusual phrasings are read by TURN_SKIM and still answered with no too
     await none.seam.answer(none.request);
     expect(none.seen).toHaveLength(0);
   });
+
+  it("a named lookup never asks the skim (live 2026-10-10: ~0.9 s per lookup)", async () => {
+    const lookup = skimmed("who is TensorGate?", {
+      kind: "ARRIVAL_FOLLOWUP",
+      arrival: { item: KEY, aspect: "REQUEST" },
+    });
+    await lookup.seam.answer({
+      ...lookup.request,
+      questionKind: "PERSON_SEARCH",
+      personSearch: {
+        name: "TensorGate",
+        entityKind: "ORGANIZATION",
+        city: null,
+        country: null,
+        organization: null,
+        role: null,
+        freshSearch: false,
+      },
+    });
+    expect(lookup.seen).toHaveLength(0);
+  });
 });
 
 describe("several items from one counterpart are one target (A3)", () => {
