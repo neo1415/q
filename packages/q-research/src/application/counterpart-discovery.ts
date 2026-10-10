@@ -347,7 +347,15 @@ function webFindOf(
   const segments = title
     .replace(/\s*[|\-–·]\s*LinkedIn.*$/iu, "")
     .split(/\s+[-–|·]\s+/u)
-    .map((part) => part.trim())
+    // A page title's own boilerplate is not a name ("… Company: Home Page").
+    .map((part) =>
+      part
+        .replace(
+          /\s*[:|]\s*(?:home(?:\s*page)?|official\s+(?:site|website)|welcome|about\s+us)\s*$/iu,
+          "",
+        )
+        .trim(),
+    )
     .filter((part) => part.length > 0);
   const first = segments[0];
   if (first === undefined || first.length > 80) return null;

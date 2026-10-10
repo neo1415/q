@@ -129,7 +129,9 @@ export function ownMandateAnswer(data: unknown): string | null {
   const stage = mandate.stage ?? {};
   const stageLine =
     stage.minStageCode != null || stage.maxStageCode != null
-      ? `${words(stage.minStageCode ?? "not stated")} to ${words(stage.maxStageCode ?? "not stated")}`
+      ? stage.minStageCode === stage.maxStageCode
+        ? words(stage.minStageCode ?? "not stated")
+        : `${words(stage.minStageCode ?? "not stated")} to ${words(stage.maxStageCode ?? "not stated")}`
       : stageCodes.length > 0
         ? stageCodes.join(", ")
         : null;

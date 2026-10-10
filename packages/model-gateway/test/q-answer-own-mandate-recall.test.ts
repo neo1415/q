@@ -277,3 +277,17 @@ describe("asksForOwnMandate / ownMandateAnswer", () => {
     ).toBeNull();
   });
 });
+
+describe("a one-stage mandate (live 2026-10-10: 'seed to seed')", () => {
+  it("names the stage once", () => {
+    const [first] = FULL.mandates;
+    const text = ownMandateAnswer({
+      ...FULL,
+      mandates: [
+        { ...first, stage: { minStageCode: "seed", maxStageCode: "seed" } },
+      ],
+    });
+    expect(text).toContain("Stages: seed");
+    expect(text).not.toContain("seed to seed");
+  });
+});

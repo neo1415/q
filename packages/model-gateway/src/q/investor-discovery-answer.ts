@@ -60,7 +60,16 @@ function regionLabel(words: readonly string[]): string | null {
   ) {
     return null;
   }
-  return first;
+  // "middle east" reads "Middle East"; an acronym such as "gcc" or "uae"
+  // reads "GCC".
+  return first
+    .split(" ")
+    .map((word) =>
+      /^(?:gcc|uae|mena|ksa)$/iu.test(word)
+        ? word.toUpperCase()
+        : `${word.charAt(0).toUpperCase()}${word.slice(1)}`,
+    )
+    .join(" ");
 }
 
 export function investorDiscoveryText(
