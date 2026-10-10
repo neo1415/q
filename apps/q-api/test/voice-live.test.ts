@@ -137,6 +137,7 @@ function setup(
     hold?: boolean;
     /** Q says `first`, then waits for `until`, then `rest` (a streamed answer). */
     stream?: { first: string; rest: string; until: Promise<void> };
+    rehearsalLine?: Parameters<typeof createLiveBroker>[0]["rehearsalLine"];
   } = {},
 ) {
   let clock = 1_000_000;
@@ -202,6 +203,9 @@ function setup(
     syntheticDemo: options.synthetic === true,
     logger,
     now: () => clock,
+    ...(options.rehearsalLine === undefined
+      ? {}
+      : { rehearsalLine: options.rehearsalLine }),
   });
   return {
     broker,
@@ -1468,5 +1472,109 @@ describe("closing a GPT-Live session over the documented sideband (fake socket)"
     // A session id that is not one never reaches the network.
     expect(await provider.closeSession?.("../../etc")).toBe(false);
     expect(opened).toHaveLength(1);
+  });
+});
+
+describe("GPT-Live persona line for a rehearsal with a researched external person", () => {
+  const REHEARSAL = "6f000000-0000-4000-8000-000000000001";
+  const lineWith = (instructions: string | null) => {
+    const recorded: { id: string; texts: string[] }[] = [];
+    const samples: [string, number][] = [];
+    return {
+      recorded,
+      samples,
+      line: {
+        prepare: () =>
+          Promise.resolve(instructions === null ? null : { instructions }),
+        record: (
+          _actor: ActorContext,
+          id: string,
+          segments: readonly { text: string }[],
+        ) => {
+          recorded.push({ id, texts: segments.map((s) => s.text) });
+          return Promise.resolve(segments.length);
+        },
+        latency: {
+          record: (metric: string, ms: number) => {
+            samples.push([metric, ms]);
+          },
+          summary: () => ({ count: 0, p50: null, p95: null }),
+        },
+      },
+    };
+  };
+
+  it("opens with the prepared persona as its only instructions (no delegation policy, no Q background)", async () => {
+    const { line } = lineWith(
+      "PERSONA: an AI rehearsal informed by public sources",
+    );
+    const { broker, created } = setup({ rehearsalLine: line });
+    const opened = await open(broker, true);
+    expect(opened.kind).toBe("OPEN");
+    expect(created[0]?.instructions).toBe(
+      "PERSONA: an AI rehearsal informed by public sources",
+    );
+    expect(created[0]?.instructions).not.toContain("Delegation policy:");
+  });
+
+  it("falls back to the refusal when the rehearsal is not an external-person one", async () => {
+    const { line } = lineWith(null);
+    const { broker } = setup({ rehearsalLine: line });
+    expect(await open(broker, true)).toEqual({
+      kind: "REFUSED",
+      reason: "REHEARSAL",
+    });
+  });
+
+  it("runs no Q turn and no tool for any delegation: nothing is searched between turns", async () => {
+    const { line } = lineWith("PERSONA");
+    const { broker, runs } = setup({ rehearsalLine: line });
+    await open(broker, true);
+    for (const [index, request] of [
+      "Can you look up their latest fund?",
+      "Search the web for the market size",
+      "Open my data room",
+    ].entries()) {
+      const result = await broker.delegate({
+        actor: ACTOR,
+        voiceSessionId: SESSION,
+        delegation: { delegationId: `d${String(index)}`, request },
+      });
+      expect(result).toMatchObject({
+        commentary: null,
+        failed: false,
+        approvalPending: false,
+      });
+    }
+    expect(runs).toEqual([]);
+  });
+
+  it("keeps the transcript as the rehearsal's turns and records latency", async () => {
+    const { line, recorded, samples } = lineWith("PERSONA");
+    const { broker } = setup({ rehearsalLine: line });
+    await open(broker, true);
+    const kept = await broker.transcript({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: {
+        segments: [
+          { role: "Q", text: "What does the business do?", at: 1_000_000 },
+          { role: "USER", text: "Freight matching.", at: 1_000_100 },
+        ],
+        timings: { firstAudioMs: 900, turnLatencyMs: [700, 1100] },
+      },
+    });
+    expect(kept).toBe(2);
+    expect(recorded).toEqual([
+      {
+        id: REHEARSAL,
+        texts: ["What does the business do?", "Freight matching."],
+      },
+    ]);
+    expect(samples).toEqual([
+      ["first_audio_ms", 900],
+      ["turn_latency_ms", 700],
+      ["turn_latency_ms", 1100],
+    ]);
   });
 });

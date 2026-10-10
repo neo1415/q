@@ -348,7 +348,7 @@ export const OpenPageInputSchema = z
       // A data-room document opens through open_company_document (R0).
       .exclude(["DATA_ROOM_DOCUMENT"])
       .describe(
-        "COMPANY: a company's page (its Overview tab). COMPANY_ELEVATOR / COMPANY_DATA_ROOM / COMPANY_DECK / COMPANY_TEAM: that company profile's Elevator pitch, Data room, Pitch deck or Team tab ('open Ledgerline's data room'). WORK_ITEM: one of Q's work items for them, by its goal as they said it. CAPITAL_ROUND: one of their rounds on Capital, by its name ('the seed round'). GATEQ_APPLICATION: for an investor, one founder's application in their GateQ inbox, by the company's name. SETTINGS: one part of their settings, named in section. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it. COMPANY_PITCH: for an investor, a company of theirs (connected, interested or saved) in Discover's Your companies tab, with its pitch when the company shares it ('show me Nixo's pitch').",
+        "COMPANY: a company's page (its Overview tab). COMPANY_ELEVATOR / COMPANY_DATA_ROOM / COMPANY_DECK / COMPANY_TEAM: that company profile's Elevator pitch, Data room, Pitch deck or Team tab ('open Ledgerline's data room'). WORK_ITEM: one of Q's work items for them, by its goal as they said it. CAPITAL_ROUND: one of their rounds on Capital, by its name ('the seed round'). GATEQ_APPLICATION: for an investor, one founder's application in their GateQ inbox, by the company's name. SETTINGS: one part of their settings, named in section. INVESTOR: an investor organisation's page. INVESTOR_REHEARSAL: for a founder, a rehearsal of their meeting with that investor, played by Q by voice, with a review after. COMPANY_REHEARSAL: for an investor, a rehearsal of their meeting with that company's founder, played by Q. EXTERNAL_REHEARSAL: a rehearsal with the person or organisation Q has just identified from public sources (an identity card), played by Q as a labelled simulation; give its externalPersonId as id. RELATIONSHIP_COMPANY: their relationship with a company. RELATIONSHIP_INVESTOR: their relationship with an investor organisation. RELATIONSHIP_COMPANY_MESSAGES / RELATIONSHIP_INVESTOR_MESSAGES: the chat with that company or investor organisation. DOCUMENT: one of their own documents Q made (a deck, a brief, a list of questions), opened in the document viewer; name it by its title as they said it. COMPANY_PITCH: for an investor, a company of theirs (connected, interested or saved) in Discover's Your companies tab, with its pitch when the company shares it ('show me Nixo's pitch').",
       ),
     id: z
       .string()
@@ -589,6 +589,7 @@ export function createOpenPageTool(
     | "documents"
     | "work"
     | "appActions"
+    | "externalRehearsal"
   >,
 ): AnyQToolDefinition {
   const candidates = (
@@ -639,6 +640,30 @@ export function createOpenPageTool(
               page: input.page,
               id: found.id,
             });
+      }
+      // W4: "rehearse with him" right after an identity card: the entity is
+      // the asker's own researched record (or a prepared seed); the id is
+      // its externalPersonId, never a name guess.
+      if (input.page === "EXTERNAL_REHEARSAL") {
+        const wanted = input.id?.toLowerCase();
+        const valid =
+          wanted !== undefined &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(
+            wanted,
+          );
+        const may =
+          valid && wanted !== undefined && ports.externalRehearsal !== undefined
+            ? await ports.externalRehearsal
+                .canRehearse(actor, wanted)
+                .catch(() => false)
+            : false;
+        return may && wanted !== undefined
+          ? allowed({
+              kind: "OPEN_RECORD_PAGE",
+              page: input.page,
+              id: wanted,
+            })
+          : deny<QClientActionToolResult>("NOT_AVAILABLE");
       }
       const companySide =
         COMPANY_TABS.has(input.page) ||

@@ -380,6 +380,7 @@ function recordPlace(page: QRecordPage, what: string | null): string {
     case "RELATIONSHIP_INVESTOR":
     case "INVESTOR_REHEARSAL":
     case "COMPANY_REHEARSAL":
+    case "EXTERNAL_REHEARSAL":
     case "WORK_ITEM":
     case "CAPITAL_ROUND":
     case "GATEQ_APPLICATION":

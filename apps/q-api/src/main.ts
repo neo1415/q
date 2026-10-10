@@ -120,6 +120,9 @@ import {
   createOpenAISidebandConnector,
 } from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
+import { createExternalRehearsalLatency } from "./composition/external-rehearsal-latency.js";
+import { createExternalSubjectResolver } from "./composition/external-resolve.js";
+import { createPostgresExternalSubjectStore } from "./composition/external-subjects.js";
 import { createLiveBroker } from "./voice/live/broker.js";
 import { createPostgresLiveSpend } from "./voice/live/spend.js";
 import { liveConfigFrom } from "./voice/live/config.js";
@@ -1141,6 +1144,12 @@ const researchComposition = composeResearch({
   gateway: modelGateway,
   dataPosture: demoDataPosture,
   logger,
+});
+// Rehearsing with a researched external entity (W4): the asker's own
+// researched record and newest brief, or a prepared public seed.
+const externalSubjectResolver = createExternalSubjectResolver({
+  researched: researchComposition.researched,
+  known: researchComposition.knownEntities.store,
 });
 
 // Prepared public research entities (W5), held hot on W2's shared index:
@@ -2744,6 +2753,10 @@ const qTools = createQTools({
       : { profiles: researchComposition.profiles }),
     // W2: find / brief a named person or organisation.
     people: researchComposition.people,
+    externalRehearsal: {
+      canRehearse: async (actor, externalPersonId) =>
+        (await externalSubjectResolver(actor, externalPersonId)) !== null,
+    },
     relationships: {
       ...createRelationshipIntelligencePort({
         interests: interestService,
@@ -4964,7 +4977,23 @@ const contentWords = (value: unknown, out: string[] = []): string[] => {
   }
   return out;
 };
+// Rehearsing with a researched external person: the sourced public brief per
+// viewer (written by the people research), and the latency board the live
+// line and the persona preparation report to.
+const externalSubjects = createPostgresExternalSubjectStore(database.sql);
+const externalRehearsalLatency = createExternalRehearsalLatency(
+  (metric, ms) => {
+    logger.info({ metric, ms }, "external rehearsal latency");
+  },
+);
 const rehearsals = createRehearsalService({
+  external: {
+    subjects: externalSubjects,
+    latency: externalRehearsalLatency,
+    // The identity card's "Rehearse with them": the researched record and
+    // its newest brief (or a prepared seed), frozen per brief version.
+    resolve: externalSubjectResolver,
+  },
   store: createPostgresRehearsalStore(database.sql),
   material: {
     viewer: async (actor) => {
@@ -5859,6 +5888,20 @@ const liveBroker =
         providerCeiling: "PUBLIC",
         syntheticDemo: syntheticDemo?.permitted === true,
         logger,
+        // A rehearsal with a researched external person speaks on GPT-Live
+        // from its prepared persona; every other rehearsal is refused here.
+        rehearsalLine: {
+          prepare: async (actor, rehearsalId, hints) => {
+            const line = await rehearsals.externalLine(
+              actor,
+              rehearsalId,
+              hints,
+            );
+            return line === null ? null : { instructions: line.instructions };
+          },
+          record: rehearsals.recordLive,
+          latency: externalRehearsalLatency,
+        },
       })
     : undefined;
 logger.info(

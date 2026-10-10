@@ -31,6 +31,9 @@ export const Q_REHEARSAL_SCREEN_PATH =
 export const REHEARSAL_COUNTERPART_KINDS = [
   "INVESTOR_ORGANISATION",
   "COMPANY",
+  // A researched person outside Capital Q: no account, no relationship.
+  // Q plays a labelled simulation built from public sources only.
+  "EXTERNAL_PERSON",
 ] as const;
 export const RehearsalCounterpartKindSchema = z.enum(
   REHEARSAL_COUNTERPART_KINDS,
@@ -38,6 +41,12 @@ export const RehearsalCounterpartKindSchema = z.enum(
 export type RehearsalCounterpartKind = z.infer<
   typeof RehearsalCounterpartKindSchema
 >;
+
+/** Shown wherever a simulation of a researched external person appears. */
+export const EXTERNAL_REHEARSAL_LABEL =
+  "AI rehearsal informed by public sources";
+export const EXTERNAL_REHEARSAL_DISCLAIMER =
+  "This is an AI rehearsal informed by public sources. It is not the real person and does not predict what they would say.";
 
 const enc = encodeURIComponent;
 export const qInvestorRehearsalsPath = (investorOrganisationId: string) =>
@@ -202,6 +211,118 @@ export const REHEARSAL_DIMENSION_NAMES = [
   "PROFESSIONALISM",
 ] as const;
 
+/**
+ * Post-call evaluation of a rehearsal with a researched external person:
+ * the areas a real meeting tests, what was covered, what to improve, and
+ * the public sources it was informed by (the only ones ever cited).
+ */
+export const EXTERNAL_EVALUATION_AREA_NAMES = [
+  "PITCH_CLARITY",
+  "FINANCIALS",
+  "BUSINESS_MODEL",
+  "MARKET_KNOWLEDGE",
+  "DEFENSIBILITY",
+  "ANSWER_QUALITY",
+  "OBJECTION_HANDLING",
+] as const;
+export const ExternalEvaluationBasisSchema = z
+  .object({
+    label: z.string().max(100),
+    disclaimer: z.string().max(300),
+    sources: z
+      .array(
+        z
+          .object({
+            label: z.string().max(200),
+            url: z.string().url().max(2048),
+          })
+          .strict(),
+      )
+      .max(12),
+    areas: z
+      .array(
+        z
+          .object({
+            area: z.enum(EXTERNAL_EVALUATION_AREA_NAMES),
+            covered: z.boolean(),
+            rating: z.string().max(40).nullable(),
+            note: z.string().max(300),
+            youSaid: z.string().max(200).nullable(),
+          })
+          .strict(),
+      )
+      .max(7),
+    beforeTheRealMeeting: z.array(z.string().max(300)).max(8),
+    /** The rehearsal mode (which entity's directions were used). */
+    scenario: z.string().max(60).optional(),
+    /** This mode's own scoring focus: covered or not, with what they said. */
+    modeFocus: z
+      .array(
+        z
+          .object({
+            key: z.string().max(60),
+            label: z.string().max(100),
+            covered: z.boolean(),
+            youSaid: z.string().max(200).nullable(),
+          })
+          .strict(),
+      )
+      .max(8)
+      .optional(),
+  })
+  .strict();
+export type ExternalEvaluationBasisDto = z.infer<
+  typeof ExternalEvaluationBasisSchema
+>;
+
+/**
+ * How a researched external entity is labelled and shown on the rehearsal
+ * screen. `imageUrl` is only ever our own stored asset (portrait or logo
+ * permitted for use); absent, the screen shows a monogram. Quotes are
+ * public SOURCE quotes shown beside the rehearsal, never spoken by Q as
+ * the entity's words.
+ */
+export const ExternalSimulationDtoSchema = z
+  .object({
+    /** The chip: "Research-informed simulation". */
+    label: z.string().max(100),
+    /** "Research-informed simulation of X's public priorities" / "AI simulation: ... (not a real employee)". */
+    title: z.string().max(300).optional(),
+    disclaimer: z.string().max(400),
+    entityKind: z
+      .enum(["PERSON", "ORGANIZATION", "GOVERNMENT_AGENCY"])
+      .optional(),
+    imageUrl: z.string().url().max(2048).nullable().optional(),
+    imageAttribution: z.string().max(200).nullable().optional(),
+    headline: z.string().max(200).nullable().optional(),
+    description: z.string().max(240).nullable().optional(),
+    quotes: z
+      .array(
+        z
+          .object({
+            quote: z.string().max(300),
+            sourceLabel: z.string().max(200),
+            sourceUrl: z.string().url().max(2048),
+          })
+          .strict(),
+      )
+      .max(3)
+      .optional(),
+    sources: z
+      .array(
+        z
+          .object({
+            label: z.string().max(200),
+            url: z.string().url().max(2048),
+          })
+          .strict(),
+      )
+      .max(12)
+      .optional(),
+  })
+  .strict();
+export type ExternalSimulationDto = z.infer<typeof ExternalSimulationDtoSchema>;
+
 export const QRehearsalReviewDtoSchema = z
   .object({
     overall: z.string().max(600),
@@ -273,6 +394,8 @@ export const QRehearsalReviewDtoSchema = z
      * review; Q fills in the real one shortly. No ratings, no score.
      */
     provisional: z.boolean().optional(),
+    /** Only for a researched external person: see ExternalEvaluationBasisSchema. */
+    externalBasis: ExternalEvaluationBasisSchema.optional(),
   })
   .strict();
 export type QRehearsalReviewDto = z.infer<typeof QRehearsalReviewDtoSchema>;
@@ -341,6 +464,8 @@ export const QRehearsalPersonaDtoSchema = z
       )
       .max(8),
     sources: z.array(QPersonaSourceDtoSchema).max(24),
+    /** Present for a researched external entity: how to label and show it. */
+    simulation: ExternalSimulationDtoSchema.optional(),
     refreshedAt: UtcTimestampSchema,
   })
   .strict();
@@ -379,6 +504,8 @@ export const QRehearsalDtoSchema = z
       })
       .strict(),
     turns: z.array(QRehearsalTurnDtoSchema).max(160),
+    /** Present for a researched external entity: how to label and show it. */
+    simulation: ExternalSimulationDtoSchema.optional(),
     review: QRehearsalReviewDtoSchema.nullable(),
     createdAt: UtcTimestampSchema,
     endedAt: UtcTimestampSchema.nullable(),

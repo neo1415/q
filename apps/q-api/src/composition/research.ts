@@ -102,6 +102,8 @@ export type ResearchComposition = {
     readonly store: KnownEntityStore;
     readonly index: KnownEntityIndex;
   };
+  /** The asker's researched records and briefs (rehearsals resolve from them). */
+  readonly researched: ReturnType<typeof createPostgresResearchedEntityStore>;
 };
 
 export type ResearchCompositionDependencies = {
@@ -502,5 +504,7 @@ export function composeResearch(
     provider,
     people,
     knownEntities: { store: knownStore, index: knownIndex },
+    /** The asker's researched records and briefs (rehearsals resolve from them). */
+    researched,
   };
 }

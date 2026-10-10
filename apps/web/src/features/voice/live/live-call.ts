@@ -458,15 +458,40 @@ export async function startLiveCall(
   const kept: { role: "USER" | "Q"; text: string; at: number }[] = [];
   let keepTimer: ReturnType<typeof setTimeout> | null = null;
   let flushing: Promise<void> = Promise.resolve();
+  // Latency the line measured, reported once with the transcript: the
+  // played person's first audio, and each gap from the founder's last word
+  // to the reply. Numbers only.
+  let firstOutputMs: number | null = null;
+  let firstOutputSent = false;
+  let latenciesSent = 0;
+  const pendingTimings = () => {
+    const turnLatencyMs = stats.latenciesMs.slice(
+      latenciesSent,
+      latenciesSent + 24,
+    );
+    const firstAudioMs =
+      firstOutputMs !== null && !firstOutputSent ? firstOutputMs : undefined;
+    if (turnLatencyMs.length === 0 && firstAudioMs === undefined) return null;
+    latenciesSent += turnLatencyMs.length;
+    if (firstAudioMs !== undefined) firstOutputSent = true;
+    return {
+      ...(firstAudioMs === undefined ? {} : { firstAudioMs }),
+      ...(turnLatencyMs.length === 0 ? {} : { turnLatencyMs }),
+    };
+  };
   const flushTranscript = (): Promise<void> => {
     if (keepTimer !== null) clearTimeout(keepTimer);
     keepTimer = null;
     flushing = flushing.then(async () => {
       while (id !== null && kept.length > 0) {
         const segments = kept.splice(0, TRANSCRIPT_BATCH);
-        await post(doFetch, `transcript/${id}`, { segments }, token).catch(
-          () => undefined,
-        );
+        const timings = pendingTimings();
+        await post(
+          doFetch,
+          `transcript/${id}`,
+          { segments, ...(timings === null ? {} : { timings }) },
+          token,
+        ).catch(() => undefined);
       }
     });
     return flushing;
@@ -625,6 +650,7 @@ export async function startLiveCall(
         const delta = typeof event["delta"] === "string" ? event["delta"] : "";
         finishUtterance();
         lastSpeechAt = performance.now();
+        firstOutputMs ??= Math.round(ms);
         if (lastInputAt !== null) {
           stats = {
             ...stats,

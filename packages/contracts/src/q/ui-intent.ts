@@ -282,6 +282,10 @@ export const Q_RECORD_PAGES = [
   "INVESTOR_REHEARSAL",
   // REHEARSE: an investor's rehearsal with a company they are connected to.
   "COMPANY_REHEARSAL",
+  // A rehearsal with a researched external person, organisation or agency
+  // (the identity card's "Rehearse with them"); the id is its
+  // externalPersonId. No account or relationship is needed.
+  "EXTERNAL_REHEARSAL",
   // follow-55 (Zino, live 2026-10-04: "open the questions for…" opened the
   // Documents list): one of their own documents, by its artifact id, in
   // the shell's document viewer.

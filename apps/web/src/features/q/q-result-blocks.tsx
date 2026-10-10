@@ -217,7 +217,8 @@ function intentLabel(intent: QUiIntent): string {
             : intent.page === "INVESTOR"
               ? "Open the investor"
               : intent.page === "INVESTOR_REHEARSAL" ||
-                  intent.page === "COMPANY_REHEARSAL"
+                  intent.page === "COMPANY_REHEARSAL" ||
+                  intent.page === "EXTERNAL_REHEARSAL"
                 ? "Rehearse the meeting"
                 : intent.page.endsWith("_MESSAGES")
                   ? "Open the chat"
