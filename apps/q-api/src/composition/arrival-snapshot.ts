@@ -409,6 +409,9 @@ export function buildArrivalSnapshot(input: {
 
 // --- freshness -------------------------------------------------------------
 
+/** How long a probe is trusted without asking the database again. */
+export const DEFAULT_TRUST_MS = 30_000;
+
 export const ARRIVAL_SNAPSHOT_CACHE_KIND = "tierB.arrivalSnapshot";
 
 /**
@@ -499,7 +502,12 @@ export function createArrivalSnapshots(dependencies: {
   readonly trustMs?: number | undefined;
 }): ArrivalSnapshots {
   const now = dependencies.now ?? (() => new Date());
-  const trustMs = dependencies.trustMs ?? 15_000;
+  // 30 s: a Q turn takes longer than the old 15 s, so the snapshot read
+  // right after one cost a probe round trip (V2: 4 against 3). The actor
+  // is resolved live on every request (session and membership), so a
+  // revoked person never reaches this cache; only another party's new
+  // data waits up to this long, and the person's own writes end trust now.
+  const trustMs = dependencies.trustMs ?? DEFAULT_TRUST_MS;
   const cache =
     dependencies.cache ?? createContextCache<Held>({ ttlMs: 10 * 60_000 });
   /** The last probe per actor: its epoch and when it was taken. */

@@ -10,6 +10,7 @@ import { ActorContextSchema } from "@capital-q/security";
 import {
   buildArrivalSnapshot,
   createArrivalSnapshots,
+  DEFAULT_TRUST_MS,
 } from "../src/composition/arrival-snapshot.js";
 import { arrivalLines, liveContextPackage } from "../src/voice/live/context.js";
 import {
@@ -178,7 +179,7 @@ describe("createArrivalSnapshots freshness", () => {
     const state = { epoch: "a".repeat(32), stamp: "s1", sequence: 7 };
     const snapshots = createArrivalSnapshots({
       now: () => new Date(clock),
-      trustMs: options?.trustMs ?? 15_000,
+      trustMs: options?.trustMs ?? DEFAULT_TRUST_MS,
       attention: () => {
         counts.attention += 1;
         return Promise.resolve(tensorGateReport());
@@ -215,7 +216,7 @@ describe("createArrivalSnapshots freshness", () => {
   it("past the trust window asks the probe once; unchanged data is not rebuilt", async () => {
     const s = scene();
     const first = await s.snapshots.forActor(ACTOR);
-    s.advance(20_000);
+    s.advance(DEFAULT_TRUST_MS + 5_000);
     expect(await s.snapshots.forActor(ACTOR)).toBe(first);
     expect(s.counts).toEqual({ probe: 2, attention: 1, briefs: 1 });
   });
@@ -246,6 +247,18 @@ describe("createArrivalSnapshots freshness", () => {
     await s.snapshots.forActor(ACTOR);
     expect(s.counts.probe).toBe(2);
     expect(s.counts.attention).toBe(2);
+  });
+
+  it("a read right after a Q turn (25 s later) sends no query; past 30 s exactly one probe", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR); // the turn's own read
+    s.advance(25_000); // the turn ran; a Q turn never invalidates
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.probe).toBe(1);
+    s.advance(10_000);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.probe).toBe(2);
+    expect(s.counts.attention).toBe(1);
   });
 
   it("is never built for a non-human actor", async () => {

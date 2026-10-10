@@ -19,6 +19,8 @@ import type {
  * cost nothing.
  */
 export function pointsAtArrival(text: string): boolean {
+  // A mandate recall is about the declared mandate, never an arrival item.
+  if (/\bmandate\b/iu.test(text)) return false;
   if (
     /\b(?:they|them|their|he|she|it|that|this|dem|wetin|abeg|request|ask|meeting|call|time|slot|message|reply|replied|word|back|agree[ds]?|accept(?:ed)?|confirm(?:ed)?|offer|next)\b/iu.test(
       text,
@@ -26,7 +28,9 @@ export function pointsAtArrival(text: string): boolean {
   ) {
     return true;
   }
-  return /\s[A-Z][A-Za-z]{2,}/u.test(text);
+  // A capital that merely starts a later sentence ("? Remind me") is not a
+  // proper noun.
+  return /[^\s.?!]\s+[A-Z][A-Za-z]{2,}/u.test(text);
 }
 
 export type ArrivalFollowUp = "REQUEST" | "SAID" | "ACCEPTED" | "OPEN";
@@ -123,6 +127,61 @@ export function mergeCounterpartItems(
   };
 }
 
+/** Capitalised words that start a question, never a counterparty's name. */
+const NOT_A_NAME = new Set([
+  "a",
+  "and",
+  "are",
+  "but",
+  "can",
+  "could",
+  "did",
+  "do",
+  "does",
+  "has",
+  "have",
+  "hey",
+  "hi",
+  "how",
+  "i",
+  "is",
+  "it",
+  "ok",
+  "okay",
+  "please",
+  "q",
+  "so",
+  "that",
+  "the",
+  "their",
+  "them",
+  "then",
+  "they",
+  "this",
+  "was",
+  "what",
+  "whats",
+  "when",
+  "where",
+  "who",
+  "why",
+  "will",
+  "would",
+  "yes",
+  "no",
+  "abeg",
+  "wetin",
+]);
+
+/** A proper name in the turn (a capitalised word that is not a question word). */
+function namesSomeoneElse(text: string): boolean {
+  for (const match of text.matchAll(/\b[A-Z][\p{L}'’-]{2,}/gu)) {
+    const word = match[0].toLowerCase().replace(/['’]s?$/u, "");
+    if (!NOT_A_NAME.has(word)) return true;
+  }
+  return false;
+}
+
 type Target =
   | { readonly kind: "ONE"; readonly item: ArrivalSnapshotItem }
   | { readonly kind: "AMBIGUOUS"; readonly names: readonly string[] }
@@ -135,6 +194,11 @@ function target(text: string, snapshot: ArrivalSnapshot): Target {
     const name = group[0]?.counterpart?.name?.toLowerCase();
     return name !== undefined && name.length > 1 && lower.includes(name);
   });
+  // A turn that names someone the snapshot does not hold ("Ledgerfold: did
+  // they accept the meeting?" while Q's arrival spoke of TensorGate) is
+  // about them, not about whoever Q mentioned: the normal path reads
+  // their own brief (R1, int-rc 05e1265f journey A2).
+  if (named.length === 0 && namesSomeoneElse(text)) return { kind: "NONE" };
   const pool = named.length > 0 ? named : groups;
   if (pool.length === 1) {
     return { kind: "ONE", item: mergeCounterpartItems(pool[0] ?? []) };
@@ -153,6 +217,24 @@ const when = (iso: string | null): string =>
     ? "an unknown time"
     : `${iso.slice(0, 16).replace("T", " ")} UTC`;
 
+/**
+ * What an arrival follow-up answers with. `open` is a page the answer
+ * actually moves the person to (an OPEN_RECORD_PAGE intent, confirmed by
+ * the browser's receipt), never only claimed in words.
+ */
+export type ArrivalReply = {
+  readonly text: string;
+  readonly itemKey: string;
+  readonly open?: {
+    readonly page:
+      | "RELATIONSHIP_COMPANY"
+      | "RELATIONSHIP_INVESTOR"
+      | "RELATIONSHIP_COMPANY_MESSAGES"
+      | "RELATIONSHIP_INVESTOR_MESSAGES";
+    readonly id: string;
+  };
+};
+
 export type ArrivalAspect =
   "REQUEST" | "THEIR_MESSAGE" | "MEETING" | "NEXT_STEP";
 
@@ -164,7 +246,7 @@ export function arrivalAspectAnswer(
   snapshot: ArrivalSnapshot | null,
   itemKey: string,
   aspect: ArrivalAspect,
-): { readonly text: string; readonly itemKey: string } | null {
+): ArrivalReply | null {
   const picked = snapshot?.items.find((one) => one.key === itemKey);
   if (
     snapshot === null ||
@@ -213,7 +295,7 @@ function unavailable(item: ArrivalSnapshotItem) {
 export function arrivalFollowUpAnswer(
   text: string,
   snapshot: ArrivalSnapshot | null,
-): { readonly text: string; readonly itemKey: string } | null {
+): ArrivalReply | null {
   if (snapshot === null) return null;
   const kind = arrivalFollowUpKind(text);
   if (kind === null) return null;
@@ -232,18 +314,36 @@ export function arrivalFollowUpAnswer(
 function answerFor(
   kind: ArrivalFollowUp,
   item: ArrivalSnapshotItem,
-): { readonly text: string; readonly itemKey: string } | null {
+): ArrivalReply | null {
   const name = item.counterpart?.name ?? "They";
   const f = item.facts;
   if (item.availability === "UNAVAILABLE") return unavailable(item);
   switch (kind) {
     case "OPEN": {
-      // With a thread, the page route opens it (not answered here). Without
-      // one the messages page would show the overview: say so instead.
-      if (item.hasConversation) return null;
+      const who = item.counterpart;
+      if (who === null) return null;
+      const investor = who.kind === "INVESTOR_ORGANISATION";
+      // With a thread the chat opens. Without one the messages page would
+      // show the overview: say so, and open the relationship instead.
+      if (item.hasConversation) {
+        return {
+          itemKey: item.key,
+          text: `Opening your conversation with ${name}.`,
+          open: {
+            page: investor
+              ? "RELATIONSHIP_INVESTOR_MESSAGES"
+              : "RELATIONSHIP_COMPANY_MESSAGES",
+            id: who.id,
+          },
+        };
+      }
       return {
         itemKey: item.key,
-        text: `There's no conversation with ${name} yet: you're not connected, so there is no chat to open. I can open your relationship with ${name} instead.`,
+        text: `There's no conversation with ${name} yet: you're not connected, so there is no chat to open. Opening your relationship with ${name} instead.`,
+        open: {
+          page: investor ? "RELATIONSHIP_INVESTOR" : "RELATIONSHIP_COMPANY",
+          id: who.id,
+        },
       };
     }
     case "REQUEST": {

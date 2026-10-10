@@ -164,6 +164,7 @@ import {
   arrivalFollowUpAnswer,
   arrivalFollowUpKind,
   pointsAtArrival,
+  type ArrivalReply,
 } from "./arrival-answer.js";
 import type { QTurnSkimmer } from "./turn-skim.js";
 export { arrivalSnapshotFact };
@@ -1966,6 +1967,85 @@ export function createModelGatewayQAnswer(
       work.finally(() => {
         prepareMs[name] = Date.now() - prepareStarted;
       });
+    let arrival: AuthorisedFact | null = null;
+    let arrivalData: ArrivalSnapshot | null = null;
+    let arrivalLoaded: Promise<void> | undefined;
+    /** Read once per turn, from the wide reads or from a follow-up's own path. */
+    const arrivalRead = (): Promise<void> => {
+      arrivalLoaded ??= (async (): Promise<void> => {
+        if (
+          dependencies.arrivalSnapshot === undefined ||
+          request.writingDocument === true
+        ) {
+          return;
+        }
+        arrivalData = await dependencies
+          .arrivalSnapshot(request.actor)
+          .catch(() => null);
+        arrival = arrivalSnapshotFact(arrivalData);
+      })();
+      return arrivalLoaded;
+    };
+    /**
+     * W1: a follow-up on what Q told them on arrival is decided HERE, before
+     * any tool read is started: when the snapshot answers it, the reads
+     * below are skipped altogether (V2: six tool reads per A3 follow-up).
+     * Started now so it overlaps the context assembly. The quick patterns
+     * answer from the snapshot; unusual words are read by TURN_SKIM.
+     */
+    const decideArrival = async (): Promise<ArrivalReply | null> => {
+      const eligible =
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined ||
+          request.turnKind === "QUESTION_TO_Q");
+      if (!eligible || dependencies.arrivalSnapshot === undefined) return null;
+      const quick = arrivalFollowUpKind(latest.content) !== null;
+      const maybe =
+        !quick &&
+        dependencies.arrivalSkim !== undefined &&
+        pointsAtArrival(latest.content);
+      if (!quick && !maybe) return null;
+      await arrivalRead();
+      const snapshot = arrivalData;
+      if (snapshot === null) return null;
+      if (quick) return arrivalFollowUpAnswer(latest.content, snapshot);
+      const named = snapshot.items.filter((item) => item.counterpart !== null);
+      if (named.length === 0 || dependencies.arrivalSkim === undefined) {
+        return null;
+      }
+      const skim = await dependencies.arrivalSkim
+        .skim({
+          utterance: latest.content,
+          recentTurns: [],
+          arrivalItems: named.map((item) => ({
+            key: item.key,
+            counterpart: item.counterpart?.name ?? null,
+            headline: item.headline,
+          })),
+          attribution: {
+            tenantId: request.tenantId,
+            userId: request.actorUserId,
+            qRunId: request.runId,
+            correlationId: request.correlationId,
+          },
+        })
+        .catch(() => null);
+      if (
+        skim !== null &&
+        skim.kind === "ARRIVAL_FOLLOWUP" &&
+        skim.confidence === "HIGH" &&
+        skim.arrival != null
+      ) {
+        return arrivalAspectAnswer(
+          snapshot,
+          skim.arrival.item,
+          skim.arrival.aspect,
+        );
+      }
+      return null;
+    };
+    const arrivalDecision = decideArrival().catch(() => null);
     const [assembled, profile, offeredForRun, availableForRun, memory] =
       await Promise.all([
         timed("assemble", context.assemble(request)),
@@ -1981,8 +2061,15 @@ export function createModelGatewayQAnswer(
       ]);
     // The prefetch below reads only tools the run may use; the research
     // filter decided later never touches them.
+    const arrivalAnswer = await arrivalDecision;
+    // An arrival follow-up the snapshot answers reads nothing else: no
+    // prefetch tool is run for it.
     const prefetchTools = new Set(
-      (availableForRun ?? offeredForRun).map((tool) => tool.definition.name),
+      arrivalAnswer !== null
+        ? []
+        : (availableForRun ?? offeredForRun).map(
+            (tool) => tool.definition.name,
+          ),
     );
 
     /**
@@ -2119,25 +2206,6 @@ export function createModelGatewayQAnswer(
       if (own === null) return;
       ownCompany = ownCompanySnapshotFact(own, plan);
     })();
-    let arrival: AuthorisedFact | null = null;
-    let arrivalData: ArrivalSnapshot | null = null;
-    let arrivalLoaded: Promise<void> | undefined;
-    /** Read once per turn, from the wide reads or from a follow-up's own path. */
-    const arrivalRead = (): Promise<void> => {
-      arrivalLoaded ??= (async (): Promise<void> => {
-        if (
-          dependencies.arrivalSnapshot === undefined ||
-          request.writingDocument === true
-        ) {
-          return;
-        }
-        arrivalData = await dependencies
-          .arrivalSnapshot(request.actor)
-          .catch(() => null);
-        arrival = arrivalSnapshotFact(arrivalData);
-      })();
-      return arrivalLoaded;
-    };
     const mandateRead = (async (): Promise<void> => {
       if (ownInvestor !== null && prefetchTools.has("get_investor_mandate")) {
         const call = {
@@ -2635,6 +2703,7 @@ export function createModelGatewayQAnswer(
       onScreenPage,
       onScreenPageCalls,
       arrival,
+      arrivalAnswer,
       arrivalSnapshotOnce: async (): Promise<ArrivalSnapshot | null> => {
         await arrivalRead();
         return arrivalData;
@@ -3588,88 +3657,41 @@ export function createModelGatewayQAnswer(
       // request?", "what did they say?", "did they accept?") is answered
       // from the Arrival Snapshot by code: no tool, no model round. Read on
       // its own, so S2's route gating of the wide reads cannot skip it.
-      const arrivalEligible =
-        request.writingDocument !== true &&
-        request.askedAction === undefined &&
-        (request.turnKind === undefined ||
-          request.turnKind === "QUESTION_TO_Q");
-      const quick =
-        arrivalEligible && arrivalFollowUpKind(latest.content) !== null;
-      // Unusual words: only when the turn plausibly points at an arrival
-      // item does TURN_SKIM read it (a cheap gate; most turns skip this).
-      const maybeArrival =
-        arrivalEligible &&
-        !quick &&
-        dependencies.arrivalSkim !== undefined &&
-        dependencies.arrivalSnapshot !== undefined &&
-        pointsAtArrival(latest.content);
-      if (quick || maybeArrival) {
-        const snapshot = await prepared.arrivalSnapshotOnce();
-        let followUp = quick
-          ? arrivalFollowUpAnswer(latest.content, snapshot)
-          : null;
-        const named = (snapshot?.items ?? []).filter(
-          (item) => item.counterpart !== null,
+      const followUp = prepared.arrivalAnswer;
+      if (followUp !== null) {
+        const message = await persistAnswer(
+          request.leadLines === undefined
+            ? followUp.text
+            : `${request.leadLines}\n\n${followUp.text}`,
+          followUp.open === undefined
+            ? undefined
+            : [
+                {
+                  kind: "UI_INTENT",
+                  intent: {
+                    kind: "OPEN_RECORD_PAGE",
+                    page: followUp.open.page,
+                    id: followUp.open.id,
+                  },
+                },
+              ],
         );
-        if (
-          !quick &&
-          snapshot !== null &&
-          named.length > 0 &&
-          dependencies.arrivalSkim !== undefined
-        ) {
-          const skim = await dependencies.arrivalSkim
-            .skim({
-              utterance: latest.content,
-              recentTurns: [],
-              arrivalItems: named.map((item) => ({
-                key: item.key,
-                counterpart: item.counterpart?.name ?? null,
-                headline: item.headline,
-              })),
-              attribution: {
-                tenantId: request.tenantId,
-                userId: request.actorUserId,
-                qRunId: request.runId,
-                correlationId: request.correlationId,
-              },
-            })
-            .catch(() => null);
-          if (
-            skim !== null &&
-            skim.kind === "ARRIVAL_FOLLOWUP" &&
-            skim.confidence === "HIGH" &&
-            skim.arrival != null
-          ) {
-            followUp = arrivalAspectAnswer(
-              snapshot,
-              skim.arrival.item,
-              skim.arrival.aspect,
-            );
-          }
-        }
-        if (followUp !== null) {
-          const message = await persistAnswer(
-            request.leadLines === undefined
-              ? followUp.text
-              : `${request.leadLines}\n\n${followUp.text}`,
-          );
-          logger?.info(
-            {
-              qRunId: request.runId,
-              itemKey: followUp.itemKey,
-              modelCalls: 0,
-              toolCalls: 0,
-              totalMs: Date.now() - startedAt,
-            },
-            "q answered an arrival follow-up from the arrival snapshot",
-          );
-          return {
-            kind: "ANSWERED",
-            messageId: message.id,
-            modelPolicyVersion: "none",
-            promptBundleVersion: rendered.bundle.bundleVersion,
-          };
-        }
+        logger?.info(
+          {
+            qRunId: request.runId,
+            itemKey: followUp.itemKey,
+            modelCalls: 0,
+            toolCalls: 0,
+            totalMs: Date.now() - startedAt,
+          },
+          "q answered an arrival follow-up from the arrival snapshot",
+        );
+        return {
+          kind: "ANSWERED",
+          messageId: message.id,
+          modelPolicyVersion: "none",
+          promptBundleVersion: rendered.bundle.bundleVersion,
+        };
       }
       // W2: a named person, company or body is identified from public
       // sources by code (a prepared entity instantly, anyone else in a few

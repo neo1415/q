@@ -178,17 +178,28 @@ test("A2 'did they accept the meeting?': the tool says SCHEDULED at the DB's tim
   const mark = await vendorMark();
   await page.goto("/home");
   const shown = await ask(page, `${company.name}: ${words}?`);
-  const read = await inputAfterSince(mark, "a-accept-answer");
-  expect(read.length, "get_relationship answered").toBeGreaterThan(0);
-  expect
-    .soft(read)
-    .toContain(
-      `A call is booked (scheduled) for ${factTime(meeting.startsAt)}.`,
-    );
-  expect.soft(read).not.toContain(`No call has been booked`);
+  // W1 (int-rc): when Q's arrival on Home spoke of this counterparty, the
+  // follow-up is answered by code from the Arrival Snapshot -- built from
+  // the same Relationship Brief -- with no tool round. Otherwise
+  // get_relationship answers. Either way the brief's booked call must
+  // reach the answer, about this counterparty, and never "no call".
+  await expect(
+    shown,
+    "the brief's booked call reached the answer",
+  ).toContainText(factTime(meeting.startsAt));
+  await expect.soft(shown).toContainText(company.name);
+  await expect.soft(shown).not.toContainText("No call is booked");
+  const read = await inputAfterSince(mark, "a-accept-answer", 5_000);
+  if (read.length > 0) {
+    expect
+      .soft(read, "get_relationship: the booked call")
+      .toContain(
+        `A call is booked (scheduled) for ${factTime(meeting.startsAt)}.`,
+      );
+    expect.soft(read).not.toContain(`No call has been booked`);
+  }
   const db = nextScheduledMeeting(relationship);
   expect.soft(db?.status).toBe("SCHEDULED");
-  await expect.soft(shown).toContainText(factTime(meeting.startsAt));
 });
 
 test("A3 Q opens the conversation: the browser lands on the chat and shows the brief's count", async () => {
