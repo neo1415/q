@@ -246,6 +246,44 @@ describe("runPersonSearch", () => {
     });
   });
 
+  it("C2: an ambiguous name between prepared entities offers a rehearsal on each card", async () => {
+    const prepared = (name: string, id: string) => ({
+      externalPersonId: id,
+      displayName: name,
+      profileUrl: null,
+      role: null,
+      organization: null,
+      location: "Qatar",
+      confidence: "STRONG" as const,
+    });
+    const answer = await runPersonSearch({
+      ask: { ...ASK, name: "Al Rayan" },
+      tools: port({
+        outcome: "AMBIGUOUS",
+        card: null,
+        elapsedMs: 1,
+        clarifyingQuestion: "Which one do you mean?",
+        candidates: [
+          prepared(
+            "AlRayan Investment LLC",
+            "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+          ),
+          prepared("Al Rayan Bank", "6c1a7e9f-5a7f-5b4c-9d2e-3f4a5b6c7d8e"),
+        ],
+      }),
+      context,
+      available,
+    });
+    expect(answer?.block?.cards.map((c) => c.external?.rehearse)).toEqual([
+      true,
+      true,
+    ]);
+    expect(answer?.block?.cards[0]?.external?.externalPersonId).toBe(
+      "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+    );
+    expect(new Set(answer?.block?.cards.map((c) => c.key)).size).toBe(2);
+  });
+
   it("W4: a match with other possible people shows them as cards too", async () => {
     const withOthers: PersonSearchResult = {
       ...MATCHED,

@@ -181,39 +181,53 @@ function candidateCards(
   candidates: readonly IdentityCandidate[],
   firstHue: number,
 ) {
-  return candidates.slice(0, 4).map((c, at) => ({
-    key: `candidate-${String(at + 1)}-${(c.profileUrl ?? c.displayName).slice(-40)}`.slice(
-      0,
-      64,
-    ),
-    name: c.displayName.slice(0, 80),
-    line: joinLine([c.role, c.organization, c.location]),
-    about: c.profileUrl === null ? null : c.profileUrl.slice(0, 160),
-    hue: ((firstHue - 1 + at) % 7) + 1,
-    fit: null,
-    reasons: [CONFIDENCE_WORDS[c.confidence]],
-    measures: [],
-    view: null,
-    said: null,
-    sourceCount: c.profileUrl === null ? 0 : 1,
-    subject: null,
-    ...(c.profileUrl !== null && c.profileUrl.startsWith("https://")
-      ? {
-          external: {
-            // Not yet a researched record: only its public page to open.
-            externalPersonId: null,
-            profileUrl: c.profileUrl,
-            rehearse: false,
-            sources: [
-              {
-                label: (c.displayName + " - public profile").slice(0, 120),
-                url: c.profileUrl,
-              },
-            ],
-          },
-        }
-      : {}),
-  }));
+  return candidates.slice(0, 4).map((c, at) => {
+    const stored = c.externalPersonId ?? null;
+    const https =
+      c.profileUrl !== null && c.profileUrl.startsWith("https://")
+        ? c.profileUrl
+        : null;
+    return {
+      key: (
+        stored ??
+        `candidate-${String(at + 1)}-${(c.profileUrl ?? c.displayName).slice(-40)}`
+      ).slice(0, 64),
+      name: c.displayName.slice(0, 80),
+      line: joinLine([c.role, c.organization, c.location]),
+      about: c.profileUrl === null ? null : c.profileUrl.slice(0, 160),
+      hue: ((firstHue - 1 + at) % 7) + 1,
+      fit: null,
+      reasons: [CONFIDENCE_WORDS[c.confidence]],
+      measures: [],
+      view: null,
+      said: null,
+      sourceCount: c.profileUrl === null ? 0 : 1,
+      subject: null,
+      ...(stored !== null || https !== null
+        ? {
+            external: {
+              // A stored record can be rehearsed (C2); a web-only lead can
+              // only open its public page until it is researched.
+              externalPersonId: stored,
+              profileUrl: https,
+              rehearse: stored !== null,
+              sources:
+                https === null
+                  ? []
+                  : [
+                      {
+                        label: (c.displayName + " - public profile").slice(
+                          0,
+                          120,
+                        ),
+                        url: https,
+                      },
+                    ],
+            },
+          }
+        : {}),
+    };
+  });
 }
 
 function candidatesBlock(

@@ -146,6 +146,7 @@ export function createPersonLookup(dependencies: {
               outcome: "AMBIGUOUS",
               card: null,
               candidates: found.records.map((record) => ({
+                externalPersonId: record.externalPersonId,
                 displayName: record.displayName,
                 profileUrl: record.profileUrl,
                 role: record.role,

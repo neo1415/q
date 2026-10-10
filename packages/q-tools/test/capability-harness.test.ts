@@ -83,6 +83,7 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     fit: port(),
     research: port(),
     people: port(),
+    counterparts: port(),
     profiles: port(),
     relationships: port(),
     email: port(),

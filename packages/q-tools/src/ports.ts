@@ -37,6 +37,7 @@ import type {
   PublicProfileLookupProvider,
   PublicWebResearchService,
   PersonLookup,
+  CounterpartDiscoverer,
 } from "@capital-q/q-research";
 import type { ActorContext, AuthorizationService } from "@capital-q/security";
 
@@ -500,6 +501,8 @@ export type QToolPorts = {
   readonly research?: PublicWebResearchService | undefined;
   /** W2: fast identity lookup of a named person or organisation; absent means no such tool. */
   readonly people?: PersonLookup | undefined;
+  /** D1: investors by meaning (known entities, then a bounded web search); absent means no such tool. */
+  readonly counterparts?: CounterpartDiscoverer | undefined;
   /**
    * W4: whether the asker may rehearse with this researched entity (their
    * own researched record, or a prepared public seed). Absent means the
