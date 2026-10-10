@@ -66,7 +66,8 @@ async function world() {
   const tools: Pick<QToolPort, "execute"> = {
     execute: async (call) => {
       const input = DiscoverCounterpartsInputSchema.parse(call.arguments);
-      const data = await tool.execute(input, context);
+      // Authorisation is covered in q-tools; this exercises the answer.
+      const data = await tool.execute(input, context, undefined);
       return {
         callId: call.callId,
         status: "SUCCEEDED",

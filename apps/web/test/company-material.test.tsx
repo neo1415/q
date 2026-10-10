@@ -60,6 +60,7 @@ vi.mock("../src/features/company/material/material-actions", () => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => undefined, push: () => undefined }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const { InvestorDataRoom, OwnerDataRoom } =
