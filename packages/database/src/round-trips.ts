@@ -164,7 +164,9 @@ function callSite(raw?: string): string {
   const via = (raw ?? "")
     .split("\n")
     .map((frame) =>
-      /(?:model-gateway\/(?:dist|src)\/q\/index|q-specialists\/(?:dist|src)\/answer|q-orchestrator\/(?:dist|src)\/graph)\.[jt]s:(\d+):/.exec(frame),
+      /(?:model-gateway\/(?:dist|src)\/q\/index|q-specialists\/(?:dist|src)\/answer|q-orchestrator\/(?:dist|src)\/graph)\.[jt]s:(\d+):/.exec(
+        frame,
+      ),
     )
     .flatMap((m) => (m === null ? [] : [m[1] ?? ""]))
     .slice(0, 4);

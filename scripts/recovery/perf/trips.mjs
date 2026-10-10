@@ -17,7 +17,8 @@ import { resolve } from "node:path";
 
 const root = resolve(new URL("../../..", import.meta.url).pathname);
 const runDir =
-  process.env.CQ_RECOVERY_RUN_DIR ?? resolve(root, ".playwright/recovery-stack");
+  process.env.CQ_RECOVERY_RUN_DIR ??
+  resolve(root, ".playwright/recovery-stack");
 const env = Object.fromEntries(
   readFileSync(resolve(runDir, "stack.env"), "utf8")
     .split("\n")
@@ -30,7 +31,10 @@ let extraBody = {};
 let rules = [];
 if (argv[0] === "--scenario") {
   const scenarios = JSON.parse(
-    readFileSync(resolve(root, "scripts/recovery/perf/trips-scenarios.json"), "utf8"),
+    readFileSync(
+      resolve(root, "scripts/recovery/perf/trips-scenarios.json"),
+      "utf8",
+    ),
   ).scenarios;
   const one = scenarios[argv[1]];
   if (one === undefined) throw new Error(`no scenario ${argv[1]}`);
@@ -87,7 +91,9 @@ for (let i = 0; i < repeat; i += 1) {
   });
   const body = await created.json();
   if (created.status !== 202 && created.status !== 200)
-    throw new Error(`refused ${created.status} ${JSON.stringify(body).slice(0, 200)}`);
+    throw new Error(
+      `refused ${created.status} ${JSON.stringify(body).slice(0, 200)}`,
+    );
   conversationId = body.conversationId;
   let status = "";
   for (let n = 0; n < 240; n += 1) {
@@ -97,13 +103,18 @@ for (let i = 0; i < repeat; i += 1) {
       })
     ).json();
     status = r.status;
-    if (["COMPLETED", "FAILED", "CANCELLED", "AWAITING_APPROVAL"].includes(status)) break;
+    if (
+      ["COMPLETED", "FAILED", "CANCELLED", "AWAITING_APPROVAL"].includes(status)
+    )
+      break;
     await new Promise((r2) => setTimeout(r2, 250));
   }
   await new Promise((r2) => setTimeout(r2, 600));
   const log = readFileSync(resolve(runDir, "q-api.log"), "utf8").split("\n");
   const line = log
-    .filter((l) => l.includes(body.runId) && l.includes("q orchestration returned"))
+    .filter(
+      (l) => l.includes(body.runId) && l.includes("q orchestration returned"),
+    )
     .pop();
   const o = line === undefined ? {} : JSON.parse(line);
   console.log(

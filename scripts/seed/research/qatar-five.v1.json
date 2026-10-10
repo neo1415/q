@@ -215,19 +215,13 @@
       "name": "Shadi Qishta",
       "entity_kind": "PERSON",
       "primary_linkedin": "https://www.linkedin.com/in/shadi-qishta-282453a/",
-      "aliases": [
-        "Shadi Qishta",
-        "Shadi Qishta Doha",
-        "Shadi Qishta Midmac"
-      ],
+      "aliases": ["Shadi Qishta", "Shadi Qishta Doha", "Shadi Qishta Midmac"],
       "associated_organization": null,
       "identity_confidence": "verified public identity",
       "facts": [
         {
           "claim": "Finance/business ventures executive with a public professional profile associated with Doha.",
-          "source_ids": [
-            "S01"
-          ],
+          "source_ids": ["S01"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -239,9 +233,7 @@
         },
         {
           "claim": "a CEO, Business Ventures role at Midmac was mentioned in recent public reports; the current employer and title aren't confirmed.",
-          "source_ids": [
-            "S06"
-          ],
+          "source_ids": ["S06"],
           "evidence_class": "third-party public report, verify current role",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -254,9 +246,7 @@
         },
         {
           "claim": "Publicly discusses IFRS adoption, financial transparency and investor confidence.",
-          "source_ids": [
-            "S02"
-          ],
+          "source_ids": ["S02"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -268,9 +258,7 @@
         },
         {
           "claim": "Publicly emphasizes consumer purchasing power as a real-world business indicator.",
-          "source_ids": [
-            "S03"
-          ],
+          "source_ids": ["S03"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -282,9 +270,7 @@
         },
         {
           "claim": "Has publicly discussed AI in telecom network operations and collaborations.",
-          "source_ids": [
-            "S04"
-          ],
+          "source_ids": ["S04"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -296,9 +282,7 @@
         },
         {
           "claim": "Has publicly highlighted Snoonu and Qatar ecommerce/logistics innovation.",
-          "source_ids": [
-            "S05"
-          ],
+          "source_ids": ["S05"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -361,21 +345,13 @@
       "name": "QInvest LLC",
       "entity_kind": "ORGANIZATION",
       "primary_linkedin": "https://www.linkedin.com/company/qinvest-llc/",
-      "aliases": [
-        "QInvest",
-        "QInvest LLC",
-        "QINVEST",
-        "Q Invest"
-      ],
+      "aliases": ["QInvest", "QInvest LLC", "QINVEST", "Q Invest"],
       "associated_organization": "QInvest LLC",
       "identity_confidence": "verified public identity",
       "facts": [
         {
           "claim": "Qatar-based Islamic investment group with investment banking, principal investments and asset management operations.",
-          "source_ids": [
-            "S07",
-            "S10"
-          ],
+          "source_ids": ["S07", "S10"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -387,9 +363,7 @@
         },
         {
           "claim": "Its credit strategy discusses capital preservation, structured and mezzanine transactions and risk-return assessment.",
-          "source_ids": [
-            "S08"
-          ],
+          "source_ids": ["S08"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -401,9 +375,7 @@
         },
         {
           "claim": "QInvest announced a USD 275 million sustainability-linked financing facility in March 2025.",
-          "source_ids": [
-            "S09"
-          ],
+          "source_ids": ["S09"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -415,9 +387,7 @@
         },
         {
           "claim": "QInvest has publicly described operational changes focused on Epicure Islamic Investment Management.",
-          "source_ids": [
-            "S11"
-          ],
+          "source_ids": ["S11"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -476,10 +446,7 @@
       "facts": [
         {
           "claim": "Director of Investments at Alchemist Doha, stated by Alchemist official team and Doha pages.",
-          "source_ids": [
-            "S12",
-            "S13"
-          ],
+          "source_ids": ["S12", "S13"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -491,9 +458,7 @@
         },
         {
           "claim": "Alchemist Doha helps technology startups in Qatar and emerging markets access investors and scale.",
-          "source_ids": [
-            "S12"
-          ],
+          "source_ids": ["S12"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -505,9 +470,7 @@
         },
         {
           "claim": "His public writing emphasizes founder commitment to a single venture rather than simultaneously pitching multiple ideas.",
-          "source_ids": [
-            "S15"
-          ],
+          "source_ids": ["S15"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "PUBLICLY_REPORTED_UNCONFIRMED",
@@ -519,10 +482,7 @@
         },
         {
           "claim": "His published investor discussions advocate 30-day execution sprints, shipping continuously, customer focus and disciplined cash runway.",
-          "source_ids": [
-            "S14",
-            "S16"
-          ],
+          "source_ids": ["S14", "S16"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -534,9 +494,7 @@
         },
         {
           "claim": "TASMU describes him as a serial founder/mentor and angel investor.",
-          "source_ids": [
-            "S17"
-          ],
+          "source_ids": ["S17"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -612,10 +570,7 @@
       "facts": [
         {
           "claim": "Government investment-promotion agency founded in 2019; facilitates foreign investment and Qatar market entry.",
-          "source_ids": [
-            "S18",
-            "S22"
-          ],
+          "source_ids": ["S18", "S22"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -627,9 +582,7 @@
         },
         {
           "claim": "Invest Qatar Gateway introduced a VC Funding Module with Qatar Investment Authority to connect startups and participating funds.",
-          "source_ids": [
-            "S19"
-          ],
+          "source_ids": ["S19"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -641,9 +594,7 @@
         },
         {
           "claim": "Invest Qatar announced a 2026 technology partnership involving Aurion Capital and LG NOVA.",
-          "source_ids": [
-            "S20"
-          ],
+          "source_ids": ["S20"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -655,9 +606,7 @@
         },
         {
           "claim": "Its published technology-sector material covers fintech, startup Qatar, AI and digital infrastructure.",
-          "source_ids": [
-            "S21"
-          ],
+          "source_ids": ["S21"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -723,10 +672,7 @@
       "facts": [
         {
           "claim": "AlRayan Investment is a Qatar investment and advisory firm established in 2007, wholly owned by AlRayan Bank.",
-          "source_ids": [
-            "S23",
-            "S26"
-          ],
+          "source_ids": ["S23", "S26"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -738,10 +684,7 @@
         },
         {
           "claim": "Core offerings include equities, sukuk, asset management, M&A and capital markets advisory.",
-          "source_ids": [
-            "S23",
-            "S24"
-          ],
+          "source_ids": ["S23", "S24"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -753,9 +696,7 @@
         },
         {
           "claim": "Publicly described asset management includes customized Sharia-compliant strategies and GCC market exposure.",
-          "source_ids": [
-            "S25"
-          ],
+          "source_ids": ["S25"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
@@ -767,9 +708,7 @@
         },
         {
           "claim": "Official website publishes leadership and team roles; use the currently verified person only when explicitly selected.",
-          "source_ids": [
-            "S27"
-          ],
+          "source_ids": ["S27"],
           "evidence_class": "publicly documented",
           "verification": {
             "status": "VERIFIED",
