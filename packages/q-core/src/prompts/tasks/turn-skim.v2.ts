@@ -41,26 +41,28 @@ WHAT THEY JUST SAID
 
 Respond with a single JSON object matching the TurnSkimResult schema.`;
 
-export const TURN_SKIM_V2: PromptDefinition<TurnSkimVariables, TurnSkimV2Result> =
-  {
-    id: "TURN_SKIM",
-    version: 2,
-    status: "DEPRECATED",
-    kind: "TASK",
-    taskClass: "FAST_CLASSIFICATION",
-    owner: "q-core",
-    changeDescription:
-      "W2 (2026-10-10): adds PERSON_SEARCH, a request to find or look up a named person, organisation or agency on the public web, with the name and the clues the person gave, so a bounded identity search answers within seconds.",
-    effectiveFrom: "2026-10-10",
-    variables: {
-      schema: TurnSkimVariablesSchema,
-      untrusted: [...TURN_SKIM_UNTRUSTED],
-    },
-    output: {
-      kind: "STRUCTURED",
-      schemaName: TURN_SKIM_SCHEMA_NAME,
-      schemaVersion: TURN_SKIM_V2_SCHEMA_VERSION,
-      schema: TurnSkimV2ResultSchema,
-    },
-    template: TEMPLATE,
-  };
+export const TURN_SKIM_V2: PromptDefinition<
+  TurnSkimVariables,
+  TurnSkimV2Result
+> = {
+  id: "TURN_SKIM",
+  version: 2,
+  status: "DEPRECATED",
+  kind: "TASK",
+  taskClass: "FAST_CLASSIFICATION",
+  owner: "q-core",
+  changeDescription:
+    "W2 (2026-10-10): adds PERSON_SEARCH, a request to find or look up a named person, organisation or agency on the public web, with the name and the clues the person gave, so a bounded identity search answers within seconds.",
+  effectiveFrom: "2026-10-10",
+  variables: {
+    schema: TurnSkimVariablesSchema,
+    untrusted: [...TURN_SKIM_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: TURN_SKIM_SCHEMA_NAME,
+    schemaVersion: TURN_SKIM_V2_SCHEMA_VERSION,
+    schema: TurnSkimV2ResultSchema,
+  },
+  template: TEMPLATE,
+};
