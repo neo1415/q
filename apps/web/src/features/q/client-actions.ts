@@ -178,6 +178,36 @@ export function openSubjectPage(
   return true;
 }
 
+/**
+ * K5 (C Part 5): the page a click on an answer card opens -- the record
+ * move's own first choice for that record (named-record-request pagesFor):
+ * a company's page; for an investor, the relationship with them, which is
+ * their page on either side. Null when the card has no page of its own.
+ */
+export function cardPagePath(subject: QSubjectRef | null): string | null {
+  if (subject === null) return null;
+  if (subject.kind === "INVESTOR_ORGANISATION") {
+    return recordPagePath(
+      "RELATIONSHIP_INVESTOR",
+      subject.investorOrganisationId,
+    );
+  }
+  return subjectPagePath(subject);
+}
+
+/**
+ * The person opened a card: a move of their own, through the one
+ * lifecycle. A click is a new turn, so a page this sentence already
+ * VERIFIED (and they have left since) is opened again, not "already done".
+ */
+export function openCardPage(subject: QSubjectRef | null): boolean {
+  const path = cardPagePath(subject);
+  if (path === null) return false;
+  beginNavigationTurn();
+  requestMove({ path });
+  return true;
+}
+
 // The client routers Q's moves go through live in control/router-registry
 // (the navigation lifecycle executes through them); re-exported for the
 // surfaces that register them.

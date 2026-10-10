@@ -26,6 +26,11 @@ import {
 import { boardTimeline, groupByDay } from "../src/features/q/board-timeline";
 import type { QTurn } from "../src/features/q/conversation";
 import { announceQSaid } from "../src/features/q-swarm/q-said";
+import { registerClientRouter } from "../src/features/q/client-actions";
+import {
+  onNavigationPhase,
+  resetNavigationLifecycle,
+} from "../src/features/q/control/navigation-lifecycle";
 import { useAnswerPlayback } from "../src/features/q/use-answer-playback";
 
 /**
@@ -165,6 +170,73 @@ describe("the canvas (C1, C3)", () => {
     expect(buttons).toHaveLength(1);
     fireEvent.click(buttons[0] as Element);
     expect(opened).toEqual([companyId]);
+  });
+
+  it("K5: clicking a card opens its company through the one navigation lifecycle; a toggle shows why", () => {
+    const companyId = "0a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+    const investorId = "1b9c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e";
+    const block = demoTop(3);
+    const withSubjects = {
+      ...block,
+      cards: block.cards.map((card, index) =>
+        index === 0
+          ? { ...card, subject: { kind: "COMPANY" as const, companyId } }
+          : index === 1
+            ? {
+                ...card,
+                subject: {
+                  kind: "INVESTOR_ORGANISATION" as const,
+                  investorOrganisationId: investorId,
+                },
+              }
+            : card,
+      ),
+    };
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    const phases: string[] = [];
+    const stop = onNavigationPhase((state) => phases.push(state.phase));
+    const onFocus = vi.fn();
+    try {
+      render(
+        <AnswerCanvas
+          block={withSubjects}
+          focus={-1}
+          said=""
+          onFocus={onFocus}
+        />,
+      );
+      const [first, second, third] = [
+        ...document.querySelectorAll("[data-ac-card] .cq-ac-head-main"),
+      ];
+      fireEvent.click(first as Element);
+      // The company's page, like a record move: requested, validated, executing.
+      expect(pushes).toEqual([`/company/${companyId}`]);
+      expect(phases.slice(0, 3)).toEqual([
+        "REQUESTED",
+        "VALIDATED",
+        "EXECUTING",
+      ]);
+      // An investor's card opens the relationship with them (its page for
+      // either side, as record moves open it).
+      fireEvent.click(second as Element);
+      expect(pushes.at(-1)).toBe(`/relationships/investor/${investorId}`);
+      // A card with no record behind it still only focuses.
+      fireEvent.click(third as Element);
+      expect(onFocus).toHaveBeenCalledWith(2);
+      expect(pushes).toHaveLength(2);
+      // Why it fits stays one tap away on a card that opens a page.
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `Why ${block.cards[0]?.name ?? ""}`,
+        }),
+      );
+      expect(onFocus).toHaveBeenCalledWith(0);
+    } finally {
+      stop();
+      registerClientRouter(null);
+      resetNavigationLifecycle();
+    }
   });
 
   it("opens the focused card with its reasons, fit in words and measure words", () => {
