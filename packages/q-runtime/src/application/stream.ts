@@ -117,6 +117,32 @@ export type QLiveDelta = {
 export type QLiveDeltaListener = (delta: QLiveDelta) => void;
 
 /**
+ * Joins consecutive fragments of one message into one, so a reader that
+ * fell behind (a slow socket, a busy event loop) receives the text in a
+ * single frame instead of replaying every fragment. Order is preserved and
+ * a fragment of another message or run is never merged across.
+ */
+export function coalesceDeltas(
+  queued: readonly QLiveDelta[],
+): readonly QLiveDelta[] {
+  const out: QLiveDelta[] = [];
+  for (const delta of queued) {
+    const last = out[out.length - 1];
+    if (
+      last !== undefined &&
+      last.runId === delta.runId &&
+      last.tenantId === delta.tenantId &&
+      last.messageId === delta.messageId
+    ) {
+      out[out.length - 1] = { ...last, text: last.text + delta.text };
+    } else {
+      out.push(delta);
+    }
+  }
+  return out;
+}
+
+/**
  * The seam a streaming-capable answer path publishes into (§33). Nothing
  * publishes in production yet: no configured provider streams, and the
  * answer is a structured call (§35). The bus exists so that the transport,
@@ -401,12 +427,13 @@ export function createQRunStreamService(
         }
 
         while (pending.length > 0 && !dirty && !signal.aborted) {
-          const delta = pending.shift();
-          if (delta === undefined) {
-            break;
-          }
-          for (const event of deltaEvents(delta, cursor)) {
-            yield { kind: "delta", event };
+          // Everything queued while the last frame was being written goes
+          // out as one frame per message, not one per fragment.
+          const batch = coalesceDeltas(pending.splice(0, pending.length));
+          for (const delta of batch) {
+            for (const event of deltaEvents(delta, cursor)) {
+              yield { kind: "delta", event };
+            }
           }
         }
         if (dirty) {

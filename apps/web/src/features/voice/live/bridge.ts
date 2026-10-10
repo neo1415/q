@@ -48,6 +48,11 @@ export type DelegationOutcome = {
   readonly failed?: boolean | undefined;
   /** Q's run moved the screen (followed before it is spoken). */
   readonly move?: LiveMove | undefined;
+  /**
+   * Only the start of the answer, for the voice to say now; the same
+   * delegation asked again (without `early`) returns the rest.
+   */
+  readonly partial?: boolean | undefined;
 };
 
 export type DelegationRequest = {
@@ -59,6 +64,8 @@ export type DelegationRequest = {
     readonly role: "user" | "q";
     readonly text: string;
   }[];
+  /** Ask for the start of the answer as soon as Q has verified some. */
+  readonly early?: boolean | undefined;
 };
 
 export type Timers = {
@@ -366,35 +373,67 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
         `Q's backend is still working on: "${record.request}". Say once, in a few natural, specific words, what you are getting for them (for example "pulling your best mandate fits now"), then keep the conversation going. Do not guess the result, do not apologise, and do not say this again.`,
       );
     }, progressAfterMs);
-    void deps
-      .delegate({
-        delegationId: record.id,
-        request: record.request,
-        context: record.context ?? contextBefore(),
-      })
-      .then(
-        async (outcome) => {
-          timers.clearTimeout(progress);
-          const note =
-            deps.beforeSpeak === undefined
-              ? null
-              : await deps.beforeSpeak(outcome).catch(() => null);
-          settle(
-            record,
-            note === null || outcome.commentary === null
-              ? outcome
-              : { ...outcome, commentary: `${note} ${outcome.commentary}` },
-          );
-        },
-        () => {
-          timers.clearTimeout(progress);
-          settle(record, {
-            commentary:
-              "Q's backend could not complete that request. Say so plainly and offer to try again; do not invent an answer.",
-            failed: true,
-          });
-        },
+    const finish = async (outcome: DelegationOutcome) => {
+      timers.clearTimeout(progress);
+      const note =
+        deps.beforeSpeak === undefined
+          ? null
+          : await deps.beforeSpeak(outcome).catch(() => null);
+      settle(
+        record,
+        note === null || outcome.commentary === null
+          ? outcome
+          : { ...outcome, commentary: `${note} ${outcome.commentary}` },
       );
+    };
+    const failed = () => {
+      timers.clearTimeout(progress);
+      settle(record, {
+        commentary:
+          "Q's backend could not complete that request. Say so plainly and offer to try again; do not invent an answer.",
+        failed: true,
+      });
+    };
+    const base = {
+      delegationId: record.id,
+      request: record.request,
+      context: record.context ?? contextBefore(),
+    };
+    void deps
+      .delegate({ ...base, early: true })
+      .then(async (outcome) => {
+        if (outcome.partial !== true) {
+          await finish(outcome);
+          return;
+        }
+        // Q has verified the start of its answer: the voice says it now,
+        // and the rest is asked for under the same id.
+        timers.clearTimeout(progress);
+        progressed = true;
+        speakStart(record, outcome);
+        await deps.delegate(base).then(finish, failed);
+      })
+      .catch(failed);
+  };
+
+  /**
+   * The start of an answer while the run goes on. Spoken unless a newer
+   * request exists (then it is kept quietly, as a superseded answer is);
+   * the status stays RUNNING until the rest arrives.
+   */
+  const speakStart = (record: DelegationRecord, outcome: DelegationOutcome) => {
+    if (record.status === "CANCELLED") return;
+    if (outcome.commentary === null || outcome.commentary.length === 0) return;
+    const index = order.indexOf(record.id);
+    if (order.slice(index + 1).length > 0) {
+      send(
+        "session.thinking.append",
+        record.providerId,
+        `Earlier request "${record.request}" (a newer one exists; do not answer it now unless asked): ${outcome.commentary}`,
+      );
+      return;
+    }
+    send("session.commentary.append", record.providerId, outcome.commentary);
   };
 
   const settle = (record: DelegationRecord, outcome: DelegationOutcome) => {
