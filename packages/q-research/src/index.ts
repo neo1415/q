@@ -148,3 +148,35 @@ export {
   type PersonSpec,
   type SourcedHit,
 } from "./domain/person-identity.js";
+export {
+  aliasKeyOf,
+  cardFromKnownEntity,
+  createInMemoryKnownEntityStore,
+  createKnownEntityIndex,
+  knownEntityResult,
+  preparedEntityIdFor,
+  type EntityFactRecord,
+  type EntitySourceRecord,
+  type KnownEntityIndex,
+  type KnownEntityRecord,
+  type KnownEntityStore,
+  type KnownLookup,
+  type PreparedEntityUpsert,
+} from "./application/known-entities.js";
+export {
+  createPersonLookup,
+  type PersonLookup,
+  type PersonLookupCommand,
+  type PersonLookupOutcome,
+} from "./application/person-lookup.js";
+export {
+  admitAssertions,
+  BRIEF_FRESH_DAYS,
+  quoteOccursIn,
+  roleContradictions,
+  STALE_AFTER_DAYS,
+  withUnknowns,
+  type AdmissionOutcome,
+  type BriefSource,
+  type ProposedAssertion,
+} from "./domain/person-brief.js";
