@@ -135,6 +135,22 @@ type Entry = {
 const ledger = new Map<string, Entry>();
 let active: Entry | null = null;
 let sequence = 0;
+/**
+ * R3 (stack run 2026-10-10, l-named-navigation): ids were `nav-<n>` per
+ * tab, and q-api keeps one receipt per id per person -- so every new tab's
+ * first move ("nav-1") was dropped as a retry of an older tab's, and Q
+ * Brain never heard it landed. A per-tab random part keeps ids unique
+ * across tabs; the sequence keeps them unique within one.
+ */
+const TAB = tabPart();
+
+function tabPart(): string {
+  try {
+    return globalThis.crypto.randomUUID().slice(0, 8);
+  } catch {
+    return Math.random().toString(36).slice(2, 10);
+  }
+}
 
 const phaseListeners = new Set<(state: NavigationState) => void>();
 const outcomeListeners = new Set<(outcome: NavigationOutcome) => void>();
@@ -365,7 +381,7 @@ export function requestNavigation(
     return active.handle;
   }
   sequence += 1;
-  const intentId = request.intentId ?? `nav-${String(sequence)}`;
+  const intentId = request.intentId ?? `nav-${TAB}-${String(sequence)}`;
   let resolve: (outcome: NavigationOutcome) => void = () => undefined;
   const settled = new Promise<NavigationOutcome>((done) => {
     resolve = done;

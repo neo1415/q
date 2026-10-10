@@ -193,6 +193,18 @@ describe("the lifecycle", () => {
     expect(outcomes).toHaveLength(1);
   });
 
+  it("an id it makes itself is unique beyond this tab (q-api dedupes per person)", async () => {
+    const one = requestNavigation({ path: "/discover" });
+    land("/discover");
+    await one.settled;
+    const two = requestNavigation({ path: "/capital" });
+    land("/capital");
+    await two.settled;
+    // Not the bare "nav-1" every new tab used to start from.
+    expect(one.intentId).toMatch(/^nav-[A-Za-z0-9]{8}-\d+$/u);
+    expect(two.intentId).not.toBe(one.intentId);
+  });
+
   it("a delayed navigation (slow server page) is VERIFIED when it lands, never FAILED first", async () => {
     const move = requestNavigation({ path: "/relationships" });
     await vi.advanceTimersByTimeAsync(12_000);
