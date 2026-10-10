@@ -105,7 +105,8 @@ describe("resolveFastNavigation", () => {
 
   it.each([
     "open discover no wait",
-    "open discover... actually, open settings",
+    "Open Discover, no, actually never mind",
+    "Open Discover... sorry, wait",
     "don't open discover",
     "never mind, open relationships",
     "Open Shiftwell -- hold on",
@@ -115,6 +116,51 @@ describe("resolveFastNavigation", () => {
       kind: "LEAVE_TO_Q",
     });
     expect(opened).toEqual([]);
+  });
+
+  it.each([
+    "Open Discover, no, actually Rehearsals",
+    "Open Discover... sorry, Rehearsals",
+    "Not Discover, Rehearsals",
+    "Okay, take me to Discover. No, actually, rehearsals.",
+    "open discover, i mean rehearsals",
+  ])(
+    "a self-correction moves only to the LAST page named: %s",
+    async (text) => {
+      const { input, opened } = reader(["Shiftwell"]);
+      expect(await resolveFastNavigation(input(text))).toEqual({
+        kind: "NAVIGATE",
+        intent: { kind: "NAVIGATE", destination: "REHEARSALS" },
+      });
+      expect(opened).toEqual([]);
+    },
+  );
+
+  it("a self-correction to a record opens that record, never the page first named", async () => {
+    const { input, opened } = reader(["Shiftwell"]);
+    const decided = await resolveFastNavigation(
+      input("Open Discover, no, actually Shiftwell relationship"),
+    );
+    expect(decided).toEqual({
+      kind: "NAVIGATE",
+      intent: {
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_COMPANY",
+        id: SHIFTWELL,
+      },
+    });
+    expect(opened.map((o) => o.name)).toEqual(["Shiftwell"]);
+  });
+
+  it("open discover... actually, open settings: Settings", async () => {
+    const { input } = reader([]);
+    const decided = await resolveFastNavigation(
+      input("open discover... actually, open privacy settings"),
+    );
+    expect(decided).toEqual({
+      kind: "NAVIGATE",
+      intent: { kind: "OPEN_SETTINGS", section: "privacy" },
+    });
   });
 
   it("leaves a question that is not a move to Q", async () => {
