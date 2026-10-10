@@ -16,8 +16,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createPreparedEntities,
+  answerFacts,
+  personaGrounding,
   preparedEntityPrewarmLines,
   rehearsalCounterpart,
+  shownQuotes,
   type PreparedEntitySource,
 } from "../src/composition/prepared-entities.js";
 import {
@@ -86,14 +89,14 @@ describe("prepared research entities: the seed", () => {
       (e) => e.demo_id === "qa-demo-shadi-qishta",
     );
     const role = shadi?.facts.find((f) => f.source_ids.includes("S06"));
-    expect(role?.verification.status).toBe("UNVERIFIED");
+    expect(role?.verification.status).toBe("PUBLICLY_REPORTED_UNCONFIRMED");
     expect(role?.evidence_class).toBe(
       "third-party public report, verify current role",
     );
     expect(shadi?.identity_read).toBe("PLAUSIBLE");
     for (const [id, source] of Object.entries(seed.sources)) {
       if (/linkedin\.com|qinvest\.com/u.test(source.url)) {
-        expect(source.access, id).toBe("UNVERIFIED");
+        expect(source.access, id).toBe("NOT_FETCHED");
       }
     }
   });
@@ -176,11 +179,11 @@ describe("prepared research entities: the loader", () => {
       expect(record.sources.length).toBeGreaterThan(0);
       expect(
         record.facts.every((f) =>
-          /^(VERIFIED|UNVERIFIED|CONTRADICTED):/u.test(f.evidenceClass ?? ""),
+          /^(VERIFIED|PUBLICLY_REPORTED_UNCONFIRMED)/u.test(
+            f.evidenceClass ?? "",
+          ),
         ),
       ).toBe(true);
-      // A quote on a login-gated page is not stored as the person's words.
-      expect(record.quotes).toEqual([]);
       if (record.entityKind !== "PERSON") expect(record.role).toBeNull();
       expect(JSON.stringify(record)).not.toMatch(/mandate/iu);
     }
@@ -332,5 +335,68 @@ describe("prepared research entities: counterparts and prewarm", () => {
     expect(text).toContain("Acme Robotics");
     expect(text).not.toMatch(/Gulf Times|S16|30-day/u);
     expect(text?.length ?? 0).toBeLessThanOrEqual(1_600);
+  });
+});
+
+describe("prepared research entities: publicly reported facts", () => {
+  it("uses unconfirmed public facts with soft wording and never states them as verified", async () => {
+    const { entities } = await warmed();
+    const shadi = entities
+      .all()
+      .find((r) => r.profileKey === "qa-demo-shadi-qishta");
+    if (shadi === undefined) throw new Error("seed has Shadi");
+    const facts = answerFacts(shadi);
+    expect(facts).toHaveLength(6);
+    expect(facts.every((f) => !f.confirmed)).toBe(true);
+    const role = facts.find((f) => f.sourceIds.includes("S06"));
+    expect(role?.claim).toMatch(
+      /^Reportedly, per a third-party LinkedIn post \(current role not confirmed\)/u,
+    );
+    expect(facts[2]?.claim).toMatch(
+      /^According to their LinkedIn \(not independently checked\)/u,
+    );
+    const qinvest = entities
+      .all()
+      .find((r) => r.profileKey === "qa-demo-qinvest");
+    expect(answerFacts(qinvest as never)[0]?.claim).toMatch(
+      /^Publicly reported/u,
+    );
+    const muhannad = entities
+      .all()
+      .find((r) => r.profileKey === "qa-demo-muhannad-taslaq");
+    expect(answerFacts(muhannad as never)[0]?.confirmed).toBe(true);
+  });
+
+  it("keeps a contradicted claim out of every answer path", () => {
+    const raw = structuredClone(rawSeed) as {
+      entities: { facts: { verification: { status: string } }[] }[];
+    };
+    const fact = raw.entities[2]?.facts[0];
+    if (fact === undefined) throw new Error("seed fact");
+    fact.verification.status = "CONTRADICTED";
+    const changed = parsePreparedSeed(raw);
+    const entity = changed.entities[2];
+    if (entity === undefined) throw new Error("seed entity");
+    const upsert = toPreparedUpsert(changed, entity, options);
+    expect(upsert.facts).toHaveLength(entity.facts.length - 1);
+    expect(JSON.stringify(upsert.facts)).not.toContain(
+      entity.facts[0]?.claim ?? "?",
+    );
+  });
+
+  it("shows a LinkedIn quote with its label but never gives it to a persona", async () => {
+    const { entities } = await warmed();
+    const shadi = entities
+      .all()
+      .find((r) => r.profileKey === "qa-demo-shadi-qishta");
+    if (shadi === undefined) throw new Error("seed has Shadi");
+    const shown = shownQuotes(shadi);
+    expect(shown[0]?.line).toContain(
+      "quoted on their LinkedIn (not independently checked)",
+    );
+    expect(shown[0]?.line).toContain("Watch what people spend");
+    expect(JSON.stringify(personaGrounding(shadi))).not.toContain(
+      "Watch what people spend",
+    );
   });
 });

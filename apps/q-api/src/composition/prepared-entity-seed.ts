@@ -18,7 +18,7 @@ import { z } from "zod";
  */
 
 const Verification = z.object({
-  status: z.enum(["VERIFIED", "UNVERIFIED", "CONTRADICTED"]),
+  status: z.enum(["VERIFIED", "PUBLICLY_REPORTED_UNCONFIRMED", "CONTRADICTED"]),
   checkedAt: z.string(),
   basis: z.string(),
   note: z.string().nullable(),
@@ -56,6 +56,8 @@ const SeedEntity = z
         source_ids: z.array(z.string()).min(1),
         evidence_class: z.string(),
         verification: Verification,
+        // How Q says it when it is not independently checked.
+        soft_wording: z.string().nullable(),
       }),
     ),
     rehearsal_topics: z.array(z.string()),
@@ -65,6 +67,8 @@ const SeedEntity = z
         quote: z.string(),
         source_id: z.string(),
         verification: Verification,
+        label: z.string(),
+        speaker: z.string(),
       }),
     ),
     image: Image,
@@ -84,7 +88,7 @@ export const PreparedSeedSchema = z
       z.object({
         url: z.string().url(),
         description: z.string(),
-        access: z.enum(["FETCHED", "UNVERIFIED"]),
+        access: z.enum(["FETCHED", "NOT_FETCHED"]),
         note: z.string(),
         fetchedAt: z.string().nullable(),
       }),
@@ -105,6 +109,16 @@ export function parsePreparedSeed(raw: unknown): PreparedSeed {
         if (!sourced.has(id)) {
           throw new Error(`${entity.demo_id}: fact cites unknown source ${id}`);
         }
+      }
+    }
+    for (const fact of entity.facts) {
+      if (
+        fact.verification.status === "PUBLICLY_REPORTED_UNCONFIRMED" &&
+        (fact.soft_wording ?? "").length === 0
+      ) {
+        throw new Error(
+          `${entity.demo_id}: a reported fact needs soft wording`,
+        );
       }
     }
     // Arabic script is held only where a source printed it; a Latin alias
@@ -224,20 +238,27 @@ export function toPreparedUpsert(
       entity.entity_kind === "PERSON" ? entity.associated_organization : null,
     location: entity.location,
     confidence: entity.identity_read,
-    facts: entity.facts.map((fact) => ({
-      claim: clip(fact.claim, 600),
-      sourceIds: fact.source_ids,
-      // The status is part of the class, so no reader sees a claim without it.
-      evidenceClass: clip(
-        `${fact.verification.status}: ${fact.evidence_class}`,
-        120,
-      ),
-    })),
+    // Public but not independently checked is used, with its soft wording
+    // in the claim itself so every answer path carries it. A contradicted
+    // claim is not an answerable fact (kept in `profile` only).
+    facts: entity.facts
+      .filter((fact) => fact.verification.status !== "CONTRADICTED")
+      .map((fact) => ({
+        claim: clip(`${fact.soft_wording ?? ""}${fact.claim}`, 600),
+        sourceIds: fact.source_ids,
+        evidenceClass:
+          fact.verification.status === "VERIFIED"
+            ? "VERIFIED"
+            : "PUBLICLY_REPORTED_UNCONFIRMED: not independently checked",
+      })),
     sources,
-    // A quote is stored as a quote only when it was checked verbatim. The
-    // seed's quotes sit on login-gated pages, so they stay in `profile`
-    // as unverified leads and are never shown as the person's words.
-    quotes: [],
+    quotes: entity.short_public_quotes.map((quote) => ({
+      text: quote.quote,
+      sourceId: quote.source_id,
+      speaker: quote.speaker,
+      date: null,
+      use: "SOURCE_QUOTE_ONLY" as const,
+    })),
     image,
     profile: {
       seedVersion: seed.seed_version,
@@ -252,11 +273,11 @@ export function toPreparedUpsert(
         basis: clip(fact.verification.basis, 400),
         note: fact.verification.note,
       })),
-      unverifiedQuotes: entity.short_public_quotes.map((quote) => ({
-        text: quote.quote,
-        sourceId: quote.source_id,
-        status: quote.verification.status,
-      })),
+      contradicted: entity.facts
+        .filter((fact) => fact.verification.status === "CONTRADICTED")
+        .map((fact) => fact.claim),
+      // Shown as a source quote with this label; never spoken by a persona.
+      quoteLabels: entity.short_public_quotes.map((quote) => quote.label),
       arabicNames: entity.arabic_names.map((name) => ({
         text: name.text,
         sourceId: name.sourceId,

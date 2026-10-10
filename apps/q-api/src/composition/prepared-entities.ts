@@ -218,3 +218,61 @@ export function preparedEntityPrewarmLines(
     return line.length > 0 ? `${head}: ${line}` : head;
   });
 }
+
+export type AnswerFact = {
+  readonly claim: string;
+  readonly sourceIds: readonly string[];
+  /** False when it is public but not independently checked: say it softly. */
+  readonly confirmed: boolean;
+};
+
+/**
+ * What Q and a persona may state about a prepared entity. Public but
+ * unconfirmed facts are included; their claim already opens with the soft
+ * wording ("According to their LinkedIn (not independently checked): ...")
+ * and `confirmed` is false so a caller can keep the hedge when it
+ * paraphrases. A contradicted claim never reaches this list (the loader
+ * does not store it as a fact).
+ */
+export function answerFacts(record: KnownEntityRecord): readonly AnswerFact[] {
+  return record.facts.map((fact) => ({
+    claim: fact.claim,
+    sourceIds: fact.sourceIds,
+    confirmed: fact.evidenceClass === "VERIFIED",
+  }));
+}
+
+/**
+ * Quotes Q may show, each as a source quote with its label ("quoted on
+ * their LinkedIn (not independently checked)"). A persona is never given
+ * these: they are not its words and it must not speak them as its own.
+ */
+export function shownQuotes(
+  record: KnownEntityRecord,
+): readonly { readonly line: string; readonly sourceId: string }[] {
+  const labels = record.profile["quoteLabels"];
+  return record.quotes.map((quote, at) => {
+    const label =
+      Array.isArray(labels) && typeof labels[at] === "string"
+        ? labels[at]
+        : "quoted from a public source (not independently checked)";
+    return {
+      line: `${record.displayName}, ${label}: "${quote.text}"`,
+      sourceId: quote.sourceId,
+    };
+  });
+}
+
+/** The persona's grounding: facts only, never the quotes. */
+export function personaGrounding(record: KnownEntityRecord): {
+  readonly facts: readonly AnswerFact[];
+  readonly rehearsalTopics: readonly string[];
+} {
+  const topics = record.profile["rehearsalTopics"];
+  return {
+    facts: answerFacts(record),
+    rehearsalTopics: Array.isArray(topics)
+      ? topics.filter((one): one is string => typeof one === "string")
+      : [],
+  };
+}
