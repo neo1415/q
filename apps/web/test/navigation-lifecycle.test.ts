@@ -11,14 +11,17 @@ import {
   resetAppRoutes,
 } from "../src/features/q/control/app-routes";
 import {
+  beginNavigationTurn,
   CONTROL_WAIT_MS,
   NAVIGATION_RETRY_MS,
   NAVIGATION_WAIT_MS,
   NOT_FOUND_MARKER,
   onNavigationOutcome,
   onNavigationPhase,
+  onNavigationTiming,
   requestNavigation,
   type NavigationOutcome,
+  type NavigationTiming,
   type NavigationPhase,
 } from "../src/features/q/control/navigation-lifecycle";
 import {
@@ -193,6 +196,36 @@ describe("the lifecycle", () => {
     expect(outcomes).toHaveLength(1);
   });
 
+  it("G2-D2: the same turn asking for the path it just VERIFIED gets that receipt, no second execution", async () => {
+    const fast = requestNavigation({ path: "/discover", turn: "utt-7" });
+    land("/discover");
+    await fast.settled;
+    // Q's answer for the same sentence, 70-800 ms later.
+    const answer = requestNavigation({ path: "/discover", turn: "utt-7" });
+    expect(answer.intentId).toBe(fast.intentId);
+    expect(await answer.settled).toEqual(await fast.settled);
+    expect(pushes).toEqual(["/discover"]);
+    expect(outcomes).toHaveLength(1);
+    // A later turn asking again is a new move.
+    const later = requestNavigation({ path: "/discover", turn: "utt-8" });
+    expect(later.intentId).not.toBe(fast.intentId);
+  });
+
+  it("G2-D2: without a named turn, the sentence the person last finished is the turn", async () => {
+    beginNavigationTurn();
+    const fast = requestNavigation({ path: "/capital" });
+    land("/capital");
+    await fast.settled;
+    expect(requestNavigation({ path: "/capital" }).intentId).toBe(
+      fast.intentId,
+    );
+    expect(outcomes).toHaveLength(1);
+    beginNavigationTurn();
+    expect(requestNavigation({ path: "/capital" }).intentId).not.toBe(
+      fast.intentId,
+    );
+  });
+
   it("an id it makes itself is unique beyond this tab (q-api dedupes per person)", async () => {
     const one = requestNavigation({ path: "/discover" });
     land("/discover");
@@ -223,6 +256,38 @@ describe("the lifecycle", () => {
     expect(pushes).toEqual(["/capital", "/capital"]);
     land("/capital");
     await expect(move.settled).resolves.toMatchObject({ status: "DONE" });
+  });
+
+  it("latency: a dropped push is re-pushed the moment another route commits, not 2.5 s later", async () => {
+    const move = requestNavigation({ path: "/capital" });
+    noteRoute("/discover?tab=yours");
+    // At once: the page's own rewrite is the sign the push was dropped.
+    expect(pushes).toEqual(["/capital", "/capital"]);
+    await vi.advanceTimersByTimeAsync(NAVIGATION_RETRY_MS + 10);
+    // The timed retry does not push a third time.
+    expect(pushes).toEqual(["/capital", "/capital"]);
+    land("/capital");
+    await expect(move.settled).resolves.toMatchObject({ status: "DONE" });
+  });
+
+  it("latency: each move reports where its time went (push, route commit, verified)", async () => {
+    const timings: NavigationTiming[] = [];
+    stops.push(onNavigationTiming((t) => timings.push(t)));
+    const move = requestNavigation({ path: "/capital" });
+    await vi.advanceTimersByTimeAsync(120);
+    land("/capital");
+    await move.settled;
+    expect(timings).toHaveLength(1);
+    const [timing] = timings;
+    expect(timing).toMatchObject({
+      intentId: move.intentId,
+      expected: "/capital",
+      status: "DONE",
+      pushes: 1,
+    });
+    expect(timing?.pushMs).toBeLessThan(20);
+    expect(timing?.commitMs).toBeGreaterThanOrEqual(100);
+    expect(timing?.totalMs).toBeGreaterThanOrEqual(timing?.commitMs ?? 0);
   });
 
   it("never landing at all: FAILED NOT_LANDED after the bound, exactly once", async () => {

@@ -102,6 +102,36 @@ export function followOfThread(
 }
 
 /**
+ * The Q turns already there when a conversation opens, so never followed.
+ * With nothing asked in this tab lately (`since` null) that is every one.
+ * Otherwise (RECOVERY-2026-10 G-D16) an answer recorded after the question
+ * is the person's fresh one and is followed. An answer still streaming has
+ * no recorded time: it is fresh only when its run is one this tab started
+ * (G2 follow-up: an older run still streaming in the conversation Home
+ * opened was treated as fresh, and its move bounced /home away).
+ */
+export function seenAtOpen(
+  turns: readonly QTurn[],
+  since: number | null,
+  ownRuns: ReadonlySet<string> = TYPED_RUNS,
+): Set<string> {
+  const seen = new Set<string>();
+  for (const turn of turns) {
+    if (turn.kind !== "Q") continue;
+    const fresh =
+      since !== null &&
+      (turn.at === undefined
+        ? turn.runId !== undefined && ownRuns.has(turn.runId)
+        : Date.parse(turn.at) >= since - FRESH_SKEW_MS);
+    if (!fresh) seen.add(turn.id);
+  }
+  return seen;
+}
+
+/** Clock skew between the browser's "asked" and the server's record. */
+const FRESH_SKEW_MS = 3_000;
+
+/**
  * The runs this tab started from typed questions. Module state, so it
  * outlives the surface that asked (2026-10-09 rerun: the Q page's surface
  * was set up again as the voice line dropped and came back, and a set held

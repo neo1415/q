@@ -16,7 +16,10 @@ import type {
 } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
+import { pendingPlaceOf } from "@capital-q/q-core/speech";
+
 import { createSpecialistQAnswer } from "../src/answer.js";
+import { openingLine } from "../src/references.js";
 import {
   matchOwnCounterpart,
   namedRecordRequestOf,
@@ -276,7 +279,10 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
     expect(intentOf(answer.blocks)).toEqual([
       { kind: "OPEN_RECORD_PAGE", page: "RELATIONSHIP_COMPANY", id: SHIFTWELL },
     ]);
-    expect(answer.content).toBe('Opening "Shiftwell Health".');
+    // G2-D3: the one pending wording (move-line.ts), so the thread's row
+    // flips to "Opened Shiftwell Health." on the browser's VERIFIED receipt.
+    expect(answer.content).toBe("Opening Shiftwell Health…");
+    expect(pendingPlaceOf(answer.content)).toBe("Shiftwell Health");
     expect(q.delegated()).toBe(0);
   });
 
@@ -295,7 +301,7 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
     expect(intentOf(answer.blocks)).toEqual([
       { kind: "OPEN_RECORD_PAGE", page: "COMPANY_DATA_ROOM", id: SHIFTWELL },
     ]);
-    expect(answer.content).toBe('Opening "Shiftwell Health"\'s data room.');
+    expect(answer.content).toBe("Opening Shiftwell Health's data room…");
   });
 
   it('"You open documents. I want to see the data room for Shiftwell." acts, never asks about documents', async () => {
@@ -325,5 +331,19 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
     expect(intentOf(answer.blocks)).toEqual([]);
     expect(answer.content).toMatch(/^I can't find "Brightmoor" data room/u);
     expect(answer.content).not.toBe("Understood.");
+  });
+});
+
+describe("G2-D3: a record move's line is the one pending wording", () => {
+  it("names the record as people read it, so the row can flip to Opened", () => {
+    const line = openingLine("INVESTOR", "Savanna Seed Partners (fictional)");
+    expect(line).toBe("Opening Savanna Seed Partners…");
+    expect(pendingPlaceOf(line)).toBe("Savanna Seed Partners");
+    expect(pendingPlaceOf(openingLine("COMPANY_DECK", "Tallyloom"))).toBe(
+      "Tallyloom's pitch deck",
+    );
+    expect(pendingPlaceOf(openingLine("DOCUMENT", undefined))).toBe(
+      "the document",
+    );
   });
 });

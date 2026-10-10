@@ -12,6 +12,7 @@ import type {
 } from "@capital-q/contracts";
 import {
   Check,
+  ChevronDown,
   ChevronRight,
   ICON_SIZE,
   ICON_STROKE,
@@ -30,7 +31,12 @@ import {
   LEVEL_WORD,
 } from "./answer-canvas-logic";
 import { MapBody } from "./blocks/data-blocks";
-import { openSubjectPage, subjectPagePath } from "./client-actions";
+import {
+  cardPagePath,
+  openCardPage,
+  openSubjectPage,
+  subjectPagePath,
+} from "./client-actions";
 
 /**
  * Q's answer as cards on the Q page (C1-C3; mockup answer-canvas.html).
@@ -145,6 +151,10 @@ function AnswerCard({
   const number = fitNumber(card);
   const words = fitWords(card);
   const provenance = fitProvenance(card);
+  // K5: a card with a record behind it opens that page on a click (the
+  // e2e "cards are navigable references"); why it fits is the toggle.
+  const opens = cardPagePath(card.subject) !== null;
+  const focusThis = () => actions.onFocus?.(rank - 1);
   return (
     <m.article
       layout={reduced ? false : "position"}
@@ -169,8 +179,17 @@ function AnswerCard({
         <button
           type="button"
           className="cq-ac-head-main border-0 bg-transparent p-0 text-left"
-          onClick={() => actions.onFocus?.(rank - 1)}
-          aria-expanded={state === "focus"}
+          onClick={() => {
+            if (!opens) {
+              focusThis();
+            } else if (actions.onOpenProfile !== undefined) {
+              actions.onOpenProfile(card);
+            } else {
+              openCardPage(card.subject);
+            }
+          }}
+          aria-expanded={opens ? undefined : state === "focus"}
+          data-ac-opens={opens ? "" : undefined}
         >
           {spot ? (
             <span className="cq-ac-spot-label" data-ac-spot-label>
@@ -221,6 +240,18 @@ function AnswerCard({
             </span>
           </div>
         )}
+        {opens ? (
+          <button
+            type="button"
+            className="cq-ac-x"
+            aria-label={`Why ${card.name}`}
+            aria-expanded={state === "focus"}
+            onClick={focusThis}
+            data-ac-why={card.key}
+          >
+            <Icon of={ChevronDown} />
+          </button>
+        ) : null}
         <button
           type="button"
           className="cq-ac-x"

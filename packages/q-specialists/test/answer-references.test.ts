@@ -454,7 +454,7 @@ describe("opening the one record a turn points at (Zino live 2026-10-04)", () =>
       page: "DOCUMENT",
       name: "Questions for Priya Khandelwal",
     });
-    expect(said?.content).toBe('Opening "Questions for Priya Khandelwal".');
+    expect(said?.content).toBe("Opening Questions for Priya Khandelwal…");
     expect(said?.blocks).toEqual([
       {
         kind: "UI_INTENT",

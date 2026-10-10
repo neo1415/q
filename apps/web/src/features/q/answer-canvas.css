@@ -246,6 +246,21 @@
   min-width: 0;
   cursor: pointer;
 }
+/* K5: a card that opens a page carries its "why" toggle beside the X. */
+.cq-ac-head:has([data-ac-why]) {
+  grid-template-columns: auto minmax(0, 1fr) auto 44px 44px;
+}
+[data-ac-why] svg {
+  transition: transform 160ms ease-out;
+}
+[data-ac-why][aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-ac-why] svg {
+    transition: none;
+  }
+}
 .cq-ac-rank {
   width: 26px;
   height: 26px;

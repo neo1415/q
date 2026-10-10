@@ -213,6 +213,32 @@ export function navigationHearing(key: string, text: string): void {
   );
 }
 
+/**
+ * Latency (typed send->VERIFIED): the words in the typed composer, as they
+ * change. A record by its name is resolved (the server's prepared reading
+ * context warmed: ~2 s cold when hosted) and its page prefetched while
+ * they type, so Send moves at once. Never moves; only a request to go
+ * somewhere is read at all.
+ */
+export function navigationTyping(text: string): void {
+  navigationHearing(TYPED_KEY, text);
+}
+const TYPED_KEY = "typed-composer";
+
+/** A composer's `input` event (bubbled to its wrapper): its words, read. */
+export function readTypedDraft(event: {
+  readonly target: EventTarget | null;
+}): void {
+  const field = event.target;
+  if (
+    typeof HTMLTextAreaElement !== "undefined" &&
+    field instanceof HTMLTextAreaElement &&
+    field.hasAttribute("data-q-composer-input")
+  ) {
+    navigationTyping(field.value);
+  }
+}
+
 /** Partial words so far, per utterance (a line that streams deltas). */
 const partials = new Map<string, string>();
 const PARTIALS_MAX = 8;
