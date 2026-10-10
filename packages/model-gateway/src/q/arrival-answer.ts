@@ -12,6 +12,23 @@ import type {
  * normal path handles it.
  */
 
+/**
+ * A cheap gate before TURN_SKIM is asked about an arrival follow-up: a
+ * pointing word ("they", "it", "the meeting", Nigerian-English "dem",
+ * "wetin") or a proper noun after the first word. Most turns fail it and
+ * cost nothing.
+ */
+export function pointsAtArrival(text: string): boolean {
+  if (
+    /\b(?:they|them|their|he|she|it|that|this|dem|wetin|abeg|request|ask|meeting|call|time|slot|message|reply|replied|word|back|agree[ds]?|accept(?:ed)?|confirm(?:ed)?|offer|next)\b/iu.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  return /\s[A-Z][A-Za-z]{2,}/u.test(text);
+}
+
 export type ArrivalFollowUp = "REQUEST" | "SAID" | "ACCEPTED";
 
 const REQUEST =
@@ -49,6 +66,53 @@ const when = (iso: string | null): string =>
     ? "an unknown time"
     : `${iso.slice(0, 16).replace("T", " ")} UTC`;
 
+export type ArrivalAspect =
+  "REQUEST" | "THEIR_MESSAGE" | "MEETING" | "NEXT_STEP";
+
+/**
+ * The semantic path: TURN_SKIM named the item (by its key) and the aspect.
+ * Null when the snapshot does not hold that item, so the normal path runs.
+ */
+export function arrivalAspectAnswer(
+  snapshot: ArrivalSnapshot | null,
+  itemKey: string,
+  aspect: ArrivalAspect,
+): { readonly text: string; readonly itemKey: string } | null {
+  const item = snapshot?.items.find((one) => one.key === itemKey);
+  if (item === undefined || item.counterpart === null) return null;
+  if (aspect === "NEXT_STEP") {
+    const next = item.facts.suggestedNextAction;
+    const name = item.counterpart.name ?? "them";
+    if (item.availability === "UNAVAILABLE" || next === null) {
+      return item.availability === "UNAVAILABLE"
+        ? unavailable(item)
+        : {
+            itemKey: item.key,
+            text: `There is nothing waiting on you with ${name} right now.`,
+          };
+    }
+    return {
+      itemKey: item.key,
+      text: `With ${name}: ${next.label}${next.owner === "THEM" ? " (waiting on them)" : ""}.`,
+    };
+  }
+  return answerFor(
+    aspect === "REQUEST"
+      ? "REQUEST"
+      : aspect === "THEIR_MESSAGE"
+        ? "SAID"
+        : "ACCEPTED",
+    item,
+  );
+}
+
+function unavailable(item: ArrivalSnapshotItem) {
+  return {
+    itemKey: item.key,
+    text: `I couldn't read the details behind "${item.headline}" just now, so I won't guess. Try again in a moment, or open the conversation.`,
+  };
+}
+
 export function arrivalFollowUpAnswer(
   text: string,
   snapshot: ArrivalSnapshot | null,
@@ -58,14 +122,16 @@ export function arrivalFollowUpAnswer(
   if (kind === null) return null;
   const item = target(text, snapshot);
   if (item === null) return null;
+  return answerFor(kind, item);
+}
+
+function answerFor(
+  kind: ArrivalFollowUp,
+  item: ArrivalSnapshotItem,
+): { readonly text: string; readonly itemKey: string } | null {
   const name = item.counterpart?.name ?? "They";
   const f = item.facts;
-  if (item.availability === "UNAVAILABLE") {
-    return {
-      itemKey: item.key,
-      text: `I couldn't read the details behind "${item.headline}" just now, so I won't guess. Try again in a moment, or open the conversation.`,
-    };
-  }
+  if (item.availability === "UNAVAILABLE") return unavailable(item);
   switch (kind) {
     case "REQUEST": {
       const request = f.request;

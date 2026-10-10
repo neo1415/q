@@ -159,9 +159,12 @@ export {
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { arrivalSnapshotFact } from "./arrival-fact.js";
 import {
+  arrivalAspectAnswer,
   arrivalFollowUpAnswer,
   arrivalFollowUpKind,
+  pointsAtArrival,
 } from "./arrival-answer.js";
+import type { QTurnSkimmer } from "./turn-skim.js";
 export { arrivalSnapshotFact };
 import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
@@ -1476,6 +1479,12 @@ export type ModelGatewayQAnswerDependencies = {
   readonly arrivalSnapshot?:
     | ((actor: QAnswerRequest["actor"]) => Promise<ArrivalSnapshot | null>)
     | undefined;
+  /**
+   * W1: the semantic fallback for an arrival follow-up in words the quick
+   * patterns do not know (TURN_SKIM's ARRIVAL_FOLLOWUP). Read-only; acts
+   * only on a HIGH confidence reading of an item the snapshot holds.
+   */
+  readonly arrivalSkim?: QTurnSkimmer | undefined;
   readonly sensitivity?: QAnswerSensitivityPolicy | undefined;
   /**
    * What KIND of material this composition handles (doc 15 §62). Omitted
@@ -3578,16 +3587,65 @@ export function createModelGatewayQAnswer(
       // request?", "what did they say?", "did they accept?") is answered
       // from the Arrival Snapshot by code: no tool, no model round. Read on
       // its own, so S2's route gating of the wide reads cannot skip it.
-      if (
+      const arrivalEligible =
         request.writingDocument !== true &&
-        arrivalFollowUpKind(latest.content) !== null &&
         request.askedAction === undefined &&
-        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
-      ) {
-        const followUp = arrivalFollowUpAnswer(
-          latest.content,
-          await prepared.arrivalSnapshotOnce(),
+        (request.turnKind === undefined ||
+          request.turnKind === "QUESTION_TO_Q");
+      const quick =
+        arrivalEligible && arrivalFollowUpKind(latest.content) !== null;
+      // Unusual words: only when the turn plausibly points at an arrival
+      // item does TURN_SKIM read it (a cheap gate; most turns skip this).
+      const maybeArrival =
+        arrivalEligible &&
+        !quick &&
+        dependencies.arrivalSkim !== undefined &&
+        dependencies.arrivalSnapshot !== undefined &&
+        pointsAtArrival(latest.content);
+      if (quick || maybeArrival) {
+        const snapshot = await prepared.arrivalSnapshotOnce();
+        let followUp = quick
+          ? arrivalFollowUpAnswer(latest.content, snapshot)
+          : null;
+        const named = (snapshot?.items ?? []).filter(
+          (item) => item.counterpart !== null,
         );
+        if (
+          !quick &&
+          snapshot !== null &&
+          named.length > 0 &&
+          dependencies.arrivalSkim !== undefined
+        ) {
+          const skim = await dependencies.arrivalSkim
+            .skim({
+              utterance: latest.content,
+              recentTurns: [],
+              arrivalItems: named.map((item) => ({
+                key: item.key,
+                counterpart: item.counterpart?.name ?? null,
+                headline: item.headline,
+              })),
+              attribution: {
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+                qRunId: request.runId,
+                correlationId: request.correlationId,
+              },
+            })
+            .catch(() => null);
+          if (
+            skim !== null &&
+            skim.kind === "ARRIVAL_FOLLOWUP" &&
+            skim.confidence === "HIGH" &&
+            skim.arrival != null
+          ) {
+            followUp = arrivalAspectAnswer(
+              snapshot,
+              skim.arrival.item,
+              skim.arrival.aspect,
+            );
+          }
+        }
         if (followUp !== null) {
           const message = await persistAnswer(
             request.leadLines === undefined

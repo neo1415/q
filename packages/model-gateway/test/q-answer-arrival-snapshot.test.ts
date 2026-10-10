@@ -14,6 +14,7 @@ import type {
   QToolPort,
   QToolProposal,
 } from "@capital-q/q-runtime";
+import { TurnSkimResultSchema } from "@capital-q/q-core";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
@@ -25,7 +26,10 @@ import {
 } from "../src/index.js";
 import { arrivalFollowUpAnswer } from "../src/q/arrival-answer.js";
 import { arrivalSnapshotFact } from "../src/q/arrival-fact.js";
-import { createModelGatewayQAnswer } from "../src/q/index.js";
+import {
+  createModelGatewayQAnswer,
+  type QTurnSkimmer,
+} from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 
 /**
@@ -114,7 +118,11 @@ const SNAPSHOT: ArrivalSnapshot = ArrivalSnapshotSchema.parse({
   ],
 });
 
-function build(snapshot: () => ArrivalSnapshot | null, said: string) {
+function build(
+  snapshot: () => ArrivalSnapshot | null,
+  said: string,
+  arrivalSkim?: QTurnSkimmer,
+) {
   const alpha = createFakeModelProvider({
     code: "alpha",
     script: [
@@ -186,6 +194,7 @@ function build(snapshot: () => ArrivalSnapshot | null, said: string) {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     tools,
+    ...(arrivalSkim === undefined ? {} : { arrivalSkim }),
     arrivalSnapshot: () => {
       snapshotReads += 1;
       return Promise.resolve(snapshot());
@@ -336,5 +345,101 @@ describe("an arrival follow-up is answered by code, with no tool and no model ro
     expect(
       arrivalFollowUpAnswer("what's the request from Halyard?", two)?.itemKey,
     ).toBe("other");
+  });
+});
+
+describe("unusual phrasings are read by TURN_SKIM and still answered with no tool", () => {
+  const WITH_NEXT: ArrivalSnapshot = ArrivalSnapshotSchema.parse({
+    ...SNAPSHOT,
+    items: SNAPSHOT.items.map((item) => ({
+      ...item,
+      facts: {
+        ...item.facts,
+        suggestedNextAction: {
+          kind: "ANSWER_INTEREST",
+          owner: "YOU",
+          label: "Answer their request to connect",
+        },
+      },
+    })),
+  });
+  const KEY = `interest:${REL}`;
+
+  function skimmed(said: string, reading: Record<string, unknown> | null) {
+    const seen: { items: readonly { key: string }[]; utterance: string }[] = [];
+    const skimmer: QTurnSkimmer = {
+      skim: (input) => {
+        seen.push({
+          items: input.arrivalItems ?? [],
+          utterance: input.utterance,
+        });
+        return Promise.resolve(
+          reading === null
+            ? null
+            : TurnSkimResultSchema.parse({ confidence: "HIGH", ...reading }),
+        );
+      },
+    };
+    const scene = build(() => WITH_NEXT, said, skimmer);
+    return { ...scene, seen };
+  }
+
+  const PARAPHRASES: readonly (readonly [
+    string,
+    "REQUEST" | "THEIR_MESSAGE" | "MEETING" | "NEXT_STEP",
+    string,
+  ])[] = [
+    ["so what did TensorGate want?", "REQUEST", "TensorGate wants to connect"],
+    ["any word back on the meeting?", "MEETING", "is booked"],
+    ["wetin dem talk?", "THEIR_MESSAGE", "Could we do Thursday 3pm"],
+    ["abeg, dem don agree to the time?", "MEETING", "2026-10-16 15:00 UTC"],
+    [
+      "okay, and what should I do about them?",
+      "NEXT_STEP",
+      "Answer their request to connect",
+    ],
+  ];
+
+  for (const [said, aspect, expected] of PARAPHRASES) {
+    it(`"${said}" -> ${aspect}: zero tool calls, zero analyst calls`, async () => {
+      const { seam, request, alpha, executed, persisted, seen } = skimmed(
+        said,
+        { kind: "ARRIVAL_FOLLOWUP", arrival: { item: KEY, aspect } },
+      );
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.items.map((i) => i.key)).toEqual([KEY]);
+      expect(executed).toEqual([]);
+      expect(alpha.calls).toHaveLength(0);
+      expect(persisted.join("\n")).toContain(expected);
+    });
+  }
+
+  it("a LOW confidence reading, a key the snapshot lacks, or a failed skim leaves it to the analyst", async () => {
+    for (const reading of [
+      {
+        kind: "ARRIVAL_FOLLOWUP",
+        confidence: "LOW",
+        arrival: { item: KEY, aspect: "REQUEST" },
+      },
+      {
+        kind: "ARRIVAL_FOLLOWUP",
+        arrival: { item: "interest:nope", aspect: "REQUEST" },
+      },
+      null,
+    ]) {
+      const { seam, request, alpha } = skimmed(
+        "so what did TensorGate want?",
+        reading,
+      );
+      await seam.answer(request);
+      expect(alpha.calls.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("a turn that points at nothing never asks the skim", async () => {
+    const none = skimmed("hello", { kind: "OTHER" });
+    await none.seam.answer(none.request);
+    expect(none.seen).toHaveLength(0);
   });
 });

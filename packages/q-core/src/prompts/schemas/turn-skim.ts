@@ -69,7 +69,7 @@ export const SkimPersonSchema = z
   .strict();
 export type SkimPerson = z.infer<typeof SkimPersonSchema>;
 
-export const TurnSkimResultSchema = z
+export const TurnSkimV2ResultSchema = z
   .object({
     kind: z.enum(TURN_SKIM_V2_KINDS),
     confidence: z.enum(["HIGH", "MEDIUM", "LOW"]),
@@ -77,6 +77,57 @@ export const TurnSkimResultSchema = z
     discover: DiscoverRequestSchema.nullable().default(null),
     /** PERSON_SEARCH only; null otherwise. */
     person: SkimPersonSchema.nullable().default(null),
+  })
+  .strict();
+export type TurnSkimV2Result = z.infer<typeof TurnSkimV2ResultSchema>;
+
+/**
+ * v3 (W1, 2026-10-10): adds ARRIVAL_FOLLOWUP, a question about one of the
+ * items Q told them on arrival, in any words ("so what did TensorGate
+ * want?", "any word back on the meeting?"). The skim is shown the arrival
+ * items (key, counterpart, headline) and names the item and the aspect;
+ * code then answers from the Arrival Snapshot with no tool.
+ */
+export const TURN_SKIM_V3_SCHEMA_VERSION = 3;
+export const TURN_SKIM_V3_KINDS = [
+  ...TURN_SKIM_V2_KINDS,
+  "ARRIVAL_FOLLOWUP",
+] as const;
+export const ARRIVAL_ASPECTS = [
+  "REQUEST",
+  "THEIR_MESSAGE",
+  "MEETING",
+  "NEXT_STEP",
+] as const;
+
+export const TurnSkimV3VariablesSchema = TurnSkimVariablesSchema.extend({
+  /** The arrival items as JSON [{key, counterpart, headline}]. UNTRUSTED. */
+  arrivalItems: z.string().max(1_500),
+}).strict();
+export type TurnSkimV3Variables = z.infer<typeof TurnSkimV3VariablesSchema>;
+export const TURN_SKIM_V3_UNTRUSTED = [
+  "utterance",
+  "recentTurns",
+  "arrivalItems",
+] as const;
+
+export const TurnSkimResultSchema = z
+  .object({
+    kind: z.enum(TURN_SKIM_V3_KINDS),
+    confidence: z.enum(["HIGH", "MEDIUM", "LOW"]),
+    count: z.number().int().min(1).max(100).nullable().default(null),
+    discover: DiscoverRequestSchema.nullable().default(null),
+    /** PERSON_SEARCH only; null otherwise. */
+    person: SkimPersonSchema.nullable().default(null),
+    /** ARRIVAL_FOLLOWUP only: the item's key as listed, and the aspect. */
+    arrival: z
+      .object({
+        item: z.string().trim().min(1).max(160),
+        aspect: z.enum(ARRIVAL_ASPECTS),
+      })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict();
 export type TurnSkimResult = z.infer<typeof TurnSkimResultSchema>;
