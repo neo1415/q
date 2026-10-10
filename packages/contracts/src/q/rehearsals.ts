@@ -294,6 +294,10 @@ export const ExternalSimulationDtoSchema = z
       .optional(),
     imageUrl: z.string().url().max(2048).nullable().optional(),
     imageAttribution: z.string().max(200).nullable().optional(),
+    /** R5: the canonical unclaimed investor organisation this simulation plays, if any. */
+    investorOrganisationId: z.string().uuid().nullable().optional(),
+    /** R5: the one distinct habit of this simulated counterpart, in words. */
+    quirk: z.string().max(240).nullable().optional(),
     headline: z.string().max(200).nullable().optional(),
     description: z.string().max(240).nullable().optional(),
     quotes: z

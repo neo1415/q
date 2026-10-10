@@ -175,6 +175,11 @@ export const QAnswerCardSchema = z
           .startsWith("https://")
           .nullable(),
         rehearse: z.boolean(),
+        /**
+         * R5: set when the entity is a canonical (unclaimed) investor
+         * organisation; Rehearse then opens the investor rehearsal.
+         */
+        investorOrganisationId: z.string().uuid().nullable().optional(),
         /** The public sources the card rests on, to open (https only). */
         sources: z
           .array(

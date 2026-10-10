@@ -34,9 +34,11 @@ import {
   cardPagePath,
   openCardPage,
   openExternalRehearsal,
+  rehearseOffered,
   openSubjectPage,
   subjectPagePath,
 } from "./client-actions";
+import { currentNavigationViewer } from "./control/app-routes";
 
 /**
  * Q's answer as cards on the Q page (C1-C3; mockup answer-canvas.html).
@@ -403,7 +405,10 @@ function AnswerCard({
                   Open profile
                 </a>
               )}
-              {card.external?.rehearse !== true ? null : (
+              {!rehearseOffered(
+                currentNavigationViewer()?.kind,
+                card.external,
+              ) ? null : (
                 <button
                   type="button"
                   className="cq-ac-btn"
@@ -413,7 +418,10 @@ function AnswerCard({
                     if (actions.onRehearse !== undefined) {
                       actions.onRehearse(card);
                     } else if (card.external?.externalPersonId != null) {
-                      openExternalRehearsal(card.external.externalPersonId);
+                      openExternalRehearsal(
+                        card.external.externalPersonId,
+                        card.external.investorOrganisationId,
+                      );
                     }
                   }}
                 >

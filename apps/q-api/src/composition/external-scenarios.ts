@@ -29,6 +29,33 @@ export type Direction = {
   readonly keywords: RegExp;
 };
 
+/**
+ * R5: the ONE distinct habit that shows during the conversation, so the three
+ * investors are not the same meeting with a different name. It is a way of
+ * running a meeting (what is asked first, what is cut in with), never a
+ * claim about what the real person or firm has said or would say.
+ */
+export type Quirk = {
+  readonly key: string;
+  /** Short, shown to the founder and in the persona's priorities. */
+  readonly label: string;
+  /** Asked early, built by code, in the founder's company's terms. */
+  readonly earlyQuestion: (company: string) => string;
+  /** Said by code in the opening line, so the habit is visible at once. */
+  readonly openingTail: string;
+  /** The live instruction for the voice: when and how the habit shows. */
+  readonly behaviour: string;
+  /** Lines the counterpart may use when the habit fires (not quotations). */
+  readonly interjections: readonly string[];
+};
+
+/** A sourced public note behind a prepared investor's brief (reported, never a quote). */
+export type ResearchNote = {
+  readonly text: string;
+  readonly url: string;
+  readonly label: string;
+};
+
 export type Scenario = {
   readonly id: string;
   readonly entityKind: EntityKind;
@@ -42,6 +69,10 @@ export type Scenario = {
   /** How this counterpart follows up and challenges. */
   readonly followUp: readonly string[];
   readonly family: "INVESTOR" | "EXECUTIVE";
+  /** R5: the one distinct habit (prepared investors only). */
+  readonly quirk?: Quirk | undefined;
+  /** R5: public research behind the brief, sourced, worded as reported. */
+  readonly notes?: readonly ResearchNote[] | undefined;
 };
 
 const k = (words: string) => new RegExp(`\\b(?:${words})`, "iu");
@@ -185,6 +216,27 @@ const QINVEST: Scenario = {
     "Every return figure gets 'and in the downside?'.",
     "Probe governance and repayment last, firmly, if they were skipped.",
   ],
+  quirk: {
+    key: "sharia_first",
+    label: "Sharia structure first",
+    earlyQuestion: (c) =>
+      `Before the market: how does ${c}'s revenue avoid riba and gharar, and can your cap table take an Islamic instrument?`,
+    openingTail:
+      "I will ask early how the structure works under Sharia principles, so have that ready.",
+    behaviour:
+      "Sharia structuring comes before everything else. Within your first two questions, ask how the revenue avoids riba (interest) and gharar (excessive uncertainty), and whether the cap table could take an Islamic instrument such as murabaha, ijara, musharaka or sukuk. Whatever the founder talks about later, bring a financing point back to whether it is Sharia-screened. If the answer is vague, say you cannot take the rest forward without it and ask again.",
+    interjections: [
+      "Before we go on: is that Sharia-screened?",
+      "Where does the return come from, and is any of it interest?",
+    ],
+  },
+  notes: [
+    {
+      text: "QInvest describes itself as an Islamic investment bank with investment banking, asset management and principal investments divisions; principal investments are reportedly real estate, credit and equity. No venture capital line was found in public sources.",
+      url: "https://gfmag.com/features/benefiting-diversity-q-qinvests-ceo-tamim-al-kawari/",
+      label: "Global Finance: Q&A with QInvest's CEO (2018)",
+    },
+  ],
 };
 
 const MUHANNAD: Scenario = {
@@ -254,6 +306,29 @@ const MUHANNAD: Scenario = {
     "Short, direct questions; ask for the number, then the date.",
     "Challenge anything that sounds like a pitch rather than a result.",
     "If the founder is vague on runway or commitment, stay there until it is clear.",
+  ],
+
+  quirk: {
+    key: "gcc_angle_and_one_metric",
+    label: "Cuts in on the Qatar / GCC angle and wants one metric",
+    earlyQuestion: (c) =>
+      `What is the one metric that proves ${c} has traction, and what is its Qatar / GCC angle?`,
+    openingTail:
+      "I move fast, so expect me to cut in: I will want your Qatar and GCC angle and the one metric that proves traction.",
+    behaviour:
+      "You are quick and accelerator-style. Cut in, politely and briefly, as soon as an answer runs past two or three sentences, with: 'and what is your Qatar / GCC angle?'. Ask for the ONE metric that proves traction, and do not accept a list of several: make the founder pick one. Keep your own turns short. Move on quickly once you have a number.",
+    interjections: [
+      "Sorry to cut in: what is your Qatar / GCC angle?",
+      "Pick one metric. Which one proves traction?",
+    ],
+  },
+  notes: [
+    {
+      text: "Alchemist Doha is a QRDI Council and Alchemist Accelerator programme aimed at eligible early-stage B2B tech startups, with access to a global network, funding and a soft landing in Qatar. A cheque size was not confirmed in public sources.",
+      url: "https://marhaba.qa/qrdi-council-and-alchemist-accelerator-unveil-alchemist-doha-for-tech-startup-attraction-and-growth/",
+      label:
+        "Marhaba: QRDI Council and Alchemist Accelerator unveil Alchemist Doha",
+    },
   ],
 };
 
@@ -400,6 +475,28 @@ const ALRAYAN: Scenario = {
     "Formal and structured; take the topics in order and finish each.",
     "Ask for the structure on paper before accepting a description.",
     "If risk is vague, ask for the worst case in numbers.",
+  ],
+
+  quirk: {
+    key: "sceptical_of_projections",
+    label: "Politely sceptical of projections; wants audited numbers",
+    earlyQuestion: (c) =>
+      `Which of ${c}'s figures are audited, and what is the worst case in numbers?`,
+    openingTail:
+      "I am a conservative reader of numbers, so I will ask what is audited and what the downside is.",
+    behaviour:
+      "You are courteous, formal and conservative, as a bank-owned asset manager would be. Treat every projection with polite scepticism: thank the founder, then say a projection is not evidence and ask for the audited or reconciled figure. Press on downside protection and governance (board, reporting, controls) before you discuss upside. Never raise your voice; you simply do not accept a forecast as fact.",
+    interjections: [
+      "Thank you. I will take that as an aspiration: what is audited?",
+      "And if that does not happen, what is the worst case, in numbers?",
+    ],
+  },
+  notes: [
+    {
+      text: "AlRayan Investment is wholly owned by AlRayan Bank and reportedly managed about USD 1.4 billion in 2025 across Sharia-compliant equities, money markets and sukuk. No private-equity or venture strategy was found in public sources.",
+      url: "https://www.forbesmiddleeast.com/lists/top-50-asset-managers-2026/akber-ahmed-khan/",
+      label: "Forbes Middle East: Top 50 asset managers 2026",
+    },
   ],
 };
 

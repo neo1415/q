@@ -34,6 +34,7 @@ type EntityRow = {
   image: KnownEntityRecord["image"];
   profile: Record<string, unknown>;
   last_researched_at: Date | string;
+  investor_organisation_id: string | null;
 };
 
 const iso = (value: Date | string): string =>
@@ -118,6 +119,7 @@ export function createPostgresKnownEntityStore(dependencies: {
       image: row.image,
       profile: row.profile,
       lastResearchedAt: iso(row.last_researched_at),
+      investorOrganisationId: row.investor_organisation_id,
     }));
   };
 
@@ -198,7 +200,8 @@ export function createPostgresKnownEntityStore(dependencies: {
       const rows = await sql<EntityRow[]>`
         select id, profile_key, entity_kind, research_status, requires_refresh,
                display_name, profile_url, role, organization, location,
-               confidence, quotes, image, profile, last_researched_at
+               confidence, quotes, image, profile, last_researched_at,
+               investor_organisation_id
           from q_runtime.external_persons
          where research_status = 'PREPARED_PUBLIC_SEED' and tenant_id is null
          order by profile_key`;
@@ -210,7 +213,7 @@ export function createPostgresKnownEntityStore(dependencies: {
         select p.id, p.profile_key, p.entity_kind, p.research_status,
                p.requires_refresh, p.display_name, p.profile_url, p.role,
                p.organization, p.location, p.confidence, p.quotes, p.image,
-               p.profile, p.last_researched_at
+               p.profile, p.last_researched_at, p.investor_organisation_id
           from q_runtime.external_persons p
           join q_runtime.external_entity_aliases a
             on a.external_person_id = p.id

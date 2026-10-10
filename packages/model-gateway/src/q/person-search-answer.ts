@@ -149,6 +149,10 @@ function cardBlock(
               ? s.profileUrl
               : null,
           rehearse: card.actions.includes("REHEARSE"),
+          // R5: an unclaimed canonical investor opens the investor rehearsal.
+          ...(s.investorOrganisationId == null
+            ? {}
+            : { investorOrganisationId: s.investorOrganisationId }),
           sources: sourceLinks(card),
         },
       },

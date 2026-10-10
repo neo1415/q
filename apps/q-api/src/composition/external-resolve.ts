@@ -141,6 +141,9 @@ export function createExternalSubjectResolver(dependencies: {
       evidenceBundleId: null,
       briefVersion: brief?.version ?? 0,
       confidence: seed.confidence,
+      ...(seed.investorOrganisationId == null
+        ? {}
+        : { investorOrganisationId: seed.investorOrganisationId }),
     };
     return { subject, brief };
   };

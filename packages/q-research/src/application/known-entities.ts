@@ -62,6 +62,8 @@ export type KnownEntityRecord = {
   /** Bounded extras the loader keeps (rehearsal topics and questions). */
   readonly profile: Readonly<Record<string, unknown>>;
   readonly lastResearchedAt: string;
+  /** R5: the canonical unclaimed investor organisation it stands in for. */
+  readonly investorOrganisationId?: string | null | undefined;
 };
 
 /** What a loader (W5) supplies; the id is derived from the profile key. */
@@ -267,6 +269,9 @@ export function cardFromKnownEntity(
       evidenceBundleId: null,
       briefVersion: 0,
       confidence: record.confidence,
+      ...(record.investorOrganisationId == null
+        ? {}
+        : { investorOrganisationId: record.investorOrganisationId }),
     },
     sources,
     uncertainty: uncertainty.slice(0, 4),

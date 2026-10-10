@@ -1428,6 +1428,15 @@ export function createRehearsalService(dependencies: {
          * prepared, so a newer brief version is picked up.
          */
         readonly resolve?: ExternalSubjectResolver | undefined;
+        /**
+         * R5: the prepared research record that stands in for a canonical,
+         * UNCLAIMED investor organisation (a public profile built by Q), or
+         * null when the organisation is a real, claimed investor. Never
+         * decides who may see the investor: that stays with `material`.
+         */
+        readonly investorLink?:
+          | ((investorOrganisationId: string) => Promise<string | null>)
+          | undefined;
       }
     | undefined;
 }): RehearsalService {
@@ -1459,6 +1468,31 @@ export function createRehearsalService(dependencies: {
       return fresh;
     }
     return external.subjects.latest(actor, id).catch(() => null);
+  }
+  /**
+   * R5: a founder's rehearsal of an UNCLAIMED investor organisation (a
+   * public profile built by Q) is the labelled external simulation: the same
+   * code-built persona, opening and guards as any researched entity. The
+   * investor must still be visible to this person exactly as for any
+   * investor (the Discover rule); a claimed investor is never replaced.
+   */
+  async function canonicalCounterpart(
+    actor: ActorContext,
+    kind: RehearsalCounterpartKind,
+    id: string,
+  ): Promise<
+    | { readonly kind: RehearsalCounterpartKind; readonly id: string }
+    | "NOT_FOUND"
+  > {
+    if (kind !== "INVESTOR_ORGANISATION") return { kind, id };
+    const linked = await external?.investorLink?.(id).catch(() => null);
+    if (linked === undefined || linked === null) return { kind, id };
+    const visible = await material
+      .counterpart(actor, kind, id)
+      .catch(() => null);
+    return visible === null
+      ? "NOT_FOUND"
+      : { kind: "EXTERNAL_PERSON", id: linked };
   }
   /** How the screen labels and shows the researched entity, from stored data. */
   async function simulationOf(
@@ -2354,11 +2388,16 @@ export function createRehearsalService(dependencies: {
       };
     },
 
-    persona: async (actor, kind, id) => {
+    persona: async (actor, askedKind, askedId) => {
       const viewer = await viewerOf(actor);
       if (viewer === null) return { kind: "NOT_A_PARTICIPANT" };
       // A founder rehearses with investors, an investor with companies.
-      if (counterpartRoleOf(kind) === viewer.role) return { kind: "NOT_FOUND" };
+      if (counterpartRoleOf(askedKind) === viewer.role) {
+        return { kind: "NOT_FOUND" };
+      }
+      const target = await canonicalCounterpart(actor, askedKind, askedId);
+      if (target === "NOT_FOUND") return { kind: "NOT_FOUND" };
+      const { kind, id } = target;
       const built = await ensurePersona(actor, viewer, kind, id);
       if (built === "NOT_FOUND") return { kind: "NOT_FOUND" };
       if (built === "Q_UNAVAILABLE") return { kind: "Q_UNAVAILABLE" };
@@ -2414,12 +2453,19 @@ export function createRehearsalService(dependencies: {
         : { kind: who.kind, id: who.id, name: who.name };
     },
 
-    start: async (actor, input) => {
+    start: async (actor, request) => {
       const viewer = await viewerOf(actor);
       if (viewer === null) return { kind: "NOT_A_PARTICIPANT" };
-      if (counterpartRoleOf(input.kind) === viewer.role) {
+      if (counterpartRoleOf(request.kind) === viewer.role) {
         return { kind: "NOT_FOUND" };
       }
+      const target = await canonicalCounterpart(
+        actor,
+        request.kind,
+        request.id,
+      );
+      if (target === "NOT_FOUND") return { kind: "NOT_FOUND" };
+      const input = { ...request, kind: target.kind, id: target.id };
       // A meeting id is input: kept only when it is one of their own.
       let meetingId: string | null = null;
       if (input.meetingId !== undefined) {

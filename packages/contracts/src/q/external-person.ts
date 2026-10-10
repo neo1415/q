@@ -142,6 +142,12 @@ export const ExternalPersonSubjectSchema = z
     /** Version of the derived brief; 0 when none has been built yet. */
     briefVersion: z.number().int().min(0),
     confidence: ExternalPersonConfidenceSchema,
+    /**
+     * R5: the canonical, UNCLAIMED investor organisation this prepared
+     * record stands in for (a public profile built by Q; not on Capital Q).
+     * When set, Rehearse opens the investor rehearsal. Absent otherwise.
+     */
+    investorOrganisationId: z.string().uuid().nullable().optional(),
   })
   .strict()
   .refine(

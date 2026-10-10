@@ -15,6 +15,7 @@
  * a credential, a connection or a table.
  */
 
+import { createInvestorLink } from "./composition/investor-link.js";
 import { createFitComposition } from "./composition/fit.js";
 import {
   createPreparedEntities,
@@ -5014,6 +5015,9 @@ const rehearsals = createRehearsalService({
     // The identity card's "Rehearse with them": the researched record and
     // its newest brief (or a prepared seed), frozen per brief version.
     resolve: externalSubjectResolver,
+    // R5: QInvest, AlRayan Investment and Alchemist Doha are canonical,
+    // unclaimed investor organisations rehearsed as labelled simulations.
+    investorLink: createInvestorLink(database.sql),
   },
   store: createPostgresRehearsalStore(database.sql),
   material: {

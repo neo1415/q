@@ -227,6 +227,11 @@ export function registerNavigationViewer(next: NavigationViewer | null): void {
   viewer = next;
 }
 
+/** Who the shell registered as signed in (null before it has). */
+export function currentNavigationViewer(): NavigationViewer | null {
+  return viewer;
+}
+
 export type RouteValidation =
   | { readonly ok: true }
   | { readonly ok: false; readonly reason: "NOT_FOUND" | "UNAUTHORIZED" };

@@ -202,11 +202,40 @@ export function cardPagePath(subject: QSubjectRef | null): string | null {
  * own to that entity's rehearsal lobby, through the one navigation
  * lifecycle (the same path as a card's Open button).
  */
-export function openExternalRehearsal(externalPersonId: string): void {
+export function openExternalRehearsal(
+  externalPersonId: string,
+  investorOrganisationId?: string | null,
+): void {
   beginNavigationTurn();
   requestMove({
-    path: recordPagePath("EXTERNAL_REHEARSAL", externalPersonId),
+    path: externalRehearsalPath(externalPersonId, investorOrganisationId),
   });
+}
+
+/**
+ * R5: an entity that is a canonical (unclaimed) investor organisation is
+ * rehearsed as the investor; any other researched entity keeps the
+ * external-person lobby.
+ */
+export function externalRehearsalPath(
+  externalPersonId: string,
+  investorOrganisationId?: string | null,
+): string {
+  return investorOrganisationId == null
+    ? recordPagePath("EXTERNAL_REHEARSAL", externalPersonId)
+    : recordPagePath("INVESTOR_REHEARSAL", investorOrganisationId);
+}
+
+/**
+ * R5: Rehearse is a founder's tool (a founder pitches an investor). An
+ * investor viewer never sees it on a card. An unknown viewer (before the
+ * shell registered one) keeps it: the lobby and the Q API still decide.
+ */
+export function rehearseOffered(
+  viewerKind: "FOUNDER" | "INVESTOR" | "NONE" | undefined,
+  external: { readonly rehearse: boolean } | undefined,
+): boolean {
+  return external?.rehearse === true && viewerKind !== "INVESTOR";
 }
 
 /**

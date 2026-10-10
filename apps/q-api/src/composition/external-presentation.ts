@@ -61,6 +61,8 @@ export function externalSimulation(
     title,
     disclaimer: `${title}. ${EXTERNAL_REHEARSAL_LABEL}. It is not the real ${entityKind === "PERSON" ? "person" : "organisation or any of its staff"} and does not predict what they would say.`,
     entityKind,
+    investorOrganisationId: subject.investorOrganisationId ?? null,
+    quirk: scenario.quirk?.label ?? null,
     // Only our own stored asset: the card saves an https asset URL it holds.
     imageUrl:
       subject.image.status === "ATTACHED" ? subject.image.assetUrl : null,

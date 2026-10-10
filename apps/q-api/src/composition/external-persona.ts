@@ -268,6 +268,23 @@ export function buildExternalPersona(input: {
     }))
     .filter((t) => t.text.length >= 3);
 
+  // R5: the prepared investor's own sourced research notes (reported, never
+  // quotations), added after the brief's themes and to the sources.
+  for (const note of scenario.notes ?? []) {
+    const existing = sources.findIndex((x) => x.url === note.url);
+    const at =
+      existing >= 0
+        ? existing
+        : sources.push({ label: plain(note.label, 200), url: note.url }) - 1;
+    themes.push({
+      topic: "BACKGROUND",
+      text: plain(note.text, 200),
+      sourceRef: at,
+      reported: true,
+    });
+  }
+  const quirk = scenario.quirk;
+
   const who = plain(subject.displayName, 120);
   const role =
     [subject.role, subject.organization]
@@ -288,6 +305,14 @@ export function buildExternalPersona(input: {
     why: plain(`Direction: ${direction.label}.`, 200),
   }));
   const likelyQuestions = [
+    ...(quirk === undefined
+      ? []
+      : [
+          {
+            question: plain(quirk.earlyQuestion(company), 300),
+            why: plain(`Habit: ${quirk.label}.`, 200),
+          },
+        ]),
     ...modeQuestions,
     ...fitThemes.slice(0, 3).map((t) => ({
       question: plain(
@@ -313,6 +338,7 @@ export function buildExternalPersona(input: {
     .map((t) => plain(reportedLine(t.text, t.reported), 200));
   // The mode's own directions lead; sourced themes keep their places.
   const priorities = [
+    ...(quirk === undefined ? [] : [plain(quirk.label, 200)]),
     ...scenario.directions
       .slice(0, 6 - sourcedPriorities.length)
       .map((direction) => direction.label),
@@ -326,7 +352,7 @@ export function buildExternalPersona(input: {
     // No accent, mannerism or temperament is inferred from the name or
     // nationality; the style is the same neutral professional every time.
     style: plain(
-      "Professional, courteous, direct. Standard natural English. A simulation informed by public sources, not the real person.",
+      `Professional, courteous, direct. Standard natural English. A simulation informed by public sources, not the real person.${quirk === undefined ? "" : ` Habit: ${quirk.label}.`}`,
       300,
     ),
     temperament: {
@@ -341,6 +367,8 @@ export function buildExternalPersona(input: {
     likelyQuestions,
     likelyAnswers: [],
     pushbacks: [
+      ...(quirk?.interjections.slice(0, 2).map((line) => plain(line, 200)) ??
+        []),
       ...scenario.followUp.slice(0, 1).map((line) => plain(line, 200)),
       ...scenario.directions
         .slice(0, 3)
@@ -462,6 +490,11 @@ export function externalLiveInstructions(input: {
     `Voice and manner: natural, standard English, measured pace, short sentences, contractions. Use the same neutral professional manner whatever the name, nationality or location suggests: never put on an accent, dialect or mannerism. One question at a time.`,
     `Opening: after that sentence, open on ${scenario.openingThemes.map((t) => JSON.stringify(t)).join(", then, if it is covered, ")}. Do not read a list of questions. Weave the angles below into a natural conversation, one at a time, in your own words, reacting to what the founder actually says.`,
     `Angles to probe (not a script; ask them naturally, skip any the founder has already covered well):\n${quote(scenario.directions.map((d) => `${d.label}: press on ${d.pressure}`))}`,
+    ...(scenario.quirk === undefined
+      ? []
+      : [
+          `Your one distinctive habit (show it clearly, at least twice in the call, and never describe it as a habit): ${scenario.quirk.behaviour} You may use lines like:\n${quote(scenario.quirk.interjections)}\nThese are style, not quotations: never attribute them to the real person or firm.`,
+        ]),
     `Follow-up behaviour:\n${quote(scenario.followUp)}`,
     `Never put words in the real person's mouth: do not quote them, do not say "you said" or "as I said on...". Public quotations are shown to the founder separately, never spoken by you.`,
     `Conduct: listen, then ask the follow-up an attentive ${built.family === "INVESTOR" ? "investor" : "senior professional"} would ask. If an answer skips the question, say so and ask again. Challenge unsupported claims and numbers that do not add up, civilly. Probe the business model, financials, market, defensibility and the ask. Do not coach or grade during the call; that happens after.`,
@@ -500,7 +533,7 @@ export function externalOpeningLine(input: {
   const company = plain(input.companyName, 80) || "your company";
   const theme = input.scenario.openingThemes[0] ?? "what the business does";
   return plain(
-    `Hello, thanks for making the time. A quick note first: this is an AI rehearsal informed by public sources, not the real person. To begin, tell me about ${company}, and in particular ${theme}.`,
+    `Hello, thanks for making the time. A quick note first: this is an AI rehearsal informed by public sources, not the real person. To begin, tell me about ${company}, and in particular ${theme}.${input.scenario.quirk === undefined ? "" : ` ${input.scenario.quirk.openingTail}`}`,
     600,
   );
 }
