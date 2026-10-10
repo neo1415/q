@@ -500,6 +500,19 @@ export type QToolPorts = {
   readonly research?: PublicWebResearchService | undefined;
   /** W2: fast identity lookup of a named person or organisation; absent means no such tool. */
   readonly people?: PersonLookup | undefined;
+  /**
+   * W4: whether the asker may rehearse with this researched entity (their
+   * own researched record, or a prepared public seed). Absent means the
+   * EXTERNAL_REHEARSAL page is never opened by Q.
+   */
+  readonly externalRehearsal?:
+    | {
+        readonly canRehearse: (
+          actor: ActorContext,
+          externalPersonId: string,
+        ) => Promise<boolean>;
+      }
+    | undefined;
   /** Public LinkedIn pages by URL; absent means the lookup tool does not exist. */
   readonly profiles?: PublicProfileLookupProvider | undefined;
   /** Relationships (CQ-Q-030); absent means no relationship tool exists. */

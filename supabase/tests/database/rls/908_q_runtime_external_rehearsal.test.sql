@@ -68,8 +68,8 @@ select throws_ok(
   $$ insert into q_runtime.rehearsal_external_subjects
        (tenant_id, viewer_user_id, external_person_id, brief_version, subject)
      values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'),
-             '00000000-0000-4000-8000-0000000908f2', 0, '{}') $$,
-  '23514', null, 'a brief version starts at one');
+             '00000000-0000-4000-8000-0000000908f2', -1, '{}') $$,
+  '23514', null, 'a brief version is never negative (0 is no brief yet)');
 select throws_ok(
   $$ insert into q_runtime.persona_profiles
        (tenant_id, viewer_user_id, subject_kind, subject_id, subject_name, profile, signal_digest)

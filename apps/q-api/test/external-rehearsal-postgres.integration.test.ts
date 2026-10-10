@@ -437,4 +437,93 @@ describe("external-person rehearsal (Postgres)", () => {
       if (!(error instanceof Rollback)) throw error;
     }
   });
+  it("Rehearse with them: start resolves the researched record, freezes it per brief version, and refuses an id that is not the asker's", async () => {
+    try {
+      await db.transactions.run(async (tx) => {
+        const me = await person(tx);
+        const subjects = createPostgresExternalSubjectStore(tx.sql);
+        const store = createPostgresRehearsalStore(tx.sql);
+        let version = 1;
+        const material: RehearsalMaterial = {
+          viewer: () =>
+            Promise.resolve({
+              role: "FOUNDER",
+              organisationName: "Acme Freight",
+            }),
+          counterpart: () => Promise.resolve(null),
+          theirMessages: () => Promise.resolve(""),
+          theirCalls: () => Promise.resolve(""),
+          counterpartMaterial: () => Promise.resolve({ text: "", sources: [] }),
+          publicWeb: () => Promise.resolve({ text: "", sources: [] }),
+          ownMaterial: () => Promise.resolve({ text: "Acme", sources: [] }),
+          relationships: () => Promise.resolve([]),
+          upcomingMeetings: () => Promise.resolve([]),
+        };
+        const composer: RehearsalComposer = {
+          personaVersion: 5,
+          persona: () => Promise.resolve(null),
+          turn: () =>
+            Promise.resolve({
+              line: "Tell me what you have shipped?",
+              mood: "NEUTRAL",
+              intensity: "NORMAL",
+              reaction: null,
+              move: "QUESTION",
+              conclusion: null,
+              appraisal: "NEUTRAL",
+              onlyNoise: false,
+            } as never),
+          review: () => Promise.resolve(null),
+        };
+        const service = createRehearsalService({
+          store,
+          material,
+          composer,
+          external: {
+            subjects,
+            // W2's research: only this id is the asker's; the brief grows.
+            resolve: (_scope, id) =>
+              Promise.resolve(
+                id === EXTERNAL_ID
+                  ? {
+                      subject: subjectOf(version),
+                      brief: briefOf(version, `topic ${String(version)}`),
+                    }
+                  : null,
+              ),
+          },
+        });
+        expect(await subjects.latest(me, EXTERNAL_ID)).toBeNull();
+        const started = await service.start(me, {
+          kind: "EXTERNAL_PERSON",
+          id: EXTERNAL_ID,
+        });
+        expect(started.kind).toBe("OK");
+        expect(
+          (await subjects.latest(me, EXTERNAL_ID))?.subject.briefVersion,
+        ).toBe(1);
+        version = 2;
+        await service.persona(me, "EXTERNAL_PERSON", EXTERNAL_ID);
+        expect(
+          (await subjects.latest(me, EXTERNAL_ID))?.subject.briefVersion,
+        ).toBe(2);
+        const rows = await tx.sql<{ n: string }[]>`
+          select count(*)::text as n from q_runtime.rehearsal_external_subjects
+           where viewer_user_id = ${me.userId}`;
+        expect(rows[0]?.n).toBe("2");
+        // An id the asker does not own and that is no seed: not found.
+        expect(
+          (
+            await service.start(me, {
+              kind: "EXTERNAL_PERSON",
+              id: randomUUID(),
+            })
+          ).kind,
+        ).toBe("NOT_FOUND");
+        throw new Rollback();
+      });
+    } catch (error) {
+      if (!(error instanceof Rollback)) throw error;
+    }
+  });
 });

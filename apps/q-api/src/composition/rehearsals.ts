@@ -79,6 +79,7 @@ import {
 import { externalEvaluationBasis } from "./external-evaluation.js";
 import { externalSimulation } from "./external-presentation.js";
 import { scenarioFor } from "./external-scenarios.js";
+import type { ExternalSubjectResolver } from "./external-resolve.js";
 import type { ExternalSubjectStore } from "./external-subjects.js";
 import type { ExternalRehearsalLatency } from "./external-rehearsal-latency.js";
 import {
@@ -1420,6 +1421,12 @@ export function createRehearsalService(dependencies: {
     | {
         readonly subjects: ExternalSubjectStore;
         readonly latency?: ExternalRehearsalLatency | undefined;
+        /**
+         * The asker's researched record and newest brief, or a prepared
+         * public seed: frozen into `subjects` each time a rehearsal is
+         * prepared, so a newer brief version is picked up.
+         */
+        readonly resolve?: ExternalSubjectResolver | undefined;
       }
     | undefined;
 }): RehearsalService {
@@ -1431,6 +1438,27 @@ export function createRehearsalService(dependencies: {
     claimsToBeRealPerson(text, [row.counterpartName])
       ? NOT_THE_REAL_PERSON_LINE
       : text;
+  /**
+   * The researched entity as it stands now: resolved from the asker's own
+   * research (or a prepared seed) and frozen per brief version, else the
+   * snapshot already held.
+   */
+  async function recordOf(actor: ActorContext, id: string) {
+    if (external === undefined) return null;
+    const fresh = await external
+      .resolve?.(actor, id)
+      .catch((error: unknown) => {
+        logger?.warn({ err: error }, "external entity not resolved");
+        return null;
+      });
+    if (fresh !== undefined && fresh !== null) {
+      await external.subjects.save(actor, fresh).catch((error: unknown) => {
+        logger?.warn({ err: error }, "external entity snapshot not saved");
+      });
+      return fresh;
+    }
+    return external.subjects.latest(actor, id).catch(() => null);
+  }
   /** How the screen labels and shows the researched entity, from stored data. */
   async function simulationOf(
     actor: ActorContext,
@@ -1740,7 +1768,7 @@ export function createRehearsalService(dependencies: {
   ): Promise<BuiltPersona | "NOT_FOUND" | "Q_UNAVAILABLE"> {
     if (external === undefined) return "NOT_FOUND";
     const started = performance.now();
-    const record = await external.subjects.latest(actor, id).catch(() => null);
+    const record = await recordOf(actor, id);
     if (record === null) return "NOT_FOUND";
     const own = await material.ownMaterial(actor).catch(() => NO_MATERIAL);
     const digest = digestOf([

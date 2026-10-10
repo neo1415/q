@@ -28,7 +28,7 @@ create table q_runtime.rehearsal_external_subjects (
   tenant_id           uuid not null references identity.tenants (id) on delete restrict,
   viewer_user_id      uuid not null references identity.user_profiles (id) on delete restrict,
   external_person_id  uuid not null,
-  brief_version       integer not null check (brief_version >= 1),
+  brief_version       integer not null check (brief_version >= 0),
   evidence_bundle_id  uuid,
   -- The identity (ExternalPersonSubject) and its evidence-classed public
   -- brief (PersonBrief), both validated by the server; brief is null while

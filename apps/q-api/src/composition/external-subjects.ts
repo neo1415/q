@@ -5,7 +5,6 @@ import {
   type PersonBrief,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
-import type { ActorContext } from "@capital-q/security";
 import { z } from "zod";
 
 /**
@@ -16,6 +15,12 @@ import { z } from "zod";
  * fact and no founder-private data is stored in it.
  */
 
+/** Whose snapshot: the asking tenant and user (an ActorContext fits). */
+export type ExternalSubjectScope = {
+  readonly tenantId: string;
+  readonly userId: string;
+};
+
 export type ExternalSubjectRecord = {
   readonly subject: ExternalPersonSubject;
   /** null while no brief exists: thin evidence, a role simulation. */
@@ -25,12 +30,12 @@ export type ExternalSubjectRecord = {
 export type ExternalSubjectStore = {
   /** The newest brief version this viewer holds for the person. */
   readonly latest: (
-    actor: ActorContext,
+    actor: ExternalSubjectScope,
     externalPersonId: string,
   ) => Promise<ExternalSubjectRecord | null>;
   /** Idempotent per (viewer, person, briefVersion): a repeat is a no-op. */
   readonly save: (
-    actor: ActorContext,
+    actor: ExternalSubjectScope,
     record: ExternalSubjectRecord,
   ) => Promise<void>;
 };

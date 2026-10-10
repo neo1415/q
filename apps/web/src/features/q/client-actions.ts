@@ -100,6 +100,8 @@ export function recordPagePath(
       return `/rehearsals/investor/${safe}`;
     case "COMPANY_REHEARSAL":
       return `/rehearsals/company/${safe}`;
+    case "EXTERNAL_REHEARSAL":
+      return `/rehearsals/person/${safe}`;
     // The Documents page opens its viewer on this one: a deep link that
     // works from any page; the Q API authorises the read as the person.
     case "DOCUMENT":

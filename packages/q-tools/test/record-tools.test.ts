@@ -568,3 +568,56 @@ describe("approving and declining an inbox item (lead decision 2026-09-27)", () 
     expect(decided).toEqual([]);
   });
 });
+
+describe("rehearsing with a researched external person (W4)", () => {
+  const OWN = "00000000-0000-4000-8000-0000000e0001";
+  const executor = createQToolExecutor({
+    registry: createQToolRegistry([
+      createOpenPageTool({
+        ...fakePorts(),
+        externalRehearsal: {
+          canRehearse: (_actor, id) => Promise.resolve(id === OWN),
+        },
+      }),
+    ]),
+  });
+
+  it("opens the rehearsal for an entity the asker may rehearse with", async () => {
+    const outcome = await executor.execute(
+      call("open_page", { page: "EXTERNAL_REHEARSAL", id: OWN }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+    ).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "EXTERNAL_REHEARSAL",
+      id: OWN,
+    });
+  });
+
+  it("never opens one by a name, a stranger's id, or when the port is absent", async () => {
+    for (const args of [
+      { page: "EXTERNAL_REHEARSAL", name: "Shadi Qishta" },
+      {
+        page: "EXTERNAL_REHEARSAL",
+        id: "00000000-0000-4000-8000-0000000e0999",
+      },
+      { page: "EXTERNAL_REHEARSAL", id: "not-an-id" },
+    ]) {
+      const outcome = await executor.execute(
+        call("open_page", args),
+        contextFor(actorA, ownPlan()),
+      );
+      expect(outcome.status).not.toBe("SUCCEEDED");
+    }
+    const bare = createQToolExecutor({
+      registry: createQToolRegistry([createOpenPageTool(fakePorts())]),
+    });
+    const outcome = await bare.execute(
+      call("open_page", { page: "EXTERNAL_REHEARSAL", id: OWN }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
+  });
+});
