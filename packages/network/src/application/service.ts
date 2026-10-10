@@ -183,8 +183,7 @@ export type InterestService = {
    * (R1). Optional so narrow fakes need not carry it.
    */
   readonly relationshipBriefs?:
-    | ReturnType<typeof createRelationshipBriefs>
-    | undefined;
+    ReturnType<typeof createRelationshipBriefs> | undefined;
   /** An investor organisation's own relationships (CQ-WEB-030). */
   readonly listRelationshipsForInvestor: (query: {
     readonly actor: ActorContext;
