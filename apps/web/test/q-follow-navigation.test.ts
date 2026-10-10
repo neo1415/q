@@ -183,3 +183,38 @@ describe("what is already there when a conversation opens (G2 follow-up)", () =>
     expect(live?.kind === "Q" ? live.runId : null).toBe("run-1");
   });
 });
+
+describe("an answer from before this page load never moves (G2 gate cd52c0ea)", () => {
+  const LOADED = Date.parse("2026-10-10T10:00:00.000Z");
+  const at = (id: string, iso: string): QTurn => ({
+    ...(qTurn(id, toDiscover) as Extract<QTurn, { kind: "Q" }>),
+    at: iso,
+  });
+
+  it("earlier answers handed in after open (the room feed's recent backlog) are never followed", () => {
+    // /home opened with nothing; then the room feed hands in answers the
+    // typed matrix recorded seconds before this load.
+    const seen = seenAtOpen([], null);
+    const backlog = [
+      at("r1", "2026-10-10T09:59:20.000Z"),
+      at("r2", "2026-10-10T09:59:40.000Z"),
+    ];
+    const followed = followOfThread(backlog, seen, {
+      active: false,
+      loadedAt: LOADED,
+    });
+    expect(followed.navigate).toBeNull();
+    expect(followed.actions).toEqual([]);
+    expect(seen.has("r1") && seen.has("r2")).toBe(true);
+  });
+
+  it("G-D16 stays: an answer recorded after this load (to what they just typed) is followed", () => {
+    const seen = seenAtOpen([], LOADED + 5_000);
+    const followed = followOfThread(
+      [at("fresh", "2026-10-10T10:00:09.000Z")],
+      seen,
+      { active: false, loadedAt: LOADED },
+    );
+    expect(followed.navigate).toBe("DISCOVER");
+  });
+});

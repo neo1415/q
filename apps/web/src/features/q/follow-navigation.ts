@@ -82,10 +82,27 @@ export function followOfThread(
   seen: Set<string>,
   voice: {
     readonly active: boolean;
+    /** When this document loaded (epoch ms); default: the real one. */
+    readonly loadedAt?: number | undefined;
     /** Runs started in this tab from typed questions (default: all noted). */
     readonly typedRuns?: ReadonlySet<string> | undefined;
   },
 ): ReturnType<typeof followOfTurns> {
+  // G2 gate (cd52c0ea): an answer recorded before this page loaded never
+  // moves the person, however it reaches the thread after open -- the
+  // room feed hands in the last 45 s of answers when a line starts, and
+  // after the typed matrix /home re-asked six earlier moves (all
+  // SUPERSEDED, a "couldn't open" notice, no page change). Marked seen.
+  const loadedAt = voice.loadedAt ?? pageLoadedAt();
+  for (const turn of turns) {
+    if (
+      turn.kind === "Q" &&
+      turn.at !== undefined &&
+      Date.parse(turn.at) < loadedAt
+    ) {
+      seen.add(turn.id);
+    }
+  }
   if (!voice.active) return followOfTurns(turns, seen);
   const typedRuns = voice.typedRuns ?? TYPED_RUNS;
   const typed = followOfTurns(
@@ -126,6 +143,11 @@ export function seenAtOpen(
     if (!fresh) seen.add(turn.id);
   }
   return seen;
+}
+
+/** When this document loaded, epoch ms (0 outside a browser). */
+function pageLoadedAt(): number {
+  return typeof performance === "undefined" ? 0 : performance.timeOrigin;
 }
 
 /** Clock skew between the browser's "asked" and the server's record. */
