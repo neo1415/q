@@ -9,7 +9,7 @@
  * receipt arrives (the web chat swaps the line; the live voice is told by
  * the receipt note), and FAILED says plainly that it did not open.
  */
-export type MovePhase = "PENDING" | "VERIFIED" | "FAILED";
+export type MovePhase = "PENDING" | "VERIFIED" | "FAILED" | "ASKED";
 
 const HOME = /^(?:home|home now)$/iu;
 
@@ -31,6 +31,10 @@ export function movePhaseLine(phase: MovePhase, place: string): string {
       return home ? "You're home." : `Opened ${where}.`;
     case "FAILED":
       return home ? "Home didn't open." : `${capitalised(where)} didn't open.`;
+    // A move this tab holds no receipt for (a reload, history): neutral
+    // past wording, never a pending state that can't resolve.
+    case "ASKED":
+      return home ? "Asked to go home." : `Asked to open ${where}.`;
   }
 }
 

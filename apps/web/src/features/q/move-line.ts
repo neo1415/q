@@ -15,6 +15,7 @@ import {
   lastNavigationTo,
   navigationFailureMessage,
   onNavigationPhase,
+  routesMatch,
   type NavigationState,
 } from "./control/navigation-lifecycle";
 
@@ -44,21 +45,27 @@ export function routeOfBlocks(blocks: readonly QResultBlock[]): string | null {
   return movePath({ navigate, action });
 }
 
-/** The words for a turn's text given its move's lifecycle state. */
+/**
+ * The words for a turn's text given its move's lifecycle state in this
+ * tab. No state (a reload, history): "Opened X." when the tab is on the
+ * target now (`here`), else neutral past wording -- never left pending.
+ */
 export function moveLineOf(
   text: string,
   state: NavigationState | null,
+  here = false,
 ): string {
   const place = pendingPlaceOf(text);
-  if (place === null || state === null) return text;
+  if (place === null) return text;
   const lead = /^(?:Opening\s+[^…\n]{1,80}?|Heading home)…/u.exec(text.trim());
   const rest = lead === null ? "" : text.trim().slice(lead[0].length).trim();
-  if (state.phase === "VERIFIED") {
-    return [movePhaseLine("VERIFIED", place), rest].filter(Boolean).join(" ");
+  const phase = state === null ? (here ? "VERIFIED" : "ASKED") : state.phase;
+  if (phase === "VERIFIED" || phase === "ASKED") {
+    return [movePhaseLine(phase, place), rest].filter(Boolean).join(" ");
   }
-  if (state.phase === "FAILED") {
+  if (phase === "FAILED") {
     const why =
-      state.reason === undefined ? "" : navigationFailureMessage(state.reason);
+      state?.reason === undefined ? "" : navigationFailureMessage(state.reason);
     return [movePhaseLine("FAILED", place), why].filter(Boolean).join(" ");
   }
   return text;
@@ -74,12 +81,17 @@ export function useMoveLine(
     (changed: () => void) => onNavigationPhase(() => changed()),
     [],
   );
-  // The ledger keeps each move's state object until its phase changes, so
-  // the snapshot is stable between changes.
-  const state = useSyncExternalStore(
+  // A string snapshot: stable by value between changes.
+  return useSyncExternalStore(
     subscribe,
-    () => (route === null ? null : lastNavigationTo(route)),
-    () => null,
+    () => {
+      if (route === null) return text;
+      const here = routesMatch(
+        route,
+        `${window.location.pathname}${window.location.search}`,
+      );
+      return moveLineOf(text, lastNavigationTo(route), here);
+    },
+    () => text,
   );
-  return moveLineOf(text, state);
 }

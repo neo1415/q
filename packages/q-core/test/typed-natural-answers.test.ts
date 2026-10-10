@@ -150,6 +150,7 @@ describe("R3: one source for what Q says about a move, by lifecycle phase", () =
     );
     expect(movePhaseLine("PENDING", "home")).toBe("Heading home…");
     expect(movePhaseLine("VERIFIED", "home")).toBe("You're home.");
+    expect(movePhaseLine("ASKED", "Capital")).toBe("Asked to open Capital.");
   });
 
   it("reads the place back from a pending line, and nothing else", () => {

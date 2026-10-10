@@ -12,11 +12,23 @@ function state(phase: NavigationState["phase"], extra = {}): NavigationState {
 }
 
 describe("R3: the typed row says opened only on the browser's VERIFIED", () => {
-  it("stays pending while the move is on its way, or was never made here", () => {
-    expect(moveLineOf("Opening Capital…", null)).toBe("Opening Capital…");
+  it("stays pending while the move is on its way in this tab", () => {
     expect(moveLineOf("Opening Capital…", state("EXECUTING"))).toBe(
       "Opening Capital…",
     );
+  });
+
+  it("no receipt in this tab (a reload): opened if the tab is there, else neutral past", () => {
+    expect(moveLineOf("Opening Capital…", null, true)).toBe("Opened Capital.");
+    expect(moveLineOf("Opening Capital…", null, false)).toBe(
+      "Asked to open Capital.",
+    );
+    expect(moveLineOf("Heading home…", null)).toBe("Asked to go home.");
+    expect(
+      moveLineOf("Opening Tensorgate… Want me to run through them?", null),
+    ).toBe("Asked to open Tensorgate. Want me to run through them?");
+    // Never left pending without a lifecycle to resolve it.
+    expect(moveLineOf("Opening Capital…", null)).not.toContain("…");
   });
 
   it("confirms on VERIFIED, keeping what followed", () => {
