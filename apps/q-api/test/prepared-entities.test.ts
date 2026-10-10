@@ -8,7 +8,9 @@ import {
 } from "@capital-q/database";
 import {
   createInMemoryKnownEntityStore,
+  createKnownEntityIndex,
   type KnownEntityRecord,
+  type KnownEntityStore,
 } from "@capital-q/q-research";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -16,7 +18,7 @@ import {
   createPreparedEntities,
   preparedEntityPrewarmLines,
   rehearsalCounterpart,
-  type PreparedEntityStore,
+  type PreparedEntitySource,
 } from "../src/composition/prepared-entities.js";
 import {
   loadPreparedSeed,
@@ -32,37 +34,36 @@ const rawSeed: unknown = JSON.parse(readFileSync(seedPath, "utf8"));
 const seed = parsePreparedSeed(rawSeed);
 const options = { webOrigin: "https://app.example" };
 
-/** W2's in-memory store with the version and the per-run round-trip count a Postgres store has. */
+/** W2's in-memory store and index, counting trips the way a Postgres store would. */
 function memoryStore() {
   const inner = createInMemoryKnownEntityStore();
   const calls = { list: 0, version: 0 };
   const versionOf = (records: readonly KnownEntityRecord[]): string =>
     `${records.length}:${JSON.stringify(records).length}`;
-  const store: PreparedEntityStore = {
+  const store: KnownEntityStore = {
     ...inner,
     listPrepared: () => {
+      calls.list += 1;
       countRoundTrip("prepared");
       return inner.listPrepared();
     },
-    listWithVersion: async () => {
-      calls.list += 1;
-      countRoundTrip("prepared");
-      const records = await inner.listPrepared();
-      return { version: versionOf(records), records };
-    },
+  };
+  const source = (): PreparedEntitySource => ({
+    store,
+    index: createKnownEntityIndex({ store }),
     version: async () => {
       calls.version += 1;
       countRoundTrip("prepared");
       return versionOf(await inner.listPrepared());
     },
-  };
-  return { store, inner, calls };
+  });
+  return { store, inner, calls, source };
 }
 
 async function warmed() {
   const memory = memoryStore();
   await loadPreparedSeed(memory.store, seed, options);
-  const entities = createPreparedEntities(memory.store);
+  const entities = createPreparedEntities(memory.source());
   await entities.start();
   return { ...memory, entities };
 }
@@ -223,7 +224,8 @@ describe("prepared research entities: the hot cache", () => {
     expect(found.map((r) => r.kind)).toEqual(Array(5).fill("FOUND"));
     expect(counter.count).toBe(0);
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(calls).toEqual({ list: 1, version: 0 });
+    expect(calls.version).toBe(1);
+    expect(calls.list).toBe(2);
   });
 
   it("resolves aliases and W3 name variants to the right entity", async () => {
@@ -242,6 +244,9 @@ describe("prepared research entities: the hot cache", () => {
     expect(key("Qishta Shadi")).toBe("qa-demo-shadi-qishta");
     expect(key("Shadi Kishta")).toBe("qa-demo-shadi-qishta");
     expect(key("Mohannad Taslaq")).toBe("qa-demo-muhannad-taslaq");
+    // W3's recognition renderings of the same names.
+    expect(key("Queue Invest")).toBe("qa-demo-qinvest");
+    expect(key("Shady Kishta")).toBe("qa-demo-shadi-qishta");
   });
 
   it("does not claim a prepared match for someone else or for a generic word", async () => {
@@ -260,12 +265,13 @@ describe("prepared research entities: the hot cache", () => {
   });
 
   it("rebuilds from the store after a restart with one query", async () => {
-    const { store } = await warmed();
-    const restarted = createPreparedEntities(store);
+    const { source } = await warmed();
+    const restarted = createPreparedEntities(source());
     expect(restarted.lookup("Invest Qatar").kind).toBe("NONE");
     const counter = createRoundTripCounter("restart");
     await withRoundTripCounter(counter, () => restarted.start());
-    expect(counter.count).toBe(1);
+    // version + the index load + the records for the prewarm list.
+    expect(counter.count).toBe(3);
     expect(restarted.lookup("Invest Qatar").kind).toBe("FOUND");
     expect(restarted.all()).toHaveLength(5);
   });
@@ -273,7 +279,7 @@ describe("prepared research entities: the hot cache", () => {
   it("reloads when the store version changes, and only then", async () => {
     const { store, entities, calls } = await warmed();
     expect(await entities.refreshIfChanged()).toBe(false);
-    expect(calls).toEqual({ list: 1, version: 1 });
+    expect(calls).toEqual({ list: 2, version: 2 });
     const entity = seed.entities[0];
     if (entity === undefined) throw new Error("seed has entities");
     // Same content: still unchanged. A corrected fact: reload.

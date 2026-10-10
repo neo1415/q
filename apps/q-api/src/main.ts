@@ -16,9 +16,9 @@
  */
 
 import { createFitComposition } from "./composition/fit.js";
-import { createPostgresPreparedEntityStore } from "./composition/known-entity-store.js";
 import {
   createPreparedEntities,
+  createPreparedVersionReader,
   preparedEntityPrewarmLines,
   watchPreparedEntities,
 } from "./composition/prepared-entities.js";
@@ -760,28 +760,6 @@ const logger = createLogger(
   { level: config.observability.logLevel },
 );
 
-// Prepared public research entities (W5), held hot: one query now, then a
-// known name costs no web call and no database trip. A failed load costs
-// the demo pack its instant lookup, never the service; the check below
-// retries and a normal search still works.
-const preparedEntities = createPreparedEntities(
-  createPostgresPreparedEntityStore({
-    sql: database.sql,
-    transactions: database.transactions,
-  }),
-);
-await preparedEntities
-  .start()
-  .then((count) => {
-    logger.info({ count }, "prepared research entities warmed");
-  })
-  .catch((error: unknown) => {
-    logger.warn({ err: error }, "prepared research entities not loaded");
-  });
-watchPreparedEntities(preparedEntities, (error) => {
-  logger.warn({ err: error }, "prepared research entities check failed");
-});
-
 // The owning contexts' public query ports. The Q side never touches another
 // context's tables: subjects, disclosure and the firewall all read through
 // these.
@@ -1158,6 +1136,26 @@ const researchComposition = composeResearch({
   gateway: modelGateway,
   dataPosture: demoDataPosture,
   logger,
+});
+
+// Prepared public research entities (W5), held hot on W2's shared index:
+// a known name costs no web call and no database trip; a change in the
+// store reloads it. A failed load costs the demo pack its instant lookup,
+// never the service; the check retries and a normal search still works.
+const preparedEntities = createPreparedEntities({
+  ...researchComposition.knownEntities,
+  version: createPreparedVersionReader(database.sql),
+});
+await preparedEntities
+  .start()
+  .then((count) => {
+    logger.info({ count }, "prepared research entities loaded");
+  })
+  .catch((error: unknown) => {
+    logger.warn({ err: error }, "prepared research entities not loaded");
+  });
+watchPreparedEntities(preparedEntities, (error) => {
+  logger.warn({ err: error }, "prepared research entities check failed");
 });
 
 // Public presence (CQ-Q-PRESENCE-001): what the web already says about a

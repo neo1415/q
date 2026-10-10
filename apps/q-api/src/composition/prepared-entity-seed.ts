@@ -1,3 +1,4 @@
+import { QATAR_FIVE } from "@capital-q/q-core/names";
 import type {
   KnownEntityStore,
   PreparedEntityUpsert,
@@ -137,6 +138,17 @@ export function parsePreparedSeed(raw: unknown): PreparedSeed {
   return seed;
 }
 
+/** W3's recognition aliases (Latin script only), by the seed's demo id. */
+const NAME_MODULE_ID: Readonly<Record<string, string>> = {
+  "qa-demo-shadi-qishta": "seed:shadi-qishta",
+  "qa-demo-qinvest": "seed:qinvest",
+  "qa-demo-muhannad-taslaq": "seed:muhannad-taslaq",
+  "qa-demo-invest-qatar": "seed:invest-qatar",
+  "qa-demo-alrayan": "seed:alrayan-investment",
+};
+const recognitionAliases = (demoId: string): readonly string[] =>
+  QATAR_FIVE.find((one) => one.id === NAME_MODULE_ID[demoId])?.aliases ?? [];
+
 const clip = (text: string, max: number): string =>
   text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 
@@ -202,6 +214,7 @@ export function toPreparedUpsert(
     aliases: [
       ...new Set([
         ...entity.aliases,
+        ...recognitionAliases(entity.demo_id),
         ...entity.arabic_names.map((name) => name.text),
       ]),
     ].filter((alias) => alias !== entity.name),

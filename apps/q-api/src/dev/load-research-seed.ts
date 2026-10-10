@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { loadDatabaseConfig } from "@capital-q/config/database";
 import { createPrivilegedDatabaseClient } from "@capital-q/database/privileged";
 
-import { createPostgresPreparedEntityStore } from "../composition/known-entity-store.js";
+import { createPostgresKnownEntityStore } from "../composition/known-entities.js";
+import { createPreparedVersionReader } from "../composition/prepared-entities.js";
 import {
   loadPreparedSeed,
   parsePreparedSeed,
@@ -47,13 +48,14 @@ const webOrigin =
 const seed = parsePreparedSeed(JSON.parse(readFileSync(seedPath, "utf8")));
 const database = createPrivilegedDatabaseClient(loadDatabaseConfig());
 try {
-  const store = createPostgresPreparedEntityStore({
+  const store = createPostgresKnownEntityStore({
     sql: database.sql,
     transactions: database.transactions,
   });
-  const before = await store.version();
+  const version = createPreparedVersionReader(database.sql);
+  const before = await version();
   const loaded = await loadPreparedSeed(store, seed, { webOrigin });
-  const after = await store.version();
+  const after = await version();
   process.stdout.write(
     `${JSON.stringify({
       seed: seed.seed_version,

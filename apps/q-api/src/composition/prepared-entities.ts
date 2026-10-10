@@ -1,10 +1,11 @@
 import {
   aliasKeyOf,
-  createKnownEntityIndex,
+  type KnownEntityIndex,
   type KnownEntityRecord,
   type KnownEntityStore,
   type KnownLookup,
 } from "@capital-q/q-research";
+import type { DatabaseExecutor } from "@capital-q/database";
 
 /**
  * Prepared public research entities, held hot (W5, on W2's store and index).
@@ -19,15 +20,32 @@ import {
  * Nothing here transliterates, "pronounces" or portrays a real person.
  */
 
-export type PreparedEntityStore = KnownEntityStore & {
-  /** Every prepared entity with the version it was read at: one query. */
-  readonly listWithVersion: () => Promise<{
-    readonly version: string;
-    readonly records: readonly KnownEntityRecord[];
-  }>;
+/**
+ * W2's store and its shared in-memory index (composeResearch's
+ * `knownEntities`), plus the cheap version read the invalidation uses.
+ */
+export type PreparedEntitySource = {
+  readonly store: KnownEntityStore;
+  readonly index: KnownEntityIndex;
   /** Changes whenever a prepared entity is written. One cheap query. */
   readonly version: () => Promise<string>;
 };
+
+/**
+ * `count:max(updated_at)` over the prepared rows (W2's table): a write
+ * anywhere moves it. Read only by the background check, never by a lookup.
+ */
+export function createPreparedVersionReader(
+  sql: DatabaseExecutor,
+): () => Promise<string> {
+  return async () => {
+    const [row] = await sql<{ version: string }[]>`
+      select count(*)::text || ':' || coalesce(max(updated_at)::text, '') as version
+        from q_runtime.external_persons
+       where tenant_id is null and research_status = 'PREPARED_PUBLIC_SEED'`;
+    return row?.version ?? "0:";
+  };
+}
 
 export type PreparedEntities = {
   /** Loads from the store (one query). Call at process start. */
@@ -78,31 +96,27 @@ const words = (text: string): string[] =>
     .filter((word) => word.length > 0);
 
 export function createPreparedEntities(
-  store: PreparedEntityStore,
+  source: PreparedEntitySource,
 ): PreparedEntities {
+  const { store, index } = source;
   let loaded: string | null = null;
   let records: readonly KnownEntityRecord[] = [];
   let names: ReadonlySet<string> = new Set();
-  // The index warms through one `listWithVersion` query; the version and
-  // the records it saw are kept from that same read.
-  const index = createKnownEntityIndex({
-    store: {
-      ...store,
-      listPrepared: async () => {
-        const read = await store.listWithVersion();
-        loaded = read.version;
-        records = read.records;
-        names = new Set(
-          read.records.flatMap((record) =>
-            [record.displayName, ...record.aliases].map(aliasKeyOf),
-          ),
-        );
-        return read.records;
-      },
-    },
-  });
 
-  const load = (): Promise<number> => index.warm();
+  async function load(): Promise<number> {
+    // Version first: a write between the reads costs one more reload on
+    // the next check, never a stale label.
+    const version = await source.version();
+    const size = await index.warm();
+    records = await store.listPrepared();
+    names = new Set(
+      records.flatMap((record) =>
+        [record.displayName, ...record.aliases].map(aliasKeyOf),
+      ),
+    );
+    loaded = version;
+    return size;
+  }
 
   return {
     start: load,
@@ -122,7 +136,7 @@ export function createPreparedEntities(
     all: () => records,
     version: () => loaded,
     refreshIfChanged: async () => {
-      if ((await store.version()) === loaded) return false;
+      if ((await source.version()) === loaded) return false;
       await load();
       return true;
     },
