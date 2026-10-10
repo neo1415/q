@@ -7,6 +7,7 @@ import {
 } from "@capital-q/contracts";
 
 import { plain } from "./external-persona.js";
+import type { Scenario } from "./external-scenarios.js";
 
 /**
  * The post-call evaluation of a rehearsal with a researched external
@@ -60,6 +61,7 @@ export function externalEvaluationBasis(input: {
   readonly dimensions: QRehearsalReviewDto["dimensions"];
   readonly tips: readonly string[];
   readonly sources: readonly { label: string; url: string | null }[];
+  readonly scenario?: Scenario | undefined;
 }): ExternalEvaluationBasis {
   const mine = input.turns.filter((turn) => turn.from === "YOU");
   const areas = EXTERNAL_EVALUATION_AREAS.map((area) => {
@@ -89,9 +91,28 @@ export function externalEvaluationBasis(input: {
       youSaid: line === undefined ? null : plain(line.text, 200),
     };
   });
-  const gaps = areas
-    .filter((a) => !a.covered)
-    .map((a) => `Prepare ${AREA_WORDS[a.area]}: it did not come up in this call.`);
+  const modeFocus = (input.scenario?.directions ?? []).map((direction) => {
+    const line = mine.find((turn) => direction.keywords.test(turn.text));
+    return {
+      key: direction.key,
+      label: direction.label,
+      covered: line !== undefined,
+      youSaid: line === undefined ? null : plain(line.text, 200),
+    };
+  });
+  const gaps = [
+    ...modeFocus
+      .filter((focus) => !focus.covered)
+      .map(
+        (focus) =>
+          `Prepare ${focus.label.toLowerCase()}: this kind of meeting tests it and it did not come up.`,
+      ),
+    ...areas
+      .filter((a) => !a.covered)
+      .map(
+        (a) => `Prepare ${AREA_WORDS[a.area]}: it did not come up in this call.`,
+      ),
+  ];
   return {
     label: EXTERNAL_REHEARSAL_LABEL,
     disclaimer: EXTERNAL_REHEARSAL_DISCLAIMER,
@@ -103,5 +124,8 @@ export function externalEvaluationBasis(input: {
       .slice(0, 12),
     areas,
     beforeTheRealMeeting: [...input.tips, ...gaps].slice(0, 8),
+    ...(input.scenario === undefined
+      ? {}
+      : { scenario: input.scenario.id, modeFocus }),
   };
 }

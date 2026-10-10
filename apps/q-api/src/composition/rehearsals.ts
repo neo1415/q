@@ -9,6 +9,7 @@ import {
   REHEARSAL_HAND_RAISED_SIGNAL,
   REHEARSAL_SILENCE_SIGNAL,
   type RehearsalDifficulty,
+  type ExternalSimulationDto,
   type ModelDataPosture,
   type PersonaSourceKind,
   type QPersonaSourceDto,
@@ -76,6 +77,8 @@ import {
   NOT_THE_REAL_PERSON_LINE,
 } from "./external-persona.js";
 import { externalEvaluationBasis } from "./external-evaluation.js";
+import { externalSimulation } from "./external-presentation.js";
+import { scenarioFor } from "./external-scenarios.js";
 import type { ExternalSubjectStore } from "./external-subjects.js";
 import type { ExternalRehearsalLatency } from "./external-rehearsal-latency.js";
 import {
@@ -1428,6 +1431,39 @@ export function createRehearsalService(dependencies: {
     claimsToBeRealPerson(text, [row.counterpartName])
       ? NOT_THE_REAL_PERSON_LINE
       : text;
+  /** How the screen labels and shows the researched entity, from stored data. */
+  async function simulationOf(
+    actor: ActorContext,
+    id: string,
+    sources: unknown,
+  ): Promise<ExternalSimulationDto | null> {
+    const record = await external?.subjects.latest(actor, id).catch(() => null);
+    if (record === undefined || record === null) return null;
+    return externalSimulation(record, publicSources(sources));
+  }
+  /** A result with the simulation shown fully (portrait, headline, sources). */
+  async function decorated(
+    actor: ActorContext,
+    result: RehearsalResult,
+  ): Promise<RehearsalResult> {
+    if (
+      result.kind !== "OK" ||
+      result.rehearsal.counterpart.kind !== "EXTERNAL_PERSON"
+    ) {
+      return result;
+    }
+    const persona = await store
+      .findPersona(actor, "EXTERNAL_PERSON", result.rehearsal.counterpart.id)
+      .catch(() => null);
+    const simulation = await simulationOf(
+      actor,
+      result.rehearsal.counterpart.id,
+      persona?.sources ?? [],
+    );
+    return simulation === null
+      ? result
+      : { kind: "OK", rehearsal: { ...result.rehearsal, simulation } };
+  }
   const turnDeadlineMs = dependencies.turnDeadlineMs ?? TURN_DEADLINE_MS;
   const visionTurnsCap = dependencies.visionTurns ?? VISION_TURNS_PER_REHEARSAL;
   const now = dependencies.now ?? (() => new Date());
@@ -1774,15 +1810,27 @@ export function createRehearsalService(dependencies: {
     graded: Pick<RehearsalReviewResult, "dimensions" | "tips">,
   ): Promise<{ externalBasis?: ReturnType<typeof externalEvaluationBasis> }> {
     if (row.counterpartKind !== "EXTERNAL_PERSON") return {};
-    const persona = await store
-      .findPersona(actor, row.counterpartKind, row.counterpartId)
-      .catch(() => null);
+    const [persona, record] = await Promise.all([
+      store
+        .findPersona(actor, row.counterpartKind, row.counterpartId)
+        .catch(() => null),
+      external?.subjects.latest(actor, row.counterpartId).catch(() => null) ??
+        Promise.resolve(null),
+    ]);
     return {
       externalBasis: externalEvaluationBasis({
         turns,
         dimensions: graded.dimensions,
         tips: graded.tips,
         sources: publicSources(persona?.sources ?? []),
+        scenario:
+          record === null
+            ? undefined
+            : scenarioFor({
+                displayName: record.subject.displayName,
+                nameVariants: record.subject.nameVariants,
+                entityKind: record.presentation?.entityKind,
+              }),
       }),
     };
   }
@@ -2285,7 +2333,11 @@ export function createRehearsalService(dependencies: {
           sources: publicSources(built.row.sources),
           ...(kind === "EXTERNAL_PERSON"
             ? {
-                simulation: {
+                simulation: (await simulationOf(
+                  actor,
+                  id,
+                  built.row.sources,
+                )) ?? {
                   label: EXTERNAL_REHEARSAL_LABEL,
                   disclaimer: EXTERNAL_REHEARSAL_DISCLAIMER,
                 },
@@ -2382,11 +2434,14 @@ export function createRehearsalService(dependencies: {
           },
         ],
       });
-      return ok(row);
+      return decorated(actor, ok(row));
     },
 
     get: async (actor, rehearsalId) =>
-      okWithHistory(actor, await store.own(actor, rehearsalId)),
+      decorated(
+        actor,
+        await okWithHistory(actor, await store.own(actor, rehearsalId)),
+      ),
 
     list: async (actor, filter) => {
       const rows = await store.list(actor, filter);

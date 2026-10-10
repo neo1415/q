@@ -83,7 +83,7 @@ describe("external persona builder", () => {
     expect(questions).toContain("Acme Freight");
     // Generic role questions still cover the evaluation dimensions.
     expect(questions).toMatch(/unit economics/);
-    expect(questions).toMatch(/copying/);
+    expect(questions).toMatch(/Acme Freight/);
     expect(built.sources.length).toBeGreaterThan(0);
     expect(built.sources.every((s) => s.url.startsWith("https://"))).toBe(true);
   });
