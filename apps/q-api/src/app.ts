@@ -554,7 +554,10 @@ export function createApp(
     });
   }
   // W1: what Q told them on arrival, as one canonical snapshot.
-  if (modules.arrivalSnapshots !== undefined && security.resolver !== undefined) {
+  if (
+    modules.arrivalSnapshots !== undefined &&
+    security.resolver !== undefined
+  ) {
     registerArrivalSnapshotRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,

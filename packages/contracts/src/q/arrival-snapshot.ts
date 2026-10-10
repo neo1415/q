@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
-import { QAttentionSourceSchema } from "./attention.js";
+import { QActivitySummarySchema, QAttentionSourceSchema } from "./attention.js";
 
 /**
  * The Arrival Snapshot (W1, founder 2026-10-10: "Q already knows what it
@@ -212,6 +212,8 @@ export const ArrivalSnapshotSchema = z
     unread: z.array(QAttentionSourceSchema),
     /** Whether the relationship briefs behind the items were readable. */
     briefsRead: z.boolean(),
+    /** What Q and its agents did since the window began (counts and names). */
+    activity: QActivitySummarySchema.nullable(),
   })
   .strict();
 export type ArrivalSnapshot = z.infer<typeof ArrivalSnapshotSchema>;

@@ -257,8 +257,7 @@ export type LiveBrokerDependencies = {
    * same snapshot the welcome and Q's turns are given).
    */
   readonly arrivalFor?:
-    | ((actor: ActorContext) => Promise<ArrivalSnapshot | null>)
-    | undefined;
+    ((actor: ActorContext) => Promise<ArrivalSnapshot | null>) | undefined;
   /**
    * The voice turn board (what the turn handler recorded for the line):
    * read after a run, so the delegation's result says whether the run

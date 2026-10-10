@@ -75,7 +75,9 @@ describe("buildArrivalSnapshot", () => {
     expect(item?.openPath).toBe(
       relationshipMessagesPath("INVESTOR_ORGANISATION", COUNTERPART),
     );
-    expect(item?.openPath).toBe(`/relationships/investor/${COUNTERPART}/messages`);
+    expect(item?.openPath).toBe(
+      `/relationships/investor/${COUNTERPART}/messages`,
+    );
   });
 
   it("bounds the message preview", () => {

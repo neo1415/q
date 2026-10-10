@@ -19,6 +19,7 @@ import {
   type SequenceState,
 } from "@capital-q/q-core/speech";
 import type {
+  ArrivalSnapshot,
   BriefingCommandRequest,
   BriefingCommandResultDto,
   NamedPicture,
@@ -81,6 +82,12 @@ export type ArrivalData = {
    * older read; null: the report itself could not be put together.
    */
   readonly attention?: QAttentionReport | null | undefined;
+  /**
+   * W1: the Arrival Snapshot this briefing was said from (the same object
+   * Q's turns and the live voice are given); absent when it could not be
+   * read, in which case the attention read or its bridge was used.
+   */
+  readonly snapshot?: ArrivalSnapshot | undefined;
   /** Where each attention line is acted on, by item key (in-app paths). */
   readonly attentionLinks?: Readonly<Record<string, string>> | undefined;
   /** What their agents finished in the window; null: not read. */

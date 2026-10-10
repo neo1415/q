@@ -47,13 +47,18 @@ const SNAPSHOT: ArrivalSnapshot = ArrivalSnapshotSchema.parse({
   asOf: NOW,
   unread: [],
   briefsRead: true,
+  activity: null,
   items: [
     {
       key: `interest:${REL}`,
       kind: "INTEREST_REQUEST",
       headline: "TensorGate wants to connect and is waiting for your answer",
       availability: "OK",
-      counterpart: { kind: "INVESTOR_ORGANISATION", id: OTHER, name: "TensorGate" },
+      counterpart: {
+        kind: "INVESTOR_ORGANISATION",
+        id: OTHER,
+        name: "TensorGate",
+      },
       ids: {
         relationshipId: REL,
         companyId: null,
@@ -210,7 +215,9 @@ function build(snapshot: () => ArrivalSnapshot | null, said: string) {
   return { seam, request, alpha, executed, reads: () => snapshotReads };
 }
 
-function promptOf(alpha: { calls: readonly { request: { messages: readonly { content: string }[] } }[] }): string {
+function promptOf(alpha: {
+  calls: readonly { request: { messages: readonly { content: string }[] } }[];
+}): string {
   const sent = alpha.calls
     .flatMap((call) => call.request.messages.map((m) => m.content))
     .join("\n");
@@ -238,7 +245,10 @@ describe("follow-ups on the arrival briefing are answered from the snapshot", ()
   }
 
   it("serves nothing when the snapshot is withheld (revoked or unreadable)", async () => {
-    const { seam, request, alpha, executed } = build(() => null, "what's the request?");
+    const { seam, request, alpha, executed } = build(
+      () => null,
+      "what's the request?",
+    );
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
     const prompt = promptOf(alpha);
     expect(prompt).not.toContain("Could we do Thursday 3pm");

@@ -112,7 +112,7 @@ export type QIntelligenceDependencies = {
   readonly sql: DatabaseExecutor;
   /** W1: what Q told them on arrival, prepared for every turn of theirs. */
   readonly arrivalSnapshot?:
-    ((actor: QAnswerRequest["actor"]) => Promise<ArrivalSnapshot | null>)
+    | ((actor: QAnswerRequest["actor"]) => Promise<ArrivalSnapshot | null>)
     | undefined;
   /** RECOVERY (C's request): receipt facts of the person's recent UI acts. */
   readonly uiActReceipts?:

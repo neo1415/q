@@ -75,7 +75,8 @@ describe("the arrival snapshot, against PostgreSQL (W1)", () => {
         await sql`insert into auth.users (id, email) values (${authId}, ${`${authId.slice(0, 8)}@arrival.example.invalid`})`;
         const [profile] = await sql<{ id: string }[]>`
           select id from identity.user_profiles where auth_user_id = ${authId}`;
-        if (profile === undefined) throw new Error("profile trigger did not run");
+        if (profile === undefined)
+          throw new Error("profile trigger did not run");
         await sql`insert into identity.organisation_memberships (id, tenant_id, organisation_id, user_id, membership_status)
           values (${membership}, ${tenant}, ${org}, ${profile.id}, 'active')`;
         users.push(profile.id);
@@ -126,7 +127,9 @@ describe("the arrival snapshot, against PostgreSQL (W1)", () => {
     actor: ActorContext,
   ): Promise<readonly RelationshipBrief[] | null> {
     if (!(await active(actor))) return null;
-    const messages = await db.sql<{ body: string; created_at: Date; n: number }[]>`
+    const messages = await db.sql<
+      { body: string; created_at: Date; n: number }[]
+    >`
       select m.body, m.created_at, count(*) over ()::int as n
         from communication.messages m
        where m.conversation_id = ${ids.conversation}
@@ -138,20 +141,27 @@ describe("the arrival snapshot, against PostgreSQL (W1)", () => {
         from network.relationship_events where relationship_id = ${ids.relationship}`;
     const base = tensorGateBrief({
       theirText: messages[0]?.body ?? "",
-      meetingStatus: meeting[0]?.status === "SCHEDULED" ? "SCHEDULED" : "CANCELLED",
+      meetingStatus:
+        meeting[0]?.status === "SCHEDULED" ? "SCHEDULED" : "CANCELLED",
       sequence: (events[0]?.seq ?? 0) + (messages[0]?.n ?? 0),
     });
     return [
       {
         ...base,
         relationshipId: ids.relationship,
-        counterparty: { kind: "INVESTOR_ORGANISATION", id: ids.investor, name: "TensorGate" },
+        counterparty: {
+          kind: "INVESTOR_ORGANISATION",
+          id: ids.investor,
+          name: "TensorGate",
+        },
         messages: { ...base.messages, count: messages[0]?.n ?? 0 },
       },
     ];
   }
 
-  async function attentionFromDatabase(actor: ActorContext): Promise<QAttentionReport> {
+  async function attentionFromDatabase(
+    actor: ActorContext,
+  ): Promise<QAttentionReport> {
     const readable = await active(actor);
     return {
       items: [

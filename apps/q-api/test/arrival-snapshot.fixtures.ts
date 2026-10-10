@@ -1,7 +1,4 @@
-import type {
-  QAttentionReport,
-  RelationshipBrief,
-} from "@capital-q/contracts";
+import type { QAttentionReport, RelationshipBrief } from "@capital-q/contracts";
 
 /**
  * A TensorGate-shaped relationship (founder 2026-10-09/10): they asked to

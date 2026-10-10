@@ -119,9 +119,7 @@ const NO_IDS = {
   messageId: null,
 } as const;
 
-function idsOf(
-  item: QAttentionItem,
-): ArrivalSnapshotItem["ids"] {
+function idsOf(item: QAttentionItem): ArrivalSnapshotItem["ids"] {
   const entity = item.entity;
   if (entity === undefined) return NO_IDS;
   switch (entity.kind) {
@@ -261,13 +259,31 @@ function itemFor(
       asOf: brief.generatedAt,
     },
     ...(latestOk
-      ? [{ source: "THREAD" as const, ref: brief.relationshipId, asOf: brief.generatedAt }]
+      ? [
+          {
+            source: "THREAD" as const,
+            ref: brief.relationshipId,
+            asOf: brief.generatedAt,
+          },
+        ]
       : []),
     ...(meetingsOk
-      ? [{ source: "SCHEDULE" as const, ref: brief.relationshipId, asOf: brief.generatedAt }]
+      ? [
+          {
+            source: "SCHEDULE" as const,
+            ref: brief.relationshipId,
+            asOf: brief.generatedAt,
+          },
+        ]
       : []),
     ...(brief.obligations.status === "OK"
-      ? [{ source: "DILIGENCE" as const, ref: brief.relationshipId, asOf: brief.generatedAt }]
+      ? [
+          {
+            source: "DILIGENCE" as const,
+            ref: brief.relationshipId,
+            asOf: brief.generatedAt,
+          },
+        ]
       : []),
   ];
   return {
@@ -371,6 +387,7 @@ export function buildArrivalSnapshot(input: {
     items,
     unread: input.report.unread,
     briefsRead: input.briefs !== null,
+    activity: input.report.activity,
   });
 }
 
@@ -486,7 +503,10 @@ export function createArrivalSnapshots(dependencies: {
     policyVersion: String(Q_CONTEXT_FIREWALL_POLICY_VERSION),
   });
 
-  async function build(actor: ActorContext, stamp: string): Promise<Held | null> {
+  async function build(
+    actor: ActorContext,
+    stamp: string,
+  ): Promise<Held | null> {
     const at = now();
     const [report, briefs] = await Promise.all([
       dependencies.attention(actor, {
@@ -495,7 +515,10 @@ export function createArrivalSnapshots(dependencies: {
       }),
       dependencies.briefs(actor).catch(() => null),
     ]);
-    return { snapshot: buildArrivalSnapshot({ report, briefs, now: at }), stamp };
+    return {
+      snapshot: buildArrivalSnapshot({ report, briefs, now: at }),
+      stamp,
+    };
   }
 
   return {

@@ -25,12 +25,16 @@ const oneLine = (text: string, max: number): string => {
 };
 
 function when(iso: string | null): string {
-  return iso === null ? "an unknown time" : iso.slice(0, 16).replace("T", " ") + " UTC";
+  return iso === null
+    ? "an unknown time"
+    : iso.slice(0, 16).replace("T", " ") + " UTC";
 }
 
 function itemLines(item: ArrivalSnapshotItem, index: number): string {
   const f = item.facts;
-  const bits: string[] = [`${String(index + 1)}. "${oneLine(item.headline, 200)}" (${item.kind.toLowerCase().replace(/_/gu, " ")}, since ${when(item.since)})`];
+  const bits: string[] = [
+    `${String(index + 1)}. "${oneLine(item.headline, 200)}" (${item.kind.toLowerCase().replace(/_/gu, " ")}, since ${when(item.since)})`,
+  ];
   if (item.availability === "UNAVAILABLE") {
     bits.push(
       "UNAVAILABLE: the detail behind this could not be read just now; say you could not check it, do not guess.",
@@ -42,7 +46,9 @@ function itemLines(item: ArrivalSnapshotItem, index: number): string {
     );
   }
   if (f.relationshipState !== null) {
-    bits.push(`Relationship state: ${f.relationshipState.toLowerCase().replace(/_/gu, " ")}.`);
+    bits.push(
+      `Relationship state: ${f.relationshipState.toLowerCase().replace(/_/gu, " ")}.`,
+    );
   }
   if (f.messageCount !== null) {
     bits.push(
@@ -75,22 +81,33 @@ function itemLines(item: ArrivalSnapshotItem, index: number): string {
     bits.push(
       `Decisions: ${f.decisions
         .slice(0, 4)
-        .map((d) => `${oneLine(d.label, 80)} (${d.owner === "YOU" ? "yours" : "theirs"})`)
+        .map(
+          (d) =>
+            `${oneLine(d.label, 80)} (${d.owner === "YOU" ? "yours" : "theirs"})`,
+        )
         .join("; ")}.`,
     );
   }
   if (f.openRequests.length > 0) {
     bits.push(
-      `Open requests: ${f.openRequests.slice(0, 4).map((r) => `"${oneLine(r.title, 100)}"`).join("; ")}.`,
+      `Open requests: ${f.openRequests
+        .slice(0, 4)
+        .map((r) => `"${oneLine(r.title, 100)}"`)
+        .join("; ")}.`,
     );
   }
   if (f.documents.length > 0) {
     bits.push(
-      `Documents: ${f.documents.slice(0, 4).map((d) => `"${oneLine(d.title, 100)}"`).join("; ")}.`,
+      `Documents: ${f.documents
+        .slice(0, 4)
+        .map((d) => `"${oneLine(d.title, 100)}"`)
+        .join("; ")}.`,
     );
   }
   if (f.suggestedNextAction !== null) {
-    bits.push(`Suggested next step: ${oneLine(f.suggestedNextAction.label, 100)}.`);
+    bits.push(
+      `Suggested next step: ${oneLine(f.suggestedNextAction.label, 100)}.`,
+    );
   }
   if (f.note !== null) bits.push(`Note: ${oneLine(f.note, 300)}`);
   if (item.openPath !== null) bits.push("Their conversation can be opened.");
@@ -118,7 +135,8 @@ export function arrivalSnapshotFact(
     statement,
     truthClass: "VERIFIED",
     evidenceStatus: "PLATFORM_VERIFIED",
-    source: "Capital Q arrival snapshot (their own relationships, messages, calls and approvals)",
+    source:
+      "Capital Q arrival snapshot (their own relationships, messages, calls and approvals)",
     asOf: snapshot.asOf.slice(0, 40),
   };
 }

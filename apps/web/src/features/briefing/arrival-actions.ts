@@ -53,6 +53,8 @@ import {
 import type { ArrivalCard, ArrivalData } from "./arrival";
 import {
   attentionFromReads,
+  attentionFromSnapshot,
+  createQApiArrivalSnapshotReader,
   createQApiAttentionReader,
   sourceOfNotice,
 } from "./attention";
@@ -216,6 +218,8 @@ export async function arrivalBriefingAction(
   // RECOVERY B1: the Q API's attention report (every source, the same read
   // as Q's own answer), beside the arrival's other reads.
   const attentionRead = createQApiAttentionReader(session)(since);
+  // W1: the one snapshot the welcome, Q's turns and the live voice share.
+  const snapshotRead = createQApiArrivalSnapshotReader(session)();
   const [account, sinceRead, approvals, workforce, done, notices, context] =
     await Promise.all([
       accountDetails().catch(() => null),
@@ -334,6 +338,7 @@ export async function arrivalBriefingAction(
       };
     }),
   );
+  const snapshot = await snapshotRead;
   return {
     firstName: firstNameOf(account?.displayName),
     timeZone: sinceRead?.timeZone ?? null,
@@ -347,6 +352,7 @@ export async function arrivalBriefingAction(
     // E2: one report of what needs them, unread sources named: workstream
     // B's read when it answered, else the bridge from this page's reads.
     attention:
+      (snapshot === null ? null : attentionFromSnapshot(snapshot)) ??
       (await attentionRead) ??
       attentionFromReads({
         cards: approvals?.ok === true ? cards : null,
@@ -357,6 +363,7 @@ export async function arrivalBriefingAction(
         since,
         now: new Date(now),
       }),
+    ...(snapshot === null ? {} : { snapshot }),
     attentionLinks: Object.fromEntries(
       (needsYouNotices ?? []).flatMap((notice) =>
         notice.linkPath === null
