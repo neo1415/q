@@ -6,7 +6,11 @@ import { expect, type Page } from "@playwright/test";
 import { call, tokenFor } from "../support/http.js";
 import { localSql } from "../support/local-db.js";
 import { emitLive, livePeers } from "../support/live-fake.js";
-import type { ScriptRule, VendorRequest } from "../support/script.js";
+import {
+  vendorRequestsSince,
+  type ScriptRule,
+  type VendorRequest,
+} from "../support/script.js";
 import { API_URL } from "../support/stack.js";
 
 /**
@@ -93,7 +97,7 @@ export function nextScheduledMeeting(relationship: string): DbMeeting | null {
     : { id: row[0] ?? "", status: row[1] ?? "", startsAt: row[2] ?? "" };
 }
 
-async function postWithKey(
+export async function postWithKey(
   email: string,
   path: string,
   body: unknown,
@@ -117,6 +121,36 @@ async function postWithKey(
   return { status: response.status, body: parsed };
 }
 
+/**
+ * The founder shares their raise with the network through the visibility
+ * screen's own route (the seed shares no objective). Returns the revoke.
+ */
+export async function shareRaiseWithNetwork(
+  founderEmail: string,
+  companyId: string,
+): Promise<() => Promise<void>> {
+  const reply = await postWithKey(
+    founderEmail,
+    `/v1/companies/${uuid(companyId)}/visibility/shares`,
+    { object: "CAPITAL_OBJECTIVE", audience: "NETWORK" },
+  );
+  expect(
+    [200, 201],
+    `share the raise: ${String(reply.status)} ${JSON.stringify(reply.body)}`,
+  ).toContain(reply.status);
+  const policy = (
+    reply.body as { share?: { policyId?: unknown } | null } | null
+  )?.share?.policyId;
+  if (typeof policy !== "string") return () => Promise.resolve();
+  return async () => {
+    await postWithKey(
+      founderEmail,
+      `/v1/companies/${uuid(companyId)}/visibility/shares/${uuid(policy)}/revoke`,
+      {},
+    );
+  };
+}
+
 /** A chat message as the person sends it on the chat screen (the product's own route). */
 export async function sendMessage(
   email: string,
@@ -134,39 +168,35 @@ export async function sendMessage(
 }
 
 /**
- * One SCHEDULED call ahead, booked through the product's own route. The
- * local stack has no Google calendar (provider keys are disabled), so a
- * booking can stay SCHEDULING; the calendar's confirmation is then the
- * one condition the harness sets in the LOCAL database, as a calendar
- * reply would have.
+ * One SCHEDULED call ahead, organised by the founder. Booking through the
+ * product's route needs the organiser's Google Calendar (409 "Your Google
+ * Calendar isn't connected" on the local stack, where provider access is
+ * disabled), so the row the booking would have left once the calendar
+ * confirmed is written in the LOCAL database: the condition a person
+ * cannot cause here, like an expired approval (local-db.ts).
  */
-export async function bookScheduledCall(
-  email: string,
+export function scheduledCallFixture(
+  founderEmail: string,
   relationship: string,
   startsAt: Date,
-): Promise<DbMeeting> {
-  const reply = await postWithKey(
-    email,
-    `/v1/relationships/${uuid(relationship)}/meetings`,
-    {
-      purpose: "G2 journey A: first call",
-      startsAt: startsAt.toISOString(),
-      durationMinutes: 30,
-      timeZone: "UTC",
-    },
-  );
-  expect(
-    [200, 201],
-    `book as ${email}: ${String(reply.status)} ${JSON.stringify(reply.body)}`,
-  ).toContain(reply.status);
-  const booked = (reply.body as { id?: unknown } | null)?.id;
-  const id = uuid(typeof booked === "string" ? booked : "");
+): DbMeeting {
+  if (!/^[a-z0-9.-]+@fictional\.capitalq\.local$/u.test(founderEmail))
+    throw new Error("synthetic accounts only");
+  const key = randomUUID().replace(/-/gu, "").slice(0, 20);
   localSql(
-    `update communication.meetings
-        set status = 'SCHEDULED',
-            meet_link = coalesce(meet_link, 'https://meet.google.com/abc-defg-hij'),
-            updated_at = clock_timestamp()
-      where id = '${id}' and status = 'SCHEDULING'`,
+    `insert into communication.meetings
+       (tenant_id, relationship_id, organiser_user_id, organiser_tenant_id,
+        purpose, starts_at, ends_at, time_zone, status, google_event_id,
+        meet_link, idempotency_key)
+     select r.tenant_id, r.id, u.id, r.tenant_id, 'G2 journey A: first call',
+            '${startsAt.toISOString()}'::timestamptz,
+            '${startsAt.toISOString()}'::timestamptz + interval '30 minutes',
+            'UTC', 'SCHEDULED', 'g2${key}', 'https://meet.google.com/abc-defg-hij',
+            'recovery-g2-${key}'
+       from network.relationships r
+       join auth.users a on a.email = '${founderEmail}'
+       join identity.user_profiles u on u.auth_user_id = a.id
+      where r.id = '${uuid(relationship)}'`,
   );
   const meeting = nextScheduledMeeting(relationship);
   if (meeting === null) throw new Error("the booked call is not SCHEDULED");
@@ -205,6 +235,24 @@ export function inputAfter(
     .filter((request) => request.rule === rule)
     .map((request) => request.input ?? "")
     .join("\n");
+}
+
+/**
+ * `inputAfter`, waiting for that round to reach the vendor: the browser's
+ * "settled answer" can be the previous turn's row while this one is still
+ * running (G2 gate: A2 read an empty log).
+ */
+export async function inputAfterSince(
+  mark: number,
+  rule: string,
+  timeoutMs = 90_000,
+): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const read = inputAfter(await vendorRequestsSince(mark), rule);
+    if (read.length > 0 || Date.now() > deadline) return read;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
 }
 
 /** The Relationship Brief as the person's own bearer reads it (R1). */
@@ -386,9 +434,13 @@ export async function watchMoves(page: Page): Promise<void> {
       push(data, unused, url);
     };
     setInterval(() => {
-      for (const node of document.querySelectorAll("[data-q-answer]")) {
+      // The Chat view's rows carry data-q-answer; the dock's thread
+      // (a dialog off /home) renders Q's line as a plain paragraph.
+      for (const node of document.querySelectorAll(
+        "[data-q-answer], [role=dialog] p",
+      )) {
         const text = (node.textContent ?? "").trim();
-        if (!/\bOpened\b|You're home\./u.test(text)) continue;
+        if (!/^(Opened\b|You're home\.)/u.test(text)) continue;
         if (log.opened.some((seen) => seen.text === text)) continue;
         log.opened.push({ text, at: performance.now(), where: where() } as {
           text: string;

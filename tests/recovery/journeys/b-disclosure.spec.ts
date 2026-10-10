@@ -5,13 +5,14 @@ import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import { call } from "../support/http.js";
 import { answer, type ScriptRule } from "../support/script.js";
-import { CAST, world } from "../support/stack.js";
+import { CAST, founderOf, world } from "../support/stack.js";
 import {
   READ_QUESTION,
   SKIM_OTHER,
   dbRaises,
   inputAfter,
   moneyText,
+  shareRaiseWithNetwork,
   type DbRaise,
 } from "./journey-fixtures.js";
 
@@ -155,14 +156,29 @@ function raiseQWasGiven(input: string): {
   };
 }
 
+let unshare: (() => Promise<void>) | null = null;
+test.afterEach(async () => {
+  await unshare?.();
+  unshare = null;
+});
+
+/** The seed's Clinicrest has an ACTIVE USD objective, shared with no one. */
+const DISCLOSER = "clinicrest";
+
 for (const key of ["mizan", "disclosed", "neither"] as const) {
   test(`B ${key}: Discover card = profile = Q's figure and source, for one investor`, async ({
     browser,
   }) => {
-    awaits(
-      ["R2"],
-      "build/r2-company (raiseFor on card, profile and Q) not merged",
-    );
+    if (key === "mizan")
+      awaits(
+        ["G2-SEED"],
+        "the local seed has no playable pitch whose transcript states a raise (every raiseView is NONE), so no Mizan-shape company exists",
+      );
+    if (key === "disclosed")
+      unshare = await shareRaiseWithNetwork(
+        founderOf(DISCLOSER),
+        world().company(DISCLOSER).companyId,
+      );
     const shape = (await shapes())[key];
     expect(
       shape,
@@ -223,7 +239,10 @@ for (const key of ["mizan", "disclosed", "neither"] as const) {
 test("B other tenant: a founder of another company sees nothing of the Mizan-shape private figure", async ({
   browser,
 }) => {
-  awaits(["R2"], "build/r2-company not merged");
+  awaits(
+    ["G2-SEED"],
+    "no Mizan-shape company in the local seed (no pitch transcript states a raise)",
+  );
   const shape = (await shapes()).mizan;
   expect(shape, "the seed has a Mizan-shape company").toBeDefined();
   if (shape?.db.amount == null || shape.db.currency === null) return;

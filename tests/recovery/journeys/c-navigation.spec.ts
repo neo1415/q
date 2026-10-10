@@ -11,7 +11,12 @@ import {
   liveUserSays,
 } from "../support/live-fake.js";
 import { localSql } from "../support/local-db.js";
-import { recordReceipts, navigationReceipts, send } from "../support/q.js";
+import {
+  navigationReceipts,
+  openQ,
+  recordReceipts,
+  send,
+} from "../support/q.js";
 import {
   answer,
   reading,
@@ -40,6 +45,10 @@ import {
  */
 const company = world().company(CAST.founderCompanyKey);
 const investor = world().investor("savanna-seed");
+// The manifest marks names "(fictional)"; the product shows the display name.
+const investorName = investor.name.replace(/ \(fictional\)$/u, "");
+/** Where a founder's "open <their investor>" lands (named-record-request.ts pagesFor). */
+const RECORD_PATH = `/relationships/investor/${investor.investorOrganisationId}`;
 
 const STARTS = [
   "/home",
@@ -118,23 +127,23 @@ function movesFrom(start: string): Move[] {
       },
     },
     {
-      label: "record /investors/:id",
-      say: `open ${investor.name}`,
-      path: `/investors/${investor.investorOrganisationId}`,
-      url: new RegExp(
-        `/investors/${investor.investorOrganisationId}(\\?|$)`,
-        "u",
-      ),
+      // A founder's "open <investor>" is a named-record request: their
+      // counterpart's page is the relationship first (named-record-request.ts
+      // pagesFor PAGE: RELATIONSHIP_INVESTOR, INVESTOR), not the model's call.
+      label: "record /relationships/investor/:id",
+      say: `open ${investorName}`,
+      path: RECORD_PATH,
+      url: new RegExp(`${RECORD_PATH}(\\?|$)`, "u"),
       rules: openPage(
         "record",
-        `open ${investor.name}`,
-        { page: "INVESTOR", id: investor.investorOrganisationId },
-        investor.name,
+        `open ${investorName}`,
+        { page: "RELATIONSHIP_INVESTOR", id: investor.investorOrganisationId },
+        investorName,
       ),
       marker: async (page) => {
-        await expect(
-          page.getByRole("heading", { level: 1 }).first(),
-        ).toContainText(investor.name);
+        await expect(page.locator("[data-relationship-hero]")).toContainText(
+          investorName,
+        );
       },
     },
     {
@@ -149,15 +158,20 @@ function movesFrom(start: string): Move[] {
         `${company.name}'s team`,
       ),
       marker: async (page) => {
+        // The profile's tab bar marks the open tab aria-current (profile-tabs.tsx).
         await expect(
           page.locator('[data-profile-tab="team"]').first(),
-        ).toHaveAttribute("aria-selected", "true");
+        ).toHaveAttribute("aria-current", "page");
       },
     },
   ];
 }
 
-async function expectVerified(page: Page, path: string): Promise<void> {
+async function expectVerified(
+  page: Page,
+  path: string,
+  sentAt?: number,
+): Promise<void> {
   await expect
     .poll(
       async () =>
@@ -170,17 +184,36 @@ async function expectVerified(page: Page, path: string): Promise<void> {
     )
     .toBeGreaterThan(0);
   const log = await moves(page);
+  console.log(
+    `MOVES ${path}: ${JSON.stringify(log.outcomes)} OPENED ${JSON.stringify(log.opened)}`,
+  );
   const mine = log.outcomes.filter((o) => pathOf(o.expected) === path);
   expect(
     mine.map((o) => o.status),
     "one VERIFIED outcome, no FAILED",
   ).toEqual(["DONE"]);
   const done = mine[0];
+  if (sentAt !== undefined && done !== undefined)
+    console.log(`VERIFIED_MS ${path} ${String(Math.round(done.at - sentAt))}`);
   expect.soft(pathOf(done?.route ?? ""), "VERIFIED where it landed").toBe(path);
   expect
     .soft(pathOf(done?.where ?? ""), "the browser was there at VERIFIED")
     .toBe(path);
-  // Q's final wording: only after VERIFIED, and only once there.
+  // Q's final wording: only after VERIFIED, and only once there. The typed
+  // answer row (QAnswer, useMoveLine) lives in the Chat view and the dock;
+  // the page Q moved to shows it once the dock is open.
+  if ((await moves(page)).opened.length === 0) {
+    await openQ(page);
+    const chat = page
+      .getByRole("button", { name: "Chat", exact: true })
+      .filter({ visible: true })
+      .first();
+    if (
+      (await chat.isVisible().catch(() => false)) &&
+      (await chat.getAttribute("aria-pressed")) !== "true"
+    )
+      await chat.click();
+  }
   await expect
     .poll(async () => (await moves(page)).opened.length, {
       timeout: 15_000,
@@ -212,16 +245,26 @@ for (const start of STARTS) {
     test(`C typed, from ${start}: ${move.label} → VERIFIED, lands, then "Opened"`, async ({
       browser,
     }) => {
-      awaits(["R3"], "build/r3-actions (navigation lifecycle) not merged");
+      if (move.label.startsWith("record"))
+        awaits(
+          ["G2-D3"],
+          'product: the named-record line is `Opening "<name>".` (references.ts:344-377), not the PENDING `Opening …` that useMoveLine swaps, so VERIFIED never reads "Opened"',
+        );
+      else if (move.label.startsWith("route") && start !== "/home")
+        awaits(
+          ["G2-D2"],
+          "product: off /home the route move executes twice (nav-*-1, nav-*-2)",
+        );
       const page = await (await contextAs(browser, CAST.founder)).newPage();
       await watchMoves(page);
       await recordReceipts(page);
       await useScript(move.rules);
       await page.goto(start);
+      const sentAt = await page.evaluate(() => performance.now());
       await send(page, move.say);
       await expect(page).toHaveURL(move.url, { timeout: 60_000 });
       await move.marker(page);
-      await expectVerified(page, move.path);
+      await expectVerified(page, move.path, sentAt);
       await page.context().close();
     });
   }
@@ -239,9 +282,13 @@ test.describe("C with GPT-Live connected (MOCK)", () => {
     test(`C voice, from ${start}: a delegated record move is confirmed to the voice only after VERIFIED`, async ({
       browser,
     }) => {
-      awaits(["R3"], "GPT-Live waits for VERIFIED (R3) not merged");
-      const say = `Open ${investor.name}`;
-      const path = `/investors/${investor.investorOrganisationId}`;
+      if (start === "/home")
+        awaits(
+          ["G2-D2"],
+          "product: the delegated move executes twice (two DONE outcomes)",
+        );
+      const say = `Open ${investorName}`;
+      const path = RECORD_PATH;
       const page = await (await contextAs(browser, CAST.founder)).newPage();
       await installLiveFake(page);
       await watchMoves(page);
@@ -250,11 +297,16 @@ test.describe("C with GPT-Live connected (MOCK)", () => {
         openPage(
           "voice",
           say,
-          { page: "INVESTOR", id: investor.investorOrganisationId },
-          investor.name,
+          {
+            page: "RELATIONSHIP_INVESTOR",
+            id: investor.investorOrganisationId,
+          },
+          investorName,
         ),
       );
       await page.goto(start);
+      // Off /home, Talk with Q is inside the Q dock (ADR 0017).
+      if (start !== "/home") await openQ(page);
       await startLive(page);
       await liveUserSays(page, say);
       const delegation = `dlg_g2_${randomUUID().slice(0, 8)}`;
@@ -318,7 +370,6 @@ test.describe("C with GPT-Live connected (MOCK)", () => {
   test("C voice: a spoken route move lands and is VERIFIED", async ({
     browser,
   }) => {
-    awaits(["R3"], "navigation lifecycle not merged");
     const page = await (await contextAs(browser, CAST.founder)).newPage();
     await installLiveFake(page);
     await watchMoves(page);
@@ -409,7 +460,6 @@ async function expectHonestFailure(
 test("C nonexistent record: FAILED (or refused), never 'opened'", async ({
   browser,
 }) => {
-  awaits(["R3"], "navigation lifecycle not merged");
   const missing = randomUUID();
   const place = "that company";
   const page = await (await contextAs(browser, CAST.founder)).newPage();
@@ -432,7 +482,6 @@ test("C nonexistent record: FAILED (or refused), never 'opened'", async ({
 test("C unauthorized record: a relationship that is not theirs ends FAILED, never 'opened'", async ({
   browser,
 }) => {
-  awaits(["R3"], "navigation lifecycle not merged");
   const stranger = strangerInvestor();
   const target = `/relationships/investor/${stranger.investorOrganisationId}`;
   const page = await (await contextAs(browser, CAST.founder)).newPage();
