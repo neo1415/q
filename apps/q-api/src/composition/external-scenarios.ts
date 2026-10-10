@@ -629,7 +629,7 @@ export function simulationTitle(
   }
   const role =
     scenario.roleLine !== null
-      ? `a ${scenario.roleLine}`
+      ? `${/^[aeiou]/iu.test(scenario.roleLine) ? "an" : "a"} ${scenario.roleLine}`
       : `a representative of ${organizationName ?? displayName}`;
   return `AI simulation: ${role} (not a real employee)`;
 }

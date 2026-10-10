@@ -167,7 +167,11 @@ const recognitionAliases = (demoId: string): readonly string[] =>
 const spoken = (wording: string | null, claim: string): string => {
   if (wording === null || wording.length === 0) return claim;
   const first = claim.split(/[\s,;:]/u)[0] ?? "";
-  const keep = /[A-Z0-9]{2}/u.test(first) || /\p{Lu}.*\p{Lu}/u.test(first);
+  // "Qatar-based", "Doha-based": a place keeps its capital.
+  const keep =
+    /[A-Z0-9]{2}/u.test(first) ||
+    /\p{Lu}.*\p{Lu}/u.test(first) ||
+    /^\p{Lu}\p{L}*-/u.test(first);
   return `${wording}${keep ? claim : claim.charAt(0).toLowerCase() + claim.slice(1)}`;
 };
 

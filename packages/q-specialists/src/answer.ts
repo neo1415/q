@@ -275,6 +275,7 @@ import {
 import { deckSectionSpeech, deckSpeech } from "./deck-speech.js";
 import {
   screenTabTarget,
+  lastOpenedScreen,
   tabAskOf,
   tabPlace,
   type TabAsk,
@@ -2051,6 +2052,7 @@ export function createSpecialistQAnswer(
   const screenTabAnswer = async (
     request: QAnswerRequest,
     text: string,
+    history: readonly QConversationMessage[],
   ): Promise<{
     readonly said: string;
     readonly blocks: readonly QResultBlock[];
@@ -2059,7 +2061,9 @@ export function createSpecialistQAnswer(
     const port = dependencies.openRecord;
     const ask = tabAskOf(text);
     if (port === undefined || ask === null || ask.name !== null) return null;
-    const target = screenTabTarget(request.plan.screen, ask);
+    const target =
+      screenTabTarget(request.plan.screen, ask) ??
+      screenTabTarget(lastOpenedScreen(history), ask);
     if (target === null) return null;
     const opened = await port
       .open(request, { page: target.page, id: target.id })
@@ -3018,7 +3022,7 @@ export function createSpecialistQAnswer(
     // "open Shiftwell", "the data room for Shiftwell": the one record the
     // name means, among their own relationships first, opened by code --
     // or one short line naming who it could be. Never "Understood.".
-    const onScreenTab = await screenTabAnswer(request, latest.content);
+    const onScreenTab = await screenTabAnswer(request, latest.content, history);
     if (onScreenTab !== null) {
       logger?.info(
         { qRunId: request.runId, outcome: onScreenTab.log },

@@ -196,7 +196,7 @@ describe("the Qatar five are five different rehearsals", () => {
       "AI simulation: a QInvest investment professional (not a real employee)",
     );
     expect(sims[3]?.title).toMatch(
-      /^AI simulation: a .*\(not a real employee\)$/,
+      /^AI simulation: an? .*\(not a real employee\)$/,
     );
     expect(sims[4]?.title).toMatch(/AlRayan/);
     sims.forEach((s) => {

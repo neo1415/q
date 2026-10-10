@@ -2,6 +2,7 @@ import type {
   DeckSectionCode,
   QRecordPage,
   QRecordTab,
+  QResultBlock,
   QScreenContext,
 } from "@capital-q/contracts";
 
@@ -269,4 +270,58 @@ export function tabPlace(ask: TabAsk): string {
     case "diligence":
       return "diligence";
   }
+}
+
+/**
+ * The record Q last opened in this conversation, read as the screen it
+ * put them on: "open Tensorgate's pitch deck", then "open their team tab"
+ * means Tensorgate even when the client sent no screen (live 2026-10-10,
+ * a text turn). A position, never authority: the tab is still opened
+ * through open_page, which refuses what they could not open by hand.
+ */
+export function lastOpenedScreen(
+  history: readonly {
+    readonly role: string;
+    readonly blocks?: readonly QResultBlock[] | undefined;
+  }[],
+): QScreenContext | undefined {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const message = history[i];
+    if (message === undefined || message.role !== "Q") continue;
+    for (const block of message.blocks ?? []) {
+      if (
+        block.kind !== "UI_INTENT" ||
+        block.intent.kind !== "OPEN_RECORD_PAGE"
+      ) {
+        continue;
+      }
+      const { page, id } = block.intent;
+      if (
+        page === "COMPANY" ||
+        page === "COMPANY_DECK" ||
+        page === "COMPANY_TEAM" ||
+        page === "COMPANY_ELEVATOR" ||
+        page === "COMPANY_DATA_ROOM" ||
+        page === "COMPANY_PITCH"
+      ) {
+        return { route: "COMPANY", companyId: id };
+      }
+      if (
+        page === "RELATIONSHIP_COMPANY" ||
+        page === "RELATIONSHIP_COMPANY_MESSAGES"
+      ) {
+        return { route: "RELATIONSHIP_COMPANY", companyId: id };
+      }
+      if (
+        page === "RELATIONSHIP_INVESTOR" ||
+        page === "RELATIONSHIP_INVESTOR_MESSAGES"
+      ) {
+        return {
+          route: "RELATIONSHIP_INVESTOR",
+          investorOrganisationId: id,
+        };
+      }
+    }
+  }
+  return undefined;
 }
