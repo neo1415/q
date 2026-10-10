@@ -30,6 +30,89 @@ export type ExternalPersonConfidence = z.infer<
   typeof ExternalPersonConfidenceSchema
 >;
 
+/**
+ * What was researched. The names keep "Person" (W4 builds on them) but a
+ * subject may be an organisation or a government agency. An organisation
+ * never carries a personal mandate or a human representative: rehearsals
+ * against one use a labelled synthetic role, never a real individual.
+ */
+export const EXTERNAL_ENTITY_KINDS = [
+  "PERSON",
+  "ORGANIZATION",
+  "GOVERNMENT_AGENCY",
+] as const;
+export const ExternalEntityKindSchema = z.enum(EXTERNAL_ENTITY_KINDS);
+export type ExternalEntityKind = z.infer<typeof ExternalEntityKindSchema>;
+
+/**
+ * PREPARED_PUBLIC_SEED: loaded in advance from public sources and shown
+ * instantly; RESEARCHED: built by a live search for this asker;
+ * REFRESHING: a fresh search is running over an existing record.
+ */
+export const EXTERNAL_RESEARCH_STATUSES = [
+  "PREPARED_PUBLIC_SEED",
+  "RESEARCHED",
+  "REFRESHING",
+] as const;
+export const ExternalResearchStatusSchema = z.enum(EXTERNAL_RESEARCH_STATUSES);
+export type ExternalResearchStatus = z.infer<
+  typeof ExternalResearchStatusSchema
+>;
+
+/**
+ * A portrait or logo. Only our own stored asset is ever referenced: a
+ * hotlinked LinkedIn or CDN URL is refused, and an attached image carries
+ * its attribution and the licence or permission it is used under.
+ */
+export const ExternalEntityImageSchema = z
+  .object({
+    status: z.enum(["NOT_ATTACHED", "ATTACHED"]),
+    assetUrl: z.string().url().max(2_048).nullable(),
+    attribution: z.string().trim().max(300).nullable(),
+    licenseNote: z.string().trim().max(300).nullable(),
+  })
+  .strict()
+  .refine(
+    (image) =>
+      image.status === "NOT_ATTACHED"
+        ? image.assetUrl === null
+        : image.assetUrl !== null &&
+          image.attribution !== null &&
+          image.licenseNote !== null,
+    { message: "an attached image names its asset, attribution and licence" },
+  )
+  .refine(
+    (image) => {
+      if (image.assetUrl === null) return true;
+      const host = new URL(image.assetUrl).hostname.toLowerCase();
+      return !/(^|\.)(linkedin\.com|licdn\.com)$/u.test(host);
+    },
+    { message: "a third-party profile image is never hotlinked" },
+  );
+export type ExternalEntityImage = z.infer<typeof ExternalEntityImageSchema>;
+export const NO_EXTERNAL_ENTITY_IMAGE: ExternalEntityImage = {
+  status: "NOT_ATTACHED",
+  assetUrl: null,
+  attribution: null,
+  licenseNote: null,
+};
+
+/**
+ * A short public quotation, only ever quoted from its source. Generated
+ * dialogue is never presented as the person's words.
+ */
+export const ExternalEntityQuoteSchema = z
+  .object({
+    text: z.string().trim().min(1).max(300),
+    /** The stored source row it came from. */
+    sourceId: z.string().trim().min(1).max(64),
+    speaker: z.string().trim().min(1).max(200),
+    date: z.string().max(40).nullable(),
+    use: z.literal("SOURCE_QUOTE_ONLY"),
+  })
+  .strict();
+export type ExternalEntityQuote = z.infer<typeof ExternalEntityQuoteSchema>;
+
 export const ExternalPersonIdSchema = z.string().uuid();
 export type ExternalPersonId = z.infer<typeof ExternalPersonIdSchema>;
 
@@ -40,6 +123,12 @@ export type ExternalPersonId = z.infer<typeof ExternalPersonIdSchema>;
 export const ExternalPersonSubjectSchema = z
   .object({
     externalPersonId: ExternalPersonIdSchema,
+    entityKind: ExternalEntityKindSchema.default("PERSON"),
+    researchStatus: ExternalResearchStatusSchema.default("RESEARCHED"),
+    /** True when the record should be refreshed before it is relied on. */
+    requiresRefresh: z.boolean().default(false),
+    image: ExternalEntityImageSchema.default(NO_EXTERNAL_ENTITY_IMAGE),
+    quotes: z.array(ExternalEntityQuoteSchema).max(8).default([]),
     displayName: z.string().trim().min(1).max(200),
     /** Spellings and transliterations searched for (Arabic, Latin variants). */
     nameVariants: z.array(z.string().trim().min(1).max(200)).max(12),
@@ -54,13 +143,24 @@ export const ExternalPersonSubjectSchema = z
     briefVersion: z.number().int().min(0),
     confidence: ExternalPersonConfidenceSchema,
   })
-  .strict();
+  .strict()
+  .refine(
+    (subject) => subject.entityKind === "PERSON" || subject.role === null,
+    {
+      message: "an organisation or agency has no personal role",
+    },
+  );
 export type ExternalPersonSubject = z.infer<typeof ExternalPersonSubjectSchema>;
 
 export const EXTERNAL_PERSON_SOURCE_MAX = 8;
 
 export const ExternalPersonSourceSchema = z
   .object({
+    /** Stable id of the stored source row (e.g. S01); null for a live result. */
+    id: z.string().trim().min(1).max(64).nullable().default(null),
+    description: z.string().trim().max(300).nullable().default(null),
+    /** How the source stands as evidence, in words ("publicly documented"). */
+    evidenceClass: z.string().trim().max(120).nullable().default(null),
     url: z.string().url().max(2_048),
     domain: z.string().max(253),
     title: z.string().max(300).nullable(),
@@ -80,6 +180,7 @@ export type ExternalPersonSource = z.infer<typeof ExternalPersonSourceSchema>;
  */
 export const IdentityCardSchema = z
   .object({
+    entityKind: ExternalEntityKindSchema.default("PERSON"),
     subject: ExternalPersonSubjectSchema,
     sources: z
       .array(ExternalPersonSourceSchema)
@@ -91,7 +192,10 @@ export const IdentityCardSchema = z
     /** What the card offers next. Fixed vocabulary; the client words it. */
     actions: z.array(z.enum(["RESEARCH_FURTHER", "REHEARSE"])).max(2),
   })
-  .strict();
+  .strict()
+  .refine((card) => card.entityKind === card.subject.entityKind, {
+    message: "the card and its subject are the same kind of entity",
+  });
 export type IdentityCard = z.infer<typeof IdentityCardSchema>;
 
 /** A plausible person among several; shown so the member can pick one. */
@@ -183,6 +287,8 @@ export type PersonBriefAssertion = z.infer<typeof PersonBriefAssertionSchema>;
 export const PersonBriefSchema = z
   .object({
     externalPersonId: ExternalPersonIdSchema,
+    entityKind: ExternalEntityKindSchema.default("PERSON"),
+    quotes: z.array(ExternalEntityQuoteSchema).max(8).default([]),
     version: z.number().int().min(1),
     builtAt: z.string().max(40),
     /** After this the brief is stale and a question refreshes it. */
@@ -192,5 +298,13 @@ export const PersonBriefSchema = z
       .max(EXTERNAL_PERSON_SOURCE_MAX * 2),
     assertions: z.array(PersonBriefAssertionSchema).max(60),
   })
-  .strict();
+  .strict()
+  .refine(
+    (brief) =>
+      brief.entityKind === "PERSON" ||
+      brief.assertions.every(
+        (a) => a.topic !== "CURRENT_ROLE" && a.topic !== "COMMUNICATION_STYLE",
+      ),
+    { message: "an organisation has no personal role or communication style" },
+  );
 export type PersonBrief = z.infer<typeof PersonBriefSchema>;
