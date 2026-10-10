@@ -198,6 +198,18 @@ export function cardPagePath(subject: QSubjectRef | null): string | null {
 }
 
 /**
+ * W4: "Rehearse with <name>" on a person's identity card: a move of their
+ * own to that entity's rehearsal lobby, through the one navigation
+ * lifecycle (the same path as a card's Open button).
+ */
+export function openExternalRehearsal(externalPersonId: string): void {
+  beginNavigationTurn();
+  requestMove({
+    path: recordPagePath("EXTERNAL_REHEARSAL", externalPersonId),
+  });
+}
+
+/**
  * The person opened a card: a move of their own, through the one
  * lifecycle. A click is a new turn, so a page this sentence already
  * VERIFIED (and they have left since) is opened again, not "already done".

@@ -125,6 +125,14 @@ function cardBlock(card: IdentityCard): QAnswerCardsBlock | null {
         said: null,
         sourceCount: card.sources.length,
         subject: null,
+        external: {
+          externalPersonId: s.externalPersonId,
+          profileUrl:
+            s.profileUrl !== null && s.profileUrl.startsWith("https://")
+              ? s.profileUrl
+              : null,
+          rehearse: card.actions.includes("REHEARSE"),
+        },
       },
     ],
     followUps,

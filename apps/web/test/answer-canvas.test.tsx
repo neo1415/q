@@ -383,3 +383,63 @@ describe("the Board's timeline (C7)", () => {
     );
   });
 });
+
+describe("W4: an identity card of a researched person", () => {
+  const externalPersonId = "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d";
+  const profileUrl = "https://qa.linkedin.com/in/shadi-qishta-282453a";
+  const block = (() => {
+    const base = demoTop(1);
+    return {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        name: "Shadi Qishta",
+        subject: null,
+        external: { externalPersonId, profileUrl, rehearse: true },
+      })),
+    };
+  })();
+
+  it("offers Rehearse with <first name>, which opens the rehearsal through the one lifecycle, and Open profile for the source", () => {
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    const phases: string[] = [];
+    const stop = onNavigationPhase((state) => phases.push(state.phase));
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      const rehearse = screen.getByRole("button", {
+        name: "Rehearse with Shadi",
+      });
+      expect(rehearse.getAttribute("data-ac-external")).not.toBeNull();
+      fireEvent.click(rehearse);
+      expect(pushes).toEqual([`/rehearsals/person/${externalPersonId}`]);
+      expect(phases.slice(0, 3)).toEqual([
+        "REQUESTED",
+        "VALIDATED",
+        "EXECUTING",
+      ]);
+      const profile = screen.getByRole("link", { name: "Open profile" });
+      expect(profile.getAttribute("href")).toBe(profileUrl);
+      expect(profile.getAttribute("target")).toBe("_blank");
+      expect(profile.getAttribute("rel")).toContain("noopener");
+      // No record behind it, so no ordinary Open button.
+      expect(document.querySelectorAll("[data-ac-open]")).toHaveLength(0);
+    } finally {
+      stop();
+      resetNavigationLifecycle();
+    }
+  });
+
+  it("offers no rehearsal when the card does not (and no profile link without a URL)", () => {
+    const plain = {
+      ...block,
+      cards: block.cards.map((card) => ({
+        ...card,
+        external: { externalPersonId, profileUrl: null, rehearse: false },
+      })),
+    };
+    render(<AnswerCanvas block={plain} focus={0} said="" />);
+    expect(screen.queryByRole("button", { name: /Rehearse with/u })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open profile" })).toBeNull();
+  });
+});

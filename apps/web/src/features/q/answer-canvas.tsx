@@ -33,6 +33,7 @@ import { MapBody } from "./blocks/data-blocks";
 import {
   cardPagePath,
   openCardPage,
+  openExternalRehearsal,
   openSubjectPage,
   subjectPagePath,
 } from "./client-actions";
@@ -126,6 +127,8 @@ export type AnswerCardActions = {
   readonly onAsk?: ((question: string) => void) | undefined;
   readonly onPin?: ((card: QAnswerCard) => void) | undefined;
   readonly onOpenProfile?: ((card: QAnswerCard) => void) | undefined;
+  /** W4: rehearse with the researched person on an identity card. */
+  readonly onRehearse?: ((card: QAnswerCard) => void) | undefined;
 };
 
 function AnswerCard({
@@ -342,6 +345,35 @@ function AnswerCard({
                     : "Open profile"}
                 </button>
               ) : null}
+              {card.external?.profileUrl == null ? null : (
+                <a
+                  className="cq-ac-btn"
+                  data-ac-external
+                  data-ac-external-profile
+                  href={card.external.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open profile
+                </a>
+              )}
+              {card.external?.rehearse !== true ? null : (
+                <button
+                  type="button"
+                  className="cq-ac-btn"
+                  data-ac-external
+                  data-ac-rehearse={card.key}
+                  onClick={() => {
+                    if (actions.onRehearse !== undefined) {
+                      actions.onRehearse(card);
+                    } else if (card.external !== undefined) {
+                      openExternalRehearsal(card.external.externalPersonId);
+                    }
+                  }}
+                >
+                  {`Rehearse with ${card.name.split(/\s+/u)[0] ?? card.name}`}
+                </button>
+              )}
               {actions.onAsk === undefined ? null : (
                 <button
                   type="button"
