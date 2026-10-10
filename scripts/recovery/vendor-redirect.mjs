@@ -19,7 +19,18 @@ const REDIRECTS = [
   "https://api.deepgram.com/v1/auth/grant",
   // V: GPT-Live's WebRTC session creation.
   "https://api.openai.com/v1/live/sessions",
+  // V2: the public people search (Serper.dev), only when the stack was
+  // started with CQ_RECOVERY_SEARCH=1 (a disabled key makes q-api build the
+  // adapter). Answered by the fake, which logs every call: a prepared
+  // entity must cost none, and an unknown person gets a scripted profile.
+  "https://google.serper.dev/search",
+  "https://scrape.serper.dev",
 ];
+// Where a redirected URL lands on the fake when its own path would clash.
+const TARGET_PATHS = {
+  "https://google.serper.dev/search": "/__fake/serper/search",
+  "https://scrape.serper.dev": "/__fake/serper/scrape",
+};
 
 if (process.env.CQ_FAKE_VOICE_VENDORS === "1") {
   const original = globalThis.fetch;
@@ -39,7 +50,7 @@ if (process.env.CQ_FAKE_VOICE_VENDORS === "1") {
         !(realLive && prefix.endsWith("/v1/live/sessions")),
     );
     if (match === undefined) return original(input, init);
-    const target = `${FAKE}${new URL(href).pathname}`;
+    const target = `${FAKE}${TARGET_PATHS[match] ?? new URL(href).pathname}`;
     return typeof input === "string" || input instanceof URL
       ? original(target, init)
       : original(new Request(target, input), init);

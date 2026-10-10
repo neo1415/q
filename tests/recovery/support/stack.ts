@@ -54,6 +54,16 @@ export const STACK_GPT_LIVE = (() => {
   return existsSync(file) ? readFileSync(file, "utf8").trim() === "1" : null;
 })();
 
+/**
+ * V2: whether the running stack's q-api has the public people-search adapter
+ * (local-stack.sh start with CQ_RECOVERY_SEARCH=1): its calls go to the fake
+ * vendor, which logs them. Off, a search cannot be scripted or counted.
+ */
+export const STACK_SEARCH = (() => {
+  const file = resolve(RUN_DIR, "search");
+  return existsSync(file) ? readFileSync(file, "utf8").trim() === "1" : null;
+})();
+
 for (const url of [WEB_URL, API_URL, Q_API_URL, SUPABASE_URL]) {
   if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/u.test(url)) {
     throw new Error(`recovery suite runs on loopback only, refused ${url}`);

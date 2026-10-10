@@ -87,6 +87,11 @@ export default defineConfig({
     { name: "knowledge", testDir: "./knowledge", use: chromium },
     // G2: the founder's five demo journeys (A-E), the release-candidate gate.
     { name: "journeys", testDir: "./journeys", use: chromium },
+    // V2: the founder's Qatar demo (welcome follow-ups, the Qatar Five,
+    // unknown and ambiguous people, voice navigation). Needs the stack
+    // started with CQ_RECOVERY_GPT_LIVE=1 CQ_RECOVERY_SEARCH=1 and
+    // `local-stack.sh seed-research`. Every measurement is LOCAL+MOCK.
+    { name: "qatar", testDir: "./qatar", use: chromium },
     // Manual only, by the founder on his machine (LIVE-PROCEDURE.md):
     // `--project live` against a stack started with CQ_RECOVERY_MODE=live.
     // In MOCK these refuse to run and are reported LIVE-PENDING.

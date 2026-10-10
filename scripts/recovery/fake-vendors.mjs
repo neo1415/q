@@ -68,6 +68,7 @@ const NO_RULE_ANSWER = {
 
 let memoryScript = null;
 let voiceFail = false;
+let searchRules = [];
 const requests = [];
 
 function loadScript() {
@@ -309,6 +310,9 @@ const server = createServer(async (req, res) => {
       stream: body.stream === true,
       rule: rule?.name ?? null,
       tools: seen.tools,
+      // V2: tools that had already answered when this round was asked, so a
+      // test can prove a follow-up needed no retrieval.
+      answeredTools: seen.answeredTools,
       lastUser: seen.lastUser,
       input: seen.allText,
     });
@@ -386,6 +390,38 @@ const server = createServer(async (req, res) => {
     return send(res, 201, {
       session: { id: `live_fake_${randomUUID()}`, model: "gpt-live-1" },
       transport: { sdp: "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=fake-live\r\n" },
+    });
+  }
+
+  // V2: the public people search. PUT /__fake/search {"rules":[{"q":"regex",
+  // "organic":[{"link","title","snippet"}]}]} scripts what the search finds;
+  // with no rule it finds nothing. Every call is logged (vendor "search") so
+  // a test can prove a prepared entity cost zero calls. DELETE clears.
+  if (path === "/__fake/search" && req.method === "PUT") {
+    searchRules = Array.isArray(body.rules) ? body.rules : [];
+    return send(res, 200, { rules: searchRules.length });
+  }
+  if (path === "/__fake/search" && req.method === "DELETE") {
+    searchRules = [];
+    return send(res, 200, { reset: true });
+  }
+  if (path === "/__fake/serper/search" && req.method === "POST") {
+    const q = String(body.q ?? "");
+    const rule = searchRules.find((r) => new RegExp(r.q, "iu").test(q));
+    record({ vendor: "search", path, q, rule: rule?.name ?? null });
+    if (rule?.delayMs !== undefined)
+      await new Promise((r) => setTimeout(r, rule.delayMs));
+    return send(res, 200, { organic: rule?.organic ?? [] });
+  }
+  if (path === "/__fake/serper/scrape" && req.method === "POST") {
+    const target = String(body.url ?? "");
+    const hit = searchRules
+      .flatMap((r) => r.organic ?? [])
+      .find((o) => o.link === target);
+    record({ vendor: "search", path, q: target, rule: hit ? "scrape" : null });
+    return send(res, 200, {
+      markdown: hit?.page ?? "",
+      metadata: { title: hit?.title ?? "" },
     });
   }
 

@@ -122,6 +122,7 @@ launch() {
     local live_key="${CQ_LIVE_OPENAI_API_KEY:-}" live_dg="${CQ_LIVE_DEEPGRAM_API_KEY:-}"
     local live_proxy="${CQ_LIVE_PROXY_HOST:-}" ca="${NODE_EXTRA_CA_CERTS:-}"
     local live_gl="${CQ_LIVE_GPT_LIVE_KEY:-}" fake_gl="${CQ_RECOVERY_GPT_LIVE:-}"
+    local fake_search="${CQ_RECOVERY_SEARCH:-}"
     for var in $(compgen -e); do unset "$var" 2>/dev/null || true; done
     export PATH="$keep_path" HOME="$keep_home"
     CQ_LIVE_OPENAI_API_KEY="$live_key"; CQ_LIVE_DEEPGRAM_API_KEY="$live_dg"
@@ -151,6 +152,10 @@ launch() {
       # its session creation answered by the fake vendor (no key, no audio).
       # The fake sessions still land on the local ledger: a high local cap.
       [[ "$fake_gl" == 1 ]] && export CQ_VOICE_LIVE=on CQ_VOICE_PREVIEW=on CQ_VOICE_LIVE_DAILY_CAP_USD=20
+      # V2, opt-in (CQ_RECOVERY_SEARCH=1): q-api builds its public people-search
+      # adapter on a DISABLED key; vendor-redirect.mjs sends its calls to the
+      # fake, which scripts and logs them. No real search provider is reachable.
+      [[ "$fake_search" == 1 && "$name" == q-api ]] && export SERPER_API_KEY="$DISABLED"
       # V (GPT-Live developer preview), opt-in: CQ_LIVE_GPT_LIVE_KEY in the
       # operator's shell. The model stays the fake; only q-api gets the key,
       # and only for the GPT-Live session call (CQ_VOICE_LIVE_OPENAI_API_KEY,
@@ -237,6 +242,7 @@ case "$cmd" in
     # need it (gpt-live.spec fails fast and says so when it is off).
     for s in "${services[@]}"; do
       [[ "$s" == q-api ]] && echo "${CQ_RECOVERY_GPT_LIVE:-0}" >"$RUN/gpt-live"
+      [[ "$s" == q-api ]] && echo "${CQ_RECOVERY_SEARCH:-0}" >"$RUN/search"
     done
     log "gpt-live: $(cat "$RUN/gpt-live" 2>/dev/null || echo unknown)"
     for s in "${services[@]}"; do start_one "$s"; done ;;
@@ -257,6 +263,12 @@ case "$cmd" in
     cd "$ROOT" && CQ_SEED_API_URL="http://127.0.0.1:$API_PORT" node scripts/seed-fictional-world.mjs --local-stack --out "$RUN/fictional-world"
     # G2-SEED: one playable pitch whose transcript says a raise (no video provider locally).
     docker exec -i supabase_db_capital-q psql -U postgres -v ON_ERROR_STOP=1 -q <"$HARNESS/scripts/recovery/seed-pitch-raise.sql" ;;
+  seed-research)
+    # V2/W5: the Qatar Five prepared entities, loaded into the LOCAL database
+    # (no web fetch, no provider call), with logos pointing at this web origin.
+    set -a; source "$ENV_FILE"; set +a
+    unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy
+    cd "$ROOT" && node --import scripts/dev-env.mjs apps/q-api/src/dev/load-research-seed.ts --web-origin "http://127.0.0.1:$WEB_PORT" ;;
   env) echo "$ENV_FILE" ;;
   *) log "usage: $0 start|stop|status|seed|env [service...]"; exit 2 ;;
 esac
