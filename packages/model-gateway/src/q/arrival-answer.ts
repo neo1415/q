@@ -153,6 +153,24 @@ const when = (iso: string | null): string =>
     ? "an unknown time"
     : `${iso.slice(0, 16).replace("T", " ")} UTC`;
 
+/**
+ * What an arrival follow-up answers with. `open` is a page the answer
+ * actually moves the person to (an OPEN_RECORD_PAGE intent, confirmed by
+ * the browser's receipt), never only claimed in words.
+ */
+export type ArrivalReply = {
+  readonly text: string;
+  readonly itemKey: string;
+  readonly open?: {
+    readonly page:
+      | "RELATIONSHIP_COMPANY"
+      | "RELATIONSHIP_INVESTOR"
+      | "RELATIONSHIP_COMPANY_MESSAGES"
+      | "RELATIONSHIP_INVESTOR_MESSAGES";
+    readonly id: string;
+  };
+};
+
 export type ArrivalAspect =
   "REQUEST" | "THEIR_MESSAGE" | "MEETING" | "NEXT_STEP";
 
@@ -164,7 +182,7 @@ export function arrivalAspectAnswer(
   snapshot: ArrivalSnapshot | null,
   itemKey: string,
   aspect: ArrivalAspect,
-): { readonly text: string; readonly itemKey: string } | null {
+): ArrivalReply | null {
   const picked = snapshot?.items.find((one) => one.key === itemKey);
   if (
     snapshot === null ||
@@ -213,7 +231,7 @@ function unavailable(item: ArrivalSnapshotItem) {
 export function arrivalFollowUpAnswer(
   text: string,
   snapshot: ArrivalSnapshot | null,
-): { readonly text: string; readonly itemKey: string } | null {
+): ArrivalReply | null {
   if (snapshot === null) return null;
   const kind = arrivalFollowUpKind(text);
   if (kind === null) return null;
@@ -232,18 +250,36 @@ export function arrivalFollowUpAnswer(
 function answerFor(
   kind: ArrivalFollowUp,
   item: ArrivalSnapshotItem,
-): { readonly text: string; readonly itemKey: string } | null {
+): ArrivalReply | null {
   const name = item.counterpart?.name ?? "They";
   const f = item.facts;
   if (item.availability === "UNAVAILABLE") return unavailable(item);
   switch (kind) {
     case "OPEN": {
-      // With a thread, the page route opens it (not answered here). Without
-      // one the messages page would show the overview: say so instead.
-      if (item.hasConversation) return null;
+      const who = item.counterpart;
+      if (who === null) return null;
+      const investor = who.kind === "INVESTOR_ORGANISATION";
+      // With a thread the chat opens. Without one the messages page would
+      // show the overview: say so, and open the relationship instead.
+      if (item.hasConversation) {
+        return {
+          itemKey: item.key,
+          text: `Opening your conversation with ${name}.`,
+          open: {
+            page: investor
+              ? "RELATIONSHIP_INVESTOR_MESSAGES"
+              : "RELATIONSHIP_COMPANY_MESSAGES",
+            id: who.id,
+          },
+        };
+      }
       return {
         itemKey: item.key,
-        text: `There's no conversation with ${name} yet: you're not connected, so there is no chat to open. I can open your relationship with ${name} instead.`,
+        text: `There's no conversation with ${name} yet: you're not connected, so there is no chat to open. Opening your relationship with ${name} instead.`,
+        open: {
+          page: investor ? "RELATIONSHIP_INVESTOR" : "RELATIONSHIP_COMPANY",
+          id: who.id,
+        },
       };
     }
     case "REQUEST": {
