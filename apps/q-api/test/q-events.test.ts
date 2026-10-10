@@ -531,7 +531,7 @@ describe("GET /v1/q/runs/:runId/events", () => {
       deltas.map(
         (f) => (JSON.parse(f.data) as { data: { text: string } }).data.text,
       ),
-    ).toEqual(["Runway ", "is 14 months."]);
+    ).toEqual(["Runway is 14 months."]); // two fragments queued together are one frame
     // A delta frame carries no id line.
     for (const chunk of rawText.split("\n\n")) {
       if (chunk.includes("event: q.message.delta")) {

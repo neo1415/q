@@ -67,6 +67,7 @@ const DelegateBody = z
       )
       .max(12)
       .optional(),
+    early: z.boolean().optional(),
   })
   .strict();
 const DelegateResult = z.object({
@@ -77,6 +78,7 @@ const DelegateResult = z.object({
   failed: z.boolean(),
   ended: z.boolean().optional(),
   unheard: z.boolean().optional(),
+  partial: z.boolean().optional(),
   move: z
     .object({
       navigate: QVoiceDestinationSchema.nullable(),

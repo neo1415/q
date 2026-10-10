@@ -3100,56 +3100,98 @@ export function createModelGatewayQAnswer(
           seenText.includes('"answerCards":{') ||
           runFits.read(request.runId).length >= 2,
       );
+      /** One whole sentence through the guards and out; see the note above. */
+      const takeSentence = (sentence: string): void => {
+        // The tool loop has already run, so the grounds -- if the
+        // model asked for them -- are known before the first sentence
+        // is published.
+        // Fact labels are rewritten before a sentence goes out, not only
+        // in the stored answer: on a voice call it is said aloud (H3b).
+        const sentenceGuarded = guardSentence(
+          citeAuthorisedFacts(sentence, facts),
+          firstSentence,
+          recommendationGrounds,
+        );
+        firstSentence = false;
+        // Nothing is "on your screen" unless a tool put it there (R0).
+        const guarded =
+          sentenceGuarded === null
+            ? null
+            : screenClaims.sentence(sentenceGuarded);
+        // One boilerplate disclaimer at most (lead live replay 2026-10-07).
+        const caveated = guarded === null ? null : caveats.sentence(guarded);
+        if (caveated === null || caveated.length === 0) {
+          return;
+        }
+        // While code's lead list is what was last said, a sentence of
+        // the model's that only repeats one of its items is not said
+        // again (lead 2026-10-03; the stored answer drops it the same
+        // way, afterLeadLines).
+        let said = caveated;
+        if (leadListOpen && request.leadLines !== undefined) {
+          said = afterLeadLines(caveated, request.leadLines).trim();
+          // A bare item number cut off as its own sentence ("1.").
+          if (said.length === 0 || /^\d+[.)]$/u.test(said)) return;
+          leadListOpen = false;
+        }
+        if (heldPromise !== null) {
+          publish(heldPromise);
+          heldPromise = null;
+        }
+        if (isEmptyPromise(said)) {
+          heldPromise = said;
+          return;
+        }
+        publish(said);
+      };
+      /**
+       * The answer's last sentence, once the answer's closing quote has
+       * been read.
+       *
+       * The analyst writes `answer` first and the rest of its object
+       * (profile changes, knowledge, action talk, cards) after it, which
+       * is often longer than the answer itself. The last sentence used to
+       * wait for that whole tail; a one-sentence answer therefore reached
+       * nobody until the turn was over. The closing quote makes the
+       * sentence whole, so it goes through the same guards as the rest.
+       *
+       * Only on a turn that offered no tools: a round that reaches for a
+       * tool may carry a closing sentence of its own ("Checking now.") that
+       * the next round's answer replaces, and nothing said can be unsaid.
+       * Tool turns keep the earlier rule (the last sentence arrives with
+       * the completed message).
+       *
+       * Held back too when it is a sentence about preparing, approving or
+       * having saved something: that is exactly the one the stored answer
+       * may replace with the engine's status line, and a spoken sentence
+       * cannot be taken back.
+       */
+      let lastReleased = false;
+      const releaseLastSentence = (): void => {
+        if (lastReleased || !partial.complete()) return;
+        lastReleased = true;
+        const last = cutter.rest();
+        if (last === null) return;
+        if (
+          offered.length > 0 ||
+          request.askedAction !== undefined ||
+          request.writingDocument === true ||
+          withoutStatusTalk(last).removed > 0
+        ) {
+          return;
+        }
+        takeSentence(last);
+      };
       const onTextDelta = (fragment: string): void => {
         seenText += fragment;
         const fresh = partial.push(seenText);
-        if (fresh.length === 0) {
-          return;
+        if (fresh.length > 0) {
+          seenAnswer += fresh;
+          for (const sentence of cutter.push(fresh)) {
+            takeSentence(sentence);
+          }
         }
-        seenAnswer += fresh;
-        for (const sentence of cutter.push(fresh)) {
-          // The tool loop has already run, so the grounds -- if the
-          // model asked for them -- are known before the first sentence
-          // is published.
-          // Fact labels are rewritten before a sentence goes out, not only
-          // in the stored answer: on a voice call it is said aloud (H3b).
-          const sentenceGuarded = guardSentence(
-            citeAuthorisedFacts(sentence, facts),
-            firstSentence,
-            recommendationGrounds,
-          );
-          firstSentence = false;
-          // Nothing is "on your screen" unless a tool put it there (R0).
-          const guarded =
-            sentenceGuarded === null
-              ? null
-              : screenClaims.sentence(sentenceGuarded);
-          // One boilerplate disclaimer at most (lead live replay 2026-10-07).
-          const caveated = guarded === null ? null : caveats.sentence(guarded);
-          if (caveated === null || caveated.length === 0) {
-            continue;
-          }
-          // While code's lead list is what was last said, a sentence of
-          // the model's that only repeats one of its items is not said
-          // again (lead 2026-10-03; the stored answer drops it the same
-          // way, afterLeadLines).
-          let said = caveated;
-          if (leadListOpen && request.leadLines !== undefined) {
-            said = afterLeadLines(caveated, request.leadLines).trim();
-            // A bare item number cut off as its own sentence ("1.").
-            if (said.length === 0 || /^\d+[.)]$/u.test(said)) continue;
-            leadListOpen = false;
-          }
-          if (heldPromise !== null) {
-            publish(heldPromise);
-            heldPromise = null;
-          }
-          if (isEmptyPromise(said)) {
-            heldPromise = said;
-            continue;
-          }
-          publish(said);
-        }
+        releaseLastSentence();
       };
 
       const options: ModelGatewayExecuteOptions<CompanyAnalystV22Result> = {

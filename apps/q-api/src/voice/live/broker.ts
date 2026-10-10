@@ -151,6 +151,16 @@ type Delegation = {
   readonly controller: AbortController;
   result: Promise<Omit<LiveDelegationResult, "stale">>;
   settled: boolean;
+  /**
+   * The first verified words the run said, once it has said some and has
+   * neither held code-built facts nor moved the screen; null if the run
+   * ended without that. Settles at most once.
+   */
+  first: Promise<string | null>;
+  /** What was handed to the voice early; null until then. */
+  partialSent: string | null;
+  /** Everything the run said and the facts it held, when it ended. */
+  ended: { readonly said: string; readonly facts: SpokenFacts | null } | null;
 };
 
 type LiveLine = {
@@ -292,17 +302,26 @@ export const LIVE_SWEEP_MS = 30_000;
 export const LIVE_INACTIVE_GRACE_MS = 2 * 60 * 1000;
 
 /** Q's run, collected: what it said, or the facts of a code-built answer. */
-function collector(id: string): {
+function collector(
+  id: string,
+  /** Called once, with the first words, while the run is still going. */
+  onFirstWords?: (said: string, facts: SpokenFacts | null) => void,
+): {
   readonly speaker: VoiceSpeaker;
   readonly said: () => string;
   readonly held: () => SpokenFacts | null;
 } {
   let text = "";
   let held: SpokenFacts | null = null;
+  let announced = false;
   const add = (part: string) => {
     const trimmed = part.trim();
     if (trimmed.length === 0 || text.length >= SPOKEN_MAX) return;
     text = text.length === 0 ? trimmed : `${text} ${trimmed}`;
+    if (!announced) {
+      announced = true;
+      onFirstWords?.(text, held);
+    }
   };
   return {
     speaker: {
@@ -352,6 +371,48 @@ function spokenCommentary(facts: SpokenFacts, context: string): string {
     return `${LIVE_SPEAK_GUIDE} ${context} ${say}${names}${next} Never quote anyone's message.`;
   }
   return `${LIVE_SPEAK_GUIDE} ${context} ${say}${names}${next} Details for follow-up questions: ${JSON.stringify(askQFactsOutput(facts))}`;
+}
+
+/** The start of an answer, handed to the voice while the run goes on. */
+export function partialCommentary(request: string, words: string): string {
+  const { say } = forRealtime(words);
+  return `${LIVE_SPEAK_GUIDE} They asked: ${JSON.stringify(request.slice(0, 300))}. Q's backend has begun answering and the rest follows in a moment: say this much in your own words now, and do not close or ask whether they want more yet: ${JSON.stringify(say)}`;
+}
+
+/**
+ * What the voice still has to say once its start was handed over early:
+ * the rest of the words (never the start again), or the run's own facts
+ * and flags when it ended differently from how it began.
+ */
+function restOf(
+  running: Pick<Delegation, "request" | "partialSent" | "ended">,
+  result: Omit<LiveDelegationResult, "stale">,
+): Omit<LiveDelegationResult, "stale"> {
+  const ended = running.ended;
+  const sent = running.partialSent ?? "";
+  if (ended === null) return result;
+  const already =
+    "You have already said the start of this answer; say only what follows, continuing naturally, never repeating it. ";
+  if (ended.facts !== null) {
+    return {
+      ...result,
+      commentary:
+        result.commentary === null ? null : `${already}${result.commentary}`,
+    };
+  }
+  const rest = ended.said.startsWith(sent)
+    ? ended.said.slice(sent.length).trim()
+    : ended.said;
+  const commentary = commentaryFor({
+    request: running.request,
+    facts: null,
+    said: rest,
+    approvalPending: result.approvalPending,
+  });
+  return {
+    ...result,
+    commentary: commentary === null ? null : `${already}${commentary}`,
+  };
 }
 
 export function commentaryFor(input: {
@@ -510,7 +571,20 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     const controller = new AbortController();
     let deadline: ReturnType<typeof setTimeout> | undefined;
     const before = line.tail;
-    const speaker = collector(`live_${line.voiceSessionId}`);
+    let sequenceBefore = 0;
+    let releaseFirst: (words: string | null) => void = () => undefined;
+    const first = new Promise<string | null>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const speaker = collector(`live_${line.voiceSessionId}`, (said, facts) => {
+      // Early only for plain words the model wrote: code-built facts are
+      // said from the whole run, an approval question ends the answer, and
+      // a screen move is followed before the voice speaks at all.
+      const moved =
+        (deps.board?.read(line.voiceSessionId).sequence ?? 0) > sequenceBefore;
+      if (facts !== null || moved || said.includes(APPROVAL_QUESTION)) return;
+      releaseFirst(said);
+    });
     const asked: VoiceTranscriptTurn = { role: "user", content: request };
     const startedAt = now();
     const delegation: Delegation = {
@@ -518,6 +592,9 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       request,
       controller,
       settled: false,
+      first,
+      partialSent: null,
+      ended: null,
       result: Promise.resolve({
         delegationId: id,
         commentary: null,
@@ -540,8 +617,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         deadline = setTimeout(() => {
           controller.abort();
         }, config.delegationDeadlineMs);
-        const sequenceBefore =
-          deps.board?.read(line.voiceSessionId).sequence ?? 0;
+        sequenceBefore = deps.board?.read(line.voiceSessionId).sequence ?? 0;
         const outcome = await turn(
           line.binding,
           // GPT-Live already ended their turn: never held as unfinished.
@@ -561,6 +637,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         }
         const said = speaker.said();
         const facts = speaker.held();
+        delegation.ended = { said, facts };
         const approvalPending = said.endsWith(APPROVAL_QUESTION);
         const commentary = commentaryFor({
           request,
@@ -607,6 +684,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       } finally {
         if (deadline !== undefined) clearTimeout(deadline);
         delegation.settled = true;
+        // No early words came: whoever waits for them stops waiting.
+        releaseFirst(null);
         logger.info(
           {
             qVoiceSessionId: line.voiceSessionId,
@@ -819,8 +898,28 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         line.delegations.set(delegation.delegationId, running);
         line.latest = delegation.delegationId;
       }
+      // The first verified words, before the run ends, for a client that
+      // asked for them. They go once; the same id asked again is the rest.
+      if (delegation.early === true && running.partialSent === null) {
+        const words = await running.first;
+        if (words !== null && running.partialSent === null) {
+          running.partialSent = words;
+          return {
+            delegationId: delegation.delegationId,
+            commentary: partialCommentary(running.request, words),
+            stale: line.latest !== delegation.delegationId,
+            approvalPending: false,
+            failed: false,
+            partial: true,
+          };
+        }
+      }
       const result = await running.result;
-      return { ...result, stale: line.latest !== delegation.delegationId };
+      const stale = line.latest !== delegation.delegationId;
+      if (running.partialSent !== null && !result.failed) {
+        return { ...restOf(running, result), stale };
+      }
+      return { ...result, stale };
     },
 
     cancel: async ({ actor, voiceSessionId, delegationId }) => {

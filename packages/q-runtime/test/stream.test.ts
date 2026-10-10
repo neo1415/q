@@ -6,6 +6,7 @@ import type { QStreamEvent } from "@capital-q/contracts";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
+  coalesceDeltas,
   createInProcessQLiveDeltaBus,
   createInProcessQRunEventNotifier,
   createQRunStreamService,
@@ -453,5 +454,42 @@ describe("createQRunStreamService", () => {
       deltaSubscribers: 0,
       deltasDropped: 0,
     });
+  });
+});
+
+describe("coalesceDeltas", () => {
+  const delta = (messageId: string, text: string) => ({
+    runId: RUN_ID as never,
+    tenantId: TENANT as never,
+    messageId: messageId as never,
+    text,
+  });
+
+  it("joins the fragments queued for one message, in order", () => {
+    expect(
+      coalesceDeltas([
+        delta("m1", "Runway "),
+        delta("m1", "is 14 "),
+        delta("m1", "months."),
+      ]),
+    ).toEqual([delta("m1", "Runway is 14 months.")]);
+  });
+
+  it("never merges across messages, and keeps their order", () => {
+    expect(
+      coalesceDeltas([
+        delta("m1", "A "),
+        delta("m2", "B "),
+        delta("m1", "C"),
+      ]).map((d) => [d.messageId, d.text]),
+    ).toEqual([
+      ["m1", "A "],
+      ["m2", "B "],
+      ["m1", "C"],
+    ]);
+  });
+
+  it("returns nothing for nothing", () => {
+    expect(coalesceDeltas([])).toEqual([]);
   });
 });
