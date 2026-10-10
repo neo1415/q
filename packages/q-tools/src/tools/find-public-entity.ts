@@ -84,7 +84,7 @@ export type FindPublicEntityOutput = z.infer<
 >;
 
 const GUIDANCE =
-  "The identity card is already on screen, built from public sources: do not repeat its fields. Say in one short sentence who was found and how sure it is (the card's confidence and uncertainty), then offer to research them further or to rehearse a conversation with them. If there are several candidates, ask the one question given. If nothing was found, say so plainly and ask for a city or company; never guess or describe someone from general knowledge. Public sources are unverified.";
+  "The identity card is already on screen, built from public sources: do not repeat its fields. Say in one short sentence who was found, as REPORTED (reportedly, according to their LinkedIn, using the card's attributionLine) and how sure it is; search-indexed findings are usable but never stated as verified fact, then offer to research them further or to rehearse a conversation with them. If there are several candidates, ask the one question given. If nothing was found, say so plainly and ask for a city or company; never guess or describe someone from general knowledge. Public sources are unverified.";
 
 export function createFindPublicEntityTool(
   ports: QToolPorts & {

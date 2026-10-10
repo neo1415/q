@@ -57,7 +57,9 @@ import {
 } from "@capital-q/q-research/providers/brightdata";
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
-import { createSerpApiResearchProvider } from "@capital-q/q-research/providers/serpapi";
+import { createScrapingBeeResearchProvider } from "@capital-q/q-research/providers/scrapingbee";
+import { createDetectingSerpProvider } from "@capital-q/q-research/providers/serp-detect";
+import { createSerperResearchProvider } from "@capital-q/q-research/providers/serper";
 import { createTavilyResearchProvider } from "@capital-q/q-research/providers/tavily";
 import type { AuthorizationService } from "@capital-q/security";
 
@@ -307,11 +309,27 @@ export function composeResearch(
             apiKey: dependencies.secrets.tavily.reveal(),
           }),
         ]),
+    // SERP_API_KEY has been configured with a Serper.dev key under a
+    // SerpApi name: the detecting provider settles which vendor answers.
     ...(dependencies.secrets.serpApi === undefined
       ? []
       : [
-          createSerpApiResearchProvider({
+          createDetectingSerpProvider({
             apiKey: dependencies.secrets.serpApi.reveal(),
+          }),
+        ]),
+    ...(dependencies.secrets.serper === undefined
+      ? []
+      : [
+          createSerperResearchProvider({
+            apiKey: dependencies.secrets.serper.reveal(),
+          }),
+        ]),
+    ...(dependencies.secrets.scrapingBee === undefined
+      ? []
+      : [
+          createScrapingBeeResearchProvider({
+            apiKey: dependencies.secrets.scrapingBee.reveal(),
           }),
         ]),
   ];
@@ -360,9 +378,24 @@ export function composeResearch(
 
   // W2: public people search. The individual indexes (not the merged one)
   // are searched side by side so each is timed and bounded alone.
+  // Ordered by measured accuracy and speed (W2 benchmark): the first takes
+  // every planned query, the rest corroborate the exact one.
+  const PERSON_INDEX_ORDER = [
+    "serper",
+    "serpapi",
+    "tavily",
+    "brightdata",
+    "scrapingbee",
+  ];
   const personProviders = dependencies.provider
     ? [dependencies.provider]
-    : indexes.map((index) => createCachedResearchProvider({ provider: index }));
+    : [...indexes]
+        .sort(
+          (a, b) =>
+            PERSON_INDEX_ORDER.indexOf(a.code) -
+            PERSON_INDEX_ORDER.indexOf(b.code),
+        )
+        .map((index) => createCachedResearchProvider({ provider: index }));
   const knownStore = createPostgresKnownEntityStore({ sql, transactions });
   const knownIndex = createKnownEntityIndex({ store: knownStore });
   // Warm in the background: until it lands, a lookup is one indexed query.

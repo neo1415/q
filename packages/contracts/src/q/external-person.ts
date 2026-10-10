@@ -187,6 +187,12 @@ export const IdentityCardSchema = z
       .min(1)
       .max(EXTERNAL_PERSON_SOURCE_MAX),
     uncertainty: z.array(z.string().max(200)).max(4),
+    /**
+     * Soft attribution for findings that are search-indexed but not
+     * independently confirmed ("According to their public LinkedIn
+     * profile ..."): usable, said as reported, never as verified fact.
+     */
+    attributionLine: z.string().max(240).nullable().default(null),
     /** True while background enrichment is still running; the card updates. */
     enriching: z.boolean(),
     /** What the card offers next. Fixed vocabulary; the client words it. */

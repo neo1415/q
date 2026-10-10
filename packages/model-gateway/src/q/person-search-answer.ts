@@ -76,8 +76,9 @@ function firstName(name: string): string {
 function cardBlock(card: IdentityCard): QAnswerCardsBlock | null {
   const s = card.subject;
   const reasons = [
+    card.attributionLine ?? CONFIDENCE_WORDS[s.confidence],
     CONFIDENCE_WORDS[s.confidence],
-    ...card.uncertainty.slice(0, 2),
+    ...card.uncertainty.slice(0, 1),
   ].map((r) => r.slice(0, 160));
   const followUps = [
     ...(card.actions.includes("RESEARCH_FURTHER")
@@ -197,7 +198,14 @@ export function personSearchText(
         ? "It looks like a strong match."
         : "It is a plausible match, not a confirmed one.";
     const note = result.card.uncertainty[0];
-    return `I found ${s.displayName}${where === null ? "" : ` (${where.replace(/ · /gu, ", ")})`}. ${how}${note === undefined ? "" : ` ${note}`} The card and its sources are on screen; I can research further or set up a rehearsal.`;
+    // Search-indexed findings are usable but said as reported.
+    const reported =
+      where === null
+        ? s.displayName
+        : `${s.displayName} is reportedly ${where.replace(/ · /gu, ", ")}`;
+    return `${reported}. ${result.card.attributionLine ?? ""} ${how}${note === undefined ? "" : ` ${note}`} The card and its sources are on screen; I can research further or set up a rehearsal.`
+      .replace(/\s+/gu, " ")
+      .trim();
   }
   if (result.outcome === "AMBIGUOUS") {
     return (

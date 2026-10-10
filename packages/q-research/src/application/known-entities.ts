@@ -267,6 +267,7 @@ export function cardFromKnownEntity(
     },
     sources,
     uncertainty: uncertainty.slice(0, 4),
+    attributionLine: `According to public sources prepared on ${record.lastResearchedAt.slice(0, 10)}.`,
     enriching: false,
     actions: ["RESEARCH_FURTHER", "REHEARSE"],
   };

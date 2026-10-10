@@ -38,16 +38,34 @@ import {
  * building the brief) is a separate, later step and never delays the card.
  */
 
+/**
+ * Measured 2026-10-10 (14 queries, Qatar five + three executives + an
+ * ambiguous and a nonexistent name): Serper.dev found 13/13 at p50 0.86 s,
+ * p95 1.74 s (rank 1 in 11); Tavily found 12/13 at p50 2.5 s, p95 3.4 s
+ * (rank 1 in 5). So the first (fastest, most accurate) index receives
+ * every planned query, a second index corroborates the exact query, and
+ * deadlines follow each index's own tail, inside one 4.5 s budget that
+ * keeps the 5 s p95 target.
+ */
 export const PERSON_SEARCH_BUDGET = {
-  /** Each provider call's own deadline. */
+  /** Default per-call deadline for an index with no measured tail of its own. */
   perCallMs: 3_000,
   /** The whole search, including ranking. */
-  overallMs: 5_000,
+  overallMs: 4_500,
   /** Queries planned for one person. */
   maxQueries: 5,
   /** Distinct hits kept per call. */
   hitsPerCall: 8,
 } as const;
+
+/** Deadline by index, from the measured tails (Serper.dev p95 1.7 s; Tavily p95 3.4 s). */
+const PROVIDER_DEADLINE_MS: Readonly<Record<string, number>> = {
+  serper: 2_200,
+  serpapi: 2_500,
+  tavily: 3_200,
+  brightdata: 3_000,
+  scrapingbee: 4_000,
+};
 
 export type PersonQueryKind =
   | "EXACT_PLACE"
@@ -116,6 +134,8 @@ export type PersonSearchCommand = {
     | Partial<{
         perCallMs: number;
         overallMs: number;
+        /** Deadline by provider code, over the default. */
+        perCallMsByProvider: Readonly<Record<string, number>>;
         maxQueries: number;
       }>
     | undefined;
@@ -208,6 +228,21 @@ export function sourcesOfCandidate(
   return out;
 }
 
+/**
+ * How the findings are attributed: search-indexed material is usable when
+ * it is said to be reported, never as a verified fact.
+ */
+export function attributionLineFor(candidate: PersonCandidate): string {
+  const profile = candidate.profileUrl;
+  if (profile !== null && /linkedin\.com/iu.test(profile)) {
+    return "According to their public LinkedIn profile (search-indexed, not independently confirmed).";
+  }
+  const domain = candidate.domains[0];
+  return domain === undefined
+    ? "Reported by public web pages (search-indexed, not independently confirmed)."
+    : `According to ${domain} (search-indexed, not independently confirmed).`;
+}
+
 class Deadline extends Error {}
 
 /**
@@ -259,6 +294,11 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
         command.budget?.perCallMs ?? PERSON_SEARCH_BUDGET.perCallMs;
       const overallMs =
         command.budget?.overallMs ?? PERSON_SEARCH_BUDGET.overallMs;
+      const deadlineFor = (code: string): number =>
+        command.budget?.perCallMsByProvider?.[code] ??
+        (command.budget?.perCallMs === undefined
+          ? (PROVIDER_DEADLINE_MS[code] ?? perCallMs)
+          : perCallMs);
       const spec: PersonSpec = {
         name: command.name.trim(),
         place: command.place?.trim() || null,
@@ -314,23 +354,21 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
       >();
       let nextCall = 0;
 
-      // The exact query and the profile-index query go to every index; the
-      // rest are spread round-robin so five queries do not cost five x n calls.
+      // The first index (the fastest and most accurate) takes every planned
+      // query; the others corroborate only the exact query and the spelling
+      // variant, so five queries do not cost five x n calls.
       const assignments: {
         planned: (typeof composed)[number];
         provider: PublicWebResearchProvider;
       }[] = [];
-      composed.forEach((planned, index) => {
-        const everywhere =
-          planned.kind === "EXACT_PLACE" || planned.kind === "PROFILE_INDEX";
-        if (everywhere) {
-          for (const provider of providers) {
+      composed.forEach((planned) => {
+        const corroborates =
+          planned.kind === "EXACT_PLACE" || planned.kind === "VARIANT";
+        providers.forEach((provider, at) => {
+          if (at === 0 || corroborates) {
             assignments.push({ planned, provider });
           }
-        } else {
-          const provider = providers[index % Math.max(providers.length, 1)];
-          if (provider !== undefined) assignments.push({ planned, provider });
-        }
+        });
       });
 
       const reevaluate = (): boolean => {
@@ -374,7 +412,7 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
                 },
                 { signal },
               ),
-            perCallMs,
+            deadlineFor(provider.code),
             overall.signal,
           ).then(
             (result) => {
@@ -481,6 +519,7 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
             },
             sources,
             uncertainty: [...decided.uncertainty],
+            attributionLine: attributionLineFor(chosen),
             enriching: true,
             actions: ["RESEARCH_FURTHER", "REHEARSE"],
           },

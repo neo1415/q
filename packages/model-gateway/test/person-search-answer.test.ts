@@ -72,6 +72,8 @@ const MATCHED: PersonSearchResult = {
       },
     ],
     uncertainty: ["One source so far; a second would confirm it."],
+    attributionLine:
+      "According to their public LinkedIn profile (search-indexed, not independently confirmed).",
     enriching: true,
     actions: ["RESEARCH_FURTHER", "REHEARSE"],
   },

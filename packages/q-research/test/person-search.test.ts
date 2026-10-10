@@ -342,8 +342,8 @@ describe("fast person search under a deadline", () => {
       ],
     }).search(command);
     const elapsed = Date.now() - started;
-    expect(elapsed).toBeGreaterThanOrEqual(2_900);
-    expect(elapsed).toBeLessThan(5_300);
+    expect(elapsed).toBeGreaterThanOrEqual(3_000);
+    expect(elapsed).toBeLessThan(4_700);
     expect(run.result.outcome).toBe("UNAVAILABLE");
   }, 10_000);
 });
