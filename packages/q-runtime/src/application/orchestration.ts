@@ -275,6 +275,23 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
       }
     | undefined;
   /**
+   * W2: a PERSON_SEARCH request as the first read understood it: one named
+   * person, company or government body to identify from public sources,
+   * with only the clues the person gave. Answered by code as an identity
+   * card from the lookup tool; never the analyst describing someone.
+   */
+  readonly personSearch?:
+    | {
+        readonly name: string;
+        readonly entityKind: "PERSON" | "ORGANIZATION" | "GOVERNMENT_AGENCY";
+        readonly city: string | null;
+        readonly country: string | null;
+        readonly organization: string | null;
+        readonly role: string | null;
+        readonly freshSearch: boolean;
+      }
+    | undefined;
+  /**
    * A FIT question as the reader read it (live 2026-10-09): their question
    * in its words -- the earlier ask when this turn only pressed on it
    * ("still waiting") -- and how many companies it asks for, null when

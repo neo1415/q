@@ -1343,10 +1343,26 @@ export {
 export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
 export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
 export { TURN_SKIM_V1 } from "./prompts/tasks/turn-skim.v1.js";
+export { TURN_SKIM_V2 } from "./prompts/tasks/turn-skim.v2.js";
+export { PERSON_BRIEF_READER_V1 } from "./prompts/tasks/person-brief-reader.v1.js";
+export {
+  PERSON_BRIEF_READER_SCHEMA_NAME,
+  PERSON_BRIEF_READER_SCHEMA_VERSION,
+  PERSON_BRIEF_READER_TOPICS,
+  PERSON_BRIEF_READER_UNTRUSTED,
+  PersonBriefReaderResultSchema,
+  PersonBriefReaderVariablesSchema,
+  type PersonBriefReaderResult,
+  type PersonBriefReaderVariables,
+} from "./prompts/schemas/person-brief-reader.js";
 export {
   TURN_SKIM_KINDS,
   TURN_SKIM_SCHEMA_NAME,
   TURN_SKIM_SCHEMA_VERSION,
+  TURN_SKIM_V2_KINDS,
+  TURN_SKIM_V2_SCHEMA_VERSION,
+  SkimPersonSchema,
+  type SkimPerson,
   TurnSkimResultSchema,
   TurnSkimVariablesSchema,
   type TurnSkimResult,
