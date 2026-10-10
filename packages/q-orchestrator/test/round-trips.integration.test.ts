@@ -168,6 +168,7 @@ describe("round trips before PREPARING_ANALYSIS, against local PostgreSQL", () =
 
     const before: number[] = [];
     const ms: number[] = [];
+    const checkpoint: number[] = [];
     try {
       for (let i = 0; i < RUNS; i += 1) {
         const { run } = await service.createRun({
@@ -197,6 +198,12 @@ describe("round trips before PREPARING_ANALYSIS, against local PostgreSQL", () =
         }
         before.push(count);
         ms.push(at);
+        // R5: the phase attribution rides on the same line, and the
+        // checkpoint saver writes in one statement per save, not one per
+        // channel and write plus BEGIN/COMMIT (35 per run before).
+        const phases = returned?.["dbRoundTripsByPhase"] as
+          Record<string, number> | undefined;
+        checkpoint.push(phases?.["checkpoint"] ?? Number.NaN);
       }
     } finally {
       await store.close();
@@ -206,6 +213,7 @@ describe("round trips before PREPARING_ANALYSIS, against local PostgreSQL", () =
       `round trips before PREPARING_ANALYSIS: p50 ${String(median(before))}, p95 ${String(p95(before))}; ms p50 ${String(median(ms))}, p95 ${String(p95(ms))} (local, n=${String(RUNS)})\n`,
     );
     expect(median(before)).toBeGreaterThan(0);
+    expect(Math.max(...checkpoint)).toBeLessThanOrEqual(4);
     expect(median(before)).toBeLessThanOrEqual(
       Number(process.env["CQ_ROUND_TRIP_BUDGET"] ?? "30"),
     );

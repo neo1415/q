@@ -158,14 +158,27 @@ function detached<T>(invoke: () => Promise<T>): Promise<T> {
 }
 
 /** The run's database round trips so far, for the returned log line. */
-function roundTripFields(): Record<string, number> {
+function roundTripFields(): Record<string, unknown> {
   const counter = currentRoundTripCounter();
   if (counter === undefined) return {};
-  const fields: Record<string, number> = { dbRoundTrips: counter.count };
+  const fields: Record<string, unknown> = {
+    dbRoundTrips: counter.count,
+    // R5: where they went, by phase or tool (labels only, never content).
+    dbRoundTripsByPhase: { ...counter.phases },
+  };
   const before = counter.marks["preparing_analysis"];
   const at = counter.markedAtMs["preparing_analysis"];
   if (before !== undefined) fields["dbRoundTripsBeforeAnalysis"] = before;
   if (at !== undefined) fields["msBeforeAnalysis"] = at;
+  const sites = Object.entries(counter.sites);
+  if (sites.length > 0) {
+    // Local diagnosis (CQ_ROUND_TRIP_TRACE=1 with the trace loader): the
+    // exact number sent in this run, and the 200 busiest call sites.
+    fields["dbRoundTripsSent"] = sites.reduce((sum, [, n]) => sum + n, 0);
+    fields["dbRoundTripSites"] = Object.fromEntries(
+      sites.sort((a, b) => b[1] - a[1]).slice(0, 200),
+    );
+  }
   return fields;
 }
 

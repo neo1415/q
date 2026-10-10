@@ -19,13 +19,68 @@ export type RoundTripCounter = {
   readonly marks: Record<string, number>;
   /** Milliseconds since the counter was created, at each named moment. */
   readonly markedAtMs: Record<string, number>;
+  /**
+   * Round trips per phase (R5): the innermost `withRoundTripPhase` label
+   * the query was sent under, or "other". Sums to `count`.
+   */
+  readonly phases: Record<string, number>;
+  /**
+   * Local diagnosis only (CQ_ROUND_TRIP_TRACE=1 with the trace loader):
+   * queries sent, per phase and calling source location, so a sink no
+   * phase names can still be found. Empty otherwise.
+   */
+  readonly sites: Record<string, number>;
   readonly startedAt: number;
 };
 
 const storage = new AsyncLocalStorage<RoundTripCounter>();
+const phaseStorage = new AsyncLocalStorage<string>();
+const TRACE = process.env["CQ_ROUND_TRIP_TRACE"] === "1";
 
 export function createRoundTripCounter(): RoundTripCounter {
-  return { count: 0, marks: {}, markedAtMs: {}, startedAt: performance.now() };
+  return {
+    count: 0,
+    marks: {},
+    markedAtMs: {},
+    phases: {},
+    sites: {},
+    startedAt: performance.now(),
+  };
+}
+
+/**
+ * Attributes the round trips `work` sends to `label` (the innermost label
+ * wins). Labels are fixed phase or tool names, never content. A plain call
+ * through when no counter is bound, so it costs nothing outside a run.
+ */
+export function withRoundTripPhase<T>(label: string, work: () => T): T {
+  if (storage.getStore() === undefined) return work();
+  return phaseStorage.run(label, work);
+}
+
+/**
+ * The first three stack frames outside the database client and
+ * node_modules, innermost first: the reading and who asked for it.
+ */
+function callSite(raw?: string): string {
+  const stack = (raw ?? new Error().stack)?.split("\n").slice(1) ?? [];
+  const sites: string[] = [];
+  for (const frame of stack) {
+    if (
+      frame.includes("node_modules") ||
+      frame.includes("/database/") ||
+      frame.includes("node:")
+    ) {
+      continue;
+    }
+    const match = /\/(?:packages|apps)\/(.+?):(\d+):\d+\)?$/.exec(frame.trim());
+    if (match === null) continue;
+    sites.push(
+      `${(match[1] ?? "").replace(/^([^/]+)\/(?:dist|src)\/(?:infrastructure\/)?/, "$1/")}:${match[2] ?? ""}`,
+    );
+    if (sites.length === 3) break;
+  }
+  return sites.length === 0 ? "unknown" : sites.join(" < ");
 }
 
 export function withRoundTripCounter<T>(
@@ -36,9 +91,32 @@ export function withRoundTripCounter<T>(
 }
 
 /** One query was sent. A no-op outside a counted context. */
-export function countRoundTrip(): void {
+export function countRoundTrip(phase?: string): void {
   const counter = storage.getStore();
-  if (counter !== undefined) counter.count += 1;
+  if (counter === undefined) return;
+  counter.count += 1;
+  const label = phase ?? phaseStorage.getStore() ?? "other";
+  counter.phases[label] = (counter.phases[label] ?? 0) + 1;
+}
+
+// Local diagnosis only (scripts/recovery/round-trip-trace.mjs): a loader
+// makes the driver call `__cqQuerySent` as each query is handed to a
+// connection, in the caller's own async context, with the stack from where
+// the query was written. The debug hook above runs where the driver
+// writes, which for a query that waited for a free connection is that
+// socket's context, not the caller's: on a busy pool it counts other
+// requests' queries to whichever run opened the socket. The sites below
+// are exact; `count` is approximate under contention.
+if (TRACE) {
+  Error.stackTraceLimit = 40;
+  (globalThis as { __cqQuerySent?: (stack?: string) => void }).__cqQuerySent = (
+    stack,
+  ) => {
+    const counter = storage.getStore();
+    if (counter === undefined) return;
+    const site = `${phaseStorage.getStore() ?? "other"} | ${callSite(stack)}`;
+    counter.sites[site] = (counter.sites[site] ?? 0) + 1;
+  };
 }
 
 /** Records the count so far under a label, once (the first time wins). */

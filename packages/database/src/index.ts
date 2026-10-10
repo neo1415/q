@@ -40,6 +40,7 @@ export {
   currentRoundTripCounter,
   markRoundTrips,
   withRoundTripCounter,
+  withRoundTripPhase,
   type RoundTripCounter,
 } from "./round-trips.js";
 export {
