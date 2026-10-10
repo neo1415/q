@@ -189,6 +189,8 @@ export type QIntelligenceDependencies = {
   ) => Promise<readonly string[]>;
   /** W4: a researched entity reachable by name (seed or own research). */
   readonly externalEntities?: SpecialistQAnswerDependencies["externalEntities"];
+  /** Instant known-entity lookups: the warm prepared index, in memory. */
+  readonly knownEntities?: SpecialistQAnswerDependencies["knownEntities"];
   /** What Capital Q remembers about the person, for the prompts (ADR 0012). */
   readonly memory?: QMemoryRecall | undefined;
   /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
@@ -468,6 +470,9 @@ export function composeQIntelligence(
       ? {}
       : { pendingDecisions: dependencies.pendingDecisions }),
     counterpartNames: dependencies.counterpartNames,
+    ...(dependencies.knownEntities === undefined
+      ? {}
+      : { knownEntities: dependencies.knownEntities }),
     ...(dependencies.externalEntities === undefined
       ? {}
       : { externalEntities: dependencies.externalEntities }),

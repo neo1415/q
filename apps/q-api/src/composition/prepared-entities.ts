@@ -263,6 +263,34 @@ export function shownQuotes(
   });
 }
 
+/**
+ * The warm index as the answer path's instant matcher: the one prepared
+ * entity a candidate names, with the words that name it and the place
+ * words that are valid clues. Several or none is null (normal path).
+ */
+export function preparedEntityMatcher(
+  entities: Pick<PreparedEntities, "lookup">,
+): (candidate: string) => {
+  readonly displayName: string;
+  readonly entityKind: KnownEntityRecord["entityKind"];
+  readonly nameWords: readonly string[];
+  readonly contextWords: readonly string[];
+} | null {
+  return (candidate) => {
+    const found = entities.lookup(candidate);
+    if (found.kind !== "FOUND") return null;
+    const record = found.record;
+    return {
+      displayName: record.displayName,
+      entityKind: record.entityKind,
+      nameWords: [record.displayName, ...record.aliases].flatMap(words),
+      contextWords: [record.location, record.organization, record.role].flatMap(
+        (text) => (text === null ? [] : words(text)),
+      ),
+    };
+  };
+}
+
 /** The persona's grounding: facts only, never the quotes. */
 export function personaGrounding(record: KnownEntityRecord): {
   readonly facts: readonly AnswerFact[];

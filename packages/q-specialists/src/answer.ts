@@ -84,7 +84,11 @@ import {
   zoneFromWords,
 } from "@capital-q/q-tools";
 import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
-import { fastLaneOf } from "./fast-lane.js";
+import {
+  fastLaneOf,
+  knownEntityLaneOf,
+  type KnownEntityMatcher,
+} from "./fast-lane.js";
 
 import {
   ANSWER_DOCUMENT_ARTIFACT_TYPE,
@@ -462,6 +466,12 @@ export type SpecialistQAnswerDependencies = {
    * app query before the full reading lands. Absent: no fast lane.
    */
   readonly turnSkim?: QTurnSkimmer | undefined;
+  /**
+   * The warm prepared-entity index, as a pure in-memory matcher. A plain
+   * "who is / tell me about / find <prepared entity>" is answered by code
+   * with no model call at all. Absent: the normal path.
+   */
+  readonly knownEntities?: KnownEntityMatcher | undefined;
   /**
    * A typed yes or no to a change waiting in this conversation, read and
    * acted on by code through the Approval Engine (pending-decision.ts).
@@ -2199,6 +2209,11 @@ export function createSpecialistQAnswer(
     };
   };
 
+  const instantLaneOf = (utterance: string) =>
+    dependencies.knownEntities === undefined
+      ? null
+      : knownEntityLaneOf(utterance, dependencies.knownEntities);
+
   const preread = (input: QPrereadInput): void => {
     if (turns === undefined || prereads.has(input.runId)) return;
     const started = (async (): Promise<EarlyReading | null> => {
@@ -2216,6 +2231,8 @@ export function createSpecialistQAnswer(
       if (conversationId === undefined || latest === undefined) return null;
       // B5: a pleasantry is answered by code; its reading would be waste.
       if (pleasantryOf(latest.content) !== null) return null;
+      // An instant known-entity lookup is answered by code: no reading.
+      if (instantLaneOf(latest.content) !== null) return null;
       // K fast lane: the short first read starts as early as the reading.
       if (dependencies.turnSkim !== undefined && !preskims.has(input.runId)) {
         preskims.set(input.runId, {
@@ -2442,6 +2459,33 @@ export function createSpecialistQAnswer(
           conversationId,
           pleasantryReply(pleasantry, request.runId, lastQ?.content ?? null),
         );
+      }
+    }
+    // Known-entity instant lane: a plain lookup of a prepared entity is
+    // answered from the warm index with zero model calls (live 2026-10-10:
+    // three classification calls ran before a code-built card).
+    if (
+      conversationId !== undefined &&
+      latest !== undefined &&
+      request.speculation === undefined &&
+      request.plan.screen?.route !== "ONBOARDING" &&
+      !sequences.has(conversationId)
+    ) {
+      const instant = instantLaneOf(latest.content);
+      if (instant !== null) {
+        const capabilities = await capabilitiesOf(request);
+        logger?.info(
+          { qRunId: request.runId, lane: "KNOWN_ENTITY" },
+          "q fast lane",
+        );
+        return delegate.answer({
+          ...request,
+          research: Promise.resolve(NO_RESEARCH),
+          capabilities: manifestOf(capabilities),
+          turnKind: "QUESTION_TO_Q",
+          ...(latest.utteranceRef !== undefined ? { spoken: true } : {}),
+          ...instant,
+        });
       }
     }
     delegate.warm?.(request);

@@ -393,4 +393,36 @@ describe("fast person search under a deadline", () => {
     expect(elapsed).toBeLessThan(4_700);
     expect(run.result.outcome).toBe("UNAVAILABLE");
   }, 10_000);
+  it("never states a clipped role or employer, and never pairs a role from one snippet with an employer from another", () => {
+    const clipped: PublicWebSearchHit = {
+      url: "https://www.linkedin.com/in/tidjane-thiam-1a2b3c",
+      title: "Tidjane Thiam - Executive Chairman of Freedom ... | LinkedIn",
+      snippet: "Location: New York, United States",
+      publishedAt: null,
+      relevance: 0.8,
+    };
+    expect(profileFactsOf(clipped).role).toBeNull();
+    expect(profileFactsOf(clipped).organization).toBeNull();
+    const roleOnly: PublicWebSearchHit = {
+      ...clipped,
+      title: "Tidjane Thiam - Executive Chairman | LinkedIn",
+    };
+    const orgOnly: PublicWebSearchHit = {
+      ...clipped,
+      title: "Tidjane Thiam - Publicis Group | LinkedIn",
+    };
+    const thiam: PersonSpec = {
+      name: "Tidjane Thiam",
+      place: null,
+      organization: null,
+      role: null,
+      variants: [],
+    };
+    const [one] = rankCandidates(thiam, [
+      { provider: "tavily", hit: roleOnly },
+      { provider: "serpapi", hit: orgOnly },
+    ]);
+    expect(one?.role).toBe("Executive Chairman");
+    expect(one?.organization).toBeNull();
+  });
 });

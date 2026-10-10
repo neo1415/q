@@ -299,6 +299,12 @@ export function profileFactsOf(hit: PublicWebSearchHit): ProfileFacts {
   ) {
     organization = experience;
   }
+  // A search result's title is cut with "..." when long: a cut-off role or
+  // employer is no fact, so it is left unknown rather than shown clipped.
+  const whole = (value: string | null): string | null =>
+    value === null || /(?:\.{2,}|…)/u.test(value) ? null : value;
+  role = whole(role);
+  organization = whole(organization);
   return {
     name,
     role: role === null ? null : role.slice(0, 200),
@@ -439,10 +445,17 @@ export function rankCandidates(
       });
     } else {
       existing.hits.push(sourced);
+      // A role and an organisation are taken together from ONE source:
+      // mixing a title from one snippet with an employer from another
+      // states a job nobody holds (live 2026-10-10, Tidjane Thiam).
+      const holder =
+        existing.facts.role !== null || existing.facts.organization !== null
+          ? existing.facts
+          : facts;
       existing.facts = {
         name: existing.facts.name ?? facts.name,
-        role: existing.facts.role ?? facts.role,
-        organization: existing.facts.organization ?? facts.organization,
+        role: holder.role,
+        organization: holder.organization,
         location: existing.facts.location ?? facts.location,
       };
     }

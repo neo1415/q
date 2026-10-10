@@ -86,9 +86,12 @@ function cardBlock(
   others: readonly IdentityCandidate[] = [],
 ): QAnswerCardsBlock | null {
   const s = card.subject;
+  // A prepared entity is a record Capital Q chose to hold: its card carries
+  // sourcing and freshness, never a "plausible match" hedge.
+  const prepared = s.researchStatus === "PREPARED_PUBLIC_SEED";
   const reasons = [
     card.attributionLine ?? CONFIDENCE_WORDS[s.confidence],
-    CONFIDENCE_WORDS[s.confidence],
+    ...(prepared ? [] : [CONFIDENCE_WORDS[s.confidence]]),
     ...card.uncertainty.slice(0, 1),
   ].map((r) => r.slice(0, 160));
   const followUps = [
@@ -123,8 +126,11 @@ function cardBlock(
           {
             label: "Identity match",
             level: LEVEL[s.confidence],
-            value:
-              s.confidence === "STRONG" ? "strong" : s.confidence.toLowerCase(),
+            value: prepared
+              ? "prepared"
+              : s.confidence === "STRONG"
+                ? "strong"
+                : s.confidence.toLowerCase(),
           },
         ],
         view:
@@ -246,6 +252,63 @@ function placeOf(ask: PersonAsk): string | null {
   );
 }
 
+/** A value cut off with an ellipsis is no fact: unknown, never clipped. */
+function whole(value: string | null): string | null {
+  if (value === null) return null;
+  const clean = value.replace(/\s+/gu, " ").trim();
+  return clean.length === 0 || /(?:\.{2,}|…)/u.test(clean) ? null : clean;
+}
+
+/**
+ * "Shadi Qishta is a finance and business executive in Doha; ..." from the
+ * entity's own one-line description. The description is a predicate
+ * ("Qatar-based Islamic investment group"), a possessive phrase ("Qatar's
+ * investment promotion agency") or a role; an article is added only where
+ * the grammar needs one. Without a description, the stored role and
+ * organisation say it.
+ */
+function preparedSentence(
+  name: string,
+  kind: IdentityCard["subject"]["entityKind"],
+  summary: string | null,
+  subject: IdentityCard["subject"],
+): string {
+  // Parentheticals ("(est. 2019)") are card detail, not spoken.
+  const line =
+    whole(summary)
+      ?.replace(/\s*\([^)]*\)/gu, "")
+      .replace(/[.;\s]+$/u, "") ?? null;
+  if (line === null) {
+    const role = kind === "PERSON" ? whole(subject.role) : null;
+    const org = whole(subject.organization);
+    const where = whole(subject.location);
+    const bits = [
+      role === null ? null : org === null ? role : `${role} at ${org}`,
+      role === null && org !== null ? `with ${org}` : null,
+      where === null ? null : `based in ${where}`,
+    ].filter((part): part is string => part !== null);
+    return bits.length === 0
+      ? `Here is what I have on ${name} from public sources.`
+      : `${name} is ${bits.join(", ")}.`;
+  }
+  const [first = ""] = line.split(/\s+/u);
+  // Keep capitals on proper names ("Qatar-based", "Qatar's", "IFRS").
+  const known = [name, subject.location, subject.organization]
+    .filter((part): part is string => part !== null)
+    .join(" ");
+  const proper =
+    /[-'’]/u.test(first) ||
+    /\p{Lu}.*\p{Lu}/u.test(first) ||
+    known.includes(first);
+  const body = proper ? line : line.replace(/^./u, (c) => c.toLowerCase());
+  const article = /['’]s$/u.test(first)
+    ? ""
+    : /^[aeiou]/iu.test(body)
+      ? "an "
+      : "a ";
+  return `${name} is ${article}${body}.`;
+}
+
 export function personSearchText(
   result: PersonSearchResult,
   ask: PersonAsk,
@@ -253,24 +316,39 @@ export function personSearchText(
   const place = placeOf(ask);
   if (result.outcome === "MATCHED" && result.card !== null) {
     const s = result.card.subject;
-    const where = joinLine([
-      s.entityKind === "PERSON" ? s.role : null,
-      s.organization,
-      s.location,
-    ]);
-    const how =
+    const offer = result.card.actions.includes("REHEARSE")
+      ? "Want me to research further or set up a rehearsal?"
+      : "Want me to research further?";
+    // A prepared entity: one natural sentence from its own description.
+    // Freshness and sourcing stay in the card; no identity hedging for a
+    // record Capital Q prepared on purpose.
+    if (s.researchStatus === "PREPARED_PUBLIC_SEED") {
+      return `${preparedSentence(s.displayName, s.entityKind, result.card.summary ?? null, s)} ${offer}`;
+    }
+    // A searched candidate: said as reported, with role and organisation
+    // only when they are whole, and the confidence in plain words.
+    const role = whole(s.entityKind === "PERSON" ? s.role : null);
+    const org = whole(s.organization);
+    const place = whole(s.location);
+    const job =
+      role !== null && org !== null
+        ? `${role} at ${org}`
+        : (role ?? (org === null ? null : `with ${org}`));
+    const facts = [
+      job === null ? null : `reportedly ${job}`,
+      place === null ? null : `based in ${place}`,
+    ].filter((part): part is string => part !== null);
+    const described =
+      facts.length === 0
+        ? `${s.displayName} turns up in public sources`
+        : `${s.displayName} is ${facts.join(", ")}`;
+    const lead =
       s.confidence === "STRONG"
-        ? "It looks like a strong match."
-        : "It is a plausible match, not a confirmed one.";
-    const note = result.card.uncertainty[0];
-    // Search-indexed findings are usable but said as reported.
-    const reported =
-      where === null
-        ? s.displayName
-        : `${s.displayName} is reportedly ${where.replace(/ · /gu, ", ")}`;
-    return `${reported}. ${result.card.attributionLine ?? ""} ${how}${note === undefined ? "" : ` ${note}`} The card and its sources are on screen; I can research further or set up a rehearsal.`
-      .replace(/\s+/gu, " ")
-      .trim();
+        ? "This looks like the right person: "
+        : s.confidence === "PLAUSIBLE"
+          ? "This could be who you mean: "
+          : "I only have a name match so far: ";
+    return `${s.entityKind === "PERSON" ? lead : ""}${described}. ${offer}`;
   }
   if (result.outcome === "AMBIGUOUS") {
     return (

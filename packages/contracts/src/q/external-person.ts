@@ -193,6 +193,11 @@ export const IdentityCardSchema = z
      * profile ..."): usable, said as reported, never as verified fact.
      */
     attributionLine: z.string().max(240).nullable().default(null),
+    /**
+     * One line saying what the entity is, from a prepared seed (never from
+     * a model); the sentence Q speaks is built from it by code.
+     */
+    summary: z.string().max(280).nullable().optional(),
     /** True while background enrichment is still running; the card updates. */
     enriching: z.boolean(),
     /** What the card offers next. Fixed vocabulary; the client words it. */

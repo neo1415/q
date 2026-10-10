@@ -131,7 +131,7 @@ describe("runPersonSearch", () => {
       rehearse: true,
     });
     expect(answer?.sources[0]?.url).toContain("shadi-qishta-282453a");
-    expect(answer?.text).toContain("strong match");
+    expect(answer?.text).toContain("This looks like the right person");
     expect(tools.asked).toEqual(["find_public_entity"]);
   });
 

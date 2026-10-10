@@ -268,9 +268,18 @@ export function cardFromKnownEntity(
     sources,
     uncertainty: uncertainty.slice(0, 4),
     attributionLine: `According to public sources prepared on ${record.lastResearchedAt.slice(0, 10)}.`,
+    summary: oneLineOf(record),
     enriching: false,
     actions: ["RESEARCH_FURTHER", "REHEARSE"],
   };
+}
+
+/** The seed's own one-line description, or null when it has none. */
+function oneLineOf(record: KnownEntityRecord): string | null {
+  const line = record.profile["oneLine"];
+  if (typeof line !== "string") return null;
+  const clean = line.replace(/\s+/gu, " ").trim().slice(0, 280);
+  return clean.length === 0 ? null : clean;
 }
 
 function hostOf(url: string): string {
