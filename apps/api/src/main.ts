@@ -937,6 +937,12 @@ const relationships: RelationshipQueryPort = {
       companyId,
       investorOrganisationId,
     ),
+  findManyByInvestor: (investorOrganisationId, companyIds) =>
+    relationshipRepository.findByInvestorAndCompanies(
+      database.sql,
+      investorOrganisationId,
+      companyIds,
+    ),
   listEvents: (relationshipId, page = {}) =>
     relationshipEventRepository.listByRelationship(
       database.sql,

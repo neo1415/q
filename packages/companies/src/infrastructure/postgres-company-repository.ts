@@ -627,6 +627,28 @@ export function createPostgresCompanyQueryPort(options: {
         marketplaceVisibility: parsed.marketplace_visibility,
       };
     },
+    findCanonicalCompanyVisibilities: async (companyIds) => {
+      if (companyIds.length === 0) return [];
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.marketplace_visibility
+          from core.companies c
+         where c.id = any(${[...companyIds]}::uuid[])`;
+      const pick = CompanyRowSchema.pick({
+        id: true,
+        tenant_id: true,
+        organisation_id: true,
+        marketplace_visibility: true,
+      });
+      return rows.map((row) => {
+        const parsed = pick.parse(row);
+        return {
+          id: parsed.id,
+          tenantId: parsed.tenant_id,
+          organisationId: parsed.organisation_id,
+          marketplaceVisibility: parsed.marketplace_visibility,
+        };
+      });
+    },
     findCanonicalCompanyProfile: async (companyId) => {
       const rows = await sql`
         select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.legal_name,

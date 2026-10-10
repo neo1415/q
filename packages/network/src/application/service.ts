@@ -118,6 +118,12 @@ export function createNetworkService(
           companyId,
           investorOrganisationId,
         ),
+      findManyByInvestor: (investorOrganisationId, companyIds) =>
+        repositories.relationships.findByInvestorAndCompanies(
+          sql,
+          investorOrganisationId,
+          companyIds,
+        ),
       listEvents: (relationshipId, page = {}) =>
         repositories.events.listByRelationship(sql, relationshipId, {
           afterSequence: page.afterSequence,

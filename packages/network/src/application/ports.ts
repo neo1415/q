@@ -41,6 +41,16 @@ export type RelationshipRepository = {
     companyId: CompanyId,
     investorOrganisationId: InvestorOrganisationId,
   ) => Promise<Relationship | null>;
+  /**
+   * S2: `findByParties` for one investor organisation against many
+   * companies in one statement (the pair constraint is unique, so at most
+   * one row per company).
+   */
+  readonly findByInvestorAndCompanies: (
+    executor: DatabaseExecutor,
+    investorOrganisationId: InvestorOrganisationId,
+    companyIds: readonly CompanyId[],
+  ) => Promise<readonly Relationship[]>;
   /** Serialises first creation of one pair until commit. */
   readonly lockPair: (
     tx: TransactionContext,
@@ -289,6 +299,16 @@ export type RelationshipQueryPort = {
     companyId: CompanyId,
     investorOrganisationId: InvestorOrganisationId,
   ) => Promise<Relationship | null>;
+  /**
+   * S2: the pair lookup for one investor against many companies, one
+   * read. Optional on the port; callers fall back to `findByParties`.
+   */
+  readonly findManyByInvestor?:
+    | ((
+        investorOrganisationId: InvestorOrganisationId,
+        companyIds: readonly CompanyId[],
+      ) => Promise<readonly Relationship[]>)
+    | undefined;
   readonly listEvents: (
     relationshipId: RelationshipId,
     page?: {

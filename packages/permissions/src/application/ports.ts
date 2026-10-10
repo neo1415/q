@@ -37,12 +37,28 @@ export type DisclosureResourceResolver = {
   readonly resolve: (
     resourceId: string,
   ) => Promise<DisclosureResourceDescriptor | null>;
+  /**
+   * S2: many resources of this kind in one read. Each descriptor names its
+   * own resource; an id that does not resolve is simply absent.
+   */
+  readonly resolveMany?:
+    | ((
+        resourceIds: readonly string[],
+      ) => Promise<readonly DisclosureResourceDescriptor[]>)
+    | undefined;
 };
 
 export type DisclosureResourceResolverRegistry = {
   readonly resolve: (
     resource: DisclosureResourceRef,
   ) => Promise<DisclosureResourceDescriptor | null>;
+  /**
+   * S2: `resolve` for many resources; one read per resource kind that can
+   * batch. The result is keyed `type:id`; an unresolved resource is absent.
+   */
+  readonly resolveMany: (
+    resources: readonly DisclosureResourceRef[],
+  ) => Promise<Map<string, DisclosureResourceDescriptor>>;
   readonly has: (resourceType: string) => boolean;
   readonly types: () => readonly DisclosureResourceType[];
 };

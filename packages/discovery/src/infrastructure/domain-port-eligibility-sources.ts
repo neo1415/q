@@ -136,24 +136,29 @@ export function createDomainEligibilityPorts(
       listActive: async (subjects) => {
         const out = new Map<string, readonly CompanyClassification[]>();
         // Read under each company's own tenant, as the Taxonomy context
-        // requires; a candidate set is bounded upstream (ELIGIBILITY_BATCH_MAX).
-        await Promise.all(
-          subjects.map(async ({ companyId, tenantId }) => {
-            const rows = await assignments.listCurrent(
-              sql,
-              TenantIdSchema.parse(tenantId),
-              { subjectType: "COMPANY", subjectId: companyId },
-            );
-            out.set(
-              companyId,
-              rows.map((r) => ({
-                nodeId: r.nodeId,
-                vocabularyCode: r.vocabularyCode,
-                source: r.assignmentSource,
-              })),
-            );
-          }),
+        // requires (the tenant and the id are matched as a pair); a
+        // candidate set is bounded upstream (ELIGIBILITY_BATCH_MAX). One
+        // statement for the set (S2), not one per company.
+        for (const { companyId } of subjects) out.set(companyId, []);
+        const rows = await assignments.listCurrentForSubjects(
+          sql,
+          "COMPANY",
+          subjects.map(({ companyId, tenantId }) => ({
+            tenantId: TenantIdSchema.parse(tenantId),
+            subjectId: companyId,
+          })),
         );
+        const grouped = new Map<string, CompanyClassification[]>();
+        for (const r of rows) {
+          const list = grouped.get(r.subjectId) ?? [];
+          list.push({
+            nodeId: r.nodeId,
+            vocabularyCode: r.vocabularyCode,
+            source: r.assignmentSource,
+          });
+          grouped.set(r.subjectId, list);
+        }
+        for (const [companyId, list] of grouped) out.set(companyId, list);
         return out;
       },
     },
@@ -248,23 +253,38 @@ export function createDomainEligibilityPorts(
         );
         const out = new Map<string, RelationshipStanding>();
         const passed: { companyId: string; relationshipId: string }[] = [];
-        await Promise.all(
-          companyIds.map(async (companyId) => {
-            const relationship = await relationships.findByParties(
-              CompanyIdSchema.parse(companyId),
-              investor,
-            );
-            out.set(
-              companyId,
-              relationship === null
-                ? { kind: "NONE" }
-                : { kind: "STATE", currentState: relationship.currentState },
-            );
-            if (relationship?.currentState === "PASSED") {
-              passed.push({ companyId, relationshipId: relationship.id });
-            }
-          }),
-        );
+        const parsedIds = companyIds.map((id) => CompanyIdSchema.parse(id));
+        // One read for the set (S2) when the port offers it.
+        const found =
+          relationships.findManyByInvestor !== undefined
+            ? new Map(
+                (
+                  await relationships.findManyByInvestor(investor, parsedIds)
+                ).map((r) => [r.companyId as string, r] as const),
+              )
+            : new Map(
+                (
+                  await Promise.all(
+                    parsedIds.map((id) =>
+                      relationships.findByParties(id, investor),
+                    ),
+                  )
+                ).flatMap((r) =>
+                  r === null ? [] : [[r.companyId as string, r] as const],
+                ),
+              );
+        for (const companyId of companyIds) {
+          const relationship = found.get(companyId) ?? null;
+          out.set(
+            companyId,
+            relationship === null
+              ? { kind: "NONE" }
+              : { kind: "STATE", currentState: relationship.currentState },
+          );
+          if (relationship?.currentState === "PASSED") {
+            passed.push({ companyId, relationshipId: relationship.id });
+          }
+        }
         // Re-approach after a pass (doc 19 §67): only for the few passed
         // pairs, and only when both reads are composed.
         const passStanding = relationships.passStanding;

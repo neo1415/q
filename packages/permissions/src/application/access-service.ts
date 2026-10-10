@@ -102,14 +102,12 @@ export function createDisclosureAccessService(
       }
     }
     const descriptors = new Map<string, DisclosureResourceDescriptor>();
-    await Promise.all(
-      [...distinct.entries()].map(async ([key, resource]) => {
-        const descriptor = await resolvers.resolve(resource);
-        if (descriptor !== null) {
-          descriptors.set(key, descriptor);
-        }
-      }),
-    );
+    // S2: one read per resource kind that can batch, not one per resource.
+    const resolved = await resolvers.resolveMany([...distinct.values()]);
+    for (const key of distinct.keys()) {
+      const descriptor = resolved.get(key);
+      if (descriptor !== undefined) descriptors.set(key, descriptor);
+    }
 
     // 3. One policy query for every resolved resource.
     const resolvedRefs = [...descriptors.values()].map((d) => d.resource);
