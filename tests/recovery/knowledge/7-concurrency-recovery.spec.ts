@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 import { runQ } from "../support/flows.js";
 import { tokenFor } from "../support/http.js";
 import {
-  READ_DISCOVER_FINTECH,
+  DISCOVER_FINTECH_RULES,
   asRun,
   cardCompanyIds,
   modelCallsSince,
@@ -68,7 +68,7 @@ async function settle(runId: string, timeoutMs = 90_000): Promise<RunView> {
 }
 
 test("K7 the same request twice at once is one run", async () => {
-  await useScript([READ_DISCOVER_FINTECH]);
+  await useScript(DISCOVER_FINTECH_RULES);
   await vendorSettled();
   const key = `recovery-g-k7-${randomUUID()}`;
   const [a, b] = await Promise.all([
@@ -84,7 +84,7 @@ test("K7 the same request twice at once is one run", async () => {
 
 test("K7 three concurrent discoveries agree, and knowledge is built once (no analyst calls)", async () => {
   // Green on int-merge 9050c90f: a regression guard, not expected red.
-  await useScript([READ_DISCOVER_FINTECH]);
+  await useScript(DISCOVER_FINTECH_RULES);
   await vendorSettled();
   const mark = await vendorMark();
   const started = await Promise.all(
@@ -117,7 +117,7 @@ test("K7 discovery still answers while the analyst model is down", async () => {
   try {
     const result = await runQ(CAST.investor, DISCOVER, [
       // The reader is up (it routes the turn); only the analyst fails.
-      READ_DISCOVER_FINTECH,
+      ...DISCOVER_FINTECH_RULES,
       {
         name: "outage-analyst",
         when: { task: "COMPANY_ANALYST" },
@@ -160,6 +160,6 @@ test("K7 a run caught by a q-api restart still ends, and the next discovery work
     TERMINAL.has(ended.status),
     `caught run ended as ${ended.status}`,
   ).toBe(true);
-  const next = await runQ(CAST.investor, DISCOVER, [READ_DISCOVER_FINTECH]);
+  const next = await runQ(CAST.investor, DISCOVER, DISCOVER_FINTECH_RULES);
   expect(next.status, "the next turn after the restart").toBe("COMPLETED");
 });

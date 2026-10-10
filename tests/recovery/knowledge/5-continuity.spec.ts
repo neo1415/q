@@ -4,7 +4,7 @@ import { contextAs } from "../support/auth.js";
 import { awaits } from "../support/expected-red.js";
 import {
   answerText,
-  READ_DISCOVER_FINTECH,
+  DISCOVER_FINTECH_RULES,
   cardCompanyIds,
   cardNames,
   modelCallsSince,
@@ -37,7 +37,7 @@ test("K5 references survive navigation in one conversation", async ({
   );
   const page = await (await contextAs(browser, CAST.investor)).newPage();
   await useScript([
-    READ_DISCOVER_FINTECH,
+    ...DISCOVER_FINTECH_RULES,
     {
       name: "they",
       when: { task: "COMPANY_ANALYST", user: "raising" },
@@ -49,7 +49,7 @@ test("K5 references survive navigation in one conversation", async ({
       reply: answer("Side by side, on what each has shared."),
     },
   ]);
-  await page.goto("/home");
+  await page.goto("/home?new=1");
   const start = (await newestRun(CAST.investor))?.runId ?? null;
   await send(page, "Show me three fintech companies");
   const cards = page.locator("[data-ac-cards] [data-ac-card]");

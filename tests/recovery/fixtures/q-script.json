@@ -1,6 +1,18 @@
 {
-  "comment": "Baseline rules for scripts/recovery/fake-vendors.mjs. A test puts its own rules in front of these through tests/recovery/support/script.ts.",
+  "comment": "Baseline rules for scripts/recovery/fake-vendors.mjs. A test puts its own rules in front of these through tests/recovery/support/script.ts. baseline-turn-skim: B's fast lane (TURN_SKIM v1) reads every other turn as OTHER, so it waits for the full reading, as a live skim would for a turn that is not companies of a kind.",
   "rules": [
+    {
+      "name": "baseline-turn-skim",
+      "when": { "task": "TURN_SKIM" },
+      "reply": {
+        "json": {
+          "kind": "OTHER",
+          "confidence": "HIGH",
+          "count": null,
+          "discover": null
+        }
+      }
+    },
     {
       "name": "baseline-turn-reader",
       "when": { "task": "TURN_READER" },
