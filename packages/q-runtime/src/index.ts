@@ -110,6 +110,7 @@ export type {
 } from "./application/ports.js";
 export {
   appendRunEvent,
+  appendRunEventAtomic,
   type QRunEventInput,
 } from "./application/run-events.js";
 export type {

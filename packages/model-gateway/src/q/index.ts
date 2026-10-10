@@ -69,6 +69,7 @@ import {
 } from "@capital-q/q-core";
 import {
   appendRunEvent,
+  appendRunEventAtomic,
   createUnconfiguredQTools,
   toQMessage,
   type QLiveDeltaBus,
@@ -1802,14 +1803,16 @@ export function createModelGatewayQAnswer(
     stage: QVisibleStage,
   ): Promise<void> {
     try {
-      await transactions.run((tx) =>
-        appendRunEvent(
-          repositories,
-          tx,
-          { id: request.runId, tenantId: request.tenantId },
-          { type: "q.stage.changed", data: { stage } },
-        ),
-      );
+      const run = { id: request.runId, tenantId: request.tenantId };
+      const input = { type: "q.stage.changed", data: { stage } } as const;
+      // One statement on the request client where the store offers it
+      // (S2); otherwise a transaction, as before.
+      const done = await appendRunEventAtomic(repositories, sql, run, input);
+      if (done === "UNSUPPORTED") {
+        await transactions.run((tx) =>
+          appendRunEvent(repositories, tx, run, input),
+        );
+      }
     } catch (error: unknown) {
       logger?.warn(
         { err: error, qRunId: request.runId },
@@ -2893,6 +2896,9 @@ export function createModelGatewayQAnswer(
       const nudgeRead = (async (): Promise<void> => {
         if (
           dependencies.onboardingNudge !== undefined &&
+          // S2: a turn answered by code or from a prepared fact carries no
+          // setup reminder (it is a note in the model's prompt).
+          !withoutWideReads &&
           request.questionSequence === undefined &&
           request.turnUnread !== true &&
           plan.scopes.some(

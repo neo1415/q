@@ -309,7 +309,10 @@ export type QRunEventRepository = {
    * Optional: a store without it is used through allocate + append.
    */
   readonly appendNext?: (
-    tx: TransactionContext,
+    // Only the executor is used: the statement is atomic by itself, so a
+    // caller with no transaction of its own may pass its request client
+    // (S2: a stage event was BEGIN, the event, COMMIT).
+    tx: { readonly sql: DatabaseExecutor },
     input: Omit<NewQRunEvent, "sequence">,
   ) => Promise<QRunEventRecord | null>;
   /** Ordered by sequence; `afterSequence` is the replay cursor. */
