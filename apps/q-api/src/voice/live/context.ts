@@ -21,6 +21,7 @@ export const LIVE_CONTEXT_MAX_CHARS = 1_600;
 const FACTS_MAX = 8;
 const FACT_MAX_CHARS = 160;
 export const REFERENTS_MAX = 8;
+export const PRONUNCIATIONS_MAX = 8;
 
 const oneLine = (text: string, max: number): string => {
   const clean = text.replace(/\s+/gu, " ").trim();
@@ -33,6 +34,11 @@ export function liveContextPackage(input: {
   readonly facts: LiveContextFacts | null;
   /** Names Q said on this line, most recent first. */
   readonly referents: readonly string[];
+  /**
+   * W3: how names are said or written, one short line each: verified
+   * guides and the person's own corrections, labelled as such.
+   */
+  readonly pronunciations?: readonly string[] | undefined;
 }): string | null {
   const lines: string[] = [];
   const side =
@@ -71,6 +77,16 @@ export function liveContextPackage(input: {
   if (referents.length > 0) {
     lines.push(
       `Recently discussed on this call (most recent first): ${referents.join(", ")}.`,
+    );
+  }
+  const hints = (input.pronunciations ?? [])
+    .map((line) => oneLine(line, 120))
+    .filter((line) => line.length > 0)
+    .slice(0, PRONUNCIATIONS_MAX);
+  if (hints.length > 0) {
+    lines.push(
+      "How these names are said or written (use exactly this; never guess another way):",
+      ...hints.map((line) => `- ${line}`),
     );
   }
   if (lines.length === 0) return null;

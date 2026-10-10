@@ -119,6 +119,7 @@ import { createDuplexSideband } from "./voice/duplex/sideband.js";
 import { createMemoryListeningStore } from "./voice/duplex/listening.js";
 import { createPostgresDuplexSpend } from "./voice/duplex/spend.js";
 import { createPostgresDuplexTranscriptStore } from "./voice/duplex/transcript.js";
+import { createPostgresPronunciationStore } from "./voice/live/pronunciations.js";
 import { ownCompanyAskerNote } from "./composition/own-company-asker.js";
 import {
   createDocumentStudioPort,
@@ -5761,6 +5762,10 @@ const liveBroker =
         // Part 6: the call's background, from approved facts only (their
         // declared mandate or their company's card, as Q's messages may
         // state them) and their own organisation's name.
+        // W3: verified and corrected name pronunciations, as hints.
+        pronunciations: createPostgresPronunciationStore({
+          sql: database.sql,
+        }),
         contextFor: async (actor) => {
           const organisationId = actor.organisationId;
           const [material, company, firm] = await Promise.all([
