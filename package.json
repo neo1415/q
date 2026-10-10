@@ -29,7 +29,7 @@
     "deploy:build:workers": "turbo run build --filter=@capital-q/workers...",
     "deploy:build:web": "turbo run build --filter=@capital-q/web...",
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "node scripts/lint.mjs",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

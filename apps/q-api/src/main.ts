@@ -17,6 +17,10 @@
 
 import { createFitComposition } from "./composition/fit.js";
 import { createAttentionSources } from "./composition/attention-sources.js";
+import {
+  createArrivalSnapshots,
+  createPostgresArrivalProbe,
+} from "./composition/arrival-snapshot.js";
 import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
 import {
   createPostgresTaxonomyAssignmentRepository,
@@ -3706,7 +3710,20 @@ const qReceipts: QReceiptPort = {
       : { status, progress: errandProgress(errand) };
   },
 };
+// W1: what Q told them on arrival, built once per actor from the same
+// attention report and relationship briefs their pages read, and handed to
+// the welcome, Q's turns, the live voice session and the Work list alike.
+const arrivalSnapshots = createArrivalSnapshots({
+  attention: (actor, options) => qTools.attention(actor, options),
+  briefs: createOwnBriefsReader({
+    interests: interestService,
+    ownCompany: runtimeDependencies.ownCompany,
+    sources: relationshipBriefBatchSources,
+  }),
+  probe: createPostgresArrivalProbe({ sql: database.sql }),
+});
 const qIntelligence = composeQIntelligence({
+  arrivalSnapshot: (actor) => arrivalSnapshots.forActor(actor),
   // RECOVERY (C's request): what came of Q's recent screen acts, from the
   // receipts ledger (composed further down; read only once turns run).
   uiActReceipts: (actor) => [
@@ -5772,6 +5789,7 @@ const liveBroker =
         // Part 6: the call's background, from approved facts only (their
         // declared mandate or their company's card, as Q's messages may
         // state them) and their own organisation's name.
+        arrivalFor: (actor) => arrivalSnapshots.forActor(actor),
         contextFor: async (actor) => {
           const organisationId = actor.organisationId;
           const [material, company, firm] = await Promise.all([
@@ -5988,6 +6006,7 @@ const { app, logger: appLogger } = createApp(
     standing: standingStore,
     // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
     attention: qTools.attention,
+    arrivalSnapshots,
     // DAILY block
     daily: dailyReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },

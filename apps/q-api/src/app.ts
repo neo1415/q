@@ -89,6 +89,11 @@ import {
   type StandingRoutesDependencies,
 } from "./http/standing.js";
 import {
+  registerArrivalSnapshotInvalidation,
+  registerArrivalSnapshotRoutes,
+  type ArrivalSnapshotRoutesDependencies,
+} from "./http/q-arrival-snapshot.js";
+import {
   registerAttentionRoutes,
   type AttentionRoutesDependencies,
 } from "./http/q-attention.js";
@@ -211,6 +216,9 @@ export type QApiModules = {
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
   /** RECOVERY B1: what needs the person, every source (unread ≠ empty). */
   readonly attention?: AttentionRoutesDependencies["attention"] | undefined;
+  /** W1: the Arrival Snapshot (what Q told them on arrival), one read for every surface. */
+  readonly arrivalSnapshots?:
+    ArrivalSnapshotRoutesDependencies["snapshots"] | undefined;
   // DAILY block: The Q Daily, the person's own editions and preferences.
   readonly daily?: DailyRoutesDependencies["daily"] | undefined;
   /** Q in a meeting: bring it to a call, read its notes. */
@@ -368,6 +376,9 @@ export function createApp(
 
   registerProblemHandling(app, logger);
   registerRequestTiming(app);
+  if (modules.arrivalSnapshots !== undefined) {
+    registerArrivalSnapshotInvalidation(app, modules.arrivalSnapshots);
+  }
 
   // Graceful shutdown: no new connections, idle ones closed now, active
   // ones given a bounded grace and then closed, so a deploy never waits
@@ -540,6 +551,17 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       attention: modules.attention,
+    });
+  }
+  // W1: what Q told them on arrival, as one canonical snapshot.
+  if (
+    modules.arrivalSnapshots !== undefined &&
+    security.resolver !== undefined
+  ) {
+    registerArrivalSnapshotRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      snapshots: modules.arrivalSnapshots,
     });
   }
   // DAILY block: The Q Daily (the person's own editions and preferences).
