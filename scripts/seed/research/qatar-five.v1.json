@@ -342,7 +342,10 @@
       "requires_refresh": true,
       "arabic_names": [],
       "pronunciation": [],
-      "one_line": "Finance and business executive in Doha; current title not verified."
+      "one_line": "Finance and business executive in Doha; current title not verified.",
+      "location": null,
+      "role": null,
+      "identity_read": "PLAUSIBLE"
     },
     {
       "demo_id": "qa-demo-qinvest",
@@ -440,7 +443,10 @@
       "requires_refresh": true,
       "arabic_names": [],
       "pronunciation": [],
-      "one_line": "Qatar-based Islamic investment group; public pages not yet verified."
+      "one_line": "Qatar-based Islamic investment group; public pages not yet verified.",
+      "location": null,
+      "role": null,
+      "identity_read": "PLAUSIBLE"
     },
     {
       "demo_id": "qa-demo-muhannad-taslaq",
@@ -565,7 +571,10 @@
       "requires_refresh": true,
       "arabic_names": [],
       "pronunciation": [],
-      "one_line": "Director of Investments at Alchemist Doha."
+      "one_line": "Director of Investments at Alchemist Doha.",
+      "location": "Doha, Qatar",
+      "role": "Director of Investments",
+      "identity_read": "STRONG"
     },
     {
       "demo_id": "qa-demo-invest-qatar",
@@ -668,7 +677,10 @@
       "requires_refresh": true,
       "arabic_names": [],
       "pronunciation": [],
-      "one_line": "Qatar's investment promotion agency (est. 2019); not a venture fund."
+      "one_line": "Qatar's investment promotion agency (est. 2019); not a venture fund.",
+      "location": "Qatar",
+      "role": null,
+      "identity_read": "STRONG"
     },
     {
       "demo_id": "qa-demo-alrayan",
@@ -777,7 +789,10 @@
         }
       ],
       "pronunciation": [],
-      "one_line": "Qatar investment and advisory firm (est. 2007), owned by AlRayan Bank."
+      "one_line": "Qatar investment and advisory firm (est. 2007), owned by AlRayan Bank.",
+      "location": "Qatar",
+      "role": null,
+      "identity_read": "STRONG"
     }
   ],
   "seed_version": "qatar-five.v1",
