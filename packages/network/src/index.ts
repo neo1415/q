@@ -203,6 +203,7 @@ export {
   type BriefThreadMessage,
   type RelationshipBriefSources,
 } from "./application/relationship-brief.js";
+export { createRelationshipBriefSources } from "./application/relationship-brief-sources.js";
 export {
   nextStepFor,
   projectorFor,

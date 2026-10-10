@@ -668,6 +668,10 @@ export const networkRelationshipOutcomePath = (
   verb: "pass" | "pause" | "resume" | "meeting-outcome",
 ) => `/v1/network/relationships/${encodeURIComponent(relationshipId)}/${verb}`;
 
+/** The Relationship Brief (R1): the asking party's standing, one read. */
+export const NETWORK_RELATIONSHIP_BRIEF_PATH =
+  "/v1/network/relationships/:relationshipId/brief" as const;
+
 /**
  * Diligence (2026-10-02): a minimal gated document area on a relationship
  * once diligence has started. A share is a disclosure policy on one of the

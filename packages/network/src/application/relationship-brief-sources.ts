@@ -1,5 +1,6 @@
-import type { RelationshipBriefSources } from "@capital-q/network";
 import type { ActorContext } from "@capital-q/security";
+
+import type { RelationshipBriefSources } from "./relationship-brief.js";
 
 /**
  * The Relationship Brief's readers (R1), over the services the screens

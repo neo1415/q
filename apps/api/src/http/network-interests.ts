@@ -14,7 +14,9 @@ import {
   NETWORK_INVESTOR_RELATIONSHIPS_PATH,
   NETWORK_COMPANY_RELATIONSHIPS_PATH,
   NETWORK_PASS_REASONS_PATH,
+  NETWORK_RELATIONSHIP_BRIEF_PATH,
   NETWORK_RELATIONSHIP_DILIGENCE_PATH,
+  RelationshipBriefSchema,
   NETWORK_DILIGENCE_DOWNLOAD_PATH,
   DiligenceDtoSchema,
   DiligenceDownloadDtoSchema,
@@ -35,6 +37,7 @@ import {
   toRelationshipSummaryDto,
   type ConnectionService,
   type InterestService,
+  type RelationshipBriefSources,
   type RelationshipOutcomeService,
 } from "@capital-q/network";
 import type { DiligenceService } from "@capital-q/permissions";
@@ -80,6 +83,11 @@ export type NetworkInterestRoutesDependencies = ActorContextDependencies & {
   readonly diligence?: DiligenceService | undefined;
   /** The named counterparts' pictures. Absent: every row reads as initials. */
   readonly namedPhotos?: NamedPhotos | undefined;
+  /**
+   * The Relationship Brief's readers (R1). Absent: the brief route still
+   * answers, with those sources UNAVAILABLE (NOT_COMPOSED).
+   */
+  readonly briefSources?: RelationshipBriefSources | undefined;
 };
 
 function investorIdOf(request: FastifyRequest): string {
@@ -202,6 +210,26 @@ export function registerNetworkInterestRoutes(
   // Diligence (2026-10-02): the relationship's area for the side asking, and
   // a shared document's short-lived download, decided by the disclosure
   // layer for this person. Writes are ADR 0040 app actions.
+  // The Relationship Brief (R1): the same read Q's get_relationship uses.
+  app.get(
+    NETWORK_RELATIONSHIP_BRIEF_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const raw = (request.params as { relationshipId?: unknown })
+        .relationshipId;
+      const brief = await service.relationshipBrief({
+        actor: getActorContext(request),
+        relationshipId: typeof raw === "string" ? raw : "",
+        sources: dependencies.briefSources ?? {},
+      });
+      // A relationship this person is not a party to is the same 404 as
+      // one that does not exist.
+      if (brief === null) throw new InterestNotFoundError();
+      void reply.header("Cache-Control", "no-store");
+      return RelationshipBriefSchema.parse(brief);
+    },
+  );
+
   const diligence = dependencies.diligence;
   if (diligence !== undefined) {
     const param = (request: FastifyRequest, key: string) => {

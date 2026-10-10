@@ -304,6 +304,7 @@ import {
 } from "@capital-q/investors";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
+  createRelationshipBriefSources,
   createCommitmentService,
   createDealCloseService,
   createRelationshipOutcomeService,
@@ -483,7 +484,6 @@ import {
   createRelationshipActionBoard,
   createRelationshipIntelligencePort,
 } from "./composition/relationship-intelligence.js";
-import { createRelationshipBriefSources } from "./composition/relationship-brief-sources.js";
 import {
   createRevokeShareAction,
   createShareRaiseAction,
