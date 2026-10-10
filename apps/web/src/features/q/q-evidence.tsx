@@ -70,6 +70,10 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
         // Sources, as before.
         evidence.push(block);
         break;
+      default:
+        // A block kind a newer server sends that this build does not know:
+        // kept, behind the disclosure, never dropped.
+        evidence.push(block);
     }
   }
   return { visible, evidence };
