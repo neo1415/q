@@ -454,6 +454,10 @@
   gap: 6px;
   cursor: pointer;
 }
+.cq-ac-btn[data-ac-external] {
+  min-height: 44px;
+  text-decoration: none;
+}
 .cq-ac-btn:hover {
   background: var(--cq-surface-subtle);
 }

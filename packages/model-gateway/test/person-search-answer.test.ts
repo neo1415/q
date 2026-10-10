@@ -124,6 +124,12 @@ describe("runPersonSearch", () => {
       "Research Shadi further",
       "Rehearse with Shadi",
     ]);
+    // The card names the researched entity: its rehearsal and its profile.
+    expect(answer?.block?.cards[0]?.external).toEqual({
+      externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+      profileUrl: "https://qa.linkedin.com/in/shadi-qishta-282453a",
+      rehearse: true,
+    });
     expect(answer?.sources[0]?.url).toContain("shadi-qishta-282453a");
     expect(answer?.text).toContain("strong match");
     expect(tools.asked).toEqual(["find_public_entity"]);

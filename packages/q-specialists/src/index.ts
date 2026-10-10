@@ -355,10 +355,12 @@ export {
   createToolOpenRecordPort,
   openTarget,
   referenceNote,
+  rehearseWithPersonCard,
   repeatedAction,
   shownItems,
   type LastAction,
   type OpenTarget,
+  type PersonCardRehearsal,
   type QOpenRecordPort,
   type ShownItem,
 } from "./references.js";

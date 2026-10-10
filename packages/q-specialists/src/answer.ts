@@ -133,6 +133,7 @@ import {
   openTarget,
   referenceNote,
   repeatedAction,
+  rehearseWithPersonCard,
   shownItems,
   type LastAction,
   type QOpenRecordPort,
@@ -2589,6 +2590,31 @@ export function createSpecialistQAnswer(
     // Spoken turns carry the recogniser's utterance; typed ones never do.
     // The reader needs to know which: only speech can be overheard.
     const spoken = latest.utteranceRef !== undefined;
+    // W4: "I want to rehearse with him" right after one person card: the
+    // pronoun is that card; the rehearsal opens through open_page's own
+    // authorize step (their own researched record or a prepared seed).
+    const cardRehearsal = rehearseWithPersonCard(latest.content, history);
+    if (cardRehearsal !== null && dependencies.openRecord !== undefined) {
+      const intent = await dependencies.openRecord
+        .open(request, {
+          page: "EXTERNAL_REHEARSAL",
+          id: cardRehearsal.externalPersonId,
+          name: cardRehearsal.name,
+        })
+        .catch(() => null);
+      if (intent !== null) {
+        logger?.info(
+          { qRunId: request.runId },
+          "q opened a rehearsal with the person card just shown",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          `Opening a rehearsal with ${cardRehearsal.name}. It is an AI rehearsal informed by public sources, not the real person.`,
+          [{ kind: "UI_INTENT", intent }],
+        );
+      }
+    }
     // What Q showed and last did, for "that one" and "try again".
     const shown = shownItems(history);
     const lastAction = lastActed.get(conversationId) ?? null;
