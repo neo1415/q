@@ -1857,6 +1857,30 @@ export function createModelGatewayQAnswer(
    * start while the turn is still being read (warm) and be taken up by
    * the answer; null when the run has no conversation to answer.
    */
+  /** S2: what the wide reads fill in; see `wide` in prepareTurn. */
+  type WideReads = {
+    readonly namedCompanies: readonly AuthorisedFact[];
+    readonly namedCompanyCalls: readonly QToolCallObservation[];
+    readonly ownDay: AuthorisedFact | null;
+    readonly ownDayCalls: readonly QToolCallObservation[];
+    readonly ownStanding: AuthorisedFact | null;
+    readonly ownStandingCall: QToolCallObservation | null;
+    readonly ownIndex: AuthorisedFact | null;
+    readonly onboardingFacts: readonly AuthorisedFact[];
+    readonly arrival: AuthorisedFact | null;
+  };
+  const NO_WIDE_READS: WideReads = {
+    namedCompanies: [],
+    namedCompanyCalls: [],
+    ownDay: null,
+    ownDayCalls: [],
+    ownStanding: null,
+    ownStandingCall: null,
+    ownIndex: null,
+    onboardingFacts: [],
+    arrival: null,
+  };
+
   async function prepareTurn(request: QAnswerRequest) {
     const plan: PermittedContextPlan = request.plan;
     /**
@@ -1966,16 +1990,21 @@ export function createModelGatewayQAnswer(
      * so it overlaps the reads below; its own record only, so nothing
      * here can carry another organisation's data.
      */
-    const standingRead = prefetchTools.has("list_my_relationships")
-      ? tools.execute(
-          {
-            callId: "q-own-standing",
-            name: "list_my_relationships",
-            arguments: {},
-          },
-          toolContext,
-        )
-      : null;
+    // S2: started on first use, once. A fit sweep asks for it at once; the
+    // wide reads below ask only when this turn's route needs them.
+    let standingStarted: ReturnType<typeof tools.execute> | undefined;
+    const standingOf = (): ReturnType<typeof tools.execute> | null => {
+      if (!prefetchTools.has("list_my_relationships")) return null;
+      standingStarted ??= tools.execute(
+        {
+          callId: "q-own-standing",
+          name: "list_my_relationships",
+          arguments: {},
+        },
+        toolContext,
+      );
+      return standingStarted;
+    };
     let ownProfile: AuthorisedFact | null = null;
     let ownProfileCall: QToolCallObservation | null = null;
     const ownInvestor = ownInvestorOrganisationIn(plan);
@@ -1995,12 +2024,9 @@ export function createModelGatewayQAnswer(
         tools,
         context: toolContext,
         available: prefetchTools,
-        own:
-          standingRead === null
-            ? Promise.resolve(null)
-            : standingRead.then((outcome) =>
-                outcome.result.ok ? outcome.result.data : null,
-              ),
+        own: (standingOf() ?? Promise.resolve(null)).then((outcome) =>
+          outcome !== null && outcome.result.ok ? outcome.result.data : null,
+        ),
       }).catch(() => null);
     const sweepAsk = !sweepable
       ? null
@@ -2068,7 +2094,7 @@ export function createModelGatewayQAnswer(
       ownCompany = ownCompanySnapshotFact(own, plan);
     })();
     let arrival: AuthorisedFact | null = null;
-    const arrivalRead = (async (): Promise<void> => {
+    const arrivalRead = async (): Promise<void> => {
       if (
         dependencies.arrivalSnapshot === undefined ||
         request.writingDocument === true
@@ -2079,7 +2105,7 @@ export function createModelGatewayQAnswer(
         .arrivalSnapshot(request.actor)
         .catch(() => null);
       arrival = arrivalSnapshotFact(snapshot);
-    })();
+    };
     const mandateRead = (async (): Promise<void> => {
       if (ownInvestor !== null && prefetchTools.has("get_investor_mandate")) {
         const call = {
@@ -2186,9 +2212,10 @@ export function createModelGatewayQAnswer(
      */
     const namedCompanies: AuthorisedFact[] = [];
     const namedCompanyCalls: QToolCallObservation[] = [];
-    const namedRead = (async (): Promise<void> => {
-      if (standingRead === null || !prefetchTools.has("get_company")) return;
-      const standing = await standingRead.catch(() => null);
+    const namedRead = async (): Promise<void> => {
+      const standingCall = standingOf();
+      if (standingCall === null || !prefetchTools.has("get_company")) return;
+      const standing = await standingCall.catch(() => null);
       if (standing === null || !standing.result.ok) return;
       const lastQ = [...earlier].reverse().find((m) => m.role === "Q");
       const onScreen =
@@ -2220,7 +2247,7 @@ export function createModelGatewayQAnswer(
           if (fact !== null) namedCompanies.push(fact);
         }),
       );
-    })();
+    };
     /**
      * The Q Daily on their screen, read for them (founder live
      * 2026-10-01: "summarize everything here" on the Daily never read the
@@ -2327,7 +2354,7 @@ export function createModelGatewayQAnswer(
      */
     let ownDay: AuthorisedFact | null = null;
     const ownDayCalls: QToolCallObservation[] = [];
-    const dayRead = (async (): Promise<void> => {
+    const dayRead = async (): Promise<void> => {
       if (!prefetchTools.has("list_schedule")) return;
       const read = async (name: string): Promise<unknown> => {
         if (!prefetchTools.has(name)) return null;
@@ -2369,7 +2396,7 @@ export function createModelGatewayQAnswer(
         work,
         rehearsals: own?.rehearsals ?? [],
       });
-    })();
+    };
     const relationshipRead = (async (): Promise<void> => {
       if (counterparty !== undefined && prefetchTools.has("get_relationship")) {
         const call = {
@@ -2403,16 +2430,17 @@ export function createModelGatewayQAnswer(
     let ownStanding: AuthorisedFact | null = null;
     let ownStandingCall: QToolCallObservation | null = null;
     let ownIndex: AuthorisedFact | null = null;
-    const indexDone = (async (): Promise<void> => {
+    const indexDone = async (): Promise<void> => {
       if (dependencies.ownIndex === undefined) return;
       const index = await dependencies
         .ownIndex({ actor: request.actor, runId: request.runId, plan })
         .catch(() => null);
       ownIndex = ownIndexFact(index);
-    })();
-    const standingDone = (async (): Promise<void> => {
-      if (standingRead !== null) {
-        const outcome = await standingRead.catch(() => null);
+    };
+    const standingDone = async (): Promise<void> => {
+      const standingCall = standingOf();
+      if (standingCall !== null) {
+        const outcome = await standingCall.catch(() => null);
         if (outcome !== null) {
           ownStandingCall = {
             toolName: outcome.toolName,
@@ -2442,7 +2470,7 @@ export function createModelGatewayQAnswer(
           }
         }
       }
-    })();
+    };
     /**
      * Where the person is in the pitch they are watching, and what is
      * said there (R18). Only when the plan carries the viewing moment --
@@ -2478,7 +2506,7 @@ export function createModelGatewayQAnswer(
      * a read that fails costs this answer the facts, never the answer.
      */
     let onboardingFacts: readonly AuthorisedFact[] = [];
-    const onboardingRead = (async (): Promise<void> => {
+    const onboardingRead = async (): Promise<void> => {
       if (
         dependencies.ownOnboarding !== undefined &&
         plan.scopes.some(
@@ -2497,25 +2525,57 @@ export function createModelGatewayQAnswer(
           );
         }
       }
-    })();
+    };
     await Promise.all([
       timed("mandate", mandateRead),
       timed("ownCompany", ownCompanyRead),
-      timed("arrival", arrivalRead),
       timed("relationship", relationshipRead),
-      timed("standing", standingDone),
-      timed("index", indexDone),
       timed("pitch", pitchRead),
-      timed("onboarding", onboardingRead),
       timed("company", companyRead),
-      timed("named", namedRead),
       timed("daily", dailyRead),
       timed("document", documentRead),
       timed("page", pageRead),
-      timed("day", dayRead),
     ]);
     prepareMs["reads"] = Date.now() - prepareStarted;
+    /**
+     * S2: the wide reads -- their standing, the companies a message names,
+     * their day, the index of what they own, their setup -- are context for
+     * the model's prompt and nothing else. A turn answered by code from an
+     * app query (companies of a kind, fit, what needs them) or from a fact
+     * already prepared (their mandate, the record on screen, their own
+     * company) never reads them; every other turn does, once, here. Taken
+     * on first use and shared by whoever asks (a warmed prepare and the
+     * answer that takes it).
+     */
+    let wideRead: Promise<WideReads> | undefined;
+    const wide = (): Promise<WideReads> => {
+      wideRead ??= (async (): Promise<WideReads> => {
+        const wideStarted = Date.now();
+        await Promise.all([
+          timed("standing", standingDone()),
+          timed("index", indexDone()),
+          timed("onboarding", onboardingRead()),
+          timed("named", namedRead()),
+          timed("day", dayRead()),
+          timed("arrival", arrivalRead()),
+        ]);
+        prepareMs["wide"] = Date.now() - wideStarted;
+        return {
+          namedCompanies,
+          namedCompanyCalls,
+          ownDay,
+          ownDayCalls,
+          ownStanding,
+          ownStandingCall,
+          ownIndex,
+          onboardingFacts,
+          arrival,
+        };
+      })();
+      return wideRead;
+    };
     return {
+      wide,
       prepareMs,
       history,
       conversationId,
@@ -2536,24 +2596,16 @@ export function createModelGatewayQAnswer(
       relationshipCall,
       onScreenCompany,
       onScreenCompanyCall,
-      namedCompanies,
-      namedCompanyCalls,
       onScreenDaily,
       onScreenDailyCall,
       onScreenDocument,
       onScreenDocumentCall,
       onScreenPage,
       onScreenPageCalls,
-      ownDay,
       arrival,
-      ownDayCalls,
       asked,
       counterparty,
-      ownStanding,
-      ownStandingCall,
-      ownIndex,
       pitchMoment,
-      onboardingFacts,
       fitSweep,
       sweptAtPrepare: sweepAsk !== null,
       discoverFor,
@@ -2649,22 +2701,13 @@ export function createModelGatewayQAnswer(
         relationshipCall,
         onScreenCompany,
         onScreenCompanyCall,
-        namedCompanies,
-        namedCompanyCalls,
         onScreenDaily,
         onScreenDailyCall,
         onScreenDocument,
         onScreenDocumentCall,
         onScreenPage,
         onScreenPageCalls,
-        ownDay,
-        arrival,
-        ownDayCalls,
-        ownStanding,
-        ownStandingCall,
-        ownIndex,
         pitchMoment,
-        onboardingFacts,
         fitSweep,
         sweptAtPrepare,
         discoverFor,
@@ -2740,6 +2783,42 @@ export function createModelGatewayQAnswer(
       // K8: the cheapest correct path. A question about what is already
       // prepared for this turn is answered over that context with no tool
       // round; everything uncertain keeps the full path.
+      // S2: whether this turn needs the wide reads at all. Settled from the
+      // request alone (never from what the reads would find): an app query
+      // (companies of a kind, fit, what needs them) and a question about
+      // something already prepared (their mandate, the record on screen,
+      // their own company) are answered without them. Their work (Q_WORK)
+      // is read from the day, so that subject takes it.
+      const provisionalRoute = answerPathOf({
+        turnKind: request.turnKind,
+        questionKind: request.questionKind,
+        preparedSubject: request.preparedSubject,
+        discover: request.discoverCompanies !== undefined,
+        fit: request.fitQuestion !== undefined,
+        attention: false,
+        writingDocument: request.writingDocument === true,
+        askedAction: request.askedAction !== undefined,
+        researchMode: research?.mode ?? "NEVER",
+        aboutNamedOther: false,
+        prepared: {
+          mandate: ownProfile !== null,
+          onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
+          qWork: true,
+          ownCompany: ownCompany !== null,
+        },
+      });
+      const withoutWideReads =
+        provisionalRoute.path === "APP_QUERY" ||
+        (provisionalRoute.path === "PREPARED_CONTEXT" &&
+          request.preparedSubject !== "Q_WORK") ||
+        (request.writingDocument !== true &&
+          request.askedAction === undefined &&
+          (request.turnKind === undefined ||
+            request.turnKind === "QUESTION_TO_Q") &&
+          asksWhatNeedsThem(latest.content));
+      let wideReads: WideReads = withoutWideReads
+        ? NO_WIDE_READS
+        : await prepared.wide();
       const route = answerPathOf({
         turnKind: request.turnKind,
         questionKind: request.questionKind,
@@ -2754,7 +2833,7 @@ export function createModelGatewayQAnswer(
         prepared: {
           mandate: ownProfile !== null,
           onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
-          qWork: ownDay !== null,
+          qWork: wideReads.ownDay !== null,
           ownCompany: ownCompany !== null,
         },
       });
@@ -2882,102 +2961,119 @@ export function createModelGatewayQAnswer(
       // Read beside the readiness read above, not before it (L1).
       await nudgeRead;
       took("nudge");
-      const facts: readonly AuthorisedFact[] = [
-        // Their readiness first when it leads this answer.
-        ...(ownReadiness === null ? [] : [ownReadiness]),
-        ...onboardingFacts,
-        ...(ownProfile === null ? [] : [ownProfile]),
-        ...(ownCompany === null ? [] : [ownCompany]),
-        ...(onScreenCompany === null ? [] : [onScreenCompany]),
-        ...namedCompanies,
-        ...(onScreenDaily === null ? [] : [onScreenDaily]),
-        ...(onScreenDocument === null ? [] : [onScreenDocument]),
-        ...onScreenPage,
-        ...(ownDay === null ? [] : [ownDay]),
-        ...(arrival === null ? [] : [arrival]),
-        ...(relationship === null ? [] : [relationship]),
-        ...(ownStanding === null ? [] : [ownStanding]),
-        ...(ownIndex === null ? [] : [ownIndex]),
-        ...(pitchMoment === null ? [] : [pitchMoment]),
-        ...assembled.facts,
-      ];
+      // S2: the prompt is assembled from the facts in hand and can be
+      // assembled again once the wide reads land (a turn that skipped them
+      // and was not, after all, answered by code).
+      const assemblePrompt = async (w: WideReads) => {
+        const facts: readonly AuthorisedFact[] = [
+          // Their readiness first when it leads this answer.
+          ...(ownReadiness === null ? [] : [ownReadiness]),
+          ...w.onboardingFacts,
+          ...(ownProfile === null ? [] : [ownProfile]),
+          ...(ownCompany === null ? [] : [ownCompany]),
+          ...(onScreenCompany === null ? [] : [onScreenCompany]),
+          ...w.namedCompanies,
+          ...(onScreenDaily === null ? [] : [onScreenDaily]),
+          ...(onScreenDocument === null ? [] : [onScreenDocument]),
+          ...onScreenPage,
+          ...(w.ownDay === null ? [] : [w.ownDay]),
+          ...(w.arrival === null ? [] : [w.arrival]),
+          ...(relationship === null ? [] : [relationship]),
+          ...(w.ownStanding === null ? [] : [w.ownStanding]),
+          ...(w.ownIndex === null ? [] : [w.ownIndex]),
+          ...(pitchMoment === null ? [] : [pitchMoment]),
+          ...assembled.facts,
+        ];
 
-      const variables: Omit<
-        CompanyAnalystV4Variables,
-        | "operatingMode"
-        | "communicationProfile"
-        | "communicationGuidance"
-        | "environmentNotes"
-      > = {
-        capability: request.capability,
-        userMessage: latest.content,
-        conversation: earlier.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-        authorisedFacts: [...facts],
-        subjectDescription: assembled.subjectDescription,
-        institutionalNotes:
-          assembled.institutionalNotes ??
-          "Nothing was established in advance for this request.",
-        memory,
-        // Filled below, once the notes are composed.
-        turnNotes: "",
-      };
-      const personality = await personalityRead;
-      const asker = await askerRead;
-      const noteParts = environmentNoteParts(facts, offered, request.subjects, {
-        // Only when the firewall actually granted it. The plan has
-        // said so all along; nothing was reading it.
-        generalKnowledge: plan.scopes.some(
-          (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
-        ),
-        ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
-        ...(request.turnUnread === true ? { turnUnread: true } : {}),
-        ...(request.writingDocument === true ? { writingDocument: true } : {}),
-        ...(request.spoken === true ? { spoken: true } : {}),
-        ...(request.questionSequence === undefined
-          ? {}
-          : { questionSequence: request.questionSequence }),
-        ...(onboardingNudge === null ? {} : { onboardingNudge }),
-        ...(personality === null ? {} : { personality }),
-        ...(asker === null ? {} : { asker }),
-      });
-      // COMPANY_ANALYST v16 (prompt-cache order): this turn's notes ride in
-      // the task's tail and the charter keeps only what is the same from
-      // turn to turn; an earlier version still gets them all in the charter.
-      const notesInTail = registry
-        .getActive("COMPANY_ANALYST")
-        .definition.template.includes("{{turnNotes}}");
-      const environmentNotes = notesInTail
-        ? noteParts.standing
-        : joinedNoteParts(noteParts);
-      const etiquetteGuides = await etiquetteRead;
-      const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
-        task: "COMPANY_ANALYST",
-        ...(etiquetteGuides === null
-          ? {}
-          : {
-              etiquette: {
-                guides: etiquetteGuides,
-                purpose: "STYLE_ONLY" as const,
-              },
-            }),
-        operatingMode: operatingModeForCapability(request.capability),
-        communicationProfile: profile,
-        environmentNotes,
-        variables: {
-          ...variables,
-          turnNotes: notesInTail ? noteParts.turn : "",
-        },
-      });
-      // Counted only when the note actually reached the model: the notes
-      // are bounded, and a reminder cut off was never offered.
-      const nudgeOffered =
-        onboardingNudge !== null &&
-        joinedNoteParts(noteParts).includes(
-          onboardingNudgeNote(onboardingNudge),
+        const variables: Omit<
+          CompanyAnalystV4Variables,
+          | "operatingMode"
+          | "communicationProfile"
+          | "communicationGuidance"
+          | "environmentNotes"
+        > = {
+          capability: request.capability,
+          userMessage: latest.content,
+          conversation: earlier.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          authorisedFacts: [...facts],
+          subjectDescription: assembled.subjectDescription,
+          institutionalNotes:
+            assembled.institutionalNotes ??
+            "Nothing was established in advance for this request.",
+          memory,
+          // Filled below, once the notes are composed.
+          turnNotes: "",
+        };
+        const personality = await personalityRead;
+        const asker = await askerRead;
+        const noteParts = environmentNoteParts(
+          facts,
+          offered,
+          request.subjects,
+          {
+            // Only when the firewall actually granted it. The plan has
+            // said so all along; nothing was reading it.
+            generalKnowledge: plan.scopes.some(
+              (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
+            ),
+            ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
+            ...(request.turnUnread === true ? { turnUnread: true } : {}),
+            ...(request.writingDocument === true
+              ? { writingDocument: true }
+              : {}),
+            ...(request.spoken === true ? { spoken: true } : {}),
+            ...(request.questionSequence === undefined
+              ? {}
+              : { questionSequence: request.questionSequence }),
+            ...(onboardingNudge === null ? {} : { onboardingNudge }),
+            ...(personality === null ? {} : { personality }),
+            ...(asker === null ? {} : { asker }),
+          },
         );
+        // COMPANY_ANALYST v16 (prompt-cache order): this turn's notes ride in
+        // the task's tail and the charter keeps only what is the same from
+        // turn to turn; an earlier version still gets them all in the charter.
+        const notesInTail = registry
+          .getActive("COMPANY_ANALYST")
+          .definition.template.includes("{{turnNotes}}");
+        const environmentNotes = notesInTail
+          ? noteParts.standing
+          : joinedNoteParts(noteParts);
+        const etiquetteGuides = await etiquetteRead;
+        const rendered = renderPrompt<CompanyAnalystV4Variables>(registry, {
+          task: "COMPANY_ANALYST",
+          ...(etiquetteGuides === null
+            ? {}
+            : {
+                etiquette: {
+                  guides: etiquetteGuides,
+                  purpose: "STYLE_ONLY" as const,
+                },
+              }),
+          operatingMode: operatingModeForCapability(request.capability),
+          communicationProfile: profile,
+          environmentNotes,
+          variables: {
+            ...variables,
+            turnNotes: notesInTail ? noteParts.turn : "",
+          },
+        });
+        // Counted only when the note actually reached the model: the notes
+        // are bounded, and a reminder cut off was never offered.
+        const nudgeOffered =
+          onboardingNudge !== null &&
+          joinedNoteParts(noteParts).includes(
+            onboardingNudgeNote(onboardingNudge),
+          );
+        return { facts, rendered, nudgeOffered };
+      };
+      let assembled0 = await assemblePrompt(wideReads);
+      let facts = assembled0.facts;
+      let rendered = assembled0.rendered;
+      let nudgeOffered = assembled0.nudgeOffered;
 
       // RECOVERY-2026-10 B4 (audit B-04): an analytical answer gets the
       // synthesis budget -- room to finish one long JSON object -- decided
@@ -3461,7 +3557,11 @@ export function createModelGatewayQAnswer(
           ask: request.personSearch,
           tools,
           context: toolContext,
-          available: prefetchTools,
+          available: new Set(
+            (availableForRun ?? offeredForRun).map(
+              (tool) => tool.definition.name,
+            ),
+          ),
         });
         if (found !== null) {
           for (const source of found.sources) {
@@ -3602,6 +3702,16 @@ export function createModelGatewayQAnswer(
           };
         }
       }
+      // S2: reaching the model after skipping the wide reads because a code-
+      // composed answer was expected (and above did not apply): read them now and prompt with
+      // the same facts a turn that always read them would have had.
+      if (withoutWideReads && provisionalRoute.path !== "PREPARED_CONTEXT") {
+        wideReads = await prepared.wide();
+        assembled0 = await assemblePrompt(wideReads);
+        facts = assembled0.facts;
+        rendered = assembled0.rendered;
+        nudgeOffered = assembled0.nudgeOffered;
+      }
       const toolCalls: QToolCallObservation[] = [];
       // A platform lookup that found nobody. It is the whole reason the
       // research hop below exists: a company Capital Q does not hold is
@@ -3663,7 +3773,7 @@ export function createModelGatewayQAnswer(
             // 2026-10-01: 11-21 s on the public web for companies
             // Capital Q holds).
             onScreenCompany === null &&
-            namedCompanies.length === 0) ||
+            wideReads.namedCompanies.length === 0) ||
           // The model asked the platform who might invest; it holds too
           // few. Investors exist in the world, so the world is asked too.
           (prospectsThin &&
@@ -3808,7 +3918,7 @@ export function createModelGatewayQAnswer(
       if (onScreenCompanyCall !== null) {
         toolCalls.push(onScreenCompanyCall);
       }
-      toolCalls.push(...namedCompanyCalls);
+      toolCalls.push(...wideReads.namedCompanyCalls);
       if (onScreenDocumentCall !== null) {
         toolCalls.push(onScreenDocumentCall);
       }
@@ -3816,11 +3926,11 @@ export function createModelGatewayQAnswer(
       if (onScreenDailyCall !== null) {
         toolCalls.push(onScreenDailyCall);
       }
-      toolCalls.push(...ownDayCalls);
-      if (ownStandingCall !== null) {
-        toolCalls.push(ownStandingCall);
+      toolCalls.push(...wideReads.ownDayCalls);
+      if (wideReads.ownStandingCall !== null) {
+        toolCalls.push(wideReads.ownStandingCall);
       }
-      if (ownProfile !== null || onboardingFacts.length > 0) {
+      if (ownProfile !== null || wideReads.onboardingFacts.length > 0) {
         messages = [...messages, OWN_MANDATE_NOTE];
       }
       // RECOVERY-2026-10 B6: what their words point at, bound by code to
