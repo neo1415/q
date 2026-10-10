@@ -21,6 +21,14 @@ import type {
 export function pointsAtArrival(text: string): boolean {
   // A mandate recall is about the declared mandate, never an arrival item.
   if (/\bmandate\b/iu.test(text)) return false;
+  // Nor is a question about their own record (K6: "my sectors", "my raise").
+  if (
+    /\bmy\s+(?:profile|company|raise|round|sectors?|stages?|cheque|check size|geography|exclusions|thesis|criteria|readiness|deck|portfolio|pipeline)\b/iu.test(
+      text,
+    )
+  ) {
+    return false;
+  }
   if (
     /\b(?:they|them|their|he|she|it|that|this|dem|wetin|abeg|request|ask|meeting|call|time|slot|message|reply|replied|word|back|agree[ds]?|accept(?:ed)?|confirm(?:ed)?|offer|next)\b/iu.test(
       text,

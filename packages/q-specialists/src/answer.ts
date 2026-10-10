@@ -2932,6 +2932,13 @@ export function createSpecialistQAnswer(
         },
       });
     }
+    // K6: the full reading is dropped (its provider call aborted) when the
+    // fast lane's skim answers the turn first; the run's own abort still
+    // reaches it.
+    const readerAbort = new AbortController();
+    request.signal?.addEventListener("abort", () => readerAbort.abort(), {
+      once: true,
+    });
     const readTurn = () =>
       turns.read(
         turnReaderInput(
@@ -2942,7 +2949,7 @@ export function createSpecialistQAnswer(
             tenantId: request.tenantId,
             userId: request.actor.userId,
             correlationId: request.correlationId,
-            signal: request.signal,
+            signal: readerAbort.signal,
           },
           withResolution(referenceNote(shown, lastAction), pointed),
         ),
@@ -2994,6 +3001,7 @@ export function createSpecialistQAnswer(
       // Never past a change waiting on their word: a yes is not a list.
       if (lane !== null && !(await waitingOnThem())) {
         speculative.current?.cancel("KIND");
+        readerAbort.abort();
         logger?.info(
           {
             qRunId: request.runId,

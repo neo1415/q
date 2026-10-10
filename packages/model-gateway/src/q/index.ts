@@ -129,6 +129,7 @@ import {
   withoutUnbackedScreenClaims,
 } from "./screen-claims.js";
 import { ownProfileFact } from "./own-profile.js";
+import { asksForOwnMandate, ownMandateAnswer } from "./own-mandate-answer.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
 import { relationshipFact } from "./relationship-fact.js";
 import {
@@ -2111,6 +2112,8 @@ export function createModelGatewayQAnswer(
     };
     let ownProfile: AuthorisedFact | null = null;
     let ownProfileCall: QToolCallObservation | null = null;
+    /** The raw declared mandate, for a recall composed by code (K6). */
+    let ownMandateData: unknown = null;
     const ownInvestor = ownInvestorOrganisationIn(plan);
     // A fit question over a set they own is computed by code, side by side
     // with the reads below, through the same tools and plan (fit-sweep.ts).
@@ -2223,6 +2226,7 @@ export function createModelGatewayQAnswer(
           const fact = ownProfileFact(kept);
           if (fact !== null) {
             ownProfile = fact;
+            ownMandateData = kept;
             ownProfileCall = {
               toolName: "investor_mandate.get",
               providerName: call.name,
@@ -2244,6 +2248,7 @@ export function createModelGatewayQAnswer(
         };
         if (outcome.result.ok) {
           ownProfile = ownProfileFact(outcome.result.data);
+          ownMandateData = outcome.result.data;
           await dependencies.ownMandateReads
             ?.remember(request.actor, outcome.result.data)
             .catch(() => undefined);
@@ -2690,6 +2695,7 @@ export function createModelGatewayQAnswer(
       memory,
       ownProfile,
       ownProfileCall,
+      ownMandateData: (): unknown => ownMandateData,
       ownCompany,
       ownInvestor,
       relationship,
@@ -3652,6 +3658,41 @@ export function createModelGatewayQAnswer(
           modelPolicyVersion: "none",
           promptBundleVersion: rendered.bundle.bundleVersion,
         };
+      }
+      // K6: "what is my mandate?" is a read of the person's own declared
+      // record, already prepared: composed by code, no model round (the
+      // dialogue call it replaced took ~8 s). Unknown fields stay unknown.
+      if (
+        ownProfile !== null &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined ||
+          request.turnKind === "QUESTION_TO_Q") &&
+        asksForOwnMandate(latest.content)
+      ) {
+        const recall = ownMandateAnswer(prepared.ownMandateData());
+        if (recall !== null) {
+          const message = await persistAnswer(
+            request.leadLines === undefined
+              ? recall
+              : `${request.leadLines}\n\n${recall}`,
+          );
+          logger?.info(
+            {
+              qRunId: request.runId,
+              modelCalls: 0,
+              toolCalls: ownProfileCall === null ? 0 : 1,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered a mandate recall by code",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
       }
       // W1: a follow-up on what Q told them on arrival ("what's the
       // request?", "what did they say?", "did they accept?") is answered

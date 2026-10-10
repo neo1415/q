@@ -10,6 +10,11 @@ describe("pointsAtArrival", () => {
     expect(pointsAtArrival("What is my mandate? Remind me.")).toBe(false);
     expect(pointsAtArrival("Show my sectors. Remind me")).toBe(false);
   });
+  it("does not fire on a question about their own profile or raise", () => {
+    expect(pointsAtArrival("what is my company profile")).toBe(false);
+    expect(pointsAtArrival("is my raise on track")).toBe(false);
+    expect(pointsAtArrival("what are my sectors and stages")).toBe(false);
+  });
   it("still fires on pointing words and mid-sentence proper nouns", () => {
     expect(pointsAtArrival("what did they say")).toBe(true);
     expect(pointsAtArrival("did Amara reply")).toBe(true);
