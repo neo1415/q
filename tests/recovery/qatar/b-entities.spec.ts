@@ -267,7 +267,8 @@ for (const entity of QATAR_FIVE) {
       const started = await sendTimed(home, words);
       const card = cards(home).filter({ hasText: entity.nameRe }).first();
       await identityCard(home, entity.nameRe, started);
-      await card.locator(".cq-ac-head-main").click();
+      if ((await card.getAttribute("data-state")) !== "focus")
+        await card.locator(".cq-ac-head-main").click();
       await expect(card, "the card is in focus").toHaveAttribute(
         "data-state",
         "focus",
