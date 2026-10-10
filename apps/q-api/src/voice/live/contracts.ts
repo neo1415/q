@@ -90,6 +90,11 @@ export const LiveDelegationRequestSchema = z
       )
       .max(12)
       .optional(),
+    /**
+     * The client can say the first verified words before the run ends and
+     * asks again (same id) for the rest. Absent: one answer, at the end.
+     */
+    early: z.boolean().optional(),
   })
   .strict();
 export type LiveDelegationRequest = z.infer<typeof LiveDelegationRequestSchema>;
@@ -123,6 +128,11 @@ export const LiveDelegationResultSchema = z
     unheard: z.boolean().optional(),
     /** The run moved the screen: follow it, and await its receipt, first. */
     move: LiveMoveSchema.optional(),
+    /**
+     * Only the start of the answer: say it now, then ask again with the
+     * same delegation id for the rest.
+     */
+    partial: z.boolean().optional(),
   })
   .strict();
 export type LiveDelegationResult = z.infer<typeof LiveDelegationResultSchema>;

@@ -30,10 +30,15 @@ function harness(options: { progressAfterMs?: number } = {}) {
   const sent: Sent[] = [];
   const pending = new Map<
     string,
-    (outcome: { commentary: string | null; stale?: boolean }) => void
+    (outcome: {
+      commentary: string | null;
+      stale?: boolean;
+      partial?: boolean;
+    }) => void
   >();
   const asked: { delegationId: string; request: string }[] = [];
   const contexts: (readonly { role: string; text: string }[])[] = [];
+  const earlies: (boolean | undefined)[] = [];
   const bridge = createLiveBridge({
     send: (event) => {
       sent.push(event);
@@ -44,6 +49,7 @@ function harness(options: { progressAfterMs?: number } = {}) {
         request: request.request,
       });
       contexts.push(request.context);
+      earlies.push(request.early);
       return new Promise((resolve) => {
         pending.set(request.delegationId, resolve);
       });
@@ -97,6 +103,7 @@ function harness(options: { progressAfterMs?: number } = {}) {
     sent,
     asked,
     contexts,
+    earlies,
     pending,
     advance,
     heard,
@@ -130,6 +137,50 @@ describe("the GPT-Live delegation bridge", () => {
         content: "Verified: Ledgerfold, Ajopot, Maji Loop.",
       }),
     ]);
+  });
+
+  it("speaks the start of an answer at once and asks for the rest under the same id", async () => {
+    const h = harness();
+    h.heard("How is the runway?");
+    h.delegation("dlg_1");
+    h.advance(400);
+    // The first call asks for early words.
+    expect(h.earlies).toEqual([true]);
+    h.pending.get("dlg_1")?.({
+      commentary: "Start: Runway is 14 months.",
+      partial: true,
+    });
+    await h.settle();
+    expect(h.sent.map((e) => [e.type, e.content])).toEqual([
+      ["session.commentary.append", "Start: Runway is 14 months."],
+    ]);
+    // The rest is asked for under the same id, without asking for more early words.
+    expect(h.asked.map((a) => a.delegationId)).toEqual(["dlg_1", "dlg_1"]);
+    expect(h.earlies).toEqual([true, undefined]);
+    h.pending.get("dlg_1")?.({ commentary: "Rest: burn has been flat." });
+    await h.settle();
+    expect(h.sent.map((e) => e.content)).toEqual([
+      "Start: Runway is 14 months.",
+      "Rest: burn has been flat.",
+    ]);
+  });
+
+  it("keeps the start of an older answer quiet when a newer request exists", async () => {
+    const h = harness();
+    h.heard("How is the runway?");
+    h.delegation("dlg_1");
+    h.advance(400);
+    h.heard("Actually, who are my investors?");
+    h.delegation("dlg_2");
+    h.advance(400);
+    h.pending.get("dlg_1")?.({
+      commentary: "Start: Runway is 14 months.",
+      partial: true,
+    });
+    await h.settle();
+    const first = h.sent[0];
+    expect(first?.type).toBe("session.thinking.append");
+    expect(first?.content).toContain("do not answer it now unless asked");
   });
 
   it("waits for late words: a delegation can arrive before the transcript settles", () => {

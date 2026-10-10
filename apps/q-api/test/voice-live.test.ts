@@ -135,6 +135,8 @@ function setup(
     spent?: number;
     answer?: string;
     hold?: boolean;
+    /** Q says `first`, then waits for `until`, then `rest` (a streamed answer). */
+    stream?: { first: string; rest: string; until: Promise<void> };
   } = {},
 ) {
   let clock = 1_000_000;
@@ -173,6 +175,17 @@ function setup(
         });
       });
       if (signal.aborted) return { kind: "INTERRUPTED", path: "Q" };
+    }
+    const streamed = options.stream;
+    if (streamed !== undefined) {
+      await speaker.speak(
+        (async function* () {
+          yield streamed.first;
+          await streamed.until;
+          yield streamed.rest;
+        })(),
+      );
+      return { kind: "SPOKEN", path: "Q" };
     }
     await speaker.speak(options.answer ?? `Answer to ${last?.content ?? ""}.`);
     return { kind: "SPOKEN", path: "Q" };
@@ -458,6 +471,89 @@ describe("GPT-Live line", () => {
     // After it settled, the same id still never starts a second run.
     await ask(broker, "dlg_1", "What are the top three companies?");
     expect(runs).toHaveLength(1);
+  });
+
+  it("hands the voice the first verified sentence while the run goes on, then only the rest (first words before completion)", async () => {
+    let finish!: () => void;
+    const until = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const { broker, runs } = setup({
+      stream: {
+        first: "Runway is 14 months. ",
+        rest: "Burn has been flat since March.",
+        until,
+      },
+    });
+    await open(broker);
+    const early = await broker.delegate({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegation: {
+        delegationId: "dlg_1",
+        request: "How is the runway?",
+        early: true,
+      },
+    });
+    // The run is still held: this came back before it ended.
+    expect(early?.partial).toBe(true);
+    expect(early?.failed).toBe(false);
+    expect(early?.commentary).toContain("Runway is 14 months.");
+    expect(early?.commentary).not.toContain("Burn has been flat");
+    finish();
+    const rest = await broker.delegate({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegation: { delegationId: "dlg_1", request: "How is the runway?" },
+    });
+    expect(rest?.partial).toBeUndefined();
+    expect(rest?.commentary).toContain("Burn has been flat since March.");
+    // What was already said is not handed over twice.
+    expect(rest?.commentary).not.toContain("Runway is 14 months.");
+    expect(runs).toHaveLength(1);
+  });
+
+  it("returns the whole answer to a client that did not ask for early words", async () => {
+    const { broker } = setup({
+      stream: {
+        first: "Runway is 14 months. ",
+        rest: "Burn has been flat since March.",
+        until: Promise.resolve(),
+      },
+    });
+    await open(broker);
+    const whole = await ask(broker, "dlg_1", "How is the runway?");
+    expect(whole?.partial).toBeUndefined();
+    expect(whole?.commentary).toContain("Runway is 14 months.");
+    expect(whole?.commentary).toContain("Burn has been flat since March.");
+  });
+
+  it("says nothing more after a one-sentence answer was handed over early", async () => {
+    const { broker } = setup({ answer: "Runway is 14 months." });
+    await open(broker);
+    const early = await broker.delegate({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegation: { delegationId: "dlg_1", request: "Runway?", early: true },
+    });
+    expect(early?.commentary).toContain("Runway is 14 months.");
+    const rest = await ask(broker, "dlg_1", "Runway?");
+    expect(rest?.commentary).toBeNull();
+    expect(rest?.failed).toBe(false);
+  });
+
+  it("never hands over an approval question early: it ends the answer and waits for a yes", async () => {
+    const { broker } = setup({
+      answer: `I prepared the email. ${APPROVAL_QUESTION}`,
+    });
+    await open(broker);
+    const early = await broker.delegate({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegation: { delegationId: "dlg_1", request: "Email them", early: true },
+    });
+    expect(early?.partial).toBeUndefined();
+    expect(early?.approvalPending).toBe(true);
   });
 
   it("queues a newer delegation behind the running one, so the slow answer is never cancelled", async () => {

@@ -196,6 +196,7 @@ export {
 export { createPostgresQRuntimeRepositories } from "./infrastructure/postgres-q-runtime-repositories.js";
 export { createPostgresQRunEventNotifier } from "./infrastructure/postgres-run-event-notifier.js";
 export {
+  coalesceDeltas,
   createInProcessQLiveDeltaBus,
   createInProcessQRunEventNotifier,
   createQRunStreamService,
