@@ -2,9 +2,9 @@ import { cachedInRun, type DatabaseExecutor } from "@capital-q/database";
 import type { QRuntimeRepositories } from "@capital-q/q-runtime";
 
 /**
- * R5: the run's own conversation and event reads, made once per run
- * (`cachedInRun`). A Q run read the same recent conversation four times
- * (answer seam, evidence context, specialist, conversational path).
+ * R5: the run's own messages and latest stage, read once per run
+ * (`cachedInRun`). The conversation history readers share one read in the
+ * repository itself (`runCacheRoot`).
  *
  * Only reads on the request client itself are cached: a read inside a
  * transaction (where it may hold a lock or must see that transaction's own
@@ -31,37 +31,6 @@ export function withRunReadCache(
     ...repositories,
     messages: {
       ...messages,
-      listRecentForConversation: (
-        executor,
-        tenantId,
-        conversationId,
-        limit,
-        options,
-      ) => {
-        const read = () =>
-          messages.listRecentForConversation(
-            executor,
-            tenantId,
-            conversationId,
-            limit,
-            options,
-          );
-        return executor !== root
-          ? read()
-          : cachedInRun(
-              {
-                aggregate: "conversation-recent",
-                tables: MESSAGE_TABLES,
-                actor: tenantId,
-                fingerprint: JSON.stringify([
-                  conversationId,
-                  limit,
-                  options?.readBack === true,
-                ]),
-              },
-              read,
-            );
-      },
       listForRun: (executor, tenantId, runId, limit) => {
         const read = () =>
           messages.listForRun(executor, tenantId, runId, limit);

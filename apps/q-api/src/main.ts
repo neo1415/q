@@ -871,7 +871,7 @@ const firewall = recordingFirewall(baseFirewall, {
 
 // R5: the run's own conversation reads, once per run (read-your-writes).
 const repositories = withRunReadCache(
-  createPostgresQRuntimeRepositories(),
+  createPostgresQRuntimeRepositories({ runCacheRoot: database.sql }),
   database.sql,
 );
 const ownInvestorOrganisations = createPostgresInvestorOrganisationRepository();
