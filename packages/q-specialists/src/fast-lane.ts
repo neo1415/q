@@ -11,7 +11,10 @@ import type { QAnswerRequest } from "@capital-q/q-runtime";
  * waits for it; everything else is null and waits, as before.
  */
 export type FastLane = Required<Pick<QAnswerRequest, "questionKind">> &
-  Pick<QAnswerRequest, "discoverCompanies" | "fitQuestion" | "personSearch">;
+  Pick<
+    QAnswerRequest,
+    "discoverCompanies" | "fitQuestion" | "personSearch" | "discoverInvestors"
+  >;
 
 export function fastLaneOf(
   skim: TurnSkimResult | null,
@@ -60,6 +63,22 @@ export function fastLaneOf(
         organization: person.organization,
         role: person.role,
         freshSearch: person.freshSearch,
+      },
+    };
+  }
+  if (skim.kind === "DISCOVER_INVESTORS") {
+    // Read-only and public-only: the worst a misread is a list of public
+    // investors nobody asked for. The region words stay as they were said.
+    const investors = skim.investors;
+    if (investors === null || investors === undefined) return null;
+    return {
+      questionKind: "DISCOVER_INVESTORS",
+      discoverInvestors: {
+        regions: investors.regions,
+        sector: investors.sector,
+        stage: investors.stage,
+        count: skim.count === null ? null : Math.min(skim.count, 5),
+        aboutMyCompany: investors.aboutMyCompany,
       },
     };
   }

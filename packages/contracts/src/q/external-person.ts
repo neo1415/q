@@ -212,6 +212,11 @@ export type IdentityCard = z.infer<typeof IdentityCardSchema>;
 /** A plausible person among several; shown so the member can pick one. */
 export const IdentityCandidateSchema = z
   .object({
+    /**
+     * Set when the candidate is already a stored record (a prepared entity),
+     * so its card can offer a rehearsal; null for a web-only lead.
+     */
+    externalPersonId: ExternalPersonIdSchema.nullable().optional(),
     displayName: z.string().max(200),
     profileUrl: z.string().url().max(2_048).nullable(),
     role: z.string().max(200).nullable(),

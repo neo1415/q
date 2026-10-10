@@ -716,6 +716,14 @@ export {
   type QControlCatalogEntry,
 } from "./tools/control-catalog.js";
 export {
+  createDiscoverCounterpartsTool,
+  DISCOVER_COUNTERPARTS,
+  DiscoverCounterpartsInputSchema,
+  DiscoverCounterpartsOutputSchema,
+  type DiscoverCounterpartsInput,
+  type DiscoverCounterpartsOutput,
+} from "./tools/discover-counterparts.js";
+export {
   createFindPublicEntityTool,
   FIND_PUBLIC_ENTITY,
   FindPublicEntityInputSchema,

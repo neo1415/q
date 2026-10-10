@@ -1216,6 +1216,11 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Finds one named person, company or government body from public sources and shows an identity card.",
   ),
   tool(
+    "discover_investors",
+    "RESEARCH",
+    "Finds investors of a region or kind from the prepared index and a short public search, as cards with a soft reason each could fit.",
+  ),
+  tool(
     "brief_public_entity",
     "RESEARCH",
     "Builds or reuses the evidence-classed brief on a public person or organisation already found.",

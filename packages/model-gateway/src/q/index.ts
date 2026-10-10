@@ -114,7 +114,18 @@ import {
   type DiscoveryAnswer,
 } from "./discover-companies.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
+import {
+  runInvestorDiscovery,
+  type InvestorAsk,
+} from "./investor-discovery-answer.js";
 export { identityCardBlock } from "./person-search-answer.js";
+export {
+  investorCardsBlock,
+  investorDiscoveryText,
+  runInvestorDiscovery,
+  type InvestorAsk,
+  type InvestorDiscoveryAnswer,
+} from "./investor-discovery-answer.js";
 export {
   createPersonBriefReader,
   type PersonBriefReaderInput,
@@ -2177,6 +2188,14 @@ export function createModelGatewayQAnswer(
         context: toolContext,
         available: prefetchTools,
       }).catch(() => null);
+    // D1: investors of a region or kind, found by meaning; cards by code.
+    const investorsFor = (ask: InvestorAsk) =>
+      runInvestorDiscovery({
+        ask,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+      }).catch(() => null);
     // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
     // source through the attention tool, under this run's plan, beside the
     // other reads; the answer is then written from it by code. Read only
@@ -2725,6 +2744,7 @@ export function createModelGatewayQAnswer(
       sweptAtPrepare: sweepAsk !== null,
       discoverFor,
       personFor,
+      investorsFor,
       sweepForReading,
       attention,
     };
@@ -2828,6 +2848,7 @@ export function createModelGatewayQAnswer(
         sweptAtPrepare,
         discoverFor,
         personFor,
+        investorsFor,
         sweepForReading,
         attention,
         counterparty,
@@ -3783,6 +3804,43 @@ export function createModelGatewayQAnswer(
               totalMs: Date.now() - startedAt,
             },
             "q answered a person search",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+      }
+      // D1: investors of a region or kind, no name given, are found by
+      // code (prepared investors, then one bounded public search); the
+      // analyst never lists them from general knowledge.
+      if (
+        request.discoverInvestors !== undefined &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+      ) {
+        const investorsStarted = Date.now();
+        const found = await investorsFor(request.discoverInvestors);
+        if (found !== null) {
+          const message = await persistAnswer(
+            found.text,
+            found.block === null ? [] : [found.block],
+          );
+          logger?.info(
+            {
+              qRunId: request.runId,
+              outcome: found.outcome,
+              shown: found.shown,
+              webSearched: found.webSearched,
+              modelCalls: 0,
+              prepareMs: prepared.prepareMs,
+              investorsMs: Date.now() - investorsStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered an investor discovery",
           );
           return {
             kind: "ANSWERED",

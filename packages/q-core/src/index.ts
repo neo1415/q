@@ -1345,6 +1345,7 @@ export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
 export { TURN_SKIM_V1 } from "./prompts/tasks/turn-skim.v1.js";
 export { TURN_SKIM_V2 } from "./prompts/tasks/turn-skim.v2.js";
 export { TURN_SKIM_V3 } from "./prompts/tasks/turn-skim.v3.js";
+export { TURN_SKIM_V4 } from "./prompts/tasks/turn-skim.v4.js";
 export { PERSON_BRIEF_READER_V1 } from "./prompts/tasks/person-brief-reader.v1.js";
 export {
   PERSON_BRIEF_READER_SCHEMA_NAME,
@@ -1363,7 +1364,9 @@ export {
   TURN_SKIM_V2_KINDS,
   TURN_SKIM_V2_SCHEMA_VERSION,
   SkimPersonSchema,
+  SkimInvestorsSchema,
   type SkimPerson,
+  type SkimInvestors,
   TurnSkimResultSchema,
   TurnSkimVariablesSchema,
   TurnSkimV3VariablesSchema,

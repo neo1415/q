@@ -111,6 +111,8 @@ export type KnownEntityIndex = {
   /** Warm lookup, else one store round trip by alias key. */
   readonly resolve: (query: string) => Promise<KnownLookup>;
   readonly size: () => number;
+  /** Every warm entity (memory only; empty before warm). For discovery by kind and place. */
+  readonly list: () => readonly KnownEntityRecord[];
   readonly warmed: () => boolean;
   /** Add or replace one entry (a loader keeps the cache in step). */
   readonly put: (record: KnownEntityRecord) => void;
@@ -211,6 +213,7 @@ export function createKnownEntityIndex(dependencies: {
         : decide(await dependencies.store.findByAlias(key));
     },
     size: () => records.size,
+    list: () => (isWarm ? [...records.values()] : []),
     warmed: () => isWarm,
     put,
   };

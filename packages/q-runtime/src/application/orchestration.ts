@@ -292,6 +292,21 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
       }
     | undefined;
   /**
+   * D1: investors of a region or kind, no name given ("top three Arab
+   * investors that may be interested in this"), as the first read
+   * understood it. Region words are as the member said them; code maps
+   * them to countries. Answered by code with candidate cards.
+   */
+  readonly discoverInvestors?:
+    | {
+        readonly regions: readonly string[];
+        readonly sector: string | null;
+        readonly stage: string | null;
+        readonly count: number | null;
+        readonly aboutMyCompany: boolean;
+      }
+    | undefined;
+  /**
    * A FIT question as the reader read it (live 2026-10-09): their question
    * in its words -- the earlier ask when this turn only pressed on it
    * ("still waiting") -- and how many companies it asks for, null when

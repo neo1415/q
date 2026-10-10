@@ -81,9 +81,21 @@ export const COUNTRIES: readonly CountryEntry[] = [
   {
     code: "AE",
     name: "United Arab Emirates",
-    aliases: ["uae", "dubai", "abu dhabi"],
+    aliases: ["uae", "emirati", "emirates", "dubai", "abu dhabi"],
   },
-  { code: "SA", name: "Saudi Arabia", aliases: ["saudi", "riyadh"] },
+  {
+    code: "SA",
+    name: "Saudi Arabia",
+    aliases: ["saudi", "saudi arabian", "riyadh", "jeddah"],
+  },
+  { code: "QA", name: "Qatar", aliases: ["qatari", "doha"] },
+  { code: "KW", name: "Kuwait", aliases: ["kuwaiti"] },
+  { code: "BH", name: "Bahrain", aliases: ["bahraini", "manama"] },
+  { code: "OM", name: "Oman", aliases: ["omani", "muscat"] },
+  { code: "JO", name: "Jordan", aliases: ["jordanian", "amman"] },
+  { code: "LB", name: "Lebanon", aliases: ["lebanese", "beirut"] },
+  { code: "IQ", name: "Iraq", aliases: ["iraqi", "baghdad"] },
+  { code: "LY", name: "Libya", aliases: ["libyan", "tripoli"] },
   {
     code: "IN",
     name: "India",
@@ -125,4 +137,83 @@ export function mentionedCountries(text: string): readonly string[] {
       mentions(text, entry.name) ||
       entry.aliases.some((alias) => mentions(text, alias)),
   ).map((entry) => entry.code);
+}
+
+const GCC = ["AE", "SA", "QA", "KW", "BH", "OM"] as const;
+const LEVANT_AND_NORTH = [
+  "EG",
+  "JO",
+  "LB",
+  "IQ",
+  "MA",
+  "TN",
+  "DZ",
+  "LY",
+] as const;
+
+/**
+ * Region words as a member says them, each with the countries it means.
+ * "Arab" is the League's members the table covers; "Middle East" and "MENA"
+ * add the same set, because the table lists no non-Arab Middle East market
+ * an investor search should lean on. A word not here is simply not a region.
+ */
+const REGION_WORDS: readonly {
+  readonly words: readonly string[];
+  readonly countries: readonly string[];
+}[] = [
+  {
+    words: [
+      "gcc",
+      "gulf",
+      "khaleeji",
+      "khaliji",
+      "persian gulf",
+      "الخليج",
+      "خليجي",
+    ],
+    countries: GCC,
+  },
+  {
+    words: [
+      "arab",
+      "arabs",
+      "arabic",
+      "arab world",
+      "mena",
+      "middle east",
+      "middle eastern",
+      "mideast",
+      "عربي",
+      "عرب",
+    ],
+    countries: [...GCC, ...LEVANT_AND_NORTH, "SD", "SO"],
+  },
+];
+
+/**
+ * The countries a member's region words mean, in table order: "Arab
+ * investors", "Gulf money", "who in Qatar" all resolve here, with no
+ * keyword list of asks. A named country (or its adjective or capital)
+ * counts as itself. Pure; an unknown word yields no country, which callers
+ * treat as "no region filter", never as a negative finding.
+ */
+export function regionCountries(text: string): readonly string[] {
+  if (text.trim().length === 0) {
+    return [];
+  }
+  // "United Arab Emirates" and "Saudi Arabia" name a country, not the Arab world.
+  const plain = text
+    .replace(/united\s+arab\s+emirates/giu, " uae ")
+    .replace(/saudi\s+arabia/giu, " saudi ");
+  const found = new Set<string>(mentionedCountries(plain));
+  for (const region of REGION_WORDS) {
+    if (region.words.some((word) => mentions(plain, word))) {
+      for (const code of region.countries) {
+        found.add(code);
+      }
+    }
+  }
+  return COUNTRIES.filter((entry) => found.has(entry.code)).map(
+    (entry) => entry.code,
+  );
 }

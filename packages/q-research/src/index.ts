@@ -83,6 +83,7 @@ export {
   COUNTRIES,
   countryName,
   mentionedCountries,
+  regionCountries,
   type CountryEntry,
 } from "./domain/geography.js";
 export {
@@ -192,3 +193,16 @@ export {
   type ResearchedEntityScope,
   type ResearchedEntityStore,
 } from "./application/person-brief-service.js";
+
+// D1 (2026-10-10): investor discovery by meaning.
+export {
+  createCounterpartDiscovery,
+  DISCOVERY_COUNT,
+  DISCOVERY_WEB_BUDGET_MS,
+  publicTerm,
+  type CounterpartAsk,
+  type CounterpartDiscoverer,
+  type CounterpartDiscovery,
+  type DiscoveredCounterpart,
+  type DiscoveryPersist,
+} from "./application/counterpart-discovery.js";

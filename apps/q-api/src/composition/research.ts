@@ -40,10 +40,12 @@ import type { ModelDataPosture } from "@capital-q/contracts";
 import {
   createKnownEntityIndex,
   createPersonBriefService,
+  createCounterpartDiscovery,
   createPersonLookup,
   createPersonSearch,
   type KnownEntityIndex,
   type KnownEntityStore,
+  type CounterpartDiscoverer,
   type PersonLookup,
   createPublicWebResearchService,
   type PublicWebResearchProvider,
@@ -97,6 +99,8 @@ export type ResearchComposition = {
    * Always present: prepared entities need no provider.
    */
   readonly people: PersonLookup;
+  /** D1: investors of a region or kind (prepared index first, one bounded search after). */
+  readonly counterparts: CounterpartDiscoverer;
   /** The prepared-entity store and its warm index (the seed loader writes here). */
   readonly knownEntities: {
     readonly store: KnownEntityStore;
@@ -494,6 +498,13 @@ export function composeResearch(
     onError: (error, what) => logger?.warn({ err: error }, `${what} failed`),
   });
 
+  const counterparts = createCounterpartDiscovery({
+    known: knownIndex,
+    providers: personProviders,
+    // A web-found investor is stored for this asker so its Rehearse link opens.
+    persist: (scope, input) => researched.remember(scope, input),
+  });
+
   return {
     research,
     profiles,
@@ -503,6 +514,7 @@ export function composeResearch(
     providerStatus: provider === undefined ? "unconfigured" : "configured",
     provider,
     people,
+    counterparts,
     knownEntities: { store: knownStore, index: knownIndex },
     /** The asker's researched records and briefs (rehearsals resolve from them). */
     researched,

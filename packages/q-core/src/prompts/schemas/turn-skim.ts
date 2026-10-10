@@ -111,7 +111,7 @@ export const TURN_SKIM_V3_UNTRUSTED = [
   "arrivalItems",
 ] as const;
 
-export const TurnSkimResultSchema = z
+export const TurnSkimV3ResultSchema = z
   .object({
     kind: z.enum(TURN_SKIM_V3_KINDS),
     confidence: z.enum(["HIGH", "MEDIUM", "LOW"]),
@@ -128,6 +128,53 @@ export const TurnSkimResultSchema = z
       .strict()
       .nullable()
       .optional(),
+  })
+  .strict();
+export type TurnSkimV3Result = z.infer<typeof TurnSkimV3ResultSchema>;
+
+/**
+ * v4 (D1, 2026-10-10): adds DISCOVER_INVESTORS, a request for investors of
+ * a region or kind without naming one ("top three Arab investors that may
+ * be interested in this", "Gulf money", "who in Qatar might back us"), in
+ * any words. The skim reads the meaning; code maps the region words to
+ * countries and answers from the prepared index and a bounded search.
+ */
+export const TURN_SKIM_V4_SCHEMA_VERSION = 4;
+export const TURN_SKIM_V4_KINDS = [
+  ...TURN_SKIM_V3_KINDS,
+  "DISCOVER_INVESTORS",
+] as const;
+
+export const SkimInvestorsSchema = z
+  .object({
+    /** Region, nationality or country words as they said them. */
+    regions: z.array(z.string().trim().min(2).max(40)).max(4).default([]),
+    /** A public sector word only; null unless they said one. */
+    sector: z.string().trim().max(40).nullable().default(null),
+    stage: z.string().trim().max(40).nullable().default(null),
+    /** True when "this", "us" or "our" is their own company or raise. */
+    aboutMyCompany: z.boolean().default(false),
+  })
+  .strict();
+export type SkimInvestors = z.infer<typeof SkimInvestorsSchema>;
+
+export const TurnSkimResultSchema = z
+  .object({
+    kind: z.enum(TURN_SKIM_V4_KINDS),
+    confidence: z.enum(["HIGH", "MEDIUM", "LOW"]),
+    count: z.number().int().min(1).max(100).nullable().default(null),
+    discover: DiscoverRequestSchema.nullable().default(null),
+    person: SkimPersonSchema.nullable().default(null),
+    arrival: z
+      .object({
+        item: z.string().trim().min(1).max(160),
+        aspect: z.enum(ARRIVAL_ASPECTS),
+      })
+      .strict()
+      .nullable()
+      .optional(),
+    /** DISCOVER_INVESTORS only; null otherwise. */
+    investors: SkimInvestorsSchema.nullable().optional(),
   })
   .strict();
 export type TurnSkimResult = z.infer<typeof TurnSkimResultSchema>;

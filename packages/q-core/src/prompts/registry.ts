@@ -132,6 +132,7 @@ import { SMALL_TALK_V1 } from "./tasks/small-talk.v1.js";
 import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
 import { TURN_SKIM_V2 } from "./tasks/turn-skim.v2.js";
 import { TURN_SKIM_V3 } from "./tasks/turn-skim.v3.js";
+import { TURN_SKIM_V4 } from "./tasks/turn-skim.v4.js";
 import { PERSON_BRIEF_READER_V1 } from "./tasks/person-brief-reader.v1.js";
 import { BRIEFING_COMMAND_V1 } from "./tasks/briefing-command.v1.js";
 // AUTO block (ADR 0030)
@@ -549,6 +550,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_SKIM_V1,
     TURN_SKIM_V2,
     TURN_SKIM_V3,
+    TURN_SKIM_V4,
     PERSON_BRIEF_READER_V1,
     BRIEFING_COMMAND_V1,
   ];

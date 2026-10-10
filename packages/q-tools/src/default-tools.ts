@@ -16,6 +16,7 @@ import {
   createResearchPublicWebTool,
   RESEARCH_PUBLIC_WEB,
 } from "./tools/research-public-web.js";
+import { createDiscoverCounterpartsTool } from "./tools/discover-counterparts.js";
 import { createFindPublicEntityTool } from "./tools/find-public-entity.js";
 import { createBriefPublicEntityTool } from "./tools/brief-public-entity.js";
 import {
@@ -158,6 +159,14 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
       : [
           createFindPublicEntityTool({ ...ports, people: ports.people }),
           createBriefPublicEntityTool({ ...ports, people: ports.people }),
+        ]),
+    ...(ports.counterparts === undefined
+      ? []
+      : [
+          createDiscoverCounterpartsTool({
+            ...ports,
+            counterparts: ports.counterparts,
+          }),
         ]),
     ...(research === undefined
       ? []

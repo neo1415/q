@@ -2766,6 +2766,7 @@ const qTools = createQTools({
       : { profiles: researchComposition.profiles }),
     // W2: find / brief a named person or organisation.
     people: researchComposition.people,
+    counterparts: researchComposition.counterparts,
     externalRehearsal: {
       canRehearse: async (actor, externalPersonId) =>
         (await externalSubjectResolver(actor, externalPersonId)) !== null,
