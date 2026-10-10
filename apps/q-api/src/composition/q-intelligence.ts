@@ -363,7 +363,17 @@ export function composeQIntelligence(
       : { uiActReceipts: dependencies.uiActReceipts }),
     ...(dependencies.arrivalSnapshot === undefined
       ? {}
-      : { arrivalSnapshot: dependencies.arrivalSnapshot }),
+      : {
+          arrivalSnapshot: dependencies.arrivalSnapshot,
+          // W1: the semantic fallback for unusual phrasings.
+          arrivalSkim: createTurnSkimmer({
+            gateway,
+            logger,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
+          }),
+        }),
     context: evidence.context,
     ...(statements === undefined ? {} : { statements }),
     ...(dependencies.profileUpdates === undefined

@@ -7,7 +7,7 @@ import {
   TurnSkimResultSchema,
   type PromptRegistry,
   type TurnSkimResult,
-  type TurnSkimVariables,
+  type TurnSkimV3Variables,
 } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../gateway.js";
@@ -42,6 +42,17 @@ export type QTurnSkimInput = {
     readonly role: "USER" | "Q";
     readonly text: string;
   }[];
+  /**
+   * W1: the items Q told them on arrival, for ARRIVAL_FOLLOWUP. Empty or
+   * absent: the skim reads as before (no such follow-up is possible).
+   */
+  readonly arrivalItems?:
+    | readonly {
+        readonly key: string;
+        readonly counterpart: string | null;
+        readonly headline: string;
+      }[]
+    | undefined;
   readonly attribution: {
     readonly tenantId: string;
     readonly userId?: string | undefined;
@@ -68,7 +79,7 @@ export function createTurnSkimmer(dependencies: {
       const utterance = input.utterance.trim().slice(0, 1_000);
       if (utterance.length === 0) return null;
       try {
-        const rendered = renderPrompt<TurnSkimVariables>(registry, {
+        const rendered = renderPrompt<TurnSkimV3Variables>(registry, {
           task: "TURN_SKIM",
           operatingMode: "ASSESSMENT",
           communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
@@ -76,6 +87,13 @@ export function createTurnSkimmer(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables: {
             utterance,
+            arrivalItems: JSON.stringify(
+              (input.arrivalItems ?? []).slice(0, 6).map((item) => ({
+                key: item.key.slice(0, 160),
+                counterpart: item.counterpart?.slice(0, 60) ?? null,
+                headline: item.headline.slice(0, 100),
+              })),
+            ).slice(0, 1_500),
             recentTurns: JSON.stringify(
               input.recentTurns.slice(-2).map((turn) => ({
                 role: turn.role,

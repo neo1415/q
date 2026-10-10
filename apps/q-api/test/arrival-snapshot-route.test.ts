@@ -13,7 +13,10 @@ import {
 } from "@capital-q/security";
 
 import { createApp, type QApiSecurityDependencies } from "../src/app.js";
-import { registerArrivalSnapshotInvalidation } from "../src/http/q-arrival-snapshot.js";
+import {
+  registerArrivalSnapshotInvalidation,
+  touchesSnapshotSources,
+} from "../src/http/q-arrival-snapshot.js";
 import {
   buildArrivalSnapshot,
   createArrivalSnapshots,
@@ -119,10 +122,41 @@ describe("GET /v1/q/arrival-snapshot", () => {
       done();
     });
     bare.get("/r", () => ({ ok: true }));
-    bare.post("/w", () => ({ ok: true }));
+    bare.post("/v1/q/approvals/:id/approve", () => ({ ok: true }));
+    bare.post("/v1/q/runs", () => ({ ok: true }));
+    bare.post("/v1/q/conversations/:id/messages", () => ({ ok: true }));
     await bare.inject({ method: "GET", url: "/r" });
+    // A Q run or turn reads the snapshot; it must never wipe it (V2: 31
+    // round trips instead of 2).
+    await bare.inject({ method: "POST", url: "/v1/q/runs", payload: {} });
+    await bare.inject({
+      method: "POST",
+      url: "/v1/q/conversations/x/messages",
+      payload: {},
+    });
     expect(ended).toEqual([]);
-    await bare.inject({ method: "POST", url: "/w", payload: {} });
+    await bare.inject({
+      method: "POST",
+      url: "/v1/q/approvals/abc/approve",
+      payload: {},
+    });
     expect(ended).toEqual([CONTEXT.userId]);
+  });
+
+  it("only writes to the snapshot's sources count", () => {
+    expect(touchesSnapshotSources("POST", "/v1/q/runs")).toBe(false);
+    expect(touchesSnapshotSources("POST", "/v1/voice/live/delegate")).toBe(
+      false,
+    );
+    expect(touchesSnapshotSources("GET", "/v1/q/approvals")).toBe(false);
+    expect(touchesSnapshotSources("POST", "/v1/q/approvals/1/reject?x=1")).toBe(
+      true,
+    );
+    expect(
+      touchesSnapshotSources("POST", "/v1/network/connection-requests"),
+    ).toBe(true);
+    expect(touchesSnapshotSources("DELETE", "/v1/team/invitations/1")).toBe(
+      true,
+    );
   });
 });
