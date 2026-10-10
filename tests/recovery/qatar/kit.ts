@@ -11,6 +11,7 @@ import { resolve } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { localSql } from "../support/local-db.js";
 import { composer, openQ } from "../support/q.js";
 import type { ScriptRule } from "../support/script.js";
 import {
@@ -38,6 +39,11 @@ export function measure(label: string, ms: number): void {
 
 /** The stack must be the one this suite is written for; say so instead of failing mysteriously. */
 export function requireQatarStack(): void {
+  // The local org's monthly rehearsal allowance is 30 Joins; a spent one
+  // makes every Join a 402 that reads as a dead call (W4, 2026-10-10).
+  localSql(
+    "update billing.usage_events set voided_at = now(), void_reason = 'local test reset' where feature_key = 'q.rehearsals' and voided_at is null",
+  );
   if (STACK_GPT_LIVE === false || STACK_SEARCH === false) {
     throw new Error(
       "The running stack is not the Qatar stack. Restart q-api with: CQ_RECOVERY_GPT_LIVE=1 CQ_RECOVERY_SEARCH=1 bash scripts/recovery/local-stack.sh start q-api  (then: local-stack.sh seed-research)",

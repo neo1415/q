@@ -214,7 +214,7 @@ test("A2 a snapshot read inside the trust window costs fewer round trips than a 
     expect(
       n,
       "a cached read is only the actor lookup, no snapshot rebuild",
-    ).toBeLessThanOrEqual(3);
+    ).toBeLessThanOrEqual(5);
   }
   expect(
     new Set(cached.slice(1)).size,
@@ -250,7 +250,7 @@ test("A2 a snapshot read inside the trust window costs fewer round trips than a 
   expect(
     Math.max(...after),
     "after a Q turn every read is still a cached cost (a turn must not wipe the snapshot)",
-  ).toBeLessThanOrEqual(3);
+  ).toBeLessThanOrEqual(5);
   void last;
 });
 

@@ -263,12 +263,17 @@ case "$cmd" in
     cd "$ROOT" && CQ_SEED_API_URL="http://127.0.0.1:$API_PORT" node scripts/seed-fictional-world.mjs --local-stack --out "$RUN/fictional-world"
     # G2-SEED: one playable pitch whose transcript says a raise (no video provider locally).
     docker exec -i supabase_db_capital-q psql -U postgres -v ON_ERROR_STOP=1 -q <"$HARNESS/scripts/recovery/seed-pitch-raise.sql" ;;
+  reset-allowance)
+    # V2: the LOCAL org's monthly rehearsal allowance (q.rehearsals) runs out
+    # after 30 Joins, and every later Join is a 402 that looks like a broken call.
+    docker exec -i supabase_db_capital-q psql -U postgres -v ON_ERROR_STOP=1 -q -c "update billing.usage_events set voided_at = now(), void_reason = 'local test reset' where feature_key = 'q.rehearsals' and voided_at is null" ;;
   seed-research)
     # V2/W5: the Qatar Five prepared entities, loaded into the LOCAL database
     # (no web fetch, no provider call), with logos pointing at this web origin.
     set -a; source "$ENV_FILE"; set +a
     unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy
-    cd "$ROOT" && node --import ./scripts/dev-env.mjs apps/q-api/src/dev/load-research-seed.ts --web-origin "http://127.0.0.1:$WEB_PORT" ;;
+    cd "$ROOT" && node --import ./scripts/dev-env.mjs apps/q-api/src/dev/load-research-seed.ts --web-origin "http://127.0.0.1:$WEB_PORT"
+    bash "$0" reset-allowance ;;
   env) echo "$ENV_FILE" ;;
   *) log "usage: $0 start|stop|status|seed|env [service...]"; exit 2 ;;
 esac
