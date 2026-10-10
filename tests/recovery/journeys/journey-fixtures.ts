@@ -470,6 +470,30 @@ export function captureReceiptPosts(page: Page): string[] {
   return posts;
 }
 
+/**
+ * The same batches, each added only once q-api has answered it. E5 replays
+ * a batch: a replay sent while the original keepalive post is still in
+ * flight can overtake it, and then the replay is the one counted (gate
+ * cd52c0ea: accepted 1 under load, 0 alone). The keepalive response is
+ * only observable through a route (see recordReceipts).
+ */
+export async function captureAnsweredReceiptPosts(
+  page: Page,
+): Promise<string[]> {
+  const posts: string[] = [];
+  await page.route("**/api/q-ui-acts", async (route) => {
+    const body = route.request().postData() ?? "";
+    const response = await route.fetch().catch(() => null);
+    if (response === null) {
+      await route.abort().catch(() => undefined);
+      return;
+    }
+    await route.fulfill({ response });
+    if (route.request().method() === "POST") posts.push(body);
+  });
+  return posts;
+}
+
 // --- scripted readings -------------------------------------------------------
 
 /** The reader's verdict for a plain question to Q (no tool, no move). */

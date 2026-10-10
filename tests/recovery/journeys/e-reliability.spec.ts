@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
-import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import { call, isRefusal, tokenFor } from "../support/http.js";
 import { answerText, newestRun, nextSettledRun } from "../support/knowledge.js";
@@ -14,6 +13,7 @@ import { CAST, Q_API_URL, world } from "../support/stack.js";
 import {
   READ_QUESTION,
   SKIM_OTHER,
+  captureAnsweredReceiptPosts,
   captureReceiptPosts,
   holdTableLock,
   inputAfter,
@@ -334,14 +334,10 @@ test("E4 the router remounts mid-move: one execution, one receipt", async ({
 test("E5 a duplicate intent id: the server counts one receipt", async ({
   browser,
 }) => {
-  awaits(
-    ["G2-D2"],
-    "product: one turn executes the same move twice (fast path, then the answer) once the first is VERIFIED; navigation-lifecycle.ts:373-381 joins only in-flight moves",
-  );
   const path = RECORD_PATH;
   const page = await (await contextAs(browser, CAST.founder)).newPage();
   await watchMoves(page);
-  const posts = captureReceiptPosts(page);
+  const posts = await captureAnsweredReceiptPosts(page);
   await useScript([
     SKIM_OTHER,
     READ_QUESTION,

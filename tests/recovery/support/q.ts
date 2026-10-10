@@ -193,7 +193,13 @@ export async function recordReceipts(page: Page): Promise<void> {
   // The batch is sent with `keepalive`, whose response body Playwright's
   // response event does not expose; passing it through a route does.
   await page.route("**/api/q-ui-acts", async (route) => {
-    const response = await route.fetch();
+    // A keepalive batch can still be in flight when the test closes its
+    // context; that is teardown, not a test failure.
+    const response = await route.fetch().catch(() => null);
+    if (response === null) {
+      await route.abort().catch(() => undefined);
+      return;
+    }
     try {
       const body = (await response.json()) as { accepted?: unknown };
       accepted.push(

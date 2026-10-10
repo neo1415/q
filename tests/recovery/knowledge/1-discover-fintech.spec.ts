@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
-import { awaits } from "../support/expected-red.js";
 import { runQ } from "../support/flows.js";
 import {
   BUDGET,
@@ -121,10 +120,6 @@ test.describe("K1 three fintech companies (API, server state)", () => {
 test("K1 in the browser: the first card renders inside the budget and matches the stored run", async ({
   browser,
 }) => {
-  awaits(
-    ["B Part 1", "C Part 5"],
-    "int-merge 9050c90f: cards are right and code-built (server < 2 s) but render 5-6.6 s after send, over the provisional 3 s browser budget",
-  );
   const page = await (await contextAs(browser, CAST.investor)).newPage();
   await page.goto("/home?new=1");
   await useScript(DISCOVER_FINTECH_RULES);

@@ -245,16 +245,6 @@ for (const start of STARTS) {
     test(`C typed, from ${start}: ${move.label} → VERIFIED, lands, then "Opened"`, async ({
       browser,
     }) => {
-      if (move.label.startsWith("record"))
-        awaits(
-          ["G2-D3"],
-          'product: the named-record line is `Opening "<name>".` (references.ts:344-377), not the PENDING `Opening …` that useMoveLine swaps, so VERIFIED never reads "Opened"',
-        );
-      else if (move.label.startsWith("route") && start !== "/home")
-        awaits(
-          ["G2-D2"],
-          "product: off /home the route move executes twice (nav-*-1, nav-*-2)",
-        );
       const page = await (await contextAs(browser, CAST.founder)).newPage();
       await watchMoves(page);
       await recordReceipts(page);
@@ -285,7 +275,7 @@ test.describe("C with GPT-Live connected (MOCK)", () => {
       if (start === "/home")
         awaits(
           ["G2-D2"],
-          "product: the delegated move executes twice (two DONE outcomes)",
+          "product (gate cd52c0ea): one DONE now, but after the typed matrix /home resumes that conversation and re-asks its earlier answers' moves on load (6 SUPERSEDED, no push, before the line opens)",
         );
       const say = `Open ${investorName}`;
       const path = RECORD_PATH;
