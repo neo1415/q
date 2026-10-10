@@ -210,8 +210,8 @@ test("A2 a snapshot read inside the trust window costs fewer round trips than a 
   for (const n of cached) {
     expect(
       n,
-      "a cached read costs fewer round trips than the rebuild",
-    ).toBeLessThan(rebuildCost);
+      "a cached read is only the actor lookup, no snapshot rebuild",
+    ).toBeLessThanOrEqual(3);
   }
   expect(
     new Set(cached.slice(1)).size,
@@ -245,9 +245,10 @@ test("A2 a snapshot read inside the trust window costs fewer round trips than a 
     `SNAPSHOT dbRoundTrips[LOCAL+MOCK] after a Q turn: ${JSON.stringify(after)} (cached=${String(cached[0])}, rebuild=${String(rebuildCost)})`,
   );
   expect(
-    last,
-    "after a Q turn the next read is still the cached cost (a turn must not wipe the snapshot)",
-  ).toBeLessThan(rebuildCost);
+    Math.max(...after),
+    "after a Q turn every read is still a cached cost (a turn must not wipe the snapshot)",
+  ).toBeLessThanOrEqual(3);
+  void last;
 });
 
 test("A3 the welcome follow-ups are answered from the snapshot: facts in the model's context, no tool round, no extra reads", async () => {
@@ -255,17 +256,20 @@ test("A3 the welcome follow-ups are answered from the snapshot: facts in the mod
   const asks = [
     {
       say: "what's the request?",
+      aspect: "REQUEST",
       reply:
         `${them} wants to connect. ${item.facts.request?.summary ?? ""}`.trim(),
       needs: [/The request:/u, new RegExp(escape(them), "u")],
     },
     {
       say: "what did they say?",
+      aspect: "THEIR_MESSAGE",
       reply: `Their latest message: "${item.facts.theirLatestMessage?.text ?? ""}"`,
       needs: [new RegExp(escape(`qa-${TAG}`), "u")],
     },
     {
       say: "did they accept the time?",
+      aspect: "MEETING",
       reply: "The call is booked, so the time is confirmed on both calendars.",
       needs: [/it is booked|booked/u],
     },
@@ -274,7 +278,20 @@ test("A3 the welcome follow-ups are answered from the snapshot: facts in the mod
   const turnsLogged: Record<string, unknown>[] = [];
   for (const [index, ask] of asks.entries()) {
     await useScript([
-      SKIM_OTHER,
+      {
+        name: `a3-skim-${String(index)}`,
+        when: { task: "TURN_SKIM", user: escape(ask.say) },
+        reply: {
+          json: {
+            kind: "ARRIVAL_FOLLOWUP",
+            confidence: "HIGH",
+            count: null,
+            discover: null,
+            person: null,
+            arrival: { item: item.key, aspect: ask.aspect },
+          },
+        },
+      },
       READ_QUESTION,
       {
         name: `a3-${String(index)}`,
@@ -305,6 +322,12 @@ test("A3 the welcome follow-ups are answered from the snapshot: facts in the mod
       (r) => r.rule === `a3-${String(index)}`,
     );
     const round = rounds[0];
+    expect
+      .soft(
+        rounds.length,
+        "answered by code from the snapshot: no analyst round",
+      )
+      .toBe(0);
     console.log(
       `A3 analyst rounds for "${ask.say}": ${String(rounds.length)} (0 = answered by code from the snapshot)`,
     );

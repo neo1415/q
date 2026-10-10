@@ -267,14 +267,14 @@ for (const entity of QATAR_FIVE) {
       const started = await sendTimed(home, words);
       const card = cards(home).filter({ hasText: entity.nameRe }).first();
       await identityCard(home, entity.nameRe, started);
-      await card.getByRole("button").first().click();
+      await card.locator(".cq-ac-head-main").click();
       await expect(card, "the card is in focus").toHaveAttribute(
-        "aria-current",
-        "true",
+        "data-state",
+        "focus",
       );
       await expect(card.getByText(/From \d+ sources?/u)).toBeVisible();
       await expect(
-        card.getByText(/Prepared from public sources/u),
+        card.getByText(/Prepared from public sources/u).first(),
       ).toBeVisible();
       // The reasons carry the soft attribution, not a verified claim.
       expect(await card.innerText()).toMatch(SOFT);
@@ -410,7 +410,7 @@ for (const entity of QATAR_FIVE) {
       ).toEqual([]);
 
       // Join: the scripted call. GPT-Live is mocked at the peer.
-      const callMark = await fakeMark();
+      const joinMark = await fakeMark();
       await page.getByRole("button", { name: "Join now" }).click();
       await expect.poll(() => livePeers(page), { timeout: 45_000 }).toBe(1);
       await expect
@@ -429,12 +429,22 @@ for (const entity of QATAR_FIVE) {
         type: "session.started",
         session: { id: `live_fake_${entity.key}`, model: "gpt-live-1" },
       });
+      const afterJoin = await fakeSince(joinMark);
+      const opening = afterJoin
+        .filter((r) => r.path === "/v1/responses")
+        .map(taskOf)
+        .filter((t) => t !== "MEMORY_EXTRACTOR");
+      if (opening.length > 0)
+        finding(
+          `${entity.canonical}: Join now ran model rounds before/at the call start: ${opening.join(", ")} (rehearsals.ts opening cue)`,
+        );
+      const callMark = await fakeMark();
       const lines = await expect
-        .poll(async () => (await liveLinesSince(callMark)).length, {
+        .poll(async () => (await liveLinesSince(joinMark)).length, {
           timeout: 30_000,
         })
         .toBeGreaterThan(0)
-        .then(() => liveLinesSince(callMark));
+        .then(() => liveLinesSince(joinMark));
       const persona = lines.at(-1)?.instructions ?? "";
       personaLines.set(entity.key, persona);
       remember("personas", entity.key, persona);
