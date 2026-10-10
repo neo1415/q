@@ -525,4 +525,64 @@ describe("external-person rehearsal (Postgres)", () => {
       if (!(error instanceof Rollback)) throw error;
     }
   });
+  it("joining makes zero model rounds: the opening line is built by code from the prepared mode", async () => {
+    try {
+      await db.transactions.run(async (tx) => {
+        const me = await person(tx);
+        const subjects = createPostgresExternalSubjectStore(tx.sql);
+        const store = createPostgresRehearsalStore(tx.sql);
+        await subjects.save(me, {
+          subject: subjectOf(1),
+          brief: briefOf(1, "founder conviction"),
+        });
+        const modelRounds = vi.fn(() => Promise.resolve(null));
+        const material: RehearsalMaterial = {
+          viewer: () =>
+            Promise.resolve({
+              role: "FOUNDER",
+              organisationName: "Acme Freight",
+            }),
+          counterpart: () => Promise.resolve(null),
+          theirMessages: () => Promise.resolve(""),
+          theirCalls: () => Promise.resolve(""),
+          counterpartMaterial: () => Promise.resolve({ text: "", sources: [] }),
+          publicWeb: () => Promise.resolve({ text: "", sources: [] }),
+          ownMaterial: () => Promise.resolve({ text: "Acme", sources: [] }),
+          relationships: () => Promise.resolve([]),
+          upcomingMeetings: () => Promise.resolve([]),
+        };
+        const composer: RehearsalComposer = {
+          personaVersion: 5,
+          persona: modelRounds,
+          turn: modelRounds,
+          review: modelRounds,
+        };
+        const service = createRehearsalService({
+          store,
+          material,
+          composer,
+          external: { subjects },
+        });
+        const started = await service.start(me, {
+          kind: "EXTERNAL_PERSON",
+          id: EXTERNAL_ID,
+        });
+        expect(started.kind).toBe("OK");
+        if (started.kind !== "OK") return;
+        expect(modelRounds).not.toHaveBeenCalled();
+        const first = started.rehearsal.turns[0];
+        expect(first?.from).toBe("THEM");
+        expect(first?.text).toMatch(/AI rehearsal informed by public sources/u);
+        // Muhannad's own mode opens on his own theme, with the founder's company.
+        expect(first?.text).toMatch(/committed to this one venture/u);
+        expect(first?.text).toContain("Acme Freight");
+        // Never a holding line, never the real person's name as an "I am".
+        expect(first?.text).not.toMatch(/lost my train of thought/u);
+        expect(first?.text).not.toMatch(/\bI am Muhannad/u);
+        throw new Rollback();
+      });
+    } catch (error) {
+      if (!(error instanceof Rollback)) throw error;
+    }
+  });
 });
