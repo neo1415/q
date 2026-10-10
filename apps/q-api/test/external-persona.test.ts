@@ -58,11 +58,31 @@ const rich: PersonBrief = PersonBriefSchema.parse({
   freshUntil: "2026-11-10",
   sources: [src(0), src(1), src(2)],
   assertions: [
-    a("INVESTMENT_INTERESTS", "logistics software in the Gulf", "PUBLIC_STATEMENT", [0]),
+    a(
+      "INVESTMENT_INTERESTS",
+      "logistics software in the Gulf",
+      "PUBLIC_STATEMENT",
+      [0],
+    ),
     a("SECTORS", "fintech infrastructure", "VERIFIED_PUBLIC_FACT", [1]),
-    a("MARKET_VIEWS", "regional capital is moving to growth-stage", "PUBLIC_STATEMENT", [2]),
-    a("RECURRING_TOPICS", "unit economics before scale", "PUBLIC_STATEMENT", [0]),
-    a("BACKGROUND", "Former banker, twenty years in the region", "VERIFIED_PUBLIC_FACT", [1]),
+    a(
+      "MARKET_VIEWS",
+      "regional capital is moving to growth-stage",
+      "PUBLIC_STATEMENT",
+      [2],
+    ),
+    a(
+      "RECURRING_TOPICS",
+      "unit economics before scale",
+      "PUBLIC_STATEMENT",
+      [0],
+    ),
+    a(
+      "BACKGROUND",
+      "Former banker, twenty years in the region",
+      "VERIFIED_PUBLIC_FACT",
+      [1],
+    ),
     a("COMMUNICATION_STYLE", "likes long silences", "UNKNOWN", []),
     a("PUBLIC_STATEMENTS", "old figure", "CONTRADICTORY_OR_STALE", [0]),
   ],
@@ -74,11 +94,22 @@ const founder = {
 
 describe("external persona builder", () => {
   it("rich evidence: grounded questions, sources, valid stored shape, label", () => {
-    const built = buildExternalPersona({ subject, brief: rich, founder, readBy: 5 });
+    const built = buildExternalPersona({
+      subject,
+      brief: rich,
+      founder,
+      readBy: 5,
+    });
     expect(built.grounding).toBe("RICH");
-    expect(CounterpartPersonaStoredSchema.safeParse(built.persona).success).toBe(true);
-    expect(built.persona.summary.startsWith(EXTERNAL_REHEARSAL_LABEL)).toBe(true);
-    const questions = built.persona.likelyQuestions.map((q) => q.question).join("|");
+    expect(
+      CounterpartPersonaStoredSchema.safeParse(built.persona).success,
+    ).toBe(true);
+    expect(built.persona.summary.startsWith(EXTERNAL_REHEARSAL_LABEL)).toBe(
+      true,
+    );
+    const questions = built.persona.likelyQuestions
+      .map((q) => q.question)
+      .join("|");
     expect(questions).toContain("logistics software in the Gulf");
     expect(questions).toContain("Acme Freight");
     // Generic role questions still cover the evaluation dimensions.
@@ -89,14 +120,24 @@ describe("external persona builder", () => {
   });
 
   it("leaves out UNKNOWN, contradictory and stale assertions", () => {
-    const built = buildExternalPersona({ subject, brief: rich, founder, readBy: 5 });
+    const built = buildExternalPersona({
+      subject,
+      brief: rich,
+      founder,
+      readBy: 5,
+    });
     const all = JSON.stringify(built.persona) + JSON.stringify(built.themes);
     expect(all).not.toContain("long silences");
     expect(all).not.toContain("old figure");
   });
 
   it("thin evidence: a labelled role simulation, no invented personality", () => {
-    const built = buildExternalPersona({ subject, brief: null, founder, readBy: 5 });
+    const built = buildExternalPersona({
+      subject,
+      brief: null,
+      founder,
+      readBy: 5,
+    });
     expect(built.grounding).toBe("THIN");
     expect(built.themes).toHaveLength(0);
     expect(built.persona.summary).toContain(EXTERNAL_REHEARSAL_LABEL);
@@ -108,7 +149,12 @@ describe("external persona builder", () => {
 
   it("a name-only (WEAK) identity is never attributed to, even with a brief", () => {
     const weak = { ...subject, confidence: "WEAK" as const };
-    const built = buildExternalPersona({ subject: weak, brief: rich, founder, readBy: 5 });
+    const built = buildExternalPersona({
+      subject: weak,
+      brief: rich,
+      founder,
+      readBy: 5,
+    });
     expect(built.grounding).toBe("THIN");
     expect(built.sources).toHaveLength(0);
   });
@@ -117,7 +163,11 @@ describe("external persona builder", () => {
     expect(identityOf(subject)).toBe(`${subject.externalPersonId}@3`);
     expect(roleFamilyOf(subject)).toBe("INVESTOR");
     expect(
-      roleFamilyOf({ ...subject, role: "Chief Technology Officer", organization: "Acme" }),
+      roleFamilyOf({
+        ...subject,
+        role: "Chief Technology Officer",
+        organization: "Acme",
+      }),
     ).toBe("EXECUTIVE");
   });
 });
@@ -148,8 +198,18 @@ describe("identity guard", () => {
 });
 
 describe("GPT-Live instructions", () => {
-  const built = buildExternalPersona({ subject, brief: rich, founder, readBy: 5 });
-  const text = externalLiveInstructions({ subject, built, founder, locale: "en-GB" });
+  const built = buildExternalPersona({
+    subject,
+    brief: rich,
+    founder,
+    readBy: 5,
+  });
+  const text = externalLiveInstructions({
+    subject,
+    built,
+    founder,
+    locale: "en-GB",
+  });
   it("carries the label, the no-impersonation rule and prepared-context-only rule", () => {
     expect(text).toContain("AI rehearsal informed by public sources");
     expect(text).toMatch(/NOT Shadi Qishta/);
@@ -160,7 +220,12 @@ describe("GPT-Live instructions", () => {
     expect(text).toContain("Acme Freight");
   });
   it("thin evidence tells the voice to invent nothing", () => {
-    const thin = buildExternalPersona({ subject, brief: null, founder, readBy: 5 });
+    const thin = buildExternalPersona({
+      subject,
+      brief: null,
+      founder,
+      readBy: 5,
+    });
     expect(externalLiveInstructions({ subject, built: thin, founder })).toMatch(
       /Invent no personality/,
     );
@@ -175,7 +240,12 @@ describe("GPT-Live instructions", () => {
         a("RECURRING_TOPICS", "pricing"),
       ],
     });
-    const b = buildExternalPersona({ subject, brief: hostile, founder, readBy: 5 });
+    const b = buildExternalPersona({
+      subject,
+      brief: hostile,
+      founder,
+      readBy: 5,
+    });
     // eslint-disable-next-line no-control-regex
     expect(JSON.stringify(b.persona)).not.toMatch(/[\u0000-\u001f]/u);
   });
@@ -185,7 +255,11 @@ describe("latency board", () => {
   it("reports p50 and p95", () => {
     const board = createExternalRehearsalLatency();
     for (let i = 1; i <= 100; i += 1) board.record("turn_latency_ms", i * 10);
-    expect(board.summary("turn_latency_ms")).toEqual({ count: 100, p50: 500, p95: 950 });
+    expect(board.summary("turn_latency_ms")).toEqual({
+      count: 100,
+      p50: 500,
+      p95: 950,
+    });
     expect(board.summary("first_audio_ms").p50).toBeNull();
   });
 });

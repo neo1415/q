@@ -27,6 +27,7 @@ import {
   rehearsalPersonaAction,
   startRehearsalAction,
 } from "./rehearsal-actions";
+import { CounterpartIdentity } from "./counterpart-identity";
 import { RehearsalRoom } from "./rehearsal-room";
 
 /**
@@ -179,13 +180,19 @@ export function RehearsalLobby({
   return (
     <section className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
       <div className="cq-stage relative flex min-h-80 flex-col items-center justify-center gap-4 rounded-(--cq-radius-xl) p-8">
-        <div className="flex size-28 items-center justify-center rounded-(--cq-radius-full) bg-(--cq-stage-surface-strong) text-4xl font-medium">
-          {initialsOf(name)}
-        </div>
-        <p className="cq-title-md text-(--cq-stage-text)">{name}</p>
-        <p className="cq-caption max-w-sm text-center text-(--cq-stage-text-muted)">
-          {rehearsalSimulationLabel(name)}
-        </p>
+        {persona.simulation !== undefined ? (
+          <CounterpartIdentity name={name} simulation={persona.simulation} />
+        ) : (
+          <>
+            <div className="flex size-28 items-center justify-center rounded-(--cq-radius-full) bg-(--cq-stage-surface-strong) text-4xl font-medium">
+              {initialsOf(name)}
+            </div>
+            <p className="cq-title-md text-(--cq-stage-text)">{name}</p>
+            <p className="cq-caption max-w-sm text-center text-(--cq-stage-text-muted)">
+              {rehearsalSimulationLabel(name)}
+            </p>
+          </>
+        )}
       </div>
 
       <div className="flex flex-col gap-5">

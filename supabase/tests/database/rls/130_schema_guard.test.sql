@@ -175,6 +175,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'person_standing',          'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'rehearsals',               'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'persona_profiles',         'RLS_REQUIRED',         '{SELECT}'),
+  ('q_runtime', 'rehearsal_external_subjects', 'RLS_REQUIRED',      '{SELECT}'),
   ('q_runtime', 'delegations',              'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'delegation_lanes',         'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'delegation_steps',         'RLS_REQUIRED',         '{SELECT}'),

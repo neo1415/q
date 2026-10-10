@@ -72,9 +72,7 @@ export function externalSimulation(
       sourceUrl: q.sourceUrl,
     })),
     sources: sources
-      .filter(
-        (s): s is QPersonaSourceDto & { url: string } => s.url !== null,
-      )
+      .filter((s): s is QPersonaSourceDto & { url: string } => s.url !== null)
       .slice(0, 12)
       .map((s) => ({ label: s.label, url: s.url })),
   };

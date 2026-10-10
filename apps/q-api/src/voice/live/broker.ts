@@ -671,8 +671,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         persona =
           deps.rehearsalLine === undefined
             ? null
-            : await deps
-                .rehearsalLine
+            : await deps.rehearsalLine
                 .prepare(binding.actor, rehearsal.rehearsalId, {
                   firstName,
                   locale,

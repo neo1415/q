@@ -39,13 +39,18 @@ import {
 import { startVoiceSessionAction } from "@/features/voice/actions";
 import { deviceLocale } from "@/features/voice/device-locale";
 import { useVoiceSession } from "@/features/voice/use-voice-session";
+
+import {
+  CounterpartMark,
+  SimulationChip,
+  SimulationDetails,
+} from "./counterpart-identity";
 import { isLineLive, type VoiceTranscriptLine } from "@/features/voice/session";
 
 import {
   clockLabel,
   elapsedLabel,
   greySignature,
-  initialsOf,
   screenChanged,
   moodWord,
   shouldNudgeSilence,
@@ -148,7 +153,18 @@ export function RehearsalRoom({
   readonly seeYou?: boolean;
 }) {
   const router = useRouter();
-  const [rehearsal, setRehearsal] = useState(initial);
+  const [rehearsal, setRehearsalState] = useState(initial);
+  // A turn's reply may carry only the plain label; keep the fuller
+  // simulation (portrait, role, sources) the screen already holds.
+  const setRehearsal = useCallback((next: QRehearsalDto) => {
+    setRehearsalState((prev) => ({
+      ...next,
+      ...(next.simulation?.entityKind !== undefined ||
+      prev.simulation === undefined
+        ? {}
+        : { simulation: prev.simulation }),
+    }));
+  }, []);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(false);
   // Consent to Q seeing them: separate from the self-view, off unless they
@@ -206,7 +222,8 @@ export function RehearsalRoom({
   const lastActivity = useRef(0);
 
   const name = rehearsal.counterpart.name;
-  const label = rehearsalSimulationLabel(name);
+  const simulation = rehearsal.simulation;
+  const label = simulation?.title ?? rehearsalSimulationLabel(name);
   const startedAt = Date.parse(initial.createdAt);
   const ended = rehearsal.endedAt !== null || rehearsal.status === "FINISHED";
 
@@ -220,7 +237,7 @@ export function RehearsalRoom({
         if (result.ok) setRehearsal(result.value);
       });
     }, 600);
-  }, [initial.id]);
+  }, [initial.id, setRehearsal]);
 
   /**
    * A small look at them, when they consented and their camera is on: a
@@ -318,8 +335,11 @@ export function RehearsalRoom({
         dropped();
       },
     },
-    // A rehearsal speaks only as the person Q plays: never GPT-Live.
-    { live: false },
+    // A rehearsal speaks only as the person Q plays. GPT-Live is used only
+    // for a researched external person, from the persona prepared before
+    // the call (no tools, no search); any other rehearsal stays on the
+    // standard line.
+    { live: initial.counterpart.kind === "EXTERNAL_PERSON" },
   );
 
   // The line as it really is: LIVE only while it can carry a turn. A line
@@ -706,10 +726,19 @@ export function RehearsalRoom({
           className="absolute -inset-2 rounded-(--cq-radius-full) border-4 border-(--cq-stage-accent)"
           style={{ opacity: "var(--level)" }}
         />
-        <div className="flex size-20 items-center justify-center rounded-(--cq-radius-full) bg-(--cq-stage-surface-strong) text-3xl font-medium text-(--cq-stage-text) sm:size-28 sm:text-4xl">
-          {initialsOf(name)}
-        </div>
+        <CounterpartMark name={name} simulation={simulation} size="stage" />
       </div>
+      {simulation === undefined ? null : (
+        <div className="absolute top-3 left-3 flex max-w-[70%] flex-col items-start gap-1">
+          <SimulationChip simulation={simulation} />
+          <SimulationDetails simulation={simulation} />
+        </div>
+      )}
+      {simulation?.headline ? (
+        <span className="cq-caption absolute right-3 bottom-3 max-w-[40%] truncate text-(--cq-stage-text-muted)">
+          {simulation.headline}
+        </span>
+      ) : null}
       <span className="cq-body-sm absolute bottom-3 left-3 max-w-[80%] truncate rounded-(--cq-radius-sm) bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
         {name}
         {thinking ? (

@@ -35,7 +35,10 @@ const TOPIC: Partial<Record<ExternalEvaluationArea, RegExp>> = {
 
 /** Review dimensions that grade an area directly. */
 const FROM_DIMENSION: Partial<
-  Record<ExternalEvaluationArea, QRehearsalReviewDto["dimensions"][number]["name"]>
+  Record<
+    ExternalEvaluationArea,
+    QRehearsalReviewDto["dimensions"][number]["name"]
+  >
 > = {
   PITCH_CLARITY: "CLARITY",
   ANSWER_QUALITY: "EVIDENCE",
@@ -110,7 +113,8 @@ export function externalEvaluationBasis(input: {
     ...areas
       .filter((a) => !a.covered)
       .map(
-        (a) => `Prepare ${AREA_WORDS[a.area]}: it did not come up in this call.`,
+        (a) =>
+          `Prepare ${AREA_WORDS[a.area]}: it did not come up in this call.`,
       ),
   ];
   return {
@@ -121,7 +125,8 @@ export function externalEvaluationBasis(input: {
         (s): s is { label: string; url: string } =>
           s.url !== null && s.url.startsWith("https://"),
       )
-      .slice(0, 12),
+      .slice(0, 12)
+      .map((source) => ({ label: source.label, url: source.url })),
     areas,
     beforeTheRealMeeting: [...input.tips, ...gaps].slice(0, 8),
     ...(input.scenario === undefined

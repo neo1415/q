@@ -289,7 +289,9 @@ export const ExternalSimulationDtoSchema = z
     /** "Research-informed simulation of X's public priorities" / "AI simulation: ... (not a real employee)". */
     title: z.string().max(300).optional(),
     disclaimer: z.string().max(400),
-    entityKind: z.enum(["PERSON", "ORGANIZATION", "GOVERNMENT_AGENCY"]).optional(),
+    entityKind: z
+      .enum(["PERSON", "ORGANIZATION", "GOVERNMENT_AGENCY"])
+      .optional(),
     imageUrl: z.string().url().max(2048).nullable().optional(),
     imageAttribution: z.string().max(200).nullable().optional(),
     headline: z.string().max(200).nullable().optional(),

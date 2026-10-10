@@ -882,7 +882,10 @@ export type RehearsalService = {
   readonly externalLine: (
     actor: ActorContext,
     rehearsalId: string,
-    hints: { readonly firstName?: string | undefined; readonly locale?: string | undefined },
+    hints: {
+      readonly firstName?: string | undefined;
+      readonly locale?: string | undefined;
+    },
   ) => Promise<{
     readonly instructions: string;
     readonly name: string;
@@ -1043,10 +1046,7 @@ export function provisionalReview(metrics: QRehearsalDto["metrics"]): {
 function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
   if (row.scorecard === null || typeof row.scorecard !== "object") return null;
   const { presence, slides, provisional, externalBasis, ...review } =
-    row.scorecard as Record<
-    string,
-    unknown
-  >;
+    row.scorecard as Record<string, unknown>;
   if (provisional === true) {
     const held = ProvisionalReviewSchema.safeParse(review);
     if (!held.success) return null;

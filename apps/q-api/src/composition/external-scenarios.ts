@@ -71,7 +71,9 @@ const SHADI: Scenario = {
       question: () =>
         "What shows your customers can afford this and will keep paying for it?",
       pressure: "demand claimed from broad market figures rather than spending",
-      keywords: k("afford|purchasing power|spend|willing(?:ness)? to pay|disposable|price sensitiv|customers? pay"),
+      keywords: k(
+        "afford|purchasing power|spend|willing(?:ness)? to pay|disposable|price sensitiv|customers? pay",
+      ),
     },
     {
       key: "financial_transparency",
@@ -79,7 +81,9 @@ const SHADI: Scenario = {
       question: () =>
         "How reliable are your numbers, who checks them, and how comparable are they to a standard report?",
       pressure: "unaudited or unreconciled figures",
-      keywords: k("audit|ifrs|reconcil|transparen|report(?:ing)?|accounts|books"),
+      keywords: k(
+        "audit|ifrs|reconcil|transparen|report(?:ing)?|accounts|books",
+      ),
     },
     {
       key: "commercial_viability",
@@ -146,7 +150,9 @@ const QINVEST: Scenario = {
       question: () =>
         "How are the sources and uses of funds laid out, and where do we sit in the structure?",
       pressure: "uses of funds that are vague",
-      keywords: k("sources and uses|use of funds|structure|tranche|seniority|security|collateral|mezzanine"),
+      keywords: k(
+        "sources and uses|use of funds|structure|tranche|seniority|security|collateral|mezzanine",
+      ),
     },
     {
       key: "asset_classes",
@@ -162,7 +168,9 @@ const QINVEST: Scenario = {
       question: () =>
         "What governance and reporting would we have, and what risks remain unresolved?",
       pressure: "no board, covenants or reporting rights discussed",
-      keywords: k("governance|board|covenant|reporting|control|oversight|compliance"),
+      keywords: k(
+        "governance|board|covenant|reporting|control|oversight|compliance",
+      ),
     },
     {
       key: "exits",
@@ -203,12 +211,15 @@ const MUHANNAD: Scenario = {
       label: "Traction",
       question: () => "What have you shipped, and who is actually using it?",
       pressure: "traction described as interest rather than use",
-      keywords: k("traction|users?|customers?|revenue|pilot|launched|shipped|retention"),
+      keywords: k(
+        "traction|users?|customers?|revenue|pilot|launched|shipped|retention",
+      ),
     },
     {
       key: "runway",
       label: "Runway",
-      question: () => "How many months of cash do you have, and what is the burn?",
+      question: () =>
+        "How many months of cash do you have, and what is the burn?",
       pressure: "a runway answer that is a guess",
       keywords: k("runway|burn|cash|months|bank"),
     },
@@ -218,20 +229,23 @@ const MUHANNAD: Scenario = {
       question: () =>
         "What will you have done in the next thirty days that you have not done yet?",
       pressure: "plans with no near-term dates",
-      keywords: k("sprint|thirty days|30 days|weekly|ship|iterat|milestone|next month"),
+      keywords: k(
+        "sprint|thirty days|30 days|weekly|ship|iterat|milestone|next month",
+      ),
     },
     {
       key: "founder_market_fit",
       label: "Founder-market fit",
       question: () => "Why are you the person to build this, here, now?",
       pressure: "no earned insight into the customer",
-      keywords: k("background|experience|insight|years|why me|spoke to|interviews?"),
+      keywords: k(
+        "background|experience|insight|years|why me|spoke to|interviews?",
+      ),
     },
     {
       key: "capital_efficiency",
       label: "Capital efficiency",
-      question: () =>
-        "What does the money buy that you cannot do without it?",
+      question: () => "What does the money buy that you cannot do without it?",
       pressure: "a raise sized by habit rather than need",
       keywords: k("capital|efficien|raise|spend|hire|budget|use of funds"),
     },
@@ -260,7 +274,9 @@ const INVEST_QATAR: Scenario = {
       question: (c) =>
         `How would ${c} enter Qatar: licence, entity, first customers, timeline?`,
       pressure: "an entry plan with no local steps",
-      keywords: k("market entry|enter|licen[cs]e|entity|setup|launch|first customers"),
+      keywords: k(
+        "market entry|enter|licen[cs]e|entity|setup|launch|first customers",
+      ),
     },
     {
       key: "partnerships",
@@ -268,7 +284,9 @@ const INVEST_QATAR: Scenario = {
       question: () =>
         "Which local partners or institutions are you working with, or need?",
       pressure: "partners assumed rather than engaged",
-      keywords: k("partner|local|government|institution|supplier|joint venture"),
+      keywords: k(
+        "partner|local|government|institution|supplier|joint venture",
+      ),
     },
     {
       key: "economic_contribution",
@@ -276,7 +294,9 @@ const INVEST_QATAR: Scenario = {
       question: () =>
         "What would this add to the economy: jobs, skills, technology, exports?",
       pressure: "contribution claimed without numbers",
-      keywords: k("jobs?|hire|hiring|skills|economy|export|local content|employ"),
+      keywords: k(
+        "jobs?|hire|hiring|skills|economy|export|local content|employ",
+      ),
     },
     {
       key: "priority_industries",
@@ -284,7 +304,9 @@ const INVEST_QATAR: Scenario = {
       question: () =>
         "Which national priority sector does this serve, and how do you know it fits?",
       pressure: "sector fit asserted loosely",
-      keywords: k("sector|industry|priority|vision|strategy|technology|logistics|fintech"),
+      keywords: k(
+        "sector|industry|priority|vision|strategy|technology|logistics|fintech",
+      ),
     },
     {
       key: "ecosystem_programmes",
@@ -292,7 +314,9 @@ const INVEST_QATAR: Scenario = {
       question: () =>
         "Which programmes or incentives would you use, and what would you need from us?",
       pressure: "asking for support without a specific need",
-      keywords: k("programme|program|incentive|accelerator|support|free zone|grant"),
+      keywords: k(
+        "programme|program|incentive|accelerator|support|free zone|grant",
+      ),
     },
     {
       key: "vc_connections",
@@ -335,7 +359,9 @@ const ALRAYAN: Scenario = {
       question: () =>
         "Can the business sustain itself, and what do the numbers say about the next three years?",
       pressure: "profit promised without a basis",
-      keywords: k("sustainab|profit|cash flow|break.?even|three years|forecast|margin"),
+      keywords: k(
+        "sustainab|profit|cash flow|break.?even|three years|forecast|margin",
+      ),
     },
     {
       key: "capital_instruments",
@@ -416,7 +442,9 @@ const GENERIC: Record<EntityKind, Scenario> = {
     aliases: [],
     roleLine: null,
     family: "INVESTOR",
-    openingThemes: ["what the business does and what it needs from the organisation"],
+    openingThemes: [
+      "what the business does and what it needs from the organisation",
+    ],
     directions: [
       {
         key: "fit",
@@ -477,7 +505,8 @@ export const SCENARIOS: readonly Scenario[] = [
   ALRAYAN,
 ];
 
-const squash = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+const squash = (text: string) =>
+  text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
 /** The mode for a subject: by name or alias, else generic for its kind. */
 export function scenarioFor(input: {
