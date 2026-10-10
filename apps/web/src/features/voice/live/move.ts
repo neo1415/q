@@ -4,7 +4,7 @@ import type {
 } from "@capital-q/contracts";
 
 import {
-  recordPagePath,
+  recordIntentPath,
   settingsPath,
   setupPath,
 } from "../../q/client-actions";
@@ -52,7 +52,7 @@ export function movePath(move: LiveMove): string | null {
     action?.kind === "OPEN_RECORD_PAGE" &&
     action.page !== "DATA_ROOM_DOCUMENT"
   ) {
-    return recordPagePath(action.page, action.id);
+    return recordIntentPath(action);
   }
   if (action?.kind === "OPEN_SETUP") return setupPath(action.journey);
   if (action?.kind === "OPEN_SETTINGS") return settingsPath(action.section);

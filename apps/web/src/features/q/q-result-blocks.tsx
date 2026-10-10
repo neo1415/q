@@ -17,7 +17,12 @@ import { ArtifactCard } from "./artifact-card";
 import { CalendarConnectCard } from "./calendar-connect-card";
 import { ComparisonCards } from "./comparison-cards";
 import { StaticAnswerCards } from "./static-answer-cards";
-import { recordPagePath, settingsPath, setupPath } from "./client-actions";
+import {
+  recordIntentPath,
+  recordPagePath,
+  settingsPath,
+  setupPath,
+} from "./client-actions";
 import { roomCardHref } from "./room/room-card-view";
 import type { QTurnObjectBlock } from "./conversation";
 import { AttentionBody } from "./blocks/attention-block";
@@ -132,7 +137,7 @@ export function intentHref(intent: QUiIntent): string | null {
     return null;
   }
   if (intent.kind === "OPEN_RECORD_PAGE") {
-    return recordPagePath(intent.page, intent.id, intent.companyId);
+    return recordIntentPath(intent);
   }
   // The company page exists now (CQ-WEB-022) and authorises the read as
   // the person; an OPEN_COMPANY card that went nowhere was R0 (live

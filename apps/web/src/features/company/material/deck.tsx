@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import {
   DECK_SECTION_LABELS,
@@ -55,10 +62,13 @@ function DeckViewer({
   companyId,
   deck,
   owner,
+  autoOpen,
 }: {
   readonly companyId: string;
   readonly deck: CompanyDeck;
   readonly owner: boolean;
+  /** N2: Q was asked to open the deck ("open Nixo's pitch deck"): open it now. */
+  readonly autoOpen: boolean;
 }) {
   const [file, setFile] = useState<OpenedFile | null>(null);
   const [slide, setSlide] = useState(1);
@@ -66,12 +76,23 @@ function DeckViewer({
   const [pending, start] = useTransition();
   const frame = useRef<HTMLDivElement>(null);
   const total = deck.pageCount;
-  const open = () =>
-    start(async () => {
-      const result = await openDeckAction(companyId);
-      if (result.ok) setFile(result.value);
-      else setMessage(result.message);
-    });
+  const open = useCallback(
+    () =>
+      start(async () => {
+        const result = await openDeckAction(companyId);
+        if (result.ok) setFile(result.value);
+        else setMessage(result.message);
+      }),
+    [companyId],
+  );
+  // The server authorises the bytes (openDeckAction) exactly as for a click.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!autoOpen || asked.current) return;
+    asked.current = true;
+    open();
+    frame.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  }, [autoOpen, open]);
   const move = (by: number) =>
     setSlide((now) => Math.max(1, Math.min(total ?? now + by, now + by)));
   return (
@@ -183,6 +204,19 @@ export function DeckForReaders({
   const [index, setIndex] = useState(0);
   const carousel = useRef<HTMLDivElement>(null);
   const { deck, extraction } = view;
+  // N2: Q opens the deck (`open=1`) or one of its sections (`sub=`) from
+  // anywhere; both are only a view of what this reader may already see.
+  const params = useSearchParams();
+  const autoOpen = params?.get("open") === "1";
+  const sub = params?.get("sub")?.toUpperCase() ?? null;
+  const sections = extraction?.sections;
+  useEffect(() => {
+    if (sub === null || sections === undefined) return;
+    const at = sections.findIndex((one) => one.section === sub);
+    if (at < 0) return;
+    setIndex(at);
+    carousel.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  }, [sub, sections]);
   if (deck === null) {
     return (
       <div className="flex flex-col gap-2 py-6" data-deck="empty">
@@ -228,7 +262,12 @@ export function DeckForReaders({
           </p>
         )}
       </div>
-      <DeckViewer companyId={companyId} deck={deck} owner={owner} />
+      <DeckViewer
+        companyId={companyId}
+        deck={deck}
+        owner={owner}
+        autoOpen={autoOpen}
+      />
       {extraction === null ? (
         <p className="cq-body-sm rounded-lg bg-(--cq-surface-subtle) p-4 text-(--cq-text-secondary)">
           {owner
