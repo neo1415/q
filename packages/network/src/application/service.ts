@@ -21,7 +21,10 @@ import {
   type RelationshipPartyView,
   type RelationshipStatus,
 } from "./relationship-status.js";
-import { createRelationshipBrief } from "./relationship-brief.js";
+import {
+  createRelationshipBrief,
+  createRelationshipBriefs,
+} from "./relationship-brief.js";
 import {
   createListIncomingInterest,
   createMayRespondToInterest,
@@ -175,6 +178,13 @@ export type InterestService = {
    * actor. Null for a non-party or nothing this side may see.
    */
   readonly relationshipBrief: ReturnType<typeof createRelationshipBrief>;
+  /**
+   * Every brief on one page of the viewer's own list, from batched reads
+   * (R1). Optional so narrow fakes need not carry it.
+   */
+  readonly relationshipBriefs?:
+    | ReturnType<typeof createRelationshipBriefs>
+    | undefined;
   /** An investor organisation's own relationships (CQ-WEB-030). */
   readonly listRelationshipsForInvestor: (query: {
     readonly actor: ActorContext;
@@ -236,6 +246,7 @@ export function createInterestService(
     relationshipForCompany: createRelationshipForCompany(dependencies),
     relationshipById: createRelationshipById(dependencies),
     relationshipBrief: createRelationshipBrief(dependencies),
+    relationshipBriefs: createRelationshipBriefs(dependencies),
     listRelationshipsForInvestor:
       createListRelationshipsForInvestor(dependencies),
     listRelationshipsForCompany:

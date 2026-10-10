@@ -54,6 +54,11 @@ export const RelationshipBriefMessageSchema = z
     /** Sent by Q on the person's approval or delegation. */
     viaQ: z.boolean(),
     sentAt: UtcTimestampSchema,
+    /**
+     * A bounded preview of the message as it stands now, for the asking
+     * party's own thread only. Null: not read (Q's single brief omits it).
+     */
+    preview: z.string().max(240).nullable().default(null),
   })
   .strict();
 
@@ -66,6 +71,8 @@ export const RelationshipBriefMeetingSchema = z
     /** Relative to the brief's generatedAt. */
     timing: z.enum(["UPCOMING", "PAST"]),
     organisedByYou: z.boolean(),
+    /** A meeting_no_show was recorded for this call on the history. */
+    noShow: z.boolean().default(false),
   })
   .strict();
 
@@ -131,6 +138,16 @@ export const RelationshipBriefSchema = z
         }),
       })
       .strict(),
+    /**
+     * Calls recorded as not having taken place (meeting_no_show), from the
+     * same history as `state`: known whenever the brief exists.
+     */
+    noShows: z
+      .array(
+        z.object({ meetingId: UuidSchema, at: UtcTimestampSchema }).strict(),
+      )
+      .max(20)
+      .default([]),
     meetings: source({
       items: z.array(RelationshipBriefMeetingSchema).max(50),
       /** The next SCHEDULED call still ahead, if any. */
@@ -157,7 +174,14 @@ export const RelationshipBriefSchema = z
     documents: source({
       items: z
         .array(
-          z.object({ id: UuidSchema, title: z.string().max(300) }).strict(),
+          z
+            .object({
+              id: UuidSchema,
+              title: z.string().max(300),
+              /** Investor side: whether anyone on this side opened it. Null: not tracked for this side. */
+              openedByYourSide: z.boolean().nullable().default(null),
+            })
+            .strict(),
         )
         .max(50),
     }),
@@ -171,6 +195,32 @@ export const RelationshipBriefSchema = z
   })
   .strict();
 export type RelationshipBrief = z.infer<typeof RelationshipBriefSchema>;
+
+/**
+ * Every relationship brief this viewer may read, in one call (R1
+ * batching): the list screens' cards read this instead of a thread, a
+ * schedule and a diligence call per relationship.
+ */
+export const NETWORK_RELATIONSHIP_BRIEFS_PATH =
+  "/v1/network/relationship-briefs" as const;
+export const RELATIONSHIP_BRIEFS_MAX = 50;
+export const RelationshipBriefListQuerySchema = z
+  .object({
+    /** A founder's own company; absent: the actor's investor organisation. */
+    companyId: UuidSchema.optional(),
+    /** Comma-separated relationship ids (a page of the list); absent: the first page. */
+    ids: z
+      .string()
+      .max(40 * RELATIONSHIP_BRIEFS_MAX)
+      .optional(),
+  })
+  .strict();
+export const RelationshipBriefListSchema = z
+  .object({
+    items: z.array(RelationshipBriefSchema).max(RELATIONSHIP_BRIEFS_MAX),
+  })
+  .strict();
+export type RelationshipBriefList = z.infer<typeof RelationshipBriefListSchema>;
 export type RelationshipBriefMessage = z.infer<
   typeof RelationshipBriefMessageSchema
 >;

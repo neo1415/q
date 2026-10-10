@@ -15,6 +15,9 @@ import {
   NETWORK_COMPANY_RELATIONSHIPS_PATH,
   NETWORK_PASS_REASONS_PATH,
   NETWORK_RELATIONSHIP_BRIEF_PATH,
+  NETWORK_RELATIONSHIP_BRIEFS_PATH,
+  RelationshipBriefListQuerySchema,
+  RelationshipBriefListSchema,
   NETWORK_RELATIONSHIP_DILIGENCE_PATH,
   RelationshipBriefSchema,
   NETWORK_DILIGENCE_DOWNLOAD_PATH,
@@ -37,6 +40,7 @@ import {
   toRelationshipSummaryDto,
   type ConnectionService,
   type InterestService,
+  type RelationshipBriefBatchSources,
   type RelationshipBriefSources,
   type RelationshipOutcomeService,
 } from "@capital-q/network";
@@ -88,6 +92,8 @@ export type NetworkInterestRoutesDependencies = ActorContextDependencies & {
    * answers, with those sources UNAVAILABLE (NOT_COMPOSED).
    */
   readonly briefSources?: RelationshipBriefSources | undefined;
+  /** The batch readers for the list's briefs (R1). Absent: those sources UNAVAILABLE. */
+  readonly briefBatchSources?: RelationshipBriefBatchSources | undefined;
 };
 
 function investorIdOf(request: FastifyRequest): string {
@@ -227,6 +233,33 @@ export function registerNetworkInterestRoutes(
       if (brief === null) throw new InterestNotFoundError();
       void reply.header("Cache-Control", "no-store");
       return RelationshipBriefSchema.parse(brief);
+    },
+  );
+
+  // Every brief on one page of the viewer's own list (R1 batching): one
+  // call instead of a thread, calls and diligence read per relationship.
+  // A malformed query is the same not-found as a list that is not theirs.
+  app.get(
+    NETWORK_RELATIONSHIP_BRIEFS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const briefs = service.relationshipBriefs;
+      if (briefs === undefined) throw new InterestNotFoundError();
+      const parsed = RelationshipBriefListQuerySchema.safeParse(
+        request.query ?? {},
+      );
+      if (!parsed.success) throw new InterestNotFoundError();
+      const items = await briefs({
+        actor: getActorContext(request),
+        companyId: parsed.data.companyId,
+        relationshipIds:
+          parsed.data.ids === undefined
+            ? undefined
+            : parsed.data.ids.split(",").filter((id) => id.length > 0),
+        sources: dependencies.briefBatchSources ?? {},
+      });
+      void reply.header("Cache-Control", "no-store");
+      return RelationshipBriefListSchema.parse({ items });
     },
   );
 

@@ -205,6 +205,40 @@ export function createPostgresScheduleStore(options: {
         )
       ).map(toMeeting),
 
+    listMeetingsForRelationships: async (
+      organisationId,
+      relationshipIds,
+      perRelationship,
+    ) => {
+      if (relationshipIds.length === 0) return new Map();
+      const parties = await sql<{ id: string }[]>`
+        select r.id
+          from network.relationships r
+          join core.companies co on co.id = r.company_id
+          join core.investor_organisations io on io.id = r.investor_organisation_id
+         where r.id = any(${[...relationshipIds]}::uuid[])
+           and (co.organisation_id = ${organisationId} or io.organisation_id = ${organisationId})`;
+      const ids = parties.map((row) => row.id);
+      const out = new Map<string, MeetingRecord[]>(ids.map((id) => [id, []]));
+      if (ids.length === 0) return out;
+      const records = (
+        await selectMeetings(
+          sql`where m.id in (
+                select id from (
+                  select id, row_number() over (partition by relationship_id
+                                                order by starts_at desc) as n
+                    from communication.meetings
+                   where relationship_id = any(${ids}::uuid[])
+                ) ranked where n <= ${perRelationship})
+              order by m.starts_at desc`,
+        )
+      ).map(toMeeting);
+      for (const record of records) {
+        out.get(record.relationshipId)?.push(record);
+      }
+      return out;
+    },
+
     listMeetingsForUser: async (userId, from, limit) =>
       (
         await selectMeetings(

@@ -1,6 +1,9 @@
 import type { DatabaseHealth } from "@capital-q/database";
 import type { DealCloseService } from "@capital-q/network";
-import { createRelationshipBriefSources } from "@capital-q/network";
+import {
+  createRelationshipBriefBatchSources,
+  createRelationshipBriefSources,
+} from "@capital-q/network";
 import type { CapitalRoundService } from "@capital-q/capital";
 import type {
   CompanyDeckService,
@@ -866,6 +869,14 @@ export function createApp(
       briefSources:
         modules.chat !== undefined && modules.schedule !== undefined
           ? createRelationshipBriefSources({
+              chat: modules.chat,
+              schedule: modules.schedule,
+              diligence: modules.diligence,
+            })
+          : undefined,
+      briefBatchSources:
+        modules.chat !== undefined && modules.schedule !== undefined
+          ? createRelationshipBriefBatchSources({
               chat: modules.chat,
               schedule: modules.schedule,
               diligence: modules.diligence,

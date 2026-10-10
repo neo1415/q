@@ -145,6 +145,18 @@ export type ScheduleStore = {
     relationshipId: string,
     limit: number,
   ) => Promise<readonly MeetingRecord[]>;
+  /**
+   * R1 batching: the calls on each listed relationship where
+   * `organisationId` is a party, newest first, at most `perRelationship`
+   * each, in one read. Every party relationship has an entry (possibly
+   * empty); one where the organisation is not a party is absent.
+   * Optional: narrow fakes need not carry it.
+   */
+  readonly listMeetingsForRelationships?: (
+    organisationId: string,
+    relationshipIds: readonly string[],
+    perRelationship: number,
+  ) => Promise<ReadonlyMap<string, readonly MeetingRecord[]>>;
   readonly listMeetingsForUser: (
     userId: string,
     from: Date,
