@@ -172,7 +172,7 @@ describe("the canvas (C1, C3)", () => {
     expect(opened).toEqual([companyId]);
   });
 
-  it("K5: clicking a card opens its company through the one navigation lifecycle; a toggle shows why", () => {
+  it("K5: a card with a record has an explicit Open that goes through the one lifecycle; a tap still spotlights", () => {
     const companyId = "0a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
     const investorId = "1b9c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e";
     const block = demoTop(3);
@@ -206,32 +206,28 @@ describe("the canvas (C1, C3)", () => {
           onFocus={onFocus}
         />,
       );
-      const [first, second, third] = [
+      const heads = [
         ...document.querySelectorAll("[data-ac-card] .cq-ac-head-main"),
       ];
-      fireEvent.click(first as Element);
-      // The company's page, like a record move: requested, validated, executing.
+      // A tap on the card keeps the spotlight; nothing moves.
+      fireEvent.click(heads[0] as Element);
+      expect(onFocus).toHaveBeenCalledWith(0);
+      expect(pushes).toEqual([]);
+      // Open: the company's page, like a record move.
+      const name0 = block.cards[0]?.name ?? "";
+      const name1 = block.cards[1]?.name ?? "";
+      fireEvent.click(screen.getByRole("button", { name: `Open ${name0}` }));
       expect(pushes).toEqual([`/company/${companyId}`]);
       expect(phases.slice(0, 3)).toEqual([
         "REQUESTED",
         "VALIDATED",
         "EXECUTING",
       ]);
-      // An investor's card opens the relationship with them (its page for
-      // either side, as record moves open it).
-      fireEvent.click(second as Element);
+      // An investor's card opens the relationship with them.
+      fireEvent.click(screen.getByRole("button", { name: `Open ${name1}` }));
       expect(pushes.at(-1)).toBe(`/relationships/investor/${investorId}`);
-      // A card with no record behind it still only focuses.
-      fireEvent.click(third as Element);
-      expect(onFocus).toHaveBeenCalledWith(2);
-      expect(pushes).toHaveLength(2);
-      // Why it fits stays one tap away on a card that opens a page.
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: `Why ${block.cards[0]?.name ?? ""}`,
-        }),
-      );
-      expect(onFocus).toHaveBeenCalledWith(0);
+      // A card with no record behind it has no Open.
+      expect(document.querySelectorAll("[data-ac-open]")).toHaveLength(2);
     } finally {
       stop();
       registerClientRouter(null);
