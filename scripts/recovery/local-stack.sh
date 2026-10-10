@@ -252,7 +252,9 @@ case "$cmd" in
   seed)
     set -a; source "$ENV_FILE"; set +a
     unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy
-    cd "$ROOT" && CQ_SEED_API_URL="http://127.0.0.1:$API_PORT" node scripts/seed-fictional-world.mjs --local-stack --out "$RUN/fictional-world" ;;
+    cd "$ROOT" && CQ_SEED_API_URL="http://127.0.0.1:$API_PORT" node scripts/seed-fictional-world.mjs --local-stack --out "$RUN/fictional-world"
+    # G2-SEED: one playable pitch whose transcript says a raise (no video provider locally).
+    docker exec -i supabase_db_capital-q psql -U postgres -v ON_ERROR_STOP=1 -q <"$HARNESS/scripts/recovery/seed-pitch-raise.sql" ;;
   env) echo "$ENV_FILE" ;;
   *) log "usage: $0 start|stop|status|seed|env [service...]"; exit 2 ;;
 esac
