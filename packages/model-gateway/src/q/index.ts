@@ -151,6 +151,7 @@ export {
 } from "./turn-skim.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { arrivalSnapshotFact } from "./arrival-fact.js";
+export { arrivalSnapshotFact };
 import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
 import { manifestFacts, manifestReads } from "./manifest-fact.js";

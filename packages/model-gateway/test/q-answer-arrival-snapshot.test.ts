@@ -1,0 +1,259 @@
+import { randomUUID } from "node:crypto";
+
+import { describe, expect, it } from "vitest";
+
+import {
+  ArrivalSnapshotSchema,
+  type ArrivalSnapshot,
+  type PermittedContextPlan,
+} from "@capital-q/contracts";
+import type {
+  QAnswerRequest,
+  QConversationMessage,
+  QRuntimeRepositories,
+  QToolPort,
+  QToolProposal,
+} from "@capital-q/q-runtime";
+import { ActorContextSchema } from "@capital-q/security";
+
+import {
+  createFakeModelProvider,
+  createInMemoryModelUsageRepository,
+  createModelGateway,
+  createModelProviderRegistry,
+  createStaticModelCatalog,
+} from "../src/index.js";
+import { arrivalSnapshotFact } from "../src/q/arrival-fact.js";
+import { createModelGatewayQAnswer } from "../src/q/index.js";
+import { TENANT, testCatalog, USER } from "./fixtures.js";
+
+/**
+ * W1: "Q already knows what it just told me". The welcome said "TensorGate
+ * wants to connect"; the follow-ups ("what's the request?", "what did they
+ * say?", "did they accept the time?") reach the model with the arrival
+ * snapshot's facts already among the authorised facts, and no tool is
+ * executed to look anything up again.
+ */
+
+const RUN = randomUUID();
+const CONVERSATION = randomUUID();
+const NOW = "2026-10-10T09:00:00.000Z";
+const REL = "7b1c0e55-0000-4000-8000-000000000001";
+const OTHER = "7b1c0e55-0000-4000-8000-000000000002";
+
+const SNAPSHOT: ArrivalSnapshot = ArrivalSnapshotSchema.parse({
+  contractVersion: "arrival-snapshot.v1",
+  version: "v-abcdef0123456789",
+  asOf: NOW,
+  unread: [],
+  briefsRead: true,
+  items: [
+    {
+      key: `interest:${REL}`,
+      kind: "INTEREST_REQUEST",
+      headline: "TensorGate wants to connect and is waiting for your answer",
+      availability: "OK",
+      counterpart: { kind: "INVESTOR_ORGANISATION", id: OTHER, name: "TensorGate" },
+      ids: {
+        relationshipId: REL,
+        companyId: null,
+        investorOrganisationId: OTHER,
+        meetingId: null,
+        approvalId: null,
+        jobId: null,
+        documentId: null,
+        messageId: null,
+      },
+      facts: {
+        request: {
+          kind: "CONNECTION_OR_INTEREST",
+          from: "TensorGate",
+          since: "2026-10-09T10:00:00.000Z",
+          summary: "TensorGate wants to connect and is waiting for your answer",
+        },
+        messageCount: 2,
+        latestMessage: null,
+        theirLatestMessage: {
+          from: "OTHER_SIDE",
+          senderName: "Tensor Gate",
+          text: "Could we do Thursday 3pm for a call?",
+          kind: "TEXT",
+          status: "SENT",
+          viaQ: false,
+          sentAt: "2026-10-09T15:00:00.000Z",
+        },
+        meeting: {
+          id: "7b1c0e55-0000-4000-8000-000000000003",
+          status: "SCHEDULED",
+          startsAt: "2026-10-16T15:00:00.000Z",
+          endsAt: "2026-10-16T15:30:00.000Z",
+          timing: "UPCOMING",
+          organisedByYou: false,
+          booked: true,
+        },
+        decisions: [],
+        documents: [],
+        openRequests: [],
+        relationshipState: "CONNECTED",
+        suggestedNextAction: null,
+        note: null,
+      },
+      openPath: `/relationships/investor/${OTHER}/messages`,
+      decidable: true,
+      evidence: [],
+      sourceVersions: { historySequence: 7, brief: "relationship-brief.v1" },
+      since: "2026-10-09T10:00:00.000Z",
+      asOf: NOW,
+    },
+  ],
+});
+
+function build(snapshot: () => ArrivalSnapshot | null, said: string) {
+  const alpha = createFakeModelProvider({
+    code: "alpha",
+    script: [
+      {
+        kind: "TEXT",
+        text: JSON.stringify({
+          answer: "Here is what I already have on TensorGate.",
+          responseShape: "CONCISE",
+          insufficientEvidence: false,
+          recommendation: null,
+        }),
+      },
+    ],
+  });
+  const gateway = createModelGateway({
+    catalog: createStaticModelCatalog(
+      testCatalog((s) => ({
+        ...s,
+        models: s.models.map((m) => ({ ...m, supportsTools: true })),
+      })),
+    ),
+    registry: createModelProviderRegistry([alpha]),
+    usage: createInMemoryModelUsageRepository(),
+    sleep: () => Promise.resolve(),
+  });
+  const messages = [
+    {
+      id: randomUUID(),
+      tenantId: TENANT,
+      conversationId: CONVERSATION,
+      runId: RUN,
+      role: "USER",
+      content: said,
+      contentType: "TEXT",
+      createdAt: NOW,
+    } as unknown as QConversationMessage,
+  ];
+  const executed: QToolProposal[] = [];
+  const tools: QToolPort = {
+    offer: () => Promise.resolve([]),
+    execute: (proposal) => {
+      executed.push(proposal);
+      return Promise.reject(new Error("no tool read is expected"));
+    },
+  };
+  const repositories = {
+    messages: {
+      listForRun: () => Promise.resolve([...messages]),
+      listRecentForConversationOfRun: () => Promise.resolve([...messages]),
+      insert: (_tx: unknown, input: { content: string }) =>
+        Promise.resolve({
+          ...messages[0],
+          id: randomUUID(),
+          role: "Q",
+          content: input.content,
+        } as QConversationMessage),
+      findById: () => Promise.resolve(null),
+    },
+    runs: { allocateEventSequence: () => Promise.resolve(2) },
+    runEvents: { append: () => Promise.resolve({}) },
+  } as unknown as QRuntimeRepositories;
+  let snapshotReads = 0;
+  const seam = createModelGatewayQAnswer({
+    gateway,
+    repositories,
+    sql: {} as never,
+    transactions: { run: (work) => work({} as never) },
+    tools,
+    arrivalSnapshot: () => {
+      snapshotReads += 1;
+      return Promise.resolve(snapshot());
+    },
+  });
+  const request = {
+    runId: RUN,
+    tenantId: TENANT,
+    actorUserId: USER,
+    actor: ActorContextSchema.parse({
+      userId: USER,
+      tenantId: TENANT,
+      actorType: "HUMAN",
+    }),
+    correlationId: `cor_${RUN}`,
+    capability: "ANSWER",
+    subjects: [],
+    retrieval: { kind: "NOT_CONFIGURED" },
+    turnKind: "QUESTION_TO_Q",
+    plan: {
+      runId: RUN,
+      tenantId: TENANT,
+      actor: { userId: USER },
+      purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
+      subjects: [],
+      scopes: [],
+      denied: [],
+      maxSensitivity: "PUBLIC",
+    } as unknown as PermittedContextPlan,
+  } as unknown as QAnswerRequest;
+  return { seam, request, alpha, executed, reads: () => snapshotReads };
+}
+
+function promptOf(alpha: { calls: readonly { request: { messages: readonly { content: string }[] } }[] }): string {
+  const sent = alpha.calls
+    .flatMap((call) => call.request.messages.map((m) => m.content))
+    .join("\n");
+  return sent.slice(Math.max(0, sent.indexOf("AUTHORISED FACTS")));
+}
+
+describe("follow-ups on the arrival briefing are answered from the snapshot", () => {
+  for (const [said, facts] of [
+    ["what's the request?", ["TensorGate wants to connect", "The request:"]],
+    ["what did they say?", ["Could we do Thursday 3pm for a call?"]],
+    ["did they accept the time?", ["booked", "2026-10-16 15:00 UTC"]],
+  ] as const) {
+    it(`"${said}" reaches the model with the facts and no tool read`, async () => {
+      const { seam, request, alpha, executed, reads } = build(
+        () => SNAPSHOT,
+        said,
+      );
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      const prompt = promptOf(alpha);
+      for (const fact of facts) expect(prompt).toContain(fact);
+      expect(prompt).toContain("do not look them up again");
+      expect(executed).toEqual([]);
+      expect(reads()).toBe(1);
+    });
+  }
+
+  it("serves nothing when the snapshot is withheld (revoked or unreadable)", async () => {
+    const { seam, request, alpha, executed } = build(() => null, "what's the request?");
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const prompt = promptOf(alpha);
+    expect(prompt).not.toContain("Could we do Thursday 3pm");
+    expect(prompt).not.toContain("What Q already told them on arrival");
+    expect(executed).toEqual([]);
+  });
+
+  it("says UNAVAILABLE for a detail that could not be read, never an empty history", () => {
+    const first = SNAPSHOT.items[0];
+    if (first === undefined) throw new Error("fixture");
+    const fact = arrivalSnapshotFact({
+      ...SNAPSHOT,
+      items: [{ ...first, availability: "UNAVAILABLE" }],
+    });
+    expect(fact?.statement).toContain("UNAVAILABLE");
+    expect(fact?.statement).toContain("do not guess");
+  });
+});
