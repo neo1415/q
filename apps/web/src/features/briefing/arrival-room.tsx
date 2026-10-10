@@ -164,12 +164,14 @@ export function ArrivalRoom({
         "flex w-full flex-col items-center",
         filled &&
           (wide
-            ? "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,40rem)_minmax(0,1fr)] lg:items-start lg:gap-8"
-            : "lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center lg:gap-8"),
+            ? "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,40rem)_minmax(0,1fr)] xl:items-start xl:gap-8"
+            : "xl:grid xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] xl:items-center xl:gap-8"),
       )}
       data-q-room={filled ? "filled" : "empty"}
     >
-      <RoomSlot side="left" className="hidden lg:flex" />
+      {/* Side columns from xl only: at lg (1024px) beside the 40rem stage
+          they were ~95px wide and crushed their cards (live 2026-10-10). */}
+      <RoomSlot side="left" className="hidden xl:flex" />
       <div
         className={cx(
           "flex flex-col items-center gap-6",
@@ -178,7 +180,7 @@ export function ArrivalRoom({
       >
         {children}
       </div>
-      <RoomSlot side="right" className="hidden lg:flex" />
+      <RoomSlot side="right" className="hidden xl:flex" />
     </div>
   );
 }

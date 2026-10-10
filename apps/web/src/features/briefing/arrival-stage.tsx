@@ -80,7 +80,8 @@ import {
  * focus.
  */
 
-const WIDE_QUERY = "(min-width: 1024px)";
+// xl, as the room grid: at 1024px the side columns were ~95px wide.
+const WIDE_QUERY = "(min-width: 1280px)";
 function subscribeWide(onChange: () => void): () => void {
   if (typeof window.matchMedia !== "function") return () => undefined;
   const query = window.matchMedia(WIDE_QUERY);
