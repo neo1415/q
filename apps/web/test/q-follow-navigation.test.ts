@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createQStreamState } from "@capital-q/api-client";
 
@@ -111,13 +111,21 @@ describe("a typed question's move while a voice line is open (n-founder-strings,
     ).toBeNull();
   });
 
-  it("with no voice line, every new answer is followed as before", () => {
+  it("with no voice line, a new answer of a run this page followed live is followed; one from elsewhere is not (G2)", () => {
     expect(
       followOfThread([answerOf("m3", "run-spoken")], new Set(), {
         active: false,
         typedRuns: new Set(),
+        liveRuns: new Set(["run-spoken"]),
       }).navigate,
     ).toBe("REHEARSALS");
+    expect(
+      followOfThread([answerOf("m4", "run-elsewhere")], new Set(), {
+        active: false,
+        typedRuns: new Set(),
+        liveRuns: new Set(),
+      }).navigate,
+    ).toBeNull();
   });
 
   it("a typed run noted in this tab is followed by a surface set up again since (rerun 18:21)", () => {
@@ -185,36 +193,65 @@ describe("what is already there when a conversation opens (G2 follow-up)", () =>
 });
 
 describe("an answer from before this page load never moves (G2 gate cd52c0ea)", () => {
-  const LOADED = Date.parse("2026-10-10T10:00:00.000Z");
-  const at = (id: string, iso: string): QTurn => ({
+  const NOW = Date.parse("2026-10-10T10:00:00.000Z");
+  const answerOf = (id: string, runId: string, at: number): QTurn => ({
     ...(qTurn(id, toDiscover) as Extract<QTurn, { kind: "Q" }>),
-    at: iso,
+    runId,
+    at: new Date(at).toISOString(),
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it("earlier answers handed in after open (the room feed's recent backlog) are never followed", () => {
-    // /home opened with nothing; then the room feed hands in answers the
-    // typed matrix recorded seconds before this load.
-    const seen = seenAtOpen([], null);
-    const backlog = [
-      at("r1", "2026-10-10T09:59:20.000Z"),
-      at("r2", "2026-10-10T09:59:40.000Z"),
-    ];
-    const followed = followOfThread(backlog, seen, {
-      active: false,
-      loadedAt: LOADED,
+  for (const skewMs of [-120_000, 0, 120_000]) {
+    it(`browser clock ${String(skewMs / 60_000)} min off: earlier runs' answers never move; this tab's typed run does (G-D16)`, () => {
+      vi.useFakeTimers({ now: NOW + skewMs });
+      const typed = new Set(["run-typed"]);
+      const live = new Set<string>();
+      // Opened with nothing on screen; nothing asked yet.
+      const seen = seenAtOpen([], null, typed);
+      // The room feed hands in the matrix's answers (recorded by the
+      // server seconds ago, whatever this clock says).
+      const backlog = [
+        answerOf("r1", "run-old-1", NOW - 20_000),
+        answerOf("r2", "run-old-2", NOW - 5_000),
+      ];
+      const stale = followOfThread(backlog, seen, {
+        active: false,
+        typedRuns: typed,
+        liveRuns: live,
+      });
+      expect(stale.navigate).toBeNull();
+      expect(stale.actions).toEqual([]);
+      // The answer to what they just typed here, recorded by the server
+      // after the browser's "now" or before it: followed either way.
+      const fresh = followOfThread(
+        [...backlog, answerOf("mine", "run-typed", NOW + 3_000 - skewMs * 2)],
+        seen,
+        { active: false, typedRuns: typed, liveRuns: live },
+      );
+      expect(fresh.navigate).toBe("DISCOVER");
     });
-    expect(followed.navigate).toBeNull();
-    expect(followed.actions).toEqual([]);
-    expect(seen.has("r1") && seen.has("r2")).toBe(true);
+  }
+
+  it("G-D16 with the laptop clock 2 min fast: the conversation reloading as the answer lands still follows this tab's run", () => {
+    // since (browser) is 2 min ahead of the server's recorded-at.
+    const since = NOW + 120_000;
+    const seen = seenAtOpen(
+      [answerOf("landing", "run-typed", NOW + 1_000)],
+      since,
+      new Set(["run-typed"]),
+    );
+    expect(seen.has("landing")).toBe(false);
   });
 
-  it("G-D16 stays: an answer recorded after this load (to what they just typed) is followed", () => {
-    const seen = seenAtOpen([], LOADED + 5_000);
-    const followed = followOfThread(
-      [at("fresh", "2026-10-10T10:00:09.000Z")],
-      seen,
-      { active: false, loadedAt: LOADED },
-    );
+  it("a run this page followed live after open may move them", () => {
+    const seen = new Set<string>();
+    const followed = followOfThread([answerOf("x", "run-live", NOW)], seen, {
+      active: false,
+      typedRuns: new Set(),
+      liveRuns: new Set(["run-live"]),
+    });
     expect(followed.navigate).toBe("DISCOVER");
   });
 });

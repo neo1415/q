@@ -24,7 +24,7 @@ import { carriedApproval, type CarriedApproval } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
 import { navigationHeard } from "./control/fast-navigation";
 import { askQ } from "./ask-route";
-import { noteTypedRun } from "./follow-navigation";
+import { noteLiveRun, noteTypedRun } from "./follow-navigation";
 import { currentScreen, currentViewing } from "./screen";
 import {
   forgetPendingAsk,
@@ -213,6 +213,8 @@ export function useQConversation(
   );
 
   const follow = useCallback((run: string) => {
+    // Seen live by this page: its answer may move them (follow-navigation).
+    noteLiveRun(run);
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;

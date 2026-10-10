@@ -82,29 +82,31 @@ export function followOfThread(
   seen: Set<string>,
   voice: {
     readonly active: boolean;
-    /** When this document loaded (epoch ms); default: the real one. */
-    readonly loadedAt?: number | undefined;
+    /** Runs this tab followed live on the stream (default: all noted). */
+    readonly liveRuns?: ReadonlySet<string> | undefined;
     /** Runs started in this tab from typed questions (default: all noted). */
     readonly typedRuns?: ReadonlySet<string> | undefined;
   },
 ): ReturnType<typeof followOfTurns> {
-  // G2 gate (cd52c0ea): an answer recorded before this page loaded never
-  // moves the person, however it reaches the thread after open -- the
-  // room feed hands in the last 45 s of answers when a line starts, and
-  // after the typed matrix /home re-asked six earlier moves (all
-  // SUPERSEDED, a "couldn't open" notice, no page change). Marked seen.
-  const loadedAt = voice.loadedAt ?? pageLoadedAt();
+  // G2 gate (cd52c0ea): an answer from a run this page never started or
+  // followed live never moves the person, however it reaches the thread
+  // after open -- the room feed hands in the last 45 s of answers when a
+  // line starts, and after the typed matrix /home re-asked six earlier
+  // moves (all SUPERSEDED, a "couldn't open" notice, no page change).
+  // Keyed on runs, not clocks: a laptop clock minutes off must not decide.
+  const typedRuns = voice.typedRuns ?? TYPED_RUNS;
+  const liveRuns = voice.liveRuns ?? LIVE_RUNS;
   for (const turn of turns) {
     if (
       turn.kind === "Q" &&
-      turn.at !== undefined &&
-      Date.parse(turn.at) < loadedAt
+      turn.runId !== undefined &&
+      !typedRuns.has(turn.runId) &&
+      !liveRuns.has(turn.runId)
     ) {
       seen.add(turn.id);
     }
   }
   if (!voice.active) return followOfTurns(turns, seen);
-  const typedRuns = voice.typedRuns ?? TYPED_RUNS;
   const typed = followOfTurns(
     turns.filter(
       (turn) =>
@@ -135,19 +137,18 @@ export function seenAtOpen(
   const seen = new Set<string>();
   for (const turn of turns) {
     if (turn.kind !== "Q") continue;
+    // A run this tab started is fresh whatever the clocks say (a laptop
+    // clock minutes off must not swallow G-D16's move); only a turn with
+    // no run falls back to comparing times.
     const fresh =
       since !== null &&
-      (turn.at === undefined
-        ? turn.runId !== undefined && ownRuns.has(turn.runId)
-        : Date.parse(turn.at) >= since - FRESH_SKEW_MS);
+      (turn.runId !== undefined
+        ? ownRuns.has(turn.runId)
+        : turn.at !== undefined &&
+          Date.parse(turn.at) >= since - FRESH_SKEW_MS);
     if (!fresh) seen.add(turn.id);
   }
   return seen;
-}
-
-/** When this document loaded, epoch ms (0 outside a browser). */
-function pageLoadedAt(): number {
-  return typeof performance === "undefined" ? 0 : performance.timeOrigin;
 }
 
 /** Clock skew between the browser's "asked" and the server's record. */
@@ -161,6 +162,17 @@ const FRESH_SKEW_MS = 3_000;
  */
 const TYPED_RUNS = new Set<string>();
 const TYPED_RUNS_MAX = 50;
+
+/** Runs this tab followed on the stream after it opened (bounded). */
+const LIVE_RUNS = new Set<string>();
+
+export function noteLiveRun(runId: string): void {
+  LIVE_RUNS.add(runId);
+  if (LIVE_RUNS.size > TYPED_RUNS_MAX) {
+    const oldest = LIVE_RUNS.values().next().value;
+    if (oldest !== undefined) LIVE_RUNS.delete(oldest);
+  }
+}
 
 export function noteTypedRun(runId: string): void {
   TYPED_RUNS.add(runId);
