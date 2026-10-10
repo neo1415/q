@@ -12,6 +12,9 @@ import {
   ordinalOf,
   PAGE_NAMES,
   pageRequestOf,
+  selfCorrected,
+  takenBack,
+  wordsNamePage,
   type PageTarget,
 } from "../src/page-request.js";
 
@@ -216,5 +219,33 @@ describe("the third company on the list (voice-cards)", () => {
     expect(cardAt(block, 3)?.name).toBe("Tensorgate");
     expect(cardAt(block, -1)?.name).toBe("Tensorgate");
     expect(cardAt(block, 4)).toBeNull();
+  });
+});
+
+describe("self-corrections (founder acceptance: 'Open Discover, no, actually Rehearsals')", () => {
+  it("the answer path reads only the last page named", () => {
+    expect(pageRequestOf("Open Discover, no, actually Rehearsals")).toEqual({
+      kind: "PAGE",
+      target: { kind: "DESTINATION", destination: "REHEARSALS" },
+    });
+    expect(selfCorrected("Open Discover... sorry, Rehearsals")).toBe(
+      "Open Rehearsals",
+    );
+    expect(selfCorrected("Not Discover, Rehearsals")).toBe("Open Rehearsals");
+    expect(selfCorrected("open discover")).toBe("open discover");
+    expect(takenBack("Open Discover, no, actually Rehearsals")).toBe(false);
+    expect(takenBack("open discover no wait")).toBe(true);
+  });
+
+  it("a model-read move is held to the last page named, never the first", () => {
+    const said = "Open Discover, no, actually Rehearsals";
+    const to = (destination: "DISCOVER" | "REHEARSALS") =>
+      ({ kind: "DESTINATION", destination }) as const;
+    expect(wordsNamePage(said, to("REHEARSALS"))).toBe(true);
+    expect(wordsNamePage(said, to("DISCOVER"))).toBe(false);
+    // A name that starts with "No" is not a correction.
+    expect(selfCorrected("Take me to No Limits Capital")).toBe(
+      "Take me to No Limits Capital",
+    );
   });
 });

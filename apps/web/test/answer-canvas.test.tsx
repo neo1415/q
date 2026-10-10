@@ -383,3 +383,119 @@ describe("the Board's timeline (C7)", () => {
     );
   });
 });
+
+describe("W4: an identity card of a researched person", () => {
+  const externalPersonId = "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d";
+  const profileUrl = "https://qa.linkedin.com/in/shadi-qishta-282453a";
+  const block = (() => {
+    const base = demoTop(1);
+    return {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        name: "Shadi Qishta",
+        subject: null,
+        external: { externalPersonId, profileUrl, rehearse: true },
+      })),
+    };
+  })();
+
+  it("offers Rehearse with <first name>, which opens the rehearsal through the one lifecycle, and Open profile for the source", () => {
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    const phases: string[] = [];
+    const stop = onNavigationPhase((state) => phases.push(state.phase));
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      const rehearse = screen.getByRole("button", {
+        name: "Rehearse with Shadi",
+      });
+      expect(rehearse.getAttribute("data-ac-external")).not.toBeNull();
+      fireEvent.click(rehearse);
+      expect(pushes).toEqual([`/rehearsals/person/${externalPersonId}`]);
+      expect(phases.slice(0, 3)).toEqual([
+        "REQUESTED",
+        "VALIDATED",
+        "EXECUTING",
+      ]);
+      const profile = screen.getByRole("link", { name: "Open profile" });
+      expect(profile.getAttribute("href")).toBe(profileUrl);
+      expect(profile.getAttribute("target")).toBe("_blank");
+      expect(profile.getAttribute("rel")).toContain("noopener");
+      // No record behind it, so no ordinary Open button.
+      expect(document.querySelectorAll("[data-ac-open]")).toHaveLength(0);
+    } finally {
+      stop();
+      resetNavigationLifecycle();
+    }
+  });
+
+  it("offers no rehearsal when the card does not (and no profile link without a URL)", () => {
+    const plain = {
+      ...block,
+      cards: block.cards.map((card) => ({
+        ...card,
+        external: { externalPersonId, profileUrl: null, rehearse: false },
+      })),
+    };
+    render(<AnswerCanvas block={plain} focus={0} said="" />);
+    expect(screen.queryByRole("button", { name: /Rehearse with/u })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open profile" })).toBeNull();
+  });
+});
+
+describe("W4: an identity card's sources are links", () => {
+  const sources = [1, 2, 3, 4, 5].map((n) => ({
+    label: `Source ${String(n)}`,
+    url: `https://example.org/s${String(n)}`,
+  }));
+  const base = demoTop(1);
+  const block = {
+    ...base,
+    cards: base.cards.map((card) => ({
+      ...card,
+      subject: null,
+      external: {
+        externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+        profileUrl: null,
+        rehearse: false,
+        sources,
+      },
+    })),
+  };
+
+  it("shows the top three in a new tab and the rest behind More sources", () => {
+    render(<AnswerCanvas block={block} focus={0} said="" />);
+    const links = [...document.querySelectorAll("[data-ac-source-link]")];
+    expect(links).toHaveLength(5);
+    const shown = links.filter((link) => link.closest("details") === null);
+    expect(shown.map((link) => link.textContent)).toEqual([
+      "Source 1",
+      "Source 2",
+      "Source 3",
+    ]);
+    for (const link of links) {
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toContain("noopener");
+    }
+    const more = document.querySelector("[data-ac-source-links] details");
+    expect(more?.querySelector("summary")?.textContent).toBe("More sources");
+    expect(more?.querySelectorAll("a")).toHaveLength(2);
+  });
+
+  it("with three or fewer there is no disclosure", () => {
+    const few = {
+      ...block,
+      cards: block.cards.map((card) => ({
+        ...card,
+        external: card.external && {
+          ...card.external,
+          sources: sources.slice(0, 2),
+        },
+      })),
+    };
+    render(<AnswerCanvas block={few} focus={0} said="" />);
+    expect(document.querySelectorAll("[data-ac-source-link]")).toHaveLength(2);
+    expect(document.querySelector("[data-ac-source-links] details")).toBeNull();
+  });
+});

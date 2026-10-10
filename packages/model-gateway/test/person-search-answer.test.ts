@@ -124,6 +124,12 @@ describe("runPersonSearch", () => {
       "Research Shadi further",
       "Rehearse with Shadi",
     ]);
+    // The card names the researched entity: its rehearsal and its profile.
+    expect(answer?.block?.cards[0]?.external).toMatchObject({
+      externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+      profileUrl: "https://qa.linkedin.com/in/shadi-qishta-282453a",
+      rehearse: true,
+    });
     expect(answer?.sources[0]?.url).toContain("shadi-qishta-282453a");
     expect(answer?.text).toContain("strong match");
     expect(tools.asked).toEqual(["find_public_entity"]);
@@ -163,6 +169,106 @@ describe("runPersonSearch", () => {
     });
     expect(answer?.block?.cards).toHaveLength(2);
     expect(answer?.text).toContain("Which one");
+  });
+
+  it("W4: the card carries its sources as links (title or host, https only) for the UI", async () => {
+    const card = MATCHED.card;
+    if (card === null) throw new Error("fixture");
+    const many: PersonSearchResult = {
+      ...MATCHED,
+      card: {
+        ...card,
+        sources: [1, 2, 3, 4, 5].map((n) => ({
+          id: null,
+          description: null,
+          evidenceClass: null,
+          url: `https://example.org/s${String(n)}`,
+          domain: "example.org",
+          title: n === 2 ? null : `Source ${String(n)}`,
+          publishedAt: null,
+          retrievedAt: "2026-10-10T00:00:00Z",
+          provider: "tavily",
+        })),
+      },
+    };
+    const answer = await runPersonSearch({
+      ask: ASK,
+      tools: port(many),
+      context,
+      available,
+    });
+    const links = answer?.block?.cards[0]?.external?.sources ?? [];
+    expect(links).toHaveLength(5);
+    expect(links[1]).toEqual({
+      label: "example.org",
+      url: "https://example.org/s2",
+    });
+    expect(links.every((l) => l.url.startsWith("https://"))).toBe(true);
+  });
+
+  it("W4: every ambiguous candidate is its own card, headed by the clarifying question", async () => {
+    const candidate = (role: string, city: string, n: number) => ({
+      displayName: "Ada Obi",
+      profileUrl: `https://ng.linkedin.com/in/ada-obi-${String(n)}`,
+      role,
+      organization: null,
+      location: city,
+      confidence: "PLAUSIBLE" as const,
+    });
+    const answer = await runPersonSearch({
+      ask: { ...ASK, name: "Ada Obi" },
+      tools: port({
+        outcome: "AMBIGUOUS",
+        card: null,
+        elapsedMs: 1,
+        clarifyingQuestion: "Which Ada Obi do you mean?",
+        candidates: [
+          candidate("Banker", "Abuja", 1),
+          candidate("Doctor", "Lagos", 2),
+          candidate("Lawyer", "Kano", 3),
+        ],
+      }),
+      context,
+      available,
+    });
+    expect(answer?.block?.cards).toHaveLength(3);
+    expect(answer?.block?.title).toBe("Which Ada Obi do you mean?");
+    expect(new Set(answer?.block?.cards.map((c) => c.key)).size).toBe(3);
+    expect(answer?.block?.cards.map((c) => c.line)).toEqual([
+      "Banker · Abuja",
+      "Doctor · Lagos",
+      "Lawyer · Kano",
+    ]);
+    // A candidate is not yet a record: it can be opened, not rehearsed.
+    expect(answer?.block?.cards[0]?.external).toMatchObject({
+      externalPersonId: null,
+      rehearse: false,
+    });
+  });
+
+  it("W4: a match with other possible people shows them as cards too", async () => {
+    const withOthers: PersonSearchResult = {
+      ...MATCHED,
+      candidates: [
+        {
+          displayName: "Shadi Qishta",
+          profileUrl: "https://www.linkedin.com/in/shadi-qishta-91b2c4",
+          role: "Product Designer",
+          organization: "Acme Studio",
+          location: "Toronto, Canada",
+          confidence: "WEAK",
+        },
+      ],
+    };
+    const answer = await runPersonSearch({
+      ask: ASK,
+      tools: port(withOthers),
+      context,
+      available,
+    });
+    expect(answer?.block?.cards).toHaveLength(2);
+    expect(answer?.block?.cards[0]?.external?.rehearse).toBe(true);
+    expect(answer?.block?.cards[1]?.external?.rehearse).toBe(false);
   });
 
   it("says nothing was found without describing anyone from general knowledge", async () => {

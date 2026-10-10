@@ -121,6 +121,7 @@ import {
 } from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
 import { createExternalRehearsalLatency } from "./composition/external-rehearsal-latency.js";
+import { createExternalEntityFinder } from "./composition/external-entity-finder.js";
 import { createExternalSubjectResolver } from "./composition/external-resolve.js";
 import { createPostgresExternalSubjectStore } from "./composition/external-subjects.js";
 import { createLiveBroker } from "./voice/live/broker.js";
@@ -285,7 +286,10 @@ import {
   checkDatabaseReadiness,
   createRequestDatabaseClient,
 } from "@capital-q/database";
-import { withRunReadCache } from "./composition/run-read-cache.js";
+import {
+  withRunCachedRelationshipLists,
+  withRunReadCache,
+} from "./composition/run-read-cache.js";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createOnboardingNudges,
@@ -790,6 +794,12 @@ const relationships: RelationshipQueryPort = {
       database.sql,
       companyId,
       investorOrganisationId,
+    ),
+  findManyByInvestor: (investorOrganisationId, companyIds) =>
+    relationshipRepository.findByInvestorAndCompanies(
+      database.sql,
+      investorOrganisationId,
+      companyIds,
     ),
   listEvents: (relationshipId, page = {}) =>
     relationshipEventRepository.listByRelationship(
@@ -1404,7 +1414,9 @@ const interestServiceOptions: InterestServiceOptions = {
     },
   },
 };
-const interestService = createInterestService(interestServiceOptions);
+const interestService = withRunCachedRelationshipLists(
+  createInterestService(interestServiceOptions),
+);
 /**
  * Post-meeting outcomes (2026-10-02): Q's generated pass, pause, resume
  * and meeting-outcome tools run through the same Network service as the
@@ -3780,6 +3792,12 @@ const qIntelligence = composeQIntelligence({
   counterpartNames: createCounterpartNames({
     ownRelationships: errandRelationships.ownRelationships,
     logger,
+  }),
+  // W4: a researched entity reachable by name (prepared seed or their own
+  // research): "take me to Shadi Qishta" shows its identity card.
+  externalEntities: createExternalEntityFinder({
+    known: researchComposition.knownEntities.index,
+    researched: researchComposition.researched,
   }),
   // A typed yes or no to a waiting change, read and acted on by code
   // through the Approval Engine (founder fixture #1).

@@ -303,9 +303,14 @@ function itemFor(
       documentId: documents[0]?.id ?? null,
     },
     facts: {
+      // The request is first-class: who made it, when, and what it says.
       request: {
         ...request,
         from: counterpart.name ?? requestFrom,
+        summary:
+          item.source === "UNANSWERED_MESSAGE" && theirs?.text != null
+            ? clip(`${counterpart.name ?? "They"} wrote: "${theirs.text}"`, 400)
+            : request.summary,
       },
       messageCount: brief.messages.count,
       latestMessage: latest,

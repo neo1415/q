@@ -395,3 +395,84 @@ function recordPlace(page: QRecordPage, what: string | null): string {
       return what === null ? "the team" : `${what}'s team`;
   }
 }
+
+/**
+ * W4: "I want to rehearse (an investment pitch) with him/her/them" typed or
+ * spoken right after Q showed one identity card of a researched person.
+ * The pronoun is bound to that card (the newest Q answer's only external
+ * card), by code; nothing earlier in the conversation is a referent, and a
+ * name said instead must be that card's. Authority still comes from
+ * open_page's authorize step, not from this reading.
+ */
+const REHEARSE_WITH =
+  /\b(?:rehears\w*|practi[sc]\w*)\b[^.?!]*?\b(?:with|against|on|for)\s+(him|her|them|this\s+(?:person|one|guy|man|woman)|that\s+(?:person|one|guy|man|woman)|the\s+same\s+(?:person|one)|[\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,2})\s*[.!?]*\s*$/iu;
+const NOT_WANTED =
+  /\b(?:don'?t|do not|never|no longer|not)\b[^.?!]*\b(?:rehears|practi[sc])/iu;
+
+export type PersonCardRehearsal = {
+  readonly externalPersonId: string;
+  readonly name: string;
+};
+
+export function rehearseWithPersonCard(
+  text: string,
+  history: readonly QConversationMessage[],
+): PersonCardRehearsal | null {
+  const said = text.replace(/\s+/gu, " ").trim();
+  if (said.length === 0 || said.length > 240 || NOT_WANTED.test(said)) {
+    return null;
+  }
+  const match = REHEARSE_WITH.exec(said);
+  const who = match?.[1];
+  if (who === undefined) return null;
+  // Right after a person card: the newest Q answer decides, nothing older.
+  const latest = [...history].reverse().find((m) => m.role === "Q");
+  if (latest === undefined) return null;
+  const externals = (latest.blocks ?? []).flatMap((block) =>
+    block.kind === "ANSWER_CARDS"
+      ? block.cards.flatMap((card) =>
+          card.external?.rehearse === true &&
+          card.external.externalPersonId !== null
+            ? [{ id: card.external.externalPersonId, name: card.name }]
+            : [],
+        )
+      : [],
+  );
+  if (externals.length !== 1) return null;
+  const only = externals[0];
+  if (only === undefined) return null;
+  const pronoun = /^(?:him|her|them|this |that |the same )/iu.test(who);
+  if (!pronoun) {
+    // A name: the card's own (full, or any one word of it), nobody else's.
+    const spoken = who
+      .toLowerCase()
+      .replace(/[.!?,;:]+$/u, "")
+      .replace(/[’']s$/u, "");
+    const parts = only.name.toLowerCase().split(/\s+/u);
+    const ok =
+      spoken === only.name.toLowerCase() ||
+      (parts.includes(spoken) && spoken.length >= 3);
+    if (!ok) return null;
+  }
+  return { externalPersonId: only.id, name: only.name };
+}
+
+/**
+ * W4: the name said in "rehearse with <name>" (not a pronoun), or null.
+ * A name only: whether it is a researched entity is decided by the
+ * lookup, and whether they may rehearse with it by open_page.
+ */
+export function rehearsalNameOf(text: string): string | null {
+  const said = text.replace(/\s+/gu, " ").trim();
+  if (said.length === 0 || said.length > 240 || NOT_WANTED.test(said)) {
+    return null;
+  }
+  const who = REHEARSE_WITH.exec(said)?.[1];
+  if (who === undefined) return null;
+  if (/^(?:him|her|them|this |that |the same )/iu.test(who)) return null;
+  const name = who
+    .replace(/[.!?,;:]+$/u, "")
+    .replace(/[’']s$/u, "")
+    .trim();
+  return name.length >= 3 ? name : null;
+}

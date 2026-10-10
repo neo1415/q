@@ -214,6 +214,10 @@ export function createFastNavigation(dependencies: {
           candidates,
           prepared: asksForRecord && reused,
           dbRoundTrips: counter.count,
+          // Local diagnosis only (CQ_ROUND_TRIP_TRACE=1): where they went.
+          ...(Object.keys(counter.sites).length === 0
+            ? {}
+            : { dbRoundTripSites: counter.sites }),
           ms: ms(),
         },
         "q fast navigation resolved",

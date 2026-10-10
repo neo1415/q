@@ -31,6 +31,7 @@ import {
   appendRunEvent,
   createCompanyQSubjectResolver,
   createPostgresQRuntimeRepositories,
+  createQOrchestrationRuntime,
   createQRuntimeService,
   createQSubjectResolverRegistry,
   QConversationNotFoundError,
@@ -1568,6 +1569,126 @@ describe("@capital-q/q-runtime concurrency against local PostgreSQL", () => {
         { n: number }[]
       >`select count(*)::int as n from q_runtime.runs where tenant_id = ${world.tenantId}`;
       expect(runs[0]?.n).toBe(1);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("S2: a lifecycle chain is one statement and leaves exactly what the step-by-step path leaves; a replay or a pending cancel falls back", async () => {
+    const world = await commitWorld();
+    try {
+      const repositories = createPostgresQRuntimeRepositories();
+      const withoutChain = {
+        ...repositories,
+        runs: { ...repositories.runs, moveChain: undefined },
+      };
+      const make = (repos: typeof repositories) =>
+        createQOrchestrationRuntime({
+          sql: db.sql,
+          transactions: db.transactions,
+          subjects: createQSubjectResolverRegistry([]),
+          securityEvents: createPostgresSecurityEventWriter({ sql: db.sql }),
+          repositories: repos,
+        });
+      const fast = make(repositories);
+      const slow = make(withoutChain);
+      const newRun = async () => {
+        const created = await service().createRun({
+          actor: world.actor,
+          input: request(),
+          idempotencyKey: `chain-${randomUUID()}`,
+          correlationId: CORRELATION(),
+        });
+        return {
+          runId: created.run.id,
+          tenantId: world.actor.tenantId,
+          actorUserId: world.actor.userId,
+        };
+      };
+      const drive = async (
+        runtime: typeof fast,
+        ref: Awaited<ReturnType<typeof newRun>>,
+      ) => {
+        const trips: number[] = [];
+        const counted = async <T>(work: () => Promise<T>): Promise<T> => {
+          const counter = createRoundTripCounter(ref.runId);
+          const value = await withRoundTripCounter(counter, work);
+          trips.push(counter.count);
+          return value;
+        };
+        await counted(() => runtime.begin(ref, "test-v1"));
+        await counted(() =>
+          runtime.advanceThrough(ref, ["CONTEXT_RESOLUTION", "POLICY_CHECK"]),
+        );
+        await counted(() => runtime.advance(ref, "PLANNING"));
+        // A replay of a move already made: unchanged, nothing appended.
+        const replay = await counted(() => runtime.advance(ref, "PLANNING"));
+        expect(replay.kind).toBe("UNCHANGED");
+        await counted(() => runtime.advanceThrough(ref, ["RETRIEVAL"]));
+        await counted(() =>
+          runtime.advance(ref, "SYNTHESIS", "PREPARING_ANALYSIS"),
+        );
+        // The stage is already showing: the move happens, the event does not.
+        await counted(() =>
+          runtime.advanceThrough(
+            ref,
+            ["VERIFICATION", "SYNTHESIS"],
+            "PREPARING_ANALYSIS",
+          ),
+        );
+        const done = await counted(() =>
+          runtime.complete(ref, { modelPolicyVersion: "p1" }),
+        );
+        expect(done.kind).toBe("ADVANCED");
+        const after = await counted(() => runtime.advance(ref, "SYNTHESIS"));
+        expect(after.kind).toBe("TERMINAL");
+        const run = await runtime.readRun(ref);
+        const events = await db.sql<
+          {
+            sequence: number;
+            event_type: string;
+            visible_stage: string | null;
+          }[]
+        >`select sequence, event_type, visible_stage from q_runtime.run_events
+           where run_id = ${ref.runId} order by sequence`;
+        return { trips, run, events };
+      };
+      const a = await drive(fast, await newRun());
+      const b = await drive(slow, await newRun());
+      expect(a.run?.status).toBe("COMPLETED");
+      expect(a.run?.version).toBe(b.run?.version);
+      expect(a.run?.lastEventSequence).toBe(b.run?.lastEventSequence);
+      expect(a.run?.modelPolicyVersion).toBe(b.run?.modelPolicyVersion);
+      expect(
+        a.events.map((e) => [e.sequence, e.event_type, e.visible_stage]),
+      ).toEqual(
+        b.events.map((e) => [e.sequence, e.event_type, e.visible_stage]),
+      );
+      // begin, the two chains, the stage move, complete: one statement each.
+      expect(a.trips[0]).toBe(1);
+      expect(a.trips[1]).toBe(1);
+      expect(a.trips[2]).toBe(1);
+      expect(a.trips[4]).toBe(1);
+      expect(a.trips[5]).toBe(1);
+      expect(a.trips[7]).toBe(1);
+      expect(Math.max(...b.trips)).toBeGreaterThan(1);
+
+      // A pending cancellation is only completed, never worked past.
+      const ref = await newRun();
+      await fast.begin(ref, "test-v1");
+      await service().cancelRun({
+        actor: world.actor,
+        runId: ref.runId,
+        correlationId: CORRELATION(),
+      });
+      const blocked = await fast.advance(ref, "CONTEXT_RESOLUTION");
+      expect(["CANCEL_REQUESTED", "TERMINAL"]).toContain(blocked.kind);
+      // Another person's reference moves nothing.
+      const stranger = {
+        ...(await newRun()),
+        actorUserId: randomUUID() as never,
+      };
+      await expect(fast.begin(stranger, "test-v1")).rejects.toThrow();
     } finally {
       await cleanup(world);
     }

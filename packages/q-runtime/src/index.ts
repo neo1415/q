@@ -103,12 +103,14 @@ export type {
   QMessageCreationRequestStore,
   QRunCreationRequestStore,
   QRunEventRepository,
+  QRunMoveChain,
   QRunRepository,
   QRunTransition,
   QRuntimeRepositories,
 } from "./application/ports.js";
 export {
   appendRunEvent,
+  appendRunEventAtomic,
   type QRunEventInput,
 } from "./application/run-events.js";
 export type {

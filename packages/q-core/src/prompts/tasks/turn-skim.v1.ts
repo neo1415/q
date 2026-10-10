@@ -39,26 +39,28 @@ WHAT THEY JUST SAID
 
 Respond with a single JSON object matching the TurnSkimResult schema.`;
 
-export const TURN_SKIM_V1: PromptDefinition<TurnSkimVariables, TurnSkimV1Result> =
-  {
-    id: "TURN_SKIM",
-    version: 1,
-    status: "DEPRECATED",
-    kind: "TASK",
-    taskClass: "FAST_CLASSIFICATION",
-    owner: "q-core",
-    changeDescription:
-      "Founder brief K (2026-10-09): a small first read beside the full turn reader, naming only companies of a kind and fit, so a read-only app query answers before the full reading lands.",
-    effectiveFrom: "2026-10-09",
-    variables: {
-      schema: TurnSkimVariablesSchema,
-      untrusted: [...TURN_SKIM_UNTRUSTED],
-    },
-    output: {
-      kind: "STRUCTURED",
-      schemaName: TURN_SKIM_SCHEMA_NAME,
-      schemaVersion: TURN_SKIM_SCHEMA_VERSION,
-      schema: TurnSkimV1ResultSchema,
-    },
-    template: TEMPLATE,
-  };
+export const TURN_SKIM_V1: PromptDefinition<
+  TurnSkimVariables,
+  TurnSkimV1Result
+> = {
+  id: "TURN_SKIM",
+  version: 1,
+  status: "DEPRECATED",
+  kind: "TASK",
+  taskClass: "FAST_CLASSIFICATION",
+  owner: "q-core",
+  changeDescription:
+    "Founder brief K (2026-10-09): a small first read beside the full turn reader, naming only companies of a kind and fit, so a read-only app query answers before the full reading lands.",
+  effectiveFrom: "2026-10-09",
+  variables: {
+    schema: TurnSkimVariablesSchema,
+    untrusted: [...TURN_SKIM_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: TURN_SKIM_SCHEMA_NAME,
+    schemaVersion: TURN_SKIM_SCHEMA_VERSION,
+    schema: TurnSkimV1ResultSchema,
+  },
+  template: TEMPLATE,
+};

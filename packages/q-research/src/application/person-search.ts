@@ -122,6 +122,9 @@ export type PersonSearchCommand = {
   readonly userId: string;
   readonly name: string;
   readonly place?: string | null | undefined;
+  /** The place, split when the member gave both: a city match beats a country. */
+  readonly city?: string | null | undefined;
+  readonly country?: string | null | undefined;
   readonly organization?: string | null | undefined;
   readonly role?: string | null | undefined;
   /** The member's own words; the only text a query may be built from. */
@@ -302,6 +305,12 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
       const spec: PersonSpec = {
         name: command.name.trim(),
         place: command.place?.trim() || null,
+        ...(command.city === undefined && command.country === undefined
+          ? {}
+          : {
+              city: command.city?.trim() || null,
+              country: command.country?.trim() || null,
+            }),
         organization: command.organization?.trim() || null,
         role: command.role?.trim() || null,
         variants: [...(command.nameVariants ?? []), ...variantsOf(command.name)]

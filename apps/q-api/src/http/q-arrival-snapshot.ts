@@ -36,6 +36,30 @@ export type ArrivalSnapshotRoutesDependencies = ActorContextDependencies & {
  * the top of the app so it covers every route. (Writes by the other side
  * are seen within the snapshot's trust window.)
  */
+/**
+ * Only writes that touch the snapshot's sources end trust: an approval's
+ * decision, a relationship / connection write, membership and invitations,
+ * chat. A Q run or turn POST (`/v1/q/runs`, `/v1/q/conversations`, voice)
+ * must not: it reads the snapshot and would otherwise wipe it every turn
+ * (V2: 31 round trips instead of 2). Everything else is covered by the
+ * probe stamp and the trust window.
+ */
+const SOURCE_WRITE_PATHS: readonly RegExp[] = [
+  /^\/v1\/q\/approvals(?:\/|$)/u,
+  /^\/v1\/network(?:\/|$)/u,
+  /^\/v1\/chat(?:\/|$)/u,
+  /^\/v1\/team(?:\/|$)/u,
+  /^\/v1\/invitations(?:\/|$)/u,
+];
+
+export function touchesSnapshotSources(method: string, url: string): boolean {
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    return false;
+  }
+  const path = url.split("?")[0] ?? url;
+  return SOURCE_WRITE_PATHS.some((pattern) => pattern.test(path));
+}
+
 export function registerArrivalSnapshotInvalidation(
   app: FastifyInstance,
   snapshots: Pick<
@@ -44,7 +68,7 @@ export function registerArrivalSnapshotInvalidation(
   >,
 ): void {
   app.addHook("onResponse", (request, _reply, done) => {
-    if (request.method !== "GET" && request.method !== "HEAD") {
+    if (touchesSnapshotSources(request.method, request.url)) {
       try {
         snapshots.invalidateActor(getActorContext(request).userId);
       } catch {

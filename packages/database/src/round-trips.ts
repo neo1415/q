@@ -159,7 +159,19 @@ function callSite(raw?: string): string {
     );
     if (sites.length === 3) break;
   }
-  return sites.length === 0 ? "unknown" : sites.join(" < ");
+  // Which part of the turn asked: the frames of the model gateway's Q
+  // answer module (prepareTurn's reads start there), outermost last.
+  const via = (raw ?? "")
+    .split("\n")
+    .map((frame) =>
+      /(?:model-gateway\/(?:dist|src)\/q\/index|q-specialists\/(?:dist|src)\/answer|q-orchestrator\/(?:dist|src)\/graph)\.[jt]s:(\d+):/.exec(
+        frame,
+      ),
+    )
+    .flatMap((m) => (m === null ? [] : [m[1] ?? ""]))
+    .slice(0, 4);
+  const base = sites.length === 0 ? "unknown" : sites.join(" < ");
+  return via.length === 0 ? base : `${base} [q/index ${via.join(",")}]`;
 }
 
 export function withRoundTripCounter<T>(

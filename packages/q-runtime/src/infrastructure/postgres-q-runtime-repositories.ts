@@ -550,6 +550,71 @@ export function createPostgresQRuntimeRepositories(
         // same columns selectRun reads), not from a second SELECT.
         return rows.length === 0 ? null : toRun(rows[0]);
       },
+      moveChain: async (executor, input) => {
+        // S2: the whole lifecycle move and its event in ONE statement (it
+        // was BEGIN, lock, update, latest-stage read, event insert, COMMIT).
+        // The UPDATE takes the row lock and its predicate (actor, tenant,
+        // status in the legal-from set) is re-checked under that lock, so a
+        // concurrent mover or a replay makes it match nothing. The event
+        // takes the next sequence from the same UPDATE, exactly as
+        // appendNext does, and is notified the same way. An event meant
+        // only when the stage changes compares against the latest visible
+        // stage as of this statement, which the lock makes the latest.
+        const event = input.event;
+        const stage = event?.visibleStage ?? null;
+        const rows = await executor`
+          with wants as (
+            select (${event !== undefined}::boolean
+                    and (not ${event?.onlyIfStageDiffers ?? false}::boolean
+                         or (select e.visible_stage
+                               from q_runtime.run_events e
+                              where e.run_id = ${input.runId}
+                                and e.tenant_id = ${input.tenantId}
+                                and e.visible_stage is not null
+                              order by e.sequence desc
+                              limit 1) is distinct from ${stage}::text)
+                   ) as appended
+          ),
+          moved as (
+            update q_runtime.runs r
+               set status = ${input.status},
+                   started_at = coalesce(${input.startedAt ?? null}::timestamptz, r.started_at),
+                   completed_at = ${input.completedAt ?? null}::timestamptz,
+                   failure_code = ${input.failureCode ?? null},
+                   orchestration_version = coalesce(${input.orchestrationVersion ?? null}, r.orchestration_version),
+                   model_policy_version = coalesce(${input.modelPolicyVersion ?? null}, r.model_policy_version),
+                   prompt_bundle_version = coalesce(${input.promptBundleVersion ?? null}, r.prompt_bundle_version),
+                   version = r.version + ${input.steps},
+                   last_event_sequence = r.last_event_sequence
+                     + case when (select appended from wants) then 1 else 0 end
+             where r.id = ${input.runId}
+               and r.tenant_id = ${input.tenantId}
+               and r.actor_user_id = ${input.actorUserId}
+               and r.status = any(${[...input.allowedFrom]}::text[])
+            returning r.id, r.tenant_id, r.actor_user_id, r.actor_organisation_id,
+                      r.conversation_id, r.objective, r.capability, r.consequence_class,
+                      r.status, r.subject_refs, r.viewing, r.screen, r.orchestration_version,
+                      r.prompt_bundle_version, r.model_policy_version, r.correlation_id,
+                      r.created_at, r.started_at, r.completed_at, r.failure_code,
+                      r.version, r.last_event_sequence
+          ),
+          inserted as (
+            insert into q_runtime.run_events
+              (tenant_id, run_id, sequence, event_type, visible_stage, payload)
+            select m.tenant_id, m.id, m.last_event_sequence,
+                   ${event?.eventType ?? null}, ${stage},
+                   ${JSON.stringify(event?.payload ?? null)}::text::jsonb
+              from moved m
+             where (select appended from wants)
+            returning run_id, sequence
+          )
+          select m.*,
+                 (select count(pg_notify(${Q_RUN_EVENTS_CHANNEL},
+                           json_build_object('runId', i.run_id, 'sequence', i.sequence)::text))
+                    from inserted i) as notified
+            from moved m`;
+        return rows.length === 0 ? null : toRun(rows[0]);
+      },
       allocateEventSequence: async (tx, tenantId, runId) => {
         // The UPDATE takes the row lock; a second allocator for the same run
         // waits and then reads the incremented value. Consecutive by
@@ -589,31 +654,37 @@ export function createPostgresQRuntimeRepositories(
                 const valid = parseQResultBlocks(input.blocks).blocks;
                 return valid.length === 0 ? null : valid;
               })();
+        // S2: the insert, the row as stored and the conversation's own
+        // clock in ONE statement (they were an insert, a re-select and an
+        // update). The conversation clock moves to the stored row's time,
+        // exactly as before.
         const rows = await tx.sql`
-          insert into q_runtime.conversation_messages
-            (id, tenant_id, conversation_id, run_id, role, content, result_blocks,
-             provider_message_ref)
-          values (coalesce(${input.id ?? null}::uuid, gen_random_uuid()),
-                  ${input.tenantId}, ${input.conversationId}, ${input.runId},
-                  ${input.role}, ${input.content},
-                  ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb,
-                  ${utteranceRef})
-          returning id`;
-        const { id } = IdRow.parse(rows[0]);
-        const created = await findMessageById(
-          tx.sql,
-          input.tenantId,
-          QMessageIdSchema.parse(id),
-        );
-        if (created === null) {
+          with inserted as (
+            insert into q_runtime.conversation_messages
+              (id, tenant_id, conversation_id, run_id, role, content, result_blocks,
+               provider_message_ref)
+            values (coalesce(${input.id ?? null}::uuid, gen_random_uuid()),
+                    ${input.tenantId}, ${input.conversationId}, ${input.runId},
+                    ${input.role}, ${input.content},
+                    ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb,
+                    ${utteranceRef})
+            returning id, tenant_id, conversation_id, run_id, role, content,
+                      content_type, result_blocks, provider_message_ref, created_at
+          ),
+          clocked as (
+            update q_runtime.conversations c
+               set last_message_at = greatest(coalesce(c.last_message_at, c.created_at),
+                                              (select i.created_at from inserted i))
+             where c.id = ${input.conversationId} and c.tenant_id = ${input.tenantId}
+            returning c.id
+          )
+          select i.*, (select count(*) from clocked) as clocked
+            from inserted i`;
+        const first = rows[0];
+        if (first === undefined) {
           throw new Error("q message insert did not return a row");
         }
-        // The conversation's own clock, for listing it by activity.
-        await tx.sql`
-          update q_runtime.conversations
-             set last_message_at = greatest(coalesce(last_message_at, created_at), ${created.createdAt}::timestamptz)
-           where id = ${input.conversationId} and tenant_id = ${input.tenantId}`;
-        return created;
+        return toMessage(first);
       },
       findById: findMessageById,
       mark: async (tx, input) => {

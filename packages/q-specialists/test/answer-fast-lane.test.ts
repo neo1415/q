@@ -218,7 +218,13 @@ describe("fastLaneOf (K)", () => {
     );
     expect(
       fastLaneOf(
-        { kind: "FIT", confidence: "HIGH", count: 3, discover: null, person: null },
+        {
+          kind: "FIT",
+          confidence: "HIGH",
+          count: 3,
+          discover: null,
+          person: null,
+        },
         "best companies for me",
       ),
     ).toEqual({

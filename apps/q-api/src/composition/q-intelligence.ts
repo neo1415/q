@@ -64,6 +64,7 @@ import {
   type ArtifactPreparation,
   type PendingDecisionPort,
   type QVisibilityNotebook,
+  type SpecialistQAnswerDependencies,
 } from "@capital-q/q-specialists";
 import { createAppActionArgumentReader } from "./app-action-arguments.js";
 import { createPostgresAwaitingActions } from "./awaiting-actions.js";
@@ -186,6 +187,8 @@ export type QIntelligenceDependencies = {
   readonly counterpartNames: (
     request: QAnswerRequest,
   ) => Promise<readonly string[]>;
+  /** W4: a researched entity reachable by name (seed or own research). */
+  readonly externalEntities?: SpecialistQAnswerDependencies["externalEntities"];
   /** What Capital Q remembers about the person, for the prompts (ADR 0012). */
   readonly memory?: QMemoryRecall | undefined;
   /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
@@ -360,7 +363,17 @@ export function composeQIntelligence(
       : { uiActReceipts: dependencies.uiActReceipts }),
     ...(dependencies.arrivalSnapshot === undefined
       ? {}
-      : { arrivalSnapshot: dependencies.arrivalSnapshot }),
+      : {
+          arrivalSnapshot: dependencies.arrivalSnapshot,
+          // W1: the semantic fallback for unusual phrasings.
+          arrivalSkim: createTurnSkimmer({
+            gateway,
+            logger,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
+          }),
+        }),
     context: evidence.context,
     ...(statements === undefined ? {} : { statements }),
     ...(dependencies.profileUpdates === undefined
@@ -455,6 +468,9 @@ export function composeQIntelligence(
       ? {}
       : { pendingDecisions: dependencies.pendingDecisions }),
     counterpartNames: dependencies.counterpartNames,
+    ...(dependencies.externalEntities === undefined
+      ? {}
+      : { externalEntities: dependencies.externalEntities }),
     ...(dependencies.waitingLines === undefined
       ? {}
       : { waitingLines: dependencies.waitingLines }),

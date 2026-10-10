@@ -158,6 +158,38 @@ export const QAnswerCardSchema = z
       .array(z.string().trim().min(1).max(160))
       .max(Q_ANSWER_CARD_FIT_BASIS_MAX)
       .optional(),
+    /**
+     * W4: an identity card for a researched person, organisation or agency
+     * (not a Capital Q record, so no `subject`). `rehearse` offers a
+     * labelled AI rehearsal with them; `profileUrl` is the public page
+     * the identity rests on.
+     */
+    external: z
+      .object({
+        /** Null for a candidate that is not yet a researched record. */
+        externalPersonId: z.string().uuid().nullable(),
+        profileUrl: z
+          .string()
+          .url()
+          .max(2048)
+          .startsWith("https://")
+          .nullable(),
+        rehearse: z.boolean(),
+        /** The public sources the card rests on, to open (https only). */
+        sources: z
+          .array(
+            z
+              .object({
+                label: z.string().trim().min(1).max(120),
+                url: z.string().url().max(2048).startsWith("https://"),
+              })
+              .strict(),
+          )
+          .max(8)
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type QAnswerCard = z.infer<typeof QAnswerCardSchema>;

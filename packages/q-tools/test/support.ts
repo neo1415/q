@@ -152,6 +152,22 @@ export function fakeCompanies(
             },
       );
     },
+    findCanonicalCompanyVisibilities: (ids) =>
+      Promise.resolve(
+        ids.flatMap((id) => {
+          const p = byId.get(id);
+          return p === undefined
+            ? []
+            : [
+                {
+                  id: p.id,
+                  tenantId: p.tenantId,
+                  organisationId: p.organisationId,
+                  marketplaceVisibility: p.marketplaceVisibility,
+                },
+              ];
+        }),
+      ),
     findCanonicalFounderProfile: () => Promise.resolve(null),
     findCanonicalCompanyProfile: (id) => Promise.resolve(byId.get(id) ?? null),
     searchCompanies: (query) => {

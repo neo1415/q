@@ -661,6 +661,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   // RECOVERY B1: the same reader as Q's what_needs_me.
   "q-api/http/q-attention.ts GET Q_ATTENTION_PATH": cap("tool.what_needs_me"),
+  "q-api/http/q-arrival-snapshot.ts GET Q_ARRIVAL_SNAPSHOT_PATH":
+    cap("tool.what_needs_me"),
   // BILLING-2 block (ADR 0036)
   "q-api/http/readiness-blueprint.ts POST Q_READINESS_BLUEPRINTS_PATH": exempt(
     "the plan-gated Readiness Blueprint (Pro), built by code from the free diagnosis Q already reads with read_my plan; the sequencing is the page's, the steps are Q's read",
@@ -974,6 +976,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/rehearsals": cap("navigate.REHEARSALS"),
   "/rehearsals/investor/[investorOrganisationId]": cap("tool.open_page"),
   "/rehearsals/company/[companyId]": cap("tool.open_page"),
+  "/rehearsals/person/[externalPersonId]": cap("tool.open_page"),
   "/rehearsals/meeting/[meetingId]": exempt(
     "the rehearsal suggested when a call was booked; it resolves to the lobby Q opens with open_page",
   ),
