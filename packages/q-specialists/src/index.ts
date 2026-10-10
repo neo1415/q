@@ -369,8 +369,20 @@ export {
 export {
   resolveFastNavigation,
   resolveNamedRecord,
+  withTabs,
   type FastNavigation,
   type NamedRecordResolution,
   type OpenRecordIntent,
 } from "./fast-navigation.js";
 export { namedRecordRequestOf } from "./named-record-request.js";
+export {
+  screenTabTarget,
+  tabAskOf,
+  tabPlace,
+  type TabAsk,
+} from "./tab-request.js";
+export {
+  deckSectionSpeech,
+  deckSpeech,
+  type DeckSpeech,
+} from "./deck-speech.js";

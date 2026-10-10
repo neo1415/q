@@ -13,6 +13,7 @@ import type {
 import type { Logger } from "@capital-q/observability";
 
 import type { TurnAppAction } from "./app-action-turn.js";
+import type { DeckSpeech } from "./deck-speech.js";
 
 /**
  * The conversation reference resolver (follow-55, Zino live 2026-10-04).
@@ -283,6 +284,18 @@ export type QOpenRecordPort = {
     QClientActionIntent,
     { kind: "OPEN_RECORD_PAGE" }
   > | null>;
+  /**
+   * N2: a company's pitch deck as this person may read it, through the
+   * read_company_deck tool's own authorize step (the same view their Pitch
+   * deck tab shows). Null: no deck they may see -- the caller refuses
+   * plainly and says nothing about it.
+   */
+  readonly deck?:
+    | ((
+        request: QAnswerRequest,
+        companyId: string,
+      ) => Promise<DeckSpeech | null>)
+    | undefined;
 };
 
 export function createToolOpenRecordPort(dependencies: {
@@ -290,6 +303,48 @@ export function createToolOpenRecordPort(dependencies: {
   readonly logger?: Logger | undefined;
 }): QOpenRecordPort {
   return {
+    deck: async (request, companyId) => {
+      try {
+        const outcome = await dependencies.tools.execute(
+          {
+            callId: "q-open-record-deck-read",
+            name: "read_company_deck",
+            arguments: { companyId },
+          },
+          {
+            actor: request.actor,
+            runId: request.runId,
+            correlationId: request.correlationId,
+            capability: request.capability,
+            plan: request.plan,
+            focus: { areas: [], tools: ["read_company_deck"] },
+            ...(request.signal === undefined ? {} : { signal: request.signal }),
+          },
+        );
+        if (!outcome.result.ok) return null;
+        const data = outcome.result.data as Partial<DeckSpeech> | null;
+        if (
+          data === null ||
+          typeof data !== "object" ||
+          !Array.isArray(data.sections) ||
+          (data.viewer !== "INVESTOR" && data.viewer !== "OWNER")
+        ) {
+          return null;
+        }
+        return {
+          viewer: data.viewer,
+          sections: data.sections,
+          confirmedByFounder: data.confirmedByFounder === true,
+        };
+      } catch (error: unknown) {
+        if (request.signal?.aborted === true) throw error;
+        dependencies.logger?.warn(
+          { err: error, qRunId: request.runId },
+          "a company's deck was not read for the person",
+        );
+        return null;
+      }
+    },
     open: async (request, target) => {
       try {
         const outcome = await dependencies.tools.execute(

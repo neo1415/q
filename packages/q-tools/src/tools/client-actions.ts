@@ -11,7 +11,10 @@ import {
   Q_TASK_CLASSES,
   QClientActionToolResultSchema,
   QMotionChoiceSchema,
+  DeckSectionCodeSchema,
   Q_RECORD_PAGES,
+  QRecordTabSchema,
+  recordPageHasTab,
   QRoomObjectSchema,
   QDocumentActSchema,
   Q_DOCUMENT_PAGE_MAX,
@@ -365,6 +368,16 @@ export const OpenPageInputSchema = z
       .describe(
         "Instead of id: the company's or investor's name, or the document's title, as they said it, even misheard or cut short ('young field agro', 'the questions for Priya'). It is matched against the records they can already see.",
       ),
+    tab: QRecordTabSchema.optional().describe(
+      "Optionally, the tab of that page to select: a company page's overview / elevator / dataroom / deck / team, or a relationship page's messages / calls / diligence ('open their team tab', 'go to diligence').",
+    ),
+    subTab: DeckSectionCodeSchema.optional().describe(
+      "With the deck tab, one section of Q's read of the deck (MARKET, TRACTION, THE_ASK...).",
+    ),
+    viewer: z
+      .literal("OPEN")
+      .optional()
+      .describe("With the deck tab: open the deck in its viewer at once."),
     section: QSettingsSectionSchema.optional().describe(
       "For SETTINGS: account, team, appearance, q (Q's personality), speaking (their speaking guide), notifications, connections (Google), billing, privacy, usage, memory, plan.",
     ),
@@ -750,8 +763,29 @@ export function createOpenPageTool(
               .catch(() => null);
         openable = standing !== null;
       }
+      // N2: the tab is only a view of a page they may open; one that is not
+      // the page's own is dropped, never guessed.
+      const tab =
+        input.tab !== undefined && recordPageHasTab(input.page, input.tab)
+          ? input.tab
+          : undefined;
+      const onDeck = tab === "deck" || input.page === "COMPANY_DECK";
+      const tabs = {
+        ...(tab === undefined ? {} : { tab }),
+        ...(onDeck && input.subTab !== undefined
+          ? { subTab: input.subTab }
+          : {}),
+        ...(onDeck && input.viewer !== undefined
+          ? { viewer: input.viewer }
+          : {}),
+      };
       return openable
-        ? allowed({ kind: "OPEN_RECORD_PAGE", page: input.page, id: recordId })
+        ? allowed({
+            kind: "OPEN_RECORD_PAGE",
+            page: input.page,
+            id: recordId,
+            ...tabs,
+          })
         : deny<QClientActionToolResult>("NOT_AVAILABLE");
     },
   });

@@ -175,6 +175,48 @@ describe("opening a record's page", () => {
     ).toEqual({ kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: COMPANY_A });
   });
 
+  it("carries a tab, a deck section and the viewer on a page they may open (N2)", async () => {
+    const outcome = await executor.execute(
+      call("open_page", {
+        page: "COMPANY",
+        id: COMPANY_A,
+        tab: "deck",
+        subTab: "TRACTION",
+        viewer: "OPEN",
+      }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+    ).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "COMPANY",
+      id: COMPANY_A,
+      tab: "deck",
+      subTab: "TRACTION",
+      viewer: "OPEN",
+    });
+  });
+
+  it("drops a tab the page does not have, and opens nothing the page would not (N2)", async () => {
+    const wrongTab = await executor.execute(
+      call("open_page", { page: "COMPANY", id: COMPANY_A, tab: "calls" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(wrongTab)).clientAction,
+    ).toEqual({ kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: COMPANY_A });
+    const notTheirs = await executor.execute(
+      call("open_page", {
+        page: "COMPANY_DECK",
+        id: COMPANY_B_PRIVATE,
+        viewer: "OPEN",
+      }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(notTheirs.result.ok).toBe(false);
+  });
+
   it("opens a network-visible company in another tenant, by id or by name (R0, Zino live 2026-10-06)", async () => {
     for (const args of [
       { page: "COMPANY", id: COMPANY_B_NETWORK },

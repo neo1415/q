@@ -12,7 +12,7 @@ import {
   movedEarlyRecently,
   moveEarly,
   prefetchPath,
-  recordPagePath,
+  recordIntentPath,
   settingsPath,
 } from "../client-actions";
 import { navigationInFlight } from "../ui-act-controller";
@@ -76,7 +76,7 @@ export function pathOfIntent(
       // A data-room document opens in the viewer, never as a move.
       return intent.page === "DATA_ROOM_DOCUMENT"
         ? null
-        : recordPagePath(intent.page, intent.id);
+        : recordIntentPath(intent);
   }
 }
 

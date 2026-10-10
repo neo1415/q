@@ -136,6 +136,7 @@ import type { QProfileGapsPort } from "./profile-gaps.js";
 import {
   openingLine,
   openTarget,
+  spokenRecordName,
   referenceNote,
   repeatedAction,
   rehearsalNameOf,
@@ -266,7 +267,19 @@ import {
   pageRequestOf,
   wordsNamePage,
 } from "./page-request.js";
-import { resolveNamedRecord } from "./fast-navigation.js";
+import {
+  resolveNamedRecord,
+  withTabs,
+  type OpenRecordIntent,
+} from "./fast-navigation.js";
+import { deckSectionSpeech, deckSpeech } from "./deck-speech.js";
+import {
+  screenTabTarget,
+  tabAskOf,
+  tabPlace,
+  type TabAsk,
+} from "./tab-request.js";
+import { movePhaseLine } from "@capital-q/q-core/speech";
 import { namedRecordRequestOf } from "./named-record-request.js";
 import type { TurnReference, TurnSkimResult } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
@@ -1936,6 +1949,57 @@ export function createSpecialistQAnswer(
     return { said: hit.said, blocks: hit.blocks };
   };
 
+  /**
+   * N2: the pitch deck was asked for (or one of its sections): it opens in
+   * its viewer and Q speaks what the deck says, composed by code from the
+   * sections the person may read (read_company_deck's own authorize step,
+   * the Context Firewall's plan). A deck they may not see is a plain
+   * refusal: no intent, no summary, nothing of its content.
+   */
+  const withDeckSpoken = async (
+    request: QAnswerRequest,
+    intent: OpenRecordIntent,
+    name: string | null,
+    said: string,
+  ): Promise<{
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+    readonly refused: boolean;
+  }> => {
+    const onDeck = intent.tab === "deck" || intent.page === "COMPANY_DECK";
+    const reader = dependencies.openRecord?.deck;
+    if (
+      !onDeck ||
+      (intent.viewer !== "OPEN" && intent.subTab === undefined) ||
+      reader === undefined
+    ) {
+      return {
+        said,
+        blocks: [{ kind: "UI_INTENT", intent }],
+        refused: false,
+      };
+    }
+    const view = await reader(request, intent.id).catch(() => null);
+    if (view === null) {
+      return {
+        said:
+          name === null
+            ? "There is no pitch deck I can open for you here."
+            : `There is no pitch deck of ${name}'s that I can open for you.`,
+        blocks: [],
+        refused: true,
+      };
+    }
+    return {
+      said:
+        intent.subTab === undefined
+          ? deckSpeech(name, view)
+          : deckSectionSpeech(name, intent.subTab, view),
+      blocks: [{ kind: "UI_INTENT", intent }],
+      refused: false,
+    };
+  };
+
   const namedRecordAnswer = async (
     request: QAnswerRequest,
     text: string,
@@ -1960,13 +2024,56 @@ export function createSpecialistQAnswer(
       open: (page, name) => port.open(request, { page, name }),
     });
     if (resolved === null) return null;
-    return resolved.kind === "OPEN"
-      ? {
-          said: resolved.said,
-          blocks: [{ kind: "UI_INTENT", intent: resolved.intent }],
-          log: `${resolved.own ? "OWN" : "REACHABLE"}_${resolved.page}`,
-        }
-      : { said: resolved.said, blocks: [], log: resolved.log };
+    if (resolved.kind !== "OPEN") {
+      return { said: resolved.said, blocks: [], log: resolved.log };
+    }
+    const spoken = await withDeckSpoken(
+      request,
+      resolved.intent,
+      resolved.name,
+      resolved.said,
+    );
+    return {
+      ...spoken,
+      log: spoken.refused
+        ? "DECK_NOT_SHARED"
+        : `${resolved.own ? "OWN" : "REACHABLE"}_${resolved.page}`,
+    };
+  };
+
+  /**
+   * N2: a tab, sub-tab or the deck asked for without a name ("open their
+   * team tab", "go to diligence", "show the deck"): the company or
+   * investor on the screen is the one meant. Read by code, opened through
+   * open_page's own authorize step; with nothing relevant on screen it is
+   * null and the other readers take the words.
+   */
+  const screenTabAnswer = async (
+    request: QAnswerRequest,
+    text: string,
+  ): Promise<{
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+    readonly log: string;
+  } | null> => {
+    const port = dependencies.openRecord;
+    const ask = tabAskOf(text);
+    if (port === undefined || ask === null || ask.name !== null) return null;
+    const target = screenTabTarget(request.plan.screen, ask);
+    if (target === null) return null;
+    const opened = await port
+      .open(request, { page: target.page, id: target.id })
+      .catch(() => null);
+    if (opened === null) return null;
+    const intent = withTabs(opened, ask);
+    if (intent.tab === undefined) return null;
+    const said = movePhaseLine("PENDING", tabPlace(ask));
+    const spoken = await withDeckSpoken(request, intent, null, said);
+    return {
+      said: spoken.said,
+      blocks: spoken.blocks,
+      log: spoken.refused ? "DECK_NOT_SHARED" : `SCREEN_${ask.tab}`,
+    };
   };
 
   /** B6: the reference each run's words were bound to, for its answer. */
@@ -2314,6 +2421,64 @@ export function createSpecialistQAnswer(
     }
   };
 
+  /** Asks that make a deck rather than open one. */
+  const MAKES_A_DECK =
+    /\b(?:draft|make|create|build|write|prepare|generate|improve|rewrite|edit|redo|fix|polish|design|update)\b/iu;
+  const DECK_WORD = /\b(?:pitch\s+)?deck\b/iu;
+
+  const openDeckAsked = async (
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    history: readonly QConversationMessage[],
+    target: {
+      readonly id?: string | undefined;
+      readonly name?: string | undefined;
+    },
+  ): Promise<QAnswerOutcome | null> => {
+    const port = dependencies.openRecord;
+    const said = [...history].reverse().find((m) => m.role === "USER")?.content;
+    if (port === undefined || said === undefined) return null;
+    if (MAKES_A_DECK.test(said) || !DECK_WORD.test(said)) return null;
+    const ask = tabAskOf(said);
+    const name = ask?.name ?? target.name ?? null;
+    const screenAsk: TabAsk = ask ?? {
+      tab: "deck",
+      subTab: null,
+      name: null,
+      viewer: true,
+    };
+    if (screenAsk.tab !== "deck") return null;
+    const opened =
+      target.id !== undefined || name !== null
+        ? await port
+            .open(request, {
+              page: "COMPANY_DECK",
+              ...(target.id === undefined
+                ? { name: name ?? "" }
+                : { id: target.id }),
+            })
+            .catch(() => null)
+        : await (async () => {
+            const onScreen = screenTabTarget(request.plan.screen, screenAsk);
+            return onScreen === null
+              ? null
+              : port.open(request, onScreen).catch(() => null);
+          })();
+    if (opened === null) return null;
+    const intent = withTabs(opened, screenAsk);
+    const spoken = await withDeckSpoken(
+      request,
+      intent,
+      name === null ? null : spokenRecordName(name),
+      movePhaseLine("PENDING", tabPlace(screenAsk)),
+    );
+    logger?.info(
+      { qRunId: request.runId, refused: spoken.refused },
+      "q opened a company's pitch deck the turn pointed at",
+    );
+    return recordAnswer(request, conversationId, spoken.said, spoken.blocks);
+  };
+
   /**
    * Open the one record the turn names or points at (follow-55), through
    * open_page's authorize step: their own documents, relationships and
@@ -2365,6 +2530,12 @@ export function createSpecialistQAnswer(
         { kind: "UI_INTENT", intent },
       ]);
     }
+    // N2 (live 2026-10-10: "open <company>'s pitch deck" read as a
+    // DOCUMENT, which covers only what Q prepared for them): a company's
+    // deck is opened as that company's Pitch deck tab, under its own
+    // authorize step, and spoken from what the deck says.
+    const deck = await openDeckAsked(request, conversationId, history, target);
+    if (deck !== null) return deck;
     logger?.info(
       { qRunId: request.runId, open: reference.open },
       "the record the turn pointed at is not one of theirs; answered instead",
@@ -2847,6 +3018,19 @@ export function createSpecialistQAnswer(
     // "open Shiftwell", "the data room for Shiftwell": the one record the
     // name means, among their own relationships first, opened by code --
     // or one short line naming who it could be. Never "Understood.".
+    const onScreenTab = await screenTabAnswer(request, latest.content);
+    if (onScreenTab !== null) {
+      logger?.info(
+        { qRunId: request.runId, outcome: onScreenTab.log },
+        "q opened a tab by its name",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        onScreenTab.said,
+        onScreenTab.blocks,
+      );
+    }
     const byName = await namedRecordAnswer(request, latest.content);
     // W4: none of their relationships, but a researched entity they can
     // reach by name: its identity card in focus.

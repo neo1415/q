@@ -127,6 +127,65 @@ export function recordPagePath(
   }
 }
 
+const COMPANY_PROFILE_PAGES: readonly QRecordPage[] = [
+  "COMPANY",
+  "COMPANY_ELEVATOR",
+  "COMPANY_DATA_ROOM",
+  "COMPANY_DECK",
+  "COMPANY_TEAM",
+];
+const COMPANY_PROFILE_TAB_NAMES: readonly string[] = [
+  "overview",
+  "elevator",
+  "dataroom",
+  "deck",
+  "team",
+];
+const RELATIONSHIP_TAB_NAMES: readonly string[] = [
+  "messages",
+  "calls",
+  "diligence",
+];
+
+/**
+ * N2: an OPEN_RECORD_PAGE intent's path, with the tab, deck section and
+ * viewer it carries. A tab the page does not have is ignored; the page
+ * authorises what it shows as the person, as for a typed URL.
+ */
+export function recordIntentPath(
+  intent: Extract<QClientActionIntent, { kind: "OPEN_RECORD_PAGE" }>,
+): string {
+  const base = recordPagePath(intent.page, intent.id, intent.companyId);
+  if (intent.tab === undefined) return base;
+  const safe = encodeURIComponent(intent.id.toLowerCase());
+  const { page, tab } = intent;
+  if (COMPANY_PROFILE_PAGES.includes(page)) {
+    // The server checked the tab against the page (the contract); the
+    // browser still only follows its own fixed tabs.
+    if (!COMPANY_PROFILE_TAB_NAMES.includes(tab)) return base;
+    const params = new URLSearchParams({ tab });
+    if (tab === "deck" && intent.subTab !== undefined) {
+      params.set("sub", intent.subTab.toLowerCase());
+    }
+    if (tab === "deck" && intent.viewer === "OPEN") params.set("open", "1");
+    return `/company/${safe}?${params.toString()}`;
+  }
+  if (!RELATIONSHIP_TAB_NAMES.includes(tab)) return base;
+  if (
+    page === "RELATIONSHIP_COMPANY" ||
+    page === "RELATIONSHIP_COMPANY_MESSAGES"
+  ) {
+    return `/relationships/company/${safe}/${tab}`;
+  }
+  if (
+    page === "RELATIONSHIP_INVESTOR" ||
+    page === "RELATIONSHIP_INVESTOR_MESSAGES"
+  ) {
+    return `/relationships/investor/${safe}/${tab}`;
+  }
+  return base;
+}
+
 /** Q room R2: a part of Settings, from the fixed route map. */
 export function settingsPath(section: QSettingsSection): string {
   switch (section) {
@@ -525,7 +584,7 @@ function performChecked(
         });
         return true;
       }
-      effects.goTo(recordPagePath(action.page, action.id));
+      effects.goTo(recordIntentPath(action));
       return true;
     case "OPEN_SETUP":
       effects.goTo(setupPath(action.journey));
