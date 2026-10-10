@@ -7,6 +7,7 @@ import {
   getDiligence,
   getDiscoveredInvestor,
   getOwnInterest,
+  getRelationshipBrief,
   getRelationshipWithCompany,
   getRelationshipWithInvestor,
   listRelationshipMeetings,
@@ -21,6 +22,7 @@ import {
   type IncomingInterestDto,
   type MeetingDto,
   type PitchSummaryDto,
+  type RelationshipBrief,
   type RelationshipStatusDto,
 } from "@capital-q/contracts";
 
@@ -86,6 +88,11 @@ type Loaded<Extra> =
       readonly readAt: number;
       /** The diligence area once diligence started; null before or unreadable. */
       readonly diligence: DiligenceDto | null;
+      /**
+       * The Relationship Brief (R1), the read Q answers from; null when
+       * nothing is on record or the brief itself could not be read.
+       */
+      readonly brief: RelationshipBrief | null;
       /** Said when nothing is on record that this side can see. */
       readonly absentSentence: string;
     } & Extra);
@@ -118,6 +125,16 @@ async function diligenceFor(
     return null;
   }
   return getDiligence(session, relationship.relationshipId).catch(() => null);
+}
+
+async function briefFor(
+  session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
+  relationship: RelationshipStatusDto | null,
+): Promise<RelationshipBrief | null> {
+  if (relationship === null) return null;
+  return getRelationshipBrief(session, relationship.relationshipId).catch(
+    () => null,
+  );
 }
 
 async function threadFor(
@@ -209,6 +226,7 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
     thread: await threadFor(session, relationship),
     meetings: await meetingsFor(session, relationship),
     diligence: await diligenceFor(session, relationship),
+    brief: await briefFor(session, relationship),
     readAt: Date.now(),
     profile: {
       ...NO_PROFILE,
@@ -291,6 +309,7 @@ export async function loadCompanySideRelationship(
     thread: await threadFor(session, relationship),
     meetings: await meetingsFor(session, relationship),
     diligence: await diligenceFor(session, relationship),
+    brief: await briefFor(session, relationship),
     readAt: Date.now(),
     profile:
       investor === null

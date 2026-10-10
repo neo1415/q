@@ -22,6 +22,8 @@ import {
   NETWORK_INVESTOR_RELATIONSHIP_PATH,
   NETWORK_INVESTOR_RELATIONSHIPS_PATH,
   NETWORK_COMPANY_RELATIONSHIPS_PATH,
+  NETWORK_RELATIONSHIP_BRIEF_PATH,
+  RelationshipBriefSchema,
   RelationshipListDtoSchema,
   RelationshipStatusResponseDtoSchema,
   type ExpressInterestRequest,
@@ -124,6 +126,25 @@ export function getRelationshipWithCompany(
     "GET",
     companyPath(NETWORK_COMPANY_RELATIONSHIP_PATH, companyId),
     RelationshipStatusResponseDtoSchema,
+  );
+}
+
+/**
+ * `GET /v1/network/relationships/:relationshipId/brief` (R1): the asking
+ * side's standing in one read, each source OK or UNAVAILABLE.
+ */
+export function getRelationshipBrief(
+  session: ApiSession,
+  relationshipId: string,
+) {
+  return call(
+    session,
+    "GET",
+    NETWORK_RELATIONSHIP_BRIEF_PATH.replace(
+      ":relationshipId",
+      encodeURIComponent(relationshipId),
+    ),
+    RelationshipBriefSchema,
   );
 }
 
