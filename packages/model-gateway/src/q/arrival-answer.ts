@@ -19,6 +19,8 @@ import type {
  * cost nothing.
  */
 export function pointsAtArrival(text: string): boolean {
+  // A mandate recall is about the declared mandate, never an arrival item.
+  if (/\bmandate\b/iu.test(text)) return false;
   if (
     /\b(?:they|them|their|he|she|it|that|this|dem|wetin|abeg|request|ask|meeting|call|time|slot|message|reply|replied|word|back|agree[ds]?|accept(?:ed)?|confirm(?:ed)?|offer|next)\b/iu.test(
       text,
@@ -26,7 +28,9 @@ export function pointsAtArrival(text: string): boolean {
   ) {
     return true;
   }
-  return /\s[A-Z][A-Za-z]{2,}/u.test(text);
+  // A capital that merely starts a later sentence ("? Remind me") is not a
+  // proper noun.
+  return /[^\s.?!]\s+[A-Z][A-Za-z]{2,}/u.test(text);
 }
 
 export type ArrivalFollowUp = "REQUEST" | "SAID" | "ACCEPTED" | "OPEN";
