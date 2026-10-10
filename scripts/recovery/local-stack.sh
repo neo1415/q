@@ -268,7 +268,7 @@ case "$cmd" in
     # (no web fetch, no provider call), with logos pointing at this web origin.
     set -a; source "$ENV_FILE"; set +a
     unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy
-    cd "$ROOT" && node --import scripts/dev-env.mjs apps/q-api/src/dev/load-research-seed.ts --web-origin "http://127.0.0.1:$WEB_PORT" ;;
+    cd "$ROOT" && node --import ./scripts/dev-env.mjs apps/q-api/src/dev/load-research-seed.ts --web-origin "http://127.0.0.1:$WEB_PORT" ;;
   env) echo "$ENV_FILE" ;;
   *) log "usage: $0 start|stop|status|seed|env [service...]"; exit 2 ;;
 esac

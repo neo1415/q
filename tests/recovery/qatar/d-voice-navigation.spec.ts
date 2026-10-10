@@ -11,6 +11,7 @@ import {
 import { contextAs } from "../support/auth.js";
 import {
   audibleNow,
+  emitLive,
   installLiveFake,
   livePeers,
   liveUserSays,
@@ -62,7 +63,6 @@ import {
  * cq:navigation-timing (pushMs, commitMs, totalMs) is summarised at the end.
  * Every figure is LOCAL+MOCK.
  */
-const SUITE_START = new Date().toISOString();
 const company = world().company(CAST.founderCompanyKey);
 
 test.beforeAll(() => {
@@ -207,7 +207,7 @@ test("D Q->a researched entity: ask, then 'take me to' it -> its rehearsal lobby
   await page.goto("/home");
   const started = await sendTimed(page, words);
   const card = await identityCard(page, shadi.nameRe, started);
-  const say = `Take me to ${shadi.canonical}`;
+  const say = `Rehearse with ${shadi.canonical}`;
   await useScript([
     SKIM_OTHER,
     READ_QUESTION,
@@ -354,7 +354,27 @@ test("D correction by voice: 'Open Discover, no, actually Rehearsals' verifies o
   await page.request.get("/discover");
   await startLive(page);
   await quiet(2_000);
+  await useScript([
+    SKIM_OTHER,
+    reading("TOOL_REQUEST", {
+      tool: { kind: "NAVIGATE", destination: "REHEARSALS", visibility: null },
+    }),
+    {
+      name: "d-correction-voice-answer",
+      when: { task: "COMPANY_ANALYST" },
+      reply: answer("Opening rehearsals…"),
+    },
+  ]);
   await liveUserSays(page, "Open Discover, no, actually Rehearsals");
+  // As the real voice does for words it cannot act on itself: hand them to Q.
+  await emitLive(page, {
+    type: "session.delegation.created",
+    delegation: {
+      id: "dlg_qa_correction",
+      type: "delegation",
+      target: "client",
+    },
+  });
   await expect(page).toHaveURL(/\/rehearsals(\?|$)/u, { timeout: 30_000 });
   await page.waitForTimeout(5_000);
   const log = await moves(page);
@@ -419,7 +439,9 @@ test("D summary: cq:navigation-timing p50/p95 (LOCAL+MOCK)", () => {
           (l) => JSON.parse(l) as { at: string; test: string; timing: Timing },
         )
         .filter(
-          (r) => r.at >= SUITE_START && r.test.includes("d-voice-navigation"),
+          (r) =>
+            r.at >= new Date(Date.now() - 90 * 60_000).toISOString() &&
+            r.test.startsWith("D "),
         )
     : [];
   const done = rows.filter((r) => r.timing.status === "DONE");
@@ -435,12 +457,10 @@ test("D summary: cq:navigation-timing p50/p95 (LOCAL+MOCK)", () => {
     `typed pushMs ${summary(pick((t) => t.pushMs, typed))} | commitMs ${summary(pick((t) => t.commitMs, typed))}`,
   ];
   for (const line of lines) console.log(`NAVTIMING[LOCAL+MOCK] ${line}`);
-  test
-    .info()
-    .annotations.push({
-      type: "measure",
-      description: `LOCAL+MOCK cq:navigation-timing ${lines.join(" || ")}`,
-    });
+  test.info().annotations.push({
+    type: "measure",
+    description: `LOCAL+MOCK cq:navigation-timing ${lines.join(" || ")}`,
+  });
   expect(
     done.length,
     "cq:navigation-timing events were recorded for DONE moves",

@@ -1,5 +1,6 @@
 import {
   readFileSync,
+  writeFileSync,
   existsSync,
   statSync,
   openSync,
@@ -427,4 +428,35 @@ export function summary(values: readonly number[]): string {
   const p50 = percentile(values, 50);
   const p95 = percentile(values, 95);
   return `n=${String(values.length)} p50=${p50 === null ? "n/a" : `${String(Math.round(p50))}ms`} p95=${p95 === null ? "n/a" : `${String(Math.round(p95))}ms`}`;
+}
+
+// --- state that survives a worker restart (a failed test restarts the worker) ---
+
+const STATE_FILE = resolve(RUN_PATH, "qatar-state.json");
+
+function readState(): Record<string, Record<string, string>> {
+  try {
+    return JSON.parse(readFileSync(STATE_FILE, "utf8")) as Record<
+      string,
+      Record<string, string>
+    >;
+  } catch {
+    return {};
+  }
+}
+
+export function remember(bucket: string, key: string, value: string): void {
+  const state = readState();
+  state[bucket] = { ...(state[bucket] ?? {}), [key]: value };
+  writeFileSync(STATE_FILE, JSON.stringify(state));
+}
+
+export function recall(bucket: string): Record<string, string> {
+  return readState()[bucket] ?? {};
+}
+
+/** A finding the run reports without failing the test that saw it. */
+export function finding(text: string): void {
+  console.log(`FINDING[${LOCAL_MOCK}] ${text}`);
+  test.info().annotations.push({ type: "finding", description: text });
 }
