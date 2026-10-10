@@ -70,6 +70,7 @@ function build(
     source?: string;
     ref?: string;
   }[] = [],
+  hold?: { readonly afterChars: number; readonly until: Promise<void> },
 ) {
   const messages: QConversationMessage[] = [
     {
@@ -99,6 +100,7 @@ function build(
           recommendation: null,
           ...extras,
         },
+        ...(hold === undefined ? {} : { hold }),
       },
     ],
   });
@@ -216,6 +218,7 @@ describe("an answer that arrives as it is written", () => {
     expect(published.map((d) => d.text.trim())).toEqual([
       "Paystack is a Nigerian payments company.",
       "Stripe acquired it in 2020.",
+      "It serves about 60,000 merchants.",
     ]);
     // Nothing that belongs to the JSON document ever leaves.
     const everything = published.map((d) => d.text).join("");
@@ -230,21 +233,89 @@ describe("an answer that arrives as it is written", () => {
     const { seam, request, published } = build(
       "1. Make the company visible to investors. 2. Upload a pitch deck. Start with visibility today. I can do it now.",
     );
-    await seam.answer({ ...request, leadLines: lead } as QAnswerRequest);
+    await seam.answer({ ...request, leadLines: lead });
     expect(published.map((d) => d.text.trim())).toEqual([
       "Investors can't find your company in Discover yet. What to do next, most important first:",
       "1. Make the company visible to investors.",
       "2. Upload a pitch deck.",
       "Start with visibility today.",
+      "I can do it now.",
     ]);
   });
 
-  it("leaves the last sentence to the completed message, which is the durable form", async () => {
-    // The final fragment is the one thing that cannot be known to be
-    // whole while text is still arriving, so it is never guessed at.
+  it("sends the last sentence as soon as the answer's closing quote is read, not when the whole object ends", async () => {
+    // The final sentence is whole the moment the answer string closes; the
+    // rest of the object (cards, knowledge, action talk) may take longer
+    // than the answer did, and a one-sentence answer used to wait for it.
     const { seam, request, published } = build("One. Two. Three.");
     await seam.answer(request);
-    expect(published.map((d) => d.text.trim())).toEqual(["One.", "Two."]);
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "One.",
+      "Two.",
+      "Three.",
+    ]);
+  });
+
+  it("has the first sentence out while the model is still writing and nothing is stored (first text before completion)", async () => {
+    let finish!: () => void;
+    const until = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const answer = "Runway is 14 months. Burn has been flat since March.";
+    // Cut inside the second sentence: the first is whole, the second is not.
+    const { seam, request, published, stored } = build(answer, {}, {}, [], {
+      afterChars: `{"answer":"Runway is 14 months. Burn has`.length,
+      until,
+    });
+    const running = seam.answer(request);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Before completion: the first sentence has reached the listener and
+    // no message has been stored.
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "Runway is 14 months.",
+    ]);
+    expect(stored.inserts).toEqual([]);
+    finish();
+    const outcome = await running;
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(stored.inserts).toHaveLength(1);
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "Runway is 14 months.",
+      "Burn has been flat since March.",
+    ]);
+    // What was streamed is what was stored: nothing heard is missing from it.
+    const content = stored.inserts[0]?.content ?? "";
+    for (const delta of published) {
+      expect(content).toContain(delta.text.trim());
+    }
+  });
+
+  it("streams a one-sentence answer, which used to reach nobody before completion", async () => {
+    const { seam, request, published } = build("Runway is 14 months.");
+    await seam.answer(request);
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "Runway is 14 months.",
+    ]);
+  });
+
+  it("keeps a closing sentence about approval or saving for the stored answer, which may replace it with the engine's status", async () => {
+    const { seam, request, published } = build(
+      "Runway is 14 months. The change is waiting for your approval.",
+    );
+    await seam.answer(request);
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "Runway is 14 months.",
+    ]);
+  });
+
+  it("keeps a closing promise to act held back, as before", async () => {
+    const { seam, request, published } = build(
+      "Runway is 14 months. Give me a moment to look that up.",
+    );
+    await seam.answer(request);
+    expect(published.map((d) => d.text.trim())).toEqual([
+      "Runway is 14 months.",
+    ]);
   });
 
   it("names the message before its text exists, so the pieces and the whole are one thing", async () => {
