@@ -128,6 +128,8 @@ export type NameCandidate = {
   readonly city?: string | undefined;
   readonly country?: string | undefined;
   readonly employer?: string | undefined;
+  /** Other names of the employer (e.g. a seeded organisation's aliases). */
+  readonly employerAliases?: readonly string[];
 };
 
 export type Corroboration = "EMPLOYER" | "CITY" | "COUNTRY";
@@ -181,7 +183,13 @@ export function rankCandidates(
       query.clues.employer !== undefined &&
       candidate.employer !== undefined
     ) {
-      const employer = scoreOrgNames(query.clues.employer, candidate.employer);
+      const clue = query.clues.employer;
+      const employer = [
+        candidate.employer,
+        ...(candidate.employerAliases ?? []),
+      ]
+        .map((name) => scoreOrgNames(clue, name))
+        .reduce((a, b) => (b.score > a.score ? b : a));
       if (employer.score >= 0.85) {
         corroborations.push("EMPLOYER");
         score += 0.12;
