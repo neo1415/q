@@ -2050,6 +2050,9 @@ importers:
       '@capital-q/observability':
         specifier: workspace:*
         version: link:../observability
+      '@capital-q/q-core':
+        specifier: workspace:*
+        version: link:../q-core
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security

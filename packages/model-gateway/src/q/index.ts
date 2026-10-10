@@ -112,6 +112,12 @@ import {
   type DiscoverAsk,
   type DiscoveryAnswer,
 } from "./discover-companies.js";
+import { runPersonSearch } from "./person-search-answer.js";
+export {
+  createPersonBriefReader,
+  type PersonBriefReaderInput,
+  type ProposedBriefAssertion,
+} from "./person-brief-reader.js";
 import { answerPathOf } from "./answer-path.js";
 import { forModelReading } from "./pending-confirmation.js";
 import { createSingleFlight } from "./single-flight.js";
@@ -3398,6 +3404,55 @@ export function createModelGatewayQAnswer(
           modelPolicyVersion: "none",
           promptBundleVersion: rendered.bundle.bundleVersion,
         };
+      }
+      // W2: a named person, company or body is identified from public
+      // sources by code (a prepared entity instantly, anyone else in a few
+      // seconds); the analyst never describes them from general knowledge.
+      if (
+        request.personSearch !== undefined &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+      ) {
+        const personStarted = Date.now();
+        const found = await runPersonSearch({
+          ask: request.personSearch,
+          tools,
+          context: toolContext,
+          available: prefetchTools,
+        });
+        if (found !== null) {
+          for (const source of found.sources) {
+            if (!publicSources.some((known) => known.url === source.url)) {
+              publicSources.push(source);
+            }
+          }
+          const message = await persistAnswer(
+            found.text,
+            found.block === null ? [] : [found.block],
+          );
+          logger?.info(
+            {
+              qRunId: request.runId,
+              outcome: found.result.outcome,
+              source: found.source,
+              confidence: found.result.card?.subject.confidence ?? null,
+              candidates: found.result.candidates.length,
+              searchMs: found.result.elapsedMs,
+              modelCalls: 0,
+              prepareMs: prepared.prepareMs,
+              personMs: Date.now() - personStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered a person search",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
       }
       // K1 (live 2026-10-09 15:57): companies of a kind are listed from
       // the catalog by code; the analyst is never asked to describe cards.

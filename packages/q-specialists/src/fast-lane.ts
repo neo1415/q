@@ -11,7 +11,7 @@ import type { QAnswerRequest } from "@capital-q/q-runtime";
  * waits for it; everything else is null and waits, as before.
  */
 export type FastLane = Required<Pick<QAnswerRequest, "questionKind">> &
-  Pick<QAnswerRequest, "discoverCompanies" | "fitQuestion">;
+  Pick<QAnswerRequest, "discoverCompanies" | "fitQuestion" | "personSearch">;
 
 export function fastLaneOf(
   skim: TurnSkimResult | null,
@@ -42,6 +42,24 @@ export function fastLaneOf(
         ranking: discover.ranking,
         mandateRelevant: discover.mandateRelevant,
         previous: false,
+      },
+    };
+  }
+  if (skim.kind === "PERSON_SEARCH") {
+    // Read-only and public-only: the worst a misread can do is show a
+    // card for a name nobody asked about, never act.
+    const person = skim.person;
+    if (person === null) return null;
+    return {
+      questionKind: "PERSON_SEARCH",
+      personSearch: {
+        name: person.name,
+        entityKind: person.kind,
+        city: person.city,
+        country: person.country,
+        organization: person.organization,
+        role: person.role,
+        freshSearch: person.freshSearch,
       },
     };
   }

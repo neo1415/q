@@ -36,6 +36,7 @@ import type { DisclosureAccessService } from "@capital-q/permissions";
 import type {
   PublicProfileLookupProvider,
   PublicWebResearchService,
+  PersonLookup,
 } from "@capital-q/q-research";
 import type { ActorContext, AuthorizationService } from "@capital-q/security";
 
@@ -497,6 +498,8 @@ export type QToolPorts = {
    */
   readonly investorGates?: InvestorGatesPort | undefined;
   readonly research?: PublicWebResearchService | undefined;
+  /** W2: fast identity lookup of a named person or organisation; absent means no such tool. */
+  readonly people?: PersonLookup | undefined;
   /** Public LinkedIn pages by URL; absent means the lookup tool does not exist. */
   readonly profiles?: PublicProfileLookupProvider | undefined;
   /** Relationships (CQ-Q-030); absent means no relationship tool exists. */

@@ -1140,6 +1140,8 @@ const researchComposition = composeResearch({
   authorization,
   investorQueries: investors,
   secrets: config.secrets.researchProviders,
+  gateway: modelGateway,
+  dataPosture: demoDataPosture,
   logger,
 });
 
@@ -2724,6 +2726,8 @@ const qTools = createQTools({
     ...(researchComposition.profiles === undefined
       ? {}
       : { profiles: researchComposition.profiles }),
+    // W2: find / brief a named person or organisation.
+    people: researchComposition.people,
     relationships: {
       ...createRelationshipIntelligencePort({
         interests: interestService,
