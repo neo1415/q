@@ -320,4 +320,50 @@ describe("@capital-q/communication against PostgreSQL", () => {
       },
     ]);
   });
+
+  it("R1 batching: the newest message per thread in one read, as readForQ sees it; none without a thread; nothing for a stranger", async () => {
+    // A second relationship of the same parties' organisations, no thread.
+    const company2 = randomUUID();
+    const relationship2 = randomUUID();
+    await db.sql`insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug)
+      values (${company2}, ${ids.tenantCo}, ${ids.orgCo}, 'Chat Co Two', ${`chat-co2-${company2.slice(0, 8)}`})`;
+    await db.sql`insert into network.relationships (id, tenant_id, company_id, investor_organisation_id, current_state)
+      values (${relationship2}, ${ids.tenantCo}, ${company2}, ${ids.investor}, 'CONNECTED')`;
+
+    for (const actor of [investor, founder]) {
+      const batch = await service.latestForRelationships(actor, [
+        ids.relationship,
+        relationship2,
+      ]);
+      const single = await service.readForQ({
+        actor,
+        relationshipId: ids.relationship,
+      });
+      const last = single.messages.at(-1);
+      expect(batch.get(ids.relationship)?.latest).toMatchObject({
+        from: last?.from,
+        sentAt: last?.sentAt,
+        senderName: last?.senderName,
+      });
+      const theirs = single.messages.findLast((m) => m.from === "OTHER_SIDE");
+      expect(batch.get(ids.relationship)?.fromThem?.sentAt).toBe(
+        theirs?.sentAt,
+      );
+      // An unsent message is never the preview.
+      expect(JSON.stringify(batch.get(ids.relationship))).not.toContain(
+        "Hello Ben",
+      );
+      expect(batch.get(relationship2)).toEqual({
+        latest: null,
+        fromThem: null,
+      });
+    }
+    const stranger = {
+      ...investor,
+      organisationId: randomUUID(),
+    } as ActorContext;
+    expect(
+      await service.latestForRelationships(stranger, [ids.relationship]),
+    ).toEqual(new Map());
+  });
 });

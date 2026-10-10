@@ -291,4 +291,20 @@ describe("@capital-q/communication schedule against PostgreSQL", () => {
       `/relationships/company/${ids.company}/messages`,
     );
   });
+
+  it("R1 batching: one read lists each party relationship's calls, as listMeetings does, and nothing for a stranger", async () => {
+    const single = await service.listMeetings(investor, ids.relationship);
+    const batch = await service.listMeetingsForRelationships(investor, [
+      ids.relationship,
+    ]);
+    expect(batch.get(ids.relationship)).toEqual(single);
+    expect((single ?? []).length).toBeGreaterThan(0);
+    const stranger = {
+      ...investor,
+      organisationId: randomUUID(),
+    } as ActorContext;
+    expect(
+      await service.listMeetingsForRelationships(stranger, [ids.relationship]),
+    ).toEqual(new Map());
+  });
 });

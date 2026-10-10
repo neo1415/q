@@ -41,6 +41,7 @@ import {
   type BriefThreadMessage,
   type InterestService,
   type NetworkService,
+  type RelationshipBriefBatchSources,
   type RelationshipBriefSources,
 } from "../src/index.js";
 
@@ -566,6 +567,165 @@ describe("Relationship Brief against local PostgreSQL", () => {
       expect(founderAfter?.sourceVersions.historySequence).toBeGreaterThan(
         after?.sourceVersions.historySequence ?? 0,
       );
+    });
+  });
+
+  /** The same facts as `sources`, as batch readers (R1 batching). */
+  function batchSources(
+    world: World,
+    meetingId: string,
+    calls: string[],
+    single = sources(world, meetingId, []),
+  ): RelationshipBriefBatchSources {
+    return {
+      threads: async (actor, ids) => {
+        calls.push(`threads:${actor.userId}:${ids.join(",")}`);
+        const out = new Map();
+        for (const id of ids) {
+          const thread = await single.thread!(actor, id);
+          out.set(id, {
+            latest: thread.at(-1) ?? null,
+            fromThem: thread.findLast((m) => m.from === "OTHER_SIDE") ?? null,
+          });
+        }
+        return out;
+      },
+      meetings: async (actor, ids) => {
+        calls.push(`meetings:${actor.userId}:${ids.join(",")}`);
+        return new Map(
+          await Promise.all(
+            ids.map(
+              async (id) => [id, await single.meetings!(actor, id)] as const,
+            ),
+          ),
+        );
+      },
+    };
+  }
+
+  it("batch: the list's briefs equal the single brief, from one read per source", async () => {
+    await withWorld(async (world) => {
+      const { relationshipId, meetingId } = await tensorGate(world);
+      const calls: string[] = [];
+      const briefs = await world.interests.relationshipBriefs!({
+        actor: world.investorRep,
+        sources: batchSources(world, meetingId, calls),
+        now: NOW,
+      });
+      const single = await world.interests.relationshipBrief({
+        actor: world.investorRep,
+        relationshipId,
+        sources: sources(world, meetingId, []),
+        now: NOW,
+      });
+      expect(briefs).toHaveLength(1);
+      expect(briefs[0]).toEqual(single);
+      expect(briefs[0]?.messages.count).toBe(3);
+      expect(calls.sort()).toEqual(
+        [
+          `meetings:${world.investorRep.userId}:${relationshipId}`,
+          `threads:${world.investorRep.userId}:${relationshipId}`,
+        ].sort(),
+      );
+      // The founder's side, by their company.
+      const founder = await world.interests.relationshipBriefs!({
+        actor: world.founder,
+        companyId: world.companyA,
+        sources: batchSources(world, meetingId, []),
+        now: NOW,
+      });
+      expect(founder.map((b) => b.yourSide)).toEqual(["COMPANY"]);
+    });
+  });
+
+  it("batch: a failed or unanswered read is UNAVAILABLE, never 'no messages'", async () => {
+    await withWorld(async (world) => {
+      await tensorGate(world);
+      const failed = await world.interests.relationshipBriefs!({
+        actor: world.investorRep,
+        sources: {
+          threads: () => Promise.reject(new Error("chat down")),
+          // A reader that answered without this relationship.
+          meetings: () => Promise.resolve(new Map()),
+        },
+        now: NOW,
+      });
+      expect(failed[0]?.messages).toEqual({
+        count: 3,
+        latest: { status: "UNAVAILABLE", reason: "READ_FAILED" },
+      });
+      expect(failed[0]?.meetings).toEqual({
+        status: "UNAVAILABLE",
+        reason: "READ_FAILED",
+      });
+    });
+  });
+
+  it("batch: a cross-tenant investor gets nothing and no reader sees the relationship", async () => {
+    await withWorld(async (world) => {
+      const { relationshipId, meetingId } = await tensorGate(world);
+      const calls: string[] = [];
+      const briefs = await world.interests.relationshipBriefs!({
+        actor: world.strangerInvestor,
+        relationshipIds: [relationshipId],
+        sources: batchSources(world, meetingId, calls),
+        now: NOW,
+      });
+      expect(briefs).toEqual([]);
+      expect(calls.join(" ")).not.toContain(relationshipId);
+      // Another founder cannot read a company that is not theirs.
+      await expect(
+        world.interests.relationshipBriefs!({
+          actor: world.otherFounder,
+          companyId: world.companyA,
+          sources: batchSources(world, meetingId, []),
+          now: NOW,
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  it("a recorded no-show is in the brief, and the call no longer counts as booked", async () => {
+    await withWorld(async (world) => {
+      const { relationshipId } = await tensorGate(world);
+      const pastMeeting = randomUUID();
+      await world.network.events.append(world.tx, {
+        relationshipId,
+        eventType: "meeting_no_show",
+        occurredAt: "2026-10-08T16:00:00.000Z",
+        actor: { type: "HUMAN", id: world.investorRep.userId },
+        source: { type: "MANUAL" },
+        visibilityScope: "relationship_shared",
+        payload: { meetingId: pastMeeting },
+        correlationId: CORRELATION(),
+      });
+      const brief = await world.interests.relationshipBrief({
+        actor: world.investorRep,
+        relationshipId,
+        sources: {
+          thread: () => Promise.resolve([]),
+          meetings: () =>
+            Promise.resolve([
+              {
+                id: pastMeeting,
+                status: "SCHEDULED",
+                startsAt: "2026-10-08T15:00:00.000Z",
+                endsAt: "2026-10-08T15:30:00.000Z",
+                organisedByYou: true,
+              },
+            ]),
+          diligence: () => Promise.resolve(null),
+        },
+        now: NOW,
+      });
+      expect(brief?.noShows).toEqual([
+        { meetingId: pastMeeting, at: "2026-10-08T16:00:00.000Z" },
+      ]);
+      expect(brief?.meetings).toMatchObject({
+        status: "OK",
+        items: [{ id: pastMeeting, noShow: true, timing: "PAST" }],
+        nextScheduled: null,
+      });
     });
   });
 });
