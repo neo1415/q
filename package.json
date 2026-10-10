@@ -28,7 +28,7 @@
     "deploy:build:q-api": "turbo run build --filter=@capital-q/q-api...",
     "deploy:build:workers": "turbo run build --filter=@capital-q/workers...",
     "deploy:build:web": "turbo run build --filter=@capital-q/web...",
-    "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
+    "typecheck": "turbo run typecheck && node --max-old-space-size=7168 node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
     "lint": "node scripts/lint.mjs",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
