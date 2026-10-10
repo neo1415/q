@@ -119,15 +119,26 @@ export async function noteForMove(
   return moveNote(await follow(path));
 }
 
+/**
+ * R3 (hosted 2026-10-09, run ae1144d7: Q Brain's line "Up now: Tensorgate."
+ * reached the voice 4.7 s before the company page's own reads finished).
+ * Q Brain's spoken line is written before the browser has moved, so it
+ * often reads as arrival ("Here's…", "Up now:", "I've opened their page").
+ * Unless the receipt is the browser's VERIFIED (DONE on the wire), the
+ * note overrules that wording explicitly.
+ */
+const ARRIVAL_WORDING =
+  "Q's line below was written before their screen moved: wherever it says the page is here, up, open or opened, do not say that.";
+
 /** What the voice is told about the screen, from the receipt. */
 export function moveNote(outcome: MoveOutcome): string {
   switch (outcome) {
     case "DONE":
       return "The page is open on their screen now (confirmed).";
     case "FAILED":
-      return "The page did NOT open on their screen. Say briefly that it didn't open and offer to try again; never say it is open.";
+      return `The page did NOT open on their screen. Say briefly that it didn't open and offer to try again; never say it is open. ${ARRIVAL_WORDING}`;
     case "PENDING":
-      return "The page is still loading on their screen: do not say it is open; say it is coming up.";
+      return `The page is still loading on their screen: do not say it is open; say it is coming up. ${ARRIVAL_WORDING}`;
   }
 }
 

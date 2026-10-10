@@ -1401,6 +1401,11 @@ export {
   type SpokenItem,
 } from "./speech/spoken-facts.js";
 export {
+  movePhaseLine,
+  pendingPlaceOf,
+  type MovePhase,
+} from "./speech/move-line.js";
+export {
   arrivalGreeting,
   arrivalSeed,
   cardFactsForVoice,

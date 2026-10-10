@@ -9,12 +9,13 @@ import type {
 
 import { applyTheme, storeTheme } from "@/features/appearance/theme";
 import { storeQMotion } from "@/features/q-aperture/q-motion";
-import { voiceAudioHeld } from "@/features/voice/voice-audio";
 import { storeVoicePreference } from "@/features/voice/voice-preference";
 
 import { forgetActiveConversations } from "./active-conversation";
 import { loadWire, wireNow, type WireContracts } from "./wire";
-import { expectNavigation, performUiAct } from "./ui-act-controller";
+import { arrivedAt, lastNavigationTo } from "./control/navigation-lifecycle";
+import { currentRoute } from "./control/route-state";
+import { performUiAct, requestMove } from "./ui-act-controller";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -173,90 +174,26 @@ export function openSubjectPage(
   return true;
 }
 
-/**
- * The app's own client router, registered by the Q session. Moving through
- * it keeps the page's JavaScript -- and Q's open voice line -- alive; a full
- * page load (the fallback before it registers) drops both and is slow
- * (founder report 2026-09-30: "3 to 5 seconds... it stops listening").
- */
-let clientRouterPush: ((path: string) => void) | null = null;
-export function registerClientRouter(
-  push: ((path: string) => void) | null,
-): void {
-  clientRouterPush = push;
-  flushWaitingMoves();
-}
+// The client routers Q's moves go through live in control/router-registry
+// (the navigation lifecycle executes through them); re-exported for the
+// surfaces that register them.
+export {
+  prefetchPath,
+  registerClientPrefetch,
+  registerClientRouter,
+  registerShellRouter,
+  setHardLoad,
+} from "./control/router-registry";
 
 /**
- * RECOVERY-2026-10 (C, V's live test 2026-10-09: a delegated open landed by
- * a HARD RELOAD, which ends the voice call). The shell's own router, from
- * the signed-in layout (QControlRuntime): there for the whole tab, so a
- * page's Q session remounting never leaves moves without a router.
- */
-let shellRouterPush: ((path: string) => void) | null = null;
-export function registerShellRouter(
-  push: ((path: string) => void) | null,
-): void {
-  shellRouterPush = push;
-  flushWaitingMoves();
-}
-
-/** The last resort: a full page load (tests replace it to observe it). */
-let hardLoad: (path: string) => void = (path) => window.location.assign(path);
-export function setHardLoad(next: ((path: string) => void) | null): void {
-  hardLoad = next ?? ((path) => window.location.assign(path));
-}
-
-/** Moves asked for while no router was registered, briefly held. */
-let waitingMoves: string[] = [];
-let waitingTimer: ReturnType<typeof setTimeout> | null = null;
-const ROUTER_WAIT_MS = 2_000;
-
-function routerPush(): ((path: string) => void) | null {
-  return clientRouterPush ?? shellRouterPush;
-}
-
-function flushWaitingMoves(): void {
-  const push = routerPush();
-  if (push === null || waitingMoves.length === 0) return;
-  const last = waitingMoves.at(-1);
-  waitingMoves = [];
-  if (waitingTimer !== null) clearTimeout(waitingTimer);
-  waitingTimer = null;
-  if (last !== undefined) push(last);
-}
-
-/**
- * Every move of Q's, through the client router. With none registered the
- * move waits (briefly) for one; a full page load is the last resort and is
- * never used while a voice call holds the audio: it would end the call.
- * The move's receipt (expectNavigation) then reports FAILED, truthfully.
+ * Every move of Q's: validated, pushed through the client router and
+ * verified by the one navigation lifecycle (control/navigation-lifecycle).
+ * With no router registered the move waits (briefly) for one; a full page
+ * load is the last resort and is never used while a voice call holds the
+ * audio (the receipt then says FAILED: NO_ROUTER).
  */
 export function pushRoute(path: string): void {
-  const push = routerPush();
-  if (push !== null) {
-    push(path);
-    return;
-  }
-  waitingMoves.push(path);
-  waitingTimer ??= setTimeout(() => {
-    waitingTimer = null;
-    const last = waitingMoves.at(-1);
-    waitingMoves = [];
-    if (last === undefined || voiceAudioHeld()) return;
-    hardLoad(last);
-  }, ROUTER_WAIT_MS);
-}
-
-/** The app router's prefetch, for a target read while they still speak. */
-let clientRouterPrefetch: ((path: string) => void) | null = null;
-export function registerClientPrefetch(
-  prefetch: ((path: string) => void) | null,
-): void {
-  clientRouterPrefetch = prefetch;
-}
-export function prefetchPath(path: string): void {
-  clientRouterPrefetch?.(path);
+  requestMove({ path });
 }
 
 /**
@@ -313,11 +250,28 @@ export function movedEarlyRecently(path: string, withinMs: number): boolean {
   );
 }
 
-/** The fast path's move: at once, confirmed by the settled route. */
+/**
+ * Q's answer moving to `path` (typed or spoken). The fast path may already
+ * have made this move for the same sentence: then the answer joins it (on
+ * its way) or gets its receipt at once (still there), never a second push
+ * -- and if the person has moved on since, they are not pulled back. A
+ * fast move that FAILED is tried again by the answer.
+ */
+export function answerMove(path: string): boolean {
+  const early = movedEarlyTo(path);
+  const last = lastNavigationTo(path);
+  if (early && last !== null && last.phase === "VERIFIED") {
+    const now = currentRoute();
+    if (now !== null && !arrivedAt(path, now)) return false;
+  }
+  requestMove({ path });
+  return true;
+}
+
+/** The fast path's move: at once, verified by the one lifecycle. */
 export function moveEarly(path: string): void {
   earlyMove = { path, at: Date.now() };
-  expectNavigation(path);
-  pushRoute(path);
+  requestMove({ path });
 }
 
 /** Q's moves on Discover's feed, heard by the feed itself. */
@@ -397,14 +351,12 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   // The Sign out button's own steps: forget which chats were open on this
   // tab, then the server action that ends the session and redirects.
   goTo: (path) => {
-    // The fast path already went there for this sentence: one move.
-    // RECOVERY-2026-10 (C2): a UI act queued after this move waits for the
-    // new page instead of acting on the one being left. Every move gets its
-    // receipt (the GPT-Live voice waits for it): one already made by the
-    // fast path, or to where they already are, is DONE at once.
-    expectNavigation(path);
-    if (movedEarlyTo(path)) return;
-    pushRoute(path);
+    // The fast path already went there for this sentence: one move, one
+    // receipt -- unless that move FAILED, when Q's answer tries it again.
+    // R3: the move is executed and verified by the one lifecycle (a move
+    // already on its way to this path joins it; to where they already are
+    // is VERIFIED at once); a UI act queued after it waits for the page.
+    answerMove(path);
   },
   screen: screenAct,
   openMaterial: (document) => {

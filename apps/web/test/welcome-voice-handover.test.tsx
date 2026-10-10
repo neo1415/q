@@ -14,6 +14,11 @@ const push = vi.fn(() => {
   order.push("push");
 });
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+// R3: Q's move goes through the one navigation lifecycle, which pushes
+// through the registered client router.
+const { registerShellRouter } =
+  await import("../src/features/q/control/router-registry");
+registerShellRouter(push);
 const end = vi.fn(async () => {
   await Promise.resolve();
   order.push("ended");

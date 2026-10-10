@@ -8,6 +8,7 @@ import { openingLine } from "./references.js";
 import {
   cannotOpenPartLine,
   matchOwnCounterpart,
+  misheardOwnCounterpart,
   namedRecordRequestOf,
   notFoundLine,
   ownCounterpartWithin,
@@ -67,8 +68,14 @@ export async function resolveNamedRecord(input: {
   // repeats and fillers around it) is that one record.
   const within =
     direct.kind === "NONE" ? ownCounterpartWithin(asked.name, names) : null;
-  const match =
-    within === null ? direct : { kind: "ONE" as const, name: within };
+  // R3: misheard by speech recognition ("TensorFlow" for their Tensorgate):
+  // their own set only, high confidence only (else Q's answer asks).
+  const misheard =
+    direct.kind === "NONE" && within === null
+      ? misheardOwnCounterpart(asked.name, names)
+      : null;
+  const found = within ?? misheard;
+  const match = found === null ? direct : { kind: "ONE" as const, name: found };
   if (match.kind === "SEVERAL") {
     return { kind: "ASK", said: whichOneLine(match.names), log: "SEVERAL" };
   }

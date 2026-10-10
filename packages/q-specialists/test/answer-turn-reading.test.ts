@@ -394,9 +394,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(run.delegated()).toBe(0);
     expect(run.stored).toHaveLength(1);
     // Said as a person says it, never "Taking you to…" (round 3).
-    expect(run.stored[0]?.content).toMatch(
-      /^(?:Here's Discover|Discover is up|Over to Discover)\.$/u,
-    );
+    expect(run.stored[0]?.content).toMatch("Opening Discover…");
     expect(run.stored[0]?.blocks).toEqual([
       {
         kind: "UI_INTENT",
@@ -422,9 +420,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     await run.answer.answer(request());
     expect(run.reads()).toBe(0);
     expect(run.delegated()).toBe(0);
-    expect(run.stored[0]?.content).toMatch(
-      /^(?:Here's Explore|Explore is up|Over to Explore)\.$/u,
-    );
+    expect(run.stored[0]?.content).toMatch("Opening Explore…");
     expect(run.stored[0]?.blocks).toEqual([
       {
         kind: "UI_INTENT",
@@ -1449,9 +1445,7 @@ describe("the turn read early, beside the firewall (ADR 0035)", () => {
     const outcome = await run.answer.answer(next);
     expect(outcome.kind).toBe("ANSWERED");
     expect(run.reads()).toBe(2);
-    expect(run.stored.at(-1)?.content).toMatch(
-      /^(?:Here's Discover|Discover is up|Over to Discover)\.$/u,
-    );
+    expect(run.stored.at(-1)?.content).toMatch("Opening Discover…");
   });
 
   it("is dropped unused when the run is refused: the answer reads the turn itself", async () => {
@@ -2274,9 +2268,7 @@ describe("speech that was not for Q is kept out of what Q reads back (founder li
     );
     expect(run.marked).not.toContain(run.message.id);
     // The request itself is still acted on.
-    expect(run.stored.at(-1)?.content).toMatch(
-      /^(?:Here's Discover|Discover is up|Over to Discover)\.$/u,
-    );
+    expect(run.stored.at(-1)?.content).toMatch("Opening Discover…");
   });
 
   it("marks Q's reply to the line too, when Q had answered it", async () => {
@@ -2582,9 +2574,7 @@ describe("PASSED and the asked action (ADR 0040 parity)", () => {
       outcomes: [],
     });
     await run.answer.answer(request());
-    expect(run.stored[0]?.content).toMatch(
-      /^(?:Here's Passed|Passed is up|Over to Passed)\.$/u,
-    );
+    expect(run.stored[0]?.content).toMatch("Opening Passed…");
     expect(run.stored[0]?.blocks).toEqual([
       {
         kind: "UI_INTENT",

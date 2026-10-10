@@ -125,7 +125,15 @@ export default async function ApplicationLayout({
       {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
           receipts to the Q API, and the notice when an act did not happen. */}
       <Suspense fallback={null}>
-        <QControlRuntime />
+        <QControlRuntime
+          viewer={{
+            kind:
+              context.kind === "FOUNDER" || context.kind === "INVESTOR"
+                ? context.kind
+                : "NONE",
+            admin,
+          }}
+        />
       </Suspense>
     </AppShell>
   );

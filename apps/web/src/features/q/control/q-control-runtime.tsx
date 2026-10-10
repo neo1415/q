@@ -4,6 +4,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { registerClientPrefetch, registerShellRouter } from "../client-actions";
+import { registerNavigationViewer, type NavigationViewer } from "./app-routes";
+import { navigationFailureMessage } from "./navigation-lifecycle";
 import { currentManifest } from "../manifest";
 import {
   noteRoute,
@@ -15,7 +17,9 @@ import { startReceiptReporter } from "./receipt-reporter";
 
 /**
  * RECOVERY-2026-10 (C2/C3): the shell's part of Q's control of the app,
- * mounted once per signed-in tab.
+ * mounted by every signed-in layout (the app shell and onboarding: R3, so
+ * Q's moves have a client router and a verified receipt on every
+ * authenticated screen).
  *
  * - The route trail: each route this tab shows, so a chained act waits for
  *   the page Q moved to, and "back" knows whether there is a page of the
@@ -24,7 +28,27 @@ import { startReceiptReporter } from "./receipt-reporter";
  * - The notice: when an act did not happen, the person reads that at once,
  *   in plain words, whatever Q's answer said while it was still on its way.
  */
-export function QControlRuntime() {
+export function QControlRuntime({
+  viewer,
+}: {
+  /**
+   * Who is signed in, as the shell knows it: lets a move to a page that
+   * isn't theirs fail at VALIDATED with a plain reason. Absent outside the
+   * app shell (onboarding); the server authorises every page regardless.
+   */
+  readonly viewer?: NavigationViewer | undefined;
+} = {}) {
+  const viewerKind = viewer?.kind;
+  const viewerAdmin = viewer?.admin;
+  useEffect(() => {
+    registerNavigationViewer(
+      viewerKind === undefined
+        ? null
+        : { kind: viewerKind, admin: viewerAdmin === true },
+    );
+    return () => registerNavigationViewer(null);
+  }, [viewerKind, viewerAdmin]);
+
   const pathname = usePathname();
   const search = useSearchParams();
   const query = search.toString();
@@ -58,11 +82,12 @@ export function QControlRuntime() {
       timer = setTimeout(() => setNotice(null), NOTICE_MS);
     };
     const stop = onUiActReport((report) => show(noticeOf(report)));
-    // A move Q made that never landed is said too, never left as if done.
+    // A move Q made that did not happen is said too, with its reason,
+    // never left as if done. One replaced by a newer move is not news.
     const stopMoves = onNavigationOutcome((outcome) =>
       show(
-        outcome.status === "FAILED"
-          ? "Q couldn't open that page. Try again, or open it from the menu."
+        outcome.status === "FAILED" && outcome.reason !== "SUPERSEDED"
+          ? navigationFailureMessage(outcome.reason)
           : null,
       ),
     );

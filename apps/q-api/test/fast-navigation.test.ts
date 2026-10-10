@@ -93,8 +93,12 @@ function outcome(data: unknown, ok: boolean): QToolCallOutcome {
   };
 }
 
-function reader(options: { denied?: boolean; names?: readonly string[] }) {
-  const calls = { plans: 0, opens: [] as unknown[] };
+function reader(options: {
+  denied?: boolean;
+  names?: readonly string[];
+  clock?: () => number;
+}) {
+  const calls = { plans: 0, opens: [] as unknown[], lists: 0 };
   const firewall: ContextFirewallPort = {
     plan: (request) => {
       calls.plans += 1;
@@ -133,15 +137,60 @@ function reader(options: { denied?: boolean; names?: readonly string[] }) {
   const resolve = createFastNavigation({
     firewall,
     tools,
-    ownRelationships: () =>
-      Promise.resolve({
+    ownRelationships: () => {
+      calls.lists += 1;
+      return Promise.resolve({
         items: (options.names ?? ["Shiftwell"]).map((name) => ({
           counterpart: { name },
         })),
-      }),
+      });
+    },
+    clock: options.clock,
   });
   return { resolve, calls };
 }
+
+describe("R3: the prepared reading context (one preparation per person, not per read)", () => {
+  it("partials, the final words and the delegation share one plan, one list and one open", async () => {
+    let at = 1_000_000;
+    const { resolve, calls } = reader({ clock: () => at });
+    const said = "Take me to Shiftwell relationship";
+    // Two partials in flight together, then the final, then the delegation.
+    const [one, two] = await Promise.all([
+      resolve(ACTOR, said),
+      resolve(ACTOR, said),
+    ]);
+    const three = await resolve(ACTOR, said);
+    const four = await resolve(ACTOR, said);
+    for (const decided of [one, two, three, four]) {
+      expect(decided).toMatchObject({
+        kind: "NAVIGATE",
+        intent: { kind: "OPEN_RECORD_PAGE", id: SHIFTWELL },
+      });
+    }
+    // Before R3: 4 plans, 4 lists, 4+ opens.
+    expect(calls.plans).toBe(1);
+    expect(calls.lists).toBe(1);
+    expect(calls.opens).toHaveLength(1);
+    // Past its bound it is prepared again (a revoked grant is honoured).
+    at += 20_001;
+    await resolve(ACTOR, said);
+    expect(calls.plans).toBe(2);
+  });
+
+  it("is per person: another member never reuses this one's plan", async () => {
+    const { resolve, calls } = reader({ clock: () => 5 });
+    await resolve(ACTOR, "Take me to Shiftwell relationship");
+    await resolve(
+      {
+        ...ACTOR,
+        userId: UserIdSchema.parse("b0000000-0000-4000-8000-000000000002"),
+      },
+      "Take me to Shiftwell relationship",
+    );
+    expect(calls.plans).toBe(2);
+  });
+});
 
 describe("fast navigation reader (RECOVERY C, stupid fast)", () => {
   it("moves on a page by name with no plan and no tool", async () => {
@@ -151,7 +200,7 @@ describe("fast navigation reader (RECOVERY C, stupid fast)", () => {
       kind: "NAVIGATE",
       intent: { kind: "NAVIGATE", destination: "DISCOVER" },
     });
-    expect(calls).toEqual({ plans: 0, opens: [] });
+    expect(calls).toEqual({ plans: 0, opens: [], lists: 0 });
   });
 
   it("opens their own record by name through open_page", async () => {

@@ -3,10 +3,7 @@ import type {
   QNavigateDestination,
 } from "@capital-q/contracts";
 
-import { destinationPath } from "@/features/voice/destinations";
-
 import type { QTurn } from "./conversation";
-import { expectNavigation } from "./ui-act-controller";
 import { wireNow } from "./wire";
 
 /**
@@ -62,20 +59,12 @@ export function followOfTurns(
       if (action.success) actions.push(action.data);
     }
   }
-  // RECOVERY-2026-10 (C2): the caller performs the actions, then moves.
-  // An answer that moves AND works the new page ("open Capital, readiness
-  // tab") has its UI acts wait for the page it moves to -- they run in
-  // order from a queue -- instead of acting on the page being left.
-  // The move itself is confirmed when the router settles on it (or is
-  // reported FAILED), whichever way the caller performs it.
-  const path = destinationPath(navigate);
-  if (
-    path !== null &&
-    typeof window !== "undefined" &&
-    path !== `${window.location.pathname}${window.location.search}`
-  ) {
-    expectNavigation(path);
-  }
+  // R3: nothing is expected here. Only the surface that makes the move
+  // asks for it (requestMove), and asks before it performs the actions, so
+  // an answer that moves AND works the new page ("open Capital, readiness
+  // tab") has its UI acts wait for that page. Registering a move here that
+  // another surface was meant to make is what left a spoken move reported
+  // FAILED with nothing ever pushed (hosted 2026-10-09).
   return { navigate, actions };
 }
 

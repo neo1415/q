@@ -1,11 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { PersonaCards } from "../persona/persona-cards";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
+import { requestMove } from "../q/ui-act-controller";
 import { useQSpeech } from "../voice/use-q-speech";
 import { useVoiceInterview } from "../voice/use-voice-interview";
 import { VoiceHandover } from "../voice/voice-handover";
@@ -77,7 +77,6 @@ export function WelcomeScreen({
    */
   readonly returning?: boolean | undefined;
 }) {
-  const router = useRouter();
   const voice = useVoiceInterview();
   const speech = useQSpeech();
   /** "Prefer to type?": the role cards and the typed setup. */
@@ -137,31 +136,37 @@ export function WelcomeScreen({
 
   const turn = voice.turn;
   const end = voice.end;
-  useFollowTurn(turn, voice.client, (followed) => {
-    if (followed.handoff === "CHAT") {
-      void end();
-      return;
-    }
-    const path = destinationPath(followed.navigate);
-    if (path !== null) {
-      // Their setup, by voice: the interview's line opens on the next
-      // screen (`?talk=1`), and this stage holds until it does, so the
-      // person never lands on the typed chat or the form in between.
-      setLeaving(
-        followed.navigate === "INTERVIEW_INVESTOR"
-          ? "Setting up your investor profile"
-          : followed.navigate === "INTERVIEW_FOUNDER"
-            ? "Setting up your company"
-            : "One moment",
-      );
-      // One line at a time: the welcome line is ended, and that end
-      // awaited, before the next screen opens the interview's line
-      // (live 2026-10-05: the two overlapped and stacked).
-      void end().then(() => {
-        router.push(path);
-      });
-    }
-  });
+  useFollowTurn(
+    turn,
+    voice.client,
+    (followed) => {
+      if (followed.handoff === "CHAT") {
+        void end();
+        return;
+      }
+      const path = destinationPath(followed.navigate);
+      if (path !== null) {
+        // Their setup, by voice: the interview's line opens on the next
+        // screen (`?talk=1`), and this stage holds until it does, so the
+        // person never lands on the typed chat or the form in between.
+        setLeaving(
+          followed.navigate === "INTERVIEW_INVESTOR"
+            ? "Setting up your investor profile"
+            : followed.navigate === "INTERVIEW_FOUNDER"
+              ? "Setting up your company"
+              : "One moment",
+        );
+        // One line at a time: the welcome line is ended, and that end
+        // awaited, before the next screen opens the interview's line
+        // (live 2026-10-05: the two overlapped and stacked).
+        void end().then(() => {
+          // R3: Q's move, through the one navigation lifecycle.
+          requestMove({ path });
+        });
+      }
+    },
+    "CALLER",
+  );
 
   if (leaving !== null) {
     return <VoiceHandover line={leaving} />;

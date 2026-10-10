@@ -43,6 +43,7 @@ import {
 } from "../onboarding-kit/material-actions";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
+import { requestMove } from "../q/ui-act-controller";
 import { VoiceHandover } from "../voice/voice-handover";
 import { VoiceStage } from "../voice/voice-stage";
 import {
@@ -1292,26 +1293,33 @@ export function QOnboardingWorkspace({
   // Q takes the person somewhere, or leaves them with the form: followed
   // once per turn, never twice.
   const voiceEnd = voice.end;
-  useFollowTurn(voice.turn, voice.client, (followed) => {
-    if (followed.handoff === "CHAT") {
-      void voiceEnd();
-      return;
-    }
-    if (followed.handoff === "FORM" || followed.navigate === "FORM") {
-      void voiceEnd();
-      const editor =
-        prompt === null ? undefined : vocabulary.editorFor(prompt.stepKey);
-      if (editor !== undefined) {
-        onEdit(editor);
+  useFollowTurn(
+    voice.turn,
+    voice.client,
+    (followed) => {
+      if (followed.handoff === "CHAT") {
+        void voiceEnd();
+        return;
       }
-      return;
-    }
-    const path = destinationPath(followed.navigate);
-    if (path !== null) {
-      void voiceEnd();
-      router.push(path);
-    }
-  });
+      if (followed.handoff === "FORM" || followed.navigate === "FORM") {
+        void voiceEnd();
+        const editor =
+          prompt === null ? undefined : vocabulary.editorFor(prompt.stepKey);
+        if (editor !== undefined) {
+          onEdit(editor);
+        }
+        return;
+      }
+      const path = destinationPath(followed.navigate);
+      if (path !== null) {
+        void voiceEnd();
+        // R3: Q's move, through the one navigation lifecycle (validated,
+        // executed, verified; one receipt).
+        requestMove({ path });
+      }
+    },
+    "CALLER",
+  );
 
   // Asked to open talking: start once, when Q's opening has settled -- so
   // there is one opening, which voice then says, instead of a typed one

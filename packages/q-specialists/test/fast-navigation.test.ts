@@ -7,6 +7,7 @@ import {
   resolveNamedRecord,
   type OpenRecordIntent,
 } from "../src/fast-navigation.js";
+import { misheardOwnCounterpart } from "../src/named-record-request.js";
 import { asksToGo, wordsNamePage } from "../src/page-request.js";
 
 /**
@@ -247,5 +248,59 @@ describe("wordsNamePage", () => {
     expect(asksToGo("Okay, open Tensor Gate.")).toBe(true);
     expect(asksToGo("I can't really see anything, so you're not")).toBe(false);
     expect(asksToGo("So no, no, you're alright.")).toBe(false);
+  });
+});
+
+describe("R3: a misheard name, matched only within their own set", () => {
+  const OWN = ["Tensorgate", "Shiftwell", "Clearwater Assurance", "Ledgerfold"];
+
+  it("TensorFlow -> their Tensorgate (hosted 2026-10-09), moved at once", async () => {
+    const { input, opened } = reader(OWN);
+    const decided = await resolveFastNavigation(input("Open TensorFlow"));
+    expect(decided).toMatchObject({
+      kind: "NAVIGATE",
+      intent: { kind: "OPEN_RECORD_PAGE" },
+    });
+    // Opened by their own name, never by what was heard.
+    expect(opened.map((one) => one.name)).toEqual(["Tensorgate"]);
+  });
+
+  it("caught by stem when the name scorer finds nothing (a long list of theirs)", () => {
+    expect(misheardOwnCounterpart("TensorFlow", OWN)).toBe("Tensorgate");
+  });
+
+  it("the same sounds spelt differently", () => {
+    expect(misheardOwnCounterpart("Shyftwel", OWN)).toBe("Shiftwell");
+  });
+
+  it("never outside their set: a name none of theirs resembles stays unknown", async () => {
+    expect(misheardOwnCounterpart("Halcyon Robotics", OWN)).toBeNull();
+    const { input, opened } = reader(OWN);
+    const decided = await resolveFastNavigation(input("Open TensorFlow"));
+    expect(decided.kind).toBe("NAVIGATE");
+    // Without Tensorgate among theirs, nothing is matched or guessed.
+    const other = reader(["Shiftwell", "Ledgerfold"]);
+    expect(await resolveFastNavigation(other.input("Open TensorFlow"))).toEqual(
+      { kind: "LEAVE_TO_Q" },
+    );
+    expect(other.opened.map((one) => one.name)).not.toContain("Tensorgate");
+    expect(opened).toHaveLength(1);
+  });
+
+  it("two of theirs it could mean: no guess (Q's answer asks)", async () => {
+    const both = ["Tensorgate", "Tensorline"];
+    expect(misheardOwnCounterpart("TensorFlow", both)).toBeNull();
+    const { input } = reader(both);
+    expect(await resolveFastNavigation(input("Open TensorFlow"))).toEqual({
+      kind: "LEAVE_TO_Q",
+    });
+  });
+
+  it("a short or weak stem is not enough", () => {
+    expect(misheardOwnCounterpart("Tens", OWN)).toBeNull();
+    // "Ledger" is 6 letters but under half of "Ledgerfold Partners Group".
+    expect(
+      misheardOwnCounterpart("Ledgerline", ["Ledgerfold Partners Group"]),
+    ).toBeNull();
   });
 });

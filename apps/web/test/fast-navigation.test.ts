@@ -35,7 +35,7 @@ import {
   releaseVoiceAudio,
 } from "../src/features/voice/voice-audio";
 import {
-  expectNavigation,
+  requestMove,
   noteRedirect,
   noteRoute,
   onNavigationOutcome,
@@ -338,25 +338,33 @@ describe("GPT-Live transcript sequences", () => {
  * that arrived, never FAILED.
  */
 describe("a move to a page that redirects", () => {
-  it("is DONE when it lands where that page sent it", () => {
+  it("is DONE when it lands where that page sent it", async () => {
     const seen: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => seen.push(outcome));
-    expectNavigation("/investors");
+    // The router's push is still on its way when the page sends them on.
+    registerClientRouter(() => undefined);
+    const move = requestMove({ path: "/investors" });
     noteRedirect("/investors", "/discover");
     noteRoute("/discover");
+    await move.settled;
     stop();
     expect(seen).toEqual([
-      { status: "DONE", expected: "/investors", route: "/discover" },
+      expect.objectContaining({
+        status: "DONE",
+        expected: "/investors",
+        route: "/discover",
+      }),
     ]);
   });
 
-  it("without the page's word, landing elsewhere is not arrival", () => {
+  it("without the page's word, landing elsewhere is not arrival", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const seen: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => seen.push(outcome));
-    expectNavigation("/rehearsals");
+    registerClientRouter(() => undefined);
+    requestMove({ path: "/rehearsals" });
     noteRoute("/relationships");
-    vi.advanceTimersByTime(21_000);
+    await vi.advanceTimersByTimeAsync(21_000);
     stop();
     expect(seen.map((outcome) => outcome.status)).toEqual(["FAILED"]);
   });
@@ -400,7 +408,12 @@ describe("every move gets a receipt", () => {
     } as unknown as Parameters<typeof performTurnChain>[0]);
     stop();
     expect(seen).toEqual([
-      { status: "DONE", expected: "/discover", route: "/discover" },
+      {
+        status: "DONE",
+        intentId: expect.any(String) as unknown,
+        expected: "/discover",
+        route: "/discover",
+      },
     ]);
   });
 });
