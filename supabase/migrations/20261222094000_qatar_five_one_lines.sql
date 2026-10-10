@@ -11,7 +11,7 @@ update q_runtime.external_persons
  where tenant_id is null and profile_key = 'qa-demo-qinvest';
 
 update q_runtime.external_persons
-   set profile = jsonb_set(profile, '{oneLine}', to_jsonb('Director of Investments at Alchemist Doha, which helps early-stage tech startups reach investors and scale.'::text)), updated_at = now()
+   set profile = jsonb_set(profile, '{oneLine}', to_jsonb('Alchemist Doha's Director of Investments, backing early-stage tech startups as they reach investors and scale.'::text)), updated_at = now()
  where tenant_id is null and profile_key = 'qa-demo-muhannad-taslaq';
 
 update q_runtime.external_persons
