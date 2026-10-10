@@ -158,6 +158,10 @@ export {
 } from "./turn-skim.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { arrivalSnapshotFact } from "./arrival-fact.js";
+import {
+  arrivalFollowUpAnswer,
+  arrivalFollowUpKind,
+} from "./arrival-answer.js";
 export { arrivalSnapshotFact };
 import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
@@ -2106,17 +2110,23 @@ export function createModelGatewayQAnswer(
       ownCompany = ownCompanySnapshotFact(own, plan);
     })();
     let arrival: AuthorisedFact | null = null;
-    const arrivalRead = async (): Promise<void> => {
-      if (
-        dependencies.arrivalSnapshot === undefined ||
-        request.writingDocument === true
-      ) {
-        return;
-      }
-      const snapshot = await dependencies
-        .arrivalSnapshot(request.actor)
-        .catch(() => null);
-      arrival = arrivalSnapshotFact(snapshot);
+    let arrivalData: ArrivalSnapshot | null = null;
+    let arrivalLoaded: Promise<void> | undefined;
+    /** Read once per turn, from the wide reads or from a follow-up's own path. */
+    const arrivalRead = (): Promise<void> => {
+      arrivalLoaded ??= (async (): Promise<void> => {
+        if (
+          dependencies.arrivalSnapshot === undefined ||
+          request.writingDocument === true
+        ) {
+          return;
+        }
+        arrivalData = await dependencies
+          .arrivalSnapshot(request.actor)
+          .catch(() => null);
+        arrival = arrivalSnapshotFact(arrivalData);
+      })();
+      return arrivalLoaded;
     };
     const mandateRead = (async (): Promise<void> => {
       if (ownInvestor !== null && prefetchTools.has("get_investor_mandate")) {
@@ -2615,6 +2625,10 @@ export function createModelGatewayQAnswer(
       onScreenPage,
       onScreenPageCalls,
       arrival,
+      arrivalSnapshotOnce: async (): Promise<ArrivalSnapshot | null> => {
+        await arrivalRead();
+        return arrivalData;
+      },
       asked,
       counterparty,
       pitchMoment,
@@ -3559,6 +3573,44 @@ export function createModelGatewayQAnswer(
           modelPolicyVersion: "none",
           promptBundleVersion: rendered.bundle.bundleVersion,
         };
+      }
+      // W1: a follow-up on what Q told them on arrival ("what's the
+      // request?", "what did they say?", "did they accept?") is answered
+      // from the Arrival Snapshot by code: no tool, no model round. Read on
+      // its own, so S2's route gating of the wide reads cannot skip it.
+      if (
+        request.writingDocument !== true &&
+        arrivalFollowUpKind(latest.content) !== null &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+      ) {
+        const followUp = arrivalFollowUpAnswer(
+          latest.content,
+          await prepared.arrivalSnapshotOnce(),
+        );
+        if (followUp !== null) {
+          const message = await persistAnswer(
+            request.leadLines === undefined
+              ? followUp.text
+              : `${request.leadLines}\n\n${followUp.text}`,
+          );
+          logger?.info(
+            {
+              qRunId: request.runId,
+              itemKey: followUp.itemKey,
+              modelCalls: 0,
+              toolCalls: 0,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered an arrival follow-up from the arrival snapshot",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
       }
       // W2: a named person, company or body is identified from public
       // sources by code (a prepared entity instantly, anyone else in a few

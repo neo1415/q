@@ -23,6 +23,7 @@ import {
   createModelProviderRegistry,
   createStaticModelCatalog,
 } from "../src/index.js";
+import { arrivalFollowUpAnswer } from "../src/q/arrival-answer.js";
 import { arrivalSnapshotFact } from "../src/q/arrival-fact.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
@@ -163,18 +164,21 @@ function build(snapshot: () => ArrivalSnapshot | null, said: string) {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
       listRecentForConversationOfRun: () => Promise.resolve([...messages]),
-      insert: (_tx: unknown, input: { content: string }) =>
-        Promise.resolve({
+      insert: (_tx: unknown, input: { content: string }) => {
+        persisted.push(input.content);
+        return Promise.resolve({
           ...messages[0],
           id: randomUUID(),
           role: "Q",
           content: input.content,
-        } as QConversationMessage),
+        } as QConversationMessage);
+      },
       findById: () => Promise.resolve(null),
     },
     runs: { allocateEventSequence: () => Promise.resolve(2) },
     runEvents: { append: () => Promise.resolve({}) },
   } as unknown as QRuntimeRepositories;
+  const persisted: string[] = [];
   let snapshotReads = 0;
   const seam = createModelGatewayQAnswer({
     gateway,
@@ -212,7 +216,14 @@ function build(snapshot: () => ArrivalSnapshot | null, said: string) {
       maxSensitivity: "PUBLIC",
     } as unknown as PermittedContextPlan,
   } as unknown as QAnswerRequest;
-  return { seam, request, alpha, executed, reads: () => snapshotReads };
+  return {
+    seam,
+    request,
+    alpha,
+    executed,
+    persisted,
+    reads: () => snapshotReads,
+  };
 }
 
 function promptOf(alpha: {
@@ -224,11 +235,20 @@ function promptOf(alpha: {
   return sent.slice(Math.max(0, sent.indexOf("AUTHORISED FACTS")));
 }
 
-describe("follow-ups on the arrival briefing are answered from the snapshot", () => {
+describe("other questions on the arrival items reach the model with the snapshot facts", () => {
   for (const [said, facts] of [
-    ["what's the request?", ["TensorGate wants to connect", "The request:"]],
-    ["what did they say?", ["Could we do Thursday 3pm for a call?"]],
-    ["did they accept the time?", ["booked", "2026-10-16 15:00 UTC"]],
+    [
+      "is there anything else on TensorGate I should know?",
+      ["TensorGate wants to connect", "The request:"],
+    ],
+    [
+      "how is the TensorGate thread going?",
+      ["Could we do Thursday 3pm for a call?"],
+    ],
+    [
+      "where do we stand with TensorGate on timing?",
+      ["booked", "2026-10-16 15:00 UTC"],
+    ],
   ] as const) {
     it(`"${said}" reaches the model with the facts and no tool read`, async () => {
       const { seam, request, alpha, executed, reads } = build(
@@ -265,5 +285,56 @@ describe("follow-ups on the arrival briefing are answered from the snapshot", ()
     });
     expect(fact?.statement).toContain("UNAVAILABLE");
     expect(fact?.statement).toContain("do not guess");
+  });
+});
+
+describe("an arrival follow-up is answered by code, with no tool and no model round", () => {
+  for (const [said, expected] of [
+    [
+      "what's the request?",
+      ["TensorGate wants to connect", "Could we do Thursday 3pm for a call?"],
+    ],
+    [
+      "what did they say?",
+      ["Tensor Gate wrote", "Could we do Thursday 3pm for a call?"],
+    ],
+    ["did they accept the time?", ["booked", "2026-10-16 15:00 UTC"]],
+  ] as const) {
+    it(`"${said}" has zero tool calls and zero model calls`, async () => {
+      const { seam, request, alpha, executed, persisted } = build(
+        () => SNAPSHOT,
+        said,
+      );
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      expect(executed).toEqual([]);
+      expect(alpha.calls).toHaveLength(0);
+      for (const text of expected) expect(persisted.join("\n")).toContain(text);
+    });
+  }
+
+  it("when the snapshot is withheld the normal path handles it", async () => {
+    const { seam, request, alpha } = build(() => null, "what's the request?");
+    await seam.answer(request);
+    expect(alpha.calls.length).toBeGreaterThan(0);
+  });
+
+  it("does not guess between two items without a name", () => {
+    const first = SNAPSHOT.items[0];
+    if (first === undefined) throw new Error("fixture");
+    const two = {
+      ...SNAPSHOT,
+      items: [
+        first,
+        {
+          ...first,
+          key: "other",
+          counterpart: { ...first.counterpart, name: "Halyard" },
+        },
+      ],
+    } as ArrivalSnapshot;
+    expect(arrivalFollowUpAnswer("what's the request?", two)).toBeNull();
+    expect(
+      arrivalFollowUpAnswer("what's the request from Halyard?", two)?.itemKey,
+    ).toBe("other");
   });
 });
