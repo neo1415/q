@@ -172,9 +172,7 @@ function roundTripFields(): Record<string, unknown> {
   if (at !== undefined) fields["msBeforeAnalysis"] = at;
   const sites = Object.entries(counter.sites);
   if (sites.length > 0) {
-    // Local diagnosis (CQ_ROUND_TRIP_TRACE=1 with the trace loader): the
-    // exact number sent in this run, and the 200 busiest call sites.
-    fields["dbRoundTripsSent"] = sites.reduce((sum, [, n]) => sum + n, 0);
+    // Local diagnosis (CQ_ROUND_TRIP_TRACE=1): the 200 busiest call sites.
     fields["dbRoundTripSites"] = Object.fromEntries(
       sites.sort((a, b) => b[1] - a[1]).slice(0, 200),
     );
@@ -407,7 +405,7 @@ export function createLangGraphQOrchestrator(
     // client and the checkpoint pool, is counted; the total and the count
     // at PREPARING_ANALYSIS are logged when the invocation returns.
     start: (input: QOrchestrationInput) =>
-      withRoundTripCounter(createRoundTripCounter(), async () => {
+      withRoundTripCounter(createRoundTripCounter(input.runId), async () => {
         const run = await runtime.loadOwnedRun(
           input.actor,
           input.runId,
@@ -472,7 +470,7 @@ export function createLangGraphQOrchestrator(
       }),
 
     resume: (input: QResumeInput) =>
-      withRoundTripCounter(createRoundTripCounter(), async () => {
+      withRoundTripCounter(createRoundTripCounter(input.runId), async () => {
         const run = await runtime.loadOwnedRun(
           input.actor,
           input.runId,

@@ -41,6 +41,8 @@ export {
   markRoundTrips,
   withRoundTripCounter,
   withRoundTripPhase,
+  cachedInRun,
+  type RunCacheKey,
   type RoundTripCounter,
 } from "./round-trips.js";
 export {
