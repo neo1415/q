@@ -425,9 +425,13 @@ export function RelationshipDeal({
   useEffect(() => {
     if (initial !== null) return;
     let live = true;
-    void readDealAction(relationshipId).then((result) => {
-      if (live && result.ok) setView(result.value);
-    });
+    // A failed read leaves the panel unrendered, as a refused one does;
+    // never an unhandled rejection.
+    void readDealAction(relationshipId)
+      .then((result) => {
+        if (live && result.ok) setView(result.value);
+      })
+      .catch(() => undefined);
     return () => {
       live = false;
     };

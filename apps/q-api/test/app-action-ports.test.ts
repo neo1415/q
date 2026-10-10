@@ -34,7 +34,12 @@ function anything(): unknown {
         : key === Symbol.toPrimitive
           ? () => "x"
           : anything(),
-    apply: () => Promise.reject(new Error("probe")),
+    // Throw, don't return a rejected promise: an action that calls a port
+    // without awaiting it (e.g. `.map` on probed input) would otherwise
+    // leave an unhandled rejection behind the probe.
+    apply: () => {
+      throw new Error("probe");
+    },
   });
 }
 
