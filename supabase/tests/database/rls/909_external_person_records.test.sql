@@ -44,7 +44,7 @@ select lives_ok($$
     (id, tenant_id, user_id, entity_kind, research_status, requires_refresh,
      profile_key, display_name, confidence)
   values ('00000000-0000-4000-8000-000000000910', null, null, 'GOVERNMENT_AGENCY',
-          'PREPARED_PUBLIC_SEED', true, 'qa-demo-invest-qatar', 'Invest Qatar', 'STRONG') $$,
+          'PREPARED_PUBLIC_SEED', true, 'pgtap-909-prepared-seed', 'Invest Qatar', 'STRONG') $$,
   'a prepared seed is platform data with no owner');
 
 select throws_ok($$
