@@ -21,6 +21,8 @@ export const LIVE_CONTEXT_MAX_CHARS = 1_600;
 const FACTS_MAX = 8;
 const FACT_MAX_CHARS = 160;
 export const REFERENTS_MAX = 8;
+const PREPARED_MAX = 8;
+const PREPARED_LINE_MAX_CHARS = 170;
 
 const oneLine = (text: string, max: number): string => {
   const clean = text.replace(/\s+/gu, " ").trim();
@@ -33,6 +35,8 @@ export function liveContextPackage(input: {
   readonly facts: LiveContextFacts | null;
   /** Names Q said on this line, most recent first. */
   readonly referents: readonly string[];
+  /** `preparedEntityPrewarmLines`: one compact line per prepared entity. */
+  readonly preparedEntities?: readonly string[] | undefined;
 }): string | null {
   const lines: string[] = [];
   const side =
@@ -63,6 +67,13 @@ export function liveContextPackage(input: {
       ...facts.map((fact) => `- ${fact}`),
     );
   }
+  // W5: researched public entities Q already knows (name, kind, one line,
+  // stable id). A list to recognise names by, never biographies; the facts
+  // come from Q's own lookup when one is asked about.
+  const prepared = (input.preparedEntities ?? [])
+    .map((line) => oneLine(line, PREPARED_LINE_MAX_CHARS))
+    .filter((line) => line.length > 0)
+    .slice(0, PREPARED_MAX);
   const referents = [
     ...new Set(input.referents.map((name) => oneLine(name, 60))),
   ]
@@ -71,6 +82,13 @@ export function liveContextPackage(input: {
   if (referents.length > 0) {
     lines.push(
       `Recently discussed on this call (most recent first): ${referents.join(", ")}.`,
+    );
+  }
+  // Last, so the length cap trims this list before the call's own context.
+  if (prepared.length > 0) {
+    lines.push(
+      "Public people and organisations Q has already researched (names only; ask Q for details):",
+      ...prepared.map((line) => `- ${line}`),
     );
   }
   if (lines.length === 0) return null;

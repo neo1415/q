@@ -341,7 +341,8 @@
       "last_researched_utc": "2026-10-09",
       "requires_refresh": true,
       "arabic_names": [],
-      "pronunciation": []
+      "pronunciation": [],
+      "one_line": "Finance and business executive in Doha; current title not verified."
     },
     {
       "demo_id": "qa-demo-qinvest",
@@ -438,7 +439,8 @@
       "last_researched_utc": "2026-10-09",
       "requires_refresh": true,
       "arabic_names": [],
-      "pronunciation": []
+      "pronunciation": [],
+      "one_line": "Qatar-based Islamic investment group; public pages not yet verified."
     },
     {
       "demo_id": "qa-demo-muhannad-taslaq",
@@ -562,7 +564,8 @@
       "last_researched_utc": "2026-10-09",
       "requires_refresh": true,
       "arabic_names": [],
-      "pronunciation": []
+      "pronunciation": [],
+      "one_line": "Director of Investments at Alchemist Doha."
     },
     {
       "demo_id": "qa-demo-invest-qatar",
@@ -664,7 +667,8 @@
       "last_researched_utc": "2026-10-09",
       "requires_refresh": true,
       "arabic_names": [],
-      "pronunciation": []
+      "pronunciation": [],
+      "one_line": "Qatar's investment promotion agency (est. 2019); not a venture fund."
     },
     {
       "demo_id": "qa-demo-alrayan",
@@ -772,7 +776,8 @@
           "basis": "page title on the official site (Arabic edition)"
         }
       ],
-      "pronunciation": []
+      "pronunciation": [],
+      "one_line": "Qatar investment and advisory firm (est. 2007), owned by AlRayan Bank."
     }
   ],
   "seed_version": "qatar-five.v1",
