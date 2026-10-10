@@ -10,6 +10,7 @@ import {
 import type {
   QAnswerRequest,
   QConversationMessage,
+  QOfferedTool,
   QRuntimeRepositories,
   QToolPort,
   QToolProposal,
@@ -125,6 +126,7 @@ function build(
   snapshot: () => ArrivalSnapshot | null,
   said: string,
   arrivalSkim?: QTurnSkimmer,
+  offered: readonly QOfferedTool[] = [],
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -165,7 +167,7 @@ function build(
   ];
   const executed: QToolProposal[] = [];
   const tools: QToolPort = {
-    offer: () => Promise.resolve([]),
+    offer: () => Promise.resolve([...offered]),
     execute: (proposal) => {
       executed.push(proposal);
       return Promise.reject(new Error("no tool read is expected"));
@@ -187,9 +189,15 @@ function build(
       findById: () => Promise.resolve(null),
     },
     runs: { allocateEventSequence: () => Promise.resolve(2) },
-    runEvents: { append: () => Promise.resolve({}) },
+    runEvents: {
+      append: (...args: unknown[]) => {
+        events.push(JSON.stringify(args));
+        return Promise.resolve({});
+      },
+    },
   } as unknown as QRuntimeRepositories;
   const persisted: string[] = [];
+  const events: string[] = [];
   let snapshotReads = 0;
   const seam = createModelGatewayQAnswer({
     gateway,
@@ -234,6 +242,7 @@ function build(
     alpha,
     executed,
     persisted,
+    events,
     reads: () => snapshotReads,
   };
 }
@@ -545,7 +554,7 @@ describe("open the conversation (A5)", () => {
   });
 
   it("says there is no conversation yet and offers the relationship page", async () => {
-    const { seam, request, alpha, executed, persisted } = build(
+    const { seam, request, alpha, executed, persisted, events } = build(
       () => pending,
       "open the conversation",
     );
@@ -555,22 +564,116 @@ describe("open the conversation (A5)", () => {
     const said = persisted.join("\n");
     expect(said).toContain("no conversation with TensorGate yet");
     expect(said).toContain("relationship");
-    expect(said).not.toMatch(/opening|opened the chat/iu);
+    expect(said).not.toMatch(/opening your conversation/iu);
+    // And it really moves them to the relationship page (the browser
+    // confirms the move), not only says so.
+    const sent = events.join("\n");
+    expect(sent).toContain("OPEN_RECORD_PAGE");
+    expect(sent).toContain('"page":"RELATIONSHIP_INVESTOR"');
+    expect(sent).toContain(OTHER);
   });
 
-  it("with a thread it is left to the navigation (not claimed by this answer)", async () => {
+  it("with a thread it opens the chat itself", async () => {
     const live = ArrivalSnapshotSchema.parse({
       ...SNAPSHOT,
       items: SNAPSHOT.items.map((item) => ({ ...item, hasConversation: true })),
     });
-    const { seam, request, alpha } = build(() => live, "open the conversation");
+    const { seam, request, alpha, events } = build(
+      () => live,
+      "open the conversation",
+    );
     await seam.answer(request);
-    expect(alpha.calls.length).toBeGreaterThan(0);
+    expect(alpha.calls).toHaveLength(0);
+    const sent = events.join("\n");
+    expect(sent).toContain("OPEN_RECORD_PAGE");
+    expect(sent).toContain("RELATIONSHIP_INVESTOR_MESSAGES");
   });
 
   it("the prepared fact tells the model not to claim a chat that does not exist", () => {
     expect(arrivalSnapshotFact(pending)?.statement).toContain(
       "no conversation yet",
     );
+  });
+});
+
+describe("a matched arrival follow-up reads no tool at all (V2: six prefetch reads)", () => {
+  const offered: QOfferedTool[] = [
+    "get_relationship",
+    "get_company",
+    "list_pending_approvals",
+    "list_q_work",
+    "list_own_relationships",
+    "list_schedule",
+  ].map((name) => ({
+    toolName: `${name}.read`,
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    definition: {
+      name,
+      description: name,
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  }));
+
+  for (const said of [
+    "what's the request?",
+    "what did they say?",
+    "did they accept the time?",
+  ]) {
+    it(`"${said}" executes zero tools even with the prefetch tools offered`, async () => {
+      const { seam, request, alpha, executed } = build(
+        () => SNAPSHOT,
+        said,
+        undefined,
+        offered,
+      );
+      await seam.answer(request);
+      expect(executed).toEqual([]);
+      expect(alpha.calls).toHaveLength(0);
+    });
+  }
+
+  it("a semantic (skim) match reads no tool either", async () => {
+    const skimmer: QTurnSkimmer = {
+      skim: () =>
+        Promise.resolve(
+          TurnSkimResultSchema.parse({
+            kind: "ARRIVAL_FOLLOWUP",
+            confidence: "HIGH",
+            arrival: { item: `interest:${REL}`, aspect: "REQUEST" },
+          }),
+        ),
+    };
+    const { seam, request, executed } = build(
+      () => SNAPSHOT,
+      "so what did TensorGate want?",
+      skimmer,
+      offered,
+    );
+    await seam.answer(request);
+    expect(executed).toEqual([]);
+  });
+
+  it("control: another question still runs its prefetch reads", async () => {
+    const { seam, request, executed } = build(
+      () => SNAPSHOT,
+      "how is my day looking?",
+      undefined,
+      offered,
+    );
+    await seam.answer(request);
+    expect(executed.length).toBeGreaterThan(0);
+  });
+
+  it("an arrival question the snapshot cannot answer keeps its reads for the analyst", async () => {
+    const { seam, request, executed } = build(
+      () => null,
+      "what's the request?",
+      undefined,
+      offered,
+    );
+    await seam.answer(request);
+    expect(executed.length).toBeGreaterThan(0);
   });
 });
