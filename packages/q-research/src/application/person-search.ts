@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 
-import type {
-  ExternalPersonSource,
-  PersonSearchResult,
+import {
+  NO_EXTERNAL_ENTITY_IMAGE,
+  type ExternalPersonSource,
+  type PersonSearchResult,
 } from "@capital-q/contracts/q";
 
 import { RESEARCH_BOUNDS, type PublicWebSearchHit } from "../contracts.js";
@@ -173,6 +174,9 @@ function sourceOf(
   retrievedAt: string,
 ): ExternalPersonSource {
   return {
+    id: null,
+    description: null,
+    evidenceClass: null,
     url: sourced.hit.url,
     domain: publicDomainOf(sourced.hit.url) ?? "",
     title: sourced.hit.title === null ? null : sourced.hit.title.slice(0, 300),
@@ -453,7 +457,13 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
         result = {
           outcome: "MATCHED",
           card: {
+            entityKind: "PERSON",
             subject: {
+              entityKind: "PERSON",
+              researchStatus: "RESEARCHED",
+              requiresRefresh: false,
+              image: NO_EXTERNAL_ENTITY_IMAGE,
+              quotes: [],
               externalPersonId: externalPersonIdFor(
                 command.tenantId,
                 command.userId,

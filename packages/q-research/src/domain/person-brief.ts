@@ -52,7 +52,7 @@ function squash(text: string): string {
     .normalize("NFKD")
     .replace(/\p{M}+/gu, "")
     .toLowerCase()
-    .replace(/[\s ]+/gu, " ")
+    .replace(/[\s\u00a0]+/gu, " ")
     .replace(/[“”"']/gu, "")
     .trim();
 }
