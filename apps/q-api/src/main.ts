@@ -16,6 +16,12 @@
  */
 
 import { createFitComposition } from "./composition/fit.js";
+import { createPostgresPreparedEntityStore } from "./composition/known-entity-store.js";
+import {
+  createPreparedEntities,
+  preparedEntityPrewarmLines,
+  watchPreparedEntities,
+} from "./composition/prepared-entities.js";
 import { createAttentionSources } from "./composition/attention-sources.js";
 import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
 import {
@@ -753,6 +759,28 @@ const logger = createLogger(
   },
   { level: config.observability.logLevel },
 );
+
+// Prepared public research entities (W5), held hot: one query now, then a
+// known name costs no web call and no database trip. A failed load costs
+// the demo pack its instant lookup, never the service; the check below
+// retries and a normal search still works.
+const preparedEntities = createPreparedEntities(
+  createPostgresPreparedEntityStore({
+    sql: database.sql,
+    transactions: database.transactions,
+  }),
+);
+await preparedEntities
+  .start()
+  .then((count) => {
+    logger.info({ count }, "prepared research entities warmed");
+  })
+  .catch((error: unknown) => {
+    logger.warn({ err: error }, "prepared research entities not loaded");
+  });
+watchPreparedEntities(preparedEntities, (error) => {
+  logger.warn({ err: error }, "prepared research entities check failed");
+});
 
 // The owning contexts' public query ports. The Q side never touches another
 // context's tables: subjects, disclosure and the firewall all read through
@@ -5758,6 +5786,10 @@ const liveBroker =
         // The turn board the voice surface polls: a delegation that moved
         // the screen says so, so the move is followed before it is spoken.
         board: voiceTurnBoard,
+        // W5: names of the prepared public entities, so the voice
+        // recognises them at once (a list, never biographies).
+        preparedEntityLines: () =>
+          preparedEntityPrewarmLines(preparedEntities.all()),
         // Part 6: the call's background, from approved facts only (their
         // declared mandate or their company's card, as Q's messages may
         // state them) and their own organisation's name.

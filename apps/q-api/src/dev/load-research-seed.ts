@@ -54,14 +54,14 @@ try {
   const before = await store.version();
   const loaded = await loadPreparedSeed(store, seed, { webOrigin });
   const after = await store.version();
-  console.log(
-    JSON.stringify({
+  process.stdout.write(
+    `${JSON.stringify({
       seed: seed.seed_version,
       entities: loaded,
       storeVersionBefore: before,
       storeVersionAfter: after,
       changed: before !== after,
-    }),
+    })}\n`,
   );
 } finally {
   await database.close();

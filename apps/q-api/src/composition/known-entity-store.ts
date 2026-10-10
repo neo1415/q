@@ -4,7 +4,11 @@ import {
   ExternalEntityImageSchema,
   ExternalEntityQuoteSchema,
 } from "@capital-q/contracts/q";
-import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
+import {
+  jsonbParam,
+  type DatabaseExecutor,
+  type TransactionManager,
+} from "@capital-q/database";
 import {
   aliasKeyOf,
   preparedEntityIdFor,
@@ -174,12 +178,12 @@ export function createPostgresPreparedEntityStore(dependencies: {
           values
             (${id}, null, null, ${entity.entityKind}, 'PREPARED_PUBLIC_SEED',
              ${entity.requiresRefresh}, ${entity.profileKey}, ${entity.displayName},
-             ${JSON.stringify([...aliases.values()].slice(0, 24))}::jsonb,
+             ${jsonbParam(tx, [...aliases.values()].slice(0, 24))},
              ${entity.profileUrl}, ${entity.role}, ${entity.organization},
              ${entity.location}, ${entity.confidence},
-             ${JSON.stringify(entity.image)}::jsonb,
-             ${JSON.stringify(entity.quotes)}::jsonb,
-             ${JSON.stringify(profile)}::jsonb,
+             ${jsonbParam(tx, entity.image)},
+             ${jsonbParam(tx, entity.quotes)},
+             ${jsonbParam(tx, profile)},
              ${entity.lastResearchedAt}, clock_timestamp())
           on conflict (profile_key) where tenant_id is null
           do update set

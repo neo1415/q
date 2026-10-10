@@ -251,6 +251,11 @@ export type LiveBrokerDependencies = {
   readonly contextFor?:
     ((actor: ActorContext) => Promise<LiveContextFacts | null>) | undefined;
   /**
+   * W5: one compact line per prepared public research entity (name, kind,
+   * one line, stable id), read from memory: no database, no web.
+   */
+  readonly preparedEntityLines?: (() => readonly string[]) | undefined;
+  /**
    * The voice turn board (what the turn handler recorded for the line):
    * read after a run, so the delegation's result says whether the run
    * moved the screen, and the client follows it before the voice speaks.
@@ -738,6 +743,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         role,
         facts,
         referents: carried?.referents ?? [],
+        preparedEntities: deps.preparedEntityLines?.() ?? [],
       });
       logger.info(
         { qVoiceSessionId: binding.voiceSessionId, model: created.model },
