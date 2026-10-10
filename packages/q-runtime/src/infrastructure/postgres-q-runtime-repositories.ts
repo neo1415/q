@@ -654,31 +654,37 @@ export function createPostgresQRuntimeRepositories(
                 const valid = parseQResultBlocks(input.blocks).blocks;
                 return valid.length === 0 ? null : valid;
               })();
+        // S2: the insert, the row as stored and the conversation's own
+        // clock in ONE statement (they were an insert, a re-select and an
+        // update). The conversation clock moves to the stored row's time,
+        // exactly as before.
         const rows = await tx.sql`
-          insert into q_runtime.conversation_messages
-            (id, tenant_id, conversation_id, run_id, role, content, result_blocks,
-             provider_message_ref)
-          values (coalesce(${input.id ?? null}::uuid, gen_random_uuid()),
-                  ${input.tenantId}, ${input.conversationId}, ${input.runId},
-                  ${input.role}, ${input.content},
-                  ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb,
-                  ${utteranceRef})
-          returning id`;
-        const { id } = IdRow.parse(rows[0]);
-        const created = await findMessageById(
-          tx.sql,
-          input.tenantId,
-          QMessageIdSchema.parse(id),
-        );
-        if (created === null) {
+          with inserted as (
+            insert into q_runtime.conversation_messages
+              (id, tenant_id, conversation_id, run_id, role, content, result_blocks,
+               provider_message_ref)
+            values (coalesce(${input.id ?? null}::uuid, gen_random_uuid()),
+                    ${input.tenantId}, ${input.conversationId}, ${input.runId},
+                    ${input.role}, ${input.content},
+                    ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb,
+                    ${utteranceRef})
+            returning id, tenant_id, conversation_id, run_id, role, content,
+                      content_type, result_blocks, provider_message_ref, created_at
+          ),
+          clocked as (
+            update q_runtime.conversations c
+               set last_message_at = greatest(coalesce(c.last_message_at, c.created_at),
+                                              (select i.created_at from inserted i))
+             where c.id = ${input.conversationId} and c.tenant_id = ${input.tenantId}
+            returning c.id
+          )
+          select i.*, (select count(*) from clocked) as clocked
+            from inserted i`;
+        const first = rows[0];
+        if (first === undefined) {
           throw new Error("q message insert did not return a row");
         }
-        // The conversation's own clock, for listing it by activity.
-        await tx.sql`
-          update q_runtime.conversations
-             set last_message_at = greatest(coalesce(last_message_at, created_at), ${created.createdAt}::timestamptz)
-           where id = ${input.conversationId} and tenant_id = ${input.tenantId}`;
-        return created;
+        return toMessage(first);
       },
       findById: findMessageById,
       mark: async (tx, input) => {

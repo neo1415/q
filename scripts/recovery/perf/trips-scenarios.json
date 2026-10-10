@@ -65,6 +65,45 @@
       },
       "rules": []
     },
+    "analyst4": {
+      "email": "investor.savanna-seed@fictional.capitalq.local",
+      "text": "Summarise Tallyloom and Kazikit for me and tell me what to ask them",
+      "rules": [
+        {
+          "name": "analyst-tools",
+          "when": { "task": "COMPANY_ANALYST", "afterTool": null },
+          "reply": {
+            "toolCalls": [
+              {
+                "name": "get_company",
+                "arguments": {
+                  "companyId": "02ca2f10-f7af-457c-80f0-b5e167205b8b"
+                }
+              },
+              {
+                "name": "get_company",
+                "arguments": {
+                  "companyId": "32c0fe0b-ade4-4c67-9097-a56f41e4709b"
+                }
+              },
+              { "name": "get_investor_mandate", "arguments": {} },
+              { "name": "list_my_relationships", "arguments": {} }
+            ]
+          }
+        },
+        {
+          "name": "analyst-answer",
+          "when": { "task": "COMPANY_ANALYST" },
+          "reply": {
+            "json": {
+              "answer": "Both are early. Ask each about runway and customers.",
+              "responseShape": "CONCISE",
+              "insufficientEvidence": false
+            }
+          }
+        }
+      ]
+    },
     "analyst": {
       "email": "investor.savanna-seed@fictional.capitalq.local",
       "text": "Compare Tallyloom and Kazikit against my mandate and tell me what to ask them",
