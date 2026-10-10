@@ -6,6 +6,7 @@ import { createPostgresSecurityEventWriter } from "@capital-q/audit";
 import { createPostgresCompanyQueryPort } from "@capital-q/companies";
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import {
+  QRunIdSchema,
   QRunSummarySchema,
   QStreamEventSchema,
   type CorrelationId,
@@ -13,6 +14,8 @@ import {
 } from "@capital-q/contracts";
 import {
   createRequestDatabaseClient,
+  createRoundTripCounter,
+  withRoundTripCounter,
   type RequestDatabase,
   type TransactionContext,
   type TransactionManager,
@@ -503,6 +506,35 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
         64,
       );
       expect(history.filter((m) => m.role === "USER")).toHaveLength(2);
+      // R5: with the run read cache, every window is a slice of ONE read at
+      // the widest window, and each equals what its own query returns.
+      const cached = createPostgresQRuntimeRepositories({
+        runCacheRoot: tx.sql,
+      });
+      const counter = createRoundTripCounter(last.run.id);
+      const windows = [2, 8, 64, 3] as const;
+      const fromCache = await withRoundTripCounter(counter, () =>
+        Promise.all(
+          windows.map((limit) =>
+            cached.messages.listRecentForConversationOfRun(
+              tx.sql,
+              TenantIdSchema.parse(tenantA),
+              last.run.id,
+              limit,
+            ),
+          ),
+        ),
+      );
+      expect(counter.count).toBe(1);
+      for (const [index, limit] of windows.entries()) {
+        const own = await repositories.messages.listRecentForConversationOfRun(
+          tx.sql,
+          TenantIdSchema.parse(tenantA),
+          last.run.id,
+          limit,
+        );
+        expect(fromCache[index]).toEqual(own);
+      }
       // Every fragment is still stored: history is never rewritten.
       const stored = await tx.sql<{ n: number }[]>`
         select count(*)::int as n from q_runtime.conversation_messages
@@ -1383,6 +1415,88 @@ describe("@capital-q/q-runtime concurrency against local PostgreSQL", () => {
         created.run.id,
       );
       expect(stored.map((e) => e.sequence)).toEqual([1, 2, 3, 4, 5]);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("R5: one-statement appends under contention: no gaps, no duplicates, in commit order, mixed with the two-statement path", async () => {
+    const world = await commitWorld();
+    try {
+      const created = await service().createRun({
+        actor: world.actor,
+        input: request(),
+        idempotencyKey: `conc-append-next-${randomUUID()}`,
+        correlationId: CORRELATION(),
+      });
+      const repositories = createPostgresQRuntimeRepositories();
+      expect(repositories.runEvents.appendNext).toBeDefined();
+      // The store without appendNext: allocate, then append.
+      const { appendNext: _omitted, ...legacyEvents } = repositories.runEvents;
+      const legacy = { ...repositories, runEvents: legacyEvents };
+      const stages = [
+        "UNDERSTANDING_REQUEST",
+        "REVIEWING_COMPANY",
+        "CHECKING_EVIDENCE",
+        "PREPARING_ANALYSIS",
+      ] as const;
+      const appended = await Promise.all(
+        Array.from({ length: 24 }, (_, i) =>
+          db.transactions.run((tx) =>
+            appendRunEvent(
+              i % 3 === 0 ? legacy : repositories,
+              tx,
+              created.run,
+              {
+                type: "q.stage.changed",
+                data: {
+                  stage: stages[i % stages.length] ?? "UNDERSTANDING_REQUEST",
+                },
+              },
+            ),
+          ),
+        ),
+      );
+      const sequences = appended.map((e) => e.sequence).sort((a, b) => a - b);
+      expect(sequences).toEqual(Array.from({ length: 24 }, (_, i) => i + 2));
+      const stored = await repositories.runEvents.listForRun(
+        db.sql,
+        world.actor.tenantId,
+        created.run.id,
+      );
+      expect(stored.map((e) => e.sequence)).toEqual(
+        Array.from({ length: 25 }, (_, i) => i + 1),
+      );
+      // A run that does not exist (or another tenant's) gets nothing.
+      const appendNext = repositories.runEvents.appendNext;
+      if (appendNext === undefined) throw new Error("no appendNext");
+      const missing = await db.transactions.run((tx) =>
+        appendNext(tx, {
+          tenantId: world.actor.tenantId,
+          runId: QRunIdSchema.parse(randomUUID()),
+          eventType: "q.stage.changed",
+          visibleStage: "UNDERSTANDING_REQUEST",
+          payload: { stage: "UNDERSTANDING_REQUEST" },
+        }),
+      );
+      expect(missing).toBeNull();
+      // A rolled-back append leaves no gap: the sequence rolls back with it.
+      await expect(
+        db.transactions.run(async (tx) => {
+          await appendRunEvent(repositories, tx, created.run, {
+            type: "q.stage.changed",
+            data: { stage: "PREPARING_ANALYSIS" },
+          });
+          throw new Error("abort");
+        }),
+      ).rejects.toThrow("abort");
+      const next = await db.transactions.run((tx) =>
+        appendRunEvent(repositories, tx, created.run, {
+          type: "q.stage.changed",
+          data: { stage: "PREPARING_ANALYSIS" },
+        }),
+      );
+      expect(next.sequence).toBe(26);
     } finally {
       await cleanup(world);
     }

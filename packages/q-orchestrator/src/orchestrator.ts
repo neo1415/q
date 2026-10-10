@@ -158,14 +158,25 @@ function detached<T>(invoke: () => Promise<T>): Promise<T> {
 }
 
 /** The run's database round trips so far, for the returned log line. */
-function roundTripFields(): Record<string, number> {
+function roundTripFields(): Record<string, unknown> {
   const counter = currentRoundTripCounter();
   if (counter === undefined) return {};
-  const fields: Record<string, number> = { dbRoundTrips: counter.count };
+  const fields: Record<string, unknown> = {
+    dbRoundTrips: counter.count,
+    // R5: where they went, by phase or tool (labels only, never content).
+    dbRoundTripsByPhase: { ...counter.phases },
+  };
   const before = counter.marks["preparing_analysis"];
   const at = counter.markedAtMs["preparing_analysis"];
   if (before !== undefined) fields["dbRoundTripsBeforeAnalysis"] = before;
   if (at !== undefined) fields["msBeforeAnalysis"] = at;
+  const sites = Object.entries(counter.sites);
+  if (sites.length > 0) {
+    // Local diagnosis (CQ_ROUND_TRIP_TRACE=1): the 200 busiest call sites.
+    fields["dbRoundTripSites"] = Object.fromEntries(
+      sites.sort((a, b) => b[1] - a[1]).slice(0, 200),
+    );
+  }
   return fields;
 }
 
@@ -394,7 +405,7 @@ export function createLangGraphQOrchestrator(
     // client and the checkpoint pool, is counted; the total and the count
     // at PREPARING_ANALYSIS are logged when the invocation returns.
     start: (input: QOrchestrationInput) =>
-      withRoundTripCounter(createRoundTripCounter(), async () => {
+      withRoundTripCounter(createRoundTripCounter(input.runId), async () => {
         const run = await runtime.loadOwnedRun(
           input.actor,
           input.runId,
@@ -459,7 +470,7 @@ export function createLangGraphQOrchestrator(
       }),
 
     resume: (input: QResumeInput) =>
-      withRoundTripCounter(createRoundTripCounter(), async () => {
+      withRoundTripCounter(createRoundTripCounter(input.runId), async () => {
         const run = await runtime.loadOwnedRun(
           input.actor,
           input.runId,

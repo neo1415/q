@@ -105,40 +105,80 @@ export function createPostgresAuthorizationPolicySource(
       const grants: AuthorizationGrant[] = [];
       const denials: AuthorizationDenial[] = [];
       let integrityFailed = false;
+      const withMembership =
+        actor.membershipId !== undefined && actor.organisationId !== undefined;
 
-      if (
-        actor.membershipId !== undefined &&
-        actor.organisationId !== undefined
-      ) {
-        const membershipRows = await sql`
-          select 1
-            from identity.organisation_memberships m
-           where m.id = ${actor.membershipId}
-             and m.user_id = ${actor.userId}
-             and m.organisation_id = ${actor.organisationId}
-             and m.tenant_id = ${actor.tenantId}
-             and m.membership_status = 'active'
-           limit 1`;
-        if (membershipRows.length === 0) {
-          return NO_FACTS;
-        }
+      // R5: one statement, one round trip (it was three, run on every
+      // authorisation check). The same three reads as before, unchanged:
+      //   member  the membership in the ActorContext is this person's, in
+      //           this organisation and tenant, and active;
+      //   roles   current assignments only, expanded through active
+      //           templates, restricted to the capability being evaluated;
+      //   grants  explicit grants/denials for the principals this actor
+      //           embodies, valid by the database clock so it agrees with
+      //           the transaction that may be running around this read.
+      // Role facts are read only for a confirmed membership, as before.
+      const [facts] = await sql<
+        { member: boolean; roles: unknown; grants: unknown }[]
+      >`
+        with member as (
+          select exists (
+            select 1
+              from identity.organisation_memberships m
+             where m.id = ${actor.membershipId ?? null}
+               and m.user_id = ${actor.userId}
+               and m.organisation_id = ${actor.organisationId ?? null}
+               and m.tenant_id = ${actor.tenantId}
+               and m.membership_status = 'active'
+          ) as confirmed
+        )
+        select
+          (select confirmed from member) as member,
+          coalesce((
+            select json_agg(json_build_object(
+                     'role_id', r.id, 'scope_type', r.scope_type, 'effect', rc.effect))
+              from identity.membership_roles mr
+              join permissions.roles r
+                on r.id = mr.role_id and r.status = 'active'
+              join permissions.role_capabilities rc
+                on rc.role_id = r.id
+              join permissions.capabilities c
+                on c.id = rc.capability_id and c.status = 'active'
+             where ${withMembership}
+               and (select confirmed from member)
+               and mr.membership_id = ${actor.membershipId ?? null}
+               and mr.valid_from <= now()
+               and (mr.valid_until is null or mr.valid_until > now())
+               and c.code = ${capability}
+          ), '[]'::json) as roles,
+          coalesce((
+            select json_agg(json_build_object(
+                     'id', g.id, 'tenant_id', g.tenant_id, 'effect', g.effect,
+                     'scope', g.scope, 'resource_type', g.resource_type,
+                     'resource_id', g.resource_id))
+              from permissions.grants g
+              join permissions.capabilities c
+                on c.id = g.capability_id and c.status = 'active'
+             where g.tenant_id = ${actor.tenantId}
+               and c.code = ${capability}
+               and g.revoked_at is null
+               and g.valid_from <= now()
+               and (g.valid_until is null or g.valid_until > now())
+               and (
+                     (g.principal_type = 'user' and g.principal_id = ${actor.userId})
+                  or (g.principal_type = 'membership' and g.principal_id = ${actor.membershipId ?? null})
+                  or (g.principal_type = 'organisation' and g.principal_id = ${actor.organisationId ?? null})
+               )
+          ), '[]'::json) as grants`;
+      if (facts === undefined) return NO_FACTS;
+      if (withMembership && facts.member !== true) {
+        return NO_FACTS;
+      }
+      const roleRows = Array.isArray(facts.roles) ? facts.roles : [];
+      const grantRows = Array.isArray(facts.grants) ? facts.grants : [];
 
-        // Role facts: current assignments only, expanded through active
-        // templates, restricted to the capability being evaluated.
-        const roleRows = await sql`
-          select r.id as role_id, r.scope_type, rc.effect
-            from identity.membership_roles mr
-            join permissions.roles r
-              on r.id = mr.role_id and r.status = 'active'
-            join permissions.role_capabilities rc
-              on rc.role_id = r.id
-            join permissions.capabilities c
-              on c.id = rc.capability_id and c.status = 'active'
-           where mr.membership_id = ${actor.membershipId}
-             and mr.valid_from <= now()
-             and (mr.valid_until is null or mr.valid_until > now())
-             and c.code = ${capability}`;
-
+      const organisationId = actor.organisationId;
+      if (withMembership && organisationId !== undefined) {
         for (const raw of roleRows) {
           const row = RoleFactRowSchema.safeParse(raw);
           if (!row.success) {
@@ -157,7 +197,7 @@ export function createPostgresAuthorizationPolicySource(
               ? {
                   kind: "ORGANISATION",
                   tenantId: actor.tenantId,
-                  organisationId: actor.organisationId,
+                  organisationId,
                 }
               : { kind: "TENANT", tenantId: actor.tenantId };
 
@@ -168,25 +208,6 @@ export function createPostgresAuthorizationPolicySource(
           }
         }
       }
-
-      // Explicit grants/denials for the principals this actor embodies.
-      // Validity is decided by the database clock so it agrees with the
-      // transaction that may be running around this read.
-      const grantRows = await sql`
-        select g.id, g.tenant_id, g.effect, g.scope, g.resource_type, g.resource_id
-          from permissions.grants g
-          join permissions.capabilities c
-            on c.id = g.capability_id and c.status = 'active'
-         where g.tenant_id = ${actor.tenantId}
-           and c.code = ${capability}
-           and g.revoked_at is null
-           and g.valid_from <= now()
-           and (g.valid_until is null or g.valid_until > now())
-           and (
-                 (g.principal_type = 'user' and g.principal_id = ${actor.userId})
-              or (g.principal_type = 'membership' and g.principal_id = ${actor.membershipId ?? null})
-              or (g.principal_type = 'organisation' and g.principal_id = ${actor.organisationId ?? null})
-           )`;
 
       for (const raw of grantRows) {
         const row = GrantRowSchema.safeParse(raw);

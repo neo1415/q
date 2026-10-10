@@ -267,9 +267,11 @@ import {
   type QViewingMoment,
 } from "@capital-q/contracts";
 import {
+  cachedInRun,
   checkDatabaseReadiness,
   createRequestDatabaseClient,
 } from "@capital-q/database";
+import { withRunReadCache } from "./composition/run-read-cache.js";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createOnboardingNudges,
@@ -277,6 +279,7 @@ import {
   createOnboardingService,
   OnboardingSessionIdSchema,
   createOwnOnboardingSummaryReader,
+  type OwnOnboardingSummaryReader,
 } from "@capital-q/onboarding";
 import {
   composeChat,
@@ -871,7 +874,11 @@ const firewall = recordingFirewall(baseFirewall, {
 });
 // end ADMIN block
 
-const repositories = createPostgresQRuntimeRepositories();
+// R5: the run's own conversation reads, once per run (read-your-writes).
+const repositories = withRunReadCache(
+  createPostgresQRuntimeRepositories({ runCacheRoot: database.sql }),
+  database.sql,
+);
 const ownInvestorOrganisations = createPostgresInvestorOrganisationRepository();
 const runtimeDependencies = {
   sql: database.sql,
@@ -896,23 +903,44 @@ const runtimeDependencies = {
         : Promise.resolve(false);
     },
   },
+  // R5: both are read once per run (a run asked up to seven times); a
+  // write by the run to the table drops the entry.
   ownInvestorOrganisation: async (actor: ActorContext) => {
-    if (actor.organisationId === undefined) return null;
-    const found = await ownInvestorOrganisations.findByOrganisation(
-      database.sql,
-      actor.tenantId,
-      actor.organisationId,
+    const organisationId = actor.organisationId;
+    if (organisationId === undefined) return null;
+    const found = await cachedInRun(
+      {
+        aggregate: "own-investor-organisation",
+        tables: ["core.investor_organisations"],
+        actor: `${actor.tenantId}/${organisationId}`,
+        fingerprint: "",
+      },
+      () =>
+        ownInvestorOrganisations.findByOrganisation(
+          database.sql,
+          actor.tenantId,
+          organisationId,
+        ),
     );
     return found === null ? null : found.id;
   },
   // A founder's own company, the default "my company" (CQ-QX-008).
   ownCompany: async (actor: ActorContext) => {
-    if (actor.organisationId === undefined) return null;
-    const found =
-      (await companies.findOrganisationCompany?.(
-        actor.tenantId,
-        actor.organisationId,
-      )) ?? null;
+    const organisationId = actor.organisationId;
+    if (organisationId === undefined) return null;
+    const found = await cachedInRun(
+      {
+        aggregate: "own-company",
+        tables: ["core.companies"],
+        actor: `${actor.tenantId}/${organisationId}`,
+        fingerprint: "",
+      },
+      async () =>
+        (await companies.findOrganisationCompany?.(
+          actor.tenantId,
+          organisationId,
+        )) ?? null,
+    );
     return found === null ? null : found.id;
   },
 };
@@ -1980,7 +2008,28 @@ const profileFindingsReader = createProfileFindingsReader({
 // Setup reminders (founder directive 2026-09-27): the versioned policy
 // over the person's own setup, keyed by the actor's own user id. Q says it
 // at a natural pause; "later", "stop" and "let's finish it" are tools.
-const onboardingNudges = createOnboardingNudges({ sql: database.sql });
+// Their own onboarding, as Q and the reminders read it: once per run (R5;
+// it was read four times), dropped by any onboarding or mandate write the
+// run makes.
+const ownOnboardingSummaryReads = createOwnOnboardingSummaryReader({
+  sql: database.sql,
+});
+const ownOnboardingSummaries: OwnOnboardingSummaryReader = {
+  read: (userId) =>
+    cachedInRun(
+      {
+        aggregate: "onboarding-summary",
+        tables: ["onboarding.", "core.investor_mandate"],
+        actor: userId,
+        fingerprint: "",
+      },
+      () => ownOnboardingSummaryReads.read(userId),
+    ),
+};
+const onboardingNudges = createOnboardingNudges({
+  sql: database.sql,
+  summaries: ownOnboardingSummaries,
+});
 
 // AUTO block (ADR 0030): "Q, handle it". The store, the approval board
 // its tools prepare on, and the port every Q surface reads it through.
@@ -3439,9 +3488,6 @@ void embeddings
 // after every run to propose memories and keep the conversation summary
 // current. Recall is composed into the prompts below; learning is hung on
 // the orchestrator further down.
-const ownOnboardingSummaries = createOwnOnboardingSummaryReader({
-  sql: database.sql,
-});
 const displayNameFor = async (actor: ActorContext): Promise<string | null> => {
   // A profile belongs to a person, not to a tenant: the predicate is the
   // acting user's own id, so this can only ever read the caller's name.

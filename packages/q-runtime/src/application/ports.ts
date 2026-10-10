@@ -255,6 +255,16 @@ export type QRunEventRepository = {
     tx: TransactionContext,
     input: NewQRunEvent,
   ) => Promise<QRunEventRecord>;
+  /**
+   * R5: allocate the run's next sequence and append the event in ONE
+   * statement (the same row lock, the same consecutive numbering, the same
+   * unique (run_id, sequence) arbiter). Null when the run does not exist.
+   * Optional: a store without it is used through allocate + append.
+   */
+  readonly appendNext?: (
+    tx: TransactionContext,
+    input: Omit<NewQRunEvent, "sequence">,
+  ) => Promise<QRunEventRecord | null>;
   /** Ordered by sequence; `afterSequence` is the replay cursor. */
   readonly listForRun: (
     executor: DatabaseExecutor,
