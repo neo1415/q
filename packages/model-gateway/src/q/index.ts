@@ -114,6 +114,7 @@ import {
   type DiscoveryAnswer,
 } from "./discover-companies.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
+export { identityCardBlock } from "./person-search-answer.js";
 export {
   createPersonBriefReader,
   type PersonBriefReaderInput,

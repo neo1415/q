@@ -166,7 +166,8 @@ export const QAnswerCardSchema = z
      */
     external: z
       .object({
-        externalPersonId: z.string().uuid(),
+        /** Null for a candidate that is not yet a researched record. */
+        externalPersonId: z.string().uuid().nullable(),
         profileUrl: z
           .string()
           .url()
@@ -174,6 +175,18 @@ export const QAnswerCardSchema = z
           .startsWith("https://")
           .nullable(),
         rehearse: z.boolean(),
+        /** The public sources the card rests on, to open (https only). */
+        sources: z
+          .array(
+            z
+              .object({
+                label: z.string().trim().min(1).max(120),
+                url: z.string().url().max(2048).startsWith("https://"),
+              })
+              .strict(),
+          )
+          .max(8)
+          .optional(),
       })
       .strict()
       .optional(),

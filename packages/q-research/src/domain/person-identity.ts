@@ -26,6 +26,13 @@ import { canonicalUrlKey, publicDomainOf } from "./url-safety.js";
 export type PersonSpec = {
   readonly name: string;
   readonly place: string | null;
+  /**
+   * The place the member gave, kept apart when known: a city match tells
+   * two people apart, a shared country does not (W4: "the one in Abuja"
+   * stayed ambiguous because both were in Nigeria).
+   */
+  readonly city?: string | null | undefined;
+  readonly country?: string | null | undefined;
   readonly organization: string | null;
   readonly role: string | null;
   /** Other spellings of the name (transliterations); the name itself is implied. */
@@ -48,6 +55,8 @@ export type PersonCandidate = {
   readonly hits: readonly SourcedHit[];
   readonly domains: readonly string[];
   readonly placeMatch: "MATCH" | "CONTRADICTED" | "UNKNOWN";
+  /** 2: the city agrees; 1: only the country (or an unsplit place) agrees; 0: neither. */
+  readonly placeScore: 0 | 1 | 2;
   readonly organizationMatch: "MATCH" | "CONTRADICTED" | "UNKNOWN";
   readonly roleMatch: "MATCH" | "UNKNOWN";
   /** How many of the anchors the member gave this candidate matches. */
@@ -333,6 +342,32 @@ function placeReading(
   return stated.length > 0 ? "CONTRADICTED" : "UNKNOWN";
 }
 
+/**
+ * How well the place the member gave agrees: the city beats a shared
+ * country. Without a split place (city/country), any agreement is 1.
+ */
+function placeScoreOf(
+  spec: PersonSpec,
+  location: string | null,
+  subdomainCountry: string | null,
+  surroundingText: string,
+): 0 | 1 | 2 {
+  const evidence = [location, subdomainCountry, surroundingText]
+    .filter((value): value is string => value !== null)
+    .join(" ");
+  const agrees = (text: string | null | undefined): boolean =>
+    text !== null &&
+    text !== undefined &&
+    placeWords(text).some((word) => containsPhrase(evidence, word));
+  if (spec.city !== null && spec.city !== undefined && agrees(spec.city)) {
+    return 2;
+  }
+  if (spec.city !== undefined || spec.country !== undefined) {
+    return agrees(spec.country) ? 1 : 0;
+  }
+  return spec.place !== null && agrees(spec.place) ? 1 : 0;
+}
+
 function orgReading(
   organization: string | null,
   statedOrg: string | null,
@@ -457,6 +492,12 @@ export function rankCandidates(
       subCountry,
       text,
     );
+    const placeScore = placeScoreOf(
+      spec,
+      draft.facts.location,
+      subCountry,
+      text,
+    );
     const organizationMatch = orgReading(
       spec.organization,
       draft.facts.organization,
@@ -498,6 +539,7 @@ export function rankCandidates(
       hits: all,
       domains,
       placeMatch,
+      placeScore,
       organizationMatch,
       roleMatch,
       anchorsMatched,
@@ -530,6 +572,7 @@ export function rankCandidates(
         ),
       ],
       placeMatch,
+      placeScore: placeScoreOf(spec, null, null, text),
       organizationMatch,
       roleMatch: "UNKNOWN",
       anchorsMatched,
@@ -550,6 +593,8 @@ const CONFIDENCE_ORDER: Readonly<Record<ExternalPersonConfidence, number>> = {
 function compareCandidates(a: PersonCandidate, b: PersonCandidate): number {
   return (
     CONFIDENCE_ORDER[b.confidence] - CONFIDENCE_ORDER[a.confidence] ||
+    // A city match outranks a shared country (and a country match, silence).
+    b.placeScore - a.placeScore ||
     b.anchorsMatched - a.anchorsMatched ||
     Number(b.profileUrl !== null) - Number(a.profileUrl !== null) ||
     b.domains.length - a.domains.length ||
@@ -587,8 +632,11 @@ export function decideIdentity(
   }
   const rivals = viable.slice(1).filter((c) => {
     if (c.profileUrl === null && top.profileUrl !== null) return false;
-    // A rival dominated on the member's anchors is a namesake, not a doubt.
-    return c.anchorsMatched >= top.anchorsMatched;
+    // A rival dominated on the member's anchors is a namesake, not a doubt;
+    // so is one whose place agrees less well (country only, against a city).
+    return (
+      c.anchorsMatched >= top.anchorsMatched && c.placeScore >= top.placeScore
+    );
   });
   if (rivals.length > 0) {
     return { kind: "AMBIGUOUS", candidates: [top, ...rivals].slice(0, 4) };

@@ -73,7 +73,18 @@ function firstName(name: string): string {
   return name.split(/\s+/u)[0] ?? name;
 }
 
-function cardBlock(card: IdentityCard): QAnswerCardsBlock | null {
+/** The identity card as Q shows it, from a stored or searched card. */
+export function identityCardBlock(
+  card: IdentityCard,
+  others: readonly IdentityCandidate[] = [],
+): QAnswerCardsBlock | null {
+  return cardBlock(card, others);
+}
+
+function cardBlock(
+  card: IdentityCard,
+  others: readonly IdentityCandidate[] = [],
+): QAnswerCardsBlock | null {
   const s = card.subject;
   const reasons = [
     card.attributionLine ?? CONFIDENCE_WORDS[s.confidence],
@@ -132,38 +143,84 @@ function cardBlock(card: IdentityCard): QAnswerCardsBlock | null {
               ? s.profileUrl
               : null,
           rehearse: card.actions.includes("REHEARSE"),
+          sources: sourceLinks(card),
         },
       },
+      // The other people the search could not rule out are cards too.
+      ...candidateCards(others, 2),
     ],
     followUps,
   });
   return parsed.success ? parsed.data : null;
 }
 
+/** The card's sources as links: a title, else the host; https only. */
+function sourceLinks(card: IdentityCard) {
+  const seen = new Set<string>();
+  const links: { label: string; url: string }[] = [];
+  for (const source of card.sources) {
+    if (!source.url.startsWith("https://") || seen.has(source.url)) continue;
+    seen.add(source.url);
+    links.push({
+      label: (source.title ?? source.domain).slice(0, 120) || source.domain,
+      url: source.url,
+    });
+    if (links.length >= 8) break;
+  }
+  return links;
+}
+
+/** One card per candidate, each with its own number so keys never collide. */
+function candidateCards(
+  candidates: readonly IdentityCandidate[],
+  firstHue: number,
+) {
+  return candidates.slice(0, 4).map((c, at) => ({
+    key: `candidate-${String(at + 1)}-${(c.profileUrl ?? c.displayName).slice(-40)}`.slice(
+      0,
+      64,
+    ),
+    name: c.displayName.slice(0, 80),
+    line: joinLine([c.role, c.organization, c.location]),
+    about: c.profileUrl === null ? null : c.profileUrl.slice(0, 160),
+    hue: ((firstHue - 1 + at) % 7) + 1,
+    fit: null,
+    reasons: [CONFIDENCE_WORDS[c.confidence]],
+    measures: [],
+    view: null,
+    said: null,
+    sourceCount: c.profileUrl === null ? 0 : 1,
+    subject: null,
+    ...(c.profileUrl !== null && c.profileUrl.startsWith("https://")
+      ? {
+          external: {
+            // Not yet a researched record: only its public page to open.
+            externalPersonId: null,
+            profileUrl: c.profileUrl,
+            rehearse: false,
+            sources: [
+              {
+                label: (c.displayName + " - public profile").slice(0, 120),
+                url: c.profileUrl,
+              },
+            ],
+          },
+        }
+      : {}),
+  }));
+}
+
 function candidatesBlock(
   candidates: readonly IdentityCandidate[],
+  question: string | null,
 ): QAnswerCardsBlock | null {
   const parsed = QAnswerCardsBlockSchema.safeParse({
     kind: "ANSWER_CARDS",
     shape: "RESEARCH",
-    title: "Which one?",
-    cards: candidates.slice(0, 4).map((c, at) => ({
-      key: `candidate-${String(at + 1)}-${(c.profileUrl ?? c.displayName).slice(-40)}`.slice(
-        0,
-        64,
-      ),
-      name: c.displayName.slice(0, 80),
-      line: joinLine([c.role, c.organization, c.location]),
-      about: c.profileUrl === null ? null : c.profileUrl.slice(0, 160),
-      hue: (at % 7) + 1,
-      fit: null,
-      reasons: [CONFIDENCE_WORDS[c.confidence]],
-      measures: [],
-      view: null,
-      said: null,
-      sourceCount: 1,
-      subject: null,
-    })),
+    // The one clarifying question heads the cards when it fits.
+    title:
+      question !== null && question.length <= 120 ? question : "Which one?",
+    cards: candidateCards(candidates, 1),
     followUps: [],
   });
   return parsed.success ? parsed.data : null;
@@ -266,9 +323,9 @@ export async function runPersonSearch(input: {
   const result = parsed.data;
   const block =
     result.outcome === "MATCHED" && result.card !== null
-      ? cardBlock(result.card)
+      ? cardBlock(result.card, result.candidates)
       : result.outcome === "AMBIGUOUS"
-        ? candidatesBlock(result.candidates)
+        ? candidatesBlock(result.candidates, result.clarifyingQuestion)
         : null;
   return {
     text: personSearchText(result, ask),

@@ -131,6 +131,48 @@ export type AnswerCardActions = {
   readonly onRehearse?: ((card: QAnswerCard) => void) | undefined;
 };
 
+/**
+ * W4: the sources an identity card rests on, as links: the top three open
+ * in a new tab (title or host, noopener); the rest sit behind a disclosure.
+ */
+function SourceLinks({
+  sources,
+}: {
+  readonly sources: readonly { readonly label: string; readonly url: string }[];
+}) {
+  const link = (source: { readonly label: string; readonly url: string }) => (
+    <li key={source.url}>
+      <a
+        className="underline"
+        href={source.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-ac-source-link
+      >
+        {source.label}
+      </a>
+    </li>
+  );
+  const rest = sources.slice(3);
+  return (
+    <div className="flex w-full flex-col gap-1" data-ac-source-links>
+      <ul className="cq-body-sm m-0 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-(--cq-text-secondary)">
+        {sources.slice(0, 3).map(link)}
+      </ul>
+      {rest.length === 0 ? null : (
+        <details className="cq-body-sm text-(--cq-text-secondary)">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center">
+            More sources
+          </summary>
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+            {rest.map(link)}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function AnswerCard({
   card,
   rank,
@@ -345,6 +387,10 @@ function AnswerCard({
                     : "Open profile"}
                 </button>
               ) : null}
+              {card.external?.sources === undefined ||
+              card.external.sources.length === 0 ? null : (
+                <SourceLinks sources={card.external.sources} />
+              )}
               {card.external?.profileUrl == null ? null : (
                 <a
                   className="cq-ac-btn"
@@ -366,7 +412,7 @@ function AnswerCard({
                   onClick={() => {
                     if (actions.onRehearse !== undefined) {
                       actions.onRehearse(card);
-                    } else if (card.external !== undefined) {
+                    } else if (card.external?.externalPersonId != null) {
                       openExternalRehearsal(card.external.externalPersonId);
                     }
                   }}

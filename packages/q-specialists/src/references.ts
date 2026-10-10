@@ -431,7 +431,8 @@ export function rehearseWithPersonCard(
   const externals = (latest.blocks ?? []).flatMap((block) =>
     block.kind === "ANSWER_CARDS"
       ? block.cards.flatMap((card) =>
-          card.external?.rehearse === true
+          card.external?.rehearse === true &&
+          card.external.externalPersonId !== null
             ? [{ id: card.external.externalPersonId, name: card.name }]
             : [],
         )
@@ -443,7 +444,10 @@ export function rehearseWithPersonCard(
   const pronoun = /^(?:him|her|them|this |that |the same )/iu.test(who);
   if (!pronoun) {
     // A name: the card's own (full, or any one word of it), nobody else's.
-    const spoken = who.toLowerCase().replace(/[’']s$/u, "");
+    const spoken = who
+      .toLowerCase()
+      .replace(/[.!?,;:]+$/u, "")
+      .replace(/[’']s$/u, "");
     const parts = only.name.toLowerCase().split(/\s+/u);
     const ok =
       spoken === only.name.toLowerCase() ||
@@ -451,4 +455,24 @@ export function rehearseWithPersonCard(
     if (!ok) return null;
   }
   return { externalPersonId: only.id, name: only.name };
+}
+
+/**
+ * W4: the name said in "rehearse with <name>" (not a pronoun), or null.
+ * A name only: whether it is a researched entity is decided by the
+ * lookup, and whether they may rehearse with it by open_page.
+ */
+export function rehearsalNameOf(text: string): string | null {
+  const said = text.replace(/\s+/gu, " ").trim();
+  if (said.length === 0 || said.length > 240 || NOT_WANTED.test(said)) {
+    return null;
+  }
+  const who = REHEARSE_WITH.exec(said)?.[1];
+  if (who === undefined) return null;
+  if (/^(?:him|her|them|this |that |the same )/iu.test(who)) return null;
+  const name = who
+    .replace(/[.!?,;:]+$/u, "")
+    .replace(/[’']s$/u, "")
+    .trim();
+  return name.length >= 3 ? name : null;
 }

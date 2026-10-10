@@ -133,6 +133,7 @@ import {
   openTarget,
   referenceNote,
   repeatedAction,
+  rehearsalNameOf,
   rehearseWithPersonCard,
   shownItems,
   type LastAction,
@@ -261,6 +262,7 @@ import {
   wordsNamePage,
 } from "./page-request.js";
 import { resolveNamedRecord } from "./fast-navigation.js";
+import { namedRecordRequestOf } from "./named-record-request.js";
 import type { TurnReference, TurnSkimResult } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
@@ -571,6 +573,25 @@ export type SpecialistQAnswerDependencies = {
    * open_page's authorize step. Absent: such a turn is answered as before.
    */
   readonly openRecord?: QOpenRecordPort | undefined;
+  /**
+   * W4: a researched person, organisation or agency the asker can already
+   * reach by name -- a prepared public seed or one of their own researched
+   * records -- with its identity card ready to show. No web search: the
+   * fallback when a name is none of their relationships.
+   */
+  readonly externalEntities?:
+    | {
+        readonly find: (
+          request: QAnswerRequest,
+          name: string,
+        ) => Promise<{
+          readonly externalPersonId: string;
+          readonly displayName: string;
+          readonly said: string;
+          readonly blocks: readonly QResultBlock[];
+        } | null>;
+      }
+    | undefined;
   /** Whether public research exists in this composition at all. */
   readonly researchAvailable?: boolean | undefined;
   /**
@@ -1854,6 +1875,56 @@ export function createSpecialistQAnswer(
    * Null: not such a request, or a plain-words name nothing of theirs
    * matches (the normal path answers it).
    */
+  /**
+   * W4 ("take me to Shadi Qishta", "rehearse with Shadi Qishta"): a name
+   * that is none of their relationships but is a researched entity they
+   * can reach (prepared seed or their own research). Opens its identity
+   * card in focus, or the rehearsal lobby when "rehearse" is said (through
+   * open_page's authorize step). Null: not such a request or no such entity.
+   */
+  const externalEntityAnswer = async (
+    request: QAnswerRequest,
+    text: string,
+    mode: "REHEARSE" | "OPEN",
+  ): Promise<{
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+  } | null> => {
+    const finder = dependencies.externalEntities;
+    if (finder === undefined) return null;
+    const name =
+      mode === "REHEARSE"
+        ? rehearsalNameOf(text)
+        : (namedRecordRequestOf(text)?.name ?? null);
+    if (name === null) return null;
+    // Their own counterparts keep their own, richer paths.
+    const own = await (
+      dependencies.counterpartNames?.(request) ?? Promise.resolve([])
+    ).catch(() => [] as readonly string[]);
+    if (own.some((one) => one.toLowerCase() === name.toLowerCase())) {
+      return null;
+    }
+    const hit = await finder.find(request, name).catch(() => null);
+    if (hit === null) return null;
+    if (mode === "REHEARSE") {
+      const port = dependencies.openRecord;
+      if (port === undefined) return null;
+      const intent = await port
+        .open(request, {
+          page: "EXTERNAL_REHEARSAL",
+          id: hit.externalPersonId,
+          name: hit.displayName,
+        })
+        .catch(() => null);
+      if (intent === null) return null;
+      return {
+        said: `Opening a rehearsal with ${hit.displayName}. It is an AI rehearsal informed by public sources, not the real person.`,
+        blocks: [{ kind: "UI_INTENT", intent }],
+      };
+    }
+    return { said: hit.said, blocks: hit.blocks };
+  };
+
   const namedRecordAnswer = async (
     request: QAnswerRequest,
     text: string,
@@ -2615,6 +2686,20 @@ export function createSpecialistQAnswer(
         );
       }
     }
+    // W4: "rehearse with Shadi Qishta" for a researched entity by name.
+    const namedRehearsal = await externalEntityAnswer(
+      request,
+      latest.content,
+      "REHEARSE",
+    );
+    if (namedRehearsal !== null) {
+      return recordAnswer(
+        request,
+        conversationId,
+        namedRehearsal.said,
+        namedRehearsal.blocks,
+      );
+    }
     // What Q showed and last did, for "that one" and "try again".
     const shown = shownItems(history);
     const lastAction = lastActed.get(conversationId) ?? null;
@@ -2711,6 +2796,27 @@ export function createSpecialistQAnswer(
     // name means, among their own relationships first, opened by code --
     // or one short line naming who it could be. Never "Understood.".
     const byName = await namedRecordAnswer(request, latest.content);
+    // W4: none of their relationships, but a researched entity they can
+    // reach by name: its identity card in focus.
+    if (byName === null || byName.log === "NOT_FOUND") {
+      const external = await externalEntityAnswer(
+        request,
+        latest.content,
+        "OPEN",
+      );
+      if (external !== null) {
+        logger?.info(
+          { qRunId: request.runId },
+          "q showed a researched entity by its name",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          external.said,
+          external.blocks,
+        );
+      }
+    }
     if (byName !== null) {
       logger?.info(
         { qRunId: request.runId, outcome: byName.log },

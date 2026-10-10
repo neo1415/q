@@ -135,6 +135,8 @@ export function createFindPublicEntityTool(
         userId: context.actor.userId,
         name: input.name,
         place,
+        city: input.city,
+        country: input.country,
         organization: input.organization,
         role: input.role,
         userText: context.conversation?.latestUserText ?? "",
