@@ -4,6 +4,7 @@ import { UuidSchema } from "../common/ids.js";
 import { MoneySchema } from "../common/money.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { EvidenceStatusSchema } from "../evidence/vocabulary.js";
+import { CompanyRaiseViewSchema } from "./company-raise.js";
 
 /**
  * Fit with your mandate (founder brief 2026-10-05, B1-B4; ADR 0052).
@@ -214,6 +215,12 @@ export const FitComparisonEntryDtoSchema = z
     about: z.string().max(400).nullable().optional(),
     /** The current raise, only where disclosure lets this reader see it. */
     raise: MoneySchema.nullable().optional(),
+    /**
+     * R2: the raise as this reader sees it on every surface (`raiseFor`),
+     * for display. `raise` above stays the disclosed objective the fit
+     * itself was computed from. Absent where no reader is composed.
+     */
+    raiseView: CompanyRaiseViewSchema.optional(),
     sources: z.array(FitCandidateSourceSchema).min(1).max(3),
     profile: FitProfileDtoSchema,
     /** Rows where this entry is the best of the set (shown with a word, never colour alone). */

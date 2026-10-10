@@ -72,6 +72,7 @@ import {
   cuesAround,
   extractPitchClaims,
   MediaAssetIdSchema,
+  firstPitchRaise,
 } from "@capital-q/media";
 import { MEDIA_EVENTS } from "@capital-q/media/events";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
@@ -522,6 +523,7 @@ import {
   createRecommendationExplanationService,
   createMaterialChanges,
   createSlateReadPipeline,
+  composeCompanyRaiseReader,
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
 
@@ -1232,6 +1234,39 @@ const pitchMedia = createMediaService({
             ownerOrganisationId: facts.organisationId,
           };
     },
+  },
+});
+// R2: the one company read for the raise, composed exactly as the API's
+// Discover card and profile compose it, so Q says what those screens say.
+const raisePitches = createPostgresDiscoverablePitchQueryPort({
+  sql: database.sql,
+});
+const companyRaise = composeCompanyRaiseReader({
+  sql: database.sql,
+  companies,
+  capital,
+  disclosure,
+  policies: createPostgresDisclosurePolicyRepository(),
+  isInvestor: async (actor) =>
+    (await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+      actor,
+    )) !== null,
+  pitches: () => raisePitches,
+  mayPlay: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    return parsed.success
+      ? pitchMedia.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
+      : false;
+  },
+  pitchRaise: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    if (!parsed.success) return null;
+    const view = await pitchMedia.getPitchTranscript({
+      actor,
+      companyId,
+      mediaAssetId: parsed.data,
+    });
+    return view.status === "AVAILABLE" ? firstPitchRaise(view.cues) : null;
   },
 });
 const recommendationExplanations = createRecommendationExplanationService({
@@ -2580,6 +2615,7 @@ const qTools = createQTools({
     },
     companies,
     capital,
+    companyRaise,
     mandates,
     investors,
     authorization,

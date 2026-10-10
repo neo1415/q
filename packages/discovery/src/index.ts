@@ -870,3 +870,7 @@ export {
   type RaisePitchCandidate,
   type RaisePolicyRow,
 } from "./company-raise/reader.js";
+export {
+  composeCompanyRaiseReader,
+  type CompanyRaiseContextPorts,
+} from "./company-raise/compose.js";

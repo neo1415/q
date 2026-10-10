@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { withoutRecommendationClaims } from "@capital-q/q-core";
 
 import {
+  cardRaiseWords,
   fitAnswerCardsBlock,
   fitCardsSummary,
   fitsInOutcome,
@@ -134,5 +135,63 @@ describe("a question back beside an answer", () => {
     expect(
       (blocks ?? []).some((block) => block.kind === "CLARIFICATION_REQUEST"),
     ).toBe(true);
+  });
+});
+
+describe("R2: Q's company card says the raise the Discover card says", () => {
+  const money = { amount: "4000000", currency: "USD" };
+  const base = {
+    truthClass: "USER_CLAIM" as const,
+    evidenceStatus: "SELF_REPORTED" as const,
+    visibility: "network_visible" as const,
+  };
+  it("labels a pitch claim as their pitch, never as the disclosed raise", () => {
+    expect(
+      cardRaiseWords({
+        raise: null,
+        raiseView: {
+          ...base,
+          source: "PITCH_CLAIM",
+          money,
+          asOf: null,
+          pitch: {
+            pitchId: "38579af4-cfa2-4fd8-9381-d9f562768c03",
+            atSeconds: 43,
+          },
+        },
+      }),
+    ).toBe("$4 million (from their pitch)");
+  });
+  it("a disclosed raise is said plainly; NONE says nothing", () => {
+    expect(
+      cardRaiseWords({
+        raise: money,
+        raiseView: {
+          ...base,
+          source: "DISCLOSED_OBJECTIVE",
+          money,
+          asOf: "2026-09-01T00:00:00.000Z",
+          pitch: null,
+        },
+      }),
+    ).toBe("$4 million");
+    expect(
+      cardRaiseWords({
+        // The legacy field cannot override the one read.
+        raise: money,
+        raiseView: {
+          source: "NONE",
+          money: null,
+          truthClass: "UNKNOWN",
+          evidenceStatus: "NO_EVIDENCE",
+          visibility: null,
+          asOf: null,
+          pitch: null,
+        },
+      }),
+    ).toBeNull();
+  });
+  it("without the read, the disclosed raise as before", () => {
+    expect(cardRaiseWords({ raise: money })).toBe("$4 million");
   });
 });

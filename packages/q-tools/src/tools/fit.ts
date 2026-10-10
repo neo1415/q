@@ -1,11 +1,13 @@
 import { z } from "zod";
 
 import {
+  CompanyRaiseViewSchema,
   FIT_COMPARISON_MAX,
   FitComparisonDtoSchema,
   FitProfileDtoSchema,
   MoneySchema,
   UuidSchema,
+  type CompanyRaiseView,
 } from "@capital-q/contracts";
 import { fitComparisonText, fitProfileText } from "@capital-q/discovery";
 
@@ -81,6 +83,8 @@ export const FitProfileOutputSchema = z
     about: z.string().max(400).nullable().optional(),
     /** The current raise, only where disclosure lets this reader see it. */
     raise: MoneySchema.nullable().optional(),
+    /** R2: the raise as the Discover card and the profile say it, for display. */
+    raiseView: CompanyRaiseViewSchema.optional(),
     profile: FitProfileDtoSchema.nullable(),
     /** The same profile as plain text. */
     text: z.string(),
@@ -124,6 +128,24 @@ const TEXT: Readonly<Record<(typeof STATUSES)[number], string>> = {
   NOT_FOUND: "That company is not one you can see a fit for.",
   NOT_AVAILABLE: "Fit is not available right now.",
 };
+
+/**
+ * R2: the raise each card shows, from the one company read the Discover
+ * card and the profile use. A failed or absent read adds nothing: the card
+ * falls back to the disclosed raise, never to a guess.
+ */
+async function raiseViewsFor(
+  ports: QToolPorts,
+  actor: QToolExecutionContext["actor"],
+  companyIds: readonly string[],
+): Promise<ReadonlyMap<string, CompanyRaiseView>> {
+  if (ports.companyRaise === undefined || companyIds.length === 0) {
+    return new Map();
+  }
+  return ports.companyRaise
+    .raisesFor(actor, companyIds)
+    .catch(() => new Map<string, CompanyRaiseView>());
+}
 
 const authorize = (
   _input: unknown,
@@ -181,11 +203,16 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
       if (result.kind !== "OK") return none(result.kind);
       const item = result.items[0];
       if (item === undefined) return none("NOT_FOUND");
+      const views = await raiseViewsFor(ports, context.actor, [
+        input.companyId,
+      ]);
+      const raiseView = views.get(input.companyId);
       return {
         status: "OK",
         name: item.name,
         about: item.about ?? null,
         raise: item.raise ?? null,
+        ...(raiseView === undefined ? {} : { raiseView }),
         profile: item.assessment.profile,
         text: fitProfileText(item.name, item.assessment.profile),
         guidance: GUIDANCE,
@@ -219,9 +246,20 @@ export function createFitTopCandidatesTool(
       if (fit === undefined) return none("NOT_AVAILABLE");
       const result = await fit.top(context.actor, input.limit ?? 3);
       if (result.kind !== "OK") return none(result.kind);
+      const views = await raiseViewsFor(
+        ports,
+        context.actor,
+        result.comparison.entries.map((entry) => entry.companyId),
+      );
       return {
         status: "OK",
-        comparison: result.comparison,
+        comparison: {
+          ...result.comparison,
+          entries: result.comparison.entries.map((entry) => {
+            const raiseView = views.get(entry.companyId);
+            return raiseView === undefined ? entry : { ...entry, raiseView };
+          }),
+        },
         text: fitComparisonText(result.comparison),
         guidance: GUIDANCE,
       };

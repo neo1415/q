@@ -13,6 +13,7 @@ import {
   type PermittedContextPlan,
   type QTaskClass,
 } from "@capital-q/contracts";
+import { createCompanyRaiseReader } from "@capital-q/discovery";
 import type {
   DisclosureAccessService,
   DisclosureDecision,
@@ -733,5 +734,101 @@ describe("R35: the company on screen in Discover", () => {
     }
     expect(decided).toEqual([]);
     expect(expressed).toEqual([]);
+  });
+});
+
+/**
+ * R2 (founder, hosted 2026-10-09): Q said a company "has not shared its
+ * raise" while its profile showed the amount said in its pitch. With the
+ * one raise read composed, Q's tool carries the same view the Discover
+ * card and the profile render -- and the founder-private objective still
+ * never reaches the investor.
+ */
+describe("R2: Q's raise is the one company read", () => {
+  const PITCH = "66666666-0000-4000-8000-000000000001";
+  const raisePorts = fakePorts({
+    companies,
+    capital,
+    disclosure,
+    authorization: fakeAuthorization(),
+    relationships,
+    investorFeed,
+    companyRaise: createCompanyRaiseReader({
+      findCanonicalCompany: (id) => companies.findCanonicalCompany(id),
+      currentObjective: async (c) => {
+        const o = await capital.getCurrentForCompany(c.tenantId, c.id);
+        return o === null
+          ? null
+          : {
+              id: o.id,
+              amount: o.target.amount,
+              currency: o.target.currency,
+              startedAt: o.startedAt,
+            };
+      },
+      disclosure,
+      objectivePolicies: () => Promise.resolve([]),
+      isInvestor: (actor) => Promise.resolve(actor.organisationId === ORG_I),
+      playablePitches: (_actor, companyId) =>
+        Promise.resolve(
+          companyId === SAVED_CO
+            ? [{ mediaAssetId: PITCH, visibility: "network_visible" as const }]
+            : [],
+        ),
+      pitchRaise: () =>
+        Promise.resolve({ atSeconds: 43, amount: "4000000", currency: "EUR" }),
+    }),
+  });
+  const raiseExecutor = createQToolExecutor({
+    registry: createQToolRegistry(createDefaultQTools(raisePorts)),
+  });
+  const raiseCall = (actor: ActorContext, companyId: string) =>
+    raiseExecutor.execute(
+      {
+        callId: randomUUID(),
+        name: "get_capital_objective",
+        arguments: { companyId },
+      },
+      contextFor(actor, unnamedPlan(actor, "GENERAL_QUESTION")),
+    );
+
+  it("a private objective with a pitch claim: NOT_SHARED, and the pitch's figure labelled as the pitch's", async () => {
+    const outcome = await raiseCall(investorI, SAVED_CO);
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        availability: "NOT_SHARED_WITH_YOU",
+        objective: null,
+        raise: {
+          source: "PITCH_CLAIM",
+          money: { amount: "4000000", currency: "EUR" },
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+          pitch: { pitchId: PITCH, atSeconds: 43 },
+        },
+      },
+    });
+    expect(JSON.stringify(outcome)).not.toContain(PRIVATE_AMOUNT);
+  });
+
+  it("a disclosed objective: the same figure in the objective and the view", async () => {
+    const outcome = await raiseCall(investorI, KESTREL);
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        availability: "CURRENT",
+        objective: { target: { amount: "3000000.00", currency: "USD" } },
+        raise: {
+          source: "DISCLOSED_OBJECTIVE",
+          money: { amount: "3000000.00", currency: "USD" },
+          visibility: "relationship_shared",
+        },
+      },
+    });
+  });
+
+  it("another investor gets no relationship-shared raise through the view", async () => {
+    const outcome = await raiseCall(investorJ, KESTREL);
+    expect(JSON.stringify(outcome)).not.toContain("3000000");
   });
 });
