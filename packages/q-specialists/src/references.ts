@@ -4,6 +4,7 @@ import type {
   QResultBlock,
 } from "@capital-q/contracts";
 import type { TurnReference } from "@capital-q/q-core";
+import { movePhaseLine } from "@capital-q/q-core/speech";
 import type {
   QAnswerRequest,
   QConversationMessage,
@@ -332,25 +333,47 @@ export function createToolOpenRecordPort(dependencies: {
   };
 }
 
-/** What Q says as it opens a record (the screen follows the intent). */
+/**
+ * A record's name as Q says it: a trailing parenthetical the records carry
+ * ("Savanna Seed Partners (fictional)") and quotes are not spoken. Bounded
+ * so the pending line stays one the thread can read back (pendingPlaceOf).
+ */
+function spokenName(name: string): string {
+  const bare = name
+    .replace(/\s*\([^)]*\)\s*$/u, "")
+    .replace(/["“”]/gu, "")
+    .trim();
+  return (bare.length === 0 ? name.trim() : bare).slice(0, 60).trim();
+}
+
+/**
+ * What Q says as it opens a record (the screen follows the intent).
+ *
+ * G2-D3 (gate on build/int-rc): this said `Opening "Savanna Seed Partners
+ * (fictional)".` -- a full stop and the quoted raw name -- so the thread
+ * never recognised it as a pending move and never flipped it to "Opened".
+ * Every move line is now the one pending wording (q-core move-line.ts).
+ */
 export function openingLine(
   page: QRecordPage,
   name: string | undefined,
 ): string {
-  const what = name === undefined ? null : `"${name.slice(0, 80)}"`;
+  const what =
+    name === undefined || name.trim().length === 0 ? null : spokenName(name);
+  return movePhaseLine("PENDING", recordPlace(page, what));
+}
+
+/** The place a record move names ("Tallyloom's pitch deck", "the chat"). */
+function recordPlace(page: QRecordPage, what: string | null): string {
   switch (page) {
     case "DOCUMENT":
     case "DATA_ROOM_DOCUMENT":
-      return what === null ? "Opening the document." : `Opening ${what}.`;
+      return what ?? "the document";
     case "RELATIONSHIP_COMPANY_MESSAGES":
     case "RELATIONSHIP_INVESTOR_MESSAGES":
-      return what === null
-        ? "Opening the chat."
-        : `Opening your chat with ${what}.`;
+      return what === null ? "the chat" : `your chat with ${what}`;
     case "COMPANY_PITCH":
-      return what === null
-        ? "Opening the pitch in Your companies."
-        : `Opening ${what} in Your companies.`;
+      return `${what ?? "the pitch"} in Your companies`;
     case "COMPANY":
     case "INVESTOR":
     case "RELATIONSHIP_COMPANY":
@@ -360,20 +383,14 @@ export function openingLine(
     case "WORK_ITEM":
     case "CAPITAL_ROUND":
     case "GATEQ_APPLICATION":
-      return what === null ? "Opening it." : `Opening ${what}.`;
+      return what ?? "the page";
     case "COMPANY_ELEVATOR":
-      return what === null
-        ? "Opening the elevator pitch."
-        : `Opening ${what}'s elevator pitch.`;
+      return what === null ? "the elevator pitch" : `${what}'s elevator pitch`;
     case "COMPANY_DATA_ROOM":
-      return what === null
-        ? "Opening the data room."
-        : `Opening ${what}'s data room.`;
+      return what === null ? "the data room" : `${what}'s data room`;
     case "COMPANY_DECK":
-      return what === null
-        ? "Opening the pitch deck."
-        : `Opening ${what}'s pitch deck.`;
+      return what === null ? "the pitch deck" : `${what}'s pitch deck`;
     case "COMPANY_TEAM":
-      return what === null ? "Opening the team." : `Opening ${what}'s team.`;
+      return what === null ? "the team" : `${what}'s team`;
   }
 }
