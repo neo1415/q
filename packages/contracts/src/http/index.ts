@@ -1130,6 +1130,14 @@ export {
   type CompanyProfileOverview,
   type CompanyProfileViewer,
 } from "./company-profile.js";
+export {
+  COMPANY_RAISE_SOURCES,
+  CompanyRaiseSourceSchema,
+  CompanyRaiseViewSchema,
+  NO_RAISE_VIEW,
+  type CompanyRaiseSource,
+  type CompanyRaiseView,
+} from "./company-raise.js";
 
 export {
   EMAIL_BODY_MAX_LENGTH,

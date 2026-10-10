@@ -41,6 +41,7 @@ import {
 import {
   CorrelationIdSchema,
   type AdminUsageDto,
+  NO_RAISE_VIEW,
   PolicyExtractionDtoSchema,
 } from "@capital-q/contracts";
 import {
@@ -306,6 +307,7 @@ import {
 import { apiServiceIdentity, createApp } from "./app.js";
 import { createChatSafetyAudit } from "./chat-safety-audit.js";
 import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
+import { createApiCompanyRaiseReader } from "./company-raise.js";
 import { createRaiseSharing } from "./pitch-claims.js";
 import { createQWorkPagePort, createWorkforceJobPort } from "./q-work-port.js";
 import { createProductionEventRegistry } from "./event-registry.js";
@@ -1562,6 +1564,37 @@ const discoverablePitches = createPostgresDiscoverablePitchQueryPort({
   sql: database.sql,
 });
 
+// R2: the one company read for the raise. The Discover card and the
+// profile both render this, so one reader is told one thing on both.
+const companyRaise = createApiCompanyRaiseReader({
+  sql: database.sql,
+  companies: disclosurePorts.companies,
+  capital: disclosurePorts.capital,
+  disclosure,
+  policies: createPostgresDisclosurePolicyRepository(),
+  isInvestor: async (actor) =>
+    (await slates.eligibilityPorts.investorSubject.investorOrganisationFor(
+      actor,
+    )) !== null,
+  pitches: () => discoverablePitches,
+  mayPlay: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    return parsed.success
+      ? media.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
+      : false;
+  },
+  pitchCues: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    if (!parsed.success) return null;
+    const view = await media.getPitchTranscript({
+      actor,
+      companyId,
+      mediaAssetId: parsed.data,
+    });
+    return view.status === "AVAILABLE" ? view.cues : null;
+  },
+});
+
 /**
  * The visibility control centre (CQ-BIZ-003). The same disclosure layer
  * the reads above use, plus its policy manager for shares and revokes;
@@ -2031,13 +2064,15 @@ const { app, logger } = createApp(config, security, {
     // is no traction figure because nothing declared and network-visible
     // carries one, and unknown stays unknown.
     feedSummaries: async (actor, companyIds) => {
-      const [raises, sectors] = await Promise.all([
+      const [raises, sectors, views] = await Promise.all([
         discoverFilterFacts.disclosedRaises === undefined
           ? new Map<string, { amount: string; currency: string }>()
           : discoverFilterFacts.disclosedRaises({ actor, companyIds }),
         companySectors.sectors === undefined
           ? new Map<string, readonly string[]>()
           : companySectors.sectors(companyIds),
+        // R2: what the card says, from the same read the profile uses.
+        companyRaise.raisesFor(actor, companyIds),
       ]);
       return new Map(
         companyIds.map((companyId) => {
@@ -2054,6 +2089,7 @@ const { app, logger } = createApp(config, security, {
                       truthClass: "USER_CLAIM" as const,
                       evidenceStatus: "SELF_REPORTED" as const,
                     },
+              raiseView: views.get(companyId) ?? NO_RAISE_VIEW,
             },
           ] as const;
         }),
@@ -2166,6 +2202,8 @@ const { app, logger } = createApp(config, security, {
       capital: disclosurePorts.capital,
       policies: createPostgresDisclosurePolicyRepository(),
     }),
+    // R2: the same raise read the Discover card renders.
+    raiseView: (actor, companyId) => companyRaise.raiseFor(actor, companyId),
     disclosedRaise: async (actor, companyId) =>
       (
         await discoverFilterFacts.disclosedRaises?.({

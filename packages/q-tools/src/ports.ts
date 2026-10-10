@@ -14,6 +14,7 @@ import type { ExploreToolPort } from "./tools/explore.js";
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import type { CompanyQueryPort } from "@capital-q/companies";
 import type {
+  CompanyRaiseReader,
   CurrentSlateExplanationService,
   DiscoveryService,
   FitService,
@@ -453,6 +454,12 @@ export type QToolPorts = {
   // end ADMIN-3 block
   readonly companies: CompanyQueryPort;
   readonly capital: CapitalObjectiveQueryPort;
+  /**
+   * R2: the one company read for the raise (`raiseFor`), the same the
+   * Discover card and the profile render. Absent: Q says only what the
+   * disclosed objective says, as before.
+   */
+  readonly companyRaise?: CompanyRaiseReader | undefined;
   readonly mandates: InvestorMandateQueryPort;
   readonly investors: InvestorOrganisationQueryPort;
   readonly authorization: AuthorizationService;

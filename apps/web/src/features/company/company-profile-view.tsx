@@ -33,6 +33,8 @@ import {
 } from "./company-profile-parts";
 import { countryLabel, stageLabel } from "./declared-labels";
 import { compactMoneyText, moneyText } from "./money-text";
+import { RaiseFact } from "./raise-fact";
+import { raiseWords } from "./raise-words";
 import {
   elevatorHref,
   Fold,
@@ -280,14 +282,23 @@ export function CompanyProfileView({
     claims.filter((claim) => claim.kind === kind);
   const sayRaise = overview?.raiseFromPitch ?? claimsOf("RAISE")[0] ?? null;
   const traction = claimsOf("TRACTION");
+  // R2: with the one raise read, the line says exactly the card's words.
+  const viewWords =
+    overview?.raiseView === undefined
+      ? null
+      : raiseWords(overview.raiseView, own);
   const raiseSummary = [
-    overview?.raise
-      ? compactMoneyText(overview.raise)
-      : overview?.raiseFromPitch
-        ? `${pitchRaiseText(overview.raiseFromPitch)}, ${pitchSaid}`
-        : own
-          ? "Not added yet"
-          : "Not shared with you",
+    viewWords !== null
+      ? viewWords.amount === null
+        ? viewWords.label
+        : `${viewWords.amount} · ${viewWords.label}`
+      : overview?.raise
+        ? compactMoneyText(overview.raise)
+        : overview?.raiseFromPitch
+          ? `${pitchRaiseText(overview.raiseFromPitch)}, ${pitchSaid}`
+          : own
+            ? "Not added yet"
+            : "Not shared with you",
     investor
       ? overview?.deck
         ? "deck shared with you"
@@ -492,7 +503,36 @@ export function CompanyProfileView({
                     {stageLabel(profile.currentStageCode) ?? "Not declared"}
                   </StripCell>
                   <StripCell term="Raising">
-                    {overview.raise !== null ? (
+                    {overview.raiseView !== undefined ? (
+                      // R2: the server's one raise read, in the same words
+                      // as the Discover card.
+                      own && overview.raiseView.source === "NONE" ? (
+                        <AddYourRaise />
+                      ) : (
+                        <RaiseFact
+                          words={raiseWords(overview.raiseView, own)}
+                          {...(overview.raiseView.pitch === null
+                            ? {}
+                            : {
+                                source: (label: string) => (
+                                  <ProfileTabLink
+                                    tab="elevator"
+                                    fallbackHref={elevatorHref(
+                                      profile.companyId,
+                                    )}
+                                    className="underline underline-offset-4"
+                                    data-raise-source="PITCH_VIDEO"
+                                  >
+                                    {label},{" "}
+                                    {pitchMoment(
+                                      overview.raiseView?.pitch?.atSeconds ?? 0,
+                                    )}
+                                  </ProfileTabLink>
+                                ),
+                              })}
+                        />
+                      )
+                    ) : overview.raise !== null ? (
                       compactMoneyText(overview.raise)
                     ) : overview.raiseFromPitch !== null ? (
                       <>

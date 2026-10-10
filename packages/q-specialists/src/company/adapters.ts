@@ -140,6 +140,12 @@ export function createToolCanonicalPort(
         if (outcome.result.ok) {
           const payload = outcome.result.data as {
             availability?: "CURRENT" | "NONE" | "NOT_SHARED_WITH_YOU";
+            /** R2: the one raise read, as the card and the profile say it. */
+            raise?: {
+              source: "DISCLOSED_OBJECTIVE" | "PITCH_CLAIM" | "NONE";
+              money: { amount: string; currency: string } | null;
+              pitch: { atSeconds: number } | null;
+            };
             objective: {
               objectiveType: string;
               status: string;
@@ -152,7 +158,27 @@ export function createToolCanonicalPort(
           // Null means the company has no current objective. Unknown stays
           // unknown: nothing here turns an absent objective into "not
           // raising", which would be an assertion nobody made.
-          if (payload.availability === "NOT_SHARED_WITH_YOU") {
+          const pitchRaise =
+            payload.raise?.source === "PITCH_CLAIM" &&
+            payload.raise.money !== null
+              ? payload.raise.money
+              : null;
+          if (
+            payload.availability === "NOT_SHARED_WITH_YOU" &&
+            pitchRaise !== null
+          ) {
+            // R2: nothing disclosed, but their own pitch says it -- the
+            // same figure and label the Discover card and the profile show.
+            // The company's claim in a video, never a disclosed or verified
+            // raise, and never the founder-private objective.
+            facts.push({
+              scope: "CAPITAL_OBJECTIVE",
+              statement: `The company has not disclosed a raise to you on Capital Q. In their pitch video they say they are raising ${pitchRaise.amount} ${pitchRaise.currency}${payload.raise?.pitch == null ? "" : ` (at ${String(Math.floor(payload.raise.pitch.atSeconds / 60))}:${String(payload.raise.pitch.atSeconds % 60).padStart(2, "0")})`}: the company's own claim from its pitch, not a disclosed or verified figure.`,
+              truthClass: "USER_CLAIM",
+              evidenceStatus: "SELF_REPORTED",
+              source: "The company's pitch video (its own words)",
+            });
+          } else if (payload.availability === "NOT_SHARED_WITH_YOU") {
             // Private (or absent) to this person: said as such, so the
             // answer is "not shared with you", never "unknown" and never
             // a guess (R35).

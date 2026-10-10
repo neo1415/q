@@ -17,7 +17,9 @@ import {
   CompanyProfilePhotoDtoSchema,
   CompanyProfileDeckDownloadDtoSchema,
   CompanyProfileDtoSchema,
+  NO_RAISE_VIEW,
   parseContract,
+  type CompanyRaiseView,
   type CompanyProfileTeamMember,
   type CompanyProfileViewer,
   type Money,
@@ -121,6 +123,15 @@ export type CompanyProfilePorts = {
         readonly photo: string | null;
         readonly cover: string | null;
       }>)
+    | undefined;
+  /**
+   * R2: the raise as this reader sees it on every surface (`raiseFor`),
+   * the same read the Discover card uses. When present it decides `raise`
+   * and `raiseFromPitch`; absent (older compositions), they are derived
+   * from `disclosedRaise` and the pitch claims as before.
+   */
+  readonly raiseView?:
+    | ((actor: ActorContext, companyId: string) => Promise<CompanyRaiseView>)
     | undefined;
   /** The current raise, only where disclosure lets this actor view it. */
   readonly disclosedRaise: (
@@ -319,7 +330,7 @@ export function registerCompanyProfileRoutes(
       const full = viewer !== "FOUNDER";
       const findable = viewer === "INVESTOR" && (await mayFindRead);
 
-      const [images, videos, raise, verified, sectors, deck, team] =
+      const [images, videos, disclosed, verified, sectors, deck, team, view] =
         await Promise.all([
           profile.images === undefined
             ? quietly(profile.photo(company), null).then((photo) => ({
@@ -329,7 +340,7 @@ export function registerCompanyProfileRoutes(
             : quietly(profile.images(company), { photo: null, cover: null }),
           videosFor(actor, company.id, viewer),
           // Not computed at all for a founder viewer: not hidden, absent.
-          full
+          full && profile.raiseView === undefined
             ? quietly(profile.disclosedRaise(actor, company.id), null)
             : null,
           full
@@ -344,7 +355,19 @@ export function registerCompanyProfileRoutes(
           viewer === "OWNER" || findable
             ? quietly(profile.team(company), [] as const)
             : ([] as const),
+          // A failed read is NONE: unknown, never a guessed figure.
+          full && profile.raiseView !== undefined
+            ? quietly(profile.raiseView(actor, company.id), NO_RAISE_VIEW)
+            : null,
         ]);
+      // The one read decides the headline raise; the profile's own
+      // derivation remains only where the composition gives no reader.
+      const raise =
+        view === null
+          ? disclosed
+          : view.source === "DISCLOSED_OBJECTIVE"
+            ? view.money
+            : null;
 
       // What the pitches say, only from videos this reader may play (the
       // list above is already the player's own rule; the transcript read
@@ -366,6 +389,18 @@ export function registerCompanyProfileRoutes(
             await quietly(profile.raiseSharing(company.id), "HIDDEN")
           : "PRIVATE";
       const pitch = presentPitchRaise({ viewer, raise, claims, sharing });
+      const viewPitch = view?.source === "PITCH_CLAIM" ? view.pitch : null;
+      const raiseFromPitch =
+        view === null
+          ? pitch.raiseFromPitch
+          : viewPitch === null
+            ? null
+            : (claims.find(
+                (claim) =>
+                  claim.kind === "RAISE" &&
+                  claim.pitchId === viewPitch.pitchId &&
+                  claim.atSeconds === viewPitch.atSeconds,
+              ) ?? null);
 
       void reply.header("Cache-Control", "no-store");
       return CompanyProfileDtoSchema.parse({
@@ -399,8 +434,9 @@ export function registerCompanyProfileRoutes(
                     },
               team: [...team],
               pitchClaims: pitch.pitchClaims,
-              raiseFromPitch: pitch.raiseFromPitch,
+              raiseFromPitch,
               pitchRaiseNotice: pitch.pitchRaiseNotice,
+              ...(view === null ? {} : { raiseView: view }),
             }
           : null,
         videos,
