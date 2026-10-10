@@ -27,6 +27,7 @@ import { boardTimeline, groupByDay } from "../src/features/q/board-timeline";
 import type { QTurn } from "../src/features/q/conversation";
 import { announceQSaid } from "../src/features/q-swarm/q-said";
 import { registerClientRouter } from "../src/features/q/client-actions";
+import { registerNavigationViewer } from "../src/features/q/control/app-routes";
 import {
   onNavigationPhase,
   resetNavigationLifecycle,
@@ -497,5 +498,57 @@ describe("W4: an identity card's sources are links", () => {
     render(<AnswerCanvas block={few} focus={0} said="" />);
     expect(document.querySelectorAll("[data-ac-source-link]")).toHaveLength(2);
     expect(document.querySelector("[data-ac-source-links] details")).toBeNull();
+  });
+});
+
+describe("R5: an identity card of a prepared investor organisation", () => {
+  const externalPersonId = "0a0a5a19-7007-5711-864e-3c7d2beab5f2";
+  const investorOrganisationId = "b0075742-0000-4000-8000-0000000000c1";
+  const block = (() => {
+    const base = demoTop(1);
+    return {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        name: "QInvest LLC",
+        subject: null,
+        external: {
+          externalPersonId,
+          investorOrganisationId,
+          profileUrl: null,
+          rehearse: true,
+        },
+      })),
+    };
+  })();
+
+  it("opens the investor rehearsal for a founder", () => {
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    registerNavigationViewer({ kind: "FOUNDER", admin: false });
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Rehearse with QInvest" }),
+      );
+      expect(pushes).toEqual([
+        `/rehearsals/investor/${investorOrganisationId}`,
+      ]);
+    } finally {
+      registerNavigationViewer(null);
+      resetNavigationLifecycle();
+    }
+  });
+
+  it("hides Rehearse from an investor viewer", () => {
+    registerNavigationViewer({ kind: "INVESTOR", admin: false });
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      expect(
+        screen.queryByRole("button", { name: /Rehearse with/u }),
+      ).toBeNull();
+    } finally {
+      registerNavigationViewer(null);
+    }
   });
 });

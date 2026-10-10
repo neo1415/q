@@ -340,10 +340,10 @@ export function buildExternalPersona(input: {
   const priorities = [
     ...(quirk === undefined ? [] : [plain(quirk.label, 200)]),
     ...scenario.directions
-      .slice(0, 6 - sourcedPriorities.length)
+      .slice(0, 6 - sourcedPriorities.length - (quirk === undefined ? 0 : 1))
       .map((direction) => direction.label),
     ...sourcedPriorities,
-  ];
+  ].slice(0, 6);
 
   const backgroundLines = background.slice(0, 3).map((a) => plain(a.text, 200));
 
