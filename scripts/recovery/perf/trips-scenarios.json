@@ -1,0 +1,74 @@
+{
+  "comment": "S2 round-trip scenarios. Each is a person, a message, the run body extras and the fake vendor script for it. Loopback fake only; no provider is called.",
+  "scenarios": {
+    "mandate": {
+      "email": "investor.savanna-seed@fictional.capitalq.local",
+      "text": "What is my mandate?",
+      "rules": [
+        {
+          "name": "reader-mandate",
+          "when": { "task": "TURN_READER" },
+          "reply": {
+            "json": {
+              "kind": "QUESTION_TO_Q",
+              "confidence": "HIGH",
+              "transcript": "CLEAR",
+              "aboutNamedOther": false,
+              "question": {
+                "kind": "THEIR_OWN_RECORDS",
+                "text": "What is my mandate?",
+                "about": [],
+                "count": null,
+                "discover": null,
+                "subject": "MANDATE"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "discovery": {
+      "email": "investor.savanna-seed@fictional.capitalq.local",
+      "text": "Show me fintech companies in Nigeria",
+      "rules": [
+        {
+          "name": "skim-discover",
+          "when": { "task": "TURN_SKIM" },
+          "reply": {
+            "json": {
+              "kind": "DISCOVER_COMPANIES",
+              "confidence": "HIGH",
+              "count": null,
+              "discover": {
+                "sectors": ["fintech"],
+                "countries": ["NG"],
+                "stages": [],
+                "ranking": "NONE",
+                "mandateRelevant": false,
+                "previous": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "brief": {
+      "email": "investor.savanna-seed@fictional.capitalq.local",
+      "text": "Where do I stand with this company?",
+      "body": {
+        "subjects": [
+          {
+            "kind": "COMPANY",
+            "companyId": "02ca2f10-f7af-457c-80f0-b5e167205b8b"
+          }
+        ]
+      },
+      "rules": []
+    },
+    "analyst": {
+      "email": "investor.savanna-seed@fictional.capitalq.local",
+      "text": "Compare Tallyloom and Kazikit against my mandate and tell me what to ask them",
+      "rules": []
+    }
+  }
+}
