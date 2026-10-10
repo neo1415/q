@@ -296,16 +296,23 @@ function preparedSentence(
   const known = [name, subject.location, subject.organization]
     .filter((part): part is string => part !== null)
     .join(" ");
+  // A possessive proper-noun phrase ("Alchemist Doha's Director …") keeps
+  // its capitals and takes no article.
+  const possessive = /^(?:\p{Lu}[\p{L}-]*\s+){0,3}\p{Lu}[\p{L}-]*['’]s\b/u.test(
+    line,
+  );
   const proper =
+    possessive ||
     /[-'’]/u.test(first) ||
     /\p{Lu}.*\p{Lu}/u.test(first) ||
     known.includes(first);
   const body = proper ? line : line.replace(/^./u, (c) => c.toLowerCase());
-  const article = /['’]s$/u.test(first)
-    ? ""
-    : /^[aeiou]/iu.test(body)
-      ? "an "
-      : "a ";
+  const article =
+    possessive || /['’]s$/u.test(first)
+      ? ""
+      : /^[aeiou]/iu.test(body)
+        ? "an "
+        : "a ";
   return `${name} is ${article}${body}.`;
 }
 
