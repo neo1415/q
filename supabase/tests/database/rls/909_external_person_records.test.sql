@@ -6,7 +6,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(13);
+select plan(12);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'q_runtime.external_persons'::regclass),
