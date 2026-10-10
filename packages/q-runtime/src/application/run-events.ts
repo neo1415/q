@@ -5,7 +5,7 @@ import {
   type QStreamEvent,
   type QVisibleStage,
 } from "@capital-q/contracts";
-import type { TransactionContext } from "@capital-q/database";
+import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 
 import type { QRunEventRecord, QRunRecord } from "../contracts/index.js";
 import { QRunNotFoundError } from "../domain/errors.js";
@@ -21,6 +21,41 @@ export type QRunEventInput = {
     readonly data: Extract<QStreamEvent, { type: T }>["data"];
   };
 }[QStreamEvent["type"]];
+
+/**
+ * S2: one run event in ONE statement, on the request client, when the store
+ * can append atomically (`appendNext`); no transaction around it. Returns
+ * null when the store cannot, so the caller falls back to a transaction and
+ * `appendRunEvent`. The same contract parse as `appendRunEvent` runs first.
+ */
+export async function appendRunEventAtomic(
+  repositories: Pick<QRuntimeRepositories, "runEvents">,
+  executor: DatabaseExecutor,
+  run: Pick<QRunRecord, "id" | "tenantId">,
+  input: QRunEventInput,
+): Promise<QRunEventRecord | null | "UNSUPPORTED"> {
+  const appendNext = repositories.runEvents.appendNext;
+  if (appendNext === undefined) return "UNSUPPORTED";
+  const event = QStreamEventSchema.parse({
+    contractVersion: 1,
+    eventId: randomUUID(),
+    runId: run.id,
+    sequence: 1,
+    occurredAt: new Date().toISOString(),
+    type: input.type,
+    data: input.data,
+  });
+  return appendNext(
+    { sql: executor },
+    {
+      tenantId: run.tenantId,
+      runId: run.id,
+      eventType: event.type,
+      visibleStage: event.type === "q.stage.changed" ? event.data.stage : null,
+      payload: event.data,
+    },
+  );
+}
 
 /**
  * Append one durable run event.

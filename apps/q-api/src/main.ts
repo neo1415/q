@@ -285,7 +285,10 @@ import {
   checkDatabaseReadiness,
   createRequestDatabaseClient,
 } from "@capital-q/database";
-import { withRunReadCache } from "./composition/run-read-cache.js";
+import {
+  withRunCachedRelationshipLists,
+  withRunReadCache,
+} from "./composition/run-read-cache.js";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createOnboardingNudges,
@@ -790,6 +793,12 @@ const relationships: RelationshipQueryPort = {
       database.sql,
       companyId,
       investorOrganisationId,
+    ),
+  findManyByInvestor: (investorOrganisationId, companyIds) =>
+    relationshipRepository.findByInvestorAndCompanies(
+      database.sql,
+      investorOrganisationId,
+      companyIds,
     ),
   listEvents: (relationshipId, page = {}) =>
     relationshipEventRepository.listByRelationship(
@@ -1404,7 +1413,9 @@ const interestServiceOptions: InterestServiceOptions = {
     },
   },
 };
-const interestService = createInterestService(interestServiceOptions);
+const interestService = withRunCachedRelationshipLists(
+  createInterestService(interestServiceOptions),
+);
 /**
  * Post-meeting outcomes (2026-10-02): Q's generated pass, pause, resume
  * and meeting-outcome tools run through the same Network service as the

@@ -113,6 +113,46 @@ export type QRunTransition = {
   readonly promptBundleVersion?: string | undefined;
 };
 
+/**
+ * S2: a chain of lifecycle moves and its event as ONE statement. The
+ * caller has already checked, from the lifecycle map, that every move in
+ * the chain is legal from each status in `allowedFrom`; the statement
+ * applies the whole chain only to a run that is the actor's, in the
+ * tenant, and in one of those statuses at the instant it holds the row
+ * lock. A run anywhere else (already moved by a replay, terminal,
+ * cancel-requested, someone else's) updates nothing and returns null, and
+ * the caller falls back to the locked, step-by-step path.
+ */
+export type QRunMoveChain = {
+  readonly tenantId: TenantId;
+  readonly actorUserId: UserId;
+  readonly runId: QRunId;
+  /** The statuses the chain may start from. */
+  readonly allowedFrom: readonly QRunStatus[];
+  /** How many lifecycle moves the chain is (the version rises by this). */
+  readonly steps: number;
+  readonly status: QRunStatus;
+  readonly startedAt?: UtcTimestamp | undefined;
+  readonly completedAt?: UtcTimestamp | undefined;
+  readonly failureCode?: QFailureDiagnosticCode | undefined;
+  readonly orchestrationVersion?: string | undefined;
+  readonly modelPolicyVersion?: string | undefined;
+  readonly promptBundleVersion?: string | undefined;
+  /**
+   * The one event the chain appends, if any. With `onlyIfStageDiffers`
+   * it is appended only when the run's latest visible stage is not
+   * already that stage (a replay never duplicates a stage event).
+   */
+  readonly event?:
+    | {
+        readonly eventType: string;
+        readonly visibleStage: QVisibleStage | null;
+        readonly payload: unknown;
+        readonly onlyIfStageDiffers: boolean;
+      }
+    | undefined;
+};
+
 export type QRunRepository = {
   readonly insert: (
     tx: TransactionContext,
@@ -173,6 +213,13 @@ export type QRunRepository = {
     tx: TransactionContext,
     input: QRunTransition,
   ) => Promise<QRunRecord | null>;
+  /** S2: see QRunMoveChain. Absent: the caller uses `transition`. */
+  readonly moveChain?:
+    | ((
+        executor: DatabaseExecutor,
+        input: QRunMoveChain,
+      ) => Promise<QRunRecord | null>)
+    | undefined;
   /**
    * Claims the next per-run event sequence under the run's row lock. Two
    * concurrent writers receive distinct consecutive numbers; neither is
@@ -262,7 +309,10 @@ export type QRunEventRepository = {
    * Optional: a store without it is used through allocate + append.
    */
   readonly appendNext?: (
-    tx: TransactionContext,
+    // Only the executor is used: the statement is atomic by itself, so a
+    // caller with no transaction of its own may pass its request client
+    // (S2: a stage event was BEGIN, the event, COMMIT).
+    tx: { readonly sql: DatabaseExecutor },
     input: Omit<NewQRunEvent, "sequence">,
   ) => Promise<QRunEventRecord | null>;
   /** Ordered by sequence; `afterSequence` is the replay cursor. */

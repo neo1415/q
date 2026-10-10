@@ -1,4 +1,5 @@
 import { cachedInRun, type DatabaseExecutor } from "@capital-q/database";
+import type { InterestService } from "@capital-q/network";
 import type { QRuntimeRepositories } from "@capital-q/q-runtime";
 
 /**
@@ -65,5 +66,62 @@ export function withRunReadCache(
             );
       },
     },
+  };
+}
+
+/**
+ * S2: the actor's own relationship list, read once per run. One turn asks
+ * for it from the standing tool, the brief, the diligence read, the
+ * commitments read and the app-action reads (up to six times), each a
+ * visibility check, a company read and a history read per relationship.
+ * The key carries the full actor (tenant, user, organisation, membership),
+ * so another person never reaches the entry; it lives and dies with the
+ * run's counter; a write this run sends to any of the tables drops it.
+ */
+const RELATIONSHIP_LIST_TABLES = [
+  "network.relationships",
+  "network.relationship_events",
+  "core.companies",
+  "core.investor_organisations",
+  "permissions.disclosure_policies",
+] as const;
+
+export function withRunCachedRelationshipLists(
+  service: InterestService,
+): InterestService {
+  const who = (actor: {
+    readonly tenantId: string;
+    readonly userId: string;
+    readonly organisationId?: string | undefined;
+    readonly membershipId?: string | undefined;
+  }) =>
+    [
+      actor.tenantId,
+      actor.userId,
+      actor.organisationId ?? "",
+      actor.membershipId ?? "",
+    ].join("/");
+  return {
+    ...service,
+    listRelationshipsForInvestor: (query) =>
+      cachedInRun(
+        {
+          aggregate: "relationships-investor",
+          tables: RELATIONSHIP_LIST_TABLES,
+          actor: who(query.actor),
+          fingerprint: "",
+        },
+        () => service.listRelationshipsForInvestor(query),
+      ),
+    listRelationshipsForCompany: (query) =>
+      cachedInRun(
+        {
+          aggregate: "relationships-company",
+          tables: RELATIONSHIP_LIST_TABLES,
+          actor: who(query.actor),
+          fingerprint: query.companyId,
+        },
+        () => service.listRelationshipsForCompany(query),
+      ),
   };
 }
