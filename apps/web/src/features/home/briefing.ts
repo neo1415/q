@@ -33,6 +33,15 @@ export type RelationshipFact = {
   readonly stateSince: string;
   /** For a company, the counterpart's id, so a slate company can be matched. */
   readonly counterpartId: string;
+  /**
+   * From the Relationship Brief (R1), when it was read: the next booked
+   * call, or that the calls could not be read. Absent: not read, and the
+   * line then claims nothing about calls.
+   */
+  readonly calls?:
+    | { readonly status: "OK"; readonly nextAt: string | null }
+    | { readonly status: "UNAVAILABLE" }
+    | undefined;
 };
 
 /** Founder only: an investor's interest in their company, unanswered. */
@@ -163,6 +172,27 @@ function isNews(fact: RelationshipFact, since: string): boolean {
   return !Number.isNaN(at) && !Number.isNaN(from) && at >= from;
 }
 
+const callDay = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "UTC",
+});
+
+/** Never "book a first meeting" over a call that is booked or unknown (R1). */
+function connectedLine(fact: RelationshipFact): string {
+  const calls = fact.calls;
+  if (calls?.status === "UNAVAILABLE") {
+    return "Your calls couldn't be read just now.";
+  }
+  if (calls?.status === "OK" && calls.nextAt !== null) {
+    return `Your call is booked for ${callDay.format(new Date(calls.nextAt))} UTC.`;
+  }
+  return "A first meeting is the natural next step.";
+}
+
 function relationshipItems(facts: BriefingFacts): BriefingItem[] {
   const recent = (facts.relationships ?? [])
     .filter((fact) => isNews(fact, facts.since))
@@ -174,7 +204,7 @@ function relationshipItems(facts: BriefingFacts): BriefingItem[] {
       items.push({
         id,
         title: `You're connected with ${fact.counterpartName}`,
-        description: "A first meeting is the natural next step.",
+        description: connectedLine(fact),
         href: fact.href,
       });
     } else if (fact.state === "PASSED" && facts.role === "FOUNDER") {

@@ -82,8 +82,10 @@ type Loaded<Extra> =
       readonly profile: CounterpartProfile;
       /** The first page of messages; null when not open or unreadable. */
       readonly thread: ChatThreadDto | null;
-      /** The relationship's calls (booked, past, cancelled); [] if none. */
+      /** The relationship's calls (booked, past, cancelled); [] if none or unread. */
       readonly meetings: readonly MeetingDto[];
+      /** False: the calls could not be read; `meetings` is then unknown, not empty. */
+      readonly meetingsRead: boolean;
       /** When this was read (request time), for past vs booked calls. */
       readonly readAt: number;
       /** The diligence area once diligence started; null before or unreadable. */
@@ -100,16 +102,31 @@ type Loaded<Extra> =
 async function meetingsFor(
   session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
   relationship: RelationshipStatusDto | null,
-): Promise<readonly MeetingDto[]> {
+): Promise<{
+  readonly meetings: readonly MeetingDto[];
+  readonly meetingsRead: boolean;
+}> {
   if (
     relationship === null ||
     !isMatchedRelationshipState(relationship.state)
   ) {
-    return [];
+    return { meetings: [], meetingsRead: true };
   }
+  // A failed read is said as such (R1), never shown as "no calls".
   return listRelationshipMeetings(session, relationship.relationshipId)
-    .then((list) => list.items)
-    .catch(() => []);
+    .then((list) => ({ meetings: list.items, meetingsRead: true }))
+    .catch(() => ({ meetings: [], meetingsRead: false }));
+}
+
+/**
+ * The Messages tab's count: the brief's, over the whole history (R1); the
+ * thread's first page only when the brief could not be read.
+ */
+export function messageCountOf(loaded: {
+  readonly brief: RelationshipBrief | null;
+  readonly thread: ChatThreadDto | null;
+}): number {
+  return loaded.brief?.messages.count ?? loaded.thread?.messages.length ?? 0;
 }
 
 async function diligenceFor(
@@ -224,7 +241,7 @@ export async function loadInvestorSideRelationship(companyId: string): Promise<
             pitch: playable,
           },
     thread: await threadFor(session, relationship),
-    meetings: await meetingsFor(session, relationship),
+    ...(await meetingsFor(session, relationship)),
     diligence: await diligenceFor(session, relationship),
     brief: await briefFor(session, relationship),
     readAt: Date.now(),
@@ -307,7 +324,7 @@ export async function loadCompanySideRelationship(
     pending:
       fromThisInvestor.find((item) => item.response === "PENDING") ?? null,
     thread: await threadFor(session, relationship),
-    meetings: await meetingsFor(session, relationship),
+    ...(await meetingsFor(session, relationship)),
     diligence: await diligenceFor(session, relationship),
     brief: await briefFor(session, relationship),
     readAt: Date.now(),

@@ -229,6 +229,7 @@ export {
   expressInterest,
   getOwnInterest,
   getRelationshipBrief,
+  listRelationshipBriefs,
   getRelationshipWithCompany,
   getRelationshipWithInvestor,
   listCompanyRelationships,

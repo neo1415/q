@@ -48,11 +48,16 @@ export function briefLines(
       `Call booked for ${formatRelationshipDate(meetings.nextScheduled.startsAt)}`,
     );
   } else {
-    const held = meetings.items
+    const past = meetings.items
       .filter((m) => m.status === "SCHEDULED" && m.timing === "PAST")
       .toSorted((a, b) => b.startsAt.localeCompare(a.startsAt))[0];
-    if (held !== undefined) {
-      lines.push(`Last call ${formatRelationshipDate(held.startsAt)}`);
+    if (past?.noShow === true) {
+      // Recorded on the history as not having taken place (meeting_no_show).
+      lines.push(
+        `The call on ${formatRelationshipDate(past.startsAt)} didn't take place`,
+      );
+    } else if (past !== undefined) {
+      lines.push(`Last call ${formatRelationshipDate(past.startsAt)}`);
     } else if (meetings.items.length === 0) {
       lines.push("No call booked");
     } else {

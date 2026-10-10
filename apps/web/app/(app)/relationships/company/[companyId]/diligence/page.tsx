@@ -10,7 +10,10 @@ import {
   DiligenceUnavailable,
   RelationshipDiligence,
 } from "@/features/relationships/relationship-diligence";
-import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
+import {
+  loadInvestorSideRelationship,
+  messageCountOf,
+} from "@/features/relationships/relationship-page-data";
 
 export const metadata: Metadata = { title: "Diligence" };
 export const dynamic = "force-dynamic";
@@ -55,7 +58,7 @@ export default async function InvestorDiligencePage({
         profile={loaded.profile}
         basePath={basePath}
         current="DILIGENCE"
-        messageCount={loaded.thread?.messages.length ?? 0}
+        messageCount={messageCountOf(loaded)}
         diligence={diligence}
         meetings={loaded.meetings}
         readAt={loaded.readAt}

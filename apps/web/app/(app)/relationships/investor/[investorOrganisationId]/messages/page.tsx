@@ -7,7 +7,10 @@ import { QSection } from "@/features/q/q-section";
 import { QPageSubject } from "@/features/q/q-subject";
 import { RelationshipConversation } from "@/features/relationships/relationship-conversation";
 import { RelationshipUnavailable } from "@/features/relationships/relationship-detail";
-import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
+import {
+  loadCompanySideRelationship,
+  messageCountOf,
+} from "@/features/relationships/relationship-page-data";
 
 export const metadata: Metadata = { title: "Messages" };
 export const dynamic = "force-dynamic";
@@ -47,7 +50,7 @@ export default async function CompanyConversationPage({
         id="chat"
         kind="CHAT"
         refs={[{ kind: "INVESTOR_ORGANISATION", id: investorOrganisationId }]}
-        total={loaded.thread?.messages.length ?? 0}
+        total={messageCountOf(loaded)}
         label={`chat with ${loaded.counterpart} open`}
       >
         <RelationshipConversation
