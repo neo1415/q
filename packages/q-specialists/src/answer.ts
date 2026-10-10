@@ -2430,7 +2430,10 @@ export function createSpecialistQAnswer(
     request: QAnswerRequest,
     conversationId: QConversationMessage["conversationId"],
     history: readonly QConversationMessage[],
-    target: { readonly id?: string | undefined; readonly name?: string | undefined },
+    target: {
+      readonly id?: string | undefined;
+      readonly name?: string | undefined;
+    },
   ): Promise<QAnswerOutcome | null> => {
     const port = dependencies.openRecord;
     const said = [...history].reverse().find((m) => m.role === "USER")?.content;
@@ -2450,7 +2453,9 @@ export function createSpecialistQAnswer(
         ? await port
             .open(request, {
               page: "COMPANY_DECK",
-              ...(target.id === undefined ? { name: name ?? "" } : { id: target.id }),
+              ...(target.id === undefined
+                ? { name: name ?? "" }
+                : { id: target.id }),
             })
             .catch(() => null)
         : await (async () => {

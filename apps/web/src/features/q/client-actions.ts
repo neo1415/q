@@ -127,6 +127,13 @@ export function recordPagePath(
   }
 }
 
+const COMPANY_PROFILE_PAGES: readonly QRecordPage[] = [
+  "COMPANY",
+  "COMPANY_ELEVATOR",
+  "COMPANY_DATA_ROOM",
+  "COMPANY_DECK",
+  "COMPANY_TEAM",
+];
 const COMPANY_PROFILE_TAB_NAMES: readonly string[] = [
   "overview",
   "elevator",
@@ -151,37 +158,32 @@ export function recordIntentPath(
   const base = recordPagePath(intent.page, intent.id, intent.companyId);
   if (intent.tab === undefined) return base;
   const safe = encodeURIComponent(intent.id.toLowerCase());
-  switch (intent.page) {
-    case "COMPANY":
-    case "COMPANY_ELEVATOR":
-    case "COMPANY_DATA_ROOM":
-    case "COMPANY_DECK":
-    case "COMPANY_TEAM": {
-      // The server checked the tab against the page (the contract); the
-      // browser still only follows its own fixed tabs.
-      if (!COMPANY_PROFILE_TAB_NAMES.includes(intent.tab)) return base;
-      const params = new URLSearchParams({ tab: intent.tab });
-      if (intent.tab === "deck" && intent.subTab !== undefined) {
-        params.set("sub", intent.subTab.toLowerCase());
-      }
-      if (intent.tab === "deck" && intent.viewer === "OPEN") {
-        params.set("open", "1");
-      }
-      return `/company/${safe}?${params.toString()}`;
+  const { page, tab } = intent;
+  if (COMPANY_PROFILE_PAGES.includes(page)) {
+    // The server checked the tab against the page (the contract); the
+    // browser still only follows its own fixed tabs.
+    if (!COMPANY_PROFILE_TAB_NAMES.includes(tab)) return base;
+    const params = new URLSearchParams({ tab });
+    if (tab === "deck" && intent.subTab !== undefined) {
+      params.set("sub", intent.subTab.toLowerCase());
     }
-    case "RELATIONSHIP_COMPANY":
-    case "RELATIONSHIP_COMPANY_MESSAGES":
-      return RELATIONSHIP_TAB_NAMES.includes(intent.tab)
-        ? `/relationships/company/${safe}/${intent.tab}`
-        : base;
-    case "RELATIONSHIP_INVESTOR":
-    case "RELATIONSHIP_INVESTOR_MESSAGES":
-      return RELATIONSHIP_TAB_NAMES.includes(intent.tab)
-        ? `/relationships/investor/${safe}/${intent.tab}`
-        : base;
-    default:
-      return base;
+    if (tab === "deck" && intent.viewer === "OPEN") params.set("open", "1");
+    return `/company/${safe}?${params.toString()}`;
   }
+  if (!RELATIONSHIP_TAB_NAMES.includes(tab)) return base;
+  if (
+    page === "RELATIONSHIP_COMPANY" ||
+    page === "RELATIONSHIP_COMPANY_MESSAGES"
+  ) {
+    return `/relationships/company/${safe}/${tab}`;
+  }
+  if (
+    page === "RELATIONSHIP_INVESTOR" ||
+    page === "RELATIONSHIP_INVESTOR_MESSAGES"
+  ) {
+    return `/relationships/investor/${safe}/${tab}`;
+  }
+  return base;
 }
 
 /** Q room R2: a part of Settings, from the fixed route map. */

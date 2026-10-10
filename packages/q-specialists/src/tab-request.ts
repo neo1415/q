@@ -218,34 +218,34 @@ export function screenTabTarget(
     screen.route === "COMPANY" ||
     screen.route === "RELATIONSHIP_COMPANY" ||
     screen.route === "PITCH";
-  switch (ask.tab) {
-    case "calls":
-    case "diligence":
-    case "messages":
-      if (companyRoute && screen.companyId !== undefined) {
-        return {
+  if (
+    ask.tab === "calls" ||
+    ask.tab === "diligence" ||
+    ask.tab === "messages"
+  ) {
+    if (companyRoute && screen.companyId !== undefined) {
+      return {
+        page:
+          ask.tab === "messages"
+            ? "RELATIONSHIP_COMPANY_MESSAGES"
+            : "RELATIONSHIP_COMPANY",
+        id: screen.companyId,
+      };
+    }
+    return screen.route === "RELATIONSHIP_INVESTOR" &&
+      screen.investorOrganisationId !== undefined
+      ? {
           page:
             ask.tab === "messages"
-              ? "RELATIONSHIP_COMPANY_MESSAGES"
-              : "RELATIONSHIP_COMPANY",
-          id: screen.companyId,
-        };
-      }
-      return screen.route === "RELATIONSHIP_INVESTOR" &&
-        screen.investorOrganisationId !== undefined
-        ? {
-            page:
-              ask.tab === "messages"
-                ? "RELATIONSHIP_INVESTOR_MESSAGES"
-                : "RELATIONSHIP_INVESTOR",
-            id: screen.investorOrganisationId,
-          }
-        : null;
-    default:
-      return companyRoute && screen.companyId !== undefined
-        ? { page: COMPANY_TAB_PAGE[ask.tab], id: screen.companyId }
-        : null;
+              ? "RELATIONSHIP_INVESTOR_MESSAGES"
+              : "RELATIONSHIP_INVESTOR",
+          id: screen.investorOrganisationId,
+        }
+      : null;
   }
+  return companyRoute && screen.companyId !== undefined
+    ? { page: COMPANY_TAB_PAGE[ask.tab], id: screen.companyId }
+    : null;
 }
 
 /** Where Q says it is going: "the team tab", "diligence", "the deck". */

@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { QTurn } from "../src/features/q/conversation";
 import {
   openSubjectPage,
+  recordIntentPath,
   performClientAction,
   subjectPagePath,
   type ClientActionEffects,
@@ -357,5 +358,50 @@ describe("the opened data-room document closes when the topic moves on (R0)", ()
         DOC,
       ),
     ).toBe(true);
+  });
+});
+
+describe("a record page with its tab, deck section and viewer (N2)", () => {
+  const id = "d48c26d2-5aca-4788-9033-073b0f9d08ec";
+  it("selects the company tab, the deck section and the viewer in the URL", () => {
+    expect(
+      recordIntentPath({
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY_TEAM",
+        id,
+        tab: "team",
+      }),
+    ).toBe(`/company/${id}?tab=team`);
+    expect(
+      recordIntentPath({
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY_DECK",
+        id,
+        tab: "deck",
+        subTab: "THE_ASK",
+        viewer: "OPEN",
+      }),
+    ).toBe(`/company/${id}?tab=deck&sub=the_ask&open=1`);
+  });
+  it("opens a relationship's calls and diligence, and leaves a bare page bare", () => {
+    expect(
+      recordIntentPath({
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_COMPANY",
+        id,
+        tab: "calls",
+      }),
+    ).toBe(`/relationships/company/${id}/calls`);
+    expect(
+      recordIntentPath({
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_INVESTOR",
+        id,
+        tab: "diligence",
+      }),
+    ).toBe(`/relationships/investor/${id}/diligence`);
+    expect(
+      recordIntentPath({ kind: "OPEN_RECORD_PAGE", page: "COMPANY", id }),
+    ).toBe(`/company/${id}`);
   });
 });

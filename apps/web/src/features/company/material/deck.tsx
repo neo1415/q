@@ -2,13 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import {
   DECK_SECTION_LABELS,
@@ -201,7 +195,7 @@ export function DeckForReaders({
   readonly companyName: string;
   readonly view: CompanyDeckView;
 }) {
-  const [index, setIndex] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null);
   const carousel = useRef<HTMLDivElement>(null);
   const { deck, extraction } = view;
   // N2: Q opens the deck (`open=1`) or one of its sections (`sub=`) from
@@ -210,13 +204,16 @@ export function DeckForReaders({
   const autoOpen = params?.get("open") === "1";
   const sub = params?.get("sub")?.toUpperCase() ?? null;
   const sections = extraction?.sections;
+  const askedAt =
+    sub === null || sections === undefined
+      ? -1
+      : sections.findIndex((one) => one.section === sub);
+  const index = picked ?? (askedAt >= 0 ? askedAt : 0);
+  const setIndex = setPicked;
   useEffect(() => {
-    if (sub === null || sections === undefined) return;
-    const at = sections.findIndex((one) => one.section === sub);
-    if (at < 0) return;
-    setIndex(at);
+    if (askedAt < 0) return;
     carousel.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
-  }, [sub, sections]);
+  }, [askedAt]);
   if (deck === null) {
     return (
       <div className="flex flex-col gap-2 py-6" data-deck="empty">

@@ -291,7 +291,10 @@ export type QOpenRecordPort = {
    * plainly and says nothing about it.
    */
   readonly deck?:
-    | ((request: QAnswerRequest, companyId: string) => Promise<DeckSpeech | null>)
+    | ((
+        request: QAnswerRequest,
+        companyId: string,
+      ) => Promise<DeckSpeech | null>)
     | undefined;
 };
 

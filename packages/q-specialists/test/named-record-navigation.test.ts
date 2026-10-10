@@ -354,7 +354,12 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
     const q = conversation(own);
     const answer = await q.say("Show me the data room for Shiftwell.");
     expect(intentOf(answer.blocks)).toEqual([
-      { kind: "OPEN_RECORD_PAGE", page: "COMPANY_DATA_ROOM", id: SHIFTWELL },
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY_DATA_ROOM",
+        id: SHIFTWELL,
+        tab: "dataroom",
+      },
     ]);
     expect(answer.content).toBe("Opening Shiftwell Health's data room…");
   });
@@ -365,7 +370,12 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
       "You open documents. I want to see the data room for Shiftwell.",
     );
     expect(intentOf(answer.blocks)).toEqual([
-      { kind: "OPEN_RECORD_PAGE", page: "COMPANY_DATA_ROOM", id: SHIFTWELL },
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY_DATA_ROOM",
+        id: SHIFTWELL,
+        tab: "dataroom",
+      },
     ]);
     expect(answer.content).not.toMatch(/document/iu);
   });
