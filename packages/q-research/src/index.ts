@@ -119,3 +119,32 @@ export {
   type ResearchOutcome,
   type ResearchSubject,
 } from "./application/research-service.js";
+
+// W2 (2026-10-10): the fast public person-identity path.
+export {
+  createPersonSearch,
+  externalPersonIdFor,
+  PERSON_SEARCH_BUDGET,
+  planPersonQueries,
+  sourcesOfCandidate,
+  type PersonCallTrace,
+  type PersonQueryKind,
+  type PersonSearchCommand,
+  type PersonSearchDependencies,
+  type PersonSearchRun,
+  type PlannedPersonQuery,
+} from "./application/person-search.js";
+export {
+  allSpellings,
+  basicNameVariants,
+  clarifyingQuestionFor,
+  decideIdentity,
+  linkedInProfileOf,
+  namesPerson,
+  profileFactsOf,
+  rankCandidates,
+  type IdentityDecision,
+  type PersonCandidate,
+  type PersonSpec,
+  type SourcedHit,
+} from "./domain/person-identity.js";
