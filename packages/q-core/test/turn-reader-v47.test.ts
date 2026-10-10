@@ -10,10 +10,10 @@ import {
 
 /** TURN_READER v47 (K8): the reader names a prepared subject. */
 describe("TURN_READER v47", () => {
-  it("is the active reader and v46 is deprecated", () => {
+  it("was the active reader; v46 is deprecated", () => {
     expect(
       createDefaultPromptRegistry().getActive("TURN_READER").definition.version,
-    ).toBe(47);
+    ).toBe(48);
     expect(TURN_READER_V46.status).toBe("DEPRECATED");
   });
 

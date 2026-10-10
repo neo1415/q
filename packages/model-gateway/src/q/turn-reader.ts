@@ -4,13 +4,13 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV47ResultSchema,
+  TurnReaderV48ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
   type TurnReaderV40Result,
-  type TurnReaderV47Result,
+  type TurnReaderV48Result,
   type TurnReaderV7Variables,
 } from "@capital-q/q-core";
 
@@ -288,7 +288,7 @@ export function createQTurnReader(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables,
         });
-        const response = await gateway.execute<TurnReaderV47Result>(
+        const response = await gateway.execute<TurnReaderV48Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             // A closed classification needs little thought; left unset, a
@@ -304,7 +304,7 @@ export function createQTurnReader(dependencies: {
             attribution: input.attribution,
           },
           {
-            schema: TurnReaderV47ResultSchema,
+            schema: TurnReaderV48ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
             ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
               ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
@@ -312,7 +312,7 @@ export function createQTurnReader(dependencies: {
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV47ResultSchema.safeParse(
+        const parsed = TurnReaderV48ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

@@ -271,6 +271,11 @@ async function replay(input: {
   readonly fit?: boolean;
   readonly spoken?: boolean;
   readonly mandate?: boolean | undefined;
+  /** K Part 4: the Tier A copy of their own mandate read. */
+  readonly ownMandateReads?: {
+    readonly get: (actor: unknown) => Promise<unknown>;
+    readonly remember: (actor: unknown, data: unknown) => Promise<void>;
+  };
   /** What the turn reader read, as the answer seam passes it on. */
   readonly reading?: Pick<
     QAnswerRequest,
@@ -349,6 +354,9 @@ async function replay(input: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     tools: port,
+    ...(input.ownMandateReads === undefined
+      ? {}
+      : { ownMandateReads: input.ownMandateReads }),
   });
   const request: QAnswerRequest = {
     runId: run as QAnswerRequest["runId"],
@@ -634,5 +642,61 @@ describe("the cheapest correct path (K8)", () => {
       },
     });
     expect(toolsOffered).toBeGreaterThan(0);
+  });
+});
+
+describe("their own mandate from the working snapshot (K Part 4)", () => {
+  const KEPT = {
+    displayName: "Halyard Capital",
+    investorType: "VC",
+    deploymentState: "ACTIVELY_DEPLOYING",
+    mandates: [],
+  };
+
+  it("a current Tier A copy answers 'what is my mandate' with no mandate tool read", async () => {
+    const remembered: unknown[] = [];
+    const { modelCalls, toolsOffered, executed } = await replay({
+      question: "what is my mandate?",
+      mandate: true,
+      script: [answer("Halyard Capital invests as a VC.")],
+      reading: {
+        questionKind: "THEIR_OWN_RECORDS",
+        preparedSubject: "MANDATE",
+      },
+      ownMandateReads: {
+        get: () => Promise.resolve(KEPT),
+        remember: (_actor, data) => {
+          remembered.push(data);
+          return Promise.resolve();
+        },
+      },
+    });
+    expect(executed).not.toContain("get_investor_mandate");
+    expect(remembered).toEqual([]);
+    // Still the prepared-context path: one model call, no tool round.
+    expect(modelCalls).toBe(1);
+    expect(toolsOffered).toBe(0);
+  });
+
+  it("without a current copy, the tool reads it and the read is kept", async () => {
+    const remembered: unknown[] = [];
+    const { executed } = await replay({
+      question: "what is my mandate?",
+      mandate: true,
+      script: [answer("Halyard Capital invests as a VC.")],
+      reading: {
+        questionKind: "THEIR_OWN_RECORDS",
+        preparedSubject: "MANDATE",
+      },
+      ownMandateReads: {
+        get: () => Promise.resolve(null),
+        remember: (_actor, data) => {
+          remembered.push(data);
+          return Promise.resolve();
+        },
+      },
+    });
+    expect(executed).toContain("get_investor_mandate");
+    expect(remembered).toHaveLength(1);
   });
 });

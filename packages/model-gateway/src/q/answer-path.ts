@@ -33,7 +33,7 @@ export type AnswerPathInput = {
   readonly turnKind: string | undefined;
   readonly questionKind: string | undefined;
   readonly preparedSubject:
-    "MANDATE" | "ON_SCREEN_RECORD" | "Q_WORK" | undefined;
+    "MANDATE" | "ON_SCREEN_RECORD" | "Q_WORK" | "OWN_COMPANY" | undefined;
   readonly discover: boolean;
   readonly fit: boolean;
   readonly attention: boolean;
@@ -46,6 +46,7 @@ export type AnswerPathInput = {
     readonly mandate: boolean;
     readonly onScreenRecord: boolean;
     readonly qWork: boolean;
+    readonly ownCompany: boolean;
   };
 };
 
@@ -81,7 +82,9 @@ export function answerPathOf(input: AnswerPathInput): AnswerPathChoice {
         ? input.prepared.mandate
         : input.preparedSubject === "ON_SCREEN_RECORD"
           ? input.prepared.onScreenRecord
-          : input.prepared.qWork;
+          : input.preparedSubject === "OWN_COMPANY"
+            ? input.prepared.ownCompany
+            : input.prepared.qWork;
     // Not prepared: the full path reads it with its tools.
     return ready
       ? { path: "PREPARED_CONTEXT", because: input.preparedSubject }

@@ -58,6 +58,87 @@ export type WorkingSnapshot = {
   } | null;
 };
 
+/**
+ * Their own `get_investor_mandate` result, kept as the tool returned it
+ * (so investor type, deployment state, constraints and the typical cheque
+ * are exactly what the authorised read said, never rebuilt from a
+ * summary), with the mandate version it matched. Served only while D's
+ * version for that mandate is unchanged and still theirs.
+ */
+type KeptMandateRead = {
+  readonly data: unknown;
+  readonly mandateId: string;
+  readonly version: string;
+};
+
+export type OwnMandateReads = {
+  readonly get: (actor: ActorContext) => Promise<unknown>;
+  readonly remember: (actor: ActorContext, data: unknown) => Promise<void>;
+};
+
+export const MANDATE_READ_KIND = "tierA.mandateRead";
+
+export function createOwnMandateReads(dependencies: {
+  readonly knowledge: CompanyKnowledgePort;
+  readonly epochs: ContextEpochReader;
+  readonly cache?: ContextCache<KeptMandateRead> | undefined;
+}): OwnMandateReads {
+  const { knowledge, epochs } = dependencies;
+  const cache =
+    dependencies.cache ??
+    createContextCache<KeptMandateRead>({ ttlMs: 10 * 60_000 });
+  const scopeOf = async (actor: ActorContext): Promise<ContextCacheScope> => ({
+    actor,
+    // Read fresh every request: a revocation changes it at once.
+    authzEpoch: await epochs.actorEpoch(actor),
+    kind: MANDATE_READ_KIND,
+    sensitivity: "CONFIDENTIAL",
+    policyVersion: String(Q_CONTEXT_FIREWALL_POLICY_VERSION),
+  });
+  return {
+    get: async (actor) => {
+      if (actor.actorType !== "HUMAN") return null;
+      const kept = cache.get(await scopeOf(actor));
+      if (kept === undefined) return null;
+      const versions = await knowledge.versions(actor, "MANDATE", [
+        kept.mandateId,
+      ]);
+      if (versions.get(kept.mandateId) === kept.version) return kept.data;
+      cache.invalidateActor(actor.userId);
+      return null;
+    },
+    remember: async (actor, data) => {
+      if (actor.actorType !== "HUMAN") return;
+      // One unambiguous active mandate of their own, or nothing is kept.
+      const summary = await knowledge.mandateSummary(actor);
+      if (summary === null) return;
+      // The read must be of that same mandate at that same canonical
+      // version; a change between the read and now keeps nothing.
+      const first = (
+        data as {
+          readonly mandates?: readonly {
+            readonly mandateId?: unknown;
+            readonly version?: unknown;
+          }[];
+        } | null
+      )?.mandates?.[0];
+      if (
+        first?.mandateId !== summary.mandateId ||
+        first.version !== summary.mandateVersion
+      ) {
+        return;
+      }
+      await cache.getOrLoad(await scopeOf(actor), () =>
+        Promise.resolve({
+          data,
+          mandateId: summary.mandateId,
+          version: summary.version,
+        }),
+      );
+    },
+  };
+}
+
 export type WorkingSnapshots = {
   /** The actor's snapshot, reused when still current; null when none. */
   readonly forActor: (actor: ActorContext) => Promise<WorkingSnapshot | null>;

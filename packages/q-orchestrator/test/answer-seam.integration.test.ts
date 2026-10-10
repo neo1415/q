@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createDefaultPromptRegistry } from "@capital-q/q-core";
+
 import { createPostgresSecurityEventWriter } from "@capital-q/audit";
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import {
@@ -381,9 +383,13 @@ describe("Model Gateway answer seam inside the Q orchestrator", () => {
       expect(final.run.status).toBe("COMPLETED");
       expect(final.run.orchestrationVersion).toBe(Q_ORCHESTRATION_VERSION);
       expect(final.run.modelPolicyVersion).toBe("normal_dialogue.v1");
-      // The active analyst (v15: proposalStatus beside v14's gestures).
+      // The bundle of the ACTIVE analyst, read from the registry: a pin to
+      // one version (v19) went stale when v22 shipped (F, 2026-10-09).
+      const analyst =
+        createDefaultPromptRegistry().getActive("COMPANY_ANALYST").definition
+          .version;
       expect(final.run.promptBundleVersion).toBe(
-        "q-system.v2_company-analyst.v19_comm.v1",
+        `q-system.v2_company-analyst.v${String(analyst)}_comm.v1`,
       );
       expect(google.calls[0]?.request.messages[0]?.content).toContain(
         "You are Q",
