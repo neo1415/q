@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { parseDatabaseConfig } from "@capital-q/config/database";
 
@@ -182,5 +182,41 @@ describe("failure handling", () => {
   it("passes an existing DatabaseError through unchanged", () => {
     const original = new DatabaseError("TIMEOUT");
     expect(toDatabaseError(original)).toBe(original);
+  });
+});
+
+describe("warm pool floor", () => {
+  it("runs one timer on the configured interval and stops it on close", async () => {
+    vi.useFakeTimers();
+    try {
+      const database = createRequestDatabaseClient(
+        config({
+          DATABASE_URL: UNREACHABLE_URL,
+          DATABASE_IDLE_TIMEOUT_SECONDS: "60",
+          DATABASE_WARM_INTERVAL_SECONDS: "25",
+        }),
+      );
+      expect(vi.getTimerCount()).toBe(1);
+      await database.close();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("starts no timer when the warm interval is 0", async () => {
+    vi.useFakeTimers();
+    try {
+      const database = createRequestDatabaseClient(
+        config({
+          DATABASE_URL: UNREACHABLE_URL,
+          DATABASE_WARM_INTERVAL_SECONDS: "0",
+        }),
+      );
+      expect(vi.getTimerCount()).toBe(0);
+      await database.close();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

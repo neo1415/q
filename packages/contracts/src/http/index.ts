@@ -1,3 +1,5 @@
+export { CQ_TRACE_HEADER, parseCqTraceId } from "./trace.js";
+
 export {
   CAPITAL_Q_ERROR_CODES,
   ErrorCodeSchema,

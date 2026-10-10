@@ -160,6 +160,7 @@ import {
   type OrganisationRoutesDependencies,
 } from "./http/organisations.js";
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerRequestTiming } from "./http/request-timing.js";
 // P5 block: brand theming
 import type { BrandThemeStore } from "@capital-q/platform-admin";
 
@@ -447,6 +448,7 @@ export function createApp(
   });
 
   registerProblemHandling(app, logger);
+  registerRequestTiming(app);
 
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the
   // process is alive and performs no dependency checks. Readiness asks the
