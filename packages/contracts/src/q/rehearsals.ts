@@ -31,6 +31,9 @@ export const Q_REHEARSAL_SCREEN_PATH =
 export const REHEARSAL_COUNTERPART_KINDS = [
   "INVESTOR_ORGANISATION",
   "COMPANY",
+  // A researched person outside Capital Q: no account, no relationship.
+  // Q plays a labelled simulation built from public sources only.
+  "EXTERNAL_PERSON",
 ] as const;
 export const RehearsalCounterpartKindSchema = z.enum(
   REHEARSAL_COUNTERPART_KINDS,
@@ -38,6 +41,12 @@ export const RehearsalCounterpartKindSchema = z.enum(
 export type RehearsalCounterpartKind = z.infer<
   typeof RehearsalCounterpartKindSchema
 >;
+
+/** Shown wherever a simulation of a researched external person appears. */
+export const EXTERNAL_REHEARSAL_LABEL =
+  "AI rehearsal informed by public sources";
+export const EXTERNAL_REHEARSAL_DISCLAIMER =
+  "This is an AI rehearsal informed by public sources. It is not the real person and does not predict what they would say.";
 
 const enc = encodeURIComponent;
 export const qInvestorRehearsalsPath = (investorOrganisationId: string) =>
