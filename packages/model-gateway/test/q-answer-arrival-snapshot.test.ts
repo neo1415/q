@@ -702,3 +702,58 @@ describe("a matched arrival follow-up reads no tool at all (V2: six prefetch rea
     expect(executed.length).toBeGreaterThan(0);
   });
 });
+
+describe("K6: the arrival skim runs beside the turn, and only when it can matter", () => {
+  const countingSkimmer = () => {
+    const starts: string[] = [];
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const skimmer: QTurnSkimmer = {
+      skim: async (input) => {
+        starts.push(input.utterance);
+        await gate;
+        return null;
+      },
+    };
+    return { skimmer, starts, release: () => release?.() };
+  };
+
+  it("starts at warm time, before anything else has finished", async () => {
+    const { skimmer, starts, release } = countingSkimmer();
+    const { seam, request } = build(
+      () => SNAPSHOT,
+      "any word back from them?",
+      skimmer,
+    );
+    seam.warm?.(request);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // In flight (its gate is still closed) before the answer was asked for.
+    expect(starts).toEqual(["any word back from them?"]);
+    release();
+    await seam.answer(request);
+  });
+
+  it("is not asked for a mandate question, or when the snapshot has no items", async () => {
+    const mandate = countingSkimmer();
+    mandate.release();
+    const a = build(
+      () => SNAPSHOT,
+      "What is my mandate? Remind me.",
+      mandate.skimmer,
+    );
+    await a.seam.answer(a.request);
+    expect(mandate.starts).toEqual([]);
+
+    const empty = countingSkimmer();
+    empty.release();
+    const b = build(
+      () => ({ ...SNAPSHOT, items: [] }),
+      "any word back from them?",
+      empty.skimmer,
+    );
+    await b.seam.answer(b.request);
+    expect(empty.starts).toEqual([]);
+  });
+});
