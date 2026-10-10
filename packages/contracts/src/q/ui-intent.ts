@@ -3,12 +3,14 @@ import { z } from "zod";
 import { QUiActIntentSchema } from "./ui-act.js";
 import { UuidSchema } from "../common/ids.js";
 import { StageCodeSchema } from "../http/companies.js";
+import { DeckSectionCodeSchema } from "../http/deck.js";
 import {
   DISCOVER_FILTER_LIST_MAX,
   DiscoverRaiseFilterSchema,
 } from "../http/discovery.js";
 import { TaxonomyCanonicalCodeSchema } from "../http/taxonomy.js";
 import { QEvidenceRefsSchema } from "./evidence-ref.js";
+import type { QManifestTab } from "./screen-manifest.js";
 import type { QVoiceChoice, QVoiceDestination } from "./voice.js";
 
 /**
@@ -311,6 +313,55 @@ export const Q_RECORD_PAGES = [
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;
 
+/**
+ * N2: the tabs of a record's page Q can select, a closed subset of the
+ * screen manifest's tabs (`QManifestTabSchema`). Company profile tabs and
+ * the relationship page's tabs; never free text.
+ */
+export const Q_COMPANY_PROFILE_TABS = [
+  "overview",
+  "elevator",
+  "dataroom",
+  "deck",
+  "team",
+] as const satisfies readonly QManifestTab[];
+export const Q_RELATIONSHIP_TABS = [
+  "messages",
+  "calls",
+  "diligence",
+] as const satisfies readonly QManifestTab[];
+export const Q_RECORD_TABS = [
+  ...Q_COMPANY_PROFILE_TABS,
+  ...Q_RELATIONSHIP_TABS,
+] as const;
+export const QRecordTabSchema = z.enum(Q_RECORD_TABS);
+export type QRecordTab = z.infer<typeof QRecordTabSchema>;
+
+const COMPANY_PROFILE_PAGES: ReadonlySet<string> = new Set([
+  "COMPANY",
+  "COMPANY_ELEVATOR",
+  "COMPANY_DATA_ROOM",
+  "COMPANY_DECK",
+  "COMPANY_TEAM",
+]);
+const RELATIONSHIP_PAGES: ReadonlySet<string> = new Set([
+  "RELATIONSHIP_COMPANY",
+  "RELATIONSHIP_INVESTOR",
+  "RELATIONSHIP_COMPANY_MESSAGES",
+  "RELATIONSHIP_INVESTOR_MESSAGES",
+]);
+
+/** Whether a tab belongs to a record page (a company's tab on a relationship is not one). */
+export function recordPageHasTab(page: QRecordPage, tab: QRecordTab): boolean {
+  if (COMPANY_PROFILE_PAGES.has(page)) {
+    return (Q_COMPANY_PROFILE_TABS as readonly string[]).includes(tab);
+  }
+  if (RELATIONSHIP_PAGES.has(page)) {
+    return (Q_RELATIONSHIP_TABS as readonly string[]).includes(tab);
+  }
+  return false;
+}
+
 export const QOpenRecordPageIntentSchema = z
   .object({
     kind: z.literal("OPEN_RECORD_PAGE"),
@@ -320,12 +371,33 @@ export const QOpenRecordPageIntentSchema = z
     companyId: UuidSchema.optional(),
     /** DATA_ROOM_DOCUMENT: its title, as the data room lists it. */
     title: z.string().trim().min(1).max(200).optional(),
+    /** N2: the page's tab to select ("open their team tab"). */
+    tab: QRecordTabSchema.optional(),
+    /** N2: a section of the pitch deck's read (a deck sub-tab). */
+    subTab: DeckSectionCodeSchema.optional(),
+    /** N2: open the deck in its viewer at once (the deck tab only). */
+    viewer: z.literal("OPEN").optional(),
   })
   .strict()
   .refine(
     (intent) =>
       intent.page !== "DATA_ROOM_DOCUMENT" || intent.companyId !== undefined,
     { message: "a data-room document names its company", path: ["companyId"] },
+  )
+  .refine(
+    (intent) =>
+      intent.tab === undefined || recordPageHasTab(intent.page, intent.tab),
+    { message: "that tab is not one of this page's", path: ["tab"] },
+  )
+  .refine(
+    (intent) =>
+      (intent.subTab === undefined && intent.viewer === undefined) ||
+      intent.tab === "deck" ||
+      (intent.tab === undefined && intent.page === "COMPANY_DECK"),
+    {
+      message: "a sub-tab and the viewer belong to the deck tab",
+      path: ["subTab"],
+    },
   );
 
 /**

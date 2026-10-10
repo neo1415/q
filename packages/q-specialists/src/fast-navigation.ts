@@ -1,11 +1,14 @@
-import type {
-  QClientActionIntent,
-  QRecordPage,
-  QUiIntent,
+import {
+  QOpenRecordPageIntentSchema,
+  type QClientActionIntent,
+  type QRecordPage,
+  type QUiIntent,
 } from "@capital-q/contracts";
 
-import { openingLine } from "./references.js";
+import { openingLine, spokenRecordName } from "./references.js";
 import {
+  type NamedRecordFacet,
+  type NamedRecordRequest,
   cannotOpenPartLine,
   matchOwnCounterpart,
   misheardOwnCounterpart,
@@ -17,6 +20,7 @@ import {
   whichOneLine,
 } from "./named-record-request.js";
 import { pageRequestOf, takenBack } from "./page-request.js";
+import { tabAskOf, type TabAsk } from "./tab-request.js";
 
 /**
  * RECOVERY-2026-10 (C, founder 2026-10-09: "stupid fast"): where the
@@ -40,9 +44,40 @@ export type NamedRecordResolution =
       readonly page: QRecordPage;
       readonly said: string;
       readonly own: boolean;
+      /** The record as Q says it ("Nixo"), for what is said after. */
+      readonly name: string;
     }
   | { readonly kind: "ASK"; readonly said: string; readonly log: string }
   | null;
+
+const FACET_OF_TAB: Readonly<Record<TabAsk["tab"], NamedRecordFacet>> = {
+  overview: "PAGE",
+  elevator: "ELEVATOR",
+  dataroom: "DATA_ROOM",
+  deck: "DECK",
+  team: "TEAM",
+  messages: "CHAT",
+  calls: "RELATIONSHIP",
+  diligence: "RELATIONSHIP",
+};
+
+/**
+ * N2: the tab (and deck section) a request names, on a page that has it.
+ * The page was authorised by open_page; the tab only selects a view of it,
+ * so one the page lacks is simply not added (the contract says which).
+ */
+export function withTabs(
+  intent: OpenRecordIntent,
+  ask: Pick<TabAsk, "tab" | "subTab" | "viewer">,
+): OpenRecordIntent {
+  const candidate = QOpenRecordPageIntentSchema.safeParse({
+    ...intent,
+    tab: ask.tab,
+    ...(ask.subTab === null ? {} : { subTab: ask.subTab }),
+    ...(ask.viewer ? { viewer: "OPEN" } : {}),
+  });
+  return candidate.success ? candidate.data : intent;
+}
 
 /**
  * The record a navigation request names, resolved against their own
@@ -58,7 +93,17 @@ export async function resolveNamedRecord(input: {
     name: string,
   ) => Promise<OpenRecordIntent | null>;
 }): Promise<NamedRecordResolution> {
-  const asked = namedRecordRequestOf(input.text);
+  // N2: "open Nixo's team tab" names a tab; the record is still Nixo.
+  const tabAsk = tabAskOf(input.text);
+  const namedTab = tabAsk?.name == null ? null : tabAsk;
+  const asked: NamedRecordRequest | null =
+    namedTab?.name == null
+      ? namedRecordRequestOf(input.text)
+      : {
+          name: namedTab.name,
+          facet: FACET_OF_TAB[namedTab.tab],
+          explicit: true,
+        };
   if (asked === null) return null;
   const names = await input
     .counterpartNames()
@@ -92,10 +137,11 @@ export async function resolveNamedRecord(input: {
     if (intent === null) continue;
     return {
       kind: "OPEN",
-      intent,
+      intent: namedTab === null ? intent : withTabs(intent, namedTab),
       page,
       said: openingLine(page, name),
       own: match.kind === "ONE",
+      name: spokenRecordName(name),
     };
   }
   return match.kind === "ONE"
