@@ -162,7 +162,7 @@ export function createCompanyRaiseReader(
       : settled(
           ports.objectivePolicies(objective.id).then(sharingFromPolicies),
           // Unknown sharing is treated as hidden: privacy wins.
-          "HIDDEN" as RaiseSharing,
+          "HIDDEN",
         );
 
   const raisesFor = async (

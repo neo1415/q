@@ -45,6 +45,12 @@ import {
   type RelationshipBriefSources,
 } from "../src/index.js";
 
+/** A port this test composes itself; absent would be a broken fixture. */
+function composed<T>(port: T | undefined, name: string): T {
+  if (port === undefined) throw new Error(`${name} is not composed`);
+  return port;
+}
+
 /**
  * The Relationship Brief (R1) against the real local database, reproducing
  * TensorGate's hosted shape (2026-10-09): connected, messages on the thread
@@ -582,7 +588,7 @@ describe("Relationship Brief against local PostgreSQL", () => {
         calls.push(`threads:${actor.userId}:${ids.join(",")}`);
         const out = new Map();
         for (const id of ids) {
-          const thread = await single.thread!(actor, id);
+          const thread = await composed(single.thread, "thread")(actor, id);
           out.set(id, {
             latest: thread.at(-1) ?? null,
             fromThem: thread.findLast((m) => m.from === "OTHER_SIDE") ?? null,
@@ -595,7 +601,11 @@ describe("Relationship Brief against local PostgreSQL", () => {
         return new Map(
           await Promise.all(
             ids.map(
-              async (id) => [id, await single.meetings!(actor, id)] as const,
+              async (id) =>
+                [
+                  id,
+                  await composed(single.meetings, "meetings")(actor, id),
+                ] as const,
             ),
           ),
         );
@@ -607,7 +617,10 @@ describe("Relationship Brief against local PostgreSQL", () => {
     await withWorld(async (world) => {
       const { relationshipId, meetingId } = await tensorGate(world);
       const calls: string[] = [];
-      const briefs = await world.interests.relationshipBriefs!({
+      const briefs = await composed(
+        world.interests.relationshipBriefs,
+        "relationshipBriefs",
+      )({
         actor: world.investorRep,
         sources: batchSources(world, meetingId, calls),
         now: NOW,
@@ -628,7 +641,10 @@ describe("Relationship Brief against local PostgreSQL", () => {
         ].sort(),
       );
       // The founder's side, by their company.
-      const founder = await world.interests.relationshipBriefs!({
+      const founder = await composed(
+        world.interests.relationshipBriefs,
+        "relationshipBriefs",
+      )({
         actor: world.founder,
         companyId: world.companyA,
         sources: batchSources(world, meetingId, []),
@@ -641,7 +657,10 @@ describe("Relationship Brief against local PostgreSQL", () => {
   it("batch: a failed or unanswered read is UNAVAILABLE, never 'no messages'", async () => {
     await withWorld(async (world) => {
       await tensorGate(world);
-      const failed = await world.interests.relationshipBriefs!({
+      const failed = await composed(
+        world.interests.relationshipBriefs,
+        "relationshipBriefs",
+      )({
         actor: world.investorRep,
         sources: {
           threads: () => Promise.reject(new Error("chat down")),
@@ -665,7 +684,10 @@ describe("Relationship Brief against local PostgreSQL", () => {
     await withWorld(async (world) => {
       const { relationshipId, meetingId } = await tensorGate(world);
       const calls: string[] = [];
-      const briefs = await world.interests.relationshipBriefs!({
+      const briefs = await composed(
+        world.interests.relationshipBriefs,
+        "relationshipBriefs",
+      )({
         actor: world.strangerInvestor,
         relationshipIds: [relationshipId],
         sources: batchSources(world, meetingId, calls),
@@ -675,7 +697,10 @@ describe("Relationship Brief against local PostgreSQL", () => {
       expect(calls.join(" ")).not.toContain(relationshipId);
       // Another founder cannot read a company that is not theirs.
       await expect(
-        world.interests.relationshipBriefs!({
+        composed(
+          world.interests.relationshipBriefs,
+          "relationshipBriefs",
+        )({
           actor: world.otherFounder,
           companyId: world.companyA,
           sources: batchSources(world, meetingId, []),

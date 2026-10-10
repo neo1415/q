@@ -288,7 +288,11 @@ export function deriveBriefDecisions(
         });
       }
       break;
-    default:
+    case "EXPRESS_INTEREST":
+    case "ANSWER_INTEREST":
+    case "DECIDE_NEXT_STEP":
+    case "FOLLOW_UP":
+    case "RESUME":
       items.push({
         kind: state.nextStep,
         owner: "YOU",

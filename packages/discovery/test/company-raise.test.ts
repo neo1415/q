@@ -197,7 +197,7 @@ function reader(over: Partial<CompanyRaiseReaderPorts> = {}) {
             reasonCode: "NO_MATCHING_SCOPE" as const,
           })),
         ),
-    } as CompanyRaiseReaderPorts["disclosure"],
+    },
     objectivePolicies: () => {
       calls.policyReads += 1;
       return Promise.resolve([]);
@@ -269,7 +269,7 @@ describe("createCompanyRaiseReader", () => {
     const { reader: r } = reader({
       disclosure: {
         evaluateMany: () => Promise.reject(new Error("down")),
-      } as CompanyRaiseReaderPorts["disclosure"],
+      },
       playablePitches: () => Promise.resolve([]),
     });
     const view = await r.raiseFor(actorOf(INVESTOR_ORG), COMPANY);
