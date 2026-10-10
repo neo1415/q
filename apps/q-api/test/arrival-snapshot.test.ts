@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ArrivalSnapshotSchema,
   relationshipMessagesPath,
+  relationshipPagePath,
 } from "@capital-q/contracts";
 import { ActorContextSchema } from "@capital-q/security";
 
@@ -78,6 +79,20 @@ describe("buildArrivalSnapshot", () => {
     expect(item?.openPath).toBe(
       `/relationships/investor/${COUNTERPART}/messages`,
     );
+  });
+
+  it("a pending relationship has no conversation: its path is the relationship page", () => {
+    const pending = buildArrivalSnapshot({
+      report: tensorGateReport(),
+      briefs: [tensorGateBrief({ state: "INTEREST_EXPRESSED" })],
+      now: NOW,
+    });
+    expect(pending.items[0]?.hasConversation).toBe(false);
+    expect(pending.items[0]?.openPath).toBe(
+      relationshipPagePath("INVESTOR_ORGANISATION", COUNTERPART),
+    );
+    expect(item?.hasConversation).toBe(true);
+    expect(item?.openPath).toContain("/messages");
   });
 
   it("bounds the message preview", () => {

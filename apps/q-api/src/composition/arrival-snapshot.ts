@@ -5,7 +5,9 @@ import {
   ARRIVAL_SNAPSHOT_VERSION,
   ArrivalSnapshotSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
+  isMatchedRelationshipState,
   relationshipMessagesPath,
+  relationshipPagePath,
   type ArrivalSnapshot,
   type ArrivalSnapshotFacts,
   type ArrivalSnapshotItem,
@@ -181,6 +183,7 @@ function itemFor(
         request,
         note: item.note === undefined ? null : clip(item.note, 600),
       },
+      hasConversation: false,
       openPath: null,
       evidence: [attentionEvidence],
       sourceVersions: { historySequence: null, brief: null },
@@ -200,6 +203,7 @@ function itemFor(
         request,
         note: item.note === undefined ? null : clip(item.note, 600),
       },
+      hasConversation: false,
       openPath: null,
       evidence: [attentionEvidence],
       sourceVersions: { historySequence: null, brief: null },
@@ -337,8 +341,15 @@ function itemFor(
           : { kind: primary.kind, owner: primary.owner, label: primary.label },
       note: item.note === undefined ? null : clip(item.note, 600),
     },
-    // "Open the conversation" is the relationship's messages page.
-    openPath: relationshipMessagesPath(counterpart.kind, counterpart.id),
+    // The messages page redirects to the overview until both sides have
+    // connected, so a pending relationship has no conversation to open:
+    // its path is the relationship page, and Q says so.
+    hasConversation:
+      brief.state !== null && isMatchedRelationshipState(brief.state.state),
+    openPath:
+      brief.state !== null && isMatchedRelationshipState(brief.state.state)
+        ? relationshipMessagesPath(counterpart.kind, counterpart.id)
+        : relationshipPagePath(counterpart.kind, counterpart.id),
     evidence: evidence.slice(0, 8),
     sourceVersions: {
       historySequence: brief.sourceVersions.historySequence,

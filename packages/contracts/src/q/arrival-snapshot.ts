@@ -164,7 +164,16 @@ export const ArrivalSnapshotItemSchema = z
       })
       .strict(),
     facts: ArrivalSnapshotFactsSchema,
-    /** Where "open the conversation" goes (in-app path); null: nowhere to open. */
+    /**
+     * A chat thread exists to open: the relationship is matched (both sides
+     * agreed to connect). The messages page redirects to the overview
+     * before that, so it is never offered as "the conversation".
+     */
+    hasConversation: z.boolean().default(false),
+    /**
+     * Where opening this goes: the chat when `hasConversation`, else the
+     * relationship page; null: nowhere to open.
+     */
     openPath: z.string().max(300).nullable(),
     decidable: z.boolean(),
     /** What each fact was read from, so an answer can cite it. */
@@ -217,6 +226,17 @@ export const ArrivalSnapshotSchema = z
   })
   .strict();
 export type ArrivalSnapshot = z.infer<typeof ArrivalSnapshotSchema>;
+
+/** The relationship's own page (the overview), from the counterpart. */
+export function relationshipPagePath(
+  counterpartKind: "COMPANY" | "INVESTOR_ORGANISATION",
+  counterpartId: string,
+): string {
+  const safe = encodeURIComponent(counterpartId.toLowerCase());
+  return counterpartKind === "COMPANY"
+    ? `/relationships/company/${safe}`
+    : `/relationships/investor/${safe}`;
+}
 
 /**
  * The in-app route of a relationship's conversation, from the counterpart

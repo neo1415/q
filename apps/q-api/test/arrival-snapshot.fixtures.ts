@@ -16,6 +16,7 @@ export function tensorGateBrief(
     readonly theirText: string;
     readonly meetingStatus: "SCHEDULING" | "SCHEDULED" | "CANCELLED" | "FAILED";
     readonly messagesUnavailable: boolean;
+    readonly state: "INTEREST_EXPRESSED" | "CONNECTED";
   }> = {},
 ): RelationshipBrief {
   const text = overrides.theirText ?? "Could we do Thursday 3pm for a call?";
@@ -38,7 +39,7 @@ export function tensorGateBrief(
     },
     generatedAt: NOW.toISOString(),
     state: {
-      state: "CONNECTED",
+      state: overrides.state ?? "CONNECTED",
       stateSince: "2026-10-09T10:00:00.000Z",
       milestones: [],
       nextStep: "SCHEDULE_MEETING",
