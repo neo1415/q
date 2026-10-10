@@ -150,6 +150,8 @@ export {
   type QTurnSkimmer,
 } from "./turn-skim.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
+import { arrivalSnapshotFact } from "./arrival-fact.js";
+export { arrivalSnapshotFact };
 import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
 import { manifestFacts, manifestReads } from "./manifest-fact.js";
@@ -160,7 +162,7 @@ import {
   tieLine,
   withFitIntegrity,
 } from "./fit-integrity.js";
-import type { QAnswerCardsBlock } from "@capital-q/contracts";
+import type { QAnswerCardsBlock, ArrivalSnapshot } from "@capital-q/contracts";
 import {
   ATTENTION_TOOL_NAME,
   asksWhatNeedsThem,
@@ -1454,6 +1456,15 @@ export type ModelGatewayQAnswerDependencies = {
         readonly countryCode: string | null;
       } | null>)
     | undefined;
+  /**
+   * W1: what Q told them on arrival, prepared for the model so a follow-up
+   * ("what's the request?") is answered from it with no tool read. Built
+   * server-side for this actor only and kept while its sources are
+   * unchanged (zero database round trips on a follow-up). Absent: none.
+   */
+  readonly arrivalSnapshot?:
+    | ((actor: QAnswerRequest["actor"]) => Promise<ArrivalSnapshot | null>)
+    | undefined;
   readonly sensitivity?: QAnswerSensitivityPolicy | undefined;
   /**
    * What KIND of material this composition handles (doc 15 §62). Omitted
@@ -2050,6 +2061,19 @@ export function createModelGatewayQAnswer(
       if (own === null) return;
       ownCompany = ownCompanySnapshotFact(own, plan);
     })();
+    let arrival: AuthorisedFact | null = null;
+    const arrivalRead = (async (): Promise<void> => {
+      if (
+        dependencies.arrivalSnapshot === undefined ||
+        request.writingDocument === true
+      ) {
+        return;
+      }
+      const snapshot = await dependencies
+        .arrivalSnapshot(request.actor)
+        .catch(() => null);
+      arrival = arrivalSnapshotFact(snapshot);
+    })();
     const mandateRead = (async (): Promise<void> => {
       if (ownInvestor !== null && prefetchTools.has("get_investor_mandate")) {
         const call = {
@@ -2471,6 +2495,7 @@ export function createModelGatewayQAnswer(
     await Promise.all([
       timed("mandate", mandateRead),
       timed("ownCompany", ownCompanyRead),
+      timed("arrival", arrivalRead),
       timed("relationship", relationshipRead),
       timed("standing", standingDone),
       timed("index", indexDone),
@@ -2514,6 +2539,7 @@ export function createModelGatewayQAnswer(
       onScreenPage,
       onScreenPageCalls,
       ownDay,
+      arrival,
       ownDayCalls,
       asked,
       counterparty,
@@ -2626,6 +2652,7 @@ export function createModelGatewayQAnswer(
         onScreenPage,
         onScreenPageCalls,
         ownDay,
+        arrival,
         ownDayCalls,
         ownStanding,
         ownStandingCall,
@@ -2861,6 +2888,7 @@ export function createModelGatewayQAnswer(
         ...(onScreenDocument === null ? [] : [onScreenDocument]),
         ...onScreenPage,
         ...(ownDay === null ? [] : [ownDay]),
+        ...(arrival === null ? [] : [arrival]),
         ...(relationship === null ? [] : [relationship]),
         ...(ownStanding === null ? [] : [ownStanding]),
         ...(ownIndex === null ? [] : [ownIndex]),
