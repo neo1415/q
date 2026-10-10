@@ -26,6 +26,27 @@ const batches = [
   [".", "--ignore-pattern", "apps/**", "--ignore-pattern", "packages/**"],
 ];
 
+// Type-aware rules resolve workspace packages through their built
+// declarations, as `pnpm typecheck` does (turbo `^build`). Without them every
+// cross-package type reads as unresolved `any` (CI, 2026-10-10). Turbo caches
+// the build, so a warm run costs seconds.
+const built = spawnSync(
+  "pnpm",
+  [
+    "exec",
+    "turbo",
+    "run",
+    "build",
+    "--filter=./packages/*",
+    "--output-logs=errors-only",
+  ],
+  { stdio: "inherit" },
+);
+if (built.status !== 0) {
+  console.log("lint: workspace packages failed to build");
+  process.exit(1);
+}
+
 let failed = false;
 for (const batch of batches) {
   const started = Date.now();
