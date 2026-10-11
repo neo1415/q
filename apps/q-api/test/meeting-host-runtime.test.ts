@@ -89,6 +89,7 @@ function setup(
     pieces?: boolean;
   } = {},
 ) {
+  const logs: { message: string; fields: Record<string, unknown> }[] = [];
   const cards: { askerUserId: string; text: string }[] = [];
   const stops: string[] = [];
   const clock = { at: START - 3 * 60_000 };
@@ -144,7 +145,9 @@ function setup(
       return Promise.resolve();
     },
     oneSided: (_m, outcome) => {
-      outcomes.push(`ONE_SIDED:${outcome.cause}:${String(outcome.rescheduleRequested)}`);
+      outcomes.push(
+        `ONE_SIDED:${outcome.cause}:${String(outcome.rescheduleRequested)}`,
+      );
       return Promise.resolve();
     },
     proposals: (_m, count) => {
@@ -185,6 +188,10 @@ function setup(
             return Promise.resolve(options.askerCard === true);
           },
         }),
+    logger: {
+      info: (fields, message) => logs.push({ message, fields }),
+      warn: (fields, message) => logs.push({ message, fields }),
+    },
     now: () => clock.at,
     tickEveryMs: null,
     leaveDelayMs: 0,
@@ -202,6 +209,7 @@ function setup(
     }
   };
   return {
+    logs,
     runtime,
     clock,
     said,
@@ -584,7 +592,12 @@ describe("meeting host in a call", () => {
     );
     clock.at += 20_000;
     await send(
-      event("transcript.data", 1, "Adaeze Okafor", "No wait, hang on, don't leave."),
+      event(
+        "transcript.data",
+        1,
+        "Adaeze Okafor",
+        "No wait, hang on, don't leave.",
+      ),
     );
     clock.at += 2_000;
     await send();
@@ -715,5 +728,49 @@ describe("what Q says aloud (meet-47)", () => {
     expect(spokenLine(`${"word ".repeat(100)}end.`).length).toBeLessThanOrEqual(
       521,
     );
+  });
+});
+
+describe("per-meeting diagnostics: a dropped transcript is visible (2026-10-09)", () => {
+  it("logs each utterance's stages (received, attributed, interpreted) without its words", async () => {
+    const { logs, send } = setup();
+    await send(
+      event("participant_events.join", 1, "Adaeze Okafor"),
+      event("transcript.data", 1, "Adaeze Okafor", "hang on please secretword"),
+    );
+    const line = logs.find((l) => l.message === "meeting host utterance");
+    expect(line?.fields).toMatchObject({
+      meetingId: MEETING,
+      stage: "utterance",
+      attributed: true,
+      interpreted: { waitAsk: true },
+    });
+    expect(JSON.stringify(logs)).not.toContain("secretword");
+  });
+
+  it("a transcript event that cannot be read is logged as dropped, not silent", async () => {
+    const { logs, send } = setup();
+    await send({
+      event: "transcript.data",
+      data: { data: { words: [{ text: "hi" }] } },
+    });
+    expect(
+      logs.some(
+        (l) =>
+          l.message === "meeting host event dropped" &&
+          l.fields["dropped"] === "unreadable_event",
+      ),
+    ).toBe(true);
+  });
+
+  it("someone speaking whom Q never saw join is attributed, not dropped", async () => {
+    const { logs, roster, send } = setup();
+    await send(event("transcript.data", 1, "Adaeze Okafor", "can you hear me"));
+    const line = logs.find((l) => l.message === "meeting host utterance");
+    expect(line?.fields).toMatchObject({
+      attributed: true,
+      implicitJoin: true,
+    });
+    expect(roster.length).toBeGreaterThan(0);
   });
 });

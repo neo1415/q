@@ -191,11 +191,7 @@ export type HostAction =
       readonly byUserId: string | null;
     };
 
-export type LeaveCause =
-  | "WAIT_EXPIRED"
-  | "WAIT_CAP"
-  | "HARD_CAP"
-  | "REMOVED";
+export type LeaveCause = "WAIT_EXPIRED" | "WAIT_CAP" | "HARD_CAP" | "REMOVED";
 
 /**
  * How the call ended up, for the runtime to act on after Q leaves: nobody
@@ -624,7 +620,11 @@ export function saysNeverMind(text: string): boolean {
  */
 export function asksQToWait(text: string): boolean {
   const t = ` ${plain(text.replace(/['’]/g, ""))} `;
-  if (/\b(?:dont wait|do not wait|no need to wait|stop waiting|dont stay)\b/.test(t)) {
+  if (
+    /\b(?:dont wait|do not wait|no need to wait|stop waiting|dont stay)\b/.test(
+      t,
+    )
+  ) {
     return false;
   }
   return WAIT_PHRASES.test(t);
@@ -672,25 +672,28 @@ export function waitMinutesAsked(text: string): number | null {
     fifteen: 15,
     twenty: 20,
   };
-  const m = /\b(\d{1,3}|a|one|two|three|four|five|ten|fifteen|twenty)\s*(?:more |extra |other )?(?:minutes?|mins?)\b/i.exec(
-    text,
-  );
+  const m =
+    /\b(\d{1,3}|a|one|two|three|four|five|ten|fifteen|twenty)\s*(?:more |extra |other )?(?:minutes?|mins?)\b/i.exec(
+      text,
+    );
   if (m === null || m[1] === undefined) return null;
-  const n = /^\d/.test(m[1]) ? Number(m[1]) : (words[m[1].toLowerCase()] ?? NaN);
+  const n = /^\d/.test(m[1])
+    ? Number(m[1])
+    : (words[m[1].toLowerCase()] ?? NaN);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-const HOST_STATS_SHAPE = {
-  utterances: 0,
-  partials: 0,
-  ignoredBot: 0,
-  ignoredEcho: 0,
-  ignoredEmpty: 0,
-  attributedImplicit: 0,
-  addressed: 0,
-  waitAsks: 0,
-  rescheduleAsks: 0,
-  answered: 0,
+export type HostStats = {
+  utterances: number;
+  partials: number;
+  ignoredBot: number;
+  ignoredEcho: number;
+  ignoredEmpty: number;
+  attributedImplicit: number;
+  addressed: number;
+  waitAsks: number;
+  rescheduleAsks: number;
+  answered: number;
 };
 
 type Present = {
@@ -733,7 +736,7 @@ export type MeetingHost = {
    */
   readonly keepWaiting: (at: number) => void;
   /** Counts of what happened to each line heard, for the logs (no words). */
-  readonly stats: () => Readonly<typeof HOST_STATS_SHAPE> & {
+  readonly stats: () => Readonly<HostStats> & {
     readonly spentChars: number;
     readonly modelCalls: number;
     readonly waitUntil: number;
@@ -777,7 +780,7 @@ export function createMeetingHost(
   /** When a present person last spoke to Q; a live conversation is not left. */
   let lastEngagedAt = -Infinity;
   /** Per-call counts of what happened to each line, for the logs. */
-  const stats = {
+  const stats: HostStats = {
     utterances: 0,
     partials: 0,
     ignoredBot: 0,

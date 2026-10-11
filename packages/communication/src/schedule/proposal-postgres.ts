@@ -5,6 +5,7 @@ import type {
 
 import type {
   ProposalEvent,
+  ProposalParties,
   ProposalRecord,
   ProposalState,
   ProposalStore,
@@ -67,10 +68,7 @@ export function createPostgresProposalStore(options: {
       return rows[0] ?? null;
     });
 
-  const insertEvent = async (
-    tx: TransactionContext,
-    event: ProposalEvent,
-  ) => {
+  const insertEvent = async (tx: TransactionContext, event: ProposalEvent) => {
     await tx.sql`
       insert into communication.meeting_time_proposal_events
         (proposal_id, tenant_id, event_type, from_state, to_state, actor_user_id,
@@ -155,9 +153,7 @@ export function createPostgresProposalStore(options: {
       transactions.run(async (tx) => {
         const accepted = patch.accepted;
         const json = (value: unknown) =>
-          value === null || value === undefined
-            ? null
-            : JSON.stringify(value);
+          value === null || value === undefined ? null : JSON.stringify(value);
         const moved = await tx.sql<{ id: string }[]>`
           update communication.meeting_time_proposals
              set state = ${event.toState},
@@ -186,4 +182,40 @@ export function createPostgresProposalStore(options: {
            where id = ${id} and state = 'CONFIRMED' and meeting_id is null`;
       }),
   };
+}
+
+/**
+ * Who the actor is on a relationship, from their ACTIVE membership of the
+ * company organisation (FOUNDER) or the investor organisation (INVESTOR).
+ * Derived here, never taken from a request. Every active member is treated
+ * as authorised to bind their side for now; narrowing that to a role or a
+ * scoped delegation is a one-line change here, behind the same port.
+ */
+export function createPostgresProposalParties(options: {
+  readonly transactions: TransactionManager;
+}): ProposalParties {
+  return ({ actorUserId, relationshipId }) =>
+    options.transactions.run(async (tx) => {
+      const rows = await tx.sql<
+        { tenant_id: string; side: "FOUNDER" | "INVESTOR" | null }[]
+      >`
+        select r.tenant_id,
+               case when exists (select 1 from identity.organisation_memberships om
+                                  where om.user_id = ${actorUserId}
+                                    and om.organisation_id = c.organisation_id
+                                    and om.membership_status = 'active') then 'FOUNDER'
+                    when exists (select 1 from identity.organisation_memberships om
+                                  where om.user_id = ${actorUserId}
+                                    and om.organisation_id = i.organisation_id
+                                    and om.membership_status = 'active') then 'INVESTOR'
+               end as side
+          from network.relationships r
+          join core.companies c on c.id = r.company_id
+          join core.investor_organisations i on i.id = r.investor_organisation_id
+         where r.id = ${relationshipId}
+         limit 1`;
+      const row = rows[0];
+      if (row === undefined || row.side === null) return null;
+      return { tenantId: row.tenant_id, side: row.side, binds: true };
+    });
 }

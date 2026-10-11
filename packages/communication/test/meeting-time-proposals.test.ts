@@ -61,7 +61,12 @@ function memoryStore() {
       if (current === undefined || current.state !== expected) {
         return Promise.resolve(false);
       }
-      if (events.some((e) => e.proposalId === id && e.idempotencyKey === event.idempotencyKey)) {
+      if (
+        events.some(
+          (e) =>
+            e.proposalId === id && e.idempotencyKey === event.idempotencyKey,
+        )
+      ) {
         return Promise.resolve(false);
       }
       proposals.set(id, {
@@ -98,7 +103,11 @@ const parties: ProposalParties = ({ actorUserId, relationshipId }) => {
     return Promise.resolve({ tenantId: TENANT, side: "INVESTOR", binds: true });
   // An investor-side member without authority to bind (an observer).
   if (actorUserId === OBSERVER)
-    return Promise.resolve({ tenantId: TENANT, side: "INVESTOR", binds: false });
+    return Promise.resolve({
+      tenantId: TENANT,
+      side: "INVESTOR",
+      binds: false,
+    });
   return Promise.resolve(null);
 };
 
@@ -111,7 +120,8 @@ function setup(options: { bookFails?: boolean } = {}) {
     store: mem.store,
     parties,
     now: () => NOW,
-    newId: () => `00000000-0000-4000-8000-0000000e${String((n += 1)).padStart(4, "0")}`,
+    newId: () =>
+      `00000000-0000-4000-8000-0000000e${String((n += 1)).padStart(4, "0")}`,
     book: ({ proposal, option, idempotencyKey }) => {
       if (failing) return Promise.reject(new Error("calendar down"));
       if (!booked.some((b) => b.key === idempotencyKey)) {
@@ -155,29 +165,51 @@ describe("the meeting time state machine", () => {
   });
 
   it("per role: only the investor accepts, declines or counters a proposal; only the founder answers a counter", () => {
-    expect(transitionProposal("INVESTOR_REVIEW", "INVESTOR", "ACCEPT").ok).toBe(true);
-    expect(transitionProposal("INVESTOR_REVIEW", "INVESTOR", "DECLINE").ok).toBe(true);
-    expect(transitionProposal("INVESTOR_REVIEW", "INVESTOR", "COUNTER").ok).toBe(true);
+    expect(transitionProposal("INVESTOR_REVIEW", "INVESTOR", "ACCEPT").ok).toBe(
+      true,
+    );
+    expect(
+      transitionProposal("INVESTOR_REVIEW", "INVESTOR", "DECLINE").ok,
+    ).toBe(true);
+    expect(
+      transitionProposal("INVESTOR_REVIEW", "INVESTOR", "COUNTER").ok,
+    ).toBe(true);
     for (const action of ["ACCEPT", "DECLINE", "COUNTER"] as const) {
       expect(transitionProposal("INVESTOR_REVIEW", "FOUNDER", action)).toEqual({
         ok: false,
         reason: "ROLE_NOT_ALLOWED",
       });
-      expect(transitionProposal("INVESTOR_REVIEW", "SYSTEM", action).ok).toBe(false);
+      expect(transitionProposal("INVESTOR_REVIEW", "SYSTEM", action).ok).toBe(
+        false,
+      );
     }
-    expect(transitionProposal("COUNTERPROPOSED", "FOUNDER", "ACCEPT_COUNTER").ok).toBe(true);
-    expect(transitionProposal("COUNTERPROPOSED", "INVESTOR", "ACCEPT_COUNTER")).toEqual({
+    expect(
+      transitionProposal("COUNTERPROPOSED", "FOUNDER", "ACCEPT_COUNTER").ok,
+    ).toBe(true);
+    expect(
+      transitionProposal("COUNTERPROPOSED", "INVESTOR", "ACCEPT_COUNTER"),
+    ).toEqual({
       ok: false,
       reason: "ROLE_NOT_ALLOWED",
     });
-    expect(transitionProposal("PROPOSED", "SYSTEM", "SEND_FOR_REVIEW").ok).toBe(true);
-    expect(transitionProposal("PROPOSED", "FOUNDER", "SEND_FOR_REVIEW").ok).toBe(false);
+    expect(transitionProposal("PROPOSED", "SYSTEM", "SEND_FOR_REVIEW").ok).toBe(
+      true,
+    );
+    expect(
+      transitionProposal("PROPOSED", "FOUNDER", "SEND_FOR_REVIEW").ok,
+    ).toBe(false);
   });
 
   it("terminal states move nowhere", () => {
     for (const state of ["CONFIRMED", "DECLINED"] as ProposalState[]) {
       for (const role of ["FOUNDER", "INVESTOR", "SYSTEM"] as const) {
-        for (const action of ["ACCEPT", "DECLINE", "COUNTER", "ACCEPT_COUNTER", "REPROPOSE"] as const) {
+        for (const action of [
+          "ACCEPT",
+          "DECLINE",
+          "COUNTER",
+          "ACCEPT_COUNTER",
+          "REPROPOSE",
+        ] as const) {
           expect(transitionProposal(state, role, action).ok).toBe(false);
         }
       }
@@ -191,7 +223,10 @@ describe("meeting time proposals: nothing is booked until the investor accepts",
     const p = await proposed(s);
     expect(p.state).toBe("INVESTOR_REVIEW");
     expect(s.booked).toEqual([]);
-    expect(s.events.map((e) => e.eventType)).toEqual(["PROPOSED", "SENT_FOR_REVIEW"]);
+    expect(s.events.map((e) => e.eventType)).toEqual([
+      "PROPOSED",
+      "SENT_FOR_REVIEW",
+    ]);
   });
 
   it("the founder cannot confirm their own proposal (unauthorised confirmation is refused)", async () => {
@@ -237,14 +272,18 @@ describe("meeting time proposals: nothing is booked until the investor accepts",
       options: [slot(14)],
       idempotencyKey: "k-propose-x",
     };
-    expect(await s.service.propose({ ...base, actorUserId: OUTSIDER })).toEqual({
-      outcome: "REFUSED",
-      reason: "NOT_A_PARTY",
-    });
-    expect(await s.service.propose({ ...base, actorUserId: INVESTOR })).toEqual({
-      outcome: "REFUSED",
-      reason: "ROLE_NOT_ALLOWED",
-    });
+    expect(await s.service.propose({ ...base, actorUserId: OUTSIDER })).toEqual(
+      {
+        outcome: "REFUSED",
+        reason: "NOT_A_PARTY",
+      },
+    );
+    expect(await s.service.propose({ ...base, actorUserId: INVESTOR })).toEqual(
+      {
+        outcome: "REFUSED",
+        reason: "ROLE_NOT_ALLOWED",
+      },
+    );
   });
 
   it("the investor's explicit acceptance is recorded, attributed, and only then booked", async () => {
@@ -257,7 +296,12 @@ describe("meeting time proposals: nothing is booked until the investor accepts",
       optionIndex: 1,
       idempotencyKey: "investor-accept-1",
     });
-    expect(out).toMatchObject({ outcome: "OK", recorded: true, confirmed: true, booked: true });
+    expect(out).toMatchObject({
+      outcome: "OK",
+      recorded: true,
+      confirmed: true,
+      booked: true,
+    });
     const after = s.proposals.get(p.id);
     expect(after).toMatchObject({
       state: "CONFIRMED",
@@ -289,12 +333,19 @@ describe("meeting time proposals: nothing is booked until the investor accepts",
     const first = await s.service.respond(input);
     const second = await s.service.respond(input);
     expect(first).toMatchObject({ recorded: true });
-    expect(second).toMatchObject({ outcome: "OK", recorded: false, confirmed: true });
+    expect(second).toMatchObject({
+      outcome: "OK",
+      recorded: false,
+      confirmed: true,
+    });
     expect(s.events.filter((e) => e.eventType === "ACCEPTED")).toHaveLength(1);
     expect(s.booked).toHaveLength(1);
     // A different key after it is confirmed is not a second acceptance.
     expect(
-      await s.service.respond({ ...input, idempotencyKey: "investor-accept-other" }),
+      await s.service.respond({
+        ...input,
+        idempotencyKey: "investor-accept-other",
+      }),
     ).toEqual({ outcome: "REFUSED", reason: "INVALID_STATE" });
   });
 
@@ -308,10 +359,17 @@ describe("meeting time proposals: nothing is booked until the investor accepts",
       optionIndex: 0,
       idempotencyKey: "investor-accept-2",
     });
-    expect(out).toMatchObject({ outcome: "OK", confirmed: true, booked: false });
+    expect(out).toMatchObject({
+      outcome: "OK",
+      confirmed: true,
+      booked: false,
+    });
     expect(s.proposals.get(p.id)?.state).toBe("CONFIRMED");
     s.heal();
-    const retry = await s.service.completeBooking({ actorUserId: FOUNDER, proposalId: p.id });
+    const retry = await s.service.completeBooking({
+      actorUserId: FOUNDER,
+      proposalId: p.id,
+    });
     expect(retry).toMatchObject({ confirmed: true, booked: true });
     await s.service.completeBooking({ actorUserId: FOUNDER, proposalId: p.id });
     expect(s.booked).toHaveLength(1);
@@ -402,7 +460,13 @@ describe("meeting time proposals: nothing is booked until the investor accepts",
         actorUserId: FOUNDER,
         relationshipId: REL,
         purpose: "Intro",
-        options: [{ ...slot(14), startsAt: "2020-01-01T10:00:00.000Z", endsAt: "2020-01-01T10:30:00.000Z" }],
+        options: [
+          {
+            ...slot(14),
+            startsAt: "2020-01-01T10:00:00.000Z",
+            endsAt: "2020-01-01T10:30:00.000Z",
+          },
+        ],
         idempotencyKey: "founder-past",
       }),
     ).toEqual({ outcome: "REFUSED", reason: "INVALID_OPTIONS" });
@@ -485,8 +549,19 @@ describe("meeting time proposals: nothing is booked until the investor accepts",
     const s = setup();
     const p = await proposed(s);
     const [a, b] = await Promise.all([
-      s.service.respond({ actorUserId: INVESTOR, proposalId: p.id, action: "ACCEPT", optionIndex: 0, idempotencyKey: "race-accept" }),
-      s.service.respond({ actorUserId: INVESTOR, proposalId: p.id, action: "DECLINE", idempotencyKey: "race-decline" }),
+      s.service.respond({
+        actorUserId: INVESTOR,
+        proposalId: p.id,
+        action: "ACCEPT",
+        optionIndex: 0,
+        idempotencyKey: "race-accept",
+      }),
+      s.service.respond({
+        actorUserId: INVESTOR,
+        proposalId: p.id,
+        action: "DECLINE",
+        idempotencyKey: "race-decline",
+      }),
     ]);
     const results = [a, b].map((r) => (r.outcome === "OK" ? "OK" : r.reason));
     expect(results.filter((r) => r === "OK")).toHaveLength(1);

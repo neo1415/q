@@ -70,7 +70,12 @@ export function registerMeetingHostRoutes(
           if (body === null) {
             // 2026-10-09: an unreadable body was dropped without a trace.
             request.log.warn(
-              { meetingId, bytes: raw.length, stage: "received", dropped: "unparsable_body" },
+              {
+                meetingId,
+                bytes: raw.length,
+                stage: "received",
+                dropped: "unparsable_body",
+              },
               "meeting host event dropped",
             );
           }

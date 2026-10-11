@@ -116,7 +116,10 @@ export {
   type ProposalStore,
   type TimeOption,
 } from "./schedule/proposal.js";
-export { createPostgresProposalStore } from "./schedule/proposal-postgres.js";
+export {
+  createPostgresProposalParties,
+  createPostgresProposalStore,
+} from "./schedule/proposal-postgres.js";
 export {
   createMeetingAssistantService,
   meetingAssistantView,

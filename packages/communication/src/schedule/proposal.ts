@@ -20,11 +20,7 @@ import { randomUUID } from "node:crypto";
  */
 
 export type ProposalState =
-  | "PROPOSED"
-  | "INVESTOR_REVIEW"
-  | "CONFIRMED"
-  | "DECLINED"
-  | "COUNTERPROPOSED";
+  "PROPOSED" | "INVESTOR_REVIEW" | "CONFIRMED" | "DECLINED" | "COUNTERPROPOSED";
 
 export type ProposalSide = "FOUNDER" | "INVESTOR";
 export type ProposalRole = ProposalSide | "SYSTEM";
@@ -53,9 +49,7 @@ type Rule = {
 
 /** The whole machine: state -> action -> who may do it, and where it goes. */
 export const PROPOSAL_TRANSITIONS: Readonly<
-  Partial<
-    Record<ProposalState, Partial<Record<ProposalAction, Rule>>>
-  >
+  Partial<Record<ProposalState, Partial<Record<ProposalAction, Rule>>>>
 > = {
   PROPOSED: {
     SEND_FOR_REVIEW: {
@@ -372,7 +366,8 @@ export function createProposalService(
       // from membership, so a request cannot claim the other one.
       if (party.side !== "FOUNDER") return refused("ROLE_NOT_ALLOWED");
       if (!party.binds) return refused("NOT_AUTHORISED");
-      if (!validOptions(input.options, now())) return refused("INVALID_OPTIONS");
+      if (!validOptions(input.options, now()))
+        return refused("INVALID_OPTIONS");
       const existing = await store.findByKey(
         input.relationshipId,
         input.idempotencyKey,
@@ -433,7 +428,8 @@ export function createProposalService(
       // from the record: no second transition, no second booking.
       const replay = await store.findEvent(current.id, input.idempotencyKey);
       if (replay !== null) {
-        if (replay.actorUserId !== input.actorUserId) return refused("CONFLICT");
+        if (replay.actorUserId !== input.actorUserId)
+          return refused("CONFLICT");
         const booked = await bookAccepted(current);
         return {
           outcome: "OK",
@@ -482,7 +478,9 @@ export function createProposalService(
         ? {
             accepted: {
               from:
-                input.action === "ACCEPT_COUNTER" ? "COUNTER_OPTIONS" : "OPTIONS",
+                input.action === "ACCEPT_COUNTER"
+                  ? "COUNTER_OPTIONS"
+                  : "OPTIONS",
               option: input.optionIndex ?? 0,
               byUserId: input.actorUserId,
               at: now_,
@@ -577,7 +575,9 @@ export function createProposalService(
     },
   };
 
-  async function sendForReview(record: ProposalRecord): Promise<ProposalOutcome> {
+  async function sendForReview(
+    record: ProposalRecord,
+  ): Promise<ProposalOutcome> {
     const result = transition(record.state, "SYSTEM", "SEND_FOR_REVIEW");
     if (!result.ok) return refused(result.reason);
     const applied = await store.apply({

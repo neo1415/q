@@ -685,8 +685,11 @@ describe("meeting host: waiting for the other participant (live bug 2026-10-09)"
     actions.flatMap((a) => (a.kind === "OUTCOME" ? [a.outcome] : []));
   const leaves = (actions: readonly HostAction[]) =>
     actions.flatMap((a) => (a.kind === "LEAVE" ? [a] : []));
-  const say = (host: ReturnType<typeof createMeetingHost>, text: string, at: number) =>
-    run(host, { kind: "UTTERANCE", participant: ADAEZE, text, at });
+  const say = (
+    host: ReturnType<typeof createMeetingHost>,
+    text: string,
+    at: number,
+  ) => run(host, { kind: "UTTERANCE", participant: ADAEZE, text, at });
 
   function waiting() {
     const host = createMeetingHost(CONTEXT);
@@ -697,7 +700,10 @@ describe("meeting host: waiting for the other participant (live bug 2026-10-09)"
   it("silence is never consent: no reschedule, no cancel, and Q stays until the wait runs out", () => {
     const host = waiting();
     run(host, { kind: "TICK", at: START + GRACE }); // the check-in
-    const quiet = host.handle({ kind: "TICK", at: START + GRACE + PATIENCE - 5_000 });
+    const quiet = host.handle({
+      kind: "TICK",
+      at: START + GRACE + PATIENCE - 5_000,
+    });
     expect(leaves(quiet)).toEqual([]);
     expect(outcomes(quiet)).toEqual([]);
     expect(host.phase()).not.toBe("LEFT");
@@ -717,7 +723,11 @@ describe("meeting host: waiting for the other participant (live bug 2026-10-09)"
   it("ordinary speech while waiting is a conversation, not a reschedule decision", () => {
     const host = waiting();
     run(host, { kind: "TICK", at: START + GRACE });
-    const out = say(host, "Yes please, tell me about the investor.", START + GRACE + 20_000);
+    const out = say(
+      host,
+      "Yes please, tell me about the investor.",
+      START + GRACE + 20_000,
+    );
     expect(outcomes(out)).toEqual([]);
     expect(leaves(out)).toEqual([]);
     expect(out.some((a) => a.kind === "RESCHEDULE_REQUESTED")).toBe(false);
@@ -748,9 +758,16 @@ describe("meeting host: waiting for the other participant (live bug 2026-10-09)"
     const out = say(host, text, at);
     expect(out.some((a) => a.kind === "COMPOSE")).toBe(false);
     expect(said(out).map((s) => s.why)).toContain("WAITING");
-    expect(said(out).map((s) => s.text).join(" ")).not.toContain("couldn't");
+    expect(
+      said(out)
+        .map((s) => s.text)
+        .join(" "),
+    ).not.toContain("couldn't");
     // The wait moved later: past where it would have run out unasked.
-    const past = host.handle({ kind: "TICK", at: START + GRACE + PATIENCE + 1 });
+    const past = host.handle({
+      kind: "TICK",
+      at: START + GRACE + PATIENCE + 1,
+    });
     expect(leaves(past)).toEqual([]);
     expect(host.phase()).not.toBe("LEFT");
   });
@@ -774,7 +791,9 @@ describe("meeting host: waiting for the other participant (live bug 2026-10-09)"
     const lines = said(out);
     expect(lines.at(-1)?.why).toBe("LEAVING");
     expect(lines.at(-1)?.text).toContain("Tunde still hasn't joined");
-    expect(lines.at(-1)?.text).toContain("Nothing about the meeting has changed");
+    expect(lines.at(-1)?.text).toContain(
+      "Nothing about the meeting has changed",
+    );
     expect(leaves(out)[0]?.cause).toBe("WAIT_CAP");
     expect(outcomes(out)).toMatchObject([
       { kind: "ONE_SIDED", cause: "WAIT_CAP", rescheduleRequested: false },
@@ -782,16 +801,20 @@ describe("meeting host: waiting for the other participant (live bug 2026-10-09)"
   });
 
   it("the wait cap is configurable and bounded, and never past the hard cap", () => {
-    expect(boundedPolicy({ waitMaxAfterStartMs: 40 * 60_000 }).waitMaxAfterStartMs).toBe(
-      40 * 60_000,
+    expect(
+      boundedPolicy({ waitMaxAfterStartMs: 40 * 60_000 }).waitMaxAfterStartMs,
+    ).toBe(40 * 60_000);
+    expect(boundedPolicy({ waitMaxAfterStartMs: 0 }).waitMaxAfterStartMs).toBe(
+      5 * 60_000,
     );
-    expect(boundedPolicy({ waitMaxAfterStartMs: 0 }).waitMaxAfterStartMs).toBe(5 * 60_000);
     expect(
       boundedPolicy({ waitMaxAfterStartMs: 9 * 3_600_000 }).waitMaxAfterStartMs,
     ).toBe(60 * 60_000);
     expect(
-      boundedPolicy({ waitMaxAfterStartMs: 60 * 60_000, hardCapAfterStartMs: 30 * 60_000 })
-        .waitMaxAfterStartMs,
+      boundedPolicy({
+        waitMaxAfterStartMs: 60 * 60_000,
+        hardCapAfterStartMs: 30 * 60_000,
+      }).waitMaxAfterStartMs,
     ).toBeLessThan(30 * 60_000);
     expect(waitMaxMsFromEnv(undefined)).toBe(20 * 60_000);
     expect(waitMaxMsFromEnv("35")).toBe(35 * 60_000);
@@ -802,7 +825,9 @@ describe("meeting host: waiting for the other participant (live bug 2026-10-09)"
     const host = waiting();
     run(host, { kind: "TICK", at: START + GRACE });
     const out = say(host, "Can we reschedule this?", START + GRACE + 10_000);
-    expect(out.filter((a) => a.kind === "RESCHEDULE_REQUESTED")).toHaveLength(1);
+    expect(out.filter((a) => a.kind === "RESCHEDULE_REQUESTED")).toHaveLength(
+      1,
+    );
     expect(leaves(out)).toEqual([]);
     expect(outcomes(out)).toEqual([]);
     const end = host.handle({ kind: "TICK", at: START + CAP });
@@ -845,7 +870,9 @@ describe("meeting host: waiting for the other participant (live bug 2026-10-09)"
     const why = said(late).map((s) => s.why);
     expect(why).toContain("GREET");
     expect(why).toContain("INTRO");
-    expect(said(late).find((s) => s.why === "GREET")?.text).toContain("Hi Tunde");
+    expect(said(late).find((s) => s.why === "GREET")?.text).toContain(
+      "Hi Tunde",
+    );
     const after = run(host, { kind: "TICK", at: START + CAP + 5 * 60_000 });
     expect(leaves(after)).toEqual([]);
     expect(outcomes(after)).toEqual([]);

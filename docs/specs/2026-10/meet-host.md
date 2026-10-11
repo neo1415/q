@@ -28,3 +28,13 @@ waiting → greeting (each arrival, consent line) → intros (both sides present
 - Recall: $0.50/h recording + $0 captions (meeting_captions); a 30-min call joined 3 min early ≈ 33 min ≈ $0.28; a no-show ≈ 13 min ≈ $0.11.
 - ElevenLabs: greetings ~110 chars × people + intro ~200 + a few answers ≈ 600–1,200 chars, capped at 2,400 per call (v3 conversational).
 - Model: ≤16 calls per call, only on addressed lines and guest introductions (~1.5k input + ≤400 output tokens each).
+
+## Waiting for the other participant, and budgets (2026-10-09)
+
+Live bug (founder, Friday): Q announced it would "arrange another time" and left while the founder told it to wait. Cause: after the check at the grace period Q asked "shall I let you know once it's rescheduled?" and the very next utterance (any words, "wait" included) or 2 minutes of silence was taken as a yes. The host now never reschedules or cancels because someone is absent; silence is never consent.
+
+- Check-in at the grace period (10 min): "It looks like we're still waiting for the other participant. Would you like me to keep waiting or help you prepare?" Q stays and talks.
+- "Wait / hang on / don't leave / stay with me / give them a few more minutes" extend the wait (code matcher first; the MEETING_HOST_TURN v4 reader returns KEEP_WAITING as the fallback).
+- The wait ends at its own expiry (no one answered the check-in and nobody is talking) or at `MEETING_WAIT_MAX_MINUTES` (default 20, bounded 5 to 60, never past the 120-minute provider hard cap). Q says why it is leaving; the booking is untouched; the reason is in `meeting_host_notes.body` (WAIT_EXPIRED, WAIT_CAP) and the logs.
+- Budgets (were: 2,400 spoken chars, 60 model calls, 2 sentences or 280 chars per answer, 0.02 USD per turn): now 20,000 chars, 150 model calls, 3 sentences or 520 chars, 0.03 USD per turn (0.04 with a frame). Per-meeting spend is at most 150 x 0.03 USD; max duration and concurrency limits are unchanged. Constants: `DEFAULT_HOST_LIMITS` in `packages/communication/src/meeting-host/host.ts`, `HOST_BUDGET` in `apps/q-api/src/composition/meeting-host-runtime.ts`.
+- Diagnostics (no words): `meeting host utterance` per line (attributed, implicitJoin, echo, interpreted), `meeting host event dropped` with a `dropped` reason, `meeting host leaving the call` with the cause and stats.

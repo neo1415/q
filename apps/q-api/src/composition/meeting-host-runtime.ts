@@ -778,7 +778,11 @@ export function createMeetingHostRuntime(dependencies: {
           absentSide: null,
         });
         logger?.info?.(
-          { meetingId: session.meetingId, stage: "interpreted", intent: "reschedule_request" },
+          {
+            meetingId: session.meetingId,
+            stage: "interpreted",
+            intent: "reschedule_request",
+          },
           "meeting host heard a request for a new time (recorded, nothing moved)",
         );
         return;
@@ -874,7 +878,11 @@ export function createMeetingHostRuntime(dependencies: {
           // matcher missed: the same bounded extension (never past the cap).
           session.host.keepWaiting(now());
           logger?.info?.(
-            { meetingId: session.meetingId, stage: "interpreted", intent: "keep_waiting_reader" },
+            {
+              meetingId: session.meetingId,
+              stage: "interpreted",
+              intent: "keep_waiting_reader",
+            },
             "meeting host read a request to keep waiting",
           );
         } else if (result?.kind === "PROPOSE" && result.proposal !== null) {
@@ -983,7 +991,10 @@ export function createMeetingHostRuntime(dependencies: {
       // visible per meeting: received -> transcribed -> attributed ->
       // interpreted -> answered.
       if (!on) {
-        logger?.warn({ meetingId, stage: "received", dropped: "host_off" }, "meeting host event dropped");
+        logger?.warn(
+          { meetingId, stage: "received", dropped: "host_off" },
+          "meeting host event dropped",
+        );
         return;
       }
       const event = hostEventOf(body, now());
@@ -991,7 +1002,12 @@ export function createMeetingHostRuntime(dependencies: {
         const name = rawEventName(body);
         if (name === null || name.startsWith("transcript")) {
           logger?.warn(
-            { meetingId, stage: "transcribed", dropped: "unreadable_event", event: name },
+            {
+              meetingId,
+              stage: "transcribed",
+              dropped: "unreadable_event",
+              event: name,
+            },
             "meeting host event dropped",
           );
         }
@@ -1000,7 +1016,12 @@ export function createMeetingHostRuntime(dependencies: {
       const session = await open(meetingId);
       if (session === null) {
         logger?.warn(
-          { meetingId, stage: "received", dropped: "no_session", kind: event.kind },
+          {
+            meetingId,
+            stage: "received",
+            dropped: "no_session",
+            kind: event.kind,
+          },
           "meeting host event dropped",
         );
         return;
