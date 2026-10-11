@@ -127,19 +127,99 @@ describe("what Q says on arrival", () => {
     expect(words.spoken).not.toMatch(/I'm listening/u);
   });
 
-  it("a quiet day is one line and no cards", () => {
+  const STORY = (id: string, headline: string, summary: string) => ({
+    editionId: "7b1c0e55-0000-4000-8000-0000000000e1",
+    editionDate: "2026-10-07",
+    sectionCode: "YOUR_SECTOR" as const,
+    storyId: id,
+    headline,
+    summary,
+    detail: null,
+    sources: [
+      {
+        publisher: "TechCabal",
+        title: headline,
+        url: "https://techcabal.com/x",
+        publishedAt: null,
+      },
+    ],
+    publishedAt: "2026-10-07T06:00:00.000Z",
+    path: `/daily/7b1c0e55-0000-4000-8000-0000000000e1#story-${id}`,
+    sectionPath: null,
+  });
+  const QUIET_DATA = { ...DATA, activity: {}, cards: [] };
+  const snapshotWith = (daily: ReturnType<typeof STORY>[]) =>
+    ({
+      contractVersion: "arrival-snapshot.v2",
+      version: "v",
+      asOf: "2026-10-08T13:00:00.000Z",
+      items: [],
+      unread: [],
+      briefsRead: true,
+      activity: null,
+      daily,
+    }) as unknown as NonNullable<ArrivalData["snapshot"]>;
+
+  it("a quiet day with no prepared story is a plain greeting, never 'all quiet'", () => {
     const words = arrivalWords(
-      { ...DATA, activity: {}, cards: [] },
+      QUIET_DATA,
       new Date("2026-10-08T13:30:00Z"),
       null,
     );
     expect(words.quiet).toBe(true);
-    // E2: casual and glad to see them, then the one quiet line.
     expect(words.spoken).toMatch(
-      /^Good afternoon, Zino\. (?:Good to see you\.|Nice to have you back\.|Glad you're here\.|Good to have you back\.) (?:Quiet day, nothing needs you\.|All quiet; nothing needs you\.)$/u,
+      /^Good afternoon, Zino\. (?:Good to see you\.|Nice to have you back\.|Glad you're here\.|Good to have you back\.)$/u,
     );
-    expect(words.welcome).not.toBeNull();
+    expect(words.spoken).not.toMatch(/quiet|nothing needs you/iu);
+    expect(words.dailyPaths).toEqual([]);
     expect(words.firstCard).toBeNull();
+  });
+
+  it("a quiet day with stories mentions one or two, dated, and invites a follow-up", () => {
+    const stories = [
+      STORY("a1", "Paystack Labs raises $20 million.", "Closed a round."),
+      STORY("b2", "Nigeria cuts licence fees", "Fees fall."),
+      STORY("c3", "A third story", "Not mentioned."),
+    ];
+    const words = arrivalWords(
+      { ...QUIET_DATA, snapshot: snapshotWith(stories) },
+      new Date("2026-10-08T13:30:00Z"),
+      null,
+    );
+    expect(words.spoken).toContain("7 October");
+    expect(words.spoken).toContain("Paystack Labs raises $20 million");
+    expect(words.spoken).toContain("Nigeria cuts licence fees");
+    expect(words.spoken).not.toContain("third story");
+    expect(words.spoken).toMatch(/gist|short version|tell you more|open one/iu);
+    expect(words.spoken).not.toMatch(/all quiet|nothing needs you/iu);
+    expect(words.dailyPaths).toEqual([
+      "/daily/7b1c0e55-0000-4000-8000-0000000000e1",
+    ]);
+  });
+
+  it("varies by day: consecutive days never say the same line", () => {
+    const stories = [STORY("a1", "Paystack Labs raises $20 million", "x")];
+    const lines = [8, 9, 10, 11, 12, 13].map(
+      (day) =>
+        arrivalWords(
+          { ...QUIET_DATA, snapshot: snapshotWith(stories) },
+          new Date(`2026-10-${String(day).padStart(2, "0")}T13:30:00Z`),
+          null,
+        ).lowdown,
+    );
+    for (let i = 1; i < lines.length; i += 1) {
+      expect(lines[i]).not.toBe(lines[i - 1]);
+    }
+  });
+
+  it("something that needs them comes first and stories are not mentioned", () => {
+    const words = arrivalWords(
+      { ...DATA, snapshot: snapshotWith([STORY("a1", "A story", "x")]) },
+      new Date("2026-10-08T13:30:00Z"),
+      null,
+    );
+    expect(words.spoken).not.toContain("A story");
+    expect(words.dailyPaths).toEqual([]);
   });
 });
 

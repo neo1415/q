@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ArrivalSnapshotSchema,
+  type QDailyEdition,
   relationshipMessagesPath,
   relationshipPagePath,
 } from "@capital-q/contracts";
@@ -39,7 +40,7 @@ describe("buildArrivalSnapshot", () => {
 
   it("is a valid, versioned contract with every headline's facts", () => {
     expect(() => ArrivalSnapshotSchema.parse(snapshot)).not.toThrow();
-    expect(snapshot.contractVersion).toBe("arrival-snapshot.v1");
+    expect(snapshot.contractVersion).toBe("arrival-snapshot.v2");
     expect(snapshot.items).toHaveLength(2);
     expect(snapshot.unread).toEqual(["REMINDER"]);
     expect(item?.headline).toContain("TensorGate");
@@ -266,5 +267,81 @@ describe("createArrivalSnapshots freshness", () => {
     const q = ActorContextSchema.parse({ ...ACTOR, actorType: "Q" });
     expect(await s.snapshots.forActor(q)).toBeNull();
     expect(s.counts.probe).toBe(0);
+  });
+});
+
+describe("P4: the snapshot carries the person's prepared Q Daily stories", () => {
+  const EDITION_ID = "7b1c0e55-0000-4000-8000-0000000000e1";
+  const edition = {
+    id: EDITION_ID,
+    number: 1,
+    editionDate: "2026-10-09",
+    frequency: "WEEKLY",
+    readerName: null,
+    topics: [],
+    lead: {
+      id: "lead1",
+      section: "LEAD",
+      headline: "Lead news",
+      standfirst: "The gist.",
+      paragraphs: [],
+      quotes: [],
+      sources: [
+        {
+          url: "https://techcabal.com/a",
+          publisher: "TechCabal",
+          title: "t",
+          publishedAt: null,
+        },
+      ],
+      image: null,
+      deal: null,
+      written: true,
+    },
+    sections: [],
+    briefs: [],
+    chart: null,
+    qTake: null,
+    generatedAt: NOW.toISOString(),
+  } as unknown as QDailyEdition;
+
+  function build(read: () => Promise<QDailyEdition | null>) {
+    let reads = 0;
+    const snapshots = createArrivalSnapshots({
+      now: () => NOW,
+      attention: () => Promise.resolve(tensorGateReport()),
+      briefs: () => Promise.resolve([tensorGateBrief({ sequence: 7 })]),
+      probe: () => Promise.resolve({ epoch: "a".repeat(32), stamp: "s1" }),
+      daily: () => {
+        reads += 1;
+        return read();
+      },
+    });
+    return { snapshots, reads: () => reads };
+  }
+
+  it("adds the stories, moves the version, and reads the edition once per window", async () => {
+    const s = build(() => Promise.resolve(edition));
+    const plain = await createArrivalSnapshots({
+      now: () => NOW,
+      attention: () => Promise.resolve(tensorGateReport()),
+      briefs: () => Promise.resolve([tensorGateBrief({ sequence: 7 })]),
+      probe: () => Promise.resolve({ epoch: "a".repeat(32), stamp: "s1" }),
+    }).forActor(ACTOR);
+    const snapshot = await s.snapshots.forActor(ACTOR);
+    expect(snapshot?.daily[0]).toMatchObject({
+      storyId: "lead1",
+      path: `/daily/${EDITION_ID}#story-lead1`,
+    });
+    expect(snapshot?.version).not.toBe(plain?.version);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.reads()).toBe(1);
+  });
+
+  it("a failed or empty edition read is no stories, never an error", async () => {
+    const failed = build(() => Promise.reject(new Error("db down")));
+    expect((await failed.snapshots.forActor(ACTOR))?.daily).toEqual([]);
+    const none = build(() => Promise.resolve(null));
+    expect((await none.snapshots.forActor(ACTOR))?.daily).toEqual([]);
   });
 });

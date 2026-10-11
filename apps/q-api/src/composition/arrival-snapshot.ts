@@ -8,6 +8,7 @@ import {
   isMatchedRelationshipState,
   relationshipMessagesPath,
   relationshipPagePath,
+  type ArrivalDailyStory,
   type ArrivalSnapshot,
   type ArrivalSnapshotFacts,
   type ArrivalSnapshotItem,
@@ -555,7 +556,7 @@ export function createArrivalSnapshots(dependencies: {
   /** The latest edition's stories per actor, kept briefly. */
   const dailyHeld = new Map<
     string,
-    { at: number; stories: ArrivalSnapshot["daily"] }
+    { at: number; stories: readonly ArrivalDailyStory[] }
   >();
   const DAILY_TRUST_MS = 60_000;
   async function withDaily(
@@ -587,7 +588,7 @@ export function createArrivalSnapshots(dependencies: {
         )
         .digest("hex")
         .slice(0, 32),
-      daily: held.stories,
+      daily: [...held.stories],
     };
   }
   const forActorCore = async (
