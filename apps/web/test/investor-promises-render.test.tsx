@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -14,6 +14,15 @@ const send = vi.fn((_input: unknown) =>
 vi.mock("next/navigation", () => ({
   usePathname: () => "/company/x",
   useRouter: () => ({ refresh: () => undefined }),
+}));
+const askNow = vi.fn((_question: string) => undefined);
+vi.mock("@/components/app-shell/global-q", () => ({
+  useGlobalQ: () => ({
+    open: false,
+    setOpen: () => undefined,
+    askAbout: () => undefined,
+    askNow: (question: string) => askNow(question),
+  }),
 }));
 vi.mock("../src/features/assumptions/assumption-actions", () => ({
   sendQuestionsAction: (input: unknown) => send(input),
@@ -138,6 +147,36 @@ describe("assumptions to test (Q.07)", () => {
     fireEvent.click(screen.getByLabelText("Where does the 41,000 come from?"));
     const button = screen.getByText("Send 1 question to Ledgerline");
     expect((button.closest("button") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("offers the three paths per question: Q checks, ask the founder, request a document", () => {
+    cleanup();
+    askNow.mockClear();
+    send.mockClear();
+    render(
+      <AssumptionsSection
+        board={BOARD}
+        companyName="Ledgerline"
+        route={{ kind: "DILIGENCE", relationshipId: RELATIONSHIP }}
+        dataRoomHref="/company/x?tab=dataroom"
+      />,
+    );
+    expect(screen.getByText("Questions to investigate")).toBeTruthy();
+    expect(screen.getAllByText("Tick to ask Ledgerline")).toHaveLength(3);
+    const checks = screen.getAllByRole("button", {
+      name: "Ask Q to check the evidence",
+    });
+    expect(checks).toHaveLength(3);
+    fireEvent.click(checks[2] as HTMLElement);
+    expect(askNow).toHaveBeenCalledTimes(1);
+    expect(askNow.mock.calls[0]?.[0]).toContain("About Ledgerline:");
+    expect(askNow.mock.calls[0]?.[0]).toContain("monthly burn");
+    // Asking Q sends nothing to the company.
+    expect(send).not.toHaveBeenCalled();
+    const requests = screen.getAllByRole("link", {
+      name: "Request a document",
+    });
+    expect(requests[0]?.getAttribute("href")).toBe("/company/x?tab=dataroom");
   });
 
   it("the evidence board card orders evidenced, claimed, not known yet", () => {

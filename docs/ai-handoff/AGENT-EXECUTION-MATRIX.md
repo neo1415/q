@@ -1,12 +1,22 @@
 # Agent execution matrix — the agent architecture as built (audited 2026-10-11 at `b021d53b`)
 
+## Current evidence checkpoint — 2026-10-11 20:56 UTC
+
+The live baseline is exact green `9261cdc4`, all four Railway services SUCCESS. The monthly start guard is deployed and fails closed for an unavailable/malformed spend ledger; durable aggregate job reservations remain missing. The existing workforce document bridge has produced a real READY ONE_PAGER, preserved version 1 through same-artifact conversational revision to version 2, rendered the viewer and exported a changed valid one-page PDF. All three canonical findings and nine gaps remain intact; the viewer's dedicated “Evidence gaps” section was verified after a warm retry. Cold document opening still needs a readiness correction.
+
+PREPARING never completes a workforce step. The existing artifact service reads the actual immutable version and rejects a damaged READY pointer, independently of the adapter's positive version check. A fresh focused run passes 24 document-job/adapter/executor regressions, including absent versions, PREPARING polling and cancellation.
+
+These are narrow document execution capabilities, not full autonomous research, writing, design, critique and iterative intelligence. The existing `runDocumentPipeline` remains the reuse target; no second platform was added. The initial deterministic bridge deliberately has no paid generation until durable aggregate reservation exists. Historical roster/gap observations below describe `b021d53b`; continuation checkpoints record the changes since that audit.
+
+Offscreen named-founder attribution is live verified at the existing release; Discover-to-selected-company analysis, cold Ask Q opening and the exact two-company browser comparison remain under acceptance. Product fixes at `06872c7c` pass local gates and are pushed/integrated, with exact CI `38173610861` in progress (pgTAP SUCCESS, quality pending; manual e2e SKIPPED). See STATE.md for the eventual exact release and browser receipts.
+
 > Read-only audit for the Codex handoff. Every claim cites file:line and is tagged CODE OBSERVED or INFERRED. No replacement architecture was implemented. The founder's proposed agent architecture document (in `capital-q-codex-source-pack.zip`) was **not supplied to the Claude session**; reconcile it here when available.
 
 Repo `neo1415/q` at `b021d53b`. Method: grep/sed/read only.
 Tags: [CO] = CODE OBSERVED (read in code). [INF] = INFERRED (reasoned from code, not run).
 Paths are relative to the repo root unless stated.
 
-## Current correction — 2026-10-11 18:15 UTC
+## Historical correction checkpoint — 2026-10-11 18:15 UTC
 
 The monthly start guard no longer fails open on an unavailable ledger or malformed spend. Proposals refuse planning; approved queued jobs are held with a spending-check explanation. Four old-code regression failures become 40 passing workforce tests; package builds, root/q-api types and changed lint/format pass. **LOCAL TESTED**, awaiting its own release gates. Historical fail-open observations below describe the audited baseline. There is still no durable aggregate paid-job reservation; a measured-spend check between steps alone cannot protect concurrent calls or crashes.
 

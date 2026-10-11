@@ -1,5 +1,26 @@
 # Performance baseline and measured first improvements
 
+## Latest live browser acceptance — 2026-10-11 21:28 UTC
+
+Exact deployed application `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`, all four Railway services SUCCESS; CI `38173610861` quality + pgTAP SUCCESS (manual e2e SKIPPED). Full tracked cold investor rehearsal PASS, including known authorized founder profile/follow-up.
+
+| Phase                             | First 20 rendered characters (ms) | First rendered card (ms) | Client completion (ms) | Evidence                                              |
+| --------------------------------- | --------------------------------- | ------------------------ | ---------------------- | ----------------------------------------------------- |
+| Top three                         | 3,212                             | 3,565                    | 3,641                  | Three canonical/rendered cards + Open controls        |
+| Selected-company explanation      | 3,656                             | none                     | 16,327                 | Six correctly bound findings, one reference           |
+| Risk/evidence follow-up           | 6,927                             | none                     | 18,949                 | Ten correctly bound findings, one reference           |
+| Exact two-company comparison      | 3,550                             | 3,550                    | 3,820                  | Exactly two requested canonical/rendered cards        |
+| Authorized known founder question | 7,606                             | none                     | 15,462                 | Three bound findings, one reference, no PUBLIC_SOURCE |
+| Known founder profile follow-up   | 3,654                             | none                     | 10,489                 | Four bound findings, one reference                    |
+
+Previous warm selected explanation on `9261cdc4`: 8,341 ms first 20 characters, 18,978 ms completion, four unbound findings/no reference (failed acceptance). Its model usage: classification 798 ms; lookup selection 1,798 + 2,036 = 3,834 ms; generation 11,908 ms. Latest selected explanation: classification 675 ms; one generation 13,593 ms, no lookup-selection rounds; extraction 2,448 ms completes 2,647 ms after the answer. Do not claim a causal or repeatable speedup from a binding-only patch: unnecessary planning is intermittent, and these are one observation each. Known-card baseline remains 8,661/20,189 ms with two selection calls totaling 3,792 ms.
+
+Cold first Discover attempt began with the SSR Ask Q button disabled/unbound and completed from its first click after actual enablement; no warm-only wait or second-click workaround. The runner's current-question MutationObserver captures a literal 20-character threshold and newly rendered card nodes; it waits for the current answer to settle. Text thresholds are not a semantic first-useful-content measurement, p95 or first audio. Voice remains cloud-transport BLOCKED; full paid session creation does not prove PCM playback.
+
+Reproduce with the exact full-browser command at the top of STATE and `scripts/handoff/live/investor-demo-rehearsal.mjs`. Private receipts `/tmp/cq-investor-demo-8kF6hc`, metadata log `/tmp/cq-demo-readiness-live.log`, scoped usage `/tmp/cq-selected-company-model-latency-after.log`; never commit raw receipts/screenshots. Next measured optimization: known canonical company lookups using existing fresh authorized tool reads; retain exact-name/ambiguity/firewall checks and repeat before/after samples.
+
+## Earlier measurements (historical)
+
 2026-10-11, source baseline `e40b1d0`; hosted baseline `b021d53b` freshly
 verified through Railway. Measurements below are separate from historical
 voice benchmarks in STATE. No production speedup is claimed before deployment.
@@ -164,3 +185,9 @@ Final answer generation took 10,437 / 9,746 / 8,704 ms with 1,326 / 1,224 / 1,10
 ## Selected-company warm-browser measurement — 2026-10-11 20:44 UTC
 
 At deployed `9261cdc4`, the diagnostic warm-only Discover rehearsal rendered three actual cards (terminal 3,202 ms), opened the correct profile, and returned selected-company analysis in 18,978 ms, first 20 rendered answer characters at 8,341 ms. This fixes the prior ten-card misroute but fails attribution acceptance: four findings have no company subjects and no COMPANY_REFERENCE. These are single observations, not semantic first-useful-text, cold opening, audio or p95 measurements. A separate fresh-page probe reproduces the unbound Discover Ask Q button and confirms that a hydrated second click opens the real panel. Both product corrections await exact release and live verification.
+
+## Selected-company critical lookup overhead — 2026-10-11 21:01 UTC
+
+The actor/run-scoped ledger for the warm selected-company explanation on deployed `9261cdc4` contains classification 798 ms; two lookup-selection rounds 1,798 and 2,036 ms; final generation 11,908 ms; structured extraction 2,100 ms finishing 2,219 ms after the answer. Lookup planning consumes 3,834 ms on the critical path despite the existing authorized on-screen profile prefetch. A turn-note correction is only an investigation; no next latency implementation or speedup is claimed. The browser first-20-character 8,341 ms / terminal 18,978 ms observation failed subject/reference acceptance.
+
+The continuation rehearsal now identifies newly rendered Q card DOM nodes and waits for the current answer to settle before disconnecting its observer; existing cards and API-before-render timing no longer force a null card measurement. Syntax/lint pass; actual cold browser execution awaits the exact gated application release. These measurements remain literal rendering thresholds, not semantic usefulness or audio.

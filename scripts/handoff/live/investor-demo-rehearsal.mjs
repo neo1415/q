@@ -83,6 +83,7 @@ async function rehearse() {
     await page.locator("main").waitFor({ timeout: 30000 });
     if (new URL(page.url()).pathname !== "/discover")
       throw new Error("Discover redirected away from the authorized workspace");
+    if (!r.ok()) throw new Error("Discover page refused");
     console.log(
       JSON.stringify({
         phase: "discover",
@@ -100,10 +101,25 @@ async function rehearse() {
     async function ask(label, text) {
       let input = page.getByPlaceholder("Ask Q", { exact: true });
       if (!(await input.isVisible())) {
-        await page
+        const askButton = page
           .getByRole("button", { name: "Ask Q", exact: true })
-          .first()
-          .click();
+          .first();
+        // Discover merges Q into its card rail; a fresh profile uses the
+        // existing dock (whose accessible name includes presence/context).
+        const control = (await askButton.isVisible())
+          ? askButton
+          : page.locator("[data-q-dock-button]").first();
+        console.log(
+          JSON.stringify({
+            phase: "open-q",
+            label,
+            disabledBeforeClick: await control.isDisabled(),
+            handlerBoundBeforeClick: await control.evaluate((el) =>
+              Object.keys(el).some((key) => key.startsWith("__reactProps")),
+            ),
+          }),
+        );
+        await control.click();
         await input.waitFor({ timeout: 30000 });
       }
       const priorRuns = new Set(observed);
@@ -117,8 +133,9 @@ async function rehearse() {
           firstAnswerText20Ms: null,
           firstRenderedCardMs: null,
         };
-        const initiallyNoCards =
-          document.querySelectorAll("[data-ac-card]").length === 0;
+        const previousCards = new Set(
+          document.querySelectorAll("[data-q-answer] [data-ac-card]"),
+        );
         const observer = new window.MutationObserver(() => {
           if (
             !document
@@ -138,9 +155,10 @@ async function rehearse() {
               performance.now() - state.started,
             );
           if (
-            initiallyNoCards &&
             state.firstRenderedCardMs === null &&
-            document.querySelector("[data-ac-card]")
+            [
+              ...document.querySelectorAll("[data-q-answer] [data-ac-card]"),
+            ].some((card) => !previousCards.has(card))
           )
             state.firstRenderedCardMs = Math.round(
               performance.now() - state.started,
@@ -206,6 +224,17 @@ async function rehearse() {
       const cards = blocks
         .filter((b) => b.kind === "ANSWER_CARDS")
         .flatMap((b) => b.cards);
+      // API completion can precede the browser's final stream update.
+      // Measure the current settled answer, never disconnect before it renders.
+      await page.waitForFunction(
+        (question) =>
+          document
+            .querySelector("[data-q-panel-person]")
+            ?.textContent.includes(question) &&
+          document.querySelector('[data-q-answer="settled"]'),
+        text,
+        { timeout: 30000 },
+      );
       const visibleTiming = await page.evaluate(() => {
         const timing = window.__cqDemoTiming;
         timing.observer.disconnect();
@@ -438,6 +467,7 @@ async function rehearse() {
         .filter((b) => b.kind === "COMPANY_REFERENCE");
       if (
         !followUpRefs.length ||
+        !findingsBound(founderFollowUp.run, founder.id) ||
         followUpRefs.some((b) => b.companyId !== founder.id)
       )
         throw new Error("KNOWN_FOUNDER_FOLLOW_UP_FAILED");

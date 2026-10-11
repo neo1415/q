@@ -206,6 +206,20 @@ export default async function CompanyPage({
         ? { kind: "DILIGENCE", relationshipId: relationship.relationshipId }
         : { kind: "CHAT", relationshipId: relationship.relationshipId };
 
+  // Where "Request a document" can really go: diligence takes a request
+  // in the investor's own words; otherwise only documents the company
+  // lists as on request can be asked for. No link that dead-ends.
+  const documentRequestHref =
+    diligence !== null
+      ? diligence.href
+      : dataRoom !== null &&
+          dataRoom.viewer === "INVESTOR" &&
+          dataRoom.documents.some(
+            (document) => document.access === "REQUESTABLE",
+          )
+        ? `/company/${encodeURIComponent(profile.companyId)}?tab=dataroom`
+        : undefined;
+
   return (
     <PageContainer className="flex flex-col gap-6">
       {/* Q room R1: the profile, its open tab (said by ProfileTabs, as it
@@ -277,6 +291,7 @@ export default async function CompanyPage({
                   assumptions={assumptions}
                   companyName={profile.canonicalName}
                   route={questionsRoute}
+                  dataRoomHref={documentRequestHref}
                 />
               </Suspense>
             )
@@ -291,12 +306,14 @@ export default async function CompanyPage({
   );
 }
 
-/** Q.07's fold: the investor's assumptions to test, streamed in. */
+/** Q.07's fold: the investor's questions to investigate, streamed in. */
 async function AssumptionsFold({
   assumptions,
   companyName,
   route,
+  dataRoomHref,
 }: {
+  readonly dataRoomHref: string | undefined;
   readonly assumptions: Promise<Awaited<
     ReturnType<typeof getCompanyAssumptions>
   > | null>;
@@ -308,9 +325,9 @@ async function AssumptionsFold({
   return (
     <Fold
       id="company-assumptions"
-      title="Assumptions to test"
+      title="Questions to investigate"
       summary={[
-        `${String(board.assumptions.length)} to test`,
+        `${String(board.assumptions.length)} key ${board.assumptions.length === 1 ? "claim" : "claims"}`,
         board.counts.unknown > 0
           ? `${String(board.counts.unknown)} not known yet`
           : null,
@@ -322,6 +339,7 @@ async function AssumptionsFold({
         board={board}
         companyName={companyName}
         route={route}
+        dataRoomHref={dataRoomHref}
       />
     </Fold>
   );
