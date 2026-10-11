@@ -105,6 +105,37 @@ async function rehearse() {
       }
       const priorRuns = new Set(observed);
       await input.fill(text);
+      await page.evaluate((question) => {
+        const oldText = document.querySelector(
+          "[data-q-answer] > .cq-body",
+        )?.textContent;
+        const state = { started: performance.now(), firstAnswerText20Ms: null };
+        const observer = new window.MutationObserver(() => {
+          if (
+            !document
+              .querySelector("[data-q-panel-person]")
+              ?.textContent.includes(question)
+          )
+            return;
+          const answer = document.querySelector(
+            "[data-q-answer] > .cq-body",
+          )?.textContent;
+          if (
+            answer !== oldText &&
+            answer?.trim().length >= 20 &&
+            state.firstAnswerText20Ms === null
+          )
+            state.firstAnswerText20Ms = Math.round(
+              performance.now() - state.started,
+            );
+        });
+        observer.observe(document.body, {
+          subtree: true,
+          childList: true,
+          characterData: true,
+        });
+        window.__cqDemoTiming = { state, observer };
+      }, text);
       const started = performance.now();
       const created = page.waitForResponse(
         (r) =>
@@ -158,12 +189,18 @@ async function rehearse() {
       const cards = blocks
         .filter((b) => b.kind === "ANSWER_CARDS")
         .flatMap((b) => b.cards);
+      const firstAnswerText20Ms = await page.evaluate(() => {
+        const timing = window.__cqDemoTiming;
+        timing.observer.disconnect();
+        return timing.state.firstAnswerText20Ms;
+      });
       console.log(
         JSON.stringify({
           phase: label,
           http: response.status(),
           status: run.status,
           completedClientMs: Math.round(performance.now() - started),
+          firstAnswerText20Ms,
           cards: cards.length,
           findings: blocks.filter((b) => b.kind === "FINDING").length,
           blockKinds: [...new Set(blocks.map((b) => b.kind))],
