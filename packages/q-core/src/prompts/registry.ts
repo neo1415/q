@@ -168,6 +168,7 @@ import { MEETING_HOST_TURN_V1 } from "./tasks/meeting-host-turn.v1.js";
 import { MEETING_HOST_TURN_V2 } from "./tasks/meeting-host-turn.v2.js";
 import { MEETING_HOST_TURN_V3 } from "./tasks/meeting-host-turn.v3.js";
 import { MEETING_HOST_TURN_V4 } from "./tasks/meeting-host-turn.v4.js";
+import { MEETING_HOST_TURN_V5 } from "./tasks/meeting-host-turn.v5.js";
 import { MEETING_SCREEN_NOTE_V1 } from "./tasks/meeting-screen-note.v1.js";
 import { MEETING_CAMERA_NOTE_V1 } from "./tasks/meeting-camera-note.v1.js";
 import { REHEARSAL_SCORE_V3 } from "./tasks/rehearsal-score.v3.js";
@@ -506,6 +507,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     MEETING_HOST_TURN_V2,
     MEETING_HOST_TURN_V3,
     MEETING_HOST_TURN_V4,
+    MEETING_HOST_TURN_V5,
     MEETING_SCREEN_NOTE_V1,
     MEETING_CAMERA_NOTE_V1,
     REHEARSAL_SCORE_V3,

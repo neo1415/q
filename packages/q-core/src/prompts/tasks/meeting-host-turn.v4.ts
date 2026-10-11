@@ -32,7 +32,7 @@ export const MEETING_HOST_TURN_V4: PromptDefinition<
 > = {
   ...MEETING_HOST_TURN_V3,
   version: 4,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Live 2026-10-09: a request to wait, stay or not leave while the other participant is absent is KEEP_WAITING (code extends the bounded wait); answers are conversational (up to about 70 words) rather than telegraphic.",
   effectiveFrom: "2026-10-09",

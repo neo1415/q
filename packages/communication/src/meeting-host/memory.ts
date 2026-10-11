@@ -279,12 +279,15 @@ export function createMeetingMemory(options: {
   readonly meetingId: string;
   /** Called once for every appended event (the runtime persists it). */
   readonly onEvent?: (event: MeetingEvent) => void;
+  /** The next sequence number (after a restart, one past what is stored). */
+  readonly startSeq?: number;
   readonly now?: () => number;
   readonly newId?: () => string;
 }): MeetingMemory {
   const log: MeetingEvent[] = [];
   const now = options.now ?? (() => Date.now());
   const newId = options.newId ?? (() => randomUUID());
+  let nextSeq = options.startSeq ?? 1;
   let summary: WorkingSummary | null = null;
   let compactedAt = 0;
   // Requests waiting for the addressee to say yes: never timed out into a yes.
@@ -298,7 +301,7 @@ export function createMeetingMemory(options: {
     const event: MeetingEvent = {
       id: newId(),
       meetingId: options.meetingId,
-      seq: log.length + 1,
+      seq: nextSeq++,
       at: new Date(at ?? now()).toISOString(),
       speakerName: speaker?.name ?? null,
       speakerUserId: speaker?.userId ?? null,
@@ -604,7 +607,7 @@ export function createMeetingMemory(options: {
       open.length > 0 ? `Questions raised: ${open.join(" | ")}` : "",
     ].filter((p) => p.length > 0);
     summary = {
-      upToSeq: log.length,
+      upToSeq: nextSeq - 1,
       commitments,
       tentative,
       suggestions,
