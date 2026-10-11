@@ -530,10 +530,9 @@ export function createMeetingMemory(options: {
       .reverse()
       .find(
         (e) =>
-          (e.kind === "COMMITMENT" ||
-            e.kind === "ACTION_ITEM" ||
-            e.kind === "PROPOSAL") &&
-          e.kind !== "NOTE",
+          e.kind === "COMMITMENT" ||
+          e.kind === "ACTION_ITEM" ||
+          e.kind === "PROPOSAL",
       );
     if (candidate === undefined) {
       return {

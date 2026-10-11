@@ -272,6 +272,9 @@ import {
   type Sourced,
 } from "./composition/rehearsals.js";
 import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
+import { createPostgresMeetingEventStore } from "./composition/meeting-events.js";
+import { createMeetingSnapshotBuilder } from "./composition/meeting-snapshot.js";
+import { createWorkingSnapshots } from "./composition/working-snapshot.js";
 import {
   createProfileAnswerAction,
   type ProfileAnswersPort,
@@ -483,6 +486,7 @@ import {
   createPostgresActorContextResolver,
   createPostgresApplicationIdentityLookup,
   createPostgresAuthorizationPolicySource,
+  createPostgresContextEpochReader,
   createPostgresPersonProfileStore,
   createPostgresSessionLiveness,
 } from "@capital-q/security/postgres";
@@ -4232,6 +4236,33 @@ const meetingHost = createMeetingHostRuntime({
     waitMaxAfterStartMs: waitMaxMsFromEnv(process.env.MEETING_WAIT_MAX_MINUTES),
   },
   store: createPostgresMeetingHostStore(database.sql),
+  // P3: the append-only meeting record, and the context snapshot prepared
+  // before Q joins -- every read through a service that already applies the
+  // Context Firewall for its viewer, each side's private layer read as that
+  // side's own actor.
+  events: createPostgresMeetingEventStore(database.sql),
+  snapshots: createMeetingSnapshotBuilder({
+    ownerActor: (userId, organisationId) =>
+      createOwnerActor({
+        resolver: actorContextResolver,
+        authUserOf: async (id) =>
+          (
+            await database.sql<{ auth_user_id: string | null }[]>`
+              select auth_user_id from identity.user_profiles where id = ${id}`
+          )[0]?.auth_user_id ?? null,
+      })(userId, organisationId),
+    knowledge: createPostgresCompanyKnowledge({ sql: database.sql }),
+    workingSnapshots: createWorkingSnapshots({
+      sql: database.sql,
+      knowledge: createPostgresCompanyKnowledge({ sql: database.sql }),
+      epochs: createPostgresContextEpochReader({ sql: database.sql }),
+    }),
+    labels: MANDATE_LABELS,
+    dataRoom: (actor, companyId) =>
+      profileMaterial.dataRoom.view(actor, companyId),
+    deck: (actor, companyId) =>
+      profileMaterial.companyDeck.view(actor, companyId),
+  }),
   voice: {
     // meet2-64: in a call, the fast engine (turbo) speaks each sentence as
     // soon as it is ready; the expressive v3 voice stays for Q in the app.

@@ -2,12 +2,17 @@ import { jsonbParam, type DatabaseExecutor } from "@capital-q/database";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
+  attributeSpeaker,
+  audienceOf,
   createMeetingHost,
+  createMeetingMemory,
+  routeMeetingTurn,
   DEFAULT_HOST_LIMITS,
   DEFAULT_HOST_POLICY,
   HOST_REFUSAL,
   hostCarded,
   hostProposed,
+  addressedToQ,
   type CallParticipant,
   type HostAction,
   type HostContext,
@@ -16,8 +21,14 @@ import {
   type HostOutcome,
   type HostParty,
   type HostPolicy,
+  type MeetingContextSnapshot,
+  type MeetingEvent,
   type MeetingHost,
+  type MeetingMemory,
+  type RoomMember,
   type RosterEntry,
+  type SnapshotSide,
+  type SpeakerRef,
 } from "@capital-q/communication";
 import type { ModelDataPosture } from "@capital-q/contracts";
 import type { ModelGateway } from "@capital-q/model-gateway";
@@ -25,11 +36,13 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  MEETING_HOST_KINDS,
-  type MeetingHostResultV2 as MeetingHostResult,
-  type MeetingHostVariablesV3 as MeetingHostVariables,
+  MEETING_HOST_KINDS_V3,
+  type MeetingHostResultV3 as MeetingHostResult,
+  type MeetingHostVariablesV4 as MeetingHostVariables,
 } from "@capital-q/q-core";
 import { etiquetteFor, type EtiquetteSource } from "./etiquette.js";
+import type { MeetingEventStore } from "./meeting-events.js";
+import type { MeetingSnapshotContext } from "./meeting-snapshot.js";
 import { z } from "zod";
 
 /**
@@ -69,6 +82,13 @@ export type MeetingHostStore = {
       })
     | null
   >;
+  /**
+   * Who is invited and which company the call is about, for the Meeting
+   * Context Snapshot. Needs no bot, so it can run when the bot is created,
+   * before Q joins.
+   */
+  readonly snapshotContext?:
+    ((meetingId: string) => Promise<MeetingSnapshotContext | null>) | undefined;
   readonly roster: (
     meetingId: string,
     tenantId: string,
@@ -151,9 +171,15 @@ export type MeetingHostComposer = {
       | "communicationGuidance"
       | "environmentNotes"
       | "seen"
+      | "prepared"
+      | "memory"
     > & {
       /** What is shown in the call now, as Q saw it (v3); "" when nothing. */
       readonly seen?: string;
+      /** v5: the prepared context the ROOM may hear; "" when none. */
+      readonly prepared?: string;
+      /** v5: the working record of what is agreed, suggested, pending. */
+      readonly memory?: string;
     },
     /**
      * 2026-10-08: the latest frame(s) shown in the call, only when the
@@ -334,6 +360,19 @@ type Session = {
   readonly context: HostContext;
   readonly host: MeetingHost;
   readonly lines: string[];
+  /**
+   * Parallel to `lines`: the side a line was said to ALONE (the room held
+   * only that side), else null. A line said to one side alone is not shown
+   * to the model once the other side is in the room.
+   */
+  readonly lineTags: (SnapshotSide | null)[];
+  /** P3: the prepared meeting context, null until built (or when none). */
+  snapshot: MeetingContextSnapshot | null;
+  snapshotReady: Promise<void>;
+  /** P3: the append-only meeting record and its working summary. */
+  readonly memory: MeetingMemory;
+  eventsChain: Promise<void>;
+  closed: boolean;
   chain: Promise<void>;
   ticker: NodeJS.Timeout | null;
   lastEventAt: number;
@@ -414,6 +453,11 @@ export type MeetingHostRuntime = {
   readonly flush: (meetingId: string) => Promise<void>;
   /** P5: the call's last lines said aloud, for a look at a shared screen. */
   readonly recentWords: (meetingId: string) => string;
+  /**
+   * P3: builds the meeting's context snapshot now (called when the bot is
+   * created, before Q joins). Idempotent; never throws.
+   */
+  readonly prepare: (meetingId: string) => Promise<void>;
   /** Live sessions, for tests and status. */
   readonly sessions: () => number;
 };
@@ -438,6 +482,18 @@ export function createMeetingHostRuntime(dependencies: {
         readonly text: string;
       }) => Promise<boolean>)
     | undefined;
+  /**
+   * P3: builds the Meeting Context Snapshot from services behind the Context
+   * Firewall. Absent: Q answers as before, with the booking alone.
+   */
+  readonly snapshots?:
+    | ((
+        context: MeetingSnapshotContext,
+        revision?: number,
+      ) => Promise<MeetingContextSnapshot>)
+    | undefined;
+  /** P3: where the append-only meeting record is kept. Absent: memory only. */
+  readonly events?: MeetingEventStore | undefined;
   readonly limits?: HostLimits;
   /** Code's capped waiting policy; never anything said in the call. */
   readonly policy?: Partial<HostPolicy>;
@@ -458,6 +514,8 @@ export function createMeetingHostRuntime(dependencies: {
 }): MeetingHostRuntime {
   const sessions = new Map<string, Session>();
   const opening = new Map<string, Promise<Session | null>>();
+  // P3: snapshots built ahead of the call, by meeting; small and short-lived.
+  const prepared = new Map<string, Promise<MeetingContextSnapshot | null>>();
   const now = dependencies.now ?? (() => Date.now());
   const { store, voice, composer, logger } = dependencies;
   const on =
@@ -465,6 +523,54 @@ export function createMeetingHostRuntime(dependencies: {
     dependencies.publicBase !== undefined &&
     dependencies.secret !== undefined &&
     dependencies.secret.length >= 20;
+
+  /** The meeting's snapshot, built once; a failure is logged and means none. */
+  function prepareSnapshot(
+    meetingId: string,
+  ): Promise<MeetingContextSnapshot | null> {
+    const build = dependencies.snapshots;
+    const read = store.snapshotContext;
+    if (build === undefined || read === undefined) return Promise.resolve(null);
+    let held = prepared.get(meetingId);
+    if (held === undefined) {
+      held = (async () => {
+        const context = await read(meetingId);
+        return context === null ? null : await build(context);
+      })().catch((error: unknown) => {
+        logger?.warn(
+          { err: error, meetingId, stage: "snapshot" },
+          "meeting context snapshot not built",
+        );
+        prepared.delete(meetingId);
+        return null;
+      });
+      prepared.set(meetingId, held);
+      if (prepared.size > 100) {
+        const oldest = prepared.keys().next().value;
+        if (oldest !== undefined) prepared.delete(oldest);
+      }
+    }
+    return held;
+  }
+
+  /** Persist events in order; a failed write is logged and never stops the call. */
+  function persist(session: Session, event: MeetingEvent): void {
+    const events = dependencies.events;
+    if (events === undefined) return;
+    session.eventsChain = session.eventsChain
+      .then(() => events.append(session.tenantId, event))
+      .catch((error: unknown) => {
+        logger?.warn(
+          {
+            err: error,
+            meetingId: session.meetingId,
+            kind: event.kind,
+            stage: "meeting_event",
+          },
+          "meeting event not written",
+        );
+      });
+  }
 
   async function open(meetingId: string): Promise<Session | null> {
     const existing = sessions.get(meetingId);
@@ -474,6 +580,19 @@ export function createMeetingHostRuntime(dependencies: {
       pending = (async () => {
         const context = await store.context(meetingId);
         if (context === null || context.declined) return null;
+        const startSeq = await dependencies.events
+          ?.nextSeq(meetingId)
+          .catch(() => 1);
+        // The memory's callback needs the session that owns the memory.
+        const owner: { session: Session | null } = { session: null };
+        const memory = createMeetingMemory({
+          meetingId,
+          now,
+          ...(startSeq === undefined ? {} : { startSeq }),
+          onEvent: (event) => {
+            if (owner.session !== null) persist(owner.session, event);
+          },
+        });
         const session: Session = {
           meetingId,
           heard: [],
@@ -496,6 +615,12 @@ export function createMeetingHostRuntime(dependencies: {
             dependencies.policy ?? DEFAULT_HOST_POLICY,
           ),
           lines: [],
+          lineTags: [],
+          snapshot: null,
+          snapshotReady: Promise.resolve(),
+          memory,
+          eventsChain: Promise.resolve(),
+          closed: false,
           chain: Promise.resolve(),
           ticker: null,
           lastEventAt: now(),
@@ -504,7 +629,13 @@ export function createMeetingHostRuntime(dependencies: {
           addressed: 0,
           answer: null,
         };
+        owner.session = session;
         sessions.set(meetingId, session);
+        // Usually already built when the bot was created; else built now.
+        const ready = session;
+        ready.snapshotReady = prepareSnapshot(meetingId).then((snapshot) => {
+          ready.snapshot = snapshot;
+        });
         const every =
           dependencies.tickEveryMs === undefined
             ? 500
@@ -545,7 +676,88 @@ export function createMeetingHostRuntime(dependencies: {
       "meeting host session closed",
     );
     sessions.delete(session.meetingId);
+    prepared.delete(session.meetingId);
     void saveHeard(session, true);
+    closeRecord(session);
+  }
+
+  /**
+   * After the call: a working summary and PROPOSED follow-ups, written to the
+   * meeting record. Nothing is sent, booked or shared by this.
+   */
+  function closeRecord(session: Session): void {
+    if (session.closed) return;
+    session.closed = true;
+    try {
+      const { followUps } = session.memory.closing();
+      logger?.info?.(
+        {
+          meetingId: session.meetingId,
+          events: session.memory.events().length,
+          followUps: followUps.length,
+        },
+        "meeting record closed",
+      );
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, meetingId: session.meetingId },
+        "meeting record not closed",
+      );
+    }
+  }
+
+  /** Who a caption name is: an invited person, a guest's own introduction, or unknown. */
+  function speakerOf(session: Session, callName: string): SpeakerRef {
+    const userId = session.host.userIdOf(callName);
+    if (userId !== null) {
+      const party = session.context.parties.find((p) => p.userId === userId);
+      if (party !== undefined) {
+        return { name: party.name, userId: party.userId, side: party.side };
+      }
+    }
+    const guest = session.host
+      .roster()
+      .find((r) => r.name === callName && r.side !== null);
+    if (guest !== undefined) {
+      return { name: callName, userId: null, side: guest.side };
+    }
+    return attributeSpeaker(callName, session.context.parties);
+  }
+
+  /** Everyone present now, with the side Capital Q identified (null: unknown). */
+  function roomOf(session: Session): RoomMember[] {
+    return session.host.roster().map((r) => ({ side: r.side }));
+  }
+
+  /** Keeps `lines` and `lineTags` together, tagging a line said to one side alone. */
+  function pushLine(session: Session, text: string): void {
+    const room = audienceOf(roomOf(session));
+    const alone =
+      !room.unidentified && room.sides.size === 1
+        ? ([...room.sides][0] ?? null)
+        : null;
+    session.lines.push(text);
+    session.lineTags.push(alone);
+    if (session.lines.length > LINES_KEPT) {
+      session.lines.shift();
+      session.lineTags.shift();
+    }
+  }
+
+  /** The call so far, minus what was said to one side alone when the room now holds more. */
+  function transcriptFor(session: Session): string {
+    const room = audienceOf(roomOf(session));
+    const only =
+      !room.unidentified && room.sides.size === 1
+        ? ([...room.sides][0] ?? null)
+        : null;
+    return session.lines
+      .filter((_, i) => {
+        const tag = session.lineTags[i] ?? null;
+        return tag === null || tag === only;
+      })
+      .join("\n")
+      .slice(-24_000);
   }
 
   /** The live record, saved now and then (and at the end); never throws. */
@@ -722,7 +934,7 @@ export function createMeetingHostRuntime(dependencies: {
     }
     switch (action.kind) {
       case "SAY": {
-        session.lines.push(`Q: ${action.text}`);
+        pushLine(session, `Q: ${action.text}`);
         hear(session, { speaker: "Q", text: action.text });
         await speak(session, action.text, action.why);
         return;
@@ -830,35 +1042,77 @@ export function createMeetingHostRuntime(dependencies: {
           sight !== undefined && asksAboutWhatIsShown(action.utterance)
             ? sight.frames(session.meetingId, action.speaker)
             : [];
-        // P4: a turn that throws (the etiquette read, the gateway) must never
-        // leave the host "composing" forever -- Q would never answer again.
-        const result = await composer
-          .turn(
-            attribution(session),
+        // P3: the snapshot is normally ready long before a question; a short
+        // wait only when Q is asked within moments of joining.
+        await Promise.race([session.snapshotReady, wait(2_000)]);
+        const asker = speakerOf(session, action.speaker);
+        const lineRef = `line:${String(session.utterances)}`;
+        const route = routeMeetingTurn({
+          utterance: action.utterance,
+          speaker: asker,
+          lineRef,
+          snapshot: session.snapshot,
+          room: roomOf(session),
+          memory: session.memory,
+        });
+        const codeAnswer = (line: string): MeetingHostResult => ({
+          kind: "ANSWER",
+          line,
+          proposal: null,
+          guest: null,
+        });
+        let result: MeetingHostResult | null;
+        if (route.kind === "SAY") {
+          // Answered by code from the prepared context or the meeting
+          // record: no model call, no extra read.
+          result = codeAnswer(route.line);
+          logger?.info?.(
             {
-              mode: "ANSWER",
-              meeting: sharedMeetingText(session.context),
-              roster: session.host
-                .roster()
-                .map(
-                  (r) =>
-                    `- ${r.name}${r.organisation === null ? "" : `, ${r.organisation}`}`,
-                )
-                .join("\n"),
-              transcript: session.lines.join("\n").slice(-24_000),
-              speaker: action.speaker.slice(0, 200),
-              utterance: action.utterance.slice(0, 2_000),
-              seen,
+              meetingId: session.meetingId,
+              stage: "brain",
+              route: route.why,
+              refs: route.sourceRefs.length,
             },
-            images,
-          )
-          .catch((error: unknown) => {
-            logger?.warn(
-              { err: error, meetingId: session.meetingId },
-              "meeting host turn threw",
-            );
-            return null;
-          });
+            "meeting brain answered by code",
+          );
+        } else if (route.kind === "QUIET") {
+          result = { kind: "QUIET", line: "", proposal: null, guest: null };
+        } else if (route.kind === "RESUME") {
+          session.host.resume();
+          result = codeAnswer(route.line);
+        } else {
+          // P4: a turn that throws (the etiquette read, the gateway) must never
+          // leave the host "composing" forever -- Q would never answer again.
+          result = await composer
+            .turn(
+              attribution(session),
+              {
+                mode: "ANSWER",
+                meeting: sharedMeetingText(session.context),
+                roster: session.host
+                  .roster()
+                  .map(
+                    (r) =>
+                      `- ${r.name}${r.organisation === null ? "" : `, ${r.organisation}`}`,
+                  )
+                  .join("\n"),
+                transcript: transcriptFor(session),
+                speaker: action.speaker.slice(0, 200),
+                utterance: action.utterance.slice(0, 2_000),
+                seen,
+                prepared: route.prepared,
+                memory: route.memory,
+              },
+              images,
+            )
+            .catch((error: unknown) => {
+              logger?.warn(
+                { err: error, meetingId: session.meetingId },
+                "meeting host turn threw",
+              );
+              return null;
+            });
+        }
         // A decline or a proposal is spoken in Capital Q's fixed words,
         // never the model's; a proposal is noted for the organiser to
         // approve after the call and never acted on in it.
@@ -885,6 +1139,16 @@ export function createMeetingHostRuntime(dependencies: {
             },
             "meeting host read a request to keep waiting",
           );
+        } else if (result?.kind === "NOTE" && result.proposal !== null) {
+          // The model asked to note an action item or agreement. Code writes
+          // it with the stance its words carry and says what it did: a note
+          // is never a commitment until the person doing it agrees.
+          const noted = session.memory.noteRequest({
+            speaker: asker,
+            text: result.proposal,
+            sourceRef: lineRef,
+          });
+          session.host.reply(noted.say);
         } else if (result?.kind === "PROPOSE" && result.proposal !== null) {
           // meet-47: the asker's own card, in their own Capital Q; never
           // an action for anyone else. Someone not on the booking is put
@@ -971,16 +1235,26 @@ export function createMeetingHostRuntime(dependencies: {
   }
 
   return {
-    urlFor: (meetingId) =>
-      on &&
-      dependencies.publicBase !== undefined &&
-      dependencies.secret !== undefined
-        ? meetingHostUrl(
-            dependencies.publicBase,
-            dependencies.secret,
-            meetingId,
-          )
-        : undefined,
+    urlFor: (meetingId) => {
+      if (
+        !on ||
+        dependencies.publicBase === undefined ||
+        dependencies.secret === undefined
+      ) {
+        return undefined;
+      }
+      // Asked for when the bot is created: the moment to prepare the
+      // meeting's context, before Q joins. Best effort, never blocks.
+      void prepareSnapshot(meetingId);
+      return meetingHostUrl(
+        dependencies.publicBase,
+        dependencies.secret,
+        meetingId,
+      );
+    },
+    prepare: async (meetingId) => {
+      await prepareSnapshot(meetingId);
+    },
     verify: (meetingId, token) =>
       on &&
       dependencies.secret !== undefined &&
@@ -1032,12 +1306,29 @@ export function createMeetingHostRuntime(dependencies: {
         if (session.utterances === 1) {
           logger?.info?.({ meetingId }, "meeting host hears the call's words");
         }
-        session.lines.push(`${event.participant.name}: ${event.text}`);
-        if (session.lines.length > LINES_KEPT) session.lines.shift();
+        pushLine(session, `${event.participant.name}: ${event.text}`);
         // Q's own voice is recorded from what it said, not the captions.
         if (!Q_BOT_CALL_NAME.test(event.participant.name.trim())) {
           hear(session, { speaker: event.participant.name, text: event.text });
           void saveHeard(session, false);
+          // P3: what the line says goes to the meeting record. A line aimed
+          // at Q is read by its brain instead, so a request to Q ("can you
+          // hear me") is never filed as someone's action item.
+          if (!addressedToQ(event.text)) {
+            try {
+              session.memory.observe({
+                speaker: speakerOf(session, event.participant.name),
+                text: event.text,
+                sourceRef: `line:${String(session.utterances)}`,
+                at: event.at,
+              });
+            } catch (error: unknown) {
+              logger?.warn(
+                { err: error, meetingId },
+                "meeting record could not read a line",
+              );
+            }
+          }
         }
         const before = session.host.stats();
         const actions = session.host.handle(event);
@@ -1108,8 +1399,90 @@ export function spokenLine(line: string, maxChars = 520): string {
 // Postgres: the booking as both sides share it, the roster, a removal.
 // ---------------------------------------------------------------------------
 
+type PartyRow = {
+  user_id: string;
+  display_name: string;
+  email: string;
+  side: "FOUNDER" | "INVESTOR" | null;
+  organisation: string | null;
+  organisation_id: string | null;
+  company_id: string;
+};
+
 export function createPostgresMeetingHostStore(sql: Sql): MeetingHostStore {
+  // Who was invited, which side and organisation: what the booking
+  // already shows both of them. Nothing else is read.
+  const partiesOf = (meetingId: string) => sql<PartyRow[]>`
+        select p.user_id, p.display_name, p.email,
+               case when exists (select 1 from identity.organisation_memberships om
+                                  where om.user_id = p.user_id and om.organisation_id = c.organisation_id
+                                    and om.membership_status = 'active') then 'FOUNDER'
+                    when exists (select 1 from identity.organisation_memberships om
+                                  where om.user_id = p.user_id and om.organisation_id = i.organisation_id
+                                    and om.membership_status = 'active') then 'INVESTOR'
+               end as side,
+               case when exists (select 1 from identity.organisation_memberships om
+                                  where om.user_id = p.user_id and om.organisation_id = c.organisation_id
+                                    and om.membership_status = 'active') then co.display_name
+                    else io.display_name
+               end as organisation,
+               case when exists (select 1 from identity.organisation_memberships om
+                                  where om.user_id = p.user_id and om.organisation_id = c.organisation_id
+                                    and om.membership_status = 'active') then c.organisation_id::text
+                    when exists (select 1 from identity.organisation_memberships om
+                                  where om.user_id = p.user_id and om.organisation_id = i.organisation_id
+                                    and om.membership_status = 'active') then i.organisation_id::text
+               end as organisation_id,
+               c.id::text as company_id
+          from communication.meeting_participants p
+          join communication.meetings m on m.id = p.meeting_id
+          join network.relationships r on r.id = m.relationship_id
+          join core.companies c on c.id = r.company_id
+          join core.investor_organisations i on i.id = r.investor_organisation_id
+          join identity.organisations co on co.id = c.organisation_id
+          join identity.organisations io on io.id = i.organisation_id
+         where p.meeting_id = ${meetingId}`;
+  const hostParties = (rows: readonly PartyRow[]): HostParty[] =>
+    rows.flatMap((p) =>
+      p.side === null
+        ? []
+        : [
+            {
+              userId: p.user_id,
+              name: p.display_name,
+              email: p.email,
+              side: p.side,
+              organisation: p.organisation ?? "",
+            },
+          ],
+    );
   return {
+    snapshotContext: async (meetingId) => {
+      const rows = await sql<
+        { purpose: string; starts_at: Date; ends_at: Date }[]
+      >`
+        select purpose, starts_at, ends_at
+          from communication.meetings where id = ${meetingId} limit 1`;
+      const meeting = rows[0];
+      if (meeting === undefined) return null;
+      const parties = await partiesOf(meetingId);
+      const organisationIds = new Map(
+        parties.flatMap((p) =>
+          p.organisation_id === null
+            ? []
+            : ([[p.user_id, p.organisation_id]] as const),
+        ),
+      );
+      return {
+        meetingId,
+        purpose: meeting.purpose,
+        startsAt: meeting.starts_at,
+        endsAt: meeting.ends_at,
+        parties: hostParties(parties),
+        companyId: parties[0]?.company_id ?? null,
+        organisationIdOf: (userId) => organisationIds.get(userId) ?? null,
+      };
+    },
     context: async (meetingId) => {
       const rows = await sql<
         {
@@ -1130,51 +1503,7 @@ export function createPostgresMeetingHostStore(sql: Sql): MeetingHostStore {
          limit 1`;
       const meeting = rows[0];
       if (meeting === undefined || meeting.bot_id === null) return null;
-      // Who was invited, which side and organisation: what the booking
-      // already shows both of them. Nothing else is read.
-      const parties = await sql<
-        {
-          user_id: string;
-          display_name: string;
-          email: string;
-          side: "FOUNDER" | "INVESTOR" | null;
-          organisation: string | null;
-        }[]
-      >`
-        select p.user_id, p.display_name, p.email,
-               case when exists (select 1 from identity.organisation_memberships om
-                                  where om.user_id = p.user_id and om.organisation_id = c.organisation_id
-                                    and om.membership_status = 'active') then 'FOUNDER'
-                    when exists (select 1 from identity.organisation_memberships om
-                                  where om.user_id = p.user_id and om.organisation_id = i.organisation_id
-                                    and om.membership_status = 'active') then 'INVESTOR'
-               end as side,
-               case when exists (select 1 from identity.organisation_memberships om
-                                  where om.user_id = p.user_id and om.organisation_id = c.organisation_id
-                                    and om.membership_status = 'active') then co.display_name
-                    else io.display_name
-               end as organisation
-          from communication.meeting_participants p
-          join communication.meetings m on m.id = p.meeting_id
-          join network.relationships r on r.id = m.relationship_id
-          join core.companies c on c.id = r.company_id
-          join core.investor_organisations i on i.id = r.investor_organisation_id
-          join identity.organisations co on co.id = c.organisation_id
-          join identity.organisations io on io.id = i.organisation_id
-         where p.meeting_id = ${meetingId}`;
-      const known: HostParty[] = parties.flatMap((p) =>
-        p.side === null
-          ? []
-          : [
-              {
-                userId: p.user_id,
-                name: p.display_name,
-                email: p.email,
-                side: p.side,
-                organisation: p.organisation ?? "",
-              },
-            ],
-      );
+      const known = hostParties(await partiesOf(meetingId));
       return {
         meetingId,
         purpose: meeting.purpose,
@@ -1248,12 +1577,12 @@ export function readHostResult(raw: unknown): MeetingHostResult | null {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw))
     return null;
   const record = raw as Record<string, unknown>;
-  const kinds = MEETING_HOST_KINDS;
+  const kinds = MEETING_HOST_KINDS_V3;
   const spelled =
     typeof record["kind"] === "string"
       ? record["kind"].trim().toUpperCase()
       : "";
-  const kind = (kinds as readonly string[]).includes(spelled)
+  const spokenKind = (kinds as readonly string[]).includes(spelled)
     ? (spelled as (typeof kinds)[number])
     : "DECLINE";
   const guestRaw = record["guest"];
@@ -1277,13 +1606,17 @@ export function readHostResult(raw: unknown): MeetingHostResult | null {
         }
       : null;
   const line = nullableText(record["line"], 1_200) ?? "";
+  const noteText = nullableText(record["proposal"], 300);
+  // A NOTE with nothing to note is just the spoken answer.
+  const kind =
+    spokenKind === "NOTE" && noteText === null ? "ANSWER" : spokenKind;
   if ((kind === "ANSWER" || kind === "RECAP") && line.length === 0) {
     return null;
   }
   return {
     kind,
     line,
-    proposal: kind === "PROPOSE" ? nullableText(record["proposal"], 300) : null,
+    proposal: kind === "PROPOSE" || kind === "NOTE" ? noteText : null,
     guest: kind === "GUEST" ? guest : null,
   };
 }
@@ -1351,7 +1684,12 @@ export function createMeetingHostComposer(dependencies: {
   return {
     turn: async (who, input, images = []) => {
       const etiquette = await etiquetteOf(who);
-      const variables = { ...input, seen: input.seen ?? "" };
+      const variables = {
+        ...input,
+        seen: input.seen ?? "",
+        prepared: input.prepared ?? "",
+        memory: input.memory ?? "",
+      };
       const rendered = renderPrompt<typeof variables>(registry, {
         task: "MEETING_HOST_TURN",
         ...(etiquette === undefined ? {} : { etiquette }),
