@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(16);
+select plan(15);
 
 insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug) values
   ('00000000-0000-4000-8000-0000000091c1', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('org_a'), 'Proposal Co A', 'proposal-co-a');
