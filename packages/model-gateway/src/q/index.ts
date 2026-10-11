@@ -2022,7 +2022,12 @@ export function createModelGatewayQAnswer(
       // P4: the Q Daily stories Q mentioned: gist / more / open, by code
       // from the snapshot's prepared objects (the gate is words only, so
       // an unrelated turn reads nothing).
-      if (dailyFollowUpKind(latest.content) !== null) {
+      // The Daily answer decides for itself (a verb, or a bare "the other
+      // one" after stories); null leaves the turn to the rest.
+      if (
+        dailyFollowUpKind(latest.content) !== null ||
+        request.questionKind === "DAILY_FOLLOW_UP"
+      ) {
         await arrivalRead();
         const daily = dailyFollowUpAnswer(
           latest.content,

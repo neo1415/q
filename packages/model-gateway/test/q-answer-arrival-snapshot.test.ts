@@ -1036,3 +1036,12 @@ describe("the story Q talked about in its own words (live 2026-10-11)", () => {
     });
   });
 });
+
+describe("a bare ordinal from the Daily lane reaches the Daily answer", () => {
+  it("'the other one' with questionKind DAILY_FOLLOW_UP is answered by code", () => {
+    const reply = dailyFollowUpAnswer("the other one", QUIET, [
+      "Lagos fintech Paystack Labs raises $20 million. Paystack Labs closed a $20 million round. The other story was Nigeria cuts fintech licence fees. Want that one, or shall I open this one?",
+    ]);
+    expect(reply?.text).toMatch(/^Nigeria cuts fintech licence fees/u);
+  });
+});
