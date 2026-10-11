@@ -10,6 +10,17 @@ Locked PADL → Product Specification → Final System Review → MVP/V1 Release
 
 GateQ Feature Specification is supplementary and never overrides the first three. Source register: [`SOURCES.md`](SOURCES.md).
 
+## October 12 investor demo and InvestIQ reconciliation
+
+The founder's complete October 11 directives are preserved verbatim:
+
+- [Investor demo priority override](session-directives/2026-10-11-investor-demo-priority.txt).
+- [InvestIQ accuracy, methodology and architectural reconciliation](session-directives/2026-10-11-investiq-reconciliation.txt).
+
+The actual investor journey is the immediate release priority. Document-workforce infrastructure is not proof of intelligent research, writing, design or critique. Preserve the completed document milestone; expand it after the demo blockers. Rehearse Discover, accurate top-three cards, company selection, grounded analysis, follow-ups and comparison through the real authenticated interface. Measure first useful text and first audio independently; an opened voice session is not audio acceptance.
+
+Core Seven remains the governing assessment framework. The new directive authorizes designing, prototyping and recommending a serious proposed quantitative methodology, with test vectors and source reconciliation. It does not authorize silently replacing production scoring semantics or presenting draft arithmetic as official FDN InvestIQ. Continue code correctness, evidence permissions, presentation and measured speed work while that proposal is prepared. Preserve historical assessments and legacy source documents.
+
 ## Product and experience
 
 1. **One integrated Q.** Q Brain, GPT-Live voice, Work agents, public research, documents, Discover, Relationships, meetings, notifications and Q Daily operate over canonical records, never duplicate state.
