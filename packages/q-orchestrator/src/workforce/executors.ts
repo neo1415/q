@@ -74,9 +74,9 @@ const RESEARCH: QAgentExecutor = {
 
 /**
  * Roles with no executor yet, and why, in words the planner's refusal and
- * the report carry. DOCUMENTS: there is no service that makes a document
- * whose result is a durable, checkable file (the data-room share and
- * request-fulfil actions move existing files; they do not make one).
+ * the report carry. DOCUMENTS: the existing artifact/document pipeline
+ * is not yet connected to a durable workforce executor. Sharing an
+ * existing file does not execute document generation.
  * DILIGENCE: no executor answers data-room requests on the person's behalf.
  */
 export const UNREGISTERED_ROLE_REASONS: Readonly<
@@ -84,7 +84,7 @@ export const UNREGISTERED_ROLE_REASONS: Readonly<
 > = {
   LEAD: "The lead Q plans the job; it is never a step.",
   DOCUMENTS:
-    "No agent can make a document yet: nothing produces a durable, checkable file.",
+    "Autonomous document generation is not connected to the existing document pipeline yet.",
   DILIGENCE: "No agent can answer data-room requests on your behalf yet.",
 };
 

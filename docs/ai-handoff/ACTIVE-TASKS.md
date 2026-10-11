@@ -3,6 +3,13 @@
 > One owner per branch or worktree. Update the status words (CODE OBSERVED · IMPLEMENTED · MERGED · LOCAL TESTED · CI GREEN · DEPLOYED · LIVE VERIFIED · BLOCKED) with evidence.
 > Snapshot 2026-10-11, HEAD `b021d53b`. **Every workstream below is MERGED, CI GREEN and DEPLOYED on `b021d53b`; none has uncommitted changes.** The "Live" line says exactly what was proven on production.
 
+## Codex active continuation — 2026-10-11
+
+- **IMPLEMENTED / LOCAL TESTED:** existing chart alignment/missing-data fix; existing authorized relationship TIMELINE adapter; workforce claim startup and lease-wait fix. Work is on `codex/preserve-optimize` from `e40b1d0f`.
+- **CODE OBSERVED / LOCAL TESTED:** repeated 8.8 fixture is explainable by mandate fit. Locked InvestIQ Core Seven/contextual methodology is not the legacy readiness diagnostic; see SCORE-LINEAGE. Hosted score provenance is still unverified.
+- **In progress:** integration/CI, deployment and authenticated browser acceptance. Previous workstream live evidence below is historical.
+- **Still open:** durable DOCUMENTS bridge into the existing artifact pipeline (fresh authority, atomic job-step/artifact binding, READY/resume semantics); proprietary approved InvestIQ parameters; broader latency/DB/provider measurements and full founder/investor journeys.
+
 ## Next owner and first slice
 
 - **Owner:** Codex (from this commit on). The Claude lead has stopped; no Claude worker holds a branch.

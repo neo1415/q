@@ -6,6 +6,20 @@ Repo `neo1415/q` at `b021d53b`. Method: grep/sed/read only.
 Tags: [CO] = CODE OBSERVED (read in code). [INF] = INFERRED (reasoned from code, not run).
 Paths are relative to the repo root unless stated.
 
+## Codex continuation — 2026-10-11
+
+The existing durable runner now starts both claimed jobs immediately and awaits
+all outcomes before ending/coalescing a pass. Each job keeps sequential steps,
+owner validation, heartbeat, cancellation and retry behavior. Deferred-job and
+queue-recovery regressions passed locally. Deployment is pending.
+
+The document pipeline already exists (`q-specialists` preparation, `q-artifacts`
+service and workers' document jobs). DOCUMENTS is unregistered because there is
+no durable workforce bridge, not because Capital Q cannot produce files. Reuse
+those services with fresh firewall decisions and atomic job-step/artifact
+idempotency; resume PREPARING until READY. Sharing remains a separate approval.
+Do not manufacture a permitted plan or duplicate document generation.
+
 ## 1. Big picture: three agent engines plus the Q Brain, not one workforce
 
 1. Q Brain = single LangGraph answer graph, 7 nodes, linear: preflight, context_firewall, pause, retrieval, answer, action_prepare, approval_gate. [CO] packages/q-orchestrator/src/graph.ts:561-589. It compiles with a Postgres checkpointer: packages/q-orchestrator/src/checkpoint-store.ts:86 (BatchedPostgresSaver extends PostgresSaver, line 114); apps/q-api/src/main.ts:4034. MemorySaver exists for unit tests only (checkpoint-store.ts:241).

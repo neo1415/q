@@ -1,5 +1,14 @@
 # Promise coverage — landing page and PADL → implementation
 
+## Codex verification update — 2026-10-11
+
+Existing visual rendering is improved locally: charts align evidence by category,
+and relationship timelines use authorized canonical history. No new scoring
+promise is claimed: mandate fit and founder-private readiness remain distinct
+from governed FDN InvestIQ; see SCORE-LINEAGE. Complete authenticated founder
+and investor journey acceptance and live verification of this slice are pending.
+Historical LIVE VERIFIED statements below retain their original revision/date.
+
 > Snapshot 2026-10-11 at `b021d53b`.
 > Sources: [`LANDING-PROMISES.md`](LANDING-PROMISES.md) (47 promises captured from https://www.fdncapitalpartners.com/capitalq.html on 2026-10-11 13:11 UTC; archive in `docs/product-sources/landing-capture-2026-10-11/`) and [`PADL-DECISIONS.md`](PADL-DECISIONS.md) (155 decision ids, all Locked).
 > Status words: **SURFACE EXISTS** means the route, package or feature is present in code (CODE OBSERVED); **LIVE VERIFIED** means it was exercised on production with evidence; **GAP** means it is missing or known to be incomplete. Most rows were **not** re-verified end to end this round, so treat SURFACE EXISTS as "build exists, needs a journey test".
