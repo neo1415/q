@@ -365,7 +365,7 @@ describe("meeting time proposal actions", () => {
       contextOf(INVESTOR, "key-review-1"),
       ids,
     );
-    const said = action("schedule.proposal.review").done(out, ids);
+    const said = action("schedule.proposal.review").done(out, ids, {});
     expect(said).toContain("Proposed, not confirmed");
     expect(said).not.toMatch(/^Confirmed/m);
   });
