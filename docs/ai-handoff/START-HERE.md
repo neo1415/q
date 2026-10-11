@@ -50,7 +50,7 @@ Useful live scripts:
 
 - `scripts/handoff/live/hosted-read.mjs "<select>"` — read-only SQL.
 - `scripts/handoff/live/rehearsal-matrix.mjs` — founder × entity rehearsal pages.
-- `scripts/handoff/live/investor-demo-rehearsal.mjs` — actual Discover/cards/profile/Q/follow-up/comparison browser journey using an existing authorized session; set `CQ_DEMO_SESSION_FILE`, `CQ_DEMO_PUBLIC_KEY_FILE`, optionally `CQ_DEMO_CHROMIUM_PATH`, and `NODE_USE_ENV_PROXY=1` in this cloud environment. It creates internal Q turns; no new accounts or outward messages. Protected temporary receipts contain private data and must not be committed.
+- `scripts/handoff/live/investor-demo-rehearsal.mjs` — actual Discover/cards/profile/Q/follow-up/comparison browser journey using an existing authorized session; set `CQ_DEMO_SESSION_FILE`, `CQ_DEMO_PUBLIC_KEY_FILE`, optionally `CQ_DEMO_CHROMIUM_PATH` and `CQ_DEMO_FOUNDER_RECORD_FILE` (a known, previously authorized founder company record for separate evidence/profile/follow-up checks), and `NODE_USE_ENV_PROXY=1` in this cloud environment. It creates internal Q turns; no new accounts or outward messages. Protected temporary receipts contain private data and must not be committed.
 - `node scripts/handoff/live/investiq-proposed-evaluation.mjs` — synthetic offline PROPOSED arithmetic experiment, no network or production scoring. Methodology design/limits: [INVESTIQ-METHODOLOGY-PROPOSED.md](INVESTIQ-METHODOLOGY-PROPOSED.md).
 
 ## Credentials — NAMES and access methods only (never commit or echo values)

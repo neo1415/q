@@ -92,6 +92,7 @@ import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
 import {
   createRunCompanies,
+  containsCompanyName,
   namedCompanySubjects,
   withCardSubjects,
 } from "./card-subjects.js";
@@ -5185,6 +5186,32 @@ export function createModelGatewayQAnswer(
                   return null;
                 });
         const companiesRead = runCompanies.take(request.runId);
+        const namedSubjects = namedCompanySubjects(
+          latest.content,
+          companiesRead,
+        );
+        const mentionsReadName = [...companiesRead.profiles.values()].some(
+          (name) => containsCompanyName(latest.content, name),
+        );
+        // The reader can mark an investor's selected company as "other".
+        // A deictic single-company question still targets the authorized
+        // screen profile. Explicit names take precedence; ambiguity stays
+        // unbound. Never establish the screen target without a fresh read.
+        const screenCompanyId =
+          plan.screen?.route === "COMPANY"
+            ? (plan.screen.companyId ?? null)
+            : null;
+        const selectedCompanySubjects =
+          !mentionsReadName &&
+          isSingleCompanyQuestion(latest.content) &&
+          screenCompanyId !== null &&
+          companiesRead.profiles.has(screenCompanyId)
+            ? askedSubjects(request.subjects, plan).filter(
+                (subject) =>
+                  subject.kind === "COMPANY" &&
+                  subject.companyId === screenCompanyId,
+              )
+            : [];
         const modelBlocks = analystResultBlocks({
           result: analyst,
           // Screen focus is not the target of a question naming another
@@ -5193,7 +5220,9 @@ export function createModelGatewayQAnswer(
           // Ordinary screen questions retain the run's allowed subjects.
           subjects:
             request.aboutNamedOther === true
-              ? namedCompanySubjects(latest.content, companiesRead)
+              ? namedSubjects.length > 0
+                ? namedSubjects
+                : selectedCompanySubjects
               : askedSubjects(request.subjects, plan),
           // RECOVERY E4: investors and places this run's tools returned,
           // so investor cards and maps name only what was read.

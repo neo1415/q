@@ -10,6 +10,7 @@ import { join } from "node:path";
  * Console output is durations, counts and binding checks only. */
 const sessionFile = process.env.CQ_DEMO_SESSION_FILE;
 const publicKeyFile = process.env.CQ_DEMO_PUBLIC_KEY_FILE;
+const founderRecordFile = process.env.CQ_DEMO_FOUNDER_RECORD_FILE;
 if (!sessionFile || !publicKeyFile)
   throw new Error("Set CQ_DEMO_SESSION_FILE and CQ_DEMO_PUBLIC_KEY_FILE");
 const webUrl =
@@ -80,6 +81,8 @@ async function rehearse() {
       timeout: 45000,
     });
     await page.locator("main").waitFor({ timeout: 30000 });
+    if (new URL(page.url()).pathname !== "/discover")
+      throw new Error("Discover redirected away from the authorized workspace");
     console.log(
       JSON.stringify({
         phase: "discover",
@@ -277,12 +280,31 @@ async function rehearse() {
       "profile-question",
       "What does this company actually do and why does it fit my mandate? Use its Capital Q records.",
     );
+    function findingsBound(run, companyId) {
+      const findings = run.messages
+        .filter((m) => m.role === "Q" && m.runId === run.runId)
+        .flatMap((m) => m.blocks ?? [])
+        .filter((b) => b.kind === "FINDING");
+      return (
+        findings.length > 0 &&
+        findings.every((b) => {
+          const companies = b.finding.subjects.filter(
+            (s) => s.kind === "COMPANY",
+          );
+          return (
+            companies.length > 0 &&
+            companies.every((s) => s.companyId === companyId)
+          );
+        })
+      );
+    }
     const references = answer.run.messages
       .filter((m) => m.role === "Q" && m.runId === answer.run.runId)
       .flatMap((m) => m.blocks ?? [])
       .filter((b) => b.kind === "COMPANY_REFERENCE");
     if (
       !references.length ||
+      !findingsBound(answer.run, first.subject.companyId) ||
       references.some((b) => b.companyId !== first.subject.companyId)
     )
       throw new Error("PROFILE_REFERENCE_MISMATCH");
@@ -305,6 +327,7 @@ async function rehearse() {
       .filter((b) => b.kind === "COMPANY_REFERENCE");
     if (
       !refs.length ||
+      !findingsBound(risks.run, first.subject.companyId) ||
       refs.some((b) => b.companyId !== first.subject.companyId)
     )
       throw new Error("FOLLOW_UP_REFERENCE_MISMATCH");
@@ -348,10 +371,94 @@ async function rehearse() {
       { timeout: 30000 },
     );
     await page.screenshot({ path: join(evidenceDir, "comparison.png") });
+    let knownFounderProfileVerified = false;
+    if (founderRecordFile) {
+      const selectedProfilePath = new URL(page.url()).pathname;
+      const discoverResponse = await page.goto(
+        new URL("/discover", webUrl).href,
+        { waitUntil: "domcontentloaded", timeout: 45000 },
+      );
+      if (!discoverResponse.ok())
+        throw new Error("Founder discovery page refused");
+      await page.locator("main").waitFor({ timeout: 30000 });
+      const founder = JSON.parse(readFileSync(founderRecordFile, "utf8"));
+      if (
+        !/^[0-9a-f-]{36}$/iu.test(founder.id) ||
+        typeof founder.canonicalName !== "string" ||
+        founder.canonicalName.length > 250
+      )
+        throw new Error("Invalid known founder record");
+      const founderAnswer = await ask(
+        "known-founder-evidence",
+        `What does ${founder.canonicalName} actually do based on its authorized Capital Q profile? Distinguish declared information from unknowns; do not infer private onboarding responses.`,
+      );
+      const blocks = founderAnswer.run.messages
+        .filter((m) => m.role === "Q" && m.runId === founderAnswer.run.runId)
+        .flatMap((m) => m.blocks ?? []);
+      const references = blocks.filter((b) => b.kind === "COMPANY_REFERENCE");
+      const findings = blocks.filter((b) => b.kind === "FINDING");
+      if (
+        !references.length ||
+        references.some((b) => b.companyId !== founder.id) ||
+        !findings.length ||
+        !findingsBound(founderAnswer.run, founder.id) ||
+        findings.some(
+          (b) =>
+            !b.finding.subjects.some(
+              (s) => s.kind === "COMPANY" && s.companyId === founder.id,
+            ),
+        ) ||
+        blocks.some((b) => b.kind === "PUBLIC_SOURCE")
+      )
+        throw new Error("KNOWN_FOUNDER_EVIDENCE_BINDING_FAILED");
+      const profilePath = selectedProfilePath.replace(
+        first.subject.companyId,
+        founder.id,
+      );
+      if (!profilePath.includes(founder.id))
+        throw new Error("Founder profile route missing");
+      const profileResponse = await page.goto(
+        new URL(profilePath, webUrl).href,
+        { waitUntil: "domcontentloaded", timeout: 45000 },
+      );
+      if (!profileResponse.ok())
+        throw new Error("Known founder profile refused");
+      await page.waitForFunction(
+        (name) => document.querySelector("main")?.innerText.includes(name),
+        founder.canonicalName,
+        { timeout: 30000 },
+      );
+      const founderFollowUp = await ask(
+        "known-founder-follow-up",
+        "What traction, material risks and missing evidence are on record for this company? Distinguish declared claims from verified facts.",
+      );
+      const followUpRefs = founderFollowUp.run.messages
+        .filter((m) => m.role === "Q" && m.runId === founderFollowUp.run.runId)
+        .flatMap((m) => m.blocks ?? [])
+        .filter((b) => b.kind === "COMPANY_REFERENCE");
+      if (
+        !followUpRefs.length ||
+        followUpRefs.some((b) => b.companyId !== founder.id)
+      )
+        throw new Error("KNOWN_FOUNDER_FOLLOW_UP_FAILED");
+      knownFounderProfileVerified = true;
+      console.log(
+        JSON.stringify({
+          phase: "known-founder-binding",
+          profileReferences: references.length,
+          findings: findings.length,
+          followUpReferences: followUpRefs.length,
+          allReferencesCorrect: true,
+          noPublicSourceSubstitution: true,
+        }),
+      );
+      await page.screenshot({ path: join(evidenceDir, "known-founder.png") });
+    }
     console.log(
       JSON.stringify({
         status: "PASS",
         actualBrowserJourney: true,
+        knownFounderProfileVerified,
         evidenceDir,
       }),
     );

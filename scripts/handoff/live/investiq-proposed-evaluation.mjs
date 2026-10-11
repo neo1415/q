@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 
-const version = "PROPOSED-investiq-experiment-0.1";
+const version = "PROPOSED-investiq-experiment-0.2";
 const dimensions = [
   ["leadership", ["capability", "coverage", "learning"]],
   ["market", ["pain", "opportunity", "timing"]],
@@ -184,7 +184,10 @@ function evaluate(input, multiplier = dimensions.map(() => 1)) {
       .update(
         JSON.stringify({
           version,
-          ...input,
+          stage: input.stage,
+          sector: input.sector,
+          model: input.model,
+          asOf: input.asOf,
           criteria: [...input.criteria]
             .sort((a, b) => a.id.localeCompare(b.id))
             .map((c) => ({
@@ -314,6 +317,7 @@ outOfMandate.syntheticMandateFit = 0;
 check("out-of-mandate", outOfMandate, (r) =>
   assert.equal(r.finalBusinessQuality, base.finalBusinessQuality),
 );
+assert.equal(evaluate(outOfMandate).inputHash, base.inputHash);
 const strong = fixture("SEED", 4);
 strong.syntheticMandateFit = 1;
 check("strong-quality-poor-fit", strong, (r) =>
@@ -391,6 +395,7 @@ console.log(
     productionIntegration: false,
     scenarios: outcomes,
     invariants: [
+      "mandate-view-does-not-change-objective-snapshot",
       "withholding-known-weakness-cannot-improve-final-score",
       "duplicate-source-no-confidence-increase",
       "stale-confidence-not-merit",

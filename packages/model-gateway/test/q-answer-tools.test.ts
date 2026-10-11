@@ -378,9 +378,14 @@ describe("named-company evidence binding", () => {
 });
 
 describe("selected-company analysis stays out of the candidate sweep", () => {
-  it.each([false, true])(
-    "answers the profile question with a late FIT reading, warm=%s",
-    async (warm) => {
+  it.each([
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ])(
+    "answers the profile question with a late FIT reading, warm=%s, other=%s",
+    async (warm, aboutNamedOther) => {
       const companyId = randomUUID();
       const investorOrganisationId = randomUUID();
       const topOffer = {
@@ -455,7 +460,23 @@ describe("selected-company analysis stays out of the candidate sweep", () => {
         "Selected Company's declared profile is seed stage; missing fit evidence remains unknown.";
       const { seam, request, messages, completed, alpha } = build({
         tools,
-        script: [{ kind: "TEXT", text: JSON.stringify(analystResult(answer)) }],
+        script: [
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult(answer),
+              findings: [
+                {
+                  statement: "Declared seed stage.",
+                  type: "FACT",
+                  confidence: "MODERATE",
+                  truthClass: "USER_CLAIM",
+                  evidenceStatus: "SELF_REPORTED",
+                },
+              ],
+            }),
+          },
+        ],
       });
       if (messages[0]) messages[0] = { ...messages[0], content: text };
       const bound = {
@@ -492,13 +513,35 @@ describe("selected-company analysis stays out of the candidate sweep", () => {
         if (!seam.warm) throw new Error("Warm seam missing");
         seam.warm(bound);
       }
-      await seam.answer({ ...bound, fitQuestion: { text, count: null } });
+      await seam.answer({
+        ...bound,
+        aboutNamedOther,
+        fitQuestion: { text, count: null },
+      });
       expect(
         tools.executed.filter((p) => p.name === "fit_top_candidates"),
       ).toHaveLength(0);
       expect(tools.executed.some((p) => p.name === "get_company")).toBe(true);
       expect(alpha.calls).toHaveLength(1);
       expect(JSON.stringify(completed)).toContain(answer);
+      const payload = completed.at(-1) as {
+        message: {
+          blocks: Array<{
+            kind: string;
+            companyId?: string;
+            finding?: { subjects: unknown[] };
+          }>;
+        };
+      };
+      expect(
+        payload.message.blocks
+          .filter((b) => b.kind === "COMPANY_REFERENCE")
+          .map((b) => b.companyId),
+      ).toEqual([companyId]);
+      expect(
+        payload.message.blocks.find((b) => b.kind === "FINDING")?.finding
+          ?.subjects,
+      ).toEqual([{ kind: "COMPANY", companyId }]);
     },
   );
 });

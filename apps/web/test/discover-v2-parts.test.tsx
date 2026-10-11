@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
 } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -209,6 +212,43 @@ describe("the card's declared facts", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "More about Nixo" }));
   }
+
+  it("enables Ask Q only after its server-rendered control is hydrated", () => {
+    const ask = vi.fn();
+    const element = (
+      <FeedCard
+        company={card(undefined)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        showMedia={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={ask}
+      />
+    );
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(element);
+    document.body.append(container);
+    const trigger =
+      container.querySelector<HTMLButtonElement>("[data-feed-ask-q]");
+    expect(trigger?.disabled).toBe(true);
+    trigger?.click();
+    expect(ask).not.toHaveBeenCalled();
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      act(() => {
+        root = hydrateRoot(container, element);
+      });
+      expect(trigger?.disabled).toBe(false);
+      trigger?.click();
+      expect(ask).toHaveBeenCalledOnce();
+    } finally {
+      act(() => root?.unmount());
+      container.remove();
+    }
+  });
 
   it("names the raise with its evidence axes: the founder's statement, not a verified fact", () => {
     renderOpen(
