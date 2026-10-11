@@ -27,6 +27,7 @@ export const Q_ANSWER_CARD_LEVELS = [
   "STRONG",
   "GOOD",
   "PARTIAL",
+  "MISMATCH",
   "UNKNOWN",
 ] as const;
 export const QAnswerCardLevelSchema = z.enum(Q_ANSWER_CARD_LEVELS);

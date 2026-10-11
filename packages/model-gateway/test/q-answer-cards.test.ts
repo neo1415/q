@@ -45,6 +45,17 @@ describe("answer card fit (ADR 0053)", () => {
   it("gives no fit when too little is known", () => {
     expect(answerCardFit(measures("STRONG", "UNKNOWN", "UNKNOWN"))).toBeNull();
   });
+
+  it("counts a known mismatch as zero while leaving unknown evidence out", () => {
+    expect(
+      answerCardFit([
+        { level: "STRONG" },
+        { level: "STRONG" },
+        { level: "MISMATCH" },
+        { level: "UNKNOWN" },
+      ]),
+    ).toEqual({ score: 6.7, measured: 3, of: 4 });
+  });
 });
 
 describe("answer cards block", () => {

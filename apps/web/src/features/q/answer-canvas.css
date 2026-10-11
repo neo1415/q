@@ -432,6 +432,9 @@
 .cq-ac-lvl-ink {
   color: var(--hue);
 }
+.cq-ac-lvl-ink[data-level="MISMATCH"] {
+  color: var(--cq-text-secondary);
+}
 .cq-ac-lvl-ink[data-level="UNKNOWN"] {
   color: var(--cq-text-tertiary);
 }

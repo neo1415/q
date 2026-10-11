@@ -74,7 +74,7 @@ function useWideCanvas(): boolean {
   );
 }
 
-/** A measure's level as a shape: full, half, ring, dashed ring. */
+/** A measure's level as a shape, including a cross for a known mismatch. */
 export function LevelShape({ level }: { readonly level: QAnswerCardLevel }) {
   return (
     <span className="cq-ac-lvl-ink" data-level={level}>
@@ -101,6 +101,13 @@ export function LevelShape({ level }: { readonly level: QAnswerCardLevel }) {
             fill="none"
             stroke="currentColor"
             strokeWidth="1.2"
+          />
+        ) : level === "MISMATCH" ? (
+          <path
+            d="M2 2l8 8M10 2l-8 8"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
           />
         ) : (
           <circle

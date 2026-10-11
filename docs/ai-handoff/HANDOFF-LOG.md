@@ -160,3 +160,14 @@ Newest entry last. Never edit past entries; correct them in a new entry.
 - **Limits:** cannot claim the named-other flag caused the observed live specialist's wrong subject: scoped Railway filters returned no run logs. The working focused-founder journey is verified, off-screen targeting remains open. Do not convert privilege into access to private founder onboarding responses.
 - **Next actions:** finish exact current release gates/migration/deployment and document/latency acceptance; then integrate the separately validated seam correction and its exact gates; continue intelligent workforce capability with durable canonical paid-budget reservations.
 - **Secrets:** no credentials, customer text, identifiers or signed links recorded.
+
+## 2026-10-11 17:22 UTC — Codex — retain canonical mismatch evidence and release green document candidate
+
+- **Workspace:** `/workspace/q`, `codex/preserve-optimize`, root only; follows `2902ed22`.
+- **Changed:** canonical fit projection retains MISMATCH with a distinct word/cross instead of dropping negative evidence; shared nine-measure limit replaces the local eight cap. Existing canonical scores and ranking unchanged. Additive card enum only, no model prompt version/formula replacement.
+- **Actual evidence:** 42 authorized current profiles, 39 with mismatch; old projection had 39 coverage errors. All actual profiles have six applicable measures, so the original cap-only attribution was wrong. Corrected projection: zero coverage errors, zero canonical score changes. Separate ninth-known/ninth-unknown regressions prove the independent cap correction. Actor-scoped history: 14 block messages, one numeric card score 10, no 8.8; historical reproduction remains open.
+- **Local validation:** all 52 package builds, 48 card/renderer/contract tests, root/web/q-api typechecks, changed lint/format and diff checks pass. CSS is deliberately ignored by eslint; checked by prettier. No gates weakened.
+- **Release:** exact `efcf49ab` CI `38154358888` quality and pgTAP SUCCESS; manual e2e SKIPPED. Applied only additive migration `20261222150000` transactionally, hosted/local now 201/201. Deploy branch pushed to exact green SHA; builds still in progress. This new fit packet and named-other packet are not yet CI green/deployed.
+- **Voice:** actual product Talk-with-Q opened provider sessions but produced no observed PCM/playing events. First audio remains unverified; no transport/product root cause claim. Do not repeat paid attempts without a new hypothesis.
+- **Next:** verify four services SUCCESS; preserve original latency receipts and measure new live SSE first text/provider call removal; inspect/approve only the private own-company DOCUMENTS plan, then verify real READY version, render and conversational revision. Deterministic initial bridge is not final intelligent document capability.
+- **Secrets:** all private receipts, profiles and credentials remain outside checkout.

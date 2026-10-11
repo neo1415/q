@@ -7,6 +7,14 @@ the signed-in founder account’s latest 100 non-null result-block messages foun
 does not establish the lineage of the reported investor scores. The historical incident below
 is recorded in repository fixtures; it is not fresh production verification.
 
+## Current authorized evidence and card correction — 2026-10-11 17:20 UTC
+
+The existing synthetic investor's 42 authorized current profiles contain no 8.8. An additional query scoped to that actor's own conversation history found 14 result-block messages and one numeric card score (10), also no 8.8. These bounded checks cannot establish historical score provenance.
+
+A real projection defect affected 39 of the 42 cards: MISMATCH parameters contributed to canonical scores but were omitted from displayed measures and coverage. All 42 profiles had six applicable parameters; none hit the old eight-measure cap. The initial cap-only attribution was incorrect. Cards now preserve MISMATCH as a zero-point known level, with a distinct “Does not match” word and cross glyph. The corrected projection has zero coverage discrepancies and zero changed canonical scores across all 42 actual profiles.
+
+A separate static defect capped measures at eight although the canonical/shared contract permits nine. The adapter now uses that existing shared constant. Ninth-known and ninth-unknown regressions cover it. No new ranking formula, FDN methodology or business service is introduced. Model prompt schemas/versions remain unchanged; the additive card level preserves existing canonical negative evidence.
+
 ## Why 8.8 repeats
 
 The recorded 2026-10-08 incident returned three companies, then expanded to ten

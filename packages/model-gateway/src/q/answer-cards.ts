@@ -20,7 +20,7 @@ import {
 /** Points out of 10 for a measure at each known level. */
 export const ANSWER_CARD_LEVEL_POINTS: Readonly<
   Record<Exclude<QAnswerCardLevel, "UNKNOWN">, number>
-> = { STRONG: 10, GOOD: 7.5, PARTIAL: 4 };
+> = { STRONG: 10, GOOD: 7.5, PARTIAL: 4, MISMATCH: 0 };
 
 /** Below this many known measures a fit says more than the evidence. */
 export const ANSWER_CARD_FIT_MIN_KNOWN = 3;

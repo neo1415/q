@@ -257,6 +257,30 @@ describe("the canvas (C1, C3)", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("shows a known mismatch as words and a cross, separate from unknown evidence", () => {
+    const base = demoTop(1);
+    const block = {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        fit: null,
+        measures: [
+          { label: "Sector", level: "MISMATCH" as const, value: null },
+          { label: "Round terms", level: "UNKNOWN" as const, value: null },
+        ],
+      })),
+    };
+    render(<AnswerCanvas block={block} focus={0} said="" />);
+    expect(screen.getAllByText("Does not match").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0);
+    expect(
+      document.querySelector('[data-level="MISMATCH"] path'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('[data-level="UNKNOWN"] circle[stroke-dasharray]'),
+    ).not.toBeNull();
+  });
+
   it("has an X on every card and one on the whole answer", () => {
     const onCloseCard = vi.fn();
     const onCloseAll = vi.fn();

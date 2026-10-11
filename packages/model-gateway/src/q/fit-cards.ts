@@ -6,6 +6,7 @@ import {
   MoneySchema,
   type CompanyRaiseView,
   QAnswerCardsBlockSchema,
+  Q_ANSWER_CARD_MEASURES_MAX,
   fitScoreOutOf10,
   type FitProfileDto,
   type Money,
@@ -209,12 +210,8 @@ const LEVEL: Readonly<Record<string, QAnswerCardLevel | null>> = {
   STRONG: "STRONG",
   PARTIAL: "PARTIAL",
   UNKNOWN: "UNKNOWN",
-  // No card level says "does not fit"; a mismatch is a reason, never a
-  // softened measure.
-  MISMATCH: null,
+  MISMATCH: "MISMATCH",
 };
-
-const MEASURES_MAX = 8;
 
 function sentence(text: string): string {
   const trimmed = text.trim().slice(0, 158);
@@ -253,7 +250,7 @@ function cardOf(fit: RunFit): Omit<QAnswerCard, "key" | "hue"> {
             },
           ];
     })
-    .slice(0, MEASURES_MAX);
+    .slice(0, Q_ANSWER_CARD_MEASURES_MAX);
   const known = measures.filter((measure) => measure.level !== "UNKNOWN");
   const numeric = score === null ? null : Number(score);
   return {
