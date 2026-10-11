@@ -355,3 +355,7 @@ The tracked runner creates internal Q turns for an existing authorized account o
 - Exact application commit `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`; CI `38173610861`: quality and pgTAP SUCCESS, manual e2e SKIPPED. Full CI tests/build passed; no migration.
 - Pushed that explicit SHA to `recovery/2026-09-12`. All four Railway services are building/queued. Last verified successful release is `9261cdc4`; do not call the new fixes live verified yet.
 - Next: confirm four-service SUCCESS and run the tracked cold investor browser rehearsal with the authorized existing-account session. Preserve phase failures and private receipts without committing customer data. Handoff/timing commits on `codex/preserve-optimize` are separate from the exact gated application SHA.
+
+## 2026-10-11 21:21 UTC — strengthen remaining browser acceptance checks
+
+- The portable rehearsal now refuses non-success Discover HTTP responses explicitly and requires all positive known-founder follow-up findings to bind to the exact founder, alongside its existing positive-reference requirement. These assertions strengthen acceptance; no application or deployment changes. Syntax, eslint and prettier pass. Full live execution remains pending the current rollout.

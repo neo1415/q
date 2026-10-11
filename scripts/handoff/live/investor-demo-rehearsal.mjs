@@ -83,6 +83,7 @@ async function rehearse() {
     await page.locator("main").waitFor({ timeout: 30000 });
     if (new URL(page.url()).pathname !== "/discover")
       throw new Error("Discover redirected away from the authorized workspace");
+    if (!r.ok()) throw new Error("Discover page refused");
     console.log(
       JSON.stringify({
         phase: "discover",
@@ -466,6 +467,7 @@ async function rehearse() {
         .filter((b) => b.kind === "COMPANY_REFERENCE");
       if (
         !followUpRefs.length ||
+        !findingsBound(founderFollowUp.run, founder.id) ||
         followUpRefs.some((b) => b.companyId !== founder.id)
       )
         throw new Error("KNOWN_FOUNDER_FOLLOW_UP_FAILED");
