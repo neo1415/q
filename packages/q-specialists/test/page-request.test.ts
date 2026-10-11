@@ -266,3 +266,11 @@ describe("'no wait' turns a page request (live 2026-10-11)", () => {
     );
   });
 });
+
+describe("a pointer is not a page name (live 2026-10-11)", () => {
+  it("leaves 'that section' and 'this page' to the other readers", () => {
+    expect(pageRequestOf("show me that section")).toBeNull();
+    expect(pageRequestOf("open this page")).toBeNull();
+    expect(pageRequestOf("take me to that section")).toBeNull();
+  });
+});

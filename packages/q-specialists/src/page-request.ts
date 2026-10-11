@@ -382,6 +382,12 @@ export function pageRequestOf(text: string): PageRequest | null {
     if (target !== undefined) return { kind: "PAGE", target };
   }
   const bare = object.replace(PAGE_WORD, "").trim();
+  // "show me that section", "open this page": a pointer back at what Q
+  // just said (a Daily story, a card), never the name of a missing page
+  // (live 2026-10-11: "there's no 'that' page").
+  if (/^(?:that|this|it|these|those|the\s+same|same)$/iu.test(bare)) {
+    return null;
+  }
   if (
     PAGE_WORD.test(object) &&
     !/'s\b|\b(?:for|of|with|about|between)\b/iu.test(object) &&
