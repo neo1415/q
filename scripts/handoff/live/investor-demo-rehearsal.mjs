@@ -117,8 +117,9 @@ async function rehearse() {
           firstAnswerText20Ms: null,
           firstRenderedCardMs: null,
         };
-        const initiallyNoCards =
-          document.querySelectorAll("[data-ac-card]").length === 0;
+        const previousCards = new Set(
+          document.querySelectorAll("[data-q-answer] [data-ac-card]"),
+        );
         const observer = new window.MutationObserver(() => {
           if (
             !document
@@ -138,9 +139,10 @@ async function rehearse() {
               performance.now() - state.started,
             );
           if (
-            initiallyNoCards &&
             state.firstRenderedCardMs === null &&
-            document.querySelector("[data-ac-card]")
+            [
+              ...document.querySelectorAll("[data-q-answer] [data-ac-card]"),
+            ].some((card) => !previousCards.has(card))
           )
             state.firstRenderedCardMs = Math.round(
               performance.now() - state.started,
@@ -206,6 +208,17 @@ async function rehearse() {
       const cards = blocks
         .filter((b) => b.kind === "ANSWER_CARDS")
         .flatMap((b) => b.cards);
+      // API completion can precede the browser's final stream update.
+      // Measure the current settled answer, never disconnect before it renders.
+      await page.waitForFunction(
+        (question) =>
+          document
+            .querySelector("[data-q-panel-person]")
+            ?.textContent.includes(question) &&
+          document.querySelector('[data-q-answer="settled"]'),
+        text,
+        { timeout: 30000 },
+      );
       const visibleTiming = await page.evaluate(() => {
         const timing = window.__cqDemoTiming;
         timing.observer.disconnect();

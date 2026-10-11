@@ -1,5 +1,59 @@
 # Active tasks — authoritative cross-model board
 
+## LATEST STATUS — lossless investor-demo continuation — 2026-10-11 21:01 UTC
+
+**Capital Q is an existing substantial application. Immediate priority: a reliable October 12 investor demo. Finish the current release and actual browser acceptance before expanding the workforce or changing scoring.**
+
+### Branches, release and gates
+
+- Latest integrated application commit: **`06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`**, remote **`build/int-rc`**; working branch **`codex/preserve-optimize`**. Both are pushed. The CI lane **`recovery/2026-09-12-8y2j4w`** is at the same application SHA. Current handoff/timing checkpoint is a subsequent work-branch commit; it does not replace that gated application SHA.
+- Exact CI **`38173610861`** for `06872c7c`: format/lint/typecheck completed successfully; full Test step running; pgTAP **SUCCESS**; manual e2e **SKIPPED**. Quality is **not yet green**. Do not deploy until exact quality and pgTAP both pass.
+- Deployment lane **`recovery/2026-09-12`** remains at **`9261cdc4cdcb6c9f7829fe50fb7d3c197907848a`**. Exact CI **`38169532816`**: quality + pgTAP **SUCCESS**, manual e2e **SKIPPED**. Fresh Railway check confirms:
+
+| Railway service      | Deployed commit                            | Status  |
+| -------------------- | ------------------------------------------ | ------- |
+| `@capital-q/web`     | `9261cdc4cdcb6c9f7829fe50fb7d3c197907848a` | SUCCESS |
+| `@capital-q/api`     | `9261cdc4cdcb6c9f7829fe50fb7d3c197907848a` | SUCCESS |
+| `@capital-q/q-api`   | `9261cdc4cdcb6c9f7829fe50fb7d3c197907848a` | SUCCESS |
+| `@capital-q/workers` | `9261cdc4cdcb6c9f7829fe50fb7d3c197907848a` | SUCCESS |
+
+- No new migration: local/hosted **201/201**. Previous exact green rollback points: `ad4703895d9736ab0c321324888697f59c5c1e5f` (CI `38166655996`) and `e271242e6833d07820c32a8e679f3403ba1ca560` (CI `38164882385`). Current `9261cdc4` is the immediate known deployed baseline. `main` remains stale; do not reset from it.
+
+### Product evidence and remaining demo defects
+
+- **LIVE VERIFIED narrow journeys:** top-ten API returns ten distinct authorized cards; the actual Discover browser renders three real Q cards/Open controls and opens the correct company profile with its canonical name visible. Three isolated named-founder questions return correctly bound findings/references without PUBLIC_SOURCE substitution. The existing workforce ONE_PAGER has real READY versions 1 and 2, preserved canonical findings/gaps, a rendered viewer and a changed valid one-page PDF. All nine gaps appear in the existing dedicated Evidence gaps section after a warm retry.
+- **LIVE REPRODUCED cold Ask Q defect on `9261cdc4`:** navigate immediately to Discover, click its visible Ask Q before React binds the handler; no Q run starts and no input opens. A hydrated second click opens the actual Q sheet. Fix in `06872c7c`: disable Discover's SSR button until hydration attaches its handler. SSR/hydration test passes; **cold production verification pending**.
+- **LIVE REPRODUCED selected-company attribution defect:** the deployed routing correction now returns analysis instead of ten unrelated candidate cards, but a warm browser explanation produces four findings with no company subjects and no COMPANY_REFERENCE. Rehearsal fails `PROFILE_REFERENCE_MISMATCH`. Fix in `06872c7c`: preserve explicit named targets/ambiguity, allow a deictic single-company fallback only to the exact screen subject after a fresh schema-valid authorized profile read. Warm/cold/other-flag regressions pass; **production verification pending**.
+- **NOT ACCEPTED:** full cold Discover → three cards → selected profile → explanation → evidence follow-up → exact two-name comparison → known authorized founder profile/follow-up. The last rehearsal stopped at explanation binding; later phases were unrun. Do not count a warm retry, API-only check, skipped CI e2e, or ranked demo records alone as full investor or genuine-founder acceptance.
+- Cold document Open similarly failed once before hydration; a delayed retry rendered all nine gaps. **Cold readiness remains unresolved.** First audio remains unverified; cloud Deepgram transport fails with proxy/tunnel errors, not evidence of a production voice defect.
+
+### Measurements and next task
+
+- Actual known-card question baseline: first 20 visible answer characters **8,661 ms**, terminal **20,189 ms**, six correctly bound findings + one reference, zero PUBLIC_SOURCE. Two model lookup-selection rounds: **1,946 + 1,846 = 3,792 ms** before generation.
+- Warm selected-company browser on `9261cdc4`: top-three terminal **3,202 ms**; explanation first 20 rendered characters **8,341 ms**, terminal **18,978 ms**, attribution failed. Actor/run-scoped usage confirms two lookup-selection calls **1,798 + 2,036 = 3,834 ms**, final generation **11,908 ms**; post-answer extraction ends 2,219 ms after completion and is not the first-response bottleneck.
+- Earlier measured own-mandate improvement: three-sample median first 20 characters **2,098 → 892 ms**, terminal **2,163 → 941 ms**. No p95/load/semantic-first-useful-text or audio claim. Named-founder correctness improved, but its measured latency did not improve.
+- **Exact next task:** observe CI `38173610861`; if exact required gates pass, push **explicit `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`** to the deployment lane (not an unrelated newer documentation HEAD). Verify all four Railway services SUCCESS at that SHA. Run the cold browser command below. Fix any real failure without weakening assertions; update these shared files in the same cycle. Then remove measured unnecessary lookup planning using existing authorized profile reads and measure before/after.
+
+```bash
+cd /workspace/q
+CQ_DEMO_SESSION_FILE=/workspace/cq-secrets/investor-session.json \
+CQ_DEMO_PUBLIC_KEY_FILE=/workspace/cq-secrets/public.key \
+CQ_DEMO_CHROMIUM_PATH=/usr/bin/chromium \
+CQ_DEMO_FOUNDER_RECORD_FILE=/workspace/cq-secrets/founder-company.json \
+NODE_USE_ENV_PROXY=1 node scripts/handoff/live/investor-demo-rehearsal.mjs
+```
+
+The tracked runner creates internal Q turns for an existing authorized account only. It requires current run/question completion, rendered card counts, exact selected/named company bindings and comparison IDs. Receipts/screenshots/failure details are private mode-700 temporary directories with mode-600 JSON; never commit them. Latest timing-only continuation identifies newly rendered Q card nodes and waits for the current browser answer to settle; syntax/lint pass, actual execution pending. It does not relax acceptance. Local-only diagnostic scripts/logs live under `/workspace/cq-secrets` and `/tmp`; the tracked runner is the portable reproduction path. Session files are not portable Git artifacts: use existing authorized sign-in/refresh documented in START-HERE; do not create accounts or send sign-in emails.
+
+### Preserved work and environment actions
+
+- Five project worktrees inspected; only the old document bridge had unfinished code. Preserved/pushed **`codex/wip-workforce-documents-preserved-2026-10-11`**, **`35c23d7a7e4b84d191e6535154db2dda46dafcaa`**. **WIP / UNVERIFIED / DO NOT DEPLOY OR MERGE WHOLESALE:** this historical snapshot places `findForWorkforce` inside `toArtifact` and lacks the later real-version rejection. The integration branch already carries corrected implementations. Preserve for archaeology; reconcile individual patches only if actually missing.
+- Original branch histories pushed: `codex/workforce-documents` at `74f4b6ce9b33658c46493a739c3567a60d50b43e`; `codex/workforce-documents-executor` at `621614a3ceeeba5d5e0b31433e37cff3d32c0a16`; detached score audit protected on `codex/preserved-score-audit-2026-10-11` at `cce99544988af127e6d0d13c39fdcd605fc841e6`. Detached workforce audit `ab96257644d21e7e27fbb72fd54a9946e23fa00c` is already an ancestor of the integrated application. Old branches are historical, not additional platforms or competing sources of truth.
+- **PROPOSED ONLY:** offline InvestIQ experiment **0.2**, ten synthetic scenarios + ten invariants pass. No production import, calibration, approved official weights or real historical 8.8 reproduction. Canonical mandate fit and FDN Business Quality are separate. Preserve original Locked PADL/Product Specification; proposed math must not replace approved production scoring.
+- Development package builds/types/tests work. Local Supabase/database startup remains blocked by Docker/vfs disk constraints; direct Postgres is unavailable; required pgTAP runs in CI. Existing authenticated hosted HTTPS reads work. No account action is needed for the current text demo while authorized session refresh remains available.
+- Cloud configuration draft was saved with existing network domains preserved plus **`agent.deepgram.com` and `api.deepgram.com`**. **User action for cloud voice verification:** review and save in environment settings, then publish. Draft saving did not activate/publish or prove transport connectivity. Recheck credential-free transport before any paid voice attempt. Secret values are never in Git or setup drafts.
+- **Do not rebuild:** GPT-Live, voice/navigation, Q cards, documents, relationships, onboarding, research or the existing LangGraph workforce. Reuse current services/tools/firewall/presentation/versioning. No second agent platform, duplicate business service, speculative rewrite, fabricated showcase record, private interview disclosure, arbitrary score precision or unverified WIP deployment. Do not weaken RLS, evidence bindings, tests or release gates.
+
 ## Cold Discover control and selected-company evidence binding — 2026-10-11 20:44 UTC
 
 - **DEPLOYED:** all four Railway services SUCCESS at `9261cdc4cdcb6c9f7829fe50fb7d3c197907848a`; exact CI `38169532816` quality and pgTAP SUCCESS, manual e2e SKIPPED. No new migration (201/201).

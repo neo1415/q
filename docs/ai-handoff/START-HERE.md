@@ -2,7 +2,7 @@
 
 **Purpose:** any coding agent (Codex, Claude Code on any account) picks up the same work without this chat. These files are the single shared memory. There are no model-specific project memories: Codex reads `AGENTS.md`, Claude reads `CLAUDE.md`, and both point here.
 
-**Current lead (from 2026-10-11):** Codex Cloud. Claude Code's ownership ended at the handoff commit recorded in `HANDOFF-LOG.md`.
+**Continuity (2026-10-11):** Codex Cloud is completing the current demo release; Claude Code may continue immediately from the prominent latest status in STATE.md. Shared handoff files and branch SHAs govern continuity; no model-specific memory or replacement application.
 
 ## Read in this order (stop when you have enough)
 

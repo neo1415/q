@@ -164,3 +164,9 @@ Final answer generation took 10,437 / 9,746 / 8,704 ms with 1,326 / 1,224 / 1,10
 ## Selected-company warm-browser measurement — 2026-10-11 20:44 UTC
 
 At deployed `9261cdc4`, the diagnostic warm-only Discover rehearsal rendered three actual cards (terminal 3,202 ms), opened the correct profile, and returned selected-company analysis in 18,978 ms, first 20 rendered answer characters at 8,341 ms. This fixes the prior ten-card misroute but fails attribution acceptance: four findings have no company subjects and no COMPANY_REFERENCE. These are single observations, not semantic first-useful-text, cold opening, audio or p95 measurements. A separate fresh-page probe reproduces the unbound Discover Ask Q button and confirms that a hydrated second click opens the real panel. Both product corrections await exact release and live verification.
+
+## Selected-company critical lookup overhead — 2026-10-11 21:01 UTC
+
+The actor/run-scoped ledger for the warm selected-company explanation on deployed `9261cdc4` contains classification 798 ms; two lookup-selection rounds 1,798 and 2,036 ms; final generation 11,908 ms; structured extraction 2,100 ms finishing 2,219 ms after the answer. Lookup planning consumes 3,834 ms on the critical path despite the existing authorized on-screen profile prefetch. A turn-note correction is only an investigation; no next latency implementation or speedup is claimed. The browser first-20-character 8,341 ms / terminal 18,978 ms observation failed subject/reference acceptance.
+
+The continuation rehearsal now identifies newly rendered Q card DOM nodes and waits for the current answer to settle before disconnecting its observer; existing cards and API-before-render timing no longer force a null card measurement. Syntax/lint pass; actual cold browser execution awaits the exact gated application release. These measurements remain literal rendering thresholds, not semantic usefulness or audio.

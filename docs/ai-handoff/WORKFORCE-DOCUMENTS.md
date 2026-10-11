@@ -1,5 +1,11 @@
 # Existing workforce document connection
 
+## Current evidence checkpoint — 2026-10-11 20:56 UTC
+
+The deployed baseline is exact green `9261cdc4` across all four services. The real workforce ONE_PAGER has READY version 2, version 1 preserved, a rendered viewer and a changed valid one-page PDF. Three canonical findings and nine gaps are preserved; all nine gaps render in the existing dedicated “Evidence gaps” section after a warm retry. The earlier section-array-only failure and label mismatch below are historical checkpoints; do not duplicate gap state. Cold document-open readiness remains unresolved.
+
+Fresh completion verification passes 24 tests across the existing artifact-job service, workforce adapter and executor. PREPARING remains running, cancellation withholds completion, and the artifact service rejects READY when its immutable current version row is absent. This is narrow real document execution/revision/export evidence, not acceptance of autonomous intelligent research, analysis, writing, design and critique. Durable aggregate paid-job reservation and those broader capabilities remain unfinished.
+
 2026-10-11. Initial connection DEPLOYED at `efcf49ab`; exact-commit quality and pgTAP passed, additive migration applied. This extends the existing
 workforce, company specialist, artifact service and document worker. It creates
 no second agent platform, document registry or business service.
