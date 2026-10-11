@@ -116,9 +116,19 @@ const NOT_PLACES = new Set([
 export function fitSweepAsk(
   text: string,
   previous: readonly string[] = [],
+  named: readonly string[] = [],
 ): FitSweepAsk | null {
   const words = text.trim();
   if (words.length === 0 || words.length > 400) return null;
+  if (named.length >= 2) {
+    return {
+      scope: "PREVIOUS",
+      place: null,
+      fitAsked: true,
+      count: Math.min(askedCount(words) ?? named.length, named.length),
+      within: [...named],
+    };
+  }
   if (previous.length > 0 && refersToShown(words) && FIT_CUE.test(words)) {
     const asked = askedCount(words);
     return {
@@ -166,8 +176,18 @@ export function fitSweepAskOfReading(
     readonly previous?: boolean | undefined;
   },
   previous: readonly string[] = [],
+  named: readonly string[] = [],
 ): FitSweepAsk {
   const words = question.text.trim().slice(0, 400);
+  if (named.length >= 2) {
+    return {
+      scope: "PREVIOUS",
+      place: null,
+      fitAsked: true,
+      count: Math.min(question.count ?? named.length, named.length),
+      within: [...named],
+    };
+  }
   const count =
     question.count === null
       ? null

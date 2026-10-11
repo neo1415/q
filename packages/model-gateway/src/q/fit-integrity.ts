@@ -5,6 +5,7 @@ import type {
 } from "@capital-q/contracts";
 import type { QConversationMessage } from "@capital-q/q-runtime";
 
+import { containsCompanyName, nameKey } from "./card-subjects.js";
 import { askedCount, refersToShown } from "./fit-sweep.js";
 
 export { refersToShown };
@@ -56,6 +57,41 @@ export function previousCardCompanyIds(
     return [];
   }
   return [];
+}
+
+/**
+ * Explicit comparison names may refer to cards before intervening prose.
+ * Resolve exact canonical names only, from bounded durable card history.
+ * A name attached to more than one record stays ambiguous; a card without
+ * a canonical subject cannot supply an id. fit_profile reauthorizes each.
+ */
+export function namedCardCompanyIds(
+  earlier: readonly QConversationMessage[],
+  text: string,
+): readonly string[] {
+  const named = new Map<string, Set<string>>();
+  for (const message of earlier.slice(-12)) {
+    if (message.role !== "Q") continue;
+    for (const block of message.blocks ?? []) {
+      if (block.kind !== "ANSWER_CARDS") continue;
+      for (const card of block.cards) {
+        if (
+          card.subject?.kind !== "COMPANY" ||
+          !containsCompanyName(text, card.name)
+        )
+          continue;
+        const key = nameKey(card.name);
+        const ids = named.get(key) ?? new Set<string>();
+        ids.add(card.subject.companyId);
+        named.set(key, ids);
+      }
+    }
+  }
+  return [
+    ...new Set(
+      [...named.values()].flatMap((ids) => (ids.size === 1 ? [...ids] : [])),
+    ),
+  ];
 }
 
 const MANDATE_WORD = /\bmandate\b/iu;

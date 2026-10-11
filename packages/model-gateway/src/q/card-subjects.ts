@@ -302,10 +302,7 @@ export function createRunCompanies(limit = 200) {
  * this run successfully read. Search candidates and model-written ids do not
  * establish it. Ambiguous or unread targets have no company attribution.
  */
-export function namedCompanySubjects(
-  text: string,
-  read: RunRead,
-): QSubjectRef[] {
+export function containsCompanyName(text: string, name: string): boolean {
   const words = (value: string) =>
     value
       .toLowerCase()
@@ -313,11 +310,17 @@ export function namedCompanySubjects(
       .replace(/[̀-ͯ]/gu, "")
       .replace(/[^a-z0-9]+/gu, " ")
       .trim();
-  const question = ` ${words(text)} `;
-  const matches = [...read.profiles].filter(([, name]) => {
-    const phrase = words(name);
-    return phrase.length > 0 && question.includes(` ${phrase} `);
-  });
+  const phrase = words(name);
+  return phrase.length > 0 && ` ${words(text)} `.includes(` ${phrase} `);
+}
+
+export function namedCompanySubjects(
+  text: string,
+  read: RunRead,
+): QSubjectRef[] {
+  const matches = [...read.profiles].filter(([, name]) =>
+    containsCompanyName(text, name),
+  );
   if (matches.length !== 1) return [];
   const target = matches[0];
   return target === undefined

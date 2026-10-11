@@ -192,6 +192,7 @@ import { manifestFacts, manifestReads } from "./manifest-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
 import {
+  namedCardCompanyIds,
   previousCardCompanyIds,
   tieLine,
   withFitIntegrity,
@@ -2167,6 +2168,13 @@ export function createModelGatewayQAnswer(
       (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q");
     // INC-1: "rank them" is the set the last answer showed.
     const shownBefore = previousCardCompanyIds(earlier);
+    // A comparison naming two earlier cards keeps those records even
+    // after company analysis or an evidence-gap follow-up showed no list.
+    const namedComparison = /\b(compare|versus|vs|between)\b/iu.test(
+      latest.content,
+    )
+      ? namedCardCompanyIds(earlier, latest.content)
+      : [];
     const sweepFor = (ask: FitSweepAsk): Promise<FitSweepResult | null> =>
       runFitSweep({
         ask,
@@ -2179,10 +2187,14 @@ export function createModelGatewayQAnswer(
       }).catch(() => null);
     const sweepAsk = !sweepable
       ? null
-      : (fitSweepAsk(latest.content, shownBefore) ??
+      : (fitSweepAsk(latest.content, shownBefore, namedComparison) ??
         (request.fitQuestion === undefined
           ? null
-          : fitSweepAskOfReading(request.fitQuestion, shownBefore)));
+          : fitSweepAskOfReading(
+              request.fitQuestion,
+              shownBefore,
+              namedComparison,
+            )));
     const fitSweep: Promise<FitSweepResult | null> =
       sweepAsk === null ? Promise.resolve(null) : sweepFor(sweepAsk);
     // Live 2026-10-09: a FIT reading arrives after a warmed prepare, which
@@ -2194,7 +2206,9 @@ export function createModelGatewayQAnswer(
       readonly previous?: boolean | undefined;
     }): Promise<FitSweepResult | null> =>
       sweepable
-        ? sweepFor(fitSweepAskOfReading(fitQuestion, shownBefore))
+        ? sweepFor(
+            fitSweepAskOfReading(fitQuestion, shownBefore, namedComparison),
+          )
         : Promise.resolve(null);
     // K1: companies of a kind, from the catalog by code, through the same
     // tools and plan; fit only for an investor and only when asked for.

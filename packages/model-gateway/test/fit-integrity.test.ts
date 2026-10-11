@@ -6,6 +6,7 @@ import type { QConversationMessage, QToolPort } from "@capital-q/q-runtime";
 import { fitSweepCardsBlock, fitSweepSummary } from "../src/q/fit-cards.js";
 import {
   mandateFitProvenance,
+  namedCardCompanyIds,
   previousCardCompanyIds,
   tieLine,
   withFitIntegrity,
@@ -114,8 +115,12 @@ function fitTools(top: number) {
 const AVAILABLE = new Set(["fit_profile", "fit_top_candidates"]);
 const CONTEXT = {} as Parameters<typeof runFitSweep>[0]["context"];
 
-async function sweep(said: string, previous: readonly string[] = []) {
-  const ask = fitSweepAsk(said, previous);
+async function sweep(
+  said: string,
+  previous: readonly string[] = [],
+  named: readonly string[] = [],
+) {
+  const ask = fitSweepAsk(said, previous, named);
   if (ask === null) throw new Error("not a fit question");
   const tools = fitTools(10);
   const result = await runFitSweep({
@@ -328,5 +333,54 @@ describe("score integrity (INC-1)", () => {
     expect(
       mandateFitProvenance({ name: "Kora", fit: null, sourceCount: 0 }),
     ).toBeNull();
+  });
+});
+
+describe("explicit names after an evidence follow-up", () => {
+  it("reads exactly the two named prior cards and never expands to candidates", async () => {
+    const first = await sweep("Show my top three companies against my mandate");
+    const prose = {
+      ...shownAnswer(first.block),
+      blocks: [],
+      content: "The company has no verified traction on record.",
+    };
+    const history = [shownAnswer(first.block), prose];
+    expect(previousCardCompanyIds(history)).toEqual([]);
+    const text =
+      "Compare Halyard and Savanna against my mandate using authorized company records.";
+    const named = namedCardCompanyIds(history, text);
+    expect(named).toEqual([ID(1), ID(2)]);
+    const comparison = await sweep(
+      text,
+      previousCardCompanyIds(history),
+      named,
+    );
+    expect(comparison.ask.scope).toBe("PREVIOUS");
+    expect(comparison.asked).not.toContain("fit_top_candidates");
+    expect(ids([comparison.block]).sort()).toEqual([ID(1), ID(2)].sort());
+    expect(comparison.block.cards.every((c) => c.fit?.score === 8.8)).toBe(
+      true,
+    );
+  });
+  it("ignores unresolved names, partial names and ambiguous canonical identities", async () => {
+    const first = await sweep("Show my top three companies against my mandate");
+    const altered: QAnswerCardsBlock = {
+      ...first.block,
+      cards: first.block.cards.map((c, index) =>
+        index === 1 ? { ...c, name: "Halyard" } : c,
+      ),
+    };
+    expect(
+      namedCardCompanyIds(
+        [shownAnswer(altered)],
+        "Compare Halyard and Clearwater",
+      ),
+    ).toEqual([ID(3)]);
+    expect(
+      namedCardCompanyIds(
+        [shownAnswer(first.block)],
+        "Compare Superhalyard and an unknown company",
+      ),
+    ).toEqual([]);
   });
 });

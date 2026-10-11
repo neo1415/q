@@ -3,7 +3,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { QArtifactIdSchema } from "@capital-q/contracts";
+import {
+  QArtifactIdSchema,
+  type QAnswerCardsBlock,
+} from "@capital-q/contracts";
 
 import type { QTurn } from "../src/features/q/conversation";
 
@@ -163,5 +166,39 @@ describe("a Q reply in the chat thread", () => {
       "ARTIFACT_REFERENCE",
     ]);
     expect(parts.companies).toHaveLength(1);
+  });
+});
+
+describe("answer cards beside Discover", () => {
+  const block: QAnswerCardsBlock = {
+    kind: "ANSWER_CARDS",
+    shape: "RANKED",
+    title: "Fit against your mandate",
+    followUps: [],
+    cards: [
+      {
+        key: "canonical-company",
+        name: "Authorized company",
+        line: "Declared seed profile",
+        hue: 1,
+        fit: null,
+        reasons: ["Stage fits the declared mandate"],
+        measures: [],
+        view: null,
+        said: null,
+        sourceCount: 0,
+        subject: { kind: "COMPANY", companyId: COMPANY },
+      },
+    ],
+  };
+  it("shows the canonical card and its open control when the reply has no separate stage", async () => {
+    render(<QAnswer turn={turn({ blocks: [block] })} cardsInline />);
+    expect(
+      await screen.findByRole("button", { name: "Open Authorized company" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Declared seed profile")).toBeTruthy();
+  });
+  it("keeps the stage's existing ownership when inline cards were not requested", () => {
+    expect(replyParts([block]).inline).toEqual([]);
   });
 });

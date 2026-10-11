@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { withOneCaveat } from "@capital-q/q-core";
 
-import { askedCount, fitSweepAsk } from "../src/q/fit-sweep.js";
+import {
+  askedCount,
+  fitSweepAsk,
+  fitSweepAskOfReading,
+} from "../src/q/fit-sweep.js";
 import {
   claimsListOnScreen,
   withoutUnbackedScreenClaims,
@@ -102,5 +106,24 @@ describe("one disclaimer at most", () => {
     expect(text).toBe(
       "Both match your stage. Round size isn't known yet. That is a prioritisation for diligence. Maji Loop is closer.",
     );
+  });
+});
+
+describe("named comparison stays within resolved records", () => {
+  const named = [
+    "3ab2cc02-160f-4812-a6b1-000000000001",
+    "3ab2cc02-160f-4812-a6b1-000000000002",
+  ];
+  it("compares two explicitly resolved companies even after a prose follow-up", () => {
+    const text =
+      "Compare Halyard and Savanna against my mandate using authorized company records.";
+    expect(fitSweepAsk(text, [], named)).toMatchObject({
+      scope: "PREVIOUS",
+      within: named,
+      count: 2,
+    });
+    expect(
+      fitSweepAskOfReading({ text, count: null }, [], named),
+    ).toMatchObject({ scope: "PREVIOUS", within: named, count: 2 });
   });
 });

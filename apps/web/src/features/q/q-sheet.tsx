@@ -204,6 +204,7 @@ export function QSheetConversation({
           <div aria-live="polite">
             <QAnswer
               turn={latestAnswer}
+              cardsInline
               onAsk={(question) => void q.ask(question)}
               onOpenArtifact={session.openArtifact}
             />

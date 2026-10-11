@@ -30,7 +30,10 @@ import {
 type Panel = "sources" | "companies" | "investors";
 
 /** What stays in view, and what sits behind a chip. */
-export function replyParts(blocks: readonly QTurnObjectBlock[]): {
+export function replyParts(
+  blocks: readonly QTurnObjectBlock[],
+  cardsInline = false,
+): {
   readonly inline: readonly QTurnObjectBlock[];
   readonly companies: readonly QTurnObjectBlock[];
   readonly investors: readonly QTurnObjectBlock[];
@@ -64,7 +67,9 @@ export function replyParts(blocks: readonly QTurnObjectBlock[]): {
         inline.push(block);
         break;
       case "ANSWER_CARDS":
-        // Laid out on the stage over the presence, not repeated inline.
+        // The dock has no stage to draw these. Reuse the card renderer
+        // there; the full Q stage retains its existing ownership.
+        if (cardsInline) inline.push(block);
         break;
     }
   }
@@ -80,6 +85,7 @@ export function QAnswer({
   onAsk,
   onOpenArtifact,
   mark = true,
+  cardsInline = false,
 }: {
   readonly turn: Extract<QTurn, { kind: "Q" }>;
   /** Continue in this thread from something Q referred to (QX-001 §9). */
@@ -87,10 +93,12 @@ export function QAnswer({
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
   /** False in a thread, where the row itself says who is speaking. */
   readonly mark?: boolean | undefined;
+  /** The dock has no separate answer stage. */
+  readonly cardsInline?: boolean | undefined;
 }) {
   const id = useId();
   const [open, setOpen] = useState<Panel | null>(null);
-  const { inline, companies, investors } = replyParts(turn.blocks);
+  const { inline, companies, investors } = replyParts(turn.blocks, cardsInline);
   const sources = evidenceSummary(turn, false);
   // R3: "Opening X…" until this tab's browser VERIFIED the move.
   const text = useMoveLine(turn.text, turn.blocks);
