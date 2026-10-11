@@ -1,5 +1,9 @@
 import { createCorrelationId } from "@capital-q/observability";
 import {
+  CorrelationIdSchema,
+  workforceCorrelationId,
+} from "@capital-q/contracts";
+import {
   DOCUMENT_JOB_ATTEMPTS_MAX,
   jobActor,
   type ArtifactService,
@@ -66,7 +70,13 @@ export function createDocumentJobRunner(dependencies: {
     signal: AbortSignal | undefined,
   ): Promise<void> => {
     const actor = jobActor(job);
-    const correlationId = createCorrelationId();
+    const attribution = job.input.workforce;
+    const correlationId =
+      attribution === undefined
+        ? createCorrelationId()
+        : CorrelationIdSchema.parse(
+            workforceCorrelationId(attribution.jobId, attribution.runId),
+          );
     const { input } = job;
     const result = await runDocumentPipeline(input.content, {
       kind: job.kind,
