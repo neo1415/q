@@ -18,9 +18,11 @@ import { RANKING_CONFIG_STATUSES } from "../ranking/config.js";
  * business model, traction, team and round terms: nine parameters, each
  * weighted, each with its own outcome map. It is a separate, frozen,
  * versioned object because it describes a fit PROFILE shown to a person,
- * not the Discover slate order: v3 still orders the feed, unchanged, and a
- * persisted slate still names v1-v3. Changing anything here is a new
- * version; a published one is never edited, so a profile shown yesterday
+ * not the Discover slate ordering policy: `fit-order.v1` combines v3's
+ * base rank with the displayed fit score and this config's merit tie-break.
+ * Historical slates retain their recorded ranking version. Changing this
+ * config requires a new version; a published one is never edited, so a
+ * profile shown yesterday
  * can be reproduced from its inputs and the version it names.
  *
  * Weights are an INITIAL heuristic (doc 19 §53: exact scoring is open
