@@ -1,4 +1,7 @@
-import { WorkforceDocumentRequestSchema } from "@capital-q/contracts";
+import {
+  WorkforceDocumentCritiqueRequestSchema,
+  WorkforceOwnDocumentRequestSchema,
+} from "@capital-q/contracts";
 import { z } from "zod";
 
 import { TaskFrameSchema } from "./common.js";
@@ -413,10 +416,101 @@ export const JobPlanResultV3Schema = JobPlanResultV2Schema.extend({
     .array(
       JobPlanResultV2Schema.shape.steps.element
         .extend({
-          document: WorkforceDocumentRequestSchema.optional(),
+          document: WorkforceOwnDocumentRequestSchema.optional(),
         })
         .strict(),
     )
     .max(12),
 }).strict();
 export type JobPlanResultV3 = z.infer<typeof JobPlanResultV3Schema>;
+
+/**
+ * v4 (2026-10-12): the lead may also ask for a memo about the ONE company
+ * the job names, and for a second specialist to critique and revise a
+ * document an earlier step prepared. The planner never writes a company
+ * id: code binds NAMED_COMPANY to the record the goal names, or refuses.
+ */
+export const JOB_PLAN_V4_SCHEMA_VERSION = 4;
+export const PlannedNamedCompanyDocumentSchema = z
+  .object({
+    operation: z.literal("PREPARE"),
+    kind: z.enum(["MEMO", "ONE_PAGER", "INVESTMENT_BRIEF"]),
+    scope: z.literal("NAMED_COMPANY"),
+  })
+  .strict();
+export const JobPlanResultV4Schema = JobPlanResultV2Schema.extend({
+  steps: z
+    .array(
+      JobPlanResultV2Schema.shape.steps.element
+        .extend({
+          document: z
+            .union([
+              WorkforceOwnDocumentRequestSchema,
+              PlannedNamedCompanyDocumentSchema,
+              WorkforceDocumentCritiqueRequestSchema,
+            ])
+            .optional(),
+        })
+        .strict(),
+    )
+    .max(12),
+}).strict();
+export type JobPlanResultV4 = z.infer<typeof JobPlanResultV4Schema>;
+
+// SUBSTANCE_CRITIQUE (2026-10-12): a second specialist's critique of a
+// prepared document, against the evidence it was built from.
+export const SUBSTANCE_CRITIQUE_SCHEMA_NAME = "SubstanceCritiqueResult";
+export const SUBSTANCE_CRITIQUE_SCHEMA_VERSION = 1;
+export const SUBSTANCE_CRITIQUE_ISSUE_KINDS = [
+  "UNSUPPORTED",
+  "CONTRADICTION",
+  "MISSING_RISK",
+  "MISSING_INFORMATION",
+  "UNCLEAR_CONCLUSION",
+  "GENERIC",
+] as const;
+
+export const SubstanceCritiqueVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    documentKind: z.string().min(1).max(40),
+    principalName: z.string().min(1).max(120),
+    companyName: z.string().min(1).max(120),
+    /** The job step's goal: what the document is for. UNTRUSTED. */
+    purpose: z.string().min(1).max(600),
+    /** The findings the document was built from. UNTRUSTED. */
+    evidence: z.string().max(12_000),
+    /** The document's sections as text. UNTRUSTED. */
+    document: z.string().min(1).max(24_000),
+  })
+  .strict();
+export type SubstanceCritiqueVariables = z.infer<
+  typeof SubstanceCritiqueVariablesSchema
+>;
+export const SUBSTANCE_CRITIQUE_UNTRUSTED = [
+  "purpose",
+  "evidence",
+  "document",
+] as const;
+
+export const SubstanceCritiqueResultSchema = z
+  .object({
+    material: z.boolean(),
+    issues: z
+      .array(
+        z
+          .object({
+            kind: z.enum(SUBSTANCE_CRITIQUE_ISSUE_KINDS),
+            section: z.string().trim().min(1).max(120),
+            problem: z.string().trim().min(1).max(400),
+            fix: z.string().trim().min(1).max(400),
+          })
+          .strict(),
+      )
+      .max(8),
+    strengths: z.array(z.string().trim().min(1).max(240)).max(3),
+  })
+  .strict();
+export type SubstanceCritiqueResult = z.infer<
+  typeof SubstanceCritiqueResultSchema
+>;

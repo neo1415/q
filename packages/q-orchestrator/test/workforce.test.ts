@@ -292,6 +292,79 @@ describe("boundPlan", () => {
   });
 });
 
+describe("boundPlan: investor documents (2026-10-12)", () => {
+  const executors = registeredExecutors({ research: true, documents: true });
+  const permitted = new Set(["documents.own.prepare", "public_web.search"]);
+  const company = "8a6f2a3e-3c4b-4d5e-9f60-7a8b9c0d1e2f";
+  const memo = {
+    key: "memo",
+    role: "DOCUMENTS",
+    agentName: null,
+    goal: "Investment memo",
+    tools: ["documents.own.prepare"],
+    dependsOn: [],
+    document: { operation: "PREPARE", kind: "MEMO", scope: "NAMED_COMPANY" },
+  };
+  const critique = {
+    key: "critique",
+    role: "DOCUMENTS",
+    agentName: null,
+    goal: "Critique and revise the memo",
+    tools: ["documents.own.prepare"],
+    dependsOn: ["memo"],
+    document: { operation: "CRITIQUE_AND_REVISE", sourceStep: "memo" },
+  };
+
+  it("binds the memo to the company the goal named, never one a model wrote", () => {
+    const bound = boundPlan([memo, critique], {
+      permitted,
+      budgetUsd: 1,
+      executors,
+      namedCompanyId: company,
+    });
+    expect(bound.refused).toEqual([]);
+    expect(bound.steps[0]?.document).toEqual({
+      operation: "PREPARE",
+      kind: "MEMO",
+      scope: "NAMED_COMPANY",
+      companyId: company,
+    });
+    expect(bound.steps[1]).toMatchObject({
+      agentName: "Reviewer",
+      document: { operation: "CRITIQUE_AND_REVISE", sourceStep: "memo" },
+    });
+  });
+
+  it("refuses a named-company memo when the goal names no company on record", () => {
+    const bound = boundPlan([memo], { permitted, budgetUsd: 1, executors });
+    expect(bound.refused).toEqual([
+      { key: "memo", reason: "NO_NAMED_COMPANY" },
+    ]);
+  });
+
+  it("refuses a model-written company id outright", () => {
+    const bound = boundPlan(
+      [{ ...memo, document: { ...memo.document, companyId: "elsewhere" } }],
+      { permitted, budgetUsd: 1, executors, namedCompanyId: company },
+    );
+    expect(bound.refused).toEqual([
+      { key: "memo", reason: "INVALID_DOCUMENT_REQUEST" },
+    ]);
+  });
+
+  it("refuses a critique that does not wait on an earlier preparation", () => {
+    const bound = boundPlan([memo, { ...critique, dependsOn: [] }], {
+      permitted,
+      budgetUsd: 1,
+      executors,
+      namedCompanyId: company,
+    });
+    expect(bound.refused).toEqual([
+      { key: "critique", reason: "INVALID_CRITIQUE_SOURCE" },
+    ]);
+  });
+});
+
 describe("gradeOf", () => {
   it("weights the rubric to 100 and never averages away an integrity failure", () => {
     expect(gradeOf(review(5), 75)).toMatchObject({ score: 100, passed: true });
@@ -574,7 +647,7 @@ describe("runJob", () => {
         },
         {
           key: "shortlist",
-          role: "DISCOVERY",
+          role: "MANDATE_WATCHER",
           executor: "DISCOVERY",
           agentName: "shortlist",
           goal: "g",
@@ -657,7 +730,7 @@ describe("runJob", () => {
       steps: [
         {
           key: "ok",
-          role: "DISCOVERY",
+          role: "MANDATE_WATCHER",
           executor: "DISCOVERY",
           agentName: "ok",
           goal: "g",

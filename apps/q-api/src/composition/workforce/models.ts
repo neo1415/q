@@ -15,15 +15,18 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   DraftRedraftResultSchema,
   DraftReviewResultV2Schema,
-  JobPlanResultV3Schema,
+  JobPlanResultV4Schema,
   renderPrompt,
+  SubstanceCritiqueResultSchema,
+  type SubstanceCritiqueResult,
+  type SubstanceCritiqueVariables,
   ReplyReaderResultSchema,
   type DraftRedraftResult,
   type DraftRedraftVariables,
   type DraftReviewResultV2,
   type DraftReviewV2Variables,
   type EtiquettePurpose,
-  type JobPlanResultV3,
+  type JobPlanResultV4,
   type JobPlanVariables,
   type ReplyReaderResult,
   type ReplyReaderVariables,
@@ -54,6 +57,7 @@ export type ReviewVariables = Omit<DraftReviewV2Variables, Frame>;
 export type RedraftVariables = Omit<DraftRedraftVariables, Frame>;
 export type ReplyVariables = Omit<ReplyReaderVariables, Frame>;
 export type PlanVariables = Omit<JobPlanVariables, Frame>;
+export type CritiqueVariables = Omit<SubstanceCritiqueVariables, Frame>;
 
 const SMALL = {
   maxAttempts: 2,
@@ -66,6 +70,13 @@ const CLASSIFY = {
   maxEstimatedCostUsd: 0.005,
   maxOutputTokens: 300,
   attemptTimeoutMs: 10_000,
+} as const;
+/** A second specialist reads a whole document: more input, one verdict. */
+const CRITIQUE = {
+  maxAttempts: 2,
+  maxEstimatedCostUsd: 0.06,
+  maxOutputTokens: 1_600,
+  attemptTimeoutMs: 60_000,
 } as const;
 const PLAN = {
   maxAttempts: 1,
@@ -94,7 +105,12 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     variables: PlanVariables,
-  ) => Promise<JobPlanResultV3 | null>;
+  ) => Promise<JobPlanResultV4 | null>;
+  readonly critique: (
+    who: Who,
+    trace: Trace,
+    variables: CritiqueVariables,
+  ) => Promise<SubstanceCritiqueResult | null>;
 };
 
 export function createWorkforceModels(dependencies: {
@@ -109,13 +125,18 @@ export function createWorkforceModels(dependencies: {
 
   async function call<V, O>(input: {
     readonly task:
-      "DRAFT_REVIEW" | "DRAFT_REDRAFT" | "REPLY_READER" | "JOB_PLAN";
+      | "DRAFT_REVIEW"
+      | "DRAFT_REDRAFT"
+      | "REPLY_READER"
+      | "JOB_PLAN"
+      | "SUBSTANCE_CRITIQUE";
     readonly taskClass: ModelTextTaskClass;
     readonly who: Who;
     readonly trace: Trace;
     readonly variables: V;
     readonly schema: z.ZodType<O>;
-    readonly budget: typeof SMALL | typeof CLASSIFY | typeof PLAN;
+    readonly budget:
+      typeof SMALL | typeof CLASSIFY | typeof PLAN | typeof CRITIQUE;
     readonly environmentNotes: string;
     readonly etiquette: EtiquettePurpose | null;
   }): Promise<O | null> {
@@ -216,16 +237,29 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     plan: (who, trace, variables) =>
-      call<PlanVariables, JobPlanResultV3>({
+      call<PlanVariables, JobPlanResultV4>({
         task: "JOB_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: JobPlanResultV3Schema,
+        schema: JobPlanResultV4Schema,
         budget: PLAN,
         environmentNotes:
           "You are planning, not acting. Code checks every step against what they allowed before anything happens.",
+        etiquette: null,
+      }),
+    critique: (who, trace, variables) =>
+      call<CritiqueVariables, SubstanceCritiqueResult>({
+        task: "SUBSTANCE_CRITIQUE",
+        taskClass: "STRUCTURED_EXTRACTION",
+        who,
+        trace,
+        variables,
+        schema: SubstanceCritiqueResultSchema,
+        budget: CRITIQUE,
+        environmentNotes:
+          "You are reviewing, not writing. Code decides from your verdict whether the document is revised.",
         etiquette: null,
       }),
   };

@@ -278,3 +278,76 @@ describe("existing document pipeline workforce bridge", () => {
     expect(pending.prepare).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("a second specialist reviews what an earlier step prepared", () => {
+  it("hands the memo's artifact to the critic and reports the revision plainly", async () => {
+    const w = world();
+    const memoArtifact = randomUUID();
+    const prospect = randomUUID();
+    const executor = w.executors.DOCUMENTS;
+    if (executor === undefined) throw new Error("Missing executor");
+    w.prepare.mockResolvedValue({
+      status: "READY",
+      artifactId: memoArtifact,
+      companyId: prospect,
+      review: {
+        material: true,
+        issues: [
+          {
+            kind: "UNSUPPORTED",
+            section: "Traction",
+            problem: "claim as fact",
+          },
+        ],
+        revisedToVersion: 2,
+      },
+    });
+    const critiqueStep = {
+      ...steps()[0],
+      key: "critique",
+      agentName: "Reviewer",
+      document: {
+        operation: "CRITIQUE_AND_REVISE" as const,
+        sourceStep: "memo",
+      },
+      dependsOn: ["memo"],
+    } as Parameters<AgentExecutor>[0];
+    const result = await executor(critiqueStep, {
+      ...context,
+      results: new Map([
+        [
+          "memo",
+          {
+            status: "DONE" as const,
+            summary: "Prepared",
+            outputs: { artifactId: memoArtifact, companyId: prospect },
+          },
+        ],
+      ]),
+    });
+    expect(w.prepare.mock.calls[0]?.[1]).toMatchObject({
+      source: { artifactId: memoArtifact, companyId: prospect },
+    });
+    expect(result).toMatchObject({
+      status: "DONE",
+      summary:
+        "Reviewed the document, found 1 issue and revised it to version 2.",
+    });
+  });
+
+  it("fails rather than guessing when the source step produced no document", async () => {
+    const w = world();
+    const executor = w.executors.DOCUMENTS;
+    if (executor === undefined) throw new Error("Missing executor");
+    const result = await executor(
+      {
+        ...steps()[0],
+        key: "critique",
+        document: { operation: "CRITIQUE_AND_REVISE", sourceStep: "memo" },
+      } as Parameters<AgentExecutor>[0],
+      context,
+    );
+    expect(result.status).toBe("FAILED");
+    expect(w.prepare).not.toHaveBeenCalled();
+  });
+});

@@ -4159,6 +4159,7 @@ const workforceDocuments = createWorkforceDocuments({
   investigate: qIntelligence.companyIntelligence.investigate,
   artifacts: qArtifacts.service,
   preparation: qArtifacts.preparation,
+  critic: workforceModels.critique,
 });
 
 // Recovery D3: the durable workforce runner. It claims approved jobs under a

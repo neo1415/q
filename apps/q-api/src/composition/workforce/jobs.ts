@@ -67,10 +67,33 @@ export type WorkforceDocumentInput = {
   readonly runId: string;
   readonly organisationId: string;
   readonly budgetUsd: number;
+  /** A critique step: the document the step it reviews prepared. */
+  readonly source?:
+    { readonly artifactId: string; readonly companyId: string } | undefined;
+  /** Whom the work is for, as the critic addresses them. */
+  readonly principalName?: string | undefined;
 };
 export type WorkforceDocumentResult =
-  | { readonly status: "READY" | "PREPARING"; readonly artifactId: string }
+  | {
+      readonly status: "READY" | "PREPARING";
+      readonly artifactId: string;
+      /** The company the document is about (bound, never a model's). */
+      readonly companyId?: string | undefined;
+      /** A critique step's verdict. */
+      readonly review?: WorkforceDocumentReview | undefined;
+    }
   | { readonly status: "FAILED" | "UNAVAILABLE"; readonly message: string };
+
+export type WorkforceDocumentReview = {
+  readonly material: boolean;
+  readonly issues: readonly {
+    readonly kind: string;
+    readonly section: string;
+    readonly problem: string;
+  }[];
+  /** The version the reviewer's revision made; null: none was needed. */
+  readonly revisedToVersion: number | null;
+};
 export type DocumentExecutionContext = {
   readonly qRunId: string;
   readonly organisationId: string;
@@ -252,6 +275,25 @@ export function createWorkforceExecutors(dependencies: {
                 "The approved document request or its authority is unavailable.",
             };
           }
+          // A critique reviews what its source step prepared, nothing else.
+          const request = step.document;
+          let source: { artifactId: string; companyId: string } | undefined;
+          if (request.operation === "CRITIQUE_AND_REVISE") {
+            const outputs = context.results.get(request.sourceStep)?.outputs;
+            const artifactId = outputs?.["artifactId"];
+            const companyId = outputs?.["companyId"];
+            if (typeof artifactId !== "string" || typeof companyId !== "string")
+              return {
+                status: "FAILED",
+                summary: "The document to review was not prepared.",
+              };
+            source = { artifactId, companyId };
+          }
+          // Only the critic addresses the person by name.
+          const principalName =
+            source === undefined
+              ? undefined
+              : await ports.principalName(owner).catch(() => undefined);
           const polling = dependencies.documentPolling ?? {
             now: Date.now,
             wait: () =>
@@ -268,7 +310,9 @@ export function createWorkforceExecutors(dependencies: {
             }
             const result = await ports.documents?.(owner, {
               canContinue: authority.canContinue,
-              request: step.document,
+              request,
+              ...(source === undefined ? {} : { source }),
+              ...(principalName === undefined ? {} : { principalName }),
               goal: step.goal,
               jobId: context.jobId,
               stepKey: step.key,
@@ -291,9 +335,16 @@ export function createWorkforceExecutors(dependencies: {
                 };
               return {
                 status: "DONE",
-                summary:
-                  "Prepared the document; it is ready in your workspace.",
-                outputs: { artifactId: result.artifactId },
+                summary: documentStepSummary(result.review),
+                outputs: {
+                  artifactId: result.artifactId,
+                  ...(result.companyId === undefined
+                    ? {}
+                    : { companyId: result.companyId }),
+                  ...(result.review === undefined
+                    ? {}
+                    : { review: result.review }),
+                },
               };
             }
             if (result.status === "FAILED" || result.status === "UNAVAILABLE") {
@@ -639,6 +690,22 @@ export type StartJobResult =
       readonly jobId: string | null;
     };
 
+/** The timeline's line for a document step, in plain words. */
+export function documentStepSummary(
+  review: WorkforceDocumentReview | undefined,
+): string {
+  if (review === undefined)
+    return "Prepared the document; it is ready in your workspace.";
+  const count = review.issues.length;
+  const found =
+    count === 0
+      ? "found no material problem"
+      : `found ${String(count)} ${count === 1 ? "issue" : "issues"}`;
+  return review.revisedToVersion === null
+    ? `Reviewed the document and ${found}; it stands as written.`
+    : `Reviewed the document, ${found} and revised it to version ${String(review.revisedToVersion)}.`;
+}
+
 /** What the lead Q may plan with: the tools its specialists can carry out. */
 export const EXECUTABLE_JOB_TOOLS: readonly string[] = [
   "search_companies",
@@ -710,6 +777,11 @@ export function createWorkforceJobs(dependencies: {
       readonly goal: string;
       readonly permitted: readonly string[];
       readonly budgetUsd: number;
+      /** The one company the goal names, resolved as the person. */
+      readonly namedCompany?:
+        | { readonly companyId: string; readonly name: string }
+        | null
+        | undefined;
     },
     trace: { readonly jobId: string; readonly runId: string } | null,
   ): Promise<PlannedJob | null> {
@@ -722,7 +794,11 @@ export function createWorkforceJobs(dependencies: {
     const planned = await dependencies.models.plan(owner, trace, {
       goal: input.goal.slice(0, 2_000),
       roster: executorRosterText(executors, permitted),
-      allowed: `Tools and actions: ${[...permitted].join(", ") || "none"}. Budget for the whole job: $${input.budgetUsd.toFixed(2)}.`,
+      allowed: `Tools and actions: ${[...permitted].join(", ") || "none"}. Budget for the whole job: $${input.budgetUsd.toFixed(2)}.${
+        input.namedCompany == null
+          ? " The job names no single company on record, so a NAMED_COMPANY document cannot be planned."
+          : ` The company the job names is on record${input.namedCompany.name === "" ? "" : `: ${input.namedCompany.name.slice(0, 120)}`}.`
+      }`,
     });
     if (planned === null) return null;
     const bound = boundPlan(
@@ -732,6 +808,7 @@ export function createWorkforceJobs(dependencies: {
         // The lead's own planning comes out of the same budget.
         budgetUsd: Math.max(0, input.budgetUsd - AGENT_REGISTRY.LEAD.budgetUsd),
         executors,
+        namedCompanyId: input.namedCompany?.companyId ?? null,
       },
     );
     if (!planIsValid(bound)) {
@@ -902,6 +979,10 @@ export function createWorkforceJobs(dependencies: {
         readonly goal: string;
         readonly permitted: readonly string[];
         readonly budgetUsd: number;
+        readonly namedCompany?:
+          | { readonly companyId: string; readonly name: string }
+          | null
+          | undefined;
       },
     ) => plan(owner, input, null),
 
