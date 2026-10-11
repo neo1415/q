@@ -152,8 +152,18 @@ function tierOf(record: KnownEntityRecord): "INVESTOR" | "DOOR_OPENER" | null {
   ]
     .filter((part): part is string => typeof part === "string")
     .join(" ");
+  if (record.entityKind === "PERSON") {
+    // A person backs companies only in an investing role ("Director of
+    // Investments", "partner", "angel"); "a finance and investment
+    // executive" describes a corporate job, not an investor (2026-10-11:
+    // the enriched seed listed Shadi Qishta among Arab investors).
+    return PERSON_INVESTOR_TEXT.test(own) ? "INVESTOR" : null;
+  }
   return INVESTOR_TEXT.test(own) ? "INVESTOR" : null;
 }
+
+const PERSON_INVESTOR_TEXT =
+  /\b(?:investors?|director of investments?|investment (?:director|manager|partner|principal|associate)|(?:general |managing |venture )?partner at|venture capital(?:ist)?|vc|angel(?: investor)?|general partner|limited partner|backs? (?:startups|founders|companies))\b/iu;
 
 function recordCountries(record: KnownEntityRecord): readonly string[] {
   const line = record.profile["oneLine"];
