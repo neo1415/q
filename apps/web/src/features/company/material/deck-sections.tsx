@@ -94,67 +94,93 @@ export function DeckReadSummary({
   const missing = sections
     .filter((section) => section.status === "NOT_IN_DECK")
     .map((s) => DECK_SECTION_LABELS[s.section].toLowerCase());
+  // The coverage grid is reference, not the reading: it starts folded so
+  // the section analysis and the deck sit near the top (founder,
+  // 2026-10-11). Native <details>: opens by keyboard and AT with no script.
   return (
-    <section
-      className="flex flex-col gap-3 rounded-lg bg-(--cq-surface-subtle) p-4"
+    <details
+      className="group rounded-lg bg-(--cq-surface-subtle)"
       aria-labelledby="deck-read-title"
       data-deck-read
     >
-      <h3 id="deck-read-title" className="cq-title-sm text-(--cq-text-primary)">
-        Q&rsquo;s read of the deck
-      </h3>
-      <p className="cq-body-sm text-(--cq-text-primary)">
-        {present} of 12 sections are in the deck.
-        {missing.length === 0
-          ? ""
-          : ` Not in the deck yet: ${missing.join(", ")}.`}
-      </p>
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {sections.map((section, index) => (
-          <li key={section.section}>
-            <button
-              type="button"
-              onClick={() => onPick(index)}
-              aria-current={current === index ? "true" : undefined}
-              className={`cq-body-sm flex min-h-11 w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-(--cq-text-primary) ${
-                current === index
-                  ? "border-(--cq-text-primary) border-2"
-                  : section.status === "NOT_IN_DECK"
-                    ? "border-dashed border-(--cq-border)"
-                    : "border-(--cq-border-subtle) bg-(--cq-surface-raised)"
-              }`}
-            >
-              <StatusMark status={section.status} />
-              <span className="min-w-0">
-                {DECK_SECTION_LABELS[section.section]}
-              </span>
-              <span className="sr-only">: {STATUS_WORDS[section.status]}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p className="cq-caption flex flex-wrap items-center gap-x-3 gap-y-1 text-(--cq-text-secondary)">
-        <span className="inline-flex items-center gap-1">
-          <StatusMark status="PRESENT" /> In the deck
+      <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 flex-col">
+          <h3
+            id="deck-read-title"
+            className="cq-title-sm text-(--cq-text-primary)"
+          >
+            Q&rsquo;s read of the deck
+          </h3>
+          <span
+            className="cq-body-sm text-(--cq-text-secondary)"
+            data-deck-read-summary
+          >
+            {present} of 12 sections identified
+            {missing.length === 0
+              ? ""
+              : ` · ${String(missing.length)} not in the deck yet`}
+          </span>
         </span>
-        <span className="inline-flex items-center gap-1">
-          <StatusMark status="NOT_IN_DECK" /> Not in the deck yet
+        <span className="cq-body-sm inline-flex items-center gap-1 text-(--cq-text-primary) underline underline-offset-4">
+          <span className="group-open:hidden">View coverage</span>
+          <span className="hidden group-open:inline">Hide coverage</span>
         </span>
-        <span className="inline-flex items-center gap-1">
-          <StatusMark status="UNCLEAR" /> Unclear
-        </span>
-      </p>
-      <p className="cq-caption text-(--cq-text-secondary)">
-        Read by Q on{" "}
-        {new Intl.DateTimeFormat("en-GB", {
-          day: "numeric",
-          month: "short",
-          timeZone: "UTC",
-        }).format(new Date(readAt))}
-        , from version {versionNumber}. Figures are the company&rsquo;s own
-        claims.
-      </p>
-    </section>
+      </summary>
+      <div className="flex flex-col gap-3 px-4 pb-4">
+        {missing.length === 0 ? null : (
+          <p className="cq-body-sm text-(--cq-text-primary)">
+            Not in the deck yet: {missing.join(", ")}.
+          </p>
+        )}
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {sections.map((section, index) => (
+            <li key={section.section}>
+              <button
+                type="button"
+                onClick={() => onPick(index)}
+                aria-current={current === index ? "true" : undefined}
+                className={`cq-body-sm flex min-h-11 w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-(--cq-text-primary) ${
+                  current === index
+                    ? "border-(--cq-text-primary) border-2"
+                    : section.status === "NOT_IN_DECK"
+                      ? "border-dashed border-(--cq-border)"
+                      : "border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+                }`}
+              >
+                <StatusMark status={section.status} />
+                <span className="min-w-0">
+                  {DECK_SECTION_LABELS[section.section]}
+                </span>
+                <span className="sr-only">
+                  : {STATUS_WORDS[section.status]}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className="cq-caption flex flex-wrap items-center gap-x-3 gap-y-1 text-(--cq-text-secondary)">
+          <span className="inline-flex items-center gap-1">
+            <StatusMark status="PRESENT" /> In the deck
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <StatusMark status="NOT_IN_DECK" /> Not in the deck yet
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <StatusMark status="UNCLEAR" /> Unclear
+          </span>
+        </p>
+        <p className="cq-caption text-(--cq-text-secondary)">
+          Read by Q on{" "}
+          {new Intl.DateTimeFormat("en-GB", {
+            day: "numeric",
+            month: "short",
+            timeZone: "UTC",
+          }).format(new Date(readAt))}
+          , from version {versionNumber}. Figures are the company&rsquo;s own
+          claims.
+        </p>
+      </div>
+    </details>
   );
 }
 

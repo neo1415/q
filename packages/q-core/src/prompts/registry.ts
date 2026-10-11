@@ -185,6 +185,7 @@ import { DOCUMENT_POLISH_V2 } from "./tasks/document-polish.v2.js";
 import { DOCUMENT_CRITIQUE_V1 } from "./tasks/document-critique.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FIT_Q_VIEW_V1 } from "./tasks/fit-q-view.v1.js";
+import { FIT_Q_VIEW_V2 } from "./tasks/fit-q-view.v2.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
 import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
@@ -415,6 +416,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     ARTIFACT_REVISION_V3,
     FIT_EXPLANATION_V1,
     FIT_Q_VIEW_V1,
+    FIT_Q_VIEW_V2,
     PRESENCE_READER_V1,
     INVESTOR_RESEARCH_READER_V1,
     DECISION_READER_V1,

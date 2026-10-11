@@ -1,5 +1,26 @@
 # Capital Q — Current shared engineering state
 
+## LATEST STATUS — Claude Code product-clarity slice on top of the demo baseline — 2026-10-11 22:45 UTC
+
+**The deployed investor-demo baseline is unchanged: all four Railway services SUCCESS at `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6` (re-inspected 22:00 UTC via the Railway API; deployment IDs as below). Rollback point = that SHA (tag push is refused by the git proxy; the SHA lives on `build/int-rc`, both `recovery/*` lanes and `codex/preserve-optimize`).**
+
+- New work: branch **`claude/capital-q-completion-mhzsiq`** (based on `build/int-rc` @ `11174c4d`), pushed. **LOCAL TESTED, NOT INTEGRATED, NOT DEPLOYED.** Pushing to `build/int-rc` / `recovery/*` and live writes on production (even fictional accounts) were refused by the session's permission classifier; the owner must allow them or merge the PR. CI runs on the PR (`pull_request` trigger).
+- Local gates on the branch head: 52 package builds; root `tsc` exit 0; web `tsc` exit 0; vitest `apps/web packages/q-core packages/q-specialists` **386 files / 3,707 tests pass**; prettier + eslint clean on every changed file.
+- What changed (all presentation/prompt; no schema, no migration, no scoring change):
+  1. **Company profile raise** — a pitch figure plus unshared round details no longer reads as a contradiction ("$4M · From their pitch" above "Raise on Capital Q · Not shared with you"). The fold explains both halves in plain words; labels are "Said in their pitch" / "Declared by the company" on card and profile; row renamed "Round details". Owner sees what investors see. Tests: `company-raise-surfaces.test.tsx`.
+  2. **Deck** — Q's 12-section coverage grid is a native `<details>`, collapsed: "N of 12 sections identified · View coverage". Section analysis and carousel stay open. Test: `company-material.test.tsx`.
+  3. **Q's view** — `FIT_Q_VIEW` v2 (v1 deprecated, same schema/inputs/firewall, lock pinned): strongest alignment first, one decisive qualification, unknowns as concrete next questions by impact, no generic praise. The profile panel now shows the qualification and unknowns (previously dropped) and "Go deeper with Q" (full assessment / risks and gaps / top open question) through the existing company-bound Q conversation. Deterministic fit unchanged. Tests: `fit-ui.test.tsx`, q-core prompts lock.
+  4. **Questions to investigate** (was "Assumptions to test") — states the three paths per claim: ask Q to check the evidence (one Q question, nothing sent), tick to ask the founder (existing approve-then-send), request a document (diligence area when in diligence; data room only when it lists on-request documents; otherwise no link). Test: `investor-promises-render.test.tsx`.
+  5. **Deal strip** — LIVE-OBSERVED defect fixed: Savanna Seed × Ajopot is in Diligence with no recorded meeting, so Met read "not reached". Passed-but-unrecorded stages are now "Not recorded" (passed); a guide line says the next stage, what establishes it and who acts, honest that soft commits aren't binding, signing happens outside Capital Q and Capital Q never moves money. Test: `deal-stage-strip.test.ts`.
+  6. **Data room copy** — "Request the rest" → "Request all on-request documents"; its sheet says it reaches nothing unlisted; empty room says nothing shared ≠ nothing exists.
+- **Live READ-ONLY evidence (fictional accounts, production API):** Savanna Seed's relationships listed; Ajopot (IN_DILIGENCE) founder inbox shows an earlier diligence document request with requester name + firm, SHARED; investor diligence shows it FULFILLED with the document; deal view reports `current: DILIGENCE`, `MET.reachedAt: null` (the defect above), `nextSteps: [SOFT_COMMIT, PASS]`. Founder notifications include "Document requested: …". Runner: `scripts/handoff/live/two-sided-readback.mjs`.
+- **NOT RUN (blocked by permission):** `scripts/handoff/live/two-sided-questions.mjs` — the write half of the question loop (send → founder inbox → answer → investor sees it, retry, three negative cases).
+
+**Next executable steps:** (1) owner merges/approves the PR or grants push to `build/int-rc` + `recovery/2026-09-12-8y2j4w`; require CI quality + pgTAP green on the exact SHA; (2) deploy by pushing that SHA to `recovery/2026-09-12`, confirm four services SUCCESS, rerun `investor-demo-rehearsal.mjs` unmodified; (3) with permission, run `two-sided-questions.mjs ledgerfold` and `… ajopot` and record PASS/FAIL; (4) continue: known-company lookup latency (unchanged next task from Codex), cold Documents → Open race, agent matrix re-audit, landing promises matrix.
+
+Run the live runners from the repo root after `pnpm exec turbo run build --filter=./packages/*`:
+`CQ_PUBLIC_JSON=<file with NEXT_PUBLIC_SUPABASE_URL/KEY> CQ_SEED_ACCOUNT_PASSWORD=… NODE_USE_ENV_PROXY=1 node scripts/handoff/live/two-sided-readback.mjs ajopot`
+
 ## LATEST STATUS — cold investor demo accepted / lossless continuation — 2026-10-11 21:28 UTC
 
 **Capital Q is an existing substantial application. The October 12 text investor-demo browser rehearsal now passes on the real deployed application. Continue from this release; do not rebuild its workforce or replace production scoring.**
