@@ -124,6 +124,9 @@ export function recordPagePath(
       return `/capital?round=${safe}#round-${safe}`;
     case "GATEQ_APPLICATION":
       return `/gateq?item=${safe}`;
+    // P4: one Q Daily edition (the story or section is the intent's anchor).
+    case "DAILY_EDITION":
+      return `/daily/${safe}`;
   }
 }
 
@@ -156,6 +159,10 @@ export function recordIntentPath(
   intent: Extract<QClientActionIntent, { kind: "OPEN_RECORD_PAGE" }>,
 ): string {
   const base = recordPagePath(intent.page, intent.id, intent.companyId);
+  // The exact story or section, never the Daily home (P4).
+  if (intent.page === "DAILY_EDITION") {
+    return intent.anchor === undefined ? base : `${base}#${intent.anchor}`;
+  }
   if (intent.tab === undefined) return base;
   const safe = encodeURIComponent(intent.id.toLowerCase());
   const { page, tab } = intent;

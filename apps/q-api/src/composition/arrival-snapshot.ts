@@ -14,6 +14,7 @@ import {
   type ArrivalSnapshotMessage,
   type QAttentionItem,
   type QAttentionReport,
+  type QDailyEdition,
   type RelationshipBrief,
   type RelationshipBriefMessage,
 } from "@capital-q/contracts";
@@ -24,6 +25,8 @@ import {
   type ContextCache,
   type ContextCacheScope,
 } from "@capital-q/security/context-cache";
+
+import { dailyStoriesOf } from "./arrival-daily.js";
 
 /**
  * W1: the Arrival Snapshot, built once per actor and shared by the welcome,
@@ -397,6 +400,7 @@ export function buildArrivalSnapshot(input: {
     .digest("hex")
     .slice(0, 32);
   return ArrivalSnapshotSchema.parse({
+    daily: [],
     contractVersion: ARRIVAL_SNAPSHOT_VERSION,
     version,
     asOf,
@@ -496,6 +500,9 @@ export function createArrivalSnapshots(dependencies: {
     actor: ActorContext,
   ) => Promise<readonly RelationshipBrief[] | null>;
   readonly probe: ArrivalProbe;
+  /** P4: the person's latest Q Daily edition; absent or null: no stories. */
+  readonly daily?:
+    ((actor: ActorContext) => Promise<QDailyEdition | null>) | undefined;
   readonly cache?: ContextCache<Held> | undefined;
   readonly now?: (() => Date) | undefined;
   /** How long a probe is trusted without asking again. */
@@ -545,8 +552,48 @@ export function createArrivalSnapshots(dependencies: {
     };
   }
 
-  return {
-    forActor: async (actor) => {
+  /** The latest edition's stories per actor, kept briefly. */
+  const dailyHeld = new Map<
+    string,
+    { at: number; stories: ArrivalSnapshot["daily"] }
+  >();
+  const DAILY_TRUST_MS = 60_000;
+  async function withDaily(
+    actor: ActorContext,
+    snapshot: ArrivalSnapshot,
+  ): Promise<ArrivalSnapshot> {
+    if (dependencies.daily === undefined) return snapshot;
+    const key = keyOf(actor);
+    const at = now().getTime();
+    let held = dailyHeld.get(key);
+    if (held === undefined || at - held.at >= DAILY_TRUST_MS) {
+      // A failed read is "none": the welcome says no news, never invents.
+      const edition = await dependencies.daily(actor).catch(() => null);
+      held = { at, stories: dailyStoriesOf(edition, now()) };
+      dailyHeld.set(key, held);
+      while (dailyHeld.size > 500) {
+        const oldest = dailyHeld.keys().next().value;
+        if (oldest === undefined) break;
+        dailyHeld.delete(oldest);
+      }
+    }
+    if (held.stories.length === 0) return snapshot;
+    return {
+      ...snapshot,
+      contractVersion: ARRIVAL_SNAPSHOT_VERSION,
+      version: createHash("sha256")
+        .update(
+          `${snapshot.version}|${held.stories.map((one) => one.storyId).join(",")}`,
+        )
+        .digest("hex")
+        .slice(0, 32),
+      daily: held.stories,
+    };
+  }
+  const forActorCore = async (
+    actor: ActorContext,
+  ): Promise<ArrivalSnapshot | null> => {
+    {
       if (actor.actorType !== "HUMAN") return null;
       const key = keyOf(actor);
       const known = verified.get(key);
@@ -572,8 +619,17 @@ export function createArrivalSnapshots(dependencies: {
       });
       verified.set(key, { epoch: probed.epoch, at: now().getTime() });
       return fresh.snapshot;
+    }
+  };
+  return {
+    forActor: async (actor) => {
+      const base = await forActorCore(actor);
+      return base === null ? null : withDaily(actor, base);
     },
     invalidateActor: (userId) => {
+      for (const key of [...dailyHeld.keys()]) {
+        if (key.split("|")[1] === userId) dailyHeld.delete(key);
+      }
       for (const key of [...verified.keys()]) {
         if (key.split("|")[1] === userId) verified.delete(key);
       }

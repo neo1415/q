@@ -66,6 +66,7 @@ import {
   quietlyNoted,
   statesSomething,
   fenceUntrusted,
+  dailyFollowUpKind,
 } from "@capital-q/q-core";
 import {
   appendRunEvent,
@@ -171,6 +172,7 @@ export {
 } from "./turn-skim.js";
 export { speculationGate, type SpeculationGate } from "./speculation.js";
 import { arrivalSnapshotFact } from "./arrival-fact.js";
+import { dailyFollowUpAnswer } from "./daily-follow-up.js";
 import {
   arrivalAspectAnswer,
   arrivalFollowUpAnswer,
@@ -2017,6 +2019,20 @@ export function createModelGatewayQAnswer(
         (request.turnKind === undefined ||
           request.turnKind === "QUESTION_TO_Q");
       if (!eligible || dependencies.arrivalSnapshot === undefined) return null;
+      // P4: the Q Daily stories Q mentioned: gist / more / open, by code
+      // from the snapshot's prepared objects (the gate is words only, so
+      // an unrelated turn reads nothing).
+      if (dailyFollowUpKind(latest.content) !== null) {
+        await arrivalRead();
+        const daily = dailyFollowUpAnswer(
+          latest.content,
+          arrivalData,
+          earlier
+            .filter((message) => message.role === "Q")
+            .map((m) => m.content),
+        );
+        if (daily !== null) return daily;
+      }
       const quick = arrivalFollowUpKind(latest.content) !== null;
       const maybe =
         !quick &&
@@ -3750,6 +3766,9 @@ export function createModelGatewayQAnswer(
                     kind: "OPEN_RECORD_PAGE",
                     page: followUp.open.page,
                     id: followUp.open.id,
+                    ...(followUp.open.anchor === undefined
+                      ? {}
+                      : { anchor: followUp.open.anchor }),
                   },
                 },
               ],

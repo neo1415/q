@@ -260,23 +260,10 @@ export function lowdownOf(facts: ArrivalFacts): Lowdown {
     ...(facts.activity.replies?.names ?? []).slice(0, 2),
   ];
   if (doneParts.length === 0 && newsParts.length === 0 && waits === null) {
-    const away = facts.hoursAway !== null && facts.hoursAway >= 20;
-    return {
-      quiet: true,
-      text: away
-        ? pick(
-            [
-              "Quiet while you were away; nothing needs you.",
-              "Nothing came in while you were away, and nothing needs you.",
-            ],
-            seed,
-          )
-        : pick(
-            ["Quiet day, nothing needs you.", "All quiet; nothing needs you."],
-            seed,
-          ),
-      mustSay: [],
-    };
+    // P4 (founder 2026-10-11): never "All quiet; nothing needs you". A
+    // quiet day says nothing of its own; the welcome greets and, when a
+    // prepared Q Daily story exists, mentions it (daily-news.ts).
+    return { quiet: true, text: "", mustSay: [] };
   }
   const since =
     facts.hoursAway === null

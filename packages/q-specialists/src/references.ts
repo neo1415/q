@@ -440,6 +440,8 @@ function recordPlace(page: QRecordPage, what: string | null): string {
     case "CAPITAL_ROUND":
     case "GATEQ_APPLICATION":
       return what ?? "the page";
+    case "DAILY_EDITION":
+      return what ?? "the Daily";
     case "COMPANY_ELEVATOR":
       return what === null ? "the elevator pitch" : `${what}'s elevator pitch`;
     case "COMPANY_DATA_ROOM":

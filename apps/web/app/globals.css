@@ -3512,3 +3512,12 @@
     }
   }
 }
+
+/* P4: the story or section Q opened the Daily at, marked for a few seconds. */
+[data-daily-focused] {
+  background: var(--cq-accent-soft);
+  outline: 2px solid var(--cq-accent);
+  outline-offset: 4px;
+  scroll-margin-top: 5rem;
+  transition: background-color 400ms ease;
+}
