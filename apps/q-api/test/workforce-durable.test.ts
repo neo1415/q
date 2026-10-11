@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { WorkforceJobStartPayload } from "@capital-q/contracts";
 import { ActorContextSchema } from "@capital-q/security";
@@ -29,6 +29,14 @@ const actor = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 const owner = { tenantId: actor.tenantId, userId: actor.userId };
+
+function deferred() {
+  let release: () => void = () => undefined;
+  const promise = new Promise<void>((resolve) => {
+    release = () => resolve();
+  });
+  return { promise, release: () => release() };
+}
 
 function payload(): WorkforceJobStartPayload {
   return {
@@ -132,6 +140,118 @@ async function approved(w: ReturnType<typeof world>) {
 }
 
 describe("durable workforce jobs (recovery D3)", () => {
+  it("starts both claimed jobs without waiting, keeps steps ordered, and coalesces passes until both settle", async () => {
+    const w = world();
+    const first = await approved(w);
+    const second = await approved(w);
+    const third = await approved(w);
+    const gate = deferred();
+    const started: string[] = [];
+    const runner = createAgentWorkRunner({
+      queue: w.queue,
+      store: w.store,
+      actorFor: () => Promise.resolve(actor),
+      jobsFor: () => {
+        const jobs = w.jobsFor();
+        return {
+          ...jobs,
+          run: async (...args: Parameters<typeof jobs.run>) => {
+            started.push(args[1].source.id);
+            if (args[1].source.id === first.actionId) await gate.promise;
+            return jobs.run(...args);
+          },
+        };
+      },
+      workerId: "parallel-worker",
+    });
+    const pass = runner.pass();
+    let settled = false;
+    void pass.then(() => {
+      settled = true;
+    });
+    try {
+      await vi.waitFor(() => {
+        expect(started).toEqual([first.actionId, second.actionId]);
+        expect(
+          w.queue.rows.find((row) => row.job_id === second.jobId)?.state,
+        ).toBe("COMPLETED");
+      });
+      expect(settled).toBe(false);
+      expect(runner.pass()).toBe(pass);
+      expect(
+        w.queue.rows.find((row) => row.job_id === first.jobId)?.state,
+      ).toBe("RUNNING");
+      expect(
+        w.queue.rows.find((row) => row.job_id === third.jobId)?.state,
+      ).toBe("QUEUED");
+      // Each outreach still receives its own earlier discovery result.
+      expect(w.record.scans).toBe(1);
+      expect(w.record.expressed).toEqual(["c-new"]);
+    } finally {
+      gate.release();
+      await pass;
+    }
+    expect(await pass).toBe(2);
+    expect(w.queue.rows.find((row) => row.job_id === first.jobId)?.state).toBe(
+      "COMPLETED",
+    );
+    expect(w.record.scans).toBe(2);
+    expect(w.record.expressed).toEqual(["c-new", "c-new"]);
+  });
+
+  it("waits for the other claimed job when a queue recovery operation rejects", async () => {
+    const w = world();
+    const first = await approved(w);
+    const second = await approved(w);
+    const gate = deferred();
+    const finish = w.queue.finish;
+    vi.spyOn(w.queue, "finish").mockImplementation((...args) =>
+      args[0] === first.jobId
+        ? Promise.reject(new Error("queue finish unavailable"))
+        : finish(...args),
+    );
+    const release = vi
+      .spyOn(w.queue, "release")
+      .mockRejectedValue(new Error("queue release unavailable"));
+    const runner = createAgentWorkRunner({
+      queue: w.queue,
+      store: w.store,
+      actorFor: () => Promise.resolve(actor),
+      jobsFor: () => {
+        const jobs = w.jobsFor();
+        return {
+          ...jobs,
+          run: async (...args: Parameters<typeof jobs.run>) => {
+            if (args[1].source.id === second.actionId) await gate.promise;
+            return jobs.run(...args);
+          },
+        };
+      },
+      workerId: "parallel-worker",
+    });
+    const pass = runner.pass();
+    let settled = false;
+    const outcome = pass.catch((error: unknown) => {
+      settled = true;
+      return error;
+    });
+    try {
+      await vi.waitFor(() => expect(release).toHaveBeenCalled());
+      expect(settled).toBe(false);
+      expect(runner.pass()).toBe(pass);
+      expect(
+        w.queue.rows.find((row) => row.job_id === second.jobId)?.state,
+      ).toBe("RUNNING");
+    } finally {
+      gate.release();
+      await outcome;
+    }
+    expect(await outcome).toBeInstanceOf(AggregateError);
+    expect(w.queue.rows.find((row) => row.job_id === second.jobId)?.state).toBe(
+      "COMPLETED",
+    );
+  });
+
   it("resumes a job a restart left behind: the finished step is not redone, the job completes", async () => {
     const w = world();
     const { jobId } = await approved(w);
