@@ -13,6 +13,8 @@ import { cx } from "@capital-q/ui";
 import { Button } from "@capital-q/ui/button";
 import { Skeleton } from "@capital-q/ui/states";
 
+import { useGlobalQ } from "@/components/app-shell/global-q";
+
 import { FitBreakdownSheet } from "./fit-breakdown";
 import { FitGlyph, glyphKindOf, outcomeWord } from "./fit-glyph";
 import { QViewMark, useQView, type QViewPort } from "./q-view-note";
@@ -134,7 +136,7 @@ function ReadyPanel({
       </section>
       {view === null || view.status !== "READY" ? null : (
         <section
-          className="flex flex-col gap-2 rounded-(--cq-radius-lg) bg-(--cq-surface-subtle) p-[18px]"
+          className="flex flex-col gap-3 rounded-(--cq-radius-lg) bg-(--cq-surface-subtle) p-[18px]"
           data-q-view={view.verdict}
         >
           <div className="flex items-center gap-2.5">
@@ -149,6 +151,29 @@ function ReadyPanel({
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {view.summary}
           </p>
+          {view.mainRisk === null ? null : (
+            <div className="flex flex-col gap-0.5" data-q-view-part="RISK">
+              <span className="cq-caption text-(--cq-text-secondary)">
+                The main qualification
+              </span>
+              <p className="cq-body-sm text-(--cq-text-primary)">
+                {view.mainRisk}
+              </p>
+            </div>
+          )}
+          {view.unknowns.length === 0 ? null : (
+            <div className="flex flex-col gap-0.5" data-q-view-part="UNKNOWNS">
+              <span className="cq-caption text-(--cq-text-secondary)">
+                Not known yet, most important first
+              </span>
+              <ul className="cq-body-sm flex list-disc flex-col gap-0.5 pl-4 text-(--cq-text-primary)">
+                {view.unknowns.map((unknown) => (
+                  <li key={unknown}>{unknown}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <GoDeeper name={name} firstUnknown={view.unknowns[0] ?? null} />
         </section>
       )}
       <FitBreakdownSheet
@@ -159,5 +184,61 @@ function ReadyPanel({
         profile={profile}
       />
     </>
+  );
+}
+
+/**
+ * The compact view is formed from the mandate rows only (Context Firewall).
+ * The deeper reading is Q's conversation about this company, which reads
+ * the evidence this investor may see, on the page's own subject; each
+ * press asks one question, never a background sweep.
+ */
+function GoDeeper({
+  name,
+  firstUnknown,
+}: {
+  readonly name: string;
+  readonly firstUnknown: string | null;
+}) {
+  const { askNow } = useGlobalQ();
+  const asks: readonly (readonly [string, string])[] = [
+    [
+      "Full assessment",
+      `Give me your investment assessment of ${name}: business model, traction, market, team and fundraising, from the evidence I can see. Separate what the company claims, what is evidenced, what is missing and what you infer.`,
+    ],
+    [
+      "Risks and gaps",
+      `What are the biggest risks, contradictions and evidence gaps for ${name}, and what would you ask the founder first?`,
+    ],
+    ...(firstUnknown === null
+      ? []
+      : ([
+          [
+            "Check the top open question",
+            `For ${name}: ${firstUnknown} What does the evidence I can see say, and if it doesn't, how do I find out?`,
+          ],
+        ] as const)),
+  ];
+  return (
+    <div
+      className="flex flex-col gap-1.5 border-t border-(--cq-border-subtle) pt-3"
+      data-q-view-part="DEEPER"
+    >
+      <span className="cq-caption text-(--cq-text-secondary)">
+        Go deeper with Q
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {asks.map(([label, question]) => (
+          <Button
+            key={label}
+            variant="secondary"
+            size="compact"
+            onClick={() => askNow(question)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+    </div>
   );
 }
