@@ -6,6 +6,7 @@ import {
   FitComparisonDtoSchema,
   FitProfileDtoSchema,
   MoneySchema,
+  MODEL_TOOL_RESULT_MAX_CHARS,
   UuidSchema,
   type CompanyRaiseView,
 } from "@capital-q/contracts";
@@ -111,7 +112,7 @@ export const FitTopCandidatesOutputSchema = z
     status: z.enum(STATUSES),
     /** The typed comparison the answer canvas renders. */
     comparison: FitComparisonDtoSchema.nullable(),
-    /** The same comparison as plain text, for any surface without cards. */
+    /** Canonical comparison text; large results keep the reasons in the typed profiles once. */
     text: z.string(),
     guidance: z.string(),
   })
@@ -251,7 +252,7 @@ export function createFitTopCandidatesTool(
         context.actor,
         result.comparison.entries.map((entry) => entry.companyId),
       );
-      return {
+      const output: FitTopCandidatesOutput = {
         status: "OK",
         comparison: {
           ...result.comparison,
@@ -263,6 +264,16 @@ export function createFitTopCandidatesTool(
         text: fitComparisonText(result.comparison),
         guidance: GUIDANCE,
       };
+      // Ten rich profiles can exceed the tool bound when all their reasons
+      // are repeated in prose. Keep every authorized row, order and raise;
+      // only shorten the redundant text to canonical scores/bands. The
+      // executor still enforces the same bound on the complete result.
+      if (JSON.stringify(output).length > MODEL_TOOL_RESULT_MAX_CHARS) {
+        output.text = fitComparisonText(result.comparison, {
+          summaryOnly: true,
+        });
+      }
+      return output;
     },
   });
 }

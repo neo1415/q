@@ -129,3 +129,9 @@ Usage latency is not summed into client latency: extraction may overlap the
 answer or continue after its receipt. These are small samples, not p95. Repeat
 this same SSE method after the corrected guard is deployed; preserve baseline
 receipts outside the repository. No first-audio success is claimed.
+
+## Large candidate result continuation — 2026-10-11 17:54 UTC
+
+On deployed efcf49ab, the same top-three request now returns three actual cards (10, 10, 8.5), versus one on the baseline. First text 3,065 ms, completion 3,068 ms by polling; this is a count/correctness improvement, not a speedup claim. A new top-ten run still returns one card (first text 2,974 ms). No live tool-failure trace was captured.
+
+The existing tool repeats every parameter explanation in typed profiles and full prose. A local projection of the actual authorized ten-profile comparison and feed-disclosed raise views measures 33,377 chars with duplicated full prose; the unchanged executor ceiling is 32,000. An adaptive canonical summary yields 28,203 chars with all ten profiles, parameter reasons, order and raise views unchanged. No extra read/provider call or ranking/scoring formula is added. Smaller envelopes retain full text; typed envelopes that themselves exceed the limit remain refused. This correction is locally validated and awaits separate exact gates/live top-ten acceptance.

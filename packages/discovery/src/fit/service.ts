@@ -407,11 +407,16 @@ export function buildFitComparison(input: {
 }
 
 /** One profile, as plain text (Q's fallback where cards are not rendered). */
-export function fitProfileText(name: string, profile: FitProfileDto): string {
+export function fitProfileText(
+  name: string,
+  profile: FitProfileDto,
+  options: { readonly summaryOnly?: boolean } = {},
+): string {
   // ADR 0059: the score out of 10 beside the words, computed here from the
   // rows below (never by a model); none when too little is known.
   const score = fitScoreOutOf10(profile);
   const head = `${name}: ${score === null ? "" : `${score}/10 · `}${FIT_BAND_LABELS[profile.band]}, ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}.`;
+  if (options.summaryOnly === true) return head;
   const rows = profile.parameters.map(
     (p) =>
       `- ${FIT_PARAMETER_LABELS[p.parameter]}: ${p.applicable ? FIT_OUTCOME_LABELS[p.outcome] : "No preference"}. ${p.reason}`,
@@ -420,12 +425,15 @@ export function fitProfileText(name: string, profile: FitProfileDto): string {
 }
 
 /** The comparison as plain text, best first. */
-export function fitComparisonText(comparison: FitComparisonDto): string {
+export function fitComparisonText(
+  comparison: FitComparisonDto,
+  options: { readonly summaryOnly?: boolean } = {},
+): string {
   if (comparison.entries.length === 0) {
     return `None of the ${comparison.considered} companies you can compare has enough known to rank yet.`;
   }
   const parts = comparison.entries.map(
-    (e) => `${e.position}. ${fitProfileText(e.name, e.profile)}`,
+    (e) => `${e.position}. ${fitProfileText(e.name, e.profile, options)}`,
   );
   return [
     ...parts,
