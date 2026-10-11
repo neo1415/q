@@ -175,7 +175,7 @@ function denialForDisclosure(
 }
 
 /** The screen with only the entities some permitted scope is bound to. */
-function screenWithin(
+export function screenWithin(
   screen: QScreenContext,
   permitted: readonly QAuthorisedKnowledgeScope[],
 ): QScreenContext {
@@ -189,8 +189,11 @@ function screenWithin(
     companyId,
     investorOrganisationId,
     documentId,
+    documentPage,
     timeZone,
     artifactId,
+    artifactSlide,
+    artifactVersion,
     manifest,
   } = screen;
   return {
@@ -205,7 +208,13 @@ function screenWithin(
     // an id only. It grants nothing: its words are read solely through
     // read_my_document, which reads it as the asker through the documents'
     // own service and refuses one that is not theirs.
-    ...(artifactId === undefined ? {} : { artifactId }),
+    ...(artifactId === undefined
+      ? {}
+      : {
+          artifactId,
+          ...(artifactSlide === undefined ? {} : { artifactSlide }),
+          ...(artifactVersion === undefined ? {} : { artifactVersion }),
+        }),
     ...(companyId !== undefined && bound({ kind: "COMPANY", companyId })
       ? { companyId }
       : {}),
@@ -214,7 +223,10 @@ function screenWithin(
       ? { investorOrganisationId }
       : {}),
     ...(documentId !== undefined && bound({ kind: "DOCUMENT", documentId })
-      ? { documentId }
+      ? {
+          documentId,
+          ...(documentPage === undefined ? {} : { documentPage }),
+        }
       : {}),
   };
 }

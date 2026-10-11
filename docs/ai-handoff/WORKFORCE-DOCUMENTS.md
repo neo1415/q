@@ -1,8 +1,16 @@
 # Existing workforce document connection
 
-2026-10-11. IMPLEMENTED / LOCAL TESTED; exact-commit CI and release pending. This extends the existing
+2026-10-11. Initial connection DEPLOYED at `efcf49ab`; exact-commit quality and pgTAP passed, additive migration applied. This extends the existing
 workforce, company specialist, artifact service and document worker. It creates
 no second agent platform, document registry or business service.
+
+## Current live acceptance — 2026-10-11 17:35 UTC
+
+The existing conversation proposal and Approval Engine produced/approved one private DOCUMENTS step: OWN_COMPANY/PREPARE/ONE_PAGER, only documents.own.prepare, $0.50 approved ceiling. The real agent remained RUNNING during observed PREPARING/version zero/no version row, and reached DONE only with actual READY/version one. Authenticated artifact read, existing viewer render and canonical export passed; the PDF has one A4 page. Content retains three USER_CLAIM findings, nine gaps, and a passing existing audit. Raw content/identifiers remain private.
+
+The initial worker uses deterministic evidence/design/check stages; this is not yet final intelligent research, writing, design critique and iteration. Canonical durable aggregate paid-job reservations remain needed before paid worker stages can be enabled reliably across crashes.
+
+An existing foreground report successfully revised from version one to two in its original conversation. The workforce one-pager revision failed, kept version one and yielded no receipt. Scoped runtime inspection shows its viewer artifact reference was dropped. The runtime/firewall correction is locally tested, not released/live verified; repeat the real same-conversation workforce revision after its exact gates. Do not call the full end-to-end document journey complete yet.
 
 ## Scope and authority
 

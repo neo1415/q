@@ -65,6 +65,23 @@ failure; the corrected scope-binding guard awaits release. These samples do
 not establish a speedup or p95. Next samples must record first useful text as
 well as completion, and separately verify usage rows.
 
+## Live comparison at efcf49ab — 2026-10-11 17:35 UTC
+
+Authenticated isolated SSE requests used the same existing investor and “What is my mandate?”; first useful answer text is the first assembled answer with at least 20 characters, excluding stage/heartbeat events. Original private receipts were preserved. All runs completed with actual mandate answers.
+
+| Revision        | First useful text (ms) | Completion (ms)       |
+| --------------- | ---------------------- | --------------------- |
+| Before ab962576 | 2,742 / 2,098 / 1,895  | 2,830 / 2,163 / 1,946 |
+| After efcf49ab  | 2,447 / 840 / 892      | 2,522 / 887 / 941     |
+
+Median first text improved 2,098→892 ms (57.5%); median completion 2,163→941 ms. Three samples each are not a p95 estimate or a controlled load benchmark; include network/authentication and the first request after release.
+
+After-release actor-scoped usage shows zero FAST_CLASSIFICATION calls. One STRUCTURED_EXTRACTION usage row per run remains (2,794 / 1,724 / 1,497 ms), recorded 2,954 / 1,852 / 1,603 ms after run completion. Do not sum these into elapsed answer time or claim that all model work disappeared.
+
+Initial autonomous document acceptance: one private approved OWN_COMPANY ONE_PAGER, observed PREPARING/version zero with DOCUMENTS RUNNING, then DONE only after real READY/version one. Viewer renders and canonical export is a one-page A4 PDF (200, application/pdf, valid PDF header). This measures readiness/correctness, not final intelligent writing quality. Existing report revision reached actual version two in 21,961 ms, but workforce one-pager revision failed in 11,906 ms and stayed version one because runtime dropped its screen artifact reference. That loss is reproduced/corrected locally; release/retry required.
+
+Actual UI voice testing with a meaningful synthetic spoken WAV also opened provider sessions but produced no observed PCM/playing event. First audio remains UNVERIFIED. No provider latency or voice success is inferred from session creation.
+
 ## Live continuation at ab962576 — 2026-10-11 15:36 UTC
 
 - Investor Discover initially returned RECOMMENDATIONS_REFRESHING, then 20
