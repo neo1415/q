@@ -111,9 +111,12 @@ export type MeetingHostStore = {
  * acting during the call.
  */
 export type MeetingHostFollowThrough = {
-  /** Nobody came: cancel the event, mark the relationship, tell both sides. */
+  /**
+   * Nobody came before Q's wait ran out: mark the relationship and tell both
+   * sides. The booking is NOT cancelled or moved (2026-10-09).
+   */
   readonly noShow: (meetingId: string) => Promise<void>;
-  /** One side came: reach the other side (unless never mind), tell those present. */
+  /** One side came: tell both sides how it ended; the booking is untouched. */
   readonly oneSided: (
     meetingId: string,
     outcome: Extract<HostOutcome, { kind: "ONE_SIDED" }>,
@@ -245,6 +248,13 @@ const RealtimeSchema = z
       .passthrough(),
   })
   .passthrough();
+
+/** The event's name when the body has one, for the logs of what was dropped. */
+export function rawEventName(body: unknown): string | null {
+  if (body === null || typeof body !== "object") return null;
+  const name = (body as Record<string, unknown>)["event"];
+  return typeof name === "string" ? name.slice(0, 80) : null;
+}
 
 /** One Recall event as a host event, or null when it is not one we use. */
 export function hostEventOf(body: unknown, at: number): HostEvent | null {
@@ -530,6 +540,7 @@ export function createMeetingHostRuntime(dependencies: {
         addressed: session.addressed,
         modelCalls: session.host.modelCalls(),
         spokenChars: session.host.spentChars(),
+        stats: session.host.stats(),
       },
       "meeting host session closed",
     );
@@ -731,17 +742,14 @@ export function createMeetingHostRuntime(dependencies: {
         const outcome = action.outcome;
         await noteSafely(session, {
           kind: outcome.kind,
-          body: null,
+          // Why Q left (WAIT_EXPIRED or WAIT_CAP); the booking is untouched.
+          body: outcome.cause,
           requestedByName: null,
           absentSide: outcome.kind === "ONE_SIDED" ? outcome.absentSide : null,
         });
         if (outcome.kind === "ONE_SIDED") {
-          await noteSafely(session, {
-            kind: outcome.reschedule ? "RESCHEDULE_WANTED" : "NEVER_MIND",
-            body: null,
-            requestedByName: null,
-            absentSide: null,
-          });
+          // An explicit "find us another time" was noted when it was said
+          // (RESCHEDULE_REQUESTED); the departure itself reschedules nothing.
           await dependencies.followThrough
             ?.oneSided(session.meetingId, outcome)
             .catch((error: unknown) => {
@@ -762,7 +770,28 @@ export function createMeetingHostRuntime(dependencies: {
         }
         return;
       }
+      case "RESCHEDULE_REQUESTED":
+        await noteSafely(session, {
+          kind: "RESCHEDULE_WANTED",
+          body: "asked for in the call; nothing moved",
+          requestedByName: action.byName,
+          absentSide: null,
+        });
+        logger?.info?.(
+          { meetingId: session.meetingId, stage: "interpreted", intent: "reschedule_request" },
+          "meeting host heard a request for a new time (recorded, nothing moved)",
+        );
+        return;
       case "LEAVE":
+        logger?.info?.(
+          {
+            meetingId: session.meetingId,
+            reason: action.reason,
+            cause: action.cause ?? null,
+            ...session.host.stats(),
+          },
+          "meeting host leaving the call",
+        );
         // Let the goodbye finish playing, then go.
         await new Promise((done) =>
           setTimeout(done, dependencies.leaveDelayMs ?? 2_500).unref(),
@@ -840,6 +869,14 @@ export function createMeetingHostRuntime(dependencies: {
           }
         } else if (result?.kind === "QUIET") {
           session.host.quiet();
+        } else if (result?.kind === "KEEP_WAITING") {
+          // The reader understood a request to keep waiting that the code
+          // matcher missed: the same bounded extension (never past the cap).
+          session.host.keepWaiting(now());
+          logger?.info?.(
+            { meetingId: session.meetingId, stage: "interpreted", intent: "keep_waiting_reader" },
+            "meeting host read a request to keep waiting",
+          );
         } else if (result?.kind === "PROPOSE" && result.proposal !== null) {
           // meet-47: the asker's own card, in their own Capital Q; never
           // an action for anyone else. Someone not on the booking is put
@@ -941,11 +978,33 @@ export function createMeetingHostRuntime(dependencies: {
       dependencies.secret !== undefined &&
       verifyMeetingHostToken(dependencies.secret, meetingId, token),
     receive: async (meetingId, body) => {
-      if (!on) return;
+      // 2026-10-09: every event that is not used says why (counts and the
+      // event name only, never words), so a dropped webhook transcript is
+      // visible per meeting: received -> transcribed -> attributed ->
+      // interpreted -> answered.
+      if (!on) {
+        logger?.warn({ meetingId, stage: "received", dropped: "host_off" }, "meeting host event dropped");
+        return;
+      }
       const event = hostEventOf(body, now());
-      if (event === null) return;
+      if (event === null) {
+        const name = rawEventName(body);
+        if (name === null || name.startsWith("transcript")) {
+          logger?.warn(
+            { meetingId, stage: "transcribed", dropped: "unreadable_event", event: name },
+            "meeting host event dropped",
+          );
+        }
+        return;
+      }
       const session = await open(meetingId);
-      if (session === null) return;
+      if (session === null) {
+        logger?.warn(
+          { meetingId, stage: "received", dropped: "no_session", kind: event.kind },
+          "meeting host event dropped",
+        );
+        return;
+      }
       session.lastEventAt = now();
       if (event.kind === "UTTERANCE") {
         session.utterances += 1;
@@ -959,6 +1018,31 @@ export function createMeetingHostRuntime(dependencies: {
           hear(session, { speaker: event.participant.name, text: event.text });
           void saveHeard(session, false);
         }
+        const before = session.host.stats();
+        const actions = session.host.handle(event);
+        const after = session.host.stats();
+        logger?.info?.(
+          {
+            meetingId,
+            stage: "utterance",
+            n: session.utterances,
+            chars: event.text.length,
+            attributed:
+              after.utterances > before.utterances &&
+              after.ignoredEcho === before.ignoredEcho,
+            implicitJoin: after.attributedImplicit > before.attributedImplicit,
+            echo: after.ignoredEcho > before.ignoredEcho,
+            interpreted: {
+              addressed: after.addressed > before.addressed,
+              waitAsk: after.waitAsks > before.waitAsks,
+              rescheduleAsk: after.rescheduleAsks > before.rescheduleAsks,
+            },
+            actions: actions.map((a) => a.kind),
+          },
+          "meeting host utterance",
+        );
+        await carryOut(session, actions);
+        return;
       }
       await carryOut(session, session.host.handle(event));
     },
@@ -979,16 +1063,16 @@ export function createMeetingHostRuntime(dependencies: {
 }
 
 /**
- * meet-47: in a call Q says one or two natural sentences, whatever the
+ * meet-47: in a call Q says up to three natural sentences, whatever the
  * model wrote; code holds the length, not the prompt alone.
  */
-export function spokenLine(line: string, maxChars = 280): string {
+export function spokenLine(line: string, maxChars = 520): string {
   const text = line.replace(/\s+/g, " ").trim();
   const sentences = text.match(/[^.!?]+[.!?]+(?:["')\]]+)?|[^.!?]+$/g) ?? [
     text,
   ];
   let out = "";
-  for (const sentence of sentences.slice(0, 2)) {
+  for (const sentence of sentences.slice(0, 3)) {
     const next = `${out}${out === "" ? "" : " "}${sentence.trim()}`;
     if (next.length > maxChars) break;
     out = next;
@@ -1186,17 +1270,21 @@ export function readHostResult(raw: unknown): MeetingHostResult | null {
 /** One short spoken answer: small, quick, cheap. */
 // meet2-64: an answer in a call is worth little after a few seconds; two
 // short attempts, not two of eight seconds each.
+// 2026-10-09 (founder): conversational answers. Per-turn cost cap 0.02 ->
+// 0.03 and 400 -> 600 tokens; the per-meeting spend stays bounded by
+// DEFAULT_HOST_LIMITS.maxModelCalls (150) x this cap, with the call's
+// duration and concurrency limits unchanged.
 const HOST_BUDGET = {
   maxAttempts: 2,
-  maxEstimatedCostUsd: 0.02,
-  maxOutputTokens: 400,
+  maxEstimatedCostUsd: 0.03,
+  maxOutputTokens: 600,
   attemptTimeoutMs: 4_000,
 } as const;
 /** A question about what is shown: one frame rides with it (vision route). */
 const HOST_LOOK_BUDGET = {
   maxAttempts: 2,
-  maxEstimatedCostUsd: 0.03,
-  maxOutputTokens: 400,
+  maxEstimatedCostUsd: 0.04,
+  maxOutputTokens: 600,
   attemptTimeoutMs: 6_000,
 } as const;
 /** The organiser's etiquette guides are re-read after this long. */

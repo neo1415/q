@@ -67,8 +67,21 @@ export function registerMeetingHostRoutes(
           }
           const meetingId = query.data.meeting;
           const body = parseJson(raw);
-          // Handled in order per call, after the answer.
-          void host.receive(meetingId, body).catch(() => undefined);
+          if (body === null) {
+            // 2026-10-09: an unreadable body was dropped without a trace.
+            request.log.warn(
+              { meetingId, bytes: raw.length, stage: "received", dropped: "unparsable_body" },
+              "meeting host event dropped",
+            );
+          }
+          // Handled in order per call, after the answer. A failure is
+          // logged (no words): it used to vanish, hiding lost transcripts.
+          void host.receive(meetingId, body).catch((error: unknown) => {
+            request.log.warn(
+              { err: error, meetingId, stage: "handled" },
+              "meeting host event failed",
+            );
+          });
           return reply.code(204).send();
         }
         if (status === undefined || !status.verify(request.headers, raw)) {

@@ -144,7 +144,7 @@ function setup(
       return Promise.resolve();
     },
     oneSided: (_m, outcome) => {
-      outcomes.push(`ONE_SIDED:${String(outcome.reschedule)}`);
+      outcomes.push(`ONE_SIDED:${outcome.cause}:${String(outcome.rescheduleRequested)}`);
       return Promise.resolve();
     },
     proposals: (_m, count) => {
@@ -560,7 +560,7 @@ describe("meeting host in a call", () => {
     expect(said).toEqual([]);
   });
 
-  it("nobody comes: after the grace period Q leaves and the no-show is followed through", async () => {
+  it("nobody comes: after the wait Q leaves with a reason and the booking is untouched", async () => {
     const { runtime, clock, left, notes, outcomes } = setup();
     // The bot's own arrival opens the session; nobody else ever joins.
     await runtime.receive(
@@ -574,19 +574,37 @@ describe("meeting host in a call", () => {
     expect(left).toEqual(["bot-1"]);
   });
 
-  it("one side comes and says never mind: recorded, and Q stops", async () => {
+  it("one side comes and the founder says wait: Q checks in, stays, and never leaves on that", async () => {
     const { clock, said, notes, outcomes, left, send } = setup();
     await send(event("participant_events.join", 1, "Adaeze Okafor"));
     clock.at = START + DEFAULT_HOST_POLICY.graceAfterStartMs;
     await send();
     expect(said.at(-1)).toBe(
-      "I'm sorry, Tunde hasn't joined. I'll reach out to them to find a new time. Shall I let you know once it's rescheduled?",
+      "It looks like we're still waiting for the other participant. Would you like me to keep waiting or help you prepare?",
     );
+    clock.at += 20_000;
     await send(
-      event("transcript.data", 1, "Adaeze Okafor", "Never mind, thanks."),
+      event("transcript.data", 1, "Adaeze Okafor", "No wait, hang on, don't leave."),
     );
-    expect(notes.map((n) => n.kind)).toEqual(["ONE_SIDED", "NEVER_MIND"]);
-    expect(outcomes).toEqual(["ONE_SIDED:false"]);
+    clock.at += 2_000;
+    await send();
+    expect(left).toEqual([]);
+    expect(outcomes).toEqual([]);
+    expect(notes).toEqual([]);
+  });
+
+  it("silence after the check-in never reschedules: Q leaves at the end of its wait, stating why, booking untouched", async () => {
+    const { clock, said, notes, outcomes, left, send } = setup();
+    await send(event("participant_events.join", 1, "Adaeze Okafor"));
+    clock.at = START + DEFAULT_HOST_POLICY.graceAfterStartMs;
+    await send();
+    clock.at += DEFAULT_HOST_POLICY.checkInPatienceMs + 1;
+    await send();
+    expect(outcomes).toEqual(["ONE_SIDED:WAIT_EXPIRED:false"]);
+    expect(notes.map((n) => [n.kind, n.body])).toEqual([
+      ["ONE_SIDED", "WAIT_EXPIRED"],
+    ]);
+    expect(said.join(" ")).toContain("Nothing about the meeting has changed");
     expect(left).toEqual(["bot-1"]);
   });
 });
@@ -685,17 +703,17 @@ describe("the bot Q books for a hosted call", () => {
 });
 
 describe("what Q says aloud (meet-47)", () => {
-  it("is one or two sentences, whatever the model wrote", () => {
+  it("is up to three sentences (conversational, 2026-10-09), whatever the model wrote", () => {
     expect(
       spokenLine(
-        "Nixo is raising a seed round. Tunde leads Zino Aviation's early-stage deals. Also, here is a third sentence nobody needs.",
+        "Nixo is raising a seed round. Tunde leads Zino Aviation's early-stage deals. Also, one more. And a fourth sentence nobody needs.",
       ),
     ).toBe(
-      "Nixo is raising a seed round. Tunde leads Zino Aviation's early-stage deals.",
+      "Nixo is raising a seed round. Tunde leads Zino Aviation's early-stage deals. Also, one more.",
     );
     expect(spokenLine("Sure, Adaeze")).toBe("Sure, Adaeze");
     expect(spokenLine(`${"word ".repeat(100)}end.`).length).toBeLessThanOrEqual(
-      281,
+      521,
     );
   });
 });
