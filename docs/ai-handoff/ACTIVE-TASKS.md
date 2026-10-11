@@ -5,9 +5,9 @@
 
 ## Codex active continuation — 2026-10-11
 
-- **IMPLEMENTED / LOCAL TESTED:** existing chart alignment/missing-data fix; existing authorized relationship TIMELINE adapter; workforce claim startup and lease-wait fix. Work is on `codex/preserve-optimize` from `e40b1d0f`.
+- **IMPLEMENTED / LOCAL TESTED:** existing chart alignment/missing-data fix; existing authorized relationship TIMELINE adapter; workforce claim startup and lease-wait fix; guarded own-mandate routing before both classifiers. Work is on `codex/preserve-optimize` from `e40b1d0f`.
 - **CODE OBSERVED / LOCAL TESTED:** repeated 8.8 fixture is explainable by mandate fit. Locked InvestIQ Core Seven/contextual methodology is not the legacy readiness diagnostic; see SCORE-LINEAGE. Hosted score provenance is still unverified.
-- **In progress:** integration/CI, deployment and authenticated browser acceptance. Previous workstream live evidence below is historical.
+- **In progress:** exact-commit CI and deployment. Founder Home/Documents/Relationships and generated-deck viewer passed baseline browser checks; full journeys remain open. Previous workstream live evidence below is historical.
 - **Still open:** durable DOCUMENTS bridge into the existing artifact pipeline (fresh authority, atomic job-step/artifact binding, READY/resume semantics); proprietary approved InvestIQ parameters; broader latency/DB/provider measurements and full founder/investor journeys.
 
 ## Next owner and first slice

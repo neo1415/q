@@ -12,6 +12,22 @@ voice benchmarks in STATE. No production speedup is claimed before deployment.
 | Presentation assembly             | Existing authorized relationship tool output projected into existing TIMELINE          | No added provider call or DB read. Strict output validation, one counterpart, at most 64 source milestones and 20 rendered events. This is a structural I/O observation, not a measured latency claim. |
 | Chart correctness                 | New DOM regression run before and after                                                | Before: August value shown under July; after: category-aligned values, unknown cells and broken line across missing periods. Conflicting orders preserve original figures without a misleading plot.   |
 
+Additional authenticated baseline: navigation `Open documents` returned NAVIGATE
+five times in 500, 476, 283, 358, 338 ms (median 358 ms); `Open relationships`
+returned NAVIGATE five times in 286, 274, 275, 279, 301 ms (median 279 ms).
+These timings include network/auth and are not first-audio timing.
+The founder browser reached Home, Documents and Relationships, then opened the
+existing generated investor deck and rendered a slide in its viewer. This is a
+bounded journey check, not complete founder/investor acceptance.
+
+The subsequent own-mandate slice reuses the canonical authorized mandate read
+and code answer before TURN_SKIM and turn-reader classification. Three plain
+recall variants now make zero calls to both classifier seams under the same
+actor/plan/run; 43 mandate/sequence/core regressions passed. Ambiguity, actions,
+updates, scoring, absent/other-org scope, onboarding, speculation and durable
+active sequences retain normal routing. This is a demonstrated provider-call
+reduction in deterministic integration tests; live investor latency is pending.
+
 Reproduce locally after package build:
 
 ```sh

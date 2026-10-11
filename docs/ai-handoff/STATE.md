@@ -7,9 +7,10 @@
 ## Codex continuation — 2026-10-11 07:13 America/Los_Angeles
 
 - Integration baseline freshly fetched: `e40b1d0f` on `build/int-rc` and the CI branch; `main` remains stale.
-- Work branch: `codex/preserve-optimize`, `/workspace/q`. Presentation commit `60001d76`; workforce commit `63df8f70`; score audit follows. No migrations or scoring algorithm changes.
+- Work branch: `codex/preserve-optimize`, `/workspace/q`. Presentation commit `60001d76`; workforce commit `63df8f70`; score audit `5bfd5f3e`; mandate routing `7ed54950`/`ccc93941` follows. No migrations or scoring algorithm changes.
 - **IMPLEMENTED / LOCAL TESTED:** category-aligned evidenced charts, run-bound authorized relationship timelines, concurrent startup of the two claimed workforce jobs with all-settled pass coalescing.
-- Local baseline: 52/52 package builds; presentation/voice/card regression set 142 tests; workforce 14 tests; fit/ranking/readiness 101 tests. Root and web/q-api typechecks passed. Changed-file lint passed (additional score-comment checks pending).
+- Local baseline: 52/52 package builds; presentation/voice/card regression set 142 tests; workforce 14 tests; fit/ranking/readiness 101 tests. Root and web/q-api typechecks passed. Changed-file lint passed (score-comment checks passed).
+- Plain own-mandate recalls now reach the existing authorized code answer before both classifiers. Durable core state is hydrated before skipping active sequences; 43 regression tests passed and the original implementation failed the new recall regression. Latest exact-commit CI is pending.
 - **Fresh infrastructure verification:** Railway API reports all four services SUCCESS at `b021d53b`; GitHub CI run `38142662370` succeeded at `e40b1d0f`; hosted migration history matches all 200 local migrations.
 - **LIVE VERIFIED baseline only:** q-api health 200 and five authenticated arrival reads 200 (268–1,201 ms). The new code is not deployed yet.
 - Network endpoint access now works after the cloud network settings update. Secrets are outside checkout; none recorded here. Local Supabase still has the disk/vfs blocker from onboarding.

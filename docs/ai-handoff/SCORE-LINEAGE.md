@@ -1,8 +1,10 @@
 # Score lineage and InvestIQ methodology audit
 
 Snapshot: 2026-10-11, source baseline `e40b1d0`. **CODE OBSERVED** only.
-This audit used repository code, tests and product-source extracts. No hosted
-records, deployments or live scores were queried. The historical incident below
+This audit used repository code, tests and product-source extracts. The initial audit queried no hosted records. A subsequent authorized check of
+the signed-in founder account’s latest 100 non-null result-block messages found
+22 messages and six answer cards, none with numeric fit. This bounded sample
+does not establish the lineage of the reported investor scores. The historical incident below
 is recorded in repository fixtures; it is not fresh production verification.
 
 ## Why 8.8 repeats
