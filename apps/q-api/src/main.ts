@@ -308,6 +308,7 @@ import {
 import {
   composeChat,
   composeSchedule,
+  createMeetingProposalPort,
   createPushSubscriptionStore,
   // AUTO block (2026-10-02)
   createCounterpartNotices,
@@ -2448,6 +2449,12 @@ const investorGatesPort: InvestorGatesPort = {
   },
 };
 const appActionPorts: OwnReadPorts = {
+  // D (2026-10-11): meeting time proposals, booked through the schedule
+  // service as the accepting person once an acceptance is recorded.
+  proposals: createMeetingProposalPort({
+    transactions: database.transactions,
+    schedule,
+  }),
   // Recovery D6: "Stop this job", shared by Q and the Work screen.
   workforceJobs: workforceJobStopPort(agentWorkQueue, workforceStore),
   readiness: readinessService,

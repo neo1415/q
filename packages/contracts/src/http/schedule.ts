@@ -116,6 +116,105 @@ export type ScheduleMeetingRequest = z.infer<
   typeof ScheduleMeetingRequestSchema
 >;
 
+// ---------------------------------------------------------------------------
+// Meeting time proposals (D, 2026-10-11). A time is a proposal until the
+// investor (or an authorised party for them) explicitly accepts it; nothing
+// is booked, and nothing is announced as confirmed, before that.
+//
+//   POST /v1/relationships/:relationshipId/meeting-proposals                           propose (founder)
+//   POST /v1/relationships/:relationshipId/meeting-proposals/review                    read (a read by POST)
+//   POST /v1/relationships/:relationshipId/meeting-proposals/:proposalId/accept        accept
+//   POST /v1/relationships/:relationshipId/meeting-proposals/:proposalId/decline       decline
+//   POST /v1/relationships/:relationshipId/meeting-proposals/:proposalId/counter       counter-propose (investor)
+// ---------------------------------------------------------------------------
+
+export const RELATIONSHIP_MEETING_PROPOSALS_PATH =
+  "/v1/relationships/:relationshipId/meeting-proposals" as const;
+export const RELATIONSHIP_MEETING_PROPOSALS_REVIEW_PATH =
+  "/v1/relationships/:relationshipId/meeting-proposals/review" as const;
+export const MEETING_PROPOSAL_ACCEPT_PATH =
+  "/v1/relationships/:relationshipId/meeting-proposals/:proposalId/accept" as const;
+export const MEETING_PROPOSAL_DECLINE_PATH =
+  "/v1/relationships/:relationshipId/meeting-proposals/:proposalId/decline" as const;
+export const MEETING_PROPOSAL_COUNTER_PATH =
+  "/v1/relationships/:relationshipId/meeting-proposals/:proposalId/counter" as const;
+
+export const MeetingTimeOptionSchema = z
+  .object({
+    startsAt: UtcTimestampSchema,
+    endsAt: UtcTimestampSchema,
+    timeZone: TimeZoneSchema,
+  })
+  .strict();
+export type MeetingTimeOption = z.infer<typeof MeetingTimeOptionSchema>;
+
+export const MeetingTimeOptionsSchema = z
+  .array(MeetingTimeOptionSchema)
+  .min(1)
+  .max(5);
+
+export const ProposeMeetingTimeRequestSchema = z
+  .object({
+    purpose: MeetingPurposeSchema,
+    options: MeetingTimeOptionsSchema,
+    /** A move of a meeting that exists: it stays valid until this is CONFIRMED. */
+    rescheduleOfMeetingId: UuidSchema.nullable().optional(),
+  })
+  .strict();
+export type ProposeMeetingTimeRequest = z.infer<
+  typeof ProposeMeetingTimeRequestSchema
+>;
+
+export const AcceptMeetingTimeRequestSchema = z
+  .object({ optionIndex: z.number().int().min(0).max(4) })
+  .strict();
+export type AcceptMeetingTimeRequest = z.infer<
+  typeof AcceptMeetingTimeRequestSchema
+>;
+
+export const CounterMeetingTimeRequestSchema = z
+  .object({ options: MeetingTimeOptionsSchema })
+  .strict();
+export type CounterMeetingTimeRequest = z.infer<
+  typeof CounterMeetingTimeRequestSchema
+>;
+
+export const MeetingTimeProposalStateSchema = z.enum([
+  "PROPOSED",
+  "INVESTOR_REVIEW",
+  "CONFIRMED",
+  "DECLINED",
+  "COUNTERPROPOSED",
+]);
+
+export const MeetingTimeProposalDtoSchema = z
+  .object({
+    id: UuidSchema,
+    relationshipId: UuidSchema,
+    purpose: MeetingPurposeSchema,
+    state: MeetingTimeProposalStateSchema,
+    options: MeetingTimeOptionsSchema,
+    counterOptions: MeetingTimeOptionsSchema.nullable(),
+    /** True only when an authorised party's acceptance is recorded. */
+    confirmed: z.boolean(),
+    acceptedOption: z.number().int().min(0).max(4).nullable(),
+    acceptedAt: UtcTimestampSchema.nullable(),
+    /** The booked call, once the booking followed the acceptance. */
+    meetingId: UuidSchema.nullable(),
+    revision: z.number().int().min(1).max(20),
+  })
+  .strict();
+export type MeetingTimeProposalDto = z.infer<
+  typeof MeetingTimeProposalDtoSchema
+>;
+
+export const MeetingTimeProposalListSchema = z
+  .object({ proposals: z.array(MeetingTimeProposalDtoSchema).max(50) })
+  .strict();
+export type MeetingTimeProposalList = z.infer<
+  typeof MeetingTimeProposalListSchema
+>;
+
 const MEET_CODE = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
 
 /**
