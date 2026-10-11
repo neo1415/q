@@ -46,6 +46,7 @@ export const Q_UI_INTENT_KINDS = [
   "SHOW_IN_Q_ROOM",
   "SHOW_CALENDAR_CONNECT",
   "DOCUMENT_ACT",
+  "CARDS",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -690,6 +691,54 @@ export const QDocumentActIntentSchema = z
   );
 export type QDocumentActIntent = z.infer<typeof QDocumentActIntentSchema>;
 
+/**
+ * Founder P5: clearing the Q page's temporary cards, by voice or click.
+ * PRESENTATION ONLY: it hides cards on this device for the session and
+ * restores them; it never approves, rejects, deletes or cancels anything
+ * and calls no business API. Categories are the card families the Q page
+ * fills up with; `name` is a spoken card name ("TensorGate"), matched
+ * against the cards on screen, never an identifier.
+ */
+export const Q_CARD_ACTIONS = [
+  "HIDE_ALL",
+  "HIDE_CATEGORY",
+  "HIDE_ONE",
+  "RESTORE_ALL",
+  "RESTORE_ONE",
+] as const;
+export const QCardActionSchema = z.enum(Q_CARD_ACTIONS);
+export type QCardAction = z.infer<typeof QCardActionSchema>;
+
+export const Q_CARD_CATEGORIES = [
+  "NEEDS_YOU",
+  "CONNECTION",
+  "SOURCE",
+  "RECOMMENDATION",
+  "ANSWER",
+] as const;
+export const QCardCategorySchema = z.enum(Q_CARD_CATEGORIES);
+export type QCardCategory = z.infer<typeof QCardCategorySchema>;
+export const Q_CARD_NAME_MAX = 120;
+
+export const QCardsIntentSchema = z
+  .object({
+    kind: z.literal("CARDS"),
+    action: QCardActionSchema,
+    category: QCardCategorySchema.optional(),
+    name: z.string().trim().min(1).max(Q_CARD_NAME_MAX).optional(),
+  })
+  .strict()
+  .refine((i) => i.action !== "HIDE_CATEGORY" || i.category !== undefined, {
+    message: "HIDE_CATEGORY names a category",
+  })
+  .refine(
+    (i) =>
+      (i.action !== "HIDE_ONE" && i.action !== "RESTORE_ONE") ||
+      i.name !== undefined,
+    { message: "HIDE_ONE and RESTORE_ONE name a card" },
+  );
+export type QCardsIntent = z.infer<typeof QCardsIntentSchema>;
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QScreenActIntentSchema,
   QSetDiscoverFiltersIntentSchema,
@@ -705,6 +754,7 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QShowInQRoomIntentSchema,
   QShowCalendarConnectIntentSchema,
   QDocumentActIntentSchema,
+  QCardsIntentSchema,
   // RECOVERY-2026-10: universal application control (ui-act.ts).
   QUiActIntentSchema,
 ]);
@@ -835,6 +885,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QShowInQRoomIntentSchema,
   QShowCalendarConnectIntentSchema,
   QDocumentActIntentSchema,
+  QCardsIntentSchema,
   QUiActIntentSchema,
 ]);
 

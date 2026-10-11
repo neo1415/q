@@ -30,6 +30,7 @@ import {
   LEVEL_WORD,
 } from "./answer-canvas-logic";
 import { MapBody } from "./blocks/data-blocks";
+import { useVisibleCards } from "./cards/card-visibility";
 import {
   cardPagePath,
   openCardPage,
@@ -729,13 +730,22 @@ export function AnswerCanvas({
 }: AnswerCanvasProps) {
   const wide = useWideCanvas();
   const reduced = useReducedMotion() === true;
-  const shown = block.cards.filter((card) => dismissed?.has(card.key) !== true);
+  // Founder P5: cards the person cleared, by voice or click, are not drawn
+  // and take no space (presentation only; the answer itself is untouched).
+  const unhidden = useVisibleCards(block.cards, (card) => ({
+    category: "ANSWER",
+    key: `answer:${block.title}:${card.key}`,
+    names: [card.name],
+  }));
+  const shown = unhidden.filter((card) => dismissed?.has(card.key) !== true);
   const { layout, tiles } = canvasLayout(shown.length, wide);
   const table = comparesAsTable(block) && shown.length === block.cards.length;
   const spotKey = spotlight === null ? undefined : block.cards[spotlight]?.key;
   const spotCard = shown.find((card) => card.key === spotKey);
   const spot = !table && spotCard !== undefined && shown.length >= 2;
   const focusKey = spot ? spotKey : block.cards[focus]?.key;
+
+  if (block.cards.length > 0 && unhidden.length === 0) return null;
 
   return (
     <LazyMotion features={loadFeatures} strict>

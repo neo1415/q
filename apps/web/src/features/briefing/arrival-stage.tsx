@@ -42,6 +42,11 @@ import {
 } from "./arrival-store";
 import { FollowUpStack } from "@/features/readiness/follow-up-stack";
 
+import {
+  useCardHidden,
+  useVisibleCards,
+} from "@/features/q/cards/card-visibility";
+
 import { attentionHref, attentionLines, unreadWords } from "./attention";
 import {
   FIT_IS_NOT_QUALITY,
@@ -174,10 +179,17 @@ export function ActivityCard({
 }
 
 /** What needs them that is acted on elsewhere, and what could not be read. */
-export function AttentionList({ data }: { readonly data: ArrivalData }) {
+export function AttentionList({
+  data,
+  lines: visibleLines,
+}: {
+  readonly data: ArrivalData;
+  /** Founder P5: the lines not cleared by the person (default: all). */
+  readonly lines?: ReturnType<typeof attentionLines> | undefined;
+}) {
   const report = data.attention;
   if (report === null || report === undefined) return null;
-  const lines = attentionLines(report);
+  const lines = visibleLines ?? attentionLines(report);
   const unread = unreadWords(report.unread);
   if (lines.length === 0 && unread === null) return null;
   const links = new Map(Object.entries(data.attentionLinks ?? {}));
@@ -402,7 +414,48 @@ export function ArrivalStage({
   const voiceActive = session?.voice.active === true;
   const { askNow } = useGlobalQ();
   const [expanded, setExpanded] = useState(false);
-  const data = ready?.data ?? null;
+  const rawData = ready?.data ?? null;
+  // Founder P5: cards the person cleared (by voice or click) are left out
+  // here, so they take no space. Presentation only: the arrival's data, its
+  // decisions and the Work area are untouched.
+  const visibleNeeds = useVisibleCards(rawData?.cards ?? [], (card) => ({
+    category: "NEEDS_YOU",
+    key: `needs:${card.key}`,
+    names: [card.counterpart ?? "", card.title].filter((n) => n.length > 0),
+  }));
+  const visibleAttention = useVisibleCards(
+    rawData?.attention == null ? [] : attentionLines(rawData.attention),
+    (item) => ({
+      category: item.source === "INTEREST_REQUEST" ? "CONNECTION" : "NEEDS_YOU",
+      key: `attention:${item.key}`,
+      names: [item.title],
+    }),
+  );
+  const visibleMatches = useVisibleCards(
+    rawData?.matches?.items ?? [],
+    (match) => ({
+      category: "RECOMMENDATION",
+      key: `match:${match.companyId}`,
+      names: [match.name],
+    }),
+  );
+  const questionsHidden = useCardHidden({
+    category: "NEEDS_YOU",
+    key: "questions",
+    names: ["questions", "q questions"],
+  });
+  const data = useMemo<ArrivalData | null>(() => {
+    if (rawData === null) return null;
+    return {
+      ...rawData,
+      cards: visibleNeeds,
+      questions: questionsHidden ? [] : rawData.questions,
+      matches:
+        rawData.matches == null
+          ? rawData.matches
+          : { ...rawData.matches, items: visibleMatches },
+    };
+  }, [rawData, visibleNeeds, visibleMatches, questionsHidden]);
   // C1 hooks: "scroll to what needs me", "show me Q's questions".
   const needsRef = useRef<HTMLElement>(null);
   const questionsRef = useRef<HTMLElement>(null);
@@ -416,10 +469,10 @@ export function ArrivalStage({
   // Words for the late-landing case below; the same words the head says.
   const words = useMemo(
     () =>
-      data === null
+      rawData === null
         ? null
-        : arrivalWords(data, now?.() ?? new Date(), browserZone()),
-    [data, now],
+        : arrivalWords(rawData, now?.() ?? new Date(), browserZone()),
+    [rawData, now],
   );
 
   const activity =
@@ -432,8 +485,7 @@ export function ArrivalStage({
   const attentionShown =
     data?.attention !== null &&
     data?.attention !== undefined &&
-    (attentionLines(data.attention).length > 0 ||
-      data.attention.unread.length > 0);
+    (visibleAttention.length > 0 || data.attention.unread.length > 0);
   const hasNeeds = (data?.cards.length ?? 0) > 0 || attentionShown;
   const present = useMemo(() => {
     const groups: StageGroup[] = [];
@@ -528,10 +580,11 @@ export function ArrivalStage({
   // What this arrival showed is remembered, so the next one says "new"
   // only of what is new (a per-browser convenience).
   useEffect(() => {
-    if (matches !== null && matches.items.length > 0) {
-      rememberSeenMatches(matches.items.map((item) => item.companyId));
+    const all = rawData?.matches?.items ?? [];
+    if (all.length > 0) {
+      rememberSeenMatches(all.map((item) => item.companyId));
     }
-  }, [matches]);
+  }, [rawData]);
 
   const strip = mode === "STRIP" && !expanded;
   const beside =
@@ -583,7 +636,7 @@ export function ArrivalStage({
           focusKey={focus}
         />
       )}
-      {strip ? null : <AttentionList data={data} />}
+      {strip ? null : <AttentionList data={data} lines={visibleAttention} />}
     </section>
   ) : null;
   // Q.01: the questions Q still has, answerable in place.

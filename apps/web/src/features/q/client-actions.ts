@@ -12,6 +12,7 @@ import { storeQMotion } from "@/features/q-aperture/q-motion";
 import { storeVoicePreference } from "@/features/voice/voice-preference";
 
 import { forgetActiveConversations } from "./active-conversation";
+import { applyCardsIntent } from "./cards/card-visibility";
 import { loadWire, wireNow, type WireContracts } from "./wire";
 import {
   arrivedAt,
@@ -617,6 +618,10 @@ function performChecked(
     // itself (each answer once), so a voice and a typed turn page alike.
     case "DOCUMENT_ACT":
       return true;
+    // Founder P5: clear or restore the temporary cards on this screen.
+    // Presentation only: the controller calls no API.
+    case "CARDS":
+      return applyCardsIntent(action);
     // RECOVERY-2026-10: a registered control on the page, with a receipt.
     case "UI_ACT":
       void performUiAct(action);

@@ -12,6 +12,10 @@
     "./page-request": {
       "types": "./dist/page-request.d.ts",
       "default": "./dist/page-request.js"
+    },
+    "./cards-request": {
+      "types": "./dist/cards-request.d.ts",
+      "default": "./dist/cards-request.js"
     }
   },
   "main": "./dist/index.js",

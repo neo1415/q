@@ -1,6 +1,9 @@
 import type { TurnSkimResult } from "@capital-q/q-core";
+import type { QCardsIntent } from "@capital-q/contracts";
 import type { QResultBlock } from "@capital-q/contracts/q";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
+
+import { cardsIntentOf, cardsLineOf, cardsRequestOf } from "./cards-request.js";
 
 /**
  * The fast lane (founder brief K, 2026-10-09): a turn the short first read
@@ -440,4 +443,20 @@ export function lastShownEntityId(
     }
   }
   return null;
+}
+
+/**
+ * Founder P5, the instant cards lane: "clear all cards", "hide the
+ * connection cards", "show me the cards again", "bring back the TensorGate
+ * card", read by code from the words alone -- no model, no database, no
+ * skim. Presentation only: the answer carries a typed CARDS intent the
+ * screen performs on this device; nothing is approved, rejected, deleted
+ * or cancelled. Null when the words are not a cards request.
+ */
+export function cardsLaneOf(
+  utterance: string,
+): { readonly said: string; readonly intent: QCardsIntent } | null {
+  const request = cardsRequestOf(utterance);
+  if (request === null) return null;
+  return { said: cardsLineOf(request), intent: cardsIntentOf(request) };
 }
