@@ -80,20 +80,93 @@ const ASPECTS: readonly { aspect: FollowUpAspect; test: RegExp }[] = [
   },
 ];
 
-const PRONOUN_PERSON = /\b(?:him|he|his|her|hers|she|them|they|their|theirs|this (?:person|guy|man|woman|investor)|that (?:person|investor))\b/iu;
+const PRONOUN_PERSON =
+  /\b(?:him|he|his|her|hers|she|them|they|their|theirs|this (?:person|guy|man|woman|investor)|that (?:person|investor))\b/iu;
 const PRONOUN_ORG =
   /\b(?:it|its|them|they|their|theirs|this (?:company|organi[sz]ation|agency|firm|fund|institution|one|body)|that (?:company|organi[sz]ation|agency|firm|fund)|the (?:agency|firm|company|organi[sz]ation))\b/iu;
 
 const TOPIC_STOP = new Set([
-  "the", "a", "an", "about", "on", "of", "in", "to", "for", "and", "or", "is",
-  "are", "was", "has", "have", "had", "do", "does", "did", "what", "who",
-  "how", "when", "where", "which", "that", "this", "these", "those", "it",
-  "his", "her", "their", "them", "him", "he", "she", "they", "said", "say",
-  "says", "saying", "ever", "publicly", "any", "anything", "something",
-  "me", "my", "i", "you", "we", "us", "with", "from", "by", "at", "as",
-  "tell", "more", "else", "please", "can", "could", "would", "will", "might",
-  "should", "stated", "wrote", "posted", "think", "thinks", "view", "views",
-  "opinion", "statement", "statements", "interview", "interviews",
+  "the",
+  "a",
+  "an",
+  "about",
+  "on",
+  "of",
+  "in",
+  "to",
+  "for",
+  "and",
+  "or",
+  "is",
+  "are",
+  "was",
+  "has",
+  "have",
+  "had",
+  "do",
+  "does",
+  "did",
+  "what",
+  "who",
+  "how",
+  "when",
+  "where",
+  "which",
+  "that",
+  "this",
+  "these",
+  "those",
+  "it",
+  "his",
+  "her",
+  "their",
+  "them",
+  "him",
+  "he",
+  "she",
+  "they",
+  "said",
+  "say",
+  "says",
+  "saying",
+  "ever",
+  "publicly",
+  "any",
+  "anything",
+  "something",
+  "me",
+  "my",
+  "i",
+  "you",
+  "we",
+  "us",
+  "with",
+  "from",
+  "by",
+  "at",
+  "as",
+  "tell",
+  "more",
+  "else",
+  "please",
+  "can",
+  "could",
+  "would",
+  "will",
+  "might",
+  "should",
+  "stated",
+  "wrote",
+  "posted",
+  "think",
+  "thinks",
+  "view",
+  "views",
+  "opinion",
+  "statement",
+  "statements",
+  "interview",
+  "interviews",
 ]);
 
 export type FollowUpDecision = {
@@ -103,8 +176,17 @@ export type FollowUpDecision = {
 };
 
 const GENERIC_SINGLE = new Set([
-  "invest", "investment", "investments", "capital", "qatar", "bank", "group",
-  "fund", "llc", "agency", "al",
+  "invest",
+  "investment",
+  "investments",
+  "capital",
+  "qatar",
+  "bank",
+  "group",
+  "fund",
+  "llc",
+  "agency",
+  "al",
 ]);
 
 function nameIndex(
@@ -119,7 +201,8 @@ function nameIndex(
     index.set(key, list);
   };
   for (const record of records) {
-    for (const name of [record.displayName, ...record.aliases]) add(name, record);
+    for (const name of [record.displayName, ...record.aliases])
+      add(name, record);
     if (record.entityKind === "PERSON") {
       // First or last name alone is how people speak ("what has Muhannad said").
       for (const part of wordsOf(record.displayName)) {
@@ -228,7 +311,9 @@ function citeOf(record: KnownEntityRecord, fact: EntityFactRecord): string {
     ),
   ].filter((host) => host.length > 0);
   const unread = fact.status === "LINK_DISCOVERED" ? ", not read" : "";
-  return hosts.length === 0 ? "" : ` (${hosts.slice(0, 2).join(", ")}${unread})`;
+  return hosts.length === 0
+    ? ""
+    : ` (${hosts.slice(0, 2).join(", ")}${unread})`;
 }
 
 const bullets = (
@@ -324,7 +409,9 @@ function saidAnswer(
   const matches = (text: string): boolean => {
     const low = wordsOf(text);
     return topicWords.some((word) =>
-      low.some((w) => w.startsWith(word.slice(0, Math.max(4, word.length - 2)))),
+      low.some((w) =>
+        w.startsWith(word.slice(0, Math.max(4, word.length - 2))),
+      ),
     );
   };
   if (topicWords.length > 0) {
@@ -394,7 +481,11 @@ export function answerPreparedFollowUp(decision: FollowUpDecision): string {
     case "QUESTIONS":
       return `${questionsBlock(record)}\n\n${tallyLine(record)}`;
     case "PITCH": {
-      const basis = factsOf(record, ["PRIORITIES", "STATEMENT", "WHAT_THEY_DO"]);
+      const basis = factsOf(record, [
+        "PRIORITIES",
+        "STATEMENT",
+        "WHAT_THEY_DO",
+      ]);
       const lead =
         basis.length === 0
           ? `I have no documented priorities for ${name} to build a pitch on.`

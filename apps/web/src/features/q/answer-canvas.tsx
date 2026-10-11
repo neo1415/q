@@ -180,7 +180,9 @@ function SourceLinks({
         {source.label}
       </a>
       {source.status === undefined ? null : (
-        <span data-ac-source-status>{` (${sourceStatusWord(source.status)})`}</span>
+        <span
+          data-ac-source-status
+        >{` (${sourceStatusWord(source.status)})`}</span>
       )}
     </li>
   );
