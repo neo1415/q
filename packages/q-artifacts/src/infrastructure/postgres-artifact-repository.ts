@@ -57,6 +57,23 @@ const ArtifactRow = z.object({
 function toArtifact(row: unknown): StoredArtifact {
   const r = ArtifactRow.parse(row);
   return {
+    findForWorkforce: async (actor, input) => {
+      const rows = await sql`
+        select * from artifacts.artifacts
+         where workforce_job_id = ${input.jobId}
+           and workforce_step_key = ${input.stepKey}
+           and workforce_intent_sha256 = ${input.intentSha256}
+           and tenant_id = ${actor.tenantId}
+           and organisation_id = ${actor.organisationId ?? null}
+           and created_by_user_id = ${actor.userId}
+           and type = ${input.type}
+           and company_id is not distinct from ${input.companyId}::uuid
+           and investor_organisation_id is not distinct from ${input.investorOrganisationId}::uuid
+           and archived_at is null
+         limit 1
+      `;
+      return rows.length === 0 ? null : toArtifact(rows[0]);
+    },
     id: r.id,
     tenantId: r.tenant_id,
     organisationId: r.organisation_id,

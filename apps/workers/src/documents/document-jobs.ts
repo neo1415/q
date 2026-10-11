@@ -78,6 +78,12 @@ export function createDocumentJobRunner(dependencies: {
             workforceCorrelationId(attribution.jobId, attribution.runId),
           );
     const { input } = job;
+    // Initial workforce preparation uses only the existing deterministic
+    // design/brand/check stages. The canonical gateway caps individual
+    // calls but has no durable job-budget reservation across crashes;
+    // optional paid stages cannot prove the approved aggregate allowance.
+    // Foreground Q document jobs retain their configured paid stages.
+    const paidStages = input.workforce === undefined;
     const result = await runDocumentPipeline(input.content, {
       kind: job.kind,
       grounding: input.grounding,
@@ -86,16 +92,16 @@ export function createDocumentJobRunner(dependencies: {
       brand: input.brand,
       photos: dependencies.photos,
       illustrations:
-        job.kind === "PITCH_DECK"
+        paidStages && job.kind === "PITCH_DECK"
           ? dependencies.images?.illustrationsFor({
               actor,
               runId: job.runId,
               correlationId,
             })
           : undefined,
-      polisher: dependencies.polisher,
+      polisher: paidStages ? dependencies.polisher : undefined,
       critic:
-        job.kind === "PITCH_DECK"
+        paidStages && job.kind === "PITCH_DECK"
           ? dependencies.criticFor?.({ job, correlationId })
           : undefined,
       sensitivity: input.sensitivity,
@@ -121,6 +127,8 @@ export function createDocumentJobRunner(dependencies: {
         kind: job.kind,
         rounds: result.rounds,
         passed: result.passed,
+        qRunId: job.runId,
+        correlationId,
       },
       "document job filed",
     );

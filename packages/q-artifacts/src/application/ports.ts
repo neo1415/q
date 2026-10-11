@@ -40,6 +40,15 @@ export type WorkforceDocumentBinding = {
  */
 
 export type ArtifactRepository = {
+  /** Actor-scoped resume lookup; matching approved intent only. */
+  readonly findForWorkforce?: (
+    actor: ActorContext,
+    input: WorkforceDocumentBinding & {
+      readonly type: string;
+      readonly companyId: string | null;
+      readonly investorOrganisationId: string | null;
+    },
+  ) => Promise<StoredArtifact | null>;
   /**
    * Atomically claim the existing artifact row for a workforce step. A
    * restart reuses it, even before the runner recorded its result. The
