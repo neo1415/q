@@ -385,6 +385,74 @@
   }
 
   /*
+   * The verified badge: brushed gold metal from the --cq-gold-* tokens. The
+   * gradient gives the metal, the top-lit gloss layer and inset highlight
+   * give a controlled shine, the edge and depth give it a rim and weight.
+   * Text and icon are --cq-gold-ink on the gold, so contrast does not
+   * depend on the theme. The single sheen pass runs once, and only when
+   * the person has not asked for reduced motion.
+   */
+  .cq-verified-badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+    padding: 3px 10px 3px 8px;
+    border: 1px solid var(--cq-gold-edge);
+    border-radius: var(--cq-radius-full);
+    color: var(--cq-gold-ink);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    background:
+      linear-gradient(180deg, var(--cq-gold-gloss), transparent 52%),
+      linear-gradient(
+        135deg,
+        var(--cq-gold-highlight) 0%,
+        var(--cq-gold-light) 28%,
+        var(--cq-gold-mid) 58%,
+        var(--cq-gold-deep) 100%
+      );
+    box-shadow:
+      inset 0 1px 0 var(--cq-gold-gloss),
+      inset 0 -1px 0 var(--cq-gold-depth),
+      0 1px 2px var(--cq-gold-depth);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cq-verified-badge::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+      background: linear-gradient(
+        105deg,
+        transparent 38%,
+        var(--cq-gold-gloss) 50%,
+        transparent 62%
+      );
+      transform: translateX(-120%);
+      animation: cq-verified-sheen 900ms var(--cq-ease) 400ms 1 forwards;
+      pointer-events: none;
+    }
+  }
+
+  @keyframes cq-verified-sheen {
+    to {
+      transform: translateX(120%);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .cq-verified-badge {
+      border-color: ButtonText;
+      color: ButtonText;
+      background: Canvas;
+      box-shadow: none;
+    }
+  }
+
+  /*
    * The theme switch in the chrome: sun · monitor · moon as one segmented
    * control. The chosen segment is raised and outlined as well as tinted,
    * so the choice never rests on colour alone. 40 px segments on desktop,

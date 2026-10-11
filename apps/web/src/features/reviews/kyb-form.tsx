@@ -5,8 +5,9 @@ import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 
 import type { KybDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
-import { ICON_SIZE, ShieldCheck } from "@capital-q/ui/icons";
 import { Input } from "@capital-q/ui/input";
+
+import { VerifiedBadge } from "@/components/verified-badge";
 
 import {
   materialUploadCompleteAction,
@@ -64,14 +65,11 @@ function StandingRow({
         {who}
       </span>
       <span className="cq-body-sm flex items-center gap-1.5 text-(--cq-text-primary)">
-        {!verified ? null : (
-          <ShieldCheck
-            size={ICON_SIZE.compact}
-            aria-hidden="true"
-            className="text-(--cq-text-secondary)"
-          />
+        {verified ? (
+          <VerifiedBadge status={standing}>{words}</VerifiedBadge>
+        ) : (
+          words
         )}
-        {words}
       </span>
     </li>
   );

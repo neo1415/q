@@ -10,14 +10,10 @@ import type {
   PitchClaimDto,
   RelationshipStateV2,
 } from "@capital-q/contracts";
-import {
-  ChevronRight,
-  Globe,
-  ICON_SIZE,
-  ShieldCheck,
-} from "@capital-q/ui/icons";
+import { ChevronRight, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { formatLongDay } from "@/components/date-format";
+import { VerifiedBadge } from "@/components/verified-badge";
 import { capitalTabHref } from "@/features/capital/capital-tabs";
 
 import { ExpressInterest } from "../network/express-interest";
@@ -388,12 +384,14 @@ export function CompanyProfileView({
             {line === "" ? null : (
               <p className="cq-caption text-(--cq-text-secondary)">{line}</p>
             )}
-            {overview?.organisationVerified === true ? (
-              <p className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
-                <ShieldCheck size={ICON_SIZE.compact} aria-hidden="true" />
-                Organisation verified by Capital Q
-              </p>
-            ) : null}
+            <VerifiedBadge
+              status={
+                overview?.organisationVerified === true ? "VERIFIED" : null
+              }
+              className="self-start"
+            >
+              Organisation verified by Capital Q
+            </VerifiedBadge>
           </div>
         </header>
 

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { requireSessionUser } from "@/auth/session";
 import { resolveQStanding } from "@/features/q/context";
+import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
 import { FictionalNames } from "@/components/app-shell/fictional-names";
 import { QControlRuntime } from "@/features/q/control/q-control-runtime";
 
@@ -31,6 +32,7 @@ export default async function OnboardingLayout({
   // Outside the app shell: the same "fictional" names rule as inside it.
   return (
     <div data-fictional-scope>
+      <PublicBrandStyle />
       {children}
       <FictionalNames />
       {/* R3: Q's moves from onboarding go through the client router and
