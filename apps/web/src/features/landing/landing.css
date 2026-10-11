@@ -3,9 +3,11 @@
  * founder-approved prototype (2026-10-04), scoped under `.lp` so none of
  * it reaches the app.
  *
- * Light only, by design: the landing pins the light palette (the same
- * values as packages/ui tokens.css) on its own root, so a dark device
- * still sees the approved page. Landing-only colours (the illustrated
+ * Themed like the app: the page reads the same semantic tokens as the
+ * signed-in product (the Capital Q gold brand, applied to public pages by
+ * PublicBrandStyle) and follows light, dark or the device through the one
+ * theme contract (`data-theme` on <html>, features/appearance). Landing-only
+ * colours (the illustrated
  * phone, call and stage panels, shadows) are named --cq-landing-* and
  * --cq-stage-* tokens below; components never carry raw colour.
  * Motion: transform and opacity, except the demo card's height reveal
@@ -16,34 +18,6 @@
   --cq-font-ui:
     var(--cq-font-landing), -apple-system, system-ui, "Segoe UI", Roboto,
     sans-serif;
-  --cq-canvas: oklch(0.985 0.004 92);
-  --cq-surface: oklch(0.995 0.002 92);
-  --cq-surface-raised: oklch(1 0 0);
-  --cq-surface-subtle: oklch(0.965 0.005 92);
-  --cq-surface-strong: oklch(0.925 0.007 92);
-  --cq-text-primary: oklch(0.19 0.012 258);
-  --cq-text-secondary: oklch(0.43 0.012 258);
-  --cq-text-tertiary: oklch(0.53 0.01 258);
-  --cq-text-inverse: oklch(0.98 0.004 92);
-  --cq-border-subtle: oklch(0.91 0.006 258);
-  --cq-border: oklch(0.86 0.008 258);
-  --cq-border-strong: oklch(0.71 0.012 258);
-  --cq-accent: oklch(0.53 0.18 258);
-  --cq-accent-hover: oklch(0.48 0.18 258);
-  --cq-accent-soft: oklch(0.94 0.035 258);
-  --cq-positive: oklch(0.5 0.13 151);
-  --cq-positive-soft: oklch(0.95 0.035 151);
-  --cq-warning: oklch(0.53 0.12 70);
-  --cq-warning-soft: oklch(0.96 0.045 78);
-  --cq-stage-canvas: oklch(0.17 0.02 262);
-  --cq-stage-surface: oklch(1 0 0 / 0.06);
-  --cq-stage-surface-strong: oklch(1 0 0 / 0.12);
-  --cq-stage-border: oklch(1 0 0 / 0.14);
-  --cq-stage-text: oklch(0.98 0.004 92);
-  --cq-stage-text-muted: oklch(1 0 0 / 0.66);
-  --cq-stage-accent: oklch(0.76 0.14 258);
-  --cq-stage-positive: oklch(0.78 0.12 151);
-  --cq-stage-q-light: oklch(0.8 0.13 258);
   --cq-radius-sm: 6px;
   --cq-radius-md: 10px;
   --cq-radius-lg: 14px;
@@ -53,34 +27,34 @@
   --cq-landing-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --cq-landing-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --cq-landing-wrap: 1200px;
-  color-scheme: light;
+  --cq-stage-positive: oklch(0.78 0.12 151);
   --cq-stage-warning: oklch(0.79 0.12 78);
   --cq-stage-danger: oklch(0.55 0.17 25);
-  --cq-landing-stage-panel: oklch(0.2 0.022 262);
-  --cq-landing-q-dot: oklch(0.8 0.13 258 / 0.9);
-  --cq-landing-stage-tile: oklch(0.27 0.02 262);
-  --cq-landing-stage-avatar: oklch(0.36 0.03 262);
-  --cq-landing-device: oklch(0.14 0.01 262);
-  --cq-landing-device-edge: oklch(0.3 0.01 262);
+  --cq-landing-stage-panel: oklch(0.2 0.022 85);
+  --cq-landing-q-dot: oklch(0.8 0.12 85 / 0.9);
+  --cq-landing-stage-tile: oklch(0.27 0.02 85);
+  --cq-landing-stage-avatar: oklch(0.36 0.03 85);
+  --cq-landing-device: oklch(0.14 0.01 85);
+  --cq-landing-device-edge: oklch(0.3 0.01 85);
   --cq-landing-device-screen: oklch(0 0 0);
   --cq-landing-stage-positive-soft: oklch(0.78 0.12 151 / 0.12);
-  --cq-landing-stage-accent-edge: oklch(0.76 0.14 258 / 0.55);
+  --cq-landing-stage-accent-edge: oklch(0.78 0.12 85 / 0.55);
   --cq-landing-illus-skin: oklch(0.3 0.03 40);
   --cq-landing-illus-skin-shade: oklch(0.17 0.02 40);
-  --cq-landing-illus-shade: oklch(0.15 0.02 262);
+  --cq-landing-illus-shade: oklch(0.15 0.02 85);
   --cq-landing-illus-rim: oklch(0.85 0.08 70 / 0.55);
   --cq-landing-illus-rim-soft: oklch(0.85 0.08 70 / 0.45);
-  --cq-landing-scrim-strong: oklch(0.12 0.02 262 / 0.92);
-  --cq-landing-scrim: oklch(0.12 0.02 262 / 0.55);
-  --cq-landing-scrim-clear: oklch(0.12 0.02 262 / 0);
+  --cq-landing-scrim-strong: oklch(0.12 0.02 85 / 0.92);
+  --cq-landing-scrim: oklch(0.12 0.02 85 / 0.55);
+  --cq-landing-scrim-clear: oklch(0.12 0.02 85 / 0);
   --cq-landing-highlight: oklch(1 0 0);
   /* Q's glow (ADR 0045: light on Q only, one hue family), at its brightest;
      the swarm fades these layers to the current glow. */
-  --cq-landing-q-bloom-core: rgb(96 140 255 / 0.735);
-  --cq-landing-q-bloom-mid: rgb(70 110 235 / 0.28);
-  --cq-landing-q-bloom-edge: rgb(50 80 200 / 0);
+  --cq-landing-q-bloom-core: rgb(226 184 88 / 0.735);
+  --cq-landing-q-bloom-mid: rgb(201 162 39 / 0.28);
+  --cq-landing-q-bloom-edge: rgb(201 162 39 / 0);
   --cq-landing-q-aperture: rgb(255 246 228 / 0.875);
-  --cq-landing-q-aperture-edge: rgb(160 190 255 / 0);
+  --cq-landing-q-aperture-edge: rgb(240 210 130 / 0);
   --cq-stage-ink-90: oklch(1 0 0 / 0.9);
   --cq-stage-ink-80: oklch(1 0 0 / 0.8);
   --cq-stage-ink-78: oklch(1 0 0 / 0.78);
@@ -94,10 +68,10 @@
   --cq-landing-shade-40: oklch(0 0 0 / 0.4);
   --cq-landing-shade-28: oklch(0 0 0 / 0.28);
   --cq-landing-shade-12: oklch(0 0 0 / 0.12);
-  --cq-landing-shadow-50: oklch(0.19 0.03 258 / 0.5);
-  --cq-landing-shadow-35: oklch(0.19 0.03 258 / 0.35);
-  --cq-landing-shadow-28: oklch(0.19 0.03 258 / 0.28);
-  --cq-landing-shadow-14: oklch(0.19 0.03 258 / 0.14);
+  --cq-landing-shadow-50: oklch(0.19 0.03 85 / 0.5);
+  --cq-landing-shadow-35: oklch(0.19 0.03 85 / 0.35);
+  --cq-landing-shadow-28: oklch(0.19 0.03 85 / 0.28);
+  --cq-landing-shadow-14: oklch(0.19 0.03 85 / 0.14);
 }
 .lp,
 .lp *,
@@ -2200,7 +2174,7 @@ html[data-pwa] .cq-landing {
     linear-gradient(
       160deg,
       oklch(0.45 0.04 var(--cq-landing-hue-a)),
-      oklch(0.22 0.03 262)
+      oklch(0.22 0.03 85)
     );
 }
 .lp .upload .bar i.filled {

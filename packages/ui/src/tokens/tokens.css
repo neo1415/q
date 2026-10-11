@@ -57,6 +57,22 @@
   --cq-danger-soft: oklch(0.95 0.04 27);
   --cq-info: var(--cq-accent);
 
+  /*
+   * The verified metal (founder, 2026-10-11): rich gold for the one badge
+   * that means Capital Q verified the record. Highlight, light, mid and
+   * deep are the gradient's stops; edge is the rim; ink is the text and
+   * icon, >= 4.5:1 on every stop; gloss and depth are the controlled
+   * specular top and the resting shadow. Used by .cq-verified-badge only.
+   */
+  --cq-gold-highlight: oklch(0.93 0.09 92);
+  --cq-gold-light: oklch(0.86 0.13 90);
+  --cq-gold-mid: oklch(0.78 0.14 85);
+  --cq-gold-deep: oklch(0.67 0.13 80);
+  --cq-gold-edge: oklch(0.5 0.1 75);
+  --cq-gold-ink: oklch(0.2 0.05 75);
+  --cq-gold-gloss: oklch(1 0 0 / 0.5);
+  --cq-gold-depth: oklch(0.35 0.08 75 / 0.32);
+
   --cq-focus-ring: var(--cq-accent);
   --cq-overlay: oklch(0.19 0.012 258 / 0.42);
 
@@ -215,6 +231,14 @@
     --cq-warning-soft: oklch(0.3 0.06 78);
     --cq-danger: oklch(0.7 0.16 27);
     --cq-danger-soft: oklch(0.28 0.06 27);
+    --cq-gold-highlight: oklch(0.9 0.1 92);
+    --cq-gold-light: oklch(0.83 0.13 90);
+    --cq-gold-mid: oklch(0.75 0.14 85);
+    --cq-gold-deep: oklch(0.64 0.13 80);
+    --cq-gold-edge: oklch(0.82 0.11 88);
+    --cq-gold-ink: oklch(0.18 0.04 75);
+    --cq-gold-gloss: oklch(1 0 0 / 0.38);
+    --cq-gold-depth: oklch(0 0 0 / 0.55);
     --cq-overlay: oklch(0.1 0.01 258 / 0.6);
     --cq-shadow-xs: 0 1px 2px oklch(0.05 0.01 258 / 0.4);
     --cq-shadow-sm:
@@ -260,6 +284,14 @@
   --cq-warning-soft: oklch(0.3 0.06 78);
   --cq-danger: oklch(0.7 0.16 27);
   --cq-danger-soft: oklch(0.28 0.06 27);
+  --cq-gold-highlight: oklch(0.9 0.1 92);
+  --cq-gold-light: oklch(0.83 0.13 90);
+  --cq-gold-mid: oklch(0.75 0.14 85);
+  --cq-gold-deep: oklch(0.64 0.13 80);
+  --cq-gold-edge: oklch(0.82 0.11 88);
+  --cq-gold-ink: oklch(0.18 0.04 75);
+  --cq-gold-gloss: oklch(1 0 0 / 0.38);
+  --cq-gold-depth: oklch(0 0 0 / 0.55);
   --cq-overlay: oklch(0.1 0.01 258 / 0.6);
   --cq-shadow-xs: 0 1px 2px oklch(0.05 0.01 258 / 0.4);
   --cq-shadow-sm:

@@ -15,11 +15,12 @@ import {
   MapPin,
   MessageSquare,
   Search,
-  ShieldCheck,
   UserRound,
 } from "@capital-q/ui/icons";
 import { buttonClassName } from "@capital-q/ui/button";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
+
+import { VerifiedBadge } from "@/components/verified-badge";
 
 import { EntityAvatar } from "../../entity/entity-avatar";
 
@@ -267,12 +268,12 @@ export function FounderPerson({
               {person.location}
             </p>
           )}
-          {person.identityVerified ? (
-            <p className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
-              <ShieldCheck size={ICON_SIZE.compact} aria-hidden="true" />{" "}
-              Identity verified by Capital Q
-            </p>
-          ) : null}
+          <VerifiedBadge
+            status={person.identityVerified ? "VERIFIED" : null}
+            className="self-start"
+          >
+            Identity verified by Capital Q
+          </VerifiedBadge>
         </div>
       </header>
       <div className="flex flex-wrap gap-3">

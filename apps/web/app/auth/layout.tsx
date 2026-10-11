@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
 import { ThemeToggle } from "@/features/appearance/theme-toggle";
 
 export const metadata: Metadata = {
@@ -25,6 +26,7 @@ export default function AuthLayout({
 }): ReactNode {
   return (
     <div className="cq-auth">
+      <PublicBrandStyle />
       <header className="cq-auth-header">
         <Link
           href="/"
