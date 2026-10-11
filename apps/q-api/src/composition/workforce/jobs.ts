@@ -841,6 +841,11 @@ export function createWorkforceJobs(dependencies: {
     const result = await runJob({
       jobId,
       goal: planned.summary,
+      onStepError: ({ stepKey, runId, error }) =>
+        dependencies.logger?.warn(
+          { err: error, jobId, stepKey, runId },
+          "workforce step executor threw; the step is FAILED",
+        ),
       steps: planned.steps,
       executors: withDurableResults(
         createWorkforceExecutors({
