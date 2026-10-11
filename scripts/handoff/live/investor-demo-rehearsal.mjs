@@ -214,7 +214,8 @@ async function rehearse() {
     );
     if (
       top.cards.length !== 3 ||
-      top.cards.some((c) => c.subject?.kind !== "COMPANY")
+      top.cards.some((c) => c.subject?.kind !== "COMPANY") ||
+      new Set(top.cards.map((c) => c.subject.companyId)).size !== 3
     )
       throw new Error("Expected three genuine Q cards");
     await page.locator("[data-ac-card]").first().waitFor({ timeout: 30000 });
@@ -341,7 +342,16 @@ async function rehearse() {
     await browser.close();
   }
 }
-await rehearse().catch(() => {
+await rehearse().catch((error) => {
+  writeFileSync(
+    join(evidenceDir, "failure.json"),
+    JSON.stringify({
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    }),
+    { mode: 0o600 },
+  );
   console.error(
     JSON.stringify({
       status: "FAILED",
