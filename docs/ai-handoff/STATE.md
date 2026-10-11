@@ -1,14 +1,14 @@
 # Capital Q — Current shared engineering state
 
-## LATEST STATUS — lossless investor-demo continuation — 2026-10-11 21:01 UTC
+## LATEST STATUS — lossless investor-demo continuation — 2026-10-11 21:20 UTC
 
 **Capital Q is an existing substantial application. Immediate priority: a reliable October 12 investor demo. Finish the current release and actual browser acceptance before expanding the workforce or changing scoring.**
 
 ### Branches, release and gates
 
 - Latest integrated application commit: **`06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`**, remote **`build/int-rc`**; working branch **`codex/preserve-optimize`**. Both are pushed. The CI lane **`recovery/2026-09-12-8y2j4w`** is at the same application SHA. Current handoff/timing checkpoint is a subsequent work-branch commit; it does not replace that gated application SHA.
-- Exact CI **`38173610861`** for `06872c7c`: format/lint/typecheck completed successfully; full Test step running; pgTAP **SUCCESS**; manual e2e **SKIPPED**. Quality is **not yet green**. Do not deploy until exact quality and pgTAP both pass.
-- Deployment lane **`recovery/2026-09-12`** remains at **`9261cdc4cdcb6c9f7829fe50fb7d3c197907848a`**. Exact CI **`38169532816`**: quality + pgTAP **SUCCESS**, manual e2e **SKIPPED**. Fresh Railway check confirms:
+- Exact CI **`38173610861`** for `06872c7c`: quality (format/lint/typecheck/full tests/build) and pgTAP **SUCCESS**; manual e2e **SKIPPED**. Exact gated application SHA was pushed to the deployment lane at 21:19 UTC. All four services are building; live browser acceptance is pending.
+- Deployment lane **`recovery/2026-09-12`** now points to **`06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`**. Last verified successful release remains **`9261cdc4cdcb6c9f7829fe50fb7d3c197907848a`**. Exact CI **`38169532816`**: quality + pgTAP **SUCCESS**, manual e2e **SKIPPED**. Fresh Railway check confirms:
 
 | Railway service      | Deployed commit                            | Status  |
 | -------------------- | ------------------------------------------ | ------- |
@@ -32,7 +32,7 @@
 - Actual known-card question baseline: first 20 visible answer characters **8,661 ms**, terminal **20,189 ms**, six correctly bound findings + one reference, zero PUBLIC_SOURCE. Two model lookup-selection rounds: **1,946 + 1,846 = 3,792 ms** before generation.
 - Warm selected-company browser on `9261cdc4`: top-three terminal **3,202 ms**; explanation first 20 rendered characters **8,341 ms**, terminal **18,978 ms**, attribution failed. Actor/run-scoped usage confirms two lookup-selection calls **1,798 + 2,036 = 3,834 ms**, final generation **11,908 ms**; post-answer extraction ends 2,219 ms after completion and is not the first-response bottleneck.
 - Earlier measured own-mandate improvement: three-sample median first 20 characters **2,098 → 892 ms**, terminal **2,163 → 941 ms**. No p95/load/semantic-first-useful-text or audio claim. Named-founder correctness improved, but its measured latency did not improve.
-- **Exact next task:** observe CI `38173610861`; if exact required gates pass, push **explicit `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`** to the deployment lane (not an unrelated newer documentation HEAD). Verify all four Railway services SUCCESS at that SHA. Run the cold browser command below. Fix any real failure without weakening assertions; update these shared files in the same cycle. Then remove measured unnecessary lookup planning using existing authorized profile reads and measure before/after.
+- **Exact next task:** observe the in-progress exact-green `06872c7c` rollout. Verify all four Railway services SUCCESS at that SHA. Run the cold browser command below. Fix any real failure without weakening assertions; update these shared files in the same cycle. Then remove measured unnecessary lookup planning using existing authorized profile reads and measure before/after.
 
 ```bash
 cd /workspace/q

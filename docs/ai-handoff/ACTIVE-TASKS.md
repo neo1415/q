@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## Release gate checkpoint — 2026-10-11 21:20 UTC
+
+Exact application `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`: CI `38173610861` quality and pgTAP SUCCESS, manual e2e SKIPPED. Exact SHA pushed to `recovery/2026-09-12`; four-service rollout is building. Next: confirm all four SUCCESS, then the full cold browser rehearsal, including selected-company binding, exact comparison and known-founder phase. No live acceptance claim yet. Latest verified release remains `9261cdc4`.
+
 ## LATEST STATUS — lossless investor-demo continuation — 2026-10-11 21:01 UTC
 
 **Capital Q is an existing substantial application. Immediate priority: a reliable October 12 investor demo. Finish the current release and actual browser acceptance before expanding the workforce or changing scoring.**
