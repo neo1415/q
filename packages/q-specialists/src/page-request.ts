@@ -304,7 +304,7 @@ export function takenBack(text: string): boolean {
  * "..., I mean ..."): what follows the last one is the request.
  */
 const CORRECTION =
-  /(?:[\s,.;:!?\u2014\u2026-]+|^)(?:(?:no+|nope)(?:\s*[,.;:!?\u2014\u2026-][\s,.;:!?\u2014\u2026-]*|\s+(?=actually|sorry|i\s+mean))(?:(?:actually|sorry|i\s+mean[t]?)\b)?|actually|sorry|i\s+mean[t]?)\b[\s,.;:!?\u2014\u2026-]*/giu;
+  /(?:[\s,.;:!?\u2014\u2026-]+|^)(?:(?:no+|nope)(?:\s*[,.;:!?\u2014\u2026-][\s,.;:!?\u2014\u2026-]*|\s+(?=actually|sorry|i\s+mean))(?:(?:actually|sorry|i\s+mean[t]?)\b)?|actually|sorry|i\s+mean[t]?|(?:(?:no+|oh)[\s,]+)?wait(?=[\s,.;:!?\u2014\u2026-]+(?:open|go|take|show|bring|actually|i\s+mean)\b))\b[\s,.;:!?\u2014\u2026-]*/giu;
 /** "Not Discover, Rehearsals" / "open not discover but rehearsals". */
 const NOT_THIS =
   /^(?<lead>.*?)\bnot\s+(?:to\s+)?[^,;]+?(?:[,;]\s*|\s+but\s+)(?:but\s+)?(?:to\s+)?(?<rest>\S.*)$/iu;

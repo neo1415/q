@@ -249,3 +249,20 @@ describe("self-corrections (founder acceptance: 'Open Discover, no, actually Reh
     );
   });
 });
+
+describe("'no wait' turns a page request (live 2026-10-11)", () => {
+  it("takes the last request after 'no wait' / 'wait'", () => {
+    expect(selfCorrected("open discover... no wait, open rehearsals")).toBe(
+      "open rehearsals",
+    );
+    expect(selfCorrected("go to capital, wait, take me to Q Daily")).toBe(
+      "take me to Q Daily",
+    );
+  });
+  it("a plain 'wait' with no new request is not a correction", () => {
+    expect(selfCorrected("wait for them")).toBe("wait for them");
+    expect(selfCorrected("open discover and wait there")).toBe(
+      "open discover and wait there",
+    );
+  });
+});
