@@ -61,6 +61,17 @@ function namedInTurn(
   return hits.length === 1 ? (hits[0] ?? null) : null;
 }
 
+function keyWordsShared(text: string, story: ArrivalDailyStory): number {
+  const flat = text.toLowerCase();
+  const words = new Set(
+    spokenHeadline(story.headline)
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length >= 5),
+  );
+  return [...words].filter((word) => flat.includes(word.slice(0, 6))).length;
+}
+
 type Referent =
   | { readonly kind: "ONE"; readonly story: ArrivalDailyStory }
   | { readonly kind: "MANY"; readonly stories: readonly ArrivalDailyStory[] }
@@ -77,7 +88,21 @@ function referentOf(
   const last = qMessages.at(-1);
   let pool: readonly ArrivalDailyStory[];
   if (last !== undefined) {
-    pool = mentionedIn(last, stories);
+    // The story Q last talked about, even in its own words (an answer
+    // that paraphrased the headline still names its key words), looking
+    // back over Q's last three lines (live 2026-10-11).
+    pool = [];
+    for (const said of qMessages.slice(-3).reverse()) {
+      const exact = mentionedIn(said, stories);
+      const found =
+        exact.length > 0
+          ? exact
+          : stories.filter((story) => keyWordsShared(said, story) >= 3);
+      if (found.length > 0) {
+        pool = found;
+        break;
+      }
+    }
   } else if (snapshot.items.length === 0) {
     // Nothing was said yet and nothing waits: the welcome named these.
     pool = welcomeStories(stories);

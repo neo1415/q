@@ -28,3 +28,13 @@ describe("dailyLaneOf: Daily-only follow-ups skip the first reads (live 2026-10-
     });
   }
 });
+
+describe("a bare ordinal after stories, not after cards (live 2026-10-11)", () => {
+  it("'the other one' is a Daily follow-up when no cards were shown", () => {
+    expect(dailyLaneOf("the other one")?.questionKind).toBe("DAILY_FOLLOW_UP");
+    expect(dailyLaneOf("The first one.")?.questionKind).toBe("DAILY_FOLLOW_UP");
+  });
+  it("after cards it is left to the reader (it means a card)", () => {
+    expect(dailyLaneOf("the other one", true)).toBeNull();
+  });
+});

@@ -1023,3 +1023,16 @@ describe("Daily follow-ups after two stories (live 2026-10-11)", () => {
     expect(dailyFollowUpAnswer("the first company", QUIET, welcome)).toBeNull();
   });
 });
+
+describe("the story Q talked about in its own words (live 2026-10-11)", () => {
+  it("'take me to the story' after a paraphrase of story two opens story two", () => {
+    const open = dailyFollowUpAnswer("take me to the story", QUIET, [
+      "The other story: Nigeria's central bank cut fintech licence fees for payment startups.",
+    ]);
+    expect(open?.open).toEqual({
+      page: "DAILY_EDITION",
+      id: EDITION,
+      anchor: "story-s2",
+    });
+  });
+});

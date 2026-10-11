@@ -2330,12 +2330,15 @@ export function createSpecialistQAnswer(
     };
   };
 
-  const instantLaneOf = (utterance: string) =>
+  const instantLaneOf = (
+    utterance: string,
+    history: readonly QConversationMessage[] = [],
+  ) =>
     (dependencies.knownEntities === undefined
       ? null
       : knownEntityLaneOf(utterance, dependencies.knownEntities)) ??
     investorDiscoveryLaneOf(utterance) ??
-    dailyLaneOf(utterance);
+    dailyLaneOf(utterance, lastAnswerShowedCards(history));
 
   /** A follow-up about a prepared entity, composed by code; null if none. */
   const preparedFollowUpOf = (
@@ -2365,7 +2368,7 @@ export function createSpecialistQAnswer(
       // B5: a pleasantry is answered by code; its reading would be waste.
       if (pleasantryOf(latest.content) !== null) return null;
       // An instant known-entity lookup is answered by code: no reading.
-      if (instantLaneOf(latest.content) !== null) return null;
+      if (instantLaneOf(latest.content, history) !== null) return null;
       if (preparedFollowUpOf(latest.content, history) !== null) return null;
       // K fast lane: the short first read starts as early as the reading.
       if (dependencies.turnSkim !== undefined && !preskims.has(input.runId)) {
@@ -2669,7 +2672,7 @@ export function createSpecialistQAnswer(
       request.plan.screen?.route !== "ONBOARDING" &&
       !sequences.has(conversationId)
     ) {
-      const instant = instantLaneOf(latest.content);
+      const instant = instantLaneOf(latest.content, history);
       if (instant !== null) {
         const capabilities = await capabilitiesOf(request);
         logger?.info(
@@ -4424,4 +4427,18 @@ export function screenActOf(text: string): {
     return { act: "GO_BACK", said: "Going back." };
   }
   return null;
+}
+
+/** Whether Q's last answer put cards on screen ("the first one" means a card then). */
+function lastAnswerShowedCards(
+  history: readonly QConversationMessage[],
+): boolean {
+  const lastQ = [...history].reverse().find((m) => m.role === "Q");
+  return (lastQ?.blocks ?? []).some(
+    (block) =>
+      block.kind === "ANSWER_CARDS" ||
+      block.kind === "COMPANY_REFERENCE" ||
+      block.kind === "INVESTOR_REFERENCE" ||
+      block.kind === "COMPARISON_CARDS",
+  );
 }

@@ -472,10 +472,20 @@ export function cardsLaneOf(
 const DAILY_ONLY =
   /\b(?:(?:the\s+)?gist|full\s+story|(?:that|this|the)\s+(?:story|article|section|news)|q\s+daily)\b/iu;
 
-export function dailyLaneOf(utterance: string): FastLane | null {
+export function dailyLaneOf(
+  utterance: string,
+  lastAnswerShowedCards = false,
+): FastLane | null {
   const text = utterance.trim();
   if (text.length === 0 || text.length > 120) return null;
-  if (!DAILY_ONLY.test(text)) return null;
+  // "the other one" / "the first one" after Q talked about stories (not
+  // after cards, where it means a card): the Daily lane, no first reads.
+  const bareOrdinal =
+    !lastAnswerShowedCards &&
+    /^(?:and\s+)?(?:the\s+)?(?:first|second|other|last|latter|former)(?:\s+one)?(?:\s+please)?[.!?]*$/iu.test(
+      text,
+    );
+  if (!bareOrdinal && !DAILY_ONLY.test(text)) return null;
   // A request to act on something else is not a Daily follow-up.
   if (
     /\b(?:draft|email|send|schedule|delete|approve|decline|deck|pitch)\b/iu.test(
