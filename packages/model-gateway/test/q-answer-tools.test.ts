@@ -277,6 +277,105 @@ const SET_THEME_OFFERED: QOfferedTool = {
   visibleStage: null,
 };
 
+describe("named-company evidence binding", () => {
+  it.each([false, true])(
+    "binds findings to the explicitly named authorised profile, including warmed reads (%s)",
+    async (warm) => {
+      const screen = randomUUID();
+      const target = randomUUID();
+      const profile = (companyId: string, canonicalName: string) => ({
+        companyId,
+        canonicalName,
+        legalName: null,
+        websiteUrl: null,
+        foundedDate: null,
+        headquartersCountry: null,
+        headquartersCity: null,
+        currentStageCode: "seed",
+        shortDescription: "Declared company profile",
+        primaryDescription: null,
+        companyStatus: "active",
+        relationToYou: "SHARED",
+        truthClass: "USER_CLAIM",
+      });
+      const tools = toolPort([GET_COMPANY], (p) =>
+        succeeded(
+          p,
+          profile(
+            p.callId === "named-profile" ? target : screen,
+            p.callId === "named-profile"
+              ? "Named Founder"
+              : "Incidental Screen Company",
+          ),
+        ),
+      );
+      const { seam, request, messages, completed, alpha } = build({
+        tools,
+        script: [
+          call("named-profile", { companyId: target }),
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult(
+                "Named Founder's declared profile is seed stage.",
+              ),
+              findings: [
+                {
+                  statement: "Declared seed stage.",
+                  type: "FACT",
+                  confidence: "MODERATE",
+                  truthClass: "USER_CLAIM",
+                  evidenceStatus: "SELF_REPORTED",
+                },
+              ],
+            }),
+          },
+        ],
+      });
+      if (messages[0])
+        messages.splice(0, 1, {
+          ...messages[0],
+          content: "What does Named Founder do?",
+        });
+      const bound = {
+        ...request,
+        subjects: [{ kind: "COMPANY" as const, companyId: screen }],
+        plan: {
+          ...request.plan,
+          screen: { route: "COMPANY" as const, companyId: screen },
+        },
+      };
+      if (warm) {
+        const warmAnswer = seam.warm;
+        if (warmAnswer === undefined) throw new Error("Warm reads unavailable");
+        warmAnswer(bound);
+      }
+      await seam.answer({ ...bound, aboutNamedOther: true });
+      const payload = completed.at(-1) as {
+        message: {
+          blocks: Array<{
+            kind: string;
+            finding?: { subjects: unknown[] };
+            companyId?: string;
+          }>;
+        };
+      };
+      expect(
+        payload.message.blocks.find((b) => b.kind === "FINDING")?.finding
+          ?.subjects,
+      ).toEqual([{ kind: "COMPANY", companyId: target }]);
+      expect(
+        payload.message.blocks
+          .filter((b) => b.kind === "COMPANY_REFERENCE")
+          .map((b) => b.companyId),
+      ).toEqual([target]);
+      expect(JSON.stringify(alpha.calls[0]?.request)).toContain(
+        "Resolve the company named in the current question",
+      );
+    },
+  );
+});
+
 describe("client actions and the screen reach the answer (R20/R21/R33)", () => {
   it("a client-action tool's authorised result rides on the answer as a UI_INTENT block", async () => {
     const tools = toolPort([SET_THEME_OFFERED], (p) => ({

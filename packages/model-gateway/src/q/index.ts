@@ -90,7 +90,11 @@ import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
-import { createRunCompanies, withCardSubjects } from "./card-subjects.js";
+import {
+  createRunCompanies,
+  namedCompanySubjects,
+  withCardSubjects,
+} from "./card-subjects.js";
 import {
   createRunFits,
   fitAnswerCardsBlock,
@@ -3184,30 +3188,34 @@ export function createModelGatewayQAnswer(
         };
         const personality = await personalityRead;
         const asker = await askerRead;
-        const noteParts = environmentNoteParts(
-          facts,
-          offered,
-          request.subjects,
-          {
-            // Only when the firewall actually granted it. The plan has
-            // said so all along; nothing was reading it.
-            generalKnowledge: plan.scopes.some(
-              (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
-            ),
-            ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
-            ...(request.turnUnread === true ? { turnUnread: true } : {}),
-            ...(request.writingDocument === true
-              ? { writingDocument: true }
-              : {}),
-            ...(request.spoken === true ? { spoken: true } : {}),
-            ...(request.questionSequence === undefined
-              ? {}
-              : { questionSequence: request.questionSequence }),
-            ...(onboardingNudge === null ? {} : { onboardingNudge }),
-            ...(personality === null ? {} : { personality }),
-            ...(asker === null ? {} : { asker }),
-          },
-        );
+        let noteParts = environmentNoteParts(facts, offered, request.subjects, {
+          // Only when the firewall actually granted it. The plan has
+          // said so all along; nothing was reading it.
+          generalKnowledge: plan.scopes.some(
+            (scope) => scope.kind === "GENERAL_MODEL_KNOWLEDGE",
+          ),
+          ...(openDocumentTitle === undefined ? {} : { openDocumentTitle }),
+          ...(request.turnUnread === true ? { turnUnread: true } : {}),
+          ...(request.writingDocument === true
+            ? { writingDocument: true }
+            : {}),
+          ...(request.spoken === true ? { spoken: true } : {}),
+          ...(request.questionSequence === undefined
+            ? {}
+            : { questionSequence: request.questionSequence }),
+          ...(onboardingNudge === null ? {} : { onboardingNudge }),
+          ...(personality === null ? {} : { personality }),
+          ...(asker === null ? {} : { asker }),
+        });
+        if (request.aboutNamedOther === true) {
+          noteParts = {
+            ...noteParts,
+            turn: [
+              "Resolve the company named in the current question through search_companies and get_company before answering from its records. The company visible on screen is navigation context; do not substitute its facts for the named target. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately.",
+              noteParts.turn,
+            ].join(" "),
+          };
+        }
         // COMPANY_ANALYST v16 (prompt-cache order): this turn's notes ride in
         // the task's tail and the charter keeps only what is the same from
         // turn to turn; an earlier version still gets them all in the charter.
@@ -5163,11 +5171,14 @@ export function createModelGatewayQAnswer(
         const companiesRead = runCompanies.take(request.runId);
         const modelBlocks = analystResultBlocks({
           result: analyst,
-          // The run's own authorised subjects, never anything the model
-          // named: a reference is caused by what the server allowed this
-          // run to be about. Their own firm, carried as context for a fit
-          // question, is not what they asked about (CQ-QX-007).
-          subjects: askedSubjects(request.subjects, plan),
+          // Screen focus is not the target of a question naming another
+          // company. Its reference must come from an exact name and a
+          // successful authorised profile read, never a model-written id.
+          // Ordinary screen questions retain the run's allowed subjects.
+          subjects:
+            request.aboutNamedOther === true
+              ? namedCompanySubjects(latest.content, companiesRead)
+              : askedSubjects(request.subjects, plan),
           // RECOVERY E4: investors and places this run's tools returned,
           // so investor cards and maps name only what was read.
           read: companiesRead,

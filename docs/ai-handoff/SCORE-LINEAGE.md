@@ -15,6 +15,21 @@ A real projection defect affected 39 of the 42 cards: MISMATCH parameters contri
 
 A separate static defect capped measures at eight although the canonical/shared contract permits nine. The adapter now uses that existing shared constant. Ninth-known and ninth-unknown regressions cover it. No new ranking formula, FDN methodology or business service is introduced. Model prompt schemas/versions remain unchanged; the additive card level preserves existing canonical negative evidence.
 
+## Repeated 6.0 and 3.5 on actual authorized profiles — 2026-10-11 18:40 UTC
+
+The same actor's 42 captured canonical fit profiles were recomputed through the existing shared `fitScoreOutOf10` function. All are `ranking-config.v4`. The observed histogram is 10 × 2, 8.5 × 1, 6 × 14, 4.5 × 1, 3.5 × 21 and 1 × 3. None is 8.8. These are mandate-fit outputs, not InvestIQ Business Quality assessments.
+
+Every profile has four known parameter outcomes. Its six applicable parameters include unknown cheque size and round terms; business model, traction and team are non-applicable for this mandate. Unknowns are omitted from the displayed mean rather than scored as mismatch.
+
+| Repeated displayed fit | Actual companies | Known outcomes                        | Shared computation           |
+| ---------------------- | ---------------- | ------------------------------------- | ---------------------------- |
+| 6.0                    | 14               | Two STRONG, one PARTIAL, one MISMATCH | `(10 + 10 + 4 + 0) / 4 = 6`  |
+| 3.5                    | 21               | One STRONG, one PARTIAL, two MISMATCH | `(10 + 4 + 0 + 0) / 4 = 3.5` |
+
+The outcomes differ even within a tied score. Of the fourteen 6.0 profiles, thirteen have strong stage/sector and geography mismatch; one has strong stage/geography and sector mismatch. Of the twenty-one 3.5 profiles, eleven have strong stage with sector/geography mismatch; ten have strong sector with stage/geography mismatch. All have PARTIAL thesis similarity. The current comparator maps a present computed semantic similarity to PARTIAL between its configured thresholds; it reports UNKNOWN when no authorized semantic feature was retrieved (`fit/observe.ts`, `features/policy.ts`). The captured profile contains the outcome, not the underlying similarity; this audit does not establish whether that similarity deserves calibration.
+
+This demonstrates coarse-level aggregation and ties in these real records, not a hard-coded fallback of 6 or 3.5. Four known outcomes provide limited numerical discrimination; the displayed mean also erases which dimension mismatched. Preserve the individual dimensions, unknown coverage and tie explanation. Do not add random precision or substitute a proposed InvestIQ formula. Historical 8.8 provenance remains unresolved; this sample cannot explain another actor's historical incident.
+
 ## Why 8.8 repeats
 
 The recorded 2026-10-08 incident returned three companies, then expanded to ten

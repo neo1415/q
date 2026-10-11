@@ -216,3 +216,13 @@ Newest entry last. Never edit past entries; correct them in a new entry.
 
 - **Next:** finish exact `5f3a0c8c` CI `38162345315` and release/live top-ten acceptance; continue authorized named-company binding and complete investor rehearsal. New spending guard and gap presentation packet remain separate work-branch changes pending their own exact gates.
 - **Secrets:** private artifact/export/browser receipts remain outside checkout; no private data or credentials committed.
+
+## 2026-10-11 18:38 UTC — Codex — demo release and named-company evidence binding
+
+- Canonical gap packet committed/pushed as `0ea65ec4`. Workforce spending guard `78a5dde9` also remains work-branch only. Neither is called deployed.
+- Exact top-ten revision `5f3a0c8c725dc89dba22d4d0ee42f0a9ced18e66` passed CI `38162345315` quality and pgTAP; manual e2e skipped. Exact SHA pushed to Railway's deployment branch; readiness and live top-ten acceptance pending.
+- Full-seam regression reproduces the wrong company reference, both with warm reads and cold reads. Named-company findings/references now bind only a single exact canonical name from this run's complete successful authorised profile read. Denied, failed, unclassified, search-only, malformed and ambiguous outcomes do not establish the target. Added turn guidance uses the final reader flag even when reads warmed earlier. No change to permission scope or scoring math.
+- 52 package builds and 61 focused tests across four gateway files pass. Root/q-api types and changed lint/format pass. Initial fixture typing errors were corrected; both warm/cold cases pass in the final rerun. Exact gates pending. Real SSE named-company baseline completed: first 20 answer characters 10,395 / 6,454 / 4,389 ms; terminal 33,164 / 16,619 / 12,148 ms. All three lack the correct company reference. No after-change improvement or resolved live journey claimed.
+- Next: commit/push and gate the bounded fix, verify four services/current cards, then authenticated demo rehearsal of named questions, follow-ups and comparison. Broader document capability work remains paused for the demo. No secrets or private customer contents committed.
+
+- **Real repeated scores:** recomputed all 42 authorized canonical profiles with the shared function. Four known outcomes per company produce 6.0 for fourteen records and 3.5 for twenty-one; no 8.8. Different stage/sector/geography patterns collapse to the same coarse mean. See SCORE-LINEAGE.md; no score math changed.
