@@ -98,6 +98,25 @@ export {
   createPostgresMeetingDirectory,
   createPostgresScheduleStore,
 } from "./schedule/postgres.js";
+// MEET-TIME block (2026-10-09): a meeting time is a proposal the investor
+// accepts; nothing is booked or called confirmed before that.
+export {
+  createProposalService,
+  PROPOSAL_TRANSITIONS,
+  transition as transitionProposal,
+  type ProposalAction,
+  type ProposalBooking,
+  type ProposalOutcome,
+  type ProposalParties,
+  type ProposalRecord,
+  type ProposalRefusal,
+  type ProposalService,
+  type ProposalSide,
+  type ProposalState,
+  type ProposalStore,
+  type TimeOption,
+} from "./schedule/proposal.js";
+export { createPostgresProposalStore } from "./schedule/proposal-postgres.js";
 export {
   createMeetingAssistantService,
   meetingAssistantView,
