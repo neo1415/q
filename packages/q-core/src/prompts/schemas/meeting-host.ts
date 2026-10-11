@@ -85,6 +85,9 @@ export const MEETING_HOST_KINDS = [
   "GUEST",
   "QUIET",
   "LEAVE_REQUEST",
+  // 2026-10-09: the other participant has not joined and the person asks Q
+  // to wait / stay / not leave, in any wording or language.
+  "KEEP_WAITING",
 ] as const;
 export const MeetingHostResultV2Schema = MeetingHostResultSchema.extend({
   kind: z.enum(MEETING_HOST_KINDS),

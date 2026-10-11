@@ -66,11 +66,13 @@ describe("MEETING_HOST_TURN", () => {
     expect(outside).not.toContain("admin mode");
   });
 
-  it("v3: answers short and at once, and may use what is shown in the call", () => {
+  it("v4: answers at once and conversationally, may use what is shown, and reads KEEP_WAITING", () => {
     const active = registry.getActive("MEETING_HOST_TURN").definition;
-    expect(active.version).toBe(3);
+    expect(active.version).toBe(4);
     expect(active.template).toContain("{{seen}}");
-    expect(active.template).toContain("under 15 words");
+    expect(active.template).toContain("under 20 words");
+    expect(active.template).toContain("KEEP_WAITING");
+    expect(active.template).toContain("never treat silence as agreement");
     expect(active.template).toContain(
       "Never describe anyone's face, appearance or identity",
     );

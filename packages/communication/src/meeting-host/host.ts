@@ -23,6 +23,15 @@
  * - Cost: a cap on spoken characters and on model calls per call; model
  *   calls happen on events (an addressed line, a guest's introduction),
  *   never per caption fragment.
+ * - Waiting (live 2026-10-09, founder): when the other side has not joined,
+ *   Q stays with the person who is there, available to talk. It checks in
+ *   once ("keep waiting or help you prepare?") and a clear ask to wait is
+ *   understood by code first. SILENCE IS NEVER CONSENT, and Q never
+ *   reschedules or cancels an active meeting because someone is absent:
+ *   when its wait runs out it says why, leaves, and the booking is left
+ *   exactly as it was. Only a person's explicit request is recorded as a
+ *   request to find a new time; the new time itself is the investor's to
+ *   accept (the scheduling proposal state machine), never Q's to book.
  */
 
 export type HostSide = "FOUNDER" | "INVESTOR";
@@ -127,6 +136,7 @@ export type SayReason =
   | "LEAVING"
   | "OFFER_RECAP"
   | "ONE_SIDED"
+  | "WAITING"
   | "PROPOSED"
   | "REPLY";
 
@@ -160,26 +170,45 @@ export type HostAction =
       readonly byUserId: string | null;
     }
   | {
+      /**
+       * Someone present explicitly asked for a new time. Recorded only: Q
+       * keeps waiting, and nothing is moved or cancelled by it.
+       */
+      readonly kind: "RESCHEDULE_REQUESTED";
+      readonly byName: string;
+      readonly byUserId: string | null;
+    }
+  | {
       readonly kind: "LEAVE";
       /** REMOVED: a participant asked Q to go. POLICY: code's own limits. */
       readonly reason: "REMOVED" | "POLICY";
+      /**
+       * Why Q left, for the logs and the record (2026-10-09): the soft wait
+       * ran out, the configured wait cap was reached, or the hard cap.
+       */
+      readonly cause?: LeaveCause | undefined;
       readonly by: CallParticipant | null;
       readonly byUserId: string | null;
     };
 
+export type LeaveCause = "WAIT_EXPIRED" | "WAIT_CAP" | "HARD_CAP" | "REMOVED";
+
 /**
- * How the call ended up, for the runtime to act on after Q leaves:
- * nobody came; or one side came and the other did not (with whether those
- * present want Q to find a new time, or said never mind).
+ * How the call ended up, for the runtime to act on after Q leaves: nobody
+ * came, or one side came and the other did not. Q left because its wait
+ * ran out; the meeting itself is NOT changed by either outcome (2026-10-09).
+ * `rescheduleRequested` is true only when a person present explicitly asked
+ * for a new time in the call -- never inferred from silence or from "wait".
  */
 export type HostOutcome =
-  | { readonly kind: "NO_SHOW" }
+  | { readonly kind: "NO_SHOW"; readonly cause: LeaveCause }
   | {
       readonly kind: "ONE_SIDED";
       readonly presentSide: HostSide;
       readonly absentSide: HostSide;
       readonly presentUserIds: readonly string[];
-      readonly reschedule: boolean;
+      readonly cause: LeaveCause;
+      readonly rescheduleRequested: boolean;
     };
 
 export type HostPhase =
@@ -198,27 +227,46 @@ export type HostPhase =
  * not abusable). Nothing a participant says can make it 0 or unbounded.
  */
 export type HostPolicy = {
-  /** After the start, with an expected side missing: then Q resolves it. */
+  /**
+   * After the start, with an expected side missing: Q checks in with the
+   * person who is there ("keep waiting or help you prepare?"). It does not
+   * leave then.
+   */
   readonly graceAfterStartMs: number;
   /** Q never stays past the start plus this, whatever happens. */
   readonly hardCapAfterStartMs: number;
-  /** Waiting for "shall I let you know?" before taking it as a yes. */
-  readonly answerWaitMs: number;
+  /**
+   * MEETING_WAIT_MAX_MINUTES: the longest Q waits for a missing side, from
+   * the start, however many times it is asked to keep waiting.
+   */
+  readonly waitMaxAfterStartMs: number;
+  /** How far one "give them a few more minutes" pushes Q's wait. */
+  readonly waitExtendMs: number;
+  /** After the check-in, how long Q waits for a reply before its wait ends. */
+  readonly checkInPatienceMs: number;
 };
 
 export const HOST_POLICY_BOUNDS = {
   graceAfterStartMs: { min: 2 * 60_000, max: 15 * 60_000 },
   hardCapAfterStartMs: { min: 15 * 60_000, max: 150 * 60_000 },
-  answerWaitMs: { min: 30_000, max: 3 * 60_000 },
+  waitMaxAfterStartMs: { min: 5 * 60_000, max: 60 * 60_000 },
+  waitExtendMs: { min: 60_000, max: 15 * 60_000 },
+  checkInPatienceMs: { min: 60_000, max: 10 * 60_000 },
 } as const;
 
 export const DEFAULT_HOST_POLICY: HostPolicy = {
   graceAfterStartMs: 10 * 60_000,
   hardCapAfterStartMs: 120 * 60_000,
-  answerWaitMs: 2 * 60_000,
+  waitMaxAfterStartMs: 20 * 60_000,
+  waitExtendMs: 5 * 60_000,
+  checkInPatienceMs: 5 * 60_000,
 };
 
-/** A policy held to its bounds: a bad configuration cannot unbound it. */
+/**
+ * A policy held to its bounds: a bad configuration cannot unbound it. The
+ * wait cap can never exceed the hard cap, and the first check-in comes
+ * before the cap.
+ */
 export function boundedPolicy(policy: Partial<HostPolicy>): HostPolicy {
   const clamp = (key: keyof HostPolicy) => {
     const value = policy[key] ?? DEFAULT_HOST_POLICY[key];
@@ -227,11 +275,32 @@ export function boundedPolicy(policy: Partial<HostPolicy>): HostPolicy {
       ? Math.min(max, Math.max(min, value))
       : DEFAULT_HOST_POLICY[key];
   };
+  const hardCapAfterStartMs = clamp("hardCapAfterStartMs");
+  const waitMaxAfterStartMs = Math.min(
+    clamp("waitMaxAfterStartMs"),
+    hardCapAfterStartMs - 60_000,
+  );
   return {
-    graceAfterStartMs: clamp("graceAfterStartMs"),
-    hardCapAfterStartMs: clamp("hardCapAfterStartMs"),
-    answerWaitMs: clamp("answerWaitMs"),
+    graceAfterStartMs: Math.min(
+      clamp("graceAfterStartMs"),
+      Math.max(waitMaxAfterStartMs - 60_000, 60_000),
+    ),
+    hardCapAfterStartMs,
+    waitMaxAfterStartMs,
+    waitExtendMs: clamp("waitExtendMs"),
+    checkInPatienceMs: clamp("checkInPatienceMs"),
   };
+}
+
+/**
+ * MEETING_WAIT_MAX_MINUTES (default 20), read once by the composition root.
+ * Anything unreadable is the default; the policy bounds hold the rest.
+ */
+export function waitMaxMsFromEnv(raw: string | undefined): number {
+  const minutes = Number(raw);
+  return raw !== undefined && raw.trim() !== "" && Number.isFinite(minutes)
+    ? minutes * 60_000
+    : DEFAULT_HOST_POLICY.waitMaxAfterStartMs;
 }
 
 export type HostLimits = {
@@ -269,10 +338,14 @@ export type HostLimits = {
 };
 
 export const DEFAULT_HOST_LIMITS: HostLimits = {
-  maxSpokenChars: 2_400,
-  // P4: about one question a minute for an hour's call (each is one short,
-  // cheap NORMAL_DIALOGUE turn); the per-call spend stays bounded.
-  maxModelCalls: 60,
+  // 2026-10-09 (founder): conversational, not telegraphic. Unprompted lines
+  // (greeting, introductions, check-ins) are held to this; answers to a
+  // person who asked are held by the model-call cap. Was 2_400.
+  maxSpokenChars: 20_000,
+  // About two exchanges a minute across an hour and a quarter, each one
+  // cheap NORMAL_DIALOGUE turn bounded by HOST_BUDGET; the per-meeting
+  // spend is at most maxModelCalls x that turn cap. Was 60.
+  maxModelCalls: 150,
   quietMs: 1_200,
   offerRecapBeforeEndMs: 3 * 60_000,
   replyHoldMs: 1_200,
@@ -537,6 +610,92 @@ export function saysNeverMind(text: string): boolean {
   );
 }
 
+/**
+ * Someone present asks Q to keep waiting for the other participant ("wait",
+ * "hang on", "don't leave", "stay with me", "let's talk while we wait",
+ * "give them a few more minutes", "they're on their way"). Read by code
+ * first, on any line while a side is missing: harmless to over-match, since
+ * the wait is bounded by the cap and nothing but the wait changes. "Wait"
+ * inside a longer question is still a wait; a model reads the rest.
+ */
+export function asksQToWait(text: string): boolean {
+  const t = ` ${plain(text.replace(/['’]/g, ""))} `;
+  if (
+    /\b(?:dont wait|do not wait|no need to wait|stop waiting|dont stay)\b/.test(
+      t,
+    )
+  ) {
+    return false;
+  }
+  return WAIT_PHRASES.test(t);
+}
+
+const WAIT_PHRASES = new RegExp(
+  "\\b(?:" +
+    [
+      "wait|waiting|hold on|hang on|hang tight|hold tight|hold the line|sit tight|stay put|stick around",
+      "bear with (?:me|us)",
+      "(?:one|just a) (?:sec|second|moment|minute)",
+      "give (?:them|him|her|it|us|me) (?:a|an|another|some|just|\\w+) (?:(?:few|little|bit|more|extra) )*(?:minutes?|moments?|mins?|bit|while|longer|time|chance)",
+      "(?:few|couple of|couple) more minutes|(?:bit|little) longer",
+      "dont (?:leave|go|hang up|drop off|disappear|quit|end)|do not (?:leave|go|hang up)|never leave",
+      "stay (?:with (?:me|us)|here|on|in the call|forever|longer|a (?:bit|while|little)|for (?:a|another) (?:bit|while|few))",
+      "keep (?:waiting|the call open|it open|the call going)",
+      "(?:talk|chat) (?:while|until)",
+      "lets (?:talk|chat|speak|keep talking|prepare|go over|use the time) (?:while|until|for now|first|meanwhile)",
+      "(?:they|he|she|everyone|everybody|the investor|the founder)(?:ll|s|re)? (?:(?:will|should|is|are|has|have|just|probably|still|about to|nearly|almost) )*(?:be here|be joining|joining|join|joins|coming|running late|on (?:their|his|her) way|late|here soon)",
+    ].join("|") +
+    ")\\b",
+);
+
+/**
+ * Someone present explicitly asks for another time. Only that: not silence,
+ * not "wait". Recorded as their request; nothing is rescheduled by Q.
+ */
+export function asksToReschedule(text: string): boolean {
+  const t = ` ${plain(text.replace(/['’]/g, ""))} `;
+  return /\b(?:re ?schedule|another time|a new time|different time|new time|find (?:us )?(?:a )?(?:new|another|different) (?:time|slot)|book (?:another|a new|a different)|push (?:it|this|the (?:call|meeting)) (?:to|back)|move (?:it|this|the (?:call|meeting)) to)\b/.test(
+    t,
+  );
+}
+
+/** "give them ten more minutes": the minutes asked for, when stated. */
+export function waitMinutesAsked(text: string): number | null {
+  const words: Record<string, number> = {
+    a: 1,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    ten: 10,
+    fifteen: 15,
+    twenty: 20,
+  };
+  const m =
+    /\b(\d{1,3}|a|one|two|three|four|five|ten|fifteen|twenty)\s*(?:more |extra |other )?(?:minutes?|mins?)\b/i.exec(
+      text,
+    );
+  if (m === null || m[1] === undefined) return null;
+  const n = /^\d/.test(m[1])
+    ? Number(m[1])
+    : (words[m[1].toLowerCase()] ?? NaN);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export type HostStats = {
+  utterances: number;
+  partials: number;
+  ignoredBot: number;
+  ignoredEcho: number;
+  ignoredEmpty: number;
+  attributedImplicit: number;
+  addressed: number;
+  waitAsks: number;
+  rescheduleAsks: number;
+  answered: number;
+};
+
 type Present = {
   readonly participant: CallParticipant;
   party: HostParty | null;
@@ -571,6 +730,20 @@ export type MeetingHost = {
   ) => HostAction[];
   /** "Q, be quiet": Q stops speaking unprompted and keeps taking notes. */
   readonly quiet: () => void;
+  /**
+   * The reader (the model, on a line addressed to Q) understood a request to
+   * keep waiting that the code matcher did not: the same bounded extension.
+   */
+  readonly keepWaiting: (at: number) => void;
+  /** Counts of what happened to each line heard, for the logs (no words). */
+  readonly stats: () => Readonly<HostStats> & {
+    readonly spentChars: number;
+    readonly modelCalls: number;
+    readonly waitUntil: number;
+    readonly waitCapAt: number;
+    readonly present: number;
+    readonly missingSides: readonly HostSide[];
+  };
   /** Whether a speaker is an invited person, for recording who asked. */
   readonly userIdOf: (name: string) => string | null;
   readonly spentChars: () => number;
@@ -593,11 +766,32 @@ export function createMeetingHost(
   const start = context.startsAt.getTime();
   /** Sides that came at all, and whether anyone came. */
   const sidesSeen = new Set<HostSide>();
-  let anyoneCame = false;
-  let resolved = false;
-  /** One side came: waiting for "shall I let you know?" since this time. */
-  let askedAt: number | null = null;
-  let oneSide: { present: HostSide; absent: HostSide } | null = null;
+  /**
+   * Waiting for a missing side (2026-10-09). `waitUntil` is when the wait
+   * runs out if nobody asks Q to keep waiting; it only ever moves later,
+   * and never past `waitCapAt`. Silence moves nothing: it is not consent.
+   */
+  const waitCapAt = start + policy.waitMaxAfterStartMs;
+  let waitUntil = start + policy.graceAfterStartMs;
+  let checkedIn = false;
+  /** Someone present explicitly asked for a new time (recorded, not acted on). */
+  let rescheduleAsked = false;
+  let lastWaitAckAt = -Infinity;
+  /** When a present person last spoke to Q; a live conversation is not left. */
+  let lastEngagedAt = -Infinity;
+  /** Per-call counts of what happened to each line, for the logs. */
+  const stats: HostStats = {
+    utterances: 0,
+    partials: 0,
+    ignoredBot: 0,
+    ignoredEcho: 0,
+    ignoredEmpty: 0,
+    attributedImplicit: 0,
+    addressed: 0,
+    waitAsks: 0,
+    rescheduleAsks: 0,
+    answered: 0,
+  };
   const present = new Map<string, Present>();
   const speaking = new Set<string>();
   const outbox: { text: string; why: SayReason; readyAt: number }[] = [];
@@ -688,6 +882,7 @@ export function createMeetingHost(
     ) {
       return;
     }
+    // (WAITING is an unprompted acknowledgement: quiet mode silences it.)
     const waiting = outbox.reduce((sum, line) => sum + line.text.length, 0);
     const overBudget = spoken + waiting + text.length > limits.maxSpokenChars;
     // P4: the spoken budget holds what Q says unprompted. An answer to a
@@ -699,7 +894,10 @@ export function createMeetingHost(
   }
 
   const answers = (why: SayReason) =>
-    why === "REPLY" || why === "REFUSE" || why === "PROPOSED";
+    why === "REPLY" ||
+    why === "REFUSE" ||
+    why === "PROPOSED" ||
+    why === "WAITING";
 
   /**
    * A line that waited too long is no longer worth saying (meet2-64: a
@@ -738,6 +936,7 @@ export function createMeetingHost(
     if (!roomQuiet && !heldLongEnough) return [];
     const next = outbox.shift();
     if (next === undefined) return [];
+    if (next.why === "REPLY") stats.answered += 1;
     spoken += next.text.length;
     remember(next.text, at);
     sayingSince = at;
@@ -847,35 +1046,110 @@ export function createMeetingHost(
     }
   }
 
-  /** One side came: say goodbye, report the outcome, and leave. */
-  function settleOneSided(reschedule: boolean): HostAction[] {
-    const side = oneSide;
-    askedAt = null;
-    if (side === null) return [];
-    queue(
-      reschedule
-        ? "Thank you. I'll let you know once it's rescheduled. I'll leave you now."
-        : "Understood, I won't. I'll leave you now.",
-      "LEAVING",
+  /** The invited sides nobody from has joined yet. */
+  function missingSides(): HostSide[] {
+    return (["FOUNDER", "INVESTOR"] as const).filter(
+      (side) =>
+        !sidesSeen.has(side) && context.parties.some((p) => p.side === side),
     );
+  }
+
+  function missingNames(): string {
+    const missing = context.parties
+      .filter((p) => !sidesSeen.has(p.side))
+      .map((p) => firstName(p.name));
+    return missing.length === 0
+      ? "the other participant"
+      : missing.length === 1
+        ? (missing[0] ?? "the other participant")
+        : "the other participants";
+  }
+
+  /**
+   * The wait is over: Q says why, reports the outcome and leaves. The
+   * booking is not touched -- not rescheduled, not cancelled -- and the
+   * reason is carried out and logged by the runtime.
+   */
+  function finishWaiting(cause: LeaveCause): HostAction[] {
+    outbox.length = 0;
+    const minutes = Math.round(
+      (cause === "WAIT_CAP" ? policy.waitMaxAfterStartMs : waitUntil - start) /
+        60_000,
+    );
+    if (present.size > 0) {
+      queue(
+        cause === "WAIT_CAP"
+          ? `I'm sorry, ${missingNames()} still hasn't joined, and I can only wait up to ${String(minutes)} minutes after the start, so I'm leaving now. Nothing about the meeting has changed: it stays booked, and your notes are kept. You can ask me to propose a new time from Capital Q whenever you like.`
+          : `I haven't heard whether to keep waiting, and ${missingNames()} hasn't joined, so I'm stepping out of the call now. Nothing about the meeting has changed: it stays booked, and your notes are kept. You can ask me to propose a new time from Capital Q whenever you like.`,
+        "LEAVING",
+      );
+    }
     const out: HostAction[] = drain();
+    const seen = [...sidesSeen];
+    const presentSide = seen[0];
+    if (presentSide === undefined || seen.length !== 1) {
+      out.push({ kind: "OUTCOME", outcome: { kind: "NO_SHOW", cause } });
+    } else {
+      out.push({
+        kind: "OUTCOME",
+        outcome: {
+          kind: "ONE_SIDED",
+          presentSide,
+          absentSide: presentSide === "FOUNDER" ? "INVESTOR" : "FOUNDER",
+          presentUserIds: [...present.values()].flatMap((h) =>
+            h.party !== null && h.party.side === presentSide
+              ? [h.party.userId]
+              : [],
+          ),
+          cause,
+          rescheduleRequested: rescheduleAsked,
+        },
+      });
+    }
     out.push({
-      kind: "OUTCOME",
-      outcome: {
-        kind: "ONE_SIDED",
-        presentSide: side.present,
-        absentSide: side.absent,
-        presentUserIds: humans().flatMap((h) =>
-          h.party !== null && h.party.side === side.present
-            ? [h.party.userId]
-            : [],
-        ),
-        reschedule,
-      },
+      kind: "LEAVE",
+      reason: "POLICY",
+      cause,
+      by: null,
+      byUserId: null,
     });
-    out.push({ kind: "LEAVE", reason: "POLICY", by: null, byUserId: null });
     left = true;
     return out;
+  }
+
+  /** The first check-in: stay available, and ask what the person wants. */
+  function checkIn(at: number): void {
+    checkedIn = true;
+    waitUntil = Math.min(waitCapAt, at + policy.checkInPatienceMs);
+    queue(
+      "It looks like we're still waiting for the other participant. Would you like me to keep waiting or help you prepare?",
+      "ONE_SIDED",
+    );
+  }
+
+  /**
+   * A present person asked Q to keep waiting: the wait moves later, within
+   * the cap, and Q says so honestly (what it can and cannot do).
+   */
+  function extendWait(at: number, text: string): void {
+    stats.waitAsks += 1;
+    const asked = waitMinutesAsked(text);
+    const by = Math.min(
+      asked === null ? policy.waitExtendMs : asked * 60_000,
+      HOST_POLICY_BOUNDS.waitExtendMs.max,
+    );
+    waitUntil = Math.min(waitCapAt, Math.max(waitUntil, at) + by);
+    // Asking to wait answers the check-in.
+    checkedIn = true;
+    if (at - lastWaitAckAt < 30_000) return;
+    lastWaitAckAt = at;
+    const minutesLeft = Math.max(0, Math.ceil((waitCapAt - at) / 60_000));
+    queue(
+      waitUntil >= waitCapAt
+        ? `Of course, I'll stay with you. I can stay up to about ${String(minutesLeft)} more minutes, and I'm here to talk or help you prepare in the meantime.`
+        : "Of course, I'll stay with you. I'm here to talk or help you prepare in the meantime.",
+      "WAITING",
+    );
   }
 
   function rosterOf(entry: Present, kind: RosterEntry["kind"]): RosterEntry {
@@ -945,6 +1219,7 @@ export function createMeetingHost(
       readonly revision?: boolean;
     } = {},
   ): HostAction[] {
+    stats.addressed += 1;
     if (asksQToBreakRules(text)) {
       queue(HOST_REFUSAL, "REFUSE");
       return [];
@@ -994,10 +1269,10 @@ export function createMeetingHost(
       return;
     }
     lastWordsAt = Math.max(lastWordsAt, event.at);
-    // Only an ordinary turn: not while one side is being asked about
-    // rescheduling, nor a guest's introduction, nor a line answered already.
+    // Only an ordinary turn: not a guest's introduction, nor a line
+    // answered already. (Waiting for the other side no longer closes the
+    // ears: 2026-10-09, speech then was read as a reschedule decision.)
     if (
-      oneSide !== null ||
       (entry.askedIntro && entry.introducedAs === null) ||
       (early !== null &&
         early.participantId === event.participant.id &&
@@ -1035,6 +1310,41 @@ export function createMeetingHost(
     }
   }
 
+  /**
+   * Someone speaks whom Q never saw join. They are in the call: they are
+   * put on the roster (no greeting, no interview), so their words are heard.
+   */
+  function implicitJoin(participant: CallParticipant): HostAction[] {
+    if (isBot(participant) || present.has(participant.id)) return [];
+    // Recall's placeholder speaker ("Unknown", id 2147483647) is where
+    // Q's own captioned voice lands (cfccb9a9); it is never a person.
+    if (
+      participant.id === "2147483647" ||
+      /^(?:unknown|someone)$/i.test(participant.name.trim())
+    ) {
+      return [];
+    }
+    const entry: Present = {
+      participant,
+      party: matchParty(participant, context.parties),
+      greeted: true,
+      askedIntro: false,
+      introducedAs: null,
+    };
+    present.set(participant.id, entry);
+    stats.attributedImplicit += 1;
+    if (entry.party !== null) sidesSeen.add(entry.party.side);
+    if (missingSides().length === 0) {
+      for (let i = outbox.length - 1; i >= 0; i -= 1) {
+        if (outbox[i]?.why === "ONE_SIDED" || outbox[i]?.why === "WAITING")
+          outbox.splice(i, 1);
+      }
+      checkedIn = false;
+    }
+    maybeIntroduce();
+    return [{ kind: "ROSTER", entry: rosterOf(entry, "ARRIVED") }];
+  }
+
   function handle(event: HostEvent): HostAction[] {
     if (left) return [];
     clock = Math.max(clock, event.at);
@@ -1051,13 +1361,16 @@ export function createMeetingHost(
           introducedAs: null,
         };
         present.set(event.participant.id, entry);
-        anyoneCame = true;
-        // The missing side arrived after all, while Q was asking: carry on.
-        if (oneSide !== null && entry.party?.side === oneSide.absent) {
-          oneSide = null;
-          askedAt = null;
-        }
         if (entry.party !== null) sidesSeen.add(entry.party.side);
+        // The missing side arrived after all: the waiting is over, the
+        // check-in (if still queued) is dropped, and Q carries on.
+        if (missingSides().length === 0) {
+          for (let i = outbox.length - 1; i >= 0; i -= 1) {
+            if (outbox[i]?.why === "ONE_SIDED" || outbox[i]?.why === "WAITING")
+              outbox.splice(i, 1);
+          }
+          checkedIn = false;
+        }
         out.push({ kind: "ROSTER", entry: rosterOf(entry, "ARRIVED") });
         greet(entry);
         maybeIntroduce();
@@ -1096,20 +1409,46 @@ export function createMeetingHost(
         out.push(...startEarly(event.participantId, event.at));
         break;
       case "PARTIAL":
+        stats.partials += 1;
         hearPartial(event);
         break;
       case "UTTERANCE": {
-        if (isBot(event.participant)) break;
+        if (isBot(event.participant)) {
+          stats.ignoredBot += 1;
+          break;
+        }
         lastSpeechAt = Math.max(lastSpeechAt, event.at);
         const text = event.text.trim().slice(0, 2_000);
-        if (text.length === 0) break;
-        const entry = present.get(event.participant.id);
+        if (text.length === 0) {
+          stats.ignoredEmpty += 1;
+          break;
+        }
+        stats.utterances += 1;
         // Never Q's own speech (live 2026-10-02, cfccb9a9: the captions
         // gave Q's greeting to an "Unknown" speaker and Q obeyed itself).
-        // Only people who joined are heard, and nothing that repeats what
-        // Q just said (its voice echoed through someone's microphone).
-        if (entry === undefined || echoesQ(text, event.at)) break;
+        // Nothing that repeats what Q just said (its voice echoed through
+        // someone's microphone) is heard as a person.
+        // The one exception: an answer to Q's own check-in ("keep waiting")
+        // repeats its words. Extending a bounded wait is harmless, and
+        // Q's acknowledgement carries no wait words, so it cannot loop.
+        if (
+          echoesQ(text, event.at) &&
+          !(missingSides().length > 0 && asksQToWait(text))
+        ) {
+          stats.ignoredEcho += 1;
+          break;
+        }
+        // 2026-10-09: words from someone whose join Q never saw (they were
+        // already in the call, or the join event was lost) are attributed,
+        // not dropped. They are on the roster from now on.
+        let entry = present.get(event.participant.id);
+        if (entry === undefined) {
+          out.push(...implicitJoin(event.participant));
+          entry = present.get(event.participant.id);
+        }
+        if (entry === undefined) break;
         lastWordsAt = Math.max(lastWordsAt, event.at);
+        lastEngagedAt = event.at;
         // 2026-10-08: the final words of a line Q began answering early.
         // The same request: the answer stands (and is not "talked over" by
         // its own question's final words). Different: the final words are
@@ -1131,9 +1470,35 @@ export function createMeetingHost(
         }
         // Words from a person over Q's line stop it (meet2-64).
         out.push(...interrupt(event.at));
-        if (askedAt !== null && oneSide !== null) {
-          out.push(...settleOneSided(!saysNeverMind(text)));
-          return out;
+        // Waiting for the other side (2026-10-09): what a present person
+        // says is a conversation, never a decision about the meeting. A
+        // clear ask to wait extends the wait (code first); an explicit ask
+        // for another time is recorded, nothing is moved. Silence moves
+        // nothing at all.
+        if (missingSides().length > 0) {
+          if (asksToReschedule(text) && !rescheduleAsked) {
+            rescheduleAsked = true;
+            stats.rescheduleAsks += 1;
+            out.push({
+              kind: "RESCHEDULE_REQUESTED",
+              byName: speakerFor(entry, event.participant).slice(0, 200),
+              byUserId: entry.party?.userId ?? null,
+            });
+            queue(
+              "I've noted that you'd like a new time. Nothing changes until the other person agrees to one, so I'll stay with you for now.",
+              "WAITING",
+            );
+            extendWait(event.at, "");
+            break;
+          }
+          if (asksQToWait(text)) {
+            lastEngagedAt = event.at;
+            extendWait(event.at, text);
+            // A line that asks to wait is answered as that (the model is
+            // not asked, and "don't leave" is not a request to break the
+            // rules); anything else they want, they ask next.
+            break;
+          }
         }
         // P4: the line after a bare "hey q" from the same person is the
         // request, whether or not it repeats the name.
@@ -1227,54 +1592,43 @@ export function createMeetingHost(
           out.push({
             kind: "LEAVE",
             reason: "POLICY",
+            cause: "HARD_CAP",
             by: null,
             byUserId: null,
           });
           left = true;
           return out;
         }
-        if (!resolved && event.at >= start + policy.graceAfterStartMs) {
-          resolved = true;
-          const both = sidesSeen.has("FOUNDER") && sidesSeen.has("INVESTOR");
-          if (!anyoneCame) {
-            // Nobody came: Q leaves; the runtime cancels and tells both.
-            out.push({ kind: "OUTCOME", outcome: { kind: "NO_SHOW" } });
-            out.push({
-              kind: "LEAVE",
-              reason: "POLICY",
-              by: null,
-              byUserId: null,
-            });
-            left = true;
+        // Waiting for a side that has not joined (2026-10-09). Q never
+        // reschedules or cancels because someone is absent, and silence is
+        // never consent: the wait only ends by its own cap or by running
+        // out, with the reason said and the booking left as it was.
+        if (missingSides().length > 0) {
+          if (event.at >= waitCapAt) {
+            out.push(...finishWaiting("WAIT_CAP"));
             return out;
           }
-          if (!both && sidesSeen.size === 1) {
-            const presentSide = [...sidesSeen][0] ?? "FOUNDER";
-            oneSide = {
-              present: presentSide,
-              absent: presentSide === "FOUNDER" ? "INVESTOR" : "FOUNDER",
-            };
-            const missing = context.parties
-              .filter((p) => p.side === oneSide?.absent)
-              .map((p) => firstName(p.name));
-            const who =
-              missing.length === 0 ? "the other side" : missing.join(" and ");
-            if (present.size > 0) {
-              askedAt = event.at;
-              queue(
-                `I'm sorry, ${who} hasn't joined. I'll reach out to them to find a new time. Shall I let you know once it's rescheduled?`,
-                "ONE_SIDED",
-              );
-            } else {
-              out.push(...settleOneSided(true));
+          if (event.at >= waitUntil) {
+            if (present.size === 0) {
+              out.push(...finishWaiting("WAIT_EXPIRED"));
               return out;
             }
+            if (!checkedIn) {
+              checkIn(event.at);
+            } else {
+              // A live conversation (words in the last two minutes, or
+              // someone speaking now) is not walked out of: the wait is
+              // held to the cap while it lasts.
+              const talking =
+                speaking.size > 0 || event.at - lastEngagedAt < 2 * 60_000;
+              if (talking) {
+                waitUntil = Math.min(waitCapAt, event.at + 30_000);
+              } else {
+                out.push(...finishWaiting("WAIT_EXPIRED"));
+                return out;
+              }
+            }
           }
-        }
-        // No answer to "shall I let you know?": taken as a yes, and Q goes.
-        if (askedAt !== null && event.at - askedAt >= policy.answerWaitMs) {
-          out.push(...settleOneSided(true));
-          return out;
         }
         const toEnd = context.endsAt.getTime() - event.at;
         if (
@@ -1311,7 +1665,7 @@ export function createMeetingHost(
       if (line.length === 0) return;
       const said = ackLatest ? `${HOST_TAKING_LATEST} ${line}` : line;
       ackLatest = false;
-      queue(said.slice(0, 600), why);
+      queue(said.slice(0, 900), why);
     },
     guestIntroduced: (participantId, intro) => {
       const entry = present.get(participantId);
@@ -1360,6 +1714,20 @@ export function createMeetingHost(
         { kind: "LEAVE_REQUESTED", byName: byName.slice(0, 200), byUserId },
       ];
     },
+    keepWaiting: (at) => {
+      if (left || missingSides().length === 0) return;
+      clock = Math.max(clock, at);
+      extendWait(at, "");
+    },
+    stats: () => ({
+      ...stats,
+      spentChars: spoken,
+      modelCalls: calls,
+      waitUntil,
+      waitCapAt,
+      present: present.size,
+      missingSides: missingSides(),
+    }),
     quiet: () => {
       composing = false;
       quiet = true;
@@ -1380,9 +1748,9 @@ export function createMeetingHost(
       if (left) return "LEFT";
       if (present.size === 0) return "WAITING";
       if (composing) return "ADDRESSED";
-      if (oneSide !== null) return "ONE_SIDED";
-      if (offeredRecap) return "CLOSING";
       if (humans().some((h) => !h.greeted)) return "GREETING";
+      if (missingSides().length > 0) return "ONE_SIDED";
+      if (offeredRecap) return "CLOSING";
       if (!introduced) return "INTROS";
       return "LISTENING";
     },

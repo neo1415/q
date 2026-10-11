@@ -311,6 +311,7 @@ import {
   createMeetingAssistantService,
   meetingRecapEmail,
   createNetworkMeetingActivityWriter,
+  waitMaxMsFromEnv,
 } from "@capital-q/communication";
 import {
   createPostgresDocumentQueryPort,
@@ -4223,6 +4224,12 @@ const meetingHost = createMeetingHostRuntime({
     config.secrets.speechProviders.elevenLabs !== undefined,
   publicBase: process.env.Q_API_PUBLIC_URL,
   secret: recallKey,
+  // MEETING_WAIT_MAX_MINUTES (default 20): the longest Q waits for a side
+  // that has not joined, however often it is asked to keep waiting. Bounded
+  // by boundedPolicy and never past the provider-minute hard cap.
+  policy: {
+    waitMaxAfterStartMs: waitMaxMsFromEnv(process.env.MEETING_WAIT_MAX_MINUTES),
+  },
   store: createPostgresMeetingHostStore(database.sql),
   voice: {
     // meet2-64: in a call, the fast engine (turbo) speaks each sentence as
@@ -4261,14 +4268,6 @@ const meetingHost = createMeetingHostRuntime({
   followThrough: createMeetingHostFollowThrough({
     sql: database.sql,
     resolver: actorContextResolver,
-    cancel: async (actor, meetingId) => {
-      const cancelled = await schedule.cancel({
-        actor,
-        meetingId,
-        correlationId: `cor_${randomUUID()}`,
-      });
-      return cancelled.outcome === "OK";
-    },
     markNoShow: async (input) => {
       const writer = createNetworkMeetingActivityWriter();
       await database.transactions.run((tx) =>
