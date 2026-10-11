@@ -90,14 +90,14 @@ describe("prepared research entities: the seed", () => {
     );
     const role = shadi?.facts.find((f) => f.source_ids.includes("S06"));
     expect(role?.verification.status).toBe("PUBLICLY_REPORTED_UNCONFIRMED");
-    expect(role?.evidence_class).toBe(
-      "third-party public report, verify current role",
-    );
+    // A third-party post was read, not confirmed by the person's own page.
+    expect(role?.status).toBe("FACT_EXTRACTED");
+    expect(role?.soft_wording).toBe("Reportedly, ");
     expect(shadi?.identity_read).toBe("PLAUSIBLE");
     for (const [id, source] of Object.entries(seed.sources)) {
-      if (/linkedin\.com|qinvest\.com/u.test(source.url)) {
-        expect(source.access, id).toBe("NOT_FETCHED");
-      }
+      // Only a source that was actually read counts as fetched; a wall
+      // (LinkedIn 999) or a failed TLS chain stays not fetched.
+      expect(source.access === "FETCHED", id).toBe(source.read_at != null);
     }
   });
 
@@ -346,22 +346,24 @@ describe("prepared research entities: publicly reported facts", () => {
       .find((r) => r.profileKey === "qa-demo-shadi-qishta");
     if (shadi === undefined) throw new Error("seed has Shadi");
     const facts = answerFacts(shadi);
-    expect(facts).toHaveLength(6);
+    expect(facts).toHaveLength(9);
     expect(facts.every((f) => !f.confirmed)).toBe(true);
     const role = facts.find((f) => f.sourceIds.includes("S06"));
     expect(role?.claim).toMatch(
-      /^Reportedly, a CEO, Business Ventures role at Midmac/u,
+      /^Reportedly, the Qatari Lens congratulated him on a new appointment as CEO Business Ventures at Midmac/u,
     );
-    expect(facts[2]?.claim).toMatch(/^According to their LinkedIn, /u);
+    expect(facts[0]?.claim).toMatch(/^According to his LinkedIn, /u);
     const qinvest = entities
       .all()
       .find((r) => r.profileKey === "qa-demo-qinvest");
     expect(answerFacts(qinvest as never)[0]?.claim).toMatch(
-      /^Reportedly, qatar-based/iu,
+      /^According to its LinkedIn page, QInvest is a Qatar-based/u,
     );
-    expect(answerFacts(qinvest as never)[2]?.claim).toMatch(
-      /^QInvest announced/u,
-    );
+    // A page that could not be opened is said as a note, never as fact.
+    expect(
+      answerFacts(qinvest as never).find((f) => /275 million/u.test(f.claim))
+        ?.claim,
+    ).toMatch(/^A previous research note says QInvest announced/u);
     // The hedge is natural speech; "not independently checked" is metadata.
     expect(
       JSON.stringify([facts, answerFacts(qinvest as never)]),
@@ -396,10 +398,10 @@ describe("prepared research entities: publicly reported facts", () => {
       .find((r) => r.profileKey === "qa-demo-shadi-qishta");
     if (shadi === undefined) throw new Error("seed has Shadi");
     const shown = shownQuotes(shadi);
-    expect(shown[0]?.line).toContain("from their LinkedIn");
-    expect(shown[0]?.line).toContain("Watch what people spend");
+    expect(shown[0]?.line).toContain("from his LinkedIn post on IFRS");
+    expect(shown[0]?.line).toContain("As someone with experience in auditing");
     expect(JSON.stringify(personaGrounding(shadi))).not.toContain(
-      "Watch what people spend",
+      "As someone with experience in auditing",
     );
   });
 });

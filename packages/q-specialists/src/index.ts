@@ -386,3 +386,11 @@ export {
   deckSpeech,
   type DeckSpeech,
 } from "./deck-speech.js";
+
+export {
+  knownEntityLaneOf,
+  lastShownEntityId,
+  type KnownEntityMatch,
+  type KnownEntityMatcher,
+  type PreparedFollowUpPort,
+} from "./fast-lane.js";

@@ -137,12 +137,37 @@ export type AnswerCardActions = {
  * W4: the sources an identity card rests on, as links: the top three open
  * in a new tab (title or host, noopener); the rest sit behind a disclosure.
  */
+/** Honest per-source wording: a link is not a reading. */
+function sourceStatusWord(status: string): string {
+  switch (status) {
+    case "VERIFIED_AGAINST_SOURCE":
+      return "read, checked";
+    case "FACT_EXTRACTED":
+    case "CONTENT_READ":
+      return "read";
+    case "BLOCKED_OR_UNAVAILABLE":
+      return "could not open";
+    case "NEEDS_REFRESH":
+      return "needs refresh";
+    default:
+      return "link only";
+  }
+}
+
 function SourceLinks({
   sources,
 }: {
-  readonly sources: readonly { readonly label: string; readonly url: string }[];
+  readonly sources: readonly {
+    readonly label: string;
+    readonly url: string;
+    readonly status?: string | undefined;
+  }[];
 }) {
-  const link = (source: { readonly label: string; readonly url: string }) => (
+  const link = (source: {
+    readonly label: string;
+    readonly url: string;
+    readonly status?: string | undefined;
+  }) => (
     <li key={source.url}>
       <a
         className="underline"
@@ -153,6 +178,9 @@ function SourceLinks({
       >
         {source.label}
       </a>
+      {source.status === undefined ? null : (
+        <span data-ac-source-status>{` (${sourceStatusWord(source.status)})`}</span>
+      )}
     </li>
   );
   const rest = sources.slice(3);
@@ -338,7 +366,7 @@ function AnswerCard({
             {card.fit === null && card.sourceCount > 0 ? (
               <span className="cq-ac-btn cq-ac-sources" data-ac-sources>
                 <Icon of={ChevronRight} />
-                {`From ${String(card.sourceCount)} ${card.sourceCount === 1 ? "source" : "sources"}`}
+                {`From ${String(card.sourceCount)} ${card.sourceCount === 1 ? "source" : "sources"}${card.sourcesRead === undefined ? "" : `, ${String(card.sourcesRead)} read`}`}
               </span>
             ) : null}
             {card.fitBasis === undefined ||

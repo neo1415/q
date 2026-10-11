@@ -21,6 +21,7 @@ import { createFitComposition } from "./composition/fit.js";
 import {
   createPreparedEntities,
   preparedEntityMatcher,
+  preparedFollowUpPort,
   createPreparedVersionReader,
   preparedEntityPrewarmLines,
   watchPreparedEntities,
@@ -3801,6 +3802,7 @@ const qIntelligence = composeQIntelligence({
   // W4: a researched entity reachable by name (prepared seed or their own
   // research): "take me to Shadi Qishta" shows its identity card.
   knownEntities: preparedEntityMatcher(preparedEntities),
+  preparedFollowUp: preparedFollowUpPort(preparedEntities),
   externalEntities: createExternalEntityFinder({
     known: researchComposition.knownEntities.index,
     researched: researchComposition.researched,

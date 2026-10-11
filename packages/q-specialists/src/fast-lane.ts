@@ -1,4 +1,5 @@
 import type { TurnSkimResult } from "@capital-q/q-core";
+import type { QResultBlock } from "@capital-q/contracts/q";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 
 /**
@@ -403,4 +404,40 @@ export function investorDiscoveryLaneOf(utterance: string): FastLane | null {
         ),
     },
   };
+}
+
+/**
+ * Follow-ups about a prepared entity ("tell me more about him", "what has
+ * Muhannad said about founders"): the composition supplies a pure function
+ * over the warm prepared records. The lane finds which prepared entity the
+ * conversation last showed; everything else is the port's. Null text means
+ * the normal path answers.
+ */
+export type PreparedFollowUpPort = (input: {
+  readonly utterance: string;
+  readonly lastShownEntityId: string | null;
+}) => string | null;
+
+/**
+ * The prepared entity whose identity card Q showed last in this
+ * conversation, read from the stored card blocks (`external.externalPersonId`).
+ * Only a lone identity card counts; a list of candidates names no one, and
+ * a later card of something else means the entity is no longer "this".
+ */
+export function lastShownEntityId(
+  history: readonly {
+    readonly role: string;
+    readonly blocks?: readonly QResultBlock[] | undefined;
+  }[],
+): string | null {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const message = history[i];
+    if (message === undefined || message.role !== "Q") continue;
+    for (const block of [...(message.blocks ?? [])].reverse()) {
+      if (block.kind !== "ANSWER_CARDS") continue;
+      if (block.cards.length !== 1) return null;
+      return block.cards[0]?.external?.externalPersonId ?? null;
+    }
+  }
+  return null;
 }

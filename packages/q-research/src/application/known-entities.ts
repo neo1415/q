@@ -8,6 +8,7 @@ import {
   type ExternalEntityKind,
   type ExternalEntityQuote,
   type ExternalPersonConfidence,
+  type ExternalSourceStatus,
   type ExternalResearchStatus,
   type IdentityCard,
   type PersonSearchResult,
@@ -33,13 +34,62 @@ export type EntitySourceRecord = {
   readonly publishedAt: string | null;
   /** How the source stands as evidence, in words ("publicly documented"). */
   readonly evidenceClass: string | null;
+  /** How far Capital Q got with it; absent means only discovered. */
+  readonly status?: ExternalSourceStatus | undefined;
+  /** Verbatim text kept from the page when it was read (bounded). */
+  readonly excerpt?: string | null | undefined;
+  /** ISO date the page was read. */
+  readonly readAt?: string | null | undefined;
+  readonly statusNote?: string | null | undefined;
 };
 
 export type EntityFactRecord = {
   readonly claim: string;
   readonly sourceIds: readonly string[];
   readonly evidenceClass: string | null;
+  /** ROLE, CAREER, WHAT_THEY_DO, PRIORITIES, STATEMENT, ARTICLE, IDENTITY. */
+  readonly topic?: string | null | undefined;
+  readonly status?: ExternalSourceStatus | undefined;
+  readonly asOf?: string | null | undefined;
 };
+
+const READ_STATUSES: ReadonlySet<ExternalSourceStatus> = new Set([
+  "CONTENT_READ",
+  "FACT_EXTRACTED",
+  "VERIFIED_AGAINST_SOURCE",
+]);
+
+/** A source with no recorded status was only discovered, never read. */
+export function sourceStatusOf(
+  source: Pick<EntitySourceRecord, "status">,
+): ExternalSourceStatus {
+  return source.status ?? "LINK_DISCOVERED";
+}
+
+export function sourceWasRead(
+  source: Pick<EntitySourceRecord, "status">,
+): boolean {
+  return READ_STATUSES.has(sourceStatusOf(source));
+}
+
+/** "6 sources, 3 read": never implies discovered links were read. */
+export function sourceTally(sources: readonly EntitySourceRecord[]): {
+  readonly total: number;
+  readonly read: number;
+  readonly phrase: string;
+} {
+  const total = sources.length;
+  const read = sources.filter(sourceWasRead).length;
+  const noun = total === 1 ? "source" : "sources";
+  return {
+    total,
+    read,
+    phrase:
+      read === total
+        ? `${String(total)} ${noun}, all read`
+        : `${String(total)} ${noun}, ${String(read)} read`,
+  };
+}
 
 export type KnownEntityRecord = {
   readonly externalPersonId: string;
@@ -235,12 +285,20 @@ export function cardFromKnownEntity(
     publishedAt: source.publishedAt,
     retrievedAt: record.lastResearchedAt,
     provider: "prepared",
+    status: sourceStatusOf(source),
+    readAt: source.readAt ?? null,
   }));
   if (sources.length === 0) return null;
   const uncertainty: string[] = [];
   if (record.researchStatus === "PREPARED_PUBLIC_SEED") {
     uncertainty.push(
       `Prepared from public sources on ${record.lastResearchedAt.slice(0, 10)}; ask for a fresh search to check it is current.`,
+    );
+  }
+  const tally = sourceTally(record.sources.slice(0, 8));
+  if (tally.read < tally.total) {
+    uncertainty.push(
+      `${tally.phrase}; the rest are links I could not open or have not read.`,
     );
   }
   if (record.requiresRefresh) {
@@ -275,7 +333,7 @@ export function cardFromKnownEntity(
     },
     sources,
     uncertainty: uncertainty.slice(0, 4),
-    attributionLine: `According to public sources prepared on ${record.lastResearchedAt.slice(0, 10)}.`,
+    attributionLine: `According to public sources prepared on ${record.lastResearchedAt.slice(0, 10)} (${tally.phrase}).`,
     summary: oneLineOf(record),
     enriching: false,
     actions: ["RESEARCH_FURTHER", "REHEARSE"],

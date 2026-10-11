@@ -160,6 +160,20 @@ export type ExternalPersonSubject = z.infer<typeof ExternalPersonSubjectSchema>;
 
 export const EXTERNAL_PERSON_SOURCE_MAX = 8;
 
+/**
+ * How far Capital Q actually got with a source. A link is not a reading:
+ * "6 sources" must never imply six were read.
+ */
+export const ExternalSourceStatusSchema = z.enum([
+  "LINK_DISCOVERED",
+  "CONTENT_READ",
+  "FACT_EXTRACTED",
+  "VERIFIED_AGAINST_SOURCE",
+  "BLOCKED_OR_UNAVAILABLE",
+  "NEEDS_REFRESH",
+]);
+export type ExternalSourceStatus = z.infer<typeof ExternalSourceStatusSchema>;
+
 export const ExternalPersonSourceSchema = z
   .object({
     /** Stable id of the stored source row (e.g. S01); null for a live result. */
@@ -175,6 +189,10 @@ export const ExternalPersonSourceSchema = z
     retrievedAt: z.string().max(40),
     /** Provider that surfaced it (the search index that found it). */
     provider: z.string().max(40),
+    /** Reading status of a prepared source; absent means only discovered. */
+    status: ExternalSourceStatusSchema.optional(),
+    /** ISO date the page was read, when it was. */
+    readAt: z.string().max(40).nullable().optional(),
   })
   .strict();
 export type ExternalPersonSource = z.infer<typeof ExternalPersonSourceSchema>;
