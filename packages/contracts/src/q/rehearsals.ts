@@ -570,6 +570,26 @@ export const QRehearsalPartnersDtoSchema = z
           .strict(),
       )
       .max(200),
+    // Demo rehearsal access: prepared public entities this person may
+    // rehearse with as labelled research-informed simulations, no
+    // connection needed. Not relationships. Absent = none.
+    researched: z
+      .array(
+        z
+          .object({
+            externalPersonId: UuidSchema,
+            // Set when a canonical unclaimed investor stands in for it.
+            investorOrganisationId: UuidSchema.nullable(),
+            name: z.string().min(1).max(200),
+            entityKind: z.enum(["PERSON", "ORGANIZATION", "GOVERNMENT_AGENCY"]),
+            // The role Q plays, e.g. "Invest Qatar investment-promotion
+            // officer"; null when the entity is a person.
+            roleLine: z.string().max(200).nullable(),
+          })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
   })
   .strict();
 export type QRehearsalPartnersDto = z.infer<typeof QRehearsalPartnersDtoSchema>;
