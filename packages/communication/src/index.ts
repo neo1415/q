@@ -106,6 +106,7 @@ export {
   transition as transitionProposal,
   type ProposalAction,
   type ProposalBooking,
+  type ProposalEvent,
   type ProposalOutcome,
   type ProposalParties,
   type ProposalRecord,
