@@ -67,12 +67,12 @@ export function createPostgresResearchedEntityStore(dependencies: {
           values (${id}, ${scope.tenantId}, ${scope.userId},
                   ${subject.entityKind}, 'RESEARCHED', false,
                   ${input.profileKey}, ${subject.displayName.slice(0, 200)},
-                  ${JSON.stringify(subject.nameVariants.slice(0, 24))}::jsonb,
+                  ${tx.sql.json(JSON.parse(JSON.stringify(subject.nameVariants.slice(0, 24))) as Parameters<typeof tx.sql.json>[0])},
                   ${subject.profileUrl}, ${role}, ${subject.organization},
                   ${subject.location}, ${subject.confidence},
-                  ${JSON.stringify(subject.image)}::jsonb,
-                  ${JSON.stringify(subject.quotes)}::jsonb,
-                  ${JSON.stringify(input.sources.slice(0, 16))}::jsonb,
+                  ${tx.sql.json(JSON.parse(JSON.stringify(subject.image)) as Parameters<typeof tx.sql.json>[0])},
+                  ${tx.sql.json(JSON.parse(JSON.stringify(subject.quotes)) as Parameters<typeof tx.sql.json>[0])},
+                  ${tx.sql.json(JSON.parse(JSON.stringify(input.sources.slice(0, 16))) as Parameters<typeof tx.sql.json>[0])},
                   clock_timestamp())
           on conflict (tenant_id, user_id, profile_key) where tenant_id is not null
           do update set
@@ -159,8 +159,8 @@ export function createPostgresResearchedEntityStore(dependencies: {
           values (${brief.externalPersonId}, ${scope.tenantId}, ${scope.userId},
                   ${brief.version}, ${brief.builtAt}::timestamptz,
                   ${brief.freshUntil}::timestamptz,
-                  ${JSON.stringify(brief.sources)}::jsonb,
-                  ${JSON.stringify(brief.assertions)}::jsonb)`;
+                  ${tx.sql.json(JSON.parse(JSON.stringify(brief.sources)) as Parameters<typeof tx.sql.json>[0])},
+                  ${tx.sql.json(JSON.parse(JSON.stringify(brief.assertions)) as Parameters<typeof tx.sql.json>[0])})`;
         await tx.sql`
           update q_runtime.external_persons
              set brief_version = ${brief.version}, updated_at = clock_timestamp()

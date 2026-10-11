@@ -144,7 +144,7 @@ export function createPostgresProposalStore(options: {
             (id, tenant_id, relationship_id, purpose, proposed_by_user_id, state, options,
              reschedule_of_meeting_id, revision, idempotency_key)
           values (${record.id}, ${record.tenantId}, ${record.relationshipId}, ${record.purpose},
-                  ${record.proposedByUserId}, ${record.state}, ${JSON.stringify(record.options)}::jsonb,
+                  ${record.proposedByUserId}, ${record.state}, ${tx.sql.json(JSON.parse(JSON.stringify(record.options)) as Parameters<typeof tx.sql.json>[0])},
                   ${record.rescheduleOfMeetingId}, ${record.revision}, ${record.idempotencyKey})`;
         await insertEvent(tx, event);
       }),
@@ -152,14 +152,23 @@ export function createPostgresProposalStore(options: {
     apply: ({ id, expected, patch, event }) =>
       transactions.run(async (tx) => {
         const accepted = patch.accepted;
+        // postgres.js json-encodes a value bound as jsonb; a pre-stringified
+        // value became a JSON string, which the array check refused (live
+        // 2026-10-11: every proposal was a 500).
         const json = (value: unknown) =>
-          value === null || value === undefined ? null : JSON.stringify(value);
+          value === null || value === undefined
+            ? null
+            : tx.sql.json(
+                JSON.parse(JSON.stringify(value)) as Parameters<
+                  typeof tx.sql.json
+                >[0],
+              );
         const moved = await tx.sql<{ id: string }[]>`
           update communication.meeting_time_proposals
              set state = ${event.toState},
-                 options = coalesce(${json(patch.options)}::jsonb, options),
+                 options = coalesce(${json(patch.options)}, options),
                  counter_options = case when ${patch.counterOptions !== undefined}::boolean
-                                        then ${json(patch.counterOptions)}::jsonb
+                                        then ${json(patch.counterOptions)}
                                         else counter_options end,
                  accepted_from = coalesce(${accepted?.from ?? null}, accepted_from),
                  accepted_option = coalesce(${accepted?.option ?? null}::integer, accepted_option),
