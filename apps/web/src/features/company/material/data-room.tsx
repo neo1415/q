@@ -350,7 +350,9 @@ function ConnectedDataRoom({
           Nothing in {companyName}&rsquo;s data room is open to you yet.
         </p>
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Documents they share with you, or list on request, appear here.
+          Documents they share with you, or list for you to request, appear
+          here. Nothing here means nothing is shared with you yet, not that
+          nothing exists.
         </p>
       </div>
     );
@@ -381,7 +383,7 @@ function ConnectedDataRoom({
             className={buttonClassName("secondary", "regular")}
             onClick={() => setAsking("ALL")}
           >
-            Request the rest
+            Request all on-request documents
           </button>
         ) : null}
       </div>
@@ -602,13 +604,19 @@ function RequestSheet({
         <SheetContent
           title={
             target === "ALL"
-              ? "Request the rest of the data room"
+              ? "Request every on-request document"
               : "Request this document"
           }
           side="side"
         >
           <div className="flex flex-col gap-4 px-4 pb-6" data-request-sheet>
-            {target === "ALL" ? null : (
+            {target === "ALL" ? (
+              <p className="cq-body-sm text-(--cq-text-secondary)">
+                This asks for the documents {companyName} lists here as
+                available on request. It does not reach anything they
+                haven&rsquo;t listed for you.
+              </p>
+            ) : (
               <p className="cq-body flex items-center gap-2 text-(--cq-text-primary)">
                 <FileText size={ICON_SIZE.regular} aria-hidden="true" />{" "}
                 {target.title}

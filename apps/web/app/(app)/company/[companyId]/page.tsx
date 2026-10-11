@@ -206,6 +206,20 @@ export default async function CompanyPage({
         ? { kind: "DILIGENCE", relationshipId: relationship.relationshipId }
         : { kind: "CHAT", relationshipId: relationship.relationshipId };
 
+  // Where "Request a document" can really go: diligence takes a request
+  // in the investor's own words; otherwise only documents the company
+  // lists as on request can be asked for. No link that dead-ends.
+  const documentRequestHref =
+    diligence !== null
+      ? diligence.href
+      : dataRoom !== null &&
+          dataRoom.viewer === "INVESTOR" &&
+          dataRoom.documents.some(
+            (document) => document.access === "REQUESTABLE",
+          )
+        ? `/company/${encodeURIComponent(profile.companyId)}?tab=dataroom`
+        : undefined;
+
   return (
     <PageContainer className="flex flex-col gap-6">
       {/* Q room R1: the profile, its open tab (said by ProfileTabs, as it
@@ -277,7 +291,7 @@ export default async function CompanyPage({
                   assumptions={assumptions}
                   companyName={profile.canonicalName}
                   route={questionsRoute}
-                  dataRoomHref={`/company/${encodeURIComponent(profile.companyId)}?tab=dataroom`}
+                  dataRoomHref={documentRequestHref}
                 />
               </Suspense>
             )
@@ -299,7 +313,7 @@ async function AssumptionsFold({
   route,
   dataRoomHref,
 }: {
-  readonly dataRoomHref: string;
+  readonly dataRoomHref: string | undefined;
   readonly assumptions: Promise<Awaited<
     ReturnType<typeof getCompanyAssumptions>
   > | null>;
