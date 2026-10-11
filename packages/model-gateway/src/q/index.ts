@@ -109,6 +109,7 @@ import {
 import {
   fitSweepAsk,
   fitSweepAskOfReading,
+  isSingleCompanyQuestion,
   runFitSweep,
   type FitSweepAsk,
   type FitSweepResult,
@@ -2164,6 +2165,7 @@ export function createModelGatewayQAnswer(
     // or an action.
     const sweepable =
       ownInvestor !== null &&
+      !isSingleCompanyQuestion(latest.content) &&
       request.writingDocument !== true &&
       (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q");
     // INC-1: "rank them" is the set the last answer showed.

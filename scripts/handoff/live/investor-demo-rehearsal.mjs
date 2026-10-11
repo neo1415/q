@@ -109,7 +109,13 @@ async function rehearse() {
         const oldText = document.querySelector(
           "[data-q-answer] > .cq-body",
         )?.textContent;
-        const state = { started: performance.now(), firstAnswerText20Ms: null };
+        const state = {
+          started: performance.now(),
+          firstAnswerText20Ms: null,
+          firstRenderedCardMs: null,
+        };
+        const initiallyNoCards =
+          document.querySelectorAll("[data-ac-card]").length === 0;
         const observer = new window.MutationObserver(() => {
           if (
             !document
@@ -126,6 +132,14 @@ async function rehearse() {
             state.firstAnswerText20Ms === null
           )
             state.firstAnswerText20Ms = Math.round(
+              performance.now() - state.started,
+            );
+          if (
+            initiallyNoCards &&
+            state.firstRenderedCardMs === null &&
+            document.querySelector("[data-ac-card]")
+          )
+            state.firstRenderedCardMs = Math.round(
               performance.now() - state.started,
             );
         });
@@ -189,10 +203,13 @@ async function rehearse() {
       const cards = blocks
         .filter((b) => b.kind === "ANSWER_CARDS")
         .flatMap((b) => b.cards);
-      const firstAnswerText20Ms = await page.evaluate(() => {
+      const visibleTiming = await page.evaluate(() => {
         const timing = window.__cqDemoTiming;
         timing.observer.disconnect();
-        return timing.state.firstAnswerText20Ms;
+        return {
+          firstAnswerText20Ms: timing.state.firstAnswerText20Ms,
+          firstRenderedCardMs: timing.state.firstRenderedCardMs,
+        };
       });
       console.log(
         JSON.stringify({
@@ -200,7 +217,7 @@ async function rehearse() {
           http: response.status(),
           status: run.status,
           completedClientMs: Math.round(performance.now() - started),
-          firstAnswerText20Ms,
+          ...visibleTiming,
           cards: cards.length,
           findings: blocks.filter((b) => b.kind === "FINDING").length,
           blockKinds: [...new Set(blocks.map((b) => b.kind))],

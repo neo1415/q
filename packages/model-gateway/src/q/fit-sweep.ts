@@ -108,6 +108,18 @@ const NOT_PLACES = new Set([
   "Them",
 ]);
 
+/** A profile explanation is not a request for a candidate list. */
+export function isSingleCompanyQuestion(text: string): boolean {
+  return (
+    /\b(?:this|that|the selected|the current|the on-screen)\s+(?:company|startup|business)\b/iu.test(
+      text,
+    ) &&
+    !/\b(?:companies|startups|businesses|founders|deals|them|those|these|others|another)\b/iu.test(
+      text,
+    )
+  );
+}
+
 /**
  * What set and place a fit question is about; null when it is not one.
  * `previous`: the companies the last answer showed, so "rank them" is
@@ -129,6 +141,7 @@ export function fitSweepAsk(
       within: [...named],
     };
   }
+  if (isSingleCompanyQuestion(words)) return null;
   if (previous.length > 0 && refersToShown(words) && FIT_CUE.test(words)) {
     const asked = askedCount(words);
     return {

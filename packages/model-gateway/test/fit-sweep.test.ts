@@ -62,6 +62,14 @@ describe("a fit question over a set the person owns", () => {
       "Top 3 startups from South Africa for me?",
       { scope: "CANDIDATES", place: "South Africa", fitAsked: true, count: 3 },
     ],
+    [
+      "Show my top 3 companies that fit my mandate better than this company.",
+      { scope: "CANDIDATES", place: null, fitAsked: true, count: 3 },
+    ],
+    [
+      "Compare this company with other companies against my mandate.",
+      { scope: "CANDIDATES", place: null, fitAsked: true, count: null },
+    ],
   ])("%s", (question, expected) => {
     expect(fitSweepAsk(question)).toEqual(expected);
   });
@@ -71,6 +79,8 @@ describe("a fit question over a set the person owns", () => {
     "Tell me about Portside",
     "Book a call with Baridi tomorrow",
     "What does fit mean?",
+    "What does this company actually do and why does it fit my mandate? Use its Capital Q records.",
+    "Explain this startup's fit and evidence gaps.",
   ])("is not one: %s", (question) => {
     expect(fitSweepAsk(question)).toBeNull();
   });

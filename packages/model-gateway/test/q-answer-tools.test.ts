@@ -35,6 +35,7 @@ import {
   Q_TOOL_LOOP_MAX_ROUNDS,
 } from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
+import { fitFixture } from "./fit-fixture.js";
 
 /**
  * The bounded tool loop in the answer seam (CQ-Q-007 §63-§66, §102) over
@@ -372,6 +373,132 @@ describe("named-company evidence binding", () => {
       expect(JSON.stringify(alpha.calls[0]?.request)).toContain(
         "Resolve the company named in the current question",
       );
+    },
+  );
+});
+
+describe("selected-company analysis stays out of the candidate sweep", () => {
+  it.each([false, true])(
+    "answers the profile question with a late FIT reading, warm=%s",
+    async (warm) => {
+      const companyId = randomUUID();
+      const investorOrganisationId = randomUUID();
+      const topOffer = {
+        ...GET_COMPANY,
+        toolName: "fit.top_candidates",
+        definition: { ...GET_COMPANY.definition, name: "fit_top_candidates" },
+      };
+      const tools = toolPort(
+        [
+          GET_COMPANY,
+          topOffer,
+          {
+            ...topOffer,
+            toolName: "fit.profile",
+            definition: { ...topOffer.definition, name: "fit_profile" },
+          },
+        ],
+        (p) => {
+          if (p.name === "fit_top_candidates") {
+            const fit = fitFixture(
+              companyId,
+              "Selected Company",
+              { STAGE: "STRONG" },
+              "STRONG_FIT",
+            );
+            const data = fit.result.data as { name: string; profile: unknown };
+            return {
+              ...succeeded(p, {
+                status: "OK",
+                comparison: {
+                  entries: [
+                    { name: data.name, line: null, profile: data.profile },
+                  ],
+                },
+              }),
+              toolName: "fit.top_candidates",
+            };
+          }
+          if (p.name === "fit_profile")
+            return {
+              ...succeeded(
+                p,
+                fitFixture(
+                  companyId,
+                  "Selected Company",
+                  { STAGE: "STRONG" },
+                  "STRONG_FIT",
+                ).result.data,
+              ),
+              toolName: "fit.profile",
+            };
+          return succeeded(p, {
+            companyId,
+            canonicalName: "Selected Company",
+            legalName: null,
+            websiteUrl: null,
+            foundedDate: null,
+            headquartersCountry: null,
+            headquartersCity: null,
+            currentStageCode: "seed",
+            shortDescription: "Declared company profile",
+            primaryDescription: null,
+            companyStatus: "active",
+            relationToYou: "SHARED",
+            truthClass: "USER_CLAIM",
+          });
+        },
+      );
+      const text =
+        "What does this company actually do and why does it fit my mandate? Use its Capital Q records.";
+      const answer =
+        "Selected Company's declared profile is seed stage; missing fit evidence remains unknown.";
+      const { seam, request, messages, completed, alpha } = build({
+        tools,
+        script: [{ kind: "TEXT", text: JSON.stringify(analystResult(answer)) }],
+      });
+      if (messages[0]) messages[0] = { ...messages[0], content: text };
+      const bound = {
+        ...request,
+        subjects: [{ kind: "COMPANY" as const, companyId }],
+        plan: PermittedContextPlanSchema.parse({
+          ...request.plan,
+          screen: { route: "COMPANY" as const, companyId },
+          scopes: [
+            {
+              kind: "INVESTOR_MANDATE" as const,
+              contextLabel: "investor_private",
+              sensitivity: "CONFIDENTIAL",
+              layer: "STRUCTURED_STATE",
+              factCategories: ["INVESTOR_THESIS"],
+              projection: "FULL",
+              rights: {
+                canUseForReasoning: true,
+                canDiscloseExistence: true,
+                canQuote: true,
+                canProvideLink: false,
+              },
+              filter: { tenantId: TENANT, investorOrganisationId },
+              isEvidence: true,
+              subject: {
+                kind: "INVESTOR_ORGANISATION" as const,
+                investorOrganisationId,
+              },
+            },
+          ],
+        }),
+      };
+      if (warm) {
+        if (!seam.warm) throw new Error("Warm seam missing");
+        seam.warm(bound);
+      }
+      await seam.answer({ ...bound, fitQuestion: { text, count: null } });
+      expect(
+        tools.executed.filter((p) => p.name === "fit_top_candidates"),
+      ).toHaveLength(0);
+      expect(tools.executed.some((p) => p.name === "get_company")).toBe(true);
+      expect(alpha.calls).toHaveLength(1);
+      expect(JSON.stringify(completed)).toContain(answer);
     },
   );
 });
