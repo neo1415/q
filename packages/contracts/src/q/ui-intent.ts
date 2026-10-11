@@ -309,6 +309,10 @@ export const Q_RECORD_PAGES = [
   "WORK_ITEM",
   "CAPITAL_ROUND",
   "GATEQ_APPLICATION",
+  // P4: one Q Daily edition, at the exact story or section (`anchor`).
+  // The id is the edition id; the Daily home is never the target when the
+  // story is known.
+  "DAILY_EDITION",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;
@@ -362,6 +366,11 @@ export function recordPageHasTab(page: QRecordPage, tab: QRecordTab): boolean {
   return false;
 }
 
+/** An element id inside a Q Daily edition page (story or section). */
+export const QDailyAnchorSchema = z
+  .string()
+  .regex(/^(?:story|section)-[A-Za-z0-9_-]{1,64}$/u);
+
 export const QOpenRecordPageIntentSchema = z
   .object({
     kind: z.literal("OPEN_RECORD_PAGE"),
@@ -377,8 +386,18 @@ export const QOpenRecordPageIntentSchema = z
     subTab: DeckSectionCodeSchema.optional(),
     /** N2: open the deck in its viewer at once (the deck tab only). */
     viewer: z.literal("OPEN").optional(),
+    /**
+     * P4: DAILY_EDITION only -- the element id of the story or section in
+     * the edition ("story-<id>", "section-<CODE>"); the page scrolls to
+     * it and marks it.
+     */
+    anchor: QDailyAnchorSchema.optional(),
   })
   .strict()
+  .refine(
+    (intent) => intent.anchor === undefined || intent.page === "DAILY_EDITION",
+    { message: "an anchor belongs to a Daily edition", path: ["anchor"] },
+  )
   .refine(
     (intent) =>
       intent.page !== "DATA_ROOM_DOCUMENT" || intent.companyId !== undefined,

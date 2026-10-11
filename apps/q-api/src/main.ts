@@ -2208,9 +2208,8 @@ const ownResults = createResultsReader({
 // end ADMIN block
 // DAILY block: The Q Daily, read and set by the person (routes and Q's
 // tools); editions are prepared by the worker only.
-const dailyReader = createDailyReaderService({
-  store: createPostgresDailyReaderStore(database.sql),
-});
+const dailyStore = createPostgresDailyReaderStore(database.sql);
+const dailyReader = createDailyReaderService({ store: dailyStore });
 const ownDaily = (actor: {
   readonly userId: string;
   readonly tenantId: string;
@@ -3772,6 +3771,8 @@ const arrivalSnapshots = createArrivalSnapshots({
     sources: relationshipBriefBatchSources,
   }),
   probe: createPostgresArrivalProbe({ sql: database.sql }),
+  // P4: their own latest Q Daily edition, for the quiet-day welcome.
+  daily: (actor) => dailyStore.latest(actor.userId, actor.tenantId),
 });
 const qIntelligence = composeQIntelligence({
   arrivalSnapshot: (actor) => arrivalSnapshots.forActor(actor),

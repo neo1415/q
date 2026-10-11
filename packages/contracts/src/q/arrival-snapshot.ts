@@ -24,7 +24,16 @@ import { QActivitySummarySchema, QAttentionSourceSchema } from "./attention.js";
  */
 
 export const Q_ARRIVAL_SNAPSHOT_PATH = "/v1/q/arrival-snapshot" as const;
-export const ARRIVAL_SNAPSHOT_VERSION = "arrival-snapshot.v1" as const;
+/**
+ * v2 (P4) adds `daily`: the prepared Q Daily stories of the latest edition.
+ * Additive; a v1 body still parses (daily defaults to none).
+ */
+export const ARRIVAL_SNAPSHOT_VERSION = "arrival-snapshot.v2" as const;
+export const ARRIVAL_SNAPSHOT_VERSIONS = [
+  "arrival-snapshot.v1",
+  ARRIVAL_SNAPSHOT_VERSION,
+] as const;
+export const ARRIVAL_DAILY_STORIES_MAX = 6;
 export const ARRIVAL_SNAPSHOT_ITEMS_MAX = 30;
 export const ARRIVAL_MESSAGE_PREVIEW_MAX = 240;
 
@@ -207,9 +216,88 @@ export const ArrivalSnapshotItemSchema = z
   .strict();
 export type ArrivalSnapshotItem = z.infer<typeof ArrivalSnapshotItemSchema>;
 
+/**
+ * P4: one prepared Q Daily story, from the person's own latest edition.
+ * The welcome, Q's turns and the follow-ups ("give me the gist", "open
+ * it") all read this same object; nothing about it is looked up again.
+ * The summary reports what the cited sources say (attributed, never
+ * verified fact).
+ */
+export const ArrivalDailyStorySchema = z
+  .object({
+    editionId: UuidSchema,
+    editionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+    sectionCode: z.enum([
+      "LEAD",
+      "YOUR_SECTOR",
+      "YOUR_MARKET",
+      "DEALS",
+      "PEOPLE",
+      "Q_TAKE",
+      "BRIEF",
+    ]),
+    storyId: z.string().min(1).max(64),
+    headline: z.string().min(1).max(200),
+    /** The authorised gist: the story's standfirst (or first paragraph). */
+    summary: z.string().min(1).max(400),
+    /** A little more, for "tell me more": the opening paragraphs. */
+    detail: z.string().max(900).nullable(),
+    sources: z
+      .array(
+        z
+          .object({
+            publisher: z.string().min(1).max(120),
+            title: z.string().max(300),
+            url: z.string().url().max(2_048),
+            publishedAt: z.string().max(40).nullable(),
+          })
+          .strict(),
+      )
+      .max(3),
+    /** When the edition was published (generated). */
+    publishedAt: z.string().max(40),
+    /** The exact in-app route: the edition, at this story. */
+    path: z.string().min(1).max(300),
+    /** The section's anchor on the edition page (null: the story's own). */
+    sectionPath: z.string().max(300).nullable(),
+  })
+  .strict();
+export type ArrivalDailyStory = z.infer<typeof ArrivalDailyStorySchema>;
+
+/** The edition page's element id for a story. */
+export function dailyStoryAnchor(storyId: string): string {
+  return `story-${storyId}`;
+}
+
+/** The edition page's element id for a section (null: it has none). */
+export function dailySectionAnchor(code: string): string | null {
+  switch (code) {
+    case "YOUR_SECTOR":
+    case "YOUR_MARKET":
+    case "DEALS":
+    case "PEOPLE":
+      return `section-${code}`;
+    case "Q_TAKE":
+      return "section-q-take";
+    case "BRIEF":
+      return "section-briefs";
+    default:
+      return null;
+  }
+}
+
+/** The in-app route of an edition, at an element (client navigation). */
+export function dailyEditionPagePath(
+  editionId: string,
+  anchor?: string | null,
+): string {
+  const base = `/daily/${encodeURIComponent(editionId.toLowerCase())}`;
+  return anchor === undefined || anchor === null ? base : `${base}#${anchor}`;
+}
+
 export const ArrivalSnapshotSchema = z
   .object({
-    contractVersion: z.literal(ARRIVAL_SNAPSHOT_VERSION),
+    contractVersion: z.enum(ARRIVAL_SNAPSHOT_VERSIONS),
     /**
      * Changes whenever any fact in the snapshot does (a hash of the items'
      * sources), so a consumer can tell "same as I was told" from "new".
@@ -223,6 +311,14 @@ export const ArrivalSnapshotSchema = z
     briefsRead: z.boolean(),
     /** What Q and its agents did since the window began (counts and names). */
     activity: QActivitySummarySchema.nullable(),
+    /**
+     * P4: the latest edition's stories, most relevant first. Empty: no
+     * edition is available (Q then invents none).
+     */
+    daily: z
+      .array(ArrivalDailyStorySchema)
+      .max(ARRIVAL_DAILY_STORIES_MAX)
+      .default([]),
   })
   .strict();
 export type ArrivalSnapshot = z.infer<typeof ArrivalSnapshotSchema>;

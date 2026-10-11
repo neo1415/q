@@ -127,6 +127,7 @@ function build(
   said: string,
   arrivalSkim?: QTurnSkimmer,
   offered: readonly QOfferedTool[] = [],
+  qHistory: readonly string[] = [],
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -154,6 +155,19 @@ function build(
     sleep: () => Promise.resolve(),
   });
   const messages = [
+    ...qHistory.map(
+      (content) =>
+        ({
+          id: randomUUID(),
+          tenantId: TENANT,
+          conversationId: CONVERSATION,
+          runId: RUN,
+          role: "Q",
+          content,
+          contentType: "TEXT",
+          createdAt: "2026-10-10T08:59:00.000Z",
+        }) as unknown as QConversationMessage,
+    ),
     {
       id: randomUUID(),
       tenantId: TENANT,
@@ -180,7 +194,7 @@ function build(
       insert: (_tx: unknown, input: { content: string }) => {
         persisted.push(input.content);
         return Promise.resolve({
-          ...messages[0],
+          ...messages[messages.length - 1],
           id: randomUUID(),
           role: "Q",
           content: input.content,
@@ -776,5 +790,196 @@ describe("K6: the arrival skim runs beside the turn, and only when it can matter
     );
     await b.seam.answer(b.request);
     expect(empty.starts).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P4: the quiet-day Q Daily stories, answered by code from the snapshot.
+
+const EDITION = "7b1c0e55-0000-4000-8000-0000000000e1";
+const story = (
+  id: string,
+  headline: string,
+  summary: string,
+  sectionCode = "YOUR_SECTOR",
+) => ({
+  editionId: EDITION,
+  editionDate: "2026-10-09",
+  sectionCode,
+  storyId: id,
+  headline,
+  summary,
+  detail: `${summary} More detail follows here.`,
+  sources: [
+    {
+      publisher: "TechCabal",
+      title: headline,
+      url: "https://techcabal.com/x",
+      publishedAt: null,
+    },
+  ],
+  publishedAt: "2026-10-09T06:00:00.000Z",
+  path: `/daily/${EDITION}#story-${id}`,
+  sectionPath:
+    sectionCode === "LEAD" ? null : `/daily/${EDITION}#section-${sectionCode}`,
+});
+const QUIET: ArrivalSnapshot = ArrivalSnapshotSchema.parse({
+  contractVersion: "arrival-snapshot.v2",
+  version: "v-quiet",
+  asOf: NOW,
+  unread: [],
+  briefsRead: true,
+  activity: null,
+  items: [],
+  daily: [
+    story(
+      "s1",
+      "Lagos fintech Paystack Labs raises $20 million.",
+      "Paystack Labs closed a $20 million round led by a global fund.",
+    ),
+    story(
+      "s2",
+      "Nigeria cuts fintech licence fees",
+      "The central bank lowered licence fees for payment startups.",
+    ),
+  ],
+});
+
+describe("P4: quiet-day Daily follow-ups run by code (no model, no tool)", () => {
+  const welcomeHistory = [
+    "Good morning, Zino. Two stories from the 9 October Daily: Lagos fintech Paystack Labs raises $20 million, and Nigeria cuts fintech licence fees. Want the gist of either?",
+  ];
+
+  it("gist of the story the welcome named alone, with no model call", async () => {
+    const one = ArrivalSnapshotSchema.parse({
+      ...QUIET,
+      daily: [QUIET.daily[0]],
+    });
+    const { seam, request, alpha, executed, persisted } = build(
+      () => one,
+      "give me the gist",
+    );
+    await seam.answer(request);
+    expect(alpha.calls).toHaveLength(0);
+    expect(executed).toEqual([]);
+    expect(persisted.join("\n")).toContain("closed a $20 million round");
+    expect(persisted.join("\n")).toContain("According to TechCabal");
+  });
+
+  it.each([
+    "tell me more",
+    "what's the full story",
+    "give me the gist",
+    "can you give me the short version",
+    "tell me more about it",
+    "what's it about",
+  ])("%s -> the prepared story text, no model", async (said) => {
+    const one = ArrivalSnapshotSchema.parse({
+      ...QUIET,
+      daily: [QUIET.daily[1]],
+    });
+    const { seam, request, alpha, persisted } = build(() => one, said);
+    await seam.answer(request);
+    expect(alpha.calls).toHaveLength(0);
+    expect(persisted.join("\n")).toContain("licence fees");
+  });
+
+  it.each([
+    "open it",
+    "take me there",
+    "show me that story",
+    "pull it up",
+    "let me see it",
+    "open the story",
+  ])("%s -> the exact story, never the Daily home", async (said) => {
+    const one = ArrivalSnapshotSchema.parse({
+      ...QUIET,
+      daily: [QUIET.daily[0]],
+    });
+    const { seam, request, alpha, events } = build(() => one, said);
+    await seam.answer(request);
+    expect(alpha.calls).toHaveLength(0);
+    const sent = events.join("\n");
+    expect(sent).toContain('"page":"DAILY_EDITION"');
+    expect(sent).toContain(EDITION);
+    expect(sent).toContain('"anchor":"story-s1"');
+  });
+
+  it("show me that section opens the section anchor", async () => {
+    const one = ArrivalSnapshotSchema.parse({
+      ...QUIET,
+      daily: [QUIET.daily[0]],
+    });
+    const { seam, request, events, persisted } = build(
+      () => one,
+      "show me that section",
+    );
+    await seam.answer(request);
+    expect(events.join("\n")).toContain('"anchor":"section-YOUR_SECTOR"');
+    expect(persisted.join("\n")).toContain("your sector");
+  });
+
+  it("two stories were named: asks which, then 'the second one' opens that one", async () => {
+    const ask = build(() => QUIET, "open it", undefined, [], welcomeHistory);
+    await ask.seam.answer(ask.request);
+    expect(ask.alpha.calls).toHaveLength(0);
+    expect(ask.persisted.join("\n")).toMatch(/which one/iu);
+    expect(ask.events.join("\n")).not.toContain("OPEN_RECORD_PAGE");
+    const second = build(
+      () => QUIET,
+      "open the second one",
+      undefined,
+      [],
+      welcomeHistory,
+    );
+    await second.seam.answer(second.request);
+    expect(second.alpha.calls).toHaveLength(0);
+    expect(second.events.join("\n")).toContain('"anchor":"story-s2"');
+  });
+
+  it("the referent is the story Q last mentioned, not the welcome's first", async () => {
+    const said = [
+      ...welcomeHistory,
+      "Nigeria cuts fintech licence fees. The central bank lowered licence fees for payment startups. According to TechCabal. Want more, or shall I open it?",
+    ];
+    const { seam, request, events } = build(
+      () => QUIET,
+      "open it",
+      undefined,
+      [],
+      said,
+    );
+    await seam.answer(request);
+    expect(events.join("\n")).toContain('"anchor":"story-s2"');
+  });
+
+  it("no stories prepared: nothing is invented, the normal path runs", async () => {
+    const none = ArrivalSnapshotSchema.parse({ ...QUIET, daily: [] });
+    const { seam, request, alpha, persisted } = build(
+      () => none,
+      "give me the gist",
+    );
+    await seam.answer(request);
+    expect(alpha.calls.length).toBeGreaterThan(0);
+    expect(persisted.join("\n")).not.toContain("TechCabal");
+  });
+
+  it("the last thing Q said was about something else: 'open it' is not the Daily", async () => {
+    const { seam, request, events } = build(
+      () => QUIET,
+      "open it",
+      undefined,
+      [],
+      ["Halyard is waiting for your reply."],
+    );
+    await seam.answer(request);
+    expect(events.join("\n")).not.toContain("DAILY_EDITION");
+  });
+
+  it("the prepared fact carries the stories for Q's turns too", () => {
+    const fact = arrivalSnapshotFact(QUIET);
+    expect(fact?.statement).toContain("Paystack Labs");
+    expect(fact?.statement).toContain(`/daily/${EDITION}#story-s1`);
+    expect(fact?.statement).toContain("Nothing is waiting on them");
   });
 });

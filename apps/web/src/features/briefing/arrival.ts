@@ -6,6 +6,8 @@ import {
   isTimeZone,
   lowdownOf,
   parseCardCommand,
+  quietDayNewsWords,
+  welcomeStories,
   remainingAfterFocus,
   summaryOfCards,
   wordsAllowDismiss,
@@ -272,6 +274,8 @@ export type ArrivalWords = {
   readonly summary: string | null;
   /** Everything Q says first, on voice. */
   readonly spoken: string;
+  /** P4: the edition route(s) the welcome's stories open, to prefetch. */
+  readonly dailyPaths: readonly string[];
 };
 
 /** "Zino Aviation is waiting for a reply" -> "Zino Aviation". */
@@ -361,6 +365,22 @@ export function arrivalWords(
         ? { quiet: false, text: `Quiet on what I could check. ${unreadLine}` }
         : { quiet: false, text: told.join(" ") };
   const matchesLine = matchesWords(data.matches ?? null);
+  const quietDay =
+    lowdown.quiet &&
+    matchesLine === null &&
+    data.cards.length === 0 &&
+    (data.attention === null || data.attention === undefined
+      ? true
+      : attentionLines(data.attention).length === 0);
+  // P4: a quiet day greets and mentions one or two prepared, dated Q Daily
+  // stories (the snapshot's own objects); with none, only the greeting.
+  const dailyLine = quietDay
+    ? quietDayNewsWords({
+        stories: data.snapshot?.daily ?? [],
+        now,
+        who: data.firstName ?? "",
+      })
+    : null;
   const first = data.cards[0];
   const firstCard =
     first === undefined
@@ -380,14 +400,24 @@ export function arrivalWords(
   return {
     greeting,
     welcome: warm.slice(greeting.length).trim() || null,
-    lowdown: lowdown.text,
+    dailyPaths:
+      dailyLine === null
+        ? []
+        : [
+            ...new Set(
+              welcomeStories(data.snapshot?.daily ?? []).map(
+                (story) => story.path.split("#")[0] ?? story.path,
+              ),
+            ),
+          ],
+    lowdown: dailyLine ?? lowdown.text,
     quiet: lowdown.quiet && matchesLine === null && lines.length === 0,
     firstCard,
     summary,
     matches: matchesLine,
     spoken: [
       warm,
-      lowdown.text,
+      dailyLine ?? lowdown.text,
       ...(summary === null
         ? [firstCard]
         : [summary, "Tell me what you'd like done with any of them."]),

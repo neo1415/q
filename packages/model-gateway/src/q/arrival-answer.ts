@@ -238,8 +238,11 @@ export type ArrivalReply = {
       | "RELATIONSHIP_COMPANY"
       | "RELATIONSHIP_INVESTOR"
       | "RELATIONSHIP_COMPANY_MESSAGES"
-      | "RELATIONSHIP_INVESTOR_MESSAGES";
+      | "RELATIONSHIP_INVESTOR_MESSAGES"
+      | "DAILY_EDITION";
     readonly id: string;
+    /** DAILY_EDITION: the story or section element on the edition page. */
+    readonly anchor?: string;
   };
 };
 

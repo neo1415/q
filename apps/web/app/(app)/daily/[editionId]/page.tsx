@@ -9,6 +9,7 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
+import { DailyAnchorFocus } from "@/features/daily/anchor-focus";
 import { Newspaper } from "@/features/daily/newspaper";
 import { qApiSession } from "@/features/q/context";
 
@@ -59,6 +60,7 @@ export default async function DailyEditionPage({
       >
         Latest edition
       </Link>
+      <DailyAnchorFocus />
       <Newspaper edition={edition} />
     </PageContainer>
   );

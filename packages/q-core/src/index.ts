@@ -1478,3 +1478,17 @@ export {
   type DeckExtractionResult,
   type DeckExtractionVariables,
 } from "./prompts/schemas/deck-extraction.js";
+
+export {
+  WELCOME_STORIES_MAX,
+  dailyFollowUpKind,
+  dailyGistWords,
+  dailyMoreWords,
+  editionDay,
+  quietDayNewsWords,
+  spokenHeadline,
+  storyOrdinal,
+  welcomeStories,
+  type DailyFollowUpKind,
+  type DailyNewsStory,
+} from "./speech/daily-news.js";

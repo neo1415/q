@@ -123,14 +123,32 @@ function itemLines(item: ArrivalSnapshotItem, index: number): string {
 export function arrivalSnapshotFact(
   snapshot: ArrivalSnapshot | null,
 ): AuthorisedFact | null {
-  if (snapshot === null || snapshot.items.length === 0) return null;
+  if (
+    snapshot === null ||
+    (snapshot.items.length === 0 && snapshot.daily.length === 0)
+  ) {
+    return null;
+  }
   const lines = snapshot.items.slice(0, ITEMS_MAX).map(itemLines);
+  // P4: the same prepared Q Daily stories the welcome named and the
+  // gist/open lane answers from; no others exist for this turn.
+  if (snapshot.daily.length > 0) {
+    lines.push(
+      `Q Daily stories prepared for them (latest edition, ${snapshot.daily[0]?.editionDate ?? "undated"}; the quiet-day welcome names the first one or two). A follow-up ("give me the gist", "tell me more", "open it") is answered from these, and opens the exact story. Report what the sources say, attributed; never add news that is not listed here:`,
+      ...snapshot.daily
+        .slice(0, 4)
+        .map(
+          (story, index) =>
+            `${String(index + 1)}. "${oneLine(story.headline, 200)}" (${story.sectionCode.toLowerCase().replace(/_/gu, " ")}, per ${story.sources[0]?.publisher ?? "its source"}, edition ${story.editionDate}): ${oneLine(story.summary, 300)} Opens at ${story.path}.`,
+        ),
+    );
+  }
   const unread =
     snapshot.unread.length === 0
       ? ""
       : ` Could not be checked: ${snapshot.unread.map((u) => u.toLowerCase().replace(/_/gu, " ")).join(", ")}.`;
   const statement = [
-    `What Q already told them on arrival (already read for them, version ${snapshot.version.slice(0, 12)}, as of ${when(snapshot.asOf)}). Questions about these items ("what's the request", "what did they say", "did they accept", "open the conversation") are answered from here: do not look them up again, call a tool, or hand them to anyone; say plainly what is not here.`,
+    `${snapshot.items.length === 0 ? "Nothing is waiting on them. " : ""}What Q already told them on arrival (already read for them, version ${snapshot.version.slice(0, 12)}, as of ${when(snapshot.asOf)}). Questions about these items ("what's the request", "what did they say", "did they accept", "open the conversation") are answered from here: do not look them up again, call a tool, or hand them to anyone; say plainly what is not here.`,
     ...lines,
     unread,
   ]
