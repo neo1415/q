@@ -274,6 +274,7 @@ import {
   composeChatSafety,
   composeSchedule,
   createCounterpartNotices,
+  createMeetingProposalPort,
   createPushSubscriptionStore,
 } from "@capital-q/communication";
 import {
@@ -2448,6 +2449,12 @@ const { app, logger } = createApp(config, security, {
   chat,
   chatSafety,
   schedule,
+  // D (2026-10-11): meeting time proposals; booking after an acceptance goes
+  // through the schedule service as the accepting person.
+  proposals: createMeetingProposalPort({
+    transactions: database.transactions,
+    schedule,
+  }),
   // AUTO block (ADR 0030): Web Push; the key is public, the private half
   // stays with the workers that send.
   push: {

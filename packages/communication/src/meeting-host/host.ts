@@ -730,6 +730,8 @@ export type MeetingHost = {
   ) => HostAction[];
   /** "Q, be quiet": Q stops speaking unprompted and keeps taking notes. */
   readonly quiet: () => void;
+  /** "Q, carry on": Q may speak unprompted again (within its caps). */
+  readonly resume: () => void;
   /**
    * The reader (the model, on a line addressed to Q) understood a request to
    * keep waiting that the code matcher did not: the same bounded extension.
@@ -1728,6 +1730,9 @@ export function createMeetingHost(
       present: present.size,
       missingSides: missingSides(),
     }),
+    resume: () => {
+      quiet = false;
+    },
     quiet: () => {
       composing = false;
       quiet = true;

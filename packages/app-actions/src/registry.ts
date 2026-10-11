@@ -19,6 +19,7 @@ import { SET_PITCH_SHARING } from "./actions/pitch.js";
 import { PROFILE_IMAGE_ACTIONS } from "./actions/profile-images.js";
 import { PROFILE_AND_RECORDS } from "./actions/records.js";
 import { SCHEDULE_ACTIONS } from "./actions/schedule.js";
+import { SCHEDULE_PROPOSAL_ACTIONS } from "./actions/schedule-proposals.js";
 import { SETTINGS_ACTIONS } from "./actions/settings.js";
 import { ETIQUETTE_ACTIONS } from "./actions/etiquette.js";
 import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
@@ -50,6 +51,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...INTEREST_ACTIONS,
   ...CHAT_ACTIONS,
   ...SCHEDULE_ACTIONS,
+  ...SCHEDULE_PROPOSAL_ACTIONS,
   ...MEDIA_ACTIONS,
   ...OUTCOME_ACTIONS,
   ...DILIGENCE_ACTIONS,

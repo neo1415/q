@@ -109,3 +109,32 @@ export const MEETING_HOST_UNTRUSTED_V3 = [
   ...MEETING_HOST_UNTRUSTED,
   "seen",
 ] as const;
+
+// v5 (founder P3, 2026-10-11): Q stays a real conversational assistant in the
+// call. It is shown the PREPARED meeting context -- only the layers every
+// person in the room may hear (the room is the intersection of who is
+// present) -- and the working record of what has been agreed, tentatively
+// said, only suggested, or awaiting approval. NOTE writes an action item
+// into the meeting memory; PROPOSE still puts an ordinary action to the
+// organiser after the call. Nothing in v5 books, sends or discloses.
+export const MeetingHostVariablesV4Schema = MeetingHostVariablesV3Schema.extend(
+  {
+    /** The room-permitted prepared context (snapshot layers). UNTRUSTED. */
+    prepared: z.string().max(5_000),
+    /** The working summary and newest meeting events. UNTRUSTED. */
+    memory: z.string().max(3_000),
+  },
+).strict();
+export type MeetingHostVariablesV4 = z.infer<
+  typeof MeetingHostVariablesV4Schema
+>;
+export const MEETING_HOST_UNTRUSTED_V4 = [
+  ...MEETING_HOST_UNTRUSTED_V3,
+  "prepared",
+  "memory",
+] as const;
+export const MEETING_HOST_KINDS_V3 = [...MEETING_HOST_KINDS, "NOTE"] as const;
+export const MeetingHostResultV3Schema = MeetingHostResultSchema.extend({
+  kind: z.enum(MEETING_HOST_KINDS_V3),
+}).strict();
+export type MeetingHostResultV3 = z.infer<typeof MeetingHostResultV3Schema>;

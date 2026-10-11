@@ -118,6 +118,10 @@ export {
   type TimeOption,
 } from "./schedule/proposal.js";
 export {
+  createMeetingProposalPort,
+  type MeetingProposalPort,
+} from "./schedule/proposal-port.js";
+export {
   createPostgresProposalParties,
   createPostgresProposalStore,
 } from "./schedule/proposal-postgres.js";
@@ -255,4 +259,51 @@ export {
   type ScreenWatch,
   type ScreenWatchLimits,
 } from "./meeting-host/screen.js";
+export {
+  isCorrection,
+  isHearingCheck,
+  isOpinionAsk,
+  isRememberAsk,
+  isResume,
+  isStayQuiet,
+  isWhereWeAre,
+  routeMeetingTurn,
+  type BrainInput,
+  type BrainRoute,
+} from "./meeting-host/brain.js";
+export {
+  affirms,
+  attributeSpeaker,
+  createMeetingMemory,
+  dueTextOf,
+  readLine,
+  type FollowUp,
+  type MeetingEvent,
+  type MeetingEventKind,
+  type MeetingMemory,
+  type MeetingStance,
+  type SpeakerRef,
+  type WorkingSummary,
+} from "./meeting-host/memory.js";
+export {
+  answerFromSnapshot,
+  audienceOf,
+  buildMeetingSnapshot,
+  factsFor,
+  layersPermittedFor,
+  MEETING_SNAPSHOT_VERSION,
+  renderSnapshot,
+  SNAPSHOT_LAYERS,
+  type Audience,
+  type MeetingContextSnapshot,
+  type PreparedAnswer,
+  type RoomMember,
+  type SnapshotFact,
+  type SnapshotLayer,
+  type SnapshotParticipant,
+  type SnapshotSide,
+  type SnapshotSources,
+  type SnapshotTopic,
+  type SnapshotTruth,
+} from "./meeting-host/snapshot.js";
 // end MEET-HOST block
