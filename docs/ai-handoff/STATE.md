@@ -4,6 +4,15 @@
 > Evidence words: CODE OBSERVED · IMPLEMENTED · MERGED · LOCAL TESTED · CI GREEN · DEPLOYED · LIVE VERIFIED · BLOCKED.
 > A recorded SHA is a snapshot; re-check Git and Railway before trusting it.
 
+## Codex live verification correction — 2026-10-11 15:17 UTC
+
+- **DEPLOYED:** all four Railway services freshly report SUCCESS at `ab962576`. Authenticated founder Home/Documents/Relationships still render.
+- **LIVE VERIFIED defect:** three isolated investor mandate recalls on that revision still incurred FAST_CLASSIFICATION (756 / 756 / 841 ms), with client completion 3,402 / 2,471 / 2,804 ms. No live classifier-removal or speedup claim. The guard confused the core investor entity ID with the identity organisation ID; a scoped hosted lookup confirms they differ.
+- **IMPLEMENTED / LOCAL TESTED correction:** real distinct IDs now appear in the regression fixture (the old guard fails three variants). The early lane validates actor/run/tenant and the firewall mandate subject against its own scope filter. 37 mandate/core/sequence tests plus six canonical gateway tests, package dependency build, root typecheck and changed-file lint passed; q-api typecheck passed.
+- **CI RED:** document packet `dd8f9353`, run `38149586379`, database job failed after local database startup succeeded. Full log download is blocked at the GitHub log-storage host; that precise host was added to the saved environment draft, which requires publication. Code inspection found an invalid new test: browser SELECT on the server-only artifacts table must raise 42501, not return zero rows. Assertion corrected without changing grants/RLS; next exact-commit CI must prove the fix.
+- Document migration remains **NOT APPLIED HOSTED**. Do not release the document packet before both exact-commit gates pass. Its evidence-only initial path is a connection, not the final intelligent document product. Real job/render/revision acceptance remains open.
+- One existing fictional voice-test account is in the current GPT-Live cohort and returns availability true. No account/cohort/flag was created or changed; first audio remains unmeasured.
+
 ## Codex document continuation — 2026-10-11 08:00 America/Los_Angeles
 
 - First packet `ab96257644d21e7e27fbb72fd54a9946e23fa00c` is **CI GREEN**: exact-commit run `38147234625`, quality and pgTAP. It was pushed to the deployment branch; Railway builds are in progress. Do not claim DEPLOYED until each service reports SUCCESS at this revision.

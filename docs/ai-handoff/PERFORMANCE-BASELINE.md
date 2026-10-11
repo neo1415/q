@@ -55,3 +55,12 @@ row each. Client timings include start/poll/network overhead; rows scoped this
 way may omit other correlations. These small samples are not a p95 estimate.
 Post-deployment measurement must distinguish removal of classifier calls from
 end-to-end latency and any remaining model calls.
+
+Post-deployment `ab962576` mandate samples: 3,402 / 2,471 / 2,804 ms client
+completion, with FAST_CLASSIFICATION 756 / 756 / 841 ms respectively. Real
+answers were present, but classifier removal did not occur. The live actor's
+identity organisation ID differs from the core investor organisation ID; the
+early guard incorrectly compared them. Distinct-ID regression reproduces the
+failure; the corrected scope-binding guard awaits release. These samples do
+not establish a speedup or p95. Next samples must record first useful text as
+well as completion, and separately verify usage rows.

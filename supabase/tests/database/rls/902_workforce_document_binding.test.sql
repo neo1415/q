@@ -52,9 +52,9 @@ select throws_ok($$ update artifacts.artifacts set status = 'READY'
   where workforce_job_id = '00000000-0000-4000-8000-0000000092a1' $$,
   '42501', null, 'browser cannot write even its own bound artifact');
 select pg_temp.act_as_user_b();
-select is((select count(*)::int from artifacts.artifacts
-  where workforce_job_id = '00000000-0000-4000-8000-0000000092a1'), 0,
-  'artifact RLS hides a different owners bound document');
+select throws_ok($$ select count(*) from artifacts.artifacts
+  where workforce_job_id = '00000000-0000-4000-8000-0000000092a1' $$,
+  '42501', null, 'browser cannot read another owners server-only artifact');
 
 select * from finish();
 rollback;

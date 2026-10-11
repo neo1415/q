@@ -2,8 +2,8 @@
 
 ## Current continuation — 2026-10-11
 
-- **CI GREEN / deployment in progress:** first packet `ab962576`, run `38147234625`. Verify all Railway service revisions, then repeat authenticated mandate measurements and bounded founder browser checks.
-- **IMPLEMENTED / local validation:** existing workforce DOCUMENTS connection for approved OWN_COMPANY PREPARE. One canonical artifact/enqueue per job step, fresh authority, real READY completion, cancellation checks, and zero additional paid generation. Migration `20261222150000` and exact-commit CI/release are pending. Details: [WORKFORCE-DOCUMENTS.md](WORKFORCE-DOCUMENTS.md).
+- **DEPLOYED:** first packet `ab962576`, all four Railway services SUCCESS. Live mandate sampling exposed a core-entity/identity-organisation guard mismatch; corrected with distinct-ID regression. No live speedup claim until correction is released and measured.
+- **IMPLEMENTED / local validation:** existing workforce DOCUMENTS connection for approved OWN_COMPANY PREPARE. One canonical artifact/enqueue per job step, fresh authority, real READY completion, cancellation checks, and zero additional paid generation. Migration `20261222150000` is not applied hosted. CI `38149586379` at `dd8f9353` failed pgTAP; the invalid browser-SELECT assertion was corrected to require permission denial. Repeat exact-commit quality + pgTAP before release. Details: [WORKFORCE-DOCUMENTS.md](WORKFORCE-DOCUMENTS.md).
 - FDN numeric methodology remains blocked on approved, versioned criteria/contextual weights. The score-lineage audit is complete; no proprietary formula, historical score or source of truth was invented.
 - End-to-end voice audio and complete founder/investor acceptance remain open. Kathryn's GPT-Live availability check is cohort-excluded; no cohort, budget or voice flag was changed.
 

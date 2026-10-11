@@ -114,3 +114,15 @@ Newest entry last. Never edit past entries; correct them in a new entry.
 - **Next three executable actions:** 1. Push locally validated document packet to work/integration/CI and inspect both exact gates. 2. Verify first packet Railway revisions and repeat investor mandate samples/browser smoke. 3. After document CI green, apply only its additive migration, deploy exact green revision and verify a real private READY artifact through an approved workforce step.
 - **Parallel work / leases:** separate document bridge/executor worktrees; root integrated their commits and completed adapter/tests. All subagents stopped after account usage limits; root owns continuation. No active competing writer.
 - **Secrets:** never recorded. Existing synthetic investor sign-in fallback exchanges an admin-generated link locally without sending email; customer screenshots and sessions stay outside checkout.
+
+## 2026-10-11 15:17 UTC — Codex — live mandate guard and database gate correction
+
+- **Workspace:** `/workspace/q`, `codex/preserve-optimize`, after `dd8f9353`.
+- **Objective:** correct a live routing defect and preserve the server-only artifact permission contract.
+- **Code changed:** own-mandate scope guard compares core subject to its firewall filter, validates current actor/run/tenant; fixture uses actual distinct identity/core IDs. pgTAP browser read assertion now requires 42501, without permission changes.
+- **Proven locally:** old guard fails three distinct-ID mandate regressions; corrected guard passes 37 mandate/core/sequence tests and six canonical gateway tests. Dependency builds, root typecheck and changed-file lint passed. q-api typecheck passed.
+- **Proven live:** four services SUCCESS at `ab962576`; founder browser paths preserved. Three mandate runs still recorded classification, so no classifier-removal/speedup claim. Scoped hosted identity comparison confirms distinct IDs. Existing fictional GPT-Live cohort account is available; audio not yet measured.
+- **CI:** `dd8f9353` database gate failed after database startup. Logs blocked by GitHub storage-host allowlist; code inspection found the invalid assertion above. Next exact-commit CI is required; document migration remains unapplied.
+- **Unfinished:** release correction, actual first useful text/audio measurements, real authorized score reproduction, autonomous document READY/render/revision, investor Discover-to-Q journey, intelligent paid document stages with durable canonical budget enforcement.
+- **Next three executable actions:** 1. Complete static checks and push corrected packet to CI. 2. Exercise existing authorized investor discovery/fit and bounded voice transport while CI runs. 3. After exact gates pass, apply additive migration, release and verify actual document job and latency.
+- **Parallel work:** all workers stopped; root owns continuation. Secrets and private runtime evidence remain outside checkout.

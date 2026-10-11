@@ -77,7 +77,7 @@ function investorRequest(): QAnswerRequest {
   const base = request();
   const subject = {
     kind: "INVESTOR_ORGANISATION" as const,
-    investorOrganisationId: actor.organisationId,
+    investorOrganisationId: "b0b0b0b0-b0b0-4b0b-8b0b-b0b0b0b0b0b0",
   };
   return {
     ...base,
@@ -99,7 +99,10 @@ function investorRequest(): QAnswerRequest {
             canQuote: true,
             canProvideLink: false,
           },
-          filter: { tenantId: TENANT, organisationId: actor.organisationId },
+          filter: {
+            tenantId: TENANT,
+            investorOrganisationId: subject.investorOrganisationId,
+          },
           isEvidence: true,
         },
       ],

@@ -2681,8 +2681,18 @@ export function createSpecialistQAnswer(
       (request.turnKind === undefined ||
         request.turnKind === "QUESTION_TO_Q") &&
       request.actor.organisationId !== undefined &&
-      ownInvestorOrganisationIn(request.plan) ===
-        request.actor.organisationId &&
+      request.plan.actor.organisationId === request.actor.organisationId &&
+      request.plan.actor.userId === request.actor.userId &&
+      request.plan.tenantId === request.tenantId &&
+      request.plan.runId === request.runId &&
+      request.plan.scopes.some(
+        (scope) =>
+          scope.kind === "INVESTOR_MANDATE" &&
+          scope.subject?.kind === "INVESTOR_ORGANISATION" &&
+          scope.subject.investorOrganisationId ===
+            scope.filter.investorOrganisationId &&
+          scope.filter.tenantId === request.tenantId,
+      ) &&
       asksForOwnMandate(latest.content)
     ) {
       // A sequence may have begun on another instance. Load the existing
