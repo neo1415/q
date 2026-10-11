@@ -80,6 +80,7 @@ import {
 import { externalEvaluationBasis } from "./external-evaluation.js";
 import { externalSimulation } from "./external-presentation.js";
 import { scenarioFor } from "./external-scenarios.js";
+import type { DemoRehearsalAccess } from "./demo-rehearsal-access.js";
 import type { ExternalSubjectResolver } from "./external-resolve.js";
 import type { ExternalSubjectStore } from "./external-subjects.js";
 import type { ExternalRehearsalLatency } from "./external-rehearsal-latency.js";
@@ -1437,6 +1438,13 @@ export function createRehearsalService(dependencies: {
         readonly investorLink?:
           | ((investorOrganisationId: string) => Promise<string | null>)
           | undefined;
+        /**
+         * Demo rehearsal access: a tenant entitled to a prepared entity
+         * rehearses its labelled simulation with no connection and without
+         * the Discover visibility check. Entitlement only: not a
+         * relationship, and without a live grant nothing changes.
+         */
+        readonly demoAccess?: DemoRehearsalAccess | undefined;
       }
     | undefined;
 }): RehearsalService {
@@ -1487,6 +1495,10 @@ export function createRehearsalService(dependencies: {
     if (kind !== "INVESTOR_ORGANISATION") return { kind, id };
     const linked = await external?.investorLink?.(id).catch(() => null);
     if (linked === undefined || linked === null) return { kind, id };
+    const entitled = await external?.demoAccess
+      ?.holds(actor, linked)
+      .catch(() => false);
+    if (entitled === true) return { kind: "EXTERNAL_PERSON", id: linked };
     const visible = await material
       .counterpart(actor, kind, id)
       .catch(() => null);
@@ -2351,8 +2363,27 @@ export function createRehearsalService(dependencies: {
         const key = `${row.counterpartKind}:${row.counterpartId}`;
         if (!last.has(key)) last.set(key, row);
       }
+      const entitled =
+        viewer.role === "FOUNDER"
+          ? await (external?.demoAccess?.list(actor) ?? Promise.resolve([]))
+              .catch(() => [])
+          : [];
       return {
         role: viewer.role,
+        researched: entitled.map((entity) => ({
+          externalPersonId: entity.externalPersonId,
+          investorOrganisationId: entity.investorOrganisationId,
+          name: entity.displayName,
+          entityKind: entity.entityKind,
+          roleLine:
+            entity.entityKind === "PERSON"
+              ? null
+              : scenarioFor({
+                  displayName: entity.displayName,
+                  nameVariants: entity.nameVariants,
+                  entityKind: entity.entityKind,
+                }).roleLine,
+        })),
         upcoming: meetings
           .flatMap((meeting) => {
             const who = byRelationship.get(meeting.relationshipId);

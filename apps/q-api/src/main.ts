@@ -15,6 +15,7 @@
  * a credential, a connection or a table.
  */
 
+import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
 import { createInvestorLink } from "./composition/investor-link.js";
 import { createFitComposition } from "./composition/fit.js";
 import {
@@ -5018,6 +5019,7 @@ const rehearsals = createRehearsalService({
     // R5: QInvest, AlRayan Investment and Alchemist Doha are canonical,
     // unclaimed investor organisations rehearsed as labelled simulations.
     investorLink: createInvestorLink(database.sql),
+    demoAccess: createDemoRehearsalAccess(database.sql),
   },
   store: createPostgresRehearsalStore(database.sql),
   material: {
