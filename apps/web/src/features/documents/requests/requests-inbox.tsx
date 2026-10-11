@@ -701,7 +701,7 @@ function QuestionSetCard({
               ? `A question from ${investor}`
               : `${String(count)} questions from ${investor}`
           }
-          detail={`${fromBoard ? "from “Assumptions to test” · " : ""}asked ${shortDate(item.askedAt)}`}
+          detail={`${fromBoard ? "from their key questions · " : ""}asked ${shortDate(item.askedAt)}`}
         />
         <Chip>Questions</Chip>
       </div>

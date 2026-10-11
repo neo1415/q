@@ -42,7 +42,9 @@ export function assumptionsCard(
       : board.assumptions;
   return {
     heading:
-      object === "EVIDENCE_BOARD" ? "Evidence board" : "Assumptions to test",
+      object === "EVIDENCE_BOARD"
+        ? "Evidence board"
+        : "Questions to investigate",
     lead:
       board.basis === "NOTHING_SHARED"
         ? "They haven't shared a confirmed deck reading with you, so every key claim is not known yet."

@@ -229,6 +229,43 @@ describe("the fit panel (profile)", () => {
   });
 });
 
+describe("Q's compact view on the profile", () => {
+  it("shows the qualification, the open questions and deeper asks bound to the company", () => {
+    const view = KORA.view;
+    if (view.status !== "READY") throw new Error("fixture");
+    const { container } = render(
+      <FitPanel
+        companyId={KORA.fit.companyId}
+        name="Kora Health"
+        fit={{ status: "READY", fit: KORA.fit }}
+        qView={{
+          ...view,
+          mainRisk: "Ticket size is only a partial match.",
+          unknowns: ["Is the round priced or a SAFE?"],
+        }}
+      />,
+    );
+    expect(
+      container.querySelector('[data-q-view-part="RISK"]')?.textContent,
+    ).toContain("Ticket size is only a partial match.");
+    expect(
+      container.querySelector('[data-q-view-part="UNKNOWNS"]')?.textContent,
+    ).toContain("Is the round priced or a SAFE?");
+    const deeper = container.querySelector('[data-q-view-part="DEEPER"]');
+    expect(deeper).not.toBeNull();
+    expect(
+      within(deeper as HTMLElement).getByRole("button", {
+        name: "Full assessment",
+      }),
+    ).toBeTruthy();
+    expect(
+      within(deeper as HTMLElement).getByRole("button", {
+        name: "Check the top open question",
+      }),
+    ).toBeTruthy();
+  });
+});
+
 describe("top N side by side", () => {
   it("renders every entry in the model's order with Q's view beside it", () => {
     render(<FitComparisonView comparison={TOP3} qViews={VIEWS} />);

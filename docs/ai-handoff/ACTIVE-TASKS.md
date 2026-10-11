@@ -1,5 +1,93 @@
 # Active tasks — authoritative cross-model board
 
+## LATEST STATUS — Claude Code product-clarity slice on top of the demo baseline — 2026-10-11 22:45 UTC
+
+**The deployed investor-demo baseline is unchanged: all four Railway services SUCCESS at `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6` (re-inspected 22:00 UTC via the Railway API; deployment IDs as below). Rollback point = that SHA (tag push is refused by the git proxy; the SHA lives on `build/int-rc`, both `recovery/*` lanes and `codex/preserve-optimize`).**
+
+- New work: branch **`claude/capital-q-completion-mhzsiq`** (based on `build/int-rc` @ `11174c4d`), pushed. **LOCAL TESTED, NOT INTEGRATED, NOT DEPLOYED.** Pushing to `build/int-rc` / `recovery/*` and live writes on production (even fictional accounts) were refused by the session's permission classifier; the owner must allow them or merge the PR. CI runs on the PR (`pull_request` trigger).
+- Local gates on the branch head: 52 package builds; root `tsc` exit 0; web `tsc` exit 0; vitest `apps/web packages/q-core packages/q-specialists` **386 files / 3,707 tests pass**; prettier + eslint clean on every changed file.
+- What changed (all presentation/prompt; no schema, no migration, no scoring change):
+  1. **Company profile raise** — a pitch figure plus unshared round details no longer reads as a contradiction ("$4M · From their pitch" above "Raise on Capital Q · Not shared with you"). The fold explains both halves in plain words; labels are "Said in their pitch" / "Declared by the company" on card and profile; row renamed "Round details". Owner sees what investors see. Tests: `company-raise-surfaces.test.tsx`.
+  2. **Deck** — Q's 12-section coverage grid is a native `<details>`, collapsed: "N of 12 sections identified · View coverage". Section analysis and carousel stay open. Test: `company-material.test.tsx`.
+  3. **Q's view** — `FIT_Q_VIEW` v2 (v1 deprecated, same schema/inputs/firewall, lock pinned): strongest alignment first, one decisive qualification, unknowns as concrete next questions by impact, no generic praise. The profile panel now shows the qualification and unknowns (previously dropped) and "Go deeper with Q" (full assessment / risks and gaps / top open question) through the existing company-bound Q conversation. Deterministic fit unchanged. Tests: `fit-ui.test.tsx`, q-core prompts lock.
+  4. **Questions to investigate** (was "Assumptions to test") — states the three paths per claim: ask Q to check the evidence (one Q question, nothing sent), tick to ask the founder (existing approve-then-send), request a document (diligence area when in diligence; data room only when it lists on-request documents; otherwise no link). Test: `investor-promises-render.test.tsx`.
+  5. **Deal strip** — LIVE-OBSERVED defect fixed: Savanna Seed × Ajopot is in Diligence with no recorded meeting, so Met read "not reached". Passed-but-unrecorded stages are now "Not recorded" (passed); a guide line says the next stage, what establishes it and who acts, honest that soft commits aren't binding, signing happens outside Capital Q and Capital Q never moves money. Test: `deal-stage-strip.test.ts`.
+  6. **Data room copy** — "Request the rest" → "Request all on-request documents"; its sheet says it reaches nothing unlisted; empty room says nothing shared ≠ nothing exists.
+- **Live READ-ONLY evidence (fictional accounts, production API):** Savanna Seed's relationships listed; Ajopot (IN_DILIGENCE) founder inbox shows an earlier diligence document request with requester name + firm, SHARED; investor diligence shows it FULFILLED with the document; deal view reports `current: DILIGENCE`, `MET.reachedAt: null` (the defect above), `nextSteps: [SOFT_COMMIT, PASS]`. Founder notifications include "Document requested: …". Runner: `scripts/handoff/live/two-sided-readback.mjs`.
+- **NOT RUN (blocked by permission):** `scripts/handoff/live/two-sided-questions.mjs` — the write half of the question loop (send → founder inbox → answer → investor sees it, retry, three negative cases).
+
+**Next executable steps:** (1) owner merges/approves the PR or grants push to `build/int-rc` + `recovery/2026-09-12-8y2j4w`; require CI quality + pgTAP green on the exact SHA; (2) deploy by pushing that SHA to `recovery/2026-09-12`, confirm four services SUCCESS, rerun `investor-demo-rehearsal.mjs` unmodified; (3) with permission, run `two-sided-questions.mjs ledgerfold` and `… ajopot` and record PASS/FAIL; (4) continue: known-company lookup latency (unchanged next task from Codex), cold Documents → Open race, agent matrix re-audit, landing promises matrix.
+
+Run the live runners from the repo root after `pnpm exec turbo run build --filter=./packages/*`:
+`CQ_PUBLIC_JSON=<file with NEXT_PUBLIC_SUPABASE_URL/KEY> CQ_SEED_ACCOUNT_PASSWORD=… NODE_USE_ENV_PROXY=1 node scripts/handoff/live/two-sided-readback.mjs ajopot`
+
+## LATEST STATUS — cold investor demo accepted / lossless continuation — 2026-10-11 21:28 UTC
+
+**Capital Q is an existing substantial application. The October 12 text investor-demo browser rehearsal now passes on the real deployed application. Continue from this release; do not rebuild its workforce or replace production scoring.**
+
+### Exact code, CI and deployment
+
+- Latest integrated application commit: **`06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`**, pushed on **`build/int-rc`**, CI lane **`recovery/2026-09-12-8y2j4w`** and deployment lane **`recovery/2026-09-12`**. Working branch **`codex/preserve-optimize`**; latest pushed rehearsal/handoff commit before this checkpoint **`79e19056bd4165f984127b066921996a0fab17a0`**. Subsequent documentation/rehearsal commits do not replace the exact gated application revision.
+- Exact CI **[`38173610861`](https://github.com/neo1415/q/actions/runs/38173610861)**: quality (format, lint, root typecheck, full tests and build) **SUCCESS**; database/pgTAP **SUCCESS**; manual e2e **SKIPPED**. Manual browser evidence below is separate from that skipped job. Local release gates passed: 52 package builds, final 82 targeted tests, root/web/q-api types, changed lint/format.
+- Fresh Railway inspection: **all four services SUCCESS at `06872c7c`**, with exact deployment receipts:
+
+| Railway service      | Deployed commit                            | Deployment ID                          | Status  |
+| -------------------- | ------------------------------------------ | -------------------------------------- | ------- |
+| `@capital-q/web`     | `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6` | `10753a26-0475-4c44-8715-c8706f5216ed` | SUCCESS |
+| `@capital-q/api`     | `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6` | `7f2feeed-d71b-4ca7-a7d3-8bc5c9490828` | SUCCESS |
+| `@capital-q/q-api`   | `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6` | `ea6dae51-0f3d-4830-8a1a-b953eac168aa` | SUCCESS |
+| `@capital-q/workers` | `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6` | `deceab1c-0bf4-4530-8372-8ceef0e01cb6` | SUCCESS |
+
+- No new migration: hosted/local **201/201**. Immediate previous all-four-success rollback: **`9261cdc4cdcb6c9f7829fe50fb7d3c197907848a`**, CI **`38169532816`** quality + pgTAP SUCCESS, manual e2e SKIPPED. Earlier exact green rollbacks: `ad4703895d9736ab0c321324888697f59c5c1e5f` (CI `38166655996`) and `e271242e6833d07820c32a8e679f3403ba1ca560` (CI `38164882385`). `main` is stale; do not reset from it.
+
+### LIVE VERIFIED product acceptance and limits
+
+- **Full tracked cold browser rehearsal PASS:** Discover HTTP 200 → immediate Ask Q attempt → three distinct canonical company cards, three rendered cards and Open controls → correct selected-company route and name → explanation → evidence/risk follow-up → exactly the two requested canonical comparison companies and two rendered cards → named authorized founder company evidence → its actual profile and follow-up. All six internal Q turns completed. Selected explanation had six positive findings and one correct company reference; risk follow-up had ten findings and one correct reference. The known founder question had three findings/one reference, follow-up four findings/one reference. Positive findings bind to the exact expected company; named founder evidence contains no PUBLIC_SOURCE substitution.
+- **Cold Discover blocker corrected and observed:** before first click, the SSR Ask Q button was disabled and had no bound React handler; Playwright's first click waited for actual enablement, opened Q and completed the request. The second fresh Discover entry in the same rehearsal also began disabled/unbound and worked. No sleep, warm-only readiness bypass or second-click workaround was added. This is one complete browser rehearsal, not a reliability/load percentile.
+- **Selected-company defect corrected and observed:** `9261cdc4` previously explained the company with four unbound findings and no COMPANY_REFERENCE (`PROFILE_REFERENCE_MISMATCH`). The `06872c7c` fallback binds deictic single-company questions only to the exact screen subject after a fresh schema-valid authorized profile read, retaining explicit-name precedence and ambiguity refusal. Explanation and follow-up now pass. The earlier selected-company routing correction also remains live: analysis returns zero candidate cards, not an unrelated ten-company sweep.
+- The known founder is a genuine previously authorized company record. Investor-visible declared profile evidence is not access to its private onboarding interviews. The rehearsal proves that authorized founder profile-to-Q journey, not complete private founder-interview disclosure or every onboarding workflow.
+- Existing document workforce evidence remains valid: real persisted READY v1 and conversational READY v2, canonical findings/gaps preserved, viewer and changed valid one-page A4 PDF. PREPARING/version zero was observed while DOCUMENTS remained RUNNING; DONE followed a real version row. A fresh 24-test completion/adapter regression pass reconfirms the canonical READY-pointer guard. This is not proof of broad intelligent research/writing/design/critique or durable aggregate paid-job budgeting.
+
+### Latest measurements and remaining defects
+
+| Actual browser phase on `06872c7c`       | First 20 rendered answer characters (ms) | First rendered card (ms) | Client completion (ms) |
+| ---------------------------------------- | ---------------------------------------- | ------------------------ | ---------------------- |
+| Top three                                | 3,212                                    | 3,565                    | 3,641                  |
+| Selected-company explanation             | 3,656                                    | none                     | 16,327                 |
+| Selected-company risk/evidence follow-up | 6,927                                    | none                     | 18,949                 |
+| Exact two-company comparison             | 3,550                                    | 3,550                    | 3,820                  |
+| Known founder question                   | 7,606                                    | none                     | 15,462                 |
+| Known founder profile follow-up          | 3,654                                    | none                     | 10,489                 |
+
+- Previous warm selected-company browser baseline on `9261cdc4`: first 20 characters **8,341 ms**, completion **18,978 ms**, attribution failed. Its scoped model usage had two lookup-selection calls **1,798 + 2,036 = 3,834 ms**. Latest selected explanation usage instead has classification **675 ms**, one final generation **13,593 ms**, and post-answer extraction **2,448 ms**, finishing 2,647 ms after the answer. **No lookup-selection rounds in that latest run.** This exposes intermittent unnecessary planning, not a proven causal or repeatable latency improvement from the binding-only patch.
+- Known-card baseline still outstanding: first 20 characters **8,661 ms**, completion **20,189 ms**, six bound findings/one reference. Two lookup-selection rounds **1,946 + 1,846 = 3,792 ms**, final generation 12,394 ms. Prepared screen/company facts already exist; inspect unnecessary named-other lookup guidance and reuse the existing fresh authorized tool read before inventing caching or a new service.
+- Earlier own-mandate measured improvement stands: three-sample median first text **2,098 → 892 ms**, completion **2,163 → 941 ms**. All text timings are a literal 20-character threshold, not semantically validated first useful content, p95 or load measurement. First audio remains **UNVERIFIED/BLOCKED in this cloud environment** by Deepgram proxy/tunnel failure; successful session creation is not audio proof.
+- **Remaining live defect:** cold Documents → immediate Open once failed to show its viewer; a four-second diagnostic retry succeeded and displayed nine canonical gaps. Reproduce by navigating to Documents and immediately pressing the existing artifact's Open without waiting for client readiness; require a real viewer/version, without readiness sleeps. A hydration cause is plausible but not confirmed for this control. Do not label the warm retry a fix.
+- **Historical real 8.8 unresolved:** current authorized 42-company fit baseline has no 8.8; repeated 6.0/3.5 are explained by the existing canonical mandate-fit calculation. October 8 source history reports top-three → “rank them” → ten companies with tied 8.8, but this is not a fresh actor/run-bound real reproduction. Canonical fit is distinct from official FDN Business Quality.
+- **PROPOSED ONLY:** offline InvestIQ v0.2, ten synthetic scenarios + ten invariants pass. No production import, real calibration or approved official weights. Source reconciliation remains additive to original Locked PADL/Product Specification; prototype precision is not institutional certainty.
+
+### Exact continuation, reproduction and protected work
+
+**Next engineering task:** measure and eliminate unnecessary model-based company lookup selection for an already-known canonical company, through the existing tool/plan/firewall. Record actual actor/run-scoped before/after provider rounds, first visible text and terminal time, including repeated selected-profile and named-offscreen cases. Preserve explicit-name/ambiguous/denied-read handling, exact comparison and private-interview boundaries. The current prompt's unconditional `aboutNamedOther` instruction at `packages/model-gateway/src/q/index.ts` asks for search/get even for a deictic selected-company question; a latest run avoided it, so do not claim universal overhead. An unambiguous canonical ID from existing durable answer cards can be a lookup hint only; obtain a fresh authorized schema-valid profile and verify its name. No optimization is implemented yet. Cold document readiness is the next independently reproduced product defect.
+
+Portable full browser rehearsal (actual command used successfully):
+
+```bash
+cd /workspace/q
+CQ_DEMO_SESSION_FILE=/workspace/cq-secrets/investor-session.json \
+CQ_DEMO_PUBLIC_KEY_FILE=/workspace/cq-secrets/public.key \
+CQ_DEMO_CHROMIUM_PATH=/usr/bin/chromium \
+CQ_DEMO_FOUNDER_RECORD_FILE=/workspace/cq-secrets/founder-company.json \
+NODE_USE_ENV_PROXY=1 node scripts/handoff/live/investor-demo-rehearsal.mjs
+```
+
+The tracked runner is the portable reproduction source. It creates internal Q turns for an existing authorized account, with no account creation or outward messages. Refresh/sign in through the existing-account methods in START-HERE; secret session files are not Git artifacts. Latest private receipts/screenshots: `/tmp/cq-investor-demo-8kF6hc`; count/timing-only log `/tmp/cq-demo-readiness-live.log`; actor/run-scoped selected-company usage `/tmp/cq-selected-company-model-latency-after.log`. These temporary files may disappear with the environment; the non-private results and exact runner are committed here. Never commit customer receipts, sessions, signed URLs, credentials or screenshots.
+
+- Five project worktrees inspected. Historical unfinished document bridge is committed/pushed as **`codex/wip-workforce-documents-preserved-2026-10-11` / `35c23d7a7e4b84d191e6535154db2dda46dafcaa`**. **UNVERIFIED WIP / DO NOT DEPLOY OR MERGE WHOLESALE:** historical `findForWorkforce` is incorrectly placed inside `toArtifact` and lacks the later real-version rejection. The integration branch already has corrected implementations; preserve this branch for archaeology only.
+- Other important histories pushed: `codex/workforce-documents` / `74f4b6ce9b33658c46493a739c3567a60d50b43e`; `codex/workforce-documents-executor` / `621614a3ceeeba5d5e0b31433e37cff3d32c0a16`; `codex/preserved-score-audit-2026-10-11` / `cce99544988af127e6d0d13c39fdcd605fc841e6`. Detached workforce audit `ab96257644d21e7e27fbb72fd54a9946e23fa00c` is an integrated ancestor. Old branches are historical, not additional platforms or competing sources of truth. No pending application-code edits at this checkpoint.
+- **Blocking environment/account actions:** no account action is needed for the text demo while existing authorized refresh remains available. For cloud voice verification, review/save/publish the saved environment configuration draft that preserves existing domains and adds `agent.deepgram.com`/`api.deepgram.com`; saving the draft did not activate it. Recheck credential-free transport before another paid voice attempt. Local Supabase startup remains blocked by Docker/vfs disk constraints; direct Postgres unavailable; required pgTAP passes in CI. Rotate chat-exposed credentials before continued production use, as already recorded by credential name in START-HERE.
+- **Must NOT rebuild/change:** GPT-Live, voice/navigation, Q cards, documents, relationships, onboarding, research, LangGraph workforce, canonical score sources or Locked PADL originals. Reuse existing services/tools/presentation/versioning. No second agent platform, duplicate business services, fabricated showcase evidence, speculative rewrite, RLS weakening, test/gate weakening, private interview disclosure or proposed score replacement. Do not deploy preserved unverified WIP.
+
 ## Cold Discover control and selected-company evidence binding — 2026-10-11 20:44 UTC
 
 - **DEPLOYED:** all four Railway services SUCCESS at `9261cdc4cdcb6c9f7829fe50fb7d3c197907848a`; exact CI `38169532816` quality and pgTAP SUCCESS, manual e2e SKIPPED. No new migration (201/201).
