@@ -83,7 +83,10 @@ import {
   toolAreaOf,
   zoneFromWords,
 } from "@capital-q/q-tools";
-import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
+import {
+  asksForOwnMandate,
+  ownInvestorOrganisationIn,
+} from "@capital-q/model-gateway/q";
 import {
   cardsLaneOf,
   fastLaneOf,
@@ -2367,6 +2370,9 @@ export function createSpecialistQAnswer(
       if (conversationId === undefined || latest === undefined) return null;
       // B5: a pleasantry is answered by code; its reading would be waste.
       if (pleasantryOf(latest.content) !== null) return null;
+      // A plain mandate recall is routed after the firewall supplies its
+      // own mandate scope; starting classifiers here would still waste calls.
+      if (asksForOwnMandate(latest.content)) return null;
       // An instant known-entity lookup is answered by code: no reading.
       if (instantLaneOf(latest.content, history) !== null) return null;
       if (preparedFollowUpOf(latest.content, history) !== null) return null;
@@ -2661,6 +2667,37 @@ export function createSpecialistQAnswer(
           pleasantryReply(pleasantry, request.runId, lastQ?.content ?? null),
         );
       }
+    }
+    // The existing delegate reads and composes their declared mandate under
+    // this same plan. Only skip classifiers for an unambiguous recall with
+    // an authorised own mandate; this routing decision grants no access.
+    if (
+      conversationId !== undefined &&
+      latest !== undefined &&
+      request.speculation === undefined &&
+      request.plan.screen?.route !== "ONBOARDING" &&
+      request.writingDocument !== true &&
+      request.askedAction === undefined &&
+      (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q") &&
+      !sequences.has(conversationId) &&
+      request.actor.organisationId !== undefined &&
+      ownInvestorOrganisationIn(request.plan) === request.actor.organisationId &&
+      asksForOwnMandate(latest.content)
+    ) {
+      const capabilities = await capabilitiesOf(request);
+      logger?.info(
+        { qRunId: request.runId, lane: "OWN_MANDATE" },
+        "q fast lane",
+      );
+      return delegate.answer({
+        ...request,
+        research: Promise.resolve(NO_RESEARCH),
+        capabilities: manifestOf(capabilities),
+        turnKind: "QUESTION_TO_Q",
+        questionKind: "THEIR_OWN_RECORDS",
+        preparedSubject: "MANDATE",
+        ...(latest.utteranceRef !== undefined ? { spoken: true } : {}),
+      });
     }
     // Known-entity instant lane: a plain lookup of a prepared entity is
     // answered from the warm index with zero model calls (live 2026-10-10:

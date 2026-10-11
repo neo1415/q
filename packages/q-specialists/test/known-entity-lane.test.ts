@@ -72,6 +72,40 @@ function request(): QAnswerRequest {
   };
 }
 
+function investorRequest(): QAnswerRequest {
+  const base = request();
+  const subject = {
+    kind: "INVESTOR_ORGANISATION" as const,
+    investorOrganisationId: actor.organisationId,
+  };
+  return {
+    ...base,
+    plan: PermittedContextPlanSchema.parse({
+      ...base.plan,
+      subjects: [subject],
+      scopes: [
+        {
+          kind: "INVESTOR_MANDATE",
+          subject,
+          contextLabel: "investor_private",
+          sensitivity: "CONFIDENTIAL",
+          layer: "STRUCTURED_STATE",
+          factCategories: ["INVESTOR_THESIS"],
+          projection: "FULL",
+          rights: {
+            canUseForReasoning: true,
+            canDiscloseExistence: true,
+            canQuote: true,
+            canProvideLink: false,
+          },
+          filter: { tenantId: TENANT, organisationId: actor.organisationId },
+          isEvidence: true,
+        },
+      ],
+    }),
+  };
+}
+
 const later = <T>(ms: number, value: T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), ms));
 
@@ -117,9 +151,12 @@ function seam(said: string) {
     createdAt: new Date().toISOString(),
   };
   let modelCalls = 0;
+  let readerCalls = 0;
+  let skimCalls = 0;
   const turns: QTurnReader = {
     read: () => {
       modelCalls += 1;
+      readerCalls += 1;
       return later(READ_MS, {
         kind: "QUESTION_TO_Q",
         confidence: "HIGH",
@@ -131,6 +168,7 @@ function seam(said: string) {
   const turnSkim: QTurnSkimmer = {
     skim: () => {
       modelCalls += 1;
+      skimCalls += 1;
       return later(SKIM_MS, null);
     },
   };
@@ -170,8 +208,98 @@ function seam(said: string) {
     turnSkim,
     knownEntities: matcher,
   });
-  return { answer, delegated, modelCalls: () => modelCalls };
+  return {
+    answer,
+    delegated,
+    modelCalls: () => modelCalls,
+    readerCalls: () => readerCalls,
+    skimCalls: () => skimCalls,
+  };
 }
+
+describe("the own-mandate instant delegation", () => {
+  it.each(["What is my mandate?", "show me my sectors", "read back my thesis"])(
+    "%s: skips both classifiers and passes the same authorised plan to the existing answer",
+    async (said) => {
+      const s = seam(said);
+      const req = investorRequest();
+      s.answer.preread?.({
+        runId: req.runId,
+        tenantId: req.tenantId,
+        actor: req.actor,
+        correlationId: req.correlationId,
+      });
+      await s.answer.answer(req);
+      expect(s.readerCalls()).toBe(0);
+      expect(s.skimCalls()).toBe(0);
+      expect(s.delegated).toHaveLength(1);
+      const delegated = s.delegated[0];
+      expect(delegated?.plan).toBe(req.plan);
+      expect(delegated?.actor).toBe(req.actor);
+      expect(delegated?.runId).toBe(req.runId);
+      expect(delegated?.turnKind).toBe("QUESTION_TO_Q");
+      expect(delegated?.questionKind).toBe("THEIR_OWN_RECORDS");
+      expect(delegated?.preparedSubject).toBe("MANDATE");
+      expect(await delegated?.research).toMatchObject({ mode: "NEVER" });
+    },
+  );
+
+  it.each([
+    "What is my mandate? Send it to Zino.",
+    "show my mandate as a document",
+    "what is my mandate and today's news?",
+    "update my mandate",
+    "score companies against my mandate",
+    "should I change my mandate?",
+  ])("%s: retains the semantic reader for actions or ambiguity", async (said) => {
+    const s = seam(said);
+    await s.answer.answer(investorRequest());
+    expect(s.readerCalls()).toBeGreaterThan(0);
+    expect(s.delegated[0]?.preparedSubject).not.toBe("MANDATE");
+  });
+
+  it("does not bypass the reader without a firewall-bound own mandate", async () => {
+    const s = seam("What is my mandate?");
+    await s.answer.answer(request());
+    expect(s.readerCalls()).toBeGreaterThan(0);
+    expect(s.delegated[0]?.preparedSubject).not.toBe("MANDATE");
+  });
+
+  it("does not route another organisation's mandate as the actor's own", async () => {
+    const s = seam("What is my mandate?");
+    const base = investorRequest();
+    await s.answer.answer({
+      ...base,
+      plan: PermittedContextPlanSchema.parse({
+        ...base.plan,
+        scopes: base.plan.scopes.map((scope) => ({
+          ...scope,
+          subject: {
+            kind: "INVESTOR_ORGANISATION",
+            investorOrganisationId: randomUUID(),
+          },
+        })),
+      }),
+    });
+    expect(s.readerCalls()).toBeGreaterThan(0);
+    expect(s.delegated[0]?.preparedSubject).not.toBe("MANDATE");
+  });
+
+  it.each(["ONBOARDING", "SPECULATION"])(
+    "%s: retains the existing guarded route",
+    async (guard) => {
+      const s = seam("What is my mandate?");
+      const base = investorRequest();
+      const req: QAnswerRequest =
+        guard === "ONBOARDING"
+          ? { ...base, plan: { ...base.plan, screen: { route: "ONBOARDING" } } }
+          : { ...base, speculation: { decided: Promise.resolve(true) } };
+      await s.answer.answer(req);
+      expect(s.readerCalls()).toBeGreaterThan(0);
+      expect(s.delegated[0]?.preparedSubject).not.toBe("MANDATE");
+    },
+  );
+});
 
 describe("the known-entity instant lane", () => {
   it.each([

@@ -286,6 +286,7 @@ export {
   type QTurnAuthority,
 } from "./delegation-reader.js";
 export { mandateStatement, ownProfileFact } from "./own-profile.js";
+export { asksForOwnMandate } from "./own-mandate-answer.js";
 export {
   ownOnboardingFacts,
   type OwnOnboarding,

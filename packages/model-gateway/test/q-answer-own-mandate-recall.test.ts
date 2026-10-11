@@ -267,6 +267,9 @@ describe("asksForOwnMandate / ownMandateAnswer", () => {
     expect(asksForOwnMandate("show me my sectors")).toBe(true);
     expect(asksForOwnMandate("should I change my mandate")).toBe(false);
     expect(asksForOwnMandate("which companies match my mandate")).toBe(false);
+    expect(asksForOwnMandate("What is my mandate? Send it to Zino.")).toBe(false);
+    expect(asksForOwnMandate("show my mandate as a document")).toBe(false);
+    expect(asksForOwnMandate("what is my mandate and today's news?")).toBe(false);
   });
   it("is null when nothing is declared", () => {
     expect(ownMandateAnswer({ mandates: [] })).toBeNull();

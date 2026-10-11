@@ -39,12 +39,15 @@ type MandateRead = {
 };
 
 const RECALL =
-  /\b(?:what(?:'s|s| is| are| was)|tell me|show|remind me|recall|summari[sz]e|list|give me|read (?:me )?back)\b[^?.!]*\bmy\s+(?:(?:investment|declared|current)\s+)?(?:mandate|thesis|investment criteria|criteria|sectors|stages|cheque(?: size| range)?|check size|geography|exclusions)\b/iu;
+  /^(?:please\s+)?(?:what(?:'s|s| is| are| was)|tell me|show(?: me)?|remind me(?: of)?|recall|summari[sz]e|list|give me|read (?:me )?back)\s+my\s+(?:(?:investment|declared|current)\s+)?(?:mandate|thesis|investment criteria|criteria|sectors|stages|cheque(?: size| range)?|check size|geography|exclusions)(?:\s+please)?[?.!]*$/iu;
 // A question that needs judgement or a change, never a plain recall.
 const NOT_RECALL =
   /\b(?:fit|fits|match|matches|suit|suits|compare|against|versus|vs|should|why|how|improve|better|score|rank|change|update|set|edit|add|remove|delete|replace|company|companies|founder|investor)\b/iu;
 
-/** True for a short, plain request to read the person's own mandate back. */
+/**
+ * True only when the whole utterance asks for a plain recall. Additional
+ * clauses need the turn reader: a recall followed by "send it" is an action.
+ */
 export function asksForOwnMandate(text: string): boolean {
   const trimmed = text.trim();
   return (
