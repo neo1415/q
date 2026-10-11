@@ -100,10 +100,25 @@ async function rehearse() {
     async function ask(label, text) {
       let input = page.getByPlaceholder("Ask Q", { exact: true });
       if (!(await input.isVisible())) {
-        await page
+        const askButton = page
           .getByRole("button", { name: "Ask Q", exact: true })
-          .first()
-          .click();
+          .first();
+        // Discover merges Q into its card rail; a fresh profile uses the
+        // existing dock (whose accessible name includes presence/context).
+        const control = (await askButton.isVisible())
+          ? askButton
+          : page.locator("[data-q-dock-button]").first();
+        console.log(
+          JSON.stringify({
+            phase: "open-q",
+            label,
+            disabledBeforeClick: await control.isDisabled(),
+            handlerBoundBeforeClick: await control.evaluate((el) =>
+              Object.keys(el).some((key) => key.startsWith("__reactProps")),
+            ),
+          }),
+        );
+        await control.click();
         await input.waitFor({ timeout: 30000 });
       }
       const priorRuns = new Set(observed);
