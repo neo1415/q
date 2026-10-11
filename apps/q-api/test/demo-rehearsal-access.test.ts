@@ -162,13 +162,17 @@ function setup(access: DemoRehearsalAccess | undefined) {
       subjects: {
         latest: (_a: unknown, id: string) => {
           const s = records.get(id);
-          return Promise.resolve(s === undefined ? null : { subject: s, brief: null });
+          return Promise.resolve(
+            s === undefined ? null : { subject: s, brief: null },
+          );
         },
         save: () => Promise.resolve(),
       },
       resolve: (_a, id) => {
         const s = records.get(id);
-        return Promise.resolve(s === undefined ? null : { subject: s, brief: null });
+        return Promise.resolve(
+          s === undefined ? null : { subject: s, brief: null },
+        );
       },
       investorLink: (id: string) =>
         Promise.resolve(id === HIDDEN_ORG ? LINKED_PERSON : null),
@@ -179,11 +183,15 @@ function setup(access: DemoRehearsalAccess | undefined) {
 }
 
 // A tenant-scoped fake of the entitlement: live grants per tenant.
-const grants = (live: Record<string, readonly string[]>): DemoRehearsalAccess => ({
+const grants = (
+  live: Record<string, readonly string[]>,
+): DemoRehearsalAccess => ({
   holds: (a, id) => Promise.resolve((live[a.tenantId] ?? []).includes(id)),
   list: (a) =>
     Promise.resolve(
-      ENTITIES.filter((e) => (live[a.tenantId] ?? []).includes(e.externalPersonId)),
+      ENTITIES.filter((e) =>
+        (live[a.tenantId] ?? []).includes(e.externalPersonId),
+      ),
     ),
 });
 
@@ -243,18 +251,18 @@ describe("demo rehearsal access", () => {
       list: () => Promise.reject(new Error("db down")),
     });
     const a = actor(ENTITLED_TENANT, FOUNDER);
-    expect((await service.persona(a, "INVESTOR_ORGANISATION", HIDDEN_ORG)).kind).toBe(
-      "NOT_FOUND",
-    );
+    expect(
+      (await service.persona(a, "INVESTOR_ORGANISATION", HIDDEN_ORG)).kind,
+    ).toBe("NOT_FOUND");
     expect((await service.partners(a)).researched).toEqual([]);
   });
 
   it("does not give an investor viewer the rehearsal", async () => {
     const { service } = setup(live);
     const a = actor(ENTITLED_TENANT, INVESTOR_USER);
-    expect((await service.persona(a, "INVESTOR_ORGANISATION", HIDDEN_ORG)).kind).toBe(
-      "NOT_FOUND",
-    );
+    expect(
+      (await service.persona(a, "INVESTOR_ORGANISATION", HIDDEN_ORG)).kind,
+    ).toBe("NOT_FOUND");
     expect((await service.partners(a)).researched).toEqual([]);
   });
 
@@ -288,7 +296,9 @@ describe("demo rehearsal access", () => {
       /investment-promotion officer \(not a real employee\)/u,
     );
     const said = started.rehearsal.turns.map((t) => t.text).join(" ");
-    expect(said).not.toMatch(/\b(fund|portfolio|cheque|check size|term sheet)\b/iu);
+    expect(said).not.toMatch(
+      /\b(fund|portfolio|cheque|check size|term sheet)\b/iu,
+    );
   });
 });
 
@@ -300,9 +310,9 @@ describe("the entitlement adapter", () => {
       return Promise.resolve([]);
     }) as never;
     const access = createDemoRehearsalAccess(sql);
-    expect(await access.holds({ tenantId: ENTITLED_TENANT }, INVEST_QATAR)).toBe(
-      false,
-    );
+    expect(
+      await access.holds({ tenantId: ENTITLED_TENANT }, INVEST_QATAR),
+    ).toBe(false);
     expect(await access.list({ tenantId: ENTITLED_TENANT })).toEqual([]);
     for (const call of seen) {
       expect(call.values[0]).toBe(ENTITLED_TENANT);

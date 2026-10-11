@@ -90,10 +90,12 @@ describe("Researched rehearsals on the Rehearsals page", () => {
     for (const name of researched.map((r) => r.name)) {
       expect(within(section).getByText(name)).toBeTruthy();
     }
-    expect(within(section).getAllByText(/Research-informed simulation/u)).toHaveLength(
-      5,
-    );
-    expect(within(section).getByText(/No connection or request is needed/u)).toBeTruthy();
+    expect(
+      within(section).getAllByText(/Research-informed simulation/u),
+    ).toHaveLength(5);
+    expect(
+      within(section).getByText(/No connection or request is needed/u),
+    ).toBeTruthy();
     // Entitled founders with no relationships are not told to go find investors.
     expect(screen.queryByText(/Once you’re in touch with/u)).toBeNull();
   });

@@ -2365,8 +2365,9 @@ export function createRehearsalService(dependencies: {
       }
       const entitled =
         viewer.role === "FOUNDER"
-          ? await (external?.demoAccess?.list(actor) ?? Promise.resolve([]))
-              .catch(() => [])
+          ? await (
+              external?.demoAccess?.list(actor) ?? Promise.resolve([])
+            ).catch(() => [])
           : [];
       return {
         role: viewer.role,
