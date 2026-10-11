@@ -150,3 +150,13 @@ Newest entry last. Never edit past entries; correct them in a new entry.
 - **Unfinished:** exact-commit CI, migration/release, live latency/provider-call comparison; autonomous typed ONE_PAGER READY/render and real conversational revision version increment; off-screen targeting; durable paid-generation reservations and genuinely intelligent document research/writing/design/critique. Actual historical 8.8 and approved FDN parameters remain open.
 - **Next actions:** push final candidate to integration/CI; after exact green gates apply additive `20261222150000` and deploy exact SHA; verify all-service revisions and actual document/latency acceptance while continuing canonical targeting investigation.
 - **Secrets:** private customer evidence and credentials remain outside checkout. Added GitHub storage-host draft needs environment review/save/publish to enable log downloads; independent work continues.
+
+## 2026-10-11 16:17 UTC — Codex — preserve named-subject reading across the existing answer seam
+
+- **Workspace:** `/workspace/q`, `codex/preserve-optimize`, follows `efcf49ab`; root only. Separate correction is held off the integration/CI branch while its current release gate runs.
+- **Code changed:** QAnswerRequest carries the existing reader's named-other flag; final request preserves it, both existing gateway path decisions use it, speculation is cancelled when it differs. No new business service, authorization path or tool.
+- **Proven locally:** original answer-seam regression gets zero offered lookup tools and fails; corrected 181 tests across five answer/voice files pass. 36 dependency builds, root/q-api typechecks, changed lint pass. Changed-file format check and diff check passed.
+- **Release:** exact `efcf49ab` run `38154358888` pgTAP passed, quality still running. All four services freshly SUCCESS at `ab962576`. Migration `20261222150000` unapplied.
+- **Limits:** cannot claim the named-other flag caused the observed live specialist's wrong subject: scoped Railway filters returned no run logs. The working focused-founder journey is verified, off-screen targeting remains open. Do not convert privilege into access to private founder onboarding responses.
+- **Next actions:** finish exact current release gates/migration/deployment and document/latency acceptance; then integrate the separately validated seam correction and its exact gates; continue intelligent workforce capability with durable canonical paid-budget reservations.
+- **Secrets:** no credentials, customer text, identifiers or signed links recorded.

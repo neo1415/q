@@ -279,7 +279,11 @@ async function replay(input: {
   /** What the turn reader read, as the answer seam passes it on. */
   readonly reading?: Pick<
     QAnswerRequest,
-    "questionKind" | "fitQuestion" | "discoverCompanies" | "preparedSubject"
+    | "questionKind"
+    | "fitQuestion"
+    | "discoverCompanies"
+    | "preparedSubject"
+    | "aboutNamedOther"
   >;
 }): Promise<{
   text: string;
@@ -618,6 +622,19 @@ describe("companies of a kind through the answer path (K1, live 2026-10-09 15:57
 });
 
 describe("the cheapest correct path (K8)", () => {
+  it("a named other keeps lookup tools even when a prepared subject was supplied", async () => {
+    const { toolsOffered } = await replay({
+      question: "What does Portside do, from its declared company profile?",
+      mandate: true,
+      script: [answer("I need Portside's authorized profile for that answer.")],
+      reading: {
+        questionKind: "THEIR_OWN_RECORDS",
+        preparedSubject: "MANDATE",
+        aboutNamedOther: true,
+      },
+    });
+    expect(toolsOffered).toBeGreaterThan(0);
+  });
   it("'what is my mandate' with the mandate prepared: one model call, no tool round", async () => {
     const { modelCalls, toolsOffered } = await replay({
       question: "what is my mandate?",

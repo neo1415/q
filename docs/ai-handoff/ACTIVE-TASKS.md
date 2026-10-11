@@ -1,5 +1,10 @@
 # Active tasks — authoritative cross-model board
 
+## Named-subject continuation — 2026-10-11 16:17 UTC
+
+- Candidate `efcf49ab` CI `38154358888` is pgTAP GREEN / quality running; no migration or release yet.
+- Separate named-other propagation correction is LOCAL TESTED: the actual answer seam no longer drops the reader flag and removes lookup tools for unrelated prepared context. Original regression fails, corrected 181 tests pass, 36 builds/root/q-api types/lint pass. Voice speculation remains governed by the final reading. This is a proven seam defect, not proof that every live targeting failure is resolved.
+
 ## Routing/readiness release correction — 2026-10-11 16:07 UTC
 
 - CI `38150727138` at `4d26e9e6` is **RED quality tests / GREEN pgTAP**. Six local navigation regressions are corrected by checking mandate intent before scope inspection; final 183 focused routing tests pass. Do not deploy the red revision or apply the migration yet.

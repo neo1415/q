@@ -4082,7 +4082,9 @@ export function createSpecialistQAnswer(
       ...(turnUnread ? { turnUnread: true } : {}),
       // Said aloud: the answer is shaped for the ear (2026-10-07).
       ...(spoken ? { spoken: true } : {}),
-      ...(read === null ? {} : { turnKind: read.kind }),
+      ...(read === null
+        ? {}
+        : { turnKind: read.kind, aboutNamedOther: read.aboutNamedOther }),
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),

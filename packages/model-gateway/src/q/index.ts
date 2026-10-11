@@ -2960,7 +2960,7 @@ export function createModelGatewayQAnswer(
         writingDocument: request.writingDocument === true,
         askedAction: request.askedAction !== undefined,
         researchMode: research?.mode ?? "NEVER",
-        aboutNamedOther: false,
+        aboutNamedOther: request.aboutNamedOther === true,
         prepared: {
           mandate: ownProfile !== null,
           onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
@@ -3001,7 +3001,7 @@ export function createModelGatewayQAnswer(
         writingDocument: request.writingDocument === true,
         askedAction: request.askedAction !== undefined,
         researchMode: research?.mode ?? "NEVER",
-        aboutNamedOther: false,
+        aboutNamedOther: request.aboutNamedOther === true,
         prepared: {
           mandate: ownProfile !== null,
           onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,

@@ -249,6 +249,8 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * readiness leads that answer (QA 2026-10-03, run 2cba241a).
    */
   readonly questionKind?: string | undefined;
+  /** The turn reader named someone other than the conversation's subject. */
+  readonly aboutNamedOther?: boolean | undefined;
   /**
    * K8: the reader read a question about something prepared for this turn
    * (their mandate, the record on screen, Q's work for them). The router

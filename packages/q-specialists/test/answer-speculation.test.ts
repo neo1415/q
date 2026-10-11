@@ -223,6 +223,20 @@ afterEach(() => {
 });
 
 describe("a spoken question answered speculatively (latency2)", () => {
+  it("discards the assumed-subject answer when the reader names someone else", async () => {
+    const run = seam({
+      said: "What does Portside do?",
+      reading: { ...QUESTION, aboutNamedOther: true },
+    });
+    await run.answer.answer(request());
+    expect(run.calls).toHaveLength(2);
+    expect(run.calls[0]?.speculation).toBeDefined();
+    expect(run.calls[1]?.aboutNamedOther).toBe(true);
+    expect(run.calls[1]?.speculation).toBeUndefined();
+    expect(run.events.some((event) => event.outcome === "CANCELLED")).toBe(
+      true,
+    );
+  });
   it("adopts the speculation when the reading is a plain question: one answer, said once", async () => {
     const run = seam({ said: "What can you do for me?", reading: QUESTION });
     const outcome = await run.answer.answer(request());

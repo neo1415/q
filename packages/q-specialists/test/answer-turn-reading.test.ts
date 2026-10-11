@@ -189,6 +189,7 @@ function seam(options: {
   const declaredActions: string[][] = [];
   const askedActions: (string | undefined)[] = [];
   const focuses: unknown[] = [];
+  const namedOthers: (boolean | undefined)[] = [];
   const outcomes = [...options.outcomes];
   const modalities: string[] = [];
   const turns: QTurnReader = {
@@ -245,6 +246,7 @@ function seam(options: {
         askedActions.push(req.askedAction);
         leads.push(req.leadLines);
         focuses.push(req.toolFocus);
+        namedOthers.push(req.aboutNamedOther);
         capabilities.push(req.capabilities);
         directives.push(
           req.research === undefined ? undefined : await req.research,
@@ -352,6 +354,7 @@ function seam(options: {
     askedActions,
     modalities,
     focuses,
+    namedOthers,
   };
 }
 
@@ -4044,6 +4047,7 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     });
     await other.answer.answer(request());
     expect(other.leads).toEqual([undefined]);
+    expect(other.namedOthers).toEqual([true]);
     const ready = seam({
       said: "what should I do next",
       reading: advice(),

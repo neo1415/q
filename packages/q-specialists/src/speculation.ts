@@ -171,6 +171,9 @@ export function speculationMisfit(input: {
     final.questionSequence !== undefined ||
     final.questionKind === "ADVICE" ||
     final.questionKind === "THEIR_OWN_RECORDS" ||
+    // The real reading may require a lookup the speculative subject lacked.
+    (final.aboutNamedOther === true) !==
+      (speculative.aboutNamedOther === true) ||
     // A fit question is answered from the computed fit, by code.
     final.fitQuestion !== undefined ||
     final.discoverCompanies !== undefined ||

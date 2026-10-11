@@ -4,6 +4,12 @@
 > Evidence words: CODE OBSERVED · IMPLEMENTED · MERGED · LOCAL TESTED · CI GREEN · DEPLOYED · LIVE VERIFIED · BLOCKED.
 > A recorded SHA is a snapshot; re-check Git and Railway before trusting it.
 
+## Codex named-subject handoff preservation — 2026-10-11 16:17 UTC
+
+- Release candidate `efcf49ab8c8f90fbb8494075acd9fd605bd63546` is pushed to integration/CI. Run `38154358888`: **pgTAP SUCCESS**, quality in progress. The preceding candidate's six navigation failures were corrected, and final focused 207 tests plus 13 artifact rerun, 52 builds, root/q-api typechecks, lint/format passed. Migration not applied; deployed services freshly verified `ab962576`.
+- Separate **IMPLEMENTED / LOCAL TESTED** correction preserves the turn reader's `aboutNamedOther` flag through QAnswerRequest into both existing conversational path decisions. They formerly hardcoded false and could remove lookup tools in favor of unrelated prepared context. A real answer-seam regression fails with zero offered tools on the old code, passes on the correction; 181 tests across five answer/voice-routing files, 36 dependency builds, root/q-api typechecks and changed lint pass. Voice speculation is cancelled when the final named-subject reading differs. No new resolver, subject grant or service was introduced.
+- This does **not** establish that the live off-screen company defect is fully fixed: a specialist misclassification may precede this seam. Scoped Railway filters for those actual runs returned no logs, so no reader-flag trace is claimed. Correct focused-founder Discover evidence remains verified; first audio and off-screen targeting remain open.
+
 ## Codex product-routing and readiness correction — 2026-10-11 16:07 UTC
 
 - **CI RED:** exact `4d26e9e6` run `38150727138` passed format/lint/typecheck and pgTAP, but quality tests failed. Local broad diagnosis reproduced six navigation failures: the mandate guard inspected its scope before checking whether the utterance was a mandate recall. The utterance check now runs first; all 14 named-record navigation and 25 mandate tests pass. No security binding or fixture was weakened.
