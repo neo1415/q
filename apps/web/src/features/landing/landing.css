@@ -2218,6 +2218,14 @@ html[data-pwa] .cq-landing {
   .lp .nav-links a:not(.btn) {
     display: none;
   }
+  .lp .brand {
+    white-space: nowrap;
+  }
+  /* The hero's own Get started sits right below, so the bar keeps the brand
+     and the theme switch (44 px segments) without wrapping on a phone. */
+  .lp .nav-links .btn {
+    display: none;
+  }
   .lp .hero {
     padding-top: 40px;
   }
