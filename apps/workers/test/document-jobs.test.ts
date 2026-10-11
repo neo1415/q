@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { QDocumentPipelineStage } from "@capital-q/contracts";
+import {
+  workforceCorrelationId,
+  type QDocumentPipelineStage,
+} from "@capital-q/contracts";
 import type {
   ClaimedDocumentJob,
   ComposedArtifact,
@@ -118,6 +121,7 @@ function fakes(claimed: ClaimedDocumentJob | null, fail = false) {
   });
   return {
     runner,
+    jobs,
     stages,
     finished,
     filed,
@@ -127,6 +131,37 @@ function fakes(claimed: ClaimedDocumentJob | null, fail = false) {
 }
 
 describe("the document worker", () => {
+  it("attributes paid document work to the actual workforce run and retains original Q provenance", async () => {
+    const claimed = job();
+    const workforce = {
+      jobId: "f0000000-0000-4000-8000-0000000000b3",
+      runId: "f0000000-0000-4000-8000-0000000000b4",
+      budgetUsd: 0.08,
+    };
+    const world = fakes({ ...claimed, input: { ...claimed.input, workforce } });
+    let actual: unknown;
+    const runner = createDocumentJobRunner({
+      jobs: world.jobs,
+      artifacts: {
+        completeDocumentJob: () => Promise.resolve({} as never),
+        failDocumentJob: () => Promise.resolve(),
+      },
+      polisher: {
+        polish: (input) => {
+          actual = input.attribution;
+          return Promise.resolve(null);
+        },
+      },
+      logger,
+    });
+    await runner.runOnce();
+    expect(actual).toEqual({
+      tenantId: claimed.tenantId,
+      userId: claimed.userId,
+      qRunId: claimed.runId,
+      correlationId: workforceCorrelationId(workforce.jobId, workforce.runId),
+    });
+  });
   it("says each stage, files version 1 with its audit, and finishes", async () => {
     const world = fakes(job());
     expect(await world.runner.runOnce()).toBe(true);

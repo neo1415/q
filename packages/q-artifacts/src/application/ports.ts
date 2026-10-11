@@ -14,6 +14,13 @@ export type WorkforceDocumentBinding = {
   readonly stepKey: string;
   /** SHA-256 of the approved intent, never of a freshly generated draft. */
   readonly intentSha256: string;
+  /** Cost belongs to this workforce run; qRunId keeps the original Q provenance. */
+  readonly execution?:
+    | {
+        readonly runId: string;
+        readonly budgetUsd: number;
+      }
+    | undefined;
 };
 
 /**

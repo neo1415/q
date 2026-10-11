@@ -45,6 +45,15 @@ export const DocumentJobInputSchema = z
       .strict()
       .nullable(),
     sensitivity: ModelSensitivitySchema,
+    /** Trusted server provenance and ceiling; never a model-supplied input. */
+    workforce: z
+      .object({
+        jobId: z.string().uuid(),
+        runId: z.string().uuid(),
+        budgetUsd: z.number().finite().min(0).max(100),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type DocumentJobInput = z.infer<typeof DocumentJobInputSchema>;

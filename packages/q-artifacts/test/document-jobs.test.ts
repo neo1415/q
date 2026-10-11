@@ -326,6 +326,27 @@ describe("documents made by a job", () => {
     expect(artifacts.size).toBe(0);
     expect(jobs.queued).toHaveLength(0);
   });
+
+  it("keeps the real Q run while deriving worker cost provenance from the trusted binding", async () => {
+    const { repository } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    const runId = "f0000000-0000-4000-8000-0000000000b2";
+    await svc.requestDocument({
+      ...request(),
+      workforce: { ...workforce, execution: { runId, budgetUsd: 0.08 } },
+    });
+    expect(jobs.queued[0]?.runId).toBe(RUN);
+    expect(jobs.queued[0]?.input.workforce).toEqual({
+      jobId: workforce.jobId,
+      runId,
+      budgetUsd: 0.08,
+    });
+  });
   it("a request is PREPARING with no version, and its job is queued with the draft", async () => {
     const { repository } = memory();
     const jobs = queue();

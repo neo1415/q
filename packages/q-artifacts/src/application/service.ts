@@ -188,7 +188,10 @@ export type ArtifactService = {
   readonly requestDocument: (
     input: PrepareArtifactInput & {
       readonly kind: DocumentJobKind;
-      readonly job: Omit<DocumentJobInput, "title" | "summary" | "content">;
+      readonly job: Omit<
+        DocumentJobInput,
+        "title" | "summary" | "content" | "workforce"
+      >;
       /** Trusted composition only; browsers and models never choose this. */
       readonly workforce?: WorkforceDocumentBinding | undefined;
     },
@@ -244,6 +247,13 @@ const WorkforceDocumentBindingSchema = z
     jobId: z.string().uuid(),
     stepKey: z.string().min(1).max(80),
     intentSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    execution: z
+      .object({
+        runId: z.string().uuid(),
+        budgetUsd: z.number().finite().min(0).max(100),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -518,6 +528,16 @@ export function createArtifactService(dependencies: {
         title: input.content.title,
         summary: input.content.summary,
         content: parseContent(input.content.content),
+        // Force server-derived provenance after spreading the draft's
+        // job fields. No ambient or client-provided workforce identity.
+        workforce:
+          binding?.execution === undefined
+            ? undefined
+            : {
+                jobId: binding.jobId,
+                runId: binding.execution.runId,
+                budgetUsd: binding.execution.budgetUsd,
+              },
       });
       const artifact = await transactions.run(async (tx) => {
         const fields = {
