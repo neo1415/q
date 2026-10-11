@@ -31,18 +31,25 @@ const HIDE_VERB = "(?:hide|clear|dismiss|remove|close|get\\s+rid\\s+of|wipe)";
 const SHOW_VERB = "(?:show|bring|put|restore|unhide|display)";
 const FILLER =
   "(?:(?:hey\\s+)?q\\s+|please\\s+|can\\s+you\\s+|could\\s+you\\s+|would\\s+you\\s+|just\\s+|go\\s+ahead\\s+and\\s+|i\\s+want\\s+you\\s+to\\s+|i\\s+would\\s+like\\s+you\\s+to\\s+)*";
-const DET = "(?:(?:all|every|each)\\s+(?:of\\s+)?)?(?:(?:the|these|those|my|this)\\s+)?";
+const DET =
+  "(?:(?:all|every|each)\\s+(?:of\\s+)?)?(?:(?:the|these|those|my|this)\\s+)?";
 const ADJ = "(?:(?:temporary|current|open|visible|floating|extra|other)\\s+)?";
 
 const CATEGORY_WORDS: ReadonlyArray<readonly [RegExp, QCardCategory]> = [
   [/^(?:connection|connections|introduction|introductions)$/u, "CONNECTION"],
-  [/^(?:needs[\s-]?you|attention|approval|approvals|decision|decisions)$/u, "NEEDS_YOU"],
+  [
+    /^(?:needs[\s-]?you|attention|approval|approvals|decision|decisions)$/u,
+    "NEEDS_YOU",
+  ],
   [/^(?:source|sources|evidence|citation|citations)$/u, "SOURCE"],
   [
     /^(?:recommendation|recommendations|suggestion|suggestions|match|matches|matching|new\s+for\s+you)$/u,
     "RECOMMENDATION",
   ],
-  [/^(?:answer|answers|result|results|company|companies|investor|investors)$/u, "ANSWER"],
+  [
+    /^(?:answer|answers|result|results|company|companies|investor|investors)$/u,
+    "ANSWER",
+  ],
 ];
 
 function categoryOf(words: string): QCardCategory | null {
@@ -75,7 +82,7 @@ const HIDE_CATEGORY = new RegExp(
   "iu",
 );
 const RESTORE_ALL = new RegExp(
-  `^${FILLER}(?:${SHOW_VERB}(?:\\s+me)?|bring|put|get)\\s+${DET}(?:(?:hidden|dismissed|cleared|removed)\\s+)?(?<cat>[a-z -]{3,24}?\\s+)?cards?(?:\\s+(?:back|again|up\\s+again|back\\s+up))?$|^${FILLER}(?:show|bring|put|restore|get)(?:\\s+me)?\\s+(?:them|those|these|everything)\\s+(?:back|again)$`,
+  `^${FILLER}(?:${SHOW_VERB}(?:\\s+me)?|bring|put|get)\\s+(?:back\\s+)?${DET}(?:(?:hidden|dismissed|cleared|removed)\\s+)?(?<cat>[a-z -]{3,24}?\\s+)?cards?(?:\\s+(?:back|again|up\\s+again|back\\s+up))?$|^${FILLER}(?:show|bring|put|restore|get)(?:\\s+me)?\\s+(?:them|those|these|everything)\\s+(?:back|again)$`,
   "iu",
 );
 const RESTORE_ALL_BACK = new RegExp(
@@ -120,7 +127,9 @@ export function cardsRequestOf(text: string): CardsRequest | null {
     const category = categoryOf(raw);
     // "show me the TensorGate cards" names something else: not this branch.
     if (category !== null) return { action: "RESTORE_ALL", category };
-    if (/^(?:all|the|my|hidden|dismissed|cleared|removed)$/iu.test(raw.trim())) {
+    if (
+      /^(?:all|the|my|hidden|dismissed|cleared|removed)$/iu.test(raw.trim())
+    ) {
       return { action: "RESTORE_ALL" };
     }
   }
@@ -132,7 +141,12 @@ export function cardsRequestOf(text: string): CardsRequest | null {
   const restoreOne = RESTORE_ONE.exec(said) ?? RESTORE_ONE_BACK.exec(said);
   if (restoreOne !== null) {
     const verbShow = /^(?:.*?\s)?(?:show|display)\b/iu.test(
-      said.slice(0, said.toLowerCase().indexOf((restoreOne.groups?.["name"] ?? "").toLowerCase())),
+      said.slice(
+        0,
+        said
+          .toLowerCase()
+          .indexOf((restoreOne.groups?.["name"] ?? "").toLowerCase()),
+      ),
     );
     const again = restoreOne.groups?.["again"] !== undefined;
     const name = nameOf(restoreOne.groups?.["name"]);

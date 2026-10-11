@@ -4,6 +4,7 @@ import type { QFindingType } from "@capital-q/contracts";
 
 import { formatDay } from "@/components/date-format";
 
+import { useCardHidden } from "./cards/card-visibility";
 import type { QTurn, QTurnObjectBlock } from "./conversation";
 import { QResultBlocks } from "./q-result-blocks";
 import { Q_CONFIDENCE_LABELS } from "./wire-constants";
@@ -109,7 +110,13 @@ export function QEvidence({
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 }) {
   const summary = evidenceSummary(turn);
-  if (summary === null) return null;
+  // Founder P5: Sources the person cleared are not drawn (and take no space).
+  const hidden = useCardHidden({
+    category: "SOURCE",
+    key: `source:${turn.id}`,
+    names: ["sources"],
+  });
+  if (summary === null || hidden) return null;
   return (
     <details className="cq-q-evidence" data-q-evidence>
       <summary className="cq-q-evidence-summary">

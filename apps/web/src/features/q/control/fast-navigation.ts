@@ -5,6 +5,11 @@ import {
   takenBack,
 } from "@capital-q/q-specialists/page-request";
 
+import {
+  cardsIntentOf,
+  cardsRequestOf,
+} from "@capital-q/q-specialists/cards-request";
+
 import { destinationPath } from "@/features/voice/destinations";
 
 import {
@@ -15,6 +20,7 @@ import {
   recordIntentPath,
   settingsPath,
 } from "../client-actions";
+import { applyCardsIntent } from "../cards/card-visibility";
 import { navigationInFlight } from "../ui-act-controller";
 
 /**
@@ -160,6 +166,14 @@ export async function navigationHeard(
   if (keyOf(text).length === 0) return null;
   // Every finished sentence (typed, any voice line) passes here first.
   noteAsked();
+  // Founder P5: "Q, clear all cards" acts in this same task, by code, with
+  // no server round trip. Presentation only; Q's answer says it too, and
+  // the controller acts once for the same words.
+  const cards = cardsRequestOf(text);
+  if (cards !== null) {
+    applyCardsIntent(cardsIntentOf(cards));
+    return null;
+  }
   const started = performance.now();
   // A page read here moves in this same task: no await, so nothing the
   // send queued (a React render, the run's request) goes first.

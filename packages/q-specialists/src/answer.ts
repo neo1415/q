@@ -85,6 +85,7 @@ import {
 } from "@capital-q/q-tools";
 import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 import {
+  cardsLaneOf,
   fastLaneOf,
   knownEntityLaneOf,
   investorDiscoveryLaneOf,
@@ -2995,6 +2996,18 @@ export function createSpecialistQAnswer(
         controlActLine(pointed.control),
         [controlActBlock(pointed.control)],
       );
+    }
+    // Founder P5: "clear all cards", "show me the cards again": a change to
+    // what is shown on this device, done in code. Presentation only.
+    const cardsLane = cardsLaneOf(latest.content);
+    if (cardsLane !== null) {
+      logger?.info(
+        { qRunId: request.runId, act: cardsLane.intent.action },
+        "q is clearing or restoring cards",
+      );
+      return recordAnswer(request, conversationId, cardsLane.said, [
+        { kind: "UI_INTENT", intent: cardsLane.intent },
+      ]);
     }
     // A bare screen command ("scroll down", "go back") is done at once in
     // code, like the wake words: it needs no reading, no model and no view

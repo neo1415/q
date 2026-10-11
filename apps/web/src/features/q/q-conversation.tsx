@@ -67,6 +67,7 @@ import {
   workingLabel,
   type QTurn,
 } from "./conversation";
+import { CardsControls } from "./cards/cards-controls";
 import { announceQGestures } from "@/features/q-swarm/q-gestures";
 import { announceQSaid } from "@/features/q-swarm/q-said";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
@@ -1501,6 +1502,7 @@ export function QConversationPanel({
                 {stageLayer}
               </StageModeProvider>
             )}
+            <CardsControls />
             <div ref={threadEnd} aria-hidden="true" />
           </div>
 
