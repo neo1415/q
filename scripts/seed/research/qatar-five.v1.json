@@ -207,7 +207,7 @@
       "fetchedAt": "2026-10-11",
       "status": "VERIFIED_AGAINST_SOURCE",
       "status_note": "News report read 2026-10-11 (Gulf Times, 28 March 2026).",
-      "excerpt": "Muhannad Taslaq, Director of Investments at Alchemist Doha, drew on lessons he gathered from founders, operators, and investors … “Dilution taken in panic is a cost you would pay for years,” he emphasised … Clarity is a competitive advantage. Smart capital doesn’t disappear in conflicts — it recalibrates. … Taslaq outlined six rules he described as a practical playbook rather than a motivational framework. … shrink the planning horizon to 30-day sprints, identify a single metric that matters and ship continuously … founders must know their exact “burn rate” … warned against raising at distressed valuations unless survival demands it",
+      "excerpt": "Muhannad Taslaq, Director of Investments at Alchemist Doha, drew on lessons he gathered from founders, operators, and investors … “Dilution taken in panic is a cost you would pay for years,” he emphasised … Clarity is a competitive advantage. Smart capital doesn’t disappear in conflicts — it recalibrates. … Taslaq outlined six rules he described as a practical playbook rather than a motivational framework. … shrink the planning horizon to 30-day sprints, identify a single metric that matters and ship continuously … founders must know their exact “burn rate” and calculate what he called their “date of death” … warned against raising at distressed valuations unless survival demands it",
       "title": "Gulf Times: Founders must keep building through crisis",
       "read_at": "2026-10-11"
     },
@@ -362,19 +362,14 @@
       "name": "Shadi Qishta",
       "entity_kind": "PERSON",
       "primary_linkedin": "https://www.linkedin.com/in/shadi-qishta-282453a/",
-      "aliases": [
-        "Shadi Qishta",
-        "Shadi Qishta Doha",
-        "Shadi Qishta Midmac"
-      ],
+      "aliases": ["Shadi Qishta", "Shadi Qishta Doha", "Shadi Qishta Midmac"],
       "associated_organization": null,
       "identity_confidence": "verified public identity",
       "facts": [
         {
-          "claim": "Finance and investment executive in Doha; the opening of his LinkedIn About text reads \"I am a strategic finance and investment executive with a track record of building…\" (cut off on the page).",
-          "source_ids": [
-            "S03"
-          ],
+          "claim": "Finance and investment executive in Doha; the opening of the About text reads \"I am a strategic finance and investment executive with a track record of building…\" (cut off on the page).",
+          "source_ids": ["S03"],
+          "evidence_class": "documented",
           "topic": "ROLE",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -387,10 +382,9 @@
           "soft_wording": "According to his LinkedIn, "
         },
         {
-          "claim": "His LinkedIn experience lists Midmac Contracting Company W.L.L. in Doha; the visible entries carry no titles or dates.",
-          "source_ids": [
-            "S03"
-          ],
+          "claim": "Midmac Contracting Company W.L.L. (Doha) appears in his experience; the visible entries carry no titles or dates.",
+          "source_ids": ["S03"],
+          "evidence_class": "documented",
           "topic": "CAREER",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -403,10 +397,9 @@
           "soft_wording": "According to his LinkedIn, "
         },
         {
-          "claim": "The Qatari Lens congratulated him on a new appointment as CEO Business Ventures at Midmac Contracting Company W.L.L. This comes from a third-party post, not from his own profile, so the current title is not confirmed.",
-          "source_ids": [
-            "S06"
-          ],
+          "claim": "the Qatari Lens congratulated him on a new appointment as CEO Business Ventures at Midmac Contracting Company W.L.L. This comes from a third-party post, not from his own profile, so the current title is not confirmed.",
+          "source_ids": ["S06"],
+          "evidence_class": "documented",
           "topic": "CAREER",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -419,11 +412,9 @@
           "soft_wording": "Reportedly, "
         },
         {
-          "claim": "His earlier posts speak for Supercell, \"a telecom company\", and tag #Supercellnetwork.",
-          "source_ids": [
-            "S04",
-            "S05"
-          ],
+          "claim": "his earlier posts speak for Supercell, \"a telecom company\", and tag #Supercellnetwork.",
+          "source_ids": ["S04", "S05"],
+          "evidence_class": "documented",
           "topic": "CAREER",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -436,10 +427,9 @@
           "soft_wording": "According to his LinkedIn posts, "
         },
         {
-          "claim": "On IFRS in Iraq he wrote that the Federal Board of Financial Supervision said adoption is optional for 2024 and mandatory from 2026, and argued it brings investor trust, clearer transparency and a chance to attract foreign investment. He says he has experience in auditing.",
-          "source_ids": [
-            "S02"
-          ],
+          "claim": "on IFRS in Iraq he wrote that the Federal Board of Financial Supervision said adoption is optional for 2024 and mandatory from 2026, and argued it brings investor trust, clearer transparency and a chance to attract foreign investment. He says he has experience in auditing.",
+          "source_ids": ["S02"],
+          "evidence_class": "documented",
           "topic": "STATEMENT",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -452,10 +442,9 @@
           "soft_wording": "In his LinkedIn post, "
         },
         {
-          "claim": "After a Nokia AI event in Dubai he listed four takeaways: AI is making telecom networks more intelligent, adaptive and efficient; it enables real-time decisions; its future depends on collaboration between operators, tech leaders and regulators; and continuous learning matters.",
-          "source_ids": [
-            "S04"
-          ],
+          "claim": "after a Nokia AI event in Dubai he listed four takeaways: AI is making telecom networks more intelligent, adaptive and efficient; it enables real-time decisions; its future depends on collaboration between operators, tech leaders and regulators; and continuous learning matters.",
+          "source_ids": ["S04"],
+          "evidence_class": "documented",
           "topic": "STATEMENT",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -468,10 +457,9 @@
           "soft_wording": "In his LinkedIn post, "
         },
         {
-          "claim": "He posted about catching up with the Snoonu team and its CEO at Web Summit Qatar, describing Snoonu as a leading tech-driven delivery platform shaping e-commerce and last-mile delivery in the region.",
-          "source_ids": [
-            "S05"
-          ],
+          "claim": "he caught up with the Snoonu team and its CEO at Web Summit Qatar, describing Snoonu as a leading tech-driven delivery platform shaping e-commerce and last-mile delivery in the region.",
+          "source_ids": ["S05"],
+          "evidence_class": "documented",
           "topic": "STATEMENT",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -484,12 +472,9 @@
           "soft_wording": "In his LinkedIn post, "
         },
         {
-          "claim": "Across the three of his own posts I read, the recurring topics are financial-reporting transparency, AI in telecom networks and Qatar's technology-led commerce. That is a pattern in the posts, not a stated investment mandate.",
-          "source_ids": [
-            "S02",
-            "S04",
-            "S05"
-          ],
+          "claim": "Across the three of his own posts I read, the recurring topics are financial-reporting transparency, AI in telecom networks and Qatar's technology-led commerce. That is a pattern in the posts, not a stated investment focus.",
+          "source_ids": ["S02", "S04", "S05"],
+          "evidence_class": "documented",
           "topic": "PRIORITIES",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -502,10 +487,9 @@
           "soft_wording": ""
         },
         {
-          "claim": "A previous research note records that he emphasises consumer purchasing power as a real-world business indicator. I could not confirm this on a page I read.",
-          "source_ids": [
-            "S03"
-          ],
+          "claim": "he emphasises consumer purchasing power as a real-world business indicator. I could not confirm this on a page I read.",
+          "source_ids": ["S03"],
+          "evidence_class": "documented",
           "topic": "PRIORITIES",
           "status": "LINK_DISCOVERED",
           "as_of": null,
@@ -577,66 +561,44 @@
       "location": null,
       "role": null,
       "identity_read": "PLAUSIBLE",
-      "summary": "Shadi Qishta is a finance and investment executive based in Doha. His public LinkedIn shows Midmac Contracting Company in his experience, and a third-party post congratulates him on a CEO Business Ventures appointment there, which his own pages do not confirm. His own posts cover IFRS and financial transparency, AI in telecom, and Qatar tech commerce. I have no public statement from him on startups, founders or investment criteria.",
+      "summary": "Shadi Qishta is a finance and investment executive based in Doha. His public LinkedIn shows Midmac Contracting Company in his experience, and a third-party post congratulates him on a CEO Business Ventures appointment there, which his own pages do not confirm. His own posts cover IFRS and financial transparency, AI in telecom, and Qatar tech commerce. I have no public statement from him on startups, founders or what he looks for in an investment.",
       "rehearsal": [
         {
           "topic": "transparent financial statements",
           "question": "How reliable are your financial reports, and who audits them?",
-          "basis_source_ids": [
-            "S02"
-          ]
+          "basis_source_ids": ["S02"]
         },
         {
           "topic": "purchasing power and actual addressable demand",
           "question": "What evidence shows your customers can afford this product and keep paying?",
-          "basis_source_ids": [
-            "S03"
-          ]
+          "basis_source_ids": ["S03"]
         },
         {
           "topic": "AI and telecommunications practical value",
           "question": "Where does AI create measurable value in your product rather than just a label?",
-          "basis_source_ids": [
-            "S04"
-          ]
+          "basis_source_ids": ["S04"]
         },
         {
           "topic": "strategic partnerships",
           "question": "Which partner makes your market-entry plan executable in Qatar?",
-          "basis_source_ids": [
-            "S05"
-          ]
+          "basis_source_ids": ["S05"]
         }
       ],
-      "source_ids": [
-        "S01",
-        "S02",
-        "S03",
-        "S04",
-        "S05",
-        "S06"
-      ]
+      "source_ids": ["S01", "S02", "S03", "S04", "S05", "S06"]
     },
     {
       "demo_id": "qa-demo-qinvest",
       "name": "QInvest LLC",
       "entity_kind": "ORGANIZATION",
       "primary_linkedin": "https://www.linkedin.com/company/qinvest-llc/",
-      "aliases": [
-        "QInvest",
-        "QInvest LLC",
-        "QINVEST",
-        "Q Invest"
-      ],
+      "aliases": ["QInvest", "QInvest LLC", "QINVEST", "Q Invest"],
       "associated_organization": "QInvest LLC",
       "identity_confidence": "verified public identity",
       "facts": [
         {
           "claim": "QInvest is a Qatar-based Islamic investment group with three business divisions: Investment Banking, Asset Management and Principal Investments (real estate, credit and equity).",
-          "source_ids": [
-            "S10",
-            "S28"
-          ],
+          "source_ids": ["S10", "S28"],
+          "evidence_class": "documented",
           "topic": "WHAT_THEY_DO",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -650,9 +612,8 @@
         },
         {
           "claim": "It was incorporated in April 2007 and is licensed by the Qatar Financial Centre Authority; its shareholders include Qatar Islamic Bank, other institutions and high-net-worth individuals.",
-          "source_ids": [
-            "S10"
-          ],
+          "source_ids": ["S10"],
+          "evidence_class": "documented",
           "topic": "IDENTITY",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -666,9 +627,8 @@
         },
         {
           "claim": "It has offices in Doha and Istanbul and affiliates in India and the UK.",
-          "source_ids": [
-            "S10"
-          ],
+          "source_ids": ["S10"],
+          "evidence_class": "documented",
           "topic": "IDENTITY",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -681,10 +641,9 @@
           "soft_wording": "According to its LinkedIn page, "
         },
         {
-          "claim": "A 2014 Euromoney article described a strategy of investment banking, principal investment and asset management with an Islamic finance focus, and named Qatar Islamic Bank as the largest shareholder. It is dated; leadership and figures have not been re-read.",
-          "source_ids": [
-            "S28"
-          ],
+          "claim": "QInvest was setting a strategy of investment banking, principal investment and asset management with an Islamic finance focus, and Qatar Islamic Bank was its largest shareholder. The article is dated; leadership and figures have not been re-read.",
+          "source_ids": ["S28"],
+          "evidence_class": "documented",
           "topic": "PRIORITIES",
           "status": "FACT_EXTRACTED",
           "as_of": "2014-04-02",
@@ -697,10 +656,9 @@
           "soft_wording": "In 2014, Euromoney reported that "
         },
         {
-          "claim": "Its credit strategy page is said to discuss capital preservation, structured and mezzanine transactions and risk-return assessment. That page could not be opened.",
-          "source_ids": [
-            "S08"
-          ],
+          "claim": "its credit strategy discusses capital preservation, structured and mezzanine transactions and risk-return assessment. I could not open that page to check.",
+          "source_ids": ["S08"],
+          "evidence_class": "documented",
           "topic": "PRIORITIES",
           "status": "LINK_DISCOVERED",
           "as_of": null,
@@ -713,10 +671,9 @@
           "soft_wording": "A previous research note says "
         },
         {
-          "claim": "QInvest is said to have announced a USD 275 million sustainability-linked financing facility in March 2025. That page could not be opened.",
-          "source_ids": [
-            "S09"
-          ],
+          "claim": "QInvest announced a USD 275 million sustainability-linked financing facility in March 2025. I could not open that page to check.",
+          "source_ids": ["S09"],
+          "evidence_class": "documented",
           "topic": "ARTICLE",
           "status": "LINK_DISCOVERED",
           "as_of": null,
@@ -729,10 +686,9 @@
           "soft_wording": "A previous research note says "
         },
         {
-          "claim": "QInvest is said to have described operational changes focused on Epicure Islamic Investment Management. That page could not be opened.",
-          "source_ids": [
-            "S11"
-          ],
+          "claim": "QInvest described operational changes focused on Epicure Islamic Investment Management. I could not open that page to check.",
+          "source_ids": ["S11"],
+          "evidence_class": "documented",
           "topic": "ARTICLE",
           "status": "LINK_DISCOVERED",
           "as_of": null,
@@ -780,40 +736,25 @@
         {
           "topic": "Sharia-compliant deal structuring",
           "question": "What exact financing structure are you proposing, and is it Sharia-compliant?",
-          "basis_source_ids": [
-            "S10"
-          ]
+          "basis_source_ids": ["S10"]
         },
         {
           "topic": "risk-adjusted returns",
           "question": "What evidence supports your return assumptions and downside case?",
-          "basis_source_ids": [
-            "S28"
-          ]
+          "basis_source_ids": ["S28"]
         },
         {
           "topic": "credible exits",
           "question": "What does the exit or repayment mechanism look like?",
-          "basis_source_ids": [
-            "S08"
-          ]
+          "basis_source_ids": ["S08"]
         },
         {
           "topic": "investment governance",
           "question": "Which financing and governance risks remain unresolved?",
-          "basis_source_ids": [
-            "S10"
-          ]
+          "basis_source_ids": ["S10"]
         }
       ],
-      "source_ids": [
-        "S07",
-        "S08",
-        "S09",
-        "S10",
-        "S11",
-        "S28"
-      ]
+      "source_ids": ["S07", "S08", "S09", "S10", "S11", "S28"]
     },
     {
       "demo_id": "qa-demo-muhannad-taslaq",
@@ -830,10 +771,8 @@
       "facts": [
         {
           "claim": "Director of Investments at Alchemist Doha, listed on the Alchemist Doha and team pages.",
-          "source_ids": [
-            "S12",
-            "S13"
-          ],
+          "source_ids": ["S12", "S13"],
+          "evidence_class": "documented",
           "topic": "ROLE",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -847,10 +786,8 @@
         },
         {
           "claim": "Alchemist's team page says he has over 20 years of experience building startups, venture studios and angel networks, and that he leads founder sourcing, supports portfolio companies and connects investors. Alchemist Doha says he manages relationships with regional and global investors and brings founder, CEO, board and exit experience.",
-          "source_ids": [
-            "S12",
-            "S13"
-          ],
+          "source_ids": ["S12", "S13"],
+          "evidence_class": "documented",
           "topic": "CAREER",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -864,9 +801,8 @@
         },
         {
           "claim": "TASMU Accelerator lists him as a serial entrepreneur (Shefa Clinics), an angel investor, a mentor with Alchemist Accelerator in the Bay Area, and a board member of several MENA startups.",
-          "source_ids": [
-            "S17"
-          ],
+          "source_ids": ["S17"],
+          "evidence_class": "documented",
           "topic": "CAREER",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -880,10 +816,8 @@
         },
         {
           "claim": "Alchemist Doha is a venture capital and investment platform for tech startups in Qatar and emerging markets, created by Alchemist Accelerator and the QRDI Council (per Gulf Times); it offers founder-friendly investment, structured fundraising support and networking events.",
-          "source_ids": [
-            "S12",
-            "S16"
-          ],
+          "source_ids": ["S12", "S16"],
+          "evidence_class": "documented",
           "topic": "WHAT_THEY_DO",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -897,9 +831,8 @@
         },
         {
           "claim": "At a Startup Grind Doha webinar (reported by Gulf Times, 28 March 2026) he said founders should keep building through a crisis rather than wait and see, outlined six rules (30-day sprints, one metric that matters, knowing the burn rate and \"date of death\"), and warned against raising at distressed valuations unless survival demands it.",
-          "source_ids": [
-            "S16"
-          ],
+          "source_ids": ["S16"],
+          "evidence_class": "documented",
           "topic": "STATEMENT",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": "2026-03-28",
@@ -913,9 +846,8 @@
         },
         {
           "claim": "In the same report he told founders to keep investor updates going even when the news is bad, to call their top 10 customers, to use AI to automate repetitive tasks before cutting headcount, and to protect their single most important revenue-generating activity.",
-          "source_ids": [
-            "S16"
-          ],
+          "source_ids": ["S16"],
+          "evidence_class": "documented",
           "topic": "STATEMENT",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": "2026-03-28",
@@ -928,10 +860,9 @@
           "soft_wording": null
         },
         {
-          "claim": "In a LinkedIn post to founders he argues against pitching multiple startups at once: \"We're here to back conviction.\" He says Alchemist Doha looks for founders obsessed with a single vision, and asks whether the founder is willing to go all-in on the idea and is the best person to execute it.",
-          "source_ids": [
-            "S15"
-          ],
+          "claim": "In a LinkedIn post to founders he argues against pitching multiple startups at once: \"We’re here to back conviction.\" He says Alchemist Doha looks for founders obsessed with a single vision, and asks whether the founder is willing to go all-in on the idea and is the best person to execute it.",
+          "source_ids": ["S15"],
+          "evidence_class": "documented",
           "topic": "STATEMENT",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -945,10 +876,8 @@
         },
         {
           "claim": "Priorities visible in his own words: a single committed idea, conviction and clarity, 30-day execution, cash discipline and honest investor communication.",
-          "source_ids": [
-            "S15",
-            "S16"
-          ],
+          "source_ids": ["S15", "S16"],
+          "evidence_class": "documented",
           "topic": "PRIORITIES",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -987,7 +916,7 @@
             "note": null
           },
           "attributionOnly": true,
-          "label": "from his LinkedIn post \"Dear Founders\"",
+          "label": "from his LinkedIn post to founders",
           "speaker": "Muhannad Taslaq"
         },
         {
@@ -1032,7 +961,7 @@
       "requires_refresh": true,
       "arabic_names": [],
       "pronunciation": [],
-      "one_line": "Alchemist Doha's Director of Investments; publicly stresses founder conviction, 30-day execution and cash discipline.",
+      "one_line": "Alchemist Doha's Director of Investments; publicly stresses founder conviction and cash discipline.",
       "location": "Doha, Qatar",
       "role": "Director of Investments",
       "identity_read": "STRONG",
@@ -1041,47 +970,30 @@
         {
           "topic": "founder conviction",
           "question": "Are you fully committed to this one business, or exploring several ventures?",
-          "basis_source_ids": [
-            "S15"
-          ]
+          "basis_source_ids": ["S15"]
         },
         {
           "topic": "early traction and customer evidence",
           "question": "Tell me the strongest signal from a paying customer.",
-          "basis_source_ids": [
-            "S16"
-          ]
+          "basis_source_ids": ["S16"]
         },
         {
           "topic": "cash burn and runway",
           "question": "What is your burn rate and exact runway, and what is your date of death?",
-          "basis_source_ids": [
-            "S16"
-          ]
+          "basis_source_ids": ["S16"]
         },
         {
           "topic": "30-day execution plans",
           "question": "What will you ship in the next 30 days to validate demand?",
-          "basis_source_ids": [
-            "S16"
-          ]
+          "basis_source_ids": ["S16"]
         },
         {
           "topic": "resilience under stress",
           "question": "What is your plan if fundraising takes twice as long?",
-          "basis_source_ids": [
-            "S16"
-          ]
+          "basis_source_ids": ["S16"]
         }
       ],
-      "source_ids": [
-        "S12",
-        "S13",
-        "S14",
-        "S15",
-        "S16",
-        "S17"
-      ]
+      "source_ids": ["S12", "S13", "S14", "S15", "S16", "S17"]
     },
     {
       "demo_id": "qa-demo-invest-qatar",
@@ -1099,10 +1011,8 @@
       "facts": [
         {
           "claim": "Invest Qatar is the Investment Promotion Agency Qatar, a government agency established in 2019 to attract foreign direct investment into Qatar. It is not a venture fund or an investor.",
-          "source_ids": [
-            "S18",
-            "S22"
-          ],
+          "source_ids": ["S18", "S22"],
+          "evidence_class": "documented",
           "topic": "IDENTITY",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1116,9 +1026,8 @@
         },
         {
           "claim": "What it does for investors: information on sectors and opportunities, introductions to government entities and key players, partner matching, business-service referrals, and business-setup support with the licensing platforms.",
-          "source_ids": [
-            "S18"
-          ],
+          "source_ids": ["S18"],
+          "evidence_class": "documented",
           "topic": "WHAT_THEY_DO",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1132,9 +1041,8 @@
         },
         {
           "claim": "Its Chief Executive Officer is Sheikh Ali Alwaleed Al-Thani, as shown on its About page.",
-          "source_ids": [
-            "S18"
-          ],
+          "source_ids": ["S18"],
+          "evidence_class": "documented",
           "topic": "ROLE",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1148,9 +1056,8 @@
         },
         {
           "claim": "On 23 June 2026 it launched a Venture Capital Funding Module on the Invest Qatar Gateway with Qatar Investment Authority: startups can review participating QIA-backed funds, check their criteria and submit pitches to fund managers. The agency connects founders to funds; the funds decide.",
-          "source_ids": [
-            "S19"
-          ],
+          "source_ids": ["S19"],
+          "evidence_class": "documented",
           "topic": "ARTICLE",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": "2026-06-23",
@@ -1164,9 +1071,8 @@
         },
         {
           "claim": "On 23 September 2026 it announced a strategic engagement with Aurion Capital and LG NOVA covering innovation programmes and scale-up support in AI, digital health, fintech, digital infrastructure, sports, and media, plus a planned hub in Qatar Science & Technology Park.",
-          "source_ids": [
-            "S20"
-          ],
+          "source_ids": ["S20"],
+          "evidence_class": "documented",
           "topic": "ARTICLE",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": "2026-09-23",
@@ -1180,9 +1086,8 @@
         },
         {
           "claim": "Its technology-sector page promotes Startup Qatar, an Invest Qatar initiative that is a single resource for startup support, funding and incubation programmes, grants and networking events.",
-          "source_ids": [
-            "S21"
-          ],
+          "source_ids": ["S21"],
+          "evidence_class": "documented",
           "topic": "PRIORITIES",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1196,11 +1101,8 @@
         },
         {
           "claim": "Priorities visible in its publications: attracting foreign investment, economic diversification, priority sectors such as AI, fintech and digital infrastructure, and a clear path from startups to QIA-backed funds.",
-          "source_ids": [
-            "S18",
-            "S19",
-            "S20"
-          ],
+          "source_ids": ["S18", "S19", "S20"],
+          "evidence_class": "documented",
           "topic": "PRIORITIES",
           "status": "FACT_EXTRACTED",
           "as_of": null,
@@ -1268,39 +1170,25 @@
         {
           "topic": "Qatar market-entry readiness",
           "question": "Why should your business establish a base in Qatar?",
-          "basis_source_ids": [
-            "S18"
-          ]
+          "basis_source_ids": ["S18"]
         },
         {
           "topic": "local partnerships",
           "question": "Which local partners and licensing steps do you need?",
-          "basis_source_ids": [
-            "S18"
-          ]
+          "basis_source_ids": ["S18"]
         },
         {
           "topic": "sector alignment and jobs",
           "question": "What measurable benefit would your expansion bring to the local ecosystem?",
-          "basis_source_ids": [
-            "S20"
-          ]
+          "basis_source_ids": ["S20"]
         },
         {
           "topic": "funding pathways via partner funds",
           "question": "Which participating fund on the Gateway fits your stage and sector?",
-          "basis_source_ids": [
-            "S19"
-          ]
+          "basis_source_ids": ["S19"]
         }
       ],
-      "source_ids": [
-        "S18",
-        "S19",
-        "S20",
-        "S21",
-        "S22"
-      ]
+      "source_ids": ["S18", "S19", "S20", "S21", "S22"]
     },
     {
       "demo_id": "qa-demo-alrayan",
@@ -1319,10 +1207,8 @@
       "facts": [
         {
           "claim": "AlRayan Investment LLC (ARI) was established in 2007 in Qatar as an investment firm focused on asset management and corporate advisory; it is 100% owned by AlRayan Bank, authorised by the QFC Regulatory Authority and regulated by the QFMA.",
-          "source_ids": [
-            "S23",
-            "S26"
-          ],
+          "source_ids": ["S23", "S26"],
+          "evidence_class": "documented",
           "topic": "IDENTITY",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1336,9 +1222,8 @@
         },
         {
           "claim": "Its stated purpose is to be the Gulf's leading Sharia-compliant asset manager and corporate advisory firm; its values are People, Trust, Excellence and Sharia.",
-          "source_ids": [
-            "S23"
-          ],
+          "source_ids": ["S23"],
+          "evidence_class": "documented",
           "topic": "PRIORITIES",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1352,10 +1237,8 @@
         },
         {
           "claim": "Asset management: public equities (Qatar and the Gulf), global sukuk and money markets; customised solutions for institutional and high-net-worth investors, with a focus on the GCC and Turkey. It manages the AlRayan GCC Fund and the AlRayan Qatar ETF (QATR).",
-          "source_ids": [
-            "S23",
-            "S25"
-          ],
+          "source_ids": ["S23", "S25"],
+          "evidence_class": "documented",
           "topic": "WHAT_THEY_DO",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1369,9 +1252,8 @@
         },
         {
           "claim": "Financial advisory: equity capital markets (IPOs, secondary offerings), debt capital markets (sukuk), M&A (buy-side and sell-side) and corporate finance (capital structure, restructuring).",
-          "source_ids": [
-            "S24"
-          ],
+          "source_ids": ["S24"],
+          "evidence_class": "documented",
           "topic": "WHAT_THEY_DO",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1385,9 +1267,8 @@
         },
         {
           "claim": "Its team page lists Akber Khan as Acting Chief Executive Officer, Zohaib Pervez as head of Asset Management (more than QAR5bn in client portfolios) and Hadi El Kadi as head of Financial Advisory.",
-          "source_ids": [
-            "S27"
-          ],
+          "source_ids": ["S27"],
+          "evidence_class": "documented",
           "topic": "ROLE",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1401,9 +1282,8 @@
         },
         {
           "claim": "Its site warns that entities are impersonating ARI, and says ARI has no lending licence.",
-          "source_ids": [
-            "S23"
-          ],
+          "source_ids": ["S23"],
+          "evidence_class": "documented",
           "topic": "ARTICLE",
           "status": "VERIFIED_AGAINST_SOURCE",
           "as_of": null,
@@ -1476,39 +1356,25 @@
         {
           "topic": "Sharia-compliant financial structures",
           "question": "How does your proposed investment meet Sharia requirements?",
-          "basis_source_ids": [
-            "S23"
-          ]
+          "basis_source_ids": ["S23"]
         },
         {
           "topic": "equity/debt and sukuk financing",
           "question": "Why is the proposed financing route, equity or sukuk, appropriate?",
-          "basis_source_ids": [
-            "S24"
-          ]
+          "basis_source_ids": ["S24"]
         },
         {
           "topic": "corporate valuation and governance",
           "question": "What valuation, financial statements and downside protections support this transaction?",
-          "basis_source_ids": [
-            "S24"
-          ]
+          "basis_source_ids": ["S24"]
         },
         {
           "topic": "financial advisory",
           "question": "What advisory or partnership support are you actually seeking?",
-          "basis_source_ids": [
-            "S24"
-          ]
+          "basis_source_ids": ["S24"]
         }
       ],
-      "source_ids": [
-        "S23",
-        "S24",
-        "S25",
-        "S26",
-        "S27"
-      ]
+      "source_ids": ["S23", "S24", "S25", "S26", "S27"]
     }
   ],
   "seed_version": "1.1",
