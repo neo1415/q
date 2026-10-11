@@ -141,6 +141,16 @@ function cardBlock(
               : null,
         said: null,
         sourceCount: card.sources.length,
+        ...(prepared
+          ? {
+              sourcesRead: card.sources.filter(
+                (source) =>
+                  source.status === "CONTENT_READ" ||
+                  source.status === "FACT_EXTRACTED" ||
+                  source.status === "VERIFIED_AGAINST_SOURCE",
+              ).length,
+            }
+          : {}),
         subject: null,
         external: {
           externalPersonId: s.externalPersonId,
@@ -174,6 +184,7 @@ function sourceLinks(card: IdentityCard) {
     links.push({
       label: (source.title ?? source.domain).slice(0, 120) || source.domain,
       url: source.url,
+      ...(source.status === undefined ? {} : { status: source.status }),
     });
     if (links.length >= 8) break;
   }

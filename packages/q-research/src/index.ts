@@ -206,3 +206,15 @@ export {
   type DiscoveredCounterpart,
   type DiscoveryPersist,
 } from "./application/counterpart-discovery.js";
+
+export {
+  answerPreparedFollowUp,
+  decidePreparedFollowUp,
+  type FollowUpAspect,
+  type FollowUpDecision,
+} from "./application/prepared-follow-up.js";
+export {
+  sourceStatusOf,
+  sourceTally,
+  sourceWasRead,
+} from "./application/known-entities.js";

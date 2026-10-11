@@ -191,6 +191,8 @@ export type QIntelligenceDependencies = {
   readonly externalEntities?: SpecialistQAnswerDependencies["externalEntities"];
   /** Instant known-entity lookups: the warm prepared index, in memory. */
   readonly knownEntities?: SpecialistQAnswerDependencies["knownEntities"];
+  /** Follow-ups about a prepared entity, composed by code (no web, no model). */
+  readonly preparedFollowUp?: SpecialistQAnswerDependencies["preparedFollowUp"];
   /** What Capital Q remembers about the person, for the prompts (ADR 0012). */
   readonly memory?: QMemoryRecall | undefined;
   /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
@@ -473,6 +475,9 @@ export function composeQIntelligence(
     ...(dependencies.knownEntities === undefined
       ? {}
       : { knownEntities: dependencies.knownEntities }),
+    ...(dependencies.preparedFollowUp === undefined
+      ? {}
+      : { preparedFollowUp: dependencies.preparedFollowUp }),
     ...(dependencies.externalEntities === undefined
       ? {}
       : { externalEntities: dependencies.externalEntities }),

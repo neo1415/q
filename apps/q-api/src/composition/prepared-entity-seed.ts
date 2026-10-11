@@ -3,6 +3,7 @@ import type {
   KnownEntityStore,
   PreparedEntityUpsert,
 } from "@capital-q/q-research";
+import { ExternalSourceStatusSchema } from "@capital-q/contracts/q";
 import { z } from "zod";
 
 /**
@@ -58,8 +59,22 @@ const SeedEntity = z
         verification: Verification,
         // How Q says it when it is not independently checked.
         soft_wording: z.string().nullable(),
+        topic: z.string().min(1).optional(),
+        status: ExternalSourceStatusSchema.optional(),
+        as_of: z.string().nullable().optional(),
       }),
     ),
+    source_ids: z.array(z.string()).optional(),
+    summary: z.string().max(900).optional(),
+    rehearsal: z
+      .array(
+        z.object({
+          topic: z.string(),
+          question: z.string(),
+          basis_source_ids: z.array(z.string()),
+        }),
+      )
+      .optional(),
     rehearsal_topics: z.array(z.string()),
     rehearsal_question_examples: z.array(z.string()),
     short_public_quotes: z.array(
@@ -91,6 +106,12 @@ export const PreparedSeedSchema = z
         access: z.enum(["FETCHED", "NOT_FETCHED"]),
         note: z.string(),
         fetchedAt: z.string().nullable(),
+        status: ExternalSourceStatusSchema.optional(),
+        status_note: z.string().optional(),
+        // Verbatim text kept from the page when it was read.
+        excerpt: z.string().max(1600).nullable().optional(),
+        read_at: z.string().nullable().optional(),
+        title: z.string().nullable().optional(),
       }),
     ),
   })
@@ -109,6 +130,15 @@ export function parsePreparedSeed(raw: unknown): PreparedSeed {
         if (!sourced.has(id)) {
           throw new Error(`${entity.demo_id}: fact cites unknown source ${id}`);
         }
+      }
+    }
+    for (const [sourceId, source] of Object.entries(seed.sources)) {
+      const read = source.read_at != null;
+      if (read && (source.excerpt ?? "").length === 0) {
+        throw new Error(`${sourceId}: a read source keeps its excerpt`);
+      }
+      if (!read && source.status === "CONTENT_READ") {
+        throw new Error(`${sourceId}: CONTENT_READ without a read date`);
       }
     }
     for (const fact of entity.facts) {
@@ -192,7 +222,10 @@ export function toPreparedUpsert(
   entity: PreparedSeedEntity,
   options: SeedMapOptions,
 ): PreparedEntityUpsert {
-  const cited = new Set(entity.facts.flatMap((fact) => fact.source_ids));
+  const cited = new Set([
+    ...entity.facts.flatMap((fact) => fact.source_ids),
+    ...(entity.source_ids ?? []),
+  ]);
   const primary = Object.entries(seed.sources).find(
     ([, source]) => source.url === entity.primary_linkedin,
   );
@@ -207,10 +240,14 @@ export function toPreparedUpsert(
       publishedAt: null,
       evidenceClass: clip(
         source.access === "FETCHED"
-          ? `fetched ${source.fetchedAt ?? seed.verified_at}`
-          : source.note,
+          ? `read ${source.fetchedAt ?? seed.verified_at}`
+          : (source.status_note ?? source.note),
         120,
       ),
+      status: source.status ?? ("LINK_DISCOVERED" as const),
+      excerpt: source.excerpt ?? null,
+      readAt: source.read_at ?? null,
+      statusNote: source.status_note ?? null,
     };
   });
   const image =
@@ -262,6 +299,9 @@ export function toPreparedUpsert(
           fact.verification.status === "VERIFIED"
             ? "VERIFIED"
             : "PUBLICLY_REPORTED_UNCONFIRMED: not independently checked",
+        topic: fact.topic ?? null,
+        status: fact.status ?? ("LINK_DISCOVERED" as const),
+        asOf: fact.as_of ?? null,
       })),
     sources,
     quotes: entity.short_public_quotes.map((quote) => ({
@@ -276,6 +316,12 @@ export function toPreparedUpsert(
       seedVersion: seed.seed_version,
       verifiedAt: seed.verified_at,
       oneLine: entity.one_line,
+      summary: entity.summary ?? entity.one_line,
+      rehearsal: (entity.rehearsal ?? []).map((item) => ({
+        topic: item.topic,
+        question: item.question,
+        basisSourceIds: item.basis_source_ids,
+      })),
       rehearsalTopics: entity.rehearsal_topics,
       rehearsalQuestions: entity.rehearsal_question_examples,
       verification: entity.facts.map((fact, ordinal) => ({

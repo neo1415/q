@@ -4,6 +4,10 @@ import {
   type TransactionManager,
 } from "@capital-q/database";
 import {
+  ExternalSourceStatusSchema,
+  type ExternalSourceStatus,
+} from "@capital-q/contracts/q";
+import {
   aliasKeyOf,
   preparedEntityIdFor,
   type KnownEntityRecord,
@@ -37,6 +41,14 @@ type EntityRow = {
   investor_organisation_id: string | null;
 };
 
+const STATUSES: ReadonlySet<string> = new Set(
+  ExternalSourceStatusSchema.options,
+);
+const asStatus = (value: string | null): ExternalSourceStatus | undefined =>
+  value !== null && STATUSES.has(value)
+    ? (value as ExternalSourceStatus)
+    : undefined;
+
 const iso = (value: Date | string): string =>
   (value instanceof Date ? value : new Date(value)).toISOString();
 
@@ -65,10 +77,15 @@ export function createPostgresKnownEntityStore(dependencies: {
         description: string | null;
         published_at: Date | string | null;
         evidence_class: string | null;
+        status: string | null;
+        excerpt: string | null;
+        read_at: Date | string | null;
+        status_note: string | null;
       }[]
     >`
       select external_person_id as id, source_id, url, description,
-             published_at, evidence_class
+             published_at, evidence_class, status, excerpt, read_at,
+             status_note
         from q_runtime.external_entity_sources
        where external_person_id in
              (select value::uuid from jsonb_array_elements_text(${idsJson}::jsonb))
@@ -79,9 +96,13 @@ export function createPostgresKnownEntityStore(dependencies: {
         claim: string;
         source_ids: string[];
         evidence_class: string | null;
+        topic: string | null;
+        status: string | null;
+        as_of: string | null;
       }[]
     >`
-      select external_person_id as id, claim, source_ids, evidence_class
+      select external_person_id as id, claim, source_ids, evidence_class,
+             topic, status, as_of
         from q_runtime.external_entity_facts
        where external_person_id in
              (select value::uuid from jsonb_array_elements_text(${idsJson}::jsonb))
@@ -105,6 +126,9 @@ export function createPostgresKnownEntityStore(dependencies: {
           claim: f.claim,
           sourceIds: f.source_ids,
           evidenceClass: f.evidence_class,
+          topic: f.topic,
+          status: asStatus(f.status),
+          asOf: f.as_of,
         })),
       sources: sources
         .filter((s) => s.id === row.id)
@@ -114,6 +138,10 @@ export function createPostgresKnownEntityStore(dependencies: {
           description: s.description,
           publishedAt: s.published_at === null ? null : iso(s.published_at),
           evidenceClass: s.evidence_class,
+          status: asStatus(s.status),
+          excerpt: s.excerpt,
+          readAt: s.read_at === null ? null : iso(s.read_at),
+          statusNote: s.status_note,
         })),
       quotes: row.quotes,
       image: row.image,
@@ -177,19 +205,23 @@ export function createPostgresKnownEntityStore(dependencies: {
           await tx.sql`
             insert into q_runtime.external_entity_sources
               (external_person_id, source_id, url, description, published_at,
-               evidence_class)
+               evidence_class, status, excerpt, read_at, status_note)
             values (${id}, ${source.sourceId}, ${source.url},
                     ${source.description}, ${source.publishedAt}::timestamptz,
-                    ${source.evidenceClass})`;
+                    ${source.evidenceClass}, ${source.status ?? "LINK_DISCOVERED"},
+                    ${source.excerpt ?? null}, ${source.readAt ?? null}::timestamptz,
+                    ${source.statusNote ?? null})`;
         }
         let ordinal = 0;
         for (const fact of entity.facts) {
           await tx.sql`
             insert into q_runtime.external_entity_facts
-              (external_person_id, ordinal, claim, source_ids, evidence_class)
+              (external_person_id, ordinal, claim, source_ids, evidence_class,
+               topic, status, as_of)
             values (${id}, ${ordinal}, ${fact.claim},
                     array(select jsonb_array_elements_text(${jsonbParam(tx.sql, fact.sourceIds)}::jsonb)),
-                    ${fact.evidenceClass})`;
+                    ${fact.evidenceClass}, ${fact.topic ?? null},
+                    ${fact.status ?? "LINK_DISCOVERED"}, ${fact.asOf ?? null})`;
           ordinal += 1;
         }
       });

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { FIT_PARAMETERS } from "../http/fit.js";
 import { QSubjectRefSchema } from "./subject.js";
+import { ExternalSourceStatusSchema } from "./external-person.js";
 
 /**
  * Q's answer as cards (founder brief 2026-10-05, C1-C5; ADR 0053).
@@ -148,6 +149,8 @@ export const QAnswerCardSchema = z
     said: z.string().trim().max(300).nullable(),
     /** How many of the answer's sources this card rests on. */
     sourceCount: z.number().int().min(0).max(100),
+    /** Of sourceCount, how many were actually read (prepared entities). */
+    sourcesRead: z.number().int().min(0).max(100).optional(),
     /** The resolved record behind the card, when there is one. */
     subject: QSubjectRefSchema.nullable(),
     /**
@@ -187,6 +190,8 @@ export const QAnswerCardSchema = z
               .object({
                 label: z.string().trim().min(1).max(120),
                 url: z.string().url().max(2048).startsWith("https://"),
+                /** Reading status of the source (prepared entities). */
+                status: ExternalSourceStatusSchema.optional(),
               })
               .strict(),
           )

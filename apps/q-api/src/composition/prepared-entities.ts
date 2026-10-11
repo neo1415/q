@@ -1,5 +1,7 @@
 import {
   aliasKeyOf,
+  answerPreparedFollowUp,
+  decidePreparedFollowUp,
   type KnownEntityIndex,
   type KnownEntityRecord,
   type KnownEntityStore,
@@ -302,5 +304,26 @@ export function personaGrounding(record: KnownEntityRecord): {
     rehearsalTopics: Array.isArray(topics)
       ? topics.filter((one): one is string => typeof one === "string")
       : [],
+  };
+}
+
+/**
+ * The follow-up port: a turn about a prepared entity (by name, or "him /
+ * them / this company" for the entity last shown) answered from its stored
+ * brief. Pure memory over the warm records; null when the turn is not one.
+ */
+export function preparedFollowUpPort(
+  entities: Pick<PreparedEntities, "all">,
+): (input: {
+  readonly utterance: string;
+  readonly lastShownEntityId: string | null;
+}) => string | null {
+  return (input) => {
+    const decision = decidePreparedFollowUp({
+      utterance: input.utterance,
+      records: entities.all(),
+      lastShownId: input.lastShownEntityId,
+    });
+    return decision === null ? null : answerPreparedFollowUp(decision);
   };
 }

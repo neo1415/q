@@ -87,6 +87,8 @@ import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 import {
   fastLaneOf,
   knownEntityLaneOf,
+  lastShownEntityId,
+  type PreparedFollowUpPort,
   investorDiscoveryLaneOf,
   type KnownEntityMatcher,
 } from "./fast-lane.js";
@@ -487,6 +489,11 @@ export type SpecialistQAnswerDependencies = {
    * with no model call at all. Absent: the normal path.
    */
   readonly knownEntities?: KnownEntityMatcher | undefined;
+  /**
+   * Follow-ups about a prepared entity, answered by code from its stored
+   * brief: no web search, no model call. Absent: the normal path.
+   */
+  readonly preparedFollowUp?: PreparedFollowUpPort | undefined;
   /**
    * A typed yes or no to a change waiting in this conversation, read and
    * acted on by code through the Approval Engine (pending-decision.ts).
@@ -2327,6 +2334,16 @@ export function createSpecialistQAnswer(
       : knownEntityLaneOf(utterance, dependencies.knownEntities)) ??
     investorDiscoveryLaneOf(utterance);
 
+  /** A follow-up about a prepared entity, composed by code; null if none. */
+  const preparedFollowUpOf = (
+    utterance: string,
+    history: Parameters<typeof lastShownEntityId>[0],
+  ): string | null =>
+    dependencies.preparedFollowUp?.({
+      utterance,
+      lastShownEntityId: lastShownEntityId(history),
+    }) ?? null;
+
   const preread = (input: QPrereadInput): void => {
     if (turns === undefined || prereads.has(input.runId)) return;
     const started = (async (): Promise<EarlyReading | null> => {
@@ -2346,6 +2363,7 @@ export function createSpecialistQAnswer(
       if (pleasantryOf(latest.content) !== null) return null;
       // An instant known-entity lookup is answered by code: no reading.
       if (instantLaneOf(latest.content) !== null) return null;
+      if (preparedFollowUpOf(latest.content, history) !== null) return null;
       // K fast lane: the short first read starts as early as the reading.
       if (dependencies.turnSkim !== undefined && !preskims.has(input.runId)) {
         preskims.set(input.runId, {
@@ -2669,6 +2687,26 @@ export function createSpecialistQAnswer(
           ...(latest.utteranceRef !== undefined ? { spoken: true } : {}),
           ...instant,
         });
+      }
+    }
+    // A follow-up about a prepared entity ("tell me more about him", "what
+    // has Muhannad said about founders") is composed by code from its
+    // stored brief: zero web search, zero analyst call (live 2026-10-11:
+    // "tell me more about this person" took long and found little).
+    if (
+      conversationId !== undefined &&
+      latest !== undefined &&
+      request.speculation === undefined &&
+      request.plan.screen?.route !== "ONBOARDING" &&
+      !sequences.has(conversationId)
+    ) {
+      const followUp = preparedFollowUpOf(latest.content, history);
+      if (followUp !== null) {
+        logger?.info(
+          { qRunId: request.runId, lane: "PREPARED_FOLLOW_UP", modelCalls: 0 },
+          "q answered a prepared-entity follow-up by code",
+        );
+        return recordAnswer(request, conversationId, followUp);
       }
     }
     delegate.warm?.(request);

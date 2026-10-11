@@ -328,9 +328,11 @@ export function briefFromKnownEntity(
       .filter((at): at is number => at !== undefined)
       .slice(0, 6);
     if (sourceRefs.length === 0) return [];
-    const needsCheck = /verify|recheck|time-sensitive/iu.test(
-      fact.evidenceClass ?? "",
-    );
+    // A claim whose page was never read is not a statement of record.
+    const needsCheck =
+      /verify|recheck|time-sensitive/iu.test(fact.evidenceClass ?? "") ||
+      fact.status === "LINK_DISCOVERED" ||
+      fact.status === "BLOCKED_OR_UNAVAILABLE";
     return [
       {
         topic: "BACKGROUND" as const,
@@ -365,6 +367,8 @@ export function briefFromKnownEntity(
       publishedAt: source.publishedAt,
       retrievedAt: record.lastResearchedAt,
       provider: "prepared",
+      status: source.status ?? "LINK_DISCOVERED",
+      readAt: source.readAt ?? null,
     })),
     assertions: assertions.length === 0 ? [] : assertions,
   });
