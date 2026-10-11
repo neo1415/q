@@ -5,6 +5,11 @@ import type {
   QMapSpec,
 } from "@capital-q/contracts";
 import type { QToolCallOutcome } from "@capital-q/q-runtime";
+import {
+  GET_RELATIONSHIP,
+  GetRelationshipOutputSchema,
+  type GetRelationshipOutput,
+} from "@capital-q/q-tools";
 
 /**
  * The record behind each answer card (R0, Zino live 2026-10-06: every card
@@ -182,6 +187,10 @@ function readOutcome(outcome: Pick<QToolCallOutcome, "result">): {
  * the investors and each subject's published country.
  */
 export class RunRead extends Map<string, string> {
+  readonly relationships = new Map<
+    string,
+    Pick<GetRelationshipOutput, "counterpart" | "relationship" | "source">
+  >();
   readonly investors = new Map<string, ReadInvestor>();
   /** Subject id (company or investor) -> ISO country, where published. */
   readonly countries = new Map<string, string>();
@@ -195,9 +204,27 @@ export class RunRead extends Map<string, string> {
 export function createRunCompanies(limit = 200) {
   const runs = new Map<string, RunRead>();
   return {
-    note(runId: string, outcome: Pick<QToolCallOutcome, "result">): void {
+    note(
+      runId: string,
+      outcome: Pick<QToolCallOutcome, "result"> &
+        Partial<
+          Pick<QToolCallOutcome, "toolName" | "status" | "classification">
+        >,
+    ): void {
       const found = readOutcome(outcome);
-      if (found.companies.length === 0 && found.investors.length === 0) return;
+      const relationship =
+        outcome.toolName === GET_RELATIONSHIP &&
+        outcome.status === "SUCCEEDED" &&
+        outcome.classification === "READ_ONLY" &&
+        outcome.result.ok
+          ? GetRelationshipOutputSchema.safeParse(outcome.result.data)
+          : null;
+      if (
+        found.companies.length === 0 &&
+        found.investors.length === 0 &&
+        !relationship?.success
+      )
+        return;
       let known = runs.get(runId);
       if (known === undefined) {
         known = new RunRead();
@@ -206,6 +233,16 @@ export function createRunCompanies(limit = 200) {
           const oldest = runs.keys().next().value;
           if (oldest !== undefined) runs.delete(oldest);
         }
+      }
+      if (relationship?.success) {
+        known.relationships.set(
+          `${relationship.data.counterpart.kind}:${relationship.data.counterpart.id}`,
+          {
+            counterpart: relationship.data.counterpart,
+            relationship: relationship.data.relationship,
+            source: relationship.data.source,
+          },
+        );
       }
       for (const { companyId, name, country } of found.companies) {
         const key = nameKey(name);

@@ -6,6 +6,7 @@ import { useEffect, useId, useState } from "react";
 import type { QMapSpec, QResultBlock } from "@capital-q/contracts";
 
 import {
+  chartLabels,
   countryName,
   formatValue,
   splitPlaces,
@@ -120,7 +121,35 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
   const { min, max } = valueScale(values);
   const y = (value: number) =>
     CHART_H - ((value - min) / (max - min)) * CHART_H;
-  const labels = block.series[0]?.points.map((point) => point.label) ?? [];
+  const labels = chartLabels(block.series);
+  // Conflicting orders or repeated categories cannot support a shared axis.
+  if (labels === null) {
+    return (
+      <figure data-q-chart={block.chart}>
+        <figcaption>
+          These series have incompatible categories. The original figures are
+          shown below.
+        </figcaption>
+        {block.series.map((series, s) => (
+          <table key={s}>
+            <caption>
+              {series.label}:{" "}
+              {standingWords(series.truthClass, series.evidenceStatus)}.{" "}
+              {series.source}
+            </caption>
+            <tbody>
+              {series.points.map((point, i) => (
+                <tr key={i}>
+                  <th scope="row">{point.label}</th>
+                  <td>{formatValue(point.value, block.currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ))}
+      </figure>
+    );
+  }
   const slot = CHART_W / Math.max(1, labels.length);
   return (
     <figure className="flex flex-col gap-2" data-q-chart={block.chart}>
@@ -143,7 +172,8 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
           const tone = SERIES_TONES[s % SERIES_TONES.length];
           if (block.chart === "BAR") {
             const width = (slot * 0.7) / block.series.length;
-            return series.points.map((point, i) => {
+            return series.points.map((point) => {
+              const i = labels.indexOf(point.label);
               const top = Math.min(y(point.value), y(0));
               return (
                 <rect
@@ -158,21 +188,41 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
               );
             });
           }
-          const d = series.points
-            .map(
-              (point, i) =>
-                `${i === 0 ? "M" : "L"}${String(i * slot + slot / 2)} ${String(y(point.value))}`,
-            )
+          const points = new Map(
+            series.points.map((point) => [point.label, point]),
+          );
+          let connected = false;
+          const d = labels
+            .map((label, i) => {
+              const point = points.get(label);
+              if (point === undefined) {
+                connected = false;
+                return "";
+              }
+              const command = connected ? "L" : "M";
+              connected = true;
+              return `${command}${String(i * slot + slot / 2)} ${String(y(point.value))}`;
+            })
             .join(" ");
           return (
-            <path
-              key={series.label}
-              d={d}
-              fill="none"
-              stroke={tone}
-              strokeWidth={2}
-              strokeDasharray={SERIES_DASH[s % SERIES_DASH.length]}
-            />
+            <g key={series.label}>
+              <path
+                d={d}
+                fill="none"
+                stroke={tone}
+                strokeWidth={2}
+                strokeDasharray={SERIES_DASH[s % SERIES_DASH.length]}
+              />
+              {series.points.map((point) => (
+                <circle
+                  key={point.label}
+                  cx={labels.indexOf(point.label) * slot + slot / 2}
+                  cy={y(point.value)}
+                  r={2.5}
+                  fill={tone}
+                />
+              ))}
+            </g>
           );
         })}
         {labels.map((label, i) => (
@@ -219,13 +269,15 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
             </tr>
           </thead>
           <tbody>
-            {labels.map((label, i) => (
+            {labels.map((label) => (
               <tr key={label}>
                 <th scope="row" className="pr-3 font-normal">
                   {label}
                 </th>
                 {block.series.map((series) => {
-                  const point = series.points[i];
+                  const point = series.points.find(
+                    (point) => point.label === label,
+                  );
                   return (
                     <td key={series.label} className="pr-3 cq-numeric">
                       {point === undefined
