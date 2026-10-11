@@ -245,7 +245,7 @@ function preview(payload: WorkforceJobStartPayload): string {
  * else goes to the person with the reason; it is never widened.
  */
 export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
-  const executors = registeredExecutors({ research: true });
+  const executors = registeredExecutors({ research: true, documents: true });
   const folded = new Map<string, readonly string[]>();
   for (const step of payload.steps) {
     if (step.role === "WRITER" || step.role === "REVIEWER") {
@@ -286,6 +286,7 @@ export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
           ["chat.message.send", "email.send"].includes(tool),
         ),
         spawned: step.spawned,
+        ...(step.document === undefined ? {} : { document: step.document }),
       },
     ];
   });
@@ -450,7 +451,7 @@ export function createWorkforceJobBoard(dependencies: {
         const planned = await jobs
           .plan(owner, {
             goal,
-            permitted: executableJobTools(jobs.research),
+            permitted: executableJobTools(jobs.research, jobs.documents),
             budgetUsd: budget,
           })
           .catch(() => null);
@@ -472,6 +473,7 @@ export function createWorkforceJobBoard(dependencies: {
           dependsOn: [...step.dependsOn].slice(0, 8),
           budgetUsd: usd(step.budgetUsd),
           spawned: step.spawned,
+          ...(step.document === undefined ? {} : { document: step.document }),
         }));
         const parsed = WorkforceJobStartPayloadSchema.safeParse({
           ownerUserId: actor.userId,

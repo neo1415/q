@@ -398,6 +398,18 @@ export type WorkforceOverviewDto = z.infer<typeof WorkforceOverviewDtoSchema>;
  */
 export const Q_WORKFORCE_JOB_START = "q.workforce.job.start" as const;
 
+/** An approved request for the existing own-company document pipeline. */
+export const WorkforceDocumentRequestSchema = z
+  .object({
+    operation: z.literal("PREPARE"),
+    kind: z.enum(["PITCH_DECK", "ONE_PAGER", "MEMO"]),
+    scope: z.literal("OWN_COMPANY"),
+  })
+  .strict();
+export type WorkforceDocumentRequest = z.infer<
+  typeof WorkforceDocumentRequestSchema
+>;
+
 export const WorkforcePlannedStepSchema = z
   .object({
     key: z.string().trim().min(1).max(40),
@@ -410,6 +422,7 @@ export const WorkforcePlannedStepSchema = z
     budgetUsd: UsdSchema,
     /** A helper the lead Q spawned for this step, with only these tools. */
     spawned: z.boolean(),
+    document: WorkforceDocumentRequestSchema.optional(),
   })
   .strict();
 export type WorkforcePlannedStep = z.infer<typeof WorkforcePlannedStepSchema>;

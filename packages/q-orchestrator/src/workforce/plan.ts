@@ -1,4 +1,9 @@
-import type { QAgentExecutor, QAgentRole } from "@capital-q/contracts";
+import {
+  WorkforceDocumentRequestSchema,
+  type WorkforceDocumentRequest,
+  type QAgentExecutor,
+  type QAgentRole,
+} from "@capital-q/contracts";
 
 import {
   STORED_ROLE,
@@ -35,6 +40,7 @@ export type ProposedStep = {
   readonly goal: string;
   readonly tools: readonly string[];
   readonly dependsOn: readonly string[];
+  readonly document?: WorkforceDocumentRequest | undefined;
 };
 
 export type BoundStep = {
@@ -48,6 +54,7 @@ export type BoundStep = {
   readonly goal: string;
   readonly tools: readonly string[];
   readonly dependsOn: readonly string[];
+  readonly document?: WorkforceDocumentRequest | undefined;
   readonly budgetUsd: number;
   /** It reaches the other side: every draft is written and reviewed inside. */
   readonly outward: boolean;
@@ -60,6 +67,7 @@ export const STEP_REFUSALS = [
   /** A real role with no executor here (incl. WRITER and REVIEWER, which run inside the sender). */
   "NO_EXECUTOR",
   "NO_PERMITTED_TOOL",
+  "INVALID_DOCUMENT_REQUEST",
   "WAITS_ON_MISSING_STEP",
   "DUPLICATE_KEY",
   "OVER_BUDGET",
@@ -139,6 +147,14 @@ export function boundPlan(
       refuse("NO_PERMITTED_TOOL");
       continue;
     }
+    const document = WorkforceDocumentRequestSchema.safeParse(step.document);
+    if (
+      (role === "DOCUMENTS" && !document.success) ||
+      (role !== "DOCUMENTS" && step.document !== undefined)
+    ) {
+      refuse("INVALID_DOCUMENT_REQUEST");
+      continue;
+    }
     // Only steps already kept can be waited on: a plan runs in order.
     if (step.dependsOn.some((key) => !kept.some((one) => one.key === key))) {
       refuse("WAITS_ON_MISSING_STEP");
@@ -162,6 +178,9 @@ export function boundPlan(
       budgetUsd,
       outward: executor.outward && tools.some((tool) => isOutwardTool(tool)),
       spawned: false,
+      ...(role === "DOCUMENTS" && document.success
+        ? { document: document.data }
+        : {}),
     });
   }
   return { steps: kept, refused, budgetUsd: spent };

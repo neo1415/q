@@ -19,6 +19,9 @@ import {
   JOB_PLAN_SCHEMA_NAME,
   JOB_PLAN_SCHEMA_VERSION,
   JOB_PLAN_V2_SCHEMA_VERSION,
+  JOB_PLAN_V3_SCHEMA_VERSION,
+  JobPlanResultV3Schema,
+  type JobPlanResultV3,
   JOB_PLAN_UNTRUSTED,
   JobPlanResultSchema,
   JobPlanResultV2Schema,
@@ -413,7 +416,7 @@ export const JOB_PLAN_V2: PromptDefinition<JobPlanVariables, JobPlanResultV2> =
   {
     id: "JOB_PLAN",
     version: 2,
-    status: "ACTIVE",
+    status: "DEPRECATED",
     kind: "TASK",
     taskClass: "STRUCTURED_EXTRACTION",
     owner: "q-core",
@@ -431,4 +434,25 @@ export const JOB_PLAN_V2: PromptDefinition<JobPlanVariables, JobPlanResultV2> =
       schema: JobPlanResultV2Schema,
     },
     template: JOB_PLAN_TEMPLATE_V2,
+  };
+
+/** New version: earlier approved plans keep their original prompt identity. */
+export const JOB_PLAN_V3: PromptDefinition<JobPlanVariables, JobPlanResultV3> =
+  {
+    ...JOB_PLAN_V2,
+    version: 3,
+    status: "ACTIVE",
+    changeDescription:
+      "Preserve typed own-company PREPARE requests for the composed document pipeline; no sharing or revision.",
+    effectiveFrom: "2026-10-11",
+    output: {
+      kind: "STRUCTURED",
+      schemaName: JOB_PLAN_SCHEMA_NAME,
+      schemaVersion: JOB_PLAN_V3_SCHEMA_VERSION,
+      schema: JobPlanResultV3Schema,
+    },
+    template: JOB_PLAN_TEMPLATE_V2.replace(
+      "- The job is",
+      "- DOCUMENTS may only prepare an own-company document using documents.own.prepare. Include document with operation PREPARE, kind PITCH_DECK, ONE_PAGER or MEMO, and scope OWN_COMPANY. Capital Q resolves the authorized company from the actor. Revision, sharing, sending and publication go in cannot.\n- The job is",
+    ),
   };
