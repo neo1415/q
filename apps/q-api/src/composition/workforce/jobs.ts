@@ -14,7 +14,11 @@ import {
   type PriorRun,
   type StepResult,
 } from "@capital-q/q-orchestrator";
-import { workforceCorrelationId, type QAgentRole } from "@capital-q/contracts";
+import {
+  workforceCorrelationId,
+  type QAgentRole,
+  type WorkforceDocumentRequest,
+} from "@capital-q/contracts";
 import { stanceDeclines } from "@capital-q/q-core";
 import { z } from "zod";
 
@@ -52,8 +56,35 @@ export type OpenConversation = {
   readonly material: string;
 };
 
+export type WorkforceDocumentInput = {
+  readonly request: WorkforceDocumentRequest;
+  readonly goal: string;
+  /** Original approved Q run, never the workforce step run. */
+  readonly qRunId: string;
+  readonly jobId: string;
+  readonly stepKey: string;
+  readonly runId: string;
+  readonly organisationId: string;
+  readonly budgetUsd: number;
+};
+export type WorkforceDocumentResult =
+  | { readonly status: "READY" | "PREPARING"; readonly artifactId: string }
+  | { readonly status: "FAILED" | "UNAVAILABLE"; readonly message: string };
+export type DocumentExecutionContext = {
+  readonly qRunId: string;
+  readonly organisationId: string;
+  /** Checks cancellation AND the current worker's lease before each continuation. */
+  readonly canContinue: () => Promise<boolean>;
+};
+
 /** The app's own services an agent may call, each authorized for the owner. */
 export type WorkforcePorts = {
+  readonly documents?:
+    | ((
+        owner: Owner,
+        input: WorkforceDocumentInput,
+      ) => Promise<WorkforceDocumentResult>)
+    | undefined;
   readonly principalName: (owner: Owner) => Promise<string>;
   /** Mandate watcher: companies newly matching the declared mandate. */
   readonly mandateMatches: (owner: Owner) => Promise<readonly MandateMatch[]>;
@@ -183,6 +214,14 @@ export function createWorkforceExecutors(dependencies: {
   readonly scheduling: boolean;
   /** The job in the person's words: research reads it as their request. */
   readonly goal?: string | undefined;
+  readonly documentContext?: DocumentExecutionContext | undefined;
+  readonly documentPolling?:
+    | {
+        readonly now: () => number;
+        readonly wait: () => Promise<void>;
+        readonly deadlineMs: number;
+      }
+    | undefined;
 }): Partial<Record<QAgentRole, AgentExecutor>> {
   const { owner, ports, models, review } = dependencies;
 
@@ -193,6 +232,83 @@ export function createWorkforceExecutors(dependencies: {
     string,
     Promise<Awaited<ReturnType<WorkforceModels["readReply"]>>>
   >();
+
+  const documents: AgentExecutor | null =
+    ports.documents === undefined
+      ? null
+      : async (step, context) => {
+          const authority = dependencies.documentContext;
+          if (
+            !has(step.tools, "documents.own.prepare") ||
+            step.document === undefined ||
+            authority === undefined ||
+            !authority.qRunId ||
+            !authority.organisationId
+          ) {
+            return {
+              status: "FAILED",
+              summary:
+                "The approved document request or its authority is unavailable.",
+            };
+          }
+          const polling = dependencies.documentPolling ?? {
+            now: Date.now,
+            wait: () =>
+              new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
+            deadlineMs: 10 * 60_000,
+          };
+          const deadline = polling.now() + polling.deadlineMs;
+          while (polling.now() < deadline) {
+            if (!(await authority.canContinue())) {
+              return {
+                status: "FAILED",
+                summary: "Document work stopped before the next continuation.",
+              };
+            }
+            const result = await ports.documents?.(owner, {
+              request: step.document,
+              goal: step.goal,
+              jobId: context.jobId,
+              stepKey: step.key,
+              runId: context.runId,
+              qRunId: authority.qRunId,
+              organisationId: authority.organisationId,
+              budgetUsd: step.budgetUsd,
+            });
+            if (result === undefined)
+              return {
+                status: "FAILED",
+                summary: "Document preparation is unavailable.",
+              };
+            if (result.status === "READY") {
+              if (!(await authority.canContinue()))
+                return {
+                  status: "FAILED",
+                  summary:
+                    "Document work stopped before completion was recorded.",
+                };
+              return {
+                status: "DONE",
+                summary:
+                  "Prepared the document; it is ready in your workspace.",
+                outputs: { artifactId: result.artifactId },
+              };
+            }
+            if (result.status === "FAILED" || result.status === "UNAVAILABLE") {
+              return {
+                status: "FAILED",
+                summary: result.message.slice(0, 500),
+              };
+            }
+            // PREPARING is still running, never a completed step or a policy hold.
+            await polling.wait();
+          }
+          return {
+            status: "FAILED",
+            summary:
+              "Document preparation did not finish before this run's deadline.",
+          };
+        };
 
   /** DISCOVERY: companies newly matching the mandate, as a shortlist. */
   const discovery: AgentExecutor = async () => {
@@ -492,6 +608,7 @@ export function createWorkforceExecutors(dependencies: {
     CONVERSATION: conversation("REPLY"),
     SCHEDULING: conversation("SCHEDULE"),
     ...(research === null ? {} : { RESEARCH: research }),
+    ...(documents === null ? {} : { DOCUMENTS: documents }),
   };
 }
 
@@ -533,10 +650,15 @@ export const EXECUTABLE_JOB_TOOLS: readonly string[] = [
 ];
 
 /** The tools the lead Q may plan with here: research only where composed. */
-export function executableJobTools(research: boolean): readonly string[] {
-  return research
-    ? [...EXECUTABLE_JOB_TOOLS, "public_web.search"]
-    : EXECUTABLE_JOB_TOOLS;
+export function executableJobTools(
+  research: boolean,
+  documents = false,
+): readonly string[] {
+  return [
+    ...EXECUTABLE_JOB_TOOLS,
+    ...(research ? ["public_web.search"] : []),
+    ...(documents ? ["documents.own.prepare"] : []),
+  ];
 }
 
 /**
@@ -593,6 +715,7 @@ export function createWorkforceJobs(dependencies: {
     // D1: the roster is what this deployment really runs, nothing more.
     const executors = registeredExecutors({
       research: dependencies.ports.research !== undefined,
+      documents: dependencies.ports.documents !== undefined,
     });
     const planned = await dependencies.models.plan(owner, trace, {
       goal: input.goal.slice(0, 2_000),
@@ -700,6 +823,7 @@ export function createWorkforceJobs(dependencies: {
     filedAlready?: { readonly jobId: string; readonly leadRunId: string },
     options: {
       readonly gated?: boolean | undefined;
+      readonly documentContext?: DocumentExecutionContext | undefined;
       /** D3: resume from, and keep, each finished step's result. */
       readonly durable?: DurableSteps | undefined;
     } = {},
@@ -724,6 +848,7 @@ export function createWorkforceJobs(dependencies: {
             step.tools.includes("schedule.meeting.book"),
           ),
           goal: input.goal,
+          documentContext: options.documentContext,
         }),
         options.durable,
       ),
@@ -760,6 +885,7 @@ export function createWorkforceJobs(dependencies: {
   return {
     /** Whether RESEARCH is registered here (a research provider is composed). */
     research: dependencies.ports.research !== undefined,
+    documents: dependencies.ports.documents !== undefined,
 
     plan: (
       owner: Owner,

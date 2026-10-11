@@ -1,3 +1,4 @@
+import { WorkforceDocumentRequestSchema } from "@capital-q/contracts";
 import { z } from "zod";
 
 import { TaskFrameSchema } from "./common.js";
@@ -404,3 +405,18 @@ export const JobPlanResultV2Schema = z
   })
   .strict();
 export type JobPlanResultV2 = z.infer<typeof JobPlanResultV2Schema>;
+
+/** v3 retains the exact typed document request in the approved plan. */
+export const JOB_PLAN_V3_SCHEMA_VERSION = 3;
+export const JobPlanResultV3Schema = JobPlanResultV2Schema.extend({
+  steps: z
+    .array(
+      JobPlanResultV2Schema.shape.steps.element
+        .extend({
+          document: WorkforceDocumentRequestSchema.optional(),
+        })
+        .strict(),
+    )
+    .max(12),
+}).strict();
+export type JobPlanResultV3 = z.infer<typeof JobPlanResultV3Schema>;

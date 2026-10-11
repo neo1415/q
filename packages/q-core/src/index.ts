@@ -1302,6 +1302,7 @@ export {
   DRAFT_REVIEW_V3,
   JOB_PLAN_V1,
   JOB_PLAN_V2,
+  JOB_PLAN_V3,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
 export {
@@ -1315,6 +1316,8 @@ export {
   DraftReviewResultV2Schema,
   JobPlanResultSchema,
   JobPlanResultV2Schema,
+  JobPlanResultV3Schema,
+  JOB_PLAN_V3_SCHEMA_VERSION,
   JOB_PLAN_V2_SCHEMA_VERSION,
   PLAN_AGENT_ROLES,
   PLAN_AGENT_ROLES_V2,
@@ -1336,6 +1339,7 @@ export {
   type DraftStage,
   type JobPlanResult,
   type JobPlanResultV2,
+  type JobPlanResultV3,
   type JobPlanVariables,
   type ReplyReaderResult,
   type ReplyReaderVariables,

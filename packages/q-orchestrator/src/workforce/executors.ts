@@ -72,6 +72,15 @@ const RESEARCH: QAgentExecutor = {
   outward: false,
 };
 
+/** Preparation only; sharing remains a separate approved action. */
+const DOCUMENTS: QAgentExecutor = {
+  role: "DOCUMENTS",
+  version: 1,
+  tools: ["documents.own.prepare"],
+  delivers: "DOCUMENT",
+  outward: false,
+};
+
 /**
  * Roles with no executor yet, and why, in words the planner's refusal and
  * the report carry. DOCUMENTS: the existing artifact/document pipeline
@@ -91,6 +100,7 @@ export const UNREGISTERED_ROLE_REASONS: Readonly<
 export type ExecutorAvailability = {
   /** A public-web research provider is composed in this deployment. */
   readonly research: boolean;
+  readonly documents?: boolean | undefined;
 };
 
 /** The executors this deployment registers, by role. */
@@ -103,6 +113,7 @@ export function registeredExecutors(
     SCHEDULING,
     DISCOVERY,
     ...(availability.research ? { RESEARCH } : {}),
+    ...(availability.documents ? { DOCUMENTS } : {}),
   };
 }
 
@@ -113,6 +124,7 @@ export const ALL_EXECUTORS: readonly QAgentExecutor[] = [
   SCHEDULING,
   DISCOVERY,
   RESEARCH,
+  DOCUMENTS,
 ].map((executor) => QAgentExecutorSchema.parse(executor));
 
 export function isQAgentRole(value: string): value is QAgentRole {

@@ -160,6 +160,23 @@ export function createAgentWorkRunner(dependencies: {
         {
           // Metered once, when first claimed: a resumed job is not a new one.
           gated: row.attempts > 1,
+          ...(row.trace.runId === undefined ||
+          row.trace.organisationId === undefined
+            ? {}
+            : {
+                documentContext: {
+                  qRunId: row.trace.runId,
+                  organisationId: row.trace.organisationId,
+                  canContinue: async () => {
+                    if (lost) return false;
+                    const kept = await queue
+                      .heartbeat(row.job_id, workerId, leaseMs)
+                      .catch(() => false);
+                    if (!kept) lost = true;
+                    return kept;
+                  },
+                },
+              }),
           durable: {
             prior: async (key) => {
               if (lost || !(await queue.live(row.job_id))) {

@@ -1124,6 +1124,8 @@ export {
   Q_WORKFORCE_JOB_START,
   WorkforceJobStartPayloadSchema,
   WorkforcePlannedStepSchema,
+  WorkforceDocumentRequestSchema,
+  type WorkforceDocumentRequest,
   type WorkforceJobStartPayload,
   type WorkforcePlannedStep,
   WORKFORCE_AGENT_ROLES,
