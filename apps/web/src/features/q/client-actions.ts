@@ -12,7 +12,7 @@ import { storeQMotion } from "@/features/q-aperture/q-motion";
 import { storeVoicePreference } from "@/features/voice/voice-preference";
 
 import { forgetActiveConversations } from "./active-conversation";
-import { applyCardsIntent } from "./cards/card-visibility";
+import { applyCardsIntent } from "./cards/card-visibility-store";
 import { loadWire, wireNow, type WireContracts } from "./wire";
 import {
   arrivedAt,

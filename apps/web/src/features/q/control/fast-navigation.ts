@@ -20,7 +20,7 @@ import {
   recordIntentPath,
   settingsPath,
 } from "../client-actions";
-import { applyCardsIntent } from "../cards/card-visibility";
+import { applyCardsIntent } from "../cards/card-visibility-store";
 import { navigationInFlight } from "../ui-act-controller";
 
 /**
