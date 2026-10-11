@@ -29,6 +29,24 @@ import type { DeckSpeech } from "./deck-speech.js";
  * and approval card.
  */
 
+/** An explicit edit of an existing file, rather than a request to open it. */
+export function asksToReviseDocument(text: string): boolean {
+  const words = text.trim();
+  return (
+    words.length <= 3_000 &&
+    /^(?:(?:please|q)[,\s]+)*(?:revise|rewrite|edit|update|shorten|restyle)\b/iu.test(
+      words,
+    ) &&
+    /\b(?:document|report|deck|memo|brief|one[- ]pager)\b/iu.test(words) &&
+    // Adding newly researched evidence needs the full research path.
+    !/\b(?:research|search|look up|find new|new evidence)\b/iu.test(words) &&
+    // Multi-action/outward turns keep the existing approval-aware path.
+    !/\b(?:send|share|publish|email|book|schedule|invite|approve|create|prepare)\b/iu.test(
+      words.replace(/\b(?:you just|you already) prepared\b/giu, ""),
+    )
+  );
+}
+
 /** One thing Q showed or named, newest first. */
 export type ShownItem = {
   readonly kind: "DOCUMENT" | "NAMED";

@@ -342,6 +342,9 @@ export function createArtifactService(dependencies: {
             artifact.id,
             artifact.currentVersion,
           );
+    if (artifact.status === "READY" && current === null) {
+      throw new ArtifactCompositionFailedError();
+    }
     const history = await repository.history(actor, artifact.id);
     return toDetail(artifact, current, history);
   };
@@ -420,6 +423,11 @@ export function createArtifactService(dependencies: {
               artifact.id,
               artifact.currentVersion,
             );
+      // A cached version number is not proof that its immutable version exists.
+      // A damaged READY pointer must never complete a workforce step.
+      if (artifact.status === "READY" && current === null) {
+        throw new ArtifactCompositionFailedError();
+      }
       return toSummary(artifact, current);
     },
     prepareArtifact: async (input) => {

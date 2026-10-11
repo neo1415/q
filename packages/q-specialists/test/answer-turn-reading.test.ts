@@ -1,10 +1,12 @@
 import type { DelegationContext, QDelegationPort } from "../src/delegation.js";
+import { asksToReviseDocument } from "../src/references.js";
 import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
 import {
   PermittedContextPlanSchema,
+  QArtifactIdSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
 import {
@@ -108,6 +110,7 @@ function seam(options: {
     noteVisibility: (entry: Record<string, unknown>) => void;
   };
   readonly offeredTools?: readonly string[];
+  readonly openRecord?: import("../src/references.js").QOpenRecordPort;
   /** A spoken turn: stored with the recogniser's utterance. */
   readonly spoken?: boolean;
   /** The company analysis takes the question (default: it never does). */
@@ -289,6 +292,9 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(options.openRecord === undefined
+      ? {}
+      : { openRecord: options.openRecord }),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
     ...(options.waitingLines === undefined
       ? {}
@@ -4093,5 +4099,92 @@ describe("a reader's move the words do not ask for is not made (live 2026-10-09)
         intent: { kind: "NAVIGATE", destination: "REHEARSALS" },
       },
     ]);
+  });
+});
+
+describe("explicit document revision cannot become opening the document", () => {
+  it.each([
+    ["Revise the report you just prepared.", true],
+    ["Please shorten this deck.", true],
+    ["Open the revised report.", false],
+    ["Do not revise my report.", false],
+    ["Update my company profile.", false],
+    ["Revise my report using new market research.", false],
+    ["Revise this document and email it to the investor.", false],
+    ["Edit my memo and prepare a new pitch deck.", false],
+  ])("keeps the full meaning of %s", (text, expected) => {
+    expect(asksToReviseDocument(text)).toBe(expected);
+  });
+  const artifactId = QArtifactIdSchema.parse(randomUUID());
+  function revisionTurn(said: string) {
+    let opened = 0;
+    const reading = {
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      tool: null,
+      aboutNamedOther: false,
+      reference: {
+        open: "DOCUMENT",
+        name: "Test report",
+        shown: 1,
+        retryLast: false,
+        sameFor: null,
+      },
+    } as TurnReaderResult;
+    const run = seam({
+      said,
+      reading,
+      outcomes: [],
+      specialistSupports: true,
+      offeredTools: ["revise_my_document", "read_my_document", "open_page"],
+      earlier: [
+        {
+          role: "Q",
+          content: "Your document is ready.",
+          blocks: [
+            {
+              kind: "ARTIFACT_REFERENCE",
+              artifactId,
+              type: "Q_REPORT",
+              status: "READY",
+              title: "Test report",
+            },
+          ],
+        },
+      ],
+      openRecord: {
+        open: () => {
+          opened += 1;
+          return Promise.resolve({
+            kind: "OPEN_RECORD_PAGE",
+            page: "DOCUMENT",
+            id: artifactId,
+          });
+        },
+      },
+    });
+    return { run, opened: () => opened };
+  }
+  it("routes the actual edit request to the existing revision tool when the reader says open", async () => {
+    const { run, opened } = revisionTurn(
+      "Revise the document you just prepared. Make the opening concise, and add a clearly labeled Evidence gaps section. Keep all existing evidence qualifications and do not invent facts.",
+    );
+    await run.answer.answer(request());
+    expect(opened()).toBe(0);
+    expect(run.delegated()).toBe(1);
+    expect(run.investigated()).toBe(0);
+    const focus = run.focuses[0] as QAnswerRequest["toolFocus"];
+    expect(focus?.tools).toContain("revise_my_document");
+    expect(run.stored).toEqual([]);
+  });
+  it("preserves a genuine request to open the document", async () => {
+    const { run, opened } = revisionTurn(
+      "Open the document you just prepared.",
+    );
+    await run.answer.answer(request());
+    expect(opened()).toBe(1);
+    expect(run.delegated()).toBe(0);
   });
 });

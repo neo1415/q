@@ -17,6 +17,7 @@ import {
 
 import {
   ArtifactAuthorityError,
+  ArtifactCompositionFailedError,
   ArtifactNotFoundError,
   ArtifactNotRevisableError,
   createArtifactService,
@@ -319,6 +320,47 @@ describe("documents made by a job", () => {
       }),
     ).toBeNull();
     expect(jobs.queued).toHaveLength(1);
+  });
+
+  it("a READY pointer cannot stand in for a real immutable version", async () => {
+    const { repository, artifacts } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    const input = { ...request(), workforce };
+    const prepared = await svc.requestDocument(input);
+    const id = prepared.artifact.artifactId;
+    const stored = artifacts.get(id);
+    if (stored === undefined) throw new Error("Expected the prepared artifact");
+    artifacts.set(id, { ...stored, status: "READY", currentVersion: 1 });
+    await expect(svc.findWorkforceDocument(input)).rejects.toBeInstanceOf(
+      ArtifactCompositionFailedError,
+    );
+    await expect(svc.requestDocument(input)).rejects.toBeInstanceOf(
+      ArtifactCompositionFailedError,
+    );
+    expect(jobs.queued).toHaveLength(1);
+
+    artifacts.set(id, stored);
+    const filed = await svc.completeDocumentJob(
+      {
+        id: workforce.jobId,
+        tenantId: ACTOR.tenantId,
+        organisationId: ACTOR.organisationId ?? "",
+        artifactId: id,
+        userId: ACTOR.userId,
+        runId: RUN,
+        kind: "PITCH_DECK",
+        attempts: 1,
+        input: { ...EXTRA, ...composed("First composition.") },
+      },
+      composed("Designed."),
+    );
+    expect(filed.current?.version).toBe(1);
+    expect((await svc.findWorkforceDocument(input))?.status).toBe("READY");
   });
 
   it("a changed approved intent or subject fails closed on the existing binding", async () => {

@@ -98,3 +98,17 @@ well as completion, and separately verify usage rows.
   The request asked for a one-page summary, but the result was a report and
   public research ran despite the existing-record wording. Do not present
   this as autonomous ONE_PAGER acceptance or a performance improvement.
+
+## Authenticated first-useful-text baseline — 2026-10-11 16:09 UTC
+
+Deployed `ab962576`, same existing fictional investor, three isolated typed
+“What is my mandate?” runs through the canonical API and actual SSE. Time starts
+before POST; stages/heartbeats are excluded. First useful text is the first
+answer content reaching 20 characters; actual mandate answers were checked.
+Acceptance: 1,075 / 561 / 560 ms; first text: 2,742 / 2,098 / 1,895 ms;
+terminal: 2,830 / 2,163 / 1,946 ms. All three COMPLETED. Scoped usage records
+classification 795 / 758 / 719 ms and extraction 2,172 / 2,015 / 1,853 ms.
+Usage latency is not summed into client latency: extraction may overlap the
+answer or continue after its receipt. These are small samples, not p95. Repeat
+this same SSE method after the corrected guard is deployed; preserve baseline
+receipts outside the repository. No first-audio success is claimed.

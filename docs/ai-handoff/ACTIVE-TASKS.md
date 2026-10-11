@@ -1,5 +1,12 @@
 # Active tasks — authoritative cross-model board
 
+## Routing/readiness release correction — 2026-10-11 16:07 UTC
+
+- CI `38150727138` at `4d26e9e6` is **RED quality tests / GREEN pgTAP**. Six local navigation regressions are corrected by checking mandate intent before scope inspection; final 183 focused routing tests pass. Do not deploy the red revision or apply the migration yet.
+- Existing conversational document revision route is **IMPLEMENTED / LOCAL TESTED**, not live verified. Canonical READY reads now also require an actual immutable version row; 52 package builds, 207 focused tests, root/q-api typechecks and changed lint/format pass.
+- Actual viewer/PDF baseline is verified; autonomous workforce READY/render and real conversational version increment are still required after release. Deterministic initial preparation remains an initial connection, not intelligent autonomous research/writing/design/critique.
+- Actual browser Discover-to-Q works with the genuine founder card in focus (correct company subjects/reference, declared facts and explicit gaps). An off-screen named-company question still used the wrong on-screen company. Investigate turn subject binding and existing canonical network tools; never widen founder-private evidence access to solve it.
+
 ## Next measured product correction — 2026-10-11
 
 - **IMPLEMENTED / LOCAL TESTED:** bounded candidate sweep for explicit counts without place filters, after real top-three Q returned one while the canonical API returned three. Rich top-ten output exceeded the existing tool bound. Original regression fails; corrected 36 fit/card/tool tests passed, final fixture lint correction 10 tests passed, model-gateway dependency build and root/q-api typechecks passed. Release separately after the current document packet gate.

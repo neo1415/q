@@ -42,7 +42,7 @@ workforce correlation for the actual step run.
 
 PREPARING keeps the existing workforce step RUNNING under its heartbeat; the
 executor polls with cancellation/lease checks and a ten-minute operational
-deadline. Only READY with an actual version yields DONE and an artifact ID.
+deadline. Only READY with an actual version yields DONE and an artifact ID. Canonical detail reads and workforce resume resolve the immutable version row and reject a READY artifact whose row is absent; a cached positive version number alone is insufficient.
 Actual pipeline failure, unavailable authority or deadline is FAILED. There is
 no outward action. Cancellation prevents later workforce continuations; a
 private document job already enqueued can still finish through its existing

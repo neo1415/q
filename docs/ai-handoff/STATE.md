@@ -4,6 +4,16 @@
 > Evidence words: CODE OBSERVED · IMPLEMENTED · MERGED · LOCAL TESTED · CI GREEN · DEPLOYED · LIVE VERIFIED · BLOCKED.
 > A recorded SHA is a snapshot; re-check Git and Railway before trusting it.
 
+## Codex product-routing and readiness correction — 2026-10-11 16:07 UTC
+
+- **CI RED:** exact `4d26e9e6` run `38150727138` passed format/lint/typecheck and pgTAP, but quality tests failed. Local broad diagnosis reproduced six navigation failures: the mandate guard inspected its scope before checking whether the utterance was a mandate recall. The utterance check now runs first; all 14 named-record navigation and 25 mandate tests pass. No security binding or fixture was weakened.
+- **IMPLEMENTED / LOCAL TESTED:** explicit conversational edits of an existing document now reach the existing canonical revision tools instead of an OPEN_RECORD_PAGE shortcut. Research and outward/multiple-action requests retain their normal path. Final focused routing set passed 183 tests; package builds (52), root/q-api typechecks, changed lint/format passed for the routing correction.
+- **IMPLEMENTED:** canonical artifact reads and workforce resume now reject READY when its actual immutable version row is absent; a positive cached version number alone is insufficient. Final 207 tests across six files, 52 package builds, root/q-api typechecks and changed lint/format passed; final artifact fixture rerun passed 13/13. Existing PREPARING polling, cancellation-before-completion and version-zero rejection remain intact.
+- **LIVE VERIFIED baseline:** private report version 1 renders in the existing viewer; canonical PDF export returns 200, application/pdf, with a valid PDF header. Its conversational revision still produced no version 2 on deployed `ab962576`.
+- **FAILED live journey acceptance:** new browser SSE run on Discover mentions the requested founder company but binds findings/reference to a different on-screen card. The actual founder onboarding is COMPLETED with 23 responses and no pending question; the company is visible in the investor's authorized feed and six shared non-null profile fields agree with the network preview. These facts prove source availability, not correct Q interrogation. No private onboarding answers or identifiers are committed.
+- **LIVE VERIFIED focused founder path:** moving 29 cards through the actual Discover feed reached the authorized founder card. A new browser SSE run COMPLETED with that company subject/reference and all company findings correctly bound; two USER_CLAIM/SELF_REPORTED findings and two UNKNOWN findings were preserved. This does not prove access to all private onboarding responses. Off-screen named-company targeting remains defective.
+- Document migration remains **NOT APPLIED HOSTED**. All services remain at `ab962576`; latest corrections require exact-commit quality + pgTAP before migration/deployment. First useful text improvements, first audio, actual historical 8.8 reproduction and intelligent autonomous document/revision acceptance remain open.
+
 ## Codex measured product continuation — 2026-10-11 15:40 UTC
 
 - Release candidate `4d26e9e6` is on integration/CI. Exact run `38150727138` **pgTAP SUCCESS**; quality passed lint/typecheck and is running tests. Migration remains unapplied until both gates pass. All four services still serve `ab962576`.

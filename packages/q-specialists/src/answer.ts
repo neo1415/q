@@ -142,6 +142,7 @@ import {
 import type { QProfileGapsPort } from "./profile-gaps.js";
 import {
   openingLine,
+  asksToReviseDocument,
   openTarget,
   spokenRecordName,
   referenceNote,
@@ -2681,6 +2682,7 @@ export function createSpecialistQAnswer(
       (request.turnKind === undefined ||
         request.turnKind === "QUESTION_TO_Q") &&
       request.actor.organisationId !== undefined &&
+      asksForOwnMandate(latest.content) &&
       request.plan.actor.organisationId === request.actor.organisationId &&
       request.plan.actor.userId === request.actor.userId &&
       request.plan.tenantId === request.tenantId &&
@@ -2692,8 +2694,7 @@ export function createSpecialistQAnswer(
           scope.subject.investorOrganisationId ===
             scope.filter.investorOrganisationId &&
           scope.filter.tenantId === request.tenantId,
-      ) &&
-      asksForOwnMandate(latest.content)
+      )
     ) {
       // A sequence may have begun on another instance. Load the existing
       // durable core before deciding this recall can skip its turn reader.
@@ -3521,6 +3522,35 @@ export function createSpecialistQAnswer(
         );
         return recordAnswer(request, conversationId, said);
       }
+    }
+    // An explicit edit of a file already on screen/in this conversation must
+    // reach its canonical revision tool, even if the reader mistakes the
+    // document reference for an instruction to open it. This chooses a path;
+    // the tool still resolves owner, firewall scope and the real READY version.
+    if (
+      request.capability === "ANSWER" &&
+      !sequences.has(conversationId) &&
+      read?.sequence == null &&
+      asksToReviseDocument(latest.content) &&
+      (request.plan.screen?.artifactId !== undefined ||
+        latestArtifactCardIn(history) !== null)
+    ) {
+      speculative.current?.cancel("FOCUS");
+      return delegate.answer({
+        ...request,
+        research: Promise.resolve(NO_RESEARCH),
+        capabilities: manifestOf(capabilities),
+        turnKind: "TOOL_REQUEST",
+        toolFocus: {
+          areas: ["Documents"],
+          tools: [
+            "revise_my_document",
+            "read_my_document",
+            "list_my_documents",
+          ],
+        },
+        ...(spoken ? { spoken: true } : {}),
+      });
     }
     // What the turn points back at (TURN_READER v40, follow-55): one record
     // to open, or Q's last action again. Bound here by code to a record of
