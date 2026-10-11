@@ -19,7 +19,12 @@ import {
   type StoredArtifact,
   type StoredArtifactVersion,
 } from "../domain/artifact.js";
-import type { ArtifactRepository, ComposedArtifact } from "./ports.js";
+import type {
+  ArtifactRepository,
+  ComposedArtifact,
+  WorkforceDocumentBinding,
+} from "./ports.js";
+import { z } from "zod";
 import {
   DocumentJobInputSchema,
   jobActor,
@@ -184,6 +189,8 @@ export type ArtifactService = {
     input: PrepareArtifactInput & {
       readonly kind: DocumentJobKind;
       readonly job: Omit<DocumentJobInput, "title" | "summary" | "content">;
+      /** Trusted composition only; browsers and models never choose this. */
+      readonly workforce?: WorkforceDocumentBinding | undefined;
     },
   ) => Promise<QArtifactDetail>;
   /** Where the person's document job has got to; null: none, or not theirs. */
@@ -231,6 +238,14 @@ export type ArtifactService = {
 
 /** How many times a losing race is retried before giving up. */
 const APPEND_ATTEMPTS = 3;
+
+const WorkforceDocumentBindingSchema = z
+  .object({
+    jobId: z.string().uuid(),
+    stepKey: z.string().min(1).max(80),
+    intentSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
 
 function sameSubject(a: QSubjectRef, b: QSubjectRef): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -494,6 +509,10 @@ export function createArtifactService(dependencies: {
       if (jobs === undefined) throw new ArtifactCompositionFailedError();
       const organisationId = authorise(input);
       const subject = input.subject;
+      const binding =
+        input.workforce === undefined
+          ? undefined
+          : WorkforceDocumentBindingSchema.parse(input.workforce);
       const jobInput = DocumentJobInputSchema.parse({
         ...input.job,
         title: input.content.title,
@@ -501,7 +520,7 @@ export function createArtifactService(dependencies: {
         content: parseContent(input.content.content),
       });
       const artifact = await transactions.run(async (tx) => {
-        const created = await repository.create(tx, {
+        const fields = {
           tenantId: input.actorContext.tenantId,
           organisationId,
           type: input.artifactType,
@@ -511,7 +530,17 @@ export function createArtifactService(dependencies: {
               ? subject.investorOrganisationId
               : null,
           createdByUserId: input.actorContext.userId,
-        });
+        };
+        const claimed =
+          binding === undefined
+            ? { artifact: await repository.create(tx, fields), created: true }
+            : await repository.createForWorkforce?.(tx, fields, binding);
+        // A conflicting replay, wrong owner or unsupported repository
+        // cannot silently fall back to creating a duplicate document.
+        if (claimed === undefined || claimed === null)
+          throw new ArtifactAuthorityError();
+        const created = claimed.artifact;
+        if (!claimed.created) return created;
         await jobs.enqueue(tx, {
           tenantId: input.actorContext.tenantId,
           organisationId,

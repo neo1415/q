@@ -60,6 +60,10 @@ function composed(body: string): ComposedArtifact {
 
 function memory() {
   const artifacts = new Map<string, StoredArtifact>();
+  const bindings = new Map<
+    string,
+    { readonly id: string; readonly digest: string }
+  >();
   const versions: StoredArtifactVersion[] = [];
   const own = (actor: ActorContext, a: StoredArtifact | undefined) =>
     a !== undefined &&
@@ -68,6 +72,26 @@ function memory() {
       ? a
       : null;
   const repository: ArtifactRepository = {
+    createForWorkforce: async (tx, input, binding) => {
+      const key = `${binding.jobId}:${binding.stepKey}`;
+      const prior = bindings.get(key);
+      if (prior !== undefined) {
+        const artifact = artifacts.get(prior.id);
+        return prior.digest === binding.intentSha256 &&
+          artifact !== undefined &&
+          artifact.tenantId === input.tenantId &&
+          artifact.organisationId === input.organisationId &&
+          artifact.createdByUserId === input.createdByUserId &&
+          artifact.type === input.type &&
+          artifact.companyId === input.companyId &&
+          artifact.archivedAt === null
+          ? { artifact, created: false }
+          : null;
+      }
+      const artifact = await repository.create(tx, input);
+      bindings.set(key, { id: artifact.id, digest: binding.intentSha256 });
+      return { artifact, created: true };
+    },
     create: (_tx, input) => {
       const artifact: StoredArtifact = {
         id: `a${String(artifacts.size + 1)}000000-0000-4000-8000-000000000001`,
@@ -210,6 +234,98 @@ function request(overrides: Record<string, unknown> = {}) {
 }
 
 describe("documents made by a job", () => {
+  const workforce = {
+    jobId: "f0000000-0000-4000-8000-0000000000b1",
+    stepKey: "prepare-own-deck",
+    intentSha256: "a".repeat(64),
+  };
+
+  it("a restart after enqueue reuses the artifact without enqueueing another worker job", async () => {
+    const { repository, artifacts } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    const first = await svc.requestDocument({ ...request(), workforce });
+    const replay = await svc.requestDocument({
+      ...request(),
+      workforce,
+      content: composed("A regenerated draft is not a new approved intent."),
+    });
+    expect(replay.artifact.artifactId).toBe(first.artifact.artifactId);
+    expect(artifacts.size).toBe(1);
+    expect(jobs.queued).toHaveLength(1);
+    expect(jobs.queued[0]?.input.content.sections[0]?.body).toBe(
+      "First composition.",
+    );
+  });
+
+  it("a changed approved intent or subject fails closed on the existing binding", async () => {
+    const { repository, artifacts } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    await svc.requestDocument({ ...request(), workforce });
+    await expect(
+      svc.requestDocument({
+        ...request(),
+        workforce: { ...workforce, intentSha256: "b".repeat(64) },
+      }),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    await expect(
+      svc.requestDocument({ ...request(), workforce, artifactType: "MEMO" }),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    expect(artifacts.size).toBe(1);
+    expect(jobs.queued).toHaveLength(1);
+  });
+
+  it("replay still requires a fresh actor-bound firewall plan", async () => {
+    const { repository } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    await svc.requestDocument({ ...request(), workforce });
+    for (const override of [
+      { revalidateAfter: "2000-01-01T00:00:00.000Z" },
+      { tenantId: COMPANY },
+      { actor: { userId: COMPANY, organisationId: ACTOR.organisationId } },
+      { subjects: [] },
+    ]) {
+      await expect(
+        svc.requestDocument({
+          ...request(),
+          workforce,
+          permittedContextPlan: plan(override),
+        }),
+      ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    }
+    expect(jobs.queued).toHaveLength(1);
+  });
+
+  it("never falls back to a non-idempotent repository for a workforce request", async () => {
+    const { repository, artifacts } = memory();
+    const { createForWorkforce: _unsupported, ...ordinaryRepository } =
+      repository;
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository: ordinaryRepository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    await expect(
+      svc.requestDocument({ ...request(), workforce }),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    expect(artifacts.size).toBe(0);
+    expect(jobs.queued).toHaveLength(0);
+  });
   it("a request is PREPARING with no version, and its job is queued with the draft", async () => {
     const { repository } = memory();
     const jobs = queue();
