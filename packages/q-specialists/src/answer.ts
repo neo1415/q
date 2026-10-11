@@ -2678,26 +2678,32 @@ export function createSpecialistQAnswer(
       request.plan.screen?.route !== "ONBOARDING" &&
       request.writingDocument !== true &&
       request.askedAction === undefined &&
-      (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q") &&
-      !sequences.has(conversationId) &&
+      (request.turnKind === undefined ||
+        request.turnKind === "QUESTION_TO_Q") &&
       request.actor.organisationId !== undefined &&
-      ownInvestorOrganisationIn(request.plan) === request.actor.organisationId &&
+      ownInvestorOrganisationIn(request.plan) ===
+        request.actor.organisationId &&
       asksForOwnMandate(latest.content)
     ) {
-      const capabilities = await capabilitiesOf(request);
-      logger?.info(
-        { qRunId: request.runId, lane: "OWN_MANDATE" },
-        "q fast lane",
-      );
-      return delegate.answer({
-        ...request,
-        research: Promise.resolve(NO_RESEARCH),
-        capabilities: manifestOf(capabilities),
-        turnKind: "QUESTION_TO_Q",
-        questionKind: "THEIR_OWN_RECORDS",
-        preparedSubject: "MANDATE",
-        ...(latest.utteranceRef !== undefined ? { spoken: true } : {}),
-      });
+      // A sequence may have begun on another instance. Load the existing
+      // durable core before deciding this recall can skip its turn reader.
+      await hydrate({ tenantId: request.tenantId, conversationId });
+      if (!sequences.has(conversationId)) {
+        const capabilities = await capabilitiesOf(request);
+        logger?.info(
+          { qRunId: request.runId, lane: "OWN_MANDATE" },
+          "q fast lane",
+        );
+        return delegate.answer({
+          ...request,
+          research: Promise.resolve(NO_RESEARCH),
+          capabilities: manifestOf(capabilities),
+          turnKind: "QUESTION_TO_Q",
+          questionKind: "THEIR_OWN_RECORDS",
+          preparedSubject: "MANDATE",
+          ...(latest.utteranceRef !== undefined ? { spoken: true } : {}),
+        });
+      }
     }
     // Known-entity instant lane: a plain lookup of a prepared entity is
     // answered from the warm index with zero model calls (live 2026-10-10:

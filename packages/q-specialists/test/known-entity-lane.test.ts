@@ -15,6 +15,7 @@ import type {
 import { ActorContextSchema } from "@capital-q/security";
 
 import { createSpecialistQAnswer } from "../src/answer.js";
+import type { ConversationCoreStore } from "../src/conversation-core.js";
 import { knownEntityLaneOf, type KnownEntityMatch } from "../src/fast-lane.js";
 
 /**
@@ -139,7 +140,7 @@ const ENTITIES: readonly (KnownEntityMatch & {
 const matcher = (candidate: string): KnownEntityMatch | null =>
   ENTITIES.find((e) => e.keys.includes(candidate)) ?? null;
 
-function seam(said: string) {
+function seam(said: string, coreState?: ConversationCoreStore) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
     tenantId: TENANT as QConversationMessage["tenantId"],
@@ -207,6 +208,7 @@ function seam(said: string) {
     turns,
     turnSkim,
     knownEntities: matcher,
+    coreState,
   });
   return {
     answer,
@@ -251,12 +253,15 @@ describe("the own-mandate instant delegation", () => {
     "update my mandate",
     "score companies against my mandate",
     "should I change my mandate?",
-  ])("%s: retains the semantic reader for actions or ambiguity", async (said) => {
-    const s = seam(said);
-    await s.answer.answer(investorRequest());
-    expect(s.readerCalls()).toBeGreaterThan(0);
-    expect(s.delegated[0]?.preparedSubject).not.toBe("MANDATE");
-  });
+  ])(
+    "%s: retains the semantic reader for actions or ambiguity",
+    async (said) => {
+      const s = seam(said);
+      await s.answer.answer(investorRequest());
+      expect(s.readerCalls()).toBeGreaterThan(0);
+      expect(s.delegated[0]?.preparedSubject).not.toBe("MANDATE");
+    },
+  );
 
   it("does not bypass the reader without a firewall-bound own mandate", async () => {
     const s = seam("What is my mandate?");
@@ -299,6 +304,27 @@ describe("the own-mandate instant delegation", () => {
       expect(s.delegated[0]?.preparedSubject).not.toBe("MANDATE");
     },
   );
+
+  it("loads a durable active sequence before deciding whether to skip the reader", async () => {
+    let loads = 0;
+    const s = seam("What is my mandate?", {
+      load: () => {
+        loads += 1;
+        return Promise.resolve({
+          v: 1,
+          unclearInARow: 0,
+          lastAction: null,
+          sequence: { topic: "my mandate", total: 3, asked: 1 },
+          focus: null,
+        });
+      },
+      save: () => Promise.resolve(),
+    });
+    await s.answer.answer(investorRequest());
+    expect(loads).toBe(1);
+    expect(s.readerCalls()).toBeGreaterThan(0);
+    expect(s.delegated[0]?.preparedSubject).not.toBe("MANDATE");
+  });
 });
 
 describe("the known-entity instant lane", () => {
