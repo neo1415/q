@@ -277,6 +277,7 @@ export default async function CompanyPage({
                   assumptions={assumptions}
                   companyName={profile.canonicalName}
                   route={questionsRoute}
+                  dataRoomHref={`/company/${encodeURIComponent(profile.companyId)}?tab=dataroom`}
                 />
               </Suspense>
             )
@@ -291,12 +292,14 @@ export default async function CompanyPage({
   );
 }
 
-/** Q.07's fold: the investor's assumptions to test, streamed in. */
+/** Q.07's fold: the investor's questions to investigate, streamed in. */
 async function AssumptionsFold({
   assumptions,
   companyName,
   route,
+  dataRoomHref,
 }: {
+  readonly dataRoomHref: string;
   readonly assumptions: Promise<Awaited<
     ReturnType<typeof getCompanyAssumptions>
   > | null>;
@@ -308,9 +311,9 @@ async function AssumptionsFold({
   return (
     <Fold
       id="company-assumptions"
-      title="Assumptions to test"
+      title="Questions to investigate"
       summary={[
-        `${String(board.assumptions.length)} to test`,
+        `${String(board.assumptions.length)} key ${board.assumptions.length === 1 ? "claim" : "claims"}`,
         board.counts.unknown > 0
           ? `${String(board.counts.unknown)} not known yet`
           : null,
@@ -322,6 +325,7 @@ async function AssumptionsFold({
         board={board}
         companyName={companyName}
         route={route}
+        dataRoomHref={dataRoomHref}
       />
     </Fold>
   );

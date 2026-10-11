@@ -576,7 +576,7 @@ export function CompanyProfileView({
                 overviewExtra === undefined ? null : (
                   <Fold
                     id="company-assumptions"
-                    title="Assumptions to test"
+                    title="Questions to investigate"
                     summary={
                       overviewExtraSummary ?? "What to ask before a call"
                     }
