@@ -150,11 +150,21 @@ const results = [];
 for (const email of FOUNDERS) {
   const row = { email, cells: {}, home: "n/a" };
   results.push(row);
-  const signIn = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: { apikey: PUBLISHABLE, "content-type": "application/json" },
-    body: JSON.stringify({ email, password: PASSWORD }),
-  });
+  const attempt = (password) =>
+    fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: PUBLISHABLE, "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+  let signIn = await attempt(PASSWORD);
+  // A real demo account (not the seed cast) may have its own password,
+  // read from a private file named by CQ_FALLBACK_PASSWORD_FILE; never
+  // printed, never committed.
+  const fallback = process.env.CQ_FALLBACK_PASSWORD_FILE;
+  if (!signIn.ok && fallback) {
+    const { readFileSync } = await import("node:fs");
+    signIn = await attempt(readFileSync(fallback, "utf8").trim());
+  }
   if (!signIn.ok) {
     row.home = `FAIL(sign-in ${signIn.status})`;
     for (const c of CELLS) row.cells[c.name] = "FAIL(sign-in)";
