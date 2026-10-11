@@ -216,6 +216,32 @@ describe("Q's read of the deck", () => {
   });
 });
 
+describe("deck coverage starts folded", () => {
+  it("summarises coverage in one line and keeps the section grid one click away", () => {
+    const { container } = render(
+      <DeckForReaders
+        companyId={fixtures.REVIEW_COMPANY_ID}
+        companyName="Kora Health"
+        view={fixtures.reviewDeck("INVESTOR", "full")}
+      />,
+    );
+    const read = container.querySelector("details[data-deck-read]");
+    expect(read).not.toBeNull();
+    expect(read?.hasAttribute("open")).toBe(false);
+    expect(
+      read?.querySelector("[data-deck-read-summary]")?.textContent,
+    ).toMatch(/^\d+ of 12 sections identified/);
+    expect(read?.querySelector("summary")?.textContent).toContain(
+      "View coverage",
+    );
+    // The section analysis itself is not folded away.
+    expect(
+      container.querySelectorAll("article[data-deck-section]").length,
+    ).toBe(12);
+    expect(read?.closest("details article")).toBeNull();
+  });
+});
+
 describe("deck coaching", () => {
   it("lists sections weakest first and names what blocks the minimum standard", () => {
     const view = fixtures.reviewDeck("OWNER");

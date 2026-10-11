@@ -278,6 +278,15 @@ export function CompanyProfileView({
     claims.filter((claim) => claim.kind === kind);
   const sayRaise = overview?.raiseFromPitch ?? claimsOf("RAISE")[0] ?? null;
   const traction = claimsOf("TRACTION");
+  // The pitch states a figure but no round details are shared with this
+  // reader: the fold explains the difference instead of listing both.
+  const pitchOnly = overview?.raise === null && sayRaise !== null;
+  const sayRaiseAmount =
+    sayRaise === null
+      ? ""
+      : sayRaise.money === null
+        ? pitchRaiseText(sayRaise) || "money"
+        : compactMoneyText(sayRaise.money);
   // R2: with the one raise read, the line says exactly the card's words.
   const viewWords =
     overview?.raiseView === undefined
@@ -583,6 +592,19 @@ export function CompanyProfileView({
                   title="The raise"
                   summary={raiseSummary}
                 >
+                  {pitchOnly ? (
+                    // A figure from the pitch with no round details shared:
+                    // say both halves plainly, so "$4M" and "not shared"
+                    // never read as a contradiction (founder, 2026-10-11).
+                    <p
+                      className="cq-body-sm text-(--cq-text-secondary)"
+                      data-raise-explainer="PITCH_ONLY"
+                    >
+                      {own
+                        ? "Investors who can watch your pitch see the amount you say in it, marked as your own statement. Your round details on Capital Q (amount, instrument, terms) stay private until you share them."
+                        : `${profile.canonicalName} says in its pitch video that it is raising ${sayRaiseAmount}. That is the company's own statement; nothing on Capital Q confirms it yet. The company hasn't shared its round details (amount, instrument, terms) with you.`}
+                    </p>
+                  ) : null}
                   {sayRaise === null ? null : (
                     <PitchQuote
                       claim={sayRaise}
@@ -594,15 +616,17 @@ export function CompanyProfileView({
                       // The raise is founder-private until shared with this
                       // reader; "not shared" never says whether one exists.
                       [
-                        overview.raise === null && sayRaise !== null
-                          ? "Raise on Capital Q"
-                          : "Raising",
+                        pitchOnly ? "Round details" : "Raising",
                         overview.raise !== null ? (
                           moneyText(overview.raise)
                         ) : own ? (
                           <AddYourRaise />
                         ) : diligence === null ? (
-                          "Not shared with you"
+                          pitchOnly ? (
+                            "Not shared with you yet"
+                          ) : (
+                            "Not shared with you"
+                          )
                         ) : (
                           <NotSharedYet href={diligence.href} />
                         ),

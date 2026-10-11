@@ -39,8 +39,8 @@ type RaiseView = {
 };
 
 const LABEL: Record<RaiseView["source"], string> = {
-  DISCLOSED_OBJECTIVE: "Disclosed raise",
-  PITCH_CLAIM: "From their pitch",
+  DISCLOSED_OBJECTIVE: "Declared by the company",
+  PITCH_CLAIM: "Said in their pitch",
   NONE: "Not shared with you",
 };
 
@@ -114,7 +114,7 @@ async function raiseOnScreen(scope: ReturnType<Page["locator"]>) {
     exact:
       (await amount.count()) === 0 ? null : await amount.getAttribute("title"),
     // The figure as shown; the profile also links the label to the pitch
-    // moment ("From their pitch, 0:06"), which the card does not carry.
+    // moment ("Said in their pitch, 0:06"), which the card does not carry.
     shown: (await amount.count()) === 0 ? null : await amount.innerText(),
     text: (await fact.innerText()).replace(/\s+/gu, " ").trim(),
   };
@@ -217,7 +217,7 @@ for (const key of ["mizan", "disclosed", "neither"] as const) {
       // The private objective's figure appears only if the pitch says the same.
       if (view.money?.amount !== db.amount)
         expect.soft(card.text).not.toContain(moneyText(db.amount, db.currency));
-      expect.soft(card.text).not.toContain("Disclosed raise");
+      expect.soft(card.text).not.toContain("Declared by the company");
     }
 
     const run = await runQ(
@@ -254,7 +254,7 @@ test("B other tenant: a founder of another company sees nothing of the Mizan-sha
   const body = await page.locator("body").innerText();
   await page.context().close();
   expect.soft(body).not.toContain(privateWords);
-  expect.soft(body).not.toContain("Disclosed raise");
+  expect.soft(body).not.toContain("Declared by the company");
 
   const run = await runQ(
     CAST.otherFounder,

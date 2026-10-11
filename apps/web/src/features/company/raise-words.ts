@@ -33,12 +33,15 @@ export function raiseWords(view: CompanyRaiseView, own: boolean): RaiseWords {
     amount: compactMoneyText(view.money),
     exact: moneyText(view.money),
     label:
+      // Plain words an investor reads at a glance: where the figure came
+      // from, never "verified". A pitch figure is what they said on video;
+      // a declared one is what the company entered on Capital Q.
       view.source === "PITCH_CLAIM"
         ? own
-          ? "From your pitch"
-          : "From their pitch"
+          ? "Said in your pitch"
+          : "Said in their pitch"
         : own
           ? "Your raise"
-          : "Disclosed raise",
+          : "Declared by the company",
   };
 }

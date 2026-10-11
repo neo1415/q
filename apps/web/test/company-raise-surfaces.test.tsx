@@ -133,9 +133,26 @@ function cardWords(view: CompanyRaiseView): string {
   return words;
 }
 
-function profileWords(view: CompanyRaiseView): string {
+const PITCH_RAISE_CLAIM = {
+  kind: "RAISE",
+  statement: "We're raising four million dollars to scale.",
+  pitchId: PITCH_ID,
+  pitchTitle: null,
+  atSeconds: 43,
+  money: { amount: "4000000", currency: "USD" },
+  stageCode: null,
+  instrument: null,
+  truthClass: "USER_CLAIM",
+  evidenceStatus: "SELF_REPORTED",
+  source: "PITCH_VIDEO",
+} as const;
+
+function renderProfile(
+  view: CompanyRaiseView,
+  viewer: CompanyProfileDto["viewer"] = "INVESTOR",
+): void {
   const profile: CompanyProfileDto = {
-    viewer: "INVESTOR",
+    viewer,
     companyId: COMPANY_ID,
     canonicalName: "Tensorgate",
     shortDescription: "Provenance for model outputs.",
@@ -153,7 +170,7 @@ function profileWords(view: CompanyRaiseView): string {
       organisationVerified: false,
       facts: [],
       pitchClaims: [],
-      raiseFromPitch: null,
+      raiseFromPitch: view.source === "PITCH_CLAIM" ? PITCH_RAISE_CLAIM : null,
       pitchRaiseNotice: null,
       deck: null,
       team: [],
@@ -170,6 +187,10 @@ function profileWords(view: CompanyRaiseView): string {
       sectorLabels={[]}
     />,
   );
+}
+
+function profileWords(view: CompanyRaiseView): string {
+  renderProfile(view);
   const fact = document.querySelector(
     "[data-profile-key-facts] [data-raise-fact]",
   );
@@ -210,13 +231,44 @@ describe("R2: Discover and the profile say the same raise to the same reader", (
   });
 
   it("labels a pitch claim as the company's pitch, never as a disclosed raise", () => {
-    expect(cardWords(PITCH)).toBe("PITCH_CLAIM|$4M|From their pitch");
+    expect(cardWords(PITCH)).toBe("PITCH_CLAIM|$4M|Said in their pitch");
     expect(cardWords(DISCLOSED)).toBe(
-      "DISCLOSED_OBJECTIVE|$5M|Disclosed raise",
+      "DISCLOSED_OBJECTIVE|$5M|Declared by the company",
     );
     expect(cardWords(NONE)).toBe("NONE||Not shared with you");
-    expect(profileWords(PITCH).split("#")[1]).toBe("$4M · From their pitch");
-    expect(profileWords(DISCLOSED).split("#")[1]).toBe("$5M · Disclosed raise");
+    expect(profileWords(PITCH).split("#")[1]).toBe("$4M · Said in their pitch");
+    expect(profileWords(DISCLOSED).split("#")[1]).toBe(
+      "$5M · Declared by the company",
+    );
     expect(profileWords(NONE).split("#")[1]).toBe("Not shared with you");
+  });
+});
+
+describe("a pitch figure and unshared round details never read as a contradiction", () => {
+  it("explains to the investor what was said and what is not shared", () => {
+    renderProfile(PITCH);
+    const fold = document.querySelector('[data-overview-fold="company-raise"]');
+    const explainer = fold?.querySelector("[data-raise-explainer]");
+    expect(explainer?.textContent).toContain(
+      "Tensorgate says in its pitch video that it is raising $4M",
+    );
+    expect(explainer?.textContent).toContain("nothing on Capital Q confirms");
+    expect(explainer?.textContent).toContain("hasn't shared its round details");
+    // The old row read "$4M" above "Raise on Capital Q · Not shared".
+    expect(fold?.textContent).not.toContain("Raise on Capital Q");
+    expect(fold?.textContent).toContain("Round details");
+  });
+
+  it("has no explainer when the company declared its raise", () => {
+    renderProfile(DISCLOSED);
+    expect(document.querySelector("[data-raise-explainer]")).toBeNull();
+  });
+
+  it("tells the owner what investors see, in their own words", () => {
+    renderProfile(PITCH, "OWNER");
+    const explainer = document.querySelector("[data-raise-explainer]");
+    expect(explainer?.textContent).toContain(
+      "Investors who can watch your pitch see the amount you say in it",
+    );
   });
 });
