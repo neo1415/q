@@ -180,7 +180,14 @@ export function routeMeetingTurn(input: BrainInput): BrainRoute {
       sourceRefs: [input.lineRef],
     };
   }
-  if (isWhereWeAre(text)) {
+  // With nothing on the record the transcript may still hold what was
+  // agreed (the code reader is narrow), so the model answers from it.
+  if (
+    isWhereWeAre(text) &&
+    memory
+      .effective()
+      .some((e) => e.kind !== "QUESTION" && e.kind !== "SUMMARY")
+  ) {
     return {
       kind: "SAY",
       why: "WHERE_WE_ARE",
