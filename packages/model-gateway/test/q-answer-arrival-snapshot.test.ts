@@ -30,6 +30,7 @@ import {
   arrivalFollowUpAnswer,
 } from "../src/q/arrival-answer.js";
 import { arrivalSnapshotFact } from "../src/q/arrival-fact.js";
+import { dailyFollowUpAnswer } from "../src/q/daily-follow-up.js";
 import {
   createModelGatewayQAnswer,
   type QTurnSkimmer,
@@ -981,5 +982,44 @@ describe("P4: quiet-day Daily follow-ups run by code (no model, no tool)", () =>
     expect(fact?.statement).toContain("Paystack Labs");
     expect(fact?.statement).toContain(`/daily/${EDITION}#story-s1`);
     expect(fact?.statement).toContain("Nothing is waiting on them");
+  });
+});
+
+describe("Daily follow-ups after two stories (live 2026-10-11)", () => {
+  const welcome = [
+    "Good morning. Two stories from the 9 October Daily: Lagos fintech Paystack Labs raises $20 million, and Nigeria cuts fintech licence fees. Want the gist of either?",
+  ];
+
+  it("a gist of two stories speaks the first and names the other", () => {
+    const reply = dailyFollowUpAnswer("give me the gist", QUIET, welcome);
+    expect(reply?.text).toMatch(
+      /^Lagos fintech Paystack Labs raises \$20 million/u,
+    );
+    expect(reply?.text).toContain(
+      "The other story was Nigeria cuts fintech licence fees",
+    );
+    expect(reply?.itemKey).toBe("daily:s1");
+  });
+
+  it("'open it' after that gist opens the story just summarised", () => {
+    const gist = dailyFollowUpAnswer("give me the gist", QUIET, welcome);
+    const open = dailyFollowUpAnswer("take me to the story", QUIET, [
+      ...welcome,
+      gist?.text ?? "",
+    ]);
+    expect(open?.open).toEqual({
+      page: "DAILY_EDITION",
+      id: EDITION,
+      anchor: "story-s1",
+    });
+  });
+
+  it("a bare 'the second one' picks that story's gist", () => {
+    const reply = dailyFollowUpAnswer("the second one", QUIET, welcome);
+    expect(reply?.text).toMatch(/^Nigeria cuts fintech licence fees/u);
+  });
+
+  it("an ordinal about something else is not a Daily reply", () => {
+    expect(dailyFollowUpAnswer("the first company", QUIET, welcome)).toBeNull();
   });
 });

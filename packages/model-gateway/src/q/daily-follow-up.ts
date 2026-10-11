@@ -86,6 +86,17 @@ function referentOf(
   }
   if (pool.length === 0) return { kind: "NONE" };
   const ordinal = storyOrdinal(text);
+  // Q's last line was one story's gist, which opens with its headline:
+  // "open it" / "that section" means that story, not "which one?"
+  // (live 2026-10-11).
+  if (pool.length > 1 && ordinal === null && last !== undefined) {
+    const lead = pool.find((story) =>
+      last
+        .toLowerCase()
+        .startsWith(spokenHeadline(story.headline).toLowerCase()),
+    );
+    if (lead !== undefined) return { kind: "ONE", story: lead };
+  }
   if (pool.length > 1 && ordinal !== null) {
     const picked = pool[ordinal === 1 ? pool.length - 1 : 0];
     if (picked !== undefined) return { kind: "ONE", story: picked };
@@ -124,19 +135,32 @@ export function dailyFollowUpAnswer(
   qMessages: readonly string[],
 ): ArrivalReply | null {
   if (snapshot === null || snapshot.daily.length === 0) return null;
-  const kind = dailyFollowUpKind(text);
+  // "the first one" / "the other one", said in reply to two stories Q
+  // named, picks that story and hears its gist (live 2026-10-11: the
+  // bare ordinal fell to the analyst).
+  const bareOrdinal =
+    storyOrdinal(text) !== null &&
+    text.trim().split(/\s+/u).length <= 5 &&
+    !/\b(?:compan|investor|deal|meeting|card)/iu.test(text);
+  const kind = dailyFollowUpKind(text) ?? (bareOrdinal ? "GIST" : null);
   if (kind === null) return null;
   const referent = referentOf(text, snapshot, qMessages);
   if (referent.kind === "NONE") return null;
   if (referent.kind === "MANY") {
     const names = referent.stories.map((one) => spokenHeadline(one.headline));
     if (kind === "GIST") {
+      const [first, ...others] = referent.stories;
+      if (first === undefined) return null;
+      const other = others[0];
       return {
-        itemKey: `daily:${referent.stories.map((one) => one.storyId).join("+")}`,
-        text: referent.stories
-          .map((one) => dailyGistWords(one).replace(/ Want more.*$/u, ""))
-          .join(" ")
-          .concat(" Want more on either, or shall I open one?"),
+        itemKey: `daily:${first.storyId}`,
+        text: dailyGistWords(first)
+          .replace(/ Want more.*$/u, "")
+          .concat(
+            other === undefined
+              ? " Want more, or shall I open it?"
+              : ` The other story was ${spokenHeadline(other.headline)}. Want that one, or shall I open this one?`,
+          ),
       };
     }
     return {

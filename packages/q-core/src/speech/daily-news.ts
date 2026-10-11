@@ -147,11 +147,12 @@ export function dailyFollowUpKind(text: string): DailyFollowUpKind | null {
   return null;
 }
 
-function attribution(story: DailyNewsStory): string {
+function attribution(story: DailyNewsStory, body: string): string {
   const publisher = story.sources[0]?.publisher;
-  return publisher === undefined || publisher.length === 0
-    ? ""
-    : ` According to ${publisher}.`;
+  if (publisher === undefined || publisher.length === 0) return "";
+  // "TechCrunch reports that ... According to TechCrunch." said it twice.
+  if (body.toLowerCase().includes(publisher.toLowerCase())) return "";
+  return ` According to ${publisher}.`;
 }
 
 function sentence(text: string): string {
@@ -161,13 +162,13 @@ function sentence(text: string): string {
 
 /** The gist, spoken: the headline for reference and the prepared summary. */
 export function dailyGistWords(story: DailyNewsStory): string {
-  return `${spokenHeadline(story.headline)}. ${sentence(story.summary)}${attribution(story)} Want more, or shall I open it?`;
+  return `${spokenHeadline(story.headline)}. ${sentence(story.summary)}${attribution(story, story.summary)} Want more, or shall I open it?`;
 }
 
 /** More: the prepared opening paragraphs (the summary when there is no more). */
 export function dailyMoreWords(story: DailyNewsStory): string {
   const body = story.detail ?? story.summary;
-  return `${spokenHeadline(story.headline)}. ${sentence(body)}${attribution(story)} Shall I open it?`;
+  return `${spokenHeadline(story.headline)}. ${sentence(body)}${attribution(story, body)} Shall I open it?`;
 }
 
 /** "the first one" / "the second" / "the other": 0, 1 or null. */

@@ -460,3 +460,29 @@ export function cardsLaneOf(
   if (request === null) return null;
   return { said: cardsLineOf(request), intent: cardsIntentOf(request) };
 }
+
+/**
+ * A follow-up that can only mean a Q Daily story ("give me the gist",
+ * "what's the full story", "show me that section"), answered by code from
+ * the arrival snapshot's prepared stories without the first reads (live
+ * 2026-10-11: two classification calls, ~2.5 s, before a code answer).
+ * Vague words ("open it", "tell me more") still go through the reader:
+ * they can mean a card or a document.
+ */
+const DAILY_ONLY =
+  /\b(?:(?:the\s+)?gist|full\s+story|(?:that|this|the)\s+(?:story|article|section|news)|q\s+daily)\b/iu;
+
+export function dailyLaneOf(utterance: string): FastLane | null {
+  const text = utterance.trim();
+  if (text.length === 0 || text.length > 120) return null;
+  if (!DAILY_ONLY.test(text)) return null;
+  // A request to act on something else is not a Daily follow-up.
+  if (
+    /\b(?:draft|email|send|schedule|delete|approve|decline|deck|pitch)\b/iu.test(
+      text,
+    )
+  ) {
+    return null;
+  }
+  return { questionKind: "DAILY_FOLLOW_UP" };
+}

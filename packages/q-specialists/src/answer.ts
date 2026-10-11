@@ -91,6 +91,7 @@ import {
   lastShownEntityId,
   type PreparedFollowUpPort,
   investorDiscoveryLaneOf,
+  dailyLaneOf,
   type KnownEntityMatcher,
 } from "./fast-lane.js";
 
@@ -2333,7 +2334,8 @@ export function createSpecialistQAnswer(
     (dependencies.knownEntities === undefined
       ? null
       : knownEntityLaneOf(utterance, dependencies.knownEntities)) ??
-    investorDiscoveryLaneOf(utterance);
+    investorDiscoveryLaneOf(utterance) ??
+    dailyLaneOf(utterance);
 
   /** A follow-up about a prepared entity, composed by code; null if none. */
   const preparedFollowUpOf = (
