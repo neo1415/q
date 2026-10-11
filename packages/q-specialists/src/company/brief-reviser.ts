@@ -33,8 +33,8 @@ import {
  * nothing — the artifact application service does that, after this has
  * returned.
  *
- * What it is given is deliberately thin: the document's own headings and
- * prose, and the person's instruction. There is no company record in the
+ * What it is given is deliberately thin: the document's own headings,
+ * prose and read-only gap list, and the person's instruction. There is no company record in the
  * prompt, so there is nothing in it to draw a new claim from, and every
  * rewritten body is checked against the record's figures before it is
  * accepted. A revision that tried to add traction produces the original
@@ -64,6 +64,14 @@ export type BriefReviser = {
  * its slides by number and its current look. Nothing else.
  */
 function renderDocument(content: QArtifactContent): string {
+  // The artifact's canonical gaps already render separately from prose.
+  // Show them to the writer as read-only data, retaining that single source.
+  const gaps =
+    content.gaps.length === 0
+      ? ""
+      : `\n\nREAD-ONLY EVIDENCE GAPS\nThese already render in the document's separate Evidence gaps section. They are not section bodies to rewrite or new claims to add.\n${content.gaps.map((gap) => `- ${gap}`).join("\n")}`;
+  const withGaps = (document: string) =>
+    `${document.slice(0, 40_000 - gaps.length)}${gaps}`;
   const prose = content.sections
     .map((section) => `## ${section.heading}\n${section.body}`)
     .join("\n\n");
@@ -74,7 +82,7 @@ function renderDocument(content: QArtifactContent): string {
       page === undefined
         ? ""
         : `\n\nLook:${page.background === undefined ? "" : ` page background ${page.background}`}${page.ink === undefined ? "" : `, text ${page.ink}`}${page.accent === undefined ? "" : `, accent ${page.accent}`}`;
-    return `${prose}${look}`.slice(0, 40_000);
+    return withGaps(`${prose}${look}`);
   }
   const slides = deck.slides
     .map((slide, index) =>
@@ -86,7 +94,7 @@ function renderDocument(content: QArtifactContent): string {
     )
     .join("\n");
   const look = `Look: ${deck.direction}${deck.accent === undefined ? "" : `, accent ${deck.accent}`}${deck.background === undefined ? "" : `, page background ${deck.background}`}${deck.ink === undefined ? "" : `, text ${deck.ink}`}${deck.cover === undefined ? "" : `, cover ${deck.cover.background.join(" to ")}${deck.cover.titleInk === undefined ? "" : `, title ${deck.cover.titleInk}`}`}`;
-  return `${prose}\n\n# SLIDES\n${slides}\n\n${look}`.slice(0, 40_000);
+  return withGaps(`${prose}\n\n# SLIDES\n${slides}\n\n${look}`);
 }
 
 /**

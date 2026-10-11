@@ -4,6 +4,12 @@
 workforce, company specialist, artifact service and document worker. It creates
 no second agent platform, document registry or business service.
 
+## Correction and new priority — 2026-10-11 18:28 UTC
+
+After exact green `c950e29b` reached all four services, the same workforce ONE_PAGER revised to actual READY version 2 with version 1 preserved. Live viewer and changed one-page PDF pass; all three findings and nine gaps remain identical. The earlier sections-array check incorrectly overlooked the existing separate gap section, rendered from canonical `content.gaps`. The requested exact label differs from its existing “What isn't on record yet” label; a locally tested packet aligns viewer/PDF to “Evidence gaps” and gives the writer read-only gap context, without duplicating gap state.
+
+The founder's new October 12 demo override pauses broader document expansion. Preserve this working initial job/render/export/revision path. Intelligent autonomous research, writing, design and critique remain unfinished and return after investor demo readiness; durable aggregate paid-job reservations remain required.
+
 ## Current live acceptance — 2026-10-11 17:35 UTC
 
 The existing conversation proposal and Approval Engine produced/approved one private DOCUMENTS step: OWN_COMPANY/PREPARE/ONE_PAGER, only documents.own.prepare, $0.50 approved ceiling. The real agent remained RUNNING during observed PREPARING/version zero/no version row, and reached DONE only with actual READY/version one. Authenticated artifact read, existing viewer render and canonical export passed; the PDF has one A4 page. Content retains three USER_CLAIM findings, nine gaps, and a passing existing audit. Raw content/identifiers remain private.

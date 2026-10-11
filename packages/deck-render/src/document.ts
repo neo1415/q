@@ -426,7 +426,7 @@ export async function documentToPdf(
   }
 
   if (document.gaps.length > 0) {
-    heading("What isn't on record yet");
+    heading("Evidence gaps");
     for (const gap of document.gaps) {
       const lines = wrapWith(fonts.regular, gap, 10.5, width - 16);
       lines.forEach((line, index) => {
