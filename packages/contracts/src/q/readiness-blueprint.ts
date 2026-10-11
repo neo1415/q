@@ -45,7 +45,8 @@ export type ReadinessBlueprintRequest = z.infer<
 >;
 
 /**
- * The InvestIQ pillar a step serves (PADL's nine pillars). Investment
+ * The legacy founder-readiness pillar a step serves; these eight pillars
+ * are distinct from InvestIQ's Core Seven (Locked PADL Chapter 4 #63). Investment
  * Fit is per investor and lives in the investor plans, not the roadmap.
  */
 export const BLUEPRINT_PILLARS = [
