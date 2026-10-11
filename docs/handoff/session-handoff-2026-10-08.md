@@ -1,3 +1,5 @@
+> **Historical (superseded 2026-10-11).** Current state, tasks and instructions: [`docs/ai-handoff/START-HERE.md`](../ai-handoff/START-HERE.md). Kept for history; verify any operational instruction here against `docs/ai-handoff/LEGACY-RECONCILIATION.md`.
+
 # Session handoff, 8 October 2026 (11:20 UTC)
 
 The founder ("Zino") asked for a fresh session to take over **every complaint, including those the previous session believed it had solved**. Treat every item below as **open until you verify it live yourself**: in production, as the right user, from logs, the database or a real browser. The founder's repeated feedback is that the previous session declared things done from unit tests and local builds while the live product still failed. Don't repeat that.

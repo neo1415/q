@@ -1,0 +1,87 @@
+# Capital Q — Current shared engineering state
+
+> Shared by Claude Code and Codex. Update at the start and end of every substantial session.
+> Evidence words: CODE OBSERVED · IMPLEMENTED · MERGED · LOCAL TESTED · CI GREEN · DEPLOYED · LIVE VERIFIED · BLOCKED.
+> A recorded SHA is a snapshot; re-check Git and Railway before trusting it.
+
+## Snapshot — 2026-10-11 ~13:30 UTC (Claude Code, final Claude-led session)
+
+### Repository
+
+- Repo: `neo1415/q`. Integration checkout used by the Claude lead: `/home/user/q-int` on local branch `int-rc`.
+- HEAD: `b021d53b587ef1583fea57f999905f3bf5331ca8`, "fix(q): a bare ordinal from the Daily lane reaches the Daily answer". The handoff-docs commit sits on top of it; see `HANDOFF-LOG.md`.
+- Branch roles:
+
+  | Branch                       | Role                                                              | Head at snapshot |
+  | ---------------------------- | ----------------------------------------------------------------- | ---------------- |
+  | `build/int-rc`               | integration branch (merge work here first)                        | `b021d53b`       |
+  | `recovery/2026-09-12-8y2j4w` | CI branch (push here to run `.github/workflows/ci.yml`)           | `b021d53b`       |
+  | `recovery/2026-09-12`        | **deploy branch**; Railway auto-deploys all four services on push | `b021d53b`       |
+  | `main`                       | stale (`b539180c`); **do not rebase onto it**                     | —                |
+  | `build/agent-autonomy`       | old (Oct 7); already an ancestor of HEAD (merged)                 | `234ba8b3`       |
+
+- Every `build/*` worker branch from this period is merged into HEAD (checked with `git merge-base --is-ancestor`). The list: a-research, b-rehearse-access, c-meeting-host, d-meeting-brain, d1-discover, e-daily, f-cards, g-gold, n2-deck-tabs, r5-rehearse, v2-qatar, r1-fix, r5-run-trips, r3-fix2, w4-fix3, k6-fast, r2-company, k5-instant, k2-fix, w1-fix3, agent-autonomy.
+- Worktrees under `/home/user/q-w-*` and `/home/user/q/.claude/worktrees/*` are in the ephemeral cloud container only, all clean and merged. They are disposable and nothing in them is unpushed.
+- Working tree at HEAD: clean apart from the handoff docs being committed.
+
+### Deployment (Railway) — DEPLOYED, revision checked through the Railway API
+
+| Service                  | Serving commit | Since (UTC)      | Notes                                                  |
+| ------------------------ | -------------- | ---------------- | ------------------------------------------------------ |
+| web (Next.js 16)         | `b021d53b`     | 2026-10-11 12:22 | europe-west4; calls api/q-api over the private network |
+| api (Fastify)            | `b021d53b`     | 2026-10-11 12:22 |                                                        |
+| q-api (Q runtime, voice) | `b021d53b`     | 2026-10-11 12:22 |                                                        |
+| workers                  | `b021d53b`     | 2026-10-11 12:22 |                                                        |
+
+- Public URLs:
+  - web: `https://capital-qweb-production.up.railway.app`
+  - api: `https://capital-qapi-production.up.railway.app`
+  - q-api: `https://capital-qq-api-production.up.railway.app`
+- Railway project `9e615d28-7db0-406e-a415-c5118a275427`, environment `f7e5768d-56e6-4ee3-be29-c38172b3114c`. These are identifiers, not secrets.
+- The web service uses `CQ_API_INTERNAL_URL` and `CQ_Q_API_INTERNAL_URL` for private networking. **Vercel is NOT used** (CLAUDE.md and ADR 0001 text that says otherwise is superseded).
+- The Railway service health logs for q-api, api and workers on this revision showed no warn or error lines at the time of the snapshot.
+
+### Database (hosted Supabase, eu-central-1)
+
+- Migrations: **200 local = 200 hosted; none missing; none extra**, checked with `scripts/handoff/hosted-migrate-https.mjs`.
+- Newest migrations, all applied:
+  - `20261222110000` qatar_five_source_status_and_enrichment
+  - `20261222120000` demo_rehearsal_access
+  - `20261222130000` communication_meeting_time_proposals
+  - `20261222140000` communication_meeting_events
+
+### CI
+
+- CI run #307 on `b021d53b`: **success** (quality: format, lint, typecheck, test, build; pgTAP database job). The e2e job is manual and was not run.
+- One earlier red run (`16428c22`) was a GitHub runner port clash while Docker was starting, not a test failure.
+
+### Active agents / leases at handoff
+
+- No Claude coding worker is editing any branch.
+- Three read-only documentation workers produced drafts for this handoff and wrote nothing to the repo.
+- **Nothing is racing Codex.** Codex owns all branches from the next commit on.
+
+### Live verification evidence (2026-10-11, production, `b021d53b` or its parent build)
+
+See `ACTIVE-TASKS.md` for each workstream. Summary:
+
+- LIVE VERIFIED:
+  - Qatar Five identity and follow-ups (0 model calls).
+  - The 24×5=120 founder rehearsal page matrix.
+  - Clear/restore cards in a browser.
+  - Scheduling PROPOSED→INVESTOR_REVIEW→COUNTERPROPOSED→DECLINED, with founder self-confirm refused (403).
+  - Q Daily gist / "the other one" / open exact story (API).
+  - Public gold pages in light/dark/system.
+  - Voice navigation resolver p50 0 ms / p95 2 ms server-side.
+- NOT live verified:
+  - Real meetings (one-party, two-party).
+  - Spoken rehearsal sessions and first-audio latency.
+  - Investor-accept → CONFIRMED booking.
+  - Quiet-day welcome in a browser (no truly quiet onboarded demo account exists).
+  - Gold VERIFIED badge on a real verified account.
+  - Live GPT-Live voice navigation in a browser session.
+
+### Known environment facts for the next operator
+
+- The cloud sandbox reaches the internet only over HTTPS through a proxy (`NODE_USE_ENV_PROXY=1` for Node fetch). Direct Postgres (5432/6543) from the sandbox times out; use the Supabase management API scripts.
+- The session-environment value of `SUPABASE_ACCESS_TOKEN` became invalid on 2026-10-11. A replacement token was supplied out of band and must live only in a secret store. See `START-HERE.md` → Credentials (names only).

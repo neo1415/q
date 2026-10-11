@@ -1,0 +1,295 @@
+Capital Q + GateQProduct Feature Specification
+Working product document for software development
+Product architecture: GateQ is the intelligent inbound layer: it receives, structures, interviews, evaluates, ranks and routes applications. Capital Q is the intelligent outbound and investment-relationship layer: it helps investors discover companies and helps founders become discoverable, understood, matched and progressed toward funding. Together, they form one investment intelligence system.
+Status: PARTIALLY VERIFIED. This document consolidates features already discussed and agreed in prior Capital Q and GateQ product conversations. A small number of connective features are framed as logical product requirements where necessary to make the combined workflow coherent; these should be validated before engineering scope is locked.
+Product | Primary Job | Core Direction
+GateQ | Inbound intelligence | Receive → Standardise → Analyse → Interview → Evaluate → Rank → Prioritise → Route
+Capital Q | Outbound intelligence and investment journey | Discover → Understand → Match → Compare → Connect → Decide → Progress
+Combined System | Investment intelligence infrastructure | One company, one intelligence layer, two complementary entry points
+# PART I — GateQ Features
+GateQ's role: the intelligent front door for inbound applications, deal flow and other high-volume submissions.
+## 1. Embeddable Investment Gateway
+What it is. A branded application gateway that an investor, fund, accelerator or organisation can place on its website or share as a direct link or QR code.
+How it works. The organisation configures its gateway and publishes it across its website, email, social channels, events or other touchpoints. Founders enter through one consistent application experience instead of sending unstructured material across multiple channels.
+Objective. Create one controlled entry point for all inbound opportunities and eliminate fragmented deal-flow intake.
+Product note. The gateway should ultimately support white-label branding and organisation-specific configuration.
+## 2. Application and Pitch-Deck Intake
+What it is. A structured submission flow for pitch decks, applications, referrals and supporting materials.
+How it works. Founders upload documents and provide core information about the company, team, market, traction, business model, fundraising and financials. GateQ extracts and organises the information into a standard company record.
+Objective. Turn messy inbound submissions into structured, comparable investment data before an investment team spends time reviewing them.
+## 3. Automatic Information Extraction
+What it is. An intelligence layer that reads submitted documents and identifies the key information investors normally need.
+How it works. The system extracts relevant fields from decks and supporting materials, maps them into the company profile, flags missing information and identifies contradictions or areas requiring clarification.
+Objective. Reduce manual data entry and make every application easier to analyse and compare.
+## 4. Standardised Application Profile
+What it is. A consistent investment profile generated from each inbound submission.
+How it works. Regardless of how a founder originally presents the company, GateQ converts the information into the same core structure covering founder, team, market, product, traction, business model, fundraising, financials and other relevant investment fields.
+Objective. Allow investment teams to compare companies on a like-for-like basis instead of interpreting a different pitch format every time.
+## 5. Investor Thesis and Screening Criteria Setup
+What it is. A configuration layer where each investor defines what it is looking for.
+How it works. The investor can specify criteria such as sector, geography, stage, cheque size, traction, revenue, founder profile, impact requirements, business model and other mandate-specific factors. GateQ uses these criteria throughout screening, matching and prioritisation.
+Objective. Ensure that every application is evaluated against the investor's actual mandate rather than a generic startup score.
+## 6. Initial AI Application Analysis
+What it is. An automated first-pass assessment of every application.
+How it works. GateQ analyses the submitted information for strengths, concerns, gaps, inconsistencies, commercial signals, traction, readiness and fit with the investor's criteria. The analysis becomes the basis for deeper questioning and scoring.
+Objective. Give the investment team a useful first view of the opportunity before human review.
+## 7. Adaptive Founder Intelligence Interview
+What it is. A conversational interview that questions the founder after the initial application and document review.
+How it works. GateQ asks investor-style questions and dynamically generates follow-up questions based on the founder's previous answers, submitted documents and identified information gaps. It can probe unclear claims, investigate inconsistencies and go deeper where the business requires more explanation.
+Objective. Conduct the 'interview before the interview' so that investors receive richer information before committing partner or analyst time.
+## 8. Evidence and Claim Validation
+What it is. A feature that separates founder claims from the evidence supporting them.
+How it works. When a founder states traction, revenue, partnerships, pilots, customers or other material facts, GateQ can request supporting information or documentation and mark whether the claim is supported, incomplete or still unverified.
+Objective. Improve the quality of investment information and reduce decisions based only on polished storytelling.
+Product note. This should support human judgment, not present AI validation as a substitute for formal due diligence.
+## 9. Missing Information Detection
+What it is. A system that identifies what the investor still needs to know.
+How it works. GateQ reviews the application, interview and documents and generates a list of unanswered questions, missing documents and weakly supported areas. These gaps can trigger additional founder questions or be surfaced to the investment team.
+Objective. Prevent incomplete applications from appearing complete and help investors know exactly what requires further work.
+## 10. Investment Thesis Match
+What it is. A company-to-investor fit assessment.
+How it works. GateQ compares the company against the investor's configured mandate and produces a thesis-match assessment, including the factors driving the match and the factors reducing it.
+Objective. Help investors quickly understand not only whether a company fits, but why it fits or does not fit.
+## 11. Investment Intelligence Scoring
+What it is. A structured scoring system for each inbound company.
+How it works. The system can generate scores across investment readiness, thesis match, founder assessment, commercial strength, growth and traction, risk, missing information and overall investment priority. Scores should be accompanied by explanations and evidence rather than shown as unexplained numbers.
+Objective. Create a consistent decision-support framework across a large volume of applications.
+## 12. Ranking and Prioritisation
+What it is. A dynamic queue that places the strongest and most relevant applications first.
+How it works. GateQ combines thesis fit, scores, evidence, readiness, risk and other configured signals to rank submissions. Investment teams see the applications that deserve attention first instead of reviewing strictly by arrival date.
+Objective. Move scarce investor attention toward the highest-potential opportunities.
+## 13. Decision Labels and Workflow Status
+What it is. Clear operational labels that show where each application sits in the review process.
+How it works. Applications can be assigned statuses such as Ready for Partner Review, High Priority, Financial Review Required, Follow Up Recommended and No Further Action. Teams can move companies through the workflow as decisions change.
+Objective. Turn GateQ from an analysis tool into a usable investment-team operating queue.
+## 14. Investment Team Dashboard
+What it is. The central workspace for reviewing inbound opportunities.
+How it works. The dashboard displays prioritised applications, key scores, thesis fit, alerts, missing information, founder interview outputs and decision status. Team members can open a company to see the full investment profile and underlying evidence.
+Objective. Give the investment team one place to understand and act on inbound deal flow.
+## 15. AI Investment Associate
+What it is. A conversational intelligence assistant for each company and the overall deal-flow pipeline.
+How it works. An investor can ask questions such as what the company does, why it fits the thesis, what the biggest risks are, how traction compares with claims, or what is still missing. The assistant answers from the company's submitted data, interview responses, financials, documents and captured intelligence.
+Objective. Reduce the time required to interrogate an opportunity and make the accumulated information immediately usable.
+## 16. Application Comparison
+What it is. A side-by-side comparison experience for shortlisted companies.
+How it works. Investors can compare companies using the same standard fields, scores, traction indicators, risks, thesis fit and readiness signals. The comparison can focus on selected companies or a specific investment theme.
+Objective. Make relative decision-making easier when several opportunities are competing for attention.
+## 17. Founder Follow-Up Requests
+What it is. A structured mechanism for requesting additional information from founders.
+How it works. When GateQ or the investment team identifies a gap, the founder receives a clear request for the relevant answer, document or clarification. New information is added back into the company record and can update the analysis.
+Objective. Keep diligence moving without relying on scattered email chains.
+## 18. Decision Feedback Loop
+What it is. A learning layer that records what the investor ultimately did with each application.
+How it works. The system captures outcomes such as passed, progressed, meeting requested, diligence started or invested. Over time, those decisions can help the system understand how the investor actually behaves compared with its stated thesis.
+Objective. Make prioritisation more useful over time and identify mandate drift or hidden investment preferences.
+Product note. Any learning system should remain explainable and configurable by the investor.
+## 19. Integrations and Data Export
+What it is. Connections between GateQ and the tools an investment team already uses.
+How it works. GateQ should be able to pass structured application data, statuses and relevant outputs into CRM, communication, document and workflow systems, while also supporting export where required.
+Objective. Reduce duplicate work and allow GateQ to become infrastructure rather than another isolated software silo.
+## 20. Multi-Vertical Gateway Configuration
+What it is. The longer-term ability to configure the same inbound intelligence engine for other high-volume application environments.
+How it works. The organisation changes the application schema, evaluation criteria, interview logic, scoring and routing rules while the core receive-to-prioritise engine remains the same. This supports use cases such as grants, scholarships, admissions, procurement, recruitment and visa or programme applications.
+Objective. Allow GateQ's core infrastructure to expand beyond investment without rebuilding the product from scratch.
+# PART II — Capital Q Features
+Capital Q's role: the outbound discovery, investment identity, matching and investment-journey layer connecting founders and investors.
+## 1. Living Company Investment Profile
+What it is. A continuously updated investment profile that gives investors a complete view of a company in one place.
+How it works. The profile combines founder information, business overview, pitch video, product demo, traction and KPIs, financials, fundraising details, team, cap table, documents, due-diligence material, updates and AI-generated intelligence. As new information is added, the profile changes rather than remaining a static pitch deck.
+Objective. Replace fragmented pitch materials with a single, current source of investment information.
+## 2. Q Card
+What it is. A portable, compressed investment identity for a company.
+How it works. The Q Card summarises the most decision-relevant information about the company, including what it does, stage, traction, raise, key signals, investment readiness and relevant Q intelligence. It can be shared or surfaced throughout Capital Q as the company's quick investment identity.
+Objective. Make a company understandable in seconds and create a standard investment identity investors can recognise across the ecosystem.
+Product note. The exact fields and public/private permissions should be finalised before engineering.
+## 3. Q Score and Investment Intelligence
+What it is. A structured representation of a company's current investment quality and readiness.
+How it works. Capital Q analyses the company's information across dimensions such as readiness, founder strength, commercial strength, growth and traction, risk, missing information and overall priority. The score should always show the underlying reasons, evidence and areas that can improve.
+Objective. Give founders and investors a common language for understanding investability without pretending that one number determines investment quality.
+## 4. Q Verified / Evidence Status
+What it is. A trust layer showing which important company claims have supporting evidence.
+How it works. Capital Q can distinguish between founder-provided statements, platform-verified information, investor-confirmed information and information that is still unsupported or outdated. Verification can apply to selected metrics, documents or claims rather than implying that the entire company has been fully diligenced.
+Objective. Increase confidence in the information investors see and make the Q Card more credible.
+## 5. Intelligent Investor Search
+What it is. A natural-language search engine for finding relevant companies and opportunities.
+How it works. Investors can describe what they want in normal language using combinations of sector, geography, stage, founder characteristics, traction, ARR or revenue, growth, technology, impact, fundraising amount, readiness and other investment signals. Capital Q translates the request into a structured search across company intelligence.
+Objective. Let investors search for the exact opportunity they want instead of manually filtering large databases.
+## 6. AI Opportunity Recommendations
+What it is. A recommendation engine that proactively surfaces companies aligned with an investor.
+How it works. Capital Q uses the investor's thesis, prior activity, saved preferences and company intelligence to identify potentially relevant businesses. Recommendations explain why each company is being surfaced.
+Objective. Help investors discover strong opportunities they may never have found through their existing network or inbound deal flow.
+## 7. Swipe Discovery
+What it is. A fast, simplified discovery experience for investors.
+How it works. Investors can move through highly compressed company cards or short founder pitch videos, quickly indicating interest or passing. Positive signals can open the full living profile or trigger deeper analysis.
+Objective. Make investment discovery faster and more engaging while keeping serious diligence available behind the simplified interface.
+## 8. Founder Pitch Video / Short-Form Discover
+What it is. A short-form video layer where founders can explain the business directly.
+How it works. Founders upload a concise pitch or elevator-pitch video that appears alongside the structured company intelligence. Investors can discover these videos in a swipeable feed and move directly into the company's Q Card or full profile.
+Objective. Preserve founder personality and storytelling while keeping discovery structured and efficient.
+## 9. Investor Thesis Profile
+What it is. A structured representation of what an investor actually wants to invest in.
+How it works. Investors define sectors, stages, geographies, cheque sizes, business models, founder characteristics, traction expectations, exclusions and other criteria. The profile powers search, matching, recommendations and inbound visibility.
+Objective. Turn vague investment preferences into usable machine-readable criteria.
+## 10. Q Match
+What it is. A bilateral matching engine between founders and investors.
+How it works. Capital Q compares company intelligence with investor thesis data and produces a match assessment showing the strongest points of alignment and any material gaps. Matching can use geography, sector, stage, founder profile, readiness and hundreds of additional investment signals.
+Objective. Focus founders on investors they genuinely fit and focus investors on companies that are relevant to them.
+## 11. Investor Discovery for Founders
+What it is. A founder-facing search and recommendation experience for finding suitable investors.
+How it works. Founders can discover investors whose mandates align with their company, stage, sector, geography, raise and readiness. Capital Q should explain the basis of the match rather than simply producing a long investor directory.
+Objective. Replace indiscriminate investor outreach with targeted fundraising.
+## 12. Investor Visibility Controls
+What it is. Controls that determine how accessible an investor is to founders.
+How it works. An investor can operate in modes such as Open, Gateway or Closed. Open investors can accept direct approaches, Gateway investors require founders to meet defined criteria or pass through an application flow, and Closed investors remain discoverable only to the extent the investor permits.
+Objective. Protect investor attention while still allowing qualified founders to reach the right capital.
+## 13. Intelligent Connection Request
+What it is. A highly compressed, Q-generated introduction card sent when a founder wants to connect with an investor.
+How it works. Instead of sending a generic message, Capital Q prepares a concise overview covering the problem, solution, traction, key metrics, raise and why the company fits that specific investor. The investor can quickly decide whether to engage.
+Objective. Increase response quality while reducing the effort required from both founders and investors.
+## 14. Permissioned Data Room
+What it is. A secure document environment attached to the company's investment profile.
+How it works. Founders can organise diligence documents and grant access at a granular folder or document level. Sensitive information is never broadly exposed by default, and the founder can see the requesting organisation and individual before granting access.
+Objective. Make deeper diligence possible without sacrificing founder control over confidential information.
+## 15. Unified Due-Diligence Workspace
+What it is. A single place where investors can review the structured profile, documents, financial information, Q&A, interview intelligence and diligence materials.
+How it works. Rather than moving between pitch decks, email, cloud folders, spreadsheets and notes, the investor accesses the relevant investment material from the company profile. Permissions determine what each investor can see.
+Objective. Reduce fragmentation and make the investment review process faster and more auditable.
+## 16. AI Founder and Company Q&A
+What it is. A conversational interface that lets investors interrogate a company without manually reading every file.
+How it works. The investor asks questions and Capital Q answers using the founder interview, company profile, financials, traction data, documents and captured intelligence. Answers should cite or point back to the underlying company information where possible.
+Objective. Move the first investor interaction from basic information gathering toward actual investment judgment.
+## 17. Opportunity Comparison
+What it is. A standardised comparison tool for multiple companies.
+How it works. Investors select companies and compare their Q Cards, thesis match, traction, commercial strength, founder signals, readiness, risks and other standardised investment fields. Capital Q can also explain the key differences between the opportunities.
+Objective. Help investors make better relative decisions across companies that would otherwise be difficult to compare.
+## 18. Founder Investment Readiness
+What it is. A founder-facing view of what is weakening or strengthening the company's ability to raise capital.
+How it works. Capital Q analyses the company's current profile and identifies missing information, weak evidence, unclear positioning, diligence gaps and other readiness issues. As founders improve the company profile or upload evidence, the readiness view updates.
+Objective. Help founders become easier to understand, evaluate and fund before they begin broad outreach.
+## 19. Q Signals, Risks and Gaps
+What it is. A concise intelligence layer highlighting what matters most about a company right now.
+How it works. Capital Q surfaces positive signals, material risks, unanswered questions and missing information separately so an investor can understand both the upside and the concerns. The same information helps founders see what investors are likely to challenge.
+Objective. Prevent the product from becoming a promotional directory and keep investment judgment evidence-led.
+## 20. Company Updates and Continuous Intelligence
+What it is. A system for keeping company profiles current after the initial fundraising setup.
+How it works. Founders can add new traction, financials, hires, partnerships, fundraising progress and other material updates. Capital Q updates the living profile, relevant scores, matches and investor-facing signals when the underlying information changes.
+Objective. Ensure investors are making decisions from current information rather than an old pitch deck.
+## 21. Investor Interest Signals
+What it is. A controlled way for founders to understand meaningful investor engagement.
+How it works. Capital Q can capture actions such as profile views, saves, requests for more information, connection acceptance, data-room requests or meeting interest, subject to appropriate privacy rules. The system can distinguish weak engagement from strong intent.
+Objective. Help founders prioritise the investors most likely to progress instead of treating every contact equally.
+Product note. Exact visibility rules require product and privacy decisions before implementation.
+## 22. Fundraising Pipeline
+What it is. A founder-side workspace for managing investor relationships through the raise.
+How it works. Relevant investors can be organised by stage such as identified, matched, contacted, interested, meeting, diligence, passed or committed. Capital Q links each investor relationship back to the investor's thesis, activity and company intelligence.
+Objective. Give founders one clear view of where the raise stands and what action should happen next.
+Product note. This is a logical connective feature for the combined investment journey and should be validated as an MVP or later-phase feature.
+## 23. Meeting Preparation Intelligence
+What it is. A pre-meeting briefing layer for founder-investor conversations.
+How it works. Before a meeting, Capital Q can summarise the company, investor thesis, match rationale, unresolved questions and the areas most likely to matter in the conversation. Each side arrives with more context, reducing time spent repeating basic information.
+Objective. Make meetings more decision-oriented and increase the value of each investor-founder interaction.
+Product note. Detailed meeting behavior remains to be fully specified.
+## 24. Q Meeting Intelligence
+What it is. A proposed capability for Q to participate in or process investor-founder meetings with permission.
+How it works. Where both parties permit it, Q can capture the discussion, identify questions, commitments, concerns, requested materials and next steps, then update the investment relationship record. The purpose is not to replace the meeting but to convert the conversation into usable investment intelligence.
+Objective. Ensure important meeting information is not lost and make the platform more valuable after the meeting than before it.
+Product note. PARTIALLY VERIFIED: the strategic direction has been discussed, but detailed consent, recording, transcription and workflow rules still need to be designed.
+## 25. Post-Meeting Action Engine
+What it is. A proposed workflow that turns meeting outcomes into concrete next actions.
+How it works. After a meeting, Capital Q can generate follow-up items such as send requested documents, answer an investor question, schedule another conversation, update a metric or prepare diligence material. Actions can be tied to the relevant investor and company record.
+Objective. Increase the likelihood that promising investor conversations progress rather than dying because follow-up is inconsistent.
+Product note. PARTIALLY VERIFIED: detailed behavior should be designed with the team before development.
+## 26. Investment Decision and Outcome Tracking
+What it is. A structured record of what happened after discovery, connection and diligence.
+How it works. Investors and founders can capture outcomes such as pass, continue, diligence, term-sheet discussion, committed or invested. These outcomes can improve future matching and help Capital Q understand which signals correlate with real investment progress.
+Objective. Close the intelligence loop from discovery to actual funding outcome.
+## 27. Standardised Investment Intelligence Report
+What it is. A shareable summary of a company's investment profile and analysis.
+How it works. The report can combine investment readiness, thesis match, founder assessment, commercial strength, growth and traction, risk, missing information and overall priority, alongside the evidence behind those assessments.
+Objective. Create a common format for discussing and reviewing investment opportunities across the ecosystem.
+## 28. Capital Q Intelligence Feed
+What it is. An institutional-style feed of relevant company and investment updates.
+How it works. Investors receive material updates from companies and themes they follow, while the separate Discover experience remains focused on fast swipeable opportunity discovery. The feed should prioritise meaningful investment information over social-media-style noise.
+Objective. Keep investors continuously informed without turning Capital Q into a generic social network.
+# PART III — Shared Platform Features
+## 1. Unified Identity and Account System
+What it is. One account architecture for founders, investors, organisations and investment-team members.
+How it works. Users can have different roles and permissions while operating across GateQ and Capital Q without creating disconnected profiles. A founder's inbound GateQ application can become or update the same company's Capital Q living profile.
+Objective. Make GateQ and Capital Q feel like one company and one intelligence system rather than two products stitched together.
+## 2. Shared Investment Intelligence Layer
+What it is. A common data and AI layer used by both inbound and outbound workflows.
+How it works. Information gathered through GateQ applications, interviews and evidence can enrich Capital Q profiles, while Capital Q company updates can keep future GateQ evaluations current where permissions allow. The same core taxonomy and intelligence model should power both products.
+Objective. Create compounding data value and prevent duplicated analysis.
+## 3. Role-Based Permissions
+What it is. A permission system controlling who can view, edit, request or share information.
+How it works. Founders control sensitive company information, investors control their visibility and gateways, and investment organisations control internal team access. Permissions should operate at both account and data-object level.
+Objective. Protect confidential investment information while supporting collaboration.
+## 4. Notifications and Action Centre
+What it is. A central place for important product events and required actions.
+How it works. Users can be notified about qualified matches, information requests, investor interest, application status changes, data-room requests, meeting actions and material company updates. Notifications should be prioritised and non-intrusive rather than constant.
+Objective. Keep users moving through the investment journey without creating notification fatigue.
+## 5. Audit Trail and Activity History
+What it is. A record of important actions taken across an investment relationship.
+How it works. The platform logs material events such as information submissions, permission changes, document access, status changes, meeting outcomes and investment decisions. Users see the history relevant to their role.
+Objective. Create accountability, continuity and institutional memory.
+## 6. Analytics and Reporting
+What it is. Performance analytics for both investors and founders.
+How it works. Investors can understand inbound volume, quality, thesis fit, review speed and funnel outcomes. Founders can understand fundraising activity, match quality, engagement and pipeline progress without exposing inappropriate private investor behavior.
+Objective. Turn platform activity into actionable operating intelligence.
+## 7. API and External Integrations
+What it is. A platform layer allowing Capital Q and GateQ intelligence to connect with external systems.
+How it works. Organisations can integrate structured profiles, applications, scores, statuses and approved intelligence into CRMs, portfolio systems, communication tools and other workflows. Over time, selected Q identity or verification components could also be exposed through APIs.
+Objective. Make the combined product infrastructure that can sit inside the broader investment ecosystem.
+# PART IV — Recommended Product Modules for Engineering
+For development purposes, the feature list above should not be treated as one giant build. The cleanest architecture is to organise the system into reusable modules:
+Identity & Permissions
+Company Profile / Q Card
+Investor Thesis Profile
+GateQ Gateway Builder
+Application & Document Intake
+Data Extraction & Standardisation
+Founder Intelligence Interview
+Investment Intelligence & Scoring
+Matching Engine
+Search & Discovery
+Ranking & Recommendation Engine
+Investor / Founder Q&A
+Data Room & Due Diligence
+Connections & Relationship Pipeline
+Meeting Intelligence
+Notifications & Action Centre
+Decision / Outcome Tracking
+Analytics
+Integrations & API
+# MVP Boundary: Recommended First Build
+INFERENTIAL recommendation. The engineering team should resist trying to build every feature at once. The first combined product should prove the core loop: structured company intelligence → investor criteria → matching → discovery → qualified connection, with GateQ handling inbound and Capital Q handling outbound.
+Unified founder/company and investor accounts
+Living company profile
+Investor thesis profile
+GateQ embeddable gateway
+Pitch deck/application upload and extraction
+Adaptive founder interview
+Investment intelligence report and explainable scores
+Thesis matching
+GateQ ranking/prioritisation dashboard
+Capital Q intelligent search
+Capital Q swipe discovery
+Q Card
+Founder-to-investor match view
+Intelligent connection request
+Basic data room permissions
+Basic relationship status / outcome tracking
+# Features to Design Before Building
+These concepts are strategically important but are not yet specified enough to hand directly to engineering without a product-design session:
+Exact Q Score methodology, weighting and governance
+Exact Q Verified standard and verification authority
+Q Card public/private fields and shareability
+Investor interest visibility and privacy rules
+Full fundraising pipeline behavior
+Q participation in live meetings, consent and recording rules
+Post-meeting action automation
+Outcome-based learning and mandate-drift logic
+Cross-vertical GateQ configuration
+External API products and Q Standard ecosystem
+# Product Principle
+GateQ finds the signal in what comes to the investor. Capital Q finds the right signal across the market. The shared intelligence layer makes both sides smarter.

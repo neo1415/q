@@ -44,3 +44,6 @@ supabase/templates
 # the code-map cache (gitignored), builder worktrees and vendored skills.
 graphify-out
 .claude
+
+# Archived third-party page captures (verbatim; not ours to format).
+docs/product-sources/landing-capture-*/
