@@ -1,5 +1,12 @@
 # Active tasks — authoritative cross-model board
 
+## Next measured product correction — 2026-10-11
+
+- **IMPLEMENTED / LOCAL TESTED:** bounded candidate sweep for explicit counts without place filters, after real top-three Q returned one while the canonical API returned three. Rich top-ten output exceeded the existing tool bound. Original regression fails; corrected 36 fit/card/tool tests passed, final fixture lint correction 10 tests passed, model-gateway dependency build and root/q-api typechecks passed. Release separately after the current document packet gate.
+- **LIVE VERIFIED baseline:** 42 authorized feed profiles contain repeated values but no 8.8. Actual founder company is in that investor feed and its network preview returns 200. Discover browser Ask Q opens and accepts a server action; new-answer timing needs a history-safe check.
+- **OPEN product defects:** named company/mandate question remained investor-scoped and took 23.8 s; private one-page request produced a READY Q_REPORT and ran public research, taking 44.5 s. Neither is complete acceptance. Autonomous typed ONE_PAGER job and conversational revision await gated deployment.
+- **VOICE BLOCKED transport:** real cohort-account session opened (201) but VM WebRTC failed; ended 204. No first audio measured.
+
 ## Current continuation — 2026-10-11
 
 - **DEPLOYED:** first packet `ab962576`, all four Railway services SUCCESS. Live mandate sampling exposed a core-entity/identity-organisation guard mismatch; corrected with distinct-ID regression. No live speedup claim until correction is released and measured.

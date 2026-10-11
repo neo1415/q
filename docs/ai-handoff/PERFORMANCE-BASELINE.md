@@ -64,3 +64,37 @@ early guard incorrectly compared them. Distinct-ID regression reproduces the
 failure; the corrected scope-binding guard awaits release. These samples do
 not establish a speedup or p95. Next samples must record first useful text as
 well as completion, and separately verify usage rows.
+
+## Live continuation at ab962576 — 2026-10-11 15:36 UTC
+
+- Investor Discover initially returned RECOMMENDATIONS_REFRESHING, then 20
+  cards; pagination exposed 42 distinct authorized records. Canonical fit
+  top-three returned three (1,458 ms client); Q's same top-three request
+  returned one (first text 2,911 ms, terminal 3,399 ms). Scoped usage recorded
+  classification 978 ms and extraction 1,492 ms.
+- The Q candidate sweep requested ten rich profiles even for top-three.
+  Reconstructing its envelope from actual authorized top-ten profiles and
+  feed-disclosed raise views exceeded the unchanged 32,000-character tool
+  limit (32,894 characters before full guidance). No matching Railway trace
+  was available, so the observed oversized envelope is not claimed as a
+  captured tool-failure trace. The regression models that failure and fails
+  against the original sweep. The correction asks the existing domain for
+  the requested count when no place filter requires a wider window; the
+  domain still ranks all candidates. Geographic filters retain their window.
+- A named company/mandate analysis took 23,835 ms to first text and 23,836 ms
+  terminal. Scoped usage: classification 763 ms, three dialogue calls
+  3,738 / 2,119 / 14,661 ms, extraction 1,930 ms. Its run remained about the
+  investor organisation, with an INVESTOR_REFERENCE receipt. Correct company
+  targeting and evidence require further verification; this is not a passing
+  investor interrogation acceptance.
+- An existing fictional GPT-Live cohort account passed availability, and the
+  canonical SDP broker opened an actual provider session (201, 2,606 ms).
+  WebRTC failed to connect from this VM; no data-channel events or audible
+  PCM arrived. Session end returned 204. First audio is UNVERIFIED; no cohort,
+  budget or flags were changed. This service transport check is not a full
+  UI/spoken-voice acceptance.
+- Founder private document preparation from the actual company returned a
+  READY Q_REPORT version 1 (first useful text 43,686 ms, terminal 44,480 ms).
+  The request asked for a one-page summary, but the result was a report and
+  public research ran despite the existing-record wording. Do not present
+  this as autonomous ONE_PAGER acceptance or a performance improvement.

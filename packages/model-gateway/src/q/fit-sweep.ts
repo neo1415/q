@@ -299,7 +299,14 @@ export async function runFitSweep(input: {
   const ids = [...wanted.keys()].slice(0, FIT_SWEEP_MAX);
   const [top, each] = await Promise.all([
     ask.scope === "CANDIDATES" && available.has("fit_top_candidates")
-      ? call("fit_top_candidates", { limit: 10 }, "q-fit-sweep-top")
+      ? call(
+          "fit_top_candidates",
+          // The domain ranks all eligible candidates before taking this
+          // window. Fetch only the requested count when no place filter
+          // needs a wider set; ten rich profiles can exceed the tool bound.
+          { limit: ask.place === null ? (ask.count ?? 10) : 10 },
+          "q-fit-sweep-top",
+        )
       : Promise.resolve([] as RunFit[]),
     Promise.all(
       ids.map((companyId, index) =>

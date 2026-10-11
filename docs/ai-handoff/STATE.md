@@ -4,6 +4,14 @@
 > Evidence words: CODE OBSERVED · IMPLEMENTED · MERGED · LOCAL TESTED · CI GREEN · DEPLOYED · LIVE VERIFIED · BLOCKED.
 > A recorded SHA is a snapshot; re-check Git and Railway before trusting it.
 
+## Codex measured product continuation — 2026-10-11 15:40 UTC
+
+- Release candidate `4d26e9e6` is on integration/CI. Exact run `38150727138` **pgTAP SUCCESS**; quality passed lint/typecheck and is running tests. Migration remains unapplied until both gates pass. All four services still serve `ab962576`.
+- Separate next correction is locally validated: explicit top-three candidate sweep asks three instead of ten unless a place filter needs the wider window. Real top-ten envelope with disclosed raise views exceeds the tool limit; original regression fails, corrected suite passes. 33 dependency builds, 36 targeted tests plus final 10-test fixture rerun, root/q-api typechecks and changed lint/format passed.
+- Actual founder company is visible in the current synthetic investor's 42-record feed; own profile and investor network preview both return 200. No 8.8 appears among those real authorized profiles. See SCORE-LINEAGE for the actual histogram; historical 8.8 reproduction remains open.
+- Foreground private Q_REPORT reached real READY version 1, but a conversational revision returned an OPEN_RECORD_PAGE DOCUMENT intent and kept version 1. That is a product routing defect, not successful revision. Initial one-page wording also produced a report and ran public research. The final intelligent document product remains unfinished.
+- Existing-cohort voice session opened, VM WebRTC failed, session ended. First audio remains unverified. All private test receipts stay outside checkout.
+
 ## Codex live verification correction — 2026-10-11 15:17 UTC
 
 - **DEPLOYED:** all four Railway services freshly report SUCCESS at `ab962576`. Authenticated founder Home/Documents/Relationships still render.

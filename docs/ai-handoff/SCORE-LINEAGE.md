@@ -157,3 +157,15 @@ Existing suites worth retaining and running for a scoring change:
 `packages/readiness/test/assess.test.ts`, `firewall.test.ts`. **LOCAL TESTED in the integration checkout:** all six fit/ranking/readiness suites listed above passed (101 tests); the presentation slice also passed the answer-card suite. This verifies code behavior, not hosted score provenance. Hosted score lineage and live UI/speech
 remain unverified; use authorized runtime records and actual result blocks in
 a subsequent verification pass.
+
+## Authorized hosted record check — 2026-10-11
+
+Existing synthetic investor actor, actual persisted feed records, canonical
+fit HTTP routes under that actor (no fixture injection or record edits): all
+42 visible companies returned ranking-config.v4 profiles. Recomputed display
+histogram: 10.0 × 2, 8.5 × 1, 6.0 × 14, 4.5 × 1, 3.5 × 21, 1.0 × 3. No 8.8
+occurred. Q's top-three request produced one 10.0 card, exposing a separate
+candidate-window/result-size issue. This sample demonstrates repeated values
+on real authorized records, but **does not reproduce the historical 8.8**.
+The historical fixture and formula analysis above remain distinct. Do not
+change customer data, add jitter or manufacture evidence to produce 8.8.

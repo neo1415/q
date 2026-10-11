@@ -126,3 +126,15 @@ Newest entry last. Never edit past entries; correct them in a new entry.
 - **Unfinished:** release correction, actual first useful text/audio measurements, real authorized score reproduction, autonomous document READY/render/revision, investor Discover-to-Q journey, intelligent paid document stages with durable canonical budget enforcement.
 - **Next three executable actions:** 1. Complete static checks and push corrected packet to CI. 2. Exercise existing authorized investor discovery/fit and bounded voice transport while CI runs. 3. After exact gates pass, apply additive migration, release and verify actual document job and latency.
 - **Parallel work:** all workers stopped; root owns continuation. Secrets and private runtime evidence remain outside checkout.
+
+## 2026-10-11 15:40 UTC — Codex — measured investor/document product checks
+
+- **Workspace:** `/workspace/q`, `codex/preserve-optimize`; release candidate `4d26e9e6` pushed to integration/CI, separate bounded-fit correction follows on work branch.
+- **Code changed:** candidate sweep respects explicit count when no place filter requires a wider candidate window. Domain still computes/ranks every eligible candidate; result-size policy and scoring are unchanged.
+- **Proven locally:** original oversized-result regression fails; corrected 36 fit/card/tool tests pass, then final 10-test rerun after correcting a fixture lint/syntax error. 33 dependency builds, root/q-api typechecks and changed-file lint/format pass.
+- **Proven live baseline at ab962576:** canonical fit top-three has three, Q returned one; measured rich top-ten envelope exceeds 32,000 chars. No captured tool-failure trace is claimed. 42 authorized feed records show repeated values but no 8.8. Actual founder company is in feed and its network preview reads. Browser Discover opens Ask Q and accepts a server action; timing requires distinguishing new answer from history.
+- **Document evidence:** private foreground Q_REPORT READY version 1, 44.5 s completion. It did not preserve the requested one-page shape or existing-evidence-only wording. Conversational revision yielded a document-opening UI intent, no revision receipt, and unchanged version 1. Explicit edit intent must reach the existing revision tool; no success claim.
+- **Voice evidence:** existing synthetic cohort session broker 201; transport failed before any audio/data-channel event; closed 204. No voice policy changes.
+- **Gates:** exact `4d26e9e6` run `38150727138` pgTAP success, quality tests still running. Migration not applied. Independent new packet is not CI green or deployed.
+- **Next actions:** finish exact release gate/migration/deployment; measure mandate first text and classifier removal; execute typed autonomous document job and repair conversational revision routing through its existing tool; verify correct founder company targeting.
+- **Parallel work:** root only. No private payloads, screenshots, credentials or signed links committed.
