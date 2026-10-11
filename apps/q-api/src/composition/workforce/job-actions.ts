@@ -441,11 +441,10 @@ export function createWorkforceJobBoard(dependencies: {
           }
         }
         const owner = { tenantId: actor.tenantId, userId: actor.userId };
-        if (
-          dependencies.withinLimit !== undefined &&
-          !(await dependencies.withinLimit(owner).catch(() => true))
-        ) {
-          return { status: "LIMIT_REACHED" };
+        if (dependencies.withinLimit !== undefined) {
+          const room = await dependencies.withinLimit(owner).catch(() => null);
+          if (room === null) return { status: "NOT_PLANNED" };
+          if (!room) return { status: "LIMIT_REACHED" };
         }
         const jobs = dependencies.jobsFor(actor);
         const planned = await jobs

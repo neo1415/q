@@ -10,7 +10,7 @@ The existing conversation proposal and Approval Engine produced/approved one pri
 
 The initial worker uses deterministic evidence/design/check stages; this is not yet final intelligent research, writing, design critique and iteration. Canonical durable aggregate paid-job reservations remain needed before paid worker stages can be enabled reliably across crashes.
 
-An existing foreground report successfully revised from version one to two in its original conversation. The workforce one-pager revision failed, kept version one and yielded no receipt. Scoped runtime inspection shows its viewer artifact reference was dropped. The runtime/firewall correction is locally tested, not released/live verified; repeat the real same-conversation workforce revision after its exact gates. Do not call the full end-to-end document journey complete yet.
+An existing foreground report successfully revised from version one to two in its original conversation. The workforce one-pager revision failed, kept version one and yielded no receipt. Scoped runtime inspection shows its viewer artifact reference was dropped. The runtime/firewall correction is now DEPLOYED at exact green `c950e29b`, all four services SUCCESS. The live retry creates actual version two of the same ONE_PAGER with a READY receipt and preserved version one; original findings and gaps remain unchanged. It does not add the requested Evidence gaps section. Existing revision accepts only existing headings and omits the gap list from the model input, so full instruction acceptance remains FAILED. Improve the existing governed reviser and repeat the same-artifact render/revision checks after its own gates. Do not call the full end-to-end document journey complete yet.
 
 ## Scope and authority
 

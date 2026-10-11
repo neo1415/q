@@ -6,6 +6,12 @@ Repo `neo1415/q` at `b021d53b`. Method: grep/sed/read only.
 Tags: [CO] = CODE OBSERVED (read in code). [INF] = INFERRED (reasoned from code, not run).
 Paths are relative to the repo root unless stated.
 
+## Current correction — 2026-10-11 18:15 UTC
+
+The monthly start guard no longer fails open on an unavailable ledger or malformed spend. Proposals refuse planning; approved queued jobs are held with a spending-check explanation. Four old-code regression failures become 40 passing workforce tests; package builds, root/q-api types and changed lint/format pass. **LOCAL TESTED**, awaiting its own release gates. Historical fail-open observations below describe the audited baseline. There is still no durable aggregate paid-job reservation; a measured-spend check between steps alone cannot protect concurrent calls or crashes.
+
+All four services now serve exact green `c950e29b`. The initial autonomous document READY/render flow is live, and same-conversation workforce revision produces real version 2. It fails the requested new evidence-gap section; actual offscreen named-founder findings still bind the wrong company. Neither is final intelligent document or complete investor journey acceptance.
+
 ## Codex continuation — 2026-10-11
 
 The existing durable runner now starts both claimed jobs immediately and awaits

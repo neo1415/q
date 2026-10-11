@@ -31,12 +31,21 @@ export async function withinMonthlyLimit(
   limitUsd: number | null,
 ): Promise<boolean> {
   if (limitUsd === null) return true;
-  // A ledger that cannot be read does not stop the person's work: each
-  // call is still capped by its own budget at the gateway.
-  const rows = await spent().catch(() => []);
-  const micros = rows.reduce(
-    (sum, row) => sum + Math.round(Number(row.usd) * 1_000_000),
-    0,
-  );
+  // An unavailable ledger is not evidence of zero spend. Callers hold new
+  // work separately from an actually exhausted allowance.
+  const rows = await spent();
+  const micros = rows.reduce((sum, row) => {
+    const usd = Number(row.usd);
+    const next = sum + Math.round(usd * 1_000_000);
+    if (
+      row.usd.trim().length === 0 ||
+      !Number.isFinite(usd) ||
+      usd < 0 ||
+      !Number.isSafeInteger(next)
+    ) {
+      throw new Error("Invalid workforce spend");
+    }
+    return next;
+  }, 0);
   return !(micros >= Math.round(limitUsd * 1_000_000));
 }

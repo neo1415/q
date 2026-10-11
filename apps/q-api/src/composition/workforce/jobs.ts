@@ -786,10 +786,12 @@ export function createWorkforceJobs(dependencies: {
       await store.setJobStatus(owner, filed.jobId, "HELD");
     };
     if (dependencies.withinLimit !== undefined) {
-      const room = await dependencies.withinLimit(owner).catch(() => true);
+      const room = await dependencies.withinLimit(owner).catch(() => null);
       if (!room) {
         await hold(
-          "This month's limit for Q's work is reached; raise it to go on.",
+          room === null
+            ? "I couldn't check this month's spending for Q's work. The job is held until spending can be checked."
+            : "This month's limit for Q's work is reached; raise it to go on.",
         );
         return false;
       }

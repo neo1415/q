@@ -178,9 +178,22 @@ describe("the workforce overview and approval link (J5, J6)", () => {
     expect(
       await withinMonthlyLimit(() => Promise.resolve([{ usd: "60" }]), 60),
     ).toBe(false);
-    expect(
-      await withinMonthlyLimit(() => Promise.reject(new Error("x")), 60),
-    ).toBe(true);
+    await expect(
+      withinMonthlyLimit(
+        () => Promise.reject(new Error("ledger unavailable")),
+        60,
+      ),
+    ).rejects.toThrow("ledger unavailable");
+  });
+
+  it("does not treat malformed recorded spend as available budget", async () => {
+    for (const usd of ["NaN", "Infinity", "-1", ""]) {
+      await expect(
+        withinMonthlyLimit(() => Promise.resolve([{ usd }]), 60),
+      ).rejects.toThrow("Invalid workforce spend");
+    }
+    const unavailable = () => Promise.reject(new Error("ledger unavailable"));
+    expect(await withinMonthlyLimit(unavailable, null)).toBe(true);
   });
 });
 
