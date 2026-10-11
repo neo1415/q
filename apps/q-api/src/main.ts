@@ -15,6 +15,7 @@
  * a credential, a connection or a table.
  */
 
+import { createWorkforceDocuments } from "./composition/workforce/documents.js";
 import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
 import { createInvestorLink } from "./composition/investor-link.js";
 import { createFitComposition } from "./composition/fit.js";
@@ -1669,6 +1670,11 @@ const workforcePortsFor = createWorkforcePorts(
         correlationId: CorrelationIdSchema.parse(`cor_${randomUUID()}`),
       });
       return booked.outcome === "OK" ? booked.meeting.id : null;
+    },
+    get documents() {
+      return qArtifacts.preparation.pipeline?.mode === "JOB"
+        ? workforceDocuments
+        : undefined;
     },
     nameOf: workforceDisplayName,
   },
@@ -4137,6 +4143,23 @@ setInterval(
   },
   10 * 60 * 1000,
 ).unref();
+
+const workforceDocuments = createWorkforceDocuments({
+  freshActor: (actor) =>
+    createOwnerActor({
+      resolver: actorContextResolver,
+      authUserOf: async (userId) =>
+        (
+          await database.sql<{ auth_user_id: string | null }[]>`
+      select auth_user_id from identity.user_profiles where id = ${userId}`
+        )[0]?.auth_user_id ?? null,
+    })(actor.userId, actor.organisationId ?? null),
+  ownCompany: (actor) => ownCompanyOf(database.sql, actor),
+  firewall,
+  investigate: qIntelligence.companyIntelligence.investigate,
+  artifacts: qArtifacts.service,
+  preparation: qArtifacts.preparation,
+});
 
 // Recovery D3: the durable workforce runner. It claims approved jobs under a
 // lease, renews it while a job runs and resumes any job a restart left

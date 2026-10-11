@@ -57,6 +57,7 @@ export type OpenConversation = {
 };
 
 export type WorkforceDocumentInput = {
+  readonly canContinue: () => Promise<boolean>;
   readonly request: WorkforceDocumentRequest;
   readonly goal: string;
   /** Original approved Q run, never the workforce step run. */
@@ -266,6 +267,7 @@ export function createWorkforceExecutors(dependencies: {
               };
             }
             const result = await ports.documents?.(owner, {
+              canContinue: authority.canContinue,
               request: step.document,
               goal: step.goal,
               jobId: context.jobId,

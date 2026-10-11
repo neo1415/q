@@ -139,6 +139,17 @@ export type ReviseArtifactInput = {
 };
 
 export type ArtifactService = {
+  /** Resume under a fresh firewall decision before any recomposition. */
+  readonly findWorkforceDocument: (
+    input: Pick<
+      PrepareArtifactInput,
+      | "actorContext"
+      | "permittedContextPlan"
+      | "qRunId"
+      | "subject"
+      | "artifactType"
+    > & { readonly workforce: WorkforceDocumentBinding },
+  ) => Promise<QArtifactSummary | null>;
   /** Create the artifact and its first version. A Prepare operation. */
   readonly prepareArtifact: (
     input: PrepareArtifactInput,
@@ -385,6 +396,32 @@ export function createArtifactService(dependencies: {
   };
 
   return {
+    findWorkforceDocument: async (input) => {
+      authorise(input);
+      const binding = WorkforceDocumentBindingSchema.parse(input.workforce);
+      if (repository.findForWorkforce === undefined)
+        throw new ArtifactAuthorityError();
+      const artifact = await repository.findForWorkforce(input.actorContext, {
+        ...binding,
+        type: input.artifactType,
+        companyId:
+          input.subject?.kind === "COMPANY" ? input.subject.companyId : null,
+        investorOrganisationId:
+          input.subject?.kind === "INVESTOR_ORGANISATION"
+            ? input.subject.investorOrganisationId
+            : null,
+      });
+      if (artifact === null) return null;
+      const current =
+        artifact.currentVersion === 0
+          ? null
+          : await repository.findVersion(
+              input.actorContext,
+              artifact.id,
+              artifact.currentVersion,
+            );
+      return toSummary(artifact, current);
+    },
     prepareArtifact: async (input) => {
       const organisationId = authorise(input);
       const subject = input.subject;

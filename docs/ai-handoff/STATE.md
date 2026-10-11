@@ -4,6 +4,15 @@
 > Evidence words: CODE OBSERVED · IMPLEMENTED · MERGED · LOCAL TESTED · CI GREEN · DEPLOYED · LIVE VERIFIED · BLOCKED.
 > A recorded SHA is a snapshot; re-check Git and Railway before trusting it.
 
+## Codex document continuation — 2026-10-11 08:00 America/Los_Angeles
+
+- First packet `ab96257644d21e7e27fbb72fd54a9946e23fa00c` is **CI GREEN**: exact-commit run `38147234625`, quality and pgTAP. It was pushed to the deployment branch; Railway builds are in progress. Do not claim DEPLOYED until each service reports SUCCESS at this revision.
+- Document connection is **IMPLEMENTED / LOCAL TESTED**, not deployed: approved typed OWN_COMPANY preparation reuses the existing composed specialist, fresh actor/firewall, artifact transaction and document worker. Atomic replay binding is migration `20261222150000`, not yet applied hosted.
+- Initial document path adds no paid model/image generation because existing usage accounting cannot enforce an aggregate allowance across crashes. Foreground document paid-stage configuration is retained. See [WORKFORCE-DOCUMENTS.md](WORKFORCE-DOCUMENTS.md).
+- Package builds passed 52/52; targeted document/workforce tests passed 47/47. Broader regressions caught the missing new JOB_PLAN v3 lock entry; the new version hash was added while v1/v2 hashes remain unchanged. Final 118/118 tests across 14 files, root/q-api typechecks and changed-file lint/format passed. This packet's exact-commit CI remains pending.
+- Agent code is integrated in `/workspace/q`; parallel agents hit their account usage limit and stopped. Root continues validation. No agent is editing root files.
+- Hosted investor baseline returned real mandate answers in three isolated runs (7,571 / 2,493 / 2,442 ms), each with a classification usage row; one also had extraction. Do not claim a live speedup until the new deployed code is measured.
+
 ## Codex continuation — 2026-10-11 07:13 America/Los_Angeles
 
 - Integration baseline freshly fetched: `e40b1d0f` on `build/int-rc` and the CI branch; `main` remains stale.

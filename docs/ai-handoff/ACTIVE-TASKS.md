@@ -1,5 +1,12 @@
 # Active tasks — authoritative cross-model board
 
+## Current continuation — 2026-10-11
+
+- **CI GREEN / deployment in progress:** first packet `ab962576`, run `38147234625`. Verify all Railway service revisions, then repeat authenticated mandate measurements and bounded founder browser checks.
+- **IMPLEMENTED / local validation:** existing workforce DOCUMENTS connection for approved OWN_COMPANY PREPARE. One canonical artifact/enqueue per job step, fresh authority, real READY completion, cancellation checks, and zero additional paid generation. Migration `20261222150000` and exact-commit CI/release are pending. Details: [WORKFORCE-DOCUMENTS.md](WORKFORCE-DOCUMENTS.md).
+- FDN numeric methodology remains blocked on approved, versioned criteria/contextual weights. The score-lineage audit is complete; no proprietary formula, historical score or source of truth was invented.
+- End-to-end voice audio and complete founder/investor acceptance remain open. Kathryn's GPT-Live availability check is cohort-excluded; no cohort, budget or voice flag was changed.
+
 > One owner per branch or worktree. Update the status words (CODE OBSERVED · IMPLEMENTED · MERGED · LOCAL TESTED · CI GREEN · DEPLOYED · LIVE VERIFIED · BLOCKED) with evidence.
 > Snapshot 2026-10-11, HEAD `b021d53b`. **Every workstream below is MERGED, CI GREEN and DEPLOYED on `b021d53b`; none has uncommitted changes.** The "Live" line says exactly what was proven on production.
 

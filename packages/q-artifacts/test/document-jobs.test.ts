@@ -72,6 +72,23 @@ function memory() {
       ? a
       : null;
   const repository: ArtifactRepository = {
+    findForWorkforce: (actor, input) => {
+      const prior = bindings.get(`${input.jobId}:${input.stepKey}`);
+      const artifact =
+        prior === undefined ? undefined : artifacts.get(prior.id);
+      return Promise.resolve(
+        prior?.digest === input.intentSha256 &&
+          artifact !== undefined &&
+          artifact.tenantId === actor.tenantId &&
+          artifact.organisationId === actor.organisationId &&
+          artifact.createdByUserId === actor.userId &&
+          artifact.type === input.type &&
+          artifact.companyId === input.companyId &&
+          artifact.archivedAt === null
+          ? artifact
+          : null,
+      );
+    },
     createForWorkforce: async (tx, input, binding) => {
       const key = `${binding.jobId}:${binding.stepKey}`;
       const prior = bindings.get(key);
@@ -260,6 +277,48 @@ describe("documents made by a job", () => {
     expect(jobs.queued[0]?.input.content.sections[0]?.body).toBe(
       "First composition.",
     );
+  });
+
+  it("an authorized resume finds the existing identity before recomposition and hides strangers", async () => {
+    const { repository } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    const input = { ...request(), workforce };
+    expect(await svc.findWorkforceDocument(input)).toBeNull();
+    const first = await svc.requestDocument(input);
+    expect((await svc.findWorkforceDocument(input))?.artifactId).toBe(
+      first.artifact.artifactId,
+    );
+    expect(
+      await svc.findWorkforceDocument({
+        ...input,
+        workforce: { ...workforce, intentSha256: "b".repeat(64) },
+      }),
+    ).toBeNull();
+    await expect(
+      svc.findWorkforceDocument({
+        ...input,
+        permittedContextPlan: plan({ subjects: [] }),
+      }),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    const stranger = { ...ACTOR, userId: UserIdSchema.parse(COMPANY) };
+    expect(
+      await svc.findWorkforceDocument({
+        ...input,
+        actorContext: stranger,
+        permittedContextPlan: plan({
+          actor: {
+            userId: stranger.userId,
+            organisationId: ACTOR.organisationId,
+          },
+        }),
+      }),
+    ).toBeNull();
+    expect(jobs.queued).toHaveLength(1);
   });
 
   it("a changed approved intent or subject fails closed on the existing binding", async () => {

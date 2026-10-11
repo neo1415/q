@@ -261,6 +261,9 @@ export type QIntelligenceCapabilities = {
 };
 
 export type QIntelligenceComposition = {
+  readonly companyIntelligence: ReturnType<
+    typeof createCompanyIntelligenceSpecialist
+  >;
   readonly retrieval: QRetrievalPort;
   readonly answer: QAnswerPort;
   readonly capabilities: QIntelligenceCapabilities;
@@ -629,6 +632,7 @@ export function composeQIntelligence(
   });
 
   return {
+    companyIntelligence: specialist,
     retrieval: evidence.port,
     answer,
     capabilities: {

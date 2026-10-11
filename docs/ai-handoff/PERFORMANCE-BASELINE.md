@@ -45,3 +45,13 @@ Remaining measured work: wider live p50/p95 samples, first-audio timing,
 authenticated founder/investor journeys, provider-call counts and DB round trips.
 The full local Supabase stack remains blocked by the 32 GB/vfs image expansion;
 CI's existing pgTAP job is the database release gate.
+
+Authenticated investor baseline on `b021d53b`: three isolated own-mandate
+questions completed in 7,571 / 2,493 / 2,442 ms, with real Q message text
+verified. Usage rows scoped by Q-run/user recorded FAST_CLASSIFICATION in every
+run (906 / 710 / 708 ms); the middle run also recorded STRUCTURED_EXTRACTION
+(1,788 ms). Earlier samples were 3,588 / 2,301 / 2,841 ms with one classification
+row each. Client timings include start/poll/network overhead; rows scoped this
+way may omit other correlations. These small samples are not a p95 estimate.
+Post-deployment measurement must distinguish removal of classifier calls from
+end-to-end latency and any remaining model calls.

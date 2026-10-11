@@ -191,10 +191,9 @@ describe("existing document pipeline workforce bridge", () => {
       status: "PREPARING",
       artifactId: randomUUID(),
     });
-    expect(await w.run()).toMatchObject({
-      status: "FAILED",
-      summary: expect.stringContaining("stopped"),
-    });
+    const stopped = await w.run();
+    expect(stopped.status).toBe("FAILED");
+    expect(stopped.summary).toContain("stopped");
     expect(w.prepare).toHaveBeenCalledTimes(1);
   });
   it("withholds READY completion when cancelled during the adapter call", async () => {
@@ -204,10 +203,9 @@ describe("existing document pipeline workforce bridge", () => {
       .mockResolvedValue(false);
     const w = world({ active });
     w.prepare.mockResolvedValue({ status: "READY", artifactId: randomUUID() });
-    expect(await w.run()).toMatchObject({
-      status: "FAILED",
-      summary: expect.stringContaining("stopped"),
-    });
+    const stopped = await w.run();
+    expect(stopped.status).toBe("FAILED");
+    expect(stopped.summary).toContain("stopped");
   });
   it("rejects revision, sharing and foreign ownership before the document service", async () => {
     expect(
@@ -236,6 +234,7 @@ describe("existing document pipeline workforce bridge", () => {
     };
     const port = createWorkforcePorts(services, unused)(actor);
     const input = {
+      canContinue: () => Promise.resolve(true),
       request: document,
       goal: proposed.goal,
       qRunId: randomUUID(),
@@ -273,10 +272,9 @@ describe("existing document pipeline workforce bridge", () => {
       status: "PREPARING",
       artifactId: randomUUID(),
     });
-    expect(await pending.run()).toMatchObject({
-      status: "FAILED",
-      summary: expect.stringContaining("deadline"),
-    });
+    const waiting = await pending.run();
+    expect(waiting.status).toBe("FAILED");
+    expect(waiting.summary).toContain("deadline");
     expect(pending.prepare).toHaveBeenCalledTimes(3);
   });
 });

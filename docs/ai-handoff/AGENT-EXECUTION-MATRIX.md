@@ -13,12 +13,15 @@ all outcomes before ending/coalescing a pass. Each job keeps sequential steps,
 owner validation, heartbeat, cancellation and retry behavior. Deferred-job and
 queue-recovery regressions passed locally. Deployment is pending.
 
-The document pipeline already exists (`q-specialists` preparation, `q-artifacts`
-service and workers' document jobs). DOCUMENTS is unregistered because there is
-no durable workforce bridge, not because Capital Q cannot produce files. Reuse
-those services with fresh firewall decisions and atomic job-step/artifact
-idempotency; resume PREPARING until READY. Sharing remains a separate approval.
-Do not manufacture a permitted plan or duplicate document generation.
+The existing document pipeline now has an IMPLEMENTED own-company workforce
+connection, pending release gates. Typed approved PREPARE requests reuse the
+composed specialist, real firewall, artifact service and document worker.
+Atomic job/step binding prevents duplicate artifacts/enqueues; PREPARING remains
+running under heartbeat until a real READY version. No paid generation runs in
+this initial workforce path because no durable aggregate budget reservation
+exists. Foreground document stages retain their configuration. See
+[WORKFORCE-DOCUMENTS.md](WORKFORCE-DOCUMENTS.md) for limitations and tests.
+The roster and gap inventory below retain their historical baseline evidence.
 
 ## 1. Big picture: three agent engines plus the Q Brain, not one workforce
 
