@@ -169,11 +169,7 @@ describe("the action registry", () => {
       ],
       ["schedule.reminder.create", "legacy:propose_reminder", "CONSEQUENTIAL"],
       ["schedule.reminder.dismiss", "legacy:dismiss_reminder", "INSTANT"],
-      [
-        "schedule.proposal.propose",
-        "propose_meeting_time",
-        "CONSEQUENTIAL",
-      ],
+      ["schedule.proposal.propose", "propose_meeting_time", "CONSEQUENTIAL"],
       ["schedule.proposal.review", "review_meeting_proposals", "READ"],
       ["schedule.proposal.accept", "accept_meeting_time", "CONSEQUENTIAL"],
       ["schedule.proposal.decline", "decline_meeting_times", "CONSEQUENTIAL"],
