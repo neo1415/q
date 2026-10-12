@@ -1871,6 +1871,69 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     );
   });
 
+  it("a go-ahead after 'Shall I plan this one anyway?' plans the goal they first gave, with proceed (live 2026-10-12)", async () => {
+    const goal =
+      "Research Ledgerfold, assess the opportunity, prepare an investment memo, get it critiqued and prepare founder diligence questions";
+    const calls: { goal: string; proceed: boolean }[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, asked, options) => {
+        calls.push({ goal: asked, proceed: options?.proceed === true });
+        return Promise.resolve({ status: "NOT_PLANNED" });
+      },
+    };
+    const { answer } = seam({
+      said: "Yes, plan this one anyway.",
+      earlier: [
+        { role: "USER", content: goal },
+        {
+          role: "Q",
+          content:
+            "Something like this is already waiting for you: Send Ledgerfold these 5 questions. Shall I plan this one anyway?",
+        },
+      ],
+      reading: {
+        ...reading(null),
+        handOver: null,
+        teamJob: true,
+      } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(calls).toEqual([{ goal, proceed: true }]);
+  });
+
+  it("a new goal after 'Shall I plan this one anyway?' is planned as itself, without proceed", async () => {
+    const calls: { goal: string; proceed: boolean }[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, asked, options) => {
+        calls.push({ goal: asked, proceed: options?.proceed === true });
+        return Promise.resolve({ status: "NOT_PLANNED" });
+      },
+    };
+    const said = "Research Kestrel Heat instead and write me a memo";
+    const { answer } = seam({
+      said,
+      earlier: [
+        { role: "USER", content: "Research Ledgerfold and write a memo" },
+        {
+          role: "Q",
+          content:
+            "Something like this is already waiting for you: Send Ledgerfold these 5 questions. Shall I plan this one anyway?",
+        },
+      ],
+      reading: {
+        ...reading(null),
+        handOver: null,
+        teamJob: true,
+      } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(calls).toEqual([{ goal: said, proceed: false }]);
+  });
+
   it("a team job whose planning failed on Q's side says so, never asks them to reword it (live 2026-10-12)", async () => {
     const teamJob: QTeamJobPort = {
       propose: () => Promise.resolve({ status: "FAILED" }),

@@ -105,7 +105,7 @@ describe("conversations.searchForOwner", () => {
     expect(text).toContain("c.title ilike any($?::text[])");
     expect(text).toContain("c.summary ilike any($?::text[])");
     expect(text).toContain(
-      "order by coalesce(c.last_message_at, c.created_at) desc",
+      "coalesce(c.last_message_at, c.created_at) desc, c.id desc",
     );
     // Every value is a parameter; the term arrives escaped, the limit bounded.
     const values = statement?.values ?? [];
@@ -128,5 +128,28 @@ describe("conversations.searchForOwner", () => {
     );
     expect(found).toEqual([]);
     expect(calls).toHaveLength(0);
+  });
+
+  it("ranks exact company subjects before recent loose summary hits, before limiting", async () => {
+    const { sql, calls } = recordingSql();
+    await createPostgresQRuntimeRepositories().conversations.searchForOwner(
+      sql,
+      TENANT,
+      USER,
+      { companyIds: [COMPANY], terms: ["Compare"], except: [], limit: 4 },
+    );
+    const statement = calls.find((call) => call.text.includes("c.tenant_id ="));
+    const ordering = statement?.text
+      .split("order by")
+      .at(-1)
+      ?.replace(/\s+/g, " ");
+    expect(ordering).toMatch(
+      /^ exists \(.*s->>'kind' = 'COMPANY'.*s->>'companyId' = any\(\$\?::text\[\]\).*\) desc, coalesce\(c.last_message_at, c.created_at\) desc, c.id desc limit \$\?$/,
+    );
+    expect(
+      statement?.values.filter(
+        (value) => Array.isArray(value) && value.includes(COMPANY),
+      ),
+    ).toHaveLength(2);
   });
 });

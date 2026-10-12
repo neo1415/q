@@ -377,6 +377,73 @@ describe("named-company evidence binding", () => {
   );
 });
 
+describe("fresh selected-company follow-ups reuse authorized identity", () => {
+  it.each([
+    ["What are the risks for this company?", "FRESH", false],
+    ["What does Different Target do?", "FRESH", true],
+    ["Compare this company with Different Target", "FRESH", true],
+    ["What are the risks for these companies?", "FRESH", true],
+    ["What are the risks for this company?", "MALFORMED", true],
+    ["What are the risks for this company?", "REVOKED", true],
+    ["What are the risks for this company?", "UNREAD", true],
+  ] as const)("%s / %s preserves lookup=%s", async (text, access, lookup) => {
+    const companyId = randomUUID();
+    const tools = toolPort(access === "UNREAD" ? [] : [GET_COMPANY], (p) =>
+      access === "REVOKED"
+        ? denied(p)
+        : access === "MALFORMED"
+          ? succeeded(p, { companyId, canonicalName: "Selected Company" })
+          : succeeded(p, {
+              companyId,
+              canonicalName: "Selected Company",
+              legalName: null,
+              websiteUrl: null,
+              foundedDate: null,
+              headquartersCountry: null,
+              headquartersCity: null,
+              currentStageCode: "seed",
+              shortDescription: "Declared company profile",
+              primaryDescription: null,
+              companyStatus: "active",
+              relationToYou: "SHARED",
+              truthClass: "USER_CLAIM",
+            }),
+    );
+    const { seam, request, messages, alpha } = build({
+      tools,
+      script: [
+        {
+          kind: "TEXT",
+          text: JSON.stringify(
+            analystResult(
+              "The authorized profile has declared claims; missing evidence stays unknown.",
+            ),
+          ),
+        },
+      ],
+    });
+    if (messages[0]) messages[0] = { ...messages[0], content: text };
+    await seam.answer({
+      ...request,
+      aboutNamedOther: true,
+      subjects: [{ kind: "COMPANY", companyId }],
+      plan: { ...request.plan, screen: { route: "COMPANY", companyId } },
+    });
+    const prompt = JSON.stringify(alpha.calls[0]?.request);
+    expect(
+      prompt.includes(
+        "Resolve the company named in the current question through search_companies and get_company",
+      ),
+    ).toBe(lookup);
+    if (!lookup) {
+      expect(prompt).toContain("freshly read authorized profile");
+      expect(
+        tools.executed.filter((p) => p.name === "get_company"),
+      ).toHaveLength(1);
+    }
+  });
+});
+
 describe("selected-company analysis stays out of the candidate sweep", () => {
   it.each([
     [false, false],

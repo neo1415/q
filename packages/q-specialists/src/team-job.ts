@@ -36,6 +36,10 @@ export type QTeamJobPort = {
   readonly propose: (
     request: QAnswerRequest,
     goal: string,
+    options?: {
+      /** They heard what was already waiting and said to go ahead (R5). */
+      readonly proceed: boolean;
+    },
   ) => Promise<TeamJobOutcome>;
 };
 
@@ -89,13 +93,16 @@ export function createToolTeamJobPort(dependencies: {
   readonly logger?: Logger | undefined;
 }): QTeamJobPort {
   return {
-    propose: async (request, goal) => {
+    propose: async (request, goal, options) => {
       try {
         const outcome = await dependencies.tools.execute(
           {
             callId: "q-team-job",
             name: "propose_q_job",
-            arguments: { goal: goal.trim().slice(0, 1_000), proceed: false },
+            arguments: {
+              goal: goal.trim().slice(0, 1_000),
+              proceed: options?.proceed === true,
+            },
           },
           {
             actor: request.actor,
@@ -142,6 +149,38 @@ export function createToolTeamJobPort(dependencies: {
   };
 }
 
+/**
+ * The question Q ends an ALREADY_WAITING line with. The next turn's reply
+ * is matched against Q's own earlier line by this exact text, so a
+ * go-ahead re-plans the goal they first gave (see goAheadGoal).
+ */
+export const PLAN_ANYWAY_QUESTION = "Shall I plan this one anyway?";
+
+/**
+ * Live 2026-10-12: Q asked "Shall I plan this one anyway?", the investor
+ * said "Yes, plan this one anyway." and Q tried to plan those words, so
+ * nothing could be planned. When Q's last turn asked that question and
+ * this turn, read as work for the team, names no work of its own, it is
+ * the go-ahead for the goal they gave just before: that goal is planned
+ * with proceed. A turn that names work of its own is a new goal; one not
+ * read as team work (a no, a question) is answered as any other turn.
+ * Deterministic: Q's own stored line and their stored words, no model.
+ */
+export function goAheadGoal(
+  history: readonly { readonly role: string; readonly content: string }[],
+  latest: string,
+): string | null {
+  if (workKindsAsked(latest) > 0) return null;
+  const before = history.at(-2);
+  const asked = history.at(-3);
+  if (before === undefined || asked === undefined) return null;
+  if (before.role === "USER" || !before.content.endsWith(PLAN_ANYWAY_QUESTION))
+    return null;
+  if (asked.role !== "USER") return null;
+  const goal = asked.content.trim();
+  return goal.length >= 3 ? goal : null;
+}
+
 const ANSWER_HERE =
   "I can answer it here from what Capital Q holds instead, if that helps.";
 
@@ -154,8 +193,8 @@ export function teamJobLine(outcome: TeamJobOutcome): string {
     case "ALREADY_WAITING": {
       const first = outcome.waiting[0];
       return first === undefined
-        ? "Work like this is already waiting for your approval, so I haven't planned another. Shall I plan this one anyway?"
-        : `Something like this is already waiting for you: ${first}. Shall I plan this one anyway?`;
+        ? `Work like this is already waiting for your approval, so I haven't planned another. ${PLAN_ANYWAY_QUESTION}`
+        : `Something like this is already waiting for you: ${first}. ${PLAN_ANYWAY_QUESTION}`;
     }
     case "NOT_PLANNED":
       return `I couldn't turn that into a plan my team can carry out, so nothing has started. Tell me who it's about and what you want at the end (a memo, a meeting brief, questions for the founder) and I'll plan it. ${ANSWER_HERE}`;
