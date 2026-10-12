@@ -174,7 +174,9 @@ jobs:
         run: pnpm exec turbo run build --filter=./packages/* --output-logs=errors-only
 
       - name: Test
-        run: pnpm test
+        # Preserve every assertion; expose test and unhandled-error failures
+        # through native check annotations when log downloads are unavailable.
+        run: pnpm test --reporter=default --reporter=github-actions
   build:
     name: build
     runs-on: ubuntu-latest

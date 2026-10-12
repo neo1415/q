@@ -65,10 +65,13 @@ export function wireWarmed(): Promise<WireContracts> {
   if (loading !== null) return loading;
   if (warming !== null) return warming;
   if (typeof window === "undefined") return loadWire();
+  // A delayed warm belongs to the browser that scheduled it. The global
+  // can disappear during teardown or change before the idle callback runs.
+  const browser = window;
   const warm = new Promise<void>((resolve) => {
-    window.setTimeout(() => {
-      if (typeof window.requestIdleCallback === "function") {
-        window.requestIdleCallback(() => resolve(), { timeout: 1_500 });
+    browser.setTimeout(() => {
+      if (typeof browser.requestIdleCallback === "function") {
+        browser.requestIdleCallback(() => resolve(), { timeout: 1_500 });
       } else {
         resolve();
       }
