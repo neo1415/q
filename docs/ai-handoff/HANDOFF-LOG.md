@@ -430,6 +430,18 @@ The tracked runner creates internal Q turns for an existing authorized account o
 - Both failures reproduced locally; corrected stale Cheque compatibility assertion and duplicate prose in compact multi-company fallback. Every rich typed field remains unchanged; 32,000 tool cap and 31,000 regression target unchanged. 52 builds/79 targeted tests/root/q-api/web types/changed lint and format pass. No new migration or score change. Preserve memo 8,000-character finding fix, new source-attributed fit values and superseded-run CI safeguards. Exact CI/deployment/live acceptance still required.
 - Six Tavus keys secured outside Git, one account key only. Read-only provider probe blocked by cloud proxy tunnel 403. Network draft additions `tavusapi.com` and `docs.tavus.io` saved, not published/active; user environment action required for live Tavus. No paid video call attempted. Continue workforce/release work rather than idle.
 
+## 2026-10-12 07:10 UTC — protected continuation while exact PR #14 CI runs
+
+- Corrected PR #14 head `d493e7db`; exact run `38214769523` has static/types/build/pgTAP PASS, full tests pending. Release remains `fdf04745`. Own fix branch is pushed; no CI cancellation from independent work.
+- `codex/workforce-tavus-integration`: strengthened existing real workforce acceptance with queue owner/run bindings, real persisted READY memo/review/version/PDF and pending founder-contact card; protected private receipts. Existing fictional-session option verifies actual authenticated email, preserving password fallback; positive sign-in and wrong-account refusal pass, no email/new account. Script syntax/eslint/format pass; full workforce execution pending release.
+- Tavus paid boundary rejects invalid or >180-second durations, nine tests/q-api types/lint/format PASS. Not yet a working avatar. Provider API blocked by cloud network proxy; draft network additions saved but not published. Provider-owned January reference differs from dormant PAL adapter, so current endpoint verification remains required, without invented endpoints or quota-bypassing key rotation.
+
+## 2026-10-12 07:46 UTC — release held at a genuine promotion test failure; Work documents protected
+
+- PR #14 and #15 CI pass/merge documented above. PR #16 exact head d1266802: CI-lane push 38217786515 SUCCESS, promotion PR run 38217979145 Test/quality FAILURE. Deployment deliberately held; production stays fdf04745. All tested/merged code trees match. Recover actual failing test before any retry or release. CI log host is proxy-blocked; bounded GitHub diagnostic is next.
+- Existing Work lacked artifact references. Added fresh-authorized canonical READY-document projection and existing viewer/Q-edit path; no new business source, extra model call or migration. Original four regressions fail before, pass after; 52 builds, 51 targeted tests, final branded/tenant negative checks, root/q-api/web types and lint/format pass. Local code protected on independent branch; no live or CI-green claim. Pending native diligence cards still need Work projection, and original conversation needs live verification.
+- Tavus API and direct CI-log download need environment draft publishing; domain additions are saved, not activated. No paid Tavus session, quota bypass or unverified WIP deployment.
+
 ## 2026-10-12 08:27 UTC — real promotion failure identified; deferred Q warm-up corrected
 
 - Native read-only GitHub diagnostic recovered blocked logs: promotion run 38217979145 has 12,933 passing tests and one uncaught window ReferenceError from q/wire.ts:70 after q-chat-reply teardown. No ignored error or retry-to-green. Diagnostic branch c8424bd3 is isolated/not for deployment; normal jobs canceled after evidence read.

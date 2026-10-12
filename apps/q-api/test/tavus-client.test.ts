@@ -60,6 +60,27 @@ describe("the Tavus adapter", () => {
     expect(init?.method).toBe("POST");
   });
 
+  it.each([0, -1, 181, 180.5, NaN, Infinity])(
+    "refuses an invalid %s-second duration before a paid provider request",
+    async (maxCallSeconds) => {
+      const fetch = fakeFetch(200, null);
+      const client = createTavusClient({ apiKey: "k-secret", fetch });
+      await expect(
+        client.createConversation({
+          palId: "p1",
+          faceId: "r1",
+          name: "Rehearsal",
+          callbackUrl: null,
+          greeting: null,
+          context: null,
+          maxCallSeconds,
+          testMode: true,
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   it("fails with the status only, never the provider's body", async () => {
     const fetch = fakeFetch(429, { message: "secret details k-secret" });
     const failed = await createTavusClient({ apiKey: "k-secret", fetch })
