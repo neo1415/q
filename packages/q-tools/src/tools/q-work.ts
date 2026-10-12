@@ -78,7 +78,8 @@ export type QWorkJobResult = {
   readonly inThisConversation: boolean | null;
   /** The reviewer's critique of the memo, as persisted; null: none recorded. */
   readonly review: {
-    readonly outcome: "REVISED" | "NO_CHANGE_NEEDED";
+    /** UNKNOWN: a critique was recorded without whether it revised. */
+    readonly outcome: "REVISED" | "NO_CHANGE_NEEDED" | "UNKNOWN";
     readonly documentTitle: string | null;
     readonly findings: readonly {
       readonly kind: string;
@@ -338,7 +339,7 @@ const WorkJobResultSchema = z
     inThisConversation: z.boolean().nullable(),
     review: z
       .object({
-        outcome: z.enum(["REVISED", "NO_CHANGE_NEEDED"]),
+        outcome: z.enum(["REVISED", "NO_CHANGE_NEEDED", "UNKNOWN"]),
         documentTitle: z.string().max(200).nullable(),
         findings: z
           .array(
