@@ -15,6 +15,10 @@
  * a credential, a connection or a table.
  */
 
+import {
+  createOwnApprovalReads,
+  createOwnDocumentReads,
+} from "./composition/own-work-reads.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { createWorkforceDocuments } from "./composition/workforce/documents.js";
 import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
@@ -2984,48 +2988,9 @@ const qTools = createQTools({
     clientActions: true,
     // R33: what waits for their approval, across conversations: the
     // Approval Engine's own listing, as the actor (composed below).
-    approvalInbox: {
-      pending: async (actor) =>
-        (await qActions.listPendingApprovals({ actor, limit: 20 })).map(
-          (row) => ({
-            approvalId: row.approvalId,
-            summary: row.summary,
-            requestedAt: row.requestedAt,
-            expiresAt: row.expiresAt,
-          }),
-        ),
-    },
-    // R33: their own documents, the artifact service's own list, as them.
-    documents: {
-      list: async (actor, limit) =>
-        (await qArtifacts.service.list(actor, { limit })).items.map((item) => ({
-          artifactId: item.artifactId,
-          type: item.type,
-          status: item.status,
-          title: item.title,
-          currentVersion: item.currentVersion,
-          updatedAt: item.updatedAt,
-        })),
-      // voiceq-63: what one of their documents says, read as the actor
-      // (the service refuses one that is not theirs).
-      read: async (actor, artifactId) => {
-        const detail = await qArtifacts.service
-          .read(actor, artifactId)
-          .catch(() => null);
-        const current = detail?.current;
-        if (detail === null || current === undefined) return null;
-        return {
-          title: current.title,
-          type: detail.artifact.type,
-          version: current.version,
-          sections: current.content.sections.map((section) => ({
-            heading: section.heading,
-            body: section.body,
-          })),
-          gaps: current.content.gaps,
-        };
-      },
-    },
+    approvalInbox: createOwnApprovalReads(() => qActions),
+    // Current and immutable document versions use the same fresh-authorized viewer service.
+    documents: createOwnDocumentReads(() => qArtifacts.service),
     // Revising one of their documents into a new version (founder
     // directive 2026-09-28). A closure: the artifact composition is built
     // further down, and only called once a run is under way.

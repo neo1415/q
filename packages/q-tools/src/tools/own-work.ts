@@ -2,6 +2,9 @@ import { z } from "zod";
 
 import {
   Q_TASK_CLASSES,
+  QApprovalIdSchema,
+  QApprovalViewSchema,
+  Q_ARTIFACT_INSTRUCTION_MAX,
   QArtifactIdSchema,
   QDocumentEditSchema,
   QArtifactStatusSchema,
@@ -62,13 +65,20 @@ const OWN = {
 
 // --- approvals waiting for them -------------------------------------------
 
-export const ListPendingApprovalsInputSchema = z.object({}).strict();
+export const ListPendingApprovalsInputSchema = z
+  .object({
+    approvalId: QApprovalIdSchema.optional().describe(
+      "Read this exact card from the pending list to see its material content and current status; omit for cheap summaries.",
+    ),
+  })
+  .strict();
 export type ListPendingApprovalsInput = z.infer<
   typeof ListPendingApprovalsInputSchema
 >;
 
 export const ListPendingApprovalsOutputSchema = z
   .object({
+    detail: QApprovalViewSchema.nullable().optional(),
     items: z
       .array(
         z
@@ -101,7 +111,7 @@ export function createListPendingApprovalsTool(
     core: true,
     providerName: "list_pending_approvals",
     description:
-      "Lists every change waiting for the person's approval, across all their conversations, newest first, as their approvals list shows it (a summary of each and when it expires). Call it when they ask what is waiting for them, what needs their approval or what they have not decided yet. Nothing is approved by reading.",
+      "Lists every change waiting for the person's approval, across all their conversations, newest first, as their approvals list shows it (a summary of each and when it expires). Call it when they ask what is waiting for them, what needs their approval or what they have not decided yet. Nothing is approved by reading. To answer which exact questions or material content waits for approval, pass that card’s approvalId from this list; the canonical detail includes its exact preview and current status.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     input: ListPendingApprovalsInputSchema,
@@ -112,7 +122,14 @@ export function createListPendingApprovalsTool(
           ? allow<null>("CONFIDENTIAL", null)
           : deny<null>("NOT_AVAILABLE"),
       ),
-    execute: async (_input, context) => {
+    execute: async (input, context) => {
+      if (input.approvalId !== undefined) {
+        const detail =
+          (await inbox
+            .read?.(context.actor, input.approvalId)
+            .catch(() => null)) ?? null;
+        return { items: [], detail };
+      }
       const items = await inbox.pending(context.actor);
       return {
         items: items.slice(0, 20).map((item) => ({
@@ -170,6 +187,7 @@ export function createListMyDocumentsTool(
     supportedPurposes: [
       "OWN_COMPANY_QUESTION",
       "INVESTOR_QUESTION",
+      "COUNTERPARTY_COMPANY_QUESTION",
       "ACTION_PREPARATION",
       "GENERAL_QUESTION",
     ],
@@ -209,6 +227,14 @@ export const READ_MY_DOCUMENT_TEXT_MAX = 12_000;
 
 export const ReadMyDocumentInputSchema = z
   .object({
+    version: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        "An immutable version from its history; omit for the current version. Read both versions when comparing actual changes.",
+      ),
     artifactId: QArtifactIdSchema.describe(
       "The document: the one open on their screen (named under WHERE THEY ARE NOW), on a document card in this conversation, or from list_my_documents.",
     ),
@@ -218,6 +244,19 @@ export type ReadMyDocumentInput = z.infer<typeof ReadMyDocumentInputSchema>;
 
 export const ReadMyDocumentOutputSchema = z
   .object({
+    instruction: z.string().max(Q_ARTIFACT_INSTRUCTION_MAX).optional(),
+    history: z
+      .array(
+        z
+          .object({
+            version: z.number().int().min(1),
+            title: z.string().max(200),
+            createdAt: z.string().max(40),
+          })
+          .strict(),
+      )
+      .max(12)
+      .optional(),
     status: z.enum(["FOUND", "NONE"]),
     title: z.string().max(200).nullable(),
     type: z.string().max(64).nullable(),
@@ -263,12 +302,13 @@ export function createReadMyDocumentTool(
     supportedPurposes: [
       "OWN_COMPANY_QUESTION",
       "INVESTOR_QUESTION",
+      "COUNTERPARTY_COMPANY_QUESTION",
       "ACTION_PREPARATION",
       "GENERAL_QUESTION",
     ],
     providerName: "read_my_document",
     description:
-      "Reads one of the documents Q prepared for them, as its viewer shows it: title, version and its sections' text. Call it when they ask what a document says, to read it out, or to summarise or check it, above all the one open on their screen. NONE: not one of theirs, or still being prepared.",
+      "Reads one of the documents Q prepared for them, as its viewer shows it: title, version and its sections' text. Call it when they ask what a document says, to read it out, or to summarise or check it, above all the one open on their screen. The saved revision instruction and version history describe requested changes (not proof they were applied); compare actual persisted version texts using version from history when asked what changed. NONE: not one of theirs, revoked, still being prepared, or that exact version is missing; never substitute the latest version.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     input: ReadMyDocumentInputSchema,
@@ -281,10 +321,16 @@ export function createReadMyDocumentTool(
       ),
     execute: async (input, context) => {
       // Read as the actor: the artifact service refuses what is not theirs.
-      const found = await read(context.actor, input.artifactId).catch(
-        () => null,
-      );
-      if (found === null || found.sections.length === 0) {
+      const found = await (
+        input.version === undefined
+          ? read(context.actor, input.artifactId)
+          : read(context.actor, input.artifactId, input.version)
+      ).catch(() => null);
+      if (
+        found === null ||
+        found.sections.length === 0 ||
+        (input.version !== undefined && found.version !== input.version)
+      ) {
         return {
           status: "NONE",
           title: null,
@@ -304,6 +350,23 @@ export function createReadMyDocumentTool(
         text,
         truncated,
         gaps: found.gaps.slice(0, 24).map((gap) => gap.slice(0, 300)),
+        ...(found.instruction === undefined
+          ? {}
+          : {
+              instruction: found.instruction.slice(
+                0,
+                Q_ARTIFACT_INSTRUCTION_MAX,
+              ),
+            }),
+        ...(found.history === undefined
+          ? {}
+          : {
+              history: found.history.slice(0, 12).map((entry) => ({
+                version: entry.version,
+                title: entry.title.slice(0, 200),
+                createdAt: entry.createdAt,
+              })),
+            }),
       };
     },
   });

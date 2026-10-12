@@ -31,6 +31,7 @@ import type {
   RelationshipSummaryDto,
   VisibilityStateDto,
   QDocumentEdit,
+  QApprovalView,
 } from "@capital-q/contracts";
 import type { DisclosureAccessService } from "@capital-q/permissions";
 import type {
@@ -1031,6 +1032,13 @@ export type RelationshipMailPort = {
  * returns only approvals requested from this actor).
  */
 export type ApprovalInboxPort = {
+  /** Exact public card, re-authorised by the Approval Engine; never a decision. */
+  readonly read?:
+    | ((
+        actor: ActorContext,
+        approvalId: string,
+      ) => Promise<QApprovalView | null>)
+    | undefined;
   readonly pending: (actor: ActorContext) => Promise<
     readonly {
       readonly approvalId: string;
@@ -1061,7 +1069,7 @@ export type OwnDocumentsPort = {
   >;
   /**
    * voiceq-63: one of their documents as its viewer shows it (title and
-   * the current version's sections), read as the actor through the
+   * the current or requested immutable version's sections), read as the actor through the
    * artifact service, which refuses one that is not theirs; null for
    * absent, not theirs, or still preparing alike. Absent: no
    * read_my_document tool.
@@ -1070,7 +1078,16 @@ export type OwnDocumentsPort = {
     | ((
         actor: ActorContext,
         artifactId: string,
+        version?: number,
       ) => Promise<{
+        readonly instruction?: string | undefined;
+        readonly history?:
+          | readonly {
+              readonly version: number;
+              readonly title: string;
+              readonly createdAt: string;
+            }[]
+          | undefined;
         readonly title: string;
         readonly type: string;
         readonly version: number;
