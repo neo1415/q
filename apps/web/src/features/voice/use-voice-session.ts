@@ -10,6 +10,7 @@ import {
   forgetLiveAvailability,
   liveAvailabilityFor,
 } from "./live/availability";
+import { LIVE_TRIAL_SPENT_NOTICE, takeLiveTrialNotice } from "./live/trial";
 import { releaseVoiceAudio, type VoiceAudioOwner } from "./voice-audio";
 import {
   LIVE_FALLBACK_NOTICE,
@@ -112,16 +113,30 @@ export function useVoiceSession(
       if (!current()) return;
       const offered = available === true;
       let quota = false;
+      // A trial that ran out on the call before this one says so once.
+      const say = (notice: string) => {
+        eventsRef.current.onLinkStatus?.(notice);
+        setTimeout(() => {
+          eventsRef.current.onLinkStatus?.(null);
+        }, 6_000);
+      };
+      const spentNotice = takeLiveTrialNotice();
       if (offered) {
         setActive("live");
         const outcome = await liveLine.start(input);
         if (outcome === "LIVE" || !current()) return;
-        quota = outcome === "QUOTA";
-        forgetLiveAvailability();
-        eventsRef.current.onLinkStatus?.(LIVE_FALLBACK_NOTICE);
-        setTimeout(() => {
-          eventsRef.current.onLinkStatus?.(null);
-        }, 6_000);
+        // A spent trial is like a provider out of quota: the duplex line
+        // is OpenAI too, so the standard voice comes up at once.
+        quota = outcome === "QUOTA" || outcome === "TRIAL_SPENT";
+        if (outcome !== "TRIAL_SPENT") forgetLiveAvailability();
+        say(
+          outcome === "TRIAL_SPENT"
+            ? LIVE_TRIAL_SPENT_NOTICE
+            : LIVE_FALLBACK_NOTICE,
+        );
+      } else if (spentNotice !== null) {
+        quota = true;
+        say(spentNotice);
       }
       // DUPLEX: the full-duplex line first when the server brokered one;
       // if it does not come up, the standard line on the same credential,

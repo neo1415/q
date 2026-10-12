@@ -72,6 +72,15 @@ export async function liveAvailabilityFor(
   }
 }
 
+/**
+ * The trial is used up (the Q API said so): this tab's voice starts on the
+ * standard line from now on, with no ask and no failed open first.
+ */
+export function liveUnavailableForTab(): void {
+  answer = false;
+  asking = null;
+}
+
 /** A GPT-Live call failed to open: ask again next time. */
 export function forgetLiveAvailability(): void {
   answer = null;

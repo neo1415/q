@@ -4,6 +4,8 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   QClientActionIntentSchema,
   QVoiceDestinationSchema,
+  QVoiceLiveTrialSchema,
+  Q_VOICE_LIVE_TRIAL_SPENT,
 } from "@capital-q/contracts";
 import { z } from "zod";
 
@@ -54,6 +56,7 @@ const OpenResult = z.object({
   maxSessionMs: z.number().int().positive(),
   idleMs: z.number().int().positive(),
   context: z.string().max(2_000).nullable().optional(),
+  trial: QVoiceLiveTrialSchema.optional(),
 });
 const DelegateBody = z
   .object({
@@ -95,12 +98,20 @@ const UsageBody = z
       .min(0)
       .max(24 * 3600),
     final: z.boolean().optional(),
+    // A trial call's own speech count: a hint the Q API bounds.
+    speechSeconds: z
+      .number()
+      .min(0)
+      .max(24 * 3600)
+      .optional(),
   })
   .strict();
 const UsageResult = z.object({
   recordedSeconds: z.number().int().min(0),
   remainingMs: z.number().int().min(0),
   capReached: z.boolean().optional(),
+  trial: QVoiceLiveTrialSchema.optional(),
+  trialSpent: z.boolean().optional(),
 });
 const EndBody = z
   .object({
@@ -290,6 +301,26 @@ export async function relayLive(
     return problem(502);
   }
   if (!upstream.ok) {
+    // The one problem code the browser acts on (a spent live-voice trial)
+    // is passed on; nothing else of the upstream body is.
+    if (upstream.status === 429) {
+      const body: unknown = await upstream.json().catch(() => null);
+      const code: unknown =
+        typeof body === "object" && body !== null
+          ? Reflect.get(body, "code")
+          : undefined;
+      if (code === Q_VOICE_LIVE_TRIAL_SPENT) {
+        return Response.json(
+          {
+            type: "about:blank",
+            title: "Live voice relay",
+            status: 429,
+            code: Q_VOICE_LIVE_TRIAL_SPENT,
+          },
+          { status: 429, headers: { "cache-control": "no-store" } },
+        );
+      }
+    }
     return problem(
       upstream.status === 404 ||
         upstream.status === 503 ||

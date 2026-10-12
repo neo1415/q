@@ -5,7 +5,7 @@ import type {
   onRequestHookHandler,
 } from "fastify";
 
-import { parseContract } from "@capital-q/contracts";
+import { parseContract, Q_VOICE_LIVE_TRIAL_SPENT } from "@capital-q/contracts";
 
 import { getActorContext } from "../../security/actor-context.js";
 import type { VoiceSessionBinding } from "../bindings.js";
@@ -85,13 +85,17 @@ export function registerLiveVoiceRoutes(
   },
 ): void {
   const { broker, withContext } = dependencies;
-  // Off a local deployment only the named people may open a paid line or
-  // see the preview; everyone else is told there is no such thing.
+  // Off a local deployment only the named people may see the preview;
+  // everyone else is told there is no such thing.
   const allowed = (request: FastifyRequest): boolean =>
     dependencies.allowedUsers === null ||
     dependencies.allowedUsers.has(
       getActorContext(request).userId.toLowerCase(),
     );
+  // A paid line: the named people, and the trial's people (whose line the
+  // broker limits to their allowance of active speech).
+  const mayOpen = (request: FastifyRequest): boolean =>
+    allowed(request) || broker.isTrialUser(getActorContext(request).userId);
   const params = (request: FastifyRequest) =>
     request.params as { voiceSessionId?: string; delegationId?: string };
 
@@ -104,7 +108,7 @@ export function registerLiveVoiceRoutes(
         request.body ?? {},
         "That is not a live voice offer.",
       );
-      if (!allowed(request))
+      if (!mayOpen(request))
         return problem(reply, 404, "No such voice session.");
       const actor = getActorContext(request);
       const binding =
@@ -132,8 +136,18 @@ export function registerLiveVoiceRoutes(
       if (opened.kind === "REFUSED") {
         request.log.info({ reason: opened.reason }, "live voice refused");
         // The browser carries on with the standard line on any refusal.
-        // 429 when the provider is out of quota: the browser then skips
-        // every OpenAI line and opens the standard voice.
+        // 429 when the provider is out of quota, or the person's trial is
+        // used up: the browser then skips every OpenAI line and opens the
+        // standard voice (the trial's code lets it say why).
+        if (opened.reason === "TRIAL_SPENT") {
+          return reply.code(429).send({
+            type: "about:blank",
+            title: "Unavailable",
+            status: 429,
+            detail: "Live voice unavailable: TRIAL_SPENT.",
+            code: Q_VOICE_LIVE_TRIAL_SPENT,
+          });
+        }
         return problem(
           reply,
           opened.reason === "PROVIDER_QUOTA" ? 429 : 503,
@@ -263,8 +277,17 @@ export function registerLiveVoiceRoutes(
   app.get(
     Q_VOICE_LIVE_AVAILABLE_PATH,
     { onRequest: availability.hook(withContext) },
-    (request, reply) => {
-      const available = broker.enabled && allowed(request);
+    async (request, reply) => {
+      let available = broker.enabled && mayOpen(request);
+      // A trial person whose allowance is used up starts on the standard
+      // voice; an unreadable use reads as no (one database read, then
+      // remembered with the answer).
+      if (available && broker.isTrialUser(getActorContext(request).userId)) {
+        const trial = await broker
+          .trialFor(getActorContext(request))
+          .catch(() => null);
+        available = trial !== null && trial.remainingSeconds > 0;
+      }
       availability.remember(request, available);
       return reply
         .code(200)

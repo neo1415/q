@@ -100,6 +100,21 @@ export type LiveVoiceProvider = {
    * throws.
    */
   readonly closeSession?: ((sessionId: string) => Promise<boolean>) | undefined;
+  /**
+   * Listens to a session's own events over the documented sideband (the
+   * trial's speech meter). Every parsed event goes to `onEvent`; `onLost`
+   * is called once if the socket cannot attach or closes before `stop`.
+   * Never throws.
+   */
+  readonly observeSession?:
+    | ((
+        sessionId: string,
+        handlers: {
+          readonly onEvent: (event: unknown) => void;
+          readonly onLost: () => void;
+        },
+      ) => { readonly stop: () => void })
+    | undefined;
 };
 
 /**
@@ -158,6 +173,10 @@ export function liveSessionBody(config: LiveSessionConfig) {
     delegation: { type: "client" },
   } as const;
 }
+
+/** The sideband address of a session (guides/voice-server-controls). */
+const attachUrl = (url: string, sessionId: string) =>
+  `${url.replace(/^http/u, "ws")}/${sessionId}/attach`;
 
 export function createGptLiveProvider(options: {
   readonly apiKey: string;
@@ -223,7 +242,7 @@ export function createGptLiveProvider(options: {
           resolve(false);
           return;
         }
-        const attach = `${url.replace(/^http/u, "ws")}/${sessionId}/attach`;
+        const attach = attachUrl(url, sessionId);
         let socket: LiveSidebandSocket;
         try {
           socket = sideband(attach, {
@@ -270,5 +289,56 @@ export function createGptLiveProvider(options: {
           // The close event follows.
         });
       }),
+    // The trial meter: the session's events as the server receives them.
+    // Only event types are read; nothing is logged or stored.
+    observeSession: (sessionId, handlers) => {
+      let stopped = false;
+      let lost = false;
+      const loseOnce = () => {
+        if (stopped || lost) return;
+        lost = true;
+        handlers.onLost();
+      };
+      if (!SESSION_ID.test(sessionId)) {
+        queueMicrotask(loseOnce);
+        return { stop: () => undefined };
+      }
+      let socket: LiveSidebandSocket;
+      try {
+        socket = sideband(attachUrl(url, sessionId), {
+          authorization: `Bearer ${options.apiKey}`,
+        });
+      } catch {
+        queueMicrotask(loseOnce);
+        return { stop: () => undefined };
+      }
+      socket.addEventListener("message", (message) => {
+        if (stopped) return;
+        const data: unknown = Reflect.get(Object(message), "data");
+        if (typeof data !== "string") return;
+        let event: unknown;
+        try {
+          event = JSON.parse(data);
+        } catch {
+          return;
+        }
+        handlers.onEvent(event);
+      });
+      socket.addEventListener("close", loseOnce);
+      socket.addEventListener("error", () => {
+        // The close event follows.
+      });
+      return {
+        stop: () => {
+          if (stopped) return;
+          stopped = true;
+          try {
+            socket.close();
+          } catch {
+            // Already closing.
+          }
+        },
+      };
+    },
   };
 }
