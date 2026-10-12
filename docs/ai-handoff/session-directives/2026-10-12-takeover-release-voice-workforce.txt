@@ -1,0 +1,231 @@
+# CAPITAL Q — CODEX TAKEOVER, OCTOBER 12
+
+You are resuming full engineering and release ownership of Capital Q, repository `neo1415/q`.
+
+Claude Code has reached its session limit after substantial production work. Continue exactly where it stopped.
+
+**This is a continuation, not a new implementation or architectural reset.**
+
+Our ultimate goal remains an exceptionally intelligent, fast, natural, context-aware Q that remembers, reasons, delegates to working agents, produces real deliverables and gives founders and investors a premium product experience.
+
+## 1. Recover the exact state
+
+Read `AGENTS.md`, `CLAUDE.md`, `docs/ai-handoff/START-HERE.md`, `STATE.md`, `ACTIVE-TASKS.md`, the latest `HANDOFF-LOG.md` and relevant recent PRs.
+
+Verify GitHub and Railway before assuming any checkpoint is current.
+
+Last independently verified:
+
+- Production branch: `61dbe92977030064f4708a1b3abcd12bd6f1851c`.
+- Integration branch: `70c7c4bc27cf7188759181253a6131e708b74eb3`.
+- PR #26: merged, including natural go-ahead re-planning and faster company lookups.
+- PR #27: merged, including Work document discoverability and agent-result recall.
+- PR #29: merged and deployed.
+- PR #28: merged, two-account cumulative active-speech voice trial.
+- PR #30: merged, reducing unnecessary model-facing tool schemas.
+- PR #31: open, clean, exact-head CI GREEN, pending deployment of voice trial and the latest integration tree.
+- PR #32: open, clean, exact-head CI GREEN, founder rehearsal memory, not deployed.
+
+Recheck these before taking action. Preserve all completed work.
+
+Claude may resume independently later; avoid concurrent changes to the same branches or deployment lanes. You own this takeover until explicitly handed back.
+
+## 2. P0 — Finish the pending releases
+
+PR #31 is ready for release based on its last exact-head CI. Reconfirm the checks and release state, then complete the established protected deployment flow.
+
+Verify Railway web, api, q-api and workers at the intended revision.
+
+This release includes the two-user voice trial and the tool-budget optimization.
+
+The database migration `20261222160000_q_voice_live_trial_usage` was already reported applied. Verify that rather than applying it again blindly.
+
+Then review PR #32, merge after confirming its exact checks and compatibility, and promote separately through the normal release process.
+
+Don't confuse passing CI with completed production verification.
+
+## 3. P0 — Fix the live workforce failures
+
+### A. Diligence question drafting
+
+Claude reproduced a genuine live failure.
+
+The investment research, memo, critique and revision completed, but the diligence step failed because the model generated questions exceeding the existing 180-character database/action limit.
+
+Do not increase that limit or truncate important questions arbitrarily.
+
+Inspect:
+
+- `apps/q-api/src/composition/workforce/diligence.ts`
+- `apps/q-api/src/composition/workforce/models.ts`
+- The `DILIGENCE_QUESTIONS` prompt, schema and model gateway.
+- Existing workforce diligence tests.
+
+Implement a bounded, intelligent repair step that rewrites only invalid overlong questions while retaining their meaning and the related evidence gap.
+
+Revalidate the repaired output through the existing schema. Preserve question quality. Fail accurately if repair cannot produce valid questions.
+
+Add realistic regressions for repeated overlength model output, repair failures, cancellation and safe action creation.
+
+Do not send the questions automatically.
+
+### B. Completed-work conversational recall
+
+Claude found that Q called `list_q_work` successfully but sometimes replied that the critique and diligence question text were unavailable.
+
+The results actually exist in the persistent workforce outputs.
+
+Investigate the exact stored data and tool-read path, including whether PR #27 already addressed part of this problem.
+
+Q must be able to answer naturally:
+
+"What did your reviewer criticize?"
+
+"What changed between memo versions 1 and 2?"
+
+"What five diligence questions did the team prepare?"
+
+"Open the revised memo."
+
+All answers must use the original owned job and authorized canonical records.
+
+Do not create duplicate state or fabricate answers from a summary.
+
+### C. Full live acceptance
+
+Run a fresh complete investor journey with an authorized fictional account:
+
+Investment goal → plan card → user approval → research → memo → independent critique → revision → five diligence questions → pending approval card.
+
+Verify actual sources, immutable memo versions, readable PDF, Work viewer and same-conversation follow-up.
+
+Only the specific team-plan approval may be exercised automatically. Never approve or execute founder-contact actions.
+
+Codex previously achieved this flow in 47.4 seconds with five research sources, eight critique issues and a version-2 memo. Use that as historical evidence, not a guaranteed runtime.
+
+## 4. P0 — Verify the two-account live-voice trial
+
+The only trial accounts are:
+
+Investor:
+`[existing trial account identity retained privately]`
+
+Founder:
+`[existing trial account identity retained privately]`
+
+Each account receives a cumulative allowance of **300 seconds of actual speaking time** across voice sessions.
+
+Count user speech and Q speech, excluding silence and idle waiting.
+
+The allowance must persist across reconnects, devices, browser refreshes, server instances and application restarts.
+
+Verify server-side charging and refusal when the quota is exhausted.
+
+Check that:
+
+- Voice works for both permitted accounts.
+- The correct account IDs were configured.
+- No other user gained unintended access.
+- Silence does not consume the allowance.
+- A reconnect does not reset the allowance.
+- Concurrent sessions cannot exceed the allowance.
+- The UI communicates remaining time and exhaustion clearly.          XZzaaaaaaaaaa
+- The trial cannot be bypassed using a different session endpoint.
+
+Use controlled short sessions for verification. Avoid unnecessary provider spend.
+
+Do not alter the established access entitlements for everyone else.
+
+## 5. P1 — Make Q faster and more natural
+
+Continue Claude's measured latency work.
+
+Prior findings:
+
+- Selected-company first useful text improved from 9.9s to 3.0s in one paired run.
+- The risks follow-up remained significantly slower.
+- Earlier changes reduced duplicated company lookups and unnecessary model-facing tools.
+- PR #30 reduced tool-schema tokens for ordinary read-only questions.
+
+Benchmark the newly integrated system.
+
+Identify wasted model turns, duplicated reads, classification overhead, prompt-cache misses and unnecessary serialization.
+
+Preserve conversational intelligence and response quality.
+
+Optimize streaming text, first meaningful response, voice responsiveness, graph/retrieval latency and multi-agent progress.
+
+Measure p50/p95 where enough samples are available rather than generalizing from one run.
+
+## 6. P1 — Complete the intelligence and memory experience
+
+Q must naturally recall relevant prior discussions, user-authorized company knowledge, previous decisions, completed agent work and rehearsal feedback.
+
+Test:
+
+- "Remember Tensorgate?"
+- "What changed since last time?"
+- "What did your agents find?"
+- "What did the reviewer change?"
+- "What should I practise before my next pitch?"
+- "Continue the work we started yesterday."
+
+Preserve distinctions between historical statements, verified facts, unverified claims and current knowledge.
+
+Investigate Hermes Agent's efficient caching, context management, tool execution and experience-based reusable skills.
+
+Evaluate Graphify-style knowledge graphs for authorized multi-hop evidence retrieval and entity relationships. Use Q's existing canonical knowledge infrastructure.
+
+Obsidian compatibility is optional, not the brain itself.
+
+Implement proven improvements, not fashionable integrations.
+
+## 7. P2 — Continue the actual product
+
+After the release and urgent defects, continue independently toward the full product goals:
+
+- Better interactive answers and evidence presentations.
+- More natural founder/investor conversations.
+- Fast and reliable agent delegation.
+- Discoverable, editable Work outputs.
+- High-quality revisions, reports, PDFs and other generated artifacts.
+- Stronger memory across voice, chat and Work.
+- Premium UX without unnecessary complexity.
+- Real Tavus video interviewers powered by the existing Q brain, with approved session limits and persistent feedback.
+- Secure reusable agent skills and graph-enhanced contextual reasoning.
+
+Preserve existing voice navigation, interface design, document engines, scoring logic and permission boundaries.
+
+Do not build replacement systems on top of working ones.
+
+## 8. Autonomy, delegation and engineering quality
+
+You have broad autonomy to investigate, implement, refactor, delegate, benchmark, test, merge and deploy within the established safeguards.
+
+Use specialist subagents for independent work when useful. Prefer economical capable models for routine execution and stronger reasoning models for difficult problems.
+
+Keep progressing on independent tasks while CI runs.
+
+Do not stop after one easy fix.
+
+Never disable legitimate tests, weaken RLS, bypass approvals, expose secrets or manufacture green results.
+
+Keep API spending controlled and do not rotate across provider accounts to evade usage limits.
+
+Verify real behavior as a founder and investor, not only through unit tests.
+
+Update the shared handoff with exact commits, test results, production revisions, known failures and next actions. Commit and push all safe completed work before the session ends.
+
+## 9. What I expect from this run
+
+First deliver the pending release and working voice trial.
+
+Then fix and live-verify the diligence drafting and agent-result recall defects.
+
+Next verify rehearsal memory and continue measurable improvements to Q's speed, reasoning, contextual memory and actual product experience.
+
+Report clearly what is IMPLEMENTED, CI GREEN, DEPLOYED and LIVE VERIFIED.
+
+**Maintain momentum. Continue Capital Q. Don't restart it.**
+
+Start immediately.

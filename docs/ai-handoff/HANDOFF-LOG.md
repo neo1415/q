@@ -459,3 +459,16 @@ The tracked runner creates internal Q turns for an existing authorized account o
 - Fresh GitHub confirms PRs #19–#22 merged, integrated 58812685. PR #23 exact CI 38242394741 and GitGuardian PASS; normal merge promotes deployment branch to 221ff996. Four-service rollout pending; previous all-four-success rollback 5d9837bf. PR18 also passed exact CI and merged a3a4eb6b. No migration or unverified WIP release.
 - Native Work approvals/context continuation changes now pass root/q-api/web types and final lint/format. Diligence tests parse captured unknown inputs rather than unsafe nested matcher assignments; missing original conversation explicitly fails. Code checkpoint still separate from already merged Work documents.
 - Attempted refreshed-fictional-session browser baseline failed before launch: documented /opt/pw-browsers/chromium does not exist. No product failure, timing or browser acceptance claim. Locate pinned browser and rerun after actual rollout. Latest user continuation directive stored verbatim; it explicitly authorizes independent parallel agent lanes.
+
+## 2026-10-12 17:55 UTC — newest takeover/release recovered; real trial gaps reproduced
+
+- Fresh integration70c7c4bc and deployed61dbe929 recovered; PR31 exact38266181317 green, normallymergedc5aa0e1; all four SUCCESS and deploymentpush38285031146 SUCCESS. Applied voice migration independently verified (RLS/no clientaccess), no reapply. Two configured300-second identities match actual existingaccounts; both authenticated LIVE availability200true, no paidprobe.
+- PR32 reviewed/green38265160940, merged74343719; pinnedPR33 exact38285348877 pendingfulltest. Root52builds/14rehearsaltests PASS. Diligence repair585ec5ad cherry-pickeda6cbc121, source33tests/types/staticgreen; combinedgates/newCI pending. Existing180canonical cap preserved; no arbitrarytruncation/send.
+- Actual voice regression failures include reconnectreset, concurrent306seconds, writefail-open,15/30second speechundercount and unmeteredbootstrap/fallback. Scoped fixes+durableclaim underway; notfulltrialacceptance. No source/store reset or newmigrationapplied. Keep canonicalusageledger; donotmerge supersededbrowser-meterprototype.
+- All older abandonedchanges inspected and safeWIPcommitted/pushed60f32642/13019cbb/7eaa7885, explicitlyunverified/superseded. Earlier accepted realmemo/PDF/critique and measuredlatency preserved; latestSTATE lists exactrelease,rollback,knownfails,reproduction,nextactions. Latest directive retained withprivateemailsredacted.
+
+### 2026-10-12 18:14 UTC — repair combined gates and existing-job acceptance
+
+- Combined diligence repair: 52 package builds, 33 tests/four files, root/q-api types, changed lint/format PASS. Exact CI pending.
+- Restored protected acceptance response-shape/substantive-revision/read-only fixes; live existing owned-job verification PASS (five sources, READY v2, real material revision, 239,597-byte PDF, five pending unexecuted questions). No new paid job or founder contact. Private receipt `/tmp/cq-workforce-acceptance-F7omnH`.
+- PR33 merged `047678e5`; latest workers/api SUCCESS, q-api/web DEPLOYING. Strict voice guard remains under independent integration; no new migration applied.
