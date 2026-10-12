@@ -959,6 +959,7 @@ export {
 } from "./errands.js";
 // REHEARSE block (2026-10-01)
 export * from "./rehearsals.js";
+export * from "./rehearsal-video.js";
 // end REHEARSE block
 export {
   Q_CONDUCT_ACTIONS,
