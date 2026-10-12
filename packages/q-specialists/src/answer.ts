@@ -2345,21 +2345,41 @@ export function createSpecialistQAnswer(
    * request to act, and never a reason to show anything: it brings the
    * Relationships area's actions into the offer, which authorize decides.
    */
+  /**
+   * Their counterparts' names, read once per run: started beside the turn
+   * reading (latency) and taken up after it. A read of their own
+   * relationships under the run's own actor; it changes nothing.
+   */
+  const counterpartReads = new Map<string, Promise<readonly string[]>>();
+  const counterpartsOf = (
+    request: QAnswerRequest,
+  ): Promise<readonly string[]> => {
+    const port = dependencies.counterpartNames;
+    if (port === undefined) return Promise.resolve([]);
+    const started = counterpartReads.get(request.runId);
+    if (started !== undefined) return started;
+    const reading = port(request).catch(() => [] as readonly string[]);
+    counterpartReads.set(request.runId, reading);
+    while (counterpartReads.size > PREREADS_MAX) {
+      const oldest = counterpartReads.keys().next().value;
+      if (oldest === undefined) break;
+      counterpartReads.delete(oldest);
+    }
+    return reading;
+  };
+  /** An investor's run on a company: across a relationship by its plan. */
+  const companyAcrossRelationship = (request: QAnswerRequest): boolean =>
+    ownInvestorOrganisationIn(request.plan) !== null &&
+    request.subjects.some((subject) => subject.kind === "COMPANY");
+
   const aboutCounterparty = async (
     request: QAnswerRequest,
     utterance: string,
     read: { readonly kind: string } | null,
   ): Promise<boolean> => {
     if (read?.kind !== "TOOL_REQUEST") return false;
-    if (
-      ownInvestorOrganisationIn(request.plan) !== null &&
-      request.subjects.some((subject) => subject.kind === "COMPANY")
-    ) {
-      return true;
-    }
-    const names = await (
-      dependencies.counterpartNames?.(request) ?? Promise.resolve([])
-    ).catch(() => []);
+    if (companyAcrossRelationship(request)) return true;
+    const names = await counterpartsOf(request);
     if (names.length === 0) return false;
     return names.some((name) => namedInWords(utterance, name));
   };
@@ -3369,6 +3389,9 @@ export function createSpecialistQAnswer(
       }
       return earlyRead ?? (await readTurn().catch(() => null));
     })();
+    // Read beside the reading rather than after it: a request to act that
+    // names one of their counterparts needs these names once it is read.
+    if (!companyAcrossRelationship(request)) void counterpartsOf(request);
     // K fast lane: the short first read, begun beside the firewall when it
     // could be, races the full reading. A HIGH confidence "companies of a
     // kind" or "fit" is answered by the read-only app query at once; any

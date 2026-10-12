@@ -195,6 +195,7 @@ function seam(options: {
   const unread: boolean[] = [];
   const capabilities: unknown[] = [];
   let reads = 0;
+  let counterpartReads = 0;
   const heardActions: unknown[] = [];
   const declaredActions: string[][] = [];
   const askedActions: (string | undefined)[] = [];
@@ -348,8 +349,10 @@ function seam(options: {
     ...(options.counterpartNames === undefined
       ? {}
       : {
-          counterpartNames: () =>
-            Promise.resolve(options.counterpartNames ?? []),
+          counterpartNames: () => {
+            counterpartReads += 1;
+            return Promise.resolve(options.counterpartNames ?? []);
+          },
         }),
     ...(options.profileGaps === undefined
       ? {}
@@ -378,6 +381,7 @@ function seam(options: {
     unread,
     capabilities,
     reads: () => reads,
+    counterpartReads: () => counterpartReads,
     heardActions,
     declaredActions,
     askedActions,
@@ -3767,6 +3771,31 @@ describe("a request naming a counterparty brings Relationships into the offer", 
       ],
       widen: true,
     });
+  });
+
+  it("reads their counterparts beside the reading, once, not after it (latency)", async () => {
+    let release: (reading: TurnReaderResult) => void = () => undefined;
+    const reading = new Promise<TurnReaderResult>((resolve) => {
+      release = resolve;
+    });
+    let counterpartsBeforeReading = -1;
+    const run = seam({
+      said: "Ask Ledgerfold for their last 12 months of management accounts.",
+      reading: null,
+      read: () => reading,
+      outcomes: [],
+      counterpartNames: ["Ledgerfold"],
+    });
+    const answering = run.answer.answer(request());
+    // The reading has not landed; the counterparts are already being read.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    counterpartsBeforeReading = run.counterpartReads();
+    release(untold());
+    await answering;
+    expect(counterpartsBeforeReading).toBe(1);
+    // Taken up after the reading, never read a second time.
+    expect(run.counterpartReads()).toBe(1);
+    expect(run.focuses.at(-1)).toMatchObject({ areas: ["Relationships"] });
   });
 
   it("5dd9bec5 (Savanna, investor): 'Ask Ledgerfold for their last 12 months of management accounts.'", async () => {
