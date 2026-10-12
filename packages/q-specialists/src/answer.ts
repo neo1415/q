@@ -7,7 +7,11 @@ import {
   type QAppActionPrepared,
   type TurnAppAction,
 } from "./app-action-turn.js";
-import { namesWebAddress, RESEARCH_TOOLS, toolFocusOf } from "./tool-focus.js";
+import {
+  namesWebAddress,
+  PLAIN_QUESTION_FOCUS,
+  toolFocusOf,
+} from "./tool-focus.js";
 import {
   TEAM_JOB_KINDS,
   goAheadGoal,
@@ -3320,7 +3324,7 @@ export function createSpecialistQAnswer(
           // What a plain question's focus is (toolFocusOf): the purpose's
           // list with the public-web tools leading, so the speculation
           // holds the web exactly as the turn's own answer would.
-          toolFocus: { areas: [], tools: [...RESEARCH_TOOLS], widen: true },
+          toolFocus: PLAIN_QUESTION_FOCUS,
         },
         answer: (shaped) => delegate.answer(shaped),
         observe: (event) => {
