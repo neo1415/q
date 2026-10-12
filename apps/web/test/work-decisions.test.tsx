@@ -382,6 +382,42 @@ describe("Done for you", () => {
     expect(doneGroups(merged)[1]?.items).toHaveLength(2);
   });
 
+  it("puts Open document on a finished job's own Done for you row", () => {
+    const finished = WorkforceJobDetailDtoSchema.parse({
+      ...job([], "JOB"),
+      job: {
+        ...job([], "JOB").job,
+        goal: "Research Kestrel Heat and write me a memo",
+        status: "DONE",
+        updatedAt: "2026-10-08T09:00:00Z",
+      },
+      documents: [
+        {
+          artifactId: id(950),
+          type: "MEMO",
+          status: "READY",
+          title: "Kestrel Heat memo",
+          currentVersion: 2,
+          createdAt: "2026-10-08T08:00:00Z",
+          updatedAt: "2026-10-08T09:00:00Z",
+        },
+      ],
+      documentsUnavailable: false,
+    });
+    render(
+      <DoneForYou
+        now={NOW}
+        initial={{ items: [], thisWeek: 0, nextCursor: null }}
+        jobs={[finished]}
+      />,
+    );
+    const row = document.querySelector(`[data-work-job="${finished.job.id}"]`);
+    expect(row?.textContent).toContain("Kestrel Heat memo · version 2");
+    expect(
+      screen.getByRole("button", { name: /^Open document/u }).closest("li"),
+    ).toBe(row);
+  });
+
   it("reads the next page by the server's cursor, never an offset", async () => {
     listDone.mockResolvedValue({
       ok: true,

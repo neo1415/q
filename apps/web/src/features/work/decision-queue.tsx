@@ -53,6 +53,7 @@ import { retryHeldAction, sendHeldAsIsAction } from "./held-actions";
 import { finishedSince } from "./job-state";
 import { readPlan } from "./plan-words";
 import { listDoneAction } from "./work-page-actions";
+import { DoneJobDocuments } from "./workforce-documents";
 import { outOfTen } from "./workforce-view";
 
 /**
@@ -1040,6 +1041,12 @@ export function DoneForYou({
                 Job done ·{" "}
                 <span suppressHydrationWarning>{ago(one.job.updatedAt)}</span>
               </p>
+              {one.documents === undefined ? null : (
+                <DoneJobDocuments
+                  documents={one.documents}
+                  unavailable={one.documentsUnavailable ?? false}
+                />
+              )}
             </li>
           ))}
         </ul>
