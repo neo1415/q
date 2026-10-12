@@ -20,9 +20,9 @@ import {
   SubstanceCritiqueResultSchema,
   type SubstanceCritiqueResult,
   type SubstanceCritiqueVariables,
-  DiligenceQuestionsResultSchema,
-  type DiligenceQuestionsResult,
-  type DiligenceQuestionsVariables,
+  DiligenceQuestionsCandidateSchema,
+  type DiligenceQuestionsCandidate,
+  type DiligenceQuestionsV2Variables,
   ReplyReaderResultSchema,
   type DraftRedraftResult,
   type DraftRedraftVariables,
@@ -61,7 +61,10 @@ export type RedraftVariables = Omit<DraftRedraftVariables, Frame>;
 export type ReplyVariables = Omit<ReplyReaderVariables, Frame>;
 export type PlanVariables = Omit<JobPlanVariables, Frame>;
 export type CritiqueVariables = Omit<SubstanceCritiqueVariables, Frame>;
-export type DiligenceVariables = Omit<DiligenceQuestionsVariables, Frame>;
+export type DiligenceVariables = Omit<
+  DiligenceQuestionsV2Variables,
+  Frame | "repairQuestions"
+> & { readonly repairQuestions?: string };
 
 const SMALL = {
   maxAttempts: 2,
@@ -119,7 +122,7 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     variables: DiligenceVariables,
-  ) => Promise<DiligenceQuestionsResult | null>;
+  ) => Promise<DiligenceQuestionsCandidate | null>;
 };
 
 export function createWorkforceModels(dependencies: {
@@ -273,13 +276,13 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     diligenceQuestions: (who, trace, variables) =>
-      call<DiligenceVariables, DiligenceQuestionsResult>({
+      call<DiligenceVariables, DiligenceQuestionsCandidate>({
         task: "DILIGENCE_QUESTIONS",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: DiligenceQuestionsResultSchema,
+        schema: DiligenceQuestionsCandidateSchema,
         budget: SMALL,
         environmentNotes:
           "You are drafting questions for the person's approval. Nothing is sent until they approve.",

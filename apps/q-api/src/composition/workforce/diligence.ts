@@ -7,6 +7,7 @@ import {
   type QSubjectRef,
   type QConversationId,
 } from "@capital-q/contracts";
+import { DiligenceQuestionsResultSchema } from "@capital-q/q-core";
 import type { QActionService } from "@capital-q/q-actions";
 import {
   runRef,
@@ -205,32 +206,75 @@ export function createWorkforceDiligence(dependencies: {
     if (current === null)
       return unavailable("The document can no longer be read as you.");
     const companyName = current.title.split(/\s+[—–-]\s+/u)[0] ?? current.title;
+    const variables = {
+      companyName: companyName.slice(0, 120) || "the company",
+      purpose: input.goal.slice(0, 600),
+      gaps:
+        current.content.gaps
+          .map((gap) => `- ${gap}`)
+          .join("\n")
+          .slice(0, 4_000) || "(none stated)",
+      critique:
+        input.critique
+          .map((line) => `- ${line}`)
+          .join("\n")
+          .slice(0, 4_000) || "(no critique)",
+      document: critiqueText(current.content).slice(0, 16_000),
+    };
     const drafted = await dependencies.questions(
       { tenantId: actor.tenantId, userId: actor.userId },
       { jobId: input.jobId, runId: input.runId },
-      {
-        companyName: companyName.slice(0, 120) || "the company",
-        purpose: input.goal.slice(0, 600),
-        gaps:
-          current.content.gaps
-            .map((gap) => `- ${gap}`)
-            .join("\n")
-            .slice(0, 4_000) || "(none stated)",
-        critique:
-          input.critique
-            .map((line) => `- ${line}`)
-            .join("\n")
-            .slice(0, 4_000) || "(no critique)",
-        document: critiqueText(current.content).slice(0, 16_000),
-      },
+      variables,
     );
     if (drafted === null)
       return {
         status: "FAILED",
         message: "The questions could not be drafted; nothing was filed.",
       };
-    const questions = drafted.questions.map((one) => one.question);
-    const about = drafted.questions.map((one) => one.about);
+    const validQuestion =
+      DiligenceQuestionsResultSchema.shape.questions.element;
+    const invalid = drafted.questions.filter(
+      (one) => !validQuestion.safeParse(one).success,
+    );
+    let finalDraft = drafted;
+    if (invalid.length > 0) {
+      if (!(await input.canContinue()))
+        return unavailable(
+          "Diligence work stopped before the questions were repaired.",
+        );
+      const repaired = await dependencies.questions(
+        { tenantId: actor.tenantId, userId: actor.userId },
+        { jobId: input.jobId, runId: input.runId },
+        { ...variables, repairQuestions: JSON.stringify(invalid) },
+      );
+      if (
+        repaired === null ||
+        repaired.questions.length !== invalid.length ||
+        repaired.questions.some(
+          (one, index) => one.about !== invalid[index]?.about,
+        )
+      )
+        return {
+          status: "FAILED",
+          message: "The questions could not be repaired; nothing was filed.",
+        };
+      let index = 0;
+      finalDraft = {
+        questions: drafted.questions.map((one) =>
+          validQuestion.safeParse(one).success
+            ? one
+            : (repaired.questions[index++] ?? one),
+        ),
+      };
+    }
+    const accepted = DiligenceQuestionsResultSchema.safeParse(finalDraft);
+    if (!accepted.success)
+      return {
+        status: "FAILED",
+        message: "The questions could not be repaired; nothing was filed.",
+      };
+    const questions = accepted.data.questions.map((one) => one.question);
+    const about = accepted.data.questions.map((one) => one.about);
     if (!(await input.canContinue()))
       return unavailable("Diligence work stopped before the card was filed.");
     const relationship = await dependencies
