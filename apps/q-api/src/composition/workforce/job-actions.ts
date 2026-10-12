@@ -502,7 +502,7 @@ export function createWorkforceJobBoard(dependencies: {
             24,
           ),
           budgetUsd: usd(budget),
-          cannot: planned.cannot.slice(0, 5).map((line) => line.slice(0, 300)),
+          cannot: planned.cannot.slice(0, 5),
         });
         if (!parsed.success) return { status: "NOT_PLANNED" };
         prepared.set(runId, {

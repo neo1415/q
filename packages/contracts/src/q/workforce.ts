@@ -461,6 +461,13 @@ export const WorkforcePlannedStepSchema = z
   .strict();
 export type WorkforcePlannedStep = z.infer<typeof WorkforcePlannedStepSchema>;
 
+/**
+ * One line of what a job asked that no permitted agent can do. Room for a
+ * real sentence: live 2026-10-12 a 200-character ceiling refused a whole
+ * plan over one honest limitation line, and Q could plan nothing.
+ */
+export const WORKFORCE_PLAN_CANNOT_MAX_LENGTH = 600;
+
 export const WorkforceJobStartPayloadSchema = z
   .object({
     ownerUserId: UuidSchema,
@@ -472,7 +479,7 @@ export const WorkforceJobStartPayloadSchema = z
     permitted: z.array(z.string().max(80)).max(24),
     budgetUsd: UsdSchema,
     /** What it asked that no permitted tool can do, in plain words. */
-    cannot: z.array(z.string().max(300)).max(5),
+    cannot: z.array(z.string().max(WORKFORCE_PLAN_CANNOT_MAX_LENGTH)).max(5),
   })
   .strict();
 export type WorkforceJobStartPayload = z.infer<
