@@ -177,6 +177,8 @@ function seam(options: {
     createdAt: new Date().toISOString(),
     ...(options.spoken === true ? { utteranceRef: "utt-1" } : {}),
   };
+  /** The conversation the seam's lines are in; a test may start another. */
+  const conversation = { id: CONVERSATION as string };
   const directives: (QResearchDirective | undefined)[] = [];
   const marked: string[] = [];
   const earlier: QConversationMessage[] = (options.earlier ?? []).map(
@@ -273,7 +275,17 @@ function seam(options: {
     repositories: {
       messages: {
         listRecentForConversationOfRun: () =>
-          Promise.resolve([...earlier, message]),
+          Promise.resolve(
+            [...earlier, message].map((line) =>
+              conversation.id === CONVERSATION
+                ? line
+                : {
+                    ...line,
+                    conversationId:
+                      conversation.id as QConversationMessage["conversationId"],
+                  },
+            ),
+          ),
         mark: (_tx: unknown, input: { messageIds: readonly string[] }) => {
           marked.push(...input.messageIds);
           return Promise.resolve();
@@ -356,6 +368,10 @@ function seam(options: {
     marked,
     message,
     earlierLines: earlier,
+    /** The same person's lines, now in a new conversation. */
+    newConversation: () => {
+      conversation.id = randomUUID();
+    },
     probes,
     leads,
     investigated: () => investigated,
@@ -1527,7 +1543,25 @@ describe("the turn read early, beside the firewall (ADR 0035)", () => {
     expect(run.reads()).toBe(3);
   });
 
-  it("is not made for a conversation's first turn", async () => {
+  it("is made for a new conversation's first turn from the person's last actions: one reading, used", async () => {
+    const run = navigate();
+    // An earlier conversation of theirs taught the reader's actions.
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(1);
+    run.newConversation();
+    const first = request();
+    early(run, first);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Read beside the firewall, before the answer began.
+    expect(run.reads()).toBe(2);
+    const outcome = await run.answer.answer(first);
+    expect(outcome.kind).toBe("ANSWERED");
+    // Exactly one reading for the new conversation's first turn: the early one.
+    expect(run.reads()).toBe(2);
+    expect(run.stored.at(-1)?.content).toMatch("Opening Discover…");
+  });
+
+  it("is not made for a person's first turn this process has seen", async () => {
     const run = navigate();
     const first = request();
     early(run, first);

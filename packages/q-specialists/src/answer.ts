@@ -2283,6 +2283,16 @@ export function createSpecialistQAnswer(
    * Q's own vocabulary, not anyone's data.
    */
   const lastActions = new Map<string, string>();
+  /**
+   * The same, by the person (tenant and user): a conversation's first turn
+   * has no actions of its own yet, but the person's last plan usually
+   * offered exactly the same ones, so its early reading can be made from
+   * them. Still taken up only on an exact match with this turn's own plan;
+   * the reader is never told an action this person was not last offered.
+   */
+  const lastActionsByActor = new Map<string, string>();
+  const actorKeyOf = (tenantId: string, userId: string): string =>
+    `${tenantId}:${userId}`;
   /** Early readings by run, bounded; dropped on refusal or when unused. */
   type EarlyReading = {
     readonly messageId: string;
@@ -2439,8 +2449,10 @@ export function createSpecialistQAnswer(
           preskims.delete(oldest);
         }
       }
-      const key = lastActions.get(conversationId);
-      // A conversation's first turn has no known actions: read later.
+      const key =
+        lastActions.get(conversationId) ??
+        lastActionsByActor.get(actorKeyOf(input.tenantId, input.actor.userId));
+      // A person this process has not yet read for: read later.
       if (key === undefined) return null;
       const actions = JSON.parse(key) as ReaderAction[];
       const reading = turns
@@ -3331,6 +3343,13 @@ export function createSpecialistQAnswer(
       const oldest = lastActions.keys().next().value;
       if (oldest !== undefined) lastActions.delete(oldest);
     }
+    const actorKey = actorKeyOf(request.tenantId, request.actor.userId);
+    lastActionsByActor.delete(actorKey);
+    lastActionsByActor.set(actorKey, actionsKey(actions));
+    if (lastActionsByActor.size > MAX_CONVERSATIONS) {
+      const oldest = lastActionsByActor.keys().next().value;
+      if (oldest !== undefined) lastActionsByActor.delete(oldest);
+    }
     const readingFirst = (async () => {
       const ready = early === undefined ? null : await early;
       const earlyRead =
@@ -3339,6 +3358,15 @@ export function createSpecialistQAnswer(
         ready.actionsKey === actionsKey(actions)
           ? await ready.reading
           : null;
+      if (ready !== null && earlyRead === null) {
+        logger?.info(
+          {
+            qRunId: request.runId,
+            sameActions: ready.actionsKey === actionsKey(actions),
+          },
+          "q early reading not used",
+        );
+      }
       return earlyRead ?? (await readTurn().catch(() => null));
     })();
     // K fast lane: the short first read, begun beside the firewall when it
