@@ -1,5 +1,6 @@
 import {
   ModelSensitivitySchema,
+  Q_ARTIFACT_FINDING_STATEMENT_MAX_LENGTH,
   QArtifactContentSchema,
   QBrandPaletteSchema,
   QDocumentPipelineStageSchema,
@@ -33,7 +34,11 @@ export const DocumentJobInputSchema = z
     title: z.string().trim().min(1).max(160),
     summary: z.string().trim().min(1).max(600),
     content: QArtifactContentSchema,
-    grounding: z.array(z.string().max(2_000)).max(400),
+    // The findings' statements, whole: the same budget a document finding
+    // has (2026-10-12), never truncated to fit.
+    grounding: z
+      .array(z.string().max(Q_ARTIFACT_FINDING_STATEMENT_MAX_LENGTH))
+      .max(400),
     sectorCodes: z.array(z.string().max(64)).max(24),
     directionChosen: z.boolean(),
     brand: z

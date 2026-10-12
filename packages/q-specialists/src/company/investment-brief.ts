@@ -3,7 +3,6 @@ import type {
   QArtifactSection,
   QPublicFinding,
 } from "@capital-q/contracts";
-import { Q_FINDING_STATEMENT_MAX_LENGTH } from "@capital-q/contracts";
 import {
   COMPANY_INTELLIGENCE_DIMENSIONS,
   type CompanyIntelligenceDimension,
@@ -121,18 +120,16 @@ export function inventsFigures(
 /** The public projection of a finding: no evidence identifiers travel. */
 /**
  * The public projection of a finding, as a document stores it: no evidence
- * identifiers, and a statement within the finding contract. A specialist's
- * own statement is unbounded (a public-research synthesis can run long);
- * live 2026-10-12 a named-company memo was refused whole at the document
- * job for one statement over the limit. It is shortened on a sentence or a
- * word, marked with an ellipsis, never cut mid-word; the full finding
- * stays where it came from.
+ * identifiers travel, and the statement is kept whole (documents carry the
+ * larger Q_ARTIFACT_FINDING_STATEMENT_MAX_LENGTH; live 2026-10-12 a memo
+ * was refused for one statement over the 2,000 a stored claim allows).
+ * One function for the brief, memo, one-pager and deck composers.
  */
 export function toPublicFinding(finding: CompanyFinding): QPublicFinding {
   return {
     findingId: finding.findingId,
     type: finding.type,
-    statement: withinFindingLimit(finding.statement),
+    statement: finding.statement.trim(),
     truthClass: finding.truthClass,
     evidenceStatus: finding.evidenceStatus,
     confidence: finding.confidence,
@@ -336,17 +333,4 @@ export function applyRevisedBodies(input: {
     summary: summary.slice(0, 600),
     content: { ...input.base.content, sections },
   };
-}
-
-export function withinFindingLimit(
-  statement: string,
-  max: number = Q_FINDING_STATEMENT_MAX_LENGTH,
-): string {
-  const clean = statement.trim();
-  if (clean.length <= max) return clean;
-  const head = clean.slice(0, max - 1);
-  const sentenceEnd = head.lastIndexOf(". ");
-  if (sentenceEnd >= max / 2) return `${head.slice(0, sentenceEnd + 1)} …`;
-  const space = head.lastIndexOf(" ");
-  return `${head.slice(0, space > 0 ? space : max - 1)}…`;
 }
