@@ -2,14 +2,17 @@ import type {
   QArtifactContent,
   QArtifactSection,
   QChart,
-  QPublicFinding,
   QSlide,
   QVisualDirection,
 } from "@capital-q/contracts";
 import type { CompanyIntelligenceDimension } from "@capital-q/q-core";
 
 import type { CompanyFinding, CompanyIntelligenceResult } from "./contracts.js";
-import { inventsFigures, recordOpening } from "./investment-brief.js";
+import {
+  inventsFigures,
+  recordOpening,
+  toPublicFinding,
+} from "./investment-brief.js";
 
 /**
  * The investor deck Q composes (QX-004 §2, §3, §4, §6).
@@ -113,20 +116,6 @@ const PUBLIC_COVER_LINE =
   "Preliminary · built from public sources · not verified by Capital Q";
 const PUBLIC_SUMMARY_NOTE =
   "This is a preliminary deck built only from public sources. Capital Q holds no record of the company and has verified none of it; what the sources do not say is listed as not known.";
-
-/** The public projection of a finding: no evidence identifiers travel. */
-function toPublicFinding(finding: CompanyFinding): QPublicFinding {
-  return {
-    findingId: finding.findingId,
-    type: finding.type,
-    statement: finding.statement,
-    truthClass: finding.truthClass,
-    evidenceStatus: finding.evidenceStatus,
-    confidence: finding.confidence,
-    subjects: [...finding.subjects],
-    evidenceRefs: [],
-  };
-}
 
 /**
  * A finding as a bullet.

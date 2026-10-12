@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { QDocumentPipelineStage, QSlideImage } from "@capital-q/contracts";
+import {
+  QArtifactContentSchema,
+  type QDocumentPipelineStage,
+  type QSlideImage,
+} from "@capital-q/contracts";
 
 import {
   composeGeneralDocument,
@@ -10,6 +14,7 @@ import {
   type IllustrationPort,
   type StockPhotoPort,
 } from "../src/index.js";
+import { withinFindingLimit } from "../src/company/investment-brief.js";
 import type {
   CompanyFinding,
   CompanyIntelligenceResult,
@@ -410,5 +415,25 @@ describe("general documents through the same pipeline", () => {
     });
     expect(composed?.title).toBe("Northstar Logistics — investment memo");
     expect(composed?.content.sections.length).toBeGreaterThan(2);
+  });
+});
+
+describe("a finding longer than the document contract (live 2026-10-12)", () => {
+  it("is shortened on a sentence or a word, and the memo passes the artifact contract", () => {
+    const long = `${"Ledgerfold's public filings describe a reconciliation product for small lenders. ".repeat(40)}End.`;
+    expect(long.length).toBeGreaterThan(2000);
+    const clipped = withinFindingLimit(long);
+    expect(clipped.length).toBeLessThanOrEqual(2000);
+    expect(clipped.endsWith("…")).toBe(true);
+    const composed = composeGeneralDocument({
+      kind: "MEMO",
+      companyName: "Ledgerfold",
+      result: result([finding({ statement: long }), ...FINDINGS]),
+    });
+    expect(composed).not.toBeNull();
+    expect(QArtifactContentSchema.safeParse(composed?.content).success).toBe(
+      true,
+    );
+    expect(withinFindingLimit("Short.")).toBe("Short.");
   });
 });
