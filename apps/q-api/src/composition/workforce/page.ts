@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   UuidSchema,
   WORKFORCE_AGENT_ROLES,
@@ -14,6 +16,7 @@ import type {
   WorkforceJobSummaryDto,
   WorkforceOverviewDto,
   WorkforceTimelineEntryDto,
+  QArtifactDetail,
 } from "@capital-q/contracts";
 
 import type {
@@ -190,6 +193,14 @@ export function createWorkforcePage(dependencies: {
   readonly now?: (() => Date) | undefined;
   /** Recovery D6: the durable work rows behind these jobs (the queue's). */
   readonly work?: Pick<AgentWorkQueue, "forOwner"> | undefined;
+  /** Resolve through the existing artifact service with fresh owner access. */
+  readonly documents?:
+    | ((
+        owner: Owner,
+        organisationId: string | null,
+        artifactIds: readonly string[],
+      ) => Promise<readonly QArtifactDetail[]>)
+    | undefined;
 }) {
   const { store } = dependencies;
 
@@ -449,6 +460,47 @@ export function createWorkforcePage(dependencies: {
       }
       timeline.sort((a, b) => a.at.localeCompare(b.at));
 
+      const work = (await workOf(owner, [detail.job.id])).get(detail.job.id);
+      const completedDocument = z
+        .object({
+          status: z.literal("DONE"),
+          outputs: z.object({ artifactId: UuidSchema }).passthrough(),
+        })
+        .passthrough();
+      const artifactIds = [
+        ...new Set(
+          Object.values(work?.results ?? {}).flatMap((result) => {
+            const parsed = completedDocument.safeParse(result);
+            return parsed.success ? [parsed.data.outputs.artifactId] : [];
+          }),
+        ),
+      ].slice(0, 12);
+      const resolved =
+        artifactIds.length === 0
+          ? []
+          : await (
+              dependencies.documents?.(
+                owner,
+                work?.trace.organisationId ?? null,
+                artifactIds,
+              ) ?? Promise.resolve([])
+            ).catch(() => []);
+      const documents = resolved
+        .filter(
+          (document) =>
+            artifactIds.includes(document.artifact.artifactId) &&
+            document.artifact.status === "READY" &&
+            document.current !== undefined &&
+            document.current.artifactId === document.artifact.artifactId &&
+            document.current.version === document.artifact.currentVersion,
+        )
+        .map((document) => document.artifact)
+        .filter(
+          (document, index, all) =>
+            all.findIndex((one) => one.artifactId === document.artifactId) ===
+            index,
+        );
+
       return {
         job: summary(
           detail.job,
@@ -458,7 +510,7 @@ export function createWorkforcePage(dependencies: {
             held: held.length,
           },
           usd(byJob.get(detail.job.id) ?? 0),
-          (await workOf(owner, [detail.job.id])).get(detail.job.id),
+          work,
         ),
         agents: detail.runs.slice(0, 200).map((run) => ({
           id: run.id,
@@ -477,6 +529,12 @@ export function createWorkforcePage(dependencies: {
         })),
         drafts: drafts.slice(0, 200),
         timeline: timeline.slice(-1_000),
+        ...(artifactIds.length === 0
+          ? {}
+          : {
+              documents,
+              documentsUnavailable: documents.length < artifactIds.length,
+            }),
       };
     },
 

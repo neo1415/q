@@ -21,6 +21,12 @@ vi.mock("../src/features/q/actions", () => ({
   approveQApprovalAction: (id: string) => approve(id),
 }));
 const refresh = vi.fn();
+vi.mock("../src/components/app-shell/global-q", () => ({
+  useGlobalQ: () => ({ askNow: vi.fn() }),
+}));
+// The canonical document viewer is exercised in workforce-documents.test.
+// This run-log suite has no document fixtures or asynchronous viewer work.
+vi.mock("next/dynamic", () => ({ default: () => () => null }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh }),
 }));

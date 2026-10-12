@@ -27,6 +27,25 @@ function publicConfig() {
 export async function signIn(email, baseUrl = API) {
   if (!email.endsWith("@fictional.capitalq.local"))
     throw new Error("live checks run on fictional accounts only");
+  if (process.env.CQ_SESSION_FILE) {
+    const stored = JSON.parse(
+      readFileSync(process.env.CQ_SESSION_FILE, "utf8"),
+    );
+    if (typeof stored.access_token !== "string")
+      throw new Error("Existing fictional session has no access token");
+    const { url, key } = publicConfig();
+    const response = await fetch(`${url}/auth/v1/user`, {
+      headers: {
+        apikey: key,
+        authorization: `Bearer ${stored.access_token}`,
+      },
+    });
+    if (!response.ok) throw new Error("Existing fictional session refused");
+    const user = await response.json();
+    if (user.email !== email)
+      throw new Error("Existing session is for a different fictional account");
+    return { baseUrl, accessToken: stored.access_token };
+  }
   const password = process.env.CQ_SEED_ACCOUNT_PASSWORD;
   if (!password) throw new Error("missing CQ_SEED_ACCOUNT_PASSWORD");
   const { url, key } = publicConfig();
