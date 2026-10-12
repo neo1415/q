@@ -1,5 +1,16 @@
 # Active tasks — authoritative cross-model board
 
+## LATEST STATUS — Codex takeover / PR #14 two failures corrected locally — 2026-10-12 06:20 UTC
+
+- Owner: Codex, branch `codex/takeover-release-pr14`, based on PR #14 head `3a0aea343b8a16cb1dd47c494f4b4e0907cf1d52`. Claude's branch is preserved; no second platform or competing release. Controlling user takeover document is preserved in [session-directives/2026-10-12-engineering-takeover.txt](session-directives/2026-10-12-engineering-takeover.txt).
+- Fresh remote lanes: integrated `9a2e89a3c6bea619f3c48ceffcda080d6d3a01d1`, CI `f829a5d1bf301fa4f595370e368e4810a742868a`, deployed `fdf047457550b8aef23fed3adc710b1e8fe2b113`. All four Railway services SUCCESS at deployed SHA; rollback that verified release until the new gate/rollout passes. No migration in this slice.
+- PR #14 exact failed run `38208967641`: two failures reproduced locally (19 passed). Preserve new Cheque compatibility wording, 8,000-character document findings, attributed round terms, disclosure boundaries and superseded-run CI behavior.
+- LOCAL TESTED correction: stale wording assertion updated; compact comparison fallback repeats only code-derived scores, retaining unknown bands and the unknown-not-negative rule. Complete typed profiles, reasons, bands, confidence, ordering and source/raise data are unchanged. Tool max 32,000 and regression headroom target 31,000 remain unchanged; the ten-profile test now passes and still deep-compares every profile and refuses truly oversized results. No scoring change or original research truncation.
+- Gates: 52 package builds PASS; 79 tests across natural conversation, fit tools, discovery fit, document jobs and workforce documents PASS; root, q-api and web types PASS; changed eslint/prettier PASS. New exact CI and live workforce chain acceptance remain pending; do not call the memo fixed live yet.
+- NEXT: push the focused PR #14 correction, require exact quality + database green, merge/promote through established lanes, verify all four Railway service revisions, then use `workforce-acceptance.mjs --approve` with existing fictional accounts and verify persisted READY memo, real critique/revision, diligence card PENDING and rendered deliverables. Approve only the exact team-job plan; never approve/send the founder-contact card.
+- Tavus keys: six supplied keys stored only in private `/workspace/cq-secrets/tavus-keys.json` mode 600, outside Git. Use one entitled account key; no pooling/failover to evade quota. Do not print or commit values. Existing dormant adapter and ADR 0066 are the reuse path; integration not implemented/live verified yet.
+- ENVIRONMENT BLOCKER: `tavusapi.com` currently fails at the cloud proxy with HTTP tunnel 403 before reaching provider. Saved network-only configuration draft adds `tavusapi.com` and `docs.tavus.io` while retaining every existing domain; `requires_publish=true`. User must review/save/publish environment settings. Saving does not activate it. Continue independent workforce/release work; no paid video session attempted.
+
 ## LATEST STATUS — PR #8 live; workforce memo step failing; fit evidence in PR #11 — 2026-10-12 04:50 UTC
 
 **Deployed (service level).** PR #8 is merged. It moved through the lanes as follows:

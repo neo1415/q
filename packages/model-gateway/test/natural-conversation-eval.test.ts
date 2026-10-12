@@ -464,7 +464,7 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
     // Built from the facts (research 2026-10-07 §4): the set, the top
     // three by name with their scores, the caveats, then the open door.
     expect(text).toBe(
-      "I looked at the five companies you've reached out to. The strongest fits for your mandate: Souqsheet at 10; then Portside at 8.5; then Maji Loop at 8. Cheque size isn't known for any of them yet. One doesn't have enough information for a score yet. I've put them on screen. Want me to dig into one?",
+      "I looked at the five companies you've reached out to. The strongest fits for your mandate: Souqsheet at 10; then Portside at 8.5; then Maji Loop at 8. Cheque compatibility isn't known for any of them yet. One doesn't have enough information for a score yet. I've put them on screen. Want me to dig into one?",
     );
     expect(text).not.toMatch(/fits best, at|out of 10|Pros and cons/u);
     expect(text).not.toMatch(/can't provide|manufacture/u);

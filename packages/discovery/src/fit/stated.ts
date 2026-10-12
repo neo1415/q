@@ -3,6 +3,7 @@ import {
   deckAskTerms,
   type CompanyDeckView,
   type CompanyRaiseView,
+  type FitContextItem,
 } from "@capital-q/contracts";
 
 import type { DeclaredFitFacts } from "./observe.js";
@@ -99,13 +100,50 @@ export function statedEvidenceFrom(input: {
       ? undefined
       : `${termsList.join(", ")} in their deck`;
 
+  // The same as values with their sources, for the row itself.
+  const raiseItems: FitContextItem[] =
+    pitch !== null && deckAmount !== undefined && sameFigure(pitch, deckAmount)
+      ? [{ label: "Raise", value: pitch, source: "PITCH_AND_DECK" }]
+      : [
+          ...(pitch === null
+            ? []
+            : [{ label: "Raise", value: pitch, source: "PITCH" as const }]),
+          ...(deckAmount === undefined
+            ? []
+            : [{ label: "Raise", value: deckAmount, source: "DECK" as const }]),
+        ];
+  const termsItems: FitContextItem[] = [
+    ...(instrument === undefined
+      ? []
+      : [{ label: "Instrument", value: instrument, source: "DECK" as const }]),
+    ...(ask.valuationCap !== undefined
+      ? [
+          {
+            label: "Valuation cap",
+            value: ask.valuationCap,
+            source: "DECK" as const,
+          },
+        ]
+      : ask.valuation !== undefined
+        ? [
+            {
+              label: "Valuation",
+              value: ask.valuation,
+              source: "DECK" as const,
+            },
+          ]
+        : []),
+  ];
+
   const statedRound =
-    raise === undefined && terms === undefined
+    raise === undefined && terms === undefined && minimumCheque === undefined
       ? null
       : {
           ...(raise === undefined ? {} : { raise }),
           ...(minimumCheque === undefined ? {} : { minimumCheque }),
           ...(terms === undefined ? {} : { terms }),
+          raiseItems,
+          termsItems,
         };
 
   const evidence: FitEvidenceLine[] = [];

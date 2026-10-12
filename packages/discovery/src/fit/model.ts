@@ -7,6 +7,7 @@ import {
   type FitHardRuleDto,
   type FitOutcome,
   type FitParameter,
+  type FitParameterContext,
   type FitParameterResultDto,
   type FitProfileDto,
 } from "@capital-q/contracts";
@@ -36,6 +37,8 @@ export type FitObservation = {
    * (not formally shared): shown as stated, never scored.
    */
   readonly stated?: boolean | undefined;
+  /** Known values beside the row, with sources, and what is still open. */
+  readonly context?: FitParameterContext | undefined;
 };
 
 export type FitInputs = {
@@ -124,6 +127,7 @@ export function assessFit(
       stale: known && o.stale,
       applicable: o.applicable,
       ...(!known && o.stated === true ? { stated: true } : {}),
+      ...(o.context === undefined ? {} : { context: o.context }),
     });
   }
 

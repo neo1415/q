@@ -3,6 +3,7 @@
  * company profile's FitPanelSlot takes `FitPanel` with `useCompanyFit`.
  */
 export { FitPanel } from "./fit-panel";
+export { FitContextValues } from "./fit-context";
 export { useCompanyFit, type CompanyFit } from "./use-company-fit";
 export { FitScore, FitRows, FitBreakdownSheet } from "./fit-breakdown";
 export { FitComparisonView, WhyTheseSheet } from "./fit-comparison";
