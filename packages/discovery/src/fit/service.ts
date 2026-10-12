@@ -442,6 +442,19 @@ export function fitComparisonText(
   if (comparison.entries.length === 0) {
     return `None of the ${comparison.considered} companies you can compare has enough known to rank yet.`;
   }
+  // The compact tool fallback accompanies complete typed profiles. Repeat
+  // only their code-derived scores here, not each band/confidence/reason.
+  // Unknown scores remain words; full prose and every profile stay intact.
+  if (options.summaryOnly === true) {
+    const scores = comparison.entries.map((entry) => {
+      const score = fitScoreOutOf10(entry.profile);
+      return `${entry.position}. ${entry.name}: ${score === null ? FIT_BAND_LABELS[entry.profile.band] : `${score}/10`}`;
+    });
+    return [
+      ...scores,
+      `Mandate fit, rules ${comparison.configLabel}. Unknown never counts against a company.`,
+    ].join("\n");
+  }
   const parts = comparison.entries.map(
     (e) => `${e.position}. ${fitProfileText(e.name, e.profile, options)}`,
   );

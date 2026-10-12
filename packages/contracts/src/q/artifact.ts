@@ -4,7 +4,7 @@ import { DecimalStringSchema } from "../common/decimal.js";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { QArtifactIdSchema, QMessageIdSchema, QRunIdSchema } from "./ids.js";
-import { QPublicFindingSchema } from "./finding.js";
+import { QArtifactFindingSchema } from "./finding.js";
 import { QSubjectRefSchema } from "./subject.js";
 
 /**
@@ -91,7 +91,7 @@ export const QArtifactSectionSchema = z
      * being filled in convincingly.
      */
     findings: z
-      .array(QPublicFindingSchema)
+      .array(QArtifactFindingSchema)
       .max(Q_ARTIFACT_FINDINGS_PER_SECTION_MAX)
       .default([]),
   })

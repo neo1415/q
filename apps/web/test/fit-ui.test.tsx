@@ -280,6 +280,21 @@ describe("Q's compact view on the profile", () => {
               applicable: true,
               evidenceStatus: null,
               stated: true as const,
+              context: {
+                items: [
+                  {
+                    label: "Raise",
+                    value: "$4M",
+                    source: "PITCH_AND_DECK" as const,
+                  },
+                  {
+                    label: "Your cheque",
+                    value: "$250k",
+                    source: "YOUR_MANDATE" as const,
+                  },
+                ],
+                open: "Ticket fit: not scored until the round is formally shared",
+              },
               reason:
                 "Raising $4M, said in their pitch and deck, minimum cheque $100k; not formally shared, so not scored.",
             }
@@ -296,8 +311,18 @@ describe("Q's compact view on the profile", () => {
     );
     const glyph = container.querySelector('[data-fit-glyph="STATED"]');
     expect(glyph).not.toBeNull();
-    expect(glyph?.closest("li")?.textContent).toContain("Stated");
-    expect(glyph?.closest("li")?.textContent).not.toContain("Unknown");
+    const row = container.querySelector('[data-fit-row="CHEQUE_SIZE"]');
+    expect(row?.textContent).toContain("Cheque compatibility");
+    expect(row?.textContent).toContain("Stated");
+    expect(row?.textContent).not.toContain("Unknown");
+    // The values themselves, each with its source, and what is still open.
+    expect(row?.textContent).toContain("$4M");
+    expect(row?.textContent).toContain("Raise · From pitch and deck");
+    expect(row?.textContent).toContain("$250k");
+    expect(row?.textContent).toContain("Your cheque · Your mandate");
+    expect(row?.querySelector("[data-fit-context-open]")?.textContent).toBe(
+      "Ticket fit: not scored until the round is formally shared",
+    );
   });
 });
 
@@ -360,7 +385,7 @@ describe("relationship fit chips", () => {
       <RelationshipFitChips profile={KORA.fit.profile} />,
     );
     expect(container.textContent).toContain("Good fit · medium confidence");
-    expect(container.textContent).toContain("Round unknown");
+    expect(container.textContent).toContain("Round terms unknown");
     expect(
       container.querySelectorAll('[data-fit-glyph="STRONG"]'),
     ).toHaveLength(3);

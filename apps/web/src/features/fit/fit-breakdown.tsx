@@ -15,6 +15,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
+import { FitContextValues } from "./fit-context";
 import { FitGlyph, FitPips, glyphKindOf, outcomeWord } from "./fit-glyph";
 
 /**
@@ -108,6 +109,12 @@ export function FitRows({
             <span className="cq-body-sm col-span-2 text-(--cq-text-primary)">
               {p.reason}
             </span>
+            {p.context === undefined ? null : (
+              <>
+                <span />
+                <FitContextValues context={p.context} className="col-span-2" />
+              </>
+            )}
             {source === undefined ? null : (
               <>
                 <span />

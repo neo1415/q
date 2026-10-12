@@ -174,7 +174,9 @@ jobs:
         run: pnpm exec turbo run build --filter=./packages/* --output-logs=errors-only
 
       - name: Test
-        run: pnpm test
+        # Preserve every assertion; expose test and unhandled-error failures
+        # through native check annotations when log downloads are unavailable.
+        run: pnpm test --reporter=default --reporter=github-actions
   build:
     name: build
     runs-on: ubuntu-latest
@@ -220,7 +222,10 @@ jobs:
   quality:
     name: quality
     needs: [static, typecheck, test, build]
-    if: always()
+    # Runs after any outcome so a failed check fails the gate, but not for a
+    # run a newer push superseded (cancel-in-progress): that run's commit is
+    # no longer the one to judge, and a red gate there misled (2026-10-12).
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

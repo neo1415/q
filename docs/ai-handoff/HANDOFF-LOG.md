@@ -406,3 +406,32 @@ The tracked runner creates internal Q turns for an existing authorized account o
   - FIT_Q_VIEW v3 reads the confirmed deck;
   - progressive disclosure across the fit panel, Q's view, the raise fold and Questions to investigate (recorded in DECISIONS.md);
   - workforce card and lead-in fixes.
+
+## 2026-10-12 05:35 UTC — Claude Code — PR #11 live; memo root cause found; PR #14
+
+- PR #11 is released: int-rc `9a2e89a3` → CI lane `f829a5d1` → deploy `fdf04745`. All four Railway services report SUCCESS.
+- Tensorgate profile verified live as Savanna Seed (`profile-capture.mjs`):
+  - the Cheque and Round rows read "Stated";
+  - FIT_Q_VIEW v3 cites the deck (four design partners, two paid contracts, $360k contracted ARR, a $4M raise);
+  - Q's open questions are: whether a lead is required, why now, and retention, sales-cycle and acquisition-cost metrics.
+- Live workforce acceptance on `fdf04745` (run `5b556924`, job `2faa77f2`):
+  - Plan card after 10.9 s; the card was approved.
+  - Research DONE in 15.1 s.
+  - The memo FAILED in 1.0 s. The new log named the cause: ZodError, a finding statement over 2,000 characters in `requestDocument`.
+- Fix (founder: "don't truncate, increase the budget"): `QArtifactFindingSchema` gives document findings an 8,000-character statement budget, and grounding gets the same. Stored claims and knowledge keep 2,000; no migration.
+- PR #14 contains that fix and the fit rows showing values with sources:
+  - "Cheque compatibility": raise, your cheque, minimum cheque, plus the open line about ticket fit;
+  - "Round terms": instrument and cap, plus "Lead investor required: not stated".
+- Next: release PR #14 → rerun the acceptance with `--approve` → verify memo v1 → critique → v2 → diligence card PENDING → capture the profile.
+
+## 2026-10-12 06:20 UTC — Codex takeover, PR #14 CI failure reproduction and correction
+
+- Recovered exact PR #14 head `3a0aea34` and failed run `38208967641`; verified current all-four-success Railway release `fdf04745`. New own branch `codex/takeover-release-pr14` preserves existing Claude history. User takeover directive is stored verbatim under session-directives.
+- Both failures reproduced locally; corrected stale Cheque compatibility assertion and duplicate prose in compact multi-company fallback. Every rich typed field remains unchanged; 32,000 tool cap and 31,000 regression target unchanged. 52 builds/79 targeted tests/root/q-api/web types/changed lint and format pass. No new migration or score change. Preserve memo 8,000-character finding fix, new source-attributed fit values and superseded-run CI safeguards. Exact CI/deployment/live acceptance still required.
+- Six Tavus keys secured outside Git, one account key only. Read-only provider probe blocked by cloud proxy tunnel 403. Network draft additions `tavusapi.com` and `docs.tavus.io` saved, not published/active; user environment action required for live Tavus. No paid video call attempted. Continue workforce/release work rather than idle.
+
+## 2026-10-12 08:27 UTC — real promotion failure identified; deferred Q warm-up corrected
+
+- Native read-only GitHub diagnostic recovered blocked logs: promotion run 38217979145 has 12,933 passing tests and one uncaught window ReferenceError from q/wire.ts:70 after q-chat-reply teardown. No ignored error or retry-to-green. Diagnostic branch c8424bd3 is isolated/not for deployment; normal jobs canceled after evidence read.
+- Own source branch codex/q-warm-lifecycle-fix binds delayed warming to its originating browser, preserving timing/schema/fast-load behavior. Two precise regressions fail before, pass after; final 15 targeted cases with native GitHub reporter pass, root/web types/lint/format pass. New exact CI/release required. Original memo/fit fixes preserved.
+- Product branch 0d6c91a7 with Work canonical READY artifacts/viewer and stronger workforce acceptance is pushed and independent. No full intelligent-workforce/Tavus live completion claim; remaining native approval visibility/conversation verification recorded. Production stays fdf04745.

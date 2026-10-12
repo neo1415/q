@@ -1,7 +1,9 @@
 import type {
   EvidenceStatus,
+  FitContextItem,
   FitHardRuleDto,
   FitParameter,
+  FitParameterContext,
 } from "@capital-q/contracts";
 
 import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
@@ -56,6 +58,9 @@ export type DeclaredFitFacts = {
         readonly minimumCheque?: string | undefined;
         /** Instrument and terms, e.g. "Post-money SAFE, $30m cap". */
         readonly terms?: string | undefined;
+        /** The same, as values with their sources, for the row itself. */
+        readonly raiseItems?: readonly FitContextItem[] | undefined;
+        readonly termsItems?: readonly FitContextItem[] | undefined;
       }
     | null
     | undefined;
@@ -293,6 +298,11 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
     return {
       ...notApplicableObservation({ statedRaise: said }),
       stated: said !== undefined,
+      context: chequeContext(
+        d,
+        null,
+        "Ticket fit: you have not set a cheque size",
+      ),
     };
   }
   const round = d.round ?? null;
@@ -321,7 +331,19 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
     roundAmount === 0 ||
     round.currency !== cheque.currency
   ) {
-    return { ...unknownObservation(facts), stated: said !== undefined };
+    return {
+      ...unknownObservation(facts),
+      stated: said !== undefined,
+      context: chequeContext(
+        d,
+        facts.chequeSize ?? facts.chequeRange,
+        round !== null && round.currency !== cheque.currency
+          ? "Ticket fit: not compared, the round is in another currency"
+          : said !== undefined
+            ? "Ticket fit: not scored until the round is formally shared"
+            : "Round amount: not known",
+      ),
+    };
   }
   const share = ref / roundAmount;
   const c = config.comparators;
@@ -337,7 +359,53 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
     evidenceStatus: round.evidenceStatus,
     stale: false,
     facts,
+    context: chequeContext(d, facts.chequeSize ?? facts.chequeRange, null),
   };
+}
+
+/**
+ * What is known beside the cheque row, each value with its source: the
+ * round (shared, or as stated in the pitch or deck), the investor's own
+ * cheque, the minimum cheque the deck states. `open` says separately what
+ * is not concluded, so an unknown ticket fit never reads as an unknown
+ * round amount. Display only; nothing here is scored.
+ */
+function chequeContext(
+  d: DeclaredFitFacts,
+  yourCheque: string | undefined | null,
+  open: string | null,
+): FitParameterContext | undefined {
+  const round = d.round ?? null;
+  const items: FitContextItem[] = [
+    ...(round === null
+      ? [...(d.statedRound?.raiseItems ?? [])]
+      : [
+          {
+            label: "Round",
+            value: formatMoney(round.amount, round.currency),
+            source: "SHARED" as const,
+          },
+        ]),
+    ...(yourCheque === undefined || yourCheque === null
+      ? []
+      : [
+          {
+            label: "Your cheque",
+            value: yourCheque,
+            source: "YOUR_MANDATE" as const,
+          },
+        ]),
+    ...(round === null && d.statedRound?.minimumCheque !== undefined
+      ? [
+          {
+            label: "Minimum cheque",
+            value: d.statedRound.minimumCheque,
+            source: "DECK" as const,
+          },
+        ]
+      : []),
+  ];
+  return items.length === 0 && open === null ? undefined : { items, open };
 }
 
 function observeBusinessModel(d: DeclaredFitFacts): FitObservation {
@@ -438,9 +506,28 @@ function observeRoundTerms(d: DeclaredFitFacts): FitObservation {
   const facts = { roundTerms: terms?.summary ?? d.statedRound?.terms };
   // Named from what they stated, not from shared round terms.
   const stated = terms === null && d.statedRound?.terms !== undefined;
-  if (policy === null) return { ...notApplicableObservation(facts), stated };
+  // Known terms and the open lead question, shown apart (2026-10-12).
+  const items: readonly FitContextItem[] =
+    terms?.summary !== undefined
+      ? [
+          {
+            label: "Terms",
+            value: terms.summary.slice(0, 60),
+            source: "SHARED",
+          },
+        ]
+      : (d.statedRound?.termsItems ?? []);
+  const leadOpen =
+    policy === null
+      ? "Lead: you have not said whether you lead"
+      : terms === null || terms.needsLead === null
+        ? "Lead investor required: not stated"
+        : null;
+  const context: FitParameterContext = { items: [...items], open: leadOpen };
+  if (policy === null)
+    return { ...notApplicableObservation(facts), stated, context };
   if (terms === null || terms.needsLead === null)
-    return { ...unknownObservation(facts), stated };
+    return { ...unknownObservation(facts), stated, context };
   const outcome = !terms.needsLead
     ? "STRONG"
     : policy === "ALWAYS"
@@ -448,7 +535,7 @@ function observeRoundTerms(d: DeclaredFitFacts): FitObservation {
       : policy === "SOMETIMES"
         ? "PARTIAL"
         : "MISMATCH";
-  return { ...known(outcome, terms.evidenceStatus), facts };
+  return { ...known(outcome, terms.evidenceStatus), facts, context };
 }
 
 function known(
