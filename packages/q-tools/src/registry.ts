@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   MODEL_TOOLS_MAX,
   ModelToolDefinitionSchema,
+  Q_CLIENT_ACTION_TOOLS,
   QToolNameSchema,
   type ModelToolDefinition,
   type QToolName,
@@ -30,6 +31,9 @@ import {
  * in the same turn.
  */
 export const Q_TURN_TOOLS_MAX = MODEL_TOOLS_MAX - 1;
+
+/** The browser's own actions (they happen in the page, at once). */
+const CLIENT_ACTIONS: ReadonlySet<string> = new Set(Q_CLIENT_ACTION_TOOLS);
 
 /** Each tool's capability area, by provider name (the reader's areas). */
 const TOOL_AREAS: ReadonlyMap<string, string> = new Map(
@@ -249,6 +253,8 @@ export function createQToolRegistry(
     const kinds = planScopeKinds(context.plan);
     const purpose = context.plan.purpose.taskClass;
     const core = (record: QToolRecord) => record.definition.core === true;
+    const readOnly = (record: QToolRecord) =>
+      record.definition.classification === "READ_ONLY";
     const focus = context.focus;
     const focused =
       focus !== undefined && (focus.areas.length > 0 || focus.tools.length > 0);
@@ -257,15 +263,31 @@ export function createQToolRegistry(
     // Focused: the core, the tools the turn named (whatever their
     // purposes), and this purpose's tools in the turn's areas. A tool no
     // capability lists has no area to judge it by, so it is kept.
+    const readsOnly = focus?.readsOnly === true;
     const relevant = (record: QToolRecord): boolean => {
-      if (core(record)) return true;
       const name = record.definition.providerName;
+      // A question keeps the core's reads, its browser actions (Q shows
+      // and navigates while it answers) and use_capability; the core's
+      // own change-makers (approve, edit, stop) wait for a request to act.
+      if (core(record)) {
+        return (
+          !readsOnly ||
+          readOnly(record) ||
+          CLIENT_ACTIONS.has(name) ||
+          named.has(name)
+        );
+      }
       const forPurpose = record.definition.supportedPurposes.includes(purpose);
-      if (!focused) return forPurpose;
       const app = declaredAction(record);
       // A named tool off this purpose is offered only when it is a declared
-      // app action: what is offered is what may execute.
+      // app action: what is offered is what may execute. (Unfocused, no
+      // tool is named, so this is the focused rule only.)
       if (named.has(name)) return forPurpose || app;
+      // A question to Q: the change-preparing tools are not shown (each
+      // schema is paid on every round); use_capability, in the core,
+      // loads one the moment the answer needs it.
+      if (readsOnly && !readOnly(record)) return false;
+      if (!focused) return forPurpose;
       const area = TOOL_AREAS.get(name);
       const inArea = area !== undefined && areas.has(area);
       // A declared app action is offered whenever its area is in the

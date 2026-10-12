@@ -54,6 +54,23 @@ export const RESEARCH_TOOLS: readonly string[] = [
 ];
 
 /**
+ * A question to Q that names nothing (tool budget 2026-10-12): the
+ * purpose's whole list, the public-web tools leading, READ_ONLY tools and
+ * the browser's own actions only. The ~40 change-making schemas (~50k
+ * characters on an investor question) were paid on every round of every
+ * question; one the answer turns out to need is a use_capability call
+ * away. The
+ * speculative answer starts from this same object, so a plain question
+ * still adopts it (speculationMisfit compares it by value).
+ */
+export const PLAIN_QUESTION_FOCUS: QToolFocus = Object.freeze({
+  areas: [],
+  tools: [...RESEARCH_TOOLS],
+  widen: true,
+  readsOnly: true,
+});
+
+/**
  * EXPLICIT asks for research: the Research area and its tools. OFFERED
  * (most turns) only keeps the tools within reach: they join whatever the
  * turn is focused on, and an unfocused turn already holds them.
@@ -152,14 +169,17 @@ export function toolFocusOf(input: {
   ) {
     return focus;
   }
-  if (focus === null) {
+  // Setting up, every tool stays shown: Q is still learning who they are,
+  // and a question there often turns into a change in the same breath.
+  if (focus === null || focus === PLAIN_QUESTION_FOCUS) {
     // Nothing else in the reading: the purpose's whole list, as before,
     // with the research tools leading so no bound can cut them.
     return { areas: [], tools: [...RESEARCH_TOOLS], widen: true };
   }
   return {
-    ...focus,
+    areas: focus.areas,
     tools: [...new Set([...focus.tools, ...RESEARCH_TOOLS])].sort(),
+    ...(focus.widen === undefined ? {} : { widen: focus.widen }),
   };
 }
 
@@ -172,12 +192,18 @@ function focusOf(input: {
 }): QToolFocus | null {
   const { reading } = input;
   if (reading === null) return null;
+  // A plain question leaves nothing to continue: "yes" after it is read
+  // exactly as it was before plain questions had a focus (the whole list).
+  const previous =
+    input.previous?.widen === true && input.previous.readsOnly === true
+      ? null
+      : input.previous;
   // "Try again" is the last turn's request once more, whatever kind it
   // was read as (lead 2026-10-04): its tools are kept.
-  if (input.previous !== null && RETRY.test(reading.text ?? "")) {
+  if (previous !== null && RETRY.test(reading.text ?? "")) {
     return {
-      areas: [...new Set(["Screens", ...input.previous.areas])].sort(),
-      tools: [...input.previous.tools].sort(),
+      areas: [...new Set(["Screens", ...previous.areas])].sort(),
+      tools: [...previous.tools].sort(),
     };
   }
   if (CORE_ONLY.has(reading.kind)) return { areas: ["Screens"], tools: [] };
@@ -202,9 +228,9 @@ function focusOf(input: {
   const handArea = reading.hand === null ? undefined : HAND_AREAS[reading.hand];
   if (handArea !== undefined) areas.add(handArea);
   if (reading.handOver) areas.add("Relationships");
-  if (CONTINUES.has(reading.kind) && input.previous !== null) {
-    for (const area of input.previous.areas) areas.add(area);
-    for (const tool of input.previous.tools) tools.add(tool);
+  if (CONTINUES.has(reading.kind) && previous !== null) {
+    for (const area of previous.areas) areas.add(area);
+    for (const tool of previous.tools) tools.add(tool);
   }
   const subjectAreas = [
     ...input.subjectKinds.flatMap((kind) => {
@@ -223,11 +249,21 @@ function focusOf(input: {
   // focused on Records, and Q answered from what little it held). The
   // tools lead the offer; nothing forces a search.
   const asks = reading.kind === QUESTION;
+  // A question that asks Q to do nothing (no action named, no hand, no
+  // hand-over) is answered by reading: only READ_ONLY tools and the core
+  // are shown (tool budget 2026-10-12). Navigation, page actions and
+  // use_capability are core, so they stay; anything else is loaded on need.
+  const question =
+    asks &&
+    reading.namedTools.length === 0 &&
+    reading.hand === null &&
+    !reading.handOver;
   if (areas.size === 0 && tools.size === 0) {
-    // A question that names nothing keeps the full offer (navigation,
+    // A question that names nothing keeps the full list (navigation,
     // page actions and the web alike): narrowing it to the research tools
     // let the bound cut navigation, and Q said it could not scroll
     // (founder 2026-10-06). The gateway keeps the web tool on such turns.
+    if (question) return PLAIN_QUESTION_FOCUS;
     if (reading.kind !== "TOOL_REQUEST" || subjectAreas.length === 0) {
       return null;
     }
@@ -241,5 +277,9 @@ function focusOf(input: {
   if (reading.research === RESEARCH_OFFERED || asks) {
     for (const tool of RESEARCH_TOOLS) tools.add(tool);
   }
-  return { areas: [...areas].sort(), tools: [...tools].sort() };
+  return {
+    areas: [...areas].sort(),
+    tools: [...tools].sort(),
+    ...(question ? { readsOnly: true } : {}),
+  };
 }

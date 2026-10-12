@@ -95,3 +95,16 @@ export function recallTermsFrom(utterance: string): string[] {
   }
   return terms;
 }
+
+/**
+ * Whether a turn is about the person's pitch practice, decided by code
+ * (no model): only then does recall read their rehearsals, so a turn about
+ * anything else carries none of it. Words, not stems that would catch
+ * "practical" or "pitcher".
+ */
+const REHEARSAL_TALK =
+  /\b(?:pitch(?:es|ed|ing)?|rehears(?:e|ed|es|al|als|ing)|practi[cs](?:e|ed|es|ing)|mock (?:meeting|pitch|call)s?|dry[- ]runs?|run[- ]?throughs?)\b/iu;
+
+export function asksAboutRehearsal(utterance: string): boolean {
+  return REHEARSAL_TALK.test(utterance);
+}
