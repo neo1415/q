@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   WorkforceDocumentRequestSchema,
   type WorkforceDocumentRequest,
@@ -40,7 +42,11 @@ export type ProposedStep = {
   readonly goal: string;
   readonly tools: readonly string[];
   readonly dependsOn: readonly string[];
-  readonly document?: WorkforceDocumentRequest | undefined;
+  /**
+   * The planner's document request (its NAMED_COMPANY form carries no
+   * company: code binds it), or an approved payload's, already bound.
+   */
+  readonly document?: unknown;
 };
 
 export type BoundStep = {
@@ -68,6 +74,10 @@ export const STEP_REFUSALS = [
   "NO_EXECUTOR",
   "NO_PERMITTED_TOOL",
   "INVALID_DOCUMENT_REQUEST",
+  /** A memo about "the company the job names" when it names none, or several. */
+  "NO_NAMED_COMPANY",
+  /** A critique of a step that is not an earlier, awaited preparation. */
+  "INVALID_CRITIQUE_SOURCE",
   "WAITS_ON_MISSING_STEP",
   "DUPLICATE_KEY",
   "OVER_BUDGET",
@@ -84,7 +94,42 @@ export type PlanBounds = {
   /** The executors registered here; default: those needing no provider. */
   readonly executors?:
     Readonly<Partial<Record<QAgentRole, QAgentExecutor>>> | undefined;
+  /**
+   * The one company the goal names, resolved under the person's own reach
+   * (`goalSubjects`). Null or absent: a NAMED_COMPANY document is refused.
+   */
+  readonly namedCompanyId?: string | null | undefined;
 };
+
+/** The planner's NAMED_COMPANY request, before code binds the company. */
+const PlannedNamedCompany = z
+  .object({
+    operation: z.literal("PREPARE"),
+    kind: z.enum(["MEMO", "ONE_PAGER", "INVESTMENT_BRIEF"]),
+    scope: z.literal("NAMED_COMPANY"),
+  })
+  .strict();
+
+function bindDocument(
+  raw: unknown,
+  namedCompanyId: string | null,
+):
+  | { readonly ok: true; readonly document: WorkforceDocumentRequest }
+  | { readonly ok: false; readonly reason: StepRefusal } {
+  const planned = PlannedNamedCompany.safeParse(raw);
+  if (planned.success) {
+    return namedCompanyId === null
+      ? { ok: false, reason: "NO_NAMED_COMPANY" }
+      : {
+          ok: true,
+          document: { ...planned.data, companyId: namedCompanyId },
+        };
+  }
+  const parsed = WorkforceDocumentRequestSchema.safeParse(raw);
+  return parsed.success
+    ? { ok: true, document: parsed.data }
+    : { ok: false, reason: "INVALID_DOCUMENT_REQUEST" };
+}
 
 export const MAX_JOB_STEPS = 12;
 
@@ -147,13 +192,32 @@ export function boundPlan(
       refuse("NO_PERMITTED_TOOL");
       continue;
     }
-    const document = WorkforceDocumentRequestSchema.safeParse(step.document);
-    if (
-      (role === "DOCUMENTS" && !document.success) ||
-      (role !== "DOCUMENTS" && step.document !== undefined)
-    ) {
+    if (role !== "DOCUMENTS" && step.document !== undefined) {
       refuse("INVALID_DOCUMENT_REQUEST");
       continue;
+    }
+    const document =
+      role === "DOCUMENTS"
+        ? bindDocument(step.document, bounds.namedCompanyId ?? null)
+        : null;
+    if (document !== null && !document.ok) {
+      refuse(document.reason);
+      continue;
+    }
+    if (
+      document?.ok === true &&
+      document.document.operation === "CRITIQUE_AND_REVISE"
+    ) {
+      // The critic reads a document an earlier step prepared, after it.
+      const source = document.document.sourceStep;
+      const prepared = kept.find((one) => one.key === source);
+      if (
+        prepared?.document?.operation !== "PREPARE" ||
+        !step.dependsOn.includes(source)
+      ) {
+        refuse("INVALID_CRITIQUE_SOURCE");
+        continue;
+      }
     }
     // Only steps already kept can be waited on: a plan runs in order.
     if (step.dependsOn.some((key) => !kept.some((one) => one.key === key))) {
@@ -171,16 +235,19 @@ export function boundPlan(
       key: step.key,
       role: stored,
       executor: role,
-      agentName: roleTitle(role),
+      // The critic is a second specialist, and the person sees it as one.
+      agentName:
+        document?.ok === true &&
+        document.document.operation === "CRITIQUE_AND_REVISE"
+          ? "Reviewer"
+          : roleTitle(role),
       goal: step.goal,
       tools,
       dependsOn: [...step.dependsOn],
       budgetUsd,
       outward: executor.outward && tools.some((tool) => isOutwardTool(tool)),
       spawned: false,
-      ...(role === "DOCUMENTS" && document.success
-        ? { document: document.data }
-        : {}),
+      ...(document?.ok === true ? { document: document.document } : {}),
     });
   }
   return { steps: kept, refused, budgetUsd: spent };

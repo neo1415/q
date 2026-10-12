@@ -50,6 +50,7 @@ import {
   type QPageManifest,
   type QResponseMessage,
   type QResultBlock,
+  type QUiIntent,
   type QVisibleStage,
 } from "@capital-q/contracts";
 import {
@@ -2538,6 +2539,18 @@ export function createSpecialistQAnswer(
         .open(request, { page, id: target.id, name: target.name })
         .catch(() => null);
       if (intent === null) continue;
+      // Live 2026-10-11 (investor rehearsal): on Ledgerfold's own page,
+      // "What does this company actually do and why does it fit my
+      // mandate?" was read as "open it", and Q answered by re-opening the
+      // page they were on, with no evidence. Opening the page already on
+      // screen never answers a question: the answer path does.
+      if (alreadyOnScreen(request, intent) && asksAQuestion(askedIn(history))) {
+        logger?.info(
+          { qRunId: request.runId, page },
+          "the record the turn pointed at is already on screen; answered instead",
+        );
+        return null;
+      }
       logger?.info(
         { qRunId: request.runId, page, byName: target.id === undefined },
         "q opened the record the turn pointed at",
@@ -3949,6 +3962,19 @@ export function createSpecialistQAnswer(
     // "handle this for me", in any language. Code prepares Q's errand for
     // the subject they are looking at, for their approval, instead of the
     // answer asking who (founder live 2026-10-01).
+    // Live 2026-10-12 (fictional investor): "Research Ledgerfold, assess
+    // the opportunity, prepare an investment memo, have it critiqued...
+    // and prepare founder diligence questions" was read as a hand-over of
+    // Ledgerfold, and a waiting connection request was turned into an
+    // "accept and send a message" card. Asking for work products is never
+    // a hand-over of a relationship: the answer path plans that work.
+    const askedForWork = asksForWorkProducts(latest.content);
+    if (askedForWork && read?.handOver != null) {
+      logger?.info(
+        { qRunId: request.runId },
+        "a request for work products is not a hand-over; answered instead",
+      );
+    }
     if (
       dependencies.handOver !== undefined &&
       read !== null &&
@@ -3956,12 +3982,17 @@ export function createSpecialistQAnswer(
       read.handOver !== undefined &&
       read.handOver !== null &&
       tool === null &&
-      !writingDocument
+      !writingDocument &&
+      !askedForWork
     ) {
       const handed = await actOnHandOver(
         dependencies.handOver,
         request,
-        { ...read.handOver, pointed: handOverSubjectPointed(pointed) },
+        {
+          ...read.handOver,
+          pointed: handOverSubjectPointed(pointed),
+          utterance: latest.content,
+        },
         read.timeWindow ?? null,
       ).catch((error: unknown) => {
         logger?.warn(
@@ -4526,4 +4557,48 @@ function lastAnswerShowedCards(
       block.kind === "INVESTOR_REFERENCE" ||
       block.kind === "COMPARISON_CARDS",
   );
+}
+
+/** The record page this intent opens is the one the person is looking at. */
+function alreadyOnScreen(
+  request: QAnswerRequest,
+  intent: Extract<QUiIntent, { kind: "OPEN_RECORD_PAGE" }>,
+): boolean {
+  const screen = request.plan.screen;
+  if (screen === undefined || intent.tab !== undefined) return false;
+  return (
+    intent.page === "COMPANY" &&
+    (screen.route === "COMPANY" || screen.route === "PITCH") &&
+    screen.companyId === intent.id
+  );
+}
+
+/** A question, not a command to go somewhere. */
+function asksAQuestion(text: string): boolean {
+  const said = text.trim().toLowerCase();
+  return (
+    said.includes("?") ||
+    /^(what|why|how|who|which|when|where|does|do|is|are|can|could|should|would|tell me|explain|describe|walk me|give me|summari[sz]e)\b/u.test(
+      said,
+    )
+  );
+}
+
+/**
+ * The words ask Q to produce analysis or documents (research, an
+ * assessment, a memo or brief, a critique or revision, diligence
+ * questions): two or more distinct kinds of work. Handing a relationship
+ * over ("handle Kestrel for me") names none of them.
+ */
+export function asksForWorkProducts(text: string): boolean {
+  const said = text.toLowerCase();
+  const kinds = [
+    /\bresearch/u,
+    /\b(assess|assessment|evaluat|analy[sz])/u,
+    /\b(memo|brief|report|one-pager|write-?up)\b/u,
+    /\b(critique|second opinion|review it|revise|revision)/u,
+    /\b(diligence questions|due diligence|questions for the founder|founder questions|diligence)/u,
+    /\b(risks?|missing information|red flags)\b/u,
+  ];
+  return kinds.filter((kind) => kind.test(said)).length >= 2;
 }

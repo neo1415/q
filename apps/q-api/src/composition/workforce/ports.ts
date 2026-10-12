@@ -14,6 +14,10 @@ import type {
   WorkforceDocumentInput,
   WorkforceDocumentResult,
 } from "./jobs.js";
+import type {
+  WorkforceDiligenceInput,
+  WorkforceDiligenceResult,
+} from "./diligence.js";
 import type { Owner } from "./store.js";
 
 /**
@@ -28,6 +32,11 @@ import type { Owner } from "./store.js";
  */
 
 export type WorkforcePortServices = {
+  readonly diligence?:
+    | ((
+        input: WorkforceDiligenceInput & { readonly actor: ActorContext },
+      ) => Promise<WorkforceDiligenceResult>)
+    | undefined;
   readonly documents?:
     | ((
         input: WorkforceDocumentInput & { readonly actor: ActorContext },
@@ -251,6 +260,20 @@ export function createWorkforcePorts(
         });
         return true;
       },
+
+      ...(services.diligence === undefined
+        ? {}
+        : {
+            diligence: async (owner, input) => {
+              if (!mine(owner) || services.diligence === undefined) {
+                return {
+                  status: "UNAVAILABLE" as const,
+                  message: "Not yours to prepare.",
+                };
+              }
+              return services.diligence({ ...input, actor });
+            },
+          }),
 
       ...(services.documents === undefined
         ? {}

@@ -7,10 +7,13 @@ import { AGENT_REGISTRY, type AgentRole } from "./registry.js";
  * Running a bounded plan (founder brief J1, J4, J9; recovery D1, D3).
  *
  * The lead Q's run opens the job; each step becomes one agent run, spawned
- * by the lead, in plan order. A step waits for the steps it names; when one
+ * by the lead. A step waits for the steps it names; when one
  * of those did not finish, it is skipped with the reason rather than run
  * on a guess. Every hand-off (lead to agent, agent to the agent that waits
  * on it) is recorded, so the workforce page shows who did what and why.
+ *
+ * Steps run as soon as what they wait on has settled; outward steps keep
+ * plan order among themselves.
  *
  * Executors are ports by registered role (`executors.ts`). A step with no
  * executor goes to the person. A job resumed after a restart skips the
@@ -105,6 +108,15 @@ export async function runJob(input: {
   readonly steps: readonly BoundStep[];
   readonly executors: Partial<Record<QAgentRole, AgentExecutor>>;
   readonly recorder: JobRecorder;
+  /** A step's executor threw: the cause, for the operator's log. */
+  readonly onStepError?:
+    | ((failure: {
+        readonly jobId: string;
+        readonly stepKey: string;
+        readonly runId: string;
+        readonly error: unknown;
+      }) => void)
+    | undefined;
 }): Promise<JobRunResult> {
   const { recorder, jobId } = input;
   const leadRunId = await recorder.startRun({
@@ -119,13 +131,14 @@ export async function runJob(input: {
   });
   const results = new Map<string, StepResult>();
   const runs = new Map<string, string>();
-  const out: {
+  const out: ({
     key: string;
     runId: string;
     status: StepStatus;
     summary: string;
-  }[] = [];
-  for (const step of input.steps) {
+  } | null)[] = input.steps.map(() => null);
+
+  const runStep = async (step: BoundStep, index: number): Promise<void> => {
     const before = await recorder.prior?.(jobId, step.key);
     if (before != null && before.status !== "FAILED") {
       // Finished before a restart: its result stands, never redone.
@@ -135,13 +148,13 @@ export async function runJob(input: {
         summary: before.summary,
         outputs: before.outputs,
       });
-      out.push({
+      out[index] = {
         key: step.key,
         runId: before.runId ?? "",
         status: before.status,
         summary: before.summary,
-      });
-      continue;
+      };
+      return;
     }
     const runId = await recorder.startRun({
       jobId,
@@ -195,23 +208,62 @@ export async function runJob(input: {
           jobId,
           runId,
           results,
-        }).catch((): StepResult => ({
-          status: "FAILED",
-          summary: "This step failed; nothing was sent.",
-        }));
+        }).catch((error: unknown): StepResult => {
+          // Kept for whoever operates the job; the person sees plain words.
+          input.onStepError?.({ jobId, stepKey: step.key, runId, error });
+          return {
+            status: "FAILED",
+            summary: "This step failed; nothing was sent.",
+          };
+        });
         status = result.status;
         summary = result.summary;
         results.set(step.key, result);
       }
     }
     await recorder.endRun(runId, status, summary.slice(0, 500));
-    out.push({ key: step.key, runId, status, summary });
+    out[index] = { key: step.key, runId, status, summary };
+  };
+
+  // Steps start as soon as the steps they wait on have settled, so
+  // independent work (research beside a shortlist) runs side by side.
+  // Steps that reach the other side still go one at a time, in plan
+  // order: two sends or bookings never race on the same thread.
+  const settled = new Map<string, Promise<void>>();
+  const all: Promise<void>[] = [];
+  let outwardTail: Promise<void> = Promise.resolve();
+  for (const [index, step] of input.steps.entries()) {
+    const ready = Promise.all(
+      step.dependsOn.map((key) => settled.get(key) ?? Promise.resolve()),
+    );
+    let running: Promise<void>;
+    if (step.outward) {
+      running = Promise.all([ready, outwardTail]).then(() =>
+        runStep(step, index),
+      );
+      outwardTail = running.catch(() => undefined);
+    } else {
+      running = ready.then(() => runStep(step, index));
+    }
+    settled.set(
+      step.key,
+      running.catch(() => undefined),
+    );
+    all.push(running);
   }
-  const done = out.filter((step) => step.status === "DONE").length;
+  // A recorder failure still ends the pass, as it did when steps ran in
+  // a line: the queue takes the job back and resumes it.
+  await Promise.all(all);
+  const finished = out.filter(
+    (one): one is NonNullable<typeof one> => one !== null,
+  );
+  const done = finished.filter((step) => step.status === "DONE").length;
+  // The lead's run says DONE only when every step is done: a job with a
+  // failed or held step is not finished, whatever else got through.
   await recorder.endRun(
     leadRunId,
-    out.length > 0 && done === 0 ? "HELD" : "DONE",
-    `${String(done)} of ${String(out.length)} steps done.`,
+    finished.length > 0 && done === finished.length ? "DONE" : "HELD",
+    `${String(done)} of ${String(finished.length)} steps done.`,
   );
-  return { leadRunId, steps: out };
+  return { leadRunId, steps: finished };
 }

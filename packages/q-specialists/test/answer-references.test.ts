@@ -46,7 +46,7 @@ const actor = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 
-function request(): QAnswerRequest {
+function request(screenCompanyId?: string): QAnswerRequest {
   const runId = randomUUID();
   return {
     runId: runId as QAnswerRequest["runId"],
@@ -75,6 +75,9 @@ function request(): QAnswerRequest {
       evaluatedAt: new Date().toISOString(),
       revalidateAfter: new Date(Date.now() + 60_000).toISOString(),
       revalidateOnResume: true,
+      ...(screenCompanyId === undefined
+        ? {}
+        : { screen: { route: "COMPANY", companyId: screenCompanyId } }),
     }),
   };
 }
@@ -197,7 +200,11 @@ function conversation(options: {
       ? {}
       : { appActionRouter: options.appActionRouter }),
   });
-  const say = async (said: string, read: QTurnReading | null) => {
+  const say = async (
+    said: string,
+    read: QTurnReading | null,
+    screenCompanyId?: string,
+  ) => {
     lines.push({
       ...(lines[0] ?? {
         tenantId: TENANT,
@@ -211,7 +218,7 @@ function conversation(options: {
       content: said,
     } as QConversationMessage);
     reading = read;
-    await answer.answer(request());
+    await answer.answer(request(screenCompanyId));
     return lines.at(-1);
   };
   return {
@@ -663,5 +670,55 @@ describe("a record's name as said", () => {
     ["Savanna Seed Partners", "Savanna Seed Partners"],
   ])("%s -> %s", (said, name) => {
     expect(spokenRecordName(said)).toBe(name);
+  });
+});
+
+describe("a question about the page already on screen is answered, not re-opened", () => {
+  // Live 2026-10-11 (investor rehearsal): on Ledgerfold's page the reader
+  // marked "What does this company actually do and why does it fit my
+  // mandate?" as an open, and Q re-opened the page with no evidence.
+  const LEDGERFOLD = "84b9641f-b618-4fa3-8b35-1d19b1c71d82";
+  const opener: QOpenRecordPort = {
+    open: (_request, target) =>
+      Promise.resolve({
+        kind: "OPEN_RECORD_PAGE",
+        page: target.page,
+        id: LEDGERFOLD,
+      }),
+  };
+  const read = {
+    ...BASE,
+    kind: "QUESTION_TO_Q",
+    reference: {
+      open: "COMPANY",
+      name: "Ledgerfold",
+      shown: null,
+      retryLast: false,
+      sameFor: null,
+    },
+  } as unknown as QTurnReading;
+
+  it("answers a question on the company's own page through the answer path", async () => {
+    const chat = conversation({ openRecord: opener });
+    const last = await chat.say(
+      "What does this company actually do and why does it fit my mandate? Use its Capital Q records.",
+      read,
+      LEDGERFOLD,
+    );
+    expect(chat.delegated()).toBe(1);
+    expect(last?.content).toBe("An answer.");
+  });
+
+  it("still opens it when they ask to open it, or when they are elsewhere", async () => {
+    const here = conversation({ openRecord: opener });
+    const opened = await here.say("Open Ledgerfold", read, LEDGERFOLD);
+    expect(here.delegated()).toBe(0);
+    expect(opened?.blocks?.[0]).toMatchObject({
+      kind: "UI_INTENT",
+      intent: { kind: "OPEN_RECORD_PAGE", id: LEDGERFOLD },
+    });
+    const elsewhere = conversation({ openRecord: opener });
+    await elsewhere.say("What does Ledgerfold do?", read);
+    expect(elsewhere.delegated()).toBe(0);
   });
 });
