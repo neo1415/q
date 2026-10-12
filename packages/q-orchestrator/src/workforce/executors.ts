@@ -82,6 +82,20 @@ const DOCUMENTS: QAgentExecutor = {
 };
 
 /**
+ * Founder questions drafted from a prepared document's gaps and its
+ * critique, filed as the person's approval card (the existing
+ * diligence.questions.send action). Never sends: the card does, once
+ * they approve exactly those questions.
+ */
+const DILIGENCE: QAgentExecutor = {
+  role: "DILIGENCE",
+  version: 1,
+  tools: ["diligence.questions.prepare"],
+  delivers: "DOCUMENT",
+  outward: false,
+};
+
+/**
  * Roles with no executor yet, and why, in words the planner's refusal and
  * the report carry. DOCUMENTS: the existing artifact/document pipeline
  * is not yet connected to a durable workforce executor. Sharing an
@@ -94,13 +108,15 @@ export const UNREGISTERED_ROLE_REASONS: Readonly<
   LEAD: "The lead Q plans the job; it is never a step.",
   DOCUMENTS:
     "Autonomous document generation is not connected to the existing document pipeline yet.",
-  DILIGENCE: "No agent can answer data-room requests on your behalf yet.",
+  DILIGENCE:
+    "Founder questions need a prepared memo or brief to draw on, and are only filed for your approval.",
 };
 
 export type ExecutorAvailability = {
   /** A public-web research provider is composed in this deployment. */
   readonly research: boolean;
   readonly documents?: boolean | undefined;
+  readonly diligence?: boolean | undefined;
 };
 
 /** The executors this deployment registers, by role. */
@@ -114,6 +130,7 @@ export function registeredExecutors(
     DISCOVERY,
     ...(availability.research ? { RESEARCH } : {}),
     ...(availability.documents ? { DOCUMENTS } : {}),
+    ...(availability.diligence ? { DILIGENCE } : {}),
   };
 }
 
@@ -125,6 +142,7 @@ export const ALL_EXECUTORS: readonly QAgentExecutor[] = [
   DISCOVERY,
   RESEARCH,
   DOCUMENTS,
+  DILIGENCE,
 ].map((executor) => QAgentExecutorSchema.parse(executor));
 
 export function isQAgentRole(value: string): value is QAgentRole {
@@ -145,7 +163,8 @@ export const STORED_ROLE: Readonly<Record<QAgentRole, AgentRole>> = {
   DOCUMENTS: "DOCUMENTS",
   SCHEDULING: "SCHEDULER",
   DISCOVERY: "MANDATE_WATCHER",
-  // Never stored: it has no executor, so no step of it ever runs.
+  // Stored as AD_HOC until the tables carry the role; its one tool
+  // (diligence.questions.prepare) maps an approved step back to it.
   DILIGENCE: "AD_HOC",
 };
 
@@ -170,9 +189,19 @@ export function executorRoleOf(stored: string): QAgentRole | null {
   }
 }
 
-/** What the person sees for a role: the stored role's title. */
+/**
+ * What the person sees for a role: the stored role's title. DILIGENCE is
+ * stored as AD_HOC (the workforce tables predate it), but the
+ * person and the planner see it as itself.
+ */
+const DILIGENCE_TITLE = "Diligence";
+const DILIGENCE_DOES =
+  "Turns a prepared memo's gaps and its critique into founder questions, filed for your approval; nothing is sent until you approve.";
+
 export function roleTitle(role: QAgentRole): string {
-  return AGENT_REGISTRY[STORED_ROLE[role]].title;
+  return role === "DILIGENCE"
+    ? DILIGENCE_TITLE
+    : AGENT_REGISTRY[STORED_ROLE[role]].title;
 }
 
 /** The roster as the lead Q's prompt reads it (trusted, code's words). */
@@ -185,7 +214,8 @@ export function executorRosterText(
     .map((executor) => {
       const agent = AGENT_REGISTRY[STORED_ROLE[executor.role]];
       const tools = executor.tools.filter((tool) => permitted.has(tool));
-      return `- ${executor.role} (${agent.title}): ${agent.does} Tools: ${tools.join(", ") || "none permitted"}.`;
+      const does = executor.role === "DILIGENCE" ? DILIGENCE_DOES : agent.does;
+      return `- ${executor.role} (${roleTitle(executor.role)}): ${does} Tools: ${tools.join(", ") || "none permitted"}.`;
     })
     .join("\n");
 }

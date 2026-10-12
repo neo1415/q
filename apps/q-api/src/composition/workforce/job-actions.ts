@@ -245,7 +245,11 @@ function preview(payload: WorkforceJobStartPayload): string {
  * else goes to the person with the reason; it is never widened.
  */
 export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
-  const executors = registeredExecutors({ research: true, documents: true });
+  const executors = registeredExecutors({
+    research: true,
+    documents: true,
+    diligence: true,
+  });
   const folded = new Map<string, readonly string[]>();
   for (const step of payload.steps) {
     if (step.role === "WRITER" || step.role === "REVIEWER") {
@@ -455,7 +459,11 @@ export function createWorkforceJobBoard(dependencies: {
         const planned = await jobs
           .plan(owner, {
             goal,
-            permitted: executableJobTools(jobs.research, jobs.documents),
+            permitted: executableJobTools(
+              jobs.research,
+              jobs.documents,
+              jobs.diligence,
+            ),
             budgetUsd: budget,
             namedCompany:
               companies.length === 1 && companies[0] !== undefined

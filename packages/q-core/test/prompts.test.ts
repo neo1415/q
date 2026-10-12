@@ -176,6 +176,7 @@ describe("registry", () => {
         "JOB_PLAN",
         // 2026-10-12: a second specialist critiques a document's substance.
         "SUBSTANCE_CRITIQUE",
+        "DILIGENCE_QUESTIONS",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {

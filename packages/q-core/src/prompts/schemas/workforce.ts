@@ -514,3 +514,51 @@ export const SubstanceCritiqueResultSchema = z
 export type SubstanceCritiqueResult = z.infer<
   typeof SubstanceCritiqueResultSchema
 >;
+
+// DILIGENCE_QUESTIONS (2026-10-12): founder questions from a prepared
+// document's gaps and its critique, for the person's approval.
+export const DILIGENCE_QUESTIONS_SCHEMA_NAME = "DiligenceQuestionsResult";
+export const DILIGENCE_QUESTIONS_SCHEMA_VERSION = 1;
+export const DiligenceQuestionsVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    companyName: z.string().min(1).max(120),
+    /** The job step's goal. UNTRUSTED. */
+    purpose: z.string().min(1).max(600),
+    /** What the document says is not known. UNTRUSTED. */
+    gaps: z.string().max(4_000),
+    /** The critique's missing-information and risk issues. UNTRUSTED. */
+    critique: z.string().max(4_000),
+    /** The document's sections as text. UNTRUSTED. */
+    document: z.string().min(1).max(16_000),
+  })
+  .strict();
+export type DiligenceQuestionsVariables = z.infer<
+  typeof DiligenceQuestionsVariablesSchema
+>;
+export const DILIGENCE_QUESTIONS_UNTRUSTED = [
+  "purpose",
+  "gaps",
+  "critique",
+  "document",
+] as const;
+export const DiligenceQuestionsResultSchema = z
+  .object({
+    questions: z
+      .array(
+        z
+          .object({
+            /** Asked of the founder, as sent (the send action's limit). */
+            question: z.string().trim().min(8).max(180),
+            /** The gap or risk it settles, in a few words. */
+            about: z.string().trim().min(1).max(120),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+export type DiligenceQuestionsResult = z.infer<
+  typeof DiligenceQuestionsResultSchema
+>;

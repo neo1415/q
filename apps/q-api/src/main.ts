@@ -15,6 +15,7 @@
  * a credential, a connection or a table.
  */
 
+import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { createWorkforceDocuments } from "./composition/workforce/documents.js";
 import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
 import { createInvestorLink } from "./composition/investor-link.js";
@@ -1674,6 +1675,12 @@ const workforcePortsFor = createWorkforcePorts(
     get documents() {
       return qArtifacts.preparation.pipeline?.mode === "JOB"
         ? workforceDocuments
+        : undefined;
+    },
+    // Questions need a document to draw on: composed with the documents.
+    get diligence() {
+      return qArtifacts.preparation.pipeline?.mode === "JOB"
+        ? workforceDiligence
         : undefined;
     },
     nameOf: workforceDisplayName,
@@ -4160,6 +4167,35 @@ const workforceDocuments = createWorkforceDocuments({
   artifacts: qArtifacts.service,
   preparation: qArtifacts.preparation,
   critic: workforceModels.critique,
+});
+const workforceDiligence = createWorkforceDiligence({
+  freshActor: (actor) =>
+    createOwnerActor({
+      resolver: actorContextResolver,
+      authUserOf: async (userId) =>
+        (
+          await database.sql<{ auth_user_id: string | null }[]>`
+      select auth_user_id from identity.user_profiles where id = ${userId}`
+        )[0]?.auth_user_id ?? null,
+    })(actor.userId, actor.organisationId ?? null),
+  firewall,
+  currentVersion: qArtifacts.preparation.port.currentVersion,
+  questions: workforceModels.diligenceQuestions,
+  relationshipWith: async (actor, companyId) => {
+    const relationship = await errandRelationships.withCompany?.(
+      actor,
+      companyId,
+    );
+    return relationship == null
+      ? null
+      : {
+          relationshipId: relationship.relationshipId,
+          state: relationship.state,
+        };
+  },
+  runtime: qRuntime,
+  orchestration: orchestrationRuntime,
+  actions: qActions,
 });
 
 // Recovery D3: the durable workforce runner. It claims approved jobs under a

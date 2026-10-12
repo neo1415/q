@@ -20,6 +20,9 @@ import {
   SubstanceCritiqueResultSchema,
   type SubstanceCritiqueResult,
   type SubstanceCritiqueVariables,
+  DiligenceQuestionsResultSchema,
+  type DiligenceQuestionsResult,
+  type DiligenceQuestionsVariables,
   ReplyReaderResultSchema,
   type DraftRedraftResult,
   type DraftRedraftVariables,
@@ -58,6 +61,7 @@ export type RedraftVariables = Omit<DraftRedraftVariables, Frame>;
 export type ReplyVariables = Omit<ReplyReaderVariables, Frame>;
 export type PlanVariables = Omit<JobPlanVariables, Frame>;
 export type CritiqueVariables = Omit<SubstanceCritiqueVariables, Frame>;
+export type DiligenceVariables = Omit<DiligenceQuestionsVariables, Frame>;
 
 const SMALL = {
   maxAttempts: 2,
@@ -111,6 +115,11 @@ export type WorkforceModels = {
     trace: Trace,
     variables: CritiqueVariables,
   ) => Promise<SubstanceCritiqueResult | null>;
+  readonly diligenceQuestions: (
+    who: Who,
+    trace: Trace,
+    variables: DiligenceVariables,
+  ) => Promise<DiligenceQuestionsResult | null>;
 };
 
 export function createWorkforceModels(dependencies: {
@@ -129,7 +138,8 @@ export function createWorkforceModels(dependencies: {
       | "DRAFT_REDRAFT"
       | "REPLY_READER"
       | "JOB_PLAN"
-      | "SUBSTANCE_CRITIQUE";
+      | "SUBSTANCE_CRITIQUE"
+      | "DILIGENCE_QUESTIONS";
     readonly taskClass: ModelTextTaskClass;
     readonly who: Who;
     readonly trace: Trace;
@@ -260,6 +270,19 @@ export function createWorkforceModels(dependencies: {
         budget: CRITIQUE,
         environmentNotes:
           "You are reviewing, not writing. Code decides from your verdict whether the document is revised.",
+        etiquette: null,
+      }),
+    diligenceQuestions: (who, trace, variables) =>
+      call<DiligenceVariables, DiligenceQuestionsResult>({
+        task: "DILIGENCE_QUESTIONS",
+        taskClass: "STRUCTURED_EXTRACTION",
+        who,
+        trace,
+        variables,
+        schema: DiligenceQuestionsResultSchema,
+        budget: SMALL,
+        environmentNotes:
+          "You are drafting questions for the person's approval. Nothing is sent until they approve.",
         etiquette: null,
       }),
   };

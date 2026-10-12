@@ -22,6 +22,10 @@ import {
 import { stanceDeclines } from "@capital-q/q-core";
 import { z } from "zod";
 
+import type {
+  WorkforceDiligenceInput,
+  WorkforceDiligenceResult,
+} from "./diligence.js";
 import type { WorkforceModels } from "./models.js";
 import { heldLine, type OutwardReview } from "./review.js";
 import type { Owner, WorkforceStore } from "./store.js";
@@ -103,6 +107,13 @@ export type DocumentExecutionContext = {
 
 /** The app's own services an agent may call, each authorized for the owner. */
 export type WorkforcePorts = {
+  /** DILIGENCE: founder questions from a document, filed for approval. */
+  readonly diligence?:
+    | ((
+        owner: Owner,
+        input: WorkforceDiligenceInput,
+      ) => Promise<WorkforceDiligenceResult>)
+    | undefined;
   readonly documents?:
     | ((
         owner: Owner,
@@ -360,6 +371,84 @@ export function createWorkforceExecutors(dependencies: {
             status: "FAILED",
             summary:
               "Document preparation did not finish before this run's deadline.",
+          };
+        };
+
+  /**
+   * DILIGENCE: founder questions from the document a step it waits on
+   * prepared (the critique's when there is one), filed as the person's
+   * approval card. DONE means filed or kept with the job, never sent.
+   */
+  const diligence: AgentExecutor | null =
+    ports.diligence === undefined
+      ? null
+      : async (step, context) => {
+          const authority = dependencies.documentContext;
+          if (
+            !has(step.tools, "diligence.questions.prepare") ||
+            authority === undefined ||
+            !authority.qRunId ||
+            !authority.organisationId
+          )
+            return {
+              status: "FAILED",
+              summary: "The approved step or its authority is unavailable.",
+            };
+          // The latest document among what it waits on, and the critic's
+          // findings about it when a critique ran.
+          let source: { artifactId: string; companyId: string } | undefined;
+          const critique: string[] = [];
+          for (const key of step.dependsOn) {
+            const outputs = context.results.get(key)?.outputs;
+            const artifactId = outputs?.["artifactId"];
+            const companyId = outputs?.["companyId"];
+            if (typeof artifactId === "string" && typeof companyId === "string")
+              source = { artifactId, companyId };
+            const review = outputs?.["review"] as
+              WorkforceDocumentReview | undefined;
+            for (const issue of review?.issues ?? []) {
+              if (
+                issue.kind === "MISSING_INFORMATION" ||
+                issue.kind === "MISSING_RISK" ||
+                issue.kind === "UNSUPPORTED"
+              )
+                critique.push(`${issue.section}: ${issue.problem}`);
+            }
+          }
+          if (source === undefined)
+            return {
+              status: "FAILED",
+              summary: "No prepared document to draw the questions from.",
+            };
+          const result = await ports.diligence?.(owner, {
+            canContinue: authority.canContinue,
+            goal: step.goal,
+            qRunId: authority.qRunId,
+            jobId: context.jobId,
+            stepKey: step.key,
+            runId: context.runId,
+            organisationId: authority.organisationId,
+            source,
+            critique,
+          });
+          if (result === undefined)
+            return { status: "FAILED", summary: "Diligence is unavailable." };
+          if ("message" in result)
+            return { status: "FAILED", summary: result.message.slice(0, 500) };
+          const count = result.questions.length;
+          const words = `${String(count)} founder ${count === 1 ? "question" : "questions"}`;
+          return {
+            status: "DONE",
+            summary:
+              result.status === "CARDED"
+                ? `Prepared ${words}; they wait for your approval before anything is sent.`
+                : `Prepared ${words}; you are not connected yet, so they are kept here for when you are.`,
+            outputs: {
+              questions: result.questions,
+              ...(result.status === "CARDED"
+                ? { qActionId: result.qActionId }
+                : {}),
+            },
           };
         };
 
@@ -662,6 +751,7 @@ export function createWorkforceExecutors(dependencies: {
     SCHEDULING: conversation("SCHEDULE"),
     ...(research === null ? {} : { RESEARCH: research }),
     ...(documents === null ? {} : { DOCUMENTS: documents }),
+    ...(diligence === null ? {} : { DILIGENCE: diligence }),
   };
 }
 
@@ -722,11 +812,13 @@ export const EXECUTABLE_JOB_TOOLS: readonly string[] = [
 export function executableJobTools(
   research: boolean,
   documents = false,
+  diligence = false,
 ): readonly string[] {
   return [
     ...EXECUTABLE_JOB_TOOLS,
     ...(research ? ["public_web.search"] : []),
     ...(documents ? ["documents.own.prepare"] : []),
+    ...(diligence ? ["diligence.questions.prepare"] : []),
   ];
 }
 
@@ -790,6 +882,7 @@ export function createWorkforceJobs(dependencies: {
     const executors = registeredExecutors({
       research: dependencies.ports.research !== undefined,
       documents: dependencies.ports.documents !== undefined,
+      diligence: dependencies.ports.diligence !== undefined,
     });
     const planned = await dependencies.models.plan(owner, trace, {
       goal: input.goal.slice(0, 2_000),
@@ -972,6 +1065,7 @@ export function createWorkforceJobs(dependencies: {
     /** Whether RESEARCH is registered here (a research provider is composed). */
     research: dependencies.ports.research !== undefined,
     documents: dependencies.ports.documents !== undefined,
+    diligence: dependencies.ports.diligence !== undefined,
 
     plan: (
       owner: Owner,
