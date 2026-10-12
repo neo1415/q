@@ -83,7 +83,7 @@ const UNRUNNABLE: JobPlanResultV2 = {
 
 function world(
   withinLimit: boolean | (() => Promise<boolean>) = true,
-  plan: JobPlanResultV2 = PLAN,
+  plan: JobPlanResultV2 | null = PLAN,
 ) {
   const checkLimit = () =>
     typeof withinLimit === "function"
@@ -194,8 +194,21 @@ describe("a job the lead Q proposes (J1, J4)", () => {
     expect(
       (await board.port.prepare(actor, "run-ledger-down", "Find me fits"))
         .status,
-    ).toBe("NOT_PLANNED");
+    ).toBe("FAILED");
     expect(plans()).toBe(0);
+  });
+
+  it("says planning failed on its side, not NOT_PLANNED, when the planner's model call fails", async () => {
+    // Live 2026-10-12: the provider refused (credit exhausted) and Q asked
+    // the person to reword a goal that was fine.
+    const { board, plans } = world(true, null);
+    const prepared = await board.port.prepare(
+      actor,
+      "run-down",
+      "Find me fits",
+    );
+    expect(prepared.status).toBe("FAILED");
+    expect(plans()).toBe(1);
   });
 
   it("holds already-approved queued work when spending cannot be checked", async () => {
