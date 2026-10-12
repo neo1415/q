@@ -466,6 +466,32 @@ const actionsKey = (actions: readonly ReaderAction[]): string =>
     })),
   );
 
+/**
+ * One more reading after the first failed, cut off at its deadline or by
+ * the run's own abort; never started for a run already aborted. A reader
+ * that ignores its signal is still not waited on past the deadline.
+ */
+async function rereadTurn<T>(
+  read: (signal: AbortSignal) => Promise<T | null>,
+  runSignal: AbortSignal,
+  deadlineMs: number,
+): Promise<T | null> {
+  if (runSignal.aborted) return null;
+  const deadline = new AbortController();
+  const timer = setTimeout(() => deadline.abort(), deadlineMs);
+  const signal = AbortSignal.any([runSignal, deadline.signal]);
+  try {
+    return await Promise.race([
+      read(signal).catch(() => null),
+      new Promise<null>((resolve) => {
+        signal.addEventListener("abort", () => resolve(null), { once: true });
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export type SpecialistQAnswerDependencies = {
   readonly specialist: QSpecialist<
     CompanyIntelligenceRequest,
@@ -496,6 +522,11 @@ export type SpecialistQAnswerDependencies = {
    * app query before the full reading lands. Absent: no fast lane.
    */
   readonly turnSkim?: QTurnSkimmer | undefined;
+  /**
+   * The wall clock of the one extra reading tried after the gateway's own
+   * attempts failed (default TURN_REREAD_DEADLINE_MS). Tests shorten it.
+   */
+  readonly turnRereadDeadlineMs?: number | undefined;
   /**
    * The warm prepared-entity index, as a pure in-memory matcher. A plain
    * "who is / tell me about / find <prepared entity>" is answered by code
@@ -864,6 +895,14 @@ export type SpecialistQAnswer = QAnswerPort & {
 };
 
 const ANSWER_LIMIT_CHARS = 32_000;
+/**
+ * The extra reading after a failed one is bounded: it goes to the fallback
+ * model the gateway has not parked, which reads a turn in about a second;
+ * one still unread after this is answered as unread rather than holding
+ * the turn for another full gateway budget (production: a failed reading
+ * plus its retry stacked past 10 s).
+ */
+const TURN_REREAD_DEADLINE_MS = 2_500;
 
 /**
  * How much of the conversation the specialist reads (CQ-QX-007 H3a).
@@ -3266,7 +3305,7 @@ export function createSpecialistQAnswer(
     request.signal?.addEventListener("abort", () => readerAbort.abort(), {
       once: true,
     });
-    const readTurn = () =>
+    const readTurn = (signal: AbortSignal = readerAbort.signal) =>
       turns.read(
         turnReaderInput(
           history,
@@ -3276,7 +3315,7 @@ export function createSpecialistQAnswer(
             tenantId: request.tenantId,
             userId: request.actor.userId,
             correlationId: request.correlationId,
-            signal: readerAbort.signal,
+            signal,
           },
           withResolution(referenceNote(shown, lastAction), pointed),
         ),
@@ -3354,7 +3393,11 @@ export function createSpecialistQAnswer(
     let read = await readingFirst;
     let turnUnread = false;
     if (read === null && request.signal?.aborted !== true) {
-      read = await readTurn().catch(() => null);
+      read = await rereadTurn(
+        readTurn,
+        readerAbort.signal,
+        dependencies.turnRereadDeadlineMs ?? TURN_REREAD_DEADLINE_MS,
+      );
       turnUnread = read === null;
       logger?.warn(
         { qRunId: request.runId, recovered: read !== null },

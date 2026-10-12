@@ -107,6 +107,10 @@ function request(): QAnswerRequest {
 function seam(options: {
   readonly said: string;
   readonly reading: TurnReaderResult | null | (() => TurnReaderResult | null);
+  /** The reader itself, in place of `reading` (latency: signals, timing). */
+  readonly read?: QTurnReader["read"];
+  /** The extra reading's deadline (default: the seam's own). */
+  readonly turnRereadDeadlineMs?: number;
   readonly outcomes: readonly QAnswerOutcome[];
   readonly visibility?: {
     noteVisibility: (entry: Record<string, unknown>) => void;
@@ -210,6 +214,7 @@ function seam(options: {
           .filter((action) => action.available === false)
           .map((action) => action.name),
       );
+      if (options.read !== undefined) return options.read(input);
       return Promise.resolve(
         typeof options.reading === "function"
           ? options.reading()
@@ -298,6 +303,9 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(options.turnRereadDeadlineMs === undefined
+      ? {}
+      : { turnRereadDeadlineMs: options.turnRereadDeadlineMs }),
     ...(options.openRecord === undefined
       ? {}
       : { openRecord: options.openRecord }),
@@ -939,6 +947,52 @@ describe("a turn whose reading fails is never silently answered as chat (B1)", (
     await run.answer.answer(request());
     expect(run.reads()).toBe(2);
     expect(run.unread).toEqual([true]);
+  });
+
+  it("the extra reading is cut off at its deadline: one extra try, the turn answered as unread", async () => {
+    const signals: AbortSignal[] = [];
+    const run = seam({
+      said: "make me a pdf of my thesis",
+      reading: null,
+      outcomes: [],
+      turnRereadDeadlineMs: 40,
+      // The first reading fails (the gateway's own attempts spent); the
+      // extra one hangs until its signal is aborted.
+      read: (input) => {
+        const signal = input.signal ?? new AbortController().signal;
+        signals.push(signal);
+        if (signals.length === 1) {
+          return Promise.reject(new Error("both attempts failed"));
+        }
+        return new Promise((_, reject) => {
+          signal.addEventListener("abort", () => reject(new Error("aborted")));
+        });
+      },
+    });
+    const started = Date.now();
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(2);
+    expect(signals[1]?.aborted).toBe(true);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(run.unread).toEqual([true]);
+  });
+
+  it("a run already aborted gets no extra reading", async () => {
+    const controller = new AbortController();
+    const run = seam({
+      said: "make me a pdf of my thesis",
+      reading: null,
+      outcomes: [],
+      read: () => {
+        // The run is cancelled while its first reading fails.
+        controller.abort();
+        return Promise.resolve(null);
+      },
+    });
+    await run.answer
+      .answer({ ...request(), signal: controller.signal })
+      .catch(() => undefined);
+    expect(run.reads()).toBe(1);
   });
 
   it("a read turn is never marked unread", async () => {
