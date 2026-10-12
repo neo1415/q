@@ -563,3 +563,33 @@ export const DiligenceQuestionsResultSchema = z
 export type DiligenceQuestionsResult = z.infer<
   typeof DiligenceQuestionsResultSchema
 >;
+
+/** Drafts never authorize an action. A bounded candidate lets the specialist
+ * repair excessive wording instead of losing the whole draft at the gateway.
+ * The canonical result above remains the only acceptable final output. */
+export const DiligenceQuestionsCandidateSchema =
+  DiligenceQuestionsResultSchema.extend({
+    questions: z
+      .array(
+        z
+          .object({
+            question: z.string().trim().min(8).max(1_000),
+            about: z.string().trim().min(1).max(120),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+  });
+export type DiligenceQuestionsCandidate = z.infer<
+  typeof DiligenceQuestionsCandidateSchema
+>;
+
+export const DiligenceQuestionsV2VariablesSchema =
+  DiligenceQuestionsVariablesSchema.extend({
+    /** Invalid draft questions to rewrite, in their original order. UNTRUSTED. */
+    repairQuestions: z.string().max(6_000).default(""),
+  });
+export type DiligenceQuestionsV2Variables = z.infer<
+  typeof DiligenceQuestionsV2VariablesSchema
+>;
