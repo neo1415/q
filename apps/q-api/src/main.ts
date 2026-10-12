@@ -4214,6 +4214,8 @@ const workforceDiligence = createWorkforceDiligence({
   firewall,
   currentVersion: qArtifacts.preparation.port.currentVersion,
   questions: workforceModels.diligenceQuestions,
+  shorten: workforceModels.shortenDiligenceQuestions,
+  logger,
   relationshipWith: async (actor, companyId) => {
     const relationship = await errandRelationships.withCompany?.(
       actor,
