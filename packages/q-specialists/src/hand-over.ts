@@ -115,6 +115,10 @@ export type QHandOverPort = {
 /** The call an errand books, named the same for every hand-over. */
 export const HAND_OVER_CALL_PURPOSE = "Introductory call";
 
+/** Words about connecting or introductions, in which a waiting request is the thing to answer. */
+const CONNECTING_WORDS =
+  /\b(connect|connection|request|accept|introduc|intro\b|reach out|get in touch|reply|respond|answer|handle|take care|deal with|follow up)/iu;
+
 /**
  * The first message a hand-over's errand sends once both sides are
  * connected: short, true for any counterpart, approved word for word.
@@ -198,6 +202,8 @@ export async function actOnHandOver(
      * only when no name was given and the screen shows no one.
      */
     readonly pointed?: HandOverSubject | null | undefined;
+    /** Their own words, to check a shortcut is what they asked for. */
+    readonly utterance?: string | undefined;
   },
   /** The time they asked for, if any (TURN_READER v28). */
   window: HandOverTimeWindow | null = null,
@@ -223,7 +229,14 @@ export async function actOnHandOver(
   ) {
     return { kind: "STANDING" };
   }
-  if (port.answerConnectionRequest !== undefined) {
+  // Accepting a waiting request (and sending a message as them) only when
+  // their words are about connecting or introductions, never as the
+  // reading of some other work about the same company (live 2026-10-12).
+  if (
+    port.answerConnectionRequest !== undefined &&
+    (handOver.utterance === undefined ||
+      CONNECTING_WORDS.test(handOver.utterance))
+  ) {
     const named =
       handOver.counterpartName ??
       (onScreen?.kind === "COMPANY" ? onScreen.companyId : null);

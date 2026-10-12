@@ -3962,6 +3962,19 @@ export function createSpecialistQAnswer(
     // "handle this for me", in any language. Code prepares Q's errand for
     // the subject they are looking at, for their approval, instead of the
     // answer asking who (founder live 2026-10-01).
+    // Live 2026-10-12 (fictional investor): "Research Ledgerfold, assess
+    // the opportunity, prepare an investment memo, have it critiqued...
+    // and prepare founder diligence questions" was read as a hand-over of
+    // Ledgerfold, and a waiting connection request was turned into an
+    // "accept and send a message" card. Asking for work products is never
+    // a hand-over of a relationship: the answer path plans that work.
+    const askedForWork = asksForWorkProducts(latest.content);
+    if (askedForWork && read?.handOver != null) {
+      logger?.info(
+        { qRunId: request.runId },
+        "a request for work products is not a hand-over; answered instead",
+      );
+    }
     if (
       dependencies.handOver !== undefined &&
       read !== null &&
@@ -3969,12 +3982,17 @@ export function createSpecialistQAnswer(
       read.handOver !== undefined &&
       read.handOver !== null &&
       tool === null &&
-      !writingDocument
+      !writingDocument &&
+      !askedForWork
     ) {
       const handed = await actOnHandOver(
         dependencies.handOver,
         request,
-        { ...read.handOver, pointed: handOverSubjectPointed(pointed) },
+        {
+          ...read.handOver,
+          pointed: handOverSubjectPointed(pointed),
+          utterance: latest.content,
+        },
         read.timeWindow ?? null,
       ).catch((error: unknown) => {
         logger?.warn(
@@ -4564,4 +4582,23 @@ function asksAQuestion(text: string): boolean {
       said,
     )
   );
+}
+
+/**
+ * The words ask Q to produce analysis or documents (research, an
+ * assessment, a memo or brief, a critique or revision, diligence
+ * questions): two or more distinct kinds of work. Handing a relationship
+ * over ("handle Kestrel for me") names none of them.
+ */
+export function asksForWorkProducts(text: string): boolean {
+  const said = text.toLowerCase();
+  const kinds = [
+    /\bresearch/u,
+    /\b(assess|assessment|evaluat|analy[sz])/u,
+    /\b(memo|brief|report|one-pager|write-?up)\b/u,
+    /\b(critique|second opinion|review it|revise|revision)/u,
+    /\b(diligence questions|due diligence|questions for the founder|founder questions|diligence)/u,
+    /\b(risks?|missing information|red flags)\b/u,
+  ];
+  return kinds.filter((kind) => kind.test(said)).length >= 2;
 }
