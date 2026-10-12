@@ -2,6 +2,7 @@ import type {
   MemoryBundle,
   MemoryConversationDigest,
   MemoryItem,
+  MemoryRehearsalDigest,
 } from "./contracts.js";
 
 /**
@@ -51,6 +52,67 @@ function digestLine(
   }: ${summary}`;
 }
 
+export const REHEARSALS_LABEL =
+  "Their own pitch rehearsals with Q, newest first (Q's coaching feedback on practice meetings, not verified facts about the company; scores are computed from Q's ratings):";
+export const NO_REHEARSALS_LINE =
+  "Their own pitch rehearsals with Q: none on record.";
+/** Per rehearsal: three of them stay inside MEMORY_TEXT_MAX with room left. */
+const REHEARSAL_MAX = 750;
+
+const plain = (label: string) => label.toLowerCase().replace(/_/g, " ");
+const clip = (text: string, max: number) =>
+  text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+
+function rehearsalLines(r: MemoryRehearsalDigest): string {
+  const head = [
+    `${r.at.slice(0, 10)}, practice meeting with ${r.counterpartName}`,
+    `${plain(r.difficulty)} difficulty`,
+    ...(r.outcome === null ? [] : [`ended ${plain(r.outcome)}`]),
+    ...(r.score === null ? [] : [`score ${String(r.score)}/100`]),
+  ].join(", ");
+  const rows = [`- ${head}`];
+  if (r.needsWork.length > 0) {
+    rows.push(`  Needed work: ${r.needsWork.map(plain).join(", ")}`);
+  }
+  if (r.strong.length > 0) {
+    rows.push(`  Strong: ${r.strong.map(plain).join(", ")}`);
+  }
+  for (const w of r.wentWrong.slice(0, 3)) {
+    rows.push(
+      `  Struggled: ${clip(w.moment, 140)} (${clip(w.why, 140)}) Better: ${clip(w.better, 160)}`,
+    );
+  }
+  if (r.wentRight.length > 0) {
+    rows.push(
+      `  Went well: ${r.wentRight
+        .slice(0, 2)
+        .map((m) => clip(m, 120))
+        .join("; ")}`,
+    );
+  }
+  if (r.tips.length > 0) {
+    rows.push(
+      `  Practise: ${r.tips
+        .slice(0, 3)
+        .map((t) => clip(t, 140))
+        .join("; ")}`,
+    );
+  }
+  if (rows.length === 1 && r.overall.length > 0) {
+    rows.push(`  Overall: ${clip(r.overall, 300)}`);
+  }
+  return clip(rows.join("\n"), REHEARSAL_MAX);
+}
+
+/** The rehearsal section, or "" when the turn did not ask about them. */
+export function renderRehearsals(
+  rehearsals: MemoryBundle["rehearsals"],
+): string {
+  if (rehearsals === undefined) return "";
+  if (rehearsals.length === 0) return NO_REHEARSALS_LINE;
+  return `${REHEARSALS_LABEL}\n${rehearsals.map(rehearsalLines).join("\n")}`;
+}
+
 function fit(sections: readonly string[], max: number): string {
   let out = "";
   for (const section of sections) {
@@ -84,6 +146,9 @@ export function renderMemoryBundle(
   const person = byType(bundle.person).map(line);
   const company = byType(bundle.company).map(line);
   const sections: string[] = [];
+  // First when present: it is only read when the turn is about pitch
+  // practice, so it is what the person is asking about.
+  sections.push(renderRehearsals(bundle.rehearsals));
   // First, because it is what the person is asking about: an earlier
   // conversation found by subject or name, however long ago. Each summary
   // is clipped so a few long ones cannot push everything else past the

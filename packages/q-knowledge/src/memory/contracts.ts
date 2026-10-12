@@ -213,6 +213,40 @@ export type MemoryBundle = {
   readonly relevant: readonly MemoryConversationDigest[];
   /** Other recent conversations of the same person: title and summary only. */
   readonly otherConversations: readonly MemoryConversationDigest[];
+  /**
+   * The person's own finished pitch rehearsals, newest first, read only
+   * when the turn is about pitching or practice. Absent: not asked about,
+   * or not read (unknown). An empty list: asked, and none on record.
+   * Q's coaching feedback on practice; never evidence about a company.
+   */
+  readonly rehearsals?: readonly MemoryRehearsalDigest[] | undefined;
+};
+
+/**
+ * One finished rehearsal's review, as the memory section needs it. Every
+ * field is Q's coaching reading of a practice meeting (or a score computed
+ * by code from its ratings), never a fact about the company.
+ */
+export type MemoryRehearsalDigest = {
+  readonly rehearsalId: string;
+  /** When it ended (or began, if it has no end time). */
+  readonly at: string;
+  readonly counterpartName: string;
+  readonly difficulty: string;
+  readonly outcome: string | null;
+  /** 0-100, computed by code from the ratings; null when there is none. */
+  readonly score: number | null;
+  readonly overall: string;
+  /** Dimensions rated NEEDS_WORK, and those rated STRONG. */
+  readonly needsWork: readonly string[];
+  readonly strong: readonly string[];
+  readonly wentWrong: readonly {
+    readonly moment: string;
+    readonly why: string;
+    readonly better: string;
+  }[];
+  readonly wentRight: readonly string[];
+  readonly tips: readonly string[];
 };
 
 export type MemoryConversationDigest = {
