@@ -180,8 +180,17 @@ export function createTavusClient(dependencies: {
         `/v2/pals/${encodeURIComponent(palId)}`,
       );
     },
-    createConversation: async (input) =>
-      conversationOf(
+    createConversation: async (input) => {
+      // Guard the paid provider boundary even if a caller's configuration
+      // or request validation is wrong. Reconnects cannot raise this cap.
+      if (
+        !Number.isInteger(input.maxCallSeconds) ||
+        input.maxCallSeconds < 1 ||
+        input.maxCallSeconds > 180
+      ) {
+        throw new TavusError("conversation duration", 400);
+      }
+      return conversationOf(
         await call("create conversation", "POST", "/v2/conversations", {
           pal_id: input.palId,
           face_id: input.faceId,
@@ -204,7 +213,8 @@ export function createTavusClient(dependencies: {
             enable_closed_captions: true,
           },
         }),
-      ),
+      );
+    },
     endConversation: async (conversationId) => {
       await call(
         "end conversation",

@@ -107,6 +107,10 @@ function request(): QAnswerRequest {
 function seam(options: {
   readonly said: string;
   readonly reading: TurnReaderResult | null | (() => TurnReaderResult | null);
+  /** The reader itself, in place of `reading` (latency: signals, timing). */
+  readonly read?: QTurnReader["read"];
+  /** The extra reading's deadline (default: the seam's own). */
+  readonly turnRereadDeadlineMs?: number;
   readonly outcomes: readonly QAnswerOutcome[];
   readonly visibility?: {
     noteVisibility: (entry: Record<string, unknown>) => void;
@@ -173,6 +177,8 @@ function seam(options: {
     createdAt: new Date().toISOString(),
     ...(options.spoken === true ? { utteranceRef: "utt-1" } : {}),
   };
+  /** The conversation the seam's lines are in; a test may start another. */
+  const conversation = { id: CONVERSATION as string };
   const directives: (QResearchDirective | undefined)[] = [];
   const marked: string[] = [];
   const earlier: QConversationMessage[] = (options.earlier ?? []).map(
@@ -189,6 +195,7 @@ function seam(options: {
   const unread: boolean[] = [];
   const capabilities: unknown[] = [];
   let reads = 0;
+  let counterpartReads = 0;
   const heardActions: unknown[] = [];
   const declaredActions: string[][] = [];
   const askedActions: (string | undefined)[] = [];
@@ -210,6 +217,7 @@ function seam(options: {
           .filter((action) => action.available === false)
           .map((action) => action.name),
       );
+      if (options.read !== undefined) return options.read(input);
       return Promise.resolve(
         typeof options.reading === "function"
           ? options.reading()
@@ -268,7 +276,17 @@ function seam(options: {
     repositories: {
       messages: {
         listRecentForConversationOfRun: () =>
-          Promise.resolve([...earlier, message]),
+          Promise.resolve(
+            [...earlier, message].map((line) =>
+              conversation.id === CONVERSATION
+                ? line
+                : {
+                    ...line,
+                    conversationId:
+                      conversation.id as QConversationMessage["conversationId"],
+                  },
+            ),
+          ),
         mark: (_tx: unknown, input: { messageIds: readonly string[] }) => {
           marked.push(...input.messageIds);
           return Promise.resolve();
@@ -298,6 +316,9 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(options.turnRereadDeadlineMs === undefined
+      ? {}
+      : { turnRereadDeadlineMs: options.turnRereadDeadlineMs }),
     ...(options.openRecord === undefined
       ? {}
       : { openRecord: options.openRecord }),
@@ -328,8 +349,10 @@ function seam(options: {
     ...(options.counterpartNames === undefined
       ? {}
       : {
-          counterpartNames: () =>
-            Promise.resolve(options.counterpartNames ?? []),
+          counterpartNames: () => {
+            counterpartReads += 1;
+            return Promise.resolve(options.counterpartNames ?? []);
+          },
         }),
     ...(options.profileGaps === undefined
       ? {}
@@ -348,12 +371,17 @@ function seam(options: {
     marked,
     message,
     earlierLines: earlier,
+    /** The same person's lines, now in a new conversation. */
+    newConversation: () => {
+      conversation.id = randomUUID();
+    },
     probes,
     leads,
     investigated: () => investigated,
     unread,
     capabilities,
     reads: () => reads,
+    counterpartReads: () => counterpartReads,
     heardActions,
     declaredActions,
     askedActions,
@@ -941,6 +969,52 @@ describe("a turn whose reading fails is never silently answered as chat (B1)", (
     expect(run.unread).toEqual([true]);
   });
 
+  it("the extra reading is cut off at its deadline: one extra try, the turn answered as unread", async () => {
+    const signals: AbortSignal[] = [];
+    const run = seam({
+      said: "make me a pdf of my thesis",
+      reading: null,
+      outcomes: [],
+      turnRereadDeadlineMs: 40,
+      // The first reading fails (the gateway's own attempts spent); the
+      // extra one hangs until its signal is aborted.
+      read: (input) => {
+        const signal = input.signal ?? new AbortController().signal;
+        signals.push(signal);
+        if (signals.length === 1) {
+          return Promise.reject(new Error("both attempts failed"));
+        }
+        return new Promise((_, reject) => {
+          signal.addEventListener("abort", () => reject(new Error("aborted")));
+        });
+      },
+    });
+    const started = Date.now();
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(2);
+    expect(signals[1]?.aborted).toBe(true);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(run.unread).toEqual([true]);
+  });
+
+  it("a run already aborted gets no extra reading", async () => {
+    const controller = new AbortController();
+    const run = seam({
+      said: "make me a pdf of my thesis",
+      reading: null,
+      outcomes: [],
+      read: () => {
+        // The run is cancelled while its first reading fails.
+        controller.abort();
+        return Promise.resolve(null);
+      },
+    });
+    await run.answer
+      .answer({ ...request(), signal: controller.signal })
+      .catch(() => undefined);
+    expect(run.reads()).toBe(1);
+  });
+
   it("a read turn is never marked unread", async () => {
     const run = seam({
       said: "what do you know about fintech in Lagos?",
@@ -1473,7 +1547,25 @@ describe("the turn read early, beside the firewall (ADR 0035)", () => {
     expect(run.reads()).toBe(3);
   });
 
-  it("is not made for a conversation's first turn", async () => {
+  it("is made for a new conversation's first turn from the person's last actions: one reading, used", async () => {
+    const run = navigate();
+    // An earlier conversation of theirs taught the reader's actions.
+    await run.answer.answer(request());
+    expect(run.reads()).toBe(1);
+    run.newConversation();
+    const first = request();
+    early(run, first);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Read beside the firewall, before the answer began.
+    expect(run.reads()).toBe(2);
+    const outcome = await run.answer.answer(first);
+    expect(outcome.kind).toBe("ANSWERED");
+    // Exactly one reading for the new conversation's first turn: the early one.
+    expect(run.reads()).toBe(2);
+    expect(run.stored.at(-1)?.content).toMatch("Opening Discover…");
+  });
+
+  it("is not made for a person's first turn this process has seen", async () => {
     const run = navigate();
     const first = request();
     early(run, first);
@@ -1777,6 +1869,25 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     expect(stored.at(-1)?.content).toMatch(
       /^I couldn't turn that into a plan my team can carry out, so nothing has started\./u,
     );
+  });
+
+  it("a team job whose planning failed on Q's side says so, never asks them to reword it (live 2026-10-12)", async () => {
+    const teamJob: QTeamJobPort = {
+      propose: () => Promise.resolve({ status: "FAILED" }),
+    };
+    const { answer, delegated, stored } = seam({
+      said: "Research Ledgerfold, write a memo and have it critiqued",
+      reading: reading(null),
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(delegated()).toBe(0);
+    const said = stored.at(-1)?.content ?? "";
+    expect(said).toMatch(
+      /^I couldn't plan this for my team just now: something failed on my side/u,
+    );
+    expect(said).not.toMatch(/Tell me who it's about/u);
   });
 
   it("work handed to the team in words naming no list of tasks is read by the reader and planned (lead review 2026-10-12)", async () => {
@@ -3679,6 +3790,30 @@ describe("a request naming a counterparty brings Relationships into the offer", 
       ],
       widen: true,
     });
+  });
+
+  it("reads their counterparts beside the reading, once, not after it (latency)", async () => {
+    let release: (reading: TurnReaderResult) => void = () => undefined;
+    const reading = new Promise<TurnReaderResult>((resolve) => {
+      release = resolve;
+    });
+    const run = seam({
+      said: "Ask Ledgerfold for their last 12 months of management accounts.",
+      reading: null,
+      read: () => reading,
+      outcomes: [],
+      counterpartNames: ["Ledgerfold"],
+    });
+    const answering = run.answer.answer(request());
+    // The reading has not landed; the counterparts are already being read.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const counterpartsBeforeReading = run.counterpartReads();
+    release(untold());
+    await answering;
+    expect(counterpartsBeforeReading).toBe(1);
+    // Taken up after the reading, never read a second time.
+    expect(run.counterpartReads()).toBe(1);
+    expect(run.focuses.at(-1)).toMatchObject({ areas: ["Relationships"] });
   });
 
   it("5dd9bec5 (Savanna, investor): 'Ask Ledgerfold for their last 12 months of management accounts.'", async () => {

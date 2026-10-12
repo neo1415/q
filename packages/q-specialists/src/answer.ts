@@ -466,6 +466,32 @@ const actionsKey = (actions: readonly ReaderAction[]): string =>
     })),
   );
 
+/**
+ * One more reading after the first failed, cut off at its deadline or by
+ * the run's own abort; never started for a run already aborted. A reader
+ * that ignores its signal is still not waited on past the deadline.
+ */
+async function rereadTurn<T>(
+  read: (signal: AbortSignal) => Promise<T | null>,
+  runSignal: AbortSignal,
+  deadlineMs: number,
+): Promise<T | null> {
+  if (runSignal.aborted) return null;
+  const deadline = new AbortController();
+  const timer = setTimeout(() => deadline.abort(), deadlineMs);
+  const signal = AbortSignal.any([runSignal, deadline.signal]);
+  try {
+    return await Promise.race([
+      read(signal).catch(() => null),
+      new Promise<null>((resolve) => {
+        signal.addEventListener("abort", () => resolve(null), { once: true });
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export type SpecialistQAnswerDependencies = {
   readonly specialist: QSpecialist<
     CompanyIntelligenceRequest,
@@ -496,6 +522,11 @@ export type SpecialistQAnswerDependencies = {
    * app query before the full reading lands. Absent: no fast lane.
    */
   readonly turnSkim?: QTurnSkimmer | undefined;
+  /**
+   * The wall clock of the one extra reading tried after the gateway's own
+   * attempts failed (default TURN_REREAD_DEADLINE_MS). Tests shorten it.
+   */
+  readonly turnRereadDeadlineMs?: number | undefined;
   /**
    * The warm prepared-entity index, as a pure in-memory matcher. A plain
    * "who is / tell me about / find <prepared entity>" is answered by code
@@ -864,6 +895,14 @@ export type SpecialistQAnswer = QAnswerPort & {
 };
 
 const ANSWER_LIMIT_CHARS = 32_000;
+/**
+ * The extra reading after a failed one is bounded: it goes to the fallback
+ * model the gateway has not parked, which reads a turn in about a second;
+ * one still unread after this is answered as unread rather than holding
+ * the turn for another full gateway budget (production: a failed reading
+ * plus its retry stacked past 10 s).
+ */
+const TURN_REREAD_DEADLINE_MS = 2_500;
 
 /**
  * How much of the conversation the specialist reads (CQ-QX-007 H3a).
@@ -2244,6 +2283,16 @@ export function createSpecialistQAnswer(
    * Q's own vocabulary, not anyone's data.
    */
   const lastActions = new Map<string, string>();
+  /**
+   * The same, by the person (tenant and user): a conversation's first turn
+   * has no actions of its own yet, but the person's last plan usually
+   * offered exactly the same ones, so its early reading can be made from
+   * them. Still taken up only on an exact match with this turn's own plan;
+   * the reader is never told an action this person was not last offered.
+   */
+  const lastActionsByActor = new Map<string, string>();
+  const actorKeyOf = (tenantId: string, userId: string): string =>
+    `${tenantId}:${userId}`;
   /** Early readings by run, bounded; dropped on refusal or when unused. */
   type EarlyReading = {
     readonly messageId: string;
@@ -2296,21 +2345,41 @@ export function createSpecialistQAnswer(
    * request to act, and never a reason to show anything: it brings the
    * Relationships area's actions into the offer, which authorize decides.
    */
+  /**
+   * Their counterparts' names, read once per run: started beside the turn
+   * reading (latency) and taken up after it. A read of their own
+   * relationships under the run's own actor; it changes nothing.
+   */
+  const counterpartReads = new Map<string, Promise<readonly string[]>>();
+  const counterpartsOf = (
+    request: QAnswerRequest,
+  ): Promise<readonly string[]> => {
+    const port = dependencies.counterpartNames;
+    if (port === undefined) return Promise.resolve([]);
+    const started = counterpartReads.get(request.runId);
+    if (started !== undefined) return started;
+    const reading = port(request).catch(() => [] as readonly string[]);
+    counterpartReads.set(request.runId, reading);
+    while (counterpartReads.size > PREREADS_MAX) {
+      const oldest = counterpartReads.keys().next().value;
+      if (oldest === undefined) break;
+      counterpartReads.delete(oldest);
+    }
+    return reading;
+  };
+  /** An investor's run on a company: across a relationship by its plan. */
+  const companyAcrossRelationship = (request: QAnswerRequest): boolean =>
+    ownInvestorOrganisationIn(request.plan) !== null &&
+    request.subjects.some((subject) => subject.kind === "COMPANY");
+
   const aboutCounterparty = async (
     request: QAnswerRequest,
     utterance: string,
     read: { readonly kind: string } | null,
   ): Promise<boolean> => {
     if (read?.kind !== "TOOL_REQUEST") return false;
-    if (
-      ownInvestorOrganisationIn(request.plan) !== null &&
-      request.subjects.some((subject) => subject.kind === "COMPANY")
-    ) {
-      return true;
-    }
-    const names = await (
-      dependencies.counterpartNames?.(request) ?? Promise.resolve([])
-    ).catch(() => []);
+    if (companyAcrossRelationship(request)) return true;
+    const names = await counterpartsOf(request);
     if (names.length === 0) return false;
     return names.some((name) => namedInWords(utterance, name));
   };
@@ -2400,8 +2469,10 @@ export function createSpecialistQAnswer(
           preskims.delete(oldest);
         }
       }
-      const key = lastActions.get(conversationId);
-      // A conversation's first turn has no known actions: read later.
+      const key =
+        lastActions.get(conversationId) ??
+        lastActionsByActor.get(actorKeyOf(input.tenantId, input.actor.userId));
+      // A person this process has not yet read for: read later.
       if (key === undefined) return null;
       const actions = JSON.parse(key) as ReaderAction[];
       const reading = turns
@@ -3215,12 +3286,19 @@ export function createSpecialistQAnswer(
     // question, or a pitch being watched), and never for a turn the
     // default cannot be: a web address is research, setup and a question
     // series carry their own notes.
+    //
+    // Gated on the early skim (production: 118 speculations cancelled in
+    // 7 days, each ~44k input tokens): where a skim is composed, the
+    // speculative answer starts only once the skim agrees with the default
+    // reading (OTHER: not a list, a fit, a person or an arrival), and not
+    // at all when the reading lands first. Nothing about what is offered
+    // or authorised changes; only whether the call is made early.
     const speculativeResearch = researchDirectiveFor(
       state,
       readingFromTurnReader(SPECULATIVE_READING),
       { available: dependencies.researchAvailable ?? true },
     );
-    if (
+    const speculate =
       dependencies.speculation?.spoken === true &&
       spoken &&
       request.speculation === undefined &&
@@ -3229,8 +3307,8 @@ export function createSpecialistQAnswer(
         !request.subjects.some((subject) => subject.kind === "COMPANY")) &&
       !namesWebAddress(latest.content) &&
       request.plan.screen?.route !== "ONBOARDING" &&
-      !sequences.has(conversationId)
-    ) {
+      !sequences.has(conversationId);
+    const startSpoken = (): void => {
       speculative.current = startSpeculation({
         request: {
           ...request,
@@ -3258,7 +3336,9 @@ export function createSpecialistQAnswer(
           dependencies.speculation?.observe?.(event);
         },
       });
-    }
+    };
+    // No skim composed: nothing to gate on, so it starts at once.
+    if (speculate && dependencies.turnSkim === undefined) startSpoken();
     // K6: the full reading is dropped (its provider call aborted) when the
     // fast lane's skim answers the turn first; the run's own abort still
     // reaches it.
@@ -3266,7 +3346,7 @@ export function createSpecialistQAnswer(
     request.signal?.addEventListener("abort", () => readerAbort.abort(), {
       once: true,
     });
-    const readTurn = () =>
+    const readTurn = (signal: AbortSignal = readerAbort.signal) =>
       turns.read(
         turnReaderInput(
           history,
@@ -3276,7 +3356,7 @@ export function createSpecialistQAnswer(
             tenantId: request.tenantId,
             userId: request.actor.userId,
             correlationId: request.correlationId,
-            signal: readerAbort.signal,
+            signal,
           },
           withResolution(referenceNote(shown, lastAction), pointed),
         ),
@@ -3292,6 +3372,13 @@ export function createSpecialistQAnswer(
       const oldest = lastActions.keys().next().value;
       if (oldest !== undefined) lastActions.delete(oldest);
     }
+    const actorKey = actorKeyOf(request.tenantId, request.actor.userId);
+    lastActionsByActor.delete(actorKey);
+    lastActionsByActor.set(actorKey, actionsKey(actions));
+    if (lastActionsByActor.size > MAX_CONVERSATIONS) {
+      const oldest = lastActionsByActor.keys().next().value;
+      if (oldest !== undefined) lastActionsByActor.delete(oldest);
+    }
     const readingFirst = (async () => {
       const ready = early === undefined ? null : await early;
       const earlyRead =
@@ -3300,8 +3387,20 @@ export function createSpecialistQAnswer(
         ready.actionsKey === actionsKey(actions)
           ? await ready.reading
           : null;
+      if (ready !== null && earlyRead === null) {
+        logger?.info(
+          {
+            qRunId: request.runId,
+            sameActions: ready.actionsKey === actionsKey(actions),
+          },
+          "q early reading not used",
+        );
+      }
       return earlyRead ?? (await readTurn().catch(() => null));
     })();
+    // Read beside the reading rather than after it: a request to act that
+    // names one of their counterparts needs these names once it is read.
+    if (!companyAcrossRelationship(request)) void counterpartsOf(request);
     // K fast lane: the short first read, begun beside the firewall when it
     // could be, races the full reading. A HIGH confidence "companies of a
     // kind" or "fit" is answered by the read-only app query at once; any
@@ -3325,6 +3424,21 @@ export function createSpecialistQAnswer(
         skimming.catch(() => null),
       ]);
       const lane = fastLaneOf(skimmed, latest.content);
+      if (speculate && lane === null) {
+        if (skimmed?.kind === "OTHER" && !readerAbort.signal.aborted) {
+          startSpoken();
+        } else {
+          logger?.info(
+            {
+              qRunId: request.runId,
+              speculation: "skipped",
+              reason: skimmed === null ? "UNSKIMMED" : "SKIM",
+              decidedAfterMs: Date.now() - skimStarted,
+            },
+            "q voice speculation",
+          );
+        }
+      }
       // Never past a change waiting on their word: a yes is not a list.
       if (lane !== null && !(await waitingOnThem())) {
         speculative.current?.cancel("KIND");
@@ -3354,7 +3468,11 @@ export function createSpecialistQAnswer(
     let read = await readingFirst;
     let turnUnread = false;
     if (read === null && request.signal?.aborted !== true) {
-      read = await readTurn().catch(() => null);
+      read = await rereadTurn(
+        readTurn,
+        readerAbort.signal,
+        dependencies.turnRereadDeadlineMs ?? TURN_REREAD_DEADLINE_MS,
+      );
       turnUnread = read === null;
       logger?.warn(
         { qRunId: request.runId, recovered: read !== null },

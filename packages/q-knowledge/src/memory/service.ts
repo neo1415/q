@@ -11,12 +11,14 @@ import {
   type MemoryBundle,
   type SmallTalkThread,
   type MemoryCandidate,
+  type MemoryConversationDigest,
   type MemoryItem,
   type MemoryOwner,
   type MemoryWriteMode,
   type MemoryWriteResult,
 } from "./contracts.js";
 import type { MemoryRepository } from "./postgres-memory-repository.js";
+import { recallTermsFrom } from "./recall-terms.js";
 
 /**
  * The memory service (doc 14 §130; ADR 0012): retrieve, remember, forget.
@@ -49,14 +51,21 @@ export type MemoryConversationDigestPort = {
     actor: ActorContext,
     exceptConversationId: string | null,
     limit: number,
-  ) => Promise<
-    readonly {
-      readonly conversationId: string;
-      readonly title: string | null;
-      readonly summary: string;
-      readonly lastMessageAt: string;
-    }[]
-  >;
+  ) => Promise<readonly MemoryConversationDigest[]>;
+  /**
+   * The actor's own summarised conversations about one of `companyIds` or
+   * mentioning one of `terms`, newest first, whatever their recency.
+   * Optional: without it recall has no relevant section.
+   */
+  readonly relevantDigests?: (
+    actor: ActorContext,
+    query: {
+      readonly companyIds: readonly string[];
+      readonly terms: readonly string[];
+      readonly except: readonly string[];
+      readonly limit: number;
+    },
+  ) => Promise<readonly MemoryConversationDigest[]>;
 };
 
 export type MemoryServiceDependencies = {
@@ -76,6 +85,11 @@ export type RecallQuery = {
   readonly conversationId?: string | undefined;
   /** Companies the run is about, for company-subject memory. */
   readonly companyIds?: readonly string[] | undefined;
+  /**
+   * What the person just asked, when known. Only names are read from it,
+   * by code (`recallTermsFrom`), to find earlier conversations about them.
+   */
+  readonly utterance?: string | undefined;
   readonly limit?: number | undefined;
 };
 
@@ -167,6 +181,7 @@ export function looksLikeSecret(content: string): boolean {
 
 const RECALL_DEFAULT = 40;
 const OTHER_CONVERSATIONS = 6;
+const RELEVANT_CONVERSATIONS = 4;
 
 export function createMemoryService(
   dependencies: MemoryServiceDependencies,
@@ -229,32 +244,72 @@ export function createMemoryService(
       );
       let thisConversation: MemoryBundle["thisConversation"] = null;
       let otherConversations: MemoryBundle["otherConversations"] = [];
+      let relevant: MemoryBundle["relevant"] = [];
       const conversations = dependencies.conversations;
       if (conversations !== undefined) {
-        try {
-          if (query.conversationId !== undefined) {
-            const digest = await conversations.digestOf(
-              query.actor,
-              query.conversationId,
-            );
-            if (digest?.summary !== null && digest?.summary !== undefined) {
-              thisConversation = {
-                title: digest.title,
-                summary: digest.summary,
-              };
+        const recentRead = (async () => {
+          try {
+            if (query.conversationId !== undefined) {
+              const digest = await conversations.digestOf(
+                query.actor,
+                query.conversationId,
+              );
+              if (digest?.summary !== null && digest?.summary !== undefined) {
+                thisConversation = {
+                  title: digest.title,
+                  summary: digest.summary,
+                };
+              }
             }
+            otherConversations = await conversations.recentDigests(
+              query.actor,
+              query.conversationId ?? null,
+              OTHER_CONVERSATIONS,
+            );
+          } catch (error: unknown) {
+            logger?.warn(
+              { err: error },
+              "conversation digests were not read for recall",
+            );
           }
-          otherConversations = await conversations.recentDigests(
-            query.actor,
-            query.conversationId ?? null,
-            OTHER_CONVERSATIONS,
-          );
-        } catch (error: unknown) {
-          logger?.warn(
-            { err: error },
-            "conversation digests were not read for recall",
-          );
-        }
+        })();
+        // In parallel with the recent read and failing on its own: a
+        // relevant earlier conversation is a bonus, never a precondition.
+        const terms = recallTermsFrom(query.utterance ?? "");
+        const relevantRead = (async () => {
+          if (
+            conversations.relevantDigests === undefined ||
+            (companyIds.size === 0 && terms.length === 0)
+          ) {
+            return;
+          }
+          try {
+            relevant = (
+              await conversations.relevantDigests(query.actor, {
+                companyIds: [...companyIds],
+                terms,
+                except:
+                  query.conversationId === undefined
+                    ? []
+                    : [query.conversationId],
+                limit: RELEVANT_CONVERSATIONS,
+              })
+            )
+              .filter((c) => c.conversationId !== query.conversationId)
+              .slice(0, RELEVANT_CONVERSATIONS);
+          } catch (error: unknown) {
+            logger?.warn(
+              { err: error },
+              "relevant conversations were not read for recall",
+            );
+          }
+        })();
+        await Promise.all([recentRead, relevantRead]);
+        // Each conversation once, in the section that says why it is here.
+        const inRelevant = new Set(relevant.map((c) => c.conversationId));
+        otherConversations = otherConversations.filter(
+          (c) => !inRelevant.has(c.conversationId),
+        );
       }
       // Bookkeeping, detached: a recall never waits on it.
       void repository
@@ -266,7 +321,13 @@ export function createMemoryService(
         .catch((error: unknown) => {
           logger?.debug({ err: error }, "memory use was not recorded");
         });
-      return { person, company, thisConversation, otherConversations };
+      return {
+        person,
+        company,
+        thisConversation,
+        relevant,
+        otherConversations,
+      };
     },
 
     remember: async (command) => {

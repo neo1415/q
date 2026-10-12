@@ -100,6 +100,7 @@ export type { QRuntimeDependencies } from "./application/dependencies.js";
 export type {
   QConversationMessageRepository,
   QConversationRepository,
+  QConversationSearch,
   QMessageCreationRequestStore,
   QRunCreationRequestStore,
   QRunEventRepository,
@@ -195,7 +196,10 @@ export {
   QRunNotResumableError,
 } from "./domain/orchestration-errors.js";
 
-export { createPostgresQRuntimeRepositories } from "./infrastructure/postgres-q-runtime-repositories.js";
+export {
+  boundConversationSearch,
+  createPostgresQRuntimeRepositories,
+} from "./infrastructure/postgres-q-runtime-repositories.js";
 export { createPostgresQRunEventNotifier } from "./infrastructure/postgres-run-event-notifier.js";
 export {
   coalesceDeltas,

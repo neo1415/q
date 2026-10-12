@@ -8,6 +8,9 @@
 //   CQ_PUBLIC_JSON=<file> CQ_SEED_ACCOUNT_PASSWORD=... NODE_USE_ENV_PROXY=1 \
 //   node scripts/handoff/live/workforce-acceptance.mjs [--approve]
 import { randomUUID } from "node:crypto";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { Q_API, signIn } from "./fictional-session.mjs";
 
@@ -45,6 +48,12 @@ const at = () => `${String(Date.now() - t0).padStart(6)} ms`;
 // Timings the lead asked for (2026-10-12): first Q text, plan prepared,
 // each agent's duration from its own startedAt/endedAt, and the whole job.
 const timings = {};
+const evidenceDir = mkdtempSync(join(tmpdir(), "cq-workforce-acceptance-"));
+function preserve(name, value) {
+  writeFileSync(join(evidenceDir, name + ".json"), JSON.stringify(value), {
+    mode: 0o600,
+  });
+}
 
 // CQ_WORKFORCE_RUN: continue a run this runner already started (its plan
 // card still pending) instead of asking again and filing a second card.
@@ -82,6 +91,7 @@ for (let i = 0; i < 480; i += 1) {
   await wait(250);
 }
 timings.runSettledMs = Date.now() - t0;
+preserve("run", run);
 const reply =
   (run?.messages ?? []).filter((m) => m.role === "Q").at(-1)?.text ?? "";
 console.log(at(), "run status", run?.status, "| Q said:", reply.slice(0, 600));
@@ -101,6 +111,7 @@ console.log(
   mine.map((a) => `${a.action?.actionType}:${a.status}`).join(", ") || "none",
 );
 const plan = mine.find((a) => a.action?.actionType === "q.workforce.job.start");
+preserve("plan-card", plan ?? null);
 if (plan === undefined) {
   console.log("FAIL no workforce plan card was prepared", timings);
   process.exit(1);
@@ -143,6 +154,7 @@ for (let i = 0; i < 360; i += 1) {
   await wait(5_000);
 }
 timings.jobTotalMs = Date.now() - approvedAt;
+preserve("job", detail);
 const ms = (a) =>
   a.endedAt === null ? null : Date.parse(a.endedAt) - Date.parse(a.startedAt);
 console.log(
@@ -184,10 +196,175 @@ for (const draft of detail?.drafts ?? []) {
   );
 }
 console.log("timings", JSON.stringify(timings));
-const passed =
+const stepsDone =
   detail?.job?.status === "DONE" &&
+  (detail?.agents ?? []).some((agent) => agent.spawnedByRunId !== null) &&
   (detail?.agents ?? []).every(
     (agent) => agent.spawnedByRunId === null || agent.status === "DONE",
   );
-console.log(passed ? "PASS job done, every step done" : "FAIL see above");
+let deliverablesVerified = false;
+if (stepsDone) {
+  try {
+    await verifyDeliverables();
+    deliverablesVerified = true;
+  } catch (error) {
+    preserve("deliverable-failure", { message: error.message });
+    console.log("FAIL persisted deliverables did not satisfy acceptance");
+  }
+}
+const passed = stepsDone && deliverablesVerified;
+console.log(
+  passed
+    ? "PASS persisted research, memo, critique/revision, PDF and pending diligence card"
+    : "FAIL inspect private acceptance receipts",
+  evidenceDir,
+);
 process.exit(passed ? 0 : 1);
+
+async function verifyDeliverables() {
+  const tokenFile = process.env.CQ_SUPABASE_MANAGEMENT_TOKEN_FILE;
+  if (!tokenFile)
+    throw new Error("Missing read-only queue evidence credential");
+  const uuid = /^[0-9a-f-]{36}$/iu;
+  if (!uuid.test(runId) || !uuid.test(detail.job.id))
+    throw new Error("Invalid owned run/job identifier");
+  // Only this authenticated run's job, with both canonical owner bindings.
+  // Privileged audit access remains local to this fictional-account runner.
+  const query = `select q.state, q.plan, q.results from q_runtime.agent_work_queue q
+    join q_runtime.runs r on r.id = '${runId}'::uuid
+      and r.tenant_id = q.tenant_id and r.actor_user_id = q.user_id
+    where q.job_id = '${detail.job.id}'::uuid
+      and q.trace->>'runId' = r.id::text limit 1`;
+  const response = await fetch(
+    "https://api.supabase.com/v1/projects/vcohxiqsmnkzxnvawgri/database/query",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${readFileSync(tokenFile, "utf8").trim()}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ query }),
+    },
+  );
+  if (!response.ok) throw new Error("Owned queue evidence refused");
+  const rows = await response.json();
+  if (rows.length !== 1 || rows[0].state !== "COMPLETED")
+    throw new Error("No completed owned queue row");
+  const queue = rows[0];
+  preserve("queue", queue);
+  const steps = queue.plan.steps;
+  const research = steps.find((step) => step.role === "RESEARCH");
+  const memo = steps.find(
+    (step) =>
+      step.document?.operation === "PREPARE" &&
+      step.document.kind === "MEMO" &&
+      step.document.scope === "NAMED_COMPANY",
+  );
+  const critic = steps.find(
+    (step) => step.document?.operation === "CRITIQUE_AND_REVISE",
+  );
+  const diligence = steps.find((step) =>
+    step.tools.includes("diligence.questions.prepare"),
+  );
+  if (!research || !memo || !critic || !diligence)
+    throw new Error("Required specialist plan is incomplete");
+  for (const step of steps) {
+    const result = queue.results[step.key];
+    if (result?.status !== "DONE")
+      throw new Error("A planned step has no persisted DONE result");
+    const agent = detail.agents.find((one) => one.id === result.runId);
+    if (!agent?.endedAt) throw new Error("A step has no finished agent run");
+    for (const dependency of step.dependsOn) {
+      const preceding = detail.agents.find(
+        (one) => one.id === queue.results[dependency]?.runId,
+      );
+      if (
+        !preceding?.endedAt ||
+        Date.parse(preceding.endedAt) > Date.parse(agent.startedAt)
+      )
+        throw new Error("Specialist dependency ordering failed");
+    }
+  }
+  const sources = queue.results[research.key].outputs?.note?.sources;
+  if (!Array.isArray(sources) || sources.length === 0)
+    throw new Error("Research has no persisted sources");
+  const prepared = queue.results[memo.key].outputs;
+  const reviewed = queue.results[critic.key].outputs;
+  if (
+    !uuid.test(prepared?.artifactId) ||
+    prepared.companyId !== memo.document.companyId ||
+    reviewed?.artifactId !== prepared.artifactId ||
+    reviewed.companyId !== prepared.companyId ||
+    typeof reviewed.review?.material !== "boolean"
+  )
+    throw new Error("Memo/critique binding failed");
+  const artifact = (await api("GET", `/v1/q/artifacts/${prepared.artifactId}`))
+    .json;
+  preserve("artifact", artifact);
+  if (
+    artifact?.artifact.status !== "READY" ||
+    artifact.artifact.type !== "MEMO" ||
+    artifact.artifact.subject?.kind !== "COMPANY" ||
+    artifact.artifact.subject.companyId !== prepared.companyId ||
+    artifact.current?.version !== artifact.artifact.currentVersion ||
+    !artifact.current?.content.sections.some((section) =>
+      section.body.trim(),
+    ) ||
+    !artifact.history.some((version) => version.version === 1)
+  )
+    throw new Error("No real readable READY memo version");
+  if (
+    reviewed.review.material &&
+    (reviewed.review.revisedToVersion < 2 ||
+      artifact.current.version !== reviewed.review.revisedToVersion)
+  )
+    throw new Error("Material critique has no real revised version");
+  const original = (
+    await api("GET", `/v1/q/artifacts/${prepared.artifactId}/versions/1`)
+  ).json;
+  preserve("original-version", original);
+  if (original?.version !== 1 || original.artifactId !== prepared.artifactId)
+    throw new Error("Original version is not readable");
+  const pdf = await fetch(
+    `${Q_API}/v1/q/artifacts/${prepared.artifactId}/export/pdf`,
+    { headers: { authorization: `Bearer ${session.accessToken}` } },
+  );
+  const bytes = Buffer.from(await pdf.arrayBuffer());
+  if (!pdf.ok || bytes.subarray(0, 5).toString() !== "%PDF-")
+    throw new Error("Memo PDF did not render");
+  writeFileSync(join(evidenceDir, "memo.pdf"), bytes, { mode: 0o600 });
+  const questions = queue.results[diligence.key].outputs;
+  if (!questions?.questions?.length || !uuid.test(questions.qActionId))
+    throw new Error("No founder-question approval card was filed");
+  const waiting = (await api("GET", "/v1/q/approvals")).json;
+  const cards = await Promise.all(
+    waiting.items.map(
+      async (item) =>
+        (await api("GET", `/v1/q/approvals/${item.approvalId}`)).json,
+    ),
+  );
+  const card = cards.find(
+    (one) => one?.action?.actionId === questions.qActionId,
+  );
+  preserve("diligence-card", card ?? null);
+  if (
+    card?.status !== "PENDING" ||
+    card.action.actionType !== "app.diligence.questions.send" ||
+    card.action.actionStatus !== "AWAITING_APPROVAL" ||
+    card.action.executedAt !== undefined
+  )
+    throw new Error("Founder contact is not safely pending approval");
+  console.log(
+    JSON.stringify({
+      researchSources: sources.length,
+      artifactReady: true,
+      artifactVersion: artifact.current.version,
+      realCritique: true,
+      materialRevision: reviewed.review.material,
+      pdfBytes: bytes.length,
+      diligenceQuestions: questions.questions.length,
+      diligencePending: true,
+      dependenciesVerified: true,
+    }),
+  );
+}

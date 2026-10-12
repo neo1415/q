@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { z } from "zod";
 
 import {
@@ -205,6 +207,31 @@ function defaultSleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/**
+ * The prompt-cache routing key for a request: who is asking, for which kind
+ * of task, with which tools on offer. Calls sharing all four share the long
+ * system prefix, so steering them to the same cache shard is what lets a
+ * first round hit a warm prefix. Hashed, because the key travels to the
+ * vendor: no tenant id, user id or tool list leaves in clear. A user's key
+ * is theirs alone, so a cache shard is never shared across users or
+ * tenants on our account even though the vendor's cache is
+ * prefix-exact anyway.
+ */
+export function promptCacheKeyOf(request: ModelGatewayRequest): string {
+  const tools = request.tools.map((tool) => tool.name).sort();
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        request.attribution.tenantId,
+        request.attribution.userId ?? null,
+        request.taskClass,
+        tools,
+      ]),
+    )
+    .digest("hex")
+    .slice(0, 32);
+}
+
 function estimatedUsage(inputTokens: number, text: string): ModelUsage {
   return {
     inputTokens,
@@ -334,6 +361,9 @@ export function createModelGateway(
               maxOutputTokens: outputTokens,
               temperature: request.temperature,
               reasoning: request.reasoning,
+              ...(candidate.model.supportsPromptCache
+                ? { cacheKey: promptCacheKeyOf(request) }
+                : {}),
             },
             {
               signal,

@@ -6129,6 +6129,23 @@ const { app, logger: appLogger } = createApp(
         store: workforceStore,
         // Recovery D6: each job's durable work state, why it stopped, trace.
         work: agentWorkQueue,
+        documents: async (owner, organisationId, artifactIds) => {
+          const actor = await createOwnerActor({
+            resolver: actorContextResolver,
+            authUserOf: async (userId) =>
+              (
+                await database.sql<{ auth_user_id: string | null }[]>`
+                  select auth_user_id from identity.user_profiles where id = ${userId}`
+              )[0]?.auth_user_id ?? null,
+          })(owner.userId, organisationId);
+          if (actor === null || actor.tenantId !== owner.tenantId) return [];
+          const documents = await Promise.all(
+            artifactIds.map((artifactId) =>
+              qArtifacts.service.read(actor, artifactId).catch(() => null),
+            ),
+          );
+          return documents.filter((document) => document !== null);
+        },
         costs: (owner, jobIds) =>
           createPostgresUsageReader(database.sql).workforceCosts(owner, jobIds),
         monthCosts: (owner, at) =>
