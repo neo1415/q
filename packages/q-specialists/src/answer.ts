@@ -3607,26 +3607,35 @@ export function createSpecialistQAnswer(
       );
       if (again !== null) return again;
     }
-    // Several kinds of work at once (research, a memo, a critique, a
-    // revision, founder questions) is a job for Q's team, planned by the
-    // lead and approved as one card -- never one in-run brief, never a
-    // hand-over (live 2026-10-12). Without a plan it is answered as before.
-    if (
-      dependencies.teamJob !== undefined &&
-      read !== null &&
-      read.confidence !== "LOW" &&
-      read.addressedToQ !== false &&
-      workKindsAsked(latest.content) >= TEAM_JOB_KINDS
-    ) {
-      const planned = await dependencies.teamJob
-        .propose(request, latest.content)
-        .catch(() => null);
-      const line = planned === null ? null : teamJobLine(planned);
-      logger?.info(
-        { qRunId: request.runId, outcome: planned?.status ?? null },
-        "q several kinds of work asked: a team job",
+    // Work handed to Q's team -- read from meaning (TURN_READER v49
+    // teamJob), or a sentence naming three kinds of work as a fast path --
+    // is planned by the lead and approved as one card: never one in-run
+    // brief, never a hand-over (live 2026-10-12). A plan that could not be
+    // made is said plainly; it is not covered by an ordinary answer.
+    const teamJobBy =
+      read === null || read.confidence === "LOW" || read.addressedToQ === false
+        ? null
+        : read.teamJob === true
+          ? "READING"
+          : workKindsAsked(latest.content) >= TEAM_JOB_KINDS
+            ? "WORDS"
+            : null;
+    if (dependencies.teamJob !== undefined && teamJobBy !== null) {
+      const startedAt = Date.now();
+      const planned = await dependencies.teamJob.propose(
+        request,
+        latest.content,
       );
-      if (line !== null) return recordAnswer(request, conversationId, line);
+      logger?.info(
+        {
+          qRunId: request.runId,
+          by: teamJobBy,
+          outcome: planned.status,
+          planMs: Date.now() - startedAt,
+        },
+        "q work handed to the team: planned",
+      );
+      return recordAnswer(request, conversationId, teamJobLine(planned));
     }
     // A LOW reading is a guess, and a guess never moves anybody's screen or
     // prepares a change: it is answered like any other turn. A document

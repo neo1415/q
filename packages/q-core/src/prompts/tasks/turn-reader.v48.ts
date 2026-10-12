@@ -34,7 +34,7 @@ export const TURN_READER_V48: PromptDefinition<
 > = {
   ...TURN_READER_V47,
   version: 48,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder brief K Part 4: a founder's question about their own company is the OWN_COMPANY prepared subject, answered from their working snapshot without a tool round.",
   effectiveFrom: "2026-10-09",

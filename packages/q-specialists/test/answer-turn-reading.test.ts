@@ -1762,17 +1762,67 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     );
   });
 
-  it("a team job that was not planned leaves the turn to the answer", async () => {
+  it("a team job that could not be planned is said plainly, never covered by an answer (lead review 2026-10-12)", async () => {
     const teamJob: QTeamJobPort = {
       propose: () => Promise.resolve({ status: "NOT_PLANNED" }),
     };
-    const { answer, delegated } = seam({
+    const { answer, delegated, stored } = seam({
       said: "Research Ledgerfold, write a memo and have it critiqued",
       reading: reading(null),
       outcomes: [],
       teamJob,
     });
     await answer.answer(request());
+    expect(delegated()).toBe(0);
+    expect(stored.at(-1)?.content).toMatch(
+      /^I couldn't turn that into a plan my team can carry out, so nothing has started\./u,
+    );
+  });
+
+  it("work handed to the team in words naming no list of tasks is read by the reader and planned (lead review 2026-10-12)", async () => {
+    const goals: string[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal) => {
+        goals.push(goal);
+        return Promise.resolve({ status: "UNAVAILABLE" });
+      },
+    };
+    const said =
+      "Get your team to investigate Ledgerfold and prepare me for a meeting";
+    const { answer, delegated, stored } = seam({
+      said,
+      reading: {
+        ...reading("Ledgerfold"),
+        handOver: null,
+        teamJob: true,
+      } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(goals).toEqual([said]);
+    expect(delegated()).toBe(0);
+    expect(stored.at(-1)?.content).toMatch(
+      /^Handing work to my team isn't available on your account here, so nothing has started\./u,
+    );
+  });
+
+  it("the same words without the reading's teamJob are answered as before (no magic word)", async () => {
+    let proposed = 0;
+    const teamJob: QTeamJobPort = {
+      propose: () => {
+        proposed += 1;
+        return Promise.resolve({ status: "FAILED" });
+      },
+    };
+    const { answer, delegated } = seam({
+      said: "Get your team to investigate Ledgerfold and prepare me for a meeting",
+      reading: { ...reading(null), handOver: null } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(proposed).toBe(0);
     expect(delegated()).toBe(1);
   });
 
@@ -1781,7 +1831,7 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     const teamJob: QTeamJobPort = {
       propose: () => {
         proposed += 1;
-        return Promise.resolve(null);
+        return Promise.resolve({ status: "FAILED" });
       },
     };
     const { answer, delegated } = seam({

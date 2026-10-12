@@ -3,12 +3,16 @@ import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
 import { z } from "zod";
 
 /**
- * A request for several kinds of work at once ("research them, write a
- * memo, have it critiqued, revise it, draft the founder questions") is a
- * job for Q's team (2026-10-12). Code asks the lead Q to plan it through
- * propose_q_job under the run's own plan -- the same tool the answer's
- * model can call -- so it is never answered as one in-run brief or read
- * as a hand-over. Nothing runs until the person approves the plan card.
+ * Work handed to Q's team (2026-10-12). The turn reader says so from
+ * meaning (TURN_READER v49 teamJob: "get your team to investigate
+ * Ledgerfold and prepare me for a meeting"); a sentence naming three kinds
+ * of work is a deterministic fast path for the same decision. Code asks
+ * the lead Q to plan it through propose_q_job under the run's own plan --
+ * the same tool the answer's model can call, the one orchestration -- so
+ * it is never answered as one in-run brief or read as a hand-over.
+ * Nothing runs until the person approves the plan card, and a plan that
+ * could not be made is said plainly: never covered by an ordinary answer
+ * that looks like the work was done.
  */
 
 export type TeamJobPlan = {
@@ -21,13 +25,18 @@ export type TeamJobPlan = {
 export type TeamJobOutcome =
   | { readonly status: "PREPARED" | "ONE_PER_TURN"; readonly plan: TeamJobPlan }
   | { readonly status: "ALREADY_WAITING"; readonly waiting: readonly string[] }
-  | { readonly status: "NOT_PLANNED" | "LIMIT_REACHED" };
+  | { readonly status: "NOT_PLANNED" | "LIMIT_REACHED" }
+  /** This run may not hand work to the team (not offered, or not authorised). */
+  | { readonly status: "UNAVAILABLE" }
+  /** Planning broke: an error, or output that did not validate. */
+  | { readonly status: "FAILED" };
 
 export type QTeamJobPort = {
+  /** Never throws, except to pass on a cancellation. */
   readonly propose: (
     request: QAnswerRequest,
     goal: string,
-  ) => Promise<TeamJobOutcome | null>;
+  ) => Promise<TeamJobOutcome>;
 };
 
 // Assessing and naming risks are one kind: "what are the risks? a brief
@@ -68,7 +77,10 @@ export function workKindsAsked(text: string): number {
   return KINDS.filter((kind) => kind.test(said)).length;
 }
 
-/** Three kinds or more is a team's job; one brief is not enough for it. */
+/**
+ * Three kinds or more is a team's job; one brief is not enough for it. A
+ * fast path only: the reading (teamJob) decides the rest, in any words.
+ */
 export const TEAM_JOB_KINDS = 3;
 
 export function createToolTeamJobPort(dependencies: {
@@ -93,9 +105,17 @@ export function createToolTeamJobPort(dependencies: {
             ...(request.signal === undefined ? {} : { signal: request.signal }),
           },
         );
-        if (!outcome.result.ok) return null;
+        if (!outcome.result.ok) {
+          dependencies.logger?.warn(
+            { qRunId: request.runId, code: outcome.failureCode },
+            "a team job was not planned",
+          );
+          return {
+            status: outcome.status === "DENIED" ? "UNAVAILABLE" : "FAILED",
+          };
+        }
         const parsed = ProposedSchema.safeParse(outcome.result.data);
-        if (!parsed.success) return null;
+        if (!parsed.success) return { status: "FAILED" };
         const data = parsed.data;
         if (
           (data.status === "PREPARED" || data.status === "ONE_PER_TURN") &&
@@ -115,22 +135,38 @@ export function createToolTeamJobPort(dependencies: {
           { err: error, qRunId: request.runId },
           "a team job was not planned",
         );
-        return null;
+        return { status: "FAILED" };
       }
     },
   };
 }
 
-/** What Q says about a planned job: the plan in plain words, then what needs them. */
-export function teamJobLine(outcome: TeamJobOutcome): string | null {
-  if (outcome.status === "ALREADY_WAITING") {
-    const first = outcome.waiting[0];
-    return first === undefined
-      ? null
-      : `Something like this is already waiting for you: ${first}. Shall I plan this one anyway?`;
-  }
-  if (outcome.status !== "PREPARED" && outcome.status !== "ONE_PER_TURN") {
-    return null;
+const ANSWER_HERE =
+  "I can answer it here from what Capital Q holds instead, if that helps.";
+
+/**
+ * What Q says about the job: the plan in plain words and what needs them,
+ * or, when nothing was planned, that nothing started and what they can do.
+ */
+export function teamJobLine(outcome: TeamJobOutcome): string {
+  switch (outcome.status) {
+    case "ALREADY_WAITING": {
+      const first = outcome.waiting[0];
+      return first === undefined
+        ? "Work like this is already waiting for your approval, so I haven't planned another. Shall I plan this one anyway?"
+        : `Something like this is already waiting for you: ${first}. Shall I plan this one anyway?`;
+    }
+    case "NOT_PLANNED":
+      return `I couldn't turn that into a plan my team can carry out, so nothing has started. Tell me who it's about and what you want at the end (a memo, a meeting brief, questions for the founder) and I'll plan it. ${ANSWER_HERE}`;
+    case "LIMIT_REACHED":
+      return `My team has reached its limit of jobs for now, so I haven't started this one. It can be planned once a running job finishes. ${ANSWER_HERE}`;
+    case "UNAVAILABLE":
+      return `Handing work to my team isn't available on your account here, so nothing has started. ${ANSWER_HERE}`;
+    case "FAILED":
+      return `I couldn't plan this for my team just now: something failed on my side, and nothing has started. Ask me again in a moment. ${ANSWER_HERE}`;
+    case "PREPARED":
+    case "ONE_PER_TURN":
+      break;
   }
   const steps = outcome.plan.steps
     .slice(0, 6)
