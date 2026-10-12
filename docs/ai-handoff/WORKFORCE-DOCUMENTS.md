@@ -1,5 +1,11 @@
 # Existing workforce document connection
 
+## LIVE named-company legion checkpoint — 2026-10-12 13:04 UTC
+
+On221ff996 the existing fictional investor's approved four-step job completed in47.4s:5research sources; READY MEMO v1; independent8-issue material critique; actual storedv2 changing both sections with gaps preserved;5questions on an unexecuted pending founder-contact card. Originalv1 is readable and PDF239,595bytes renders. Work's existing viewer opensv2 viaTeam map and exposesEdit withQ. Strong persisted acceptance PASS after correcting its original-version response shape; no extra job or approval.
+
+Still incomplete: primaryWork Open discoverability/hydration (localtested), original card conversationbinding(nativefixPR25rollingout), and Q's ability to explain real critic changes/questioncontents inoriginalconversation (livefollowupfails, canonical read-tool connection underway). Actual conversational revision fromWork remains to be demonstrated. Do not claim fullproductcompletion or sufficient aggregatepaid-budget enforcement. PREPARING/absent immutableversion stillcannotcomplete a workforce step. Exactstatus and reproduction commands live inSTATE.
+
 ## Product continuation — 2026-10-12 09:25 UTC
 
 Work now projects completed-job references through the existing artifact service under a freshly resolved owner: only an actual matching READY current version offers Open in the existing viewer. Pending native diligence approvals are projected through the existing Approval Engine under the same fresh actor, with exact previews, human approval and Needs you visibility. Diligence card runs reuse the original owned Q conversation; inaccessible/null context fails rather than manufacturing a new conversation. These are local changes on `codex/workforce-tavus-integration`, not deployed product acceptance. See STATE.md for exact gates.

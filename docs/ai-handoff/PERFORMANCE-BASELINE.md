@@ -1,5 +1,20 @@
 # Performance baseline and measured first improvements
 
+## Paired live browser measurement — 2026-10-12 13:04 UTC
+
+Same existing fictional investor, tracked actualbrowser, before5d9837bf and after221ff996(Q API/web stable at measurement; allfourservices verifiedSUCCESS before legion acceptance). BothDiscover/card/profile/explanation/followup/exactcomparison PASS; optional known-founder-record check omitted. One sample per phase, no p50/p95 or causal claim; first20renderedcharacters is an observable threshold, notfirstaudio.
+
+| Phase                | Before first20/completion(ms) | After first20/completion(ms) |
+| -------------------- | ----------------------------- | ---------------------------- |
+| Topthree             | 2970/3442                     | 3626/4151                    |
+| Selected explanation | 9868/23365                    | 2988/16616                   |
+| Risks followup       | 17656/30914                   | 7716/23131                   |
+| Exactcomparison      | 2432/2846                     | 2738/3087                    |
+
+Owner/tenant/Q-run-bound usage: explanation before two selectors2830+2123ms, final13231ms; after zero selectors, final13949ms and11756inputtokens versus15225before. Risks after stillselectors1768+1984ms even thoughfresh company.get already succeeded32ms; mandatory named-other prompt forcessearch118ms andduplicateread32ms. Focused existing-tracker guard74dd49be has69tests/builds/root/package types/staticPASS, notdeployed. Measured3752ms overhead is a target, notpromised releasedsavings. Postanswerextraction completes later; don'tadd it tocriticalpath.
+
+Realworkforce: firstQtext10051ms; plancard11363ms; approvedjob47408ms. Research15088, Documents3334, Reviewer18532, Diligence4824ms. Original-conversation resultfollowup16726/17397ms fails substantivecontinuity. Firstaudio remainsunverified; HTTPthink-then-TTS runner cannotmeasure livefirstspokenaudio. Privatefullreceipts stayoutsideGit. SeeSTATE for gates,reproduction and exactserviceIDs.
+
 ## Latest live browser acceptance — 2026-10-11 21:28 UTC
 
 Exact deployed application `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`, all four Railway services SUCCESS; CI `38173610861` quality + pgTAP SUCCESS (manual e2e SKIPPED). Full tracked cold investor rehearsal PASS, including known authorized founder profile/follow-up.
