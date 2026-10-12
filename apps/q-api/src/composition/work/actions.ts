@@ -578,6 +578,8 @@ export function createWorkPort(dependencies: {
     | undefined;
   readonly isInvestor: (actor: ActorContext) => Promise<boolean>;
   readonly ownCompany: (actor: ActorContext) => Promise<string | null>;
+  /** Workforce jobs' persisted results (reviewer changes, diligence questions). */
+  readonly jobResults?: QWorkIntelligencePort["jobResults"];
   /** ADR 0028 errands, read and stopped beside delegated work. */
   readonly errands?:
     | {
@@ -696,6 +698,9 @@ export function createWorkPort(dependencies: {
               status: row.status,
               lastStep: row.failure ?? row.last_step,
             })),
+    ...(dependencies.jobResults === undefined
+      ? {}
+      : { jobResults: dependencies.jobResults }),
     answer: (actor, delegationId, laneId, answer) =>
       store.answer(actor, delegationId, laneId, answer),
     setAway: (actor, away) => store.setAway(actor, away),
