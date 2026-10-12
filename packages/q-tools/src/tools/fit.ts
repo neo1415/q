@@ -53,7 +53,7 @@ export const FIT_TOP_CANDIDATES = "fit.top_candidates" as const;
 // code from the rows (`text` carries it as "7.5/10 · Good fit"); the model
 // repeats it, never makes one.
 const GUIDANCE =
-  "Say each company's fit as the score out of 10 given in text beside its band in words (\"7.5/10 · Good fit\"), exactly as given; where no score is given, the band in words alone. Never a percentage, never a score of your own, never a different number. Then the parameter rows that matter, with their reasons. Unknown means not known yet, never bad. Q's view, if you give one, is labelled as your view and does not change the fit. Do not make a document or PDF unless the person asked for a file.";
+  "Say each company's fit as the score out of 10 given in text beside its profile's band in words (\"7.5/10 · Good fit\"), exactly as given; where no score is given, the band in words alone. Never a percentage, never a score of your own, never a different number. Then the parameter rows that matter, with their reasons. Unknown means not known yet, never bad. Q's view, if you give one, is labelled as your view and does not change the fit. Do not make a document or PDF unless the person asked for a file.";
 
 const STATUSES = [
   "OK",

@@ -423,3 +423,9 @@ The tracked runner creates internal Q turns for an existing authorized account o
   - "Cheque compatibility": raise, your cheque, minimum cheque, plus the open line about ticket fit;
   - "Round terms": instrument and cap, plus "Lead investor required: not stated".
 - Next: release PR #14 → rerun the acceptance with `--approve` → verify memo v1 → critique → v2 → diligence card PENDING → capture the profile.
+
+## 2026-10-12 06:20 UTC — Codex takeover, PR #14 CI failure reproduction and correction
+
+- Recovered exact PR #14 head `3a0aea34` and failed run `38208967641`; verified current all-four-success Railway release `fdf04745`. New own branch `codex/takeover-release-pr14` preserves existing Claude history. User takeover directive is stored verbatim under session-directives.
+- Both failures reproduced locally; corrected stale Cheque compatibility assertion and duplicate prose in compact multi-company fallback. Every rich typed field remains unchanged; 32,000 tool cap and 31,000 regression target unchanged. 52 builds/79 targeted tests/root/q-api/web types/changed lint and format pass. No new migration or score change. Preserve memo 8,000-character finding fix, new source-attributed fit values and superseded-run CI safeguards. Exact CI/deployment/live acceptance still required.
+- Six Tavus keys secured outside Git, one account key only. Read-only provider probe blocked by cloud proxy tunnel 403. Network draft additions `tavusapi.com` and `docs.tavus.io` saved, not published/active; user environment action required for live Tavus. No paid video call attempted. Continue workforce/release work rather than idle.
