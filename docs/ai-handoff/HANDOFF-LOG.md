@@ -374,3 +374,10 @@ The tracked runner creates internal Q turns for an existing authorized account o
 - Shipped in the branch: raise wording + explainer, deck coverage fold, FIT_Q_VIEW v2 + profile "Go deeper with Q", Questions to investigate (three paths), deal strip "Not recorded" + next-stage guide (live-observed defect), data-room copy. No schema/scoring change.
 - Live read-only two-sided evidence recorded in STATE. Write-path runner committed but not run: permission classifier refused production writes and release-branch pushes. Needs owner action.
 - Next: PR CI → integrate → deploy → rehearse; run \`two-sided-questions.mjs\`; then lookup latency and the Documents cold-open race.
+
+## 2026-10-12 00:30 UTC — Claude Code — PR #2 released; workforce investor chain in PR #5
+
+- Release via GitHub merges (PR #2 → int-rc, PR #3 → CI lane, PR #4 → deploy lane); Railway four SUCCESS at `e1266dd8` (tree = tested `f7ff0fdc`). Rollback `06872c7c`.
+- Live rehearsal (fictional investor) failed at the selected-company question: reader read it as "open"; fixed in PR #5 (`70f1be86`), not yet deployed.
+- PR #5: runner concurrency/error/lead-status; NAMED_COMPANY memo; SUBSTANCE_CRITIQUE revise; DILIGENCE questions → approval card. Local gates green; CI running.
+- Next: release PR #5, rerun rehearsal, run the full workforce acceptance live, then Tavus.
