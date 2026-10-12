@@ -34,6 +34,7 @@ const OpenBody = z
   .object({
     voiceSessionId: z.string().uuid().optional(),
     voice: z.enum(["FEMALE", "MALE"]).optional(),
+    activeMeterVersion: z.literal(1).optional(),
     sdp: z.string().min(10).max(100_000),
     briefingOpening: z.boolean().optional(),
     firstName: z.string().trim().min(1).max(40).optional(),
@@ -52,6 +53,8 @@ const OpenResult = z.object({
   provider: z.literal("openai"),
   model: z.string().nullable(),
   maxSessionMs: z.number().int().positive(),
+  activeSessionId: z.string().uuid().optional(),
+  activeRemainingMs: z.number().int().min(0).max(300_000).optional(),
   idleMs: z.number().int().positive(),
   context: z.string().max(2_000).nullable().optional(),
 });
@@ -94,6 +97,8 @@ const UsageBody = z
       .int()
       .min(0)
       .max(24 * 3600),
+    activeSessionId: z.string().uuid().optional(),
+    activeMs: z.number().int().min(0).max(3_600_000).optional(),
     final: z.boolean().optional(),
   })
   .strict();
@@ -101,6 +106,7 @@ const UsageResult = z.object({
   recordedSeconds: z.number().int().min(0),
   remainingMs: z.number().int().min(0),
   capReached: z.boolean().optional(),
+  activeRemainingMs: z.number().int().min(0).max(300_000).optional(),
 });
 const EndBody = z
   .object({

@@ -37,6 +37,7 @@ export const LiveOpenRequestSchema = z
     /** A standard voice session to attach to; absent: a line of its own. */
     voiceSessionId: z.string().uuid().optional(),
     voice: z.enum(["FEMALE", "MALE"]).optional(),
+    activeMeterVersion: z.literal(1).optional(),
     sdp: z.string().min(10).max(SDP_MAX),
     /** For the prompt only (data, never instructions); bounded. */
     firstName: z.string().trim().min(1).max(40).optional(),
@@ -62,6 +63,8 @@ export const LiveOpenResultSchema = z
     /** As the provider reported it when the session was created. */
     model: z.string().nullable(),
     maxSessionMs: z.number().int().positive(),
+    activeSessionId: z.string().uuid().optional(),
+    activeRemainingMs: z.number().int().min(0).max(300_000).optional(),
     /** No speech either way for this long: the client closes the line. */
     idleMs: z.number().int().positive(),
     /**
@@ -145,6 +148,8 @@ export const LiveUsageReportSchema = z
       .int()
       .min(0)
       .max(24 * 3600),
+    activeSessionId: z.string().uuid().optional(),
+    activeMs: z.number().int().min(0).max(3_600_000).optional(),
     final: z.boolean().optional(),
   })
   .strict();
@@ -200,6 +205,7 @@ export const LiveUsageResultSchema = z
     remainingMs: z.number().int().min(0),
     /** Today's voice spend cap is reached: close now. */
     capReached: z.boolean().optional(),
+    activeRemainingMs: z.number().int().min(0).max(300_000).optional(),
   })
   .strict();
 

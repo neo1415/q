@@ -87,11 +87,15 @@ export function registerLiveVoiceRoutes(
   const { broker, withContext } = dependencies;
   // Off a local deployment only the named people may open a paid line or
   // see the preview; everyone else is told there is no such thing.
-  const allowed = (request: FastifyRequest): boolean =>
+  const allowed = async (request: FastifyRequest): Promise<boolean> =>
     dependencies.allowedUsers === null ||
     dependencies.allowedUsers.has(
       getActorContext(request).userId.toLowerCase(),
-    );
+    ) ||
+    (await (
+      broker.trialAllowed?.(getActorContext(request).userId) ??
+      Promise.resolve(false)
+    ).catch(() => false));
   const params = (request: FastifyRequest) =>
     request.params as { voiceSessionId?: string; delegationId?: string };
 
@@ -104,7 +108,7 @@ export function registerLiveVoiceRoutes(
         request.body ?? {},
         "That is not a live voice offer.",
       );
-      if (!allowed(request))
+      if (!(await allowed(request)))
         return problem(reply, 404, "No such voice session.");
       const actor = getActorContext(request);
       const binding =
@@ -121,6 +125,7 @@ export function registerLiveVoiceRoutes(
       const opened = await broker.open({
         binding,
         sdp: body.sdp,
+        activeMeterVersion: body.activeMeterVersion,
         briefingOpening: body.briefingOpening,
         firstName: body.firstName,
         role: body.role,
@@ -263,8 +268,8 @@ export function registerLiveVoiceRoutes(
   app.get(
     Q_VOICE_LIVE_AVAILABLE_PATH,
     { onRequest: availability.hook(withContext) },
-    (request, reply) => {
-      const available = broker.enabled && allowed(request);
+    async (request, reply) => {
+      const available = broker.enabled && (await allowed(request));
       availability.remember(request, available);
       return reply
         .code(200)
@@ -280,7 +285,10 @@ export function registerLiveVoiceRoutes(
       Q_VOICE_LIVE_PREVIEW_PATH,
       { onRequest: withContext },
       (request, reply) =>
-        allowed(request)
+        dependencies.allowedUsers === null ||
+        dependencies.allowedUsers.has(
+          getActorContext(request).userId.toLowerCase(),
+        )
           ? reply
               .code(200)
               .header("Cache-Control", "no-store")

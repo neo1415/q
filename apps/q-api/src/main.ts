@@ -130,6 +130,7 @@ import { createExternalRehearsalLatency } from "./composition/external-rehearsal
 import { createExternalEntityFinder } from "./composition/external-entity-finder.js";
 import { createExternalSubjectResolver } from "./composition/external-resolve.js";
 import { createPostgresExternalSubjectStore } from "./composition/external-subjects.js";
+import { createPostgresLiveActiveTrials } from "./voice/live/active-trial.js";
 import { createLiveBroker } from "./voice/live/broker.js";
 import { createPostgresLiveSpend } from "./voice/live/spend.js";
 import { liveConfigFrom } from "./voice/live/config.js";
@@ -5972,6 +5973,7 @@ const liveBroker =
         firewall,
         turn: voiceTurn,
         spend: createPostgresLiveSpend(database.sql),
+        trials: createPostgresLiveActiveTrials(database.sql),
         // The turn board the voice surface polls: a delegation that moved
         // the screen says so, so the move is followed before it is spoken.
         board: voiceTurnBoard,

@@ -158,6 +158,8 @@ export type VoiceSessionStart = {
 
 /** The live session, as the UI drives it. */
 export type VoiceSessionClient = {
+  /** Remaining cumulative active-speech trial allowance; absent for ordinary voice. */
+  readonly activeRemainingMs?: number | null | undefined;
   readonly state: VoiceState;
   readonly connected: boolean;
   readonly muted: boolean;

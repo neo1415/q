@@ -1,3 +1,4 @@
+import { createActiveSpeechMeter } from "./active-speech-meter.js";
 import {
   navigationHeard,
   navigationHeardFor,
@@ -31,6 +32,7 @@ import {
  */
 
 export type LiveCallStats = {
+  readonly activeRemainingMs?: number | undefined;
   /** As the provider's session-create response (201) named it. */
   readonly createdModel: string | null;
   /** As the provider's own `session.started` reported it. */
@@ -385,6 +387,14 @@ export async function startLiveCall(
   let idleMs = 3 * 60_000;
   let connection: Connection | null = null;
   let ended = false;
+  let activeSessionId: string | undefined;
+  let activeMeter: ReturnType<typeof createActiveSpeechMeter> | null = null;
+  let meteredRemainingMs = 0;
+  let lastMeterConfirmedAt = performance.now();
+  let lastMeterPostedAt = 0;
+  let meterPosting = false;
+  let inputSpeech = false;
+  let inputSpeechKnown = false;
   let lastSpeechAt = performance.now();
   let lastInputAt: number | null = null;
   // Seconds billed by earlier provider sessions of this same call.
@@ -529,14 +539,42 @@ export async function startLiveCall(
   const reportUsage = async (seconds: number, final: boolean) => {
     if (id === null) return;
     try {
-      const result = await post<{ remainingMs: number; capReached?: boolean }>(
+      const result = await post<{
+        remainingMs: number;
+        capReached?: boolean;
+        activeSessionId?: string;
+        activeRemainingMs?: number;
+      }>(
         doFetch,
         `usage/${id}`,
         // Each provider session is its own line on the server: its own
         // seconds, never the call's running total (counted once).
-        { seconds, final },
+        {
+          seconds,
+          final,
+          ...(activeMeter === null
+            ? {}
+            : { activeSessionId, activeMs: activeMeter.activeMs() }),
+        },
         token,
       );
+      if (activeMeter !== null) {
+        if (result.activeRemainingMs === undefined) {
+          void end("cap");
+          return;
+        }
+        meteredRemainingMs = result.activeRemainingMs;
+        lastMeterConfirmedAt = performance.now();
+        stats = {
+          ...stats,
+          activeRemainingMs: Math.min(
+            activeMeter.remainingMs(),
+            meteredRemainingMs,
+          ),
+        };
+        update();
+        if (meteredRemainingMs <= 0) void end("cap");
+      }
       if (final) return;
       if (result.capReached === true) void end("cap");
       else if (result.remainingMs === 0) void end("max_length");
@@ -618,6 +656,16 @@ export async function startLiveCall(
         }
         break;
       }
+      case "input_audio_buffer.speech_started":
+      case "session.input_audio.speech_started":
+        inputSpeechKnown = true;
+        inputSpeech = true;
+        break;
+      case "input_audio_buffer.speech_stopped":
+      case "session.input_audio.speech_stopped":
+        inputSpeechKnown = true;
+        inputSpeech = false;
+        break;
       case "session.input_transcript.delta": {
         const delta = typeof event["delta"] === "string" ? event["delta"] : "";
         lastInputAt = ms;
@@ -744,6 +792,8 @@ export async function startLiveCall(
       sdp: string;
       model: string | null;
       maxSessionMs: number;
+      activeSessionId?: string;
+      activeRemainingMs?: number;
       idleMs?: number;
       context?: string | null;
     }>(
@@ -751,6 +801,7 @@ export async function startLiveCall(
       "open",
       {
         sdp: offer,
+        activeMeterVersion: 1,
         voice: options.voice,
         ...(id === null ? {} : { voiceSessionId: id }),
         ...(options.briefingOpening === true ? { briefingOpening: true } : {}),
@@ -763,6 +814,16 @@ export async function startLiveCall(
     id = opened.voiceSessionId;
     token = opened.sessionToken ?? token;
     maxSessionMs = opened.maxSessionMs;
+    if (opened.activeRemainingMs !== undefined) {
+      activeSessionId = opened.activeSessionId;
+      if (activeSessionId === undefined) throw new LiveCallUnavailable(null);
+      activeMeter = createActiveSpeechMeter(
+        opened.activeRemainingMs,
+        performance.now(),
+      );
+      meteredRemainingMs = opened.activeRemainingMs;
+      lastMeterConfirmedAt = performance.now();
+    }
     idleMs = opened.idleMs ?? idleMs;
     background = opened.context ?? background;
     stats = { ...stats, createdModel: opened.model };
@@ -805,6 +866,12 @@ export async function startLiveCall(
   let renewing = false;
   const renew = async (cause: "provider" | "network") => {
     if (ended || renewing) return;
+    // Trials retain their durable reservation until confirmed closure;
+    // reconnect explicitly instead of reporting an unconfirmed final as closed.
+    if (activeMeter !== null) {
+      void end(cause);
+      return;
+    }
     if (stats.renewals >= RENEWALS_MAX) {
       void end(cause);
       return;
@@ -842,7 +909,10 @@ export async function startLiveCall(
   // The speaking indicator follows the player, not generation: audio can
   // play after the model has finished producing it.
   const meter = setInterval(() => {
-    const speaking = levelOf(output, outBuffer) > SPEAKING_LEVEL;
+    const speaking =
+      !audio.muted &&
+      audio.volume > 0 &&
+      levelOf(output, outBuffer) > SPEAKING_LEVEL;
     if (speaking) lastSpeechAt = performance.now();
     if (speaking !== stats.qSpeaking) {
       stats = { ...stats, qSpeaking: speaking };
@@ -857,6 +927,35 @@ export async function startLiveCall(
         reply = null;
       }
       update();
+    }
+    if (activeMeter !== null && !ended) {
+      const at = performance.now();
+      const microphoneActive =
+        mic.getAudioTracks().some((track) => track.enabled) &&
+        levelOf(input, inBuffer) > SPEAKING_LEVEL &&
+        (inputSpeechKnown ? inputSpeech : utterance !== null);
+      activeMeter.sample(at, microphoneActive, speaking);
+      const remaining = Math.min(activeMeter.remainingMs(), meteredRemainingMs);
+      if (
+        Math.ceil(remaining / 1000) !==
+        Math.ceil((stats.activeRemainingMs ?? 0) / 1000)
+      ) {
+        stats = { ...stats, activeRemainingMs: remaining };
+        update();
+      }
+      if (
+        activeMeter.remainingMs() <= 0 ||
+        meteredRemainingMs <= 0 ||
+        at - lastMeterConfirmedAt > 5_000
+      ) {
+        void end("cap");
+      } else if (!meterPosting && at - lastMeterPostedAt >= 1_000) {
+        meterPosting = true;
+        lastMeterPostedAt = at;
+        void reportUsage(current, false).finally(() => {
+          meterPosting = false;
+        });
+      }
     }
     watchPage();
     // Runaway guard: nobody has spoken for the idle window.
@@ -896,7 +995,10 @@ export async function startLiveCall(
         mine.channel.send(JSON.stringify({ type: "session.close" }));
       }
     }
-    finished = finish(mine, reason);
+    finished = (async () => {
+      if (activeMeter !== null) await reportUsage(current, false);
+      await finish(mine, reason);
+    })();
     return Promise.resolve();
   };
 

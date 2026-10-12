@@ -61,6 +61,13 @@ export function VoicePanel({
         outputLevel={client.outputLevel}
       />
 
+      {client.activeRemainingMs != null ? (
+        <p className="text-sm text-(--cq-text-secondary)">
+          Live voice trial: {Math.ceil(client.activeRemainingMs / 1000)} seconds
+          of speech remaining. Silence does not count.
+        </p>
+      ) : null}
+
       {notice !== null ? (
         <div className="w-full max-w-(--cq-layout-narrow)">
           <InlineNotice tone="warning" title={notice}>

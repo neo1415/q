@@ -60,6 +60,9 @@ export function useLiveVoiceSession(
     readonly audioOwner?: VoiceAudioOwner | undefined;
   } = {},
 ): LiveVoiceClient {
+  const [activeRemainingMs, setActiveRemainingMs] = useState<number | null>(
+    null,
+  );
   const [state, setState] = useState<VoiceState>("IDLE");
   const [connected, setConnected] = useState(false);
   const [muted, setMutedState] = useState(false);
@@ -134,6 +137,7 @@ export function useLiveVoiceSession(
           onTranscript,
           onUpdate: ({ stats }) => {
             if (startsRef.current !== mine) return;
+            setActiveRemainingMs(stats.activeRemainingMs ?? null);
             if (stats.qSpeaking) setState("Q_SPEAKING");
             else
               setState((current) =>
@@ -203,6 +207,7 @@ export function useLiveVoiceSession(
   return useMemo(
     () => ({
       state,
+      activeRemainingMs,
       connected,
       muted,
       transcript,
@@ -216,6 +221,7 @@ export function useLiveVoiceSession(
     }),
     [
       state,
+      activeRemainingMs,
       connected,
       muted,
       transcript,

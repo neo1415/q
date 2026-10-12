@@ -222,6 +222,12 @@ export function VoiceStage({
             inputLevel={client.inputLevel}
             outputLevel={client.outputLevel}
           />
+          {client.activeRemainingMs != null ? (
+            <p className="text-sm text-(--cq-text-secondary)">
+              Live voice trial: {Math.ceil(client.activeRemainingMs / 1000)}{" "}
+              seconds of speech remaining. Silence does not count.
+            </p>
+          ) : null}
           <div className="flex flex-col items-center gap-1" role="status">
             <span className="cq-label text-(--cq-text-primary)">
               {client.pausedAway === true

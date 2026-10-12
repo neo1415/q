@@ -30,6 +30,7 @@ import {
 import { liveContextPackage, referentsOf } from "../src/voice/live/context.js";
 import { heardRequest, spokenWords } from "../src/voice/live/heard.js";
 import { LIVE_DEFAULTS, liveConfigFrom } from "../src/voice/live/config.js";
+import type { LiveActiveTrialStore } from "../src/voice/live/active-trial.js";
 import { livePrompt } from "../src/voice/live/prompt.js";
 import {
   createGptLiveProvider,
@@ -133,6 +134,8 @@ function setup(
     sensitivity?: QSensitivityClass;
     synthetic?: boolean;
     spent?: number;
+    trials?: LiveActiveTrialStore;
+    closeConfirmed?: boolean;
     answer?: string;
     hold?: boolean;
     /** Q says `first`, then waits for `until`, then `rest` (a streamed answer). */
@@ -147,6 +150,11 @@ function setup(
   const provider: LiveVoiceProvider = {
     providerId: "a1000000-0000-4000-8000-000000000003",
     modelId: "a2000000-0000-4000-8000-000000000022",
+    ...(options.closeConfirmed === undefined
+      ? {}
+      : {
+          closeSession: () => Promise.resolve(options.closeConfirmed === true),
+        }),
     createWebRtcSession: ({ config, sdp }) => {
       created.push({
         sdp,
@@ -194,6 +202,7 @@ function setup(
   const usage = createInMemoryModelUsageRepository();
   const broker = createLiveBroker({
     config: { ...LIVE_DEFAULTS, enabled: true },
+    ...(options.trials === undefined ? {} : { trials: options.trials }),
     provider,
     firewall: firewall(options),
     turn,
@@ -1608,5 +1617,188 @@ describe("GPT-Live persona line for a rehearsal with a researched external perso
       ["turn_latency_ms", 700],
       ["turn_latency_ms", 1100],
     ]);
+  });
+});
+
+function trialStore(): LiveActiveTrialStore & {
+  consumed(): number;
+  reserved(): boolean;
+  sessionId(): string;
+} {
+  let consumed = 0;
+  let cumulative = 0;
+  let reservation: string | null = null;
+  return {
+    remaining: async (userId) =>
+      userId === ACTOR.userId ? 300_000 - consumed : null,
+    reserve: async (userId, sessionId) => {
+      if (
+        userId !== ACTOR.userId ||
+        reservation !== null ||
+        consumed >= 300_000
+      )
+        return null;
+      reservation = sessionId;
+      cumulative = 0;
+      return 300_000 - consumed;
+    },
+    checkpoint: async (userId, sessionId, activeMs) => {
+      if (userId !== ACTOR.userId || reservation !== sessionId) return 0;
+      consumed = Math.min(
+        300_000,
+        consumed + Math.max(0, activeMs - cumulative),
+      );
+      cumulative = Math.max(cumulative, activeMs);
+      return 300_000 - consumed;
+    },
+    release: async (userId, sessionId) => {
+      if (userId === ACTOR.userId && reservation === sessionId)
+        reservation = null;
+    },
+    consumed: () => consumed,
+    reserved: () => reservation !== null,
+    sessionId: () => reservation ?? "",
+  };
+}
+
+describe("GPT-Live cumulative active-speech trial enforcement", () => {
+  it("keeps silent idle free and cumulative checkpoints idempotent", async () => {
+    const trials = trialStore();
+    const w = setup({ trials, closeConfirmed: true });
+    expect(
+      (
+        await w.broker.open({
+          binding: binding(),
+          sdp: "v=0 offer",
+          activeMeterVersion: 1,
+        })
+      ).kind,
+    ).toBe("OPEN");
+    w.tick(1000);
+    const idle = await w.broker.usage({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: { seconds: 1, activeSessionId: trials.sessionId(), activeMs: 0 },
+    });
+    expect(idle?.activeRemainingMs).toBe(300_000);
+    w.tick(1000);
+    await w.broker.usage({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: {
+        seconds: 2,
+        activeSessionId: trials.sessionId(),
+        activeMs: 1000,
+      },
+    });
+    await w.broker.usage({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: {
+        seconds: 2,
+        activeSessionId: trials.sessionId(),
+        activeMs: 1000,
+      },
+    });
+    expect(trials.consumed()).toBe(1000);
+    w.broker.end({ actor: ACTOR, voiceSessionId: SESSION, reason: "ended" });
+    await vi.waitFor(() => expect(trials.reserved()).toBe(false));
+    const next = await w.broker.open({
+      binding: binding(),
+      sdp: "v=0 offer",
+      activeMeterVersion: 1,
+    });
+    expect(next.kind === "OPEN" ? next.result.activeRemainingMs : null).toBe(
+      299_000,
+    );
+    w.broker.end({ actor: ACTOR, voiceSessionId: SESSION, reason: "ended" });
+  });
+  it("refuses another broker session while the lifetime allowance is reserved", async () => {
+    const trials = trialStore();
+    const one = setup({ trials, closeConfirmed: false });
+    const two = setup({ trials, closeConfirmed: true });
+    await one.broker.open({
+      binding: binding(),
+      sdp: "v=0 offer",
+      activeMeterVersion: 1,
+    });
+    expect(
+      await two.broker.open({
+        binding: binding(),
+        sdp: "v=0 offer",
+        activeMeterVersion: 1,
+      }),
+    ).toEqual({ kind: "REFUSED", reason: "CAP_REACHED" });
+    one.broker.end({ actor: ACTOR, voiceSessionId: SESSION, reason: "ended" });
+    await Promise.resolve();
+    expect(trials.reserved()).toBe(true);
+    expect(
+      await two.broker.open({
+        binding: binding(),
+        sdp: "v=0 offer",
+        activeMeterVersion: 1,
+      }),
+    ).toEqual({ kind: "REFUSED", reason: "CAP_REACHED" });
+  });
+  it("stops at zero and cannot obtain a fresh allowance after reconnect", async () => {
+    const trials = trialStore();
+    const w = setup({ trials, closeConfirmed: true });
+    await w.broker.open({
+      binding: binding(),
+      sdp: "v=0 offer",
+      activeMeterVersion: 1,
+    });
+    for (let at = 1000; at <= 300_000; at += 1000) {
+      w.tick(1000);
+      await w.broker.usage({
+        actor: ACTOR,
+        voiceSessionId: SESSION,
+        report: {
+          seconds: at / 1000,
+          activeSessionId: trials.sessionId(),
+          activeMs: at,
+        },
+      });
+    }
+    expect(trials.consumed()).toBe(300_000);
+    expect(w.broker.size()).toBe(0);
+    await vi.waitFor(() => expect(trials.reserved()).toBe(false));
+    expect(
+      await w.broker.open({
+        binding: binding(),
+        sdp: "v=0 offer",
+        activeMeterVersion: 1,
+      }),
+    ).toEqual({ kind: "REFUSED", reason: "CAP_REACHED" });
+  });
+  it("fails closed when a trial omits active metering and refuses other actors", async () => {
+    const trials = trialStore();
+    const w = setup({ trials, closeConfirmed: true });
+    await w.broker.open({
+      binding: binding(),
+      sdp: "v=0 offer",
+      activeMeterVersion: 1,
+    });
+    expect(
+      await w.broker.usage({
+        actor: STRANGER,
+        voiceSessionId: SESSION,
+        report: {
+          seconds: 1,
+          activeSessionId: trials.sessionId(),
+          activeMs: 1000,
+        },
+      }),
+    ).toBeNull();
+    expect(
+      (
+        await w.broker.usage({
+          actor: ACTOR,
+          voiceSessionId: SESSION,
+          report: { seconds: 1, activeSessionId: trials.sessionId() },
+        })
+      )?.remainingMs,
+    ).toBe(0);
+    expect(w.broker.size()).toBe(0);
   });
 });

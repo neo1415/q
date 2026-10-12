@@ -32,6 +32,7 @@ import {
   settledTurn,
   type VoiceTurnHandler,
 } from "../turn.js";
+import type { LiveActiveTrialStore } from "./active-trial.js";
 import type { LiveConfig } from "./config.js";
 import type {
   LiveDelegationRequest,
@@ -181,6 +182,8 @@ type LiveLine = {
   latest: string | null;
   recordedSeconds: number;
   finalReported: boolean;
+  trialSessionId?: string | undefined;
+  trialHeartbeatAt?: number | undefined;
   /**
    * Delegations run one after another on a line, never over each other.
    * The voice turn handler supersedes (cancels) the run a line is waiting
@@ -202,9 +205,11 @@ type LiveLine = {
 export type LiveBroker = {
   readonly enabled: boolean;
   readonly maxSessionMs: number;
+  readonly trialAllowed?: ((userId: string) => Promise<boolean>) | undefined;
   readonly open: (input: {
     readonly binding: VoiceSessionBinding;
     readonly sdp: string;
+    readonly activeMeterVersion?: 1 | undefined;
     readonly briefingOpening?: boolean | undefined;
     readonly firstName?: string | undefined;
     readonly locale?: string | undefined;
@@ -233,6 +238,7 @@ export type LiveBroker = {
     recordedSeconds: number;
     remainingMs: number;
     capReached?: boolean;
+    activeRemainingMs?: number;
   } | null>;
   readonly end: (input: {
     readonly actor: ActorContext;
@@ -249,6 +255,7 @@ export type LiveBroker = {
 };
 
 export type LiveBrokerDependencies = {
+  readonly trials?: LiveActiveTrialStore | undefined;
   readonly config: LiveConfig;
   readonly provider: LiveVoiceProvider | undefined;
   readonly firewall: ContextFirewallPort;
@@ -521,7 +528,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     }
   };
 
-  const forget = (line: LiveLine, reason: string) => {
+  const forget = async (line: LiveLine, reason: string) => {
     lines.delete(line.voiceSessionId);
     for (const delegation of line.delegations.values()) {
       if (!delegation.settled) delegation.controller.abort();
@@ -547,31 +554,43 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     // The provider session is ended from here too, unless its browser saw
     // it close (final usage): a superseded, expired, abandoned or failed
     // line never keeps billing because its browser did not close it.
-    if (!line.finalReported) {
-      void (
+    const confirmed =
+      line.finalReported ||
+      (await (
         provider?.closeSession?.(line.providerSessionId) ??
         Promise.resolve(false)
-      )
-        .then((confirmed) => {
-          logger.info(
-            { qVoiceSessionId: line.voiceSessionId, reason, confirmed },
-            "live voice provider session closed from the server",
+      ).catch(() => false));
+    logger.info(
+      { qVoiceSessionId: line.voiceSessionId, reason, confirmed },
+      "live voice provider session closed from the server",
+    );
+    if (confirmed && line.trialSessionId !== undefined) {
+      await deps.trials
+        ?.release(line.actor.userId, line.trialSessionId)
+        .catch((error: unknown) => {
+          logger.warn(
+            { err: error },
+            "live trial reservation could not be released",
           );
-        })
-        .catch(() => undefined);
+        });
     }
   };
 
   const sweep = () => {
     const at = now();
     for (const line of [...lines.values()]) {
-      if (at - line.openedAt > config.maxSessionMs + GRACE_MS) {
-        forget(line, "expired");
+      if (
+        line.trialHeartbeatAt !== undefined &&
+        at - line.trialHeartbeatAt > 10_000
+      ) {
+        void forget(line, "trial_meter_lost");
+      } else if (at - line.openedAt > config.maxSessionMs + GRACE_MS) {
+        void forget(line, "expired");
       } else if (
         at - line.lastActivityAt >
         config.idleMs + LIVE_INACTIVE_GRACE_MS
       ) {
-        forget(line, "inactive");
+        void forget(line, "inactive");
       }
     }
   };
@@ -772,6 +791,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   return {
     enabled,
     maxSessionMs: config.maxSessionMs,
+    trialAllowed: async (userId) =>
+      ((await deps.trials?.remaining(userId)) ?? 0) > 0,
     size: () => {
       sweep();
       return lines.size;
@@ -780,6 +801,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     open: async ({
       binding,
       sdp,
+      activeMeterVersion,
       briefingOpening,
       firstName,
       locale,
@@ -816,7 +838,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         if (line.voiceSessionId === binding.voiceSessionId) {
           carried = { history: line.history, referents: line.referents };
         }
-        forget(line, "replaced");
+        await forget(line, "replaced");
       }
       let spent: number;
       try {
@@ -851,6 +873,23 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       ) {
         return { kind: "REFUSED", reason: "INELIGIBLE" };
       }
+      let trialRemaining: number | null = null;
+      let trialSessionId: string | undefined;
+      try {
+        trialRemaining = (await deps.trials?.remaining(actor.userId)) ?? null;
+        if (trialRemaining !== null) {
+          if (activeMeterVersion !== 1)
+            return { kind: "REFUSED", reason: "CAP_REACHED" };
+          trialSessionId = randomUUID();
+          trialRemaining =
+            (await deps.trials?.reserve(actor.userId, trialSessionId)) ?? 0;
+          if (trialRemaining <= 0)
+            return { kind: "REFUSED", reason: "CAP_REACHED" };
+        }
+      } catch (error: unknown) {
+        logger.warn({ err: error }, "live trial allowance unreadable");
+        return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
+      }
       let created;
       try {
         created = await provider.createWebRtcSession({
@@ -873,6 +912,10 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           sdp,
         });
       } catch (error: unknown) {
+        if (trialSessionId !== undefined)
+          await deps.trials
+            ?.release(actor.userId, trialSessionId)
+            .catch(() => undefined);
         logger.warn({ err: error }, "live voice session not created");
         return {
           kind: "REFUSED",
@@ -895,6 +938,9 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         latest: null,
         recordedSeconds: 0,
         finalReported: false,
+        ...(trialSessionId === undefined
+          ? {}
+          : { trialSessionId, trialHeartbeatAt: at }),
         tail: Promise.resolve(),
         referents: carried === null ? [] : [...carried.referents],
         ...(persona === null || rehearsal === undefined
@@ -955,6 +1001,12 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           model: created.model,
           maxSessionMs: config.maxSessionMs,
           idleMs: config.idleMs,
+          ...(trialRemaining === null
+            ? {}
+            : {
+                activeSessionId: trialSessionId,
+                activeRemainingMs: trialRemaining,
+              }),
           context,
         },
       };
@@ -1112,6 +1164,33 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       const line = ownLine(actor, voiceSessionId);
       if (line === null) return null;
       line.lastActivityAt = now();
+      let activeRemainingMs: number | undefined;
+      if (line.trialSessionId !== undefined) {
+        if (report.activeSessionId !== line.trialSessionId) return null;
+        if (report.activeMs === undefined || deps.trials === undefined) {
+          void forget(line, "trial_meter_missing");
+          return {
+            recordedSeconds: line.recordedSeconds,
+            remainingMs: 0,
+            activeRemainingMs: 0,
+          };
+        }
+        try {
+          activeRemainingMs = await deps.trials.checkpoint(
+            actor.userId,
+            line.trialSessionId,
+            Math.min(report.activeMs, Math.max(0, now() - line.openedAt)),
+          );
+          line.trialHeartbeatAt = now();
+        } catch {
+          void forget(line, "trial_meter_unavailable");
+          return {
+            recordedSeconds: line.recordedSeconds,
+            remainingMs: 0,
+            activeRemainingMs: 0,
+          };
+        }
+      }
       await record(
         line,
         report.final === true
@@ -1132,11 +1211,14 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           capReached = true;
         }
       }
+      if (activeRemainingMs === 0) void forget(line, "trial_complete");
       return {
         recordedSeconds: line.recordedSeconds,
-        remainingMs: capReached
-          ? 0
-          : Math.max(0, config.maxSessionMs - (now() - line.openedAt)),
+        ...(activeRemainingMs === undefined ? {} : { activeRemainingMs }),
+        remainingMs:
+          capReached || activeRemainingMs === 0
+            ? 0
+            : Math.max(0, config.maxSessionMs - (now() - line.openedAt)),
         ...(capReached ? { capReached: true } : {}),
       };
     },
@@ -1144,7 +1226,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     end: ({ actor, voiceSessionId, reason }) => {
       const line = ownLine(actor, voiceSessionId);
       if (line === null) return false;
-      forget(line, reason);
+      void forget(line, reason);
       return true;
     },
   };
