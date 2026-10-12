@@ -63,12 +63,14 @@ jobs:
               text = Path('/tmp/cq-log-read-error.txt').read_text(errors='replace')
           text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
           text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\t')
-          start = text.find('Failed Tests')
-          if start < 0:
-              start = text.find('FAIL ')
-          excerpt = text[max(0, start - 100):start + 3500] if start >= 0 else text[-3500:]
-          escaped = excerpt.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-          print('::notice title=Specified CI job failure evidence::' + escaped)
+          end = text.rfind('Process completed with exit code 1')
+          if end < 0:
+              end = len(text)
+          excerpt = text[max(0, end - 20000):end + 100]
+          for index, offset in enumerate(range(0, len(excerpt), 3000), 1):
+              chunk = excerpt[offset:offset + 3000]
+              escaped = chunk.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::notice title=Specified CI job failure evidence {index}::' + escaped)
           PY
   # The quality gate's checks run as parallel jobs (2026-10-12): the same
   # commands as one serial job, on clean runners, in about half the wall
