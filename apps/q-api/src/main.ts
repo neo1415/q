@@ -2168,6 +2168,7 @@ const workforceJobResults = createWorkforceJobResults({
   store: workforceStore,
   work: agentWorkQueue,
   artifacts: {
+    read: (actor, artifactId) => qArtifacts.service.read(actor, artifactId),
     readVersion: (actor, artifactId, version) =>
       qArtifacts.service.readVersion(actor, artifactId, version),
   },
