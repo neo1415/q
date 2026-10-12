@@ -24,12 +24,13 @@ import {
  */
 
 /** How long a key that failed for this reason is passed over. */
-const COOLDOWN_MS: Readonly<Record<Exclude<TavusFailureKind, "OTHER">, number>> =
-  {
-    AUTH: 60 * 60_000,
-    CREDIT: 60 * 60_000,
-    QUOTA: 60_000,
-  };
+const COOLDOWN_MS: Readonly<
+  Record<Exclude<TavusFailureKind, "OTHER">, number>
+> = {
+  AUTH: 60 * 60_000,
+  CREDIT: 60 * 60_000,
+  QUOTA: 60_000,
+};
 
 /** At most this many keys; the session row's index column is bounded too. */
 export const TAVUS_MAX_KEYS = 32;

@@ -14,7 +14,10 @@ import type { Logger } from "@capital-q/observability";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import type { RehearsalResult, RehearsalService } from "./rehearsals.js";
-import { TavusKeysExhaustedError, type TavusKeyPool } from "./tavus/key-pool.js";
+import {
+  TavusKeysExhaustedError,
+  type TavusKeyPool,
+} from "./tavus/key-pool.js";
 import { TavusError } from "./tavus/client.js";
 
 /**
@@ -355,7 +358,8 @@ export type RehearsalVideoService = {
 };
 
 const DID_NOT_CATCH = "Sorry, I lost you for a second there. Say that again?";
-const ALREADY_OVER = "I think we've covered it for today. Thanks for your time.";
+const ALREADY_OVER =
+  "I think we've covered it for today. Thanks for your time.";
 /** Lines a bridge may serve per session: a bound on spend and abuse. */
 const MAX_BRIDGE_LINES = 60;
 
@@ -423,8 +427,7 @@ export function createRehearsalVideoService(dependencies: {
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
   readonly setTimer?:
-    | ((run: () => void, ms: number) => { cancel: () => void })
-    | undefined;
+    ((run: () => void, ms: number) => { cancel: () => void }) | undefined;
 }): RehearsalVideoService {
   const { store, rehearsals, pool, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
@@ -501,16 +504,18 @@ export function createRehearsalVideoService(dependencies: {
       return;
     }
     if (row.conversationId !== null) {
-      await client.endConversation(row.conversationId).catch((error: unknown) => {
-        logger?.warn(
-          {
-            videoSessionId: row.id,
-            keyIndex: row.keyIndex,
-            status: error instanceof TavusError ? error.status : null,
-          },
-          "rehearsal video: provider end failed",
-        );
-      });
+      await client
+        .endConversation(row.conversationId)
+        .catch((error: unknown) => {
+          logger?.warn(
+            {
+              videoSessionId: row.id,
+              keyIndex: row.keyIndex,
+              status: error instanceof TavusError ? error.status : null,
+            },
+            "rehearsal video: provider end failed",
+          );
+        });
     }
     if (row.palId !== null) {
       await client.deletePal(row.palId).catch(() => undefined);
@@ -610,7 +615,10 @@ export function createRehearsalVideoService(dependencies: {
         if (held.status === "FAILED") {
           return {
             kind: "OK",
-            response: { mode: "VOICE_FALLBACK", reason: "PROVIDER_UNAVAILABLE" },
+            response: {
+              mode: "VOICE_FALLBACK",
+              reason: "PROVIDER_UNAVAILABLE",
+            },
           };
         }
         return { kind: "ALREADY_USED" };
@@ -724,7 +732,10 @@ export function createRehearsalVideoService(dependencies: {
           );
           return {
             kind: "OK",
-            response: { mode: "VOICE_FALLBACK", reason: "PROVIDER_UNAVAILABLE" },
+            response: {
+              mode: "VOICE_FALLBACK",
+              reason: "PROVIDER_UNAVAILABLE",
+            },
           };
         }
         joinLinks.set(live.id, joinUrl);
@@ -774,15 +785,23 @@ export function createRehearsalVideoService(dependencies: {
       const rehearsal = options.continueByVoice
         ? await rehearsals.get(actor, rehearsalId)
         : await finishAs(closed);
-      if (rehearsal.kind === "NOT_FOUND" || rehearsal.kind === "NOT_A_PARTICIPANT") {
+      if (
+        rehearsal.kind === "NOT_FOUND" ||
+        rehearsal.kind === "NOT_A_PARTICIPANT"
+      ) {
         return { kind: "NOT_FOUND" };
       }
       if (rehearsal.kind !== "OK") return { kind: "Q_UNAVAILABLE" };
-      return { kind: "OK", session: toDto(closed), rehearsal: rehearsal.rehearsal };
+      return {
+        kind: "OK",
+        session: toDto(closed),
+        rehearsal: rehearsal.rehearsal,
+      };
     },
 
     bridge: async (sessionId, bearer, messages, signal) => {
-      if (bearer.length < 32 || bearer.length > 128) return { kind: "UNAUTHORISED" };
+      if (bearer.length < 32 || bearer.length > 128)
+        return { kind: "UNAUTHORISED" };
       const row = await store.byToken(sessionId, tokenHashOf(bearer));
       if (row === null) return { kind: "UNAUTHORISED" };
       const open = row.status === "LIVE" || row.status === "STARTING";
@@ -814,7 +833,9 @@ export function createRehearsalVideoService(dependencies: {
       if (result.kind === "OK") {
         const line = latestThemLine(result.rehearsal);
         reply =
-          line === null ? { kind: "SILENT" } : { kind: "LINE", text: line.text };
+          line === null
+            ? { kind: "SILENT" }
+            : { kind: "LINE", text: line.text };
       } else if (result.kind === "FINISHED") {
         reply = { kind: "LINE", text: ALREADY_OVER };
       } else {

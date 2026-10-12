@@ -99,7 +99,11 @@ function contentText(content: unknown): string {
   return "";
 }
 
-function chunk(id: string, delta: Record<string, unknown>, finish: string | null) {
+function chunk(
+  id: string,
+  delta: Record<string, unknown>,
+  finish: string | null,
+) {
   return `data: ${JSON.stringify({
     id,
     object: "chat.completion.chunk",
