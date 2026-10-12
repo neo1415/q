@@ -1,3 +1,4 @@
+import type { Logger } from "@capital-q/observability";
 import { createHash } from "node:crypto";
 
 import {
@@ -70,6 +71,12 @@ export function createWorkforceDocuments(dependencies: {
   readonly preparation: ArtifactPreparation;
   /** The second specialist; absent: critique steps cannot run here. */
   readonly critic?: WorkforceModels["critique"] | undefined;
+  /**
+   * Live 2026-10-12: a named-company memo failed in 1.3 s with no trace,
+   * because both failure paths here were silent. A failed step now says
+   * which error stopped it (class and message only, never the content).
+   */
+  readonly logger?: Logger | undefined;
 }) {
   /**
    * The second specialist. It reads the version the person may read now
@@ -391,7 +398,18 @@ export function createWorkforceDocuments(dependencies: {
           },
         },
         history: [],
+        logger: dependencies.logger,
       });
+      if (prepared.kind !== "PREPARED") {
+        dependencies.logger?.warn(
+          {
+            jobId: input.jobId,
+            stepKey: input.stepKey,
+            outcome: prepared.kind,
+          },
+          "workforce document was not prepared",
+        );
+      }
       return prepared.kind === "PREPARED"
         ? outcomeOf(prepared.summary)
         : {
@@ -401,7 +419,11 @@ export function createWorkforceDocuments(dependencies: {
                 ? "There is too little authorized information on record to prepare this document."
                 : "The document could not be prepared.",
           };
-    } catch {
+    } catch (error: unknown) {
+      dependencies.logger?.warn(
+        { err: error, jobId: input.jobId, stepKey: input.stepKey },
+        "workforce document preparation threw",
+      );
       return unavailable();
     }
   };
