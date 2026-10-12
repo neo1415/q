@@ -329,7 +329,7 @@ export function createWorkforceJobActions(dependencies: {
         { kind: "USER", userId: payload.ownerUserId },
       ],
       describe: (payload) => ({
-        summary: `Q's team: ${payload.summary}`.slice(0, 200),
+        summary: cardSummary(`Q's team: ${payload.summary}`),
         preview: preview(payload),
       }),
       confirm: () =>
@@ -538,4 +538,19 @@ export function createWorkforceJobBoard(dependencies: {
       },
     },
   };
+}
+
+/**
+ * The card's one line, at most 200 characters, ending on a sentence or a
+ * word, never mid-word (live 2026-10-12: "... for your approval. The res").
+ * The full plan is the card's preview.
+ */
+export function cardSummary(text: string, max = 200): string {
+  const clean = text.replace(/\s+/gu, " ").trim();
+  if (clean.length <= max) return clean;
+  const head = clean.slice(0, max);
+  const sentenceEnd = head.lastIndexOf(". ");
+  if (sentenceEnd >= max / 2) return head.slice(0, sentenceEnd + 1);
+  const space = head.lastIndexOf(" ", max - 1);
+  return `${head.slice(0, space > 0 ? space : max - 1).replace(/[,;:]$/u, "")}…`;
 }

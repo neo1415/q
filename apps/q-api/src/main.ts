@@ -2282,6 +2282,9 @@ const fitComposition = createFitComposition({
       .filter((item) => item.interest.response == null)
       .map((item) => item.interest.companyId),
   feed: investorFeed,
+  raiseReader: companyRaise,
+  deckView: (actor, companyId) =>
+    profileMaterial.companyDeck.view(actor, companyId),
   viewer: createFitQViewer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
@@ -4167,6 +4170,7 @@ const workforceDocuments = createWorkforceDocuments({
   artifacts: qArtifacts.service,
   preparation: qArtifacts.preparation,
   critic: workforceModels.critique,
+  logger,
 });
 const workforceDiligence = createWorkforceDiligence({
   freshActor: (actor) =>

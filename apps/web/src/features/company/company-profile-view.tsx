@@ -10,6 +10,7 @@ import type {
   PitchClaimDto,
   RelationshipStateV2,
 } from "@capital-q/contracts";
+import { deckAskTerms } from "@capital-q/contracts";
 import { ChevronRight, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { formatLongDay } from "@/components/date-format";
@@ -593,16 +594,17 @@ export function CompanyProfileView({
                   summary={raiseSummary}
                 >
                   {pitchOnly ? (
-                    // A figure from the pitch with no round details shared:
-                    // say both halves plainly, so "$4M" and "not shared"
-                    // never read as a contradiction (founder, 2026-10-11).
+                    // A figure from the pitch with no round formally shared:
+                    // one sentence says both halves, so "$4M" and "not
+                    // shared" never read as a contradiction (2026-10-11),
+                    // and nothing repeats what the rows below say.
                     <p
                       className="cq-body-sm text-(--cq-text-secondary)"
                       data-raise-explainer="PITCH_ONLY"
                     >
                       {own
-                        ? "Investors who can watch your pitch see the amount you say in it, marked as your own statement. Your round details on Capital Q (amount, instrument, terms) stay private until you share them."
-                        : `${profile.canonicalName} says in its pitch video that it is raising ${sayRaiseAmount}. That is the company's own statement; nothing on Capital Q confirms it yet. The company hasn't shared its round details (amount, instrument, terms) with you.`}
+                        ? "Investors who can watch your pitch see the amount you say in it, as your statement. Your round details stay private until you share them."
+                        : `${profile.canonicalName} states ${sayRaiseAmount} in its pitch, its own statement; the round isn't formally shared with you yet.`}
                     </p>
                   ) : null}
                   {sayRaise === null ? null : (
@@ -671,6 +673,12 @@ export function CompanyProfileView({
                         : []),
                     ]}
                   />
+                  {/* The round as their confirmed deck states it (2026-10-12). */}
+                  {investor ? (
+                    <Suspense fallback={null}>
+                      <DeckRoundTerms deck={deck} />
+                    </Suspense>
+                  ) : null}
                   {claimsOf("USE_OF_FUNDS").map((claim) => (
                     <PitchQuote
                       key={`${claim.pitchId}-${String(claim.atSeconds)}`}
@@ -888,6 +896,46 @@ export function CompanyProfileView({
 }
 
 type Eventually<T> = T | Promise<T>;
+
+/**
+ * The round's terms as the deck's confirmed "The ask" states them, for an
+ * investor who may see the deck: the same reading the fit uses
+ * (deckAskTerms), labelled as the deck's, never as verified. A lead that
+ * the deck does not name is said once, here; nothing if the deck is silent.
+ */
+function DeckRoundTerms({
+  deck: eventually,
+}: {
+  readonly deck: Eventually<CompanyDeckView | null> | null;
+}) {
+  const deck = useSettled(eventually);
+  const terms = deckAskTerms(deck?.extraction?.sections);
+  const rows: (readonly [string, string])[] = [
+    ...(terms.instrument === undefined
+      ? []
+      : ([["Instrument", terms.instrument]] as const)),
+    ...(terms.valuationCap === undefined
+      ? terms.valuation === undefined
+        ? []
+        : ([["Valuation", terms.valuation]] as const)
+      : ([["Valuation cap", terms.valuationCap]] as const)),
+    ...(terms.minimumCheque === undefined
+      ? []
+      : ([["Minimum cheque", terms.minimumCheque]] as const)),
+    ...(terms.committedInvestors === "NOT_IN_DECK"
+      ? ([["Lead or committed investors", "Not in the deck"]] as const)
+      : []),
+  ];
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1" data-deck-round-terms>
+      <span className="cq-caption text-(--cq-text-tertiary)">
+        From their confirmed deck
+      </span>
+      <ProfileRows rows={rows} />
+    </div>
+  );
+}
 
 function useSettled<T>(value: Eventually<T>): T {
   return value instanceof Promise ? use(value) : value;

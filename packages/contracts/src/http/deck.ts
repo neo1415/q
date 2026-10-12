@@ -383,3 +383,69 @@ export function deckSectionForReaders(
   const { criteria: _criteria, ...section } = reading;
   return section;
 }
+
+/**
+ * The round as the deck's confirmed "The ask" states it (2026-10-12): the
+ * amount, instrument, valuation cap and minimum cheque, picked from the
+ * section's facts by label, and whether it names committed investors.
+ * One reading for every surface (the fit's stated context, the profile's
+ * raise), so they never disagree. Display strings in the deck's own words;
+ * a value longer than a term is prose and is left out. Never scored.
+ */
+export type DeckAskTerms = {
+  readonly amount?: string | undefined;
+  readonly instrument?: string | undefined;
+  readonly valuationCap?: string | undefined;
+  /** A valuation stated as such (a priced round), when no cap is. */
+  readonly valuation?: string | undefined;
+  readonly minimumCheque?: string | undefined;
+  /**
+   * PRESENT: named; NOT_IN_DECK: the deck lists the fact with no value;
+   * undefined: the deck says nothing about it.
+   */
+  readonly committedInvestors?: "PRESENT" | "NOT_IN_DECK" | undefined;
+};
+
+const DECK_TERM_VALUE_MAX = 40;
+const ASK_AMOUNT = /\b(amount|raising|raise|round size|sought|target)\b/iu;
+const ASK_INSTRUMENT = /\binstrument\b/iu;
+const ASK_CAP = /\b(valuation cap|cap)\b/iu;
+const ASK_VALUATION = /\bvaluation\b/iu;
+const ASK_MINIMUM = /\bminimum\b|\bmin\.? (cheque|check|ticket)\b/iu;
+const ASK_COMMITTED =
+  /\b(committed|lead investor|lead|investors? (in|so far))\b/iu;
+
+export function deckAskTerms(
+  sections: readonly DeckSection[] | null | undefined,
+): DeckAskTerms {
+  const ask = (sections ?? []).find(
+    (section) => section.section === "THE_ASK" && section.status === "PRESENT",
+  );
+  const facts = ask?.facts ?? [];
+  const pick = (pattern: RegExp, exclude?: RegExp) =>
+    facts.find(
+      (fact) =>
+        fact.value !== null &&
+        fact.value.length <= DECK_TERM_VALUE_MAX &&
+        pattern.test(fact.label) &&
+        (exclude === undefined || !exclude.test(fact.label)),
+    )?.value ?? undefined;
+  const committed = facts.find((fact) => ASK_COMMITTED.test(fact.label));
+  const valuationCap = pick(ASK_CAP);
+  return {
+    amount: pick(ASK_AMOUNT, ASK_MINIMUM),
+    instrument: pick(ASK_INSTRUMENT),
+    valuationCap,
+    valuation:
+      valuationCap === undefined
+        ? pick(ASK_VALUATION, /\bcap\b|\bminimum\b/iu)
+        : undefined,
+    minimumCheque: pick(ASK_MINIMUM),
+    committedInvestors:
+      committed === undefined
+        ? undefined
+        : committed.value === null
+          ? "NOT_IN_DECK"
+          : "PRESENT",
+  };
+}

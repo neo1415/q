@@ -772,6 +772,12 @@ export {
   type FitServiceDependencies,
   type FitTopResult,
 } from "./fit/service.js";
+export {
+  FIT_EVIDENCE_LINES_MAX,
+  statedEvidenceFrom,
+  type FitEvidenceLine,
+  type FitStatedEvidence,
+} from "./fit/stated.js";
 // Q.02 (2026-10-07): how Q reads an investor's thesis; suggestions apply
 // only on approval, through the ordinary mandate update.
 export {

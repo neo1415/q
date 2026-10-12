@@ -50,7 +50,7 @@ export const FIT_Q_VIEW_V2: PromptDefinition<
 > = {
   id: "FIT_Q_VIEW",
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "NORMAL_DIALOGUE",
   owner: "q-core",

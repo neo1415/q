@@ -46,11 +46,16 @@ const at = () => `${String(Date.now() - t0).padStart(6)} ms`;
 // each agent's duration from its own startedAt/endedAt, and the whole job.
 const timings = {};
 
-const created = await api("POST", "/v1/q/runs", {
-  capability: "ANSWER",
-  message: { text: GOAL },
-  modality: "TEXT",
-});
+// CQ_WORKFORCE_RUN: continue a run this runner already started (its plan
+// card still pending) instead of asking again and filing a second card.
+const created =
+  process.env.CQ_WORKFORCE_RUN === undefined
+    ? await api("POST", "/v1/q/runs", {
+        capability: "ANSWER",
+        message: { text: GOAL },
+        modality: "TEXT",
+      })
+    : { status: 0, json: { runId: process.env.CQ_WORKFORCE_RUN }, text: "" };
 const runId = created.json?.runId;
 if (!runId)
   throw new Error(`run not created: HTTP ${created.status} ${created.text}`);
@@ -80,9 +85,16 @@ timings.runSettledMs = Date.now() - t0;
 const reply =
   (run?.messages ?? []).filter((m) => m.role === "Q").at(-1)?.text ?? "";
 console.log(at(), "run status", run?.status, "| Q said:", reply.slice(0, 600));
+// The list carries no action; each card's detail does.
 const approvals = (await api("GET", "/v1/q/approvals")).json;
-const list = approvals?.items ?? approvals?.approvals ?? approvals ?? [];
-const mine = (Array.isArray(list) ? list : []).filter((a) => a.runId === runId);
+const mine = await Promise.all(
+  (approvals?.items ?? [])
+    .filter((a) => a.runId === runId)
+    .map(
+      async (a) =>
+        (await api("GET", `/v1/q/approvals/${a.approvalId}`)).json ?? a,
+    ),
+);
 console.log(
   at(),
   "approval cards from this run:",
