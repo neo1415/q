@@ -160,7 +160,7 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
       raise: pitch("4000000"),
       deck: deck(TENSORGATE_ASK),
     });
-    expect(said.statedRound).toEqual({
+    expect(said.statedRound).toMatchObject({
       raise: "$4M, said in their pitch and deck",
       minimumCheque: "$100k",
       terms: "Post-money SAFE, $30m cap in their deck",
@@ -173,6 +173,27 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
     expect(withStated.terms.reason).toBe(
       "Post-money SAFE, $30m cap in their deck; whether they need a lead is not stated.",
     );
+    // The row shows the values themselves, each with its source, and
+    // says separately what is not concluded (2026-10-12).
+    expect(withStated.cheque.context).toEqual({
+      items: [
+        { label: "Raise", value: "$4M", source: "PITCH_AND_DECK" },
+        { label: "Your cheque", value: "$250k", source: "YOUR_MANDATE" },
+        { label: "Minimum cheque", value: "$100k", source: "DECK" },
+      ],
+      open: "Ticket fit: not scored until the round is formally shared",
+    });
+    expect(withStated.terms.context).toEqual({
+      items: [
+        { label: "Instrument", value: "Post-money SAFE", source: "DECK" },
+        { label: "Valuation cap", value: "$30m", source: "DECK" },
+      ],
+      open: "Lead investor required: not stated",
+    });
+    expect(without.cheque.context).toEqual({
+      items: [{ label: "Your cheque", value: "$250k", source: "YOUR_MANDATE" }],
+      open: "Round amount: not known",
+    });
     expect(withStated.cheque.stated).toBe(true);
     expect(withStated.terms.stated).toBe(true);
     expect(without.cheque.stated).toBeUndefined();
@@ -231,7 +252,7 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
 
   it("a pitch-only raise, no deck: named as said in their pitch", () => {
     const said = statedEvidenceFrom({ raise: pitch("2500000"), deck: null });
-    expect(said.statedRound).toEqual({
+    expect(said.statedRound).toMatchObject({
       raise: "$2.5M, said in their pitch",
     });
     expect(

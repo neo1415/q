@@ -118,11 +118,18 @@ export function inventsFigures(
 }
 
 /** The public projection of a finding: no evidence identifiers travel. */
-function toPublicFinding(finding: CompanyFinding): QPublicFinding {
+/**
+ * The public projection of a finding, as a document stores it: no evidence
+ * identifiers travel, and the statement is kept whole (documents carry the
+ * larger Q_ARTIFACT_FINDING_STATEMENT_MAX_LENGTH; live 2026-10-12 a memo
+ * was refused for one statement over the 2,000 a stored claim allows).
+ * One function for the brief, memo, one-pager and deck composers.
+ */
+export function toPublicFinding(finding: CompanyFinding): QPublicFinding {
   return {
     findingId: finding.findingId,
     type: finding.type,
-    statement: finding.statement,
+    statement: finding.statement.trim(),
     truthClass: finding.truthClass,
     evidenceStatus: finding.evidenceStatus,
     confidence: finding.confidence,

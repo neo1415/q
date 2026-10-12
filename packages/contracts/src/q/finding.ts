@@ -79,6 +79,27 @@ export const QPublicFindingSchema = z.object(findingShape).strict();
 export type QPublicFinding = z.infer<typeof QPublicFindingSchema>;
 
 /**
+ * A finding as a prepared DOCUMENT carries it (2026-10-12). A document
+ * quotes what its findings rest on in full -- a public-research synthesis
+ * or a passage of the company's own document can run past the 2,000 a
+ * stored claim allows -- so its statement budget is larger, matching the
+ * text bound the model contracts already use. Stored claims, knowledge and
+ * live answers keep Q_FINDING_STATEMENT_MAX_LENGTH; nothing is truncated
+ * to fit a document. The version's whole content stays within its own
+ * stored bound (artifact_versions_content_bounded).
+ */
+export const Q_ARTIFACT_FINDING_STATEMENT_MAX_LENGTH = 8000;
+
+export const QArtifactFindingSchema = QPublicFindingSchema.extend({
+  statement: z
+    .string()
+    .trim()
+    .min(1)
+    .max(Q_ARTIFACT_FINDING_STATEMENT_MAX_LENGTH),
+}).strict();
+export type QArtifactFinding = z.infer<typeof QArtifactFindingSchema>;
+
+/**
  * INTERNAL. What the runtime holds: the public shape plus the classification
  * the firewall needs to decide what may leave.
  *

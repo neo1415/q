@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { QDocumentPipelineStage, QSlideImage } from "@capital-q/contracts";
+import {
+  QArtifactContentSchema,
+  type QDocumentPipelineStage,
+  type QSlideImage,
+} from "@capital-q/contracts";
 
 import {
   composeGeneralDocument,
@@ -410,5 +414,24 @@ describe("general documents through the same pipeline", () => {
     });
     expect(composed?.title).toBe("Northstar Logistics — investment memo");
     expect(composed?.content.sections.length).toBeGreaterThan(2);
+  });
+});
+
+describe("a finding longer than a stored claim (live 2026-10-12)", () => {
+  it("is kept whole in the memo, which passes the artifact contract", () => {
+    const long = `${"Ledgerfold's public filings describe a reconciliation product for small lenders. ".repeat(40)}End.`;
+    expect(long.length).toBeGreaterThan(2000);
+    const composed = composeGeneralDocument({
+      kind: "MEMO",
+      companyName: "Ledgerfold",
+      result: result([finding({ statement: long }), ...FINDINGS]),
+    });
+    expect(composed).not.toBeNull();
+    const parsed = QArtifactContentSchema.safeParse(composed?.content);
+    expect(parsed.success).toBe(true);
+    const statements = (composed?.content.sections ?? []).flatMap((section) =>
+      section.findings.map((f) => f.statement),
+    );
+    expect(statements).toContain(long);
   });
 });
