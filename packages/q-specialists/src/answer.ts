@@ -3286,12 +3286,19 @@ export function createSpecialistQAnswer(
     // question, or a pitch being watched), and never for a turn the
     // default cannot be: a web address is research, setup and a question
     // series carry their own notes.
+    //
+    // Gated on the early skim (production: 118 speculations cancelled in
+    // 7 days, each ~44k input tokens): where a skim is composed, the
+    // speculative answer starts only once the skim agrees with the default
+    // reading (OTHER: not a list, a fit, a person or an arrival), and not
+    // at all when the reading lands first. Nothing about what is offered
+    // or authorised changes; only whether the call is made early.
     const speculativeResearch = researchDirectiveFor(
       state,
       readingFromTurnReader(SPECULATIVE_READING),
       { available: dependencies.researchAvailable ?? true },
     );
-    if (
+    const speculate =
       dependencies.speculation?.spoken === true &&
       spoken &&
       request.speculation === undefined &&
@@ -3300,8 +3307,8 @@ export function createSpecialistQAnswer(
         !request.subjects.some((subject) => subject.kind === "COMPANY")) &&
       !namesWebAddress(latest.content) &&
       request.plan.screen?.route !== "ONBOARDING" &&
-      !sequences.has(conversationId)
-    ) {
+      !sequences.has(conversationId);
+    const startSpoken = (): void => {
       speculative.current = startSpeculation({
         request: {
           ...request,
@@ -3329,7 +3336,9 @@ export function createSpecialistQAnswer(
           dependencies.speculation?.observe?.(event);
         },
       });
-    }
+    };
+    // No skim composed: nothing to gate on, so it starts at once.
+    if (speculate && dependencies.turnSkim === undefined) startSpoken();
     // K6: the full reading is dropped (its provider call aborted) when the
     // fast lane's skim answers the turn first; the run's own abort still
     // reaches it.
@@ -3415,6 +3424,21 @@ export function createSpecialistQAnswer(
         skimming.catch(() => null),
       ]);
       const lane = fastLaneOf(skimmed, latest.content);
+      if (speculate && lane === null) {
+        if (skimmed?.kind === "OTHER" && !readerAbort.signal.aborted) {
+          startSpoken();
+        } else {
+          logger?.info(
+            {
+              qRunId: request.runId,
+              speculation: "skipped",
+              reason: skimmed === null ? "UNSKIMMED" : "SKIM",
+              decidedAfterMs: Date.now() - skimStarted,
+            },
+            "q voice speculation",
+          );
+        }
+      }
       // Never past a change waiting on their word: a yes is not a list.
       if (lane !== null && !(await waitingOnThem())) {
         speculative.current?.cancel("KIND");
