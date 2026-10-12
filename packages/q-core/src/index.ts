@@ -306,6 +306,10 @@ export {
   V48_SUBJECT,
 } from "./prompts/tasks/turn-reader.v48.js";
 export {
+  TURN_READER_V49,
+  V49_TEAM_JOB,
+} from "./prompts/tasks/turn-reader.v49.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -377,6 +381,9 @@ export {
   TURN_READER_V48_SCHEMA_VERSION,
   TurnReaderV48ResultSchema,
   type TurnReaderV48Result,
+  TURN_READER_V49_SCHEMA_VERSION,
+  TurnReaderV49ResultSchema,
+  type TurnReaderV49Result,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,

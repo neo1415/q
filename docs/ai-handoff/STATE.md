@@ -1,5 +1,35 @@
 # Capital Q — Current shared engineering state
 
+## LATEST STATUS — PR #5 deployed; team-job routing in PR #8 — 2026-10-12 03:40 UTC
+
+**DEPLOYED (service level):** PR #5 merged through GitHub's merge operation. The release lane carries it:
+
+- `build/int-rc` = `450c67ce`
+- CI lane = `e3654b53`
+- deploy lane `recovery/2026-09-12` = `f23583ad`
+
+All three have tree `2e155c68`. Railway reports all four services SUCCESS at `f23583ad`. Rollback point: `e1266dd8`.
+
+**LIVE REHEARSAL on `f23583ad` (fictional investor Savanna Seed, `investor-demo-rehearsal.mjs`): PASS.** Timings are measured to the first rendered characters ("first text") and to completion ("done").
+
+| Phase                     | Result                                | First text | Done      |
+| ------------------------- | ------------------------------------- | ---------- | --------- |
+| Top three                 | 3 cards                               | 3,342 ms   | —         |
+| Selected-company question | 6 findings, COMPANY_REFERENCE correct | 2,891 ms   | 15,993 ms |
+| Risks follow-up           | 10 findings                           | —          | 22,570 ms |
+| Comparison                | 2 cards                               | 2,410 ms   | —         |
+
+The earlier on-screen defect is fixed live. The runner's Q-control race fix (it now waits for either control) is in PR #8.
+
+**Workforce acceptance (live, `f23583ad`): NOT YET PASS.**
+
+- Run 1: the goal became an "Accept Ledgerfold's connection request" card through the hand-over shortcut. Fixed in `7c0315b6` (deployed). The stray approval `09dde253-…` was rejected.
+- Run 2: Q produced one in-run brief (5 public sources) and no `q.workforce.job.start` card.
+
+PR [neo1415/q#8](https://github.com/neo1415/q/pull/8) (`c174746e`, LOCAL TESTED, CI running) routes three or more kinds of asked work to `propose_q_job` and says the plan back. Local checks: 4,430 tests pass; root and q-api tsc 0; lint and format clean.
+
+**Next:** PR #8 green → merge → lane PRs → deploy → `node scripts/handoff/live/workforce-acceptance.mjs`, then `--approve` → verify memo v1 → critique → revised v2 → diligence card left pending → then Tavus (ADR 0066 Proposed; adapter dormant in PR #8; one key only; no Gulf voice in the Tavus catalogue).
+
 ## LATEST STATUS — PR #2 deployed; workforce slice in PR #5 — 2026-10-12 00:30 UTC
 
 **DEPLOYED (service level):** PR #2 merged through GitHub's merge operation (direct pushes to release branches are refused in Claude sessions; merges via the GitHub integration work). `build/int-rc` = `668ee838`, CI lane `recovery/2026-09-12-8y2j4w` = `a4c254c6`, deploy lane `recovery/2026-09-12` = `e1266dd8`; all three trees identical to the CI-tested `f7ff0fdc` (tree `54d168aa`). CI: PR #2 run 38180652493, PR #4 runs 38182707886/38182711449, CI-lane push run 38182733437 — quality and pgTAP SUCCESS. Railway: all four services SUCCESS at `e1266dd8` (workers `f2d068e7`, api `46d38485`, q-api `9282d3f2`, web `df1360ae`). Rollback: `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`.

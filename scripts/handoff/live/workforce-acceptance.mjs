@@ -42,6 +42,9 @@ async function api(method, path, body) {
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const t0 = Date.now();
 const at = () => `${String(Date.now() - t0).padStart(6)} ms`;
+// Timings the lead asked for (2026-10-12): first Q text, plan prepared,
+// each agent's duration from its own startedAt/endedAt, and the whole job.
+const timings = {};
 
 const created = await api("POST", "/v1/q/runs", {
   capability: "ANSWER",
@@ -53,8 +56,13 @@ if (!runId)
   throw new Error(`run not created: HTTP ${created.status} ${created.text}`);
 console.log(at(), "run", runId);
 let run;
-for (let i = 0; i < 120; i += 1) {
+for (let i = 0; i < 480; i += 1) {
   run = (await api("GET", `/v1/q/runs/${runId}`)).json;
+  const said = (run?.messages ?? []).some(
+    (m) => m.role === "Q" && (m.text ?? "").length > 0,
+  );
+  if (said && timings.firstQTextMs === undefined)
+    timings.firstQTextMs = Date.now() - t0;
   if (
     [
       "COMPLETED",
@@ -66,8 +74,9 @@ for (let i = 0; i < 120; i += 1) {
     ].includes(run?.status)
   )
     break;
-  await wait(1_000);
+  await wait(250);
 }
+timings.runSettledMs = Date.now() - t0;
 const reply =
   (run?.messages ?? []).filter((m) => m.role === "Q").at(-1)?.text ?? "";
 console.log(at(), "run status", run?.status, "| Q said:", reply.slice(0, 600));
@@ -81,20 +90,23 @@ console.log(
 );
 const plan = mine.find((a) => a.action?.actionType === "q.workforce.job.start");
 if (plan === undefined) {
-  console.log("FAIL no workforce plan card was prepared");
+  console.log("FAIL no workforce plan card was prepared", timings);
   process.exit(1);
 }
+timings.planCardMs = Date.now() - t0;
 console.log(
   at(),
   "plan preview:",
   (plan.action?.preview ?? plan.action?.summary ?? "").slice(0, 900),
 );
 if (!APPROVE) {
+  console.log("timings", JSON.stringify(timings));
   console.log(
     "Plan prepared; re-run with --approve to approve exactly this card.",
   );
   process.exit(0);
 }
+const approvedAt = Date.now();
 const approved = await api(
   "POST",
   `/v1/q/approvals/${plan.approvalId}/approve`,
@@ -107,33 +119,63 @@ console.log(
   approved.json?.status ?? approved.text,
 );
 
-let job = null;
-for (let i = 0; i < 180; i += 1) {
+const ENDED = ["DONE", "FAILED", "HELD", "CANCELLED", "STOPPED", "BLOCKED"];
+let detail = null;
+for (let i = 0; i < 360; i += 1) {
   const jobs = (await api("GET", "/v1/q/workforce/jobs")).json;
-  const items = jobs?.items ?? jobs?.jobs ?? [];
-  const found = items.find((one) =>
-    (one.goal ?? "").startsWith(GOAL.slice(0, 60)),
-  );
+  const found = (jobs?.items ?? []).find((one) => one.trace?.runId === runId);
   if (found !== undefined) {
-    job =
-      (await api("GET", `/v1/q/workforce/jobs/${found.jobId ?? found.id}`))
-        .json ?? found;
-    if (
-      ["DONE", "FAILED", "HELD", "CANCELLED", "STOPPED"].includes(job?.status)
-    )
-      break;
+    detail = (await api("GET", `/v1/q/workforce/jobs/${found.id}`)).json;
+    if (ENDED.includes(detail?.job?.status)) break;
   }
   await wait(5_000);
 }
-console.log(at(), "job", job?.status);
-for (const step of job?.steps ?? job?.runs ?? []) {
+timings.jobTotalMs = Date.now() - approvedAt;
+const ms = (a) =>
+  a.endedAt === null ? null : Date.parse(a.endedAt) - Date.parse(a.startedAt);
+console.log(
+  at(),
+  "job",
+  detail?.job?.status,
+  detail?.job?.stoppedBecause ?? "",
+  "| cost",
+  detail?.job?.costUsd,
+);
+timings.agents = (detail?.agents ?? []).map((agent) => ({
+  agent: agent.agentName,
+  role: agent.role,
+  status: agent.status,
+  ms: ms(agent),
+}));
+for (const agent of detail?.agents ?? []) {
   console.log(
     " -",
-    step.agentName ?? step.role,
+    agent.agentName,
+    `(${agent.role})`,
     "|",
-    step.status,
+    agent.status,
     "|",
-    (step.summary ?? "").slice(0, 300),
+    ms(agent),
+    "ms |",
+    (agent.summary ?? "").slice(0, 300),
   );
 }
-console.log(JSON.stringify(job).slice(0, 4000));
+for (const draft of detail?.drafts ?? []) {
+  console.log(
+    " draft",
+    draft.attempt,
+    draft.channel,
+    draft.outcome?.outcome ?? "",
+    draft.outcome?.approvalStatus ?? "",
+    "|",
+    draft.body.slice(0, 200),
+  );
+}
+console.log("timings", JSON.stringify(timings));
+const passed =
+  detail?.job?.status === "DONE" &&
+  (detail?.agents ?? []).every(
+    (agent) => agent.spawnedByRunId === null || agent.status === "DONE",
+  );
+console.log(passed ? "PASS job done, every step done" : "FAIL see above");
+process.exit(passed ? 0 : 1);

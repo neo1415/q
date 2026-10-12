@@ -55,6 +55,7 @@ import {
   createToolCanonicalPort,
   createToolHandOverPort,
   createToolDelegationPort,
+  createToolTeamJobPort,
   createToolReadinessLead,
   createToolAppActionPort,
   createToolOpenRecordPort,
@@ -556,6 +557,10 @@ export function composeQIntelligence(
     readinessLead: createToolReadinessLead({ tools }),
     // QA 2026-10-03: work handed over in general is a standing instruction.
     delegation: createToolDelegationPort({
+      tools,
+      ...(logger === undefined ? {} : { logger }),
+    }),
+    teamJob: createToolTeamJobPort({
       tools,
       ...(logger === undefined ? {} : { logger }),
     }),

@@ -46,6 +46,7 @@ import {
   namedInWords,
   unknownScreenLine,
 } from "../src/answer.js";
+import { workKindsAsked, type QTeamJobPort } from "../src/team-job.js";
 import {
   createToolProfileGapsPort,
   type QProfileGapsPort,
@@ -128,6 +129,8 @@ function seam(options: {
   readonly handOver?: QHandOverPort;
   /** Work handed over in general (QA 2026-10-03). */
   readonly delegation?: QDelegationPort;
+  /** Several kinds of work at once: a team job (live 2026-10-12). */
+  readonly teamJob?: QTeamJobPort;
   /** Readiness lead lines for "what should I do next?" (lead 2026-10-03). */
   readonly readinessLead?: (request: QAnswerRequest) => Promise<string | null>;
   /** Their profile's gaps filled by code (TURN_READER v27). */
@@ -309,6 +312,7 @@ function seam(options: {
     ...(options.delegation === undefined
       ? {}
       : { delegation: options.delegation }),
+    ...(options.teamJob === undefined ? {} : { teamJob: options.teamJob }),
     ...(options.readinessLead === undefined
       ? {}
       : { readinessLead: options.readinessLead }),
@@ -1714,6 +1718,143 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     expect(asked).toEqual([]);
     expect(errands).toEqual([]);
     expect(delegated()).toBe(1);
+  });
+
+  it("the same request, with Q's team composed, is planned as one team job and the plan is said back (live 2026-10-12)", async () => {
+    const { value, asked, errands } = port(() => null);
+    const goals: string[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal) => {
+        goals.push(goal);
+        return Promise.resolve({
+          status: "PREPARED",
+          plan: {
+            summary:
+              "Research Ledgerfold, write and critique a memo, draft diligence questions.",
+            steps: [
+              { who: "Research", does: "Reads Ledgerfold's public record." },
+              { who: "Documents", does: "Writes the investment memo." },
+              { who: "Reviewer", does: "Critiques it and revises it once." },
+              { who: "Diligence", does: "Drafts the founder questions." },
+            ],
+            needsYou: ["Sending the questions needs your approval."],
+            cannot: [],
+          },
+        });
+      },
+    };
+    const said =
+      "Research Ledgerfold and how it fits Savanna Seed Partners, assess the opportunity, identify the important risks and missing information, prepare an investment memo, get a second specialist to critique it, revise the memo, and prepare appropriate founder diligence questions. Show me the results and anything requiring my approval.";
+    const { answer, delegated, stored } = seam({
+      said,
+      reading: reading("Ledgerfold"),
+      outcomes: [],
+      handOver: value,
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(goals).toEqual([said]);
+    expect(asked).toEqual([]);
+    expect(errands).toEqual([]);
+    expect(delegated()).toBe(0);
+    expect(stored.at(-1)?.content).toBe(
+      "I've planned this as a job for my team: Research Ledgerfold, write and critique a memo, draft diligence questions. Research reads Ledgerfold's public record; Documents writes the investment memo; Reviewer critiques it and revises it once; Diligence drafts the founder questions. Nothing starts until you approve the plan. Sending the questions needs your approval.",
+    );
+  });
+
+  it("a team job that could not be planned is said plainly, never covered by an answer (lead review 2026-10-12)", async () => {
+    const teamJob: QTeamJobPort = {
+      propose: () => Promise.resolve({ status: "NOT_PLANNED" }),
+    };
+    const { answer, delegated, stored } = seam({
+      said: "Research Ledgerfold, write a memo and have it critiqued",
+      reading: reading(null),
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(delegated()).toBe(0);
+    expect(stored.at(-1)?.content).toMatch(
+      /^I couldn't turn that into a plan my team can carry out, so nothing has started\./u,
+    );
+  });
+
+  it("work handed to the team in words naming no list of tasks is read by the reader and planned (lead review 2026-10-12)", async () => {
+    const goals: string[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal) => {
+        goals.push(goal);
+        return Promise.resolve({ status: "UNAVAILABLE" });
+      },
+    };
+    const said =
+      "Get your team to investigate Ledgerfold and prepare me for a meeting";
+    const { answer, delegated, stored } = seam({
+      said,
+      reading: {
+        ...reading("Ledgerfold"),
+        handOver: null,
+        teamJob: true,
+      } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(goals).toEqual([said]);
+    expect(delegated()).toBe(0);
+    expect(stored.at(-1)?.content).toMatch(
+      /^Handing work to my team isn't available on your account here, so nothing has started\./u,
+    );
+  });
+
+  it("the same words without the reading's teamJob are answered as before (no magic word)", async () => {
+    let proposed = 0;
+    const teamJob: QTeamJobPort = {
+      propose: () => {
+        proposed += 1;
+        return Promise.resolve({ status: "FAILED" });
+      },
+    };
+    const { answer, delegated } = seam({
+      said: "Get your team to investigate Ledgerfold and prepare me for a meeting",
+      reading: { ...reading(null), handOver: null } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(proposed).toBe(0);
+    expect(delegated()).toBe(1);
+  });
+
+  it("a question with two kinds of work is not a team job", async () => {
+    let proposed = 0;
+    const teamJob: QTeamJobPort = {
+      propose: () => {
+        proposed += 1;
+        return Promise.resolve({ status: "FAILED" });
+      },
+    };
+    const { answer, delegated } = seam({
+      said: "What are the main risks? Give me a brief assessment.",
+      reading: reading(null),
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(proposed).toBe(0);
+    expect(delegated()).toBe(1);
+  });
+
+  it("counts the kinds of work: assessing and naming risks are one kind", () => {
+    expect(
+      workKindsAsked("What are the main risks? Give me a brief assessment."),
+    ).toBe(2);
+    expect(
+      workKindsAsked(
+        "Research them, prepare an investment memo, get it critiqued, revise it and draft founder diligence questions",
+      ),
+    ).toBe(5);
+    expect(workKindsAsked("handle it")).toBe(0);
   });
 
   it("names the work kinds: two or more is a work request, a hand-over names none", () => {
