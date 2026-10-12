@@ -542,6 +542,11 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   const { config, provider, firewall, turn, spend, logger } = deps;
   const now = deps.now ?? Date.now;
   const lines = new Map<string, LiveLine>();
+  // A failed write leaves speech unaccounted for; this process must not
+  // reopen that owner on a stale persisted balance.
+  const failedTrialWrites = new Set<string>();
+  const trialOwner = (actor: ActorContext) =>
+    `${actor.tenantId}|${actor.userId}`;
   const enabled = config.enabled && provider !== undefined;
 
   const pastCap = (line: LiveLine, at: number) =>
@@ -617,7 +622,12 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   const persistTrial = (line: LiveLine): Promise<void> => {
     const trial = line.trial;
     const store = deps.trialUsage;
-    if (trial === undefined || store === undefined) return Promise.resolve();
+    if (
+      trial === undefined ||
+      store === undefined ||
+      failedTrialWrites.has(trialOwner(line.actor))
+    )
+      return Promise.resolve();
     trial.persisting = trial.persisting.then(async () => {
       const seconds = trialLineSeconds(line, now());
       try {
@@ -629,7 +639,10 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         });
         trial.othersSeconds = Math.max(0, total - seconds);
       } catch (error: unknown) {
+        failedTrialWrites.add(trialOwner(line.actor));
         logger.warn({ err: error }, "live voice trial use could not be saved");
+        if (lines.get(line.voiceSessionId) === line)
+          forget(line, "trial_ledger_unavailable");
       }
     });
     return trial.persisting;
@@ -987,8 +1000,24 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       // of it is left; their use is read from Postgres (any device, any
       // instance). An unreadable use refuses: unknown is not unused.
       const allowance = trialAllowance(actor.userId);
+      let carried: Pick<LiveLine, "history" | "referents"> | null = null;
       let trialUsed = 0;
       if (allowance !== undefined) {
+        // Stop and durably flush this process's old line BEFORE reading its
+        // balance. Reading first allowed an immediate reconnect to reuse it.
+        for (const line of [...lines.values()]) {
+          if (
+            line.actor.userId !== actor.userId ||
+            line.actor.tenantId !== actor.tenantId
+          )
+            continue;
+          if (line.voiceSessionId === binding.voiceSessionId)
+            carried = { history: line.history, referents: line.referents };
+          forget(line, "replaced");
+          await line.trial?.persisting;
+        }
+        if (failedTrialWrites.has(trialOwner(actor)))
+          return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
         if (deps.trialUsage === undefined)
           return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
         try {
@@ -1004,7 +1033,6 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       // One live line per person: a new one replaces what was open. A
       // renewal of the same call (same voice session) keeps what Q was
       // asked and said, and the names discussed.
-      let carried: Pick<LiveLine, "history" | "referents"> | null = null;
       for (const line of [...lines.values()]) {
         if (line.actor.userId !== actor.userId) continue;
         if (line.voiceSessionId === binding.voiceSessionId) {

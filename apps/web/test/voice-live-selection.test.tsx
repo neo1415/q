@@ -156,6 +156,30 @@ describe("GPT-Live as the product voice", () => {
     standardStart.mockClear();
   });
 
+  it.each(["spent", "unavailable", "not offered"])(
+    "never opens another paid provider for a LIVE-only trial: %s",
+    async (reason) => {
+      trialSpent = reason === "spent";
+      opens = reason !== "unavailable";
+      available = reason !== "not offered";
+      const { result } = renderHook(() => useVoiceSession());
+      await ready();
+      await act(async () => {
+        await result.current.start({
+          credential: {
+            ...credential,
+            liveOnly: true,
+            token: "",
+            providerConversationId: "",
+          },
+        });
+      });
+      expect(calls).toHaveLength(1);
+      expect(standardStart).not.toHaveBeenCalled();
+      expect(duplexStart).not.toHaveBeenCalled();
+    },
+  );
+
   it("opens every voice start on GPT-Live, attached to the issued session", async () => {
     const { result } = renderHook(() => useVoiceSession());
     await ready();
