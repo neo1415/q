@@ -1,5 +1,19 @@
 # Capital Q — Current shared engineering state
 
+## LATEST STATUS — PR #8 live at `6600e61d`; PR #11 in CI — 2026-10-12 04:50 UTC
+
+All four Railway services report SUCCESS at `6600e61d`, which is PR #8. Lanes:
+
+- `build/int-rc` `368c0e10`
+- CI lane `d9d19eb1`
+- deploy lane `6600e61d`
+
+Rollback point: `f23583ad`.
+
+Workforce acceptance: planning works, Research is DONE, the memo step FAILS. See ACTIVE-TASKS. PR #11 carries the logging needed to root-cause it, plus the Tensorgate fit and profile work.
+
+No migrations.
+
 ## LATEST STATUS — PR #5 deployed; team-job routing in PR #8 — 2026-10-12 03:40 UTC
 
 **DEPLOYED (service level):** PR #5 merged through GitHub's merge operation. The release lane carries it:

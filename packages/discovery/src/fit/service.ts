@@ -18,6 +18,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import type { EligibilityReasonCode } from "../eligibility/contracts.js";
 import type { EligibilityService } from "../eligibility/service.js";
+import type { FitEvidenceLine } from "./stated.js";
 import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
 
 import { FIT_CONFIG_CURRENT, type FitConfig } from "./config.js";
@@ -61,6 +62,10 @@ export type FitCompanyInputs = {
   /** The current raise, only where disclosure lets this reader see it. */
   readonly raise?:
     { readonly amount: string; readonly currency: string } | null | undefined;
+  /** What the company stated where this reader may see it; never scored. */
+  readonly evidence?: readonly FitEvidenceLine[] | undefined;
+  /** That evidence came through a grant: models read it only as CONFIDENTIAL. */
+  readonly evidenceConfidential?: boolean | undefined;
 };
 
 export type FitInputSource = {
@@ -114,6 +119,9 @@ export type FitProfileItem = {
   readonly about?: string | null | undefined;
   readonly raise?:
     { readonly amount: string; readonly currency: string } | null | undefined;
+  /** For Q's view: what the company stated where this reader may see it. */
+  readonly evidence?: readonly FitEvidenceLine[] | undefined;
+  readonly evidenceConfidential?: boolean | undefined;
 };
 
 export type FitProfilesResult =
@@ -256,6 +264,8 @@ export function createFitService(
           : input.line,
         about: input.about ?? null,
         raise: input.raise ?? null,
+        evidence: input.evidence ?? [],
+        evidenceConfidential: input.evidenceConfidential ?? false,
       });
     }
     // Request order, as eligibility returned it.

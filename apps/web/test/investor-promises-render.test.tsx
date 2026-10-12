@@ -149,6 +149,35 @@ describe("assumptions to test (Q.07)", () => {
     expect((button.closest("button") as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it("shows the three most important first; the rest on demand (2026-10-12)", () => {
+    cleanup();
+    const many = {
+      ...BOARD,
+      assumptions: [0, 1].flatMap((round) =>
+        BOARD.assumptions.map((a) => ({
+          ...a,
+          id: `${a.id}-${String(round)}`,
+          question: `${a.question} (${String(round)})`,
+          label: `${a.label} ${String(round)}`,
+        })),
+      ),
+    };
+    render(
+      <AssumptionsSection
+        board={many}
+        companyName="Ledgerline"
+        route={{ kind: "NOT_CONNECTED" }}
+      />,
+    );
+    expect(screen.getAllByText("Tick to ask Ledgerline")).toHaveLength(3);
+    fireEvent.click(
+      screen.getByText(`Show all ${String(many.assumptions.length)}`),
+    );
+    expect(screen.getAllByText("Tick to ask Ledgerline")).toHaveLength(
+      many.assumptions.length,
+    );
+  });
+
   it("offers the three paths per question: Q checks, ask the founder, request a document", () => {
     cleanup();
     askNow.mockClear();

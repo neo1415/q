@@ -13,7 +13,7 @@ import {
   FitQViewResultSchema,
   renderPrompt,
   type FitQViewResult,
-  type FitQViewVariables,
+  type FitQViewV3Variables,
   type PromptRegistry,
 } from "@capital-q/q-core";
 import { budgetForTaskClass } from "@capital-q/model-gateway/q";
@@ -26,9 +26,12 @@ import type { Logger } from "@capital-q/observability";
  *   fit model (code)   the band, the confidence, nine rows; fixed
  *   this file          Worth a look / Maybe / Probably not, in Q's words
  *
- * The model is given the reader's own fit rows and the company's
- * network-visible line, nothing else: no snapshot, no mandate text, no
- * private company material (Context Firewall). It cannot alter the fit:
+ * The model is given the reader's own fit rows, the company's
+ * network-visible line, and (v3) what the company STATED where this reader
+ * may already see it -- the pitch raise, the deck facts the founder
+ * confirmed for investors -- read by the caller under the reader's own
+ * authorisation. No snapshot, no mandate text, no founder-private material
+ * (Context Firewall). It cannot alter the fit:
  * the caller keeps the profile and shows this beside it, labelled, as a
  * Q_INFERENCE. Every failure is in-band UNAVAILABLE and the card simply
  * shows no view; the fit is unaffected.
@@ -42,6 +45,19 @@ export type FitQViewRequest = {
   /** Network-visible one-liner. Untrusted content, fenced by the prompt. */
   readonly companyLine: string | null;
   readonly profile: FitProfileDto;
+  /**
+   * What the company stated where this reader may see it (label, value;
+   * null value: the deck does not give it). Untrusted, fenced.
+   */
+  readonly evidence?:
+    | readonly { readonly label: string; readonly value: string | null }[]
+    | undefined;
+  /**
+   * The evidence's sensitivity for model routing: CONFIDENTIAL when the
+   * deck reached this reader through a relationship grant rather than to
+   * all investors. Absent: the viewer's default.
+   */
+  readonly sensitivity?: ModelSensitivity | undefined;
   readonly signal?: AbortSignal | undefined;
 };
 
@@ -108,17 +124,21 @@ export function createFitQViewer(
         .filter((s) => s.length > 0)
         .join(": ")
         .slice(0, 400);
+      const evidence = (request.evidence ?? []).slice(0, 60).map((line) => ({
+        label: line.label.slice(0, 160),
+        value: line.value === null ? null : line.value.slice(0, 200),
+      }));
       const fitLabel = `${FIT_BAND_LABELS[request.profile.band]}, ${FIT_CONFIDENCE_LABELS[request.profile.confidence].toLowerCase()}`;
 
       let rendered;
       try {
-        rendered = renderPrompt<FitQViewVariables>(registry, {
+        rendered = renderPrompt<FitQViewV3Variables>(registry, {
           task: "FIT_Q_VIEW",
           operatingMode: "ASSESSMENT",
           communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
           environmentNotes:
             "You are giving a short view beside a fit Capital Q already computed. You cannot change the fit or any row.",
-          variables: { rows, fitLabel, companyDescription },
+          variables: { rows, fitLabel, companyDescription, evidence },
         });
       } catch (error: unknown) {
         logger?.warn({ err: error }, "fit Q view prompt did not render");
@@ -131,7 +151,10 @@ export function createFitQViewer(
           {
             taskClass: "NORMAL_DIALOGUE",
             budget: budgetForTaskClass("NORMAL_DIALOGUE"),
-            sensitivity: dependencies.sensitivity ?? "NETWORK_VISIBLE",
+            sensitivity:
+              request.sensitivity ??
+              dependencies.sensitivity ??
+              "NETWORK_VISIBLE",
             ...(dependencies.dataPosture === undefined
               ? {}
               : { dataPosture: dependencies.dataPosture }),
@@ -160,9 +183,12 @@ export function createFitQViewer(
       }
       if (result === undefined) return unavailable;
 
-      const supplied = [companyDescription, ...rows.map((r) => r.reason)].join(
-        " ",
-      );
+      // A figure may come from the rows or from what the company stated.
+      const supplied = [
+        companyDescription,
+        ...rows.map((r) => r.reason),
+        ...evidence.flatMap((line) => [line.label, line.value ?? ""]),
+      ].join(" ");
       const ungrounded = fitQViewGroundingFailure(result, supplied);
       if (ungrounded !== null) {
         logger?.warn({ rule: ungrounded }, "fit Q view was not grounded");

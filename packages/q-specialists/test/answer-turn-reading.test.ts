@@ -1758,7 +1758,7 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     expect(errands).toEqual([]);
     expect(delegated()).toBe(0);
     expect(stored.at(-1)?.content).toBe(
-      "I've planned this as a job for my team: Research Ledgerfold, write and critique a memo, draft diligence questions. Research reads Ledgerfold's public record; Documents writes the investment memo; Reviewer critiques it and revises it once; Diligence drafts the founder questions. Nothing starts until you approve the plan. Sending the questions needs your approval.",
+      "I've planned this as a job for my team: 4 steps, Research → Documents → Reviewer → Diligence. Sending the questions needs your approval.",
     );
   });
 

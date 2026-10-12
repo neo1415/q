@@ -86,6 +86,12 @@ export const FitParameterResultDtoSchema = z
      * counts toward neither fit nor confidence (outcome is UNKNOWN).
      */
     applicable: z.boolean(),
+    /**
+     * The reason names what the company STATED where this reader may see
+     * it (a pitch, a confirmed deck) but did not formally share: shown as
+     * stated, never scored. Only on UNKNOWN rows; absent otherwise.
+     */
+    stated: z.literal(true).optional(),
   })
   .strict();
 export type FitParameterResultDto = z.infer<typeof FitParameterResultDtoSchema>;
@@ -367,6 +373,12 @@ export const FIT_OUTCOME_LABELS: Readonly<Record<FitOutcome, string>> = {
 
 /** The word for a parameter the investor declared no preference on. */
 export const FIT_NOT_APPLICABLE_LABEL = "No preference";
+
+/**
+ * The word for an UNKNOWN row whose reason names what the company stated
+ * where the reader may see it (`stated`): known from them, not scored.
+ */
+export const FIT_STATED_LABEL = "Stated";
 
 export const Q_VIEW_VERDICT_LABELS: Readonly<Record<QViewVerdict, string>> = {
   WORTH_A_LOOK: "Worth a look",
