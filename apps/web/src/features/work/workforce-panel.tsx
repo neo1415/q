@@ -1,12 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import {
+  useState,
+  useSyncExternalStore,
+  useTransition,
+  type ReactNode,
+} from "react";
 
 import type {
   WorkforceDraftDto,
   WorkforceJobDetailDto,
   WorkforceOverviewDto,
+  QApprovalView,
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { Button } from "@capital-q/ui/button";
@@ -60,6 +66,7 @@ import { WorkforceDocuments } from "./workforce-documents";
 type Tab = "now" | "team" | "cost";
 
 const ICON = { size: 14, strokeWidth: ICON_STROKE } as const;
+const subscribeHydration = () => () => undefined;
 
 /** HH:MM in the reader's own clock; the server's may differ, so no warning. */
 function clock(iso: string): string {
@@ -392,7 +399,83 @@ function JobCard({
         documents={job.documents ?? []}
         unavailable={job.documentsUnavailable ?? false}
       />
+      <PreparedApprovals
+        approvals={job.approvals ?? []}
+        unavailable={job.approvalsUnavailable ?? false}
+      />
     </article>
+  );
+}
+
+function approvalState(view: QApprovalView): string {
+  switch (view.action.actionStatus) {
+    case "EXECUTED":
+      return "Completed";
+    case "FAILED":
+      return "Action failed";
+    case "RECONCILIATION_REQUIRED":
+      return "Outcome needs checking";
+    case "EXECUTING":
+      return "In progress";
+    case "APPROVED":
+    case "AWAITING_APPROVAL":
+    case "PROPOSED":
+    case "REJECTED":
+    case "EXPIRED":
+    case "WITHDRAWN":
+      return {
+        APPROVED: "Approved; waiting to run.",
+        PENDING: "This approval can’t be decided right now.",
+        REJECTED: "Rejected",
+        EXPIRED: "Expired",
+        REVOKED: "Withdrawn",
+      }[view.status];
+  }
+}
+
+function PreparedApprovals({
+  approvals,
+  unavailable,
+}: {
+  readonly approvals: readonly QApprovalView[];
+  readonly unavailable: boolean;
+}) {
+  if (approvals.length === 0 && !unavailable) return null;
+  return (
+    <section
+      aria-label="Prepared actions"
+      className="border-t border-(--cq-border-subtle) px-4 py-3"
+    >
+      {approvals.map((view) => (
+        <details
+          key={view.approvalId}
+          data-workforce-approval={view.approvalId}
+        >
+          <summary className="cq-label cursor-pointer py-2">
+            {view.action.summary}
+          </summary>
+          <p className="cq-body-sm mb-3 whitespace-pre-line text-(--cq-text-secondary)">
+            {view.action.preview ?? view.action.summary}
+          </p>
+          {view.status === "PENDING" &&
+          view.canDecide &&
+          view.action.actionStatus === "AWAITING_APPROVAL" ? (
+            <ApproveButton approvalId={view.approvalId}>
+              Approve this action
+            </ApproveButton>
+          ) : (
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {approvalState(view)}
+            </p>
+          )}
+        </details>
+      ))}
+      {unavailable ? (
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          An approval from this job isn’t available right now.
+        </p>
+      ) : null}
+    </section>
   );
 }
 
@@ -587,12 +670,17 @@ export function ApproveButton({
 }) {
   const router = useRouter();
   const [busy, start] = useTransition();
+  const interactive = useSyncExternalStore(
+    subscribeHydration,
+    () => true,
+    () => false,
+  );
   const [error, setError] = useState<string | null>(null);
   return (
     <>
       <Button
         variant="primary"
-        disabled={busy}
+        disabled={busy || !interactive}
         onClick={() => {
           start(async () => {
             setError(null);

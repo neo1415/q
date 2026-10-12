@@ -1,0 +1,230 @@
+# CAPITAL Q — NEXT AUTONOMOUS PRODUCT COMPLETION RUN
+
+Repository: `neo1415/q`
+
+You are resuming Capital Q as the primary autonomous engineering and release owner.
+
+**Your mission is to complete the existing agent legion, make Q substantially faster and more intelligent, improve durable contextual memory, adapt useful capabilities from Hermes and Graphify, refine the actual founder/investor product experience, and complete Tavus rehearsals.**
+
+This is an ongoing product-completion mission, not a new project or a single narrowly scoped coding task.
+
+## FIRST — Recover the latest state, don't repeat work
+
+Read `AGENTS.md`, `CLAUDE.md`, `docs/ai-handoff/START-HERE.md`, `STATE.md`, `ACTIVE-TASKS.md`, the latest handoff log, and relevant architecture/product documents.
+
+Inspect GitHub, current branches, PRs, tests, production releases and Railway service revisions. GitHub and actual deployed behavior take precedence over stale handoff notes.
+
+Last independently checked state:
+
+- PRs #19, #20, #21 and #22 are merged into `build/int-rc`.
+- Integration HEAD: `58812685847e99f7435020538ce450da11eb65c3`.
+- PR #23 is open and its exact-head CI checks have passed, including tests, build, types, lint, pgTAP, quality and GitGuardian.
+- Production Git branch remains `5d9837bf50e189ebee12ea84772355e34b08c2db`.
+- Full workforce acceptance and production latency improvements are not yet verified.
+- Work document integration and stricter acceptance tests are merged.
+- Graphify is present as engineering tooling, not verified Q runtime graph intelligence.
+- Tavus's adapter exists, but its full video integration remains unfinished.
+
+Verify every checkpoint again before acting.
+
+## P0 — FINISH THE RELEASE AND THE LEGION
+
+First, finish PR #23's established gated deployment procedure if it remains open.
+
+Verify the four Railway services deploy the correct commit and are healthy. Run actual authenticated production acceptance.
+
+Complete this user journey:
+
+Natural-language investment task → Q proposes a multi-agent plan → investor approves → research with real evidence → persisted investment memo → independent critique → materially improved revised memo → diligence questions → pending human approval.
+
+Prove:
+
+- Research sources and memo artifacts genuinely exist.
+- Critique is substantive, not a status flag.
+- Revised output is stored, accessible and appropriately versioned.
+- The original Q conversation retains context.
+- Work displays the resulting documents, progress and pending approvals.
+- The actual document viewer and PDF export work.
+- No founder-contact message is sent without authorization.
+- Failures, retries, progress and budget enforcement behave truthfully.
+
+Fix root causes and repeat acceptance until it passes.
+
+Do not spend the next session solely working on CI if independent productive work can continue while tests run.
+
+## P1 — MAKE Q EXCEPTIONALLY FAST
+
+Previous baseline reported approximately 13.7-second p50 and 43-second p95 answer latency. Treat these as historical measurements until verified against current production.
+
+The latest release includes concurrent lexical/semantic retrieval, prompt-cache improvements, bounded reading retries, earlier first-turn reading and reduced wasted voice speculation.
+
+**Measure whether those changes actually helped.**
+
+Instrument and optimize:
+
+- Time to first meaningful text.
+- Time to first spoken audio.
+- Time to first agent progress.
+- Full answer completion.
+- Multi-agent task completion.
+- Token usage and actual cache-hit rates.
+- Model classifications and redundant calls.
+- Database, retrieval and tool latency.
+- Voice turn-taking and interruptions.
+
+Find and eliminate avoidable waits, unnecessary sequential operations, repeated context hydration, oversized tool payloads and unnecessary model rounds.
+
+Preserve sophisticated answers and correct authorization.
+
+Simple questions should take the cheapest correct path. Complex questions should stream useful progress while deeper intelligence executes.
+
+Do not force a single model or architectural approach. Use profiling evidence to select the fastest reliable path for each task.
+
+## P1 — Q'S INTELLIGENCE AND LONG-TERM CONTEXT
+
+Continue improving the existing Q brain, not replacing it.
+
+A user should be able to return after several days and naturally ask:
+
+"Remember Tensorgate? What has changed since our last discussion?"
+
+Q should retrieve the right historical conversations and authorized company records, understand the previous assessment, recognize new evidence and explain only what materially changed.
+
+Improve:
+
+- Relevant cross-conversation recall.
+- Long-term episodic, semantic and preference memory.
+- Entity-based memory for companies, investors, relationships and meetings.
+- Context continuity across voice, chat and agent tasks.
+- Historical versus current facts.
+- Contradictions, corrections and source revocations.
+- Knowledge freshness and provenance.
+- Efficient context assembly that avoids excessive tokens.
+
+Don't simply feed larger memories into prompts. Retrieve smaller, higher-value context.
+
+Build a realistic regression suite covering memory relevance, accuracy, authorization, contradictions and cross-conversation continuity.
+
+## P2 — HERMES, GRAPHIFY AND SELF-IMPROVEMENT
+
+Study the actual open-source implementation of Hermes Agent:
+
+`https://github.com/NousResearch/hermes-agent`
+
+Compare its prompt caching, context compression, skill management, memory providers, tool execution, subagent lifecycle and session continuity with Q's existing code.
+
+Adopt valuable techniques when they demonstrably improve Q.
+
+Particularly explore reusable skills generated from completed successful workflows.
+
+Example: After completing several investor diligence exercises, Q may learn an effective research and evidence-validation procedure. The procedure can become reusable by approved specialists without granting itself new permissions or becoming an unquestioned source of truth.
+
+Next, evaluate Graphify:
+
+`https://github.com/Graphify-Labs/graphify`
+
+Investigate whether graph-backed retrieval can improve complex knowledge questions connecting companies, investors, financial metrics, evidence, meetings, claims and relationships.
+
+Build on `@capital-q/q-knowledge`, its existing retrieval service, memory, source authority and authorization systems.
+
+Graph construction and updating should normally happen asynchronously.
+
+Use graph retrieval selectively when appropriate. Benchmark it against the current retrieval system for both reasoning quality and response latency.
+
+Avoid a separate authoritative memory database or cross-tenant graph traversal.
+
+**Obsidian:** Optional Markdown vault import/export or knowledge exploration, only where useful. It must not slow Q's normal request path or become a required service.
+
+If Hermes or Graphify introduces overhead without measurable benefit, adapt only the useful ideas and move on.
+
+## P2 — ACTUAL PRODUCT EXPERIENCE
+
+Do not mistake backend capability for product completion.
+
+Exercise Capital Q as a real founder and a real investor using authorized test accounts.
+
+Q must consistently:
+
+- Understand natural requests without special commands.
+- Recognize when a question requires multiple specialist agents.
+- Choose an appropriate presentation: concise text, evidence cards, comparisons, charts, documents, interactive controls or spoken response.
+- Populate presentations with real authorized data.
+- Remember relevant context instead of repeating previous questions.
+- Make completed work discoverable and editable.
+- Provide useful feedback throughout longer operations.
+- Seamlessly transition between natural conversation and task execution.
+
+Preserve the existing Q visual direction, navigation, voice features, Q cards, Work experience and investor/founder journeys.
+
+Prioritize broken or frustrating real interactions over decorative UI changes.
+
+Review InvestIQ, discovery, mandate compatibility, evidence, relationships, document revisions and onboarding against the existing product specifications.
+
+For every change, demonstrate its actual product impact.
+
+## P3 — COMPLETE TAVUS REHEARSALS
+
+Reuse the existing Tavus adapter and Rehearsals system. Do not build a separate assistant.
+
+Q remains the intelligence and conversational brain; Tavus handles the face, audiovisual interface and appropriate real-time turn-taking.
+
+Complete the UI, live bridge, provider lifecycle, authorized persona context, four distinctive stock interviewers, fallback experience, feedback persistence and scoring.
+
+Enforce the full 180-second hard session limit server-side and through supported provider controls.
+
+Ensure realistic responsiveness, natural spoken conversation and clear AI disclosure.
+
+Investigate current Tavus API contracts rather than assuming older PAL/persona fields remain valid.
+
+Live provider access may require publishing the previously prepared Cloud Environment network-allowlist changes. Inspect available configuration and surface precise blockers. Do not expose keys or bypass account usage limits.
+
+Start with one excellent live interviewer and then complete the remaining experiences.
+
+Do not claim Tavus works until a real video rehearsal succeeds.
+
+## AUTONOMY AND DELEGATION
+
+You are empowered to operate as an autonomous engineering lead.
+
+You may investigate unlisted defects, profile unfamiliar systems, refactor existing components, change implementation strategy and reorganize priorities as findings warrant.
+
+Use independent subagents for meaningful parallel work, with strong reasoning models for difficult architectural or security work and cheaper capable models for routine tasks when available.
+
+Suggested independent lanes:
+
+- Product/legion acceptance and release.
+- Performance, model routing and voice.
+- Memory, knowledge and Graphify.
+- Rehearsal integration and user experience.
+
+Use separate worktrees and avoid overlapping edits or deployments.
+
+Do not stop to ask about routine technical choices. Respect security boundaries, human-approval gates, spending limits and provider access.
+
+Release validated milestones through the existing CI and Railway process.
+
+When waiting on CI, work on independent tasks. Do not repeatedly restart checks by pushing unnecessary commits.
+
+Carry work beyond the first easy achievement.
+
+## DEFINITION OF DONE
+
+A successful milestone must be:
+
+1. Implemented in the existing architecture.
+2. Covered by meaningful regression tests.
+3. Passed through exact-commit release gates.
+4. Actually deployed.
+5. Verified through a real authenticated product journey.
+6. Benchmarked when performance is involved.
+7. Recorded accurately in the shared handoff.
+
+Report IMPLEMENTED, CI GREEN, DEPLOYED and LIVE VERIFIED separately. Never treat them as synonyms.
+
+The product goal is a Q that **understands naturally, responds very quickly, remembers appropriately, connects evidence intelligently, delegates difficult work, produces real deliverables, and gets measurably better from validated experience**.
+
+Keep optimizing the actual user experience.
+
+Do not rebuild Capital Q, introduce duplicate orchestration, compromise authorization or optimize away useful intelligence.
+
+**Finish, verify, release, then continue improving. Start immediately.**

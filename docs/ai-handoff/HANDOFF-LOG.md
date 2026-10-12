@@ -447,3 +447,15 @@ The tracked runner creates internal Q turns for an existing authorized account o
 - Native read-only GitHub diagnostic recovered blocked logs: promotion run 38217979145 has 12,933 passing tests and one uncaught window ReferenceError from q/wire.ts:70 after q-chat-reply teardown. No ignored error or retry-to-green. Diagnostic branch c8424bd3 is isolated/not for deployment; normal jobs canceled after evidence read.
 - Own source branch codex/q-warm-lifecycle-fix binds delayed warming to its originating browser, preserving timing/schema/fast-load behavior. Two precise regressions fail before, pass after; final 15 targeted cases with native GitHub reporter pass, root/web types/lint/format pass. New exact CI/release required. Original memo/fit fixes preserved.
 - Product branch 0d6c91a7 with Work canonical READY artifacts/viewer and stronger workforce acceptance is pushed and independent. No full intelligent-workforce/Tavus live completion claim; remaining native approval visibility/conversation verification recorded. Production stays fdf04745.
+
+## 2026-10-12 09:25 UTC — native Work approvals and original conversation preserved
+
+- Warm fix PR #17 exact CI 38224342952 quality/pgTAP PASS, merged 55ddf097. PR #18 run 38227999773 still tests pending; all other mandatory jobs pass. PR #16 held. Fresh production read confirms all four SUCCESS at fdf04745, including latest q-api deployment d51a934a. No deployment/migration claim.
+- Pending product checkpoint exposes native approval previews through fresh canonical reads, completed-job Needs you and existing approval action. Diligence runs bind to the original owned conversation, with explicit failure for absent context. No new service, authorization bypass or automatic founder contact.
+- Final 22 targeted deliverable/diligence/UI tests pass; corrected typed-mock four-case rerun passes. Root types passed; app types and final lint pending following null-context correction. Strong acceptance and live browser rerun remain required. See top STATE/ACTIVE for reproductions and preserved branches.
+
+## 2026-10-12 09:28 UTC — latest combined release promoted; prior handoff reconciled
+
+- Fresh GitHub confirms PRs #19–#22 merged, integrated 58812685. PR #23 exact CI 38242394741 and GitGuardian PASS; normal merge promotes deployment branch to 221ff996. Four-service rollout pending; previous all-four-success rollback 5d9837bf. PR18 also passed exact CI and merged a3a4eb6b. No migration or unverified WIP release.
+- Native Work approvals/context continuation changes now pass root/q-api/web types and final lint/format. Diligence tests parse captured unknown inputs rather than unsafe nested matcher assignments; missing original conversation explicitly fails. Code checkpoint still separate from already merged Work documents.
+- Attempted refreshed-fictional-session browser baseline failed before launch: documented /opt/pw-browsers/chromium does not exist. No product failure, timing or browser acceptance claim. Locate pinned browser and rerun after actual rollout. Latest user continuation directive stored verbatim; it explicitly authorizes independent parallel agent lanes.

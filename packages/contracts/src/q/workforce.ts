@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { QWorkStateSchema } from "./agent-capability.js";
 import { QArtifactSummarySchema } from "./artifact.js";
+import { QApprovalViewSchema } from "./approval.js";
 
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
@@ -274,6 +275,9 @@ export const WorkforceJobDetailDtoSchema = z
     documents: z.array(QArtifactSummarySchema).max(12).optional(),
     /** A referenced result is not currently authorized, readable or READY. */
     documentsUnavailable: z.boolean().optional(),
+    /** Native approval records prepared by this job; never a second approval path. */
+    approvals: z.array(QApprovalViewSchema).max(12).optional(),
+    approvalsUnavailable: z.boolean().optional(),
   })
   .strict();
 export type WorkforceJobDetailDto = z.infer<typeof WorkforceJobDetailDtoSchema>;

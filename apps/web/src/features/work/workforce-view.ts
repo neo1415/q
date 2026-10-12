@@ -421,6 +421,12 @@ export type JobStatusView = {
 export function needsYou(detail: WorkforceJobDetailDto): boolean {
   return (
     detail.job.status === "HELD" ||
+    (detail.approvals ?? []).some(
+      (view) =>
+        view.status === "PENDING" &&
+        view.canDecide &&
+        view.action.actionStatus === "AWAITING_APPROVAL",
+    ) ||
     detail.drafts.some(
       (draft) =>
         draft.outcome?.outcome === "HELD" ||

@@ -4173,6 +4173,15 @@ const workforceDocuments = createWorkforceDocuments({
   logger,
 });
 const workforceDiligence = createWorkforceDiligence({
+  conversationForRun: async (actor, runId) => {
+    const { run } = await qRuntime.getRun({
+      actor,
+      runId: QRunIdSchema.parse(runId),
+    });
+    if (run.conversationId === null)
+      throw new Error("Original workforce conversation unavailable");
+    return run.conversationId;
+  },
   freshActor: (actor) =>
     createOwnerActor({
       resolver: actorContextResolver,
@@ -6129,7 +6138,7 @@ const { app, logger: appLogger } = createApp(
         store: workforceStore,
         // Recovery D6: each job's durable work state, why it stopped, trace.
         work: agentWorkQueue,
-        documents: async (owner, organisationId, artifactIds) => {
+        deliverables: async (owner, organisationId, references) => {
           const actor = await createOwnerActor({
             resolver: actorContextResolver,
             authUserOf: async (userId) =>
@@ -6138,13 +6147,32 @@ const { app, logger: appLogger } = createApp(
                   select auth_user_id from identity.user_profiles where id = ${userId}`
               )[0]?.auth_user_id ?? null,
           })(owner.userId, organisationId);
-          if (actor === null || actor.tenantId !== owner.tenantId) return [];
-          const documents = await Promise.all(
-            artifactIds.map((artifactId) =>
-              qArtifacts.service.read(actor, artifactId).catch(() => null),
+          if (actor === null || actor.tenantId !== owner.tenantId)
+            return { documents: [], approvals: [] };
+          const [documents, approvals] = await Promise.all([
+            Promise.all(
+              references.artifactIds.map((artifactId) =>
+                qArtifacts.service.read(actor, artifactId).catch(() => null),
+              ),
             ),
-          );
-          return documents.filter((document) => document !== null);
+            Promise.all(
+              references.actionIds.map((actionId) =>
+                (async () => {
+                  const approval = await qActions.findApprovalForAction(
+                    actor.tenantId,
+                    QActionProposalIdSchema.parse(actionId),
+                  );
+                  return approval === null
+                    ? null
+                    : qActions.getApproval({ actor, approvalId: approval.id });
+                })().catch(() => null),
+              ),
+            ),
+          ]);
+          return {
+            documents: documents.filter((document) => document !== null),
+            approvals: approvals.filter((approval) => approval !== null),
+          };
         },
         costs: (owner, jobIds) =>
           createPostgresUsageReader(database.sql).workforceCosts(owner, jobIds),

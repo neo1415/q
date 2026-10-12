@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
-import { QArtifactDetailSchema } from "@capital-q/contracts";
+import {
+  QArtifactDetailSchema,
+  QApprovalViewSchema,
+  Q_CONTRACT_VERSION,
+  type QApprovalView,
+} from "@capital-q/contracts";
 import { createWorkforcePage } from "../src/composition/workforce/page.js";
 import { createInMemoryWorkforceStore } from "../src/composition/workforce/store.js";
 import type { WorkRow } from "../src/composition/workforce/queue.js";
@@ -63,44 +68,111 @@ async function setup() {
     finished_at: at,
   };
   const forOwner = vi.fn(() => Promise.resolve([row]));
-  const documents = vi.fn(() => Promise.resolve([document]));
-  return { store, job, row, forOwner, documents };
+  const approvals: QApprovalView[] = [];
+  const deliverables = vi.fn(() =>
+    Promise.resolve({ documents: [document], approvals }),
+  );
+  return { store, job, row, forOwner, deliverables };
 }
 
 describe("workforce document deliverables", () => {
+  it("returns only the job's native pending action under the same fresh owner read", async () => {
+    const fixture = await setup();
+    const actionId = randomUUID();
+    const pending = QApprovalViewSchema.parse({
+      contractVersion: Q_CONTRACT_VERSION,
+      approvalId: randomUUID(),
+      runId: randomUUID(),
+      status: "PENDING",
+      requestedAt: at.toISOString(),
+      expiresAt: new Date(at.getTime() + 60_000).toISOString(),
+      canDecide: true,
+      action: {
+        actionId,
+        actionType: "app.diligence.questions.send",
+        actionVersion: 1,
+        actionClass: "CONFIRM_REQUIRED",
+        actionStatus: "AWAITING_APPROVAL",
+        targets: [{ kind: "COMPANY", companyId: randomUUID() }],
+        summary: "Send founder questions",
+        preview: "What evidence supports the retention claim?",
+      },
+    });
+    fixture.forOwner.mockResolvedValue([
+      {
+        ...fixture.row,
+        results: {
+          ...fixture.row.results,
+          diligence: { status: "DONE", outputs: { qActionId: actionId } },
+        },
+      },
+    ]);
+    fixture.deliverables.mockResolvedValue({
+      documents: [document],
+      approvals: [pending],
+    });
+    const page = createWorkforcePage({
+      store: fixture.store,
+      work: { forOwner: fixture.forOwner },
+      deliverables: fixture.deliverables,
+    });
+    expect((await page.detail(owner, fixture.job.id))?.approvals).toEqual([
+      pending,
+    ]);
+    expect(fixture.deliverables).toHaveBeenCalledExactlyOnceWith(
+      owner,
+      organisationId,
+      { artifactIds: [artifactId], actionIds: [actionId] },
+    );
+    fixture.deliverables.mockResolvedValue({
+      documents: [document],
+      approvals: [
+        QApprovalViewSchema.parse({
+          ...pending,
+          action: { ...pending.action, actionId: randomUUID() },
+        }),
+      ],
+    });
+    const hidden = await page.detail(owner, fixture.job.id);
+    expect(hidden?.approvals).toEqual([]);
+    expect(hidden?.approvalsUnavailable).toBe(true);
+  });
   it("resolves one canonical current document for preparation and critique outputs", async () => {
     const fixture = await setup();
     const page = createWorkforcePage({
       store: fixture.store,
       work: { forOwner: fixture.forOwner },
-      documents: fixture.documents,
+      deliverables: fixture.deliverables,
     });
     const detail = await page.detail(owner, fixture.job.id);
     expect(detail?.documents).toEqual([document.artifact]);
     expect(detail?.documentsUnavailable).toBe(false);
-    expect(fixture.documents).toHaveBeenCalledExactlyOnceWith(
+    expect(fixture.deliverables).toHaveBeenCalledExactlyOnceWith(
       owner,
       organisationId,
-      [artifactId],
+      { artifactIds: [artifactId], actionIds: [] },
     );
   });
 
   it("never shows PREPARING or a READY pointer without a real matching version", async () => {
     const fixture = await setup();
-    const documents = vi.fn(() =>
-      Promise.resolve([
-        { ...document, current: undefined },
-        {
-          ...document,
-          artifact: { ...document.artifact, status: "PREPARING" as const },
-        },
-        { ...document, current: { ...current, version: 1 } },
-      ]),
+    const deliverables = vi.fn(() =>
+      Promise.resolve({
+        documents: [
+          { ...document, current: undefined },
+          {
+            ...document,
+            artifact: { ...document.artifact, status: "PREPARING" as const },
+          },
+          { ...document, current: { ...current, version: 1 } },
+        ],
+        approvals: [],
+      }),
     );
     const page = createWorkforcePage({
       store: fixture.store,
       work: { forOwner: fixture.forOwner },
-      documents,
+      deliverables,
     });
     const detail = await page.detail(owner, fixture.job.id);
     expect(detail?.documents).toEqual([]);
@@ -112,7 +184,7 @@ describe("workforce document deliverables", () => {
     const page = createWorkforcePage({
       store: fixture.store,
       work: { forOwner: fixture.forOwner },
-      documents: fixture.documents,
+      deliverables: fixture.deliverables,
     });
     expect(
       await page.detail({ ...owner, userId: randomUUID() }, fixture.job.id),
@@ -120,13 +192,16 @@ describe("workforce document deliverables", () => {
     expect(
       await page.detail({ ...owner, tenantId: randomUUID() }, fixture.job.id),
     ).toBeNull();
-    expect(fixture.documents).not.toHaveBeenCalled();
-    fixture.documents.mockResolvedValue([
-      QArtifactDetailSchema.parse({
-        ...document,
-        artifact: { ...document.artifact, artifactId: randomUUID() },
-      }),
-    ]);
+    expect(fixture.deliverables).not.toHaveBeenCalled();
+    fixture.deliverables.mockResolvedValue({
+      documents: [
+        QArtifactDetailSchema.parse({
+          ...document,
+          artifact: { ...document.artifact, artifactId: randomUUID() },
+        }),
+      ],
+      approvals: [],
+    });
     const detail = await page.detail(owner, fixture.job.id);
     expect(detail?.documents).toEqual([]);
     expect(detail?.documentsUnavailable).toBe(true);
@@ -134,11 +209,11 @@ describe("workforce document deliverables", () => {
 
   it("keeps an unreadable document visibly unavailable without exposing its contents", async () => {
     const fixture = await setup();
-    fixture.documents.mockRejectedValue(new Error("Access was revoked"));
+    fixture.deliverables.mockRejectedValue(new Error("Access was revoked"));
     const page = createWorkforcePage({
       store: fixture.store,
       work: { forOwner: fixture.forOwner },
-      documents: fixture.documents,
+      deliverables: fixture.deliverables,
     });
     const detail = await page.detail(owner, fixture.job.id);
     expect(detail?.documents).toEqual([]);

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 import {
+  QConversationIdSchema,
   PermittedContextPlanSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   QRunIdSchema,
@@ -99,7 +101,7 @@ function world(
   const propose = vi.fn((_input: unknown) =>
     Promise.resolve({ action: { id: "action-1" } } as never),
   );
-  const createRun = vi.fn(() =>
+  const createRun = vi.fn((_input: unknown) =>
     Promise.resolve({
       created: true,
       run: {
@@ -111,6 +113,8 @@ function world(
     } as never),
   );
   const ok = () => Promise.resolve();
+  const conversationId = QConversationIdSchema.parse(randomUUID());
+  const conversationForRun = vi.fn(() => Promise.resolve(conversationId));
   const diligence = createWorkforceDiligence({
     freshActor: () => Promise.resolve(actor),
     firewall: {
@@ -131,6 +135,7 @@ function world(
           : { relationshipId, state: options.state ?? "CONNECTED" },
       ),
     runtime: { createRun },
+    conversationForRun,
     orchestration: {
       begin: ok,
       advanceThrough: ok,
@@ -151,7 +156,15 @@ function world(
     source: { artifactId: randomUUID(), companyId },
     critique: ["Risks: default rate is not addressed."],
   };
-  return { diligence, input, propose, questions, createRun };
+  return {
+    diligence,
+    input,
+    propose,
+    questions,
+    createRun,
+    conversationId,
+    conversationForRun,
+  };
 }
 
 describe("the diligence specialist", () => {
@@ -159,6 +172,15 @@ describe("the diligence specialist", () => {
     const w = world();
     const result = await w.diligence(w.input);
     expect(result).toMatchObject({ status: "CARDED", qActionId: "action-1" });
+    expect(w.conversationForRun).toHaveBeenCalledExactlyOnceWith(
+      w.input.actor,
+      w.input.qRunId,
+    );
+    expect(w.createRun).toHaveBeenCalledTimes(1);
+    const createdInput = z
+      .object({ input: z.object({ conversationId: QConversationIdSchema }) })
+      .parse(w.createRun.mock.calls[0]?.[0]);
+    expect(createdInput.input.conversationId).toBe(w.conversationId);
     const card = w.propose.mock.calls[0]?.[0] as {
       actionType: string;
       payload: {
@@ -174,6 +196,18 @@ describe("the diligence specialist", () => {
     const drafted = w.questions.mock.calls[0]?.[2];
     expect(drafted?.gaps).toContain("Default rate on loans");
     expect(drafted?.critique).toContain("default rate is not addressed");
+  });
+
+  it("does not create an unrelated conversation when the original owned run is unavailable", async () => {
+    const w = world();
+    w.conversationForRun.mockRejectedValue(
+      new Error("Original run inaccessible"),
+    );
+    await expect(w.diligence(w.input)).rejects.toThrow(
+      "Original run inaccessible",
+    );
+    expect(w.createRun).not.toHaveBeenCalled();
+    expect(w.propose).not.toHaveBeenCalled();
   });
 
   it("keeps the questions with the job when they are not connected, filing nothing", async () => {
