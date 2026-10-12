@@ -50,6 +50,7 @@ import {
   type QPageManifest,
   type QResponseMessage,
   type QResultBlock,
+  type QUiIntent,
   type QVisibleStage,
 } from "@capital-q/contracts";
 import {
@@ -2538,6 +2539,18 @@ export function createSpecialistQAnswer(
         .open(request, { page, id: target.id, name: target.name })
         .catch(() => null);
       if (intent === null) continue;
+      // Live 2026-10-11 (investor rehearsal): on Ledgerfold's own page,
+      // "What does this company actually do and why does it fit my
+      // mandate?" was read as "open it", and Q answered by re-opening the
+      // page they were on, with no evidence. Opening the page already on
+      // screen never answers a question: the answer path does.
+      if (alreadyOnScreen(request, intent) && asksAQuestion(askedIn(history))) {
+        logger?.info(
+          { qRunId: request.runId, page },
+          "the record the turn pointed at is already on screen; answered instead",
+        );
+        return null;
+      }
       logger?.info(
         { qRunId: request.runId, page, byName: target.id === undefined },
         "q opened the record the turn pointed at",
@@ -4525,5 +4538,30 @@ function lastAnswerShowedCards(
       block.kind === "COMPANY_REFERENCE" ||
       block.kind === "INVESTOR_REFERENCE" ||
       block.kind === "COMPARISON_CARDS",
+  );
+}
+
+/** The record page this intent opens is the one the person is looking at. */
+function alreadyOnScreen(
+  request: QAnswerRequest,
+  intent: Extract<QUiIntent, { kind: "OPEN_RECORD_PAGE" }>,
+): boolean {
+  const screen = request.plan.screen;
+  if (screen === undefined || intent.tab !== undefined) return false;
+  return (
+    intent.page === "COMPANY" &&
+    (screen.route === "COMPANY" || screen.route === "PITCH") &&
+    screen.companyId === intent.id
+  );
+}
+
+/** A question, not a command to go somewhere. */
+function asksAQuestion(text: string): boolean {
+  const said = text.trim().toLowerCase();
+  return (
+    said.includes("?") ||
+    /^(what|why|how|who|which|when|where|does|do|is|are|can|could|should|would|tell me|explain|describe|walk me|give me|summari[sz]e)\b/u.test(
+      said,
+    )
   );
 }
