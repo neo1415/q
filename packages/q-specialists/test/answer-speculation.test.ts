@@ -7,7 +7,7 @@ import {
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
 import { speculationGate, type QTurnReader } from "@capital-q/model-gateway/q";
-import type { TurnReaderV8Result } from "@capital-q/q-core";
+import type { TurnReaderV8Result, TurnSkimResult } from "@capital-q/q-core";
 import type {
   QAnswerOutcome,
   QAnswerRequest,
@@ -132,6 +132,8 @@ function seam(options: {
   readonly readerMs?: number;
   /** How long the answer takes to its first sentence. */
   readonly firstSentenceMs?: number;
+  /** The early skim, when one is composed. */
+  readonly skim?: TurnSkimResult | null;
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -204,6 +206,13 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(options.skim === undefined
+      ? {}
+      : {
+          turnSkim: {
+            skim: () => Promise.resolve(options.skim ?? null),
+          },
+        }),
     ...(options.speculate === false
       ? {}
       : {
@@ -313,6 +322,59 @@ describe("a spoken question answered speculatively (latency2)", () => {
     await run.answer.answer(asked);
     expect(run.calls[0]?.plan).toBe(asked.plan);
     expect(run.calls[0]?.actor).toBe(asked.actor);
+  });
+});
+
+describe("speculation gated on the early skim (latency: 118 cancelled in 7 days)", () => {
+  const skimOf = (
+    kind: TurnSkimResult["kind"],
+    confidence: TurnSkimResult["confidence"],
+  ): TurnSkimResult => ({
+    kind,
+    confidence,
+    count: null,
+    discover: null,
+    person: null,
+  });
+
+  it("makes no speculative call when the skim disagrees with the default reading", async () => {
+    const run = seam({
+      said: "What did Paystack raise last?",
+      reading: QUESTION,
+      readerMs: 50,
+      // Not confident enough for the fast lane, but not a plain question.
+      skim: skimOf("DISCOVER_COMPANIES", "LOW"),
+    });
+    await run.answer.answer(request());
+    expect(run.calls).toHaveLength(1);
+    expect(run.calls[0]?.speculation).toBeUndefined();
+    expect(run.events).toEqual([]);
+    expect(run.heard.map((h) => h.text)).toEqual(["Answer 1."]);
+  });
+
+  it("speculates, and adopts, when the skim agrees", async () => {
+    const run = seam({
+      said: "What can you do for me?",
+      reading: QUESTION,
+      readerMs: 50,
+      skim: skimOf("OTHER", "HIGH"),
+    });
+    await run.answer.answer(request());
+    expect(run.calls).toHaveLength(1);
+    expect(run.calls[0]?.speculation).toBeDefined();
+    expect(run.events).toMatchObject([{ outcome: "ADOPTED", reason: null }]);
+  });
+
+  it("makes no speculative call when the skim could not be read", async () => {
+    const run = seam({
+      said: "What can you do for me?",
+      reading: QUESTION,
+      readerMs: 50,
+      skim: null,
+    });
+    await run.answer.answer(request());
+    expect(run.calls.every((c) => c.speculation === undefined)).toBe(true);
+    expect(run.events).toEqual([]);
   });
 });
 

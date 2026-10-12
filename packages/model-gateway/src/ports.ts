@@ -40,6 +40,13 @@ export type ModelProviderRequest = {
   readonly maxOutputTokens: number;
   readonly temperature: number | undefined;
   readonly reasoning: ModelReasoningLevel;
+  /**
+   * An opaque routing hint for the vendor's prompt cache, set by the gateway
+   * only for a model the catalogue marks as caching prompts. It is a hash —
+   * never a raw tenant, user or content value — and an adapter whose vendor
+   * has no such hint ignores it.
+   */
+  readonly cacheKey?: string | undefined;
 };
 
 export type ModelExecutionContext = {

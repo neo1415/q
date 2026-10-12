@@ -407,6 +407,12 @@ export function createOpenAIModelProvider(
         reasoning: { effort: OPENAI_REASONING_EFFORT[request.reasoning] },
         // Nothing is kept on the vendor's side between calls.
         store: false,
+        // The gateway's hashed cache key, set only for a model the catalogue
+        // marks as caching prompts: it routes this caller's calls to the
+        // shard that already holds their shared prefix. Not stored data.
+        ...(request.cacheKey === undefined
+          ? {}
+          : { prompt_cache_key: request.cacheKey }),
         ...(request.output.kind === "STRUCTURED"
           ? {
               text: {
