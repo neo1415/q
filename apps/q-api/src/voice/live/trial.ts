@@ -158,10 +158,12 @@ export function createSpeechMeter(): SpeechMeter {
     return Math.min(at, last + SPEECH_OPEN_STALE_MS);
   };
 
-  const close = (side: SpeechSide, at: number) => {
+  const close = (side: SpeechSide, at: number, authoritativeStop = false) => {
     const started = open[side];
     if (started === null) return;
-    add(started, openEnd(side, at));
+    // A real provider stop confirms the whole stretch even when
+    // transcription was delayed; the stale cap applies only to missing stops.
+    add(started, authoritativeStop ? at : openEnd(side, at));
     open[side] = null;
   };
 
@@ -179,7 +181,7 @@ export function createSpeechMeter(): SpeechMeter {
         if (open[side] !== null) close(side, at);
         open[side] = at;
       } else if (signal.kind === "stop") {
-        close(side, at);
+        close(side, at, true);
       } else {
         const previous = lastPulse[side];
         const from =

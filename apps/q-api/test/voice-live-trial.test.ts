@@ -390,6 +390,44 @@ describe("measuring active speech", () => {
 });
 
 describe("the trial line (broker)", () => {
+  it("audit: an immediate reconnect cannot reuse unflushed speech", async () => {
+    const store = memoryStore();
+    const line = instance(store);
+    await openLine(line);
+    speak(line, "user", 299);
+    const reconnect = await openLine(line);
+    expect(
+      reconnect.outcome.kind === "OPEN" &&
+        reconnect.outcome.result.trial?.remainingSeconds,
+    ).toBe(1);
+    line.broker.end({
+      actor: TRIAL,
+      voiceSessionId: reconnect.voiceSessionId,
+      reason: "audit_end",
+    });
+    await settle();
+  });
+
+  it("audit: a failed durable usage write closes the paid line", async () => {
+    vi.useFakeTimers();
+    const store = memoryStore();
+    const line = instance(store);
+    const a = await openLine(line);
+    speak(line, "user", 3);
+    const failedStore = vi
+      .spyOn(store, "record")
+      .mockRejectedValue(new Error("db write unavailable"));
+    line.tick(TRIAL_TICK_MS * TRIAL_PERSIST_TICKS);
+    await vi.advanceTimersByTimeAsync(TRIAL_TICK_MS * TRIAL_PERSIST_TICKS);
+    expect(line.closed).toEqual([line.created[0]]);
+    failedStore.mockRestore();
+    line.broker.end({
+      actor: TRIAL,
+      voiceSessionId: a.voiceSessionId,
+      reason: "audit_end",
+    });
+  });
+
   it("opens with the remaining allowance and charges speech, not silence", async () => {
     const store = memoryStore();
     const line = instance(store);

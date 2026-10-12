@@ -108,7 +108,11 @@ export function useVoiceSession(
       // A known answer costs no wait; one still on its way is waited for
       // at most LIVE_AVAILABLE_TIMEOUT_MS, then the existing line opens
       // (2026-10-09: a late answer used to read as "no" for the whole tab).
-      const available = allowLive ? await liveAvailabilityFor() : false;
+      const liveOnly = input.credential.liveOnly === true;
+      // A server-issued LIVE-only binding already selects the metered path;
+      // no second availability request can change that authority.
+      const available =
+        liveOnly || (allowLive ? await liveAvailabilityFor() : false);
       // Ended, or started again, while it waited: nothing opens.
       if (!current()) return;
       const offered = available === true;
@@ -125,6 +129,19 @@ export function useVoiceSession(
         setActive("live");
         const outcome = await liveLine.start(input);
         if (outcome === "LIVE" || !current()) return;
+        if (liveOnly) {
+          say(
+            outcome === "TRIAL_SPENT"
+              ? LIVE_TRIAL_SPENT_NOTICE
+              : "Live voice isn't available right now.",
+          );
+          eventsRef.current.onError?.(
+            outcome === "TRIAL_SPENT"
+              ? LIVE_TRIAL_SPENT_NOTICE
+              : "Live voice isn't available right now.",
+          );
+          return;
+        }
         // A spent trial is like a provider out of quota: the duplex line
         // is OpenAI too, so the standard voice comes up at once.
         quota = outcome === "QUOTA" || outcome === "TRIAL_SPENT";

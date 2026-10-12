@@ -671,8 +671,10 @@ export function registerQVoiceRoutes(
       }
       const deepgram = dependencies.deepgram;
       const elevenLabs = dependencies.provider;
+      const liveOnly =
+        dependencies.live?.broker.isTrialUser(actor.userId) === true;
       const transport = deepgram ?? elevenLabs;
-      if (transport === undefined) {
+      if (transport === undefined && !liveOnly) {
         return reply.code(404).send({
           type: "about:blank",
           title: "Not Found",
@@ -680,9 +682,10 @@ export function registerQVoiceRoutes(
           detail: "Voice isn't available right now.",
         });
       }
-      const voice = transport.voices.includes(input.voice)
-        ? input.voice
-        : "FEMALE";
+      const voice =
+        (transport?.voices.includes(input.voice) ?? liveOnly)
+          ? input.voice
+          : "FEMALE";
 
       // Q opens the interview in its own words: a greeting and the live
       // question, from the session's state. Composed here so the browser
@@ -905,7 +908,16 @@ export function registerQVoiceRoutes(
         readonly sessionToken: string;
         readonly settings?: DeepgramAgentSettings | undefined;
       };
-      if (deepgram !== undefined) {
+      if (liveOnly) {
+        dependencies.bindings.releaseFor(actor.userId);
+        // The real local session identifies its binding; no provider call or
+        // provider token exists for this LIVE-only bootstrap.
+        credentials = {
+          token: "",
+          providerConversationId: voiceSessionId,
+          sessionToken: sealFor(voiceSessionId, false),
+        };
+      } else if (deepgram !== undefined) {
         // One voice session per person on this transport: a new one
         // replaces whatever was left open.
         dependencies.bindings.releaseFor(actor.userId);
@@ -969,6 +981,7 @@ export function registerQVoiceRoutes(
       // Any failure here is silent: the person gets the standard line.
       let duplex: QVoiceDuplexCredential | undefined;
       if (
+        !liveOnly &&
         dependencies.duplex?.enabled === true &&
         input.duplex !== false &&
         input.rehearsal === undefined
@@ -1014,8 +1027,11 @@ export function registerQVoiceRoutes(
         .send(
           CreateQVoiceSessionResponseSchema.parse({
             voiceSessionId,
-            providerConversationId: credentials.providerConversationId,
+            providerConversationId: liveOnly
+              ? ""
+              : credentials.providerConversationId,
             token: credentials.token,
+            ...(liveOnly ? { liveOnly: true } : {}),
             voice,
             expiresAt: new Date(
               issuedAt + VOICE_CONNECT_WINDOW_MS,
@@ -1110,6 +1126,8 @@ export function registerQVoiceRoutes(
     registerDuplexVoiceRoutes(app, {
       broker: dependencies.duplex,
       withContext,
+      restricted: (actor) =>
+        dependencies.live?.broker.isTrialUser(actor.userId) === true,
       replaced: (voiceSessionId, userId) =>
         dependencies.bindings.replaced?.(voiceSessionId, userId) === true,
       // A11 (C-16): a line this instance does not hold is adopted from the

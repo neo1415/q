@@ -18,6 +18,7 @@ import {
 } from "@capital-q/security";
 
 import { createVoiceSessionBindings } from "../src/voice/bindings.js";
+import { registerDuplexVoiceRoutes } from "../src/voice/duplex/routes.js";
 import type { DuplexBroker } from "../src/voice/duplex/broker.js";
 import { createDeepgramVoiceProvider } from "../src/voice/providers/deepgram.js";
 import { registerQVoiceRoutes } from "../src/voice/routes.js";
@@ -114,6 +115,40 @@ const open = (server: FastifyInstance, payload: object = {}) =>
   });
 
 describe("the voice session route with duplex", () => {
+  it("refuses an old unmetered duplex session for a trial without minting or adopting", async () => {
+    const broker = fakeBroker(() =>
+      Promise.resolve({ kind: "DUPLEX", credential: CREDENTIAL }),
+    );
+    const rejoin = vi
+      .spyOn(broker, "rejoin")
+      .mockResolvedValue({ credential: CREDENTIAL });
+    const adopt = vi.spyOn(broker, "adopt");
+    const end = vi.spyOn(broker, "end");
+    const server = Fastify();
+    registerDuplexVoiceRoutes(server, {
+      broker,
+      withContext: (request, _reply, done) => {
+        request.actorContext = ACTOR;
+        done();
+      },
+      restricted: (actor) => actor.userId === ACTOR.userId,
+    });
+    const response = await server.inject({
+      method: "POST",
+      url: qVoiceDuplexRejoinPath("5f000000-0000-4000-8000-000000000001"),
+      payload: { cause: "NETWORK" },
+    });
+    expect(response.statusCode).toBe(404);
+    expect(rejoin).not.toHaveBeenCalled();
+    expect(adopt).not.toHaveBeenCalled();
+    expect(end).toHaveBeenCalledWith({
+      actor: ACTOR,
+      voiceSessionId: "5f000000-0000-4000-8000-000000000001",
+      reason: "trial_requires_metered_live",
+    });
+    await server.close();
+  });
+
   it("adds the duplex line to a complete standard credential", async () => {
     const broker = fakeBroker(() =>
       Promise.resolve({ kind: "DUPLEX", credential: CREDENTIAL }),
