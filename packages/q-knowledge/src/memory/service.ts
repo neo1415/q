@@ -14,11 +14,12 @@ import {
   type MemoryConversationDigest,
   type MemoryItem,
   type MemoryOwner,
+  type MemoryRehearsalDigest,
   type MemoryWriteMode,
   type MemoryWriteResult,
 } from "./contracts.js";
 import type { MemoryRepository } from "./postgres-memory-repository.js";
-import { recallTermsFrom } from "./recall-terms.js";
+import { asksAboutRehearsal, recallTermsFrom } from "./recall-terms.js";
 
 /**
  * The memory service (doc 14 §130; ADR 0012): retrieve, remember, forget.
@@ -68,12 +69,26 @@ export type MemoryConversationDigestPort = {
   ) => Promise<readonly MemoryConversationDigest[]>;
 };
 
+/**
+ * The person's own finished, reviewed rehearsals (owner and tenant from
+ * the actor, never from the caller), newest first. Founder-private
+ * practice: read only for that person's own recall.
+ */
+export type MemoryRehearsalPort = {
+  readonly recentForOwner: (
+    actor: ActorContext,
+    limit: number,
+  ) => Promise<readonly MemoryRehearsalDigest[]>;
+};
+
 export type MemoryServiceDependencies = {
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
   readonly repository: MemoryRepository;
   /** Conversation working memory, read from the runtime's own store. */
   readonly conversations?: MemoryConversationDigestPort | undefined;
+  /** Optional: without it recall has no rehearsal section. */
+  readonly rehearsals?: MemoryRehearsalPort | undefined;
   readonly logger?: Logger | undefined;
   /** The clock small talk's lapse is measured on; injected for tests. */
   readonly now?: (() => number) | undefined;
@@ -182,6 +197,7 @@ export function looksLikeSecret(content: string): boolean {
 const RECALL_DEFAULT = 40;
 const OTHER_CONVERSATIONS = 6;
 const RELEVANT_CONVERSATIONS = 4;
+export const RECALLED_REHEARSALS = 3;
 
 export function createMemoryService(
   dependencies: MemoryServiceDependencies,
@@ -245,6 +261,31 @@ export function createMemoryService(
       let thisConversation: MemoryBundle["thisConversation"] = null;
       let otherConversations: MemoryBundle["otherConversations"] = [];
       let relevant: MemoryBundle["relevant"] = [];
+      // Only for the person themselves, and only when the turn is about
+      // their pitch practice. A failed read leaves it absent (unknown),
+      // never an empty list, which would say "none on record".
+      const held: { rehearsals?: MemoryBundle["rehearsals"] } = {};
+      const rehearsalPort = dependencies.rehearsals;
+      const rehearsalRead =
+        rehearsalPort !== undefined &&
+        query.actor.actorType === "HUMAN" &&
+        asksAboutRehearsal(query.utterance ?? "")
+          ? (async () => {
+              try {
+                held.rehearsals = (
+                  await rehearsalPort.recentForOwner(
+                    query.actor,
+                    RECALLED_REHEARSALS,
+                  )
+                ).slice(0, RECALLED_REHEARSALS);
+              } catch (error: unknown) {
+                logger?.warn(
+                  { err: error },
+                  "rehearsals were not read for recall",
+                );
+              }
+            })()
+          : Promise.resolve();
       const conversations = dependencies.conversations;
       if (conversations !== undefined) {
         const recentRead = (async () => {
@@ -311,6 +352,7 @@ export function createMemoryService(
           (c) => !inRelevant.has(c.conversationId),
         );
       }
+      await rehearsalRead;
       // Bookkeeping, detached: a recall never waits on it.
       void repository
         .markUsed(
@@ -327,6 +369,9 @@ export function createMemoryService(
         thisConversation,
         relevant,
         otherConversations,
+        ...(held.rehearsals === undefined
+          ? {}
+          : { rehearsals: held.rehearsals }),
       };
     },
 
