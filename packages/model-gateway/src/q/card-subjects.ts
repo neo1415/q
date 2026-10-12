@@ -288,6 +288,10 @@ export function createRunCompanies(limit = 200) {
         }
       }
     },
+    /** Inspect fresh reads while preparing the prompt; final projection still takes them. */
+    read(runId: string): RunRead {
+      return runs.get(runId) ?? new RunRead();
+    },
     take(runId: string): RunRead {
       const known = runs.get(runId) ?? new RunRead();
       runs.delete(runId);
