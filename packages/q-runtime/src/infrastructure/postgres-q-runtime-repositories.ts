@@ -465,7 +465,14 @@ export function createPostgresQRuntimeRepositories(
                     and s->>'companyId' = any(${bounded.companyIds}::text[]))
                or c.title ilike any(${bounded.patterns}::text[])
                or c.summary ilike any(${bounded.patterns}::text[]))
-           order by coalesce(c.last_message_at, c.created_at) desc, c.id desc
+           order by exists (
+                 select 1
+                   from jsonb_array_elements(
+                          case when jsonb_typeof(c.subject_refs) = 'array'
+                               then c.subject_refs else '[]'::jsonb end) s
+                  where s->>'kind' = 'COMPANY'
+                    and s->>'companyId' = any(${bounded.companyIds}::text[])) desc,
+                    coalesce(c.last_message_at, c.created_at) desc, c.id desc
            limit ${bounded.limit}`;
         return rows.map(toConversation);
       },

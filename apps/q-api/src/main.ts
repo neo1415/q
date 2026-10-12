@@ -204,6 +204,7 @@ import {
 } from "./composition/workforce/queue.js";
 import { createAgentWorkRunner } from "./composition/workforce/runner.js";
 import { createWorkforcePage } from "./composition/workforce/page.js";
+import { createWorkforceJobResults } from "./composition/workforce/results.js";
 import { createOutwardReview } from "./composition/workforce/review.js";
 import { createHeldRetry } from "./composition/workforce/held-retry.js";
 import { createBriefingCommandReader } from "./composition/briefing-command.js";
@@ -2158,7 +2159,22 @@ async function instructionPeopleOf(actor: ActorContext) {
     decisions: (who) => workFeed.decisions(who, 30),
   });
 }
+// Jobs of Q's team as their steps persisted them (the reviewer's changes,
+// the diligence questions), for list_q_work in the original conversation.
+// The artifact and run reads are composed further down; called on demand.
+const workforceJobResults = createWorkforceJobResults({
+  store: workforceStore,
+  work: agentWorkQueue,
+  artifacts: {
+    readVersion: (actor, artifactId, version) =>
+      qArtifacts.service.readVersion(actor, artifactId, version),
+  },
+  conversationOf: async (actor, runId) =>
+    (await qRuntime.getRun({ actor, runId: QRunIdSchema.parse(runId) })).run
+      .conversationId,
+});
 const workPort = createWorkPort({
+  jobResults: workforceJobResults,
   instructions: instructionStore,
   // Errands are composed further down; read only when a tool asks.
   errands: {

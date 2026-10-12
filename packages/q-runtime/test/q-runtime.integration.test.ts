@@ -272,6 +272,90 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
   // Creation, persistence, projection
   // -------------------------------------------------------------------------
 
+  it("recalls older exact-company discussions before loose recent matches without widening ownership", async () => {
+    await withWorld(async ({ tx, adminA, memberA, adminB, companyA }) => {
+      const repositories = createPostgresQRuntimeRepositories();
+      async function conversation(
+        person: Person,
+        exact: boolean,
+        date: string,
+      ) {
+        const created = await repositories.conversations.insert(tx, {
+          tenantId: person.actor.tenantId,
+          userId: person.actor.userId,
+          organisationId: person.actor.organisationId ?? null,
+          subjects: exact ? [{ kind: "COMPANY", companyId: companyA }] : [],
+        });
+        await tx.sql`update q_runtime.conversations
+          set title = 'Compare companies', summary = 'Compare earlier findings',
+              last_message_at = ${date}::timestamptz
+          where id = ${created.id} and tenant_id = ${person.actor.tenantId}`;
+        return created.id;
+      }
+      const olderExact = await conversation(
+        adminA,
+        true,
+        "2026-09-01T00:00:00Z",
+      );
+      const newerExact = await conversation(
+        adminA,
+        true,
+        "2026-09-02T00:00:00Z",
+      );
+      const loose = [];
+      for (let day = 1; day <= 4; day += 1) {
+        loose.push(
+          await conversation(
+            adminA,
+            false,
+            `2026-10-0${String(day)}T00:00:00Z`,
+          ),
+        );
+      }
+      await conversation(memberA, true, "2026-10-10T00:00:00Z");
+      await conversation(adminB, true, "2026-10-10T00:00:00Z");
+      const archived = await conversation(adminA, true, "2026-10-10T00:00:00Z");
+      await repositories.conversations.archiveForOwner(
+        tx,
+        adminA.actor.tenantId,
+        adminA.actor.userId,
+        archived,
+      );
+      const excluded = await conversation(adminA, true, "2026-10-11T00:00:00Z");
+      const found = await repositories.conversations.searchForOwner(
+        tx.sql,
+        adminA.actor.tenantId,
+        adminA.actor.userId,
+        {
+          companyIds: [companyA],
+          terms: ["Compare"],
+          except: [excluded],
+          limit: 4,
+        },
+      );
+      expect(found.map((item) => item.id)).toEqual([
+        newerExact,
+        olderExact,
+        loose[3],
+        loose[2],
+      ]);
+      const withoutCompany = await repositories.conversations.searchForOwner(
+        tx.sql,
+        adminA.actor.tenantId,
+        adminA.actor.userId,
+        {
+          companyIds: [],
+          terms: ["Compare"],
+          except: [excluded],
+          limit: 4,
+        },
+      );
+      expect(withoutCompany.map((item) => item.id)).toEqual(
+        [...loose].reverse(),
+      );
+    });
+  });
+
   it("accepts a run durably: conversation, run, opening message and first event, nothing analysed", async () => {
     await withWorld(async ({ tx, service, adminA, companyA }) => {
       const result = await service.createRun({

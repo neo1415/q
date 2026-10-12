@@ -10,6 +10,7 @@ import {
 import { namesWebAddress, RESEARCH_TOOLS, toolFocusOf } from "./tool-focus.js";
 import {
   TEAM_JOB_KINDS,
+  goAheadGoal,
   teamJobLine,
   workKindsAsked,
   type QTeamJobPort,
@@ -3740,14 +3741,17 @@ export function createSpecialistQAnswer(
             : null;
     if (dependencies.teamJob !== undefined && teamJobBy !== null) {
       const startedAt = Date.now();
+      const goAhead = goAheadGoal(history, latest.content);
       const planned = await dependencies.teamJob.propose(
         request,
-        latest.content,
+        goAhead ?? latest.content,
+        ...(goAhead === null ? [] : [{ proceed: true }]),
       );
       logger?.info(
         {
           qRunId: request.runId,
           by: teamJobBy,
+          goAhead: goAhead !== null,
           outcome: planned.status,
           planMs: Date.now() - startedAt,
         },

@@ -495,6 +495,7 @@ export {
   SET_AWAY,
   STOP_Q_WORK,
   type QWorkIntelligencePort,
+  type QWorkJobResult,
   type QWorkProposal,
 } from "./tools/q-work.js";
 // end AUTO block
