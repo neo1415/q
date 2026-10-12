@@ -288,6 +288,7 @@ import {
   CorrelationIdSchema,
   QApprovalIdSchema,
   QRunIdSchema,
+  qRehearsalVideoBridgeBasePath,
   createEventRegistry,
   type ModelDataPosture,
   type QViewingMoment,
@@ -671,6 +672,15 @@ import {
   withLearning,
 } from "./composition/memory-learner.js";
 import { createRehearsalRecallPort } from "./composition/rehearsal-recall.js";
+import {
+  createPostgresRehearsalVideoStore,
+  createRehearsalVideoService,
+  enabledInterviewersFrom,
+} from "./composition/rehearsal-video.js";
+import {
+  createTavusKeyPool,
+  tavusKeysFrom,
+} from "./composition/tavus/key-pool.js";
 import { ownRecordTerms } from "./voice/vocabulary.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
@@ -5899,6 +5909,49 @@ const voiceTurn = timedVoiceTurns(
   }),
   voiceTimings,
 );
+// ADR 0066: the rehearsal met by video. Tavus is the face and voice; every
+// line is the rehearsal service's, reached through the bridge. Keys come
+// only from server configuration (CQ_TAVUS_API_KEYS; never logged, the
+// session records the key's index). Without keys or a public origin the
+// interviewer list says video is unavailable and a start answers "carry on
+// by voice".
+const tavusKeys = tavusKeysFrom({
+  CQ_TAVUS_API_KEYS: process.env.CQ_TAVUS_API_KEYS,
+  TAVUS_API_KEY: process.env.TAVUS_API_KEY,
+});
+const rehearsalVideo = createRehearsalVideoService({
+  store: createPostgresRehearsalVideoStore(database.sql),
+  rehearsals,
+  pool:
+    tavusKeys.length === 0
+      ? null
+      : createTavusKeyPool({
+          keys: tavusKeys,
+          onKeyFailure: ({ keyIndex, kind, status }) => {
+            logger.warn(
+              { keyIndex, kind, status },
+              "rehearsal video: Tavus key passed over",
+            );
+          },
+        }),
+  publicBaseUrl: process.env.Q_API_PUBLIC_URL?.trim() || null,
+  bridgePath: qRehearsalVideoBridgeBasePath,
+  enabledInterviewers: enabledInterviewersFrom(
+    process.env.CQ_REHEARSAL_VIDEO_INTERVIEWERS,
+  ),
+  testMode: process.env.CQ_TAVUS_TEST_MODE === "true",
+  logger,
+});
+logger.info(
+  { tavusKeys: tavusKeys.length },
+  "rehearsal video: configured key count",
+);
+setInterval(() => {
+  void rehearsalVideo.sweep().catch((error: unknown) => {
+    logger.warn({ err: error }, "rehearsal video sweep failed");
+  });
+}, 30_000).unref();
+
 // REHEARSE: a rehearsal's voice line speaks only as the person Q plays.
 const rehearsalVoiceTurn = createRehearsalAwareTurn({
   rehearsals,
@@ -6264,6 +6317,7 @@ const { app, logger: appLogger } = createApp(
       },
     }),
     rehearsals,
+    rehearsalVideo,
     // BILLING block (ADR 0034)
     rehearsalEntitlements: entitlements,
     // end BILLING block
