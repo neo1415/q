@@ -406,3 +406,20 @@ The tracked runner creates internal Q turns for an existing authorized account o
   - FIT_Q_VIEW v3 reads the confirmed deck;
   - progressive disclosure across the fit panel, Q's view, the raise fold and Questions to investigate (recorded in DECISIONS.md);
   - workforce card and lead-in fixes.
+
+## 2026-10-12 05:35 UTC — Claude Code — PR #11 live; memo root cause found; PR #14
+
+- PR #11 is released: int-rc `9a2e89a3` → CI lane `f829a5d1` → deploy `fdf04745`. All four Railway services report SUCCESS.
+- Tensorgate profile verified live as Savanna Seed (`profile-capture.mjs`):
+  - the Cheque and Round rows read "Stated";
+  - FIT_Q_VIEW v3 cites the deck (four design partners, two paid contracts, $360k contracted ARR, a $4M raise);
+  - Q's open questions are: whether a lead is required, why now, and retention, sales-cycle and acquisition-cost metrics.
+- Live workforce acceptance on `fdf04745` (run `5b556924`, job `2faa77f2`):
+  - Plan card after 10.9 s; the card was approved.
+  - Research DONE in 15.1 s.
+  - The memo FAILED in 1.0 s. The new log named the cause: ZodError, a finding statement over 2,000 characters in `requestDocument`.
+- Fix (founder: "don't truncate, increase the budget"): `QArtifactFindingSchema` gives document findings an 8,000-character statement budget, and grounding gets the same. Stored claims and knowledge keep 2,000; no migration.
+- PR #14 contains that fix and the fit rows showing values with sources:
+  - "Cheque compatibility": raise, your cheque, minimum cheque, plus the open line about ticket fit;
+  - "Round terms": instrument and cap, plus "Lead investor required: not stated".
+- Next: release PR #14 → rerun the acceptance with `--approve` → verify memo v1 → critique → v2 → diligence card PENDING → capture the profile.
