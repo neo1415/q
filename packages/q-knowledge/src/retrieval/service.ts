@@ -380,19 +380,29 @@ export function createAuthorisedRetrievalService(
       const wantsLexical = requested !== "SEMANTIC_ONLY";
       const wantsSemantic = requested !== "LEXICAL_ONLY";
 
-      const lexicalOutcome = wantsLexical
-        ? await runLexical(envelope, text)
-        : { candidates: [], state: "NOT_ATTEMPTED" as const, ms: null };
-      throwIfCancelled(request.signal);
-      const semanticOutcome = wantsSemantic
-        ? await runSemantic(envelope, text, request.signal)
-        : {
-            candidates: [],
-            state: "NOT_ATTEMPTED" as const,
-            embeddingMs: null,
-            searchMs: null,
-            reason: null,
-          };
+      // Lexical and semantic are parallel components of one hybrid step
+      // (ADR-001), under the one envelope already resolved above: neither
+      // widens what the other may read, and each degrades on its own. Run
+      // concurrently, the step costs the slower half (usually the query
+      // embedding) instead of their sum (2026-10-12).
+      const [lexicalOutcome, semanticOutcome] = await Promise.all([
+        wantsLexical
+          ? runLexical(envelope, text)
+          : Promise.resolve({
+              candidates: [] as readonly LexicalCandidate[],
+              state: "NOT_ATTEMPTED" as const,
+              ms: null,
+            }),
+        wantsSemantic
+          ? runSemantic(envelope, text, request.signal)
+          : Promise.resolve({
+              candidates: [] as readonly SemanticCandidate[],
+              state: "NOT_ATTEMPTED" as const,
+              embeddingMs: null,
+              searchMs: null,
+              reason: null,
+            }),
+      ]);
       throwIfCancelled(request.signal);
 
       const degraded: RetrievalDegradation = {
