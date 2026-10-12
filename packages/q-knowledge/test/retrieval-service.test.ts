@@ -231,6 +231,70 @@ describe("authorised retrieval service", () => {
     expect(result.executedStrategy).toBe("LEXICAL_ONLY");
   });
 
+  it("runs the lexical and semantic halves concurrently under the one envelope (2026-10-12)", async () => {
+    // Lexical is held open until the semantic half has already embedded the
+    // query and searched: sequential execution would deadlock this test.
+    let releaseLexical: (() => void) | undefined;
+    const lexicalHeld = new Promise<void>((resolve) => {
+      releaseLexical = resolve;
+    });
+    const order: string[] = [];
+    const lexicalEnvelopes: unknown[] = [];
+    const semanticScopes: unknown[] = [];
+    const service = createAuthorisedRetrievalService({
+      sql,
+      lexical: {
+        search: async (_executor, query) => {
+          order.push("lexical:start");
+          lexicalEnvelopes.push(query.constraints);
+          await lexicalHeld;
+          order.push("lexical:end");
+          return [{ chunkId: chunkId(1), rank: 1 } as never];
+        },
+      },
+      semantic: {
+        search: (_executor, query) => {
+          order.push("semantic:search");
+          semanticScopes.push(query.authorisedScopes);
+          releaseLexical?.();
+          return Promise.resolve([{ chunkId: chunkId(2), rank: 1 } as never]);
+        },
+      },
+      hydration: fakeHydration([hydrated(chunkId(1)), hydrated(chunkId(2))]),
+      embeddings: {
+        embedQuery: () => {
+          order.push("semantic:embed");
+          return Promise.resolve({
+            vector: [0.1],
+            dimension: 1,
+            configurationVersion: "x-v1",
+          });
+        },
+      } as never,
+    });
+    const result = await service.retrieve({
+      query: "market size",
+      envelope: envelope(),
+    });
+    expect(order.indexOf("semantic:search")).toBeLessThan(
+      order.indexOf("lexical:end"),
+    );
+    expect(order[0]).toBe("lexical:start");
+    expect(result.executedStrategy).toBe("HYBRID");
+    expect(result.hits.map((hit) => hit.chunkId).sort()).toEqual(
+      [chunkId(1), chunkId(2)].sort(),
+    );
+    // Both halves read through the same authorised constraints.
+    expect(lexicalEnvelopes).toEqual([envelope().constraints]);
+    expect(semanticScopes).toEqual([
+      envelope().constraints.map((c) => ({
+        subjectIds: c.subjectIds,
+        visibilityScopes: c.visibilityScopes,
+        sensitivityCeiling: c.sensitivityCeiling,
+      })),
+    ]);
+  });
+
   it("degrades to semantic when the lexical half fails", async () => {
     const service = createAuthorisedRetrievalService({
       sql,

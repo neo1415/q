@@ -204,11 +204,20 @@ export type MemoryBundle = {
     readonly title: string | null;
     readonly summary: string;
   } | null;
+  /**
+   * The same person's earlier conversations about what they are asking now
+   * (a company of the run, or a name they used), whatever their recency:
+   * what was discussed, never evidence. None of them repeats in
+   * `otherConversations`.
+   */
+  readonly relevant: readonly MemoryConversationDigest[];
   /** Other recent conversations of the same person: title and summary only. */
-  readonly otherConversations: readonly {
-    readonly conversationId: string;
-    readonly title: string | null;
-    readonly summary: string;
-    readonly lastMessageAt: string;
-  }[];
+  readonly otherConversations: readonly MemoryConversationDigest[];
+};
+
+export type MemoryConversationDigest = {
+  readonly conversationId: string;
+  readonly title: string | null;
+  readonly summary: string;
+  readonly lastMessageAt: string;
 };

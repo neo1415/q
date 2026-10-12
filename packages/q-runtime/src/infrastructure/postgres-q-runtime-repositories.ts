@@ -30,7 +30,10 @@ import {
   UserIdSchema,
 } from "@capital-q/security";
 
-import type { QRuntimeRepositories } from "../application/ports.js";
+import type {
+  QConversationSearch,
+  QRuntimeRepositories,
+} from "../application/ports.js";
 import { Q_RUN_EVENTS_CHANNEL } from "../application/stream.js";
 import {
   QConversationContextTypeSchema,
@@ -66,6 +69,56 @@ const Timestamp = z
         : new Date(value).toISOString(),
     ),
   );
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const CONVERSATION_SEARCH_LIMIT = 4;
+export const CONVERSATION_SEARCH_TERMS = 8;
+
+/** `%`, `_` and the escape itself, so a term only ever matches literally. */
+export function escapeLikePattern(term: string): string {
+  return term.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
+/**
+ * The search a caller asked for, bounded here rather than trusted: the
+ * terms come from a person's words, so their number and length are capped
+ * and LIKE wildcards are escaped before they reach a pattern. Null when
+ * nothing is left to match on, so no query is made at all.
+ */
+export function boundConversationSearch(query: QConversationSearch): {
+  readonly companyIds: string[];
+  readonly patterns: string[];
+  readonly except: string[];
+  readonly limit: number;
+} | null {
+  const companyIds = [
+    ...new Set(query.companyIds.filter((id) => UUID_PATTERN.test(id))),
+  ].slice(0, CONVERSATION_SEARCH_TERMS);
+  const seen = new Set<string>();
+  const patterns: string[] = [];
+  for (const raw of query.terms) {
+    const term = raw.trim();
+    if (term.length < 3 || term.length > 60) continue;
+    const key = term.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    patterns.push(`%${escapeLikePattern(term)}%`);
+    if (patterns.length === CONVERSATION_SEARCH_TERMS) break;
+  }
+  if (companyIds.length === 0 && patterns.length === 0) return null;
+  const limit = Math.min(
+    Math.max(Math.trunc(query.limit), 1),
+    CONVERSATION_SEARCH_LIMIT,
+  );
+  return {
+    companyIds,
+    patterns,
+    except: query.except.filter((id) => UUID_PATTERN.test(id)),
+    limit: Number.isFinite(limit) ? limit : CONVERSATION_SEARCH_LIMIT,
+  };
+}
 
 /** The stored `data` of a stream event; its shape is re-validated on read. */
 const JsonObject = z.record(z.string(), z.unknown());
@@ -387,6 +440,33 @@ export function createPostgresQRuntimeRepositories(
                   or coalesce(c.last_message_at, c.created_at) < ${before}::timestamptz)
            order by coalesce(c.last_message_at, c.created_at) desc, c.id desc
            limit ${page.limit}`;
+        return rows.map(toConversation);
+      },
+      searchForOwner: async (executor, tenantId, userId, query) => {
+        const bounded = boundConversationSearch(query);
+        if (bounded === null) return [];
+        // Only summarised conversations: a match without a summary has
+        // nothing for memory to say. LIKE's default escape is the
+        // backslash, which is what `escapeLikePattern` writes.
+        const rows = await executor`
+          ${selectConversation(executor)}
+           where c.tenant_id = ${tenantId}
+             and c.user_id = ${userId}
+             and c.archived_at is null
+             and c.summary is not null
+             and c.id <> all(${bounded.except}::uuid[])
+             and (
+               exists (
+                 select 1
+                   from jsonb_array_elements(
+                          case when jsonb_typeof(c.subject_refs) = 'array'
+                               then c.subject_refs else '[]'::jsonb end) s
+                  where s->>'kind' = 'COMPANY'
+                    and s->>'companyId' = any(${bounded.companyIds}::text[]))
+               or c.title ilike any(${bounded.patterns}::text[])
+               or c.summary ilike any(${bounded.patterns}::text[]))
+           order by coalesce(c.last_message_at, c.created_at) desc, c.id desc
+           limit ${bounded.limit}`;
         return rows.map(toConversation);
       },
       setDigest: async (tx, tenantId, conversationId, digest) => {

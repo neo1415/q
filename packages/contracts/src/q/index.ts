@@ -1126,6 +1126,7 @@ export {
   Q_WORKFORCE_OVERVIEW_PATH,
   Q_WORKFORCE_JOB_START,
   WorkforceJobStartPayloadSchema,
+  WORKFORCE_PLAN_CANNOT_MAX_LENGTH,
   WorkforcePlannedStepSchema,
   WorkforceDocumentCritiqueRequestSchema,
   WorkforceDocumentRequestSchema,

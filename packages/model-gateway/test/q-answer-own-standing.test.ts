@@ -599,6 +599,29 @@ describe("Q calls them by their profile name (founder live 2026-10-01)", () => {
   });
 });
 
+describe("memory recall is given what was just asked (relevant recall)", () => {
+  it("passes the person's latest message to recall, so earlier conversations about it can be found", async () => {
+    const asked: (string | undefined)[] = [];
+    const said =
+      "Remember what we discussed about Tensorgate? Has anything changed?";
+    const { seam, request } = build(
+      { status: "SUCCEEDED", data: CONNECTED },
+      undefined,
+      {
+        memory: {
+          recall: (input) => {
+            asked.push(input.utterance);
+            return Promise.resolve("");
+          },
+        },
+      },
+      { said },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(asked).toEqual([said]);
+  });
+});
+
 describe("The Q Daily on their screen is read before the model (founder live 2026-10-01)", () => {
   it("states today's edition among the facts when they ask from /daily, and not elsewhere", async () => {
     const daily = build({ status: "SUCCEEDED", data: CONNECTED });

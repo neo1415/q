@@ -38,10 +38,38 @@ export type LiveWebRtcSession = {
 
 export class LiveProviderError extends Error {
   readonly status: number | null;
-  constructor(message: string, status: number | null) {
+  /** The provider's machine error code, e.g. "insufficient_quota"; bounded. */
+  readonly code: string | null;
+  constructor(
+    message: string,
+    status: number | null,
+    code: string | null = null,
+  ) {
     super(message);
     this.name = "LiveProviderError";
     this.status = status;
+    this.code = code;
+  }
+}
+
+const ERROR_CODE = /^[a-z0-9_.-]{1,64}$/u;
+
+/** The `error.code` (or `error.type`) of a provider error body, or null. */
+async function providerErrorCode(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.json();
+    const error: unknown =
+      typeof body === "object" && body !== null
+        ? Reflect.get(body, "error")
+        : undefined;
+    if (typeof error !== "object" || error === null) return null;
+    for (const key of ["code", "type"]) {
+      const value: unknown = Reflect.get(error, key);
+      if (typeof value === "string" && ERROR_CODE.test(value)) return value;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -161,12 +189,16 @@ export function createGptLiveProvider(options: {
           signal === undefined ? timeout : AbortSignal.any([signal, timeout]),
       });
       if (response.status !== 201 && response.status !== 200) {
-        // The body is the provider's and may echo request details: it is
-        // never surfaced; the status is enough to act on.
-        await response.body?.cancel().catch(() => undefined);
+        // The body is the provider's and may echo request details: only its
+        // machine code is kept (live 2026-10-12: every session 429'd and the
+        // log could not say whether credit or a rate limit was the cause;
+        // "insufficient_quota" and "rate_limit_exceeded" need different
+        // owner action). Nothing else from the body is read or logged.
+        const code = await providerErrorCode(response);
         throw new LiveProviderError(
-          `live session not created (${String(response.status)})`,
+          `live session not created (${String(response.status)}${code === null ? "" : ` ${code}`})`,
           response.status,
+          code,
         );
       }
       const parsed = CreatedSchema.safeParse(await response.json());

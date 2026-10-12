@@ -198,6 +198,11 @@ export type QJobPort = {
       }
     | { readonly status: "NOT_PLANNED" }
     | { readonly status: "LIMIT_REACHED" }
+    /**
+     * Planning broke on Q's side (a model provider refused, a store was
+     * unreachable): never NOT_PLANNED, which would blame their wording.
+     */
+    | { readonly status: "FAILED" }
   >;
 };
 
@@ -229,6 +234,7 @@ const ProposeQJobOutputSchema = z
       "NOT_PLANNED",
       "LIMIT_REACHED",
       "ALREADY_WAITING",
+      "FAILED",
     ]),
     plan: z
       .object({

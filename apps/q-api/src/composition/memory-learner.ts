@@ -198,6 +198,28 @@ export function createConversationDigestPort(
           lastMessageAt: c.lastMessageAt ?? c.createdAt,
         }));
     },
+    // The actor's own conversations only: tenant and owner come from the
+    // actor, never from the query, and the repository bounds the rest.
+    relevantDigests: async (actor, query) => {
+      const found = await repositories.conversations.searchForOwner(
+        sql,
+        actor.tenantId,
+        actor.userId,
+        query,
+      );
+      return found.flatMap((c) =>
+        c.summary === null
+          ? []
+          : [
+              {
+                conversationId: c.id,
+                title: c.title,
+                summary: c.summary,
+                lastMessageAt: c.lastMessageAt ?? c.createdAt,
+              },
+            ],
+      );
+    },
   };
 }
 
@@ -217,6 +239,7 @@ export function createMemoryLearner(
         actor: input.actor,
         conversationId: input.conversationId,
         companyIds,
+        utterance: input.utterance,
       });
       return renderMemoryBundle(bundle);
     },
@@ -353,7 +376,12 @@ export function createMemoryLearner(
               text: m.content.slice(0, TURN_MAX_CHARS),
             })),
             knownMemory: renderMemoryBundle(
-              { ...known, thisConversation: null, otherConversations: [] },
+              {
+                ...known,
+                thisConversation: null,
+                relevant: [],
+                otherConversations: [],
+              },
               5_000,
             ),
             previousSummary: conversation.summary ?? "",

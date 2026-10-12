@@ -1379,6 +1379,12 @@ export type QMemoryRecall = {
     /** The conversation the run belongs to, when the caller knows it. */
     readonly conversationId?: string | undefined;
     readonly subjects: readonly QSubjectRef[];
+    /**
+     * The person's latest message, so memory can find earlier
+     * conversations about what it names. The memory service reads names
+     * from it by code; no model is asked.
+     */
+    readonly utterance?: string | undefined;
     readonly signal?: AbortSignal | undefined;
   }) => Promise<string>;
 };
@@ -1866,6 +1872,7 @@ export function createModelGatewayQAnswer(
   async function recallMemory(
     request: QAnswerRequest,
     conversationId: string,
+    utterance: string,
   ): Promise<string> {
     const port = dependencies.memory;
     if (port === undefined) return NOTHING_REMEMBERED;
@@ -1876,6 +1883,7 @@ export function createModelGatewayQAnswer(
           runId: request.runId,
           conversationId,
           subjects: request.subjects,
+          utterance,
           signal: request.signal,
         })
       ).trim();
@@ -2103,7 +2111,7 @@ export function createModelGatewayQAnswer(
         tools.available === undefined
           ? Promise.resolve(null)
           : timed("available", tools.available(toolContext)),
-        timed("memory", recallMemory(request, conversationId)),
+        timed("memory", recallMemory(request, conversationId, latest.content)),
       ]);
     // The prefetch below reads only tools the run may use; the research
     // filter decided later never touches them.
