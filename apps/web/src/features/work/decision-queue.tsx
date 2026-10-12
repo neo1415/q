@@ -54,6 +54,7 @@ import { finishedSince } from "./job-state";
 import { readPlan } from "./plan-words";
 import { listDoneAction } from "./work-page-actions";
 import { outOfTen } from "./workforce-view";
+import { WorkforceDocuments } from "./workforce-documents";
 
 /**
  * Work around decisions (Zino, 2026-10-08; design
@@ -1000,7 +1001,8 @@ export function DoneForYou({
         className="flex items-baseline gap-2 cq-title-sm text-(--cq-text-primary)"
       >
         Done for you
-        {initial === null ? null : (
+        {initial === null ||
+        (initial.thisWeek === 0 && finished.length > 0) ? null : (
           <span className="cq-body font-normal cq-numeric text-(--cq-text-tertiary)">
             {initial.thisWeek} this week
           </span>
@@ -1010,7 +1012,7 @@ export function DoneForYou({
         <p className="mt-2 cq-body-sm text-(--cq-text-secondary)" role="status">
           What Q did couldn’t load. Try again in a moment.
         </p>
-      ) : groups.length === 0 ? (
+      ) : groups.length === 0 && finished.length === 0 ? (
         <p className="mt-2 cq-body-sm text-(--cq-text-secondary)">
           Nothing done yet. Messages Q sends and calls it books for you show
           here, grouped by company.
@@ -1040,6 +1042,10 @@ export function DoneForYou({
                 Job done ·{" "}
                 <span suppressHydrationWarning>{ago(one.job.updatedAt)}</span>
               </p>
+              <WorkforceDocuments
+                documents={one.documents ?? []}
+                unavailable={one.documentsUnavailable ?? false}
+              />
             </li>
           ))}
         </ul>

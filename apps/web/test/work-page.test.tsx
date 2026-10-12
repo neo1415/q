@@ -8,10 +8,12 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderToString } from "react-dom/server";
 import type { NotificationDto } from "@capital-q/contracts";
 
 import {
   QApprovalViewSchema,
+  QArtifactSummarySchema,
   QPendingApprovalSchema,
   QWorkDtoSchema,
   type QApprovalView,
@@ -386,6 +388,74 @@ describe("Work (WORK-58)", () => {
 });
 
 describe("Work's team map and cost, secondary (P7, 2026-10-08)", () => {
+  it("keeps the server-rendered team control disabled until its handler is attached", async () => {
+    const { workforceFixtures } = await import("../app/dev/workforce/fixtures");
+    const fixtures = workforceFixtures(Date.now());
+    const html = renderToString(
+      <WorkPage
+        suggestions={[]}
+        approvals={[]}
+        work={[]}
+        done={null}
+        workforce={{ overview: fixtures.overview, jobs: fixtures.jobs }}
+      />,
+    );
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    const button = container.querySelector('button[data-work-view="team"]');
+    if (!(button instanceof HTMLButtonElement))
+      throw new Error("Missing team control");
+    expect(button.disabled).toBe(true);
+  });
+  it("opens completed documents directly from Done for you without visiting the team map", async () => {
+    const { workforceFixtures } = await import("../app/dev/workforce/fixtures");
+    const now = Date.now();
+    const fixtures = workforceFixtures(now);
+    const first = fixtures.jobs[0];
+    if (first === undefined) throw new Error("Missing workforce fixture");
+    const memo = QArtifactSummarySchema.parse({
+      artifactId: "c0000000-0000-4000-8000-000000000001",
+      type: "MEMO",
+      status: "READY",
+      title: "Reviewed investment memo",
+      currentVersion: 2,
+      createdAt: new Date(now).toISOString(),
+      updatedAt: new Date(now).toISOString(),
+    });
+    render(
+      <WorkPage
+        suggestions={[]}
+        approvals={[]}
+        work={[]}
+        done={{ items: [], nextCursor: null, thisWeek: 0 }}
+        workforce={{
+          overview: fixtures.overview,
+          jobs: [
+            {
+              ...first,
+              job: {
+                ...first.job,
+                source: "JOB",
+                status: "DONE",
+                workState: "COMPLETED",
+                updatedAt: new Date(now).toISOString(),
+              },
+              documents: [memo],
+            },
+          ],
+        }}
+      />,
+    );
+    const finished = document.querySelector("[data-work-finished]");
+    if (!(finished instanceof HTMLElement))
+      throw new Error("No finished job on Work");
+    expect(
+      within(finished).getByRole("button", { name: "Open document" }),
+    ).toBeTruthy();
+    expect(within(finished).getByText("Version 2")).toBeTruthy();
+    expect(screen.queryByText(/Nothing done yet/u)).toBeNull();
+    expect(document.querySelectorAll("[data-agent]").length).toBe(0);
+  });
   it("shows Q's team as a map with every specialist, and the month's cost", async () => {
     globalThis.ResizeObserver ??= class {
       observe() {}

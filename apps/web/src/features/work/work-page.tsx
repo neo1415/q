@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   useTransition,
   type ComponentType,
   type FormEvent,
@@ -141,6 +142,8 @@ type Props = {
  * and In progress (one line per job). Q's team map and its cost stay, one
  * tap away, never in the way of a decision.
  */
+const subscribeHydration = () => () => undefined;
+
 export function WorkPage({
   suggestions,
   approvals,
@@ -152,6 +155,11 @@ export function WorkPage({
   initialView,
   liveReads = true,
 }: Props) {
+  const interactive = useSyncExternalStore(
+    subscribeHydration,
+    () => true,
+    () => false,
+  );
   const running = (work ?? []).filter((item) => item.status === "ACTIVE");
   const timeLanes = running.flatMap((item) =>
     item.lanes
@@ -229,6 +237,7 @@ export function WorkPage({
             <button
               type="button"
               data-work-view="work"
+              disabled={!interactive}
               onClick={() => setView("work")}
               className="inline-flex min-h-11 items-center px-2 cq-label text-(--cq-text-primary) hover:underline"
             >
@@ -251,6 +260,7 @@ export function WorkPage({
               key={key}
               type="button"
               data-work-view={key}
+              disabled={!interactive}
               aria-pressed={view === key}
               onClick={() => setView(view === key ? "work" : key)}
               className={cx(
