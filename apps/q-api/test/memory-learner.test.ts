@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+
+import { describe, expect, it, vi } from "vitest";
+
+import type { DatabaseExecutor } from "@capital-q/database";
 
 import type { ModelGateway } from "@capital-q/model-gateway";
-import type {
-  MemoryBundle,
-  MemoryService,
-  RememberCommand,
+import {
+  createMemoryService,
+  createPostgresMemoryRepository,
+  MemoryItemSchema,
+  type MemoryItem,
+  type MemoryOwner,
+  type MemoryRepository,
+  type MemoryBundle,
+  type MemoryService,
+  type RememberCommand,
 } from "@capital-q/q-knowledge";
 import type {
   QConversation,
@@ -35,6 +45,155 @@ const actor = ActorContextSchema.parse({
   tenantId: TENANT,
   actorType: "HUMAN",
 });
+
+describe("voice pronunciation context", () => {
+  const now = "2026-10-12T00:00:00.000Z";
+  function item(key: string, overrides: Partial<MemoryItem> = {}): MemoryItem {
+    return MemoryItemSchema.parse({
+      id: randomUUID(),
+      tenantId: TENANT,
+      ownerContextType: "user",
+      ownerContextId: USER,
+      subject: null,
+      memoryType: "pronunciation",
+      memoryKey: key,
+      content: "A name the person taught Q to hear",
+      structuredValue: {},
+      quote: "Say the name this way",
+      contentSha256: "a".repeat(64),
+      sourceConversationId: null,
+      sourceRunId: null,
+      writeMode: "USER_CONFIRMED",
+      status: "active",
+      supersededBy: null,
+      validFrom: now,
+      validTo: null,
+      lastUsedAt: null,
+      useCount: 0,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    });
+  }
+  function pronunciationWorld(rows: readonly MemoryItem[]) {
+    const listLive = vi.fn<MemoryRepository["listLive"]>(
+      (_sql, tenantId, owner: MemoryOwner, limit) =>
+        Promise.resolve(
+          rows
+            .filter(
+              (row) =>
+                row.tenantId === tenantId &&
+                row.ownerContextType === owner.ownerContextType &&
+                row.ownerContextId === owner.ownerContextId &&
+                (row.status === "active" || row.status === "confirmed") &&
+                (row.validTo === null ||
+                  Date.parse(row.validTo) > Date.parse(now)),
+            )
+            .slice(0, limit),
+        ),
+    );
+    const markUsed = vi.fn<MemoryRepository["markUsed"]>(() =>
+      Promise.resolve(),
+    );
+    const sql = vi.fn(() => Promise.resolve([])) as unknown as DatabaseExecutor;
+    const conversations = {
+      digestOf: vi.fn(() => Promise.resolve(null)),
+      recentDigests: vi.fn(() => Promise.resolve([])),
+      relevantDigests: vi.fn(() => Promise.resolve([])),
+    };
+    const memory = createMemoryService({
+      sql,
+      transactions: { run: (work) => work({ sql }) },
+      repository: { ...createPostgresMemoryRepository(), listLive, markUsed },
+      conversations,
+      now: () => Date.parse(now),
+    });
+    return {
+      ...world(null, memory),
+      memory,
+      sql,
+      listLive,
+      markUsed,
+      conversations,
+    };
+  }
+
+  it("returns the same names without reading conversations or marking unrelated memory used", async () => {
+    const rows = [
+      item("pronunciation.nem_salvage"),
+      item("pronunciation.nem-salvage"),
+      item("pronunciation.kora", {
+        subject: { subjectType: "PERSON", subjectId: USER },
+      }),
+      item("pronunciation.company_secret", {
+        subject: { subjectType: "COMPANY", subjectId: RUN },
+      }),
+      item("preference.concise", { memoryType: "preference" }),
+      item("pronunciation.forgotten", { status: "forgotten" }),
+      item("pronunciation.expired", { validTo: "2026-10-11T00:00:00.000Z" }),
+    ];
+    const expected = ["nem salvage", "kora"];
+    const baseline = pronunciationWorld(rows);
+    const recalled = await baseline.memory.recall({ actor, limit: 60 });
+    expect(
+      recalled.person
+        .filter((row) => row.memoryType === "pronunciation")
+        .map((row) => row.memoryKey),
+    ).toEqual([
+      "pronunciation.nem_salvage",
+      "pronunciation.nem-salvage",
+      "pronunciation.kora",
+    ]);
+    const test = pronunciationWorld(rows);
+    expect(await test.learner.termsFor(actor)).toEqual(expected);
+    expect(test.markUsed).not.toHaveBeenCalled();
+    expect(test.conversations.recentDigests).not.toHaveBeenCalled();
+    expect(test.listLive).toHaveBeenCalledTimes(1);
+    expect(test.listLive).toHaveBeenCalledWith(
+      test.sql,
+      actor.tenantId,
+      { ownerContextType: "user", ownerContextId: actor.userId },
+      200,
+    );
+    expect(test.conversations.digestOf).not.toHaveBeenCalled();
+    expect(test.conversations.relevantDigests).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { userId: "b0000000-0000-4000-8000-000000000002", tenantId: TENANT },
+    { userId: USER, tenantId: "c0000000-0000-4000-8000-000000000002" },
+  ])(
+    "uses only the requesting owner and tenant ($userId / $tenantId)",
+    async (identity) => {
+      const test = pronunciationWorld([item("pronunciation.private_name")]);
+      const other = ActorContextSchema.parse({
+        ...identity,
+        actorType: "HUMAN",
+      });
+      expect(await test.learner.termsFor(other)).toEqual([]);
+      expect(test.listLive).toHaveBeenCalledWith(
+        test.sql,
+        other.tenantId,
+        { ownerContextType: "user", ownerContextId: other.userId },
+        200,
+      );
+    },
+  );
+
+  it("keeps the first 60 live items and the 20 deduplicated name cap", async () => {
+    const rows = Array.from({ length: 60 }, (_, i) =>
+      item(`preference.item${String(i)}`, { memoryType: "preference" }),
+    );
+    rows.push(item("pronunciation.outside_window"));
+    expect(await pronunciationWorld(rows).learner.termsFor(actor)).toEqual([]);
+    const names = Array.from({ length: 25 }, (_, i) =>
+      item(`pronunciation.name${String(i)}`),
+    );
+    expect(await pronunciationWorld(names).learner.termsFor(actor)).toEqual(
+      names.slice(0, 20).map((row) => row.memoryKey.split(".").at(-1)),
+    );
+  });
+});
 const logger = {
   info: () => undefined,
   warn: () => undefined,
@@ -43,7 +202,7 @@ const logger = {
   child: () => logger,
 } as never;
 
-function world(extractorOutput: unknown) {
+function world(extractorOutput: unknown, memoryOverride?: MemoryService) {
   const remembered: RememberCommand[] = [];
   const digests: unknown[] = [];
   const conversation = {
@@ -114,7 +273,7 @@ function world(extractorOutput: unknown) {
   } as unknown as ModelGateway;
   const learner = createMemoryLearner({
     gateway,
-    memory,
+    memory: memoryOverride ?? memory,
     repositories: {
       runs: { findForActor: () => Promise.resolve(run) },
       conversations: {
