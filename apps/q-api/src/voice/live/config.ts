@@ -1,4 +1,5 @@
 import { GPT_LIVE_VOICES, type GptLiveVoice } from "../providers/gpt-live.js";
+import { liveTrialGrantsFrom } from "./trial.js";
 
 /**
  * GPT-Live line settings (workstream V), from the environment. Off unless
@@ -43,6 +44,13 @@ export type LiveConfig = {
    * so switching the line on never opens paid sessions to every account.
    */
   readonly allowedUsers: ReadonlySet<string> | null;
+  /**
+   * The trial (owner 2026-10-12, CQ_VOICE_LIVE_TRIAL, JSON of user id ->
+   * seconds): these people may open a live line, in any deployment, for a
+   * cumulative allowance of active speech (trial.ts). A trial entry always
+   * limits that person, even one also on `allowedUsers`.
+   */
+  readonly trial: ReadonlyMap<string, number>;
 };
 
 export const LIVE_DEFAULTS: LiveConfig = {
@@ -55,6 +63,7 @@ export const LIVE_DEFAULTS: LiveConfig = {
   voices: { FEMALE: "marin", MALE: "cedar" },
   preview: false,
   allowedUsers: null,
+  trial: new Map(),
 };
 
 function bounded(
@@ -133,5 +142,6 @@ export function liveConfigFrom(
       on(env.CQ_VOICE_PREVIEW) &&
       (deploymentEnvironment === "local" || allowedUsers.size > 0),
     allowedUsers: deploymentEnvironment === "local" ? null : allowedUsers,
+    trial: liveTrialGrantsFrom(env.CQ_VOICE_LIVE_TRIAL),
   };
 }

@@ -1,4 +1,9 @@
 import {
+  Q_VOICE_LIVE_TRIAL_SPENT,
+  type QVoiceLiveTrial,
+} from "@capital-q/contracts";
+
+import {
   navigationHeard,
   navigationHeardFor,
   navigationHearingDelta,
@@ -60,7 +65,9 @@ export type LiveCallEnd =
   | "network"
   | "provider"
   /** Another voice line started in this tab: this one stopped first. */
-  | "superseded";
+  | "superseded"
+  /** The person's live-voice trial allowance is used up. */
+  | "trial";
 
 export type LiveTranscript = {
   /** One utterance's id, stable while it grows. */
@@ -91,6 +98,8 @@ export type LiveCallOptions = {
   readonly onUpdate?: ((update: LiveCallUpdate) => void) | undefined;
   readonly onTranscript?: ((line: LiveTranscript) => void) | undefined;
   readonly onEnded: (reason: LiveCallEnd) => void;
+  /** A trial call: its allowance as the Q API counts it (open, usage). */
+  readonly onTrial?: ((trial: QVoiceLiveTrial) => void) | undefined;
   readonly fetch?: typeof fetch;
   /** C's fast path: "open X" moves the screen on the final words. */
   readonly fastNavigation?: boolean | undefined;
@@ -120,11 +129,23 @@ export type LiveCall = {
 
 export class LiveCallUnavailable extends Error {
   readonly status: number | null;
-  constructor(status: number | null) {
+  /** The Q API's problem code, when it gave a known one. */
+  readonly code: string | null;
+  constructor(status: number | null, code: string | null = null) {
     super(`live voice unavailable (${String(status)})`);
     this.name = "LiveCallUnavailable";
     this.status = status;
+    this.code = code;
   }
+}
+
+/** The open was refused because this person's live-voice trial is used up. */
+export function isLiveTrialSpent(error: unknown): boolean {
+  return (
+    error instanceof LiveCallUnavailable &&
+    error.status === 429 &&
+    error.code === Q_VOICE_LIVE_TRIAL_SPENT
+  );
 }
 
 const RELAY = "/api/q-voice-live";
@@ -157,6 +178,9 @@ function channelOpened(
 const SPEAKING_LEVEL = 0.02;
 const UTTERANCE_END_MS = 900;
 const RENEWALS_MAX = 2;
+/** The page's speech hint: words this close together are one stretch. */
+const SPEECH_GAP_MS = 1_500;
+const SPEECH_PULSE_MS = 400;
 const CONTEXT_CHARS = 1_600;
 
 /**
@@ -241,7 +265,22 @@ async function post<T>(
     },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new LiveCallUnavailable(response.status);
+  if (!response.ok) {
+    let code: string | null = null;
+    if (response.status === 429) {
+      try {
+        const problem: unknown = await response.json();
+        const value: unknown =
+          typeof problem === "object" && problem !== null
+            ? Reflect.get(problem, "code")
+            : undefined;
+        code = value === Q_VOICE_LIVE_TRIAL_SPENT ? value : null;
+      } catch {
+        code = null;
+      }
+    }
+    throw new LiveCallUnavailable(response.status, code);
+  }
   return (response.status === 204 ? null : await response.json()) as T;
 }
 
@@ -390,6 +429,19 @@ export async function startLiveCall(
   // Seconds billed by earlier provider sessions of this same call.
   let billedBefore = 0;
   let current = 0;
+  // The trial: this session's own count of active speech (both sides'
+  // words as they stream), sent with usage as a hint the Q API can only
+  // use to charge more, never less. Reset with each provider session.
+  let speechMs = 0;
+  let lastWordsAt: number | null = null;
+  let trialCall = false;
+  const heardWords = (at: number) => {
+    speechMs +=
+      lastWordsAt !== null && at - lastWordsAt <= SPEECH_GAP_MS
+        ? at - lastWordsAt
+        : SPEECH_PULSE_MS;
+    lastWordsAt = at;
+  };
 
   const update = () => {
     options.onUpdate?.({ stats, bridge: bridge.state() });
@@ -529,16 +581,30 @@ export async function startLiveCall(
   const reportUsage = async (seconds: number, final: boolean) => {
     if (id === null) return;
     try {
-      const result = await post<{ remainingMs: number; capReached?: boolean }>(
+      const result = await post<{
+        remainingMs: number;
+        capReached?: boolean;
+        trial?: QVoiceLiveTrial;
+        trialSpent?: boolean;
+      }>(
         doFetch,
         `usage/${id}`,
         // Each provider session is its own line on the server: its own
-        // seconds, never the call's running total (counted once).
-        { seconds, final },
+        // seconds, never the call's running total (counted once). A trial
+        // call adds its own speech count, a hint the server bounds.
+        {
+          seconds,
+          final,
+          ...(trialCall
+            ? { speechSeconds: Math.round(speechMs / 100) / 10 }
+            : {}),
+        },
         token,
       );
       if (final) return;
-      if (result.capReached === true) void end("cap");
+      if (result.trial !== undefined) options.onTrial?.(result.trial);
+      if (result.trialSpent === true) void end("trial");
+      else if (result.capReached === true) void end("cap");
       else if (result.remainingMs === 0) void end("max_length");
     } catch {
       // A lost report is estimated by the server at the line's end.
@@ -620,6 +686,7 @@ export async function startLiveCall(
       }
       case "session.input_transcript.delta": {
         const delta = typeof event["delta"] === "string" ? event["delta"] : "";
+        heardWords(ms);
         lastInputAt = ms;
         lastSpeechAt = performance.now();
         // Interrupted mid-sentence: what it had said is still kept.
@@ -648,6 +715,7 @@ export async function startLiveCall(
         break;
       case "session.output_transcript.delta": {
         const delta = typeof event["delta"] === "string" ? event["delta"] : "";
+        heardWords(ms);
         finishUtterance();
         lastSpeechAt = performance.now();
         firstOutputMs ??= Math.round(ms);
@@ -746,6 +814,7 @@ export async function startLiveCall(
       maxSessionMs: number;
       idleMs?: number;
       context?: string | null;
+      trial?: QVoiceLiveTrial;
     }>(
       doFetch,
       "open",
@@ -766,6 +835,10 @@ export async function startLiveCall(
     idleMs = opened.idleMs ?? idleMs;
     background = opened.context ?? background;
     stats = { ...stats, createdModel: opened.model };
+    if (opened.trial !== undefined) {
+      trialCall = true;
+      options.onTrial?.(opened.trial);
+    }
     try {
       await pc.setRemoteDescription({ type: "answer", sdp: opened.sdp });
     } catch (error: unknown) {
@@ -815,14 +888,17 @@ export async function startLiveCall(
     await reportUsage(current, true);
     billedBefore += current;
     current = 0;
+    speechMs = 0;
+    lastWordsAt = null;
     try {
       if (old !== null) old.closeRequested = true;
       old?.pc.close();
       stats = { ...stats, renewals: stats.renewals + 1 };
       connection = await connect();
-    } catch {
+    } catch (error: unknown) {
       renewing = false;
-      void end(cause);
+      // The trial ran out (the server ended the session): not a failure.
+      void end(isLiveTrialSpent(error) ? "trial" : cause);
       return;
     }
     renewing = false;

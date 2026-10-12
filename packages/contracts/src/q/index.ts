@@ -324,6 +324,10 @@ export {
   qVoiceCardPath,
   QVoiceCardUpdateSchema,
   type QVoiceCardUpdate,
+  Q_VOICE_LIVE_TRIAL_MAX_SECONDS,
+  QVoiceLiveTrialSchema,
+  type QVoiceLiveTrial,
+  Q_VOICE_LIVE_TRIAL_SPENT,
 } from "./voice.js";
 
 export {
