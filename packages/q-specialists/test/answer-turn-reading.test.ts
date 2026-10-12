@@ -3778,7 +3778,6 @@ describe("a request naming a counterparty brings Relationships into the offer", 
     const reading = new Promise<TurnReaderResult>((resolve) => {
       release = resolve;
     });
-    let counterpartsBeforeReading = -1;
     const run = seam({
       said: "Ask Ledgerfold for their last 12 months of management accounts.",
       reading: null,
@@ -3789,7 +3788,7 @@ describe("a request naming a counterparty brings Relationships into the offer", 
     const answering = run.answer.answer(request());
     // The reading has not landed; the counterparts are already being read.
     await new Promise((resolve) => setTimeout(resolve, 0));
-    counterpartsBeforeReading = run.counterpartReads();
+    const counterpartsBeforeReading = run.counterpartReads();
     release(untold());
     await answering;
     expect(counterpartsBeforeReading).toBe(1);
