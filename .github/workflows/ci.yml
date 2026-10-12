@@ -54,12 +54,15 @@ jobs:
           CQ_DIAG_JOB: ${{ inputs.diagnose_job }}
         run: |
           [[ "$CQ_DIAG_JOB" =~ ^[0-9]{1,16}$ ]] || exit 1
-          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${CQ_DIAG_JOB}/logs" > /tmp/cq-failed-job.log 2> /tmp/cq-log-read-error.txt || true
+          gh api --allow-escape-sequences "repos/${GITHUB_REPOSITORY}/actions/jobs/${CQ_DIAG_JOB}/logs" > /tmp/cq-failed-job.log 2> /tmp/cq-log-read-error.txt || true
           python3 - <<'PY'
           from pathlib import Path
+          import re
           text = Path('/tmp/cq-failed-job.log').read_text(errors='replace')
           if not text:
               text = Path('/tmp/cq-log-read-error.txt').read_text(errors='replace')
+          text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
+          text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\t')
           start = text.find('Failed Tests')
           if start < 0:
               start = text.find('FAIL ')
