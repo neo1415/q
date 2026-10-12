@@ -54,16 +54,16 @@ jobs:
           CQ_DIAG_JOB: ${{ inputs.diagnose_job }}
         run: |
           [[ "$CQ_DIAG_JOB" =~ ^[0-9]{1,16}$ ]] || exit 1
-          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${CQ_DIAG_JOB}/logs" > /tmp/cq-failed-job.log
+          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${CQ_DIAG_JOB}/logs" > /tmp/cq-failed-job.log 2> /tmp/cq-log-read-error.txt || true
           python3 - <<'PY'
           from pathlib import Path
           text = Path('/tmp/cq-failed-job.log').read_text(errors='replace')
+          if not text:
+              text = Path('/tmp/cq-log-read-error.txt').read_text(errors='replace')
           start = text.find('Failed Tests')
           if start < 0:
               start = text.find('FAIL ')
-          if start < 0:
-              raise SystemExit('No failing-test excerpt found in specified job')
-          excerpt = text[max(0, start - 100):start + 16000]
+          excerpt = text[max(0, start - 100):start + 16000] if start >= 0 else text[-16000:]
           escaped = excerpt.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
           print('::notice title=Specified CI job failure evidence::' + escaped)
           PY
