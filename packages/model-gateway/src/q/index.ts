@@ -3233,10 +3233,38 @@ export function createModelGatewayQAnswer(
           ...(asker === null ? {} : { asker }),
         });
         if (request.aboutNamedOther === true) {
+          // A reader may call an investor's selected company "other" even
+          // for "the risks for this company". Its complete profile was
+          // already freshly authorized above: forcing name search here
+          // caused two paid selection rounds and another get_company
+          // (live 2026-10-12: 3,752 ms in the selection calls alone).
+          // Reuse only one successful, schema-valid profile bound to the
+          // selected subject. Different names, comparisons, ambiguous or
+          // unread/revoked targets keep the existing resolution rule.
+          const read = runCompanies.read(request.runId);
+          const screenCompanyId =
+            plan.screen?.route === "COMPANY"
+              ? (plan.screen.companyId ?? null)
+              : null;
+          const selectedTarget =
+            screenCompanyId !== null &&
+            read.profiles.size === 1 &&
+            read.profiles.has(screenCompanyId) &&
+            request.subjects.some(
+              (subject) =>
+                subject.kind === "COMPANY" &&
+                subject.companyId === screenCompanyId,
+            ) &&
+            isSingleCompanyQuestion(latest.content) &&
+            !/\b(?:compar(?:e|ed|ing|ison)|versus|vs|against|alongside|relative to)\b/iu.test(
+              latest.content,
+            );
           noteParts = {
             ...noteParts,
             turn: [
-              "Resolve the company named in the current question through search_companies and get_company before answering from its records. The company visible on screen is navigation context; do not substitute its facts for the named target. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately.",
+              selectedTarget
+                ? "The current single-company question refers to the selected company whose complete, freshly read authorized profile is already among the facts. Use those facts without searching for its identity or reading the same profile again. If the question instead names a different target, resolve it through search_companies and get_company; never substitute the selected company's facts. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately."
+                : "Resolve the company named in the current question through search_companies and get_company before answering from its records. The company visible on screen is navigation context; do not substitute its facts for the named target. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately.",
               noteParts.turn,
             ].join(" "),
           };
