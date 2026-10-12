@@ -17,6 +17,7 @@ import type {
   WorkforceOverviewDto,
   WorkforceTimelineEntryDto,
   QArtifactDetail,
+  QApprovalView,
 } from "@capital-q/contracts";
 
 import type {
@@ -193,13 +194,19 @@ export function createWorkforcePage(dependencies: {
   readonly now?: (() => Date) | undefined;
   /** Recovery D6: the durable work rows behind these jobs (the queue's). */
   readonly work?: Pick<AgentWorkQueue, "forOwner"> | undefined;
-  /** Resolve through the existing artifact service with fresh owner access. */
-  readonly documents?:
+  /** Resolve canonical documents and approvals under one fresh owner context. */
+  readonly deliverables?:
     | ((
         owner: Owner,
         organisationId: string | null,
-        artifactIds: readonly string[],
-      ) => Promise<readonly QArtifactDetail[]>)
+        references: {
+          readonly artifactIds: readonly string[];
+          readonly actionIds: readonly string[];
+        },
+      ) => Promise<{
+        readonly documents: readonly QArtifactDetail[];
+        readonly approvals: readonly QApprovalView[];
+      }>)
     | undefined;
 }) {
   const { store } = dependencies;
@@ -475,17 +482,29 @@ export function createWorkforcePage(dependencies: {
           }),
         ),
       ].slice(0, 12);
+      const completedAction = completedDocument.extend({
+        outputs: z.object({ qActionId: UuidSchema }).passthrough(),
+      });
+      const actionIds = [
+        ...new Set(
+          Object.values(work?.results ?? {}).flatMap((result) => {
+            const parsed = completedAction.safeParse(result);
+            return parsed.success ? [parsed.data.outputs.qActionId] : [];
+          }),
+        ),
+      ].slice(0, 12);
+      const unavailable = { documents: [], approvals: [] };
       const resolved =
-        artifactIds.length === 0
-          ? []
+        artifactIds.length === 0 && actionIds.length === 0
+          ? unavailable
           : await (
-              dependencies.documents?.(
+              dependencies.deliverables?.(
                 owner,
                 work?.trace.organisationId ?? null,
-                artifactIds,
-              ) ?? Promise.resolve([])
-            ).catch(() => []);
-      const documents = resolved
+                { artifactIds, actionIds },
+              ) ?? Promise.resolve(unavailable)
+            ).catch(() => unavailable);
+      const documents = resolved.documents
         .filter(
           (document) =>
             artifactIds.includes(document.artifact.artifactId) &&
@@ -498,6 +517,13 @@ export function createWorkforcePage(dependencies: {
         .filter(
           (document, index, all) =>
             all.findIndex((one) => one.artifactId === document.artifactId) ===
+            index,
+        );
+      const approvals = resolved.approvals
+        .filter((view) => actionIds.includes(view.action.actionId))
+        .filter(
+          (view, index, all) =>
+            all.findIndex((one) => one.approvalId === view.approvalId) ===
             index,
         );
 
@@ -534,6 +560,12 @@ export function createWorkforcePage(dependencies: {
           : {
               documents,
               documentsUnavailable: documents.length < artifactIds.length,
+            }),
+        ...(actionIds.length === 0
+          ? {}
+          : {
+              approvals,
+              approvalsUnavailable: approvals.length < actionIds.length,
             }),
       };
     },

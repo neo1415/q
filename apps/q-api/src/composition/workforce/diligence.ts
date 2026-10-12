@@ -5,6 +5,7 @@ import {
   isMatchedRelationshipState,
   QRunIdSchema,
   type QSubjectRef,
+  type QConversationId,
 } from "@capital-q/contracts";
 import type { QActionService } from "@capital-q/q-actions";
 import {
@@ -73,6 +74,11 @@ export function createWorkforceDiligence(dependencies: {
     readonly state: string;
   } | null>;
   readonly runtime: Pick<QRuntimeService, "createRun">;
+  /** Owned runtime read; a background card remains in its original Q conversation. */
+  readonly conversationForRun: (
+    actor: ActorContext,
+    runId: string,
+  ) => Promise<QConversationId>;
   readonly orchestration: Pick<
     QOrchestrationRuntime,
     "begin" | "advanceThrough" | "fail" | "complete"
@@ -91,9 +97,14 @@ export function createWorkforceDiligence(dependencies: {
   ): Promise<string> {
     const key = `workforce:${input.jobId}:${input.stepKey}`.slice(0, 200);
     const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
+    const conversationId = await dependencies.conversationForRun(
+      actor,
+      input.qRunId,
+    );
     const created = await dependencies.runtime.createRun({
       actor,
       input: {
+        conversationId,
         capability: "PREPARE_ACTION",
         message: {
           text: `Questions for ${card.companyName}, prepared by Q's team for your approval.`.slice(
