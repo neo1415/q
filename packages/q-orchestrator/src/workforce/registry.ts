@@ -104,7 +104,7 @@ export const AGENT_REGISTRY: Readonly<Record<AgentRole, AgentDefinition>> = {
   DOCUMENTS: {
     role: "DOCUMENTS",
     title: "Documents",
-    does: "Finds or prepares what the other side asked for, such as a deck or a PDF, for grading and sharing.",
+    does: "Prepares documents from the evidence you may see: your own company's deck, one-pager or memo, or an investment memo on a company the job names, and has a second specialist critique and revise one. Sharing stays yours.",
     tools: [
       "list_my_documents",
       "list_uploaded_documents",

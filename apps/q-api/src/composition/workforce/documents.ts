@@ -21,8 +21,38 @@ import type {
   WorkforceDocumentInput,
   WorkforceDocumentResult,
 } from "./jobs.js";
+import type { WorkforceModels } from "./models.js";
 
-/** Approved own-company preparation through Q's existing evidence and artifact pipeline. */
+/** The marker a reviewer's revision carries, so a retry never revises twice. */
+export const REVIEWER_REVISION_PREFIX = "Second-specialist review:";
+
+const CRITIQUE_DOCUMENT_MAX = 24_000;
+const CRITIQUE_EVIDENCE_MAX = 12_000;
+
+/** The document as the critic reads it: headings, prose and stated gaps. */
+export function critiqueText(content: {
+  readonly sections: readonly {
+    readonly heading: string;
+    readonly body: string;
+  }[];
+  readonly gaps: readonly string[];
+}): string {
+  const body = content.sections
+    .map((section) => `## ${section.heading}\n${section.body}`)
+    .join("\n\n");
+  const gaps =
+    content.gaps.length === 0
+      ? ""
+      : `\n\n## Stated as not known\n${content.gaps.map((gap) => `- ${gap}`).join("\n")}`;
+  return `${body}${gaps}`.slice(0, CRITIQUE_DOCUMENT_MAX);
+}
+
+/**
+ * Approved document work through Q's existing evidence and artifact
+ * pipeline: a document about the person's own company, a memo about the
+ * one company the job named (bound by code at planning), or a second
+ * specialist's critique and revision of a document an earlier step made.
+ */
 export function createWorkforceDocuments(dependencies: {
   readonly freshActor: (actor: ActorContext) => Promise<ActorContext | null>;
   readonly ownCompany: (
@@ -38,7 +68,144 @@ export function createWorkforceDocuments(dependencies: {
     "findWorkforceDocument" | "requestDocument"
   >;
   readonly preparation: ArtifactPreparation;
+  /** The second specialist; absent: critique steps cannot run here. */
+  readonly critic?: WorkforceModels["critique"] | undefined;
 }) {
+  /**
+   * The second specialist. It reads the version the person may read now
+   * (re-authorised), against the findings the document was built from,
+   * and revises once only when its verdict is material. A technical
+   * failure is FAILED with its reason, never a quiet "looks fine".
+   */
+  async function critiqueAndRevise(
+    actor: ActorContext,
+    input: WorkforceDocumentInput,
+  ): Promise<WorkforceDocumentResult> {
+    const failed = (message: string): WorkforceDocumentResult => ({
+      status: "FAILED",
+      message,
+    });
+    if (dependencies.critic === undefined)
+      return failed("No reviewer is available to critique this document.");
+    const source = input.source;
+    if (source === undefined)
+      return failed("The document to review was not prepared.");
+    const subject: Extract<QSubjectRef, { kind: "COMPANY" }> = {
+      kind: "COMPANY",
+      companyId: source.companyId,
+    };
+    const runId = QRunIdSchema.parse(input.qRunId);
+    const correlationId = createCorrelationId();
+    const decision = await dependencies.firewall.plan({
+      actor,
+      runId,
+      correlationId,
+      capability: "ANSWER",
+      subjects: [subject],
+    });
+    if (decision.outcome !== "AUTHORISED")
+      return failed("This document can no longer be reviewed as you.");
+    const current = await dependencies.preparation.port.currentVersion(
+      actor,
+      source.artifactId,
+    );
+    if (current === null)
+      return failed("This document can no longer be read as you.");
+    if (current.instruction?.startsWith(REVIEWER_REVISION_PREFIX) === true) {
+      // A retry after the revision was filed: the review already happened.
+      return {
+        status: "READY",
+        artifactId: source.artifactId,
+        companyId: source.companyId,
+        review: {
+          material: true,
+          issues: [],
+          revisedToVersion: current.version,
+        },
+      };
+    }
+    const grounding = current.content.sections.flatMap((section) => [
+      section.body,
+      ...section.findings.map((finding) => finding.statement),
+    ]);
+    const evidence = current.content.sections
+      .flatMap((section) =>
+        section.findings.map((finding) => `- ${finding.statement}`),
+      )
+      .join("\n")
+      .slice(0, CRITIQUE_EVIDENCE_MAX);
+    if (!(await input.canContinue()))
+      return failed("Review stopped before it started.");
+    const verdict = await dependencies.critic(
+      { tenantId: actor.tenantId, userId: actor.userId },
+      { jobId: input.jobId, runId: input.runId },
+      {
+        documentKind: current.content.deck === undefined ? "memo" : "deck",
+        principalName: input.principalName ?? "the person",
+        companyName: current.title.slice(0, 120),
+        purpose: input.goal.slice(0, 600),
+        evidence: evidence.length > 0 ? evidence : "(no findings recorded)",
+        document: critiqueText(current.content),
+      },
+    );
+    if (verdict === null)
+      return failed(
+        "The reviewer could not finish its critique; nothing was changed.",
+      );
+    const issues = verdict.issues.map((issue) => ({
+      kind: issue.kind,
+      section: issue.section,
+      problem: issue.problem,
+    }));
+    if (!verdict.material || verdict.issues.length === 0) {
+      return {
+        status: "READY",
+        artifactId: source.artifactId,
+        companyId: source.companyId,
+        review: { material: false, issues, revisedToVersion: null },
+      };
+    }
+    if (!(await input.canContinue()))
+      return failed("Review stopped before the revision.");
+    const instruction = `${REVIEWER_REVISION_PREFIX} ${verdict.issues
+      .map((issue) => `${issue.section}: ${issue.problem} Fix: ${issue.fix}`)
+      .join(" ")}`.slice(0, 1_900);
+    const revised = await dependencies.preparation.reviser.revise({
+      base: {
+        title: current.title,
+        summary: current.summary,
+        content: current.content,
+      },
+      instruction,
+      grounding,
+      sensitivity: decision.plan.maxSensitivity,
+      attribution: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        qRunId: runId,
+        correlationId,
+      },
+    });
+    const filed = await dependencies.preparation.port.revise({
+      actorContext: actor,
+      permittedContextPlan: decision.plan,
+      qRunId: runId,
+      artifactId: source.artifactId,
+      instruction,
+      content: revised,
+    });
+    return {
+      status: "READY",
+      artifactId: filed.artifactId,
+      companyId: source.companyId,
+      review: {
+        material: true,
+        issues,
+        revisedToVersion: filed.currentVersion,
+      },
+    };
+  }
+
   return async (
     input: WorkforceDocumentInput & { readonly actor: ActorContext },
   ): Promise<WorkforceDocumentResult> => {
@@ -47,10 +214,8 @@ export function createWorkforceDocuments(dependencies: {
       message: "This document cannot be prepared with the current authority.",
     });
     try {
+      const request = input.request;
       if (
-        dependencies.preparation.pipeline?.mode !== "JOB" ||
-        input.request.scope !== "OWN_COMPANY" ||
-        input.request.operation !== "PREPARE" ||
         input.actor.organisationId !== input.organisationId ||
         !(await input.canContinue())
       )
@@ -63,11 +228,21 @@ export function createWorkforceDocuments(dependencies: {
         actor.organisationId !== input.organisationId
       )
         return unavailable();
-      const own = await dependencies.ownCompany(actor);
-      if (own === null) return unavailable();
+      if (request.operation === "CRITIQUE_AND_REVISE") {
+        return await critiqueAndRevise(actor, input);
+      }
+      if (dependencies.preparation.pipeline?.mode !== "JOB")
+        return unavailable();
+      // The company: the person's own, or the one the approved plan bound
+      // from what the goal named. Either way the firewall decides below.
+      const companyId =
+        request.scope === "OWN_COMPANY"
+          ? ((await dependencies.ownCompany(actor))?.companyId ?? null)
+          : request.companyId;
+      if (companyId === null) return unavailable();
       const subject: Extract<QSubjectRef, { kind: "COMPANY" }> = {
         kind: "COMPANY",
-        companyId: own.companyId,
+        companyId,
       };
       const runId = QRunIdSchema.parse(input.qRunId);
       const correlationId = createCorrelationId();
@@ -91,7 +266,7 @@ export function createWorkforceDocuments(dependencies: {
               tenantId: actor.tenantId,
               userId: actor.userId,
               organisationId: actor.organisationId,
-              companyId: own.companyId,
+              companyId,
               budgetUsd: input.budgetUsd,
             }),
           )
@@ -103,14 +278,14 @@ export function createWorkforceDocuments(dependencies: {
         permittedContextPlan: decision.plan,
         qRunId: runId,
         subject,
-        artifactType: input.request.kind,
+        artifactType: request.kind,
         workforce,
       };
       const outcomeOf = (
         artifact: QArtifactSummary,
       ): WorkforceDocumentResult =>
         artifact.status === "READY" && artifact.currentVersion > 0
-          ? { status: "READY", artifactId: artifact.artifactId }
+          ? { status: "READY", artifactId: artifact.artifactId, companyId }
           : artifact.status === "PREPARING"
             ? { status: "PREPARING", artifactId: artifact.artifactId }
             : {
@@ -139,7 +314,7 @@ export function createWorkforceDocuments(dependencies: {
       );
       if (
         result.blocked !== null ||
-        result.companyId !== own.companyId ||
+        result.companyId !== companyId ||
         !(await input.canContinue())
       )
         return unavailable();
@@ -201,13 +376,15 @@ export function createWorkforceDocuments(dependencies: {
           plan: decision.plan,
         },
         company: subject,
-        companyName: result.companyName ?? "Your company",
+        companyName:
+          result.companyName ??
+          (request.scope === "OWN_COMPANY" ? "Your company" : "The company"),
         saidVerbatim: input.goal,
         result: {
           ...result,
           artifactRequest: {
             kind: "PREPARE",
-            artifactType: input.request.kind,
+            artifactType: request.kind,
             instruction: "",
             visualDirection: null,
             quote: input.goal.slice(0, 400),

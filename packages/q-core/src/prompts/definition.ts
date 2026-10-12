@@ -96,6 +96,8 @@ export const PROMPT_IDS = [
   "DRAFT_REDRAFT",
   "REPLY_READER",
   "JOB_PLAN",
+  "SUBSTANCE_CRITIQUE",
+  "DILIGENCE_QUESTIONS",
   /** Founder brief J7 2026-10-06: people's words read by meaning. */
   "ONBOARDING_MOVE_READER",
   "PREFERENCE_POLARITY",
@@ -174,6 +176,8 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   DRAFT_REDRAFT: "draft-redraft",
   REPLY_READER: "reply-reader",
   JOB_PLAN: "job-plan",
+  SUBSTANCE_CRITIQUE: "substance-critique",
+  DILIGENCE_QUESTIONS: "diligence-questions",
   // Founder brief J7.
   ONBOARDING_MOVE_READER: "onboarding-move-reader",
   PREFERENCE_POLARITY: "preference-polarity",

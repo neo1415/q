@@ -1,5 +1,25 @@
 # Capital Q — Current shared engineering state
 
+## LATEST STATUS — PR #2 deployed; workforce slice in PR #5 — 2026-10-12 00:30 UTC
+
+**DEPLOYED (service level):** PR #2 merged through GitHub's merge operation (direct pushes to release branches are refused in Claude sessions; merges via the GitHub integration work). `build/int-rc` = `668ee838`, CI lane `recovery/2026-09-12-8y2j4w` = `a4c254c6`, deploy lane `recovery/2026-09-12` = `e1266dd8`; all three trees identical to the CI-tested `f7ff0fdc` (tree `54d168aa`). CI: PR #2 run 38180652493, PR #4 runs 38182707886/38182711449, CI-lane push run 38182733437 — quality and pgTAP SUCCESS. Railway: all four services SUCCESS at `e1266dd8` (workers `f2d068e7`, api `46d38485`, q-api `9282d3f2`, web `df1360ae`). Rollback: `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`.
+
+**LIVE REHEARSAL on `e1266dd8` (fictional investor Savanna Seed): FAILED at phase 3, root-caused and fixed in PR #5.** Discover 200; top-three 3 cards / 3 Open controls (first text 3,820 ms, done 4,002 ms); correct Ledgerfold profile. The selected-company question returned a canned card line plus OPEN_RECORD_PAGE for the page already on screen (`PROFILE_REFERENCE_MISMATCH`): the TURN_READER marked it as an open; three FAST_CLASSIFICATION calls, no answer generation. Fix `70f1be86`: when the referenced record is the company page on screen and the person asked a question, code declines the navigation and the answer path responds; regression fails before, passes after. Not caused by PR #2 (no routing change). Rerun the rehearsal after PR #5 deploys.
+
+**PR [neo1415/q#5](https://github.com/neo1415/q/pull/5) → `build/int-rc` (LOCAL TESTED, CI running):**
+
+- `744a82bd` runner: independent steps concurrent, outward steps serialized in plan order; executor errors reported (`onStepError` → q-api log); lead DONE only when every step is DONE.
+- `32dd5891` investor memo on the NAMED_COMPANY (bound by code from `goalSubjects`, never a model id) + SUBSTANCE_CRITIQUE second specialist that revises once into a new version when material; JOB_PLAN v4.
+- `70f1be86` the on-screen question routing fix above.
+- `03b1f8c8` DILIGENCE executor: DILIGENCE_QUESTIONS drafts ≤5 founder questions from the memo's gaps + critique; files `app.diligence.questions.send` as the investor's approval card (run version `q-workforce-card-v1`), or keeps them with the job when not connected. Stored as AD_HOC (no migration).
+- Local: 5,433 tests pass (orchestrator/tools/core/specialists/contracts/q-api) + web suites earlier; root tsc 0; lint/prettier clean.
+
+**Not yet proven live:** the mandatory autonomous workforce acceptance ("research… memo… critique… revise… diligence questions") has not been run in production; it needs PR #5 deployed. The two-sided question write test (`two-sided-questions.mjs`) remains unrun (production writes were refused by the session's permission classifier earlier; reading is fine).
+
+**Tavus (read-only audit only):** six keys valid; each sees 100 stock replicas, 0 custom replicas, 0 active conversations; key #1 has one custom persona (separate account from at least some others). Account identity/quota sharing is not exposed by the API — owner must confirm entitlements before any failover; use one key until then. Keys stored outside the repo (`/root/.cq-tavus-keys`).
+
+**Next:** PR #5 CI green → merge (GitHub) → CI lane PR → deploy-lane PR → four-service SUCCESS → rerun `investor-demo-rehearsal.mjs` → run the workforce acceptance through Q as the fictional investor and record artifacts, critique version, card → then Tavus rehearsal implementation (180 s hard cap, server-side end).
+
 ## LATEST STATUS — Claude Code product-clarity slice on top of the demo baseline — 2026-10-11 22:45 UTC
 
 **The deployed investor-demo baseline is unchanged: all four Railway services SUCCESS at `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6` (re-inspected 22:00 UTC via the Railway API; deployment IDs as below). Rollback point = that SHA (tag push is refused by the git proxy; the SHA lives on `build/int-rc`, both `recovery/*` lanes and `codex/preserve-optimize`).**

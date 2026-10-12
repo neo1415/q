@@ -41,6 +41,7 @@ import type { Logger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
+  asksForWorkProducts,
   createSpecialistQAnswer,
   namedInWords,
   unknownScreenLine,
@@ -1696,6 +1697,32 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     );
     return { line: stored.at(-1)?.content, delegated: delegated() };
   };
+
+  it("a request for research, a memo and diligence questions is never answered by accepting a waiting request (live 2026-10-12)", async () => {
+    const { value, asked, errands } = port(() => ({
+      status: "PREPARED",
+      awaitingApprovalOf:
+        "Accept Ledgerfold's connection request and send them your message",
+    }));
+    const { answer, delegated } = seam({
+      said: "Research Ledgerfold and how it fits Savanna Seed Partners, assess the opportunity, identify the important risks and missing information, prepare an investment memo, get a second specialist to critique it, revise the memo, and prepare appropriate founder diligence questions. Show me the results and anything requiring my approval.",
+      reading: reading("Ledgerfold"),
+      outcomes: [],
+      handOver: value,
+    });
+    await answer.answer(request());
+    expect(asked).toEqual([]);
+    expect(errands).toEqual([]);
+    expect(delegated()).toBe(1);
+  });
+
+  it("names the work kinds: two or more is a work request, a hand-over names none", () => {
+    expect(asksForWorkProducts("handle Kestrel for me")).toBe(false);
+    expect(asksForWorkProducts("get me a meeting with Priya")).toBe(false);
+    expect(
+      asksForWorkProducts("research them and write me a memo on the risks"),
+    ).toBe(true);
+  });
 
   it("one request waiting, asked for by name: prepared as one approval with the message", async () => {
     const { value, asked, errands } = port(() => ({

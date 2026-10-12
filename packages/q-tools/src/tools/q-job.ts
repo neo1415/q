@@ -289,9 +289,10 @@ export function createQJobTools(
         ),
       execute: async (input, context) => {
         // Resolved here, as the person, so the check matches records,
-        // not only words; a go-ahead skips the check and the look-up.
+        // not only words. A go-ahead skips the waiting check, not the
+        // look-up: the plan binds the company the goal names from it.
         const subjects =
-          input.proceed || names === undefined
+          names === undefined
             ? []
             : await goalSubjects(names, context.actor, input.goal).catch(
                 () => [],
