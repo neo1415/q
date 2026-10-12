@@ -278,3 +278,124 @@ describe("existing document pipeline workforce bridge", () => {
     expect(pending.prepare).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("a second specialist reviews what an earlier step prepared", () => {
+  it("hands the memo's artifact to the critic and reports the revision plainly", async () => {
+    const w = world();
+    const memoArtifact = randomUUID();
+    const prospect = randomUUID();
+    const executor = w.executors.DOCUMENTS;
+    if (executor === undefined) throw new Error("Missing executor");
+    w.prepare.mockResolvedValue({
+      status: "READY",
+      artifactId: memoArtifact,
+      companyId: prospect,
+      review: {
+        material: true,
+        issues: [
+          {
+            kind: "UNSUPPORTED",
+            section: "Traction",
+            problem: "claim as fact",
+          },
+        ],
+        revisedToVersion: 2,
+      },
+    });
+    const critiqueStep = {
+      ...steps()[0],
+      key: "critique",
+      agentName: "Reviewer",
+      document: {
+        operation: "CRITIQUE_AND_REVISE" as const,
+        sourceStep: "memo",
+      },
+      dependsOn: ["memo"],
+    } as Parameters<AgentExecutor>[0];
+    const result = await executor(critiqueStep, {
+      ...context,
+      results: new Map([
+        [
+          "memo",
+          {
+            status: "DONE" as const,
+            summary: "Prepared",
+            outputs: { artifactId: memoArtifact, companyId: prospect },
+          },
+        ],
+      ]),
+    });
+    expect(w.prepare.mock.calls[0]?.[1]).toMatchObject({
+      source: { artifactId: memoArtifact, companyId: prospect },
+    });
+    expect(result).toMatchObject({
+      status: "DONE",
+      summary:
+        "Reviewed the document, found 1 issue and revised it to version 2.",
+    });
+  });
+
+  it("fails rather than guessing when the source step produced no document", async () => {
+    const w = world();
+    const executor = w.executors.DOCUMENTS;
+    if (executor === undefined) throw new Error("Missing executor");
+    const result = await executor(
+      {
+        ...steps()[0],
+        key: "critique",
+        document: { operation: "CRITIQUE_AND_REVISE", sourceStep: "memo" },
+      } as Parameters<AgentExecutor>[0],
+      context,
+    );
+    expect(result.status).toBe("FAILED");
+    expect(w.prepare).not.toHaveBeenCalled();
+  });
+});
+
+describe("the diligence step survives planning, approval and resume", () => {
+  it("is stored as a helper, shown as Diligence, and maps back to its executor", () => {
+    const bound = boundPlan(
+      [
+        {
+          key: "questions",
+          role: "DILIGENCE",
+          agentName: null,
+          goal: "Founder questions from the memo",
+          tools: ["diligence.questions.prepare"],
+          dependsOn: [],
+        },
+      ],
+      {
+        permitted: new Set(["diligence.questions.prepare"]),
+        budgetUsd: 0.5,
+        executors: registeredExecutors({ research: false, diligence: true }),
+      },
+    );
+    expect(bound.refused).toEqual([]);
+    expect(bound.steps[0]).toMatchObject({
+      role: "AD_HOC",
+      executor: "DILIGENCE",
+      agentName: "Diligence",
+      outward: false,
+    });
+    const payload = WorkforceJobStartPayloadSchema.parse({
+      ownerUserId: owner.userId,
+      goal: "g",
+      summary: "s",
+      steps: bound.steps.map((step) => ({
+        key: step.key,
+        role: step.role,
+        agentName: step.agentName,
+        goal: step.goal,
+        tools: [...step.tools],
+        dependsOn: [...step.dependsOn],
+        budgetUsd: step.budgetUsd.toFixed(2),
+        spawned: false,
+      })),
+      permitted: ["diligence.questions.prepare"],
+      budgetUsd: "0.50",
+      cannot: [],
+    });
+    expect(plannedFrom(payload).steps[0]?.executor).toBe("DILIGENCE");
+  });
+});

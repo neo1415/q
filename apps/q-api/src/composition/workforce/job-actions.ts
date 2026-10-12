@@ -245,7 +245,11 @@ function preview(payload: WorkforceJobStartPayload): string {
  * else goes to the person with the reason; it is never widened.
  */
 export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
-  const executors = registeredExecutors({ research: true, documents: true });
+  const executors = registeredExecutors({
+    research: true,
+    documents: true,
+    diligence: true,
+  });
   const folded = new Map<string, readonly string[]>();
   for (const step of payload.steps) {
     if (step.role === "WRITER" || step.role === "REVIEWER") {
@@ -447,11 +451,24 @@ export function createWorkforceJobBoard(dependencies: {
           if (!room) return { status: "LIMIT_REACHED" };
         }
         const jobs = dependencies.jobsFor(actor);
+        // The one company the goal names, resolved as the person by
+        // goalSubjects; several or none: no NAMED_COMPANY document.
+        const companies = (options?.subjects ?? []).flatMap((subject) =>
+          subject.kind === "COMPANY" ? [subject.companyId] : [],
+        );
         const planned = await jobs
           .plan(owner, {
             goal,
-            permitted: executableJobTools(jobs.research, jobs.documents),
+            permitted: executableJobTools(
+              jobs.research,
+              jobs.documents,
+              jobs.diligence,
+            ),
             budgetUsd: budget,
+            namedCompany:
+              companies.length === 1 && companies[0] !== undefined
+                ? { companyId: companies[0], name: "" }
+                : null,
           })
           .catch(() => null);
         // D1: a plan with any step no registered executor can run is not
