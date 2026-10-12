@@ -1,5 +1,15 @@
 # Capital Q — Current shared engineering state
 
+## LATEST RELEASE — production 047678e5 (all four SUCCESS) — 2026-10-12 18:25 UTC (Claude, release owner while Codex was out)
+
+- Deployed since 09:28: PRs #19–#22 (retrieval concurrency, relevant memory recall, answer latency, Work documents), #26 (go-ahead re-plan; Codex follow-up lookups + exact-company memory ranking), #27 (Work Open document; list_q_work v2 job review/diligence), #28 (live-voice trial), #30 (plain questions offered read tools only), #32/#33 (founder rehearsal recall). Rollback: 61dbe929, then fb2b6403.
+- Migration `20261222160000_q_voice_live_trial_usage` APPLIED to hosted (202/202) after pgTAP; RLS on, 0 policies, no authenticated select.
+- q-api `CQ_VOICE_LIVE_TRIAL` = the two trial accounts' PROFILE ids (identity.user_profiles.id, NOT auth.users.id): 801f52ed… (cq-daniel-tensorgate), 4b83f67b… (cq-investor-partech), 300 s each. App user ids are profile ids everywhere; auth ids grant nothing.
+- LIVE VERIFIED (fictional accounts): Tensorgate memory recall in a new conversation; "Yes, plan this one anyway." re-plans the original goal (plan card 8.3 s); workforce plan→mandate→research→memo→critique+revision v2 (8 issues); founder.ajopot rehearsal-struggle recall with dated, practice-labelled coaching.
+- LIVE DEFECTS OPEN (fix branches in progress): (1) DILIGENCE step fails when the model writes a question >180 chars (DB contract network.diligence_questions 3..180 — keep it; branch `claude/diligence-question-length` adds one bounded rewrite, never truncates); (2) list_q_work v2 called but Q said the questions/reviewer changes were not on record although job 43b7bdb4 persisted both — branch `claude/work-results-fix`.
+- Founder-contact card "Send Ledgerfold these 5 questions" (requested 12:41) remains PENDING, never approved or sent. Acceptance runner approves only its own plan card.
+- Codex branch `codex/voice-trial-durable-claim` (per-account durable claim + migration 20261222170000) is unmerged; Codex owns voice files.
+
 ## LATEST RELEASE — PR #23 merged; four-service rollout pending — 2026-10-12 09:28 UTC
 
 GitHub has advanced beyond the older checkpoints below. PRs #19–#22 are merged into `build/int-rc` at `58812685847e99f7435020538ce450da11eb65c3`: concurrent retrieval, relevant cross-conversation recall, measured-path latency changes and canonical Work document integration. PR #23 exact-head CI `38242394741` passed tests/build/types/lint/pgTAP/quality and GitGuardian (manual e2e skipped). Normal merge promoted it to deployment branch as `221ff996ca7c8242a2e8e7c1dce85b92f2b78b23`; current Railway rollout must be verified before any live claim. Immediately previous verified rollback is `5d9837bf50e189ebee12ea84772355e34b08c2db`, all four services SUCCESS: workers `eaf7b46c`, api `e4a2d943`, q-api `0e099f4b`, web `a08c4046`. No migration. PR #18 exact run `38227999773` also passed and merged as `a3a4eb6b`; PR #16 was subsequently merged as `5d9837bf`. Earlier release-hold paragraphs are historical.

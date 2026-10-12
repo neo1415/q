@@ -563,3 +563,84 @@ export const DiligenceQuestionsResultSchema = z
 export type DiligenceQuestionsResult = z.infer<
   typeof DiligenceQuestionsResultSchema
 >;
+
+/**
+ * The longest question the send action, and the table it writes, accept
+ * (network.diligence_questions CHECK 3..180; ASSUMPTION_QUESTION_MAX_LENGTH).
+ */
+export const DILIGENCE_QUESTION_SENT_MAX_LENGTH = 180;
+/**
+ * The longest question accepted from the drafter (2026-10-12 live failure:
+ * one question a few characters over 180 refused the whole draft). A longer
+ * draft is never sent and never cut: code asks for those questions to be
+ * rewritten shorter (DILIGENCE_QUESTIONS_SHORTEN), and fails the step if
+ * they still do not fit.
+ */
+export const DILIGENCE_QUESTION_DRAFT_MAX_LENGTH = 400;
+
+// v2: the same questions, accepted at draft length (see above).
+export const DILIGENCE_QUESTIONS_SCHEMA_VERSION_V2 = 2;
+export const DiligenceQuestionsDraftResultSchema = z
+  .object({
+    questions: z
+      .array(
+        z
+          .object({
+            /** Over 180 is rewritten by code's repair call before filing. */
+            question: z
+              .string()
+              .trim()
+              .min(8)
+              .max(DILIGENCE_QUESTION_DRAFT_MAX_LENGTH),
+            about: z.string().trim().min(1).max(120),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+export type DiligenceQuestionsDraftResult = z.infer<
+  typeof DiligenceQuestionsDraftResultSchema
+>;
+
+// DILIGENCE_QUESTIONS_SHORTEN (2026-10-12): drafted questions over the send
+// limit, rewritten under it with the same meaning. Never truncation.
+export const DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_NAME =
+  "DiligenceQuestionsShortenResult";
+export const DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_VERSION = 1;
+export const DiligenceQuestionsShortenVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    companyName: z.string().min(1).max(120),
+    /** How many questions are given, and so must come back. */
+    count: z.string().regex(/^[1-5]$/u),
+    /** The over-long questions, numbered. UNTRUSTED (model-drafted). */
+    questions: z.string().min(1).max(2_400),
+  })
+  .strict();
+export type DiligenceQuestionsShortenVariables = z.infer<
+  typeof DiligenceQuestionsShortenVariablesSchema
+>;
+export const DILIGENCE_QUESTIONS_SHORTEN_UNTRUSTED = ["questions"] as const;
+export const DiligenceQuestionsShortenResultSchema = z
+  .object({
+    questions: z
+      .array(
+        z
+          .object({
+            question: z
+              .string()
+              .trim()
+              .min(8)
+              .max(DILIGENCE_QUESTION_SENT_MAX_LENGTH),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+export type DiligenceQuestionsShortenResult = z.infer<
+  typeof DiligenceQuestionsShortenResultSchema
+>;
