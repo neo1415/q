@@ -670,3 +670,18 @@ export const TURN_READER_V48_SCHEMA_VERSION = 48;
 /** v48 (K4): the prepared subject may be OWN_COMPANY. Shape is v44's. */
 export const TurnReaderV48ResultSchema = TurnReaderV44ResultSchema;
 export type TurnReaderV48Result = z.infer<typeof TurnReaderV48ResultSchema>;
+
+export const TURN_READER_V49_SCHEMA_VERSION = 49;
+
+/**
+ * v49 (lead review 2026-10-12): whether they ask Q's team to carry out a
+ * piece of work of several steps for them ("get your team to investigate
+ * Ledgerfold and prepare me for a meeting"). Read from meaning, in any
+ * words, so delegation never depends on naming three kinds of work; code
+ * then has the lead Q plan the job for their approval. Defaults to false
+ * so a reading that omits it is answered as before.
+ */
+export const TurnReaderV49ResultSchema = TurnReaderV44ResultSchema.extend({
+  teamJob: z.boolean().default(false),
+}).strict();
+export type TurnReaderV49Result = z.infer<typeof TurnReaderV49ResultSchema>;

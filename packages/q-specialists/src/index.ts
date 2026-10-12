@@ -306,6 +306,14 @@ export {
   type QHandOverPort,
 } from "./hand-over.js";
 export {
+  createToolTeamJobPort,
+  TEAM_JOB_KINDS,
+  teamJobLine,
+  workKindsAsked,
+  type QTeamJobPort,
+  type TeamJobOutcome,
+} from "./team-job.js";
+export {
   actOnDelegation,
   createToolDelegationPort,
   DELEGATION_CANDIDATE,

@@ -106,9 +106,15 @@ async function rehearse() {
           .first();
         // Discover merges Q into its card rail; a fresh profile uses the
         // existing dock (whose accessible name includes presence/context).
-        const control = (await askButton.isVisible())
-          ? askButton
-          : page.locator("[data-q-dock-button]").first();
+        // Whichever becomes visible first is the control: checking once
+        // raced the rail's render and picked the dock Discover hides.
+        const dock = page.locator("[data-q-dock-button]:visible").first();
+        const control = await Promise.any([
+          askButton
+            .waitFor({ state: "visible", timeout: 30000 })
+            .then(() => askButton),
+          dock.waitFor({ state: "visible", timeout: 30000 }).then(() => dock),
+        ]);
         console.log(
           JSON.stringify({
             phase: "open-q",
