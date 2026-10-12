@@ -38,6 +38,14 @@ import type {
  * under the version the caller read.
  */
 
+/** A bounded search of one owner's conversations; see `searchForOwner`. */
+export type QConversationSearch = {
+  readonly companyIds: readonly string[];
+  readonly terms: readonly string[];
+  readonly except: readonly string[];
+  readonly limit: number;
+};
+
 export type QConversationRepository = {
   readonly insert: (
     tx: TransactionContext,
@@ -80,6 +88,20 @@ export type QConversationRepository = {
       readonly limit: number;
       readonly before?: UtcTimestamp | undefined;
     },
+  ) => Promise<readonly QConversation[]>;
+  /**
+   * The owner's own summarised conversations that look relevant to what
+   * they are asking now, for cross-conversation memory: those whose
+   * subjects name one of `companyIds`, or whose title or summary contains
+   * one of `terms`. Tenant, owner and not archived, always; `except` is
+   * left out; newest activity first. The implementation bounds it (at most
+   * 4 rows, 8 terms of 3-60 characters) whatever the caller asks.
+   */
+  readonly searchForOwner: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    userId: UserId,
+    query: QConversationSearch,
   ) => Promise<readonly QConversation[]>;
   /** Other recent conversations of the owner, for cross-conversation memory: identifiers, titles and summaries only. */
   readonly setDigest: (

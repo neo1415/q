@@ -251,6 +251,7 @@ export {
   MemoryWriteModeSchema,
   type MemoryBundle,
   type MemoryCandidate,
+  type MemoryConversationDigest,
   type MemoryItem,
   type MemoryOwner,
   type MemoryOwnerContextType,
@@ -281,7 +282,12 @@ export {
   type RecallQuery,
   type RememberCommand,
 } from "./memory/service.js";
-export { MEMORY_TEXT_MAX, renderMemoryBundle } from "./memory/render.js";
+export {
+  MEMORY_TEXT_MAX,
+  RELEVANT_LABEL,
+  renderMemoryBundle,
+} from "./memory/render.js";
+export { RECALL_TERMS_MAX, recallTermsFrom } from "./memory/recall-terms.js";
 
 export {
   COMMUNICATION_ASPECTS,

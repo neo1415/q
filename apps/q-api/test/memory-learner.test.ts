@@ -90,6 +90,7 @@ function world(extractorOutput: unknown) {
     person: [],
     company: [],
     thisConversation: null,
+    relevant: [],
     otherConversations: [],
   };
   const memory: MemoryService = {
