@@ -23,6 +23,10 @@ on:
         description: "Also run the Playwright e2e job (needs a seeded local stack)"
         type: boolean
         default: false
+      diagnose_job:
+        description: "Read one existing repository job's failed-test evidence (diagnostic branch only)"
+        type: string
+        default: ""
 
 # Read-only. This job checks out code and runs local tooling; it never writes to
 # the repository, publishes, or deploys. Unspecified permissions default to none.
@@ -35,6 +39,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  failed_test_evidence:
+    name: failed-test-evidence
+    if: github.event_name == 'workflow_dispatch' && inputs.diagnose_job != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Recover the specified job's failure excerpt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CQ_DIAG_JOB: ${{ inputs.diagnose_job }}
+        run: |
+          [[ "$CQ_DIAG_JOB" =~ ^[0-9]{1,16}$ ]] || exit 1
+          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${CQ_DIAG_JOB}/logs" > /tmp/cq-failed-job.log
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('/tmp/cq-failed-job.log').read_text(errors='replace')
+          start = text.find('Failed Tests')
+          if start < 0:
+              start = text.find('FAIL ')
+          if start < 0:
+              raise SystemExit('No failing-test excerpt found in specified job')
+          excerpt = text[max(0, start - 100):start + 16000]
+          escaped = excerpt.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print('::notice title=Specified CI job failure evidence::' + escaped)
+          PY
   # The quality gate's checks run as parallel jobs (2026-10-12): the same
   # commands as one serial job, on clean runners, in about half the wall
   # clock (lint ~9 min and tests ~14 min no longer queue behind each other).
