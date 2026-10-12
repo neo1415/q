@@ -977,3 +977,37 @@ export const QVoiceCardUpdateSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 export type QVoiceCardUpdate = z.infer<typeof QVoiceCardUpdateSchema>;
+
+/**
+ * The GPT-Live trial (owner 2026-10-12): a named person may use live voice
+ * for a cumulative allowance of ACTIVE SPEECH (their words plus Q's, idle
+ * silence excluded), measured by the Q API from the provider's own events.
+ * The server is the only authority: the browser shows these numbers and
+ * may report a bounded hint that can only consume allowance, never add it.
+ */
+export const Q_VOICE_LIVE_TRIAL_MAX_SECONDS = 3_600;
+
+export const QVoiceLiveTrialSchema = z
+  .object({
+    /** The grant, in seconds of active speech. */
+    allowanceSeconds: z
+      .number()
+      .int()
+      .min(1)
+      .max(Q_VOICE_LIVE_TRIAL_MAX_SECONDS),
+    /** What is left now, rounded down; 0: spent. */
+    remainingSeconds: z
+      .number()
+      .int()
+      .min(0)
+      .max(Q_VOICE_LIVE_TRIAL_MAX_SECONDS),
+  })
+  .strict();
+export type QVoiceLiveTrial = z.infer<typeof QVoiceLiveTrialSchema>;
+
+/**
+ * The problem `code` of a live-voice open refused because the trial is
+ * spent (HTTP 429, so the browser opens the standard voice exactly as for
+ * a provider quota refusal).
+ */
+export const Q_VOICE_LIVE_TRIAL_SPENT = "LIVE_VOICE_TRIAL_SPENT" as const;

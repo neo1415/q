@@ -463,6 +463,66 @@ describe("the voice preview gate", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
+  it("passes on a spent trial's code and its remaining time, and nothing else of a refusal", async () => {
+    const refusal = (body: unknown) =>
+      vi.fn<typeof fetch>(() =>
+        Promise.resolve(Response.json(body, { status: 429 })),
+      );
+    const open = () =>
+      new Request("http://web.test/api/q-voice-live/open", {
+        method: "POST",
+        body: JSON.stringify({ sdp: "v=0 offer here" }),
+      });
+    const spent = await relayLive(
+      open(),
+      { relay: "open" },
+      {
+        doFetch: refusal({ status: 429, code: "LIVE_VOICE_TRIAL_SPENT" }),
+        enabled: () => true,
+      },
+    );
+    expect(spent.status).toBe(429);
+    expect(await spent.json()).toMatchObject({
+      code: "LIVE_VOICE_TRIAL_SPENT",
+    });
+    const quota = await relayLive(
+      open(),
+      { relay: "open" },
+      {
+        doFetch: refusal({ status: 429, code: "x", detail: "provider said" }),
+        enabled: () => true,
+      },
+    );
+    expect(quota.status).toBe(429);
+    const body = (await quota.json()) as Record<string, unknown>;
+    expect(body["code"]).toBeUndefined();
+    expect(body["detail"]).toBeUndefined();
+
+    const opened = await relayLive(
+      open(),
+      { relay: "open" },
+      {
+        doFetch: vi.fn<typeof fetch>(() =>
+          Promise.resolve(
+            Response.json({
+              voiceSessionId: "5f000000-0000-4000-8000-000000000001",
+              sdp: "v=0 answer",
+              provider: "openai",
+              model: null,
+              maxSessionMs: 1_200_000,
+              idleMs: 180_000,
+              trial: { allowanceSeconds: 300, remainingSeconds: 185 },
+            }),
+          ),
+        ),
+        enabled: () => true,
+      },
+    );
+    expect(((await opened.json()) as Record<string, unknown>)["trial"]).toEqual(
+      { allowanceSeconds: 300, remainingSeconds: 185 },
+    );
+  });
+
   it("relays a valid delegation with the person's session when open", async () => {
     const upstream = vi.fn<typeof fetch>(() =>
       Promise.resolve(

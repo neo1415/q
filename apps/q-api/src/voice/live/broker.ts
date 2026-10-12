@@ -7,6 +7,7 @@ import {
   QVoiceDestinationSchema,
   sensitivityWithin,
   type ModelSensitivity,
+  type QVoiceLiveTrial,
 } from "@capital-q/contracts";
 import type { ArrivalSnapshot } from "@capital-q/contracts";
 import type { ModelUsageRepository } from "@capital-q/model-gateway";
@@ -51,6 +52,13 @@ import {
 import { heardRequest, spokenWords, UNHEARD_COMMENTARY } from "./heard.js";
 import type { PronunciationStore } from "./pronunciations.js";
 import { livePrompt } from "./prompt.js";
+import {
+  createSpeechMeter,
+  speechSignalOf,
+  withHint,
+  type LiveTrialUsageStore,
+  type SpeechMeter,
+} from "./trial.js";
 
 /** The exchange since the previous delegation that Q Brain is shown. */
 const LEAD_TURNS_MAX = 6;
@@ -142,7 +150,12 @@ export type LiveRefusal =
    * ran out of credit). Every OpenAI voice line shares it, so the client
    * skips the duplex line and goes straight to the standard voice.
    */
-  | "PROVIDER_QUOTA";
+  | "PROVIDER_QUOTA"
+  /**
+   * The person's live-voice trial allowance is used up. Answered like
+   * PROVIDER_QUOTA (429): the browser opens the standard voice.
+   */
+  | "TRIAL_SPENT";
 
 export type LiveOpenOutcome =
   | { readonly kind: "OPEN"; readonly result: LiveOpenResult }
@@ -197,6 +210,32 @@ type LiveLine = {
    * delegated, and its transcript is kept as the rehearsal's turns.
    */
   rehearsalId?: string | undefined;
+  /** Set on a trial person's line: its allowance and speech meter. */
+  trial?: TrialLine | undefined;
+};
+
+/** A trial line's allowance accounting (trial.ts). */
+type TrialLine = {
+  readonly allowanceSeconds: number;
+  /** The person's seconds on every other session, as last read. */
+  othersSeconds: number;
+  readonly meter: SpeechMeter;
+  observer: { readonly stop: () => void } | null;
+  /**
+   * The sideband was lost (or never attached) at this time: from then the
+   * line counts wall-clock, because unmeasured is not unspoken.
+   */
+  lostAt: number | null;
+  /** What the meter had measured when the sideband was lost, ms. */
+  lostBaseMs: number;
+  /** The browser's own count (only ever raises the charge). */
+  hintSeconds: number | undefined;
+  persisting: Promise<void>;
+  timer: ReturnType<typeof setInterval> | null;
+  ticks: number;
+  spent: boolean;
+  /** When the line ended: nothing after it is charged. */
+  stoppedAt: number | null;
 };
 
 export type LiveBroker = {
@@ -233,7 +272,16 @@ export type LiveBroker = {
     recordedSeconds: number;
     remainingMs: number;
     capReached?: boolean;
+    trial?: QVoiceLiveTrial;
+    trialSpent?: boolean;
   } | null>;
+  /** Whether this person has a live-voice trial (config, no read). */
+  readonly isTrialUser: (userId: string) => boolean;
+  /**
+   * This person's trial and what is left of it; null when they have no
+   * trial. Throws when their use cannot be read (unknown is not unused).
+   */
+  readonly trialFor: (actor: ActorContext) => Promise<QVoiceLiveTrial | null>;
   readonly end: (input: {
     readonly actor: ActorContext;
     readonly voiceSessionId: string;
@@ -283,6 +331,11 @@ export type LiveBrokerDependencies = {
       }
     | undefined;
   readonly now?: (() => number) | undefined;
+  /**
+   * The trial's persisted use (q_runtime.voice_live_trial_usage). Absent,
+   * a trial person's line is refused: their use could not be counted.
+   */
+  readonly trialUsage?: LiveTrialUsageStore | undefined;
   /**
    * q_runtime.voice_line_turns (A's duplex write path): both sides of the
    * line, routed 'live', so what GPT-Live said can be audited.
@@ -344,6 +397,10 @@ export const LIVE_SWEEP_MS = 30_000;
  * seconds of speech, and the browser itself closes after `idleMs` silence.
  */
 export const LIVE_INACTIVE_GRACE_MS = 2 * 60 * 1000;
+/** A trial line checks its allowance this often (and on every signal). */
+export const TRIAL_TICK_MS = 1_000;
+/** ... and saves its use every this many ticks (and when it ends). */
+export const TRIAL_PERSIST_TICKS = 5;
 
 /** Q's run, collected: what it said, or the facts of a code-built answer. */
 function collector(
@@ -521,8 +578,128 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     }
   };
 
+  // --- The trial (trial.ts) -------------------------------------------------
+
+  const trialAllowance = (userId: string) =>
+    config.trial.get(userId.toLowerCase());
+
+  /** This trial line's charge so far, seconds. */
+  const trialLineSeconds = (line: LiveLine, at: number): number => {
+    const trial = line.trial;
+    if (trial === undefined) return 0;
+    // Nothing after the line ended counts.
+    const until = Math.min(at, trial.stoppedAt ?? at);
+    const ms =
+      trial.lostAt === null
+        ? trial.meter.measuredMs(until)
+        : trial.lostBaseMs + Math.max(0, until - trial.lostAt);
+    return withHint(
+      ms / 1000,
+      trial.hintSeconds,
+      (until - line.openedAt) / 1000,
+    );
+  };
+
+  const trialRemaining = (line: LiveLine, at: number): number => {
+    const trial = line.trial;
+    if (trial === undefined) return Number.POSITIVE_INFINITY;
+    return Math.max(
+      0,
+      trial.allowanceSeconds - trial.othersSeconds - trialLineSeconds(line, at),
+    );
+  };
+
+  /**
+   * The line's charge into Postgres (only ever raised), one write at a
+   * time, and every other session of theirs read back: a second device's
+   * use reaches this line within one persist.
+   */
+  const persistTrial = (line: LiveLine): Promise<void> => {
+    const trial = line.trial;
+    const store = deps.trialUsage;
+    if (trial === undefined || store === undefined) return Promise.resolve();
+    trial.persisting = trial.persisting.then(async () => {
+      const seconds = trialLineSeconds(line, now());
+      try {
+        const total = await store.record({
+          actor: line.actor,
+          providerSessionId: line.providerSessionId,
+          voiceSessionId: line.voiceSessionId,
+          seconds,
+        });
+        trial.othersSeconds = Math.max(0, total - seconds);
+      } catch (error: unknown) {
+        logger.warn({ err: error }, "live voice trial use could not be saved");
+      }
+    });
+    return trial.persisting;
+  };
+
+  /** Past the allowance: the line ends now (its provider session too). */
+  const checkTrial = (line: LiveLine) => {
+    const trial = line.trial;
+    if (trial === undefined || trial.spent) return;
+    if (trialRemaining(line, now()) > 0) return;
+    trial.spent = true;
+    logger.info(
+      { qVoiceSessionId: line.voiceSessionId },
+      "live voice trial allowance used up: line ended",
+    );
+    if (lines.get(line.voiceSessionId) === line) forget(line, "trial_spent");
+  };
+
+  const startTrial = (line: LiveLine) => {
+    const trial = line.trial;
+    if (trial === undefined) return;
+    const lose = () => {
+      if (trial.lostAt !== null) return;
+      const at = now();
+      trial.lostBaseMs = trial.meter.measuredMs(at);
+      trial.lostAt = at;
+      logger.warn(
+        { qVoiceSessionId: line.voiceSessionId },
+        "live voice trial meter lost: counting wall-clock",
+      );
+    };
+    if (provider?.observeSession === undefined) {
+      lose();
+    } else {
+      trial.observer = provider.observeSession(line.providerSessionId, {
+        onEvent: (event) => {
+          const signal = speechSignalOf(event);
+          if (signal === null) return;
+          trial.meter.signal(signal, now());
+          checkTrial(line);
+        },
+        onLost: lose,
+      });
+    }
+    trial.timer = setInterval(() => {
+      trial.ticks += 1;
+      checkTrial(line);
+      if (!trial.spent && trial.ticks % TRIAL_PERSIST_TICKS === 0)
+        void persistTrial(line);
+    }, TRIAL_TICK_MS);
+    trial.timer.unref();
+  };
+
+  const stopTrial = (line: LiveLine) => {
+    const trial = line.trial;
+    if (trial === undefined) return;
+    if (trial.timer !== null) clearInterval(trial.timer);
+    trial.timer = null;
+    const at = now();
+    // Charged up to now; nothing after the line ends counts.
+    trial.meter.signal({ kind: "closed" }, at);
+    trial.stoppedAt = at;
+    trial.observer?.stop();
+    trial.observer = null;
+    void persistTrial(line);
+  };
+
   const forget = (line: LiveLine, reason: string) => {
     lines.delete(line.voiceSessionId);
+    stopTrial(line);
     for (const delegation of line.delegations.values()) {
       if (!delegation.settled) delegation.controller.abort();
     }
@@ -806,6 +983,23 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         if (persona === null) return { kind: "REFUSED", reason: "REHEARSAL" };
       }
       const { actor } = binding;
+      // The trial: a person with an allowance opens a line only while some
+      // of it is left; their use is read from Postgres (any device, any
+      // instance). An unreadable use refuses: unknown is not unused.
+      const allowance = trialAllowance(actor.userId);
+      let trialUsed = 0;
+      if (allowance !== undefined) {
+        if (deps.trialUsage === undefined)
+          return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
+        try {
+          trialUsed = await deps.trialUsage.usedSeconds(actor);
+        } catch (error: unknown) {
+          logger.warn({ err: error }, "live voice trial use unreadable");
+          return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
+        }
+        if (trialUsed >= allowance)
+          return { kind: "REFUSED", reason: "TRIAL_SPENT" };
+      }
       sweep();
       // One live line per person: a new one replaces what was open. A
       // renewal of the same call (same voice session) keeps what Q was
@@ -883,7 +1077,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         };
       }
       const at = now();
-      lines.set(binding.voiceSessionId, {
+      const line: LiveLine = {
         voiceSessionId: binding.voiceSessionId,
         providerSessionId: created.sessionId,
         actor,
@@ -900,7 +1094,27 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         ...(persona === null || rehearsal === undefined
           ? {}
           : { rehearsalId: rehearsal.rehearsalId }),
-      });
+        ...(allowance === undefined
+          ? {}
+          : {
+              trial: {
+                allowanceSeconds: allowance,
+                othersSeconds: trialUsed,
+                meter: createSpeechMeter(),
+                observer: null,
+                lostAt: null,
+                lostBaseMs: 0,
+                hintSeconds: undefined,
+                persisting: Promise.resolve(),
+                timer: null,
+                ticks: 0,
+                spent: false,
+                stoppedAt: null,
+              },
+            }),
+      };
+      lines.set(binding.voiceSessionId, line);
+      startTrial(line);
       // Part 6: the background note for this session (and its renewals).
       // A persona line gets none: its prepared context is the whole of what
       // it may use, and no record of the founder's rides in on the side.
@@ -956,6 +1170,16 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           maxSessionMs: config.maxSessionMs,
           idleMs: config.idleMs,
           context,
+          ...(allowance === undefined
+            ? {}
+            : {
+                trial: {
+                  allowanceSeconds: allowance,
+                  remainingSeconds: Math.floor(
+                    Math.max(0, allowance - trialUsed),
+                  ),
+                },
+              }),
         },
       };
     },
@@ -1119,6 +1343,18 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           : report.seconds,
       );
       if (report.final === true) line.finalReported = true;
+      // The trial: the browser's count may raise the charge, never lower
+      // it (trialLineSeconds bounds it by the line's wall-clock length).
+      const trial = line.trial;
+      if (trial !== undefined) {
+        if (report.speechSeconds !== undefined) {
+          trial.hintSeconds = Math.max(
+            trial.hintSeconds ?? 0,
+            report.speechSeconds,
+          );
+        }
+        checkTrial(line);
+      }
       // The daily cap holds during a line too, not only at its start: past
       // it the client closes (its seconds are already on today's ledger).
       let capReached = false;
@@ -1132,12 +1368,37 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           capReached = true;
         }
       }
+      const trialSpent = trial?.spent === true;
       return {
         recordedSeconds: line.recordedSeconds,
-        remainingMs: capReached
-          ? 0
-          : Math.max(0, config.maxSessionMs - (now() - line.openedAt)),
+        remainingMs:
+          capReached || trialSpent
+            ? 0
+            : Math.max(0, config.maxSessionMs - (now() - line.openedAt)),
         ...(capReached ? { capReached: true } : {}),
+        ...(trial === undefined
+          ? {}
+          : {
+              trial: {
+                allowanceSeconds: trial.allowanceSeconds,
+                remainingSeconds: Math.floor(trialRemaining(line, now())),
+              },
+            }),
+        ...(trialSpent ? { trialSpent: true } : {}),
+      };
+    },
+
+    isTrialUser: (userId) => trialAllowance(userId) !== undefined,
+
+    trialFor: async (actor) => {
+      const allowance = trialAllowance(actor.userId);
+      if (allowance === undefined) return null;
+      if (deps.trialUsage === undefined)
+        throw new Error("live voice trial use is not stored here");
+      const used = await deps.trialUsage.usedSeconds(actor);
+      return {
+        allowanceSeconds: allowance,
+        remainingSeconds: Math.floor(Math.max(0, allowance - used)),
       };
     },
 

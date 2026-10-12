@@ -62,6 +62,7 @@ const SnapshotSchema = z.object({
       areas: z.array(z.string().max(80)).max(40),
       tools: z.array(z.string().max(120)).max(200),
       widen: z.boolean().optional(),
+      readsOnly: z.boolean().optional(),
     })
     .nullable(),
 });
@@ -84,6 +85,9 @@ export function readCoreSnapshot(
             areas: focus.areas,
             tools: focus.tools,
             ...(focus.widen === undefined ? {} : { widen: focus.widen }),
+            ...(focus.readsOnly === undefined
+              ? {}
+              : { readsOnly: focus.readsOnly }),
           },
   };
 }

@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { liveUnavailableForTab } from "../live/availability";
 import {
+  isLiveTrialSpent,
   LiveCallUnavailable,
   startLiveCall,
   type LiveCall,
@@ -10,6 +12,11 @@ import {
   type LiveCallOptions,
   type LiveTranscript,
 } from "../live/live-call";
+import {
+  LIVE_TRIAL_LOW_SECONDS,
+  liveTrialLeftNotice,
+  noteLiveTrialSpent,
+} from "../live/trial";
 import type { VoiceAudioOwner } from "../voice-audio";
 import type {
   VoiceSessionClient,
@@ -37,7 +44,7 @@ import type {
  * then skips the duplex line and opens the standard voice (lead,
  * 2026-10-09: the demo must degrade to a working voice, not two failures).
  */
-export type LiveStart = "LIVE" | "FAILED" | "QUOTA";
+export type LiveStart = "LIVE" | "FAILED" | "QUOTA" | "TRIAL_SPENT";
 
 export type LiveVoiceClient = Omit<VoiceSessionClient, "start"> & {
   readonly start: (input: VoiceSessionStart) => Promise<LiveStart>;
@@ -46,6 +53,9 @@ export type LiveVoiceClient = Omit<VoiceSessionClient, "start"> & {
 /** Said once when a GPT-Live call cannot open and another line takes over. */
 export const LIVE_FALLBACK_NOTICE =
   "Live voice isn't available right now, so I'm on my standard voice.";
+
+/** How long a status line (time left on the trial) stays up. */
+const STATUS_SHOWN_MS = 6_000;
 
 const GREETING =
   "The call has just connected. Greet them warmly now, in one short natural sentence: no question, no filler.";
@@ -73,6 +83,22 @@ export function useLiveVoiceSession(
   const startCall = options.startCall ?? startLiveCall;
   const callRef = useRef<LiveCall | null>(null);
   const startsRef = useRef(0);
+  // One plain status line at a time, shown briefly (the trial's time left).
+  const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showStatus = useCallback((text: string) => {
+    if (statusTimer.current !== null) clearTimeout(statusTimer.current);
+    eventsRef.current.onLinkStatus?.(text);
+    statusTimer.current = setTimeout(() => {
+      statusTimer.current = null;
+      eventsRef.current.onLinkStatus?.(null);
+    }, STATUS_SHOWN_MS);
+  }, []);
+  useEffect(
+    () => () => {
+      if (statusTimer.current !== null) clearTimeout(statusTimer.current);
+    },
+    [],
+  );
 
   const onTranscript = useCallback((line: LiveTranscript) => {
     if (line.text.length === 0) return;
@@ -114,6 +140,8 @@ export function useLiveVoiceSession(
       setState("CONNECTING");
       const opening = firstMessage ?? credential.firstMessage;
       let came = false;
+      let trialShown = false;
+      let trialLowShown = false;
       try {
         const call = await startCall({
           voice: credential.voice,
@@ -142,15 +170,35 @@ export function useLiveVoiceSession(
                   : current,
               );
           },
+          onTrial: (trial) => {
+            if (startsRef.current !== mine) return;
+            // Progressive: what is left when the call opens, and once more
+            // when less than a minute is left; nothing in between.
+            const opening = !trialShown;
+            const low =
+              trial.remainingSeconds < LIVE_TRIAL_LOW_SECONDS && !trialLowShown;
+            if (!opening && !low) return;
+            trialShown = true;
+            if (low) trialLowShown = true;
+            showStatus(liveTrialLeftNotice(trial.remainingSeconds));
+          },
           onEnded: (reason: LiveCallEnd) => {
             if (startsRef.current !== mine) return;
             callRef.current = null;
             setConnected(false);
             setState("IDLE");
+            if (reason === "trial") {
+              // The standard voice takes over, and says why once it is up.
+              liveUnavailableForTab();
+              noteLiveTrialSpent();
+            }
             // A call that came up and then lost its network is reported as
-            // dropped, which is what brings the surface's line back.
+            // dropped, which is what brings the surface's line back (on the
+            // standard voice when the trial ran out).
             eventsRef.current.onEnded?.(
-              reason === "network" || reason === "provider"
+              reason === "network" ||
+                reason === "provider" ||
+                reason === "trial"
                 ? "dropped"
                 : "ended",
             );
@@ -167,12 +215,16 @@ export function useLiveVoiceSession(
         return "LIVE";
       } catch (error: unknown) {
         if (!came) setState("IDLE");
+        if (isLiveTrialSpent(error)) {
+          liveUnavailableForTab();
+          return "TRIAL_SPENT";
+        }
         return error instanceof LiveCallUnavailable && error.status === 429
           ? "QUOTA"
           : "FAILED";
       }
     },
-    [onTranscript, startCall, options.audioOwner],
+    [onTranscript, startCall, options.audioOwner, showStatus],
   );
 
   const end = useCallback(async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PLAIN_QUESTION_FOCUS,
   RESEARCH_TOOLS,
   toolFocusOf,
   type FocusReading,
@@ -95,10 +96,97 @@ describe("toolFocusOf", () => {
     ).toEqual({ areas: ["Relationships"], tools: [], widen: true });
     // Nothing to act on and nothing it is about: the purpose's list.
     expect(focus(reading({ kind: "TOOL_REQUEST" }), [])).toBeNull();
-    // A question that names nothing keeps the whole offer, navigation
+    // A question that names nothing keeps the whole list, navigation
     // included; the gateway keeps the web tool on such turns (founder
     // 2026-10-06: Q said it could not scroll when this was narrowed).
-    expect(focus(reading({}), ["INVESTOR_ORGANISATION"])).toBeNull();
+    // Tool budget 2026-10-12: widened, but reads only (navigation and
+    // use_capability are core, so they stay).
+    expect(focus(reading({}), ["INVESTOR_ORGANISATION"])).toBe(
+      PLAIN_QUESTION_FOCUS,
+    );
+    expect(PLAIN_QUESTION_FOCUS).toEqual({
+      areas: [],
+      tools: RESEARCH_TOOLS,
+      widen: true,
+      readsOnly: true,
+    });
+  });
+
+  describe("tool budget 2026-10-12: a question to Q is shown reads only", () => {
+    it("a question by its kind is reads only; a request to act never is", () => {
+      expect(focus(reading({ questionKind: "ADVICE" }), ["COMPANY"])).toEqual({
+        areas: ["Records", "Research"],
+        tools: RESEARCH_TOOLS,
+        readsOnly: true,
+      });
+      expect(
+        focus(
+          reading({ kind: "TOOL_REQUEST", namedTools: ["propose_meeting"] }),
+        )?.readsOnly,
+      ).toBeUndefined();
+      expect(
+        focus(reading({ kind: "TOOL_REQUEST" }), ["COMPANY"])?.readsOnly,
+      ).toBeUndefined();
+      for (const kind of ["ANSWER", "CORRECTION", "RESEARCH_REQUEST"]) {
+        expect(
+          focus(reading({ kind, questionKind: "ADVICE" }))?.readsOnly,
+        ).toBeUndefined();
+      }
+    });
+
+    it("a question that names an action, holds a hand or hands over is not reads only", () => {
+      expect(
+        focus(
+          reading({ questionKind: "ADVICE", namedTools: ["propose_meeting"] }),
+        )?.readsOnly,
+      ).toBeUndefined();
+      expect(
+        focus(reading({ questionKind: "ADVICE", hand: "SET_VISIBILITY" }))
+          ?.readsOnly,
+      ).toBeUndefined();
+      expect(
+        focus(reading({ questionKind: "ADVICE", handOver: true }))?.readsOnly,
+      ).toBeUndefined();
+    });
+
+    it('"yes" after a question never inherits reads only', () => {
+      // After a plain question: exactly as before (nothing to continue).
+      expect(
+        toolFocusOf({
+          reading: reading({ kind: "ANSWER" }),
+          subjectKinds: [],
+          areaOf,
+          previous: PLAIN_QUESTION_FOCUS,
+        }),
+      ).toBeNull();
+      // After a question by kind: its areas and tools, every tool in them.
+      const after = toolFocusOf({
+        reading: reading({ kind: "ANSWER" }),
+        subjectKinds: [],
+        areaOf,
+        previous: { areas: ["Research"], tools: [], readsOnly: true },
+      });
+      expect(after).toEqual({ areas: ["Research"], tools: [] });
+    });
+
+    it("onboarding keeps every tool shown", () => {
+      const onboarding = (read: FocusReading) =>
+        toolFocusOf({
+          reading: read,
+          subjectKinds: [],
+          areaOf,
+          previous: null,
+          onboarding: true,
+        });
+      expect(onboarding(reading({}))).toEqual({
+        areas: [],
+        tools: RESEARCH_TOOLS,
+        widen: true,
+      });
+      expect(
+        onboarding(reading({ questionKind: "THEIR_OWN_RECORDS" }))?.readsOnly,
+      ).toBeUndefined();
+    });
   });
 
   describe("research and web reading are guaranteed (run 13955ca2)", () => {

@@ -40,11 +40,16 @@ let available = true;
 let opens = true;
 let quota = false;
 let neverAnswers = false;
+let trialSpent = false;
+let trialOnOpen: { allowanceSeconds: number; remainingSeconds: number } | null =
+  null;
 class LiveCallUnavailable extends Error {
   readonly status: number | null;
-  constructor(status: number | null) {
+  readonly code: string | null;
+  constructor(status: number | null, code: string | null = null) {
     super("live voice unavailable");
     this.status = status;
+    this.code = code;
   }
 }
 const calls: Record<string, unknown>[] = [];
@@ -52,6 +57,10 @@ const typed: string[] = [];
 let slowAnswer: Promise<boolean> | null = null;
 vi.mock("../src/features/voice/live/live-call", () => ({
   LiveCallUnavailable,
+  isLiveTrialSpent: (error: unknown) =>
+    error instanceof LiveCallUnavailable &&
+    error.status === 429 &&
+    error.code === "LIVE_VOICE_TRIAL_SPENT",
   LIVE_AVAILABLE_TIMEOUT_MS: 1_500,
   askLiveVoice: () =>
     neverAnswers
@@ -59,7 +68,14 @@ vi.mock("../src/features/voice/live/live-call", () => ({
       : (slowAnswer ?? Promise.resolve(available)),
   startLiveCall: (options: Record<string, unknown>) => {
     calls.push(options);
+    if (trialSpent)
+      return Promise.reject(
+        new LiveCallUnavailable(429, "LIVE_VOICE_TRIAL_SPENT"),
+      );
     if (quota) return Promise.reject(new LiveCallUnavailable(429));
+    if (trialOnOpen !== null) {
+      (options["onTrial"] as (trial: typeof trialOnOpen) => void)(trialOnOpen);
+    }
     if (!opens) return Promise.reject(new LiveCallUnavailable(503));
     return Promise.resolve({
       voiceSessionId: "5f000000-0000-4000-8000-000000000001",
@@ -87,6 +103,19 @@ const ready = () =>
   });
 const { LIVE_FALLBACK_NOTICE } =
   await import("../src/features/voice/provider/live-session");
+const { LIVE_TRIAL_SPENT_NOTICE, liveTrialLeftNotice } =
+  await import("../src/features/voice/live/trial");
+
+describe("the trial's words", () => {
+  it("are plain and approximate", () => {
+    expect(liveTrialLeftNotice(300)).toBe("About 5 min of live voice left.");
+    expect(liveTrialLeftNotice(185)).toBe("About 3 min of live voice left.");
+    expect(liveTrialLeftNotice(75)).toBe("About a minute of live voice left.");
+    expect(liveTrialLeftNotice(20)).toBe(
+      "Less than a minute of live voice left.",
+    );
+  });
+});
 
 const credential = {
   voiceSessionId: "5f000000-0000-4000-8000-000000000001",
@@ -118,6 +147,8 @@ describe("GPT-Live as the product voice", () => {
     opens = true;
     quota = false;
     neverAnswers = false;
+    trialSpent = false;
+    trialOnOpen = null;
     slowAnswer = null;
     duplexStart.mockClear();
     calls.length = 0;
@@ -295,6 +326,80 @@ describe("GPT-Live as the product voice", () => {
     });
     expect(calls).toHaveLength(0);
     expect(standardStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("says plainly how much live voice a trial has left when the call opens", async () => {
+    trialOnOpen = { allowanceSeconds: 300, remainingSeconds: 185 };
+    const statuses: (string | null)[] = [];
+    const { result } = renderHook(() =>
+      useVoiceSession({
+        onLinkStatus: (status) => {
+          statuses.push(status);
+        },
+      }),
+    );
+    await ready();
+    await act(async () => {
+      await result.current.start({ credential });
+    });
+    expect(statuses).toEqual(["About 3 min of live voice left."]);
+    expect(standardStart).not.toHaveBeenCalled();
+  });
+
+  it("a spent trial opens the standard voice at once, says why, and the tab stops trying live", async () => {
+    trialSpent = true;
+    const statuses: (string | null)[] = [];
+    const { result } = renderHook(() =>
+      useVoiceSession({
+        onLinkStatus: (status) => {
+          statuses.push(status);
+        },
+      }),
+    );
+    await ready();
+    await act(async () => {
+      await result.current.start({ credential: withDuplex });
+    });
+    expect(calls).toHaveLength(1);
+    expect(duplexStart).not.toHaveBeenCalled();
+    expect(standardStart).toHaveBeenCalledTimes(1);
+    expect(statuses).toEqual([LIVE_TRIAL_SPENT_NOTICE]);
+    // The next start goes straight to the standard voice.
+    await act(async () => {
+      await result.current.start({ credential });
+    });
+    expect(calls).toHaveLength(1);
+    expect(standardStart).toHaveBeenCalledTimes(2);
+  });
+
+  it("a trial that runs out mid-call hands over to the standard voice with one line", async () => {
+    const ended: string[] = [];
+    const statuses: (string | null)[] = [];
+    const { result } = renderHook(() =>
+      useVoiceSession({
+        onEnded: (reason) => {
+          ended.push(reason);
+        },
+        onLinkStatus: (status) => {
+          statuses.push(status);
+        },
+      }),
+    );
+    await ready();
+    await act(async () => {
+      await result.current.start({ credential });
+    });
+    act(() => {
+      (calls[0]?.["onEnded"] as (reason: string) => void)("trial");
+    });
+    // Dropped, so the surface brings its line back: on the standard voice.
+    expect(ended).toEqual(["dropped"]);
+    await act(async () => {
+      await result.current.start({ credential });
+    });
+    expect(calls).toHaveLength(1);
+    expect(standardStart).toHaveBeenCalledTimes(1);
+    expect(statuses).toEqual([LIVE_TRIAL_SPENT_NOTICE]);
   });
 
   it("never opens GPT-Live where a surface opts out (a rehearsal)", async () => {

@@ -1,6 +1,7 @@
 import {
   QClientActionIntentSchema,
   QVoiceDestinationSchema,
+  QVoiceLiveTrialSchema,
 } from "@capital-q/contracts";
 import { z } from "zod";
 
@@ -69,6 +70,8 @@ export const LiveOpenResultSchema = z
      * sent to the voice as quiet context at the start of each session.
      */
     context: z.string().max(2_000).nullable().optional(),
+    /** Present only for a trial: the allowance and what is left of it. */
+    trial: QVoiceLiveTrialSchema.optional(),
   })
   .strict();
 export type LiveOpenResult = z.infer<typeof LiveOpenResultSchema>;
@@ -146,6 +149,16 @@ export const LiveUsageReportSchema = z
       .min(0)
       .max(24 * 3600),
     final: z.boolean().optional(),
+    /**
+     * The browser's own count of active speech on this session (a trial
+     * line): a hint that can only consume allowance, bounded by the
+     * session's wall-clock length on the server. Never authority.
+     */
+    speechSeconds: z
+      .number()
+      .min(0)
+      .max(24 * 3600)
+      .optional(),
   })
   .strict();
 export type LiveUsageReport = z.infer<typeof LiveUsageReportSchema>;
@@ -200,6 +213,10 @@ export const LiveUsageResultSchema = z
     remainingMs: z.number().int().min(0),
     /** Today's voice spend cap is reached: close now. */
     capReached: z.boolean().optional(),
+    /** A trial line: what is left of the allowance now. */
+    trial: QVoiceLiveTrialSchema.optional(),
+    /** The trial allowance is spent: close now (remainingMs is 0). */
+    trialSpent: z.boolean().optional(),
   })
   .strict();
 

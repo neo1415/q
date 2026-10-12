@@ -525,6 +525,14 @@ export type QToolFocus = {
    * app actions in them. Absent: the areas narrow the purpose's tools.
    */
   readonly widen?: boolean | undefined;
+  /**
+   * A question to Q (tool budget 2026-10-12): only READ_ONLY tools, the
+   * browser's own actions and what the turn named are offered; every
+   * change-making tool, core or not, stays one `use_capability` call
+   * away. Narrows the offer (cost) only: what may execute is decided
+   * without the focus, exactly as before.
+   */
+  readonly readsOnly?: boolean | undefined;
 };
 
 /**
