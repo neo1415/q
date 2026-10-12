@@ -289,6 +289,38 @@ describe("GPT-Live provider adapter", () => {
     expect(bodyOf(calls[0]?.init)).not.toContain(DISABLED_KEY);
   });
 
+  it("names a 429's machine code (quota vs rate limit), never its message (live 2026-10-12)", async () => {
+    for (const [body, code] of [
+      [
+        '{"error":{"message":"You exceeded your current quota, secret","type":"insufficient_quota","code":"insufficient_quota"}}',
+        "insufficient_quota",
+      ],
+      [
+        '{"error":{"message":"Rate limit reached for org-123","type":"requests","code":"rate_limit_exceeded"}}',
+        "rate_limit_exceeded",
+      ],
+      ["not json", null],
+      ['{"error":{"code":"Has Spaces And Secrets"}}', null],
+    ] as const) {
+      const provider = createGptLiveProvider({
+        apiKey: DISABLED_KEY,
+        fetch: () => Promise.resolve(new Response(body, { status: 429 })),
+      });
+      const failure = await provider
+        .createWebRtcSession({
+          config: { instructions: "x", voice: "marin" },
+          sdp: "v=0 offer sdp",
+        })
+        .catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(LiveProviderError);
+      expect((failure as LiveProviderError).status).toBe(429);
+      expect((failure as LiveProviderError).code).toBe(code);
+      expect((failure as Error).message).not.toMatch(
+        /secret|org-123|exceeded your/u,
+      );
+    }
+  });
+
   it("maps a refusal to a status without the provider's body", async () => {
     const provider = createGptLiveProvider({
       apiKey: DISABLED_KEY,
