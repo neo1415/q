@@ -9,6 +9,12 @@ import {
 } from "./app-action-turn.js";
 import { namesWebAddress, RESEARCH_TOOLS, toolFocusOf } from "./tool-focus.js";
 import {
+  TEAM_JOB_KINDS,
+  teamJobLine,
+  workKindsAsked,
+  type QTeamJobPort,
+} from "./team-job.js";
+import {
   readingMisfit,
   SPECULATIVE_READING,
   speculationMisfit,
@@ -541,6 +547,8 @@ export type SpecialistQAnswerDependencies = {
    * instruction. Absent: such a turn is answered as before.
    */
   readonly delegation?: QDelegationPort | undefined;
+  /** Several kinds of work at once: the lead Q plans a team job. */
+  readonly teamJob?: QTeamJobPort | undefined;
   /**
    * Their own readiness gaps as the opening lines of "what should I do
    * next?", or null when there are none (or no company of theirs).
@@ -3598,6 +3606,27 @@ export function createSpecialistQAnswer(
         reference.sameFor,
       );
       if (again !== null) return again;
+    }
+    // Several kinds of work at once (research, a memo, a critique, a
+    // revision, founder questions) is a job for Q's team, planned by the
+    // lead and approved as one card -- never one in-run brief, never a
+    // hand-over (live 2026-10-12). Without a plan it is answered as before.
+    if (
+      dependencies.teamJob !== undefined &&
+      read !== null &&
+      read.confidence !== "LOW" &&
+      read.addressedToQ !== false &&
+      workKindsAsked(latest.content) >= TEAM_JOB_KINDS
+    ) {
+      const planned = await dependencies.teamJob
+        .propose(request, latest.content)
+        .catch(() => null);
+      const line = planned === null ? null : teamJobLine(planned);
+      logger?.info(
+        { qRunId: request.runId, outcome: planned?.status ?? null },
+        "q several kinds of work asked: a team job",
+      );
+      if (line !== null) return recordAnswer(request, conversationId, line);
     }
     // A LOW reading is a guess, and a guess never moves anybody's screen or
     // prepares a change: it is answered like any other turn. A document
