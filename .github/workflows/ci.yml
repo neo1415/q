@@ -35,10 +35,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
-    name: quality
+  # The quality gate's checks run as parallel jobs (2026-10-12): the same
+  # commands as one serial job, on clean runners, in about half the wall
+  # clock (lint ~9 min and tests ~14 min no longer queue behind each other).
+  # `quality` below passes only when every one of them passed, so branch
+  # protection and Railway's "Wait for CI" see the same gate as before.
+  static:
+    name: format and lint
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -75,21 +80,158 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Cheapest gates first so obvious failures do not pay for a build.
+      # Cheapest gate first so an obvious failure is reported in a minute.
       - name: Format check
         run: pnpm format:check
 
       - name: Lint
         run: pnpm lint
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # .nvmrc is the single runtime version source, shared with local dev.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Corepack activates the exact pnpm pinned in package.json#packageManager,
+      # so CI and local development run the same package manager version.
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+          node --version
+          pnpm --version
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      # Fails if package.json and pnpm-lock.yaml have drifted apart.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck
         run: pnpm typecheck
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # .nvmrc is the single runtime version source, shared with local dev.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Corepack activates the exact pnpm pinned in package.json#packageManager,
+      # so CI and local development run the same package manager version.
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+          node --version
+          pnpm --version
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      # Fails if package.json and pnpm-lock.yaml have drifted apart.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Tests import workspace packages through their built output, which
+      # the serial job got from the typecheck step before it.
+      - name: Build workspace packages
+        run: pnpm exec turbo run build --filter=./packages/* --output-logs=errors-only
 
       - name: Test
         run: pnpm test
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # .nvmrc is the single runtime version source, shared with local dev.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Corepack activates the exact pnpm pinned in package.json#packageManager,
+      # so CI and local development run the same package manager version.
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+          node --version
+          pnpm --version
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      # Fails if package.json and pnpm-lock.yaml have drifted apart.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm build
+  quality:
+    name: quality
+    needs: [static, typecheck, test, build]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every quality check passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then exit 1; fi
+          done
 
   # Every migration from empty, then every pgTAP suite (RLS, grants,
   # append-only guards, schema guard). The local Supabase stack runs in

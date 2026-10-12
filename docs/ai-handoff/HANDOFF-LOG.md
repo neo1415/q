@@ -381,3 +381,12 @@ The tracked runner creates internal Q turns for an existing authorized account o
 - Live rehearsal (fictional investor) failed at the selected-company question: reader read it as "open"; fixed in PR #5 (`70f1be86`), not yet deployed.
 - PR #5: runner concurrency/error/lead-status; NAMED_COMPANY memo; SUBSTANCE_CRITIQUE revise; DILIGENCE questions → approval card. Local gates green; CI running.
 - Next: release PR #5, rerun rehearsal, run the full workforce acceptance live, then Tavus.
+
+## 2026-10-12 03:40 UTC — Claude Code — PR #5 live; team-job routing in PR #8
+
+- PR #5 released: int-rc `450c67ce` → CI lane `e3654b53` → deploy `f23583ad`; Railway reports all four services SUCCESS. The investor rehearsal PASSES live.
+- Live workforce acceptance found two routing defects:
+  - the hand-over shortcut turned the goal into a connection-request card (fixed in `7c0315b6`, deployed);
+  - the goal got a single in-run brief instead of a team job (fix in PR #8).
+- PR #8 also carries the dormant Tavus REST adapter and ADR 0066 (Proposed).
+- Next: release PR #8, then run `workforce-acceptance.mjs` and `--approve` live.
