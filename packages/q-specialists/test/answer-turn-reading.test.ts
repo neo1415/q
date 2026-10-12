@@ -1871,6 +1871,25 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     );
   });
 
+  it("a team job whose planning failed on Q's side says so, never asks them to reword it (live 2026-10-12)", async () => {
+    const teamJob: QTeamJobPort = {
+      propose: () => Promise.resolve({ status: "FAILED" }),
+    };
+    const { answer, delegated, stored } = seam({
+      said: "Research Ledgerfold, write a memo and have it critiqued",
+      reading: reading(null),
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(delegated()).toBe(0);
+    const said = stored.at(-1)?.content ?? "";
+    expect(said).toMatch(
+      /^I couldn't plan this for my team just now: something failed on my side/u,
+    );
+    expect(said).not.toMatch(/Tell me who it's about/u);
+  });
+
   it("work handed to the team in words naming no list of tasks is read by the reader and planned (lead review 2026-10-12)", async () => {
     const goals: string[] = [];
     const teamJob: QTeamJobPort = {

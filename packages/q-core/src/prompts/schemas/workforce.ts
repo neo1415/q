@@ -1,4 +1,5 @@
 import {
+  WORKFORCE_PLAN_CANNOT_MAX_LENGTH as JOB_PLAN_CANNOT_MAX,
   WorkforceDocumentCritiqueRequestSchema,
   WorkforceOwnDocumentRequestSchema,
 } from "@capital-q/contracts";
@@ -364,7 +365,7 @@ export const JobPlanResultSchema = z
       )
       .max(12),
     /** What the job asks that no permitted agent can do. */
-    cannot: z.array(z.string().trim().min(1).max(200)).max(5),
+    cannot: z.array(z.string().trim().min(1).max(JOB_PLAN_CANNOT_MAX)).max(5),
   })
   .strict();
 export type JobPlanResult = z.infer<typeof JobPlanResultSchema>;
@@ -404,7 +405,7 @@ export const JobPlanResultV2Schema = z
       )
       .max(12),
     /** What the job asks that no registered agent can do. */
-    cannot: z.array(z.string().trim().min(1).max(200)).max(5),
+    cannot: z.array(z.string().trim().min(1).max(JOB_PLAN_CANNOT_MAX)).max(5),
   })
   .strict();
 export type JobPlanResultV2 = z.infer<typeof JobPlanResultV2Schema>;

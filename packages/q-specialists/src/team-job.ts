@@ -58,6 +58,7 @@ const ProposedSchema = z.object({
     "NOT_PLANNED",
     "LIMIT_REACHED",
     "ALREADY_WAITING",
+    "FAILED",
   ]),
   plan: z
     .object({
@@ -126,8 +127,8 @@ export function createToolTeamJobPort(dependencies: {
         if (data.status === "ALREADY_WAITING") {
           return { status: "ALREADY_WAITING", waiting: data.waiting ?? [] };
         }
-        return data.status === "LIMIT_REACHED"
-          ? { status: "LIMIT_REACHED" }
+        return data.status === "LIMIT_REACHED" || data.status === "FAILED"
+          ? { status: data.status }
           : { status: "NOT_PLANNED" };
       } catch (error: unknown) {
         if (request.signal?.aborted === true) throw error;

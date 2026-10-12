@@ -447,7 +447,7 @@ export function createWorkforceJobBoard(dependencies: {
         const owner = { tenantId: actor.tenantId, userId: actor.userId };
         if (dependencies.withinLimit !== undefined) {
           const room = await dependencies.withinLimit(owner).catch(() => null);
-          if (room === null) return { status: "NOT_PLANNED" };
+          if (room === null) return { status: "FAILED" };
           if (!room) return { status: "LIMIT_REACHED" };
         }
         const jobs = dependencies.jobsFor(actor);
@@ -471,13 +471,14 @@ export function createWorkforceJobBoard(dependencies: {
                 : null,
           })
           .catch(() => null);
+        // Live 2026-10-12: the planner's provider refused (credit exhausted)
+        // and Q told the person to reword their goal. A plan that could not
+        // be made is Q's failure, said as one; NOT_PLANNED is kept for a
+        // plan that came back empty or named work no agent here can do.
+        if (planned === null) return { status: "FAILED" };
         // D1: a plan with any step no registered executor can run is not
         // offered at all -- never a partial plan approved as if whole.
-        if (
-          planned === null ||
-          planned.steps.length === 0 ||
-          planned.refused.length > 0
-        ) {
+        if (planned.steps.length === 0 || planned.refused.length > 0) {
           return { status: "NOT_PLANNED" };
         }
         const steps = planned.steps.slice(0, 12).map((step) => ({
@@ -501,7 +502,7 @@ export function createWorkforceJobBoard(dependencies: {
             24,
           ),
           budgetUsd: usd(budget),
-          cannot: planned.cannot.slice(0, 5).map((line) => line.slice(0, 300)),
+          cannot: planned.cannot.slice(0, 5),
         });
         if (!parsed.success) return { status: "NOT_PLANNED" };
         prepared.set(runId, {
