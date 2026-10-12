@@ -34,7 +34,9 @@ async function api(method, path, body) {
   let json = null;
   try {
     json = JSON.parse(text);
-  } catch {}
+  } catch {
+    // Problem details are JSON; anything else is reported as text.
+  }
   return { status: response.status, json, text: text.slice(0, 300) };
 }
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
