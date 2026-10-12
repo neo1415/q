@@ -252,6 +252,7 @@ export {
   type MemoryBundle,
   type MemoryCandidate,
   type MemoryConversationDigest,
+  type MemoryRehearsalDigest,
   type MemoryItem,
   type MemoryOwner,
   type MemoryOwnerContextType,
@@ -277,6 +278,7 @@ export {
   smallTalkFollowUp,
   type ForgetCommand,
   type MemoryConversationDigestPort,
+  type MemoryRehearsalPort,
   type MemoryService,
   type MemoryServiceDependencies,
   type RecallQuery,
@@ -284,10 +286,16 @@ export {
 } from "./memory/service.js";
 export {
   MEMORY_TEXT_MAX,
+  NO_REHEARSALS_LINE,
+  REHEARSALS_LABEL,
   RELEVANT_LABEL,
   renderMemoryBundle,
 } from "./memory/render.js";
-export { RECALL_TERMS_MAX, recallTermsFrom } from "./memory/recall-terms.js";
+export {
+  RECALL_TERMS_MAX,
+  asksAboutRehearsal,
+  recallTermsFrom,
+} from "./memory/recall-terms.js";
 
 export {
   COMMUNICATION_ASPECTS,

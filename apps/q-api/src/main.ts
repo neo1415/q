@@ -670,6 +670,7 @@ import {
   createMemoryLearner,
   withLearning,
 } from "./composition/memory-learner.js";
+import { createRehearsalRecallPort } from "./composition/rehearsal-recall.js";
 import { ownRecordTerms } from "./voice/vocabulary.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
@@ -3615,6 +3616,7 @@ const memoryService = createMemoryService({
   transactions: database.transactions,
   repository: createPostgresMemoryRepository(),
   conversations: createConversationDigestPort(repositories, database.sql),
+  rehearsals: createRehearsalRecallPort(database.sql),
   logger,
 });
 const memoryLearner = createMemoryLearner({
