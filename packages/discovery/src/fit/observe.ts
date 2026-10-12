@@ -42,6 +42,24 @@ export type DeclaredFitFacts = {
   readonly companySector?: string | undefined;
   readonly companyPlace?: string | undefined;
 
+  /**
+   * What the company has STATED about its round where this reader may see
+   * it -- said in a pitch they may play, or in a deck section the founder
+   * confirmed -- but not formally shared as its raise. Context for the
+   * reason sentence only: it never moves an outcome, the band or the
+   * confidence (scoring stays on `round`, the formally shared raise).
+   * Display strings with their source, e.g. "$4M (pitch and deck)".
+   */
+  readonly statedRound?:
+    | {
+        readonly raise?: string | undefined;
+        readonly minimumCheque?: string | undefined;
+        /** Instrument and terms, e.g. "Post-money SAFE, $30m cap". */
+        readonly terms?: string | undefined;
+      }
+    | null
+    | undefined;
+
   /** The round as shared with this reader. */
   readonly round?:
     | (DeclaredMoney & { readonly evidenceStatus: EvidenceStatus | null })
@@ -249,6 +267,19 @@ function amountOf(value: string | undefined): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+/**
+ * "$4M (pitch and deck), minimum cheque $100k": what they stated, only when
+ * the round was not formally shared (a shared raise is the raise).
+ */
+function statedRaise(d: DeclaredFitFacts): string | undefined {
+  const stated = d.statedRound ?? null;
+  if ((d.round ?? null) !== null || stated?.raise === undefined)
+    return undefined;
+  return stated.minimumCheque === undefined
+    ? stated.raise
+    : `${stated.raise}, minimum cheque ${stated.minimumCheque}`;
+}
+
 function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
   const cheque = d.cheque ?? null;
   const ref =
@@ -257,7 +288,13 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
       : (amountOf(cheque.typical) ??
         amountOf(cheque.max) ??
         amountOf(cheque.min));
-  if (cheque === null || ref === null) return notApplicableObservation();
+  const said = statedRaise(d);
+  if (cheque === null || ref === null) {
+    return {
+      ...notApplicableObservation({ statedRaise: said }),
+      stated: said !== undefined,
+    };
+  }
   const round = d.round ?? null;
   const roundAmount = amountOf(round?.amount);
   const facts = {
@@ -271,6 +308,11 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
         : undefined,
     roundSize:
       round === null ? undefined : formatMoney(round.amount, round.currency),
+    statedRaise: said,
+    roundOtherCurrency:
+      round !== null && round.currency !== cheque.currency
+        ? formatMoney(round.amount, round.currency)
+        : undefined,
   };
   // No FX: a round in another currency is not comparable, so it is unknown.
   if (
@@ -279,7 +321,7 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
     roundAmount === 0 ||
     round.currency !== cheque.currency
   ) {
-    return unknownObservation(facts);
+    return { ...unknownObservation(facts), stated: said !== undefined };
   }
   const share = ref / roundAmount;
   const c = config.comparators;
@@ -384,13 +426,21 @@ function observeTeam(d: DeclaredFitFacts): FitObservation {
   return { ...known("STRONG", team.evidenceStatus), facts };
 }
 
+/**
+ * Round terms here are lead compatibility: whether the round needs a lead
+ * against whether the investor leads. The instrument and terms they STATED
+ * (a SAFE, its cap) are named in the sentence when visible, but they never
+ * answer the lead question, which stays unknown until it is stated.
+ */
 function observeRoundTerms(d: DeclaredFitFacts): FitObservation {
   const policy = d.leadPolicy ?? null;
-  if (policy === null) return notApplicableObservation();
   const terms = d.roundTerms ?? null;
-  const facts = { roundTerms: terms?.summary };
+  const facts = { roundTerms: terms?.summary ?? d.statedRound?.terms };
+  // Named from what they stated, not from shared round terms.
+  const stated = terms === null && d.statedRound?.terms !== undefined;
+  if (policy === null) return { ...notApplicableObservation(facts), stated };
   if (terms === null || terms.needsLead === null)
-    return unknownObservation(facts);
+    return { ...unknownObservation(facts), stated };
   const outcome = !terms.needsLead
     ? "STRONG"
     : policy === "ALWAYS"

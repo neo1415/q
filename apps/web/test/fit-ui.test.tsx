@@ -224,8 +224,11 @@ describe("the fit panel (profile)", () => {
       />,
     );
     expect(screen.getByText("Fit with your mandate")).toBeTruthy();
-    expect(screen.getByText("Q's view, not a verified fact")).toBeTruthy();
-    expect(container.querySelectorAll("[data-fit-glyph]")).toHaveLength(9);
+    expect(screen.getByText("Q's view · not verified")).toBeTruthy();
+    // Only the parameters the mandate declares; the rest are in "See why".
+    expect(container.querySelectorAll("[data-fit-glyph]")).toHaveLength(
+      KORA.fit.profile.parameters.filter((p) => p.applicable).length,
+    );
   });
 });
 
@@ -258,11 +261,43 @@ describe("Q's compact view on the profile", () => {
         name: "Full assessment",
       }),
     ).toBeTruthy();
+    // Each open question is itself a question to Q (depth on demand).
     expect(
-      within(deeper as HTMLElement).getByRole("button", {
-        name: "Check the top open question",
-      }),
+      within(
+        container.querySelector('[data-q-view-part="UNKNOWNS"]') as HTMLElement,
+      ).getByRole("button", { name: "Is the round priced or a SAFE?" }),
     ).toBeTruthy();
+  });
+
+  it("names a stated, unshared figure as Stated, never as Unknown (Tensorgate, 2026-10-12)", () => {
+    const profile = {
+      ...KORA.fit.profile,
+      parameters: KORA.fit.profile.parameters.map((p) =>
+        p.parameter === "CHEQUE_SIZE"
+          ? {
+              ...p,
+              outcome: "UNKNOWN" as const,
+              applicable: true,
+              evidenceStatus: null,
+              stated: true as const,
+              reason:
+                "Raising $4M, said in their pitch and deck, minimum cheque $100k; not formally shared, so not scored.",
+            }
+          : p,
+      ),
+    };
+    const { container } = render(
+      <FitPanel
+        companyId={KORA.fit.companyId}
+        name="Kora Health"
+        fit={{ status: "READY", fit: { ...KORA.fit, profile } }}
+        qView={null}
+      />,
+    );
+    const glyph = container.querySelector('[data-fit-glyph="STATED"]');
+    expect(glyph).not.toBeNull();
+    expect(glyph?.closest("li")?.textContent).toContain("Stated");
+    expect(glyph?.closest("li")?.textContent).not.toContain("Unknown");
   });
 });
 

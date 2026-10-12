@@ -9,6 +9,7 @@ import type {
 } from "../eligibility/ports.js";
 import type { DeclaredFitFacts } from "../fit/observe.js";
 import type { FitCompanyInputs, FitInputSource } from "../fit/service.js";
+import type { FitStatedEvidence } from "../fit/stated.js";
 import type { FilterMoney } from "../slates/filters.js";
 
 import { readCurrentFeatureSnapshot } from "./postgres-feature-snapshot-store.js";
@@ -52,6 +53,17 @@ export type FitInputSourceDependencies = {
         companyIds: readonly string[],
       ) => Promise<ReadonlyMap<string, FilterMoney>>)
     | undefined;
+  /**
+   * What each company STATED where this reader may see it (a pitch they
+   * may play, the deck sections confirmed for investors): context beside
+   * the fit and evidence for Q's view, never scored (fit/stated.ts).
+   */
+  readonly stated?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, FitStatedEvidence>>)
+    | undefined;
 };
 
 const MODE = "INVESTOR_DISCOVER";
@@ -62,7 +74,7 @@ export function createFitInputSource(
   return {
     read: async (query) => {
       const ids = [...query.companyIds];
-      const [mandate, facts, identities, raises, snapshots, models] =
+      const [mandate, facts, identities, raises, snapshots, models, stated] =
         await Promise.all([
           dependencies.eligibilityPorts.mandates.activeMandate({
             tenantId: query.actor.tenantId,
@@ -89,6 +101,11 @@ export function createFitInputSource(
           businessModelsOf(dependencies.sql, ids, query.mandateId).catch(
             () => EMPTY_MODELS,
           ),
+          dependencies.stated === undefined
+            ? Promise.resolve(new Map<string, FitStatedEvidence>())
+            : dependencies
+                .stated(query.actor, ids)
+                .catch(() => new Map<string, FitStatedEvidence>()),
         ]);
       const fromMandate =
         mandate.kind === "FOUND" ? mandateFacts(mandate.mandate) : {};
@@ -112,6 +129,7 @@ export function createFitInputSource(
         if (identity === undefined) return;
         const company = factsById.get(companyId);
         const raise = raises.get(companyId);
+        const said = stated.get(companyId) ?? null;
         const stage = stageLabel(company?.currentStageCode ?? null);
         const place = countryName(company?.headquartersCountry ?? null);
         const declared: DeclaredFitFacts = {
@@ -122,6 +140,7 @@ export function createFitInputSource(
           ),
           companyStage: stage,
           companyPlace: place,
+          statedRound: said?.statedRound ?? null,
           round:
             raise === undefined
               ? null
@@ -145,6 +164,8 @@ export function createFitInputSource(
             raise === undefined
               ? null
               : { amount: raise.amount, currency: raise.currency },
+          evidence: said?.evidence ?? [],
+          evidenceConfidential: said?.confidential ?? false,
         });
       });
       return out;

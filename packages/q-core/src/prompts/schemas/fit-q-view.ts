@@ -49,6 +49,30 @@ export type FitQViewVariables = z.infer<typeof FitQViewVariablesSchema>;
 
 export const FIT_Q_VIEW_UNTRUSTED = ["rows", "companyDescription"] as const;
 
+/**
+ * v3 (lead review 2026-10-12, Tensorgate): what the company STATED where
+ * this investor may see it -- the raise said in a pitch they may play, the
+ * deck facts the founder confirmed for investors. A null value is a fact
+ * the deck does not give: a genuine gap. The company's own words, never
+ * verified; UNTRUSTED data.
+ */
+export const FitQViewEvidenceLineSchema = z
+  .object({
+    label: z.string().min(1).max(160),
+    value: z.string().max(200).nullable(),
+  })
+  .strict();
+
+export const FitQViewV3VariablesSchema = FitQViewVariablesSchema.extend({
+  evidence: z.array(FitQViewEvidenceLineSchema).max(60),
+}).strict();
+export type FitQViewV3Variables = z.infer<typeof FitQViewV3VariablesSchema>;
+
+export const FIT_Q_VIEW_V3_UNTRUSTED = [
+  ...FIT_Q_VIEW_UNTRUSTED,
+  "evidence",
+] as const;
+
 export const FitQViewResultSchema = z
   .object({
     verdict: z.enum(FIT_Q_VIEW_VERDICTS),

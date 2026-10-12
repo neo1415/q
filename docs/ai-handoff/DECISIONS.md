@@ -21,6 +21,18 @@ The actual investor journey is the immediate release priority. Document-workforc
 
 Core Seven remains the governing assessment framework. The new directive authorizes designing, prototyping and recommending a serious proposed quantitative methodology, with test vectors and source reconciliation. It does not authorize silently replacing production scoring semantics or presenting draft arithmetic as official FDN InvestIQ. Continue code correctness, evidence permissions, presentation and measured speed work while that proposal is prepared. Preserve historical assessments and legacy source documents.
 
+## October 12 directions: delegation by meaning, stated evidence, concision
+
+- **Delegation is understood, not keyword-matched.** Q recognises work handed to its team from meaning (TURN_READER `teamJob`), in any words. A keyword count is only a deterministic fast path to the same decision. Both go through the one orchestration (`propose_q_job` → one plan card). A plan that cannot be made is said plainly; it is never covered by an ordinary answer that looks like the work was done.
+- **"Not formally disclosed" is not "not known at all."** A figure a company stated where the reader may see it (a pitch they may play, a deck section the founder confirmed) is shown as stated and attributed, and Q reads it. It is never scored unless the founder formally shares it: the canonical mandate-fit methodology and disclosure controls are unchanged. Q never asks the investor for what their authorized deck already says.
+- **Progressive disclosure, everywhere.** Capital Q is an analyst who gets to the point:
+  - Lead with the insight, not how the system works.
+  - Primary assessments are 2–3 dense sentences.
+  - Show at most three high-priority questions at first.
+  - Long evidence lists, repeated claims, coverage grids and technical explanations are collapsed by default. Provenance, confidence detail and methodology sit behind accessible expandable controls.
+  - No caveat or fact repeats across adjacent sections.
+  - Depth is on demand: a question to Q. Conciseness is not shallowness; reason fully, say what matters.
+
 ## Product and experience
 
 1. **One integrated Q.** Q Brain, GPT-Live voice, Work agents, public research, documents, Discover, Relationships, meetings, notifications and Q Daily operate over canonical records, never duplicate state.

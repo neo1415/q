@@ -3,10 +3,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
+  CompanyDeckView,
   CompanyProfileDto,
   CompanyRaiseView,
   DiscoveredCompanyDto,
 } from "@capital-q/contracts";
+import { DECK_SECTIONS } from "@capital-q/contracts";
 
 /**
  * R2 (founder, hosted 2026-10-09): Discover said a company "has not shared
@@ -150,6 +152,7 @@ const PITCH_RAISE_CLAIM = {
 function renderProfile(
   view: CompanyRaiseView,
   viewer: CompanyProfileDto["viewer"] = "INVESTOR",
+  deck: CompanyDeckView | null = null,
 ): void {
   const profile: CompanyProfileDto = {
     viewer,
@@ -185,6 +188,7 @@ function renderProfile(
       interest={null}
       connected={false}
       sectorLabels={[]}
+      deck={deck}
     />,
   );
 }
@@ -249,14 +253,63 @@ describe("a pitch figure and unshared round details never read as a contradictio
     renderProfile(PITCH);
     const fold = document.querySelector('[data-overview-fold="company-raise"]');
     const explainer = fold?.querySelector("[data-raise-explainer]");
-    expect(explainer?.textContent).toContain(
-      "Tensorgate says in its pitch video that it is raising $4M",
+    // One sentence, both halves (progressive disclosure, 2026-10-12).
+    expect(explainer?.textContent).toBe(
+      "Tensorgate states $4M in its pitch, its own statement; the round isn't formally shared with you yet.",
     );
-    expect(explainer?.textContent).toContain("nothing on Capital Q confirms");
-    expect(explainer?.textContent).toContain("hasn't shared its round details");
     // The old row read "$4M" above "Raise on Capital Q · Not shared".
     expect(fold?.textContent).not.toContain("Raise on Capital Q");
     expect(fold?.textContent).toContain("Round details");
+  });
+
+  it("names the round's terms as their confirmed deck states them, and a lead the deck does not name (2026-10-12)", () => {
+    const fact = (label: string, value: string | null) => ({
+      label,
+      value,
+      unknownReason: value === null ? ("NOT_IN_DECK" as const) : null,
+      kind: "TEXT" as const,
+      asOf: null,
+      pages: [12],
+      truthClass: "USER_CLAIM" as const,
+      evidenceStatus: "SELF_REPORTED" as const,
+      confidence: "HIGH" as const,
+    });
+    const deck = {
+      viewer: "INVESTOR",
+      companyId: COMPANY_ID,
+      deck: null,
+      coaching: null,
+      extraction: {
+        extractionId: "11111111-1111-4111-8111-111111111111",
+        readAt: "2026-10-06T13:00:00.000Z",
+        versionNumber: 1,
+        confirmed: true,
+        sections: DECK_SECTIONS.map((section) => ({
+          section,
+          status: section === "THE_ASK" ? "PRESENT" : "NOT_IN_DECK",
+          summary: null,
+          pages: [],
+          facts:
+            section === "THE_ASK"
+              ? [
+                  fact("Amount sought", "$4m"),
+                  fact("Instrument", "Post-money SAFE"),
+                  fact("Valuation cap", "$30m"),
+                  fact("Minimum cheque", "$100k"),
+                  fact("Committed investors", null),
+                ]
+              : [],
+          confidence: "HIGH",
+        })),
+      },
+    } as CompanyDeckView;
+    renderProfile(PITCH, "INVESTOR", deck);
+    const terms = document.querySelector("[data-deck-round-terms]");
+    expect(terms?.textContent).toContain("From their confirmed deck");
+    expect(terms?.textContent).toContain("Post-money SAFE");
+    expect(terms?.textContent).toContain("$30m");
+    expect(terms?.textContent).toContain("$100k");
+    expect(terms?.textContent).toContain("Not in the deck");
   });
 
   it("has no explainer when the company declared its raise", () => {
