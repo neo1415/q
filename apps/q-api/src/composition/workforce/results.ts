@@ -95,7 +95,10 @@ export function createWorkforceJobResults(dependencies: {
     | {
         /** The artifact with its version history (no content), as the person. */
         readonly read?:
-          | ((actor: ActorContext, artifactId: string) => Promise<QArtifactDetail>)
+          | ((
+              actor: ActorContext,
+              artifactId: string,
+            ) => Promise<QArtifactDetail>)
           | undefined;
         readonly readVersion: (
           actor: ActorContext,
