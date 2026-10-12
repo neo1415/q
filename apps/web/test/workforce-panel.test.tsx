@@ -7,6 +7,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { QApprovalViewSchema, Q_CONTRACT_VERSION } from "@capital-q/contracts";
 
 import { FIXTURE_IDS, workforceFixtures } from "../app/dev/workforce/fixtures";
 import {
@@ -14,6 +15,7 @@ import {
   jobLines,
   markAgainst,
   teamMembers,
+  needsYou,
 } from "../src/features/work/workforce-view";
 
 const approve = vi.fn<(id: string) => Promise<unknown>>();
@@ -44,6 +46,60 @@ describe("the workforce run log (J5)", () => {
   const { jobs, overview } = workforceFixtures(NOW);
   const intro = jobs[0];
   if (intro === undefined) throw new Error("fixture");
+
+  it("keeps a completed preparation job waiting on its exact native founder-question card", () => {
+    const pending = QApprovalViewSchema.parse({
+      contractVersion: Q_CONTRACT_VERSION,
+      approvalId: "c0000000-0000-4000-8000-000000000011",
+      runId: "c0000000-0000-4000-8000-000000000012",
+      status: "PENDING",
+      requestedAt: "2026-10-12T07:00:00Z",
+      expiresAt: "2026-10-12T08:00:00Z",
+      canDecide: true,
+      action: {
+        actionId: "c0000000-0000-4000-8000-000000000013",
+        actionType: "app.diligence.questions.send",
+        actionVersion: 1,
+        actionClass: "CONFIRM_REQUIRED",
+        actionStatus: "AWAITING_APPROVAL",
+        targets: [
+          {
+            kind: "COMPANY",
+            companyId: "c0000000-0000-4000-8000-000000000014",
+          },
+        ],
+        summary: "Send founder diligence questions",
+        preview: "What evidence supports the retention claim?",
+      },
+    });
+    const completed = {
+      ...intro,
+      job: { ...intro.job, status: "DONE" as const },
+      drafts: [],
+      approvals: [pending],
+    };
+    expect(needsYou(completed)).toBe(true);
+    render(<WorkforcePanel overview={overview} jobs={[completed]} />);
+    fireEvent.click(screen.getByText(pending.action.summary));
+    expect(screen.getByText(pending.action.preview ?? "")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Approve this action" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
+    expect(approve).not.toHaveBeenCalled();
+    cleanup();
+    const expired = {
+      ...completed,
+      approvals: [{ ...pending, canDecide: false }],
+    };
+    expect(needsYou(expired)).toBe(false);
+    render(<WorkforcePanel overview={overview} jobs={[expired]} />);
+    fireEvent.click(screen.getByText(pending.action.summary));
+    expect(
+      screen.queryByRole("button", { name: "Approve this action" }),
+    ).toBeNull();
+  });
 
   it("reads a job as steps owned by specialists, in plain words", () => {
     const lines = jobLines(intro);

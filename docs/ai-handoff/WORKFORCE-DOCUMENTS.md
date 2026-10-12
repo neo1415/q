@@ -1,5 +1,11 @@
 # Existing workforce document connection
 
+## Product continuation — 2026-10-12 09:25 UTC
+
+Work now projects completed-job references through the existing artifact service under a freshly resolved owner: only an actual matching READY current version offers Open in the existing viewer. Pending native diligence approvals are projected through the existing Approval Engine under the same fresh actor, with exact previews, human approval and Needs you visibility. Diligence card runs reuse the original owned Q conversation; inaccessible/null context fails rather than manufacturing a new conversation. These are local changes on `codex/workforce-tavus-integration`, not deployed product acceptance. See STATE.md for exact gates.
+
+The strengthened live acceptance requires real persisted research, named-company memo/version history, independent critique with actual revision when material, a valid rendered PDF and an unexecuted pending diligence card. No founder send is approved. Status-only DONE cannot satisfy it. Full Work viewer and conversational revision still require browser verification after release.
+
 ## Current evidence checkpoint — 2026-10-11 20:56 UTC
 
 The deployed baseline is exact green `9261cdc4` across all four services. The real workforce ONE_PAGER has READY version 2, version 1 preserved, a rendered viewer and a changed valid one-page PDF. Three canonical findings and nine gaps are preserved; all nine gaps render in the existing dedicated “Evidence gaps” section after a warm retry. The earlier section-array-only failure and label mismatch below are historical checkpoints; do not duplicate gap state. Cold document-open readiness remains unresolved.
