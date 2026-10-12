@@ -104,6 +104,7 @@ function build(script: readonly FakeBehaviour[]) {
   return {
     viewer: createFitQViewer({ gateway, dataPosture: "SYNTHETIC_DEMO" }),
     provider,
+    gateway,
   };
 }
 
@@ -154,6 +155,62 @@ describe("Q's view beside a fit", () => {
         "$31k a month",
       ),
     ).toBeNull();
+  });
+
+  it("reads what the company stated (pitch, confirmed deck) and may cite it; an unstated figure is still refused (Tensorgate, 2026-10-12)", async () => {
+    const evidence = [
+      { label: "Pitch · Raise", value: "$4M" },
+      { label: "The ask · Instrument", value: "Post-money SAFE" },
+      { label: "The ask · Valuation cap", value: "$30m" },
+      { label: "The ask · Committed investors", value: null },
+    ];
+    const cited = view({
+      summary:
+        "In your sector at seed; the deck states $4m on a post-money SAFE with a $30m cap.",
+      unknowns: [
+        "Does the round still need a lead? The deck names no committed investors.",
+      ],
+    });
+    const { viewer, provider } = build([cited]);
+    const result = await viewer.view({
+      ...REQUEST,
+      profile: profile(),
+      evidence,
+    });
+    expect(result.status).toBe("READY");
+    const sent = JSON.stringify(provider.calls[0]?.request);
+    expect(sent).toContain("Post-money SAFE");
+    expect(sent).toContain("Committed investors");
+    expect(sent).toContain("STATED");
+
+    const { viewer: again } = build([
+      view({ summary: "The deck states a $75m cap." }),
+    ]);
+    expect(
+      (await again.view({ ...REQUEST, profile: profile(), evidence })).status,
+    ).toBe("UNAVAILABLE");
+  });
+
+  it("a deck reached through a grant is sent at CONFIDENTIAL", async () => {
+    const { gateway } = build([view()]);
+    const seen: unknown[] = [];
+    const spying: typeof gateway = {
+      ...gateway,
+      execute: (request, options) => {
+        seen.push(request.sensitivity);
+        return gateway.execute(request, options);
+      },
+    };
+    await createFitQViewer({
+      gateway: spying,
+      dataPosture: "SYNTHETIC_DEMO",
+    }).view({
+      ...REQUEST,
+      profile: profile(),
+      evidence: [{ label: "The ask · Instrument", value: "SAFE" }],
+      sensitivity: "CONFIDENTIAL",
+    });
+    expect(seen).toEqual(["CONFIDENTIAL"]);
   });
 
   it("an outage is in-band and never throws", async () => {

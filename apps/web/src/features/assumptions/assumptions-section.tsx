@@ -39,6 +39,9 @@ export type QuestionsRoute =
   /** Not connected: questions can be picked and copied, not sent. */
   | { readonly kind: "NOT_CONNECTED" };
 
+/** The most important first; the rest one tap away (2026-10-12). */
+export const ASSUMPTIONS_SHOWN_FIRST = 3;
+
 const shortDay = (iso: string) =>
   new Date(iso).toLocaleDateString("en-GB", {
     day: "numeric",
@@ -61,6 +64,7 @@ export function AssumptionsSection({
   const { askNow } = useGlobalQ();
   const [picked, setPicked] = useState<readonly string[]>([]);
   const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [key, setKey] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -127,24 +131,32 @@ export function AssumptionsSection({
         >
           Questions to investigate
         </h2>
+        {/* The insight first; how the three paths work is one tap away
+            (progressive disclosure, 2026-10-12). */}
         <p className="cq-body-sm text-(--cq-text-secondary)">
           {board.basis === "NOTHING_SHARED"
-            ? `${companyName} hasn't shared a confirmed deck reading with you yet, so none of its key claims can be checked yet. These are the first things to find out.`
-            : `The claims ${companyName}'s business rests on, what each one is backed by, and what isn't known yet, from the deck reading they confirmed and shared with you.`}
+            ? `No confirmed deck reading shared yet: the first things to find out about ${companyName}.`
+            : `What ${companyName}'s case rests on, from the deck reading they confirmed for you.`}
         </p>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          For each one you can{" "}
-          <b className="font-medium text-(--cq-text-primary)">ask Q to check</b>{" "}
-          the evidence you already have,{" "}
-          <b className="font-medium text-(--cq-text-primary)">
-            tick it to ask {companyName}
-          </b>{" "}
-          directly, or{" "}
-          <b className="font-medium text-(--cq-text-primary)">
-            request a document
-          </b>{" "}
-          that would settle it.
-        </p>
+        <details className="group" data-assumptions-help>
+          <summary className="cq-caption min-h-[44px] cursor-pointer text-(--cq-text-tertiary) underline underline-offset-4 sm:min-h-0">
+            How to settle one
+          </summary>
+          <p className="cq-body-sm pt-1 text-(--cq-text-secondary)">
+            <b className="font-medium text-(--cq-text-primary)">
+              Ask Q to check
+            </b>{" "}
+            the evidence you already have,{" "}
+            <b className="font-medium text-(--cq-text-primary)">
+              tick it to ask {companyName}
+            </b>{" "}
+            directly, or{" "}
+            <b className="font-medium text-(--cq-text-primary)">
+              request a document
+            </b>{" "}
+            that would settle it.
+          </p>
+        </details>
       </div>
       <div className="flex flex-wrap gap-2" aria-label="Evidence board">
         <StandingBadge standing="EVIDENCED" count={board.counts.evidenced} />
@@ -152,7 +164,14 @@ export function AssumptionsSection({
         <StandingBadge standing="UNKNOWN" count={board.counts.unknown} />
       </div>
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-        {board.assumptions.map((assumption) => {
+        {(showAll
+          ? board.assumptions
+          : board.assumptions.filter(
+              (assumption, index) =>
+                index < ASSUMPTIONS_SHOWN_FIRST ||
+                picked.includes(assumption.id),
+            )
+        ).map((assumption) => {
           const checked = picked.includes(assumption.id);
           return (
             <li
@@ -268,6 +287,17 @@ export function AssumptionsSection({
           );
         })}
       </ul>
+      {showAll || board.assumptions.length <= ASSUMPTIONS_SHOWN_FIRST ? null : (
+        <Button
+          variant="quiet"
+          size="compact"
+          className="self-start"
+          onClick={() => setShowAll(true)}
+          data-assumptions-show-all
+        >
+          Show all {String(board.assumptions.length)}
+        </Button>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span
           className="cq-body-sm text-(--cq-text-secondary)"

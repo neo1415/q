@@ -390,3 +390,19 @@ The tracked runner creates internal Q turns for an existing authorized account o
   - the goal got a single in-run brief instead of a team job (fix in PR #8).
 - PR #8 also carries the dormant Tavus REST adapter and ADR 0066 (Proposed).
 - Next: release PR #8, then run `workforce-acceptance.mjs` and `--approve` live.
+
+## 2026-10-12 04:50 UTC — Claude Code — PR #8 live; fit evidence and concision in PR #11
+
+- PR #8 released: TURN_READER v49 `teamJob` plus honest planning failures, and parallel CI.
+  - Lanes: int-rc `368c0e10` → CI lane `d9d19eb1` → deploy `6600e61d`.
+  - Railway: all four services SUCCESS.
+- Live acceptance:
+  - Q now plans the investor job; the card is approved; Research is done.
+  - The named-company memo step fails in 1.3 s, silently. PR #11 adds logging.
+  - Next: release PR #11, rerun, root-cause, rerun until PASS.
+- PR #11 (Tensorgate fit):
+  - attributed stated round context, never scored;
+  - lead requirement honest;
+  - FIT_Q_VIEW v3 reads the confirmed deck;
+  - progressive disclosure across the fit panel, Q's view, the raise fold and Questions to investigate (recorded in DECISIONS.md);
+  - workforce card and lead-in fixes.

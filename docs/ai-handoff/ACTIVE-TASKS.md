@@ -1,5 +1,60 @@
 # Active tasks — authoritative cross-model board
 
+## LATEST STATUS — PR #8 live; workforce memo step failing; fit evidence in PR #11 — 2026-10-12 04:50 UTC
+
+**Deployed (service level).** PR #8 is merged. It moved through the lanes as follows:
+
+- `build/int-rc` `368c0e10`
+- CI lane via PR #9: `d9d19eb1`
+- deploy lane via PR #10: `6600e61d`
+
+All four Railway services report SUCCESS at `6600e61d`. Rollback point: `f23583ad`.
+
+PR #8 contents:
+
+- TURN_READER v49 `teamJob`, which reads delegation from meaning;
+- honest messages when planning fails;
+- CI quality checks run as parallel jobs behind one `quality` gate (about 16.5 min, down from about 29).
+
+**Workforce acceptance (live, `6600e61d`): FAIL at the memo step.**
+
+- Planning:
+  - First Q text came after 10.1 s.
+  - The plan card holds four steps: Research → Documents memo → Reviewer critique and revision → Diligence card.
+  - The card was approved.
+- Research: DONE in 23.7 s, with 5 public sources.
+- Documents (named-company MEMO): FAILED in 1.3 s with "The document could not be prepared."
+  - No artifact row was written (checked by read-only SQL).
+  - No log was written, because both failure paths were silent. They now log in PR #11.
+- Reviewer and Diligence: SKIPPED, because they depend on the memo.
+- The run was `5f89cc59`, job `226d21f4`.
+
+**Next for this:** release PR #11 → rerun `CQ_WORKFORCE_RUN=<new run> workforce-acceptance.mjs --approve` → read the `workforce document preparation threw` / `was not prepared` log → fix the root cause → rerun until it PASSes.
+
+Suspects:
+
+- the artifact `authorise` subject or plan check;
+- `DocumentJobInputSchema` / `QArtifactContentSchema` parse of a named-company MEMO;
+- `jobs.enqueue`.
+
+**PR [neo1415/q#11](https://github.com/neo1415/q/pull/11) (LOCAL TESTED: 9,051 tests; root/q-api/web tsc 0; lint and format clean):**
+
+- Fit stated round context:
+  - pitch raise plus the deck's confirmed "The ask", attributed and flagged `stated`, never scored;
+  - the pinned digest is unchanged.
+- Lead requirement stays unknown, and the sentence says so.
+- Shared `deckAskTerms` helper.
+- FIT_Q_VIEW v3: reads the stated facts and asks only open questions.
+- Progressive disclosure on the fit panel, Q's view, the raise fold and Questions to investigate.
+- Workforce: failure logging, a card summary that ends on a word, a short Q lead-in.
+- `profile-capture.mjs`: a read-only profile capture as the fictional investor.
+
+**Live "before" evidence (Tensorgate as Savanna Seed):**
+
+- The fit read "Cheque size: Unknown" and "Round: Unknown" (reasons "Round size not shared." and "Round terms not shared.").
+- Q's unknowns asked for the round size and terms.
+- The deck's confirmed THE_ASK states $4m, a post-money SAFE, a $30m cap and a $100k minimum cheque, with committed investors absent.
+
 ## LATEST STATUS — PR #2 deployed; workforce slice in PR #5 — 2026-10-12 00:30 UTC
 
 **DEPLOYED (service level):** PR #2 merged through GitHub's merge operation (direct pushes to release branches are refused in Claude sessions; merges via the GitHub integration work). `build/int-rc` = `668ee838`, CI lane `recovery/2026-09-12-8y2j4w` = `a4c254c6`, deploy lane `recovery/2026-09-12` = `e1266dd8`; all three trees identical to the CI-tested `f7ff0fdc` (tree `54d168aa`). CI: PR #2 run 38180652493, PR #4 runs 38182707886/38182711449, CI-lane push run 38182733437 — quality and pgTAP SUCCESS. Railway: all four services SUCCESS at `e1266dd8` (workers `f2d068e7`, api `46d38485`, q-api `9282d3f2`, web `df1360ae`). Rollback: `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`.

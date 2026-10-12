@@ -15,6 +15,12 @@ import type { FitOutcome, FitParameter } from "@capital-q/contracts";
  * Wording rules: unknown says what is missing, never "poor"; a low thesis
  * overlap says "little overlap", never "bad"; nothing is a number the
  * inputs did not contain.
+ *
+ * Stated context (2026-10-12): a round the company stated where this
+ * reader may see it (a pitch, a confirmed deck) but did not formally share
+ * is named in the UNKNOWN and NO_PREFERENCE sentences as stated, never
+ * scored ("not formally shared" is not "not known at all"). The slots are
+ * new, so every v1 input without them renders exactly as before.
  */
 
 export const FIT_REASON_TEMPLATES_VERSION = "fit-reasons.v1" as const;
@@ -22,7 +28,14 @@ export const FIT_REASON_TEMPLATES_VERSION = "fit-reasons.v1" as const;
 /** The key a template is chosen by. NO_PREFERENCE: the mandate declares nothing here. */
 export type FitReasonKey = FitOutcome | "NO_PREFERENCE";
 
-type Template = { readonly withFacts: string; readonly plain: string };
+/**
+ * withFacts may list alternatives, tried in order: the first whose slots
+ * are all filled is used, then the plain sentence.
+ */
+type Template = {
+  readonly withFacts: string | readonly string[];
+  readonly plain: string;
+};
 
 export const FIT_REASON_TEMPLATES: Readonly<
   Record<FitParameter, Readonly<Record<FitReasonKey, Template>>>
@@ -102,11 +115,14 @@ export const FIT_REASON_TEMPLATES: Readonly<
       plain: "Their round is outside your cheque range.",
     },
     UNKNOWN: {
-      withFacts: "Round size not shared.",
+      withFacts: [
+        "Raising {roundOtherCurrency}, in another currency than your cheque, so not compared.",
+        "Raising {statedRaise}; not formally shared, so not scored.",
+      ],
       plain: "Round size not shared.",
     },
     NO_PREFERENCE: {
-      withFacts: "You have not set a cheque size.",
+      withFacts: "Raising {statedRaise}; you have not set a cheque size.",
       plain: "You have not set a cheque size.",
     },
   },
@@ -212,11 +228,11 @@ export const FIT_REASON_TEMPLATES: Readonly<
       plain: "Needs a lead; you never lead.",
     },
     UNKNOWN: {
-      withFacts: "Round terms not shared.",
+      withFacts: "{roundTerms}; whether they need a lead is not stated.",
       plain: "Round terms not shared.",
     },
     NO_PREFERENCE: {
-      withFacts: "You have not said whether you lead.",
+      withFacts: "{roundTerms}; you have not said whether you lead.",
       plain: "You have not said whether you lead.",
     },
   },
@@ -234,13 +250,21 @@ export function renderFitReason(
   facts: Readonly<Record<string, string | undefined>>,
 ): string {
   const template = FIT_REASON_TEMPLATES[parameter][key];
-  const slots = [...template.withFacts.matchAll(SLOT)].map((m) => m[1] ?? "");
-  const complete = slots.every((slot) => {
-    const value = facts[slot];
-    return value !== undefined && value.trim().length > 0;
-  });
-  if (!complete) return template.plain;
-  return template.withFacts.replace(SLOT, (_m, slot: string) =>
-    (facts[slot] ?? "").trim(),
-  );
+  const candidates =
+    typeof template.withFacts === "string"
+      ? [template.withFacts]
+      : template.withFacts;
+  for (const sentence of candidates) {
+    const slots = [...sentence.matchAll(SLOT)].map((m) => m[1] ?? "");
+    const complete = slots.every((slot) => {
+      const value = facts[slot];
+      return value !== undefined && value.trim().length > 0;
+    });
+    if (complete) {
+      return sentence.replace(SLOT, (_m, slot: string) =>
+        (facts[slot] ?? "").trim(),
+      );
+    }
+  }
+  return template.plain;
 }

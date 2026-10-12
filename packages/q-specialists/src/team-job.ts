@@ -168,22 +168,19 @@ export function teamJobLine(outcome: TeamJobOutcome): string {
     case "ONE_PER_TURN":
       break;
   }
-  const steps = outcome.plan.steps
-    .slice(0, 6)
-    .map((step) =>
-      `${step.who} ${step.does.charAt(0).toLowerCase()}${step.does.slice(1)}`.replace(
-        /\.$/u,
-        "",
-      ),
-    )
-    .join("; ");
-  const needs =
-    outcome.plan.needsYou.length === 0
-      ? "Nothing starts until you approve the plan."
-      : `Nothing starts until you approve the plan. ${outcome.plan.needsYou.join(" ")}`;
-  const cannot =
-    outcome.plan.cannot.length === 0
-      ? ""
-      : ` What the team can't do here: ${outcome.plan.cannot.join("; ")}.`;
-  return `I've planned this as a job for my team: ${outcome.plan.summary.replace(/\.$/u, "")}. ${steps}.${cannot} ${needs}`;
+  // The engine narrates the card itself (its summary, and that nothing is
+  // saved until approved); this line only leads into it, briefly: who does
+  // what, in order. The full plan, its limits and its budget are the card.
+  const who: string[] = [];
+  for (const step of outcome.plan.steps) {
+    if (who.at(-1) !== step.who) who.push(step.who);
+  }
+  const needs = outcome.plan.needsYou.filter(
+    (need) => !/\bapprov(e|al)\b.*\bplan\b|\bplan\b.*\bapprov/iu.test(need),
+  );
+  const steps = `${String(outcome.plan.steps.length)} ${outcome.plan.steps.length === 1 ? "step" : "steps"}`;
+  return [
+    `I've planned this as a job for my team: ${steps}, ${who.join(" → ")}.`,
+    ...needs.map((need) => `${need.replace(/\.$/u, "")}.`),
+  ].join(" ");
 }
