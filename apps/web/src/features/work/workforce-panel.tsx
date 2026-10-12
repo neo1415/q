@@ -42,6 +42,7 @@ import {
   type StepState,
 } from "./workforce-view";
 import { workStateOf } from "./job-state";
+import { WorkforceDocuments } from "./workforce-documents";
 
 /**
  * Q's team (founder brief J5; approved mockup 2026-10-06 b/workforce): on
@@ -387,6 +388,10 @@ function JobCard({
           )}
         </ol>
       ) : null}
+      <WorkforceDocuments
+        documents={job.documents ?? []}
+        unavailable={job.documentsUnavailable ?? false}
+      />
     </article>
   );
 }
