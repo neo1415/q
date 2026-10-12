@@ -16,6 +16,7 @@ import { Skeleton } from "@capital-q/ui/states";
 import { useGlobalQ } from "@/components/app-shell/global-q";
 
 import { FitBreakdownSheet } from "./fit-breakdown";
+import { FitContextValues } from "./fit-context";
 import { FitGlyph, glyphKindOf, outcomeWord } from "./fit-glyph";
 import { QViewMark, useQView, type QViewPort } from "./q-view-note";
 import type { CompanyFit } from "./use-company-fit";
@@ -111,23 +112,33 @@ function ReadyPanel({
           </span>
         </p>
         <ul className="flex flex-col gap-0.5">
-          {/* Parameters the mandate declares nothing on are in "See why". */}
+          {/* Parameters the mandate declares nothing on are in "See why",
+              unless something is known for them (a stated raise). */}
           {profile.parameters
-            .filter((p) => p.applicable)
+            .filter((p) => p.applicable || (p.context?.items.length ?? 0) > 0)
             .map((p) => {
               const kind = glyphKindOf(p);
               return (
                 <li
                   key={p.parameter}
-                  className="flex min-h-[30px] items-center gap-2.5 text-sm"
+                  className="flex flex-col gap-1 py-0.5"
+                  data-fit-row={p.parameter}
                 >
-                  <FitGlyph kind={kind} />
-                  <span className="flex-1 text-(--cq-text-primary)">
-                    {FIT_PARAMETER_LABELS[p.parameter]}
+                  <span className="flex min-h-[30px] items-center gap-2.5 text-sm">
+                    <FitGlyph kind={kind} />
+                    <span className="flex-1 text-(--cq-text-primary)">
+                      {FIT_PARAMETER_LABELS[p.parameter]}
+                    </span>
+                    <span className="text-(--cq-text-secondary)">
+                      {outcomeWord(kind)}
+                    </span>
                   </span>
-                  <span className="text-(--cq-text-secondary)">
-                    {outcomeWord(kind)}
-                  </span>
+                  {p.context === undefined ? null : (
+                    <FitContextValues
+                      context={p.context}
+                      className="pl-[26px]"
+                    />
+                  )}
                 </li>
               );
             })}

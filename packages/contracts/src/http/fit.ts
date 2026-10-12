@@ -71,6 +71,56 @@ export const FIT_CONFIDENCE_LEVELS = ["HIGH", "MEDIUM", "LOW"] as const;
 export const FitConfidenceSchema = z.enum(FIT_CONFIDENCE_LEVELS);
 export type FitConfidence = z.infer<typeof FitConfidenceSchema>;
 
+/**
+ * Where a value shown beside a fit row comes from (2026-10-12). The fit
+ * scores only declared inputs; these say what is KNOWN to this reader and
+ * from where, so a row never looks empty because scoring cannot use it.
+ */
+export const FIT_CONTEXT_SOURCES = [
+  "PITCH",
+  "DECK",
+  "PITCH_AND_DECK",
+  "SHARED",
+  "YOUR_MANDATE",
+] as const;
+export const FitContextSourceSchema = z.enum(FIT_CONTEXT_SOURCES);
+export type FitContextSource = z.infer<typeof FitContextSourceSchema>;
+
+export const FIT_CONTEXT_SOURCE_LABELS: Readonly<
+  Record<FitContextSource, string>
+> = {
+  PITCH: "From pitch",
+  DECK: "From deck",
+  PITCH_AND_DECK: "From pitch and deck",
+  SHARED: "Shared with you",
+  YOUR_MANDATE: "Your mandate",
+};
+
+export const FitContextItemSchema = z
+  .object({
+    /** "Raise", "Your cheque", "Instrument", "Valuation cap". */
+    label: z.string().min(1).max(40),
+    /** The value as stated, e.g. "$4M", "Post-money SAFE". */
+    value: z.string().min(1).max(60),
+    source: FitContextSourceSchema,
+  })
+  .strict();
+export type FitContextItem = z.infer<typeof FitContextItemSchema>;
+
+export const FitParameterContextSchema = z
+  .object({
+    /** What is known, each with its source; never scored. */
+    items: z.array(FitContextItemSchema).max(6),
+    /**
+     * What is still open, said separately from what is known: "Ticket fit
+     * not scored until the round is formally shared", "Lead investor
+     * required: not stated". Null when nothing is.
+     */
+    open: z.string().min(1).max(120).nullable(),
+  })
+  .strict();
+export type FitParameterContext = z.infer<typeof FitParameterContextSchema>;
+
 export const FitParameterResultDtoSchema = z
   .object({
     parameter: FitParameterSchema,
@@ -92,6 +142,8 @@ export const FitParameterResultDtoSchema = z
      * stated, never scored. Only on UNKNOWN rows; absent otherwise.
      */
     stated: z.literal(true).optional(),
+    /** Known values beside the row, with their sources (CHEQUE_SIZE, ROUND_TERMS). */
+    context: FitParameterContextSchema.optional(),
   })
   .strict();
 export type FitParameterResultDto = z.infer<typeof FitParameterResultDtoSchema>;
@@ -356,12 +408,14 @@ export const FIT_PARAMETER_LABELS: Readonly<Record<FitParameter, string>> = {
   STAGE: "Stage",
   SECTOR: "Sector",
   GEOGRAPHY: "Geography",
-  CHEQUE_SIZE: "Cheque size",
+  // The raise is the round, not anyone's cheque: this row compares the
+  // investor's own cheque with the round (2026-10-12).
+  CHEQUE_SIZE: "Cheque compatibility",
   BUSINESS_MODEL: "Business model",
   TRACTION: "Traction",
   TEAM: "Team",
   THESIS: "Thesis",
-  ROUND_TERMS: "Round",
+  ROUND_TERMS: "Round terms",
 };
 
 export const FIT_OUTCOME_LABELS: Readonly<Record<FitOutcome, string>> = {
