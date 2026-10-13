@@ -142,6 +142,7 @@ function setup(
 ) {
   let clock = 1_000_000;
   const runs: string[] = [];
+  const runBindings: VoiceSessionBinding[] = [];
   const holds: Deferred[] = [];
   const created: { sdp: string; instructions: string; voice: string }[] = [];
   const provider: LiveVoiceProvider = {
@@ -161,13 +162,14 @@ function setup(
     },
   };
   const turn: VoiceTurnHandler = async (
-    _binding,
+    binding,
     transcript,
     signal,
     speaker,
   ) => {
     const last = transcript[transcript.length - 1];
     runs.push(last?.content ?? "");
+    runBindings.push(binding);
     if (options.hold === true) {
       await new Promise<void>((resolve) => {
         holds.push({ resolve });
@@ -210,6 +212,7 @@ function setup(
   return {
     broker,
     runs,
+    runBindings,
     holds,
     created,
     usage,
@@ -1547,6 +1550,70 @@ describe("GPT-Live persona line for a rehearsal with a researched external perso
       "PERSONA: an AI rehearsal informed by public sources",
     );
     expect(created[0]?.instructions).not.toContain("Delegation policy:");
+  });
+
+  it("delegates Q-backed rehearsal dialogue once on the original owned binding", async () => {
+    const { line, recorded } = lineWith("Q owns every line");
+    const { broker, runs, runBindings } = setup({
+      rehearsalLine: {
+        ...line,
+        prepare: () =>
+          Promise.resolve({ instructions: "Q owns every line", qBacked: true }),
+      },
+      answer: "What evidence supports your enterprise demand?",
+    });
+    expect((await open(broker, true)).kind).toBe("OPEN");
+    const request = {
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      delegation: {
+        delegationId: "rehearsal-d1",
+        request: "We sell to regulated enterprises.",
+      },
+    };
+    const first = await broker.delegate(request);
+    const repeated = await broker.delegate(request);
+    expect(first?.commentary).toContain(
+      "Speak this Q-generated counterpart line exactly",
+    );
+    expect(first?.commentary).toContain(
+      "What evidence supports your enterprise demand?",
+    );
+    expect(repeated).toEqual(first);
+    expect(runs).toEqual(["We sell to regulated enterprises."]);
+    expect(runBindings[0]?.thread.rehearsal?.rehearsalId).toBe(REHEARSAL);
+    await broker.transcript({
+      actor: ACTOR,
+      voiceSessionId: SESSION,
+      report: {
+        segments: [
+          {
+            role: "Q",
+            text: "What evidence supports your enterprise demand?",
+            at: 1_000_000,
+          },
+        ],
+      },
+    });
+    expect(recorded).toEqual([]); // Q's canonical turn handler already persists these turns.
+  });
+
+  it("keeps the provider sensitivity ceiling for Q-backed rehearsal audio", async () => {
+    const { line } = lineWith("Q owns every line");
+    const { broker, created, runs } = setup({
+      sensitivity: "INTERNAL",
+      rehearsalLine: {
+        ...line,
+        prepare: () =>
+          Promise.resolve({ instructions: "Q owns every line", qBacked: true }),
+      },
+    });
+    expect(await open(broker, true)).toEqual({
+      kind: "REFUSED",
+      reason: "INELIGIBLE",
+    });
+    expect(created).toEqual([]);
+    expect(runs).toEqual([]);
   });
 
   it("falls back to the refusal when the rehearsal is not an external-person one", async () => {
