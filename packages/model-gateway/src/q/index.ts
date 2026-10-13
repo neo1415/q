@@ -229,6 +229,7 @@ import {
   analystResultBlocks,
   askedSubjects,
   ownInvestorOrganisationIn,
+  withConversationFindings,
 } from "./result-blocks.js";
 
 export {
@@ -635,6 +636,21 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
     'TAKE THEM THERE. If the person asks to be taken to, shown or to open a page, screen, tab or profile ("take me to relationships", "open Discover", "show me Clearwater"), call open_page for it in this same turn, even when the message also asks a question; then answer the question too. Scrolling or working the page on screen is control_screen. You can always do both; never say you cannot navigate or scroll. SHOW CARDS. When they ask for the top, best, most promising, a shortlist, a ranking, a list or a comparison of companies, investors or relationships ("top three", "which of these make the most sense", "list the people asking to connect"), fill answerCards with one card per company in the answer, as well as the spoken answer. LOOK IT UP FIRST. If the message names a company, organisation or person you have no authorised facts about, look it up now with the tools (search_companies with the name as given, then get_company with the returned companyId). If the person asks for public, current, external or web information, or asks you to check or compare what the public web says, call research_public_web now with a short public query (a few words: the subject as named plus what to look for; never a figure, a customer name or an identifier), up to three other phrasings in alsoSearch, and entityName when they named one company or person (a name is enough; no website needed). What is current or specific (an accelerator batch, recent funding, news, a named company, fund or person) is looked up, never answered from memory. Call the tool through the function-calling interface and write nothing else in that turn. THEN ANSWER IN THE SAME TURN. When nothing needs looking up, or once results are in front of you, write the JSON object and nothing else: at minimum {"answer": "...", "responseShape": "CONCISE" or "ANALYTICAL", "insufficientEvidence": true or false}, plus any other field of the schema that applies. Leave out every field you are not certain of the exact shape of: a field in the wrong shape (null for a list, a string where the schema has an object, a renamed key) loses the whole answer, and an absent one costs nothing. Never reply with prose outside the object, and never reply that you are about to answer.',
+};
+
+/**
+ * The conversation renders `findings`; `companyFindings`, `coverage` and
+ * `materialChanges` belong to the company specialist's own run and no
+ * conversation surface reads them. Live 2026-10-13: a selected-company
+ * answer wrote both channels (2,104 output tokens, ~21 s of generation),
+ * and a risks follow-up put every point in the unread one. Trailing, so the
+ * cached prefix is unchanged; the shared template, which the specialist
+ * also uses, is untouched.
+ */
+const CONVERSATION_FINDINGS_NOTE: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "IN THIS CONVERSATION put each evidence-backed point in findings, which is shown beside the answer. Leave companyFindings, coverage and materialChanges out: they are not shown here.",
 };
 
 /**
@@ -3585,6 +3601,9 @@ export function createModelGatewayQAnswer(
         // proposal already prepared, the person was told Q's reasoning
         // service was unreachable).
         lenientFields: ANALYST_LENIENT_FIELDS,
+        // A root key the reading does not define (live 2026-10-13: a root
+        // `followUps`) is left out, not a reason to regenerate the answer.
+        unknownRootKeys: "DROP",
       };
 
       // The message and its durable completion event commit together
@@ -4307,8 +4326,19 @@ export function createModelGatewayQAnswer(
         : [];
       let messages: ModelMessage[] =
         offered.length === 0
-          ? [...rendered.messages, capabilities, ...workNote]
-          : [...rendered.messages, capabilities, ...workNote, TOOLS_FIRST_NOTE];
+          ? [
+              ...rendered.messages,
+              capabilities,
+              ...workNote,
+              CONVERSATION_FINDINGS_NOTE,
+            ]
+          : [
+              ...rendered.messages,
+              capabilities,
+              ...workNote,
+              CONVERSATION_FINDINGS_NOTE,
+              TOOLS_FIRST_NOTE,
+            ];
 
       if (ownProfileCall !== null) {
         toolCalls.push(ownProfileCall);
@@ -4565,6 +4595,7 @@ export function createModelGatewayQAnswer(
                 {
                   invalidListItems: "DROP",
                   lenientFields: ANALYST_LENIENT_FIELDS,
+                  unknownRootKeys: "DROP",
                 },
               );
               if (
@@ -5357,7 +5388,7 @@ export function createModelGatewayQAnswer(
               )
             : [];
         const modelBlocks = analystResultBlocks({
-          result: analyst,
+          result: withConversationFindings(analyst),
           // Screen focus is not the target of a question naming another
           // company. Its reference must come from an exact name and a
           // successful authorised profile read, never a model-written id.
