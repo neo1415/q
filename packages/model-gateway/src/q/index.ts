@@ -140,6 +140,14 @@ export {
 } from "./person-brief-reader.js";
 import { answerPathOf } from "./answer-path.js";
 import { forModelReading } from "./pending-confirmation.js";
+import {
+  holdsWebForOwned,
+  OWNED_FIRST_CODE,
+  OWNED_FIRST_MESSAGE,
+  ownedReadFound,
+  PUBLIC_WEB_TOOL,
+  settledWithin,
+} from "./owned-first.js";
 import { createSingleFlight } from "./single-flight.js";
 import { stableToolOrder } from "./tool-order.js";
 import {
@@ -442,6 +450,13 @@ function loadCapabilities(
 }
 /** Calls in total per turn (raised from 6, autopilot P1 2026-10-06). */
 export const Q_TOOL_LOOP_MAX_CALLS = 10;
+
+/**
+ * Speed lane C: how long an answer that is otherwise ready waits for the
+ * arrival skim (a FAST_CLASSIFICATION call, ~0.75-0.95 s p50 in
+ * production, 2.4 s seen). Past it the answer goes on without it.
+ */
+export const ARRIVAL_SKIM_GRACE_MS = 250;
 
 export function taskClassForCapability(
   capability: QCapability,
@@ -1515,6 +1530,11 @@ export type ModelGatewayQAnswerDependencies = {
    * only on a HIGH confidence reading of an item the snapshot holds.
    */
   readonly arrivalSkim?: QTurnSkimmer | undefined;
+  /**
+   * How long the answer waits, once it is otherwise ready, for the
+   * arrival skim above (ARRIVAL_SKIM_GRACE_MS when absent).
+   */
+  readonly arrivalSkimGraceMs?: number | undefined;
   readonly sensitivity?: QAnswerSensitivityPolicy | undefined;
   /**
    * What KIND of material this composition handles (doc 15 §62). Omitted
@@ -2023,18 +2043,37 @@ export function createModelGatewayQAnswer(
      * Started now so it overlaps the context assembly. The quick patterns
      * answer from the snapshot; unusual words are read by TURN_SKIM.
      */
+    const arrivalEligible =
+      // A named lookup is answered by code from the lookup tool; reading
+      // it as a possible arrival follow-up cost a model call (live
+      // 2026-10-10: ~0.9 s of a 1.4 s known-entity answer).
+      request.personSearch === undefined &&
+      request.discoverInvestors === undefined &&
+      request.writingDocument !== true &&
+      request.askedAction === undefined &&
+      (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q");
+    /**
+     * Speed lane C (production 2026-10-12): only a follow-up that code
+     * itself recognises (a Daily verb, the quick arrival patterns) holds
+     * the reads below until it is decided. The semantic fallback (a
+     * TURN_SKIM model call after the snapshot read) answers almost nothing
+     * yet matched nearly every follow-up -- any pronoun or proper noun --
+     * and held every read behind it: 1.0-2.7 s on the three slow runs
+     * profiled (6027a668, b5eb0a12, decbdddf). It now runs beside the
+     * reads and is taken only if it has answered by the time the answer
+     * needs it; otherwise the turn is answered with the arrival fact among
+     * the wide reads, as every other turn is.
+     */
+    const arrivalByCode =
+      arrivalEligible &&
+      dependencies.arrivalSnapshot !== undefined &&
+      (dailyFollowUpKind(latest.content) !== null ||
+        request.questionKind === "DAILY_FOLLOW_UP" ||
+        arrivalFollowUpKind(latest.content) !== null);
     const decideArrival = async (): Promise<ArrivalReply | null> => {
-      const eligible =
-        // A named lookup is answered by code from the lookup tool; reading
-        // it as a possible arrival follow-up cost a model call (live
-        // 2026-10-10: ~0.9 s of a 1.4 s known-entity answer).
-        request.personSearch === undefined &&
-        request.discoverInvestors === undefined &&
-        request.writingDocument !== true &&
-        request.askedAction === undefined &&
-        (request.turnKind === undefined ||
-          request.turnKind === "QUESTION_TO_Q");
-      if (!eligible || dependencies.arrivalSnapshot === undefined) return null;
+      if (!arrivalEligible || dependencies.arrivalSnapshot === undefined) {
+        return null;
+      }
       // P4: the Q Daily stories Q mentioned: gist / more / open, by code
       // from the snapshot's prepared objects (the gate is words only, so
       // an unrelated turn reads nothing).
@@ -2115,7 +2154,7 @@ export function createModelGatewayQAnswer(
       ]);
     // The prefetch below reads only tools the run may use; the research
     // filter decided later never touches them.
-    const arrivalAnswer = await arrivalDecision;
+    const arrivalAnswer = arrivalByCode ? await arrivalDecision : null;
     // An arrival follow-up the snapshot answers reads nothing else: no
     // prefetch tool is run for it.
     const prefetchTools = new Set(
@@ -2785,6 +2824,8 @@ export function createModelGatewayQAnswer(
       onScreenPageCalls,
       arrival,
       arrivalAnswer,
+      /** The semantic arrival reading still running beside the reads. */
+      arrivalLate: arrivalByCode ? null : arrivalDecision,
       arrivalSnapshotOnce: async (): Promise<ArrivalSnapshot | null> => {
         await arrivalRead();
         return arrivalData;
@@ -3818,7 +3859,14 @@ export function createModelGatewayQAnswer(
       // request?", "what did they say?", "did they accept?") is answered
       // from the Arrival Snapshot by code: no tool, no model round. Read on
       // its own, so S2's route gating of the wide reads cannot skip it.
-      const followUp = prepared.arrivalAnswer;
+      const followUp =
+        prepared.arrivalAnswer ??
+        (prepared.arrivalLate === null
+          ? null
+          : await settledWithin(
+              prepared.arrivalLate,
+              dependencies.arrivalSkimGraceMs ?? ARRIVAL_SKIM_GRACE_MS,
+            ));
       if (followUp !== null) {
         const message = await persistAnswer(
           request.leadLines === undefined
@@ -4317,6 +4365,8 @@ export function createModelGatewayQAnswer(
           // model calls it in the next step of the same turn.
           let loadRounds = 0;
           let textRound = false;
+          /** A read of their own records found something (owned-first.ts). */
+          let ownedFound = false;
           /**
            * The chained look-up rounds beyond the first
            * (Q_TOOL_LOOP_MAX_ROUNDS). Never after public-web content was
@@ -4555,15 +4605,32 @@ export function createModelGatewayQAnswer(
             }
             rounds += 1;
             took(`round${String(rounds)}`);
-            const proposals = result.output.calls.slice(
+            const proposed = result.output.calls.slice(
               0,
               Q_TOOL_LOOP_MAX_CALLS - calls,
             );
             const assistant: ModelMessage = {
               role: "ASSISTANT",
               content: result.output.text,
-              toolCalls: [...proposals],
+              toolCalls: [...proposed],
             };
+            // Speed lane C (owned-first.ts): under ONLY_IF_EMPTY a web call
+            // beside a read of their own records goes last, waits for it,
+            // and runs only if every such read came back empty.
+            const holdWeb = holdsWebForOwned({
+              researchMode: research?.mode,
+              proposals: proposed.map((call) => ({
+                name: call.name,
+                classification: classificationOf(call.name),
+              })),
+              ownedFoundEarlier: ownedFound,
+            });
+            const proposals = holdWeb
+              ? [
+                  ...proposed.filter((call) => call.name !== PUBLIC_WEB_TOOL),
+                  ...proposed.filter((call) => call.name === PUBLIC_WEB_TOOL),
+                ]
+              : proposed;
             const results: ModelMessage[] = [];
             // Reads run side by side (Zino live 2026-10-07: eight fit.profile
             // reads in a row, one after another). Only when every call in
@@ -4579,20 +4646,45 @@ export function createModelGatewayQAnswer(
               );
             const early = together
               ? proposals.map((call) =>
-                  callTool(
-                    {
-                      callId: call.callId,
-                      name: call.name,
-                      arguments: call.arguments,
-                    },
-                    toolContext,
-                  ).then(
-                    (outcome) => ({ ok: true as const, outcome }),
-                    (error: unknown) => ({ ok: false as const, error }),
-                  ),
+                  holdWeb && call.name === PUBLIC_WEB_TOOL
+                    ? undefined
+                    : callTool(
+                        {
+                          callId: call.callId,
+                          name: call.name,
+                          arguments: call.arguments,
+                        },
+                        toolContext,
+                      ).then(
+                        (outcome) => ({ ok: true as const, outcome }),
+                        (error: unknown) => ({ ok: false as const, error }),
+                      ),
                 )
               : null;
+            let heldThisRound = 0;
             for (const [index, call] of proposals.entries()) {
+              if (holdWeb && call.name === PUBLIC_WEB_TOOL && ownedFound) {
+                // Answered by their own records: the web is not asked, and
+                // the model is told so in the call's own result.
+                heldThisRound += 1;
+                results.push({
+                  role: "TOOL",
+                  callId: call.callId,
+                  name: call.name,
+                  content: JSON.stringify({
+                    ok: false,
+                    error: {
+                      code: OWNED_FIRST_CODE,
+                      safeMessage: OWNED_FIRST_MESSAGE,
+                    },
+                  }),
+                });
+                logger?.info(
+                  { qRunId: request.runId, round: rounds },
+                  "q public web held: their own records answered first",
+                );
+                continue;
+              }
               calls += 1;
               const tool = offeredByName.get(call.name);
               if (
@@ -4621,6 +4713,13 @@ export function createModelGatewayQAnswer(
                 failureCode: outcome.failureCode,
                 latencyMs: outcome.latencyMs,
               });
+              if (
+                research?.mode === "ONLY_IF_EMPTY" &&
+                classificationOf(call.name) === "READ_ONLY" &&
+                ownedReadFound(outcome)
+              ) {
+                ownedFound = true;
+              }
               collectSources(outcome);
               collectClientAction(outcome);
               collectDocument(outcome);
@@ -4708,10 +4807,11 @@ export function createModelGatewayQAnswer(
             ) {
               gapsRounds = 1;
             }
-            const roundOutcomes = toolCalls.slice(-proposals.length);
+            const ran = proposals.length - heldThisRound;
+            const roundOutcomes = ran > 0 ? toolCalls.slice(-ran) : [];
             if (
               recoveryRounds === 0 &&
-              proposals.length > 0 &&
+              ran > 0 &&
               roundOutcomes.every((outcome) => outcome.status !== "SUCCEEDED")
             ) {
               recoveryRounds = 1;
