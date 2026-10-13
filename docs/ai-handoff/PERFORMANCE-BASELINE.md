@@ -1,5 +1,22 @@
 # Performance baseline and measured first improvements
 
+## October 13 deployed product browser sample and scoped model diagnostics
+
+Deployed `f3fe5520`, existing authorized fictional investor, TLS verification enabled. Corrected harness matches current run/message/full visible answer and exact canonical cards/company paths. The complete investor journey passed. Individual observations:
+
+| Turn                   | First 20 rendered characters | Settled total | Scope                                             |
+| ---------------------- | ---------------------------: | ------------: | ------------------------------------------------- |
+| Top three              |                     3,336 ms |      3,735 ms | Three exact current cards                         |
+| Selected company       |                     4,513 ms |     54,112 ms | Full answer and all company references bound      |
+| Risks follow-up        |                     7,932 ms |     27,756 ms | Same selected company                             |
+| Two-company comparison |                     2,415 ms |      2,619 ms | Exact two companies and rendered comparison table |
+
+These thresholds are visible text, not semantic first-useful-content or p95. No paired before/after speed claim. Scoped `ai_ops.model_usage` shows selected-company FAST_CLASSIFICATION 812 ms, three NORMAL_DIALOGUE calls totalling 50,532 ms, and STRUCTURED_EXTRACTION 2,010 ms. These are call sums, not mutually exclusive wall-clock phases. Normal-dialogue cached input was 0/88,660; the subsequent risks turn had 69,046/93,873 cached input tokens. No general cache-share claim from these samples.
+
+Exact earliest-call logs identify strict schema refusal of invented root `followUps` (19,017 ms call), without truncation. A later 15,310 ms successful tool-model call was refused by text acceptance; bounded diagnostics included malformed company-finding fields. Those diagnostics alone do not explain its complete refusal. Final 16,205 ms model call completed the answer. Strict validation and safe invalid-item DROP remain unchanged. A separate versioned COMPANY_ANALYST v23 guidance correction is being gated, with actual after-release refusal/timing checks still pending.
+
+Private receipts remain outside Git: `/tmp/cq-investor-demo-eeG3eg`, `/tmp/cq-browser-model-phase-summary.json` and `/tmp/cq-profile-schema-diagnostics-early.json`. Work Open exact memo v2 and stored workforce deliverables separately passed; full media/cutoff evidence is not inferred from these text/API checks.
+
 ## October 13 connected-memory live baseline (before PR #38 deployment)
 
 Production revision `1165b92e3869832aedb4b54c63e5bf4cbd00bfd6`; existing authorized fictional investor, two fresh internal Q conversations. No contact, approval, account creation or paid audiovisual session. These are single observations, not p50/p95 or a causal speedup.
