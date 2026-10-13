@@ -1,5 +1,13 @@
 # Active tasks — authoritative cross-model board
 
+## 2026-10-13 09:22 UTC — next executable work
+
+1. Findings correction complete through protected release and full authenticated investor browser acceptance on592b32ff. Preserve strict contracts; do not rerun unchanged gates without a reason.
+2. PRIORITY NOW: human Tensorgate Tavus pilot. User ready and signed in. Wait configuration-only q-api deployment SUCCESS and old deployment fully drained; fresh admitted/unadmitted catalogue checks; then provide existing eligible investor lobby. Exactly one paid allocation, <=180seconds, no deploy/restart during it. Observe actual AI face/audio/Q replies, interruption, same-room refresh/deadline and persisted review; distinguish unobserved fallback from demonstrated behavior. Confirm provider ended before restoring test mode.
+3. After pilot, assess complete founder/investor/workforce journeys, genuine multihop authorized graph memory, and counterpart coverage (investor organisation/external researched person/company). Prepare durable spend/concurrency protection before wider paid access. Preserve Q evidence-grounded persona as intelligence and Tavus as audiovisual transport.
+4. Measure representative first useful text/audio/completion p50/p95 with enough valid samples. Existing single samples and cloud voice ICE failure do not establish media acceptance or general performance. Continue measured caching/compression/routing/round reduction/parallelism work.
+5. Update shared root checkpoint, commit/push and protected integration PR after concrete pilot facts. Preserve existing branches and all uncommitted work.
+
 ## CURRENT PRIORITIES — 2026-10-13 — Codex takeover
 
 1. PR #42 is shipped independently (all four SUCCESS `f3fe5520`, exact CI green). Current-run rendered investor journey, Work exact memo v2 viewer, selected-company continuity and stored workforce deliverables PASS. Keep named-founder extension, actual voice/media and compound post-release evidence as separate checks.

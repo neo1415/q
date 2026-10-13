@@ -1,5 +1,9 @@
 # Performance baseline and measured first improvements
 
+## October13 v25 full authenticated investor browser acceptance
+
+Production592b32ff, private receipt `/tmp/cq-investor-demo-1Tc4Lv`, full journey PASS. Individual observations: ranking first20 rendered characters4342ms/total5118ms; selected profile5571/26112 with seven native findings; risks4586/18920 with six native findings; comparison8244/34002 with exact two canonical companies. Native findings and company binding are verified from the current rendered answer. These are single observations of a text threshold, not semantic first useful content, first audio, p50/p95 or causal improvement. V24 zero-findings failure remains a failed product gate; this release corrects it without relaxing validation.
+
 ## October 13 deployed product browser sample and scoped model diagnostics
 
 Deployed `f3fe5520`, existing authorized fictional investor, TLS verification enabled. Corrected harness matches current run/message/full visible answer and exact canonical cards/company paths. The complete investor journey passed. Individual observations:

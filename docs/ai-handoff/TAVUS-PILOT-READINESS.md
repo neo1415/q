@@ -1,6 +1,6 @@
 # Tavus pilot readiness
 
-Preparation only; no room is reserved for later joining.
+User is now ready and confirms Tensorgate sign-in (2026-10-13). One paid <=180-second human pilot is authorized; no room is reserved for later joining.
 
 Release prerequisites (root owner): exact latest PR44 quality+database CI green; immutable migration 20261222175000 then additive 20261222180000 applied before code; exact q-api/web deployed SHA verified. One q-api replica; one explicitly entitled provider key. Stable existing voice-session secret across service instances. Q_API_PUBLIC_URL must equal the reachable HTTPS q-api origin.
 
@@ -29,6 +29,6 @@ Verify early end through POST /v1/q/rehearsals/<owned-id>/video/end with {"conti
 Verify deadline through stored created_at/ends_at/status/ended_reason (redacted metadata), provider authoritative ended confirmation, and saved canonical transcript/review flags. Server timer and30s sweep complement provider max_call_duration<=180. API acknowledgement alone is not remote human video/audio proof.
 POST /v1/q/rehearsals/<owned-id>/finish is now guarded: failed/unconfirmed video termination returns503 and must not generate a final review. Review GET never performs finish; active or physically open video redirects to existing live room.
 
-When founder is actually ready (root only): record one paid allocation, switch only that admitted profile from test mode at that time, keep exactly one q-api replica/no deploy or restart during the180s cap, perform one human remote face/audio conversation with Q-backed lines and saved transcript, confirm provider end, inspect saved nonprovisional review, then restore test mode or remove new paid admission. The paid allocation is NOT authorized during this preparation.
+When founder is actually ready (root only): record one paid allocation, switch only that admitted profile from test mode at that time, keep exactly one q-api replica/no deploy or restart during the180s cap, perform one human remote face/audio conversation with Q-backed lines and saved transcript, confirm provider end, inspect saved nonprovisional review, then restore test mode or remove new paid admission. The user has now authorized the single paid human pilot and is ready; wait the configuration deployment and old instance drain before allowing the one allocation.
 
 Known broader rollout limitations: no durable spend ledger, allocation checkpoint or distributed bridge idempotency. Pending allocation compensation and turn coordination are process-local. No broad rollout claim.
