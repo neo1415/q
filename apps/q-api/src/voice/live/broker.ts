@@ -554,8 +554,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   // A failed write leaves speech unaccounted for; this process must not
   // reopen that owner on a stale persisted balance.
   const failedTrialWrites = new Set<string>();
-  const trialOwner = (actor: ActorContext) =>
-    `${actor.tenantId}|${actor.userId}`;
+  const trialOwner = (actor: ActorContext) => actor.userId;
   const enabled = config.enabled && provider !== undefined;
 
   const pastCap = (line: LiveLine, at: number) =>
@@ -1044,11 +1043,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         // Stop and durably flush this process's old line BEFORE reading its
         // balance. Reading first allowed an immediate reconnect to reuse it.
         for (const line of [...lines.values()]) {
-          if (
-            line.actor.userId !== actor.userId ||
-            line.actor.tenantId !== actor.tenantId
-          )
-            continue;
+          if (line.actor.userId !== actor.userId) continue;
           if (line.voiceSessionId === binding.voiceSessionId)
             carried = { history: line.history, referents: line.referents };
           forget(line, "replaced");

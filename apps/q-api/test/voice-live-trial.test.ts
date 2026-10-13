@@ -727,6 +727,22 @@ describe("the trial line (broker)", () => {
     await settle();
   });
 
+  it("flushes a replaced line across owned tenant contexts before reconnecting", async () => {
+    const store = memoryStore();
+    const line = instance(store);
+    await openLine(line);
+    speak(line, "user", 299);
+    const reconnect = await openLine(
+      line,
+      actorOf(TENSORGATE_DANIEL, OTHER_TENANT),
+    );
+    expect(
+      reconnect.outcome.kind === "OPEN" &&
+        reconnect.outcome.result.trial?.remainingSeconds,
+    ).toBe(1);
+    expect(line.closed).toHaveLength(1);
+  });
+
   it("audit: a failed durable usage write closes the paid line", async () => {
     vi.useFakeTimers();
     const store = memoryStore();
