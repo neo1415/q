@@ -92,9 +92,9 @@ export function jobOf(
         ? null
         : {
             artifactId: review.artifactId,
-            material: review.review.material,
+            material: review.review.material ?? null,
             issues: review.review.issues,
-            revisedToVersion: review.review.revisedToVersion,
+            revisedToVersion: review.review.revisedToVersion ?? null,
           },
     diligence:
       diligence === null

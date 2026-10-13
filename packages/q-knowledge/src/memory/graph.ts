@@ -62,7 +62,8 @@ export type GraphJob = {
   /** The reviewer's last recorded verdict, as the step persisted it. */
   readonly review: {
     readonly artifactId: string;
-    readonly material: boolean;
+    /** Null: an older or partial record did not say (unknown). */
+    readonly material: boolean | null;
     readonly issues: readonly GraphReviewIssue[];
     readonly revisedToVersion: number | null;
   } | null;
@@ -231,6 +232,8 @@ export type ConnectedCompany = {
     readonly revisedToVersion: number | null;
     /** The document's current version, when it moved past the review. */
     readonly documentNowAt: number | null;
+    /** False: the record did not say whether the review changed anything. */
+    readonly outcomeKnown: boolean;
     readonly issues: readonly GraphReviewIssue[];
   }[];
   readonly diligence: readonly {
@@ -384,7 +387,8 @@ export async function buildConnectedRecall(
     const reviews = companyJobs.flatMap((j) => {
       if (j.review === null) return [];
       const doc = docById.get(j.review.artifactId) ?? null;
-      const revised = j.review.material && j.review.revisedToVersion !== null;
+      const revised =
+        j.review.material === true && j.review.revisedToVersion !== null;
       const reviewedVersion =
         revised && j.review.revisedToVersion !== null
           ? Math.max(j.review.revisedToVersion - 1, 1)
@@ -400,6 +404,7 @@ export async function buildConnectedRecall(
             doc !== null && settledAt !== null && doc.version > settledAt
               ? doc.version
               : null,
+          outcomeKnown: j.review.material !== null,
           issues: j.review.issues.slice(0, GRAPH_LIMITS.issuesPerReview),
         },
       ];
@@ -592,9 +597,11 @@ function companyLines(
     const what =
       r.revisedToVersion !== null
         ? `on v${String(r.reviewedVersion ?? 1)}, revised to v${String(r.revisedToVersion)}`
-        : r.issues.length === 0
-          ? "no material change needed"
-          : "kept as written";
+        : !r.outcomeKnown
+          ? "outcome not recorded"
+          : r.issues.length === 0
+            ? "no material change needed"
+            : "kept as written";
     const moved =
       r.documentNowAt === null
         ? ""

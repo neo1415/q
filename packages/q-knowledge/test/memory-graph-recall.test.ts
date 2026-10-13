@@ -837,3 +837,22 @@ describe("bounded", () => {
     expect(namesCompany("anything", "AB")).toBe(false);
   });
 });
+
+describe("an older review record", () => {
+  it("that does not say whether it changed anything is unknown, not 'no change'", async () => {
+    const w = world();
+    w.jobs = w.jobs.map((j) =>
+      j.review === null || j.userId !== investor.userId
+        ? j
+        : {
+            ...j,
+            review: { ...j.review, material: null, revisedToVersion: null },
+          },
+    );
+    const text = await recallText(w, investor, Q1, { graph: true });
+    expect(text).toMatch(
+      /Reviewer \(Q's reviewer, Q inference; 2026-10-03; outcome not recorded\)/u,
+    );
+    expect(text).not.toMatch(/no material change needed|kept as written/u);
+  });
+});

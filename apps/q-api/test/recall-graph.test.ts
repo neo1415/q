@@ -337,3 +337,26 @@ describe("mandate fit", () => {
     }
   });
 });
+
+describe("an older persisted review", () => {
+  it("without material or revisedToVersion reads them as unknown", () => {
+    const parsed = jobOf(
+      { id: "j-3", goal: "x", status: "DONE" },
+      {
+        ...workRow(ownerA, "j-3"),
+        results: {
+          critique: {
+            status: "DONE",
+            outputs: { artifactId, review: { issues: [] } },
+          },
+        },
+      },
+    );
+    expect(parsed.review).toEqual({
+      artifactId,
+      material: null,
+      issues: [],
+      revisedToVersion: null,
+    });
+  });
+});
