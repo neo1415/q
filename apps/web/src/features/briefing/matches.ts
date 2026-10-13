@@ -25,6 +25,11 @@ export type ArrivalMatch = {
   /** ISO alpha-2 head-office country, as the company states it. */
   readonly country: string | null;
   readonly band: FitBand | null;
+  /**
+   * The canonical mandate fit out of 10 (`fitScoreOutOf10`, the number Q
+   * and Discover order by); null or absent when none is shown.
+   */
+  readonly score?: number | null;
   /** Q's take, in words, from the fit profile (or the slate's reasons). */
   readonly take: string;
 };
@@ -189,15 +194,26 @@ export function matchesWords(matches: ArrivalMatches | null): string | null {
     matches.total === 1
       ? `${matches.label === "SINCE_LAST_VISIT" ? "A new company" : "One company in your feed"} fits your mandate: ${matches.items[0]?.name ?? ""}.`
       : `${count} ${fresh}companies in your feed fit your mandate: ${list(matches.items.map((item) => item.name))}${matches.total > matches.items.length ? ", and more" : ""}.`;
-  // The best fit, by the platform's band, only when it is a real fit.
-  const best = [...matches.items].sort(
+  // The best fit, only when it is a real fit (D10, 2026-10-12): ordered
+  // as Q and Discover order (fit-order.v1): the canonical score out of 10
+  // first, then the band, then the slate's own order. A tie at the top is
+  // not a "best", so nothing is claimed.
+  const ordered = [...matches.items].sort(
     (a, b) =>
+      (b.score ?? -1) - (a.score ?? -1) ||
       BAND_ORDER.indexOf(a.band ?? "NOT_ENOUGH_INFORMATION") -
-      BAND_ORDER.indexOf(b.band ?? "NOT_ENOUGH_INFORMATION"),
-  )[0];
+        BAND_ORDER.indexOf(b.band ?? "NOT_ENOUGH_INFORMATION"),
+  );
+  const [best, next] = ordered;
+  const tiedAtTop =
+    best !== undefined &&
+    next !== undefined &&
+    best.band === next.band &&
+    (best.score ?? null) === (next.score ?? null);
   const strongest =
     best !== undefined &&
     matches.items.length > 1 &&
+    !tiedAtTop &&
     (best.band === "STRONG_FIT" || best.band === "GOOD_FIT")
       ? `${best.name} fits best. ${best.take.split(". ")[0]?.replace(/\.$/u, "") ?? ""}.`
       : null;

@@ -317,6 +317,20 @@ export function fitSweepCardsBlock(
   return fits.length === 0 ? null : rankedBlock(fits, title);
 }
 
+/**
+ * The cards whose fit is Capital Q's own computed mandate fit (fit_profile
+ * through `fitScoreOutOf10`), as opposed to a fit `answerCardFit` derived
+ * from measures a model judged. The two use different point scales (the
+ * platform has no GOOD level; a model card's GOOD is 7.5), so a card's
+ * spoken label must say which it is (D2; noted for an ADR, not unified
+ * here). Known by object identity at the moment the answer is stored.
+ */
+const PLATFORM_FIT_CARDS = new WeakSet<object>();
+
+export function isPlatformFitCard(card: object): boolean {
+  return PLATFORM_FIT_CARDS.has(card);
+}
+
 function rankedBlock(
   chosen: readonly RunFit[],
   title: string,
@@ -343,7 +357,9 @@ function rankedBlock(
     cards,
     followUps: [],
   });
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) return null;
+  for (const card of parsed.data.cards) PLATFORM_FIT_CARDS.add(card);
+  return parsed.data;
 }
 
 const COUNT_WORDS = [
@@ -384,6 +400,7 @@ export function fitSweepSummary(input: {
   readonly asked: string;
 }): string {
   const { block, place } = input;
+  if (block.shape === "SIDE_BY_SIDE") return comparisonSummary(block);
   const scored = block.cards.filter((card) => card.fit !== null);
   const unscored = block.cards.length - scored.length;
   const plural = (n: number) => (n === 1 ? "company" : "companies");
@@ -427,6 +444,23 @@ export function fitSweepSummary(input: {
   return door === null
     ? `${lead}${body} ${caveat}`
     : `${lead}${body.slice(0, door.index)} ${caveat}${body.slice(door.index)}`;
+}
+
+/**
+ * D7: what Q says over a comparison table: the companies in the order
+ * asked, each with its computed mandate fit, never "ranked".
+ */
+function comparisonSummary(block: QAnswerCardsBlock): string {
+  const each = block.cards.map((card) =>
+    card.fit === null
+      ? `${card.name} without enough information for a score yet`
+      : `${card.name} at ${String(card.fit.score)} out of 10`,
+  );
+  const listed =
+    each.length <= 2
+      ? each.join(" and ")
+      : `${each.slice(0, -1).join(", ")} and ${each.at(-1) ?? ""}`;
+  return `Here they are side by side against your mandate: ${listed}. That's mandate fit, not a judgement of quality. The comparison is on screen.`;
 }
 
 /**
