@@ -254,6 +254,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'approvals',                 'INTERNAL_SERVER_ONLY', '{}'),
   -- Live-voice trial usage (2026-10-12): server-only; suite 913.
   ('q_runtime', 'voice_live_trial_usage',    'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'voice_live_trial_claims',   'INTERNAL_SERVER_ONLY', '{}'),
   ('ai_ops', 'providers',                   'INTERNAL_SERVER_ONLY', '{}'),
   ('ai_ops', 'models',                      'INTERNAL_SERVER_ONLY', '{}'),
   ('ai_ops', 'model_prices',                'INTERNAL_SERVER_ONLY', '{}'),

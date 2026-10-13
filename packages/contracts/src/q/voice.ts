@@ -244,7 +244,7 @@ export type CreateQVoiceSessionRequest = z.infer<
  * audio transport, nothing in Capital Q. The provider conversation id is
  * returned so a client can correlate its own session, and for no other use.
  */
-export const CreateQVoiceSessionResponseSchema = z
+const StandardQVoiceSessionResponseSchema = z
   .object({
     voiceSessionId: UuidSchema,
     providerConversationId: z.string().min(1).max(200),
@@ -287,6 +287,22 @@ export const CreateQVoiceSessionResponseSchema = z
     duplex: z.lazy(() => QVoiceDuplexCredentialSchema).optional(),
   })
   .strict();
+
+/** A local binding for a metered LIVE-only trial, never a provider credential. */
+export const CreateQVoiceSessionResponseSchema = z.union([
+  StandardQVoiceSessionResponseSchema.extend({
+    liveOnly: z.literal(false).optional(),
+  }),
+  StandardQVoiceSessionResponseSchema.extend({
+    liveOnly: z.literal(true),
+    // Inactive fields stay empty so existing transport shapes remain compatible.
+    token: z.literal(""),
+    providerConversationId: z.literal(""),
+    sessionToken: z.string().min(1).max(8192),
+    deepgram: z.never().optional(),
+    duplex: z.never().optional(),
+  }),
+]);
 
 export type CreateQVoiceSessionResponse = z.infer<
   typeof CreateQVoiceSessionResponseSchema

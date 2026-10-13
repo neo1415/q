@@ -116,7 +116,9 @@ export type SpeechMeter = {
  * any time between a stop and the next start, are silence and never count.
  * Signals arrive in time order (server receive time).
  */
-export function createSpeechMeter(): SpeechMeter {
+export function createSpeechMeter(
+  options: { readonly authoritativeOpen?: boolean } = {},
+): SpeechMeter {
   /** Closed stretches, merged and sorted; folded into `folded` when old. */
   let stretches: [number, number][] = [];
   let folded = 0;
@@ -155,13 +157,17 @@ export function createSpeechMeter(): SpeechMeter {
   /** Where an open stretch on this side ends if nothing more arrives. */
   const openEnd = (side: SpeechSide, at: number): number => {
     const last = lastSignal[side] ?? at;
-    return Math.min(at, last + SPEECH_OPEN_STALE_MS);
+    return options.authoritativeOpen === true
+      ? at
+      : Math.min(at, last + SPEECH_OPEN_STALE_MS);
   };
 
-  const close = (side: SpeechSide, at: number) => {
+  const close = (side: SpeechSide, at: number, authoritativeStop = false) => {
     const started = open[side];
     if (started === null) return;
-    add(started, openEnd(side, at));
+    // A real provider stop confirms the whole stretch even when
+    // transcription was delayed; the stale cap applies only to missing stops.
+    add(started, authoritativeStop ? at : openEnd(side, at));
     open[side] = null;
   };
 
@@ -179,7 +185,7 @@ export function createSpeechMeter(): SpeechMeter {
         if (open[side] !== null) close(side, at);
         open[side] = at;
       } else if (signal.kind === "stop") {
-        close(side, at);
+        close(side, at, true);
       } else {
         const previous = lastPulse[side];
         const from =
@@ -247,7 +253,7 @@ export function withHint(
 // --- Persisted use --------------------------------------------------------
 
 export type LiveTrialUsageStore = {
-  /** Seconds this person has used, every session summed. */
+  /** This person's usage across every session and owned tenant context. */
   readonly usedSeconds: (actor: ActorContext) => Promise<number>;
   /**
    * Raise one provider session's count to `seconds` (never lowers it).
@@ -270,8 +276,9 @@ const asStored = (seconds: number) =>
   Math.round(Math.min(MAX_SESSION_SECONDS, Math.max(0, seconds)) * 100) / 100;
 
 /**
- * q_runtime.voice_live_trial_usage, read and written only as the person on
- * the line: every statement names their tenant and user.
+ * Canonical usage remains owner-private. Writes name the resolved tenant
+ * and user; allowance reads sum only that same person's global account,
+ * so choosing another owned organisation cannot reset the trial.
  */
 export function createPostgresLiveTrialUsage(
   sql: DatabaseExecutor,
@@ -280,8 +287,7 @@ export function createPostgresLiveTrialUsage(
     const rows = await sql<{ seconds: string }[]>`
       select coalesce(sum(speech_seconds), 0)::text as seconds
         from q_runtime.voice_live_trial_usage
-       where tenant_id = ${actor.tenantId}
-         and user_id = ${actor.userId}`;
+       where user_id = ${actor.userId}`;
     const seconds = Number(rows[0]?.seconds ?? "0");
     if (!Number.isFinite(seconds)) throw new Error("unreadable trial usage");
     return seconds;
