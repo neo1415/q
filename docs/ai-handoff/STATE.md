@@ -474,3 +474,7 @@ See `ACTIVE-TASKS.md` for each workstream. Summary:
 
 - The cloud sandbox reaches the internet only over HTTPS through a proxy (`NODE_USE_ENV_PROXY=1` for Node fetch). Direct Postgres (5432/6543) from the sandbox times out; use the Supabase management API scripts.
 - The session-environment value of `SUPABASE_ACCESS_TOKEN` became invalid on 2026-10-11. A replacement token was supplied out of band and must live only in a secret store. See `START-HERE.md` → Credentials (names only).
+
+## October 13 independent voice reliability checkpoint
+
+The cumulative active-speech guard is preserved on pushed `codex/oct13-voice-trial-guard` (`5d748085`), based on `6f47fd5d`. See [VOICE-TRIAL-DURABLE-GUARD.md](VOICE-TRIAL-DURABLE-GUARD.md). Existing unfinished source was also backed up as WIP `71518a20` on `codex/voice-trial-audit-takeover`. The continuation restores the strict concurrent-consumption regression, requires bounded confirmed observer readiness before SDP, checks observation again after context reads, and flushes replacement accounting across owned tenant contexts. Package-build and fresh local gates are pending at this checkpoint; no CI-green, migration-applied, deployed or live-verification claim. Migration `20261222170000` remains unapplied. Tavus and independent product release ownership remain with the root engineer.
