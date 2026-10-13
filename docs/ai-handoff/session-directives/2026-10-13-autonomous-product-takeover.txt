@@ -1,0 +1,483 @@
+# CAPITAL Q — AUTONOMOUS PRODUCT TAKEOVER
+## October 13, 2026 — Continue Claude's Latest Work
+
+Repository: https://github.com/neo1415/q
+
+You are assuming engineering, integration and release leadership for the existing Capital Q product.
+
+This is an ongoing product-completion mission. It is not a new project, a codebase rewrite, or merely a request to finish a few pull requests.
+
+**The overriding goal is to make Capital Q exceptionally intelligent, extremely fast, deeply contextual, capable of meaningful autonomous work, and delightful to use.**
+
+Continue developing, testing, improving and releasing the actual product. Fix legitimate problems as they arise without allowing routine bug fixes to replace the wider mission.
+
+You have substantial engineering autonomy, subject to the existing architecture, product decisions, security boundaries, provider entitlements, financial safeguards and release procedures.
+
+---
+
+## 1. Recover the existing context
+
+Read the repository's shared handoff before starting.
+
+Start with:
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `docs/ai-handoff/START-HERE.md`
+- `docs/ai-handoff/STATE.md`
+- `docs/ai-handoff/ACTIVE-TASKS.md`
+- Latest `docs/ai-handoff/HANDOFF-LOG.md`
+- `docs/ai-handoff/DECISIONS.md`
+- `docs/ai-handoff/AGENT-EXECUTION-MATRIX.md`
+- `docs/adr/0066-tavus-faces-for-rehearsals.md`
+- Relevant current product source documents and approved ADRs.
+
+Read the latest PR discussions and inspect their actual code changes.
+
+The existing handoff contains historical sections that may be stale. GitHub, current code and production behavior take precedence for operational status.
+
+Verify all branches, current PRs, CI results, migrations and Railway deployments.
+
+Do not assume that Claude's or the previous Codex account's private worktrees, credentials or running subagents are available in your environment.
+
+**Preserve all existing work. Avoid duplicate implementations.**
+
+---
+
+## 2. Latest verified state — October 13, 2026
+
+Last checked:
+
+Production branch `recovery/2026-09-12`:
+
+`1165b92e3869832aedb4b54c63e5bf4cbd00bfd6`
+
+Integration branch `build/int-rc`:
+
+`6f47fd5d032b8a218904c53641a9928549c07075`
+
+### PR #36 — MERGED AND RELEASED
+
+The production release includes the diligence-question repair and completed-work recall fixes.
+
+The full investment workflow was successfully executed and inspected against actual production records.
+
+### PR #37 — MERGED, NOT YET DEPLOYED
+
+Adds:
+
+- An explanation of mandate-fit scores, including 8.8/10.
+- Clearer answer-card presentation.
+- Better Q walk-through wording.
+- Correct Work job counts.
+- Fixes for clipped card controls.
+
+The canonical scoring formula remains unchanged.
+
+### PR #38 — MERGED, NOT YET DEPLOYED
+
+Adds:
+
+- Connected contextual memory across conversations, documents, mandates and completed jobs.
+- Faster answer-path scheduling.
+- Avoidance of unnecessary web searches when the person's authorized records already answer the question.
+- Better recent-conversation and job recall.
+- Preservation of the full wording of diligence questions.
+
+Graph-memory fixture benchmarks reportedly improved from 0/7 to 7/7 and from 0/6 to 6/6 expected facts.
+
+These are offline results, not yet independently live-verified production measurements.
+
+### PR #39 — OPEN, CI RUNNING
+
+https://github.com/neo1415/q/pull/39
+
+Latest checked head:
+
+`c9545a01e16ccc96a9cc72b4b262dca04743fdd6`
+
+Implements the first Tavus video-rehearsal integration.
+
+A previous test failed because five new routes were absent from the API capability-parity inventory. Claude updated their classification and pushed a correction. Review that classification for correctness; do not weaken the route-governance requirement.
+
+At the last check, pgTAP and build passed. Full tests and other checks were still in progress.
+
+### PR #40 — OPEN, CI RUNNING
+
+https://github.com/neo1415/q/pull/40
+
+Latest checked head:
+
+`8316f44547aed01239e0472d6f95240aa99e468c`
+
+Adds:
+
+- Correct handling of decimals such as `3.8%`.
+- Proper side-by-side comparison tables.
+- Better spoken mandate-fit explanations.
+- Correct Home best-match selection based on canonical scoring.
+
+At the last check, build, pgTAP and types passed. Other checks were still running.
+
+Recheck all these statuses immediately. Don't trust this snapshot if newer work has arrived.
+
+---
+
+## 3. The live investment-legion milestone is real
+
+On production `1165b92e`, Claude completed and inspected a genuine investment task.
+
+It included:
+
+- A plan approved by the investor.
+- Research using five sources.
+- A 7,593-character investment memo.
+- Independent review identifying eight issues.
+- A materially revised 9,891-character version-2 memo.
+- Five founder diligence questions within the 180-character limit.
+- A pending founder-contact approval card.
+- No actual founder contact.
+
+The job finished in approximately 50 seconds.
+
+The stricter acceptance runner initially couldn't complete its verification because a required read-only database credential wasn't supplied. Claude subsequently inspected the persisted job, versions, critique, questions and pending card directly.
+
+Treat the live job as a genuine product milestone, but correct the test runner's re-verification limitations rather than claiming that every automated acceptance check passed.
+
+Do not allow the investor workflow to become the entire engineering roadmap.
+
+---
+
+## 4. Immediate release plan
+
+Review the state of PRs #39 and #40.
+
+For PR #39:
+
+- Confirm exact-head CI is green.
+- Review the rehearsal routes and authorization model.
+- Verify the migration and pgTAP.
+- Review the Tavus provider integration, especially token handling and key selection.
+- Apply the migration safely before deploying code that depends on it.
+- Configure the appropriate server-side provider credentials through authorized means.
+- Release through the established gated deployment process.
+
+For PR #40:
+
+- Confirm exact-head CI.
+- Merge safely into `build/int-rc`.
+- Integrate and release its product fixes.
+
+PRs #37 and #38 are already merged.
+
+Do not delay the independently ready memory, speed and UI improvements indefinitely because Tavus requires credentials, provider approval or additional video testing. They may be promoted separately if necessary.
+
+Verify all four Railway services and record the exact deployed commits.
+
+No premature live-success claims.
+
+---
+
+## 5. Tavus — finish the actual immersive experience
+
+The first video-rehearsal vertical slice is implemented in PR #39 but is not yet live-verified.
+
+Current design:
+
+A founder starts an existing Q rehearsal, selects a stock Tavus interviewer, joins a video room and has a conversation in which Tavus provides the audiovisual interface while Q's established rehearsal engine generates the substantive replies.
+
+The implementation includes:
+
+- A Tavus provider client.
+- Existing Q rehearsal-service integration.
+- An OpenAI-compatible conversation bridge.
+- Scoped per-session authentication.
+- Backend routes and contracts.
+- A founder-facing video stage.
+- Stock interviewer options.
+- Session persistence.
+- A 180-second hard limit.
+- Ending and voice fallback.
+- An existing persisted rehearsal review.
+
+A Tavus provider test-mode lifecycle reportedly succeeded: PAL creation, conversation creation, read, end and cleanup.
+
+**Still required:**
+
+- Verify a real authenticated founder can complete the video journey.
+- Confirm actual audiovisual behavior and first-audio latency.
+- Verify Q's responses genuinely drive the interviewer.
+- Check session expiry, reconnects and restarts.
+- Preserve the transcript and rehearsal review.
+- Improve the closing experience before the three-minute cutoff.
+- Repair the known in-memory join-link limitation.
+- Deliver all four interviewer personas and supported voice selections after the first vertical slice is stable.
+- Check fallback and provider-failure handling.
+- Measure and control provider costs.
+
+### Tavus key safeguard
+
+Claude reported that six Tavus keys exist and that a key-pool can select another key if the current account reaches credit or quota limits.
+
+**Do not assume this behavior is authorized.**
+
+The owner has not confirmed that switching between those accounts to bypass limits is permitted.
+
+Before deploying this configuration, review ADR 0066 and the Tavus account entitlements.
+
+Use one properly entitled account for the initial release. Only use multiple accounts for legitimate separately entitled workloads in accordance with provider terms and explicit owner authorization.
+
+Never expose credentials, rotate accounts to circumvent quotas or silently incur material provider costs.
+
+The video product must still work with a single legitimate configured provider account.
+
+---
+
+## 6. Graph-enhanced memory — make the existing achievement real
+
+PR #38 introduces a selective connected-memory implementation using canonical existing records.
+
+It is deliberately not a new memory database.
+
+It connects:
+
+- Previous conversations.
+- Company and investor records.
+- Mandates.
+- Job outcomes.
+- Saved documents.
+- Reviewer findings.
+- Diligence questions.
+- Other authorized context.
+
+The implementation has bounded traversal, limited fan-out and latency controls.
+
+It reportedly passed its two offline multi-hop benchmarks, including permission-negative cases.
+
+**Your mission is to take this further into the actual Q experience.**
+
+Test real questions such as:
+
+"Which companies have we discussed recently that fit my mandate, what did your agents find, and which unresolved risks remain?"
+
+"Remember Tensorgate? What changed since our previous assessment, and which of my concerns were resolved?"
+
+"Which investment memos did your agents revise, what did the reviewers identify, and which decisions are still awaiting me?"
+
+Improve answer quality, source attribution, historical understanding, contradiction handling and freshness.
+
+Graphify-inspired capabilities should enhance the existing Q runtime, not become a second authoritative brain.
+
+Do not inflate prompt context or add unnecessary graph execution to simple questions.
+
+The accepted standard is a real improvement in conversational intelligence, not merely a passing retrieval fixture.
+
+---
+
+## 7. Hermes-inspired speed and intelligence
+
+PR #38 also includes concrete latency optimizations.
+
+The previous system sometimes spent 1–2.7 seconds on turn classification before allowing reads to proceed.
+
+A separate memory question unnecessarily spent 7.4 seconds on web research even when internal authorized records supplied the answer.
+
+These issues were addressed through concurrent read scheduling and improved owned-evidence-first tool execution.
+
+Local simulated-port timing tests showed reductions, but these are not production p50/p95 measurements.
+
+**Now measure and improve the deployed behavior.**
+
+Focus on:
+
+- First meaningful text.
+- First spoken audio.
+- Streaming responsiveness.
+- Repeated model classifications.
+- Cache utilization.
+- Context assembly.
+- Unnecessary model/tool turns.
+- Slow work-history recall.
+- Redundant retrieval.
+- Tool invocation costs.
+- Voice interruption and conversational latency.
+- First visible agent progress.
+- Efficient long-task execution.
+
+Continue examining the actual Hermes Agent implementation:
+
+https://github.com/NousResearch/hermes-agent
+
+Adapt proven techniques that complement Q's existing design.
+
+Pay special attention to reusable validated agent skills, efficient context management, stable prompt caching and bounded tool parallelism.
+
+Do not install a second agent architecture or duplicate already-working capabilities.
+
+Preserve deep reasoning and evidence correctness while making Q much faster.
+
+---
+
+## 8. Founder/investor product experience
+
+PRs #37 and #40 address genuine product problems.
+
+The investor's unexplained 8.8/10 was correctly traced to the existing mandate-fit formula, not overall company quality.
+
+Its components were four Strong measures and one Partial measure, with unknown measures excluded.
+
+The score disclosure should make this transparent without changing the calculation.
+
+PR #40 also improves:
+
+- Side-by-side comparison requests.
+- Spoken number and decimal formatting.
+- Clearer fit explanations.
+- Consistent Home/Discover ranking.
+
+Test these as an actual investor and founder.
+
+Continue improving:
+
+- Onboarding.
+- Discover.
+- Investor/founder profiles.
+- Q cards.
+- Charts and tables.
+- Work.
+- Document generation and editing.
+- Approvals.
+- Rehearsals.
+- Voice navigation.
+- Memory continuity.
+- Mobile and desktop experience.
+
+Q should automatically select a useful presentation from the authorized data it has.
+
+A comparison request should produce an actual comparison, not an unrelated ranking.
+
+A completed document should be easy to find, open, inspect and edit with Q.
+
+A conversational follow-up should not lose the job or relevant evidence.
+
+Preserve the established InvestIQ/FDN formulas and approved product invariants.
+
+Do not change canonical scoring simply because the interface seems surprising.
+
+---
+
+## 9. Remaining known issues
+
+Address these through bounded engineering work alongside the main product lanes:
+
+- The meeting speech lane still mishandles some decimals.
+- Two investment-fit scales have different semantics; unification would require an approved design decision.
+- Pending approvals in other Q conversations are not always discoverable from the current conversation.
+- Tavus join state needs reliable restart recovery.
+- Tavus lacks a graceful "closing soon" experience.
+- All four video interviewer experiences aren't finished.
+- The live GPT-Live trial needs fully verified concurrency, reconnect, ledger-failure and alternate-provider safeguards.
+
+The two authorized voice trial accounts are:
+
+Investor: `[private authorized trial account email redacted]`
+
+Founder: `[private authorized trial account email redacted]`
+
+Each has a 300-second cumulative active-speech allowance, excluding silence.
+
+Recover the existing `codex/voice-trial-durable-claim` work and verify whether it has been integrated.
+
+Do not create a duplicate quota system.
+
+Never approve founder-contact cards during automated acceptance.
+
+---
+
+## 10. Parallel engineering and freedom
+
+You are the engineering lead.
+
+You may autonomously inspect, research, architect, implement, refactor, test, debug, integrate, merge and deploy through the established release process, respecting the safeguards above.
+
+Use independent subagents and worktrees where efficient.
+
+Maintain these active tracks:
+
+**Track A — Immersive interaction:** Tavus, video rehearsal and voice experience.
+
+**Track B — Q intelligence:** Graph-backed context, long-term memory, better multi-hop reasoning and validated reusable knowledge.
+
+**Track C — Performance:** Hermes-inspired improvements, streaming, caching, routing and latency optimization.
+
+**Track D — Product:** Investor/founder experience, visual presentation, Work, InvestIQ, navigation and UX.
+
+**Reliability track:** Existing defects, regressions, provider failures, voice quota enforcement and release gates.
+
+Do not make Track A wait for Track B, or all product work wait for a minor CI issue.
+
+Integrate work coherently through `build/int-rc`, the repository's CI lane and protected deployment branch.
+
+Avoid simultaneous release owners if Claude resumes. Record ownership in the shared handoff.
+
+Do not stop at one successful PR. Continue choosing and delivering the highest-impact product improvements.
+
+Do not take unapproved high-cost actions, weaken security, bypass quota restrictions or carry out external contact without appropriate authorization.
+
+---
+
+## 11. Acceptance standards
+
+For each significant capability, distinguish:
+
+**Implemented:** Code exists.
+
+**Tested:** Appropriate local tests passed.
+
+**CI green:** Exact committed revision passed required checks.
+
+**Deployed:** The intended code is running in the relevant services.
+
+**Live verified:** The actual user journey was successfully exercised against that deployment.
+
+These distinctions are mandatory.
+
+Run authenticated real product journeys, not only mocked unit tests.
+
+For each major milestone, explain what a founder or investor can actually do now.
+
+Use evidence-based performance measurements, not attractive numbers taken from incomparable runs.
+
+If blocked by provider configuration or human approval, report the exact blocker and continue independent productive work.
+
+---
+
+## 12. Keep the project moving
+
+Update:
+
+- `docs/ai-handoff/STATE.md`
+- `docs/ai-handoff/ACTIVE-TASKS.md`
+- `docs/ai-handoff/HANDOFF-LOG.md`
+
+Preserve current architecture and decisions.
+
+Commit and push important completed work so future Codex and Claude sessions can resume.
+
+Before your own usage limit is reached, leave exact commits, open PRs, deployed revisions, unfinished work and next executable steps.
+
+Do not allow unfinished private worktrees to become the only copy of important progress.
+
+### Final governing principle
+
+Capital Q is supposed to be an exceptional AI investment operating experience.
+
+The agent legion, connected memory, autonomous work, Hermes-inspired performance, Tavus video, voice, interactive answers, InvestIQ and the entire founder/investor product must feel like one coherent, capable intelligence.
+
+**Keep building the actual product while identifying and correcting everything that stands in the way.**
+
+Do not restart the implementation. Do not reduce the mission to bug fixing. Do not stop at an architecture document or green test suite.
+
+Reconcile the live state, claim release ownership, finish the current PRs safely, validate them in production, and continue engineering the next highest-value capability.
+
+Begin now.

@@ -695,7 +695,11 @@ describe("a matched arrival follow-up reads no tool at all (V2: six prefetch rea
     });
   }
 
-  it("a semantic (skim) match reads no tool either", async () => {
+  // Speed lane C (2026-10-12): the semantic skim no longer holds the reads
+  // (it held every follow-up that named anyone, 1.0-2.7 s in production);
+  // they run beside it and are discarded when it answers. The answer is
+  // still code's, with no analyst call.
+  it("a semantic (skim) match is still answered by code, its reads run beside it", async () => {
     const skimmer: QTurnSkimmer = {
       skim: () =>
         Promise.resolve(
@@ -706,14 +710,15 @@ describe("a matched arrival follow-up reads no tool at all (V2: six prefetch rea
           }),
         ),
     };
-    const { seam, request, executed } = build(
+    const { seam, request, alpha, persisted } = build(
       () => SNAPSHOT,
       "so what did TensorGate want?",
       skimmer,
       offered,
     );
-    await seam.answer(request);
-    expect(executed).toEqual([]);
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(0);
+    expect(persisted.join("\n")).toContain("TensorGate wants to connect");
   });
 
   it("control: another question still runs its prefetch reads", async () => {
@@ -736,6 +741,82 @@ describe("a matched arrival follow-up reads no tool at all (V2: six prefetch rea
     );
     await seam.answer(request);
     expect(executed.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Speed lane C (production 2026-10-12, runs 6027a668 / b5eb0a12 /
+ * decbdddf): the arrival skim (snapshot read + a FAST_CLASSIFICATION call,
+ * 0.75-2.4 s) held every prefetch read, so every follow-up naming anyone
+ * waited for it before Q could start. Fake timed ports: a skim that takes
+ * SKIM_MS. Before: the answer could not start until it returned. After:
+ * the reads run beside it and the answer waits at most the grace.
+ */
+describe("speed lane C: a slow arrival skim no longer holds the answer", () => {
+  const SKIM_MS = 600;
+  const slowSkim = (
+    reading: Record<string, unknown> | null,
+  ): { skimmer: QTurnSkimmer; done: () => number | null } => {
+    let doneAt: number | null = null;
+    return {
+      skimmer: {
+        skim: async () => {
+          await new Promise((resolve) => setTimeout(resolve, SKIM_MS));
+          doneAt = Date.now();
+          return reading === null
+            ? null
+            : TurnSkimResultSchema.parse({ confidence: "HIGH", ...reading });
+        },
+      },
+      done: () => doneAt,
+    };
+  };
+
+  it("an ordinary follow-up naming a counterpart reaches the model before the skim returns", async () => {
+    const { skimmer } = slowSkim({ kind: "OTHER" });
+    const { seam, request, alpha } = build(
+      () => SNAPSHOT,
+      "How does TensorGate compare with what I usually back?",
+      skimmer,
+    );
+    const started = Date.now();
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const elapsed = Date.now() - started;
+    console.info(
+      `[speed-lane-c] arrival skim ${String(SKIM_MS)} ms: answer completed in ${String(elapsed)} ms`,
+    );
+    expect(alpha.calls.length).toBeGreaterThan(0);
+    expect(elapsed).toBeLessThan(SKIM_MS);
+  });
+
+  it("a skim that would have matched, but too late, leaves the answer to the analyst with the arrival facts", async () => {
+    const { skimmer } = slowSkim({
+      kind: "ARRIVAL_FOLLOWUP",
+      arrival: { item: `interest:${REL}`, aspect: "REQUEST" },
+    });
+    const { seam, request, alpha } = build(
+      () => SNAPSHOT,
+      "so what did TensorGate want?",
+      skimmer,
+    );
+    const started = Date.now();
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(Date.now() - started).toBeLessThan(SKIM_MS);
+    expect(alpha.calls.length).toBeGreaterThan(0);
+    // Nothing is lost: the snapshot the skim would have answered from is
+    // among the facts the analyst answers from.
+    expect(promptOf(alpha)).toContain("TensorGate wants to connect");
+  });
+
+  it("a follow-up code recognises still waits for its own decision (no reads, no model)", async () => {
+    const { skimmer } = slowSkim(null);
+    const { seam, request, alpha } = build(
+      () => SNAPSHOT,
+      "what's the request?",
+      skimmer,
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(0);
   });
 });
 

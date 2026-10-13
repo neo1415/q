@@ -120,6 +120,25 @@ function jobLine(job: WorkJob, zone: string | null): string {
   const here =
     job.inThisConversation === true ? ", asked in this conversation" : "";
   bits.push(`"${text(job.goal) ?? "a job"}" (${state}${finished}${here}).`);
+  // The questions come before the reviewer's detail (live 2026-10-13: eight
+  // findings filled the job's room and the clip cut the questions, so Q
+  // said it had only a summary of them). They are kept word for word and
+  // whole; the findings are what the clip may shorten.
+  const diligence = job.diligence ?? null;
+  const questions = (diligence?.questions ?? [])
+    .map(text)
+    .filter((one): one is string => one !== null);
+  const filed =
+    diligence?.filedForApproval === true
+      ? "filed for their approval; not sent"
+      : "kept with the job; not sent";
+  bits.push(
+    questions.length === 0
+      ? "Founder diligence questions: none recorded."
+      : `Founder diligence questions prepared (${String(questions.length)}, ${filed}), word for word: ${questions
+          .map((question, i) => `${String(i + 1)}) ${question}`)
+          .join(" ")}`,
+  );
   const review = job.review ?? null;
   if (review === null) {
     bits.push("Reviewer's critique and changes: not recorded (unknown).");
@@ -160,21 +179,6 @@ function jobLine(job: WorkJob, zone: string | null): string {
     else if (review.outcome !== "NO_CHANGE_NEEDED")
       bits.push("Which sections changed: not known.");
   }
-  const diligence = job.diligence ?? null;
-  const questions = (diligence?.questions ?? [])
-    .map(text)
-    .filter((one): one is string => one !== null);
-  const filed =
-    diligence?.filedForApproval === true
-      ? "filed for their approval; not sent"
-      : "kept with the job; not sent";
-  bits.push(
-    questions.length === 0
-      ? "Founder diligence questions: none recorded."
-      : `Founder diligence questions prepared (${String(questions.length)}, ${filed}), word for word: ${questions
-          .map((question, i) => `${String(i + 1)}) ${question}`)
-          .join(" ")}`,
-  );
   return bits.join(" ").slice(0, JOB_TEXT_MAX);
 }
 

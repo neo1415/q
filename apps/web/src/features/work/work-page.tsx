@@ -66,7 +66,12 @@ import {
   summarisesCards,
   type NoticeGroup,
 } from "./notice-groups";
-import { jobLine, jobsInProgress, workStateOf } from "./job-state";
+import {
+  inProgressCounts,
+  jobLine,
+  jobsInProgress,
+  workStateOf,
+} from "./job-state";
 import { readPlan } from "./plan-words";
 import type { WorkforceView } from "./workforce-actions";
 import { WorkforceCost } from "./workforce-cost";
@@ -387,6 +392,7 @@ function InProgress({
   // Recovery D6: the durable work state -- running, waiting, or stopped
   // this week with why -- read from the same fields Q reads.
   const tasks = jobsInProgress(jobs, now);
+  const { running, stopped } = inProgressCounts(items.length, tasks);
   const listRef = useRef<HTMLUListElement>(null);
   useQControl({
     id: "list.work-jobs",
@@ -402,7 +408,8 @@ function InProgress({
       >
         In progress
         <span className="cq-body font-normal cq-numeric text-(--cq-text-tertiary)">
-          {items.length + tasks.length}
+          {running}
+          {stopped === 0 ? null : ` · ${String(stopped)} stopped`}
         </span>
       </h2>
       {failed ? (

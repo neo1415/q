@@ -100,3 +100,25 @@ function firstBoundary(text: string): number {
   }
   return best;
 }
+
+/**
+ * Whole text, cut into its sentences by the same boundary the stream
+ * uses. Each piece keeps its own surrounding whitespace, so joining them
+ * back with "" gives the original text exactly: a caller that keeps a
+ * prefix never re-spaces what it keeps. A decimal ("3.8%", "8.8/10"), a
+ * version ("v2.1") or a URL ("capitalq.com/x") has no space after its
+ * stop, so it is never a boundary (D9: "3. 8%" reached a revised memo
+ * from a per-stop splitter that rejoined with a space).
+ */
+export function splitSentences(text: string): string[] {
+  const out: string[] = [];
+  let rest = text;
+  for (;;) {
+    const cut = firstBoundary(rest);
+    if (cut <= 0 || cut >= rest.length) break;
+    out.push(rest.slice(0, cut));
+    rest = rest.slice(cut);
+  }
+  if (rest.length > 0) out.push(rest);
+  return out;
+}

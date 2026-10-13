@@ -24,10 +24,12 @@ import {
   canvasLayout,
   comparesAsTable,
   fitNumber,
+  fitExplanation,
   fitProvenance,
   fitWords,
   tieLine,
   LEVEL_WORD,
+  type FitExplanation,
 } from "./answer-canvas-logic";
 import { MapBody } from "./blocks/data-blocks";
 import { useVisibleCards } from "./cards/card-visibility";
@@ -213,6 +215,67 @@ function SourceLinks({
   );
 }
 
+/**
+ * How a mandate fit out of 10 is worked out, closed by default
+ * (progressive disclosure): what it measures, what each known measure
+ * added, what was not known and the method. Explains the score the card
+ * already shows; it never computes a different one.
+ */
+function FitHow({
+  explanation,
+  name,
+}: {
+  readonly explanation: FitExplanation;
+  readonly name?: string | undefined;
+}) {
+  return (
+    <details className="cq-ac-how" data-ac-fit-how>
+      <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 text-(--cq-text-primary)">
+        {name === undefined
+          ? `How ${explanation.score} is worked out`
+          : `${name}: how ${explanation.score} is worked out`}
+      </summary>
+      <div className="flex flex-col gap-2 pb-2">
+        <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
+          Mandate fit measures how well this company matches the mandate you
+          declared. It is not a judgement of the business.
+        </p>
+        <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+          {explanation.rows.map((row) => (
+            <li
+              key={row.label}
+              className="cq-body-sm flex justify-between gap-3 text-(--cq-text-secondary)"
+            >
+              <span>
+                {row.label} · {LEVEL_WORD[row.level]}
+              </span>
+              <span className="cq-numeric text-(--cq-text-primary)">
+                {row.points === null ? "left out" : String(row.points)}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {explanation.sum === null ? null : (
+          <p
+            className="cq-body-sm cq-numeric m-0 text-(--cq-text-primary)"
+            data-ac-fit-sum
+          >
+            {explanation.sum}
+          </p>
+        )}
+        {explanation.unknown.length === 0 ? null : (
+          <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
+            {`Not known yet: ${explanation.unknown.join(", ")}. Unknown measures are left out, never scored as zero, so the score can move either way once they are known.`}
+          </p>
+        )}
+        <p className="cq-caption m-0 text-(--cq-text-tertiary)">
+          {`Points: ${explanation.scale}. Under three known measures there is no score. Computed by Capital Q's code from your mandate, never by a model (ADR 0059).`}
+        </p>
+      </div>
+    </details>
+  );
+}
+
 function AnswerCard({
   card,
   rank,
@@ -235,6 +298,7 @@ function AnswerCard({
   const number = fitNumber(card);
   const words = fitWords(card);
   const provenance = fitProvenance(card);
+  const how = fitExplanation(card);
   // K5: a card with a record behind it has an explicit Open control; a
   // tap on the card itself keeps the spotlight (founder-requested).
   const opens = cardPagePath(card.subject) !== null;
@@ -373,6 +437,7 @@ function AnswerCard({
                 ))}
               </dl>
             )}
+            {how === null ? null : <FitHow explanation={how} />}
             {card.fit === null && card.sourceCount > 0 ? (
               <span className="cq-ac-btn cq-ac-sources" data-ac-sources>
                 <Icon of={ChevronRight} />

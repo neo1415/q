@@ -84,6 +84,20 @@ export function jobsInProgress<
   });
 }
 
+/**
+ * The In progress heading's numbers: what is running, and what stopped
+ * this week. A stopped job stays listed so it can be opened, but is never
+ * counted as running (live 2026-10-12: "In progress 3" over three failed
+ * jobs).
+ */
+export function inProgressCounts(
+  others: number,
+  tasks: readonly { readonly job: WorkforceJobSummaryDto }[],
+): { readonly running: number; readonly stopped: number } {
+  const stopped = tasks.filter((one) => jobLine(one.job).stopped).length;
+  return { running: others + tasks.length - stopped, stopped };
+}
+
 /** What Q finished since the person last looked (jobs; steps come from Done). */
 export function finishedSince<
   T extends { readonly job: WorkforceJobSummaryDto },

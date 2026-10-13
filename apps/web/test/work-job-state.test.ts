@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { WorkforceJobSummaryDto } from "@capital-q/contracts";
 
 import {
+  inProgressCounts,
   finishedSince,
   jobLine,
   jobsInProgress,
@@ -66,6 +67,11 @@ describe("a job's state on Work (D6)", () => {
     });
     // And it stays on In progress this week, so it can be opened.
     expect(jobsInProgress([failed], NOW)).toHaveLength(1);
+    // ...but it is not counted as running.
+    expect(inProgressCounts(1, jobsInProgress([failed], NOW))).toEqual({
+      running: 1,
+      stopped: 1,
+    });
   });
 
   it("a finished job leaves In progress and shows under what Q finished", () => {
