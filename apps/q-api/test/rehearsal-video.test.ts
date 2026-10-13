@@ -18,6 +18,7 @@ import {
   createRehearsalVideoService,
   enabledInterviewersFrom,
   joinUrlOf,
+  selectRehearsalInterviewer,
   type RehearsalVideoStore,
   type VideoSessionRow,
 } from "../src/composition/rehearsal-video.js";
@@ -99,7 +100,15 @@ function fakeRehearsals() {
       INVESTOR_REHEARSAL_ID,
       {
         owner: FOUNDER.userId,
-        dto: dto({ id: INVESTOR_REHEARSAL_ID, userRole: "INVESTOR" }),
+        dto: dto({
+          id: INVESTOR_REHEARSAL_ID,
+          userRole: "INVESTOR",
+          counterpart: {
+            kind: "COMPANY",
+            id: REHEARSAL_ID,
+            name: "Company One",
+          },
+        }),
       },
     ],
   ]);
@@ -314,6 +323,7 @@ function setup(
     configured?: boolean;
     testMode?: boolean;
     paidUserIds?: ReadonlySet<string>;
+    allAccounts?: boolean;
   } = {},
 ) {
   let clock = T0.getTime();
@@ -326,6 +336,7 @@ function setup(
     stillAllowed,
     store,
     testMode: options.testMode,
+    allAccounts: options.allAccounts,
     paidUserIds: options.paidUserIds ?? new Set([FOUNDER.userId]),
     joinCipher: createTokenCipher(Buffer.alloc(32, 1).toString("base64")),
     rehearsals: rehearsals.service,
@@ -559,15 +570,15 @@ describe("starting a video rehearsal", () => {
     expect(harness.tavus.calls.pals).toHaveLength(0);
   });
 
-  it("is for founders only", async () => {
+  it("admits an owned investor-company rehearsal but refuses nonhuman actors", async () => {
     const harness = setup();
-    expect(
-      await harness.service.start(
-        FOUNDER,
-        INVESTOR_REHEARSAL_ID,
-        "partner-steve",
-      ),
-    ).toEqual({ kind: "NOT_A_FOUNDER" });
+    const result = await harness.service.start(
+      FOUNDER,
+      INVESTOR_REHEARSAL_ID,
+      "q-selected",
+    );
+    expect(result.kind).toBe("OK");
+    expect(harness.tavus.calls.pals).toHaveLength(1);
     expect(
       await harness.service.start(
         ActorContextSchema.parse({ ...FOUNDER, actorType: "Q" }),
@@ -575,7 +586,7 @@ describe("starting a video rehearsal", () => {
         "partner-steve",
       ),
     ).toEqual({ kind: "NOT_A_FOUNDER" });
-    expect(harness.tavus.calls.pals).toHaveLength(0);
+    expect(harness.tavus.calls.pals).toHaveLength(1);
   });
 
   it("refuses an interviewer that is planned but not enabled", async () => {
@@ -690,10 +701,10 @@ describe("canonical video admission", () => {
     },
   );
 
-  it("admits the explicitly configured profile in test mode only after fresh authorization", async () => {
+  it("hides no-face test rooms from the lobby and still requires fresh authorization for explicit tests", async () => {
     const harness = setup({ testMode: true });
     expect((await harness.service.interviewers(FOUNDER)).videoAvailable).toBe(
-      true,
+      false,
     );
     await startVideo(harness);
     expect(harness.tavus.calls.conversations[0]?.input.testMode).toBe(true);
@@ -1277,4 +1288,108 @@ describe("the routes", () => {
     expect(other.statusCode).toBe(404);
     await stranger.app.close();
   });
+});
+
+describe("bounded wider video access", () => {
+  it("selects presentation from Q style and falls back only to enabled stock assets", () => {
+    const rehearsal = dto();
+    const enabled = new Set([
+      "partner-steve",
+      "analyst-julia",
+      "partner-raj",
+      "partner-mary",
+    ]);
+    for (const [style, expected] of [
+      ["Brisk and precise", "analyst-julia"],
+      ["Sceptical and direct", "partner-raj"],
+      ["Warm and supportive", "partner-mary"],
+      ["Calm", "partner-steve"],
+    ]) {
+      expect(
+        selectRehearsalInterviewer(
+          {
+            ...rehearsal,
+            persona: { ...rehearsal.persona, style: style ?? "" },
+          },
+          enabled,
+        )?.id,
+      ).toBe(expected);
+    }
+    expect(
+      selectRehearsalInterviewer(rehearsal, new Set(["analyst-julia"]))?.id,
+    ).toBe("analyst-julia");
+    expect(selectRehearsalInterviewer(rehearsal, new Set())).toBeUndefined();
+  });
+  it("admits other legitimate accounts only with explicit wider funding configuration", async () => {
+    const harness = setup({ allAccounts: true, paidUserIds: new Set() });
+    expect((await harness.service.interviewers(STRANGER)).videoAvailable).toBe(
+      true,
+    );
+    harness.stillAllowed.mockResolvedValue(false);
+    expect((await harness.service.interviewers(STRANGER)).videoAvailable).toBe(
+      false,
+    );
+    expect(
+      await harness.service.start(STRANGER, REHEARSAL_ID, "q-selected"),
+    ).toEqual({ kind: "NOT_FOUND" });
+    expect(harness.tavus.calls.conversations).toHaveLength(0);
+  });
+  for (const [message, reason] of [
+    ["CQ_VIDEO_ALLOWANCE_EXHAUSTED", "ALLOWANCE_EXHAUSTED"],
+    ["CQ_VIDEO_CONCURRENCY_LIMIT", "CONCURRENCY_LIMIT"],
+  ] as const) {
+    it(`preserves voice fallback without provider allocation for ${reason}`, async () => {
+      const harness = setup();
+      vi.spyOn(harness.store, "claim").mockRejectedValueOnce(
+        new Error(message),
+      );
+      expect(
+        await harness.service.start(FOUNDER, REHEARSAL_ID, "q-selected"),
+      ).toEqual({ kind: "OK", response: { mode: "VOICE_FALLBACK", reason } });
+      expect(harness.tavus.calls.pals).toHaveLength(0);
+      expect(harness.rehearsals.rows.get(REHEARSAL_ID)?.dto.status).toBe(
+        "ACTIVE",
+      );
+    });
+  }
+  it("asks the existing Q engine to wrap up near the immutable deadline", async () => {
+    const harness = setup();
+    const session = await startVideo(harness);
+    await harness.advance(151_000);
+    const signal = new AbortController().signal;
+    await harness.service.bridge(
+      session.id,
+      bearerOf(harness.tavus.calls),
+      [{ role: "user", text: "Here is our traction." }],
+      signal,
+    );
+    expect(harness.rehearsals.service.say).toHaveBeenCalledWith(
+      FOUNDER,
+      REHEARSAL_ID,
+      { text: "Here is our traction." },
+      expect.any(AbortSignal),
+      { closingSoon: true },
+    );
+    expect(harness.tavus.calls.conversations).toHaveLength(1);
+    await harness.advance(29_000);
+    expect(harness.tavus.calls.ended).toHaveLength(1);
+  });
+});
+
+it("does not return provider speech after Q work runs past the original deadline", async () => {
+  const harness = setup();
+  const session = await startVideo(harness);
+  harness.rehearsals.service.say.mockImplementationOnce(async () => {
+    await harness.advance(181_000);
+    return { kind: "OK", rehearsal: dto() };
+  });
+  expect(
+    await harness.service.bridge(
+      session.id,
+      bearerOf(harness.tavus.calls),
+      [{ role: "user", text: "Our traction." }],
+      new AbortController().signal,
+    ),
+  ).toEqual({ kind: "SILENT" });
+  expect(harness.tavus.calls.ended).toHaveLength(1);
 });
