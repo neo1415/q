@@ -1,5 +1,20 @@
 # Capital Q — Current shared engineering state
 
+## 2026-10-13 22:00 UTC — GateQ text journey DEPLOYED (Claude); live acceptance pending
+
+- **Production `recovery/2026-09-12` = `20cb347e`**, merged from release PR #70. The tree equals int-rc 47d87665, plus two production-only files.
+  - It carries GateQ #66 (backend), #68 (web) and #69 (Q opens the interview), the speed-close docs and the Q Pitch blueprint docs.
+- **Release CI:** run 38470826379 passed every job (build, typecheck, format/lint, test, pgTAP, quality).
+- **Deploy evidence:**
+  - The web homepage ETag changed at 21:54:36 UTC, so the new build is serving.
+  - api `/health/ready` reports database OK; q-api `/health/live` is OK.
+  - Per-service Railway status was NOT read: no working Railway API access in this session.
+- **Migrations:** hosted 208, none pending; `20261223090000` was applied earlier.
+- **Integration `build/int-rc` = `86106e43`.** It also carries Q Pitch foundations (#67, package-only, not wired into any app).
+- **Not yet live-verified:** the GateQ founder-to-investor journey.
+  - Run `scripts/handoff/live/gateq-acceptance.mjs`. It needs `CQ_SB_URL`/`CQ_SB_PUBLISHABLE` and a valid `SUPABASE_ACCESS_TOKEN`; the current token returns 401.
+  - `GATEQ_CONTACT_REQUIRED_FROM` stays unset.
+
 ## 2026-10-13 17:00 UTC — Q speed sprint CLOSED (Claude); next priority GateQ
 
 - **DEPLOYED and live-verified** (production `5ce3d76b`; q-api/api/workers at `c2f08536`, server code identical; integration `ea3f71a0` has the same `packages`/`apps`/`supabase` code; hosted migrations: none pending):
