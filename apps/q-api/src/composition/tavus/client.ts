@@ -193,6 +193,10 @@ export type TavusClient = {
     /** A private room: only the holder of the returned token joins. */
     readonly requireAuth?: boolean | undefined;
   }) => Promise<TavusCreatedConversation>;
+  /** Recovery only, on this same account; unrelated rooms never escape. */
+  readonly findConversationsForPal: (
+    palId: string,
+  ) => Promise<readonly TavusConversation[]>;
   readonly endConversation: (conversationId: string) => Promise<void>;
   readonly getConversation: (
     conversationId: string,
@@ -326,6 +330,43 @@ export function createTavusClient(dependencies: {
         ...conversationOf(created),
         meetingToken: created.meeting_token ?? null,
       };
+    },
+    findConversationsForPal: async (palId) => {
+      const schema = z.object({
+        data: z
+          .array(
+            ConversationSchema.extend({
+              pal_id: z.string().optional(),
+              persona_id: z.string().optional(),
+            }),
+          )
+          .max(100),
+        total_count: z.number().int().nonnegative().optional(),
+      });
+      const found: TavusConversation[] = [];
+      for (let page = 1; page <= 20; page += 1) {
+        const response = schema.parse(
+          await call(
+            "conversation recovery",
+            "GET",
+            `/v2/conversations?limit=100&page=${String(page)}`,
+          ),
+        );
+        if ((response.total_count ?? 0) > 2000)
+          throw new TavusError("conversation recovery bound", 503);
+        found.push(
+          ...response.data
+            .filter((item) => (item.pal_id ?? item.persona_id) === palId)
+            .map(conversationOf),
+        );
+        if (
+          response.data.length < 100 ||
+          (response.total_count !== undefined &&
+            page * 100 >= response.total_count)
+        )
+          return found;
+      }
+      throw new TavusError("conversation recovery incomplete", 503);
     },
     endConversation: async (conversationId) => {
       await call(

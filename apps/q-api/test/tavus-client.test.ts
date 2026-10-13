@@ -165,3 +165,33 @@ describe("the Tavus adapter", () => {
     expect((failed as TavusError).status).toBe(429);
   });
 });
+
+it("recovers only the recorded PAL's conversations from the same account", async () => {
+  const fetch = fakeFetch(200, {
+    data: [
+      { conversation_id: "ours", pal_id: "pal0", status: "active" },
+      { conversation_id: "unrelated", pal_id: "other", status: "active" },
+    ],
+    total_count: 2,
+  });
+  const client = createTavusClient({
+    apiKey: "disabled-locally-000000000000",
+    fetch,
+  });
+  expect(await client.findConversationsForPal("pal0")).toEqual([
+    { conversationId: "ours", conversationUrl: null, status: "active" },
+  ]);
+  expect(fetch.mock.calls[0]?.[0]).toBe(
+    "https://tavusapi.com/v2/conversations?limit=100&page=1",
+  );
+});
+
+it("fails closed when a recovery inventory exceeds its safe scan bound", async () => {
+  const fetch = fakeFetch(200, { data: [], total_count: 2001 });
+  await expect(
+    createTavusClient({
+      apiKey: "disabled-locally-000000000000",
+      fetch,
+    }).findConversationsForPal("pal0"),
+  ).rejects.toThrow(TavusError);
+});
