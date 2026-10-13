@@ -29,13 +29,30 @@ Implemented focused safeguards:
 - Every bridge request, including cached retries, revalidates the stored actor
   through active profile, uncached suspension and the canonical actor resolver.
   The resolved tenant/user/organisation/membership must match exactly.
-  Revocation or failed admission also prevents background review model calls.
+  Background provisional-review retries use the canonical material viewer;
+  their fresh revocation behavior remains a separate verification obligation.
 - Unconfirmed provider end does not close the canonical session or finish its
   review. A failed end can recover only through an authoritative provider
   read explicitly reporting ended. The sweep retries at the existing deadline. ENDED non-voice rows
   whose canonical rehearsal remains ACTIVE are also selected for review retry.
 - A closing-soon notice is shown during the last 30 seconds. This is a UI
   notice, not proof of a spoken closing cue.
+- If conversation creation succeeds but the LIVE write fails, retained provider
+  IDs are used for compensating termination. Unconfirmed termination keeps the
+  row open for deadline/sweep cleanup. Confirmed failed-allocation cleanup keeps
+  the canonical voice fallback ACTIVE. The retained allocation IDs are local
+  to the process until successful persistence; they are not a durable checkpoint.
+- Same-replica bridge requests are serialized per session. Overlapping identical
+  requests reuse the completed reply; queued requests recheck authorization.
+  Distinct turns cannot overwrite the same transcript snapshot concurrently.
+  The queue does not provide distributed or restart-safe idempotency.
+
+October 13 continuation validation: 52 package builds, 67 focused tests,
+root/q-api typechecks, changed-file lint and formatting passed. Two new
+regressions fail against the preceding PR44 service: lost cleanup after the
+LIVE write fails, and duplicate Q calls from overlapping bridge retries.
+CI, hosted migration, deployment and actual audiovisual acceptance remain
+separate gates for the corrected head.
 
 Remaining limitations to verify or correct before broad rollout:
 
@@ -45,6 +62,11 @@ Remaining limitations to verify or correct before broad rollout:
   conversation creation; a process crash during allocation can orphan objects.
 - Bridge retry deduplication and its 60-line count are process-local; a restart
   can repeat a turn. Existing canonical rehearsal ownership still binds reads.
+- The single authorized paid pilot requires one admitted founder and one Q API
+  replica, with no restart/deployment during the room's fixed deadline. Keep
+  test mode enabled until the founder is ready; restore it or remove paid
+  admission immediately after the one controlled test. Broad rollout requires
+  durable spend admission, allocation checkpoints and turn coordination.
 - Timing starts at allocation, not a provider participant-joined callback;
   startup reduces the founder's available time. The current cap is deliberately
   not extended without reviewing the provider backstop.
