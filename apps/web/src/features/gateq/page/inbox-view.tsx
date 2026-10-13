@@ -18,6 +18,7 @@ import type {
   GateqInboxDto,
   GateqInboxItemDto,
   GateqPassReason,
+  QManifestRef,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import {
@@ -46,7 +47,11 @@ import {
 } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
+import { QPageState, QSection, useQDialog } from "@/features/q/q-section";
+
 import { QNavIcon } from "@/components/app-shell/q-nav-icon";
+
+import { SubmittedBrief, SubmittedTranscript } from "./submitted-brief";
 
 import { FitGlyph } from "../fit-glyph";
 import {
@@ -233,6 +238,24 @@ export function InboxView({
     null;
   const detail =
     current === null ? null : (details[current.applicationId] ?? null);
+
+  const applicationFocus: QManifestRef | undefined =
+    state === "full" &&
+    (desktop || phoneOpen) &&
+    detail !== null &&
+    current?.applicationId === detail.item.applicationId
+      ? { kind: "GATEQ_APPLICATION", id: detail.item.applicationId }
+      : undefined;
+  const selectedRefs: QManifestRef[] = items
+    .filter((item) => checked.has(item.applicationId))
+    .map((item) => ({ kind: "GATEQ_APPLICATION", id: item.applicationId }));
+  useQDialog(
+    phoneOpen && !desktop && applicationFocus !== undefined,
+    "gateq-application-dialog",
+    "APPLICATION",
+    applicationFocus === undefined ? [] : [applicationFocus],
+    "Submitted GateQ application",
+  );
 
   const run = useCallback(
     (work: () => Promise<Done<unknown>>, after?: string) => {
@@ -750,14 +773,44 @@ export function InboxView({
 
   return (
     <>
+      <QPageState tab="inbox" focus={applicationFocus} />
+      {applicationFocus === undefined ? null : (
+        <QSection
+          id="gateq-application"
+          kind="GATEQ_APPLICATION"
+          refs={[applicationFocus]}
+          label="Submitted GateQ application"
+        />
+      )}
       {chips}
-      {bulk}
-      <div className="gq-ibx">
-        {list}
-        <div className="gq-detail" aria-live="polite">
-          {detailPane}
+      {selectedRefs.length === 0 ? (
+        bulk
+      ) : (
+        <QSection
+          id="gateq-selection"
+          kind="GATEQ_INBOX"
+          refs={selectedRefs}
+          label="Selected GateQ applications"
+        >
+          {bulk}
+        </QSection>
+      )}
+      <QSection
+        id="gateq-inbox"
+        kind="GATEQ_INBOX"
+        refs={visible.map((item) => ({
+          kind: "GATEQ_APPLICATION",
+          id: item.applicationId,
+        }))}
+        label="GateQ inbox"
+      >
+        <div className="gq-ibx">
+          {list}
+          <div className="gq-detail" aria-live="polite">
+            {detailPane}
+          </div>
         </div>
-      </div>
+      </QSection>
       <p className="cq-caption gq-t3">
         {shortcutsOn ? (
           <>
@@ -1085,6 +1138,8 @@ function Detail({
   const [more, setMore] = useState(false);
   const view = qView(item);
   const passed = detail?.messages.find((message) => message.kind === "PASS");
+  const contactEmail =
+    detail?.dossier?.contact?.email ?? detail?.contact.email ?? null;
   return (
     <div className="gq-dt">
       <div className="flex items-start gap-3.5">
@@ -1121,10 +1176,10 @@ function Detail({
           <MessageSquare {...icon} />
           Reply
         </Button>
-        {detail?.contact.email ? (
+        {contactEmail !== null ? (
           <a
             className={buttonClassName("secondary", "compact")}
-            href={`mailto:${detail.contact.email}?subject=${encodeURIComponent(`${fund} and ${item.companyName}: a call`)}`}
+            href={`mailto:${contactEmail}?subject=${encodeURIComponent(`${fund} and ${item.companyName}: a call`)}`}
             aria-disabled={!canDecide}
           >
             Book a call
@@ -1210,17 +1265,19 @@ function Detail({
         </div>
       )}
 
-      <div className="gq-qview">
-        <span className="text-(--cq-q-light)">
-          <QNavIcon size={22} strokeWidth={2} aria-hidden />
-        </span>
-        <div className="flex flex-col gap-0.5">
-          <p className="gq-who">Q&apos;s view, not a verified fact</p>
-          <p className="cq-body">
-            <b>{view.lead}.</b> <span className="gq-t2">{view.why}</span>
-          </p>
+      {detail?.dossier == null ? (
+        <div className="gq-qview">
+          <span className="text-(--cq-q-light)">
+            <QNavIcon size={22} strokeWidth={2} aria-hidden />
+          </span>
+          <div className="flex flex-col gap-0.5">
+            <p className="gq-who">Q&apos;s view, not a verified fact</p>
+            <p className="cq-body">
+              <b>{view.lead}.</b> <span className="gq-t2">{view.why}</span>
+            </p>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {detail === null ? (
         <div className="flex flex-col gap-3">
@@ -1229,90 +1286,100 @@ function Detail({
         </div>
       ) : (
         <>
-          <div
-            className="grid gap-5"
-            style={{
-              gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
-            }}
-          >
-            <section className="gq-sect">
-              <h3 className="cq-title-sm">Your gate&apos;s rules</h3>
-              <div>
-                {detail.rules.length === 0 ? (
-                  <p className="cq-body-sm gq-t2">
-                    No published rules yet, so nothing was checked.
+          {detail.dossier == null ? (
+            <>
+              <div
+                className="grid gap-5"
+                style={{
+                  gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
+                }}
+              >
+                <section className="gq-sect">
+                  <h3 className="cq-title-sm">Your gate&apos;s rules</h3>
+                  <div>
+                    {detail.rules.length === 0 ? (
+                      <p className="cq-body-sm gq-t2">
+                        No published rules yet, so nothing was checked.
+                      </p>
+                    ) : (
+                      detail.rules.map((rule) => (
+                        <div
+                          key={rule.label}
+                          className="gq-check"
+                          style={{ fontSize: 14 }}
+                        >
+                          <FitGlyph
+                            kind={
+                              rule.standing === "MEETS"
+                                ? "fit"
+                                : rule.standing === "DOES_NOT_MEET"
+                                  ? "no"
+                                  : "unk"
+                            }
+                          />
+                          <span>{rule.label}</span>
+                          <span className="gq-status">
+                            {rule.standing === "MEETS"
+                              ? "Meets"
+                              : rule.standing === "DOES_NOT_MEET"
+                                ? "Doesn't meet"
+                                : "Not answered"}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+                <section className="gq-sect">
+                  <h3 className="cq-title-sm">Their answers</h3>
+                  <ul className="flex flex-col">
+                    {detail.answers.map((answer) => (
+                      <li
+                        key={answer.label}
+                        className="flex min-h-7 items-center gap-2 text-sm"
+                      >
+                        <span className="flex-1 gq-t2">{answer.label}</span>
+                        <span>{answer.value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="cq-caption gq-t3">
+                    Their own claims, not verified.
                   </p>
-                ) : (
-                  detail.rules.map((rule) => (
-                    <div
-                      key={rule.label}
-                      className="gq-check"
-                      style={{ fontSize: 14 }}
-                    >
-                      <FitGlyph
-                        kind={
-                          rule.standing === "MEETS"
-                            ? "fit"
-                            : rule.standing === "DOES_NOT_MEET"
-                              ? "no"
-                              : "unk"
-                        }
-                      />
-                      <span>{rule.label}</span>
-                      <span className="gq-status">
-                        {rule.standing === "MEETS"
-                          ? "Meets"
-                          : rule.standing === "DOES_NOT_MEET"
-                            ? "Doesn't meet"
-                            : "Not answered"}
-                      </span>
-                    </div>
-                  ))
-                )}
+                </section>
               </div>
-            </section>
-            <section className="gq-sect">
-              <h3 className="cq-title-sm">Their answers</h3>
-              <ul className="flex flex-col">
-                {detail.answers.map((answer) => (
-                  <li
-                    key={answer.label}
-                    className="flex min-h-7 items-center gap-2 text-sm"
-                  >
-                    <span className="flex-1 gq-t2">{answer.label}</span>
-                    <span>{answer.value}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="cq-caption gq-t3">
-                Their own claims, not verified.
-              </p>
-            </section>
-          </div>
 
-          <section className="gq-sect">
-            <h3 className="cq-title-sm">Their note</h3>
-            <p className="cq-body" style={{ maxWidth: "62ch" }}>
-              {detail.note === null ? (
-                <span className="gq-t2">No note.</span>
-              ) : (
-                `“${detail.note}”`
-              )}
-            </p>
-            {detail.contact.name || detail.contact.email ? (
-              <p className="cq-caption gq-t2">
-                {[detail.contact.name, detail.contact.email]
-                  .filter((part) => part !== null)
-                  .join(" · ")}
-              </p>
-            ) : null}
-          </section>
+              <section className="gq-sect">
+                <h3 className="cq-title-sm">Their note</h3>
+                <p className="cq-body" style={{ maxWidth: "62ch" }}>
+                  {detail.note === null ? (
+                    <span className="gq-t2">No note.</span>
+                  ) : (
+                    `“${detail.note}”`
+                  )}
+                </p>
+                {detail.contact.name || detail.contact.email ? (
+                  <p className="cq-caption gq-t2">
+                    {[detail.contact.name, detail.contact.email]
+                      .filter((part) => part !== null)
+                      .join(" · ")}
+                  </p>
+                ) : null}
+              </section>
+            </>
+          ) : (
+            <SubmittedBrief dossier={detail.dossier} />
+          )}
+          <SubmittedTranscript
+            turns={detail.transcript}
+            recordedTurnCount={detail.dossier?.transcript.turnCount}
+          />
 
           <section className="gq-sect">
             <h3 className="cq-title-sm">What they shared</h3>
             {detail.shared.length === 0 ? (
               <p className="cq-body-sm gq-t2">
-                Only the form. They didn&apos;t attach documents.
+                No documents were attached to this submission.
               </p>
             ) : (
               <ul className="gq-hair">
@@ -1463,7 +1530,10 @@ function Sheets({
           ) : sheet.kind === "reply" ? (
             <ReplySheet
               initial={draftReply({
-                founderName: details[sheet.id]?.contact.name ?? null,
+                founderName:
+                  details[sheet.id]?.dossier?.contact?.name ??
+                  details[sheet.id]?.contact.name ??
+                  null,
                 fund,
               })}
               onSend={(message) => onReplied(sheet.id, message)}
@@ -1567,7 +1637,10 @@ function PassSheet({
   const draftFor = useCallback(
     (id: string, why: GateqPassReason) =>
       draftPass({
-        founderName: details[id]?.contact.name ?? null,
+        founderName:
+          details[id]?.dossier?.contact?.name ??
+          details[id]?.contact.name ??
+          null,
         companyName:
           items.find((item) => item.applicationId === id)?.companyName ??
           "your company",
