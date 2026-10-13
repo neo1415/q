@@ -1,5 +1,7 @@
 # Tavus pilot readiness
 
+Current repaired deploymentf4c2e603 all-four SUCCESS/drained. Explicit Video lobby browser PASS (Video preselected/Steve checked/Join enabled; Join not clicked); human retry link sent. Single paid <=180second pilot authorized, engineer has allocated no room. Human audiovisual acceptance remains pending.
+
 Human join failed: correct admitted Tensorgate profile saw no Video selector and entered a refused voice rehearsal. No Tavus room allocated. One paid <=180-second pilot remains authorized but NOT human audiovisual accepted. Repair and verify the browser join path before retrying.
 
 Release prerequisites (root owner): exact latest PR44 quality+database CI green; immutable migration 20261222175000 then additive 20261222180000 applied before code; exact q-api/web deployed SHA verified. One q-api replica; one explicitly entitled provider key. Stable existing voice-session secret across service instances. Q_API_PUBLIC_URL must equal the reachable HTTPS q-api origin.
