@@ -1,4 +1,21 @@
-import { randomUUID } from "node:crypto";
+import {
+  createHash,
+  randomInt,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
+
+import {
+  ApplicationContactDtoSchema,
+  ApplicationCoverageDtoSchema,
+  GATEQ_TRANSCRIPT_MAX_TURNS,
+  type ApplicationContactConfirmResponse,
+  type ApplicationContactDto,
+  type ApplicationContactResponse,
+  type ApplicationCoverageDto,
+  type ApplicationTranscriptTurnDto,
+  type GateqContactChannel,
+} from "@capital-q/contracts";
 
 import type { TransactionManager } from "@capital-q/database";
 import { qualify, type QualificationResult } from "@capital-q/gateq";
@@ -25,13 +42,20 @@ import {
   sessionTokenMatches,
   SESSION_LIFETIME_MS,
 } from "../domain/session-credential.js";
+import { coverageFor } from "./coverage.js";
+import { buildDossier } from "./dossier.js";
 import type {
+  ApplicationContactRepository,
   ApplicationDocumentRepository,
   ApplicationFactRepository,
   ApplicationRepository,
   ApplicationSessionRepository,
   ApplicationSubmissionRepository,
+  ApplicationTurnRepository,
   BoundPolicyPort,
+  DocumentTitlesPort,
+  StoredContact,
+  StoredTurn,
   TaxonomyResolutionPort,
 } from "./ports.js";
 
@@ -61,7 +85,94 @@ export type IntakeDependencies = {
   readonly transactions: TransactionManager;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * GateQ slice 1. Each is optional so a composition without it keeps the
+   * v1 behaviour exactly: no transcript in the snapshot, no contact
+   * requirement, no dossier titles.
+   */
+  readonly turns?: ApplicationTurnRepository | undefined;
+  readonly contacts?: ApplicationContactRepository | undefined;
+  readonly documentTitles?: DocumentTitlesPort | undefined;
+  /** Sends the one-time code. False or a throw: it did not go. */
+  readonly contactCodeMailer?: ContactCodeMailer | undefined;
+  /**
+   * Applications created at or after this instant cannot be submitted
+   * without a confirmed contact, even when none was ever given. Absent:
+   * only an application that has a contact on record must confirm it
+   * (applications from before contacts existed keep working).
+   */
+  readonly contactRequiredFrom?: string | undefined;
+  /** Test seam for the six-digit code. */
+  readonly newContactCode?: (() => string) | undefined;
 };
+
+/** GateQ slice 1: how long a contact code works, and how many tries. */
+export const CONTACT_CODE_TTL_MINUTES = 30;
+export const CONTACT_CODE_MAX_ATTEMPTS = 5;
+
+/** Mails the six-digit code to the applicant's own address. */
+export type ContactCodeMailer = (input: {
+  readonly to: string;
+  readonly companyName: string;
+  readonly code: string;
+  readonly expiresInMinutes: number;
+}) => Promise<boolean>;
+
+export type ContactDetails = {
+  readonly name: string;
+  readonly email: string;
+  readonly role: string;
+  readonly companyName: string;
+  readonly phone?: string | undefined;
+  readonly preferredChannel?: GateqContactChannel | undefined;
+};
+
+/**
+ * The verifier of a contact code, bound to the application: the same six
+ * digits issued to two applications never verify each other.
+ */
+const hashContactCode = (applicationId: string, code: string): string =>
+  createHash("sha256")
+    .update(`gateq-contact-code:${applicationId}:${code}`, "utf8")
+    .digest("hex");
+
+const sameHash = (a: string, b: string): boolean => {
+  const left = Buffer.from(a, "hex");
+  const right = Buffer.from(b, "hex");
+  return left.length === right.length && timingSafeEqual(left, right);
+};
+
+/** What a guest may see of their own contact. Never the code or its hash. */
+export function contactDto(contact: StoredContact): ApplicationContactDto {
+  return ApplicationContactDtoSchema.parse({
+    name: contact.name,
+    email: contact.email,
+    role: contact.role,
+    companyName: contact.companyName,
+    phone: contact.phone,
+    preferredChannel: contact.preferredChannel,
+    emailConfirmed: contact.emailConfirmedAt !== null,
+    confirmedVia: contact.confirmedVia,
+  });
+}
+
+export function transcriptDto(
+  turns: readonly StoredTurn[],
+): ApplicationTranscriptTurnDto[] {
+  return turns.slice(0, GATEQ_TRANSCRIPT_MAX_TURNS).map((turn) => ({
+    seq: turn.seq,
+    role: turn.role,
+    text: turn.text,
+    at: turn.createdAt,
+  }));
+}
+
+/**
+ * How much transcript text a submission snapshot carries. The row is
+ * bounded at 256 KiB; a long interview keeps its opening turns and says it
+ * was cut rather than failing the founder's Submit.
+ */
+const SNAPSHOT_TRANSCRIPT_CHARS = 150_000;
 
 /** A verified guest: one application, and the policy it was bound to. */
 export type GuestContext = {
@@ -104,6 +215,22 @@ export type IntakeService = {
   }>;
   /** Internal: the verified guest, for the interview layer above. */
   readonly authorise: (token: string) => Promise<GuestContext>;
+  /**
+   * GateQ slice 1: save the applicant's contact and send a one-time code.
+   * With `accountEmail` (a signed-in founder's own verified address,
+   * resolved server-side), a matching email is confirmed without a code.
+   */
+  readonly startContact: (input: {
+    readonly token: string;
+    readonly contact: ContactDetails;
+    readonly accountEmail?: string | undefined;
+  }) => Promise<ApplicationContactResponse>;
+  readonly confirmContact: (input: {
+    readonly token: string;
+    readonly code: string;
+  }) => Promise<ApplicationContactConfirmResponse>;
+  /** The deterministic completeness check, and what stands before Submit. */
+  readonly coverage: (token: string) => Promise<ApplicationCoverageDto>;
 };
 
 export function createIntakeService(
@@ -119,8 +246,16 @@ export function createIntakeService(
     taxonomy,
     transactions,
     logger,
+    turns,
+    contacts,
+    documentTitles,
+    contactCodeMailer,
+    contactRequiredFrom,
   } = dependencies;
   const clock = dependencies.clock ?? (() => new Date());
+  const newContactCode =
+    dependencies.newContactCode ??
+    (() => String(randomInt(0, 1_000_000)).padStart(6, "0"));
 
   /**
    * Turn a credential into an application, or refuse.
@@ -212,6 +347,46 @@ export function createIntakeService(
       projection: await projectionFor(application),
       evaluatedAt: clock().toISOString(),
     });
+  };
+
+  /**
+   * Whether Submit needs a confirmed contact, and whether it has one.
+   *
+   * A contact on record must be confirmed. Without one, only an application
+   * created after `contactRequiredFrom` is held back, so an application
+   * begun before contacts existed (and the form that has not yet learnt to
+   * ask) keeps working until the composition says otherwise.
+   */
+  const contactStanding = async (
+    application: Application,
+  ): Promise<{
+    readonly contact: StoredContact | null;
+    readonly required: boolean;
+    readonly confirmed: boolean;
+  }> => {
+    const contact =
+      contacts === undefined ? null : await contacts.findFor(application.id);
+    if (contact !== null) {
+      return {
+        contact,
+        required: true,
+        confirmed: contact.emailConfirmedAt !== null,
+      };
+    }
+    const required =
+      contacts !== undefined &&
+      contactRequiredFrom !== undefined &&
+      Date.parse(application.createdAt) >= Date.parse(contactRequiredFrom);
+    return { contact: null, required, confirmed: false };
+  };
+
+  const policyFor = async (application: Application) => {
+    const policy = await policies.policyByVersionId({
+      gatewayId: application.gatewayId,
+      gatewayVersionId: application.gatewayVersionId,
+    });
+    if (policy === null) throw new IntakeRefusedError("NOT_FOUND");
+    return policy;
   };
 
   return {
@@ -366,10 +541,74 @@ export function createIntakeService(
       if (qualification.access !== "MAY_APPLY") {
         throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
       }
+      // Who the organisation may contact must be reachable before anything
+      // is disclosed to it (slice 1). A guest is told this one apart.
+      const standing = await contactStanding(application);
+      if (standing.required && !standing.confirmed) {
+        throw new IntakeRefusedError("CONTACT_NOT_CONFIRMED");
+      }
 
       const submittedAt = clock().toISOString();
       const snapshot = await viewOf(application);
       const documentIds = await documents.listFor(application.id);
+
+      // Snapshot v2 and the dossier, when the composition stores turns.
+      // Everything is read before the transaction and built
+      // deterministically; the transaction only writes the one row.
+      let v2:
+        { readonly snapshot: unknown; readonly dossier: unknown } | undefined;
+      if (turns !== undefined) {
+        const policy = await policyFor(application);
+        const current = await facts.currentFor(application.id);
+        const transcript = transcriptDto(await turns.listFor(application.id));
+        let budget = SNAPSHOT_TRANSCRIPT_CHARS;
+        const kept = transcript.filter((turn) => {
+          budget -= turn.text.length;
+          return budget >= 0;
+        });
+        const coverage = coverageFor({
+          policy,
+          qualification,
+          facts: current,
+        });
+        const contact =
+          standing.contact === null ? null : contactDto(standing.contact);
+        const titles =
+          documentTitles === undefined || documentIds.length === 0
+            ? new Map<string, string>()
+            : await documentTitles
+                .titles(documentIds)
+                .catch(() => new Map<string, string>());
+        v2 = {
+          snapshot: {
+            ...snapshot,
+            documentIds,
+            snapshotVersion: 2,
+            contact,
+            transcript: kept,
+            transcriptTruncated: kept.length < transcript.length,
+            coverage,
+          },
+          dossier: buildDossier({
+            reference: application.publicReference,
+            declaredName: application.declaredName,
+            submittedAt,
+            generatedAt: submittedAt,
+            facts: current,
+            qualification,
+            coverage,
+            contact,
+            documents: documentIds.map((documentId) => ({
+              documentId,
+              title: (titles.get(documentId) ?? "Shared document").slice(
+                0,
+                200,
+              ),
+            })),
+            turnCount: transcript.length,
+          }),
+        };
+      }
 
       const recorded = await transactions.run(async (tx) => {
         const result = await submissions.record(tx, {
@@ -378,10 +617,13 @@ export function createIntakeService(
           gatewayVersionId: application.gatewayVersionId,
           // Frozen. A later edit cannot rewrite what was received, because
           // what was received is this row and this row is immutable.
-          snapshot: { ...snapshot, documentIds },
+          snapshot: v2?.snapshot ?? { ...snapshot, documentIds },
           qualification,
           clientRequestId: input.clientRequestId,
           submittedAt,
+          ...(v2 === undefined
+            ? {}
+            : { dossier: v2.dossier, snapshotVersion: 2 as const }),
         });
         await applications.setStatus(
           tx,
@@ -406,6 +648,150 @@ export function createIntakeService(
         qualification,
         deduplicated: false,
       };
+    },
+
+    startContact: async (input) => {
+      const { application } = await authorise(input.token);
+      if (contacts === undefined) throw new IntakeRefusedError("NOT_FOUND");
+      if (application.status === "SUBMITTED") {
+        // The contact the organisation received is the one in its dossier.
+        throw new IntakeRefusedError("ALREADY_SUBMITTED");
+      }
+      const details = {
+        name: input.contact.name.trim(),
+        email: input.contact.email.trim().toLowerCase(),
+        role: input.contact.role.trim(),
+        companyName: input.contact.companyName.trim(),
+        phone: input.contact.phone?.trim() ?? null,
+        preferredChannel: input.contact.preferredChannel ?? null,
+      };
+      const now = clock();
+      const existing = await contacts.findFor(application.id);
+      const base = {
+        applicationId: application.id,
+        tenantId: application.tenantId,
+        ...details,
+      };
+
+      // A signed-in founder's own verified account address needs no code.
+      // It confirms reachability only: no membership, no organisation.
+      if (
+        input.accountEmail !== undefined &&
+        input.accountEmail.trim().toLowerCase() === details.email
+      ) {
+        const saved = await contacts.save({
+          ...base,
+          codeHash: null,
+          codeExpiresAt: null,
+          emailConfirmedAt: now.toISOString(),
+          confirmedVia: "ACCOUNT",
+        });
+        return {
+          contact: contactDto(saved),
+          codeSent: false,
+          codeExpiresInMinutes: null,
+        };
+      }
+
+      // The same address, already confirmed: the details change, the
+      // confirmation stands, and nobody is sent another code.
+      if (
+        existing !== null &&
+        existing.emailConfirmedAt !== null &&
+        existing.email === details.email
+      ) {
+        const saved = await contacts.save({
+          ...base,
+          codeHash: null,
+          codeExpiresAt: null,
+          emailConfirmedAt: existing.emailConfirmedAt,
+          confirmedVia: existing.confirmedVia,
+        });
+        return {
+          contact: contactDto(saved),
+          codeSent: false,
+          codeExpiresInMinutes: null,
+        };
+      }
+
+      const code = newContactCode();
+      const saved = await contacts.save({
+        ...base,
+        codeHash: hashContactCode(application.id, code),
+        codeExpiresAt: new Date(
+          now.getTime() + CONTACT_CODE_TTL_MINUTES * 60_000,
+        ).toISOString(),
+        emailConfirmedAt: null,
+        confirmedVia: null,
+      });
+      const codeSent =
+        contactCodeMailer === undefined
+          ? false
+          : await contactCodeMailer({
+              to: details.email,
+              companyName: details.companyName,
+              code,
+              expiresInMinutes: CONTACT_CODE_TTL_MINUTES,
+            }).catch(() => false);
+      logger?.info(
+        { gatewayId: application.gatewayId, codeSent },
+        "gateq applicant contact code issued",
+      );
+      return {
+        contact: contactDto(saved),
+        codeSent,
+        codeExpiresInMinutes: CONTACT_CODE_TTL_MINUTES,
+      };
+    },
+
+    confirmContact: async (input) => {
+      const { application } = await authorise(input.token);
+      if (contacts === undefined) return { status: "NOT_FOUND", contact: null };
+      const contact = await contacts.findFor(application.id);
+      if (contact === null) return { status: "NOT_FOUND", contact: null };
+      // Confirming twice is confirmed: a retried request is harmless.
+      if (contact.emailConfirmedAt !== null) {
+        return { status: "CONFIRMED", contact: contactDto(contact) };
+      }
+      if (contact.codeHash === null || contact.codeExpiresAt === null) {
+        return { status: "NOT_FOUND", contact: null };
+      }
+      if (
+        Date.parse(contact.codeExpiresAt) <= clock().getTime() ||
+        contact.codeAttempts >= CONTACT_CODE_MAX_ATTEMPTS
+      ) {
+        return { status: "EXPIRED", contact: contactDto(contact) };
+      }
+      if (
+        !/^[0-9]{6}$/.test(input.code) ||
+        !sameHash(contact.codeHash, hashContactCode(application.id, input.code))
+      ) {
+        await contacts.recordFailedAttempt(application.id);
+        return { status: "WRONG_CODE", contact: contactDto(contact) };
+      }
+      const confirmed = await contacts.confirm({
+        applicationId: application.id,
+        at: clock().toISOString(),
+        via: "EMAIL_CODE",
+      });
+      return confirmed === null
+        ? { status: "NOT_FOUND", contact: null }
+        : { status: "CONFIRMED", contact: contactDto(confirmed) };
+    },
+
+    coverage: async (token) => {
+      const { application } = await authorise(token);
+      const policy = await policyFor(application);
+      const qualification = await qualificationFor(application);
+      const current = await facts.currentFor(application.id);
+      const standing = await contactStanding(application);
+      return ApplicationCoverageDtoSchema.parse({
+        coverage: coverageFor({ policy, qualification, facts: current }),
+        contact: { required: standing.required, confirmed: standing.confirmed },
+        documentCount: await documents.countFor(application.id),
+        transcriptTurns:
+          turns === undefined ? 0 : await turns.countFor(application.id),
+      });
     },
   };
 }

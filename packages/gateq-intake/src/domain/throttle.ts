@@ -55,6 +55,17 @@ export const GATEQ_GUEST_OPERATIONS = [
    * could run up against an investor's front door.
    */
   "START",
+  /**
+   * GateQ slice 1: saving the contact sends an email, so it is the tight
+   * one; a script must not turn the door into a mail cannon.
+   */
+  "CONTACT",
+  /** Typing the six-digit code. The code's own attempt limit is stricter. */
+  "CONTACT_CONFIRM",
+  /** Reading their own transcript back. */
+  "TRANSCRIPT",
+  /** The pre-submit coverage check: engine and taxonomy, no model. */
+  "COVERAGE",
 ] as const;
 export type GateQGuestOperation = (typeof GATEQ_GUEST_OPERATIONS)[number];
 
@@ -80,6 +91,10 @@ export const GATEQ_GUEST_QUOTAS: Readonly<
   SUBMIT: { limit: 5, windowMs: 10 * 60_000 },
   UPLOAD: { limit: 10, windowMs: 10 * 60_000 },
   START: { limit: 60, windowMs: 10 * 60_000 },
+  CONTACT: { limit: 5, windowMs: 10 * 60_000 },
+  CONTACT_CONFIRM: { limit: 15, windowMs: 10 * 60_000 },
+  TRANSCRIPT: { limit: 120, windowMs: 10 * 60_000 },
+  COVERAGE: { limit: 120, windowMs: 10 * 60_000 },
 };
 
 /** Beyond this many live buckets the oldest window is dropped. */

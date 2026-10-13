@@ -1,22 +1,33 @@
 import type { GatewayPolicy, PublicGateway } from "@capital-q/gateq";
 import type { Logger } from "@capital-q/observability";
+import type { ApplicationTranscriptTurnDto } from "@capital-q/contracts";
 
 import {
   IntakeRefusedError,
+  type ApplicationDimension,
   type ApplicationView,
 } from "../contracts/index.js";
+import { explainQualification } from "./coverage.js";
 import type { GateQInterviewer, InterviewChannel } from "./interviewer.js";
-import type { IntakeService } from "./intake-service.js";
-import type { ApplicationSessionRepository, BoundPolicyPort } from "./ports.js";
+import { transcriptDto, type IntakeService } from "./intake-service.js";
+import type {
+  ApplicationSessionRepository,
+  ApplicationTurnRepository,
+  BoundPolicyPort,
+  StoredTurn,
+} from "./ports.js";
 
 /**
- * One applicant turn, end to end (CQ-GATE-002R §6, §7).
+ * One applicant turn, end to end (CQ-GATE-002R §6, §7; GateQ slice 1).
  *
  *   authorise the guest
- *   → load the bounded state the interview may see
+ *   → a retried exchange returns what it already said
+ *   → record what the person said, in order
+ *   → load the bounded state the interview may see (facts, recent turns,
+ *     what was already asked, how far the talk has drifted)
  *   → ask the interviewer
  *   → validate what it proposed
- *   → record what survived
+ *   → record what survived, then Q's reply
  *   → recompute the deterministic answer
  *   → return what is safe to say
  *
@@ -26,11 +37,25 @@ import type { ApplicationSessionRepository, BoundPolicyPort } from "./ports.js";
  * model's own sentence says otherwise, which is why the reply and the
  * state come from different places.
  *
- * A retry is the same turn. The session remembers the last client turn id
- * and the answer it produced, so a double-tapped send returns what the
- * applicant already saw instead of paying for a second model call and
- * recording the same sentence twice.
+ * A retry is the same turn. With a transcript store, the exchange is keyed
+ * on the applicant's client turn id: a stored Q reply is returned as it
+ * was, and neither the model nor the store is touched again. Without one,
+ * the session's single last-turn slot does the same for the turn
+ * immediately before.
  */
+
+/** How much of the conversation the interviewer is shown. */
+const RECENT_TURNS = 8;
+
+/** Q turn intents that mean the conversation left the application. */
+const TANGENT_INTENTS: ReadonlySet<string> = new Set([
+  "SMALL_TALK",
+  "OFF_TOPIC",
+  "SABOTAGE",
+]);
+
+/** The client turn id Q's opening line is stored under, once. */
+const OPENING_TURN_ID = "opening";
 
 export type ConversationDependencies = {
   readonly intake: IntakeService;
@@ -45,6 +70,11 @@ export type ConversationDependencies = {
     ApplicationSessionRepository,
     "lastTurn" | "rememberTurn"
   >;
+  /**
+   * GateQ slice 1: the durable transcript. Absent, the interview runs as
+   * before (no history, single-slot idempotency).
+   */
+  readonly turns?: ApplicationTurnRepository | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -73,7 +103,49 @@ export type ConversationService = {
   }) => Promise<ApplicantTurnResult>;
   /** The applicant's own view, with the deterministic answer attached. */
   readonly summary: (token: string) => Promise<ApplicantTurnResult>;
+  /** The interview so far, both sides, oldest first. Their own only. */
+  readonly transcript: (
+    token: string,
+  ) => Promise<readonly ApplicationTranscriptTurnDto[]>;
 };
+
+/** What the interviewer is shown of the conversation so far. */
+function historyFrom(stored: readonly StoredTurn[]): {
+  readonly recentTurns: readonly {
+    readonly role: "person" | "q";
+    readonly text: string;
+  }[];
+  readonly askedAlready: readonly ApplicationDimension[];
+  readonly tangents: number;
+} {
+  const recentTurns = stored.slice(-RECENT_TURNS).map((turn) => ({
+    role: turn.role === "PERSON" ? ("person" as const) : ("q" as const),
+    text: turn.text,
+  }));
+  // What Q actually asked about, in the order it first asked: not what
+  // happens to be answered, which is a different list.
+  const askedAlready: ApplicationDimension[] = [];
+  for (const turn of stored) {
+    if (
+      turn.askingDimension !== null &&
+      !askedAlready.includes(turn.askingDimension)
+    ) {
+      askedAlready.push(turn.askingDimension);
+    }
+  }
+  // Consecutive Q turns, newest first, that read the person as off the
+  // application. One on-topic turn ends the run.
+  let tangents = 0;
+  for (const turn of [...stored].reverse()) {
+    if (turn.role !== "Q") continue;
+    if (turn.intent !== null && TANGENT_INTENTS.has(turn.intent)) {
+      tangents += 1;
+    } else {
+      break;
+    }
+  }
+  return { recentTurns, askedAlready, tangents };
+}
 
 export function createConversationService(
   dependencies: ConversationDependencies,
@@ -84,6 +156,7 @@ export function createConversationService(
     policies,
     publicGatewayFor,
     turnMemory,
+    turns,
     logger,
   } = dependencies;
 
@@ -99,15 +172,7 @@ export function createConversationService(
   const explain = (
     policy: GatewayPolicy,
     qualification: Awaited<ReturnType<IntakeService["qualification"]>>,
-  ) => {
-    const label = (criterionId: string) =>
-      policy.criteria.find((c) => c.id === criterionId)?.label ?? "a criterion";
-    return {
-      access: qualification.access,
-      unmet: qualification.principalMismatches.map(label),
-      stillNeeded: qualification.unknowns.map(label),
-    };
-  };
+  ) => explainQualification(policy, qualification);
 
   const stateFor = async (token: string) => {
     const guest = await intake.authorise(token);
@@ -141,6 +206,12 @@ export function createConversationService(
     openingFor: async (input) => {
       const { guest, policy, publicGateway } = await stateFor(input.token);
       const qualification = await intake.qualification(input.token);
+      // Everything already established, so a resumed application opens on
+      // what is still open rather than on a greeting from nowhere (§35).
+      const facts = await intake.factsFor(input.token);
+      const stored =
+        turns === undefined ? [] : await turns.listFor(guest.application.id);
+      const history = historyFrom(stored);
       const outcome = await interviewer.turn({
         stage: "APPLICATION",
         channel: input.channel ?? "text",
@@ -148,40 +219,90 @@ export function createConversationService(
         application: {
           policy,
           qualification,
-          // Nothing yet, or everything from a resumed application — the
-          // opening reads differently because the state does, not because
-          // a branch chose a different sentence (§35).
-          facts: [],
+          facts,
+          // No document reading reaches the interview in this slice: the
+          // only document text an applicant's session could see is
+          // Evidence extraction, and no port exposes it to a guest
+          // credential without new authority. Values stay unproposed.
           documentProposals: [],
         },
         utterance: "",
-        recentTurns: [],
-        tangents: 0,
-        askedAlready: [],
+        recentTurns: history.recentTurns,
+        tangents: history.tangents,
+        askedAlready: history.askedAlready,
         attribution: {
           tenantId: guest.application.tenantId,
           correlationId: input.correlationId,
         },
       });
+      // Stored once, so the transcript begins with the question the
+      // founder was answering. A later opening (a resume) is not stored
+      // again: the first one already is.
+      if (
+        turns !== undefined &&
+        stored.length === 0 &&
+        guest.application.status !== "SUBMITTED"
+      ) {
+        await turns.append({
+          applicationId: guest.application.id,
+          tenantId: guest.application.tenantId,
+          role: "Q",
+          text: outcome.reply,
+          clientTurnId: OPENING_TURN_ID,
+          askingDimension: outcome.asking,
+          intent: outcome.intent,
+        });
+      }
       return outcome.reply;
     },
 
     turn: async (input) => {
       const { guest, policy, publicGateway } = await stateFor(input.token);
+      const applicationId = guest.application.id;
 
       // A retry is the same turn. Before anything is spent or recorded.
-      const last = await turnMemory.lastTurn(guest.sessionId);
-      if (last !== null && last.clientTurnId === input.clientTurnId) {
-        return resultFor(input.token, last.reply, true);
+      if (turns !== undefined) {
+        const exchange = await turns.findExchange(
+          applicationId,
+          input.clientTurnId,
+        );
+        if (exchange.q !== null) {
+          return resultFor(input.token, exchange.q.text, true);
+        }
+      } else {
+        const last = await turnMemory.lastTurn(guest.sessionId);
+        if (last !== null && last.clientTurnId === input.clientTurnId) {
+          return resultFor(input.token, last.reply, true);
+        }
       }
 
       if (guest.application.status === "SUBMITTED") {
         throw new IntakeRefusedError("ALREADY_SUBMITTED");
       }
 
-      const view = await intake.resume(input.token);
+      // What the person said is on the record before the model is asked,
+      // so a failed model call loses nothing and a retry resumes it. A
+      // retried append of the same exchange writes nothing.
+      if (turns !== undefined) {
+        await turns.append({
+          applicationId,
+          tenantId: guest.application.tenantId,
+          role: "PERSON",
+          text: input.message,
+          clientTurnId: input.clientTurnId,
+        });
+      }
+
       const qualification = await intake.qualification(input.token);
       const facts = await intake.factsFor(input.token);
+      const stored =
+        turns === undefined ? [] : await turns.listFor(applicationId);
+      // The interviewer gets this turn as the utterance, not twice.
+      const prior = stored.filter(
+        (turn) =>
+          !(turn.role === "PERSON" && turn.clientTurnId === input.clientTurnId),
+      );
+      const history = historyFrom(prior);
 
       const outcome = await interviewer.turn({
         stage: "APPLICATION",
@@ -191,14 +312,15 @@ export function createConversationService(
           policy,
           qualification,
           facts,
+          // See openingFor: no authorised document-text port for a guest.
           documentProposals: [],
         },
         utterance: input.message,
-        recentTurns: [],
+        recentTurns: history.recentTurns,
         // The model is told how far off the application the conversation
         // has drifted; it decides how much of a person to be about it.
-        tangents: 0,
-        askedAlready: view.facts.map((fact) => fact.dimension),
+        tangents: history.tangents,
+        askedAlready: history.askedAlready,
         attribution: {
           tenantId: guest.application.tenantId,
           correlationId: input.correlationId,
@@ -211,6 +333,19 @@ export function createConversationService(
           facts: outcome.facts,
         });
       }
+      if (turns !== undefined) {
+        await turns.append({
+          applicationId,
+          tenantId: guest.application.tenantId,
+          role: "Q",
+          text: outcome.reply,
+          clientTurnId: input.clientTurnId,
+          askingDimension: outcome.asking,
+          intent: outcome.intent,
+        });
+      }
+      // Kept as well: the single slot still answers for a composition, or
+      // an older client, that has no transcript store.
       await turnMemory.rememberTurn({
         sessionId: guest.sessionId,
         clientTurnId: input.clientTurnId,
@@ -223,6 +358,7 @@ export function createConversationService(
           intent: outcome.intent,
           recorded: outcome.facts.length,
           rejected: outcome.rejectedFacts,
+          history: history.recentTurns.length,
         },
         "gateq applicant turn",
       );
@@ -235,5 +371,11 @@ export function createConversationService(
     },
 
     summary: async (token) => resultFor(token, "", false),
+
+    transcript: async (token) => {
+      const guest = await intake.authorise(token);
+      if (turns === undefined) return [];
+      return transcriptDto(await turns.listFor(guest.application.id));
+    },
   };
 }
