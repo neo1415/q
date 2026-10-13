@@ -1,5 +1,26 @@
 # Performance baseline and measured first improvements
 
+## October13 v25 full authenticated investor browser acceptance
+
+Production592b32ff, private receipt `/tmp/cq-investor-demo-1Tc4Lv`, full journey PASS. Individual observations: ranking first20 rendered characters4342ms/total5118ms; selected profile5571/26112 with seven native findings; risks4586/18920 with six native findings; comparison8244/34002 with exact two canonical companies. Native findings and company binding are verified from the current rendered answer. These are single observations of a text threshold, not semantic first useful content, first audio, p50/p95 or causal improvement. V24 zero-findings failure remains a failed product gate; this release corrects it without relaxing validation.
+
+## October 13 deployed product browser sample and scoped model diagnostics
+
+Deployed `f3fe5520`, existing authorized fictional investor, TLS verification enabled. Corrected harness matches current run/message/full visible answer and exact canonical cards/company paths. The complete investor journey passed. Individual observations:
+
+| Turn                   | First 20 rendered characters | Settled total | Scope                                             |
+| ---------------------- | ---------------------------: | ------------: | ------------------------------------------------- |
+| Top three              |                     3,336 ms |      3,735 ms | Three exact current cards                         |
+| Selected company       |                     4,513 ms |     54,112 ms | Full answer and all company references bound      |
+| Risks follow-up        |                     7,932 ms |     27,756 ms | Same selected company                             |
+| Two-company comparison |                     2,415 ms |      2,619 ms | Exact two companies and rendered comparison table |
+
+These thresholds are visible text, not semantic first-useful-content or p95. No paired before/after speed claim. Scoped `ai_ops.model_usage` shows selected-company FAST_CLASSIFICATION 812 ms, three NORMAL_DIALOGUE calls totalling 50,532 ms, and STRUCTURED_EXTRACTION 2,010 ms. These are call sums, not mutually exclusive wall-clock phases. Normal-dialogue cached input was 0/88,660; the subsequent risks turn had 69,046/93,873 cached input tokens. No general cache-share claim from these samples.
+
+Exact earliest-call logs identify strict schema refusal of invented root `followUps` (19,017 ms call), without truncation. A later 15,310 ms successful tool-model call was refused by text acceptance; bounded diagnostics included malformed company-finding fields. Those diagnostics alone do not explain its complete refusal. Final 16,205 ms model call completed the answer. Strict validation and safe invalid-item DROP remain unchanged. A separate versioned COMPANY_ANALYST v23 guidance correction is being gated, with actual after-release refusal/timing checks still pending.
+
+Private receipts remain outside Git: `/tmp/cq-investor-demo-eeG3eg`, `/tmp/cq-browser-model-phase-summary.json` and `/tmp/cq-profile-schema-diagnostics-early.json`. Work Open exact memo v2 and stored workforce deliverables separately passed; full media/cutoff evidence is not inferred from these text/API checks.
+
 ## October 13 connected-memory live baseline (before PR #38 deployment)
 
 Production revision `1165b92e3869832aedb4b54c63e5bf4cbd00bfd6`; existing authorized fictional investor, two fresh internal Q conversations. No contact, approval, account creation or paid audiovisual session. These are single observations, not p50/p95 or a causal speedup.
@@ -216,3 +237,16 @@ At deployed `9261cdc4`, the diagnostic warm-only Discover rehearsal rendered thr
 The actor/run-scoped ledger for the warm selected-company explanation on deployed `9261cdc4` contains classification 798 ms; two lookup-selection rounds 1,798 and 2,036 ms; final generation 11,908 ms; structured extraction 2,100 ms finishing 2,219 ms after the answer. Lookup planning consumes 3,834 ms on the critical path despite the existing authorized on-screen profile prefetch. A turn-note correction is only an investigation; no next latency implementation or speedup is claimed. The browser first-20-character 8,341 ms / terminal 18,978 ms observation failed subject/reference acceptance.
 
 The continuation rehearsal now identifies newly rendered Q card DOM nodes and waits for the current answer to settle before disconnecting its observer; existing cards and API-before-render timing no longer force a null card measurement. Syntax/lint pass; actual cold browser execution awaits the exact gated application release. These measurements remain literal rendering thresholds, not semantic usefulness or audio.
+
+## 2026-10-13 — current profile samples around immutable analyst guidance
+
+Before (912e594c, receipt2DSXfQ): selected profile23,133ms total; first20 rendered chars4,946ms; six native findings/exact company bindingsPASS. One NORMAL_DIALOGUE19,957ms,37,656input/0cached tokens, no schema refusal. After (23e3971c, receiptCWCP1L):13,046ms total/3,061ms first20chars; correct reference but zero native findings, full journeyFAILED. One dialogue10,728ms,12,446input/0cached; prepared-context path, no schema diagnostics. Subject identities matched. Different path/context size and failed evidence presentation prevent a speed success claim. v25 must preserve actual native findings before comparing further; no p95 from these samples.
+
+## October 13 human pilot stage receipt and product surface checks
+
+Private read-only provider verbose receipt `/tmp/cq-pilot-verbose-private.json` and owner/purpose/time-scoped model receipt `/tmp/cq-pilot-stage-metadata.json`:
+
+- NORMAL_DIALOGUE eight calls, zero failures, model-stage p50 2582ms/p95 3556ms, sum21139ms. STRUCTURED_EXTRACTION two calls, zero failures, p50 10958ms/p95 11344ms, sum21916ms. These are descriptive quantiles of this single account's rehearsal-purpose calls during the pilot window, not user first-useful-text/first-audio/completion latency or a wider product p95. No paired speedup claim.
+- Provider transcription receipt contains timing/duration fields but lacks a verified mapping from those stamps to browser-heard first audio. Do not derive first-audio latency by subtracting adjacent transcript stamps. Human perceived replies3–5seconds. Provider `system.shutdown`11:01:37.562700Z, reasonend_conversation_endpoint_hit, is1923ms after canonical endsAt11:01:35.640Z; DB end confirmation3688ms after. Exact physical180second cutoff from allocation was not proven. Bounded source follow-up removes iframe at canonical deadline and suppresses Q replies completed after deadline; provider duration backstop/timer/sweep remain.
+- Authenticated existing investor and founder `/gateq`, `/work`, `/documents`, `/relationships` all200/route-bound/content/no visible load-error. Private receipts `/tmp/cq-investor-demo-dkTx8K` (investor), `/tmp/cq-investor-demo-B1lIOg` (founder). Elapsed checks included reading content and screenshot: investor10908/7143/4244/3201ms, founder9615/11315/7563/3116ms. These are one surface check per role, not first paint/useful-content quantiles or end-to-end application/approval acceptance.
+- Source GateQ fixes: failed context remains unavailable rather than becoming founder; failed gateway lookup renders retry rather than “no gate”/creation; independent policy/public gateway/inbox reads for settings run together. Three focused regression testsPASS. Browser checks above precede that release; no deployed performance improvement claimed.

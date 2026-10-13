@@ -177,7 +177,7 @@ export function registerRehearsalVideoRoutes(
             request,
             reply,
             "PERMISSION_DENIED",
-            "Video rehearsals are for a company's founders.",
+            "Video rehearsals require an authorized participant account.",
           );
         case "UNKNOWN_INTERVIEWER":
           return problem(

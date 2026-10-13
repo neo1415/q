@@ -108,7 +108,6 @@ export function RehearsalLobby({
     useState<EntitlementProblemExtension | null>(null);
   const [joining, startJoining] = useTransition();
   // ADR 0066: a founder may meet them by video, with a stock AI interviewer.
-  const founderSide = kind !== "COMPANY";
   const [interviewers, setInterviewers] =
     useState<RehearsalInterviewersDto | null>(null);
   const [meetBy, setMeetBy] = useState<"VOICE" | "VIDEO">(
@@ -124,7 +123,6 @@ export function RehearsalLobby({
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!founderSide) return;
     let live = true;
     void rehearsalInterviewersAction()
       .then((result) => {
@@ -135,7 +133,7 @@ export function RehearsalLobby({
         }
         setInterviewers(result.value);
         const first = result.value.interviewers.find((item) => item.available);
-        setInterviewerId(first?.id ?? null);
+        setInterviewerId(first === undefined ? null : "q-selected");
       })
       .catch(() => {
         if (live)
@@ -144,7 +142,7 @@ export function RehearsalLobby({
     return () => {
       live = false;
     };
-  }, [founderSide, interviewerAttempt]);
+  }, [interviewerAttempt]);
 
   useEffect(() => {
     let live = true;
@@ -185,10 +183,9 @@ export function RehearsalLobby({
   }
 
   const meetingModeReady =
-    !founderSide ||
-    (interviewers !== null &&
-      (meetBy !== "VIDEO" ||
-        (interviewers.videoAvailable && interviewerId !== null)));
+    interviewers !== null &&
+    (meetBy !== "VIDEO" ||
+      (interviewers.videoAvailable && interviewerId !== null));
 
   function join() {
     if (!meetingModeReady) return;
@@ -230,7 +227,15 @@ export function RehearsalLobby({
         window.history.replaceState(null, "", voicePath);
         router.replace(voicePath);
         setVoiceNote(
-          "Video isn’t available just now, so you’re in the voice room instead.",
+          opened.ok &&
+            opened.value.mode === "VOICE_FALLBACK" &&
+            opened.value.reason === "ALLOWANCE_EXHAUSTED"
+            ? "Your two video interviews have been used. You can carry on in the voice room."
+            : opened.ok &&
+                opened.value.mode === "VOICE_FALLBACK" &&
+                opened.value.reason === "CONCURRENCY_LIMIT"
+              ? "Video rooms are busy. You can carry on in the voice room."
+              : "Video isn’t available just now, so you’re in the voice room instead.",
         );
         setRehearsal(result.value);
       } else if (result.ok) setRehearsal(result.value);
@@ -396,7 +401,7 @@ export function RehearsalLobby({
           </p>
         </fieldset>
 
-        {!founderSide || interviewers !== null ? null : (
+        {interviewers !== null ? null : (
           <div role="status" className="cq-body-sm text-(--cq-text-secondary)">
             {interviewerError === null ? (
               "Checking how you can meet…"
@@ -419,10 +424,15 @@ export function RehearsalLobby({
         {!requestedVideo ||
         interviewers === null ||
         interviewers.videoAvailable ? null : (
-          <p role="alert">
-            Video is not available for this account. No video room has been
-            started.
-          </p>
+          <div role="alert" className="flex flex-col items-start gap-2">
+            <p>
+              Video is not available for this account. No video room has been
+              started.
+            </p>
+            <Button variant="secondary" onClick={() => setMeetBy("VOICE")}>
+              Use voice instead
+            </Button>
+          </div>
         )}
         {interviewers === null || !interviewers.videoAvailable ? null : (
           <fieldset className="flex flex-col gap-2">
@@ -459,37 +469,11 @@ export function RehearsalLobby({
                   A stock AI face and voice plays {name}; Q decides every word.
                   It is never a likeness of the real person.
                 </p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {interviewers.interviewers.map((item) => (
-                    <label
-                      key={item.id}
-                      className={`cq-body-sm flex min-h-11 items-start gap-2 rounded-(--cq-radius-md) border p-3 ${
-                        item.available ? "cursor-pointer" : "opacity-60"
-                      } ${
-                        interviewerId === item.id
-                          ? "border-(--cq-accent) text-(--cq-text-primary)"
-                          : "border-(--cq-border) text-(--cq-text-secondary)"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="rehearsal-interviewer"
-                        value={item.id}
-                        disabled={!item.available}
-                        checked={interviewerId === item.id}
-                        onChange={() => setInterviewerId(item.id)}
-                        className="mt-1 accent-(--cq-accent)"
-                      />
-                      <span className="flex flex-col">
-                        <span className="text-(--cq-text-primary)">
-                          {item.name}
-                          {item.available ? "" : " (coming soon)"}
-                        </span>
-                        <span className="cq-caption">{item.style}</span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  Q chooses an available stock avatar and voice to suit this
+                  rehearsal. Two video interviews per account, up to three
+                  minutes each; reconnecting keeps the original deadline.
+                </p>
               </div>
             )}
           </fieldset>

@@ -225,6 +225,6 @@ describe("video lobby admission and durable navigation", () => {
       ),
     );
     expect(actions.start).toHaveBeenCalledTimes(1);
-    expect(actions.video).toHaveBeenCalledWith(ID, "partner-steve");
+    expect(actions.video).toHaveBeenCalledWith(ID, "q-selected");
   });
 });
