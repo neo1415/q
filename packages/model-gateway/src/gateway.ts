@@ -141,12 +141,15 @@ export type ModelGatewayExecuteOptions<T> = {
   readonly lenientFields?: readonly string[] | undefined;
   /** STRUCTURED output only: stand-ins for enum labels outside the set, by dotted path. */
   readonly enumFallbacks?: Readonly<Record<string, string>> | undefined;
+  /** STRUCTURED output only: drop (and count) root keys the schema does not know. */
+  readonly unknownRootKeys?: "REFUSE" | "DROP" | undefined;
 };
 
 type AcceptOptions = {
   readonly invalidListItems: InvalidListItems | undefined;
   readonly lenientFields: readonly string[] | undefined;
   readonly enumFallbacks: Readonly<Record<string, string>> | undefined;
+  readonly unknownRootKeys: "REFUSE" | "DROP" | undefined;
 };
 
 export type ModelGateway = {
@@ -440,6 +443,7 @@ export function createModelGateway(
               invalidListItems: accept.invalidListItems,
               lenientFields: accept.lenientFields,
               enumFallbacks: accept.enumFallbacks,
+              unknownRootKeys: accept.unknownRootKeys,
             });
             if (accepted.ok && (accepted.dropped?.length ?? 0) > 0) {
               // Paths and codes only, never a value the model wrote.
@@ -676,6 +680,7 @@ export function createModelGateway(
               invalidListItems: options.invalidListItems,
               lenientFields: options.lenientFields,
               enumFallbacks: options.enumFallbacks,
+              unknownRootKeys: options.unknownRootKeys,
             },
           );
         } finally {
