@@ -13,8 +13,8 @@ Implemented focused safeguards:
 - Only one provider account is instantiated. An explicit `TAVUS_API_KEY`
   takes precedence; a legacy `CQ_TAVUS_API_KEYS` list is accepted only if it
   resolves to one key. Credit, quota and auth refusals never rotate accounts.
-- Test mode uses `CQ_TAVUS_TEST_MODE=true`. Outside test mode, paid allocation
-  additionally requires the actor's canonical profile UUID in
+- Test mode uses `CQ_TAVUS_TEST_MODE=true`. Both test and paid catalogue/start
+  require the actor's canonical profile UUID in
   `CQ_TAVUS_PAID_USER_IDS`; an empty set fails closed to existing voice.
   This controls initial paid acceptance; it is **not a monthly budget ledger**.
 - Immutable migration `20261222175000` remains unchanged. New additive migration
@@ -29,8 +29,9 @@ Implemented focused safeguards:
 - Every bridge request, including cached retries, revalidates the stored actor
   through active profile, uncached suspension and the canonical actor resolver.
   The resolved tenant/user/organisation/membership must match exactly.
-  Background provisional-review retries use the canonical material viewer;
-  their fresh revocation behavior remains a separate verification obligation.
+  Background provisional-review retries also check fresh account admission
+  before invoking canonical review; actual revoked-session live acceptance
+  remains a separate verification obligation.
 - Unconfirmed provider end does not close the canonical session or finish its
   review. A failed end can recover only through an authoritative provider
   read explicitly reporting ended. The sweep retries at the existing deadline. ENDED non-voice rows
@@ -53,6 +54,29 @@ regressions fail against the preceding PR44 service: lost cleanup after the
 LIVE write fails, and duplicate Q calls from overlapping bridge retries.
 CI, hosted migration, deployment and actual audiovisual acceptance remain
 separate gates for the corrected head.
+
+Browser and canonical lifecycle continuation:
+
+- The lobby persists the owned canonical rehearsal id before provider allocation.
+  The stable `/rehearsals/live/<id>?video=1` route reads that existing room only.
+  Pending/no-row recovery is bounded to 60 seconds or the original deadline;
+  refresh never creates another rehearsal, resets the clock or allocates a room.
+- Both catalogue and new starts require one configured canonical profile in
+  test and paid modes. Existing owned recovery/end remains available after
+  removing new-allocation admission; fresh exact context is still checked.
+- The canonical finish endpoint waits for provider termination through the
+  existing video service. Unconfirmed close returns unavailable without a final
+  review. Review GET is read-only and resumes an active/open room.
+- Confirmed failed allocation retains the same ACTIVE canonical voice fallback.
+  Uncertain allocation remains open and cannot silently become voice or review.
+
+Final source validation: 52 package builds, 148 focused tests across eight files,
+root/q-api/web typechecks, changed lint/format and diff checks passed. Three new
+baseline defects were reproduced before correction: unadmitted test catalogue,
+finish-before-provider-close, and review GET mutation. New exact-head CI,
+migration and deployment remain required. Read-only pilot instructions and
+checker are preserved in [TAVUS-PILOT-READINESS.md](TAVUS-PILOT-READINESS.md).
+The owner will join later; no paid room is allocated during preparation.
 
 Remaining limitations to verify or correct before broad rollout:
 
