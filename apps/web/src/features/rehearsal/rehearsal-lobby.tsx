@@ -2,6 +2,7 @@
 
 import { primeMeetSounds } from "./meet-sounds";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import {
@@ -10,6 +11,8 @@ import {
   type QRehearsalDto,
   type QRehearsalPersonaDto,
   type RehearsalDifficulty,
+  type RehearsalInterviewersDto,
+  type RehearsalVideoSessionDto,
   type RehearsalCounterpartKind,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
@@ -24,9 +27,12 @@ import {
   TRAIT_SOURCE_WORDS,
 } from "./meet";
 import {
+  rehearsalInterviewersAction,
   rehearsalPersonaAction,
   startRehearsalAction,
+  startRehearsalVideoAction,
 } from "./rehearsal-actions";
+import { RehearsalVideoStage } from "./rehearsal-video-stage";
 import { CounterpartIdentity } from "./counterpart-identity";
 import { RehearsalRoom } from "./rehearsal-room";
 
@@ -85,6 +91,7 @@ export function RehearsalLobby({
   readonly counterpartId: string;
   readonly meetingId?: string | undefined;
 }) {
+  const router = useRouter();
   const [persona, setPersona] = useState<QRehearsalPersonaDto | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -98,6 +105,31 @@ export function RehearsalLobby({
   const [entitlement, setEntitlement] =
     useState<EntitlementProblemExtension | null>(null);
   const [joining, startJoining] = useTransition();
+  // ADR 0066: a founder may meet them by video, with a stock AI interviewer.
+  const founderSide = kind !== "COMPANY";
+  const [interviewers, setInterviewers] =
+    useState<RehearsalInterviewersDto | null>(null);
+  const [meetBy, setMeetBy] = useState<"VOICE" | "VIDEO">("VOICE");
+  const [interviewerId, setInterviewerId] = useState<string | null>(null);
+  const [video, setVideo] = useState<{
+    readonly rehearsal: QRehearsalDto;
+    readonly session: RehearsalVideoSessionDto;
+  } | null>(null);
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!founderSide) return;
+    let live = true;
+    void rehearsalInterviewersAction().then((result) => {
+      if (!live || !result.ok) return;
+      setInterviewers(result.value);
+      const first = result.value.interviewers.find((item) => item.available);
+      setInterviewerId(first?.id ?? null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [founderSide]);
 
   useEffect(() => {
     let live = true;
@@ -111,8 +143,30 @@ export function RehearsalLobby({
     };
   }, [kind, counterpartId, attempt]);
 
+  if (video !== null) {
+    return (
+      <RehearsalVideoStage
+        rehearsal={video.rehearsal}
+        session={video.session}
+        onContinueByVoice={(open) => {
+          setVideo(null);
+          setRehearsal(open);
+        }}
+      />
+    );
+  }
+
   if (rehearsal !== null) {
-    return <RehearsalRoom initial={rehearsal} seeYou={seeYou} />;
+    return (
+      <div className="flex flex-col gap-3">
+        {voiceNote === null ? null : (
+          <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
+            {voiceNote}
+          </p>
+        )}
+        <RehearsalRoom initial={rehearsal} seeYou={seeYou} />
+      </div>
+    );
   }
 
   function join() {
@@ -128,7 +182,36 @@ export function RehearsalLobby({
         voice,
         difficulty,
       });
-      if (result.ok) setRehearsal(result.value);
+      if (result.ok && meetBy === "VIDEO" && interviewerId !== null) {
+        // The same rehearsal, met by video; if video can't open, the voice
+        // room carries on with it, nothing lost.
+        // Persist the owned canonical id before asking for any provider
+        // allocation. Refresh during allocation must not return to a lobby
+        // whose Join button can create another rehearsal and another room.
+        const livePath = `/rehearsals/live/${encodeURIComponent(result.value.id)}?video=1`;
+        window.history.replaceState(null, "", livePath);
+        const opened = await startRehearsalVideoAction(
+          result.value.id,
+          interviewerId,
+        );
+        if (opened.ok && opened.value.mode === "VIDEO") {
+          setVideo({ rehearsal: result.value, session: opened.value.session });
+          // The canonical id survives refresh. The destination reads this
+          // existing room only; it cannot create another paid conversation.
+          router.replace(livePath);
+          return;
+        }
+        // A confirmed fallback preserves the same canonical rehearsal URL.
+        // If allocation remains uncertain, recovery still sees its open
+        // row and fails closed rather than blindly entering another room.
+        const voicePath = `/rehearsals/live/${encodeURIComponent(result.value.id)}?video=0`;
+        window.history.replaceState(null, "", voicePath);
+        router.replace(voicePath);
+        setVoiceNote(
+          "Video isn’t available just now, so you’re in the voice room instead.",
+        );
+        setRehearsal(result.value);
+      } else if (result.ok) setRehearsal(result.value);
       else if (result.entitlement !== undefined)
         setEntitlement(result.entitlement);
       else setMessage(result.message);
@@ -290,6 +373,77 @@ export function RehearsalLobby({
             {DIFFICULTIES.find((choice) => choice.value === difficulty)?.hint}
           </p>
         </fieldset>
+
+        {interviewers === null || !interviewers.videoAvailable ? null : (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="cq-label mb-1 text-(--cq-text-primary)">
+              How you’ll meet
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              {(["VOICE", "VIDEO"] as const).map((choice) => (
+                <label
+                  key={choice}
+                  className={`cq-body-sm inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-(--cq-radius-md) border px-3 ${
+                    meetBy === choice
+                      ? "border-(--cq-accent) text-(--cq-text-primary)"
+                      : "border-(--cq-border) text-(--cq-text-secondary)"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="rehearsal-meet-by"
+                    value={choice}
+                    checked={meetBy === choice}
+                    onChange={() => setMeetBy(choice)}
+                    className="accent-(--cq-accent)"
+                  />
+                  {choice === "VOICE"
+                    ? "Voice room"
+                    : `Video, up to ${String(interviewers.maxSeconds / 60)} minutes`}
+                </label>
+              ))}
+            </div>
+            {meetBy !== "VIDEO" ? null : (
+              <div className="flex flex-col gap-2">
+                <p className="cq-caption text-(--cq-text-tertiary)">
+                  A stock AI face and voice plays {name}; Q decides every word.
+                  It is never a likeness of the real person.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {interviewers.interviewers.map((item) => (
+                    <label
+                      key={item.id}
+                      className={`cq-body-sm flex min-h-11 items-start gap-2 rounded-(--cq-radius-md) border p-3 ${
+                        item.available ? "cursor-pointer" : "opacity-60"
+                      } ${
+                        interviewerId === item.id
+                          ? "border-(--cq-accent) text-(--cq-text-primary)"
+                          : "border-(--cq-border) text-(--cq-text-secondary)"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="rehearsal-interviewer"
+                        value={item.id}
+                        disabled={!item.available}
+                        checked={interviewerId === item.id}
+                        onChange={() => setInterviewerId(item.id)}
+                        className="mt-1 accent-(--cq-accent)"
+                      />
+                      <span className="flex flex-col">
+                        <span className="text-(--cq-text-primary)">
+                          {item.name}
+                          {item.available ? "" : " (coming soon)"}
+                        </span>
+                        <span className="cq-caption">{item.style}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </fieldset>
+        )}
 
         <label className="cq-body-sm flex min-h-11 cursor-pointer items-start gap-3 text-(--cq-text-secondary)">
           <input
