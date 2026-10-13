@@ -341,7 +341,14 @@ export type BridgeResult =
   | { readonly kind: "UNAUTHORISED" };
 
 export type RehearsalVideoService = {
-  readonly interviewers: () => RehearsalInterviewersDto;
+  readonly interviewers: (
+    actor: ActorContext,
+  ) => Promise<RehearsalInterviewersDto>;
+  /** Canonical finish entry: confirms physical video close before review. */
+  readonly finish: (
+    actor: ActorContext,
+    rehearsalId: string,
+  ) => Promise<RehearsalResult | { readonly kind: "PROVIDER_UNAVAILABLE" }>;
   readonly start: (
     actor: ActorContext,
     rehearsalId: string,
@@ -440,7 +447,7 @@ export function createRehearsalVideoService(dependencies: {
   readonly enabledInterviewers: ReadonlySet<string>;
   /** Tavus test_mode: the room is created but no face joins (no minutes). */
   readonly testMode?: boolean | undefined;
-  /** Controlled paid rollout; empty/missing fails closed outside test mode. */
+  /** Canonical profile admission for test and paid rooms; empty fails closed. */
   readonly paidUserIds?: ReadonlySet<string> | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
@@ -460,8 +467,7 @@ export function createRehearsalVideoService(dependencies: {
     pool !== null &&
     pool.size > 0 &&
     dependencies.publicBaseUrl !== null &&
-    (dependencies.testMode === true ||
-      (dependencies.paidUserIds?.size ?? 0) > 0);
+    (dependencies.paidUserIds?.size ?? 0) > 0;
   const timers = new Map<string, { cancel: () => void }>();
   // Allocation IDs survive a failed LIVE write for compensating cleanup in
   // this process. They are not a durable allocation checkpoint across crashes.
@@ -647,18 +653,91 @@ export function createRehearsalVideoService(dependencies: {
     );
   }
 
+  async function canRecover(actor: ActorContext, row: VideoSessionRow) {
+    return (
+      actor.actorType === "HUMAN" &&
+      actor.userId === row.userId &&
+      actor.tenantId === row.tenantId &&
+      (actor.organisationId ?? null) === row.organisationId &&
+      (actor.membershipId ?? null) === row.membershipId &&
+      (await dependencies.stillAllowed(actorOf(row)).catch(() => false))
+    );
+  }
+
+  async function endAs(
+    actor: ActorContext,
+    rehearsalId: string,
+    options: { readonly continueByVoice: boolean },
+  ): Promise<EndVideoResult> {
+    const row = await store.ownByRehearsal(actor, rehearsalId);
+    if (row === null || !(await canRecover(actor, row)))
+      return { kind: "NOT_FOUND" };
+    const open = row.status === "LIVE" || row.status === "STARTING";
+    let closed: VideoSessionRow;
+    try {
+      closed = open
+        ? await closeSession(
+            row,
+            options.continueByVoice ? "CONTINUED_BY_VOICE" : "FOUNDER_ENDED",
+          )
+        : row;
+    } catch {
+      return { kind: "PROVIDER_UNAVAILABLE" };
+    }
+    const rehearsal = await (
+      options.continueByVoice
+        ? rehearsals.get(actor, rehearsalId)
+        : finishAs(closed)
+    ).catch(() => null);
+    if (rehearsal === null) return { kind: "Q_UNAVAILABLE" };
+    if (
+      rehearsal.kind === "NOT_FOUND" ||
+      rehearsal.kind === "NOT_A_PARTICIPANT"
+    ) {
+      return { kind: "NOT_FOUND" };
+    }
+    if (rehearsal.kind !== "OK") return { kind: "Q_UNAVAILABLE" };
+    return {
+      kind: "OK",
+      session: toDto(closed),
+      rehearsal: rehearsal.rehearsal,
+    };
+  }
+
   return {
-    interviewers: () => ({
-      videoAvailable:
+    interviewers: async (actor) => {
+      const admitted =
         configured &&
-        REHEARSAL_INTERVIEWERS.some((item) =>
-          dependencies.enabledInterviewers.has(item.id),
-        ),
-      maxSeconds: REHEARSAL_VIDEO_MAX_SECONDS,
-      interviewers: REHEARSAL_INTERVIEWERS.map((item) =>
-        interviewerDto(item.id),
-      ),
-    }),
+        actor.actorType === "HUMAN" &&
+        dependencies.paidUserIds?.has(actor.userId) === true &&
+        (await dependencies.stillAllowed(actor).catch(() => false));
+      return {
+        videoAvailable:
+          admitted &&
+          REHEARSAL_INTERVIEWERS.some((item) =>
+            dependencies.enabledInterviewers.has(item.id),
+          ),
+        maxSeconds: REHEARSAL_VIDEO_MAX_SECONDS,
+        interviewers: REHEARSAL_INTERVIEWERS.map((item) => ({
+          ...interviewerDto(item.id),
+          available: admitted && dependencies.enabledInterviewers.has(item.id),
+        })),
+      };
+    },
+
+    finish: async (actor, rehearsalId) => {
+      const row = await store.ownByRehearsal(actor, rehearsalId);
+      if (row === null) return rehearsals.finish(actor, rehearsalId);
+      if (!(await canRecover(actor, row))) return { kind: "NOT_FOUND" };
+      if (row.endedReason === "CONTINUED_BY_VOICE")
+        return rehearsals.finish(actor, rehearsalId);
+      const result = await endAs(actor, rehearsalId, {
+        continueByVoice: false,
+      });
+      return result.kind === "OK"
+        ? { kind: "OK", rehearsal: result.rehearsal }
+        : result;
+    },
 
     start: async (actor, rehearsalId, interviewerId) => {
       if (actor.actorType !== "HUMAN") return { kind: "NOT_A_FOUNDER" };
@@ -678,10 +757,13 @@ export function createRehearsalVideoService(dependencies: {
       const rehearsal = read.rehearsal;
       if (rehearsal.userRole !== "FOUNDER") return { kind: "NOT_A_FOUNDER" };
       if (rehearsal.status !== "ACTIVE") return { kind: "FINISHED" };
+      if (!(await dependencies.stillAllowed(actor).catch(() => false)))
+        return { kind: "NOT_FOUND" };
       disclosures.set(rehearsal.id, disclosureFor(rehearsal));
 
       const held = await store.ownByRehearsal(actor, rehearsalId);
       if (held !== null) {
+        if (!(await canRecover(actor, held))) return { kind: "NOT_FOUND" };
         if (held.status === "LIVE" || held.status === "STARTING") {
           if (held.endsAt.getTime() > now().getTime()) {
             if (held.status === "LIVE") scheduleCap(held);
@@ -709,8 +791,7 @@ export function createRehearsalVideoService(dependencies: {
         !configured ||
         pool === null ||
         dependencies.publicBaseUrl === null ||
-        (dependencies.testMode !== true &&
-          !dependencies.paidUserIds?.has(actor.userId))
+        !dependencies.paidUserIds?.has(actor.userId)
       ) {
         return {
           kind: "OK",
@@ -879,45 +960,16 @@ export function createRehearsalVideoService(dependencies: {
 
     get: async (actor, rehearsalId) => {
       const row = await store.ownByRehearsal(actor, rehearsalId);
-      if (row === null) return null;
+      if (row === null || !(await canRecover(actor, row))) return null;
+      // Confirmed failed allocation has no room to recover. Its canonical
+      // rehearsal stays ACTIVE for the existing voice fallback. Uncertain
+      // compensation remains STARTING and is never collapsed into absence.
+      if (row.status === "FAILED") return null;
       if (row.status === "LIVE") scheduleCap(row);
       return toDto(row);
     },
 
-    end: async (actor, rehearsalId, options) => {
-      const row = await store.ownByRehearsal(actor, rehearsalId);
-      if (row === null) return { kind: "NOT_FOUND" };
-      const open = row.status === "LIVE" || row.status === "STARTING";
-      let closed: VideoSessionRow;
-      try {
-        closed = open
-          ? await closeSession(
-              row,
-              options.continueByVoice ? "CONTINUED_BY_VOICE" : "FOUNDER_ENDED",
-            )
-          : row;
-      } catch {
-        return { kind: "PROVIDER_UNAVAILABLE" };
-      }
-      const rehearsal = await (
-        options.continueByVoice
-          ? rehearsals.get(actor, rehearsalId)
-          : finishAs(closed)
-      ).catch(() => null);
-      if (rehearsal === null) return { kind: "Q_UNAVAILABLE" };
-      if (
-        rehearsal.kind === "NOT_FOUND" ||
-        rehearsal.kind === "NOT_A_PARTICIPANT"
-      ) {
-        return { kind: "NOT_FOUND" };
-      }
-      if (rehearsal.kind !== "OK") return { kind: "Q_UNAVAILABLE" };
-      return {
-        kind: "OK",
-        session: toDto(closed),
-        rehearsal: rehearsal.rehearsal,
-      };
-    },
+    end: endAs,
 
     bridge: async (sessionId, bearer, messages, signal) =>
       serialBridge(sessionId, async () => {
