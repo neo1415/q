@@ -25,9 +25,14 @@ const calls = {
   save: vi.fn<Action>(),
   submit: vi.fn<Action>(),
   share: vi.fn<Action>(),
+  progress: vi.fn<Action>(),
 };
 
 vi.mock("../src/features/gateq/apply-actions", () => ({
+  interviewProgressAction: (...args: unknown[]) => calls.progress(...args),
+  contactAction: vi.fn(),
+  confirmContactAction: vi.fn(),
+  applicationTurnAction: vi.fn(),
   startFormAction: (...args: unknown[]) => calls.start(...args),
   saveAnswersAction: (...args: unknown[]) => calls.save(...args),
   submitApplicationAction: (...args: unknown[]) => calls.submit(...args),
@@ -36,6 +41,7 @@ vi.mock("../src/features/gateq/materials-actions", () => ({
   shareMaterialsAction: (...args: unknown[]) => calls.share(...args),
 }));
 
+vi.mock("../src/features/q-swarm/q-swarm", () => ({ QSwarm: () => null }));
 const model = await import("../src/features/gateq/form/form-model");
 const { GateQForm } = await import("../src/features/gateq/form/gateq-form");
 
@@ -76,7 +82,27 @@ const summary = (
 });
 
 beforeEach(() => {
+  sessionStorage.clear();
   for (const fn of Object.values(calls)) fn.mockReset();
+  calls.progress.mockResolvedValue({
+    ok: true,
+    application: summary({ access: "MAY_APPLY" }),
+    transcript: { turns: [] },
+    coverage: {
+      contact: { confirmed: false, required: true },
+      coverage: {
+        version: 1,
+        access: "MAY_APPLY",
+        unmet: [],
+        stillNeeded: [],
+        answered: [],
+        unknown: [],
+        declined: [],
+        missing: [],
+        contradictions: [],
+      },
+    },
+  });
   calls.start.mockResolvedValue({
     ok: true,
     sessionToken: "gqs_token_aaaaaaaaaaaaaaaa",
@@ -196,16 +222,19 @@ async function press(name: RegExp | string) {
 }
 
 describe("the form, driven like a founder", () => {
-  it("shows the investor's rules before asking anything", () => {
-    render(<GateQForm gateway={GATEWAY} />);
+  it("shows the investor's rules before asking anything", async () => {
+    await act(async () => {
+      render(<GateQForm gateway={GATEWAY} />);
+      await Promise.resolve();
+    });
     expect(screen.getByText("West Africa")).toBeTruthy();
     expect(
-      screen.getByText(/Nothing is sent until you press Send/),
+      screen.getByText(/Nothing is sent until you review and press Submit/),
     ).toBeTruthy();
     expect(calls.start).not.toHaveBeenCalled();
   });
 
-  it("checks the answers, then sends only when the founder presses Send", async () => {
+  it("checks answers and enters the interview without submitting", async () => {
     calls.save.mockResolvedValue({
       ok: true,
       sessionToken: "gqs_token_aaaaaaaaaaaaaaaa",
@@ -217,7 +246,10 @@ describe("the form, driven like a founder", () => {
       reply: null,
       application: summary({ access: "MAY_APPLY", status: "SUBMITTED" }),
     });
-    render(<GateQForm gateway={GATEWAY} />);
+    await act(async () => {
+      render(<GateQForm gateway={GATEWAY} />);
+      await Promise.resolve();
+    });
     fireEvent.change(screen.getByLabelText("Company name"), {
       target: { value: "Kora Health" },
     });
@@ -254,9 +286,39 @@ describe("the form, driven like a founder", () => {
     // Nothing has been sent yet: checking is not sharing.
     expect(calls.submit).not.toHaveBeenCalled();
 
-    await press("Send to Sahel Capital");
-    expect(calls.submit).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Sent to Sahel Capital")).toBeTruthy();
+    await press("Continue with Q");
+    expect(calls.submit).not.toHaveBeenCalled();
+    expect(screen.getByText("Confirm your contact details")).toBeTruthy();
+  });
+
+  it("restores the same form session and saved step after refresh", async () => {
+    const { saveRecovery } =
+      await import("../src/features/gateq/form/session-recovery");
+    saveRecovery(GATEWAY.publicId, {
+      token: "gqs_token_aaaaaaaaaaaaaaaa",
+      answers: {
+        ...model.EMPTY_ANSWERS,
+        companyName: "Kora",
+        stage: "seed",
+        country: "NG",
+        sectors: ["Health"],
+      },
+      step: "round",
+      interview: false,
+      pendingTurn: null,
+      submitKey: "",
+    });
+    await act(async () => {
+      render(<GateQForm gateway={GATEWAY} />);
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Your round")).toBeTruthy();
+    expect(calls.progress).toHaveBeenCalledWith("gqs_token_aaaaaaaaaaaaaaaa");
+    expect(calls.start).not.toHaveBeenCalled();
+    await press("Back");
+    expect(screen.getByLabelText<HTMLInputElement>("Company name").value).toBe(
+      "Kora",
+    );
   });
 
   it("never offers Send when a required rule is not met", () => {
@@ -278,7 +340,7 @@ describe("the form, driven like a founder", () => {
     expect(screen.queryByRole("button", { name: /Send to/ })).toBeNull();
   });
 
-  it("shares only the documents the founder ticked, and only on Send", async () => {
+  it("keeps selected documents private when entering the interview", async () => {
     calls.share.mockResolvedValue({ ok: true });
     calls.save.mockResolvedValue({
       ok: true,
@@ -293,23 +355,26 @@ describe("the form, driven like a founder", () => {
     });
     const deck = "00000000-0000-4000-8000-0000000000d1";
     const accounts = "00000000-0000-4000-8000-0000000000d2";
-    render(
-      <GateQForm
-        gateway={GATEWAY}
-        prefill={{
-          companyName: "Kora Health",
-          oneLiner: "Gets clinics paid",
-          stageCode: "seed",
-          country: "NG",
-          contactName: null,
-          contactEmail: "amara@kora.ng",
-        }}
-        materials={[
-          { id: deck, name: "Pitch deck v3", detail: "Pitch deck" },
-          { id: accounts, name: "Management accounts", detail: "Financials" },
-        ]}
-      />,
-    );
+    await act(async () => {
+      render(
+        <GateQForm
+          gateway={GATEWAY}
+          prefill={{
+            companyName: "Kora Health",
+            oneLiner: "Gets clinics paid",
+            stageCode: "seed",
+            country: "NG",
+            contactName: null,
+            contactEmail: "amara@kora.ng",
+          }}
+          materials={[
+            { id: deck, name: "Pitch deck v3", detail: "Pitch deck" },
+            { id: accounts, name: "Management accounts", detail: "Financials" },
+          ]}
+        />,
+      );
+      await Promise.resolve();
+    });
     fireEvent.click(screen.getByRole("button", { name: "Health" }));
     await press("Continue");
     fireEvent.click(screen.getByRole("radio", { name: "$1M–$3M" }));
@@ -328,9 +393,8 @@ describe("the form, driven like a founder", () => {
     await press("Continue");
     await press("Check my fit");
     expect(calls.share).not.toHaveBeenCalled();
-    await press("Send to Sahel Capital");
-    expect(calls.share).toHaveBeenCalledWith("gqs_token_aaaaaaaaaaaaaaaa", [
-      deck,
-    ]);
+    await press("Continue with Q");
+    expect(calls.share).not.toHaveBeenCalled();
+    expect(calls.submit).not.toHaveBeenCalled();
   });
 });

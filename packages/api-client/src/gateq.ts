@@ -2,6 +2,21 @@ import { z } from "zod";
 
 import {
   ApplicationTurnResponseSchema,
+  ApplicationContactRequestSchema,
+  ApplicationContactAccountRequestSchema,
+  GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+  type ApplicationContactAccountRequest,
+  ApplicationContactResponseSchema,
+  ApplicationContactConfirmResponseSchema,
+  ApplicationTranscriptDtoSchema,
+  ApplicationCoverageDtoSchema,
+  ApplicationSummaryDtoSchema,
+  GATEQ_APPLY_CONTACT_PATH,
+  GATEQ_APPLY_CONTACT_CONFIRM_PATH,
+  GATEQ_APPLY_TRANSCRIPT_PATH,
+  GATEQ_APPLY_COVERAGE_PATH,
+  GATEQ_APPLY_SESSION_PATH,
+  type ApplicationContactRequest,
   ApplicationAnswersResponseSchema,
   GATEQ_APPLY_ANSWERS_PATH,
   GATEQ_APPLY_MATERIALS_PATH,
@@ -221,5 +236,72 @@ export function shareApplicationMaterials(
     GATEQ_APPLY_MATERIALS_PATH,
     ShareApplicationMaterialsResponseSchema,
     { body: input },
+  );
+}
+
+export function saveApplicationContact(
+  baseUrl: string,
+  sessionToken: string,
+  input: ApplicationContactRequest,
+) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "POST",
+    GATEQ_APPLY_CONTACT_PATH,
+    ApplicationContactResponseSchema,
+    { body: ApplicationContactRequestSchema.parse(input) },
+  );
+}
+export function confirmApplicationContact(
+  baseUrl: string,
+  sessionToken: string,
+  code: string,
+) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "POST",
+    GATEQ_APPLY_CONTACT_CONFIRM_PATH,
+    ApplicationContactConfirmResponseSchema,
+    { body: { code } },
+  );
+}
+export function getApplicationTranscript(
+  baseUrl: string,
+  sessionToken: string,
+) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "GET",
+    GATEQ_APPLY_TRANSCRIPT_PATH,
+    ApplicationTranscriptDtoSchema,
+  );
+}
+export function getApplicationCoverage(baseUrl: string, sessionToken: string) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "GET",
+    GATEQ_APPLY_COVERAGE_PATH,
+    ApplicationCoverageDtoSchema,
+  );
+}
+export function resumeApplication(baseUrl: string, sessionToken: string) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "GET",
+    GATEQ_APPLY_SESSION_PATH,
+    ApplicationSummaryDtoSchema,
+  );
+}
+
+export function confirmAccountApplicationContact(
+  session: ApiSession,
+  input: ApplicationContactAccountRequest,
+) {
+  return call(
+    session,
+    "POST",
+    GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+    ApplicationContactResponseSchema,
+    { body: ApplicationContactAccountRequestSchema.parse(input) },
   );
 }
