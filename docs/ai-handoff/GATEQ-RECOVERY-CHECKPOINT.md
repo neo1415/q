@@ -10,4 +10,4 @@ Before deploying the recovered backend, bind **`GATEQ_CONTACT_CODE_SECRET`** to 
 
 This slice does not repair resend attempt reset, concurrent code confirmation, duplicate model calls, or final-turn/submission races. Do not expose the recovered backend until those defects and protected release gates are resolved. No new paid video usage is authorized by this work.
 
-Focused regression results and exact pushed revision will be recorded after execution. Not deployed or browser accepted.
+Verifier source pushed and remotely verified at `f14bd3cd02b9c156b41c51817fce4daebc921472`. All52 package builds PASS; focused interview/contact suite23PASS; broader GateQ suite92PASS/2FAIL (the preserved exchange concurrency regressions). Changed-file domain/API lint, formatting and API typecheck PASS. Root typecheck in progress. Initial pre-build checks were blocked by missing generated package entries and were not treated as passes. Not deployed or browser accepted.
