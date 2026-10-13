@@ -24,7 +24,7 @@ export function RehearsalVideoStage({
   session,
   onContinueByVoice,
 }: {
-  readonly rehearsal: QRehearsalDto;
+  readonly rehearsal: Pick<QRehearsalDto, "id" | "counterpart">;
   readonly session: RehearsalVideoSessionDto;
   readonly onContinueByVoice: (rehearsal: QRehearsalDto) => void;
 }) {
