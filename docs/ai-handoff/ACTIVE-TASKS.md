@@ -1,5 +1,29 @@
 # Active tasks — authoritative cross-model board
 
+## 2026-10-13 — Q Pitch lane opened; GateQ lane continues (integration owner: Claude)
+
+- **Read first:** before starting or modifying Q Pitch, demo identities, scripted tours, navigation, narration or showcase features, read `docs/specs/q-pitch/Q_PITCH_MASTER_BLUEPRINT.md`.
+- **Shared baseline:** its approved experience design, 12-minute investor script, Feature Atlas, wow moments, interruption rules, performance targets and certification requirements are the baseline for Claude, Codex, subagents and every future agent.
+- **No alternatives:** do not invent a different Q Pitch architecture, script, experience or demo account system.
+- **Precedence:** the locked PADL and higher-priority Capital Q specifications still take precedence. Flag conflicts; never silently override.
+- **Changes:** a material change is a proposed revision for product-owner approval. Approved revisions go in the blueprint's changelog.
+- **Status and claims:**
+  - Feature status: `docs/specs/q-pitch/IMPLEMENTATION_STATUS.md`. PLANNED is not certified.
+  - Every demonstration claim must map to `docs/specs/q-pitch/CERTIFICATION_MANIFEST.md`.
+- **Shared handoff:** progress, release evidence, risks and branch ownership stay in `docs/ai-handoff/`.
+- **Parallel lanes:** GateQ and Q Pitch run in parallel lanes with one integration owner. No conflicting changes to shared contracts, authorization, Q orchestration or migrations.
+
+- **Assignment ledger:**
+
+  | Lane                          | Owner                         | Branch                                 | Files owned                                                                                                                                                      | Contract version                     |
+  | ----------------------------- | ----------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+  | A GateQ text slice (backend)  | Claude worker                 | `claude/gateq-interview-backend`       | `packages/gateq-intake/**`, `apps/api/src/http/gateq-apply.ts`, `packages/contracts/src/http/gateq-intake.ts` and `gateq-inbox.ts`, one additive GateQ migration | gateq-intake contracts (in progress) |
+  | A GateQ web                   | next, after backend contracts | TBD                                    | `apps/web/src/features/gateq/**`, `apps/web/app/g/**`                                                                                                            | consumes Lane A backend              |
+  | B Q Pitch foundations (P0–P1) | Claude worker                 | `claude/q-pitch-foundations`           | new Q Pitch package/feature files only; read-only audits of identity/memberships                                                                                 | new `q-pitch` contracts v1           |
+  | Integration / release         | Claude (this session)         | `build/int-rc` → `recovery/2026-09-12` | migrations, shared Q contracts, CI, releases                                                                                                                     | —                                    |
+
+- **Guest uploads:** ADR `docs/adr/0067-gateq-guest-application-documents.md` (Proposed). This is required for full GateQ acceptance and is implemented after the text slice.
+
 ## 2026-10-13 17:00 UTC — Q speed sprint CLOSED (Claude); next priority GateQ
 
 - **DEPLOYED and live-verified** (production `5ce3d76b`; q-api/api/workers at `c2f08536`, server code identical; integration `ea3f71a0` has the same `packages`/`apps`/`supabase` code; hosted migrations: none pending):
