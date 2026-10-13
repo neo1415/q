@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## 2026-10-13 — GateQ text interview/dossier completion directive
+
+New governing task: [full user directive](session-directives/2026-10-13-gateq-adaptive-interview-and-inbox.txt). Complete contact/verified guest ownership → frozen published qualification → adaptive Q interview and evidence → founder review/explicit submission → immutable source-linked dossier in existing inbox → human decision. Reuse gateq/gateq-intake, Evidence, Q/rehearsal/voice modules; no duplicate system or new scoring formula. Start with complete text flow/dossier, then independently authorized voice/video; do not change the 180second rehearsal cap or assume 15–20minute GateQ paid usage funded. Current inspected gaps confirmed: form sends directly; conversation-service supplies empty document proposals/history. Preserve main Q speed/Graph/product work and bounded video release. No implementation or live acceptance claimed for this new scope.
+
 ## 2026-10-13 11:42 UTC — bounded video slice locally gated, product checks resumed
 
 - IMPLEMENTED/LOCAL TESTED, not yet DEPLOYED: own canonical investor-company video admitted; all three supported kinds reuse existing rehearsal ownership/entitlement; Q selects enabled stock presentation from authorized persona style, no extra model/personality; original Q stage canvas/footer retained around provider iframe (vendor interior remains). New sparrow-2 turn detector, next-Q-turn wrap-up cue near original deadline, no unsolicited closing support through current iframe/REST path and limitation disclosed. Client drops iframe at deadline even if review save pending; bridge bounds in-flight Q work and suppresses late speech. Same-room recovery/immutable deadline/confirmed-close-before-review retained.
