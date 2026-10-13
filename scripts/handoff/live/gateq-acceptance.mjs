@@ -15,7 +15,7 @@ if (process.argv.slice(2).length) {
   );
 }
 const gateway = process.env.CQ_GATEQ_PUBLIC_ID;
-if (!gateway || !/^gq_[a-z0-9]{24}$/.test(gateway)) {
+if (!gateway || !/^gq_[0-9a-hjkmnp-tv-z]{26}$/.test(gateway)) {
   throw new Error("Set CQ_GATEQ_PUBLIC_ID to the isolated, owned test gateway");
 }
 const web =
