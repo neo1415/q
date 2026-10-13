@@ -187,6 +187,7 @@ function instance(
     readonly clock?: { now: number };
     readonly observe?: boolean;
     readonly closeConfirmed?: boolean;
+    readonly closeResult?: Promise<boolean>;
     readonly observerReady?: boolean;
     readonly observerReadiness?: Promise<boolean>;
     readonly contextRead?: Promise<null>;
@@ -216,7 +217,10 @@ function instance(
       : {
           closeSession: (id: string) => {
             closed.push(id);
-            return Promise.resolve(options.closeConfirmed !== false);
+            return (
+              options.closeResult ??
+              Promise.resolve(options.closeConfirmed !== false)
+            );
           },
         }),
     ...(options.observe === false
@@ -724,6 +728,115 @@ describe("the trial line (broker)", () => {
     });
     await settle();
     expect(await store.usedSeconds(TRIAL)).toBeLessThanOrEqual(300);
+  });
+
+  it("charges speech until delayed provider termination before admitting a reconnect", async () => {
+    const store = memoryStore();
+    let terminate: (confirmed: boolean) => void = () => undefined;
+    const closeResult = new Promise<boolean>((resolve) => {
+      terminate = resolve;
+    });
+    const first = instance(store, { closeResult });
+    const second = instance(store);
+    const opened = await openLine(first);
+    speak(first, "user", 290);
+    first.broker.end({
+      actor: TRIAL,
+      voiceSessionId: opened.voiceSessionId,
+      reason: "reconnect",
+    });
+    expect((await openLine(second)).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "TRIAL_IN_USE",
+    });
+    speak(first, "q", 8);
+    first.emit("session.closed");
+    // An ordinary socket close after a confirmed session.closed is safe.
+    first.sidebands[0]?.onLost();
+    terminate(true);
+    await settle();
+    expect(await store.usedSeconds(TRIAL)).toBe(298);
+    expect(first.sidebands[0]?.stopped).toBe(true);
+    const resumed = await openLine(second);
+    expect(
+      resumed.outcome.kind === "OPEN" &&
+        resumed.outcome.result.trial?.remainingSeconds,
+    ).toBe(2);
+    second.broker.end({
+      actor: TRIAL,
+      voiceSessionId: resumed.voiceSessionId,
+      reason: "test_end",
+    });
+    await settle();
+  });
+
+  it("holds the account claim until the final shutdown usage is durable", async () => {
+    const store = memoryStore();
+    const first = instance(store);
+    const opened = await openLine(first);
+    speak(first, "user", 3);
+    let finishWrite: () => void = () => undefined;
+    const writing = new Promise<void>((resolve) => {
+      finishWrite = resolve;
+    });
+    const record = store.record;
+    const pending = vi
+      .spyOn(store, "record")
+      .mockImplementation(async (input) => {
+        await writing;
+        return record(input);
+      });
+    first.broker.end({
+      actor: TRIAL,
+      voiceSessionId: opened.voiceSessionId,
+      reason: "test_end",
+    });
+    await settle();
+    expect(store.claims.size).toBe(1);
+    const second = instance(store);
+    expect((await openLine(second)).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "TRIAL_IN_USE",
+    });
+    finishWrite();
+    await settle();
+    pending.mockRestore();
+    expect(store.claims.size).toBe(0);
+    expect(await store.usedSeconds(TRIAL)).toBe(3);
+    const resumed = await openLine(second);
+    expect(
+      resumed.outcome.kind === "OPEN" &&
+        resumed.outcome.result.trial?.remainingSeconds,
+    ).toBe(297);
+    second.broker.end({
+      actor: TRIAL,
+      voiceSessionId: resumed.voiceSessionId,
+      reason: "test_end",
+    });
+    await settle();
+  });
+
+  it("retains the claim when observation is lost during delayed shutdown", async () => {
+    const store = memoryStore();
+    let terminate: (confirmed: boolean) => void = () => undefined;
+    const closeResult = new Promise<boolean>((resolve) => {
+      terminate = resolve;
+    });
+    const first = instance(store, { closeResult });
+    const opened = await openLine(first);
+    speak(first, "user", 3);
+    first.broker.end({
+      actor: TRIAL,
+      voiceSessionId: opened.voiceSessionId,
+      reason: "test_end",
+    });
+    first.sidebands[0]?.onLost();
+    terminate(true);
+    await settle();
+    expect((await openLine(instance(store))).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "TRIAL_IN_USE",
+    });
   });
 
   it("audit: an immediate reconnect cannot reuse unflushed speech", async () => {

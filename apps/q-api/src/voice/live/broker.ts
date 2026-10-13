@@ -673,7 +673,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     const trial = line.trial;
     if (trial === undefined) return;
     const lose = () => {
-      if (trial.lostAt !== null) return;
+      if (trial.lostAt !== null || trial.providerTerminated) return;
       const at = now();
       trial.lostBaseMs = trial.meter.measuredMs(at);
       trial.lostAt = at;
@@ -689,11 +689,13 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     } else {
       trial.observer = provider.observeSession(line.providerSessionId, {
         onEvent: (event) => {
+          if (trial.stoppedAt !== null) return;
           const signal = speechSignalOf(event);
           if (signal === null) return;
           trial.meter.signal(signal, now());
           if (signal.kind === "closed") {
             trial.providerTerminated = true;
+            trial.stoppedAt = now();
             if (lines.get(line.voiceSessionId) === line)
               forget(line, "provider_closed");
             return;
@@ -722,8 +724,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     if (trial === undefined) return;
     if (trial.timer !== null) clearInterval(trial.timer);
     trial.timer = null;
-    const at = now();
-    // Charged up to now; nothing after the line ends counts.
+    const at = trial.stoppedAt ?? now();
+    // Freeze only after provider termination (or uncertainty retaining the claim).
     trial.meter.signal({ kind: "closed" }, at);
     trial.stoppedAt = at;
     trial.observer?.stop();
@@ -733,7 +735,11 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
 
   const forget = (line: LiveLine, reason: string) => {
     lines.delete(line.voiceSessionId);
-    stopTrial(line);
+    // Logical removal prevents new work, but the provider can still speak
+    // while its asynchronous shutdown is in flight. Keep observation alive
+    // until termination is confirmed; otherwise the final ledger is incomplete.
+    if (line.trial?.timer != null) clearInterval(line.trial.timer);
+    if (line.trial !== undefined) line.trial.timer = null;
     for (const delegation of line.delegations.values()) {
       if (!delegation.settled) delegation.controller.abort();
     }
@@ -772,6 +778,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           );
           const trial = line.trial;
           if (trial === undefined) return confirmed;
+          stopTrial(line);
           await trial.persisting;
           if (
             !confirmed ||
@@ -792,6 +799,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           });
         })
         .catch((error: unknown) => {
+          stopTrial(line);
           logger.warn({ err: error }, "live voice trial claim remains held");
           return false;
         });
