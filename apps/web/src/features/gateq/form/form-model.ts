@@ -23,7 +23,35 @@ export const DECLINED = GATEQ_DECLINED;
 export type Declined = typeof DECLINED;
 
 export const FORM_STEPS = ["company", "round", "share", "note"] as const;
-export type FormStep = (typeof FORM_STEPS)[number] | "check" | "sent";
+/**
+ * GateQ slice 1 (2026-10-13): contact first, then the four form steps and
+ * the rule check, then the interview with Q, then the review. Submit lives
+ * only on the review; "sent" is after it.
+ */
+export type FormStep =
+  | "contact"
+  | (typeof FORM_STEPS)[number]
+  | "check"
+  | "interview"
+  | "review"
+  | "sent";
+
+/** The progress bar's segments, in order. "check" sits on "note". */
+export const FLOW_PROGRESS = [
+  "contact",
+  "company",
+  "round",
+  "share",
+  "note",
+  "interview",
+  "review",
+] as const;
+
+export function progressFor(step: FormStep): number {
+  if (step === "sent") return FLOW_PROGRESS.length;
+  if (step === "check") return FLOW_PROGRESS.indexOf("note") + 1;
+  return FLOW_PROGRESS.indexOf(step) + 1;
+}
 
 export type Choice = { readonly value: string; readonly label: string };
 
@@ -439,4 +467,192 @@ export function stepForDimension(dimension: string): FormStep {
   return dimension === "RAISE_SIZE" || dimension === "CHEQUE_COMPATIBILITY"
     ? "round"
     : "company";
+}
+
+// ---------------------------------------------------------------------------
+// GateQ slice 1: the contact step
+// ---------------------------------------------------------------------------
+
+export type ContactChannel = "EMAIL" | "PHONE";
+
+/** What the contact step collects. Empty string: not yet. */
+export type ContactAnswers = {
+  readonly name: string;
+  readonly email: string;
+  readonly role: string;
+  readonly companyName: string;
+  readonly phone: string;
+  /** Empty: no preference given. */
+  readonly preferredChannel: ContactChannel | "";
+};
+
+export const EMPTY_CONTACT: ContactAnswers = {
+  name: "",
+  email: "",
+  role: "",
+  companyName: "",
+  phone: "",
+  preferredChannel: "",
+};
+
+/** A signed-in founder starts from their account and profile. */
+export function contactFromProfile(
+  prefill: FormPrefill | null,
+): ContactAnswers {
+  if (prefill === null) return EMPTY_CONTACT;
+  return {
+    ...EMPTY_CONTACT,
+    name: prefill.contactName ?? "",
+    email: prefill.contactEmail ?? "",
+    companyName: prefill.companyName,
+  };
+}
+
+export type ContactErrors = Partial<Record<keyof ContactAnswers, string>>;
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE = /^\+?[0-9 ().-]{6,32}$/;
+
+export function validateContact(contact: ContactAnswers): ContactErrors {
+  const errors: ContactErrors = {};
+  if (contact.name.trim() === "") errors.name = "Add your full name.";
+  if (contact.email.trim() === "") {
+    errors.email = "Add an email the investor can reach you at.";
+  } else if (!EMAIL.test(contact.email.trim())) {
+    errors.email = "That email doesn't look right.";
+  }
+  if (contact.role.trim() === "") {
+    errors.role = "Add your role, like Founder & CEO.";
+  }
+  if (contact.companyName.trim() === "") {
+    errors.companyName = "Add your company's name.";
+  }
+  if (contact.phone.trim() !== "" && !PHONE.test(contact.phone.trim())) {
+    errors.phone = "Use digits, spaces and an optional +.";
+  }
+  if (contact.preferredChannel === "PHONE" && contact.phone.trim() === "") {
+    errors.phone = "Add a phone number, or choose email.";
+  }
+  return errors;
+}
+
+/** The contact as the API's bounded request. Blank optional fields are left out. */
+export function contactRequest(contact: ContactAnswers): {
+  readonly name: string;
+  readonly email: string;
+  readonly role: string;
+  readonly companyName: string;
+  readonly phone?: string;
+  readonly preferredChannel?: ContactChannel;
+} {
+  return {
+    name: contact.name.trim(),
+    email: contact.email.trim().toLowerCase(),
+    role: contact.role.trim(),
+    companyName: contact.companyName.trim(),
+    ...(contact.phone.trim() === "" ? {} : { phone: contact.phone.trim() }),
+    ...(contact.preferredChannel === ""
+      ? {}
+      : { preferredChannel: contact.preferredChannel }),
+  };
+}
+
+/** The six digits a person types, however they type them. */
+export function normaliseCode(raw: string): string {
+  return raw.replace(/\D/g, "").slice(0, 6);
+}
+
+export const CODE_STATUS_WORDS: Readonly<
+  Record<"WRONG_CODE" | "EXPIRED" | "NOT_FOUND", string>
+> = {
+  WRONG_CODE: "That code isn't right. Check the email and try again.",
+  EXPIRED: "That code has expired. Send a new one.",
+  NOT_FOUND: "There's no code waiting. Send a new one.",
+};
+
+/** Where the investor may reach the founder: the confirmed channel only. */
+export function reachWords(contact: {
+  readonly email: string;
+  readonly phone: string | null;
+  readonly preferredChannel: ContactChannel | null;
+}): string {
+  return contact.preferredChannel === "PHONE" && contact.phone !== null
+    ? `by phone at ${contact.phone} or at ${contact.email}`
+    : `at ${contact.email}`;
+}
+
+// ---------------------------------------------------------------------------
+// GateQ slice 1: the interview
+// ---------------------------------------------------------------------------
+
+/**
+ * Quick answers. The interview's turn contract carries text only, so these
+ * travel as the founder's own words; the API's interviewer reads them like
+ * any other answer. (The form's DECLINED is structured; a turn has no such
+ * field yet.)
+ */
+export const QUICK_REPLIES = {
+  UNKNOWN: "I don't know.",
+  DECLINED: "I'd rather not say.",
+} as const;
+
+export type InterviewLine = {
+  readonly from: "Q" | "YOU";
+  readonly text: string;
+};
+
+export function linesFromTranscript(
+  turns: readonly { readonly role: "PERSON" | "Q"; readonly text: string }[],
+): readonly InterviewLine[] {
+  return turns.map((turn) => ({
+    from: turn.role === "Q" ? "Q" : "YOU",
+    text: turn.text,
+  }));
+}
+
+/** Q's most recent line, when it is the one waiting for an answer. */
+export function latestQuestion(lines: readonly InterviewLine[]): string | null {
+  const last = lines.at(-1);
+  return last?.from === "Q" ? last.text : null;
+}
+
+// ---------------------------------------------------------------------------
+// GateQ slice 1: the review
+// ---------------------------------------------------------------------------
+
+export type Provenance =
+  "APPLICANT_PROVIDED" | "DOCUMENT_SUPPORTED" | "ESTIMATED" | "UNKNOWN";
+
+/** The founder's own view of where an answer came from. */
+export const REVIEW_PROVENANCE_WORDS: Readonly<Record<Provenance, string>> = {
+  APPLICANT_PROVIDED: "You said",
+  DOCUMENT_SUPPORTED: "From your documents",
+  ESTIMATED: "Estimated",
+  UNKNOWN: "Unknown",
+};
+
+export const MISSING_REASON_WORDS: Readonly<
+  Record<
+    | "REQUIRED_BY_GATEWAY"
+    | "PREFERRED_BY_GATEWAY"
+    | "CONTRADICTION"
+    | "UNDERSTANDING",
+    string
+  >
+> = {
+  REQUIRED_BY_GATEWAY: "Their rules need this",
+  PREFERRED_BY_GATEWAY: "They prefer to know",
+  CONTRADICTION: "Two answers disagree",
+  UNDERSTANDING: "Helps them understand you",
+};
+
+/** Submit stands only when the engine admits it and the contact is confirmed. */
+export function maySubmit(coverage: {
+  readonly coverage: { readonly access: string };
+  readonly contact: { readonly required: boolean; readonly confirmed: boolean };
+}): boolean {
+  return (
+    coverage.coverage.access === "MAY_APPLY" &&
+    (!coverage.contact.required || coverage.contact.confirmed)
+  );
 }
