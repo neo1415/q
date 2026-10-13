@@ -359,6 +359,7 @@ export {
 export {
   endRehearsalVideo,
   getRehearsalInterviewers,
+  getRehearsalVideo,
   startRehearsalVideo,
   finishRehearsal,
   getRehearsal,

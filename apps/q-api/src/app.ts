@@ -654,6 +654,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       rehearsals: modules.rehearsals,
+      video: modules.rehearsalVideo,
       entitlements: modules.rehearsalEntitlements,
     });
   }

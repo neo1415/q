@@ -123,9 +123,11 @@ export function registerRehearsalVideoRoutes(
   app.get(
     Q_REHEARSAL_VIDEO_INTERVIEWERS_PATH,
     { onRequest: withContext },
-    async (_request, reply) => {
+    async (request, reply) => {
       void reply.header("Cache-Control", "no-store");
-      return RehearsalInterviewersDtoSchema.parse(video.interviewers());
+      return RehearsalInterviewersDtoSchema.parse(
+        await video.interviewers(getActorContext(request)),
+      );
     },
   );
 
