@@ -739,6 +739,8 @@ export function createRehearsalVideoService(dependencies: {
               const remaining = Math.floor(
                 (endsAt.getTime() - now().getTime()) / 1_000,
               );
+              if (remaining < 1)
+                throw new TavusError("conversation duration", 408);
               const conversation = await client.createConversation({
                 palId,
                 faceId: interviewer.faceId,

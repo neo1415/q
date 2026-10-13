@@ -442,6 +442,26 @@ describe("starting a video rehearsal", () => {
     restart.close();
   });
 
+  it("allocates no paid room if provider setup has already consumed the deadline", async () => {
+    const harness = setup();
+    const client = harness.tavus.pool.clientAt(0);
+    if (client === null) throw new Error("missing fake client");
+    const createPal = client.createPal;
+    vi.spyOn(client, "createPal").mockImplementation(async (input) => {
+      const pal = await createPal(input);
+      await harness.advance(181000);
+      return pal;
+    });
+    const result = await harness.service.start(
+      FOUNDER,
+      REHEARSAL_ID,
+      "partner-steve",
+    );
+    expect(result.kind === "OK" && result.response.mode).toBe("VOICE_FALLBACK");
+    expect(harness.tavus.calls.conversations).toHaveLength(0);
+    expect(harness.tavus.calls.deleted).toEqual([{ key: 0, id: "pal0" }]);
+  });
+
   it("never restarts the clock: after the cap the same rehearsal has no second video", async () => {
     const harness = setup();
     await startVideo(harness);
