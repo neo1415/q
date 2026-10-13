@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import {
@@ -5,6 +6,7 @@ import {
   jsonbParam,
   type DatabaseExecutor,
   type TransactionManager,
+  type TransactionContext,
 } from "@capital-q/database";
 
 import {
@@ -13,6 +15,7 @@ import {
   ApplicationSchema,
   ApplicationSessionSchema,
   FactValueSchema,
+  IntakeRefusedError,
   type Application,
   type ApplicationFact,
   type ApplicationSession,
@@ -165,6 +168,12 @@ export function createPostgresApplicationRepository(options: {
         select * from gateq.applications where id = ${id} limit 1`;
       const row = rows[0];
       return row === undefined ? null : toApplication(row);
+    },
+
+    lock: async (tx, id) => {
+      const rows =
+        await tx.sql`select * from gateq.applications where id = ${id} for update`;
+      return rows[0] === undefined ? null : toApplication(rows[0]);
     },
 
     setStatus: async (tx, id, status, submittedAt) => {
@@ -437,7 +446,82 @@ export function createPostgresApplicationTurnRepository(options: {
   readonly transactions: TransactionManager;
 }): ApplicationTurnRepository {
   const { sql, transactions } = options;
+  const appendInTransaction: ApplicationTurnRepository["appendInTransaction"] =
+    async (tx, input) => {
+      const locked =
+        await tx.sql`select status from gateq.applications where id = ${input.applicationId} and tenant_id = ${input.tenantId} for update`;
+      if (locked[0] === undefined) throw new IntakeRefusedError("NOT_FOUND");
+      if (locked[0]["status"] === "SUBMITTED")
+        throw new IntakeRefusedError("ALREADY_SUBMITTED");
+      await tx.sql`
+      insert into gateq.application_turns (application_id, tenant_id, seq, role, text, client_turn_id, asking_dimension, intent)
+      select ${input.applicationId}, ${input.tenantId}, coalesce(max(seq), 0) + 1,
+             ${input.role}, ${input.text}, ${input.clientTurnId}, ${input.askingDimension ?? null}, ${input.intent ?? null}
+        from gateq.application_turns where application_id = ${input.applicationId}
+      on conflict (application_id, client_turn_id, role) do nothing`;
+    };
+  const finishExchange = async (
+    tx: TransactionContext,
+    applicationId: string,
+    claimId: string,
+  ): Promise<void> => {
+    await tx.sql`update gateq.applications set interview_claim_id = null, interview_claim_turn_id = null, interview_claim_expires_at = null, interview_outcome = null where id = ${applicationId} and interview_claim_id = ${claimId}`;
+  };
   return {
+    appendInTransaction,
+    finishExchange,
+    readOutcome: async (applicationId, claimId) => {
+      const rows = await sql<
+        { interview_outcome: unknown }[]
+      >`select interview_outcome from gateq.applications where id = ${applicationId} and interview_claim_id = ${claimId}`;
+      return rows[0]?.["interview_outcome"] ?? null;
+    },
+    checkpointOutcome: async (applicationId, claimId, outcome) => {
+      const rows =
+        await sql`update gateq.applications set interview_outcome = ${jsonbParam(sql, outcome)} where id = ${applicationId} and interview_claim_id = ${claimId} and interview_claim_expires_at > clock_timestamp() returning id`;
+      if (rows.length !== 1)
+        throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+    },
+    releaseExchange: async (applicationId, claimId) => {
+      await sql`update gateq.applications set interview_claim_id = null, interview_claim_expires_at = null where id = ${applicationId} and interview_claim_id = ${claimId}`;
+    },
+    pendingFor: async (applicationId) => {
+      const rows =
+        await sql`select interview_claim_turn_id from gateq.applications where id = ${applicationId}`;
+      return (
+        rows[0] !== undefined && rows[0]["interview_claim_turn_id"] !== null
+      );
+    },
+    assertClaim: async (tx, applicationId, claimId) => {
+      const rows =
+        await tx.sql`select id from gateq.applications where id = ${applicationId} and status <> 'SUBMITTED' and interview_claim_id = ${claimId} and interview_claim_expires_at > clock_timestamp() for update`;
+      return rows.length === 1;
+    },
+    claimExchange: async (input) =>
+      transactions.run(async (tx) => {
+        const rows =
+          await tx.sql`select status, interview_claim_id, interview_claim_turn_id, interview_claim_expires_at > clock_timestamp() as claim_live from gateq.applications where id = ${input.applicationId} and tenant_id = ${input.tenantId} for update`;
+        const app = rows[0];
+        if (app === undefined) throw new IntakeRefusedError("NOT_FOUND");
+        const existing =
+          await tx.sql`select role, text from gateq.application_turns where application_id = ${input.applicationId} and client_turn_id = ${input.clientTurnId}`;
+        const person = existing.find((row) => row["role"] === "PERSON");
+        if (person !== undefined && person["text"] !== input.text)
+          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+        if (existing.some((row) => row["role"] === "Q")) return null;
+        if (app["status"] === "SUBMITTED")
+          throw new IntakeRefusedError("ALREADY_SUBMITTED");
+        if (
+          (app["interview_claim_turn_id"] !== null &&
+            app["interview_claim_turn_id"] !== input.clientTurnId) ||
+          (app["interview_claim_id"] !== null && app["claim_live"] === true)
+        )
+          throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+        const claimId = randomUUID();
+        await tx.sql`update gateq.applications set interview_claim_id = ${claimId}, interview_claim_turn_id = ${input.clientTurnId}, interview_claim_expires_at = clock_timestamp() + interval '5 minutes' where id = ${input.applicationId}`;
+        await appendInTransaction(tx, { ...input, role: "PERSON" });
+        return claimId;
+      }),
     listFor: async (applicationId, limit) => {
       const rows =
         limit === undefined
@@ -471,26 +555,8 @@ export function createPostgresApplicationTurnRepository(options: {
       };
     },
 
-    append: async (input) => {
-      await transactions.run(async (tx) => {
-        await tx.sql`
-          select id from gateq.applications
-           where id = ${input.applicationId}
-           for update`;
-        await tx.sql`
-          insert into gateq.application_turns (
-            application_id, tenant_id, seq, role, text, client_turn_id,
-            asking_dimension, intent
-          )
-          select ${input.applicationId}, ${input.tenantId},
-                 coalesce(max(seq), 0) + 1, ${input.role}, ${input.text},
-                 ${input.clientTurnId}, ${input.askingDimension ?? null},
-                 ${input.intent ?? null}
-            from gateq.application_turns
-           where application_id = ${input.applicationId}
-          on conflict (application_id, client_turn_id, role) do nothing`;
-      });
-    },
+    append: async (input) =>
+      transactions.run((tx) => appendInTransaction(tx, input)),
 
     countFor: async (applicationId) => {
       const rows = await sql`

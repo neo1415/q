@@ -1,5 +1,12 @@
 # Capital Q — Current shared engineering state
 
+## GateQ durable exchange slice — 2026-10-13
+
+- IMPLEMENTED / LOCAL TESTED, not released: database-owned per-application exchange claim before model spend; exact retry text binding; checkpointed typed model reply reused after final write failure; atomically commits facts, Q transcript and claim completion. Five-minute fenced claim recovery for the same pending key, with a120second bounded interviewer call; completed exchanges replay without another model call. A crash after provider completion but before the reply checkpoint can still require a necessary recovery call; no universal exactly-once provider claim.
+- Submission now locks the canonical application while reading/freezing facts, qualification, contact, documents, transcript, coverage and deterministic dossier. In-flight/pending final turn prevents Submit. New immutable migration20261223100000 adds claim/checkpoint constraints and application-row locking guards for facts/documents/contact/transcript;10pgTAP cases added, not yet executed in protected CI or applied hosted. No transaction held across model/email calls.
+- All52 package builds PASS (50cache hits); GateQ96tests PASS, including both preserved independent concurrency regressions and2 new finalization/checkpoint regressions. Static/root type gates being completed; early missing-generated-entry/QA port errors are not passes. No deploy, live browser acceptance or paid room. Contact resend/shared attempt limits remain to fix before exposing recovered backend.
+- Read/reconciled all20 supplementary GateQ features with locked PADL, Real Product Specification, Final System Review and actual MVP/V1 DOCX. Concise CODE OBSERVED/gaps/defer boundaries in GATEQ-V1-CAPABILITIES.md. One isolated frontend owner is implementing existing form/contact/interview/review and typed API-client wrappers; no Q Pitch changes. Materials sharing remains deferred to explicit Submit to protect disclosure and canonical relationship effects.
+
 ## GateQ execution recovery — 2026-10-13
 
 - Active repair branch: `codex/gateq-completion-recovery`, recovered from QA `f03c963c` with Claude backend `0552c4f7` included. Remote production `5ce3d76b` and integration `be2ab28a` verified by GitHub refs; deployed service revisions not rechecked in this slice. Original branches and earlier uncommitted contact work preserved. Q Pitch is outside this assignment.

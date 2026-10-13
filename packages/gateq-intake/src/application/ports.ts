@@ -26,6 +26,10 @@ export type ApplicationRepository = {
     application: Omit<Application, "createdAt" | "updatedAt">,
   ) => Promise<Application>;
   readonly findById: (id: ApplicationId) => Promise<Application | null>;
+  readonly lock: (
+    tx: TransactionContext,
+    id: ApplicationId,
+  ) => Promise<Application | null>;
   readonly setStatus: (
     tx: TransactionContext,
     id: ApplicationId,
@@ -150,6 +154,48 @@ export type StoredTurn = {
  * twice for one client turn id is written once.
  */
 export type ApplicationTurnRepository = {
+  readonly readOutcome: (
+    applicationId: ApplicationId,
+    claimId: string,
+  ) => Promise<unknown>;
+  readonly checkpointOutcome: (
+    applicationId: ApplicationId,
+    claimId: string,
+    outcome: unknown,
+  ) => Promise<void>;
+  readonly claimExchange: (input: {
+    readonly applicationId: ApplicationId;
+    readonly tenantId: string;
+    readonly clientTurnId: string;
+    readonly text: string;
+  }) => Promise<string | null>;
+  readonly assertClaim: (
+    tx: TransactionContext,
+    applicationId: ApplicationId,
+    claimId: string,
+  ) => Promise<boolean>;
+  readonly releaseExchange: (
+    applicationId: ApplicationId,
+    claimId: string,
+  ) => Promise<void>;
+  readonly finishExchange: (
+    tx: TransactionContext,
+    applicationId: ApplicationId,
+    claimId: string,
+  ) => Promise<void>;
+  readonly pendingFor: (applicationId: ApplicationId) => Promise<boolean>;
+  readonly appendInTransaction: (
+    tx: TransactionContext,
+    input: {
+      readonly applicationId: ApplicationId;
+      readonly tenantId: string;
+      readonly role: "PERSON" | "Q";
+      readonly text: string;
+      readonly clientTurnId: string;
+      readonly askingDimension?: ApplicationDimension | null | undefined;
+      readonly intent?: string | null | undefined;
+    },
+  ) => Promise<void>;
   /** Oldest first. `limit` keeps the newest that many. */
   readonly listFor: (
     applicationId: ApplicationId,

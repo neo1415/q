@@ -109,8 +109,10 @@ function exchangeWorld() {
     criteria: [],
     publishedAt: at,
   };
-  const unused = async (): Promise<never> => {
-    throw new Error("Unexpected QA fixture operation");
+  const unused = (): Promise<never> => {
+    return Promise.resolve().then(() => {
+      throw new Error("Unexpected QA fixture operation");
+    });
   };
   const rows: StoredTurn[] = [];
   const seen: InterviewTurnInput[] = [];
@@ -129,104 +131,136 @@ function exchangeWorld() {
     finish = resolve;
   });
   const intake = {
-    authorise: async () => ({ application, sessionId }),
-    qualification: async () => qualification,
-    factsFor: async () => [],
-    resume: async () => view,
-    recordFacts: async () => view,
+    authorise: () => Promise.resolve({ application, sessionId }),
+    qualification: () => Promise.resolve(qualification),
+    factsFor: () => Promise.resolve([]),
+    resume: () => Promise.resolve(view),
+    recordFacts: () => Promise.resolve(view),
     start: unused,
     attachDocument: unused,
     submit: unused,
     startContact: unused,
     confirmContact: unused,
     coverage: unused,
-    completeTurn: async (input: {
+    completeTurn: (input: {
       claimId: string;
       clientTurnId: string;
       reply: string;
       asking: StoredTurn["askingDimension"];
       intent: string;
     }) => {
-      if (input.claimId !== activeClaim)
-        throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
-      rows.push({
-        seq: rows.length + 1,
-        role: "Q",
-        text: input.reply,
-        clientTurnId: input.clientTurnId,
-        askingDimension: input.asking,
-        intent: input.intent,
-        createdAt: "2026-10-13T12:00:00.000Z",
+      return Promise.resolve().then(() => {
+        if (input.claimId !== activeClaim)
+          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+        rows.push({
+          seq: rows.length + 1,
+          role: "Q",
+          text: input.reply,
+          clientTurnId: input.clientTurnId,
+          askingDimension: input.asking,
+          intent: input.intent,
+          createdAt: "2026-10-13T12:00:00.000Z",
+        });
+        activeClaim = null;
       });
-      activeClaim = null;
     },
   };
-  const model = vi.fn(async (input: InterviewTurnInput) => {
-    seen.push(input);
-    return pending;
+  const model = vi.fn((input: InterviewTurnInput) => {
+    return Promise.resolve().then(() => {
+      seen.push(input);
+      return pending;
+    });
   });
   const conversation = createConversationService({
     intake,
     interviewer: { turn: model },
     policies: {
-      policyByVersionId: async () => policy,
-      currentPolicyByPublicId: async () => null,
+      policyByVersionId: () => Promise.resolve(policy),
+      currentPolicyByPublicId: () => Promise.resolve(null),
     },
-    publicGatewayFor: async () => publicGateway,
-    turnMemory: { lastTurn: async () => null, rememberTurn: async () => {} },
+    publicGatewayFor: () => Promise.resolve(publicGateway),
+    turnMemory: {
+      lastTurn: () => Promise.resolve(null),
+      rememberTurn: () => {
+        return Promise.resolve().then(() => {});
+      },
+    },
     turns: {
-      claimExchange: async (input: { clientTurnId: string; text: string }) => {
-        const person = rows.find(
-          (row) =>
-            row.role === "PERSON" && row.clientTurnId === input.clientTurnId,
-        );
-        if (person && person.text !== input.text)
-          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
-        if (activeClaim !== null)
-          throw new IntakeRefusedError("TOO_MANY_REQUESTS");
-        activeClaim = randomUUID();
-        return activeClaim;
+      readOutcome: () => Promise.resolve(null),
+      checkpointOutcome: () => {
+        return Promise.resolve().then(() => {});
       },
-      assertClaim: async (
-        _tx: unknown,
-        _applicationId: unknown,
-        claimId: string,
-      ) => claimId === activeClaim,
-      releaseExchange: async (_applicationId: unknown, claimId: string) => {
-        if (activeClaim === claimId) activeClaim = null;
+      appendInTransaction: () => {
+        return Promise.resolve().then(() => {});
       },
-      pendingFor: async () => activeClaim !== null,
-      listFor: async () => [...rows],
-      countFor: async () => rows.length,
-      findExchange: async (_id: unknown, clientTurnId: string) => ({
-        person:
-          rows.find(
-            (row) => row.clientTurnId === clientTurnId && row.role === "PERSON",
-          ) ?? null,
-        q:
-          rows.find(
-            (row) => row.clientTurnId === clientTurnId && row.role === "Q",
-          ) ?? null,
-      }),
-      append: async (
-        input: Parameters<ApplicationTurnRepository["append"]>[0],
-      ) => {
-        if (
-          rows.some(
+      finishExchange: () => {
+        return Promise.resolve().then(() => {});
+      },
+      claimExchange: (input: { clientTurnId: string; text: string }) => {
+        return Promise.resolve().then(() => {
+          const person = rows.find(
             (row) =>
-              row.clientTurnId === input.clientTurnId &&
-              row.role === input.role,
+              row.role === "PERSON" && row.clientTurnId === input.clientTurnId,
+          );
+          if (person && person.text !== input.text)
+            throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+          if (activeClaim !== null)
+            throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+          activeClaim = randomUUID();
+          if (person === undefined)
+            rows.push({
+              seq: rows.length + 1,
+              role: "PERSON",
+              text: input.text,
+              clientTurnId: input.clientTurnId,
+              askingDimension: null,
+              intent: null,
+              createdAt: at,
+            });
+          return activeClaim;
+        });
+      },
+      assertClaim: (_tx: unknown, _applicationId: unknown, claimId: string) =>
+        Promise.resolve(claimId === activeClaim),
+      releaseExchange: (_applicationId: unknown, claimId: string) => {
+        return Promise.resolve().then(() => {
+          if (activeClaim === claimId) activeClaim = null;
+        });
+      },
+      pendingFor: () => Promise.resolve(activeClaim !== null),
+      listFor: () => Promise.resolve([...rows]),
+      countFor: () => Promise.resolve(rows.length),
+      findExchange: (_id: unknown, clientTurnId: string) =>
+        Promise.resolve({
+          person:
+            rows.find(
+              (row) =>
+                row.clientTurnId === clientTurnId && row.role === "PERSON",
+            ) ?? null,
+          q:
+            rows.find(
+              (row) => row.clientTurnId === clientTurnId && row.role === "Q",
+            ) ?? null,
+        }),
+      append: (input: Parameters<ApplicationTurnRepository["append"]>[0]) => {
+        return Promise.resolve().then(() => {
+          if (
+            rows.some(
+              (row) =>
+                row.clientTurnId === input.clientTurnId &&
+                row.role === input.role,
+            )
           )
-        )
-          return;
-        rows.push({
-          seq: rows.length + 1,
-          role: input.role,
-          text: input.text,
-          clientTurnId: input.clientTurnId,
-          askingDimension: input.askingDimension ?? null,
-          intent: input.intent ?? null,
-          createdAt: "2026-10-13T12:00:00.000Z",
+            return;
+          rows.push({
+            seq: rows.length + 1,
+            role: input.role,
+            text: input.text,
+            clientTurnId: input.clientTurnId,
+            askingDimension: input.askingDimension ?? null,
+            intent: input.intent ?? null,
+            createdAt: "2026-10-13T12:00:00.000Z",
+          });
         });
       },
     },

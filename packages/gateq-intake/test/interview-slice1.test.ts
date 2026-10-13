@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -11,11 +12,14 @@ import {
   type PublicGateway,
 } from "@capital-q/gateq";
 import {
+  ApplicationTranscriptTurnDtoSchema,
   GateqDossierV1Schema,
   GateqCoverageV1Schema,
 } from "@capital-q/contracts";
 
 import {
+  ApplicationFactSchema,
+  IntakeRefusedError,
   type Application,
   type ApplicationFact,
   type ApplicationSession,
@@ -31,7 +35,11 @@ import type {
   InterviewTurnInput,
   InterviewTurnOutcome,
 } from "../src/application/interviewer.js";
-import type { StoredContact, StoredTurn } from "../src/application/ports.js";
+import type {
+  ApplicationTurnRepository,
+  StoredContact,
+  StoredTurn,
+} from "../src/application/ports.js";
 
 /**
  * GateQ slice 1 over an in-memory store: the durable interview, the
@@ -153,11 +161,76 @@ function world(
   let nextCode = 100_000;
 
   const transactions = {
-    run: async <T>(work: (tx: { sql: unknown }) => Promise<T>): Promise<T> =>
-      work({ sql: null }),
+    run: <T>(work: (tx: { sql: unknown }) => Promise<T>): Promise<T> =>
+      Promise.resolve(work({ sql: null })),
   };
 
-  const turns = {
+  const claims = new Map<
+    string,
+    { id: string | null; turnId: string; outcome: unknown }
+  >();
+  const turns: ApplicationTurnRepository = {
+    claimExchange: async (input: {
+      applicationId: string;
+      tenantId: string;
+      clientTurnId: string;
+      text: string;
+    }) => {
+      const prior = claims.get(input.applicationId);
+      const person = turnRows.find(
+        (row) =>
+          row.applicationId === input.applicationId &&
+          row.clientTurnId === input.clientTurnId &&
+          row.role === "PERSON",
+      );
+      if (person !== undefined && person.text !== input.text)
+        throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+      if (
+        prior !== undefined &&
+        (prior.id !== null || prior.turnId !== input.clientTurnId)
+      )
+        throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+      const id = randomUUID();
+      claims.set(input.applicationId, {
+        id,
+        turnId: input.clientTurnId,
+        outcome: prior?.outcome ?? null,
+      });
+      await turns.append({ ...input, role: "PERSON" });
+      return id;
+    },
+    readOutcome: (applicationId: string) =>
+      Promise.resolve(claims.get(applicationId)?.outcome ?? null),
+    checkpointOutcome: (
+      applicationId: string,
+      _claimId: string,
+      outcome: unknown,
+    ) => {
+      return Promise.resolve().then(() => {
+        const claim = claims.get(applicationId);
+        if (claim !== undefined)
+          claims.set(applicationId, { ...claim, outcome });
+      });
+    },
+    assertClaim: (_tx: unknown, applicationId: string, id: string) =>
+      Promise.resolve(claims.get(applicationId)?.id === id),
+    releaseExchange: (applicationId: string, id: string) => {
+      return Promise.resolve().then(() => {
+        const claim = claims.get(applicationId);
+        if (claim?.id === id) claims.set(applicationId, { ...claim, id: null });
+      });
+    },
+    finishExchange: (_tx: unknown, applicationId: string, id: string) => {
+      return Promise.resolve().then(() => {
+        if (claims.get(applicationId)?.id === id) claims.delete(applicationId);
+      });
+    },
+    pendingFor: (applicationId: string) =>
+      Promise.resolve(claims.has(applicationId)),
+    appendInTransaction: (
+      _tx: unknown,
+      input: Parameters<ApplicationTurnRepository["append"]>[0],
+    ) => Promise.resolve(turns.append(input)),
     listFor: (applicationId: string, limit?: number) => {
       const rows = turnRows
         .filter((row) => row.applicationId === applicationId)
@@ -268,6 +341,7 @@ function world(
         return Promise.resolve(row);
       },
       findById: (id) => Promise.resolve(applications.get(id) ?? null),
+      lock: (_tx, id) => Promise.resolve(applications.get(id) ?? null),
       setStatus: (_tx, id, status, submittedAt) => {
         const row = applications.get(id);
         if (row === undefined) throw new Error("no such application");
@@ -470,6 +544,7 @@ function world(
     seen,
     script,
     turnRows,
+    turns,
     contactRows,
     submissions,
     mailed,
@@ -490,6 +565,80 @@ const CONTACT = {
 };
 
 describe("the interview transcript", () => {
+  it("blocks submission during the final model turn, then freezes its facts and complete transcript", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.recordFacts({ token, facts: QUALIFYING });
+    let release: ((outcome: InterviewTurnOutcome) => void) | undefined;
+    const result = new Promise<InterviewTurnOutcome>((resolve) => {
+      release = resolve;
+    });
+    w.interviewer.turn.mockImplementationOnce(() => result);
+    const running = w.conversation.turn({
+      token,
+      message: "Annual revenue is $100k.",
+      clientTurnId: "final-turn",
+      correlationId: "final-turn",
+    });
+    await vi.waitFor(() => expect(w.interviewer.turn).toHaveBeenCalledTimes(1));
+    await expect(
+      w.intake.submit({ token, clientRequestId: "submit-final" }),
+    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    expect(w.submissions).toHaveLength(0);
+    if (release === undefined) throw new Error("model not started");
+    release({
+      reply: "Thank you. Please review your disclosure.",
+      intent: "ANSWER",
+      facts: [
+        fact("claims.revenue", { kind: "TEXT", text: "$100k annual revenue" }),
+      ],
+      rejectedFacts: 0,
+      asking: null,
+      questionForQ: null,
+      readyToReview: true,
+    });
+    await running;
+    await w.intake.submit({ token, clientRequestId: "submit-final" });
+    expect(w.submissions).toHaveLength(1);
+    const frozen = z
+      .object({
+        facts: z.array(ApplicationFactSchema),
+        transcript: z.array(ApplicationTranscriptTurnDtoSchema),
+      })
+      .parse(w.submissions[0]?.snapshot);
+    expect(
+      frozen.facts.find((item) => item.dimension === "claims.revenue")?.value,
+    ).toEqual({ kind: "TEXT", text: "$100k annual revenue" });
+    expect(frozen.transcript.map((item) => item.role)).toEqual(["PERSON", "Q"]);
+    expect(frozen.transcript[1]?.text).toBe(
+      "Thank you. Please review your disclosure.",
+    );
+  });
+
+  it("reuses a checkpointed model reply when finalization fails, without another model call", async () => {
+    const w = world();
+    const { token } = await w.start();
+    vi.spyOn(w.turns, "appendInTransaction").mockRejectedValueOnce(
+      new Error("temporary write failure"),
+    );
+    const input = {
+      token,
+      message: "We sell to banks.",
+      clientTurnId: "recover-turn",
+      correlationId: "recover-turn",
+    };
+    await expect(w.conversation.turn(input)).rejects.toThrow(
+      "temporary write failure",
+    );
+    await w.conversation.turn(input);
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+    expect(w.turnRows.map((turn) => turn.role)).toEqual(["PERSON", "Q"]);
+    await expect(
+      w.conversation.turn({ ...input, message: "We sell to schools instead." }),
+    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+  });
+
   it("stores both sides of a turn, in order", async () => {
     const w = world();
     const { token } = await w.start();

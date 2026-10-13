@@ -237,6 +237,15 @@ export type IntakeService = {
   }) => Promise<ApplicationContactConfirmResponse>;
   /** The deterministic completeness check, and what stands before Submit. */
   readonly coverage: (token: string) => Promise<ApplicationCoverageDto>;
+  readonly completeTurn: (input: {
+    readonly token: string;
+    readonly claimId: string;
+    readonly clientTurnId: string;
+    readonly reply: string;
+    readonly asking: StoredTurn["askingDimension"];
+    readonly intent: string;
+    readonly facts: readonly NewApplicationFact[];
+  }) => Promise<void>;
 };
 
 export function createIntakeService(
@@ -403,6 +412,44 @@ export function createIntakeService(
   };
 
   return {
+    completeTurn: async (input) => {
+      const { application } = await authorise(input.token);
+      if (turns === undefined) throw new IntakeRefusedError("NOT_FOUND");
+      const proposed = input.facts.map((fact) =>
+        NewApplicationFactSchema.parse(fact),
+      );
+      await transactions.run(async (tx) => {
+        if (!(await turns.assertClaim(tx, application.id, input.claimId)))
+          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+        if (proposed.length > 0) {
+          await facts.record(tx, {
+            applicationId: application.id,
+            tenantId: application.tenantId,
+            facts: proposed,
+            at: clock().toISOString(),
+          });
+          const name = proposed.find(
+            (fact) => fact.dimension === "company.name",
+          );
+          if (name?.value.kind === "TEXT")
+            await applications.setDeclaredName(
+              tx,
+              application.id,
+              name.value.text,
+            );
+        }
+        await turns.appendInTransaction(tx, {
+          applicationId: application.id,
+          tenantId: application.tenantId,
+          role: "Q",
+          text: input.reply,
+          clientTurnId: input.clientTurnId,
+          askingDimension: input.asking,
+          intent: input.intent,
+        });
+        await turns.finishExchange(tx, application.id, input.claimId);
+      });
+    },
     authorise,
 
     start: async (input) => {
@@ -483,6 +530,12 @@ export function createIntakeService(
 
       const at = clock().toISOString();
       await transactions.run(async (tx) => {
+        const locked = await applications.lock(tx, application.id);
+        if (locked === null) throw new IntakeRefusedError("NOT_FOUND");
+        if (locked.status === "SUBMITTED")
+          throw new IntakeRefusedError("ALREADY_SUBMITTED");
+        if (turns !== undefined && (await turns.pendingFor(application.id)))
+          throw new IntakeRefusedError("TOO_MANY_REQUESTS");
         await facts.record(tx, {
           applicationId: application.id,
           tenantId: application.tenantId,
@@ -508,6 +561,10 @@ export function createIntakeService(
         throw new IntakeRefusedError("ALREADY_SUBMITTED");
       }
       await transactions.run(async (tx) => {
+        const locked = await applications.lock(tx, application.id);
+        if (locked === null) throw new IntakeRefusedError("NOT_FOUND");
+        if (locked.status === "SUBMITTED")
+          throw new IntakeRefusedError("ALREADY_SUBMITTED");
         await documents.attach(tx, {
           applicationId: application.id,
           tenantId: application.tenantId,
@@ -527,140 +584,146 @@ export function createIntakeService(
     },
 
     submit: async (input) => {
-      const { application } = await authorise(input.token);
+      const guest = await authorise(input.token);
+      return transactions.run(async (tx) => {
+        const application = await applications.lock(tx, guest.application.id);
+        if (application === null) throw new IntakeRefusedError("NOT_FOUND");
+        if (turns !== undefined && (await turns.pendingFor(application.id)))
+          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
 
-      // Idempotence first: a double-click and a retried request are one
-      // submission, and the second one gets the first one's answer.
-      const existing = await submissions.findForApplication(application.id);
-      if (existing !== null) {
-        if (existing.clientRequestId !== input.clientRequestId) {
-          throw new IntakeRefusedError("ALREADY_SUBMITTED");
+        // Idempotence first: a double-click and a retried request are one
+        // submission, and the second one gets the first one's answer.
+        const existing = await submissions.findForApplication(application.id);
+        if (existing !== null) {
+          if (existing.clientRequestId !== input.clientRequestId) {
+            throw new IntakeRefusedError("ALREADY_SUBMITTED");
+          }
+          return {
+            submittedAt: existing.submittedAt,
+            qualification: await qualificationFor(application),
+            deduplicated: true,
+          };
         }
-        return {
-          submittedAt: existing.submittedAt,
-          qualification: await qualificationFor(application),
-          deduplicated: true,
-        };
-      }
 
-      const qualification = await qualificationFor(application);
-      // Only an application the door would actually admit is submitted.
-      // A QUALIFIED gateway that has already established a required
-      // mismatch is not a form to finish (§26): the applicant is told
-      // plainly and offered a correction, not another twenty questions.
-      // A required unknown is not a refusal either — it is a question
-      // still to answer, and submitting over it would hand the
-      // organisation an application nobody could assess.
-      if (qualification.access !== "MAY_APPLY") {
-        throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
-      }
-      // Who the organisation may contact must be reachable before anything
-      // is disclosed to it (slice 1). A guest is told this one apart.
-      const standing = await contactStanding(application);
-      if (standing.required && !standing.confirmed) {
-        throw new IntakeRefusedError("CONTACT_NOT_CONFIRMED");
-      }
+        const qualification = await qualificationFor(application);
+        // Only an application the door would actually admit is submitted.
+        // A QUALIFIED gateway that has already established a required
+        // mismatch is not a form to finish (§26): the applicant is told
+        // plainly and offered a correction, not another twenty questions.
+        // A required unknown is not a refusal either — it is a question
+        // still to answer, and submitting over it would hand the
+        // organisation an application nobody could assess.
+        if (qualification.access !== "MAY_APPLY") {
+          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+        }
+        // Who the organisation may contact must be reachable before anything
+        // is disclosed to it (slice 1). A guest is told this one apart.
+        const standing = await contactStanding(application);
+        if (standing.required && !standing.confirmed) {
+          throw new IntakeRefusedError("CONTACT_NOT_CONFIRMED");
+        }
 
-      const submittedAt = clock().toISOString();
-      const snapshot = await viewOf(application);
-      const documentIds = await documents.listFor(application.id);
+        const submittedAt = clock().toISOString();
+        const snapshot = await viewOf(application);
+        const documentIds = await documents.listFor(application.id);
 
-      // Snapshot v2 and the dossier, when the composition stores turns.
-      // Everything is read before the transaction and built
-      // deterministically; the transaction only writes the one row.
-      let v2:
-        { readonly snapshot: unknown; readonly dossier: unknown } | undefined;
-      if (turns !== undefined) {
-        const policy = await policyFor(application);
-        const current = await facts.currentFor(application.id);
-        const transcript = transcriptDto(await turns.listFor(application.id));
-        let budget = SNAPSHOT_TRANSCRIPT_CHARS;
-        const kept = transcript.filter((turn) => {
-          budget -= turn.text.length;
-          return budget >= 0;
-        });
-        const coverage = coverageFor({
-          policy,
-          qualification,
-          facts: current,
-        });
-        const contact =
-          standing.contact === null ? null : contactDto(standing.contact);
-        const titles =
-          documentTitles === undefined || documentIds.length === 0
-            ? new Map<string, string>()
-            : await documentTitles
-                .titles(documentIds)
-                .catch(() => new Map<string, string>());
-        v2 = {
-          snapshot: {
-            ...snapshot,
-            documentIds,
-            snapshotVersion: 2,
-            contact,
-            transcript: kept,
-            transcriptTruncated: kept.length < transcript.length,
-            coverage,
-          },
-          dossier: buildDossier({
-            reference: application.publicReference,
-            declaredName: application.declaredName,
-            submittedAt,
-            generatedAt: submittedAt,
-            facts: current,
+        // Snapshot v2 and the dossier, when the composition stores turns.
+        // Everything is read before the transaction and built
+        // deterministically; the transaction only writes the one row.
+        let v2:
+          { readonly snapshot: unknown; readonly dossier: unknown } | undefined;
+        if (turns !== undefined) {
+          const policy = await policyFor(application);
+          const current = await facts.currentFor(application.id);
+          const transcript = transcriptDto(await turns.listFor(application.id));
+          let budget = SNAPSHOT_TRANSCRIPT_CHARS;
+          const kept = transcript.filter((turn) => {
+            budget -= turn.text.length;
+            return budget >= 0;
+          });
+          const coverage = coverageFor({
+            policy,
             qualification,
-            coverage,
-            contact,
-            documents: documentIds.map((documentId) => ({
-              documentId,
-              title: (titles.get(documentId) ?? "Shared document").slice(
-                0,
-                200,
-              ),
-            })),
-            turnCount: transcript.length,
-          }),
-        };
-      }
+            facts: current,
+          });
+          const contact =
+            standing.contact === null ? null : contactDto(standing.contact);
+          const titles =
+            documentTitles === undefined || documentIds.length === 0
+              ? new Map<string, string>()
+              : await documentTitles
+                  .titles(documentIds)
+                  .catch(() => new Map<string, string>());
+          v2 = {
+            snapshot: {
+              ...snapshot,
+              documentIds,
+              snapshotVersion: 2,
+              contact,
+              transcript: kept,
+              transcriptTruncated: kept.length < transcript.length,
+              coverage,
+            },
+            dossier: buildDossier({
+              reference: application.publicReference,
+              declaredName: application.declaredName,
+              submittedAt,
+              generatedAt: submittedAt,
+              facts: current,
+              qualification,
+              coverage,
+              contact,
+              documents: documentIds.map((documentId) => ({
+                documentId,
+                title: (titles.get(documentId) ?? "Shared document").slice(
+                  0,
+                  200,
+                ),
+              })),
+              turnCount: transcript.length,
+            }),
+          };
+        }
 
-      const recorded = await transactions.run(async (tx) => {
-        const result = await submissions.record(tx, {
-          applicationId: application.id,
-          tenantId: application.tenantId,
-          gatewayVersionId: application.gatewayVersionId,
-          // Frozen. A later edit cannot rewrite what was received, because
-          // what was received is this row and this row is immutable.
-          snapshot: v2?.snapshot ?? { ...snapshot, documentIds },
-          qualification,
-          clientRequestId: input.clientRequestId,
-          submittedAt,
-          ...(v2 === undefined
-            ? {}
-            : { dossier: v2.dossier, snapshotVersion: 2 as const }),
-        });
-        await applications.setStatus(
-          tx,
-          application.id,
-          "SUBMITTED",
-          submittedAt,
+        const recorded = await (async () => {
+          const result = await submissions.record(tx, {
+            applicationId: application.id,
+            tenantId: application.tenantId,
+            gatewayVersionId: application.gatewayVersionId,
+            // Frozen. A later edit cannot rewrite what was received, because
+            // what was received is this row and this row is immutable.
+            snapshot: v2?.snapshot ?? { ...snapshot, documentIds },
+            qualification,
+            clientRequestId: input.clientRequestId,
+            submittedAt,
+            ...(v2 === undefined
+              ? {}
+              : { dossier: v2.dossier, snapshotVersion: 2 as const }),
+          });
+          await applications.setStatus(
+            tx,
+            application.id,
+            "SUBMITTED",
+            submittedAt,
+          );
+          return result;
+        })();
+
+        logger?.info(
+          {
+            gatewayId: application.gatewayId,
+            outcome: qualification.outcome,
+            access: qualification.access,
+            documents: documentIds.length,
+          },
+          "gateq application submitted",
         );
-        return result;
+        return {
+          submittedAt: recorded.submittedAt,
+          qualification,
+          deduplicated: false,
+        };
       });
-
-      logger?.info(
-        {
-          gatewayId: application.gatewayId,
-          outcome: qualification.outcome,
-          access: qualification.access,
-          documents: documentIds.length,
-        },
-        "gateq application submitted",
-      );
-      return {
-        submittedAt: recorded.submittedAt,
-        qualification,
-        deduplicated: false,
-      };
     },
 
     startContact: async (input) => {
