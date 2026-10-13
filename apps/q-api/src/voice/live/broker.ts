@@ -52,6 +52,7 @@ import {
 import { heardRequest, spokenWords, UNHEARD_COMMENTARY } from "./heard.js";
 import type { PronunciationStore } from "./pronunciations.js";
 import { livePrompt } from "./prompt.js";
+import type { LiveTrialClaimStore } from "./trial-claim.js";
 import {
   createSpeechMeter,
   speechSignalOf,
@@ -152,10 +153,11 @@ export type LiveRefusal =
    */
   | "PROVIDER_QUOTA"
   /**
-   * The person's live-voice trial allowance is used up. Answered like
-   * PROVIDER_QUOTA (429): the browser opens the standard voice.
+   * The person's live-voice trial allowance is used up (429). A LIVE-only
+   * trial binding permits no unmetered fallback.
    */
-  | "TRIAL_SPENT";
+  | "TRIAL_SPENT"
+  | "TRIAL_IN_USE";
 
 export type LiveOpenOutcome =
   | { readonly kind: "OPEN"; readonly result: LiveOpenResult }
@@ -216,14 +218,16 @@ type LiveLine = {
 
 /** A trial line's allowance accounting (trial.ts). */
 type TrialLine = {
+  readonly claimId: string;
+  closing: Promise<boolean> | null;
   readonly allowanceSeconds: number;
   /** The person's seconds on every other session, as last read. */
   othersSeconds: number;
   readonly meter: SpeechMeter;
-  observer: { readonly stop: () => void } | null;
+  observer: { readonly stop: () => void; readonly ready?: Promise<boolean> } | null;
   /**
-   * The sideband was lost (or never attached) at this time: from then the
-   * line counts wall-clock, because unmeasured is not unspoken.
+   * Observation was lost here. The line ends immediately and its claim
+   * stays held: unknown audio cannot be refunded or guessed as silence.
    */
   lostAt: number | null;
   /** What the meter had measured when the sideband was lost, ms. */
@@ -279,7 +283,7 @@ export type LiveBroker = {
   readonly isTrialUser: (userId: string) => boolean;
   /**
    * This person's trial and what is left of it; null when they have no
-   * trial. Throws when their use cannot be read (unknown is not unused).
+   * trial. Throws when usage is unreadable or an account claim is held.
    */
   readonly trialFor: (actor: ActorContext) => Promise<QVoiceLiveTrial | null>;
   readonly end: (input: {
@@ -336,6 +340,7 @@ export type LiveBrokerDependencies = {
    * a trial person's line is refused: their use could not be counted.
    */
   readonly trialUsage?: LiveTrialUsageStore | undefined;
+  readonly trialClaims?: LiveTrialClaimStore | undefined;
   /**
    * q_runtime.voice_line_turns (A's duplex write path): both sides of the
    * line, routed 'live', so what GPT-Live said can be audited.
@@ -595,9 +600,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     // Nothing after the line ended counts.
     const until = Math.min(at, trial.stoppedAt ?? at);
     const ms =
-      trial.lostAt === null
-        ? trial.meter.measuredMs(until)
-        : trial.lostBaseMs + Math.max(0, until - trial.lostAt);
+      trial.lostAt === null ? trial.meter.measuredMs(until) : trial.lostBaseMs;
     return withHint(
       ms / 1000,
       trial.hintSeconds,
@@ -671,8 +674,10 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       trial.lostAt = at;
       logger.warn(
         { qVoiceSessionId: line.voiceSessionId },
-        "live voice trial meter lost: counting wall-clock",
+        "live voice trial meter lost: ending unmeasured line",
       );
+      if (lines.get(line.voiceSessionId) === line)
+        forget(line, "trial_meter_unavailable");
     };
     if (provider?.observeSession === undefined) {
       lose();
@@ -686,6 +691,11 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         },
         onLost: lose,
       });
+    }
+    if (lines.get(line.voiceSessionId) !== line) {
+      trial.observer?.stop();
+      trial.observer = null;
+      return;
     }
     trial.timer = setInterval(() => {
       trial.ticks += 1;
@@ -737,18 +747,42 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     // The provider session is ended from here too, unless its browser saw
     // it close (final usage): a superseded, expired, abandoned or failed
     // line never keeps billing because its browser did not close it.
-    if (!line.finalReported) {
-      void (
+    if (!line.finalReported || line.trial !== undefined) {
+      const closing = (
         provider?.closeSession?.(line.providerSessionId) ??
         Promise.resolve(false)
       )
-        .then((confirmed) => {
+        .then(async (confirmed) => {
           logger.info(
             { qVoiceSessionId: line.voiceSessionId, reason, confirmed },
             "live voice provider session closed from the server",
           );
+          const trial = line.trial;
+          if (trial === undefined) return confirmed;
+          await trial.persisting;
+          if (
+            !confirmed ||
+            trial.lostAt !== null ||
+            failedTrialWrites.has(trialOwner(line.actor)) ||
+            deps.trialClaims === undefined
+          )
+            return false;
+          // Match numeric(9,2) canonical usage rounding before releasing.
+          const finalSeconds =
+            Math.round(trialLineSeconds(line, now()) * 100) / 100;
+          return deps.trialClaims.release({
+            actor: line.actor,
+            claimId: trial.claimId,
+            providerSessionId: line.providerSessionId,
+            finalSeconds,
+            providerTerminated: true,
+          });
         })
-        .catch(() => undefined);
+        .catch((error: unknown) => {
+          logger.warn({ err: error }, "live voice trial claim remains held");
+          return false;
+        });
+      if (line.trial !== undefined) line.trial.closing = closing;
     }
   };
 
@@ -1014,11 +1048,17 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           if (line.voiceSessionId === binding.voiceSessionId)
             carried = { history: line.history, referents: line.referents };
           forget(line, "replaced");
+          await line.trial?.closing;
           await line.trial?.persisting;
         }
         if (failedTrialWrites.has(trialOwner(actor)))
           return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
-        if (deps.trialUsage === undefined)
+        if (
+          deps.trialUsage === undefined ||
+          deps.trialClaims === undefined ||
+          provider.observeSession === undefined ||
+          provider.closeSession === undefined
+        )
           return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
         try {
           trialUsed = await deps.trialUsage.usedSeconds(actor);
@@ -1073,6 +1113,26 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       ) {
         return { kind: "REFUSED", reason: "INELIGIBLE" };
       }
+      let trialClaim: {
+        readonly claimId: string;
+        readonly remainingSeconds: number;
+      } | null = null;
+      if (allowance !== undefined) {
+        try {
+          trialClaim =
+            (await deps.trialClaims?.claim({
+              actor,
+              allowanceSeconds: allowance,
+              voiceSessionId: binding.voiceSessionId,
+            })) ?? null;
+        } catch (error: unknown) {
+          logger.warn({ err: error }, "live voice trial claim unavailable");
+          return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
+        }
+        if (trialClaim === null)
+          return { kind: "REFUSED", reason: "TRIAL_IN_USE" };
+        trialUsed = allowance - trialClaim.remainingSeconds;
+      }
       let created;
       try {
         created = await provider.createWebRtcSession({
@@ -1095,6 +1155,29 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           sdp,
         });
       } catch (error: unknown) {
+        // An explicit provider rejection proves no session was created. A
+        // timeout, parse error or server error is ambiguous: retain the claim.
+        if (
+          trialClaim !== null &&
+          error instanceof LiveProviderError &&
+          error.status !== null &&
+          [400, 401, 403, 404, 422, 429].includes(error.status)
+        ) {
+          await deps.trialClaims
+            ?.release({
+              actor,
+              claimId: trialClaim.claimId,
+              providerSessionId: null,
+              finalSeconds: 0,
+              providerTerminated: true,
+            })
+            .catch((releaseError: unknown) => {
+              logger.warn(
+                { err: releaseError },
+                "rejected provider trial claim remains held",
+              );
+            });
+        }
         logger.warn({ err: error }, "live voice session not created");
         return {
           kind: "REFUSED",
@@ -1122,13 +1205,15 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         ...(persona === null || rehearsal === undefined
           ? {}
           : { rehearsalId: rehearsal.rehearsalId }),
-        ...(allowance === undefined
+        ...(allowance === undefined || trialClaim === null
           ? {}
           : {
               trial: {
+                claimId: trialClaim.claimId,
+                closing: null,
                 allowanceSeconds: allowance,
                 othersSeconds: trialUsed,
-                meter: createSpeechMeter(),
+                meter: createSpeechMeter({ authoritativeOpen: true }),
                 observer: null,
                 lostAt: null,
                 lostBaseMs: 0,
@@ -1143,6 +1228,17 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       };
       lines.set(binding.voiceSessionId, line);
       startTrial(line);
+      if (line.trial !== undefined) {
+        const attached = await line.trial.observer?.ready?.catch(() => false) ?? false;
+        if (!attached || lines.get(binding.voiceSessionId) !== line) {
+          if (lines.get(binding.voiceSessionId) === line) {
+            line.trial.lostAt = now();
+            line.trial.lostBaseMs = line.trial.meter.measuredMs(now());
+            forget(line, "trial_observer_not_ready");
+          }
+          return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
+        }
+      }
       // Part 6: the background note for this session (and its renewals).
       // A persona line gets none: its prepared context is the whole of what
       // it may use, and no record of the founder's rides in on the side.
@@ -1424,6 +1520,13 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       if (deps.trialUsage === undefined)
         throw new Error("live voice trial use is not stored here");
       const used = await deps.trialUsage.usedSeconds(actor);
+      if (
+        used < allowance &&
+        (deps.trialClaims === undefined || (await deps.trialClaims.held(actor)))
+      )
+        throw new Error(
+          "live voice trial unavailable while another claim is held",
+        );
       return {
         allowanceSeconds: allowance,
         remainingSeconds: Math.floor(Math.max(0, allowance - used)),

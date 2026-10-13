@@ -279,16 +279,18 @@ export function registerLiveVoiceRoutes(
     { onRequest: availability.hook(withContext) },
     async (request, reply) => {
       let available = broker.enabled && mayOpen(request);
-      // A trial person whose allowance is used up starts on the standard
-      // voice; an unreadable use reads as no (one database read, then
-      // remembered with the answer).
+      // A spent, held or unreadable trial is unavailable. Its LIVE-only
+      // binding never authorises an unmetered fallback.
       if (available && broker.isTrialUser(getActorContext(request).userId)) {
         const trial = await broker
           .trialFor(getActorContext(request))
           .catch(() => null);
         available = trial !== null && trial.remainingSeconds > 0;
       }
-      availability.remember(request, available);
+      // Trial balances and account claims change during a call; cache only
+      // ordinary configured access, never a trial's mutable availability.
+      if (!broker.isTrialUser(getActorContext(request).userId))
+        availability.remember(request, available);
       return reply
         .code(200)
         .header("Cache-Control", "no-store")

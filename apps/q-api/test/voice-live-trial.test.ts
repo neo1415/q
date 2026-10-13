@@ -39,6 +39,7 @@ import {
 import {
   createGptLiveProvider,
   type LiveVoiceProvider,
+  LiveProviderError,
 } from "../src/voice/providers/gpt-live.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
 
@@ -127,18 +128,30 @@ const firewall: ContextFirewallPort = {
 /** The same semantics as the Postgres store: per session, only grows. */
 function memoryStore(): LiveTrialUsageStore & {
   readonly rows: Map<string, number>;
+  readonly voices: Map<string, string>;
+  readonly claims: Map<
+    string,
+    { claimId: string; tenantId: string; voiceSessionId: string }
+  >;
   failing: boolean;
 } {
   const rows = new Map<string, number>();
+  const voices = new Map<string, string>();
+  const claims = new Map<
+    string,
+    { claimId: string; tenantId: string; voiceSessionId: string }
+  >();
   const prefix = (actor: ActorContext) => `${actor.tenantId}|${actor.userId}|`;
   const store = {
     rows,
+    voices,
+    claims,
     failing: false,
     usedSeconds: (actor: ActorContext) => {
       if (store.failing) return Promise.reject(new Error("db down"));
       let total = 0;
       for (const [key, value] of rows) {
-        if (key.startsWith(prefix(actor))) total += value;
+        if (key.split("|")[1] === actor.userId) total += value;
       }
       return Promise.resolve(total);
     },
@@ -149,6 +162,7 @@ function memoryStore(): LiveTrialUsageStore & {
       readonly seconds: number;
     }) => {
       const key = `${prefix(input.actor)}${input.providerSessionId}`;
+      voices.set(key, input.voiceSessionId);
       rows.set(
         key,
         Math.max(rows.get(key) ?? 0, Math.round(input.seconds * 100) / 100),
@@ -167,11 +181,16 @@ type Sideband = {
 
 /** One fake broker instance (a q-api process) over a shared store. */
 function instance(
-  store: LiveTrialUsageStore | undefined,
+  store: ReturnType<typeof memoryStore> | undefined,
   options: {
     readonly trial?: string;
     readonly clock?: { now: number };
     readonly observe?: boolean;
+    readonly closeConfirmed?: boolean;
+    readonly observerReady?: boolean;
+    readonly closeAvailable?: boolean;
+    readonly createError?: Error;
+    readonly missingClaims?: boolean;
   } = {},
 ) {
   const clock = options.clock ?? { now: 1_000_000 };
@@ -183,15 +202,17 @@ function instance(
     providerId: "a1000000-0000-4000-8000-000000000003",
     modelId: "a2000000-0000-4000-8000-000000000023",
     createWebRtcSession: () => {
+      if (options.createError !== undefined)
+        return Promise.reject(options.createError);
       sessions += 1;
       const id = `live_${String(sessions)}_${randomUUID().slice(0, 8)}`;
       created.push(id);
       return Promise.resolve({ sessionId: id, sdp: "v=0 answer", model: null });
     },
-    closeSession: (id) => {
+    ...(options.closeAvailable === false ? {} : { closeSession: (id: string) => {
       closed.push(id);
-      return Promise.resolve(true);
-    },
+      return Promise.resolve(options.closeConfirmed !== false);
+    } }),
     ...(options.observe === false
       ? {}
       : {
@@ -205,6 +226,7 @@ function instance(
             const sideband: Sideband = { ...handlers, stopped: false };
             sidebands.push(sideband);
             return {
+              ready: Promise.resolve(options.observerReady !== false),
               stop: () => {
                 sideband.stopped = true;
               },
@@ -238,6 +260,51 @@ function instance(
     logger,
     now: () => clock.now,
     trialUsage: store,
+    trialClaims:
+      store === undefined || options.missingClaims === true
+        ? undefined
+        : {
+            held: (actor) => Promise.resolve(store.claims.has(actor.userId)),
+            claim: async ({ actor, allowanceSeconds, voiceSessionId }) => {
+              const used = await store.usedSeconds(actor);
+              if (store.claims.has(actor.userId) || used >= allowanceSeconds)
+                return null;
+              const claimId = randomUUID();
+              store.claims.set(actor.userId, {
+                claimId,
+                tenantId: actor.tenantId,
+                voiceSessionId,
+              });
+              return { claimId, remainingSeconds: allowanceSeconds - used };
+            },
+            release: ({
+              actor,
+              claimId,
+              providerSessionId,
+              finalSeconds,
+              providerTerminated,
+            }) => {
+              const claim = store.claims.get(actor.userId);
+              if (
+                claim?.claimId !== claimId ||
+                claim.tenantId !== actor.tenantId ||
+                providerTerminated !== true
+              )
+                return Promise.resolve(false);
+              if (providerSessionId === null) {
+                if (finalSeconds !== 0) return Promise.resolve(false);
+              } else {
+                const key = `${actor.tenantId}|${actor.userId}|${providerSessionId}`;
+                if (
+                  (store.rows.get(key) ?? -1) < finalSeconds ||
+                  store.voices.get(key) !== claim.voiceSessionId
+                )
+                  return Promise.resolve(false);
+              }
+              store.claims.delete(actor.userId);
+              return Promise.resolve(true);
+            },
+          },
   });
   /** The newest line's provider sideband, as the provider would speak. */
   const emit = (type: string) => {
@@ -390,6 +457,186 @@ describe("measuring active speech", () => {
 });
 
 describe("the trial line (broker)", () => {
+  it("refuses usable SDP and retains unknown allowance if observer readiness fails", async () => {
+    const store = memoryStore();
+    const line = instance(store, { observerReady: false });
+    expect((await openLine(line)).outcome).toEqual({ kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" });
+    expect(line.closed).toEqual([line.created[0]]);
+    await settle();
+    expect(store.claims.size).toBe(1);
+  });
+
+  it("refuses before paid creation without server termination capability", async () => {
+    const line = instance(memoryStore(), { closeAvailable: false });
+    expect((await openLine(line)).outcome).toEqual({ kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" });
+    expect(line.created).toEqual([]);
+  });
+
+  it("refuses paid trial creation without durable admission", async () => {
+    const store = memoryStore();
+    const line = instance(store, { missingClaims: true });
+    expect((await openLine(line)).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "LEDGER_UNAVAILABLE",
+    });
+    expect(line.created).toEqual([]);
+  });
+
+  it("atomically admits only one concurrent instance before either provider is created", async () => {
+    const store = memoryStore();
+    const first = instance(store);
+    const second = instance(store);
+    const outcomes = await Promise.all([openLine(first), openLine(second)]);
+    expect(outcomes.map((value) => value.outcome.kind).sort()).toEqual([
+      "OPEN",
+      "REFUSED",
+    ]);
+    expect(first.created.length + second.created.length).toBe(1);
+    const opened =
+      outcomes[0]?.outcome.kind === "OPEN"
+        ? { line: first, value: outcomes[0] }
+        : { line: second, value: outcomes[1] };
+    if (opened.value === undefined)
+      throw new Error("missing concurrent outcome");
+    opened.line.broker.end({
+      actor: TRIAL,
+      voiceSessionId: opened.value.voiceSessionId,
+      reason: "ended",
+    });
+    await settle();
+  });
+
+  it("retains the durable claim across restart when provider termination is unconfirmed", async () => {
+    const store = memoryStore();
+    const line = instance(store, { closeConfirmed: false });
+    const opened = await openLine(line);
+    speak(line, "user", 2);
+    line.broker.end({
+      actor: TRIAL,
+      voiceSessionId: opened.voiceSessionId,
+      reason: "ended",
+    });
+    await settle();
+    expect(await store.usedSeconds(TRIAL)).toBe(2);
+    const restarted = instance(store);
+    expect((await openLine(restarted)).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "TRIAL_IN_USE",
+    });
+    expect(restarted.created).toEqual([]);
+  });
+
+  it("ends on observer loss without charging future silence or refunding unknown allowance", async () => {
+    const store = memoryStore();
+    const line = instance(store);
+    await openLine(line);
+    speak(line, "user", 2);
+    line.sidebands[0]?.onLost();
+    line.tick(4 * 60 * 1000);
+    await settle();
+    expect(line.closed).toEqual([line.created[0]]);
+    expect(await store.usedSeconds(TRIAL)).toBe(2);
+    const restarted = instance(store);
+    expect((await openLine(restarted)).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "TRIAL_IN_USE",
+    });
+  });
+
+  it.each([280, 290])(
+    "ends continuously observed open speech before stop when %s seconds were already used",
+    async (used) => {
+      vi.useFakeTimers();
+      const store = memoryStore();
+      await store.record({
+        actor: TRIAL,
+        providerSessionId: "prior",
+        voiceSessionId: "prior",
+        seconds: used,
+      });
+      const line = instance(store);
+      await openLine(line);
+      line.emit("input_audio_buffer.speech_started");
+      for (let seconds = 0; seconds < 25; seconds += 1) {
+        line.tick(1000);
+        await vi.advanceTimersByTimeAsync(1000);
+      }
+      expect(line.closed).toEqual([line.created[0]]);
+      expect(await store.usedSeconds(TRIAL)).toBe(300);
+    },
+  );
+
+  it("releases a provisional claim only after an explicit rejected creation", async () => {
+    const store = memoryStore();
+    const line = instance(store, {
+      createError: new LiveProviderError("quota", 429),
+    });
+    expect((await openLine(line)).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "PROVIDER_QUOTA",
+    });
+    expect(store.claims.size).toBe(0);
+    const resumed = instance(store);
+    const opened = await openLine(resumed);
+    expect(opened.outcome.kind).toBe("OPEN");
+    resumed.broker.end({
+      actor: TRIAL,
+      voiceSessionId: opened.voiceSessionId,
+      reason: "ended",
+    });
+    await settle();
+  });
+
+  it.each([
+    new Error("network response lost"),
+    new LiveProviderError("server error", 503),
+  ])(
+    "retains a provisional claim on ambiguous provider creation: %s",
+    async (error) => {
+      const store = memoryStore();
+      const line = instance(store, { createError: error });
+      expect((await openLine(line)).outcome).toEqual({
+        kind: "REFUSED",
+        reason: "PROVIDER_UNAVAILABLE",
+      });
+      expect(store.claims.size).toBe(1);
+      const restarted = instance(store);
+      expect((await openLine(restarted)).outcome).toEqual({
+        kind: "REFUSED",
+        reason: "TRIAL_IN_USE",
+      });
+      expect(restarted.created).toEqual([]);
+    },
+  );
+
+  it("audit: concurrent instances cannot each consume the remaining allowance", async () => {
+    const store = memoryStore();
+    await store.record({
+      actor: TRIAL,
+      providerSessionId: "prior",
+      voiceSessionId: "prior",
+      seconds: 290,
+    });
+    const first = instance(store);
+    const second = instance(store);
+    const a = await openLine(first);
+    const b = await openLine(second);
+    speak(first, "user", 8);
+    speak(second, "user", 8);
+    first.broker.end({
+      actor: TRIAL,
+      voiceSessionId: a.voiceSessionId,
+      reason: "audit_end",
+    });
+    second.broker.end({
+      actor: TRIAL,
+      voiceSessionId: b.voiceSessionId,
+      reason: "audit_end",
+    });
+    await settle();
+    expect(await store.usedSeconds(TRIAL)).toBeLessThanOrEqual(300);
+  });
+
   it("audit: an immediate reconnect cannot reuse unflushed speech", async () => {
     const store = memoryStore();
     const line = instance(store);
@@ -485,7 +732,8 @@ describe("the trial line (broker)", () => {
     // other's use once it is saved.
     const device = instance(store, { clock: restarted.clock });
     const c = await openLine(device);
-    expect(c.outcome.kind).toBe("OPEN");
+    expect(c.outcome).toEqual({ kind: "REFUSED", reason: "TRIAL_IN_USE" });
+    expect(device.created).toEqual([]);
     converse(restarted, 40);
     restarted.broker.end({
       actor: TRIAL,
@@ -494,6 +742,11 @@ describe("the trial line (broker)", () => {
     });
     await settle();
     expect(await store.usedSeconds(TRIAL)).toBe(180);
+    const resumed = await openLine(device);
+    expect(
+      resumed.outcome.kind === "OPEN" &&
+        resumed.outcome.result.trial?.remainingSeconds,
+    ).toBe(120);
     // The device's line learns of it on its next save and is ended once
     // its own speech takes the rest (120 s).
     device.tick(TRIAL_TICK_MS * TRIAL_PERSIST_TICKS);
@@ -653,17 +906,15 @@ describe("the trial line (broker)", () => {
     expect(high?.trial?.remainingSeconds).toBe(240);
   });
 
-  it("counts wall-clock when the sideband cannot be heard: unmeasured is not unspoken", async () => {
+  it("refuses before paid creation when server speech cannot be observed", async () => {
     const store = memoryStore();
     const line = instance(store, { observe: false });
-    const { voiceSessionId } = await openLine(line);
-    line.tick(40_000);
-    const report = await line.broker.usage({
-      actor: TRIAL,
-      voiceSessionId,
-      report: { seconds: 40 },
+    expect((await openLine(line)).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "LEDGER_UNAVAILABLE",
     });
-    expect(report?.trial?.remainingSeconds).toBe(260);
+    expect(line.created).toEqual([]);
+    expect(store.claims.size).toBe(0);
   });
 
   it("leaves everyone else as they were: no trial, no meter, no row", async () => {
@@ -689,7 +940,7 @@ describe("the trial line (broker)", () => {
     expect(store.rows.size).toBe(0);
   });
 
-  it("keeps one tenant's use out of another tenant's read", async () => {
+  it("keeps a person's budget across tenant contexts without exposing another person's use", async () => {
     const store = memoryStore();
     await store.record({
       actor: TRIAL,
@@ -699,12 +950,13 @@ describe("the trial line (broker)", () => {
     });
     expect(
       await store.usedSeconds(actorOf(TENSORGATE_DANIEL, OTHER_TENANT)),
-    ).toBe(0);
+    ).toBe(300);
+    expect(await store.usedSeconds(actorOf(NOBODY))).toBe(0);
   });
 });
 
 describe("the live routes for the trial", () => {
-  function server(store: LiveTrialUsageStore) {
+  function server(store: ReturnType<typeof memoryStore>) {
     const line = instance(store);
     const app = Fastify();
     const withContext: onRequestHookHandler = (request, _reply, done) => {
@@ -734,6 +986,22 @@ describe("the live routes for the trial", () => {
     return { app, ask };
   }
 
+  it("does not cache a trial's yes while a durable account claim is held", async () => {
+    const { app, ask } = server(memoryStore());
+    const available = "/v1/q/voice/live/available";
+    expect((await ask("GET", available, PARTECH_INVESTOR)).json()).toEqual({
+      available: true,
+    });
+    expect(
+      (await ask("POST", "/v1/q/voice/live/sessions", PARTECH_INVESTOR))
+        .statusCode,
+    ).toBe(201);
+    expect((await ask("GET", available, PARTECH_INVESTOR)).json()).toEqual({
+      available: false,
+    });
+    await app.close();
+  });
+
   it("opens for the trial and the allow-list, refuses a spent trial with 429 and its code, 404 for anyone else", async () => {
     const store = memoryStore();
     const { app, ask } = server(store);
@@ -760,7 +1028,12 @@ describe("the live routes for the trial", () => {
     expect(spent.json<{ code?: string }>().code).toBe(Q_VOICE_LIVE_TRIAL_SPENT);
 
     const available = "/v1/q/voice/live/available";
+    // This account already has an admitted provider line above: it cannot
+    // start a fresh unrestricted call while its durable claim is held.
     expect((await ask("GET", available, PARTECH_INVESTOR)).json()).toEqual({
+      available: false,
+    });
+    expect((await ask("GET", available, ALLOW_LISTED)).json()).toEqual({
       available: true,
     });
     expect((await ask("GET", available, TENSORGATE_DANIEL)).json()).toEqual({

@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createSpeechMeter } from "../src/voice/live/trial.js";
 
 describe("speech boundary audit", () => {
+  it("counts an authoritative open interval continuously while observation is healthy", () => {
+    const meter = createSpeechMeter({ authoritativeOpen: true });
+    meter.signal({ kind: "start", side: "user" }, 1000);
+    expect(meter.measuredMs(31000)).toBe(30000);
+  });
   it("audit: authoritative start and stop count speech without transcription deltas", () => {
     const meter = createSpeechMeter();
     meter.signal({ kind: "start", side: "user" }, 1000);
