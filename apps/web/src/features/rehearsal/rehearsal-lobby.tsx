@@ -341,7 +341,7 @@ export function RehearsalLobby({
           </p>
         </div>
 
-        <fieldset className="flex flex-col gap-2">
+        <fieldset hidden={meetBy === "VIDEO"} className="flex flex-col gap-2">
           <legend className="cq-label mb-1 text-(--cq-text-primary)">
             Their voice
           </legend>
