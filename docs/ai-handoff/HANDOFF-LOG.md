@@ -466,3 +466,10 @@ The tracked runner creates internal Q turns for an existing authorized account o
 - Live failures found and fixed this session: plan schema `cannot` line >200 refused whole plans (now 600 end to end); planner failures said "reword" (now FAILED, honest); "yes, plan it anyway" re-planned the word "yes" (now the original goal with proceed); voice trial config first set with auth ids (corrected to profile ids before the code deployed).
 - Open: diligence question length (bounded rewrite, branch claude/diligence-question-length); list_q_work v2 recall miss (branch claude/work-results-fix). Founder-contact card stays PENDING.
 - Measured: prompt-cache share and turn latency after A2/A3 still need real-traffic volume; recheck ai_ops.model_usage cached_input_tokens by hour.
+
+## 2026-10-13 04:05 UTC — autonomous product takeover, fresh release reconciliation
+
+- Fresh production1165b92e allfourSUCCESS, integration6f47fd5d. Codex ownsrelease; currentdirective preserved withprivateemailsredacted. User prioritizesexistingTavus39 and explicitlyapprovedcontrolledpaidminutes aftertestmode; singleentitledaccount, noquotaevadingpool.
+- Parallelownedworktrees recoverexistingvoice WIP71518a20 and improveTavus singleaccount/restartlifecycle; canonicalmemory/performance livebefore/after lane active. Existing39/40 fulltestgates pending atinitialcheck. No newmigration orTavus deployment/liveclaim. PR34 supersededrepair mustnotmergewholesale.
+
+- PR40 exactCI38343394696 fullrequiredPASS, normallymerged1f05df4c. PR39 originalexactCI38343566801 fullrequiredPASS but discoveredsourceblockers requirecorrectedexactgate. ReadonlyTavus oneaccountcatalog200,150stockfaces/configuredfaceexists,no minutesallocated. Restoredstrongacceptancerunnerfromprotected1864da7c; existingownedjob reverifiedPASSon1165b92e (five sources,READYv2,materialrevision,PDF,fivependingquestions).

@@ -15,6 +15,9 @@ import { join } from "node:path";
 import { Q_API, signIn } from "./fictional-session.mjs";
 
 const APPROVE = process.argv.includes("--approve");
+const VERIFY = process.argv.includes("--verify");
+if (VERIFY && !process.env.CQ_WORKFORCE_RUN)
+  throw new Error("Verification requires the existing owned CQ_WORKFORCE_RUN");
 const GOAL =
   process.env.CQ_WORKFORCE_GOAL ??
   "Research Ledgerfold and how it fits Savanna Seed Partners, assess the opportunity, identify the important risks and missing information, prepare an investment memo, get a second specialist to critique it, revise the memo, and prepare appropriate founder diligence questions. Show me the results and anything requiring my approval.";
@@ -53,6 +56,26 @@ function preserve(name, value) {
   writeFileSync(join(evidenceDir, name + ".json"), JSON.stringify(value), {
     mode: 0o600,
   });
+}
+
+// Read-only continuation: prove an existing owned job without another paid turn
+// or another approval attempt. The canonical queue read still binds its owner.
+if (VERIFY) {
+  const ownedRunId = process.env.CQ_WORKFORCE_RUN;
+  const jobs = (await api("GET", "/v1/q/workforce/jobs")).json;
+  const found = (jobs?.items ?? []).find(
+    (one) => one.trace?.runId === ownedRunId,
+  );
+  if (!found) throw new Error("No job for the existing owned run");
+  const ownedDetail = (await api("GET", `/v1/q/workforce/jobs/${found.id}`))
+    .json;
+  preserve("job", ownedDetail);
+  await verifyDeliverables(ownedRunId, ownedDetail);
+  console.log(
+    "PASS verified existing owned workforce deliverables",
+    evidenceDir,
+  );
+  process.exit(0);
 }
 
 // CQ_WORKFORCE_RUN: continue a run this runner already started (its plan
@@ -205,7 +228,7 @@ const stepsDone =
 let deliverablesVerified = false;
 if (stepsDone) {
   try {
-    await verifyDeliverables();
+    await verifyDeliverables(runId, detail);
     deliverablesVerified = true;
   } catch (error) {
     preserve("deliverable-failure", { message: error.message });
@@ -221,7 +244,7 @@ console.log(
 );
 process.exit(passed ? 0 : 1);
 
-async function verifyDeliverables() {
+async function verifyDeliverables(runId, detail) {
   const tokenFile = process.env.CQ_SUPABASE_MANAGEMENT_TOKEN_FILE;
   if (!tokenFile)
     throw new Error("Missing read-only queue evidence credential");
@@ -315,16 +338,50 @@ async function verifyDeliverables() {
     throw new Error("No real readable READY memo version");
   if (
     reviewed.review.material &&
-    (reviewed.review.revisedToVersion < 2 ||
-      artifact.current.version !== reviewed.review.revisedToVersion)
+    (!Number.isInteger(reviewed.review.revisedToVersion) ||
+      reviewed.review.revisedToVersion < 2 ||
+      artifact.current.version < reviewed.review.revisedToVersion ||
+      !reviewed.review.issues?.some(
+        (issue) => typeof issue.problem === "string" && issue.problem.trim(),
+      ))
   )
     throw new Error("Material critique has no real revised version");
   const original = (
     await api("GET", `/v1/q/artifacts/${prepared.artifactId}/versions/1`)
   ).json;
   preserve("original-version", original);
-  if (original?.version !== 1 || original.artifactId !== prepared.artifactId)
+  if (
+    original?.artifact?.artifactId !== prepared.artifactId ||
+    original.current?.artifactId !== prepared.artifactId ||
+    original.current?.version !== 1 ||
+    !original.current.content.sections.some((section) => section.body.trim())
+  )
     throw new Error("Original version is not readable");
+  if (reviewed.review.material) {
+    // A later conversational edit may advance the current version. Read the
+    // critic's actual immutable revision rather than assuming it stays latest.
+    const revised =
+      artifact.current.version === reviewed.review.revisedToVersion
+        ? artifact
+        : (
+            await api(
+              "GET",
+              `/v1/q/artifacts/${prepared.artifactId}/versions/${reviewed.review.revisedToVersion}`,
+            )
+          ).json;
+    preserve("reviewed-version", revised);
+    if (
+      revised?.current?.artifactId !== prepared.artifactId ||
+      revised.current.version !== reviewed.review.revisedToVersion ||
+      !revised.current.content.sections.some(
+        (section) =>
+          original.current.content.sections.find(
+            (before) => before.heading === section.heading,
+          )?.body !== section.body,
+      )
+    )
+      throw new Error("Material critique has no substantive stored revision");
+  }
   const pdf = await fetch(
     `${Q_API}/v1/q/artifacts/${prepared.artifactId}/export/pdf`,
     { headers: { authorization: `Bearer ${session.accessToken}` } },
@@ -334,7 +391,17 @@ async function verifyDeliverables() {
     throw new Error("Memo PDF did not render");
   writeFileSync(join(evidenceDir, "memo.pdf"), bytes, { mode: 0o600 });
   const questions = queue.results[diligence.key].outputs;
-  if (!questions?.questions?.length || !uuid.test(questions.qActionId))
+  if (
+    !Array.isArray(questions?.questions) ||
+    questions.questions.length !== 5 ||
+    questions.questions.some(
+      (question) =>
+        typeof question !== "string" ||
+        question.trim().length === 0 ||
+        question.length > 180,
+    ) ||
+    !uuid.test(questions.qActionId)
+  )
     throw new Error("No founder-question approval card was filed");
   const waiting = (await api("GET", "/v1/q/approvals")).json;
   const cards = await Promise.all(
