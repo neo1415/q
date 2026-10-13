@@ -357,6 +357,9 @@ export {
 } from "./admin.js";
 // REHEARSE block
 export {
+  endRehearsalVideo,
+  getRehearsalInterviewers,
+  startRehearsalVideo,
   finishRehearsal,
   getRehearsal,
   getRehearsalMeeting,

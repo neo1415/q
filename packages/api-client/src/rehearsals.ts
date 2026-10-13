@@ -1,5 +1,13 @@
 import {
+  EndRehearsalVideoResponseSchema,
   Q_REHEARSAL_PARTNERS_PATH,
+  Q_REHEARSAL_VIDEO_INTERVIEWERS_PATH,
+  qRehearsalVideoEndPath,
+  qRehearsalVideoPath,
+  RehearsalInterviewersDtoSchema,
+  StartRehearsalVideoResponseSchema,
+  type EndRehearsalVideoRequest,
+  type StartRehearsalVideoRequest,
   Q_REHEARSALS_PATH,
   qInvestorRehearsalsPath,
   qRehearsalFinishPath,
@@ -128,5 +136,49 @@ export function finishRehearsal(session: ApiSession, rehearsalId: string) {
     "POST",
     qRehearsalFinishPath(rehearsalId),
     QRehearsalDtoSchema,
+  );
+}
+
+/** ADR 0066: the stock AI interviewers, and whether video is on. */
+export function getRehearsalInterviewers(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    Q_REHEARSAL_VIDEO_INTERVIEWERS_PATH,
+    RehearsalInterviewersDtoSchema,
+  );
+}
+
+/**
+ * Meet the rehearsal's counterpart by video; or, when video is not
+ * available, the answer to carry on in the voice room. Idempotent: a
+ * retry returns the same session.
+ */
+export function startRehearsalVideo(
+  session: ApiSession,
+  rehearsalId: string,
+  body: StartRehearsalVideoRequest,
+) {
+  return call(
+    session,
+    "POST",
+    qRehearsalVideoPath(rehearsalId),
+    StartRehearsalVideoResponseSchema,
+    { body },
+  );
+}
+
+/** Ends the video call: the review follows, or the voice room carries on. */
+export function endRehearsalVideo(
+  session: ApiSession,
+  rehearsalId: string,
+  body: EndRehearsalVideoRequest,
+) {
+  return call(
+    session,
+    "POST",
+    qRehearsalVideoEndPath(rehearsalId),
+    EndRehearsalVideoResponseSchema,
+    { body },
   );
 }
