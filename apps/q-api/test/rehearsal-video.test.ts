@@ -224,6 +224,28 @@ function memoryStore(): RehearsalVideoStore & {
       const row = rows.get(sessionId);
       return Promise.resolve(row?.tokenHash === tokenHash ? row : null);
     },
+    markProviderRequest: (row, input) => {
+      const held = rows.get(row.id);
+      if (held === undefined || held.status !== "STARTING")
+        return Promise.resolve(null);
+      const next = {
+        ...held,
+        keyIndex: input.keyIndex,
+        palId: input.palId,
+        providerRequestStartedAt: input.at,
+        providerRequestResolvedAt: null,
+      };
+      rows.set(row.id, next);
+      return Promise.resolve(next);
+    },
+    resolveProviderRequest: (row, at) => {
+      const held = rows.get(row.id);
+      if (held === undefined || held.providerRequestStartedAt == null)
+        return Promise.resolve(null);
+      const next = { ...held, providerRequestResolvedAt: at };
+      rows.set(row.id, next);
+      return Promise.resolve(next);
+    },
     markLive: (row, input) => {
       const held = rows.get(row.id);
       if (held?.status !== "STARTING") return Promise.resolve(null);
@@ -254,6 +276,8 @@ function memoryStore(): RehearsalVideoStore & {
           (row) =>
             (row.status === "LIVE" ||
               row.status === "STARTING" ||
+              (row.providerRequestStartedAt != null &&
+                row.providerRequestResolvedAt == null) ||
               (row.status === "ENDED" &&
                 row.endedReason !== "CONTINUED_BY_VOICE")) &&
             row.endsAt <= now,
@@ -297,6 +321,7 @@ function fakeTavus(
         meetingToken: "room-token",
       });
     },
+    findConversationsForPal: () => Promise.resolve([]),
     endConversation: (id) => {
       calls.ended.push({ key, id });
       return Promise.resolve();
@@ -1392,4 +1417,72 @@ it("does not return provider speech after Q work runs past the original deadline
     ),
   ).toEqual({ kind: "SILENT" });
   expect(harness.tavus.calls.ended).toHaveLength(1);
+});
+
+describe("durable provider allocation checkpoint", () => {
+  it("records account and PAL before any paid conversation request", async () => {
+    const harness = setup();
+    const client = harness.tavus.pool.clientAt(0);
+    if (client === null) throw new Error("missing client");
+    const create = client.createConversation;
+    vi.spyOn(client, "createConversation").mockImplementation((input) => {
+      const row = [...harness.store.rows.values()][0];
+      expect(row?.keyIndex).toBe(0);
+      expect(row?.palId).toBe("pal0");
+      expect(row?.providerRequestStartedAt).toEqual(T0);
+      return create(input);
+    });
+    await startVideo(harness);
+  });
+  it("allocates no paid room when the durable checkpoint fails", async () => {
+    const harness = setup();
+    vi.spyOn(harness.store, "markProviderRequest").mockRejectedValueOnce(
+      new Error("database unavailable"),
+    );
+    const result = await harness.service.start(
+      FOUNDER,
+      REHEARSAL_ID,
+      "q-selected",
+    );
+    expect(result.kind === "OK" && result.response.mode).toBe("VOICE_FALLBACK");
+    expect(harness.tavus.calls.conversations).toHaveLength(0);
+    expect(harness.tavus.calls.deleted).toEqual([{ key: 0, id: "pal0" }]);
+  });
+  it("retains an uncertain reservation across failed allocation and recovers it without creating another room", async () => {
+    const harness = setup({
+      failConversation: () => new TavusError("create conversation", 503),
+    });
+    const result = await harness.service.start(
+      FOUNDER,
+      REHEARSAL_ID,
+      "q-selected",
+    );
+    expect(result.kind === "OK" && result.response.mode).toBe("VOICE_FALLBACK");
+    const failed = [...harness.store.rows.values()][0];
+    expect(failed?.status).toBe("FAILED");
+    expect(failed?.providerRequestStartedAt).toEqual(T0);
+    expect(failed?.providerRequestResolvedAt).toBeNull();
+    expect(await harness.service.get(FOUNDER, REHEARSAL_ID)).toBeNull();
+    const client = harness.tavus.pool.clientAt(0);
+    if (client === null) throw new Error("missing client");
+    vi.spyOn(client, "findConversationsForPal").mockResolvedValue([
+      { conversationId: "orphan", conversationUrl: null, status: "active" },
+    ]);
+    vi.spyOn(client, "getConversation").mockResolvedValue({
+      conversationId: "orphan",
+      conversationUrl: null,
+      status: "ended",
+    });
+    await harness.advance(181_000);
+    await harness.service.sweep();
+    expect(
+      [...harness.store.rows.values()][0]?.providerRequestResolvedAt,
+    ).not.toBeNull();
+    expect(harness.tavus.calls.ended).toContainEqual({ key: 0, id: "orphan" });
+    expect(harness.tavus.calls.conversations).toHaveLength(1);
+    expect(harness.rehearsals.finished).toEqual([]);
+    expect(harness.rehearsals.rows.get(REHEARSAL_ID)?.dto.status).toBe(
+      "ACTIVE",
+    );
+  });
 });
