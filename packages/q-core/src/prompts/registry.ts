@@ -49,6 +49,7 @@ import { COMPANY_ANALYST_V21 } from "./tasks/company-analyst.v21.js";
 import { COMPANY_ANALYST_V22 } from "./tasks/company-analyst.v22.js";
 import { COMPANY_ANALYST_V23 } from "./tasks/company-analyst.v23.js";
 import { COMPANY_ANALYST_V24 } from "./tasks/company-analyst.v24.js";
+import { COMPANY_ANALYST_V25 } from "./tasks/company-analyst.v25.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -423,7 +424,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     COMPANY_ANALYST_V21,
     { ...COMPANY_ANALYST_V22, status: "DEPRECATED" },
     { ...COMPANY_ANALYST_V23, status: "DEPRECATED" },
-    COMPANY_ANALYST_V24,
+    { ...COMPANY_ANALYST_V24, status: "DEPRECATED" },
+    COMPANY_ANALYST_V25,
     ARTIFACT_REVISION_V1,
     ARTIFACT_REVISION_V2,
     ARTIFACT_REVISION_V3,

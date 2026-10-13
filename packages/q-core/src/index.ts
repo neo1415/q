@@ -1554,3 +1554,7 @@ export {
 } from "./prompts/tasks/company-analyst.v23.js";
 
 export { COMPANY_ANALYST_V24 } from "./prompts/tasks/company-analyst.v24.js";
+export {
+  COMPANY_ANALYST_V25,
+  V25_RESULT_GUIDANCE,
+} from "./prompts/tasks/company-analyst.v25.js";
