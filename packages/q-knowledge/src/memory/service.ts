@@ -19,6 +19,11 @@ import {
   type MemoryWriteResult,
 } from "./contracts.js";
 import type { MemoryRepository } from "./postgres-memory-repository.js";
+import {
+  connectedRecallWithin,
+  planGraphRecall,
+  type RecallGraphPort,
+} from "./graph.js";
 import { asksAboutRehearsal, recallTermsFrom } from "./recall-terms.js";
 
 /**
@@ -89,6 +94,13 @@ export type MemoryServiceDependencies = {
   readonly conversations?: MemoryConversationDigestPort | undefined;
   /** Optional: without it recall has no rehearsal section. */
   readonly rehearsals?: MemoryRehearsalPort | undefined;
+  /**
+   * Optional: connected recall over the person's own records (graph.ts).
+   * Without it, or when the turn does not ask across them, none is read.
+   */
+  readonly graph?: RecallGraphPort | undefined;
+  /** The connected read's time budget; late is absent, never awaited. */
+  readonly graphBudgetMs?: number | undefined;
   readonly logger?: Logger | undefined;
   /** The clock small talk's lapse is measured on; injected for tests. */
   readonly now?: (() => number) | undefined;
@@ -286,6 +298,32 @@ export function createMemoryService(
               }
             })()
           : Promise.resolve();
+      // Connected recall: only for the person themselves, only when code
+      // reads the turn as asking across linked things, under its budget,
+      // and failing on its own. The person's own words come from the live
+      // items above (superseded and forgotten ones are never live).
+      const graphPort = dependencies.graph;
+      const graphPlan =
+        graphPort !== undefined && query.actor.actorType === "HUMAN"
+          ? planGraphRecall(query.utterance ?? "", [...companyIds])
+          : null;
+      const graphRead =
+        graphPort !== undefined && graphPlan !== null
+          ? connectedRecallWithin(
+              {
+                port: graphPort,
+                actor: query.actor,
+                plan: graphPlan,
+                seedCompanyIds: [...companyIds],
+                memories: items.filter((item) => !lapsed(item)),
+                now: now(),
+              },
+              dependencies.graphBudgetMs,
+            ).catch((error: unknown) => {
+              logger?.warn({ err: error }, "connected recall was not read");
+              return undefined;
+            })
+          : Promise.resolve(undefined);
       const conversations = dependencies.conversations;
       if (conversations !== undefined) {
         const recentRead = (async () => {
@@ -353,6 +391,7 @@ export function createMemoryService(
         );
       }
       await rehearsalRead;
+      const connected = await graphRead;
       // Bookkeeping, detached: a recall never waits on it.
       void repository
         .markUsed(
@@ -372,6 +411,7 @@ export function createMemoryService(
         ...(held.rehearsals === undefined
           ? {}
           : { rehearsals: held.rehearsals }),
+        ...(connected === undefined ? {} : { connected }),
       };
     },
 

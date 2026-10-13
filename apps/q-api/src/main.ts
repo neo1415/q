@@ -670,6 +670,7 @@ import {
   createMemoryLearner,
   withLearning,
 } from "./composition/memory-learner.js";
+import { createRecallGraphPort } from "./composition/recall-graph.js";
 import { createRehearsalRecallPort } from "./composition/rehearsal-recall.js";
 import { ownRecordTerms } from "./voice/vocabulary.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
@@ -3616,6 +3617,18 @@ const memoryService = createMemoryService({
   repository: createPostgresMemoryRepository(),
   conversations: createConversationDigestPort(repositories, database.sql),
   rehearsals: createRehearsalRecallPort(database.sql),
+  // Connected recall: read only when a turn asks across the person's
+  // conversations, jobs, documents and mandate; each hop through the port
+  // that already authorises it as the person; nothing stored or built.
+  graph: createRecallGraphPort({
+    sql: database.sql,
+    repositories,
+    store: workforceStore,
+    work: agentWorkQueue,
+    // Composed further down; only read when a turn needs it.
+    artifacts: () => qArtifacts.service,
+    knowledge: createPostgresCompanyKnowledge({ sql: database.sql }),
+  }),
   logger,
 });
 const memoryLearner = createMemoryLearner({
