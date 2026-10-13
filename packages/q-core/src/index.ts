@@ -1543,3 +1543,6 @@ export {
   type DailyFollowUpKind,
   type DailyNewsStory,
 } from "./speech/daily-news.js";
+
+export { TURN_READER_V50, V50_FIT } from "./prompts/tasks/turn-reader.v50.js";
+export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";

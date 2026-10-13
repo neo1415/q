@@ -1422,3 +1422,100 @@ describe("a natural answer after a proposal (G-D3)", () => {
     },
   );
 });
+
+describe("compound fit questions retain the synthesis path", () => {
+  it.each([
+    ["Which companies fit my mandate?", "FIT", false],
+    [
+      "Which companies have we discussed recently that fit my mandate, what did your agents find, and which unresolved risks remain?",
+      "THEIR_OWN_RECORDS",
+      true,
+    ],
+    [
+      "Which companies fit my mandate and what did Q learn about them?",
+      "THEIR_OWN_RECORDS",
+      true,
+    ],
+    [
+      "Which companies fit my mandate and what are their weaknesses?",
+      "THEIR_OWN_RECORDS",
+      true,
+    ],
+  ] as const)(
+    "reuses authorized computed fit reads for %s (%s), synthesis=%s",
+    async (text, questionKind, compound) => {
+      const companyId = randomUUID();
+      const investorOrganisationId = randomUUID();
+      const topOffer: QOfferedTool = {
+        ...GET_COMPANY,
+        toolName: "fit.top_candidates",
+        definition: { ...GET_COMPANY.definition, name: "fit_top_candidates" },
+      };
+      const profileOffer: QOfferedTool = {
+        ...topOffer,
+        toolName: "fit.profile",
+        definition: { ...topOffer.definition, name: "fit_profile" },
+      };
+      const fit = fitFixture(
+        companyId,
+        "Selected Company",
+        { STAGE: "STRONG" },
+        "STRONG_FIT",
+      );
+      const data = fit.result.data as { name: string; profile: unknown };
+      const tools = toolPort([topOffer, profileOffer], (proposal) => ({
+        ...succeeded(proposal, {
+          status: "OK",
+          comparison: {
+            entries: [{ name: data.name, line: null, profile: data.profile }],
+          },
+        }),
+        toolName: "fit.top_candidates",
+      }));
+      const answer =
+        "The reviewer revised the memo; unresolved evidence remains unknown.";
+      const { seam, request, messages, completed, alpha } = build({
+        tools,
+        script: [{ kind: "TEXT", text: JSON.stringify(analystResult(answer)) }],
+      });
+      if (messages[0]) messages[0] = { ...messages[0], content: text };
+      const bound = {
+        ...request,
+        plan: PermittedContextPlanSchema.parse({
+          ...request.plan,
+          scopes: [
+            {
+              kind: "INVESTOR_MANDATE",
+              contextLabel: "investor_private",
+              sensitivity: "CONFIDENTIAL",
+              layer: "STRUCTURED_STATE",
+              factCategories: ["INVESTOR_THESIS"],
+              projection: "FULL",
+              rights: {
+                canUseForReasoning: true,
+                canDiscloseExistence: true,
+                canQuote: true,
+                canProvideLink: false,
+              },
+              filter: { tenantId: TENANT, investorOrganisationId },
+              isEvidence: true,
+              subject: {
+                kind: "INVESTOR_ORGANISATION",
+                investorOrganisationId,
+              },
+            },
+          ],
+        }),
+      };
+      // The same authorized plan is prepared before the actual reading.
+      if (!seam.warm) throw new Error("Warm seam missing");
+      seam.warm(bound);
+      await seam.answer({ ...bound, questionKind });
+      expect(
+        tools.executed.filter((p) => p.name === "fit_top_candidates"),
+      ).toHaveLength(1);
+      expect(alpha.calls).toHaveLength(compound ? 1 : 0);
+      if (compound) expect(JSON.stringify(completed)).toContain(answer);
+    },
+  );
+});

@@ -443,7 +443,9 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
     const { text, blocks, modelCalls, executed } = await replay({
       question:
         "List the companies that have been reached out to so far and their scores against the mandate, including pros and cons of investing in them.",
+      // Ranking-only meaning is certified by the existing reader.
       // What the model said live; it is never asked now.
+      reading: { questionKind: "FIT" },
       script: [answer(LIVE_Q2)],
     });
     expect(modelCalls).toBe(0);
@@ -474,6 +476,7 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
   it("Q3 'Which specific companies in Kenya closely match the criteria?' -- the Kenya set only, cards, no disclaimers", async () => {
     const { text, blocks, modelCalls } = await replay({
       question: "Which specific companies in Kenya closely match the criteria?",
+      reading: { questionKind: "FIT" },
       script: [answer(LIVE_Q3)],
     });
     expect(modelCalls).toBe(0);
@@ -491,6 +494,7 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
     const q2 = await replay({
       question:
         "List the companies that have been reached out to so far and their scores against the mandate, including pros and cons of investing in them.",
+      reading: { questionKind: "FIT" },
       script: [answer(LIVE_Q2)],
       fit: false,
     });
@@ -500,6 +504,7 @@ describe("natural conversation: Zino's questions, live replay fixtures (2026-10-
 
     const q3 = await replay({
       question: "Which specific companies in Kenya closely match the criteria?",
+      reading: { questionKind: "FIT" },
       script: [answer(LIVE_Q3)],
       fit: false,
     });
