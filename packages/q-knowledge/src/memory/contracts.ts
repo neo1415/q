@@ -3,6 +3,8 @@ import { z } from "zod";
 import { UtcTimestampSchema } from "@capital-q/contracts";
 import { TenantIdSchema } from "@capital-q/security";
 
+import type { ConnectedRecall } from "./graph.js";
+
 /**
  * Q memory (doc 13 §40; doc 14 §55-§61, §130-§131; ADR 0012).
  *
@@ -220,6 +222,13 @@ export type MemoryBundle = {
    * Q's coaching feedback on practice; never evidence about a company.
    */
   readonly rehearsals?: readonly MemoryRehearsalDigest[] | undefined;
+  /**
+   * Connected recall (graph.ts): the person's conversations, jobs, their
+   * organisation's documents and their mandate slate, joined through the
+   * companies they share; read only when the turn asks across them.
+   * Absent: not asked, or not read within its budget (unknown).
+   */
+  readonly connected?: ConnectedRecall | undefined;
 };
 
 /**
