@@ -1,5 +1,17 @@
 # Performance baseline and measured first improvements
 
+## October 13 15:00 UTC — Claude takeover baseline before PR #59 (production cfc694b3)
+
+Single authenticated browser journey, fictional investor; private receipt in the newest `/tmp/cq-investor-demo-*`. First 20 rendered characters / settled:
+
+| Turn             | First text |   Settled | Model calls (ledger)                                                                                                                               | Result                                              |
+| ---------------- | ---------: | --------: | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Top three        |   3,500 ms |  3,969 ms | reader 1.2 s; code fit sweep, no answer model                                                                                                      | 3 cards                                             |
+| Selected profile |   5,984 ms | 24,974 ms | reader 1.1 s; one NORMAL_DIALOGUE 21.5 s, 38,227 in / 0 cached / 2,104 out                                                                         | 5 findings                                          |
+| Risks follow-up  |  15,095 ms | 29,825 ms | reader 2.5 s TIMEOUT + 3.3 s root-key refusal + 1.7 s; 2 tool rounds 2.3 + 2.9 s (cached 26k/39k); answer 15.8 s, 17,542 in / 0 cached / 1,628 out | **0 findings (points in companyFindings) → FAILED** |
+
+Single observations, not p50/p95. The profile turn's 21 s is generation-bound (about 100 output tokens/s). The risks turn loses about 6 s before the answer starts.
+
 ## October13 v25 full authenticated investor browser acceptance
 
 Production592b32ff, private receipt `/tmp/cq-investor-demo-1Tc4Lv`, full journey PASS. Individual observations: ranking first20 rendered characters4342ms/total5118ms; selected profile5571/26112 with seven native findings; risks4586/18920 with six native findings; comparison8244/34002 with exact two canonical companies. Native findings and company binding are verified from the current rendered answer. These are single observations of a text threshold, not semantic first useful content, first audio, p50/p95 or causal improvement. V24 zero-findings failure remains a failed product gate; this release corrects it without relaxing validation.
