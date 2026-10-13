@@ -29,6 +29,7 @@ import type {
   VoiceSpeaker,
 } from "../src/voice/provider.js";
 import type { InterviewAgent } from "../src/voice/interview-agent.js";
+import type { LiveBroker } from "../src/voice/live/broker.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
 
 /**
@@ -122,6 +123,7 @@ function buildApp(options: {
   readonly provider: RealtimeVoiceProvider;
   readonly bindings: VoiceSessionBindings;
   readonly interviewAgent?: InterviewAgent | undefined;
+  readonly trialBroker?: LiveBroker | undefined;
 }): FastifyInstance {
   const security: QApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
@@ -141,6 +143,15 @@ function buildApp(options: {
       voice: {
         provider: options.provider,
         bindings: options.bindings,
+        ...(options.trialBroker === undefined
+          ? {}
+          : {
+              live: {
+                broker: options.trialBroker,
+                allowedUsers: null,
+                preview: { enabled: false, providers: () => ({}) },
+              },
+            }),
         ...(options.interviewAgent === undefined
           ? {}
           : {
@@ -155,6 +166,61 @@ function buildApp(options: {
 const AUTH = { authorization: `Bearer ${BEARER}` };
 
 describe("POST /v1/q/voice/sessions", () => {
+  it("issues only a real local binding for a trial, without any provider credential", async () => {
+    const provider = fakeProvider();
+    const bindings = createVoiceSessionBindings();
+    const trialBroker: LiveBroker = {
+      enabled: true,
+      maxSessionMs: 600000,
+      open: () => Promise.resolve({ kind: "REFUSED", reason: "OFF" }),
+      delegate: () => Promise.resolve(null),
+      cancel: () => Promise.resolve(null),
+      usage: () => Promise.resolve(null),
+      isTrialUser: (id) => id === CONTEXT.userId,
+      trialFor: () =>
+        Promise.resolve({ allowanceSeconds: 300, remainingSeconds: 300 }),
+      end: () => false,
+      transcript: () => Promise.resolve(null),
+      size: () => 0,
+    };
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      provider,
+      bindings,
+      trialBroker,
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/q/voice/sessions",
+      headers: AUTH,
+      payload: { voice: "FEMALE" },
+    });
+    expect(response.statusCode).toBe(201);
+    const body = response.json<{
+      liveOnly?: boolean;
+      voiceSessionId: string;
+      token: string;
+      providerConversationId: string;
+      sessionToken: string;
+      duplex?: unknown;
+      deepgram?: unknown;
+    }>();
+    expect(body).toMatchObject({
+      liveOnly: true,
+      token: "",
+      providerConversationId: "",
+    });
+    expect(body.duplex).toBeUndefined();
+    expect(body.deepgram).toBeUndefined();
+    expect(provider.issued).toHaveLength(0);
+    expect(bindings.byVoiceSessionId(body.voiceSessionId)?.actor).toEqual(
+      CONTEXT,
+    );
+    expect(body.sessionToken.length).toBeGreaterThan(0);
+    await app.close();
+  });
+
   it("refuses an unauthenticated caller and issues nothing", async () => {
     const provider = fakeProvider();
     const app = buildApp({

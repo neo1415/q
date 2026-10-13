@@ -113,7 +113,7 @@ export type LiveVoiceProvider = {
           readonly onEvent: (event: unknown) => void;
           readonly onLost: () => void;
         },
-      ) => { readonly stop: () => void })
+      ) => { readonly stop: () => void; readonly ready?: Promise<boolean> })
     | undefined;
 };
 
@@ -153,6 +153,7 @@ const nodeSideband: LiveSidebandFactory = (url, headers) => {
 /** Provider session ids are opaque; bounded and printable (path-safe). */
 const SESSION_ID = /^[A-Za-z0-9_-]{1,200}$/u;
 const CLOSE_CONFIRM_MS = 10_000;
+export const OBSERVER_ATTACH_TIMEOUT_MS = 5_000;
 
 /** The provider's answer, validated: external data starts as unknown. */
 const CreatedSchema = z.object({
@@ -294,14 +295,25 @@ export function createGptLiveProvider(options: {
     observeSession: (sessionId, handlers) => {
       let stopped = false;
       let lost = false;
+      let settleReady: (attached: boolean) => void = () => undefined;
+      const ready = new Promise<boolean>((resolve) => {
+        settleReady = resolve;
+      });
+      let attachTimer: ReturnType<typeof setTimeout> | null = null;
+      const finishReady = (attached: boolean) => {
+        if (attachTimer !== null) clearTimeout(attachTimer);
+        attachTimer = null;
+        settleReady(attached);
+      };
       const loseOnce = () => {
         if (stopped || lost) return;
         lost = true;
+        finishReady(false);
         handlers.onLost();
       };
       if (!SESSION_ID.test(sessionId)) {
         queueMicrotask(loseOnce);
-        return { stop: () => undefined };
+        return { ready, stop: () => finishReady(false) };
       }
       let socket: LiveSidebandSocket;
       try {
@@ -310,8 +322,12 @@ export function createGptLiveProvider(options: {
         });
       } catch {
         queueMicrotask(loseOnce);
-        return { stop: () => undefined };
+        return { ready, stop: () => finishReady(false) };
       }
+      attachTimer = setTimeout(loseOnce, OBSERVER_ATTACH_TIMEOUT_MS);
+      attachTimer.unref();
+      socket.addEventListener("open", () => finishReady(true));
+      if (socket.readyState === 1) finishReady(true);
       socket.addEventListener("message", (message) => {
         if (stopped) return;
         const data: unknown = Reflect.get(Object(message), "data");
@@ -325,13 +341,13 @@ export function createGptLiveProvider(options: {
         handlers.onEvent(event);
       });
       socket.addEventListener("close", loseOnce);
-      socket.addEventListener("error", () => {
-        // The close event follows.
-      });
+      socket.addEventListener("error", loseOnce);
       return {
+        ready,
         stop: () => {
           if (stopped) return;
           stopped = true;
+          finishReady(false);
           try {
             socket.close();
           } catch {
