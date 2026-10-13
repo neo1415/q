@@ -1,5 +1,12 @@
 # Active tasks — authoritative cross-model board
 
+## 2026-10-13 10:20 UTC — protected core repair integrated; final rehearsal audio scope gated locally
+
+- Core repair PR52 sourcebcc0b743 exactCI38380132523 required quality/pgTAP SUCCESS, normal merge integration2adf2a0654d3f8be7f91d451b104c87a4d68060b. Production candidate PR53 a4eeed95 exactCI38381207915 also SUCCESS, held for the final client audio scope safeguard. Production remains592b32ff; no new deployment, Tavus allocation or human AV acceptance.
+- Final integration review found the common Live audio adapter could add Q's ordinary greeting and use general navigation shortcuts during a rehearsal. Owned rehearsal starts now explicitly disable those shortcuts and speak only Q's supplied counterpart opening. Regular Q voice starts retain their existing behavior. The Q-backed dialogue and durable trial guard remain intact.
+- Final root focused run180tests/eight files PASS; production checkout62 UI/recovery/selection tests PASS plus prior125 broker/trial/claim/bootstrap/lobby tests PASS. Final root and web types/lint PASS in both owned checkouts; q-api unchanged since its passed types. All4445 tracked app/package/dependency files compare byte-identical between candidates. Exact final-head protected CI and four-service rollout still required; do not promote the superseded a4eeed95 candidate.
+- Read-only provider preflight selectedSteve stock face present/status completed. Private sessions refreshed with exact existing identities. User's failed rehearsal belongs to admitted canonical profile; still zero video rows. No paid room reserved, no allowance reset or alternative paid provider minted. Next: gate final role scope, promote combined candidate, verify admission and explicit video URL in authenticated browser, then coordinate the one <=180second human pilot.
+
 ## 2026-10-13 09:44 UTC — human join FAILED; pilot remains unallocated
 
 - User screenshot confirms correct Savanna investor lobby URL, same canonical admitted Tensorgate profile (verified against the actual newly created rehearsal). User says Video/PartnerSteve options were absent. Screenshot is the voice rehearsal, no AI face; human audiovisual acceptance FAILED/NOT DELIVERED. Hosted video rows0: no Tavus provider allocation or successful video pilot.

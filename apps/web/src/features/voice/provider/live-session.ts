@@ -134,6 +134,7 @@ export function useLiveVoiceSession(
     async ({
       credential,
       firstMessage,
+      rehearsal = false,
     }: VoiceSessionStart): Promise<LiveStart> => {
       const mine = (startsRef.current += 1);
       setTranscript([]);
@@ -152,10 +153,12 @@ export function useLiveVoiceSession(
               : { sessionToken: credential.sessionToken }),
           },
           opening: {
-            greeting: GREETING,
+            greeting: rehearsal
+              ? "Speak only the supplied counterpart opening line exactly. Do not add a greeting or question."
+              : GREETING,
             ...(opening === undefined ? {} : { content: opening }),
           },
-          fastNavigation: true,
+          fastNavigation: !rehearsal,
           ...(options.audioOwner === undefined
             ? {}
             : { audioOwner: options.audioOwner }),
