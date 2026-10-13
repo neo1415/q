@@ -1662,3 +1662,26 @@ describe("frames through the HTTP route reach the voice turn (live P0 2026-10-02
     await server.close();
   });
 });
+
+describe("video time notice through the existing Q engine", () => {
+  it("uses the existing wrap-up cue on the same model round without altering human words", async () => {
+    const { service, seen } = setup();
+    const rehearsal = await startWith(service);
+    const before = seen.turnInputs.length;
+    const result = await service.say(
+      actor(FOUNDER),
+      rehearsal.id,
+      { text: "We have recurring revenue." },
+      undefined,
+      { closingSoon: true },
+    );
+    expect(result.kind).toBe("OK");
+    expect(seen.turnInputs.slice(before).map((input) => input.cue)).toEqual([
+      "WRAP_UP",
+    ]);
+    if (result.kind !== "OK") throw new Error(result.kind);
+    expect(
+      result.rehearsal.turns.filter((turn) => turn.from === "YOU").at(-1)?.text,
+    ).toBe("We have recurring revenue.");
+  });
+});

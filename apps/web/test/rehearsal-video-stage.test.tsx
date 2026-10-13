@@ -129,3 +129,15 @@ describe("the video rehearsal stage", () => {
     expect(screen.getByText(/can’t be rejoined/u)).toBeTruthy();
   });
 });
+
+it("removes provider media at the absolute deadline even while review saving is pending", () => {
+  render(
+    <RehearsalVideoStage
+      rehearsal={REHEARSAL}
+      session={session({ endsAt: new Date(Date.now() - 1).toISOString() })}
+      onContinueByVoice={() => undefined}
+    />,
+  );
+  expect(screen.queryByTitle(/Video rehearsal/u)).toBeNull();
+  expect(screen.getByText(/Time is up/u)).toBeTruthy();
+});

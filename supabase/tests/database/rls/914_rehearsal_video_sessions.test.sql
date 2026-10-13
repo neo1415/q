@@ -45,17 +45,17 @@ select lives_ok(
      values
        ('00000000-0000-4000-8000-0000000914a2', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'),
         '00000000-0000-4000-8000-0000000914a1', 'partner-steve', repeat('a', 64),
-        clock_timestamp() + interval '180 seconds'),
+        clock_timestamp() + interval '179 seconds'),
        ('00000000-0000-4000-8000-0000000914b2', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('user_b'),
         '00000000-0000-4000-8000-0000000914b1', 'partner-steve', repeat('b', 64),
-        clock_timestamp() + interval '180 seconds') $$,
+        clock_timestamp() + interval '179 seconds') $$,
   'the Q API records a video session per rehearsal');
 select throws_ok(
   $$ insert into q_runtime.rehearsal_video_sessions
        (id, tenant_id, user_id, rehearsal_id, interviewer_id, bridge_token_hash, ends_at)
      values ('00000000-0000-4000-8000-0000000914a3', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'),
              '00000000-0000-4000-8000-0000000914a1', 'partner-steve', repeat('c', 64),
-             clock_timestamp() + interval '180 seconds') $$,
+             clock_timestamp() + interval '179 seconds') $$,
   '23505', null, 'one video session per rehearsal: a second is refused');
 select throws_ok(
   $$ insert into q_runtime.rehearsal_video_sessions
@@ -69,7 +69,7 @@ select throws_ok(
        (id, tenant_id, user_id, rehearsal_id, interviewer_id, bridge_token_hash, ends_at)
      values ('00000000-0000-4000-8000-0000000914a5', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'),
              '00000000-0000-4000-8000-0000000914f1', 'partner-steve', 'plain-secret-not-a-hash',
-             clock_timestamp() + interval '180 seconds') $$,
+             clock_timestamp() + interval '179 seconds') $$,
   '23514', null, 'the bridge bearer is stored only as a SHA-256 hash');
 select lives_ok(
   $$ update q_runtime.rehearsal_video_sessions

@@ -5997,6 +5997,7 @@ const rehearsalVideo = createRehearsalVideoService({
     process.env.CQ_REHEARSAL_VIDEO_INTERVIEWERS,
   ),
   testMode: process.env.CQ_TAVUS_TEST_MODE === "true",
+  allAccounts: process.env.CQ_TAVUS_ALL_ACCOUNTS === "true",
   paidUserIds: new Set(
     (process.env.CQ_TAVUS_PAID_USER_IDS ?? "")
       .split(/[\s,]+/u)

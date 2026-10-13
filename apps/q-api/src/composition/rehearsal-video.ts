@@ -86,6 +86,28 @@ export const REHEARSAL_INTERVIEWERS: readonly RehearsalInterviewer[] = [
   },
 ];
 
+/** Presentation only: reuse the authorized Q persona, never infer a likeness. */
+export function selectRehearsalInterviewer(
+  rehearsal: Pick<QRehearsalDto, "persona" | "counterpart">,
+  enabled: ReadonlySet<string>,
+): RehearsalInterviewer | undefined {
+  const style = rehearsal.persona.style.toLowerCase();
+  const preferred = /\b(numbers|precise|analytical|metrics|brisk)\b/u.test(
+    style,
+  )
+    ? "analyst-julia"
+    : /\b(direct|challenging|sceptical|skeptical|thesis)\b/u.test(style)
+      ? "partner-raj"
+      : /\b(warm|supportive|team|empathetic)\b/u.test(style)
+        ? "partner-mary"
+        : "partner-steve";
+  return (
+    REHEARSAL_INTERVIEWERS.find(
+      (item) => item.id === preferred && enabled.has(item.id),
+    ) ?? REHEARSAL_INTERVIEWERS.find((item) => enabled.has(item.id))
+  );
+}
+
 /** Enabled interviewer ids from configuration; unknown ids are ignored. */
 export function enabledInterviewersFrom(raw: string | undefined): Set<string> {
   const known = new Set(REHEARSAL_INTERVIEWERS.map((item) => item.id));
@@ -449,6 +471,8 @@ export function createRehearsalVideoService(dependencies: {
   readonly testMode?: boolean | undefined;
   /** Canonical profile admission for test and paid rooms; empty fails closed. */
   readonly paidUserIds?: ReadonlySet<string> | undefined;
+  /** Explicit wider funding authorization; durable DB allowance still applies. */
+  readonly allAccounts?: boolean | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
   readonly setTimer?:
@@ -467,7 +491,11 @@ export function createRehearsalVideoService(dependencies: {
     pool !== null &&
     pool.size > 0 &&
     dependencies.publicBaseUrl !== null &&
-    (dependencies.paidUserIds?.size ?? 0) > 0;
+    (dependencies.allAccounts === true ||
+      (dependencies.paidUserIds?.size ?? 0) > 0);
+  const admittedAccount = (actor: ActorContext) =>
+    dependencies.allAccounts === true ||
+    dependencies.paidUserIds?.has(actor.userId) === true;
   const timers = new Map<string, { cancel: () => void }>();
   // Allocation IDs survive a failed LIVE write for compensating cleanup in
   // this process. They are not a durable allocation checkpoint across crashes.
@@ -708,8 +736,9 @@ export function createRehearsalVideoService(dependencies: {
     interviewers: async (actor) => {
       const admitted =
         configured &&
+        dependencies.testMode !== true &&
         actor.actorType === "HUMAN" &&
-        dependencies.paidUserIds?.has(actor.userId) === true &&
+        admittedAccount(actor) &&
         (await dependencies.stillAllowed(actor).catch(() => false));
       return {
         videoAvailable:
@@ -741,9 +770,16 @@ export function createRehearsalVideoService(dependencies: {
 
     start: async (actor, rehearsalId, interviewerId) => {
       if (actor.actorType !== "HUMAN") return { kind: "NOT_A_FOUNDER" };
-      const interviewer = REHEARSAL_INTERVIEWERS.find(
-        (item) => item.id === interviewerId,
-      );
+      const read = await rehearsals.get(actor, rehearsalId);
+      if (read.kind !== "OK") return { kind: "NOT_FOUND" };
+      const rehearsal = read.rehearsal;
+      const interviewer =
+        interviewerId === "q-selected"
+          ? selectRehearsalInterviewer(
+              rehearsal,
+              dependencies.enabledInterviewers,
+            )
+          : REHEARSAL_INTERVIEWERS.find((item) => item.id === interviewerId);
       if (
         interviewer === undefined ||
         !dependencies.enabledInterviewers.has(interviewer.id)
@@ -752,10 +788,6 @@ export function createRehearsalVideoService(dependencies: {
       }
       // The rehearsal service decides whose rehearsal this is: someone
       // else's is the same NOT_FOUND as none.
-      const read = await rehearsals.get(actor, rehearsalId);
-      if (read.kind !== "OK") return { kind: "NOT_FOUND" };
-      const rehearsal = read.rehearsal;
-      if (rehearsal.userRole !== "FOUNDER") return { kind: "NOT_A_FOUNDER" };
       if (rehearsal.status !== "ACTIVE") return { kind: "FINISHED" };
       if (!(await dependencies.stillAllowed(actor).catch(() => false)))
         return { kind: "NOT_FOUND" };
@@ -791,7 +823,7 @@ export function createRehearsalVideoService(dependencies: {
         !configured ||
         pool === null ||
         dependencies.publicBaseUrl === null ||
-        !dependencies.paidUserIds?.has(actor.userId)
+        !admittedAccount(actor)
       ) {
         return {
           kind: "OK",
@@ -804,14 +836,34 @@ export function createRehearsalVideoService(dependencies: {
       const endsAt = new Date(
         createdAt.getTime() + REHEARSAL_VIDEO_MAX_SECONDS * 1_000,
       );
-      const claimed = await store.claim(actor, {
-        id: randomUUID(),
-        rehearsalId,
-        interviewerId: interviewer.id,
-        tokenHash: tokenHashOf(bearer),
-        createdAt,
-        endsAt,
-      });
+      let claimed: Awaited<ReturnType<RehearsalVideoStore["claim"]>>;
+      try {
+        claimed = await store.claim(actor, {
+          id: randomUUID(),
+          rehearsalId,
+          interviewerId: interviewer.id,
+          tokenHash: tokenHashOf(bearer),
+          createdAt,
+          endsAt,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (
+          message !== "CQ_VIDEO_ALLOWANCE_EXHAUSTED" &&
+          message !== "CQ_VIDEO_CONCURRENCY_LIMIT"
+        )
+          throw error;
+        return {
+          kind: "OK",
+          response: {
+            mode: "VOICE_FALLBACK",
+            reason:
+              message === "CQ_VIDEO_ALLOWANCE_EXHAUSTED"
+                ? "ALLOWANCE_EXHAUSTED"
+                : "CONCURRENCY_LIMIT",
+          },
+        };
+      }
       if (!claimed.created) {
         // A concurrent start won: answer with its session.
         return {
@@ -847,7 +899,7 @@ export function createRehearsalVideoService(dependencies: {
                 },
                 perception: { perception_model: "off" },
                 conversational_flow: {
-                  turn_detection_model: "sparrow-1",
+                  turn_detection_model: "sparrow-2",
                   turn_taking_patience: "medium",
                 },
               },
@@ -1002,13 +1054,29 @@ export function createRehearsalVideoService(dependencies: {
         lines.set(row.id, count);
 
         if (signal.aborted) return { kind: "SILENT" };
+        const started = performance.now();
+        const remainingMs = row.endsAt.getTime() - now().getTime();
+        const within = AbortSignal.any([
+          signal,
+          AbortSignal.timeout(Math.max(1, remainingMs)),
+        ]);
         const result = await rehearsals.say(
           actorOf(row),
           row.rehearsalId,
           { text: latest },
-          signal,
+          within,
+          { closingSoon: remainingMs <= 30_000 },
         );
-        if (signal.aborted) return { kind: "SILENT" };
+        logger?.info(
+          {
+            qTurnMs: Math.round(performance.now() - started),
+            remainingMs,
+            resultKind: result.kind,
+          },
+          "rehearsal video: Q bridge timing",
+        );
+        if (within.aborted || row.endsAt.getTime() <= now().getTime())
+          return { kind: "SILENT" };
         let reply: BridgeResult;
         if (result.kind === "OK") {
           const line = latestThemLine(result.rehearsal);

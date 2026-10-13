@@ -23,7 +23,11 @@ import {
   FounderApplications,
   ClaimView,
 } from "@/features/gateq/page/founder-views";
-import { GateqChrome, type GateqTab } from "@/features/gateq/page/gateq-chrome";
+import {
+  ErrorBlock,
+  GateqChrome,
+  type GateqTab,
+} from "@/features/gateq/page/gateq-chrome";
 import { CopyLink, InboxView } from "@/features/gateq/page/inbox-view";
 import {
   FindView,
@@ -57,6 +61,14 @@ export default async function GateqPage({ searchParams }: Props) {
   const params = await searchParams;
   const context = await resolveOwnContext();
   const session = await apiSession();
+
+  if (context.kind === "NONE" && context.unavailable === true) {
+    return (
+      <PageContainer>
+        <ErrorBlock what="GateQ" retryHref="/gateq" />
+      </PageContainer>
+    );
+  }
 
   if (context.kind !== "INVESTOR" || session === null) {
     const tab: GateqTab =
@@ -117,6 +129,16 @@ export default async function GateqPage({ searchParams }: Props) {
   const origin = appOrigin();
   const link = gateway === null ? "" : `${origin}/g/${gateway.publicId}`;
 
+  if (gateways === null) {
+    return (
+      <PageContainer>
+        <GateqChrome role="INVESTOR" active={tab}>
+          <ErrorBlock what="Your gate" retryHref={`/gateq?tab=${tab}`} />
+        </GateqChrome>
+      </PageContainer>
+    );
+  }
+
   if (gateway === null && tab !== "find") {
     return (
       <PageContainer>
@@ -148,15 +170,13 @@ export default async function GateqPage({ searchParams }: Props) {
   const gatewayId = gateway?.id ?? "";
 
   if (tab === "gate") {
-    const [policy, published] = await Promise.all([
+    const [policy, published, inbox] = await Promise.all([
       getGatewayPolicy(session, gatewayId).catch(
         (): GatewayPolicyDto | null => null,
       ),
       publicGateway(gateway?.publicId ?? ""),
+      getGateqInbox(session, gatewayId, "INBOX").catch(() => null),
     ]);
-    const inbox = await getGateqInbox(session, gatewayId, "INBOX").catch(
-      () => null,
-    );
     const snippet = `<script src="${origin}/gateq.js" data-gate="${gateway?.publicId ?? ""}" async></script>`;
     const publishedPolicy =
       policy?.version.status === "PUBLISHED" ? policy : null;
