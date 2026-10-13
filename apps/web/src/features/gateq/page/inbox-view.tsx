@@ -61,6 +61,7 @@ import {
   type Done,
 } from "./gateq-actions";
 import { ErrorBlock, Skeleton, StateBlock } from "./gateq-chrome";
+import { DossierSection, TranscriptSection } from "./inbox-dossier";
 import {
   chipsFor,
   draftPass,
@@ -1229,6 +1230,11 @@ function Detail({
         </div>
       ) : (
         <>
+          {/* Slice 1: only a submission that carries one. Older ones render
+              exactly as before. */}
+          {detail.dossier === null || detail.dossier === undefined ? null : (
+            <DossierSection dossier={detail.dossier} />
+          )}
           <div
             className="grid gap-5"
             style={{
@@ -1333,6 +1339,10 @@ function Detail({
               </ul>
             )}
           </section>
+
+          {detail.transcript === null || detail.transcript === undefined ? null : (
+            <TranscriptSection turns={detail.transcript} />
+          )}
 
           <section className="gq-sect">
             <div className="gq-sect-h">
