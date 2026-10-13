@@ -580,3 +580,24 @@ The cumulative active-speech guard is preserved on pushed `codex/oct13-voice-tri
   - a stable tool set per task (96 tools ≈ 20k prefix tokens, and the set changes per turn);
   - card-first emission on the fast paths;
   - preloading the canvas when a run is followed.
+
+## 2026-10-13 17:00 UTC — Q speed sprint CLOSED (Claude); next priority GateQ
+
+- **DEPLOYED and live-verified** (production `5ce3d76b`; q-api/api/workers at `c2f08536`, server code identical; integration `ea3f71a0` has the same `packages`/`apps`/`supabase` code; hosted migrations: none pending):
+  - #57/#58 video allocation checkpoint and migration `20261222190000`.
+  - #59/#61 model-gateway:
+    - unknown root keys are dropped, not refused (analyst answer and turn reader);
+    - conversation findings fall back to the specialist channel;
+    - a trailing findings note keeps output short.
+  - #60/#63 web: card code and contracts load when a run starts.
+  - #62/#63 web: a SIDE_BY_SIDE comparison renders as one table even when the cards' measures differ; a missing measure shows "Not recorded".
+- **Full authenticated investor journey PASS** on 5ce3d76b (receipt `/tmp/cq-investor-demo-HZt53D`, private). See PERFORMANCE-BASELINE.md.
+- **Tavus:** read-only check returned `videoAvailable:false`, so the paid window stays closed. No paid room was opened.
+- **LOCAL-ONLY/UNRECOVERED:** `apps/api/src/composition/gateq-contact.ts` (Codex workspace unreachable; no commit on any branch). Rebuild it with GateQ.
+- **MEASURED FOLLOW-UPS (not started; do opportunistically or when they block a product journey):**
+  1. **Tool overhead.** Own-records questions offer 96 tools (about 20–25k prompt tokens). THEIR_OWN_RECORDS opens 5 areas (`tool-focus.ts`), and the set changes between turns, which breaks cache reuse. Candidate fix: a fixed core set per task plus `use_capability`, and a cache-friendly tool order.
+  2. **Slow comparison generation.** One measurement each run: 7.9/27.2 s, then 14.2/30.8 s (one tool round plus a ~21 s answer of about 2,280 output tokens). Output length is the main cost; stream or shorten it without losing findings.
+  3. **Caching.** A conversation's first analyst call is uncached (0/38k). Later turns cache 26–39k. A stable tool set (item 1) is the prerequisite.
+  4. **Turn reader.** The first attempt sometimes goes to Gemini and is aborted at 2.5 s (seen once, about 6 s lost before the answer started). Watch for it.
+  5. **First-audio latency.** Not measured this sprint (no provider-verified browser first-audio stamp). Measure within GPT-Live/duplex with no new paid usage.
+- **NEXT PRIORITY (founder 2026-10-13):** GateQ complete adaptive interview, secure evidence collection and investor-facing dossier; see `session-directives/2026-10-13-gateq-adaptive-interview-and-inbox.txt`. Then the full voice/Tavus experience, then Q Pitch.

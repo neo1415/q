@@ -1,5 +1,22 @@
 # Performance baseline and measured first improvements
 
+## October 13 16:50 UTC — sprint close: production 5ce3d76b, full investor journey PASS
+
+Same fictional investor and browser journey; single observations, not p50/p95. First 20 rendered characters / first card / settled:
+
+| Turn             | Baseline cfc694b3                          | Final 5ce3d76b               | Result                              |
+| ---------------- | ------------------------------------------ | ---------------------------- | ----------------------------------- |
+| Top three        | 3,500 / 3,802 / 3,969 ms                   | **3,025 / 3,146 / 3,401 ms** | 3 exact cards                       |
+| Selected profile | 5,984 / – / 24,974 ms                      | **5,493 / – / 14,199 ms**    | 7 findings (baseline 5)             |
+| Risks follow-up  | 15,095 / – / 29,825 ms, 0 findings, FAILED | **4,817 / – / 13,884 ms**    | 8 findings                          |
+| Comparison       | not reached                                | 14,171 / – / 30,828 ms       | rendered table, exact two companies |
+
+- Between the two runs after #59/#61 (16:15 and 16:50 UTC), comparison first text varied from 7.9 s to 14.2 s; treat it as unstable.
+- Model work (ledger, run after #59/#61):
+  - profile: one answer call, 21.5 → 12.3 s, 2,104 → 1,206 output tokens;
+  - risks: answer calls 3 → 1, and no turn-reader refusals.
+- Outstanding measured items are in STATE.md (tool overhead, comparison generation, first-call cache, reader fallback, first audio).
+
 ## October 13 16:15 UTC — after PR #59/#61 (production c2f08536), same journey
 
 Same fictional investor, same browser journey, one observation each (not p50/p95). First 20 rendered characters / settled:
