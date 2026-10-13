@@ -296,6 +296,13 @@ export const GATEQ_APPLY_CONTACT_ACCOUNT_PATH =
 /** The interview so far, both sides, in order. */
 export const GATEQ_APPLY_TRANSCRIPT_PATH =
   "/v1/gateq/apply/transcript" as const;
+/**
+ * Opens the interview: when nothing has been said yet, Q asks the first
+ * question (stored once); otherwise the transcript is returned as it is,
+ * with no model call. Idempotent, so a reload or a double click is safe.
+ */
+export const GATEQ_APPLY_INTERVIEW_OPEN_PATH =
+  "/v1/gateq/apply/interview/open" as const;
 /** What is answered, unknown, declined, missing and contradictory. */
 export const GATEQ_APPLY_COVERAGE_PATH = "/v1/gateq/apply/coverage" as const;
 
