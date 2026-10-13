@@ -413,6 +413,10 @@ describe("Done for you", () => {
     );
     const row = document.querySelector(`[data-work-job="${finished.job.id}"]`);
     expect(row?.textContent).toContain("Kestrel Heat memo · version 2");
+    // Live 2026-10-12: a job finished this week counts in "this week".
+    expect(
+      screen.getByRole("heading", { name: /Done for you\s*1 this week/u }),
+    ).toBeTruthy();
     expect(
       screen.getByRole("button", { name: /^Open document/u }).closest("li"),
     ).toBe(row);

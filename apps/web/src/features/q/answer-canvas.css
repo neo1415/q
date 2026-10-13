@@ -1269,3 +1269,35 @@
     display: none;
   }
 }
+
+/* How a mandate fit is worked out: closed by default, opened on request. */
+.cq-ac-how {
+  border-top: 1px solid var(--cq-border-subtle);
+  padding-top: 2px;
+}
+.cq-ac-how > summary:focus-visible {
+  outline: 2px solid var(--cq-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--cq-radius-md);
+}
+
+/* A resting card with an Open control keeps a column for it, so Open is
+   never clipped and Close never wraps under the rank (live 2026-10-12). */
+@media (min-width: 761px) {
+  .cq-ac-cards .cq-ac-card[data-state="rest"] .cq-ac-head:has([data-ac-open]) {
+    grid-template-columns: auto minmax(0, 1fr) auto 44px;
+  }
+}
+@media (max-width: 760px) {
+  .cq-ac-cards[data-tiles]
+    .cq-ac-card[data-state="rest"]
+    .cq-ac-head:has([data-ac-open]) {
+    grid-template-columns: auto minmax(0, 1fr) auto 36px;
+  }
+  .cq-ac-cards[data-tiles]
+    .cq-ac-card[data-state="rest"]
+    .cq-ac-head:has([data-ac-open])
+    .cq-ac-x {
+    grid-column: 4;
+  }
+}
