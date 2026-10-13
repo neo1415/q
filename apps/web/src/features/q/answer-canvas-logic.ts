@@ -188,16 +188,28 @@ export function tieLine(
   return `Tied with ${who ?? ""} on mandate fit (${fit.score.toFixed(1)}).`;
 }
 
-/** Comparisons lay out as one table when every card has the same measures. */
+/**
+ * A side-by-side comparison lays out as one table whenever every card has
+ * measures. Live 2026-10-13: Ledgerfold carried seven measures and F2 six
+ * (each had one the other lacked), so the comparison fell back to two loose
+ * cards. The rows are every measure any card has, in the order first seen;
+ * a company without that measure shows it as not recorded, never as a low
+ * level (unknown stays unknown).
+ */
 export function comparesAsTable(block: QAnswerCardsBlock): boolean {
   if (block.shape !== "SIDE_BY_SIDE" || block.cards.length < 2) return false;
-  const first = block.cards[0]?.measures.map((measure) => measure.label);
-  if (first === undefined || first.length === 0) return false;
-  return block.cards.every(
-    (card) =>
-      card.measures.length === first.length &&
-      card.measures.every((measure, at) => measure.label === first[at]),
-  );
+  return block.cards.every((card) => card.measures.length > 0);
+}
+
+/** The comparison table's rows: every measure label, in first-seen order. */
+export function compareRows(block: QAnswerCardsBlock): readonly string[] {
+  const labels: string[] = [];
+  for (const card of block.cards) {
+    for (const measure of card.measures) {
+      if (!labels.includes(measure.label)) labels.push(measure.label);
+    }
+  }
+  return labels;
 }
 
 function folded(text: string): string {
