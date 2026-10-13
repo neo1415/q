@@ -120,6 +120,13 @@ export function isSingleCompanyQuestion(text: string): boolean {
   );
 }
 
+/** A fit ranking alone cannot answer a request for historical work or risks. */
+export function fitNeedsSynthesis(text: string): boolean {
+  return /\b(?:discuss(?:ed|ions?|ing)?|talked|conversations?|agents?|review(?:er|ed|s)?|critique|memos?|documents?|findings?|risks?|concerns?|unresolved|diligence|changed?|since|awaiting|pending)\b/iu.test(
+    text,
+  );
+}
+
 /**
  * What set and place a fit question is about; null when it is not one.
  * `previous`: the companies the last answer showed, so "rank them" is

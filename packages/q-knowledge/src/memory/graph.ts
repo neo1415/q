@@ -686,8 +686,8 @@ function companyLines(
   }
   for (const d of c.diligence) {
     rows.push(
-      `  Diligence questions Q prepared (${d.filedForApproval ? "waiting for your approval" : "kept, not sent"}; ${dated(d.at, now)}): ${d.questions
-        .map((q) => shorten(q, 140))
+      `  Diligence questions Q prepared (${d.filedForApproval ? "filed for approval; current approval status not checked" : "kept, not sent"}; ${dated(d.at, now)}): ${d.questions
+        .map((q) => shorten(q, 180))
         .join(" | ")}`,
     );
   }
@@ -802,10 +802,16 @@ export function renderConnectedRecall(
     );
   }
   let out = rows.join("\n");
-  for (const company of recall.companies) {
-    const next = `${out}\n${companyLines(company, recall, now)}`;
-    if (next.length > max) break;
-    out = next;
+  companies: for (const company of recall.companies) {
+    // Several historical jobs can make one company's evidence exceed the
+    // entire section budget. Keep complete lines instead of discarding
+    // that company, and never cut a question's final qualification.
+    const lines = companyLines(company, recall, now).split("\n");
+    for (const line of lines) {
+      const next = `${out}\n${line}`;
+      if (next.length > max) break companies;
+      out = next;
+    }
   }
   if (recall.unread.length > 0) {
     const tail = `\nNot read this time (unknown, not none): ${recall.unread.join(", ")}.`;
