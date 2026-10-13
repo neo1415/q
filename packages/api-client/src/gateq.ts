@@ -9,6 +9,7 @@ import {
   GATEQ_APPLY_CONTACT_CONFIRM_PATH,
   GATEQ_APPLY_CONTACT_PATH,
   GATEQ_APPLY_COVERAGE_PATH,
+  GATEQ_APPLY_INTERVIEW_OPEN_PATH,
   GATEQ_APPLY_TRANSCRIPT_PATH,
   type ApplicationContactRequest,
   ApplicationTurnResponseSchema,
@@ -295,6 +296,22 @@ export function getApplicationTranscript(
     { baseUrl, accessToken: sessionToken },
     "GET",
     GATEQ_APPLY_TRANSCRIPT_PATH,
+    ApplicationTranscriptDtoSchema,
+  );
+}
+
+/**
+ * Anonymous: opens the interview. Q asks the first question when nothing
+ * has been said yet; otherwise this is the transcript, with no model call.
+ */
+export function openApplicationInterview(
+  baseUrl: string,
+  sessionToken: string,
+) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "POST",
+    GATEQ_APPLY_INTERVIEW_OPEN_PATH,
     ApplicationTranscriptDtoSchema,
   );
 }

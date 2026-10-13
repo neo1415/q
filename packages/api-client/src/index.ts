@@ -345,6 +345,7 @@ export {
   getPublicGateway,
   listGatewayApplications,
   listGateways,
+  openApplicationInterview,
   publishGatewayVersion,
   saveAccountApplicationContact,
   saveApplicationAnswers,

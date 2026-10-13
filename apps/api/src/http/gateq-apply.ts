@@ -10,6 +10,7 @@ import {
   GATEQ_APPLY_CONTACT_CONFIRM_PATH,
   GATEQ_APPLY_CONTACT_PATH,
   GATEQ_APPLY_COVERAGE_PATH,
+  GATEQ_APPLY_INTERVIEW_OPEN_PATH,
   GATEQ_APPLY_TRANSCRIPT_PATH,
   ApplicationAnswersRequestSchema,
   ApplicationAnswersResponseSchema,
@@ -371,6 +372,28 @@ export function registerGateQApplyRoutes(
     const token = credential(request);
     try {
       await charge(token, "TRANSCRIPT");
+      const turns = await conversation.transcript(token);
+      void reply.header("Cache-Control", "no-store");
+      return ApplicationTranscriptDtoSchema.parse({ turns });
+    } catch (error: unknown) {
+      return refuse(error, reply);
+    }
+  });
+
+  app.post(GATEQ_APPLY_INTERVIEW_OPEN_PATH, async (request, reply) => {
+    const token = credential(request);
+    try {
+      const existing = await conversation.transcript(token);
+      if (existing.length > 0) {
+        await charge(token, "TRANSCRIPT");
+        void reply.header("Cache-Control", "no-store");
+        return ApplicationTranscriptDtoSchema.parse({ turns: existing });
+      }
+      // A form-started application has no opening line yet: Q asks the
+      // first question here, so the founder answers rather than starts.
+      // Stored once under its fixed turn id; a concurrent open is a no-op.
+      await charge(token, "TURN");
+      await conversation.openingFor({ token, correlationId: randomUUID() });
       const turns = await conversation.transcript(token);
       void reply.header("Cache-Control", "no-store");
       return ApplicationTranscriptDtoSchema.parse({ turns });

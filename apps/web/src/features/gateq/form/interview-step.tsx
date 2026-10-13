@@ -18,7 +18,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { ChatComposer, ChatTranscript } from "../apply-experience";
-import { applicationTurnAction, transcriptAction } from "../apply-actions";
+import { applicationTurnAction, openInterviewAction } from "../apply-actions";
 import {
   latestQuestion,
   linesFromTranscript,
@@ -89,11 +89,12 @@ export function InterviewStep({
   const end = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
-  // Resume: what the server recorded, every time this step mounts.
+  // Resume what the server recorded, every time this step mounts; on a
+  // fresh interview the server asks Q's opening question first.
   useEffect(() => {
     if (preview !== undefined || sessionToken === null) return;
     let current = true;
-    void transcriptAction(sessionToken).then((result) => {
+    void openInterviewAction(sessionToken).then((result) => {
       if (!current) return;
       if (!result.ok) {
         setProblem(result.message);

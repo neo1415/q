@@ -9,6 +9,7 @@ import {
   confirmApplicationContact,
   getApplicationCoverage,
   getApplicationTranscript,
+  openApplicationInterview,
   saveApplicationAnswers,
   saveApplicationContact,
   startApplication,
@@ -373,6 +374,26 @@ export async function transcriptAction(
   }
   try {
     const transcript = await getApplicationTranscript(url, token.data);
+    return { ok: true, turns: transcript.turns };
+  } catch (error: unknown) {
+    return failed(error);
+  }
+}
+
+/**
+ * Opens the interview: Q's first question when nothing has been said yet,
+ * otherwise the transcript as recorded (a resume makes no model call).
+ */
+export async function openInterviewAction(
+  sessionToken: string,
+): Promise<TranscriptResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null) {
+    return { ok: false, message: "Please try again." };
+  }
+  try {
+    const transcript = await openApplicationInterview(url, token.data);
     return { ok: true, turns: transcript.turns };
   } catch (error: unknown) {
     return failed(error);

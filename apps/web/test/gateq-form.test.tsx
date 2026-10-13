@@ -30,7 +30,7 @@ const calls = {
   contact: vi.fn<Action>(),
   confirm: vi.fn<Action>(),
   accountContact: vi.fn<Action>(),
-  transcript: vi.fn<Action>(),
+  open: vi.fn<Action>(),
   turn: vi.fn<Action>(),
   coverage: vi.fn<Action>(),
 };
@@ -49,7 +49,7 @@ vi.mock("../src/features/gateq/apply-actions", () => ({
   submitApplicationAction: tracked("submit"),
   saveContactAction: tracked("contact"),
   confirmContactAction: tracked("confirm"),
-  transcriptAction: tracked("transcript"),
+  openInterviewAction: tracked("open"),
   applicationTurnAction: tracked("turn"),
   coverageAction: tracked("coverage"),
   startApplicationAction: vi.fn(),
@@ -189,7 +189,7 @@ beforeEach(() => {
     codeSent: false,
     codeExpiresInMinutes: null,
   });
-  calls.transcript.mockResolvedValue({
+  calls.open.mockResolvedValue({
     ok: true,
     turns: [
       {
@@ -512,7 +512,7 @@ describe("the form, driven like a founder", () => {
       "save",
       "save",
       "save",
-      "transcript",
+      "open",
       "turn",
       "coverage",
       "submit",
@@ -689,7 +689,7 @@ describe("the interview step", () => {
   const ref = { current: null };
 
   it("resumes from the server's transcript on mount", async () => {
-    calls.transcript.mockResolvedValue({
+    calls.open.mockResolvedValue({
       ok: true,
       turns: [
         {
@@ -723,7 +723,7 @@ describe("the interview step", () => {
       />,
     );
     await flush();
-    expect(calls.transcript).toHaveBeenCalledWith(TOKEN);
+    expect(calls.open).toHaveBeenCalledWith(TOKEN);
     expect(screen.getByText("Clinics.")).toBeTruthy();
     // Q's latest question, by the composer.
     expect(
@@ -740,7 +740,7 @@ describe("the interview step", () => {
     ).toBeTruthy();
     await press("Resume the interview");
     await flush();
-    expect(calls.transcript).toHaveBeenCalledTimes(2);
+    expect(calls.open).toHaveBeenCalledTimes(2);
   });
 
   it("retries a failed message with the same client turn id", async () => {
