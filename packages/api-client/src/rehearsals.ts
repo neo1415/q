@@ -5,6 +5,7 @@ import {
   qRehearsalVideoEndPath,
   qRehearsalVideoPath,
   RehearsalInterviewersDtoSchema,
+  RehearsalVideoSessionDtoSchema,
   StartRehearsalVideoResponseSchema,
   type EndRehearsalVideoRequest,
   type StartRehearsalVideoRequest,
@@ -146,6 +147,16 @@ export function getRehearsalInterviewers(session: ApiSession) {
     "GET",
     Q_REHEARSAL_VIDEO_INTERVIEWERS_PATH,
     RehearsalInterviewersDtoSchema,
+  );
+}
+
+/** Reads the existing owner's private room; never allocates a conversation. */
+export function getRehearsalVideo(session: ApiSession, rehearsalId: string) {
+  return call(
+    session,
+    "GET",
+    qRehearsalVideoPath(rehearsalId),
+    RehearsalVideoSessionDtoSchema,
   );
 }
 

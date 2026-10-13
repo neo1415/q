@@ -993,6 +993,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/rehearsals/meeting/[meetingId]": exempt(
     "the rehearsal suggested when a call was booked; it resolves to the lobby Q opens with open_page",
   ),
+  "/rehearsals/live/[rehearsalId]": exempt(
+    "the person joins their rehearsal video room from the lobby after choosing to start it",
+  ),
   "/rehearsals/r/[rehearsalId]": exempt(
     "the person's own review of one rehearsal, reached from the room and Rehearsals",
   ),

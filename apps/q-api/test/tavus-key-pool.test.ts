@@ -11,7 +11,7 @@ import {
   tavusKeysFrom,
 } from "../src/composition/tavus/key-pool.js";
 
-/** Owner directive 2026-10-12: every configured key is used, by index. */
+/** October 13: one entitled account; refusals must never rotate accounts. */
 
 const KEY = (n: number) => `tavus_test_key_${String(n).padStart(20, "0")}`;
 
@@ -29,12 +29,12 @@ function fakeClients(count: number) {
 }
 
 describe("Tavus keys from configuration", () => {
-  it("reads a comma or whitespace separated list, in order, de-duplicated", () => {
+  it("rejects a list resolving to more than one provider account", () => {
     expect(
       tavusKeysFrom({
         CQ_TAVUS_API_KEYS: `${KEY(1)}, ${KEY(2)}\n${KEY(3)} ${KEY(1)}`,
       }),
-    ).toEqual([KEY(1), KEY(2), KEY(3)]);
+    ).toEqual([]);
   });
 
   it("falls back to the single TAVUS_API_KEY and skips anything not key-shaped", () => {
@@ -81,38 +81,26 @@ describe("choosing a key for a session", () => {
     });
     expect(result).toEqual({ value: "ok", keyIndex: 0 });
     expect(used).toEqual([0]);
-    expect(pool.size).toBe(3);
+    expect(pool.size).toBe(1);
   });
 
   it.each(["AUTH", "CREDIT", "QUOTA"] as const)(
-    "moves to the next key on %s and passes the failed key over afterwards",
+    "fails closed on %s without touching a second account",
     async (kind) => {
       const fake = fakeClients(3);
-      const failures: unknown[] = [];
       const pool = createTavusKeyPool({
         keys: [KEY(1), KEY(2), KEY(3)],
         createClient: fake.createClient,
-        onKeyFailure: (event) => failures.push(event),
       });
-      const first = await pool.withHealthyKey((client, index) =>
-        index === 0
-          ? Promise.reject(new TavusError("create conversation", 400, kind))
-          : Promise.resolve(client),
+      const work = vi.fn(() =>
+        Promise.reject(new TavusError("create conversation", 400, kind)),
       );
-      expect(first.keyIndex).toBe(1);
-      expect(first.value).toBe(fake.clients[1]);
-      expect(failures).toEqual([{ keyIndex: 0, kind, status: 400 }]);
-      const work = vi.fn((_c: TavusClient, index: number) =>
-        Promise.resolve(index),
+      await expect(pool.withHealthyKey(work)).rejects.toBeInstanceOf(
+        TavusKeysExhaustedError,
       );
-      const second = await pool.withHealthyKey(work);
-      expect(second.keyIndex).toBe(1);
       expect(work).toHaveBeenCalledTimes(1);
-      expect(pool.health()[0]).toEqual({
-        index: 0,
-        healthy: false,
-        lastFailure: kind,
-      });
+      expect(fake.made).toEqual([KEY(1)]);
+      expect(pool.clientAt(1)).toBeNull();
     },
   );
 
@@ -149,11 +137,11 @@ describe("choosing a key for a session", () => {
       createClient: fakeClients(2).createClient,
       now: () => clock,
     });
-    await pool.withHealthyKey((_c, index) =>
-      index === 0
-        ? Promise.reject(new TavusError("x", 429, "QUOTA"))
-        : Promise.resolve(index),
-    );
+    await expect(
+      pool.withHealthyKey(() =>
+        Promise.reject(new TavusError("x", 429, "QUOTA")),
+      ),
+    ).rejects.toBeInstanceOf(TavusKeysExhaustedError);
     clock += 61_000;
     const again = await pool.withHealthyKey((_c, index) =>
       Promise.resolve(index),
@@ -167,7 +155,8 @@ describe("choosing a key for a session", () => {
       keys: [KEY(1), KEY(2)],
       createClient: fake.createClient,
     });
-    expect(pool.clientAt(1)).toBe(fake.clients[1]);
+    expect(pool.clientAt(0)).toBe(fake.clients[0]);
+    expect(pool.clientAt(1)).toBeNull();
     expect(pool.clientAt(2)).toBeNull();
     expect(pool.clientAt(-1)).toBeNull();
     expect(pool.clientAt(0.5)).toBeNull();

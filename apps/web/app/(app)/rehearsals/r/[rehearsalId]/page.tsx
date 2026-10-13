@@ -1,22 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { finishRehearsal, getRehearsal } from "@capital-q/api-client";
+import { redirect } from "next/navigation";
+import { z } from "zod";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
 import { qApiSession } from "@/features/q/context";
+import { readRehearsalRoom } from "@/features/rehearsal/read-rehearsal-room";
 import { RehearsalReview } from "@/features/rehearsal/rehearsal-review";
 
 export const metadata: Metadata = { title: "Rehearsal review" };
 export const dynamic = "force-dynamic";
 
-/**
- * One rehearsal's review (REHEARSE). Leaving the room lands here; a
- * rehearsal still open is finished first (idempotent: a finished one is
- * returned as it is), so the review is written once.
- */
+/** Review reads never finish an active rehearsal or bypass provider close. */
 export default async function RehearsalReviewPage({
   params,
 }: {
@@ -24,15 +22,19 @@ export default async function RehearsalReviewPage({
 }) {
   const { rehearsalId } = await params;
   const session = await qApiSession();
-  let rehearsal =
-    session === null
+  const id = z.string().uuid().safeParse(rehearsalId);
+  const room =
+    session === null || !id.success
       ? null
-      : await getRehearsal(session, rehearsalId).catch(() => null);
-  if (session !== null && rehearsal?.status === "ACTIVE") {
-    rehearsal =
-      (await finishRehearsal(session, rehearsalId).catch(() => null)) ??
-      rehearsal;
-  }
+      : await readRehearsalRoom(session, id.data).catch(() => null);
+  if (
+    room !== null &&
+    (room.rehearsal.status === "ACTIVE" || room.video?.status === "LIVE")
+  )
+    redirect(
+      `/rehearsals/live/${encodeURIComponent(room.rehearsal.id)}${room.video === null ? "" : "?video=1"}`,
+    );
+  const rehearsal = room?.rehearsal ?? null;
   if (rehearsal === null) {
     return (
       <PageContainer>

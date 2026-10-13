@@ -119,6 +119,13 @@ export function RehearsalVideoStage({
         </div>
       )}
 
+      {left > 0 && left <= 30 ? (
+        <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
+          We’re closing shortly. Finish your last point; Q will save your
+          transcript and review.
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
         <Button
           variant="primary"
