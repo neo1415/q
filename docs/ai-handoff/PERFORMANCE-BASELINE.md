@@ -1,5 +1,9 @@
 # Performance baseline and measured first improvements
 
+## October13 v25 full authenticated investor browser acceptance
+
+Production592b32ff, private receipt `/tmp/cq-investor-demo-1Tc4Lv`, full journey PASS. Individual observations: ranking first20 rendered characters4342ms/total5118ms; selected profile5571/26112 with seven native findings; risks4586/18920 with six native findings; comparison8244/34002 with exact two canonical companies. Native findings and company binding are verified from the current rendered answer. These are single observations of a text threshold, not semantic first useful content, first audio, p50/p95 or causal improvement. V24 zero-findings failure remains a failed product gate; this release corrects it without relaxing validation.
+
 ## October 13 deployed product browser sample and scoped model diagnostics
 
 Deployed `f3fe5520`, existing authorized fictional investor, TLS verification enabled. Corrected harness matches current run/message/full visible answer and exact canonical cards/company paths. The complete investor journey passed. Individual observations:
@@ -233,3 +237,7 @@ At deployed `9261cdc4`, the diagnostic warm-only Discover rehearsal rendered thr
 The actor/run-scoped ledger for the warm selected-company explanation on deployed `9261cdc4` contains classification 798 ms; two lookup-selection rounds 1,798 and 2,036 ms; final generation 11,908 ms; structured extraction 2,100 ms finishing 2,219 ms after the answer. Lookup planning consumes 3,834 ms on the critical path despite the existing authorized on-screen profile prefetch. A turn-note correction is only an investigation; no next latency implementation or speedup is claimed. The browser first-20-character 8,341 ms / terminal 18,978 ms observation failed subject/reference acceptance.
 
 The continuation rehearsal now identifies newly rendered Q card DOM nodes and waits for the current answer to settle before disconnecting its observer; existing cards and API-before-render timing no longer force a null card measurement. Syntax/lint pass; actual cold browser execution awaits the exact gated application release. These measurements remain literal rendering thresholds, not semantic usefulness or audio.
+
+## 2026-10-13 — current profile samples around immutable analyst guidance
+
+Before (912e594c, receipt2DSXfQ): selected profile23,133ms total; first20 rendered chars4,946ms; six native findings/exact company bindingsPASS. One NORMAL_DIALOGUE19,957ms,37,656input/0cached tokens, no schema refusal. After (23e3971c, receiptCWCP1L):13,046ms total/3,061ms first20chars; correct reference but zero native findings, full journeyFAILED. One dialogue10,728ms,12,446input/0cached; prepared-context path, no schema diagnostics. Subject identities matched. Different path/context size and failed evidence presentation prevent a speed success claim. v25 must preserve actual native findings before comparing further; no p95 from these samples.

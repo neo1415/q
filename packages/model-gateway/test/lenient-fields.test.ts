@@ -44,15 +44,62 @@ describe("auxiliary fields of an answer", () => {
 });
 
 describe("the analyst answer schema (live 2026-10-09)", () => {
-  it("is the schema of the prompt in use, so a v22 answer is never refused", async () => {
-    const { COMPANY_ANALYST_V22 } = await import("@capital-q/q-core");
+  it("is the schema of the prompt in use, so the active prompt uses the same result schema", async () => {
+    const { createDefaultPromptRegistry } = await import("@capital-q/q-core");
     const { ANALYST_RESULT_SCHEMA } = await import("../src/q/index.js");
     // v17 refused every answer that carried v22's `visual` (unknown key)
     // and re-ran it: 10-15 s on every turn.
-    const output = COMPANY_ANALYST_V22.output;
+    const output =
+      createDefaultPromptRegistry().getActive("COMPANY_ANALYST").definition
+        .output;
     expect(output.kind === "STRUCTURED" ? output.schema : null).toBe(
       ANALYST_RESULT_SCHEMA,
     );
     expect(Object.keys(ANALYST_RESULT_SCHEMA.shape)).toContain("visual");
+  });
+});
+
+describe("analyst shape refusal regressions (offline)", () => {
+  const answer = {
+    answer: "The authorised description is self-reported.",
+    responseShape: "CONCISE",
+    insufficientEvidence: false,
+  };
+
+  it("still refuses an invented root followUps property", async () => {
+    const { ANALYST_RESULT_SCHEMA } = await import("../src/q/index.js");
+    const refused = acceptStructuredOutput(
+      JSON.stringify({ ...answer, followUps: ["A synthetic next question"] }),
+      ANALYST_RESULT_SCHEMA,
+      { invalidListItems: "DROP", lenientFields: ANALYST_LENIENT_FIELDS },
+    );
+    expect(refused.ok).toBe(false);
+    expect(!refused.ok && refused.refusals).toContain(
+      "(root):unrecognized_keys(followUps)",
+    );
+  });
+
+  it("keeps DROP for a malformed finding without weakening the strict contract", async () => {
+    const { ANALYST_RESULT_SCHEMA } = await import("../src/q/index.js");
+    const accepted = acceptStructuredOutput(
+      JSON.stringify({
+        ...answer,
+        companyFindings: [
+          {
+            dimension: "DESCRIPTION",
+            type: "FACT",
+            text: "Synthetic description",
+            coverage: "SELF_REPORTED",
+          },
+        ],
+      }),
+      ANALYST_RESULT_SCHEMA,
+      { invalidListItems: "DROP", lenientFields: ANALYST_LENIENT_FIELDS },
+    );
+    expect(accepted.ok).toBe(true);
+    expect(accepted.ok && accepted.value.companyFindings).toEqual([]);
+    expect(accepted.ok && accepted.dropped).toContain(
+      "companyFindings.0:unrecognized_keys(text,coverage)",
+    );
   });
 });

@@ -649,7 +649,7 @@ const TOOLS_FIRST_NOTE: ModelMessage = {
  */
 /**
  * The schema the analyst's answer is checked against: the one the prompt in
- * use writes to (COMPANY_ANALYST v22). Pinned by a test, because a lag here
+ * use writes to (COMPANY_ANALYST v23, schema v22). Pinned by a test, because a lag here
  * refuses every answer carrying a newer field and re-runs it (live
  * 2026-10-09: 10-15 s on every turn).
  */
@@ -3570,7 +3570,7 @@ export function createModelGatewayQAnswer(
 
       const options: ModelGatewayExecuteOptions<CompanyAnalystV22Result> = {
         signal: request.signal,
-        // The schema the prompt in use (COMPANY_ANALYST v22) writes to: live
+        // The schema the prompt in use (COMPANY_ANALYST v23, schema v22) writes to: live
         // 2026-10-09, v17 refused every answer carrying v22's `visual` as an
         // unknown key, and each refusal re-ran the answer (10-15 s a turn).
         schema: ANALYST_RESULT_SCHEMA,

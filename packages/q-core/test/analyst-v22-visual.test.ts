@@ -22,9 +22,9 @@ const answer = {
 };
 
 describe("COMPANY_ANALYST v22", () => {
-  it("is active and adds only the visual line after v21's disclaimer rule", () => {
+  it("retains the visual line after v21's disclaimer rule", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(22);
+    expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(25);
     expect(COMPANY_ANALYST_V22.template).toBe(
       COMPANY_ANALYST_V21.template.replace(
         V21_NO_DISCLAIMER_LINE,

@@ -15,6 +15,7 @@
  * a credential, a connection or a table.
  */
 
+import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { createWorkforceDocuments } from "./composition/workforce/documents.js";
 import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
@@ -6107,7 +6108,7 @@ const liveBroker =
               : providerSecrets.openai.reveal(),
         }),
         firewall,
-        turn: voiceTurn,
+        turn: rehearsalVoiceTurn,
         spend: createPostgresLiveSpend(database.sql),
         // The trial's persisted use of active speech (CQ_VOICE_LIVE_TRIAL).
         trialUsage: createPostgresLiveTrialUsage(database.sql),
@@ -6168,8 +6169,8 @@ const liveBroker =
         providerCeiling: "PUBLIC",
         syntheticDemo: syntheticDemo?.permitted === true,
         logger,
-        // A rehearsal with a researched external person speaks on GPT-Live
-        // from its prepared persona; every other rehearsal is refused here.
+        // Public external personas retain their prepared line; other owned
+        // active rehearsals delegate every reply to Q on the same binding.
         rehearsalLine: {
           prepare: async (actor, rehearsalId, hints) => {
             const line = await rehearsals.externalLine(
@@ -6177,7 +6178,20 @@ const liveBroker =
               rehearsalId,
               hints,
             );
-            return line === null ? null : { instructions: line.instructions };
+            if (line !== null) return { instructions: line.instructions };
+            const owned = await rehearsals.get(actor, rehearsalId);
+            if (
+              owned.kind !== "OK" ||
+              owned.rehearsal.status !== "ACTIVE" ||
+              owned.rehearsal.endedAt !== null
+            )
+              return null;
+            // No private persona is sent to the audio model. Each answer
+            // uses the existing authorized Q rehearsal service and store.
+            return {
+              instructions: qBackedRehearsalLivePrompt(),
+              qBacked: true,
+            };
           },
           record: rehearsals.recordLive,
           latency: externalRehearsalLatency,

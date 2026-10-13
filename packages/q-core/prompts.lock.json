@@ -22,6 +22,7 @@
     "company-analyst/v20": "955cc4f5809b13abbd4f75d8fe5f30d94c9722fad41a4d5017a52686c8f9b387",
     "company-analyst/v21": "6649537e0ac888f3291019ee222a737ea7163c70d17c4096969f18a12762cd60",
     "company-analyst/v22": "e61b46220b5086fd74cd4a1f0d4149ab3726224066e06561806e1a28cce31561",
+    "company-analyst/v23": "f14b0bc5de153352760cf69f9dcef674502a077f561c5bba4a7a9132c3477b46",
     "company-analyst/v3": "c6f302afe031d6c8f9826a7daddbbf3a5e9375b71e1f6ded5054748595146db9",
     "company-analyst/v4": "f9b36094d18d55f110db8cf94eedbfe065facae1751ea0c202c7eb13c11cf891",
     "company-analyst/v5": "837e7151090fdd38d8e9efeae051a9fd662db0220fd20707d4a5f4da7af7855c",
@@ -220,7 +221,9 @@
     "work-shortlist/v1": "901f1389ffedbd8c702574097b87e51f926cc594305d8d43c8b3b4c65c2d10e3",
     "work-slot-reader/v1": "9cc7753d25abaeab63e9a2082567b701e9d370fdcf1583447030b6453f14b3fc",
     "work-stand-in-reply/v1": "4d100697d1b9a8c359cb49cc9fc70cc8e17613dd667efc128ee3ea9a51a96be0",
-    "work-stand-in-reply/v2": "b9888e4f6ae15e90894bbdd1acdc16390f74d862ec6064922fe397eafc8aa3df"
+    "work-stand-in-reply/v2": "b9888e4f6ae15e90894bbdd1acdc16390f74d862ec6064922fe397eafc8aa3df",
+    "company-analyst/v24": "e79f1a628eee84c2d5f9aeee94f1021041bbbe0657e334b8276c79ce376136e8",
+    "company-analyst/v25": "a344b5f50814938df4f9bf81bff88b17d059c19ea85269283cff4f30d2135631"
   },
   "generatedBy": "CQ-Q-006"
 }

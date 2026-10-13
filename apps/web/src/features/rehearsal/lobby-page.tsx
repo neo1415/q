@@ -20,10 +20,12 @@ export async function RehearsalLobbyPage({
   kind,
   counterpartId,
   meeting,
+  requestedVideo = false,
 }: {
   readonly kind: RehearsalCounterpartKind;
   readonly counterpartId: string;
   readonly meeting: string | undefined;
+  readonly requestedVideo?: boolean;
 }) {
   const context = await resolveOwnContext();
   // A researched external person is rehearsed by a founder, who pitches.
@@ -60,6 +62,7 @@ export async function RehearsalLobbyPage({
           Rehearsals
         </Link>
         <RehearsalLobby
+          requestedVideo={requestedVideo}
           kind={kind}
           counterpartId={id.data}
           meetingId={meetingId.success ? meetingId.data : undefined}

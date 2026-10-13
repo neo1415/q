@@ -63,15 +63,19 @@ const analystVariables = (
 function render(
   profile = DEFAULT_COMMUNICATION_PROFILE,
   variables = analystVariables(),
+  taskVersion?: number,
 ) {
   return renderPrompt<CompanyAnalystVariables>(registry, {
     task: "COMPANY_ANALYST",
+    taskVersion,
     operatingMode: "DEBRIEF",
     communicationProfile: profile,
     environmentNotes: "test environment",
     variables,
   });
 }
+
+const V23_MAX_PROMPT_TOKENS = 5_300;
 
 /** Families whose every version is DEPRECATED: retired, never removed. */
 const RETIRED_FAMILIES: ReadonlySet<string> = new Set(["INTERVIEW_CONDUCTOR"]);
@@ -290,7 +294,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v22_comm.v1",
+      "q-system.v2_company-analyst.v25_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -373,7 +377,7 @@ describe("renderer", () => {
     ]);
   });
 
-  it("keeps rendered prompts small: charter under 2,000 tokens, task bundles under 3,600", () => {
+  it("keeps the historical v22 budget and bounds v23 instruction growth", () => {
     const rendered = render();
     const system = rendered.messages[0]?.content.length ?? 0;
     expect(system / 4).toBeLessThan(2_000);
@@ -402,7 +406,20 @@ describe("renderer", () => {
     // 4,500 since company-analyst/v20 (natural conversation, Zino live
     // 2026-10-07): ~370 tokens of HOW YOU TALK -- answer first, first
     // person, names in lists, one caveat. In the cached prefix.
-    expect(rendered.characters / 4).toBeLessThan(4_500);
+    // v22 remains under its historical cap. The approved v23 addition keeps
+    // all v22 instructions verbatim and adds strict shape guidance/example:
+    // the synthetic render grows from 4,497 to 5,127.75 estimated tokens.
+    // This versioned template check does not change gateway admission,
+    // provider context/output limits or production validators.
+    const historical = render(
+      DEFAULT_COMMUNICATION_PROFILE,
+      analystVariables(),
+      22,
+    );
+    expect(historical.characters / 4).toBeLessThan(4_500);
+    expect(rendered.bundle.task).toBe("company-analyst/v25");
+    expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS);
+    expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });
 });
 
