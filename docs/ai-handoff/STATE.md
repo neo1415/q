@@ -1,5 +1,13 @@
 # Capital Q — Current shared engineering state
 
+## GateQ execution recovery — 2026-10-13
+
+- Active repair branch: `codex/gateq-completion-recovery`, recovered from QA `f03c963c` with Claude backend `0552c4f7` included. Remote production `5ce3d76b` and integration `be2ab28a` verified by GitHub refs; deployed service revisions not rechecked in this slice. Original branches and earlier uncommitted contact work preserved. Q Pitch is outside this assignment.
+- IMPLEMENTED / focused LOCAL TESTED: application-bound HMAC contact code verifier; 23 interview/contact tests PASS, including three new verifier cases. Dedicated server-only `GATEQ_CONTACT_CODE_SECRET` (at least 32 bytes) required before deployment; exact setup and rotation behavior in `GATEQ-RECOVERY-CHECKPOINT.md`. No secret generated or deployed.
+- REPRODUCED: both existing exchange concurrency regressions FAIL (duplicate model call and interpretation of unstored changed retry text). These assertions remain intact. Resend reset, shared throttling, code-confirmation concurrency and final-turn/submission consistency remain unrepaired.
+- Fresh checkout frozen install PASS after offline metadata miss; package builds in progress. First test attempt executed zero tests because GateQ dist was not ready, then rerun executed 25 (23 PASS / 2 reproduced FAIL). Early package typecheck blocked by not-yet-built model-gateway dist; not a typecheck PASS. No release, migrations, browser acceptance or paid video usage claimed.
+- Next: finish package prerequisites and static/type gates for verifier slice; repair durable exchange ownership and atomic finalization, then shared verification abuse budgets; complete existing founder interview/review/inbox and authorized Evidence integration. Measure useful text, source-linked findings/cards/artifacts and resume/submission latency within GateQ.
+
 ## 2026-10-13 17:00 UTC — Q speed sprint CLOSED (Claude); next priority GateQ
 
 - **DEPLOYED and live-verified** (production `5ce3d76b`; q-api/api/workers at `c2f08536`, server code identical; integration `ea3f71a0` has the same `packages`/`apps`/`supabase` code; hosted migrations: none pending):

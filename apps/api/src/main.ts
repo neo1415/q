@@ -753,6 +753,7 @@ const gateqApply =
             level: config.observability.logLevel,
           }),
           turns: applicationTurns,
+          contactCodeSecret: process.env["GATEQ_CONTACT_CODE_SECRET"],
           contacts: createPostgresApplicationContactRepository({
             sql: database.sql,
           }),

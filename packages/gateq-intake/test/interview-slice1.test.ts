@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -127,7 +127,9 @@ const QUALIFYING: readonly NewApplicationFact[] = [
 
 type Scripted = Partial<InterviewTurnOutcome>;
 
-function world(options: { contactRequiredFrom?: string } = {}) {
+function world(
+  options: { contactRequiredFrom?: string; contactCodeSecret?: string } = {},
+) {
   let now = NOW;
   const policy = policyOf([GEO, STAGE]);
   const applications = new Map<string, Application>();
@@ -408,6 +410,8 @@ function world(options: { contactRequiredFrom?: string } = {}) {
     clock: () => now,
     turns: turns,
     contacts: contacts,
+    contactCodeSecret:
+      options.contactCodeSecret ?? "test-only-contact-verifier-secret-32-bytes",
     documentTitles: {
       titles: (ids) =>
         Promise.resolve(new Map(ids.map((id) => [id, "Pitch deck"]))),
@@ -717,6 +721,48 @@ describe("coverage", () => {
 });
 
 describe("the applicant contact", () => {
+  it("does not store an offline-enumerable legacy verifier or accept it after recovery", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    const entry = [...w.contactRows.entries()][0];
+    expect(entry).toBeDefined();
+    if (entry === undefined) throw new Error("missing contact fixture");
+    const [applicationId, contact] = entry;
+    const code = w.mailed[0]?.code ?? "";
+    const legacy = createHash("sha256")
+      .update(`gateq-contact-code:${applicationId}:${code}`)
+      .digest("hex");
+    expect(contact.codeHash).not.toBe(legacy);
+    w.contactRows.set(applicationId, { ...contact, codeHash: legacy });
+    expect((await w.intake.confirmContact({ token, code })).status).toBe(
+      "WRONG_CODE",
+    );
+  });
+
+  it("refuses code issuance with an absent or weak verifier secret before sending mail", async () => {
+    const w = world({ contactCodeSecret: "" });
+    const { token } = await w.start();
+    await expect(
+      w.intake.startContact({ token, contact: CONTACT }),
+    ).rejects.toThrow("not configured");
+    expect(w.contactRows.size).toBe(0);
+    expect(w.mailed).toHaveLength(0);
+  });
+
+  it("keeps verified-account contact confirmation available without a code secret", async () => {
+    const w = world({ contactCodeSecret: "" });
+    const { token } = await w.start();
+    const result = await w.intake.startContact({
+      token,
+      contact: CONTACT,
+      accountEmail: CONTACT.email,
+    });
+    expect(result.contact.emailConfirmed).toBe(true);
+    expect(result.codeSent).toBe(false);
+    expect(w.mailed).toHaveLength(0);
+  });
+
   it("is confirmed by the code that was mailed, and only that code", async () => {
     const w = world();
     const { token } = await w.start();
@@ -733,6 +779,10 @@ describe("the applicant contact", () => {
     const right = await w.intake.confirmContact({ token, code });
     expect(right.status).toBe("CONFIRMED");
     expect(right.contact?.confirmedVia).toBe("EMAIL_CODE");
+    expect([...w.contactRows.values()][0]?.codeHash).toBeNull();
+    expect((await w.intake.confirmContact({ token, code })).status).toBe(
+      "CONFIRMED",
+    );
   });
 
   it("expires after its time", async () => {

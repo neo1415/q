@@ -1,5 +1,5 @@
 import {
-  createHash,
+  createHmac,
   randomInt,
   randomUUID,
   timingSafeEqual,
@@ -104,6 +104,8 @@ export type IntakeDependencies = {
   readonly contactRequiredFrom?: string | undefined;
   /** Test seam for the six-digit code. */
   readonly newContactCode?: (() => string) | undefined;
+  /** Server-only verifier key, independent of database and session credentials. */
+  readonly contactCodeSecret?: string | undefined;
 };
 
 /** GateQ slice 1: how long a contact code works, and how many tries. */
@@ -131,9 +133,13 @@ export type ContactDetails = {
  * The verifier of a contact code, bound to the application: the same six
  * digits issued to two applications never verify each other.
  */
-const hashContactCode = (applicationId: string, code: string): string =>
-  createHash("sha256")
-    .update(`gateq-contact-code:${applicationId}:${code}`, "utf8")
+const hashContactCode = (
+  secret: string,
+  applicationId: string,
+  code: string,
+): string =>
+  createHmac("sha256", secret)
+    .update(`gateq-contact-code:v1:${applicationId}:${code}`, "utf8")
     .digest("hex");
 
 const sameHash = (a: string, b: string): boolean => {
@@ -253,6 +259,13 @@ export function createIntakeService(
     contactRequiredFrom,
   } = dependencies;
   const clock = dependencies.clock ?? (() => new Date());
+  const contactCodeSecret = (): string => {
+    const secret = dependencies.contactCodeSecret;
+    if (secret === undefined || Buffer.byteLength(secret, "utf8") < 32) {
+      throw new Error("GateQ contact verification is not configured");
+    }
+    return secret;
+  };
   const newContactCode =
     dependencies.newContactCode ??
     (() => String(randomInt(0, 1_000_000)).padStart(6, "0"));
@@ -717,7 +730,7 @@ export function createIntakeService(
       const code = newContactCode();
       const saved = await contacts.save({
         ...base,
-        codeHash: hashContactCode(application.id, code),
+        codeHash: hashContactCode(contactCodeSecret(), application.id, code),
         codeExpiresAt: new Date(
           now.getTime() + CONTACT_CODE_TTL_MINUTES * 60_000,
         ).toISOString(),
@@ -764,7 +777,10 @@ export function createIntakeService(
       }
       if (
         !/^[0-9]{6}$/.test(input.code) ||
-        !sameHash(contact.codeHash, hashContactCode(application.id, input.code))
+        !sameHash(
+          contact.codeHash,
+          hashContactCode(contactCodeSecret(), application.id, input.code),
+        )
       ) {
         await contacts.recordFailedAttempt(application.id);
         return { status: "WRONG_CODE", contact: contactDto(contact) };
