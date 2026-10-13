@@ -35,7 +35,7 @@ export const TURN_READER_V49: PromptDefinition<
 > = {
   ...TURN_READER_V48,
   version: 49,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Lead review 2026-10-12: teamJob, read from meaning, when the person hands Q's team a piece of work of several steps; code has the lead plan it for approval instead of one in-run answer.",
   effectiveFrom: "2026-10-12",
