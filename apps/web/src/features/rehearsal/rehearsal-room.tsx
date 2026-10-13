@@ -297,6 +297,7 @@ export function RehearsalRoom({
     setNotice("The voice line dropped. Reconnect, or keep going by typing.");
   };
 
+  const voiceStartError = useRef<string | null>(null);
   const voice = useVoiceSession(
     {
       onLine: (line: VoiceTranscriptLine) => {
@@ -309,7 +310,12 @@ export function RehearsalRoom({
         }
         if (line.role === "q" && !line.partial) refresh();
       },
-      onError: (message) => setNotice(message),
+      onError: (message) => {
+        voiceStartError.current = message;
+        setNotice(message);
+        setVoiceLive("TYPED");
+        setPanel(true);
+      },
       onEnded: (reason) => {
         if (left.current || reason === "ended") return;
         // A dropped line comes back on its own first (a deploy of the Q API,
@@ -375,6 +381,7 @@ export function RehearsalRoom({
       resume: boolean,
       options: { readonly quiet?: boolean } = {},
     ): Promise<boolean> => {
+      voiceStartError.current = null;
       setVoiceLive("CONNECTING");
       const started = await startVoiceSessionAction({
         rehearsal: { rehearsalId: initial.id },
@@ -394,8 +401,10 @@ export function RehearsalRoom({
       try {
         await voice.start({
           credential: started.value,
+          rehearsal: true,
           firstMessage: started.value.firstMessage,
         });
+        if (voiceStartError.current !== null) return false;
         lastActivity.current = Date.now();
         upSince.current = Date.now();
         setVoiceLive("LIVE");

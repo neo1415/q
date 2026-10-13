@@ -86,10 +86,12 @@ export function RehearsalLobby({
   kind,
   counterpartId,
   meetingId,
+  requestedVideo = false,
 }: {
   readonly kind: RehearsalCounterpartKind;
   readonly counterpartId: string;
   readonly meetingId?: string | undefined;
+  readonly requestedVideo?: boolean;
 }) {
   const router = useRouter();
   const [persona, setPersona] = useState<QRehearsalPersonaDto | null>(null);
@@ -109,7 +111,11 @@ export function RehearsalLobby({
   const founderSide = kind !== "COMPANY";
   const [interviewers, setInterviewers] =
     useState<RehearsalInterviewersDto | null>(null);
-  const [meetBy, setMeetBy] = useState<"VOICE" | "VIDEO">("VOICE");
+  const [meetBy, setMeetBy] = useState<"VOICE" | "VIDEO">(
+    requestedVideo ? "VIDEO" : "VOICE",
+  );
+  const [interviewerAttempt, setInterviewerAttempt] = useState(0);
+  const [interviewerError, setInterviewerError] = useState<string | null>(null);
   const [interviewerId, setInterviewerId] = useState<string | null>(null);
   const [video, setVideo] = useState<{
     readonly rehearsal: QRehearsalDto;
@@ -120,16 +126,25 @@ export function RehearsalLobby({
   useEffect(() => {
     if (!founderSide) return;
     let live = true;
-    void rehearsalInterviewersAction().then((result) => {
-      if (!live || !result.ok) return;
-      setInterviewers(result.value);
-      const first = result.value.interviewers.find((item) => item.available);
-      setInterviewerId(first?.id ?? null);
-    });
+    void rehearsalInterviewersAction()
+      .then((result) => {
+        if (!live) return;
+        if (!result.ok) {
+          setInterviewerError(result.message);
+          return;
+        }
+        setInterviewers(result.value);
+        const first = result.value.interviewers.find((item) => item.available);
+        setInterviewerId(first?.id ?? null);
+      })
+      .catch(() => {
+        if (live)
+          setInterviewerError("Couldn’t load meeting options. Please retry.");
+      });
     return () => {
       live = false;
     };
-  }, [founderSide]);
+  }, [founderSide, interviewerAttempt]);
 
   useEffect(() => {
     let live = true;
@@ -169,7 +184,14 @@ export function RehearsalLobby({
     );
   }
 
+  const meetingModeReady =
+    !founderSide ||
+    (interviewers !== null &&
+      (meetBy !== "VIDEO" ||
+        (interviewers.videoAvailable && interviewerId !== null)));
+
   function join() {
+    if (!meetingModeReady) return;
     // Inside the click: the room's sounds may play later.
     primeMeetSounds();
     setMessage(null);
@@ -374,6 +396,34 @@ export function RehearsalLobby({
           </p>
         </fieldset>
 
+        {!founderSide || interviewers !== null ? null : (
+          <div role="status" className="cq-body-sm text-(--cq-text-secondary)">
+            {interviewerError === null ? (
+              "Checking how you can meet…"
+            ) : (
+              <>
+                <p>{interviewerError}</p>
+                <Button
+                  onClick={() => {
+                    setInterviewerError(null);
+                    setInterviewers(null);
+                    setInterviewerAttempt((value) => value + 1);
+                  }}
+                >
+                  Retry meeting options
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+        {!requestedVideo ||
+        interviewers === null ||
+        interviewers.videoAvailable ? null : (
+          <p role="alert">
+            Video is not available for this account. No video room has been
+            started.
+          </p>
+        )}
         {interviewers === null || !interviewers.videoAvailable ? null : (
           <fieldset className="flex flex-col gap-2">
             <legend className="cq-label mb-1 text-(--cq-text-primary)">
@@ -460,7 +510,11 @@ export function RehearsalLobby({
         </label>
 
         <div className="flex flex-col gap-2">
-          <Button size="large" onClick={join} disabled={joining}>
+          <Button
+            size="large"
+            onClick={join}
+            disabled={joining || !meetingModeReady}
+          >
             {joining ? `${name} is joining…` : "Join now"}
           </Button>
           <p className="cq-caption text-(--cq-text-tertiary)">

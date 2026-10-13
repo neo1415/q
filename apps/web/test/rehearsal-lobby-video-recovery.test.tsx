@@ -68,6 +68,93 @@ afterEach(() => {
 });
 
 describe("video lobby admission and durable navigation", () => {
+  it("does not silently join voice while meeting options are loading", async () => {
+    actions.interviewers.mockReturnValue(new Promise(() => undefined));
+    render(
+      <RehearsalLobby
+        kind="INVESTOR_ORGANISATION"
+        counterpartId={ID}
+        requestedVideo
+      />,
+    );
+    await screen.findByText(/Ready to rehearse/u);
+    const join = screen.getByRole("button", { name: "Join now" });
+    expect(join.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(join);
+    expect(actions.start).not.toHaveBeenCalled();
+    expect(screen.getByText("Checking how you can meet…")).toBeTruthy();
+  });
+
+  it("shows a failed options read and recovers the requested video mode on retry", async () => {
+    actions.interviewers.mockResolvedValueOnce({
+      ok: false,
+      message: "Couldn't reach Q just now.",
+    });
+    render(
+      <RehearsalLobby
+        kind="INVESTOR_ORGANISATION"
+        counterpartId={ID}
+        requestedVideo
+      />,
+    );
+    const retry = await screen.findByRole("button", {
+      name: "Retry meeting options",
+    });
+    expect(
+      screen.getByRole("button", { name: "Join now" }).hasAttribute("disabled"),
+    ).toBe(true);
+    fireEvent.click(retry);
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("radio", { name: /Video, up to/u })
+          .getAttribute("checked"),
+      ).not.toBeNull(),
+    );
+    expect(
+      screen.getByRole("button", { name: "Join now" }).hasAttribute("disabled"),
+    ).toBe(false);
+    expect(actions.start).not.toHaveBeenCalled();
+  });
+
+  it("keeps a rejected meeting-options request recoverable without allocating", async () => {
+    actions.interviewers.mockRejectedValueOnce(new Error("transport failed"));
+    render(
+      <RehearsalLobby
+        kind="INVESTOR_ORGANISATION"
+        counterpartId={ID}
+        requestedVideo
+      />,
+    );
+    expect(
+      await screen.findByRole("button", { name: "Retry meeting options" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Join now" }).hasAttribute("disabled"),
+    ).toBe(true);
+    expect(actions.start).not.toHaveBeenCalled();
+  });
+
+  it("refuses a requested video join when canonical video admission is absent", async () => {
+    actions.interviewers.mockResolvedValue({
+      ok: true,
+      value: { ...catalogue, videoAvailable: false, interviewers: [] },
+    });
+    render(
+      <RehearsalLobby
+        kind="INVESTOR_ORGANISATION"
+        counterpartId={ID}
+        requestedVideo
+      />,
+    );
+    await screen.findByRole("alert");
+    const join = screen.getByRole("button", { name: "Join now" });
+    expect(join.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(join);
+    expect(actions.start).not.toHaveBeenCalled();
+    expect(actions.video).not.toHaveBeenCalled();
+  });
+
   it("keeps voice selected by default and hides video when canonical admission is absent", async () => {
     actions.interviewers.mockResolvedValue({
       ok: true,

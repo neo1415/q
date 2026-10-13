@@ -180,6 +180,27 @@ describe("GPT-Live as the product voice", () => {
     },
   );
 
+  it("keeps an owned rehearsal out of general Q navigation and greetings", async () => {
+    const { result } = renderHook(() => useVoiceSession());
+    await ready();
+    await act(async () => {
+      await result.current.start({
+        credential,
+        rehearsal: true,
+        firstMessage: "What evidence supports your enterprise demand?",
+      });
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      fastNavigation: false,
+      opening: { content: "What evidence supports your enterprise demand?" },
+    });
+    expect(
+      (calls[0]?.["opening"] as { greeting?: string })?.greeting,
+    ).toContain("Do not add a greeting or question");
+    expect(standardStart).not.toHaveBeenCalled();
+  });
+
   it("opens every voice start on GPT-Live, attached to the issued session", async () => {
     const { result } = renderHook(() => useVoiceSession());
     await ready();

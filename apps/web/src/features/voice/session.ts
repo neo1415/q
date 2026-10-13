@@ -154,6 +154,8 @@ export type VoiceSessionStart = {
   readonly credential: CreateQVoiceSessionResponse;
   /** What Q says first, when the interview has a question to ask. */
   readonly firstMessage?: string | undefined;
+  /** Stay in the owned rehearsal: no general Q greeting or navigation shortcuts. */
+  readonly rehearsal?: boolean;
 };
 
 /** The live session, as the UI drives it. */

@@ -11,9 +11,12 @@ export default async function InvestorRehearsalPage({
   searchParams,
 }: {
   readonly params: Promise<{ readonly investorOrganisationId: string }>;
-  readonly searchParams: Promise<{ readonly meeting?: string }>;
+  readonly searchParams: Promise<{
+    readonly meeting?: string;
+    readonly video?: string;
+  }>;
 }) {
-  const [{ investorOrganisationId }, { meeting }] = await Promise.all([
+  const [{ investorOrganisationId }, { meeting, video }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -22,6 +25,7 @@ export default async function InvestorRehearsalPage({
       kind="INVESTOR_ORGANISATION"
       counterpartId={investorOrganisationId}
       meeting={meeting}
+      requestedVideo={video === "1"}
     />
   );
 }
