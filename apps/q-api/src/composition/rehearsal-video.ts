@@ -142,6 +142,8 @@ export type VideoSessionRow = {
   readonly palId: string | null;
   readonly conversationId: string | null;
   readonly sealedJoinUrl?: string | null;
+  readonly providerRequestStartedAt?: Date | null;
+  readonly providerRequestResolvedAt?: Date | null;
   readonly status: VideoSessionStatus;
   readonly endedReason: VideoEndedReason | null;
   readonly createdAt: Date;
@@ -174,6 +176,18 @@ export type RehearsalVideoStore = {
   readonly byToken: (
     sessionId: string,
     tokenHash: string,
+  ) => Promise<VideoSessionRow | null>;
+  readonly markProviderRequest: (
+    row: VideoSessionRow,
+    input: {
+      readonly keyIndex: number;
+      readonly palId: string;
+      readonly at: Date;
+    },
+  ) => Promise<VideoSessionRow | null>;
+  readonly resolveProviderRequest: (
+    row: VideoSessionRow,
+    at: Date,
   ) => Promise<VideoSessionRow | null>;
   readonly markLive: (
     row: VideoSessionRow,
@@ -209,6 +223,8 @@ type RawRow = {
   provider_pal_id: string | null;
   provider_conversation_id: string | null;
   sealed_join_url: string | null;
+  provider_request_started_at: Date | null;
+  provider_request_resolved_at: Date | null;
   status: VideoSessionStatus;
   ended_reason: VideoEndedReason | null;
   created_at: Date;
@@ -228,6 +244,8 @@ const fromRaw = (row: RawRow): VideoSessionRow => ({
   palId: row.provider_pal_id,
   conversationId: row.provider_conversation_id,
   sealedJoinUrl: row.sealed_join_url,
+  providerRequestStartedAt: row.provider_request_started_at,
+  providerRequestResolvedAt: row.provider_request_resolved_at,
   status: row.status,
   endedReason: row.ended_reason,
   createdAt: row.created_at,
@@ -240,7 +258,7 @@ export function createPostgresRehearsalVideoStore(
 ): RehearsalVideoStore {
   const columns = sql`id, tenant_id, user_id, organisation_id, membership_id,
     rehearsal_id, interviewer_id, provider_key_index, provider_pal_id,
-    provider_conversation_id, sealed_join_url, status, ended_reason, created_at, ends_at, ended_at`;
+    provider_conversation_id, sealed_join_url, provider_request_started_at, provider_request_resolved_at, status, ended_reason, created_at, ends_at, ended_at`;
   const UUID =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
   const own = async (actor: ActorContext, rehearsalId: string) => {
@@ -289,6 +307,19 @@ export function createPostgresRehearsalVideoStore(
       const row = rows[0];
       return row === undefined ? null : fromRaw(row);
     },
+    markProviderRequest: async (row, input) => {
+      const rows = await sql<RawRow[]>`
+        update q_runtime.rehearsal_video_sessions set provider_key_index=${input.keyIndex},provider_pal_id=${input.palId},provider_request_started_at=${input.at}
+        where id=${row.id} and tenant_id=${row.tenantId} and user_id=${row.userId} and status='STARTING' and provider_request_started_at is null and ends_at>${input.at}
+        returning ${columns}`;
+      return rows[0] === undefined ? null : fromRaw(rows[0]);
+    },
+    resolveProviderRequest: async (row, at) => {
+      const rows = await sql<RawRow[]>`
+        update q_runtime.rehearsal_video_sessions set provider_request_resolved_at=coalesce(provider_request_resolved_at,${at})
+        where id=${row.id} and tenant_id=${row.tenantId} and user_id=${row.userId} and provider_request_started_at is not null returning ${columns}`;
+      return rows[0] === undefined ? null : fromRaw(rows[0]);
+    },
     markLive: async (row, input) => {
       const rows = await sql<RawRow[]>`
         update q_runtime.rehearsal_video_sessions
@@ -321,7 +352,7 @@ export function createPostgresRehearsalVideoStore(
       const rows = await sql<RawRow[]>`
         select ${columns} from q_runtime.rehearsal_video_sessions
          where ends_at <= ${now}
-           and (status in ('STARTING', 'LIVE') or (status = 'ENDED'
+           and (status in ('STARTING', 'LIVE') or (provider_request_started_at is not null and provider_request_resolved_at is null) or (status = 'ENDED'
              and ended_reason <> 'CONTINUED_BY_VOICE'
              and exists (select 1 from q_runtime.rehearsals r
                where r.id = rehearsal_id and r.tenant_id = rehearsal_video_sessions.tenant_id
@@ -609,6 +640,25 @@ export function createRehearsalVideoService(dependencies: {
       );
       throw new Error("rehearsal video provider account unavailable");
     }
+    if (
+      row.conversationId === null &&
+      row.providerRequestStartedAt != null &&
+      row.providerRequestResolvedAt == null
+    ) {
+      if (row.palId === null)
+        throw new Error("rehearsal video allocation is unconfirmed");
+      const rooms = await client.findConversationsForPal(row.palId);
+      // Absence cannot prove a timed-out create won't still complete.
+      if (rooms.length === 0)
+        throw new Error("rehearsal video allocation is unconfirmed");
+      for (const room of rooms) {
+        if (room.status !== "ended")
+          await client.endConversation(room.conversationId);
+        const confirmed = await client.getConversation(room.conversationId);
+        if (confirmed?.status !== "ended")
+          throw new Error("rehearsal video end is unconfirmed");
+      }
+    }
     if (row.conversationId !== null) {
       // Keep the row open if provider termination is unconfirmed. The
       // fixed cap and sweep retry; do not report a successful end.
@@ -640,9 +690,14 @@ export function createRehearsalVideoService(dependencies: {
     answered.delete(row.id);
     lines.delete(row.id);
     await releaseProvider(allocations.get(row.id) ?? row);
-    const closed = await store.close(row, { status, reason, at: now() });
+    const resolved = await store.resolveProviderRequest(row, now());
+    const closed = await store.close(resolved ?? row, {
+      status,
+      reason,
+      at: now(),
+    });
     allocations.delete(row.id);
-    return closed ?? row;
+    return closed ?? resolved ?? row;
   }
 
   async function finishAs(row: VideoSessionRow): Promise<RehearsalResult> {
@@ -877,7 +932,7 @@ export function createRehearsalVideoService(dependencies: {
       const disclosure = disclosureFor(rehearsal);
       try {
         const { value, keyIndex } = await pool.withHealthyKey(
-          async (client) => {
+          async (client, providerKeyIndex) => {
             const { palId } = await client.createPal({
               name: `cq-rehearsal-${row.id}`,
               // Conduct and disclosure only: what is said comes from Q.
@@ -904,12 +959,21 @@ export function createRehearsalVideoService(dependencies: {
                 },
               },
             });
+            let requested: VideoSessionRow | null = null;
             try {
               const remaining = Math.floor(
                 (endsAt.getTime() - now().getTime()) / 1_000,
               );
               if (remaining < 1)
                 throw new TavusError("conversation duration", 408);
+              requested = await store.markProviderRequest(row, {
+                keyIndex: providerKeyIndex,
+                palId,
+                at: now(),
+              });
+              if (requested === null)
+                throw new Error("rehearsal video allocation checkpoint failed");
+              allocations.set(row.id, requested);
               const conversation = await client.createConversation({
                 palId,
                 faceId: interviewer.faceId,
@@ -926,14 +990,26 @@ export function createRehearsalVideoService(dependencies: {
               });
               return { palId, conversation };
             } catch (error: unknown) {
-              // Never leave a PAL behind on an account we move away from.
-              await client.deletePal(palId).catch(() => undefined);
+              const refused =
+                error instanceof TavusError &&
+                [400, 401, 402, 403, 404, 422, 429].includes(error.status);
+              if (requested === null || refused) {
+                if (requested !== null) {
+                  const resolved = await store.resolveProviderRequest(
+                    requested,
+                    now(),
+                  );
+                  if (resolved !== null) allocations.set(row.id, resolved);
+                }
+                if (requested === null)
+                  await client.deletePal(palId).catch(() => undefined);
+              }
               throw error;
             }
           },
         );
         const allocated: VideoSessionRow = {
-          ...row,
+          ...(allocations.get(row.id) ?? row),
           keyIndex,
           palId: value.palId,
           conversationId: value.conversation.conversationId,
@@ -999,10 +1075,27 @@ export function createRehearsalVideoService(dependencies: {
           },
           "rehearsal video: provider unavailable; continuing by voice",
         );
-        await closeSession(row, "PROVIDER_UNAVAILABLE", "FAILED").catch(() => {
-          const allocated = allocations.get(row.id);
-          if (allocated !== undefined) scheduleCap(allocated);
-        });
+        await closeSession(row, "PROVIDER_UNAVAILABLE", "FAILED").catch(
+          async () => {
+            // No private join URL has been issued: Q may continue by voice,
+            // while the unresolved paid reservation remains occupied.
+            const known = allocations.get(row.id);
+            if (known?.conversationId != null) {
+              scheduleCap(known);
+              return;
+            }
+            const failed = await store.close(row, {
+              status: "FAILED",
+              reason: "PROVIDER_UNAVAILABLE",
+              at: now(),
+            });
+            const allocated = failed ?? allocations.get(row.id);
+            if (allocated !== undefined) {
+              allocations.set(row.id, allocated);
+              scheduleCap(allocated);
+            }
+          },
+        );
         return {
           kind: "OK",
           response: { mode: "VOICE_FALLBACK", reason: "PROVIDER_UNAVAILABLE" },
@@ -1013,10 +1106,30 @@ export function createRehearsalVideoService(dependencies: {
     get: async (actor, rehearsalId) => {
       const row = await store.ownByRehearsal(actor, rehearsalId);
       if (row === null || !(await canRecover(actor, row))) return null;
-      // Confirmed failed allocation has no room to recover. Its canonical
-      // rehearsal stays ACTIVE for the existing voice fallback. Uncertain
-      // compensation remains STARTING and is never collapsed into absence.
+      // An unissued join can fall back on the same canonical rehearsal.
+      // Uncertain paid reservations remain occupied independently of the
+      // user-facing failure; known live calls retain confirmed-end recovery.
       if (row.status === "FAILED") return null;
+      if (
+        row.status === "STARTING" &&
+        row.sealedJoinUrl == null &&
+        now().getTime() - row.createdAt.getTime() >= 60_000
+      ) {
+        try {
+          await closeSession(row, "PROVIDER_UNAVAILABLE", "FAILED");
+        } catch {
+          const failed = await store.close(row, {
+            status: "FAILED",
+            reason: "PROVIDER_UNAVAILABLE",
+            at: now(),
+          });
+          if (failed !== null) {
+            allocations.set(row.id, failed);
+            scheduleCap(failed);
+          }
+        }
+        return null;
+      }
       if (row.status === "LIVE") scheduleCap(row);
       return toDto(row);
     },
