@@ -1,5 +1,14 @@
 # Active tasks — authoritative cross-model board
 
+## CURRENT PRIORITIES — 2026-10-13 — Codex takeover
+
+1. PR #42 is shipped independently (all four SUCCESS `f3fe5520`, exact CI green). Finish real rendered investor journey with current rail/sheet selectors; keep current-question, exact company and no-leak assertions. Then Work/memo/review/diligence and selected-company continuity checks.
+2. PR #43 merged integration at `9da9f057`, migration 170000 applied/security read verified. Gate a voice-only production promotion from `f3fe5520`, drain old q-api replicas, then verify actual speech accounting/closure; physical cutoff is not established by unit tests.
+3. PR #44 `1fafd4f3` compensation/bridge fixes pushed; fix browser refresh, admission in test mode and finish-before-termination before new exact CI/migration 180000/restricted deployment. No paid room now: owner will join later. Preserve one fixed <=180 s entitlement, single replica/no restart, one profile; retain fail-closed fallback.
+4. PR #45 `1e5f16b8` compound evidence/graph completeness fixes pushed; await exact CI, merge independently and gate production promotion. Repeat live compound memo/reviewer/question recall and measure first useful text with evidence quality. Do not claim p95 from two samples.
+5. Keep shared checkpoint current after each merge/deployment. Do not retry local Supabase vfs image pulls; CI pgTAP + hosted HTTPS. Network is active; no restart needed. All provider test suites use disabled-local keys.
+
+
 ## ACTIVE WORKSTREAMS — owner directive 2026-10-12 18:40 UTC (product priority correction)
 
 The workforce demo is no longer the whole effort. These four lanes are ACTIVE engineering work, run in parallel, owned by Claude (release owner while Codex is unavailable; Codex owns voice-trial files `apps/q-api/src/voice/**` and `codex/voice-trial-durable-claim`). Each reports: capability users experience now · code implemented · CI · deployed + live-verified · blocked + exact next action.
