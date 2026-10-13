@@ -401,6 +401,7 @@ export function RehearsalRoom({
       try {
         await voice.start({
           credential: started.value,
+          rehearsal: true,
           firstMessage: started.value.firstMessage,
         });
         if (voiceStartError.current !== null) return false;
