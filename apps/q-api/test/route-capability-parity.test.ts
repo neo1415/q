@@ -703,6 +703,19 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/rehearsals.ts POST Q_REHEARSAL_SCREEN_PATH": exempt(
     "a frame of the screen the person shares in the rehearsal room; only the person can share their screen",
   ),
+  // ADR 0066: the video rehearsal room's own transport. The founder starts
+  // and ends their own call; the bridge is called by Tavus, never a person.
+  "q-api/http/rehearsal-video.ts GET Q_REHEARSAL_VIDEO_INTERVIEWERS_PATH":
+    exempt(
+      "the stock interviewers a founder can pick, shown in the rehearsal lobby",
+    ),
+  "q-api/http/rehearsal-video.ts GET Q_REHEARSAL_VIDEO_PATH": exempt(
+    "the founder reading their own video rehearsal's state, shown in the rehearsal room",
+  ),
+  "q-api/http/rehearsal-video.ts POST Q_REHEARSAL_VIDEO_PATH": Q_TRANSPORT,
+  "q-api/http/rehearsal-video.ts POST Q_REHEARSAL_VIDEO_END_PATH": Q_TRANSPORT,
+  "q-api/http/rehearsal-video.ts POST `${Q_REHEARSAL_VIDEO_BRIDGE_BASE_PATH}/chat/completions`":
+    WEBHOOK,
   // end REHEARSE block
   "q-api/http/meeting-assistant.ts GET Q_MEETING_ASSISTANT_PATH": exempt(
     "the organiser reading whether Q is in their call and its notes; shown on the meeting itself",
@@ -1121,6 +1134,11 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_USAGE_PATH",
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_END_PATH",
   "q-api/voice/live/routes.ts POST Q_VOICE_LIVE_TRANSCRIPT_PATH",
+  // ADR 0066: the video rehearsal's start, end and the provider's turn
+  // bridge are the room's transport, like the live voice session's.
+  "q-api/http/rehearsal-video.ts POST Q_REHEARSAL_VIDEO_PATH",
+  "q-api/http/rehearsal-video.ts POST Q_REHEARSAL_VIDEO_END_PATH",
+  "q-api/http/rehearsal-video.ts POST `${Q_REHEARSAL_VIDEO_BRIDGE_BASE_PATH}/chat/completions`",
   // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
   // conversation's own transport, never a person's action.
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",

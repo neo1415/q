@@ -13,10 +13,13 @@ const securityHeaders = [
   // stays in the browser (REHEARSE; live 2026-10-01 the camera button was
   // refused by this header). Display capture is not listed, so it keeps
   // its default of self (the rehearsal's screen share). Location is not a
-  // product feature.
+  // product feature. The video rehearsal's room (ADR 0066) is the one
+  // other origin delegated camera, microphone and screen share, and only
+  // inside its iframe: the provider's private room host, nothing wider.
   {
     key: "Permissions-Policy",
-    value: "camera=(self), geolocation=(), microphone=(self)",
+    value:
+      'camera=(self "https://tavus.daily.co"), display-capture=(self "https://tavus.daily.co"), geolocation=(), microphone=(self "https://tavus.daily.co")',
   },
 ];
 

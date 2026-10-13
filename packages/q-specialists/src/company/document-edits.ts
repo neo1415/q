@@ -4,6 +4,7 @@ import type {
   QSlide,
   QSlideImage,
 } from "@capital-q/contracts";
+import { splitSentences } from "@capital-q/q-core";
 
 import type { StockPhotoPort } from "./deck-photos.js";
 import {
@@ -107,7 +108,7 @@ function shorterSlide(slide: QSlide): QSlide | null {
       6,
       Math.min(SLIDE_BODY_WORDS_MAX, Math.round(words(only).length * 0.6)),
     );
-    const sentence = only.match(/^[^.!?]+[.!?]/)?.[0];
+    const sentence = splitSentences(only)[0]?.trim();
     const next =
       sentence !== undefined && words(sentence).length <= keep
         ? sentence
@@ -186,9 +187,9 @@ export async function applyDocumentEdit(
         const all = words(section.body);
         if (all.length <= 12) return no("That section is already short.");
         const keep = Math.max(12, Math.round(all.length * 0.6));
-        const sentences = section.body.match(/[^.!?]+[.!?]+/g) ?? [];
+        // Real sentence ends only, so "3.8%" is never cut to "3." (D9).
         let body = "";
-        for (const sentence of sentences) {
+        for (const sentence of splitSentences(section.body)) {
           if (words(`${body}${sentence}`).length > keep) break;
           body = `${body}${sentence}`;
         }

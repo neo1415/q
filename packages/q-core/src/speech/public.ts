@@ -57,3 +57,4 @@ export {
   type DailyFollowUpKind,
   type DailyNewsStory,
 } from "./daily-news.js";
+export { splitSentences } from "../communication/sentences.js";
