@@ -5,23 +5,7 @@ import {
   type TavusFailureKind,
 } from "./client.js";
 
-/**
- * The configured Tavus keys (owner directive 2026-10-12: the six supplied
- * keys are all used). A session takes the first healthy key in order and
- * moves to the next ONLY when the provider refuses that key (AUTH), its
- * account is out of credit (CREDIT) or at a usage or concurrency limit
- * (QUOTA). Any other failure is the provider's, not the key's, and is not
- * retried on another account. The chosen key is recorded on the session
- * by INDEX, never value, so ending and cleanup use the same account.
- *
- * Keys live only in server configuration (CQ_TAVUS_API_KEYS, comma or
- * whitespace separated; TAVUS_API_KEY as a single-key fallback). They are
- * never logged, returned, or put in a prompt; logs carry the index.
- *
- * ADR 0066 point 4 says keys are not pooled to evade a plan's limits and a
- * further key is used only when the owner records that it is a separately
- * entitled account. Moving on at CREDIT/QUOTA relies on that record.
- */
+/** One configured, explicitly entitled account. Refusals never rotate accounts. */
 
 /** How long a key that failed for this reason is passed over. */
 const COOLDOWN_MS: Readonly<
@@ -40,7 +24,7 @@ export function tavusKeysFrom(env: {
   readonly CQ_TAVUS_API_KEYS?: string | undefined;
   readonly TAVUS_API_KEY?: string | undefined;
 }): readonly string[] {
-  const raw = [env.CQ_TAVUS_API_KEYS ?? "", env.TAVUS_API_KEY ?? ""].join(",");
+  const raw = env.TAVUS_API_KEY ?? env.CQ_TAVUS_API_KEYS ?? "";
   const keys: string[] = [];
   for (const part of raw.split(/[\s,]+/u)) {
     const key = part.trim();
@@ -50,7 +34,7 @@ export function tavusKeysFrom(env: {
     if (!keys.includes(key)) keys.push(key);
     if (keys.length === TAVUS_MAX_KEYS) break;
   }
-  return keys;
+  return keys.length === 1 ? keys : [];
 }
 
 export type TavusKeyHealth = {
@@ -69,8 +53,7 @@ export class TavusKeysExhaustedError extends Error {
 export type TavusKeyPool = {
   readonly size: number;
   /**
-   * Runs `work` with the first healthy key, moving to the next only on an
-   * AUTH, CREDIT or QUOTA refusal. Returns the value and the key's index.
+   * Runs `work` with the sole account; refusals fail closed. Returns the value and the key's index.
    */
   readonly withHealthyKey: <T>(
     work: (client: TavusClient, keyIndex: number) => Promise<T>,
@@ -96,9 +79,7 @@ export function createTavusKeyPool(dependencies: {
   const make =
     dependencies.createClient ??
     ((apiKey: string) => createTavusClient({ apiKey }));
-  const clients = dependencies.keys
-    .slice(0, TAVUS_MAX_KEYS)
-    .map((key) => make(key));
+  const clients = dependencies.keys.slice(0, 1).map((key) => make(key));
   const until = clients.map(() => 0);
   const last: (TavusFailureKind | null)[] = clients.map(() => null);
 

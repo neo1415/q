@@ -1,3 +1,4 @@
+import { createTokenCipher } from "@capital-q/integrations";
 import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
@@ -241,7 +242,10 @@ function memoryStore(): RehearsalVideoStore & {
       Promise.resolve(
         [...rows.values()].filter(
           (row) =>
-            (row.status === "LIVE" || row.status === "STARTING") &&
+            (row.status === "LIVE" ||
+              row.status === "STARTING" ||
+              (row.status === "ENDED" &&
+                row.endedReason !== "CONTINUED_BY_VOICE")) &&
             row.endsAt <= now,
         ),
       ),
@@ -307,6 +311,7 @@ function setup(
     keys?: number;
     failConversation?: (key: number) => TavusError | null;
     configured?: boolean;
+    paidUserIds?: ReadonlySet<string>;
   } = {},
 ) {
   let clock = T0.getTime();
@@ -316,6 +321,8 @@ function setup(
   const tavus = fakeTavus(options.keys ?? 2, options.failConversation);
   const service = createRehearsalVideoService({
     store,
+    paidUserIds: options.paidUserIds ?? new Set([FOUNDER.userId]),
+    joinCipher: createTokenCipher(Buffer.alloc(32, 1).toString("base64")),
     rehearsals: rehearsals.service,
     pool: options.configured === false ? null : tavus.pool,
     publicBaseUrl: "https://q-api.example.test/",
@@ -339,7 +346,19 @@ function setup(
     await new Promise((resolve) => setTimeout(resolve, 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
   };
-  return { service, rehearsals, store, tavus, advance, timers };
+  const restarted = () =>
+    createRehearsalVideoService({
+      store,
+      paidUserIds: new Set([FOUNDER.userId]),
+      rehearsals: rehearsals.service,
+      pool: tavus.pool,
+      joinCipher: createTokenCipher(Buffer.alloc(32, 1).toString("base64")),
+      publicBaseUrl: "https://q-api.example.test/",
+      bridgePath: qRehearsalVideoBridgeBasePath,
+      enabledInterviewers: enabledInterviewersFrom(undefined),
+      now: () => new Date(clock),
+    });
+  return { service, rehearsals, store, tavus, advance, timers, restarted };
 }
 
 /** The bearer the PAL was given, as the provider would present it. */
@@ -395,6 +414,32 @@ describe("starting a video rehearsal", () => {
     expect(second.id).toBe(first.id);
     expect(second.endsAt).toBe(first.endsAt);
     expect(harness.tavus.calls.conversations).toHaveLength(1);
+  });
+
+  it("recovers the same private room on a restarted replica without another provider call", async () => {
+    const harness = setup();
+    const first = await startVideo(harness);
+    harness.service.close();
+    const restart = harness.restarted();
+    expect(await restart.get(STRANGER, REHEARSAL_ID)).toBeNull();
+    const recovered = await restart.get(FOUNDER, REHEARSAL_ID);
+    expect(recovered?.joinUrl).toBe(first.joinUrl);
+    expect(recovered?.endsAt).toBe(first.endsAt);
+    const repeated = await restart.start(
+      FOUNDER,
+      REHEARSAL_ID,
+      "partner-steve",
+    );
+    expect(
+      repeated.kind === "OK" &&
+        repeated.response.mode === "VIDEO" &&
+        repeated.response.session.joinUrl,
+    ).toBe(first.joinUrl);
+    expect(harness.tavus.calls.conversations).toHaveLength(1);
+    expect([...harness.store.rows.values()][0]?.sealedJoinUrl).not.toContain(
+      "room-token",
+    );
+    restart.close();
   });
 
   it("never restarts the clock: after the cap the same rehearsal has no second video", async () => {
@@ -477,6 +522,17 @@ describe("falling back to the voice room", () => {
     ).toBeTruthy();
   });
 
+  it("does not allocate paid provider resources outside the explicit rollout", async () => {
+    const harness = setup({ paidUserIds: new Set() });
+    expect(
+      await harness.service.start(FOUNDER, REHEARSAL_ID, "partner-steve"),
+    ).toEqual({
+      kind: "OK",
+      response: { mode: "VOICE_FALLBACK", reason: "NOT_CONFIGURED" },
+    });
+    expect(harness.tavus.calls.pals).toHaveLength(0);
+  });
+
   it("falls back when every key is refused, leaving no PAL behind", async () => {
     const harness = setup({
       keys: 2,
@@ -492,10 +548,7 @@ describe("falling back to the voice room", () => {
       kind: "OK",
       response: { mode: "VOICE_FALLBACK", reason: "PROVIDER_UNAVAILABLE" },
     });
-    expect(harness.tavus.calls.deleted).toEqual([
-      { key: 0, id: "pal0" },
-      { key: 1, id: "pal1" },
-    ]);
+    expect(harness.tavus.calls.deleted).toEqual([{ key: 0, id: "pal0" }]);
     expect([...harness.store.rows.values()][0]?.status).toBe("FAILED");
     // The rehearsal itself is untouched: it continues in the voice room.
     expect(harness.rehearsals.finished).toEqual([]);
@@ -519,22 +572,22 @@ describe("falling back to the voice room", () => {
   });
 });
 
-describe("several keys", () => {
-  it("moves to the next key on a quota refusal and ends with that same key", async () => {
+describe("single entitled account", () => {
+  it("a quota refusal falls back without creating a room on another account", async () => {
     const harness = setup({
       keys: 3,
-      failConversation: (key) =>
-        key === 0 ? new TavusError("create conversation", 400, "QUOTA") : null,
+      failConversation: () =>
+        new TavusError("create conversation", 429, "QUOTA"),
     });
-    const session = await startVideo(harness);
-    expect(session.joinUrl).toContain("conv1");
-    expect(harness.tavus.calls.deleted).toEqual([{ key: 0, id: "pal0" }]);
-    expect([...harness.store.rows.values()][0]?.keyIndex).toBe(1);
-    await harness.service.end(FOUNDER, REHEARSAL_ID, {
-      continueByVoice: false,
-    });
-    expect(harness.tavus.calls.ended).toEqual([{ key: 1, id: "conv1" }]);
-    expect(harness.tavus.calls.deleted.at(-1)).toEqual({ key: 1, id: "pal1" });
+    const result = await harness.service.start(
+      FOUNDER,
+      REHEARSAL_ID,
+      "partner-steve",
+    );
+    expect(result.kind === "OK" && result.response.mode).toBe("VOICE_FALLBACK");
+    expect(harness.tavus.calls.conversations.map((call) => call.key)).toEqual([
+      0,
+    ]);
   });
 });
 
@@ -673,6 +726,50 @@ describe("ending", () => {
     });
     expect(twice.kind).toBe("OK");
     expect(harness.rehearsals.finished).toEqual([REHEARSAL_ID]);
+  });
+
+  it("does not report an ended call or finish the review when provider termination fails", async () => {
+    const harness = setup();
+    await startVideo(harness);
+    const client = harness.tavus.pool.clientAt(0);
+    if (client === null) throw new Error("missing fake client");
+    const failedEnd = vi
+      .spyOn(client, "endConversation")
+      .mockRejectedValue(new TavusError("end conversation", 503));
+    expect(
+      await harness.service.end(FOUNDER, REHEARSAL_ID, {
+        continueByVoice: false,
+      }),
+    ).toEqual({ kind: "PROVIDER_UNAVAILABLE" });
+    expect([...harness.store.rows.values()][0]?.status).toBe("LIVE");
+    expect(harness.rehearsals.finished).toEqual([]);
+    failedEnd.mockRestore();
+    const retry = await harness.service.end(FOUNDER, REHEARSAL_ID, {
+      continueByVoice: false,
+    });
+    expect(retry.kind).toBe("OK");
+    expect(harness.rehearsals.finished).toEqual([REHEARSAL_ID]);
+  });
+
+  it("recovers a saved video end whose canonical review failed, after restart", async () => {
+    const harness = setup();
+    await startVideo(harness);
+    harness.rehearsals.service.finish.mockRejectedValueOnce(
+      new Error("temporary Q failure"),
+    );
+    expect(
+      await harness.service.end(FOUNDER, REHEARSAL_ID, {
+        continueByVoice: false,
+      }),
+    ).toEqual({ kind: "Q_UNAVAILABLE" });
+    expect([...harness.store.rows.values()][0]?.status).toBe("ENDED");
+    expect(harness.rehearsals.finished).toEqual([]);
+    harness.service.close();
+    await harness.advance(181000);
+    const restart = harness.restarted();
+    expect(await restart.sweep()).toBe(1);
+    expect(harness.rehearsals.finished).toEqual([REHEARSAL_ID]);
+    restart.close();
   });
 
   it("continuing by voice leaves the rehearsal open", async () => {

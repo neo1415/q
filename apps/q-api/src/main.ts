@@ -54,7 +54,7 @@ import {
 } from "@capital-q/gateq-intake";
 import { createCounterpartNames } from "./composition/counterpart-names.js";
 import { createWaitingLines } from "./composition/waiting-lines.js";
-import { randomUUID } from "node:crypto";
+import { hkdfSync, randomUUID } from "node:crypto";
 
 import {
   loadDatabaseConfig,
@@ -684,6 +684,7 @@ import {
 import { ownRecordTerms } from "./voice/vocabulary.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
+  createTokenCipher,
   composeGoogleIntegrations,
   createPostgresCounterpartDirectory,
   createInboundEmailService,
@@ -5924,6 +5925,17 @@ const tavusKeys = tavusKeysFrom({
 });
 const rehearsalVideo = createRehearsalVideoService({
   store: createPostgresRehearsalVideoStore(database.sql),
+  joinCipher: createTokenCipher(
+    Buffer.from(
+      hkdfSync(
+        "sha256",
+        voiceSessionSecret,
+        "capital-q/rehearsal-video",
+        "join-url.v1",
+        32,
+      ),
+    ).toString("base64"),
+  ),
   rehearsals,
   pool:
     tavusKeys.length === 0
@@ -5943,6 +5955,15 @@ const rehearsalVideo = createRehearsalVideoService({
     process.env.CQ_REHEARSAL_VIDEO_INTERVIEWERS,
   ),
   testMode: process.env.CQ_TAVUS_TEST_MODE === "true",
+  paidUserIds: new Set(
+    (process.env.CQ_TAVUS_PAID_USER_IDS ?? "")
+      .split(/[\s,]+/u)
+      .filter((id) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(
+          id,
+        ),
+      ),
+  ),
   logger,
 });
 logger.info(

@@ -10,6 +10,7 @@ import {
   type StartRehearsalVideoResponse,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
+import { SecretToken, type TokenCipher } from "@capital-q/integrations";
 import type { Logger } from "@capital-q/observability";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
@@ -118,6 +119,7 @@ export type VideoSessionRow = {
   readonly keyIndex: number | null;
   readonly palId: string | null;
   readonly conversationId: string | null;
+  readonly sealedJoinUrl?: string | null;
   readonly status: VideoSessionStatus;
   readonly endedReason: VideoEndedReason | null;
   readonly createdAt: Date;
@@ -157,6 +159,7 @@ export type RehearsalVideoStore = {
       readonly keyIndex: number;
       readonly palId: string;
       readonly conversationId: string;
+      readonly sealedJoinUrl: string;
     },
   ) => Promise<VideoSessionRow | null>;
   /** Closes an open session; null when it was already closed. */
@@ -183,6 +186,7 @@ type RawRow = {
   provider_key_index: number | null;
   provider_pal_id: string | null;
   provider_conversation_id: string | null;
+  sealed_join_url: string | null;
   status: VideoSessionStatus;
   ended_reason: VideoEndedReason | null;
   created_at: Date;
@@ -201,6 +205,7 @@ const fromRaw = (row: RawRow): VideoSessionRow => ({
   keyIndex: row.provider_key_index,
   palId: row.provider_pal_id,
   conversationId: row.provider_conversation_id,
+  sealedJoinUrl: row.sealed_join_url,
   status: row.status,
   endedReason: row.ended_reason,
   createdAt: row.created_at,
@@ -213,7 +218,7 @@ export function createPostgresRehearsalVideoStore(
 ): RehearsalVideoStore {
   const columns = sql`id, tenant_id, user_id, organisation_id, membership_id,
     rehearsal_id, interviewer_id, provider_key_index, provider_pal_id,
-    provider_conversation_id, status, ended_reason, created_at, ends_at, ended_at`;
+    provider_conversation_id, sealed_join_url, status, ended_reason, created_at, ends_at, ended_at`;
   const UUID =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
   const own = async (actor: ActorContext, rehearsalId: string) => {
@@ -267,7 +272,8 @@ export function createPostgresRehearsalVideoStore(
         update q_runtime.rehearsal_video_sessions
            set status = 'LIVE', provider_key_index = ${input.keyIndex},
                provider_pal_id = ${input.palId},
-               provider_conversation_id = ${input.conversationId}
+               provider_conversation_id = ${input.conversationId},
+               sealed_join_url = ${input.sealedJoinUrl}
          where id = ${row.id} and tenant_id = ${row.tenantId}
            and user_id = ${row.userId} and status = 'STARTING'
         returning ${columns}`;
@@ -292,7 +298,12 @@ export function createPostgresRehearsalVideoStore(
       // each row is then acted on only as its own founder.
       const rows = await sql<RawRow[]>`
         select ${columns} from q_runtime.rehearsal_video_sessions
-         where status in ('STARTING', 'LIVE') and ends_at <= ${now}
+         where ends_at <= ${now}
+           and (status in ('STARTING', 'LIVE') or (status = 'ENDED'
+             and ended_reason <> 'CONTINUED_BY_VOICE'
+             and exists (select 1 from q_runtime.rehearsals r
+               where r.id = rehearsal_id and r.tenant_id = rehearsal_video_sessions.tenant_id
+                 and r.user_id = rehearsal_video_sessions.user_id and r.status = 'ACTIVE')))
          order by ends_at
          limit 50`;
       return rows.map(fromRaw);
@@ -319,7 +330,8 @@ export type EndVideoResult =
       readonly rehearsal: QRehearsalDto;
     }
   | { readonly kind: "NOT_FOUND" }
-  | { readonly kind: "Q_UNAVAILABLE" };
+  | { readonly kind: "Q_UNAVAILABLE" }
+  | { readonly kind: "PROVIDER_UNAVAILABLE" };
 
 export type BridgeMessage = { readonly role: string; readonly text: string };
 
@@ -418,12 +430,16 @@ export function createRehearsalVideoService(dependencies: {
   readonly rehearsals: Pick<RehearsalService, "get" | "say" | "finish">;
   /** Null: video is not configured, every start falls back to voice. */
   readonly pool: TavusKeyPool | null;
+  /** Existing credentials-at-rest cipher, purpose-specific server key. */
+  readonly joinCipher: TokenCipher;
   /** The Q API's public origin the provider calls back; null: not configured. */
   readonly publicBaseUrl: string | null;
   readonly bridgePath: (sessionId: string) => string;
   readonly enabledInterviewers: ReadonlySet<string>;
   /** Tavus test_mode: the room is created but no face joins (no minutes). */
   readonly testMode?: boolean | undefined;
+  /** Controlled paid rollout; empty/missing fails closed outside test mode. */
+  readonly paidUserIds?: ReadonlySet<string> | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
   readonly setTimer?:
@@ -439,12 +455,16 @@ export function createRehearsalVideoService(dependencies: {
       return { cancel: () => clearTimeout(handle) };
     });
   const configured =
-    pool !== null && pool.size > 0 && dependencies.publicBaseUrl !== null;
+    pool !== null &&
+    pool.size > 0 &&
+    dependencies.publicBaseUrl !== null &&
+    (dependencies.testMode === true ||
+      (dependencies.paidUserIds?.size ?? 0) > 0);
   const timers = new Map<string, { cancel: () => void }>();
   /**
    * The join link of a live session (it carries the room's token), held
-   * in memory only, never stored: a retried start on this instance gets the
-   * same room; elsewhere the session reads as live without a link.
+   * cached locally; its encrypted owner/session-bound credential is held
+   * on the canonical row so another replica can recover the same room.
    */
   const joinLinks = new Map<string, string>();
   const disclosures = new Map<string, string>();
@@ -469,6 +489,30 @@ export function createRehearsalVideoService(dependencies: {
     };
   };
 
+  function recoveredJoinUrl(row: VideoSessionRow): string | null {
+    if (row.endsAt.getTime() <= now().getTime()) return null;
+    const cached = joinLinks.get(row.id);
+    if (cached !== undefined) return cached;
+    if (!row.sealedJoinUrl) return null;
+    try {
+      const plain = dependencies.joinCipher
+        .decrypt(
+          Buffer.from(row.sealedJoinUrl, "base64"),
+          `rehearsal-video:${row.tenantId}:${row.userId}:${row.id}`,
+        )
+        .reveal();
+      const url = new URL(plain);
+      const recovered = joinUrlOf(
+        url.origin + url.pathname,
+        url.searchParams.get("t"),
+      );
+      if (recovered !== null) joinLinks.set(row.id, recovered);
+      return recovered;
+    } catch {
+      return null;
+    }
+  }
+
   const toDto = (row: VideoSessionRow): RehearsalVideoSessionDto => {
     const open = row.status === "LIVE" || row.status === "STARTING";
     return {
@@ -476,7 +520,7 @@ export function createRehearsalVideoService(dependencies: {
       rehearsalId: row.rehearsalId,
       interviewer: interviewerDto(row.interviewerId),
       status: open ? "LIVE" : "ENDED",
-      joinUrl: open ? (joinLinks.get(row.id) ?? null) : null,
+      joinUrl: open ? recoveredJoinUrl(row) : null,
       startedAt: row.createdAt.toISOString(),
       endsAt: row.endsAt.toISOString(),
       maxSeconds: REHEARSAL_VIDEO_MAX_SECONDS,
@@ -501,21 +545,12 @@ export function createRehearsalVideoService(dependencies: {
         { videoSessionId: row.id, keyIndex: row.keyIndex },
         "rehearsal video: recorded key is no longer configured",
       );
-      return;
+      throw new Error("rehearsal video provider account unavailable");
     }
     if (row.conversationId !== null) {
-      await client
-        .endConversation(row.conversationId)
-        .catch((error: unknown) => {
-          logger?.warn(
-            {
-              videoSessionId: row.id,
-              keyIndex: row.keyIndex,
-              status: error instanceof TavusError ? error.status : null,
-            },
-            "rehearsal video: provider end failed",
-          );
-        });
+      // Keep the row open if provider termination is unconfirmed. The
+      // fixed cap and sweep retry; do not report a successful end.
+      await client.endConversation(row.conversationId);
     }
     if (row.palId !== null) {
       await client.deletePal(row.palId).catch(() => undefined);
@@ -532,9 +567,8 @@ export function createRehearsalVideoService(dependencies: {
     joinLinks.delete(row.id);
     answered.delete(row.id);
     lines.delete(row.id);
+    await releaseProvider(row);
     const closed = await store.close(row, { status, reason, at: now() });
-    // Released whether or not this call closed it: ending twice is safe.
-    await releaseProvider(closed ?? row);
     return closed ?? row;
   }
 
@@ -604,6 +638,7 @@ export function createRehearsalVideoService(dependencies: {
       if (held !== null) {
         if (held.status === "LIVE" || held.status === "STARTING") {
           if (held.endsAt.getTime() > now().getTime()) {
+            if (held.status === "LIVE") scheduleCap(held);
             return {
               kind: "OK",
               response: { mode: "VIDEO", session: toDto(held) },
@@ -624,7 +659,13 @@ export function createRehearsalVideoService(dependencies: {
         return { kind: "ALREADY_USED" };
       }
 
-      if (!configured || pool === null || dependencies.publicBaseUrl === null) {
+      if (
+        !configured ||
+        pool === null ||
+        dependencies.publicBaseUrl === null ||
+        (dependencies.testMode !== true &&
+          !dependencies.paidUserIds?.has(actor.userId))
+      ) {
         return {
           kind: "OK",
           response: { mode: "VOICE_FALLBACK", reason: "NOT_CONFIGURED" },
@@ -714,11 +755,23 @@ export function createRehearsalVideoService(dependencies: {
           value.conversation.conversationUrl,
           value.conversation.meetingToken,
         );
-        const live = await store.markLive(row, {
-          keyIndex,
-          palId: value.palId,
-          conversationId: value.conversation.conversationId,
-        });
+        const live =
+          joinUrl === null
+            ? null
+            : await store.markLive(row, {
+                keyIndex,
+                palId: value.palId,
+                conversationId: value.conversation.conversationId,
+                sealedJoinUrl:
+                  joinUrl === null
+                    ? ""
+                    : dependencies.joinCipher
+                        .encrypt(
+                          new SecretToken(joinUrl),
+                          `rehearsal-video:${row.tenantId}:${row.userId}:${row.id}`,
+                        )
+                        .toString("base64"),
+              });
         if (live === null || joinUrl === null) {
           await closeSession(
             live ?? {
@@ -769,22 +822,32 @@ export function createRehearsalVideoService(dependencies: {
 
     get: async (actor, rehearsalId) => {
       const row = await store.ownByRehearsal(actor, rehearsalId);
-      return row === null ? null : toDto(row);
+      if (row === null) return null;
+      if (row.status === "LIVE") scheduleCap(row);
+      return toDto(row);
     },
 
     end: async (actor, rehearsalId, options) => {
       const row = await store.ownByRehearsal(actor, rehearsalId);
       if (row === null) return { kind: "NOT_FOUND" };
       const open = row.status === "LIVE" || row.status === "STARTING";
-      const closed = open
-        ? await closeSession(
-            row,
-            options.continueByVoice ? "CONTINUED_BY_VOICE" : "FOUNDER_ENDED",
-          )
-        : row;
-      const rehearsal = options.continueByVoice
-        ? await rehearsals.get(actor, rehearsalId)
-        : await finishAs(closed);
+      let closed: VideoSessionRow;
+      try {
+        closed = open
+          ? await closeSession(
+              row,
+              options.continueByVoice ? "CONTINUED_BY_VOICE" : "FOUNDER_ENDED",
+            )
+          : row;
+      } catch {
+        return { kind: "PROVIDER_UNAVAILABLE" };
+      }
+      const rehearsal = await (
+        options.continueByVoice
+          ? rehearsals.get(actor, rehearsalId)
+          : finishAs(closed)
+      ).catch(() => null);
+      if (rehearsal === null) return { kind: "Q_UNAVAILABLE" };
       if (
         rehearsal.kind === "NOT_FOUND" ||
         rehearsal.kind === "NOT_A_PARTICIPANT"
@@ -850,8 +913,11 @@ export function createRehearsalVideoService(dependencies: {
       const due = await store.overdue(now());
       let ended = 0;
       for (const row of due) {
-        const closed = await closeSession(row, "TIME_LIMIT").catch(() => null);
-        if (closed?.endedReason === "TIME_LIMIT") {
+        const closed =
+          row.status === "ENDED"
+            ? row
+            : await closeSession(row, "TIME_LIMIT").catch(() => null);
+        if (closed !== null && closed.endedReason !== "CONTINUED_BY_VOICE") {
           await finishAs(closed).catch(() => undefined);
           ended += 1;
         }

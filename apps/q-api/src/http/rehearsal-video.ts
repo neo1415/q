@@ -226,6 +226,13 @@ export function registerRehearsalVideoRoutes(
           });
         case "NOT_FOUND":
           return problem(request, reply, "RESOURCE_NOT_FOUND", "Not found.");
+        case "PROVIDER_UNAVAILABLE":
+          return problem(
+            request,
+            reply,
+            "PROVIDER_UNAVAILABLE",
+            "The video provider has not confirmed the call ended. Try again in a moment.",
+          );
         case "Q_UNAVAILABLE":
           return problem(
             request,
