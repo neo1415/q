@@ -232,9 +232,12 @@ function halt(state: DirectorState): GuideEffect[] {
   const effects: GuideEffect[] = [{ type: "CANCEL_SPEECH" }];
   if (scene !== undefined) {
     const from =
-      state.pending === null ? state.actionIndex : state.pending.actionIndex + 1;
+      state.pending === null
+        ? state.actionIndex
+        : state.pending.actionIndex + 1;
     const queued = scene.actions.slice(from).map((a) => a.actionId);
-    if (queued.length > 0) effects.push({ type: "CANCEL_QUEUED", actionIds: queued });
+    if (queued.length > 0)
+      effects.push({ type: "CANCEL_QUEUED", actionIds: queued });
   }
   if (state.pending !== null) {
     effects.push({
@@ -282,7 +285,10 @@ function lastValidBefore(state: DirectorState): number | null {
 }
 
 /** RESUME with no unresolved dispatch: back to work from the cursor. */
-function resumeFromCursor(state: DirectorState, routeIntact: boolean): Transition {
+function resumeFromCursor(
+  state: DirectorState,
+  routeIntact: boolean,
+): Transition {
   // The screen moved during the pause: the scene's own actions put it
   // back, from the first, rather than acting on the wrong page.
   return prepare(state, state.sceneIndex, routeIntact ? state.actionIndex : 0);
@@ -300,12 +306,19 @@ const HALTABLE: ReadonlySet<GuideState> = new Set<GuideState>([
   "INTERRUPTED",
 ]);
 
-export function transition(state: DirectorState, event: GuideEvent): Transition {
+export function transition(
+  state: DirectorState,
+  event: GuideEvent,
+): Transition {
   switch (event.type) {
     case "SCENE_PREPARED": {
-      if (state.phase !== "PREPARE_SCENE") return reject(state, event, "NOT_IN_THIS_STATE");
+      if (state.phase !== "PREPARE_SCENE")
+        return reject(state, event, "NOT_IN_THIS_STATE");
       const scene = sceneAt(state, state.sceneIndex);
-      if (event.sceneId !== scene.sceneId || event.capsule.sceneId !== scene.sceneId) {
+      if (
+        event.sceneId !== scene.sceneId ||
+        event.capsule.sceneId !== scene.sceneId
+      ) {
         return reject(state, event, "STALE_SCENE");
       }
       // A capsule for anyone but the current actor is never used: it may
@@ -324,20 +337,23 @@ export function transition(state: DirectorState, event: GuideEvent): Transition 
       };
     }
     case "SCENE_PREPARE_FAILED": {
-      if (state.phase !== "PREPARE_SCENE") return reject(state, event, "NOT_IN_THIS_STATE");
+      if (state.phase !== "PREPARE_SCENE")
+        return reject(state, event, "NOT_IN_THIS_STATE");
       if (event.sceneId !== sceneAt(state, state.sceneIndex).sceneId) {
         return reject(state, event, "STALE_SCENE");
       }
       return fallback(state, event.failureCode);
     }
     case "BEGIN": {
-      if (state.phase !== "READY") return reject(state, event, "NOT_IN_THIS_STATE");
+      if (state.phase !== "READY")
+        return reject(state, event, "NOT_IN_THIS_STATE");
       const scene = sceneAt(state, state.sceneIndex);
       if (state.actionIndex >= scene.actions.length) {
         // Resumed after every action landed: only the outcome is left.
         return acknowledge(enter(state, "SPEAK_AND_ACT"));
       }
-      const before = state.actionIndex === 0 ? linesAt(scene, "BEFORE_ACK") : [];
+      const before =
+        state.actionIndex === 0 ? linesAt(scene, "BEFORE_ACK") : [];
       return dispatch(
         state,
         "SPEAK_AND_ACT",
@@ -345,10 +361,14 @@ export function transition(state: DirectorState, event: GuideEvent): Transition 
       );
     }
     case "ACTION_RESULT": {
-      if (state.phase !== "SPEAK_AND_ACT") return reject(state, event, "NOT_IN_THIS_STATE");
+      if (state.phase !== "SPEAK_AND_ACT")
+        return reject(state, event, "NOT_IN_THIS_STATE");
       const { result } = event;
       const scene = sceneAt(state, state.sceneIndex);
-      const expected = state.pending === null ? undefined : scene.actions[state.pending.actionIndex];
+      const expected =
+        state.pending === null
+          ? undefined
+          : scene.actions[state.pending.actionIndex];
       if (
         state.pending === null ||
         result.dispatchId !== state.pending.dispatchId ||
@@ -375,19 +395,25 @@ export function transition(state: DirectorState, event: GuideEvent): Transition 
       return acknowledge(advanced);
     }
     case "ACK_TIMEOUT": {
-      if (state.phase !== "SPEAK_AND_ACT") return reject(state, event, "NOT_IN_THIS_STATE");
-      if (state.pending === null || event.dispatchId !== state.pending.dispatchId) {
+      if (state.phase !== "SPEAK_AND_ACT")
+        return reject(state, event, "NOT_IN_THIS_STATE");
+      if (
+        state.pending === null ||
+        event.dispatchId !== state.pending.dispatchId
+      ) {
         return reject(state, event, "STALE_DISPATCH");
       }
       // It may still land: the host is asked to resolve it (halt does).
       return fallback(state, "ACK_TIMEOUT");
     }
     case "SPEECH_DONE": {
-      if (state.phase !== "ACKNOWLEDGE") return reject(state, event, "NOT_IN_THIS_STATE");
+      if (state.phase !== "ACKNOWLEDGE")
+        return reject(state, event, "NOT_IN_THIS_STATE");
       return checkpoint(state);
     }
     case "CONTINUE": {
-      if (state.phase !== "CHECKPOINT") return reject(state, event, "NOT_ACKNOWLEDGED");
+      if (state.phase !== "CHECKPOINT")
+        return reject(state, event, "NOT_ACKNOWLEDGED");
       const advancing = enter(state, "ADVANCE");
       const next = state.sceneIndex + 1;
       if (next >= state.scenes.length) {
@@ -400,8 +426,10 @@ export function transition(state: DirectorState, event: GuideEvent): Transition 
     }
     case "PAUSE":
     case "INTERRUPT": {
-      if (!HALTABLE.has(state.phase)) return reject(state, event, "NOT_IN_THIS_STATE");
-      const target: GuideState = event.type === "PAUSE" ? "PAUSED" : "INTERRUPTED";
+      if (!HALTABLE.has(state.phase))
+        return reject(state, event, "NOT_IN_THIS_STATE");
+      const target: GuideState =
+        event.type === "PAUSE" ? "PAUSED" : "INTERRUPTED";
       const already = state.phase === "PAUSED" || state.phase === "INTERRUPTED";
       return {
         state: enter({ ...state, resumeRouteIntact: null }, target),
@@ -410,10 +438,18 @@ export function transition(state: DirectorState, event: GuideEvent): Transition 
       };
     }
     case "DISPATCH_RESOLVED": {
-      if (state.pending === null || event.dispatchId !== state.pending.dispatchId) {
+      if (
+        state.pending === null ||
+        event.dispatchId !== state.pending.dispatchId
+      ) {
         return reject(state, event, "STALE_DISPATCH");
       }
-      if (state.phase !== "PAUSED" && state.phase !== "INTERRUPTED" && state.phase !== "RESUME" && state.phase !== "SAFE_FALLBACK") {
+      if (
+        state.phase !== "PAUSED" &&
+        state.phase !== "INTERRUPTED" &&
+        state.phase !== "RESUME" &&
+        state.phase !== "SAFE_FALLBACK"
+      ) {
         return reject(state, event, "NOT_IN_THIS_STATE");
       }
       const resolved: DirectorState = {
@@ -444,7 +480,10 @@ export function transition(state: DirectorState, event: GuideEvent): Transition 
         return {
           state: resuming,
           effects: [
-            { type: "RESOLVE_DISPATCHED", dispatchId: state.pending.dispatchId },
+            {
+              type: "RESOLVE_DISPATCHED",
+              dispatchId: state.pending.dispatchId,
+            },
           ],
         };
       }
@@ -456,7 +495,9 @@ export function transition(state: DirectorState, event: GuideEvent): Transition 
       return moveTo(state, target);
     }
     case "JUMP_TO_CHAPTER": {
-      const chapter = state.chapters.find((c) => c.chapterId === event.chapterId);
+      const chapter = state.chapters.find(
+        (c) => c.chapterId === event.chapterId,
+      );
       const target =
         chapter === undefined
           ? -1
@@ -465,7 +506,8 @@ export function transition(state: DirectorState, event: GuideEvent): Transition 
       return moveTo(state, target);
     }
     case "ROLE_SWITCHED": {
-      if (sameActor(event.actor, state.actor)) return reject(state, event, "SAME_ACTOR");
+      if (sameActor(event.actor, state.actor))
+        return reject(state, event, "SAME_ACTOR");
       const already = state.phase === "PAUSED" || state.phase === "INTERRUPTED";
       const effects: GuideEffect[] = [
         ...(already || state.phase === "COMPLETE" ? [] : halt(state)),
@@ -474,14 +516,20 @@ export function transition(state: DirectorState, event: GuideEvent): Transition 
       ];
       return {
         state: enter(
-          { ...state, actor: event.actor, capsule: null, resumeRouteIntact: null },
+          {
+            ...state,
+            actor: event.actor,
+            capsule: null,
+            resumeRouteIntact: null,
+          },
           state.phase === "COMPLETE" ? "COMPLETE" : "PAUSED",
         ),
         effects,
       };
     }
     case "FALLBACK_DONE": {
-      if (state.phase !== "SAFE_FALLBACK") return reject(state, event, "NOT_IN_THIS_STATE");
+      if (state.phase !== "SAFE_FALLBACK")
+        return reject(state, event, "NOT_IN_THIS_STATE");
       // Back to the last valid scene, or this scene's start, and let the
       // person decide: a failed step is never retried behind their back.
       const target = lastValidBefore(state) ?? state.sceneIndex;

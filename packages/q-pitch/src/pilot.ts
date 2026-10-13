@@ -34,7 +34,8 @@ export const PILOT_CERTIFICATION_LEDGER: CertificationLedger =
       featureId: "INV-DISCOVER-TOP3",
       status: "PRODUCTION_LIVE_VERIFIED",
       actorContext: PILOT_ACTOR,
-      fixture: "Existing fictional seeded companies (Ledgerfold, F2, Ledgerline)",
+      fixture:
+        "Existing fictional seeded companies (Ledgerfold, F2, Ledgerline)",
       appCommit: APP_COMMIT,
       verifiedAt: VERIFIED_AT,
       verifierType: "BROWSER",
@@ -51,7 +52,8 @@ export const PILOT_CERTIFICATION_LEDGER: CertificationLedger =
       ],
       claimsForbidden: ["Instant", "fit = quality", "any p95 claim"],
       validUntil: {
-        invalidatedBy: "Next change to the model-gateway fit path or answer-canvas",
+        invalidatedBy:
+          "Next change to the model-gateway fit path or answer-canvas",
       },
     },
     {
@@ -78,7 +80,8 @@ export const PILOT_CERTIFICATION_LEDGER: CertificationLedger =
         "any fixed latency claim",
       ],
       validUntil: {
-        invalidatedBy: "Next change to the analyst prompt/schema or result blocks",
+        invalidatedBy:
+          "Next change to the analyst prompt/schema or result blocks",
       },
     },
     {
@@ -128,7 +131,8 @@ export const PILOT_CERTIFICATION_LEDGER: CertificationLedger =
       ],
       claimsForbidden: ["Fast comparison", "ranking as quality"],
       validUntil: {
-        invalidatedBy: "Next change to the comparison card builders or answer-canvas",
+        invalidatedBy:
+          "Next change to the comparison card builders or answer-canvas",
       },
     },
   ]);
@@ -197,8 +201,16 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
       actor: PILOT_ACTOR,
       expectedRoute: "/discover",
       actions: [
-        { actionId: "ta_open-discover", kind: "openRoute", destination: "DISCOVER" },
-        { actionId: "ta_ask-top-three", kind: "askApprovedQuestion", question: "q.top-three" },
+        {
+          actionId: "ta_open-discover",
+          kind: "openRoute",
+          destination: "DISCOVER",
+        },
+        {
+          actionId: "ta_ask-top-three",
+          kind: "askApprovedQuestion",
+          question: "q.top-three",
+        },
       ],
       lines: [
         {
@@ -247,7 +259,11 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
       actor: PILOT_ACTOR,
       expectedRoute: "/company/[companyId]",
       actions: [
-        { actionId: "ta_open-ledgerfold", kind: "openCompany", company: "ledgerfold" },
+        {
+          actionId: "ta_open-ledgerfold",
+          kind: "openCompany",
+          company: "ledgerfold",
+        },
         {
           actionId: "ta_ask-profile",
           kind: "askApprovedQuestion",
@@ -292,7 +308,8 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
           text: "You shouldn't have to read everything to understand what matters. If you want to challenge my analysis, each risk here carries its source and the uncertainty I've stated.",
           claimIds: ["INV-RISKS-FOLLOWUP.c1"],
           timing: "AFTER_ACK",
-          source: "Blueprint §6 04:35–05:25, narrowed to INV-RISKS-FOLLOWUP (owner review)",
+          source:
+            "Blueprint §6 04:35–05:25, narrowed to INV-RISKS-FOLLOWUP (owner review)",
         },
       ],
       fallbackLines: [FALLBACK],
@@ -338,7 +355,8 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
           text: "Where one of them has no record for a measure, it says 'Not recorded'. Unknown isn't a low score.",
           claimIds: ["INV-COMPARE-TABLE.c2"],
           timing: "AFTER_ACK",
-          source: "CERTIFICATION INV-COMPARE-TABLE; blueprint §6 03:35 'unknown is not zero'",
+          source:
+            "CERTIFICATION INV-COMPARE-TABLE; blueprint §6 03:35 'unknown is not zero'",
         },
       ],
       fallbackLines: [FALLBACK],

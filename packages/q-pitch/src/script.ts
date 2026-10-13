@@ -96,8 +96,13 @@ export const SceneScriptSchema = z
   .strict()
   .refine(
     (s) =>
-      s.lines.every((l) => l.claimIds.every((c) => s.approvedClaimIds.includes(c))),
-    { message: "every line's claims are approved for the scene", path: ["lines"] },
+      s.lines.every((l) =>
+        l.claimIds.every((c) => s.approvedClaimIds.includes(c)),
+      ),
+    {
+      message: "every line's claims are approved for the scene",
+      path: ["lines"],
+    },
   )
   .refine((s) => s.fallbackLines.every((l) => l.kind === "CONNECTIVE"), {
     message: "a fallback states no claim",
@@ -159,7 +164,9 @@ export const TourScriptSchema = z
   .refine(
     (t) => {
       const asked = new Set(t.questions.map((q) => q.questionId));
-      return t.scenes.every((s) => s.actions.every((a) => !hasQuestion(a) || asked.has(a.question)));
+      return t.scenes.every((s) =>
+        s.actions.every((a) => !hasQuestion(a) || asked.has(a.question)),
+      );
     },
     { message: "every asked question is in the approved question table" },
   );
@@ -168,7 +175,9 @@ export type TourScript = z.infer<typeof TourScriptSchema>;
 function hasQuestion(
   action: TourAction,
 ): action is Extract<TourAction, { question: string }> {
-  return action.kind === "buildComparison" || action.kind === "askApprovedQuestion";
+  return (
+    action.kind === "buildComparison" || action.kind === "askApprovedQuestion"
+  );
 }
 
 /**
@@ -212,8 +221,12 @@ export const CertificationEntrySchema = z
   })
   .strict()
   .refine(
-    (e) => e.claimsAllowed.every((c) => c.claimId.startsWith(`${e.featureId}.`)),
-    { message: "an entry's claims belong to its feature", path: ["claimsAllowed"] },
+    (e) =>
+      e.claimsAllowed.every((c) => c.claimId.startsWith(`${e.featureId}.`)),
+    {
+      message: "an entry's claims belong to its feature",
+      path: ["claimsAllowed"],
+    },
   );
 export type CertificationEntry = z.infer<typeof CertificationEntrySchema>;
 

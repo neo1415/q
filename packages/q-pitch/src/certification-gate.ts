@@ -192,7 +192,11 @@ export function certifyTour(
     const check = checkOf(scene);
     rejectedLines.push(...check.rejectedLines);
     if (check.reasons.length === 0) {
-      decisions.push({ sceneId: scene.sceneId, verdict: "ADMITTED", reasons: [] });
+      decisions.push({
+        sceneId: scene.sceneId,
+        verdict: "ADMITTED",
+        reasons: [],
+      });
       resolved.set(scene.sceneId, scene);
       continue;
     }

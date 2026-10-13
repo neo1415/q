@@ -38,9 +38,7 @@ export const TourActionIdSchema = z
 export type TourActionId = z.infer<typeof TourActionIdSchema>;
 
 /** A stable key of a seeded demo record ("ledgerfold"), never a uuid or name. */
-export const FixtureKeySchema = z
-  .string()
-  .regex(/^[a-z][a-z0-9-]{1,62}$/u);
+export const FixtureKeySchema = z.string().regex(/^[a-z][a-z0-9-]{1,62}$/u);
 export type FixtureKey = z.infer<typeof FixtureKeySchema>;
 
 /**
@@ -72,7 +70,11 @@ export const OpenRouteActionSchema = z
   .strict();
 
 export const OpenCompanyActionSchema = z
-  .object({ ...base, kind: z.literal("openCompany"), company: FixtureKeySchema })
+  .object({
+    ...base,
+    kind: z.literal("openCompany"),
+    company: FixtureKeySchema,
+  })
   .strict();
 
 export const SelectTabActionSchema = z

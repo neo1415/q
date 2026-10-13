@@ -77,7 +77,10 @@ export const GuideEventSchema = z.discriminatedUnion("type", [
     .strict(),
   z.object({ type: z.literal("BEGIN") }).strict(),
   z
-    .object({ type: z.literal("ACTION_RESULT"), result: TourActionResultSchema })
+    .object({
+      type: z.literal("ACTION_RESULT"),
+      result: TourActionResultSchema,
+    })
     .strict(),
   z
     .object({ type: z.literal("ACK_TIMEOUT"), dispatchId: DispatchIdSchema })
@@ -98,9 +101,7 @@ export const GuideEventSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   /** `routeIntact`: the screen is still where the cursor expects. */
-  z
-    .object({ type: z.literal("RESUME"), routeIntact: z.boolean() })
-    .strict(),
+  z.object({ type: z.literal("RESUME"), routeIntact: z.boolean() }).strict(),
   z.object({ type: z.literal("GO_BACK") }).strict(),
   z
     .object({ type: z.literal("JUMP_TO_CHAPTER"), chapterId: ChapterIdSchema })

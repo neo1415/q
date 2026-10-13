@@ -23,7 +23,9 @@ export const SceneIdSchema = z.string().regex(/^s\.[a-z0-9][a-z0-9.-]{1,62}$/u);
 export type SceneId = z.infer<typeof SceneIdSchema>;
 
 /** Atlas feature id, as CERTIFICATION_MANIFEST.md names them. */
-export const FeatureIdSchema = z.string().regex(/^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/u);
+export const FeatureIdSchema = z
+  .string()
+  .regex(/^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/u);
 export type FeatureId = z.infer<typeof FeatureIdSchema>;
 
 /** A certified claim: `<featureId>.c<n>` (one ledger entry's allowed claim). */
@@ -55,23 +57,26 @@ export const TourActorSchema = z
     account: z
       .email()
       .max(200)
-      .refine((email) => email.toLowerCase().endsWith(FICTIONAL_ACCOUNT_DOMAIN), {
-        message: "a tour actor is a fictional demo account",
-      }),
+      .refine(
+        (email) => email.toLowerCase().endsWith(FICTIONAL_ACCOUNT_DOMAIN),
+        {
+          message: "a tour actor is a fictional demo account",
+        },
+      ),
   })
   .strict();
 export type TourActor = z.infer<typeof TourActorSchema>;
 
 export function sameActor(a: TourActor, b: TourActor): boolean {
-  return a.role === b.role && a.account.toLowerCase() === b.account.toLowerCase();
+  return (
+    a.role === b.role && a.account.toLowerCase() === b.account.toLowerCase()
+  );
 }
 
 /** Re-certification due: a time, or a change that invalidates the entry. */
 export const ValidUntilSchema = z.union([
   z.object({ at: z.iso.datetime({ offset: true }) }).strict(),
-  z
-    .object({ invalidatedBy: z.string().trim().min(1).max(300) })
-    .strict(),
+  z.object({ invalidatedBy: z.string().trim().min(1).max(300) }).strict(),
 ]);
 export type ValidUntil = z.infer<typeof ValidUntilSchema>;
 
@@ -80,7 +85,12 @@ export type ValidUntil = z.infer<typeof ValidUntilSchema>;
  * different words; `truthClassOfClaimKind` maps them (flagged in the
  * report: the blueprint has no ESTIMATE, ADR-001 has no STATED).
  */
-export const CLAIM_KINDS = ["VERIFIED", "STATED", "INFERRED", "UNKNOWN"] as const;
+export const CLAIM_KINDS = [
+  "VERIFIED",
+  "STATED",
+  "INFERRED",
+  "UNKNOWN",
+] as const;
 export const ClaimKindSchema = z.enum(CLAIM_KINDS);
 export type ClaimKind = z.infer<typeof ClaimKindSchema>;
 
@@ -143,7 +153,9 @@ export const SceneEvidenceSchema = z
     /** An app route pattern ("/company/[companyId]"), never a URL. */
     expectedRoute: z.string().regex(/^\/[A-Za-z0-9/_[\]-]{0,200}$/u),
     /** Registered control ids or result-block kinds expected on screen. */
-    expectedUI: z.array(z.string().regex(/^[A-Za-z][A-Za-z0-9._-]{0,80}$/u)).max(32),
+    expectedUI: z
+      .array(z.string().regex(/^[A-Za-z][A-Za-z0-9._-]{0,80}$/u))
+      .max(32),
     actionContracts: z.array(TourActionKindSchema).min(1).max(16),
     fallbackScene: SceneIdSchema.nullable(),
     // Facts
@@ -157,7 +169,9 @@ export const SceneEvidenceSchema = z
     // Prefetch: safe UI data/media for THIS actor only.
     prefetch: z
       .object({
-        routes: z.array(z.string().regex(/^\/[A-Za-z0-9/_[\]-]{0,200}$/u)).max(4),
+        routes: z
+          .array(z.string().regex(/^\/[A-Za-z0-9/_[\]-]{0,200}$/u))
+          .max(4),
         mediaIds: z.array(OpaqueIdSchema).max(8),
       })
       .strict(),
@@ -165,7 +179,10 @@ export const SceneEvidenceSchema = z
   .strict()
   .refine(
     (e) => e.facts.every((fact) => e.approvedClaimIds.includes(fact.claimId)),
-    { message: "every fact is one of the scene's approved claims", path: ["facts"] },
+    {
+      message: "every fact is one of the scene's approved claims",
+      path: ["facts"],
+    },
   )
   .refine((e) => e.fallbackScene !== e.sceneId, {
     message: "a scene cannot be its own fallback",
