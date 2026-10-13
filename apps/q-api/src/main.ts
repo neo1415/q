@@ -484,6 +484,7 @@ import {
   createPostgresMemoryRepository,
 } from "@capital-q/q-knowledge";
 import {
+  AuthUserIdSchema,
   OrganisationIdSchema,
   TenantIdSchema,
   createAuthorizationService,
@@ -5923,8 +5924,34 @@ const tavusKeys = tavusKeysFrom({
   CQ_TAVUS_API_KEYS: process.env.CQ_TAVUS_API_KEYS,
   TAVUS_API_KEY: process.env.TAVUS_API_KEY,
 });
+const rehearsalVideoActorResolver = createPostgresActorContextResolver({
+  sql: database.sql,
+});
 const rehearsalVideo = createRehearsalVideoService({
   store: createPostgresRehearsalVideoStore(database.sql),
+  stillAllowed: async (actor) => {
+    if (actor.organisationId === undefined || actor.membershipId === undefined)
+      return false;
+    const [profiles, suspended] = await Promise.all([
+      database.sql<{ auth_user_id: string }[]>`
+        select auth_user_id from identity.user_profiles
+         where id = ${actor.userId} and status = 'active' limit 1`,
+      isAccountSuspended(database.sql, actor.userId),
+    ]);
+    const identity = AuthUserIdSchema.safeParse(profiles[0]?.auth_user_id);
+    if (suspended || !identity.success) return false;
+    const resolution = await rehearsalVideoActorResolver.resolveHumanContext({
+      principal: { authUserId: identity.data },
+      selection: { organisationId: actor.organisationId },
+    });
+    return (
+      resolution.status === "RESOLVED" &&
+      resolution.context.userId === actor.userId &&
+      resolution.context.tenantId === actor.tenantId &&
+      resolution.context.organisationId === actor.organisationId &&
+      resolution.context.membershipId === actor.membershipId
+    );
+  },
   joinCipher: createTokenCipher(
     Buffer.from(
       hkdfSync(

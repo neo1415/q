@@ -432,6 +432,8 @@ export function createRehearsalVideoService(dependencies: {
   readonly pool: TavusKeyPool | null;
   /** Existing credentials-at-rest cipher, purpose-specific server key. */
   readonly joinCipher: TokenCipher;
+  /** Fresh canonical account/membership admission for every provider turn. */
+  readonly stillAllowed: (actor: ActorContext) => Promise<boolean>;
   /** The Q API's public origin the provider calls back; null: not configured. */
   readonly publicBaseUrl: string | null;
   readonly bridgePath: (sessionId: string) => string;
@@ -584,6 +586,8 @@ export function createRehearsalVideoService(dependencies: {
 
   async function finishAs(row: VideoSessionRow): Promise<RehearsalResult> {
     const actor = actorOf(row);
+    if (!(await dependencies.stillAllowed(actor).catch(() => false)))
+      return { kind: "NOT_A_PARTICIPANT" };
     const finished = await rehearsals.finish(actor, row.rehearsalId);
     if (finished.kind === "FINISHED") {
       return rehearsals.get(actor, row.rehearsalId);
@@ -878,7 +882,11 @@ export function createRehearsalVideoService(dependencies: {
       if (bearer.length < 32 || bearer.length > 128)
         return { kind: "UNAUTHORISED" };
       const row = await store.byToken(sessionId, tokenHashOf(bearer));
-      if (row === null) return { kind: "UNAUTHORISED" };
+      if (
+        row === null ||
+        !(await dependencies.stillAllowed(actorOf(row)).catch(() => false))
+      )
+        return { kind: "UNAUTHORISED" };
       const open = row.status === "LIVE" || row.status === "STARTING";
       if (!open || row.endsAt.getTime() <= now().getTime()) {
         return { kind: "LINE", text: ALREADY_OVER };

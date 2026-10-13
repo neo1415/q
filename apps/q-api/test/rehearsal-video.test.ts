@@ -319,7 +319,9 @@ function setup(
   const rehearsals = fakeRehearsals();
   const store = memoryStore();
   const tavus = fakeTavus(options.keys ?? 2, options.failConversation);
+  const stillAllowed = vi.fn((_actor: ActorContext) => Promise.resolve(true));
   const service = createRehearsalVideoService({
+    stillAllowed,
     store,
     paidUserIds: options.paidUserIds ?? new Set([FOUNDER.userId]),
     joinCipher: createTokenCipher(Buffer.alloc(32, 1).toString("base64")),
@@ -348,6 +350,7 @@ function setup(
   };
   const restarted = () =>
     createRehearsalVideoService({
+      stillAllowed,
       store,
       paidUserIds: new Set([FOUNDER.userId]),
       rehearsals: rehearsals.service,
@@ -358,7 +361,16 @@ function setup(
       enabledInterviewers: enabledInterviewersFrom(undefined),
       now: () => new Date(clock),
     });
-  return { service, rehearsals, store, tavus, advance, timers, restarted };
+  return {
+    service,
+    rehearsals,
+    store,
+    tavus,
+    advance,
+    timers,
+    restarted,
+    stillAllowed,
+  };
 }
 
 /** The bearer the PAL was given, as the provider would present it. */
@@ -675,6 +687,41 @@ describe("the bridge", () => {
       },
     ]);
   });
+
+  it.each([
+    "suspended account",
+    "revoked membership",
+    "unavailable authorization",
+  ])(
+    "refuses an existing provider bearer after %s, including cached replies and review generation",
+    async (reason) => {
+      const harness = setup();
+      const session = await startVideo(harness);
+      const bearer = bearerOf(harness.tavus.calls);
+      const messages = [{ role: "user", text: "Our margin is improving." }];
+      const signal = new AbortController().signal;
+      await harness.service.bridge(session.id, bearer, messages, signal);
+      if (reason === "unavailable authorization")
+        harness.stillAllowed.mockRejectedValue(new Error("unavailable"));
+      else harness.stillAllowed.mockResolvedValue(false);
+      expect(
+        await harness.service.bridge(session.id, bearer, messages, signal),
+      ).toEqual({ kind: "UNAUTHORISED" });
+      expect(harness.rehearsals.said).toHaveLength(1);
+      expect(
+        await harness.service.bridge(
+          session.id,
+          bearer,
+          [{ role: "user", text: "Another question." }],
+          signal,
+        ),
+      ).toEqual({ kind: "UNAUTHORISED" });
+      await harness.service.end(FOUNDER, REHEARSAL_ID, {
+        continueByVoice: false,
+      });
+      expect(harness.rehearsals.finished).toEqual([]);
+    },
+  );
 
   it("answers a provider retry of the same words without a second turn", async () => {
     const harness = setup();

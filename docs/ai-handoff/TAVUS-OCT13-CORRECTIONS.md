@@ -3,7 +3,7 @@
 This continues the existing video rehearsal slice; Q's canonical rehearsal
 service remains the interviewer intelligence, transcript and review owner.
 
-Local targeted verification: 27 session/route tests passed on the final deadline guard;
+Local targeted verification: 30 session/route tests passed on the fresh authorization guard;
 19 account/refusal, 12 adapter and four UI tests passed unchanged in the preceding
 four-file run. No provider calls. Package build passed 52/52; capability-parity passed 11 tests. Full types and
 release CI/migrations/deployment remain separate gates.
@@ -26,6 +26,10 @@ Implemented focused safeguards:
 - Reads and repeated starts recover the same room after a restart. They never
   allocate another room or extend the fixed 180-second creation deadline.
   If provider setup consumes that deadline, no paid conversation is allocated.
+- Every bridge request, including cached retries, revalidates the stored actor
+  through active profile, uncached suspension and the canonical actor resolver.
+  The resolved tenant/user/organisation/membership must match exactly.
+  Revocation or failed admission also prevents background review model calls.
 - Unconfirmed provider end does not close the canonical session or finish its
   review. A failed end can recover only through an authoritative provider
   read explicitly reporting ended. The sweep retries at the existing deadline. ENDED non-voice rows
