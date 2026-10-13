@@ -228,9 +228,16 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq-apply.ts POST GATEQ_APPLY_START_PATH": PUBLIC,
   "api/http/gateq-apply.ts GET GATEQ_APPLY_SESSION_PATH": PUBLIC,
   "api/http/gateq-apply.ts POST GATEQ_APPLY_TURN_PATH": PUBLIC,
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_INTERVIEW_OPEN_PATH": PUBLIC,
   "api/http/gateq-apply.ts POST GATEQ_APPLY_SUBMIT_PATH": PUBLIC,
   // F1: the GateQ form, the same anonymous applicant surface.
   "api/http/gateq-apply.ts POST GATEQ_APPLY_ANSWERS_PATH": PUBLIC,
+  // GateQ slice 1: the applicant's contact, its code, their own transcript
+  // and the pre-submit coverage check; the same anonymous applicant surface.
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_PATH": PUBLIC,
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_CONFIRM_PATH": PUBLIC,
+  "api/http/gateq-apply.ts GET GATEQ_APPLY_TRANSCRIPT_PATH": PUBLIC,
+  "api/http/gateq-apply.ts GET GATEQ_APPLY_COVERAGE_PATH": PUBLIC,
   ...Object.fromEntries(
     [
       "POST GATEQ_GATEWAYS_PATH",
@@ -251,6 +258,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq.ts GET GATEQ_PUBLIC_GATEWAY_PATH": PUBLIC,
   "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH": exempt(
     "the founder ticking their own documents in the GateQ form, at the moment they press Send; consent belongs on that screen",
+  ),
+  "api/http/gateq.ts POST GATEQ_APPLY_CONTACT_ACCOUNT_PATH": exempt(
+    "a signed-in founder confirming their own contact on the GateQ application screen; it carries the applicant's guest credential, which no Q session holds",
   ),
   "api/http/gateq.ts GET GATEQ_GATEWAY_APPLICATIONS_PATH": exempt(
     "the organisation reading applications submitted to its own gateway, on its gateway page",
@@ -1115,6 +1125,15 @@ const Q_ROOM_DOCUMENT_DROPS: ReadonlySet<string> = new Set([
 const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "api/http/gateq-apply.ts POST GATEQ_APPLY_ANSWERS_PATH",
   "api/http/gateq.ts POST GATEQ_APPLY_MATERIALS_PATH",
+  // GateQ slice 1: the applicant's contact and its one-time code, both
+  // authorised by the guest credential only the founder's browser holds
+  // (the account variant carries it too). Pending the lead's decision.
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_PATH",
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_CONFIRM_PATH",
+  "api/http/gateq.ts POST GATEQ_APPLY_CONTACT_ACCOUNT_PATH",
+  // Q's opening question for a form-started interview, under the same
+  // guest credential. Pending the lead's decision.
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_INTERVIEW_OPEN_PATH",
   // P14: authorised by a one-time code only the claimant's inbox holds; no
   // actor carries it, so no declared action can. Pending the lead's decision.
   "api/http/gateq.ts POST COMPANY_CLAIM_CONFIRM_PATH",

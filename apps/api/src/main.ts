@@ -172,8 +172,12 @@ import {
   createPostgresApplicationRepository,
   createPostgresApplicationSessionRepository,
   createPostgresApplicationSubmissionRepository,
+  createPostgresApplicationContactRepository,
+  IntakeRefusedError,
+  createPostgresApplicationTurnRepository,
   createPostgresSubmissionInbox,
   createGateqInbox,
+  renderApplicationContactCodeEmail,
   renderClaimCodeEmail,
   sendGateqEmailLogged,
   type GateqEmailEvent,
@@ -208,6 +212,7 @@ import {
 } from "./gateq/company-projection.js";
 import { mandateVocabularyFrom } from "./gateq/mandate-vocabulary.js";
 import {
+  createAccountEmailPort,
   createIntakeBoundPolicyPort,
   createIntakeTaxonomyPort,
 } from "./gateq/intake-ports.js";
@@ -701,10 +706,26 @@ const wordsReaders =
         }),
       });
 
+/**
+ * GateQ slice 1: `GATEQ_CONTACT_REQUIRED_FROM`, an ISO instant. A value
+ * that does not parse is ignored rather than locking every applicant out.
+ */
+function gateqContactRequiredFrom(): string | undefined {
+  const raw = process.env["GATEQ_CONTACT_REQUIRED_FROM"]?.trim();
+  if (raw === undefined || raw === "") return undefined;
+  return Number.isNaN(Date.parse(raw)) ? undefined : raw;
+}
+
 const gateqApply =
   gateqModelProviders.length === 0
     ? undefined
     : (() => {
+        // GateQ slice 1: the interview transcript, read by the interview
+        // and frozen into the submission with the dossier.
+        const applicationTurns = createPostgresApplicationTurnRepository({
+          sql: database.sql,
+          transactions: database.transactions,
+        });
         const intake = createIntakeService({
           applications: createPostgresApplicationRepository({
             sql: database.sql,
@@ -731,6 +752,44 @@ const gateqApply =
           logger: createLogger(apiServiceIdentity(config), {
             level: config.observability.logLevel,
           }),
+          turns: applicationTurns,
+          contacts: createPostgresApplicationContactRepository({
+            sql: database.sql,
+          }),
+          // Display titles of the documents the founder shared, for the
+          // dossier. The same read the inbox uses.
+          documentTitles: sharedDocumentsPort({ sql: database.sql }),
+          // The six-digit code, through the app sender, outcome logged
+          // with the recipient's domain only. Resolved at call time: the
+          // sender is composed further down this file.
+          contactCodeMailer: async ({
+            to,
+            companyName,
+            code,
+            expiresInMinutes,
+          }) => {
+            const rendered = renderApplicationContactCodeEmail({
+              companyName,
+              code,
+              expiresInMinutes,
+            });
+            return sendGateqEmailLogged(
+              gateqFounderMail,
+              logGateqEmail,
+              "APPLICATION_CONTACT_CODE",
+              to,
+              {
+                subject: rendered.subject,
+                text: rendered.text,
+                html: rendered.html,
+                fromName: "Capital Q",
+              },
+            );
+          },
+          // When set (an ISO instant), applications created from then on
+          // must confirm a contact before Submit even if they never gave
+          // one. Unset until the web form asks for the contact first.
+          contactRequiredFrom: gateqContactRequiredFrom(),
         });
         const conversation = createConversationService({
           intake,
@@ -766,6 +825,7 @@ const gateqApply =
           turnMemory: createPostgresApplicationSessionRepository({
             sql: database.sql,
           }),
+          turns: applicationTurns,
           logger: createLogger(apiServiceIdentity(config), {
             level: config.observability.logLevel,
           }),
@@ -2477,6 +2537,33 @@ const { app, logger } = createApp(config, security, {
     });
   },
   gateqApply,
+  // GateQ slice 1: a signed-in founder's contact; their own verified
+  // account email confirms a matching address without a code.
+  gateqApplicationContact:
+    gateqApply === undefined
+      ? undefined
+      : async ({ actor, request }) => {
+          const { sessionToken, ...contact } = request;
+          // The same per-session allowance as the guest route: this one
+          // can send an email too.
+          const guest = await gateqApply.intake.authorise(sessionToken);
+          if (
+            !gateqApply.throttle.charge({
+              sessionId: guest.sessionId,
+              operation: "CONTACT",
+            })
+          ) {
+            throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+          }
+          const accountEmail = await createAccountEmailPort({
+            sql: database.sql,
+          })(actor.userId);
+          return gateqApply.intake.startContact({
+            token: sessionToken,
+            contact,
+            ...(accountEmail === null ? {} : { accountEmail }),
+          });
+        },
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
   // F3: "Find my startup": claim requests and saved startup searches.
   // P14 item 7: a platform admin makes an unclaimed company's profile

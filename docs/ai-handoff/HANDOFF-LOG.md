@@ -561,3 +561,43 @@ The cumulative active-speech guard is preserved on pushed `codex/oct13-voice-tri
 - Hosted allowance migration20261222185000 applied through approved HTTPS runner after exact quality/pgTAP gates; hosted206/local206 then no pending. Two allocations/account/no renewal, one open/account/two globally, strict180sec reservation. Paid window remains CLOSED/test mode; wider flag not enabled. No second paid room. No Live voice setting changed. Bounded UI/automatic stock selection/company coverage/next-reply closing are source/deployed, not broader human AV acceptance.
 - Final CODE OBSERVED spending gap: uncertain remote create could release local slot before remote allocation resolved. Owned source follow-up persists selected account/PAL before paid create, bounds same-account PAL-specific recovery, retains unresolved financial/concurrency reservation independently of canonical voice fallback, never starts another room for recovery. Known live sessions retain confirmed close before final review. New immutable migration20261222190000 adds checkpoint columns/guard; not applied. New8pgTAP cases still CI required. 67 focused adapter/rehearsal testsPASS, root/q-api types and changed lint/formatPASS; packages unchanged from validated52build. Initial four regression failures exposed duplicate free-PAL cleanup and premature collapse of known allocations; root behavior corrected, assertions retained, final67PASS.
 - Root and existing product checkout fast-forwarded to integration51a09275/production0a7e5f1a, preserving all prior source/helpers. Existing product branch now owns GateQ contact/interview/dossier work. New contact service source requires name/company/role/email and verified identity/email match without creating membership; not wired/deployed/accepted yet. Full new GateQ directive preserved verbatim in session-directives. No longer GateQ paid usage authorized by rehearsal allowance; start complete text flow/dossier first.
+
+## 2026-10-13 15:10 UTC — Claude takeover: checkpoint release deployed; Q speed slice 1 in CI
+
+- DEPLOYED: #57 and #58 were reconciled first. Their six code/migration files are byte-identical, both had green CI on their heads, and neither base had moved. #57 merged to integration (43c25e7f). Migration `20261222190000` passed review (additive columns, existing rows satisfy the check, the allowance guard is strictly tighter) and was applied through the HTTPS runner: hosted 207, none missing, columns verified. #58 then merged to production (cfc694b3). Railway q-api SUCCESS at cfc694b3; web/api/workers unchanged at 0a7e5f1a. No paid Tavus room was opened.
+- RECOVERY: `apps/api/src/composition/gateq-contact.ts` is in no commit on any branch, and no `CLAUDE-NEXT-RUN.md` exists anywhere. Codex's workspace is not reachable from this container. Status: **LOCAL-ONLY/UNRECOVERED**; rebuild it only when GateQ resumes.
+- Branch `claude/capital-q-completion-mhzsiq` now records its superseded tip 1f05df4c via an ours-merge. Its tree equals production; the #39/#40 content reached production through Codex's later merges.
+- BASELINE (production cfc694b3, fictional investor savanna-seed, one browser journey; first 20 rendered characters / settled):
+  - top three 3.5/4.0 s, three cards;
+  - selected profile 6.0/25.0 s, five findings; one call 21.5 s, 38,227 input / 0 cached / 2,104 output tokens;
+  - risks 15.1/29.8 s, **0 findings → journey FAILED**. The turn reader stalled about 6 s (2.5 s timeout, then a refusal over a tool's fields written at the root). Then came two tool rounds (2.3 + 2.9 s) and a 15.8 s answer that put all nine points in `companyFindings`, which no conversation surface renders.
+- IN CI: PR #59 (`claude/q-speed-1`, model-gateway only):
+  - the analyst answer and the turn reader drop unknown root keys (counted, never named) instead of refusing the reading;
+  - conversation findings fall back to the specialist channel at the weakest honest evidence reading;
+  - a trailing conversation note asks for `findings` only.
+    Local gates PASS. Not yet deployed or live-measured.
+- NEXT: deploy #59 and re-run the same journey. Then:
+  - a stable tool set per task (96 tools ≈ 20k prefix tokens, and the set changes per turn);
+  - card-first emission on the fast paths;
+  - preloading the canvas when a run is followed.
+
+## 2026-10-13 17:00 UTC — Q speed sprint CLOSED (Claude); next priority GateQ
+
+- **DEPLOYED and live-verified** (production `5ce3d76b`; q-api/api/workers at `c2f08536`, server code identical; integration `ea3f71a0` has the same `packages`/`apps`/`supabase` code; hosted migrations: none pending):
+  - #57/#58 video allocation checkpoint and migration `20261222190000`.
+  - #59/#61 model-gateway:
+    - unknown root keys are dropped, not refused (analyst answer and turn reader);
+    - conversation findings fall back to the specialist channel;
+    - a trailing findings note keeps output short.
+  - #60/#63 web: card code and contracts load when a run starts.
+  - #62/#63 web: a SIDE_BY_SIDE comparison renders as one table even when the cards' measures differ; a missing measure shows "Not recorded".
+- **Full authenticated investor journey PASS** on 5ce3d76b (receipt `/tmp/cq-investor-demo-HZt53D`, private). See PERFORMANCE-BASELINE.md.
+- **Tavus:** read-only check returned `videoAvailable:false`, so the paid window stays closed. No paid room was opened.
+- **LOCAL-ONLY/UNRECOVERED:** `apps/api/src/composition/gateq-contact.ts` (Codex workspace unreachable; no commit on any branch). Rebuild it with GateQ.
+- **MEASURED FOLLOW-UPS (not started; do opportunistically or when they block a product journey):**
+  1. **Tool overhead.** Own-records questions offer 96 tools (about 20–25k prompt tokens). THEIR_OWN_RECORDS opens 5 areas (`tool-focus.ts`), and the set changes between turns, which breaks cache reuse. Candidate fix: a fixed core set per task plus `use_capability`, and a cache-friendly tool order.
+  2. **Slow comparison generation.** One measurement each run: 7.9/27.2 s, then 14.2/30.8 s (one tool round plus a ~21 s answer of about 2,280 output tokens). Output length is the main cost; stream or shorten it without losing findings.
+  3. **Caching.** A conversation's first analyst call is uncached (0/38k). Later turns cache 26–39k. A stable tool set (item 1) is the prerequisite.
+  4. **Turn reader.** The first attempt sometimes goes to Gemini and is aborted at 2.5 s (seen once, about 6 s lost before the answer started). Watch for it.
+  5. **First-audio latency.** Not measured this sprint (no provider-verified browser first-audio stamp). Measure within GPT-Live/duplex with no new paid usage.
+- **NEXT PRIORITY (founder 2026-10-13):** GateQ complete adaptive interview, secure evidence collection and investor-facing dossier; see `session-directives/2026-10-13-gateq-adaptive-interview-and-inbox.txt`. Then the full voice/Tavus experience, then Q Pitch.

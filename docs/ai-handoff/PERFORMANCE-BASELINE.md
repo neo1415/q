@@ -1,5 +1,49 @@
 # Performance baseline and measured first improvements
 
+## October 13 16:50 UTC — sprint close: production 5ce3d76b, full investor journey PASS
+
+Same fictional investor and browser journey; single observations, not p50/p95. First 20 rendered characters / first card / settled:
+
+| Turn             | Baseline cfc694b3                          | Final 5ce3d76b               | Result                              |
+| ---------------- | ------------------------------------------ | ---------------------------- | ----------------------------------- |
+| Top three        | 3,500 / 3,802 / 3,969 ms                   | **3,025 / 3,146 / 3,401 ms** | 3 exact cards                       |
+| Selected profile | 5,984 / – / 24,974 ms                      | **5,493 / – / 14,199 ms**    | 7 findings (baseline 5)             |
+| Risks follow-up  | 15,095 / – / 29,825 ms, 0 findings, FAILED | **4,817 / – / 13,884 ms**    | 8 findings                          |
+| Comparison       | not reached                                | 14,171 / – / 30,828 ms       | rendered table, exact two companies |
+
+- Between the two runs after #59/#61 (16:15 and 16:50 UTC), comparison first text varied from 7.9 s to 14.2 s; treat it as unstable.
+- Model work (ledger, run after #59/#61):
+  - profile: one answer call, 21.5 → 12.3 s, 2,104 → 1,206 output tokens;
+  - risks: answer calls 3 → 1, and no turn-reader refusals.
+- Outstanding measured items are in STATE.md (tool overhead, comparison generation, first-call cache, reader fallback, first audio).
+
+## October 13 16:15 UTC — after PR #59/#61 (production c2f08536), same journey
+
+Same fictional investor, same browser journey, one observation each (not p50/p95). First 20 rendered characters / settled:
+
+| Turn             | Before (cfc694b3)  | After (c2f08536)      | Answer model calls                              | Answer output tokens | Findings                                                               |
+| ---------------- | ------------------ | --------------------- | ----------------------------------------------- | -------------------- | ---------------------------------------------------------------------- |
+| Top three        | 3,500 / 3,969 ms   | 3,654 / 4,061 ms      | 0 (code)                                        | –                    | 3 cards                                                                |
+| Selected profile | 5,984 / 24,974 ms  | **5,035 / 15,536 ms** | 1 → 1 (21.5 s → **12.3 s**)                     | 2,104 → **1,206**    | 5 → **8**                                                              |
+| Risks follow-up  | 15,095 / 29,825 ms | **4,630 / 17,324 ms** | 3 → **1** (14.4 s; 26k/38.5k cached)            | 1,628 → 1,529        | 0 (FAILED) → **10**                                                    |
+| Comparison       | not reached        | 7,937 / 27,155 ms     | 2 (tool round 2.7 s + 20.9 s, 39k/40.8k cached) | 2,280                | 10; two canonical cards; table NOT rendered (uneven measures) → PR #62 |
+
+- The turn reader made no refusal or timeout retries this run.
+- The remaining dominant cost is answer output length (about 100 tokens/s). Unfocused own-records questions still offer 96 tools.
+- Cost per profile answer: $0.0102 before (from the ledger); the after cost is not separately computed.
+
+## October 13 15:00 UTC — Claude takeover baseline before PR #59 (production cfc694b3)
+
+Single authenticated browser journey, fictional investor; private receipt in the newest `/tmp/cq-investor-demo-*`. First 20 rendered characters / settled:
+
+| Turn             | First text |   Settled | Model calls (ledger)                                                                                                                               | Result                                              |
+| ---------------- | ---------: | --------: | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Top three        |   3,500 ms |  3,969 ms | reader 1.2 s; code fit sweep, no answer model                                                                                                      | 3 cards                                             |
+| Selected profile |   5,984 ms | 24,974 ms | reader 1.1 s; one NORMAL_DIALOGUE 21.5 s, 38,227 in / 0 cached / 2,104 out                                                                         | 5 findings                                          |
+| Risks follow-up  |  15,095 ms | 29,825 ms | reader 2.5 s TIMEOUT + 3.3 s root-key refusal + 1.7 s; 2 tool rounds 2.3 + 2.9 s (cached 26k/39k); answer 15.8 s, 17,542 in / 0 cached / 1,628 out | **0 findings (points in companyFindings) → FAILED** |
+
+Single observations, not p50/p95. The profile turn's 21 s is generation-bound (about 100 output tokens/s). The risks turn loses about 6 s before the answer starts.
+
 ## October13 v25 full authenticated investor browser acceptance
 
 Production592b32ff, private receipt `/tmp/cq-investor-demo-1Tc4Lv`, full journey PASS. Individual observations: ranking first20 rendered characters4342ms/total5118ms; selected profile5571/26112 with seven native findings; risks4586/18920 with six native findings; comparison8244/34002 with exact two canonical companies. Native findings and company binding are verified from the current rendered answer. These are single observations of a text threshold, not semantic first useful content, first audio, p50/p95 or causal improvement. V24 zero-findings failure remains a failed product gate; this release corrects it without relaxing validation.

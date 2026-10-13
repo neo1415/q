@@ -1,5 +1,45 @@
 # Capital Q — Current shared engineering state
 
+## 2026-10-13 17:00 UTC — Q speed sprint CLOSED (Claude); next priority GateQ
+
+- **DEPLOYED and live-verified** (production `5ce3d76b`; q-api/api/workers at `c2f08536`, server code identical; integration `ea3f71a0` has the same `packages`/`apps`/`supabase` code; hosted migrations: none pending):
+  - #57/#58 video allocation checkpoint and migration `20261222190000`.
+  - #59/#61 model-gateway:
+    - unknown root keys are dropped, not refused (analyst answer and turn reader);
+    - conversation findings fall back to the specialist channel;
+    - a trailing findings note keeps output short.
+  - #60/#63 web: card code and contracts load when a run starts.
+  - #62/#63 web: a SIDE_BY_SIDE comparison renders as one table even when the cards' measures differ; a missing measure shows "Not recorded".
+- **Full authenticated investor journey PASS** on 5ce3d76b (receipt `/tmp/cq-investor-demo-HZt53D`, private). See PERFORMANCE-BASELINE.md.
+- **Tavus:** read-only check returned `videoAvailable:false`, so the paid window stays closed. No paid room was opened.
+- **LOCAL-ONLY/UNRECOVERED:** `apps/api/src/composition/gateq-contact.ts` (Codex workspace unreachable; no commit on any branch). Rebuild it with GateQ.
+- **MEASURED FOLLOW-UPS (not started; do opportunistically or when they block a product journey):**
+  1. **Tool overhead.** Own-records questions offer 96 tools (about 20–25k prompt tokens). THEIR_OWN_RECORDS opens 5 areas (`tool-focus.ts`), and the set changes between turns, which breaks cache reuse. Candidate fix: a fixed core set per task plus `use_capability`, and a cache-friendly tool order.
+  2. **Slow comparison generation.** One measurement each run: 7.9/27.2 s, then 14.2/30.8 s (one tool round plus a ~21 s answer of about 2,280 output tokens). Output length is the main cost; stream or shorten it without losing findings.
+  3. **Caching.** A conversation's first analyst call is uncached (0/38k). Later turns cache 26–39k. A stable tool set (item 1) is the prerequisite.
+  4. **Turn reader.** The first attempt sometimes goes to Gemini and is aborted at 2.5 s (seen once, about 6 s lost before the answer started). Watch for it.
+  5. **First-audio latency.** Not measured this sprint (no provider-verified browser first-audio stamp). Measure within GPT-Live/duplex with no new paid usage.
+- **NEXT PRIORITY (founder 2026-10-13):** GateQ complete adaptive interview, secure evidence collection and investor-facing dossier; see `session-directives/2026-10-13-gateq-adaptive-interview-and-inbox.txt`. Then the full voice/Tavus experience, then Q Pitch.
+
+## 2026-10-13 15:10 UTC — Claude takeover: checkpoint release deployed; Q speed slice 1 in CI
+
+- DEPLOYED: #57 and #58 were reconciled first. Their six code/migration files are byte-identical, both had green CI on their heads, and neither base had moved. #57 merged to integration (43c25e7f). Migration `20261222190000` passed review (additive columns, existing rows satisfy the check, the allowance guard is strictly tighter) and was applied through the HTTPS runner: hosted 207, none missing, columns verified. #58 then merged to production (cfc694b3). Railway q-api SUCCESS at cfc694b3; web/api/workers unchanged at 0a7e5f1a. No paid Tavus room was opened.
+- RECOVERY: `apps/api/src/composition/gateq-contact.ts` is in no commit on any branch, and no `CLAUDE-NEXT-RUN.md` exists anywhere. Codex's workspace is not reachable from this container. Status: **LOCAL-ONLY/UNRECOVERED**; rebuild it only when GateQ resumes.
+- Branch `claude/capital-q-completion-mhzsiq` now records its superseded tip 1f05df4c via an ours-merge. Its tree equals production; the #39/#40 content reached production through Codex's later merges.
+- BASELINE (production cfc694b3, fictional investor savanna-seed, one browser journey; first 20 rendered characters / settled):
+  - top three 3.5/4.0 s, three cards;
+  - selected profile 6.0/25.0 s, five findings; one call 21.5 s, 38,227 input / 0 cached / 2,104 output tokens;
+  - risks 15.1/29.8 s, **0 findings → journey FAILED**. The turn reader stalled about 6 s (2.5 s timeout, then a refusal over a tool's fields written at the root). Then came two tool rounds (2.3 + 2.9 s) and a 15.8 s answer that put all nine points in `companyFindings`, which no conversation surface renders.
+- IN CI: PR #59 (`claude/q-speed-1`, model-gateway only):
+  - the analyst answer and the turn reader drop unknown root keys (counted, never named) instead of refusing the reading;
+  - conversation findings fall back to the specialist channel at the weakest honest evidence reading;
+  - a trailing conversation note asks for `findings` only.
+    Local gates PASS. Not yet deployed or live-measured.
+- NEXT: deploy #59 and re-run the same journey. Then:
+  - a stable tool set per task (96 tools ≈ 20k prefix tokens, and the set changes per turn);
+  - card-first emission on the fast paths;
+  - preloading the canvas when a run is followed.
+
 ## 2026-10-13 13:40 UTC — bounded slice deployed; allocation checkpoint closes wider-funding gate
 
 - DEPLOYED: PR55 f0a89007 exactCI38393620721 SUCCESS/normal integration merge51a09275; PR56 e021d3ad exactCI38393622180 SUCCESS/normal production merge0a7e5f1abc61b9eea9bd9c994939ee026f381926. Source/DB4798files byte-identical. Production pushCI38397302675 SUCCESS. All four Railway services0a7e5f1a SUCCESS/drained: workersa3dd0e09-5ff8-4464-a4a8-db144ff0cb8d; api5072b12f-326b-4ec7-8221-599b59fbfd4b; q-apia955d3b6-4dd7-4721-b209-c0b4e1339cc8; web1f6f9b4b-e822-4e52-a168-ba3bea9d868a.

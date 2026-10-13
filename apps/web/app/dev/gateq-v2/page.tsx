@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 
 import {
   GATEQ_INBOX_VIEWS,
+  type ApplicationContactDto,
+  type ApplicationCoverageDto,
   type ApplicationSummaryDto,
   type ClaimableCompanyDto,
   type FounderApplicationDto,
@@ -48,7 +50,7 @@ export const metadata: Metadata = {
  *
  *   ?view=form|founder|claim|inbox|inbox-detail|find|gate
  *   &state=full|loading|empty|error|limited
- *   &step=company|round|share|note|check|sent   (form)
+ *   &step=contact|company|round|share|note|check|interview|review|sent   (form)
  *   &sheet=pass|pack|claim   &bulk=1   &solo=1
  */
 
@@ -111,6 +113,74 @@ const summary = (
   stillNeeded: [],
   ...over,
 });
+
+// GateQ slice 1: the confirmed contact, an interview under way, the review.
+const PREVIEW_CONTACT: ApplicationContactDto = {
+  name: "Amara Okafor",
+  email: "amara@korahealth.ng",
+  role: "Founder & CEO",
+  companyName: "Kora Health",
+  phone: null,
+  preferredChannel: "EMAIL",
+  emailConfirmed: true,
+  confirmedVia: "ACCOUNT",
+};
+
+const PREVIEW_TRANSCRIPT = [
+  {
+    from: "Q" as const,
+    text: "Who pays Kora today: the clinics, or the insurers?",
+  },
+  {
+    from: "YOU" as const,
+    text: "The clinics, a monthly fee plus 1% of claims we recover.",
+  },
+  {
+    from: "Q" as const,
+    text: "Your deck says 64 clinics. How many paid in the last full month?",
+  },
+];
+
+const PREVIEW_COVERAGE: ApplicationCoverageDto = {
+  coverage: {
+    version: 1,
+    access: "MAY_APPLY",
+    unmet: [],
+    stillNeeded: [],
+    answered: [
+      {
+        dimension: "STAGE",
+        label: "Stage",
+        group: "COMPANY",
+        summary: "Seed",
+        provenance: "APPLICANT_PROVIDED",
+      },
+      {
+        dimension: "CUSTOMERS",
+        label: "Customers",
+        group: "TRACTION",
+        summary: "64 clinics",
+        provenance: "DOCUMENT_SUPPORTED",
+      },
+    ],
+    unknown: [{ dimension: "BURN", label: "Monthly burn", group: "TRACTION" }],
+    declined: [
+      { dimension: "VALUATION", label: "Valuation", group: "FUNDRAISING" },
+    ],
+    missing: [
+      {
+        dimension: "TEAM_SIZE",
+        label: "Team size",
+        group: "TEAM",
+        reason: "UNDERSTANDING",
+      },
+    ],
+    contradictions: ["Clinics: 64 in the deck, 58 paying in the interview"],
+  },
+  contact: { required: true, confirmed: true },
+  documentCount: 1,
+  transcriptTurns: 3,
+};
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -510,7 +580,10 @@ export default async function GateqReviewPage({
       stepParam === "share" ||
       stepParam === "note" ||
       stepParam === "check" ||
-      stepParam === "sent"
+      stepParam === "sent" ||
+      stepParam === "contact" ||
+      stepParam === "interview" ||
+      stepParam === "review"
         ? stepParam
         : "company";
     body = (
@@ -556,9 +629,17 @@ export default async function GateqReviewPage({
           application:
             state === "limited"
               ? summary({ access: "MAY_NOT_APPLY", unmet: ["West Africa"] })
-              : step === "check" || step === "sent" || state === "error"
+              : step === "check" ||
+                  step === "sent" ||
+                  step === "interview" ||
+                  step === "review" ||
+                  state === "error"
                 ? summary({ access: "MAY_APPLY" })
                 : null,
+          // GateQ slice 1 screens.
+          contact: step === "contact" ? null : PREVIEW_CONTACT,
+          transcript: PREVIEW_TRANSCRIPT,
+          coverage: PREVIEW_COVERAGE,
         }}
       />
     );

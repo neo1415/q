@@ -13,6 +13,19 @@ Capital Q is an AI-native Investment Intelligence Operating System for private c
 
 Do not replace `CLAUDE.md`. Update the shared handoff files instead.
 
+## Q Pitch — canonical specification (all agents)
+
+- **Read first:** before starting or modifying Q Pitch, demo identities, scripted tours, navigation, narration or showcase features, read `docs/specs/q-pitch/Q_PITCH_MASTER_BLUEPRINT.md`.
+- **Shared baseline:** its approved experience design, 12-minute investor script, Feature Atlas, wow moments, interruption rules, performance targets and certification requirements are the baseline for Claude, Codex, subagents and every future agent.
+- **No alternatives:** do not invent a different Q Pitch architecture, script, experience or demo account system.
+- **Precedence:** the locked PADL and higher-priority Capital Q specifications still take precedence. Flag conflicts; never silently override.
+- **Changes:** a material change is a proposed revision for product-owner approval. Approved revisions go in the blueprint's changelog.
+- **Status and claims:**
+  - Feature status: `docs/specs/q-pitch/IMPLEMENTATION_STATUS.md`. PLANNED is not certified.
+  - Every demonstration claim must map to `docs/specs/q-pitch/CERTIFICATION_MANIFEST.md`.
+- **Shared handoff:** progress, release evidence, risks and branch ownership stay in `docs/ai-handoff/`.
+- **Parallel lanes:** GateQ and Q Pitch run in parallel lanes with one integration owner. No conflicting changes to shared contracts, authorization, Q orchestration or migrations.
+
 ## 2. Source hierarchy
 
 Locked PADL → Product Specification → Final System Review → MVP/V1 Release Definition → `docs/architecture/` 11–25 → `docs/adr/` → `docs/specs/` → current task → code.

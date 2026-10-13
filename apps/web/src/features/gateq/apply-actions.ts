@@ -6,13 +6,24 @@ import { z } from "zod";
 import {
   ApiProblemError,
   applicationTurn,
+  confirmApplicationContact,
+  getApplicationCoverage,
+  getApplicationTranscript,
+  openApplicationInterview,
   saveApplicationAnswers,
+  saveApplicationContact,
   startApplication,
   submitApplication,
 } from "@capital-q/api-client";
-import type { ApplicationSummaryDto } from "@capital-q/contracts";
+import type {
+  ApplicationContactDto,
+  ApplicationCoverageDto,
+  ApplicationSummaryDto,
+  ApplicationTranscriptTurnDto,
+} from "@capital-q/contracts";
 import {
   ApplicationAnswersRequestSchema,
+  ApplicationContactRequestSchema,
   GATEQ_TURN_MAX_CHARS,
 } from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
@@ -65,6 +76,11 @@ export type ApplyResult =
       readonly message: string;
       /** A spent allowance: wait, nothing is lost (P7 rate-limited state). */
       readonly rateLimited?: boolean;
+      /**
+       * Slice 1: Submit refused with 409 because the contact email is not
+       * confirmed yet. The founder fixes it on the contact step.
+       */
+      readonly contactNotConfirmed?: boolean;
     };
 
 const PublicId = z.string().regex(/^[A-Za-z0-9_-]{4,64}$/);
@@ -168,6 +184,15 @@ export async function submitApplicationAction(
       application: submitted.application,
     };
   } catch (error: unknown) {
+    // The submit route's only 409 is CONTACT_NOT_CONFIRMED (every other
+    // refusal is a 404 that says nothing).
+    if (error instanceof ApiProblemError && error.status === 409) {
+      return {
+        ok: false,
+        contactNotConfirmed: true,
+        message: "Confirm your contact email before submitting.",
+      };
+    }
     return failure(error);
   }
 }
@@ -237,5 +262,160 @@ export async function saveAnswersAction(
     };
   } catch (error: unknown) {
     return formFailure(error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// GateQ slice 1: contact first, the durable interview and the review.
+// Still anonymous and credential-scoped: the session token names exactly one
+// application, and the API derives everything else.
+// ---------------------------------------------------------------------------
+
+type Failed = {
+  readonly ok: false;
+  readonly message: string;
+  readonly rateLimited?: boolean;
+};
+
+function failed(error: unknown): Failed {
+  const result = failure(error);
+  return result.ok
+    ? { ok: false, message: "Please try again." }
+    : {
+        ok: false,
+        message: result.message,
+        ...(result.rateLimited === true ? { rateLimited: true } : {}),
+      };
+}
+
+export type ContactResult =
+  | {
+      readonly ok: true;
+      readonly contact: ApplicationContactDto;
+      readonly codeSent: boolean;
+      readonly codeExpiresInMinutes: number | null;
+    }
+  | Failed;
+
+/** A guest's contact: saved, and a six-digit code sent to the email. */
+export async function saveContactAction(
+  sessionToken: string,
+  contact: unknown,
+): Promise<ContactResult> {
+  const token = Token.safeParse(sessionToken);
+  const parsed = ApplicationContactRequestSchema.safeParse(contact);
+  const url = base();
+  if (!token.success || !parsed.success || url === null) {
+    return { ok: false, message: "Please check your details and try again." };
+  }
+  try {
+    const saved = await saveApplicationContact(url, token.data, parsed.data);
+    return {
+      ok: true,
+      contact: saved.contact,
+      codeSent: saved.codeSent,
+      codeExpiresInMinutes: saved.codeExpiresInMinutes,
+    };
+  } catch (error: unknown) {
+    return failed(error);
+  }
+}
+
+export type ConfirmResult =
+  | {
+      readonly ok: true;
+      readonly status: "CONFIRMED" | "WRONG_CODE" | "EXPIRED" | "NOT_FOUND";
+      readonly contact: ApplicationContactDto | null;
+    }
+  | Failed;
+
+const Code = z.string().regex(/^[0-9]{6}$/);
+
+export async function confirmContactAction(
+  sessionToken: string,
+  code: string,
+): Promise<ConfirmResult> {
+  const token = Token.safeParse(sessionToken);
+  const digits = Code.safeParse(code.replace(/\s/g, ""));
+  const url = base();
+  if (!token.success || url === null) {
+    return { ok: false, message: "Please try again." };
+  }
+  if (!digits.success) {
+    return { ok: false, message: "The code is six digits." };
+  }
+  try {
+    const confirmed = await confirmApplicationContact(
+      url,
+      token.data,
+      digits.data,
+    );
+    return { ok: true, status: confirmed.status, contact: confirmed.contact };
+  } catch (error: unknown) {
+    return failed(error);
+  }
+}
+
+export type TranscriptResult =
+  | {
+      readonly ok: true;
+      readonly turns: readonly ApplicationTranscriptTurnDto[];
+    }
+  | Failed;
+
+/** The interview so far, as the server recorded it: what a resume shows. */
+export async function transcriptAction(
+  sessionToken: string,
+): Promise<TranscriptResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null) {
+    return { ok: false, message: "Please try again." };
+  }
+  try {
+    const transcript = await getApplicationTranscript(url, token.data);
+    return { ok: true, turns: transcript.turns };
+  } catch (error: unknown) {
+    return failed(error);
+  }
+}
+
+/**
+ * Opens the interview: Q's first question when nothing has been said yet,
+ * otherwise the transcript as recorded (a resume makes no model call).
+ */
+export async function openInterviewAction(
+  sessionToken: string,
+): Promise<TranscriptResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null) {
+    return { ok: false, message: "Please try again." };
+  }
+  try {
+    const transcript = await openApplicationInterview(url, token.data);
+    return { ok: true, turns: transcript.turns };
+  } catch (error: unknown) {
+    return failed(error);
+  }
+}
+
+export type CoverageResult =
+  { readonly ok: true; readonly coverage: ApplicationCoverageDto } | Failed;
+
+/** The deterministic completeness check the review screen shows. */
+export async function coverageAction(
+  sessionToken: string,
+): Promise<CoverageResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null) {
+    return { ok: false, message: "Please try again." };
+  }
+  try {
+    const coverage = await getApplicationCoverage(url, token.data);
+    return { ok: true, coverage };
+  } catch (error: unknown) {
+    return failed(error);
   }
 }

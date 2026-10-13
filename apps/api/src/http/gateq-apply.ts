@@ -1,6 +1,17 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  ApplicationContactConfirmRequestSchema,
+  ApplicationContactConfirmResponseSchema,
+  ApplicationContactRequestSchema,
+  ApplicationContactResponseSchema,
+  ApplicationCoverageDtoSchema,
+  ApplicationTranscriptDtoSchema,
+  GATEQ_APPLY_CONTACT_CONFIRM_PATH,
+  GATEQ_APPLY_CONTACT_PATH,
+  GATEQ_APPLY_COVERAGE_PATH,
+  GATEQ_APPLY_INTERVIEW_OPEN_PATH,
+  GATEQ_APPLY_TRANSCRIPT_PATH,
   ApplicationAnswersRequestSchema,
   ApplicationAnswersResponseSchema,
   GATEQ_APPLY_ANSWERS_PATH,
@@ -100,7 +111,9 @@ function summaryDto(result: ApplicantTurnResult): unknown {
               ? `${fact.value.amount} ${fact.value.currency}`
               : fact.value.kind === "PHRASES"
                 ? fact.value.phrases.join(", ")
-                : "not known yet",
+                : fact.value.declined === true
+                  ? "preferred not to say"
+                  : "not known yet",
       provenance: fact.provenance,
     })),
     documentCount: result.view.documentCount,
@@ -128,9 +141,13 @@ export function registerGateQApplyRoutes(
     // their turn budget that ran out, would be a lie that costs them the
     // application. It goes to the central problem handler, which owns the
     // public wording.
+    // Slice 1: an unconfirmed contact is the other one. The founder can
+    // fix it on the same screen, so it is a 409 the problem handler words,
+    // never a 404 that says the application is gone.
     if (
       error instanceof IntakeRefusedError &&
-      error.refusal !== "TOO_MANY_REQUESTS"
+      error.refusal !== "TOO_MANY_REQUESTS" &&
+      error.refusal !== "CONTACT_NOT_CONFIRMED"
     ) {
       reply.callNotFound();
       return undefined;
@@ -303,6 +320,95 @@ export function registerGateQApplyRoutes(
         deduplicated: submitted.deduplicated,
         application: summaryDto(summary),
       });
+    } catch (error: unknown) {
+      return refuse(error, reply);
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // GateQ slice 1: contact first, the transcript and the coverage check.
+  // All guest-credential scoped, all charged to the verified session.
+  // -------------------------------------------------------------------------
+
+  app.post(GATEQ_APPLY_CONTACT_PATH, async (request, reply) => {
+    const input = parseContract(
+      ApplicationContactRequestSchema,
+      request.body,
+      "The contact details are not valid.",
+    );
+    const token = credential(request);
+    try {
+      // Before the email: a refused request sends nothing.
+      await charge(token, "CONTACT");
+      const saved = await intake.startContact({ token, contact: input });
+      void reply.header("Cache-Control", "no-store");
+      return ApplicationContactResponseSchema.parse(saved);
+    } catch (error: unknown) {
+      return refuse(error, reply);
+    }
+  });
+
+  app.post(GATEQ_APPLY_CONTACT_CONFIRM_PATH, async (request, reply) => {
+    const input = parseContract(
+      ApplicationContactConfirmRequestSchema,
+      request.body,
+      "The code is not valid.",
+    );
+    const token = credential(request);
+    try {
+      await charge(token, "CONTACT_CONFIRM");
+      const confirmed = await intake.confirmContact({
+        token,
+        code: input.code,
+      });
+      void reply.header("Cache-Control", "no-store");
+      return ApplicationContactConfirmResponseSchema.parse(confirmed);
+    } catch (error: unknown) {
+      return refuse(error, reply);
+    }
+  });
+
+  app.get(GATEQ_APPLY_TRANSCRIPT_PATH, async (request, reply) => {
+    const token = credential(request);
+    try {
+      await charge(token, "TRANSCRIPT");
+      const turns = await conversation.transcript(token);
+      void reply.header("Cache-Control", "no-store");
+      return ApplicationTranscriptDtoSchema.parse({ turns });
+    } catch (error: unknown) {
+      return refuse(error, reply);
+    }
+  });
+
+  app.post(GATEQ_APPLY_INTERVIEW_OPEN_PATH, async (request, reply) => {
+    const token = credential(request);
+    try {
+      const existing = await conversation.transcript(token);
+      if (existing.length > 0) {
+        await charge(token, "TRANSCRIPT");
+        void reply.header("Cache-Control", "no-store");
+        return ApplicationTranscriptDtoSchema.parse({ turns: existing });
+      }
+      // A form-started application has no opening line yet: Q asks the
+      // first question here, so the founder answers rather than starts.
+      // Stored once under its fixed turn id; a concurrent open is a no-op.
+      await charge(token, "TURN");
+      await conversation.openingFor({ token, correlationId: randomUUID() });
+      const turns = await conversation.transcript(token);
+      void reply.header("Cache-Control", "no-store");
+      return ApplicationTranscriptDtoSchema.parse({ turns });
+    } catch (error: unknown) {
+      return refuse(error, reply);
+    }
+  });
+
+  app.get(GATEQ_APPLY_COVERAGE_PATH, async (request, reply) => {
+    const token = credential(request);
+    try {
+      await charge(token, "COVERAGE");
+      const coverage = await intake.coverage(token);
+      void reply.header("Cache-Control", "no-store");
+      return ApplicationCoverageDtoSchema.parse(coverage);
     } catch (error: unknown) {
       return refuse(error, reply);
     }
