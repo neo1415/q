@@ -993,3 +993,69 @@ describe("last-time recall covers recent distinct conversations and jobs", () =>
     );
   });
 });
+
+describe("connected diligence wording and approval evidence", () => {
+  it("preserves a complete canonical question, including its final qualifier", async () => {
+    const w = world();
+    const question =
+      "Provide monthly revenue, cash balances, cost of funds, operating costs, loan losses and portfolio-at-risk definitions for eighteen months, with currency basis and denominators.";
+    expect(question.length).toBeGreaterThan(140);
+    expect(question.length).toBeLessThanOrEqual(180);
+    const job = w.jobs[0];
+    if (job === undefined || job.diligence === null)
+      throw new Error("Missing fixture diligence");
+    w.jobs[0] = {
+      ...job,
+      diligence: { questions: [question], filedForApproval: true },
+    };
+    const text = await recallText(w, investor, Q2, {
+      graph: true,
+      companyIds: [TENSORGATE],
+    });
+    expect(text).toContain(question);
+  });
+
+  it("reports historical filing without inventing a still-pending approval", async () => {
+    const text = await recallText(world(), investor, Q2, {
+      graph: true,
+      companyIds: [TENSORGATE],
+    });
+    expect(text).toContain(
+      "filed for approval; current approval status not checked",
+    );
+    expect(text).not.toContain("waiting for your approval");
+  });
+});
+
+describe("connected recall with several jobs for the same company", () => {
+  it("keeps complete useful evidence when a company's history exceeds the budget", async () => {
+    const w = world();
+    const job = w.jobs[0];
+    if (job === undefined) throw new Error("Missing fixture job");
+    w.jobs = Array.from({ length: 6 }, (_, index) => ({
+      ...job,
+      jobId: `40000000-0000-4000-8000-00000000000${String(index + 1)}`,
+    }));
+    const recall = await buildConnectedRecall({
+      port: portOver(w),
+      actor: investor,
+      plan: planGraphRecall(Q2, [TENSORGATE]) ?? {
+        cues: new Set(["REVIEW"]),
+        windowDays: 31,
+      },
+      seedCompanyIds: [TENSORGATE],
+      memories: [],
+      now: NOW,
+    });
+    expect(renderConnectedRecall(recall, 10_000).length).toBeGreaterThan(
+      CONNECTED_MAX,
+    );
+    const bounded = renderConnectedRecall(recall);
+    expect(bounded.length).toBeLessThanOrEqual(CONNECTED_MAX);
+    expect(bounded).toContain("Tensorgate investment memo");
+    expect(bounded).toContain(
+      "Net revenue retention is asserted without a source",
+    );
+    expect(bounded).not.toMatch(/…$/u);
+  });
+});

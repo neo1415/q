@@ -4,6 +4,7 @@ import { withOneCaveat } from "@capital-q/q-core";
 
 import {
   askedCount,
+  fitNeedsSynthesis,
   fitSweepAsk,
   fitSweepAskOfReading,
 } from "../src/q/fit-sweep.js";
@@ -135,5 +136,24 @@ describe("named comparison stays within resolved records", () => {
     expect(
       fitSweepAskOfReading({ text, count: null }, [], named),
     ).toMatchObject({ scope: "PREVIOUS", within: named, count: 2 });
+  });
+});
+
+describe("fit rankings with additional evidence requests", () => {
+  it.each([
+    "Which companies have we discussed recently that fit my mandate, what did your agents find, and which unresolved risks remain?",
+    "Rank my saved companies and explain what the reviewers changed in their memos.",
+    "Compare those two companies against my mandate and list pending diligence decisions.",
+  ])("requires synthesis beyond computed fit: %s", (text) => {
+    expect(fitNeedsSynthesis(text)).toBe(true);
+  });
+
+  it.each([
+    "Show me the top three companies that fit my mandate.",
+    "Rank my saved companies.",
+    "Compare these two companies against my mandate.",
+    "Which companies in Kenya fit best and why?",
+  ])("keeps the pure fit fast path: %s", (text) => {
+    expect(fitNeedsSynthesis(text)).toBe(false);
   });
 });
