@@ -2017,6 +2017,22 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/q-pitch:
+    dependencies:
+      '@capital-q/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   packages/q-presence:
     dependencies:
       '@capital-q/contracts':
