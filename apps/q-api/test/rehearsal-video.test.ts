@@ -419,6 +419,55 @@ describe("starting a video rehearsal", () => {
     expect(stored?.tokenHash).not.toBe(bearerOf(harness.tavus.calls));
   });
 
+  it("compensates with allocated provider IDs when saving LIVE fails", async () => {
+    const harness = setup();
+    vi.spyOn(harness.store, "markLive").mockRejectedValueOnce(
+      new Error("database unavailable"),
+    );
+    const result = await harness.service.start(
+      FOUNDER,
+      REHEARSAL_ID,
+      "partner-steve",
+    );
+    expect(result).toEqual({
+      kind: "OK",
+      response: { mode: "VOICE_FALLBACK", reason: "PROVIDER_UNAVAILABLE" },
+    });
+    expect(harness.tavus.calls.ended).toEqual([{ key: 0, id: "conv0" }]);
+    expect(harness.tavus.calls.deleted).toEqual([{ key: 0, id: "pal0" }]);
+    expect([...harness.store.rows.values()][0]?.status).toBe("FAILED");
+    expect(harness.rehearsals.finished).toEqual([]);
+  });
+
+  it.each(["timer", "sweep"])(
+    "keeps failed-persistence allocation open until %s confirms compensating end",
+    async (retry) => {
+      const harness = setup();
+      vi.spyOn(harness.store, "markLive").mockRejectedValueOnce(
+        new Error("database unavailable"),
+      );
+      const client = harness.tavus.pool.clientAt(0);
+      if (client === null) throw new Error("missing fake client");
+      const end = vi
+        .spyOn(client, "endConversation")
+        .mockRejectedValueOnce(new TavusError("end conversation", 503));
+      await harness.service.start(FOUNDER, REHEARSAL_ID, "partner-steve");
+      expect([...harness.store.rows.values()][0]?.status).toBe("STARTING");
+      expect(harness.tavus.calls.deleted).toEqual([]);
+      expect(harness.rehearsals.finished).toEqual([]);
+      if (retry === "sweep") {
+        for (const timer of harness.timers) timer.cancelled = true;
+      }
+      await harness.advance(180_000);
+      if (retry === "sweep") await harness.service.sweep();
+      expect(end).toHaveBeenCalledTimes(2);
+      expect(end).toHaveBeenLastCalledWith("conv0");
+      expect([...harness.store.rows.values()][0]?.status).toBe("FAILED");
+      expect(harness.tavus.calls.deleted).toEqual([{ key: 0, id: "pal0" }]);
+      expect(harness.rehearsals.finished).toEqual([]);
+    },
+  );
+
   it("is idempotent: a retried start returns the same session and pays once", async () => {
     const harness = setup();
     const first = await startVideo(harness);
@@ -722,6 +771,104 @@ describe("the bridge", () => {
       expect(harness.rehearsals.finished).toEqual([]);
     },
   );
+
+  it("deduplicates overlapping retries while serializing a following turn", async () => {
+    const harness = setup();
+    const session = await startVideo(harness);
+    const original = harness.rehearsals.service.say.getMockImplementation();
+    if (original === undefined) throw new Error("missing fake say");
+    let release: () => void = () => undefined;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let entered: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    harness.rehearsals.service.say.mockImplementationOnce(async (...args) => {
+      entered();
+      await blocked;
+      return original(...args);
+    });
+    const bearer = bearerOf(harness.tavus.calls);
+    const signal = new AbortController().signal;
+    const words = [{ role: "user", text: "Our margins are improving." }];
+    const first = harness.service.bridge(session.id, bearer, words, signal);
+    await started;
+    const retry = harness.service.bridge(session.id, bearer, words, signal);
+    const next = harness.service.bridge(
+      session.id,
+      bearer,
+      [...words, { role: "user", text: "Revenue has doubled." }],
+      signal,
+    );
+    // Let overlapping requests reach their turn boundary while the first
+    // Q call is still blocked; a sequential retry test misses this race.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(harness.rehearsals.service.say).toHaveBeenCalledTimes(1);
+    release();
+    const [reply, repeated, following] = await Promise.all([
+      first,
+      retry,
+      next,
+    ]);
+    expect(repeated).toEqual(reply);
+    expect(following).not.toEqual(reply);
+    expect(harness.rehearsals.said.map((turn) => turn.text)).toEqual([
+      "Our margins are improving.",
+      "Revenue has doubled.",
+    ]);
+    expect(harness.stillAllowed).toHaveBeenCalledTimes(3);
+  });
+
+  it("rechecks authorization after waiting for an overlapping retry", async () => {
+    const harness = setup();
+    const session = await startVideo(harness);
+    const original = harness.rehearsals.service.say.getMockImplementation();
+    if (original === undefined) throw new Error("missing fake say");
+    let release: () => void = () => undefined;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let entered: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    harness.rehearsals.service.say.mockImplementationOnce(async (...args) => {
+      entered();
+      await blocked;
+      return original(...args);
+    });
+    const bearer = bearerOf(harness.tavus.calls);
+    const signal = new AbortController().signal;
+    const words = [{ role: "user", text: "Our margins are improving." }];
+    const first = harness.service.bridge(session.id, bearer, words, signal);
+    await started;
+    const retry = harness.service.bridge(session.id, bearer, words, signal);
+    harness.stillAllowed.mockResolvedValue(false);
+    release();
+    expect((await first).kind).toBe("LINE");
+    expect(await retry).toEqual({ kind: "UNAUTHORISED" });
+    expect(harness.rehearsals.service.say).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the session queue after a failed turn so a retry can run", async () => {
+    const harness = setup();
+    const session = await startVideo(harness);
+    harness.rehearsals.service.say.mockRejectedValueOnce(
+      new Error("temporary failure"),
+    );
+    const bearer = bearerOf(harness.tavus.calls);
+    const signal = new AbortController().signal;
+    const words = [{ role: "user", text: "Our margins are improving." }];
+    const first = harness.service.bridge(session.id, bearer, words, signal);
+    const failed = expect(first).rejects.toThrow("temporary failure");
+    const retry = harness.service.bridge(session.id, bearer, words, signal);
+    await failed;
+    expect((await retry).kind).toBe("LINE");
+    expect(harness.rehearsals.service.say).toHaveBeenCalledTimes(2);
+    expect(harness.rehearsals.said).toHaveLength(1);
+  });
 
   it("answers a provider retry of the same words without a second turn", async () => {
     const harness = setup();

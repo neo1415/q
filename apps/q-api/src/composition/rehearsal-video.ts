@@ -463,6 +463,32 @@ export function createRehearsalVideoService(dependencies: {
     (dependencies.testMode === true ||
       (dependencies.paidUserIds?.size ?? 0) > 0);
   const timers = new Map<string, { cancel: () => void }>();
+  // Allocation IDs survive a failed LIVE write for compensating cleanup in
+  // this process. They are not a durable allocation checkpoint across crashes.
+  const allocations = new Map<string, VideoSessionRow>();
+  // Serialize turns in this replica: overlapping retries see the completed
+  // reply, and different turns cannot overwrite the same transcript snapshot.
+  // This does not provide distributed or restart-safe idempotency.
+  const bridgeTails = new Map<string, Promise<void>>();
+
+  async function serialBridge(
+    sessionId: string,
+    run: () => Promise<BridgeResult>,
+  ): Promise<BridgeResult> {
+    const previous = bridgeTails.get(sessionId) ?? Promise.resolve();
+    let release: () => void = () => undefined;
+    const tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    bridgeTails.set(sessionId, tail);
+    await previous;
+    try {
+      return await run();
+    } finally {
+      release();
+      if (bridgeTails.get(sessionId) === tail) bridgeTails.delete(sessionId);
+    }
+  }
   /**
    * The join link of a live session (it carries the room's token), held
    * cached locally; its encrypted owner/session-bound credential is held
@@ -579,8 +605,9 @@ export function createRehearsalVideoService(dependencies: {
     joinLinks.delete(row.id);
     answered.delete(row.id);
     lines.delete(row.id);
-    await releaseProvider(row);
+    await releaseProvider(allocations.get(row.id) ?? row);
     const closed = await store.close(row, { status, reason, at: now() });
+    allocations.delete(row.id);
     return closed ?? row;
   }
 
@@ -603,7 +630,12 @@ export function createRehearsalVideoService(dependencies: {
       setTimer(() => {
         timers.delete(row.id);
         void (async () => {
-          const closed = await closeSession(row, "TIME_LIMIT");
+          const compensating = allocations.has(row.id);
+          const closed = await closeSession(
+            row,
+            compensating ? "PROVIDER_UNAVAILABLE" : "TIME_LIMIT",
+            compensating ? "FAILED" : "ENDED",
+          );
           if (closed.endedReason === "TIME_LIMIT") await finishAs(closed);
         })().catch((error: unknown) => {
           logger?.warn(
@@ -767,6 +799,13 @@ export function createRehearsalVideoService(dependencies: {
             }
           },
         );
+        const allocated: VideoSessionRow = {
+          ...row,
+          keyIndex,
+          palId: value.palId,
+          conversationId: value.conversation.conversationId,
+        };
+        allocations.set(row.id, allocated);
         const joinUrl = joinUrlOf(
           value.conversation.conversationUrl,
           value.conversation.meetingToken,
@@ -807,6 +846,7 @@ export function createRehearsalVideoService(dependencies: {
             },
           };
         }
+        allocations.delete(live.id);
         joinLinks.set(live.id, joinUrl);
         scheduleCap(live);
         logger?.info(
@@ -826,9 +866,10 @@ export function createRehearsalVideoService(dependencies: {
           },
           "rehearsal video: provider unavailable; continuing by voice",
         );
-        await closeSession(row, "PROVIDER_UNAVAILABLE", "FAILED").catch(
-          () => undefined,
-        );
+        await closeSession(row, "PROVIDER_UNAVAILABLE", "FAILED").catch(() => {
+          const allocated = allocations.get(row.id);
+          if (allocated !== undefined) scheduleCap(allocated);
+        });
         return {
           kind: "OK",
           response: { mode: "VOICE_FALLBACK", reason: "PROVIDER_UNAVAILABLE" },
@@ -878,66 +919,79 @@ export function createRehearsalVideoService(dependencies: {
       };
     },
 
-    bridge: async (sessionId, bearer, messages, signal) => {
-      if (bearer.length < 32 || bearer.length > 128)
-        return { kind: "UNAUTHORISED" };
-      const row = await store.byToken(sessionId, tokenHashOf(bearer));
-      if (
-        row === null ||
-        !(await dependencies.stillAllowed(actorOf(row)).catch(() => false))
-      )
-        return { kind: "UNAUTHORISED" };
-      const open = row.status === "LIVE" || row.status === "STARTING";
-      if (!open || row.endsAt.getTime() <= now().getTime()) {
-        return { kind: "LINE", text: ALREADY_OVER };
-      }
-      // The founder's latest words only; the provider's system messages
-      // (its own prompt, perception notes) are data and never forwarded.
-      const said = messages.filter((message) => message.role === "user");
-      const latest = said.at(-1)?.text.trim().slice(0, 4_000) ?? "";
-      if (latest.length === 0) return { kind: "SILENT" };
-      // A provider retry of the same utterance is answered from memory,
-      // never a second rehearsal turn.
-      const key = `${String(said.length)}:${latest}`;
-      const previous = answered.get(row.id);
-      if (previous?.key === key) return previous.reply;
-      const count = (lines.get(row.id) ?? 0) + 1;
-      if (count > MAX_BRIDGE_LINES) return { kind: "LINE", text: ALREADY_OVER };
-      lines.set(row.id, count);
+    bridge: async (sessionId, bearer, messages, signal) =>
+      serialBridge(sessionId, async () => {
+        // Admission is checked after waiting, including identical retries.
+        if (bearer.length < 32 || bearer.length > 128)
+          return { kind: "UNAUTHORISED" };
+        const row = await store.byToken(sessionId, tokenHashOf(bearer));
+        if (
+          row === null ||
+          !(await dependencies.stillAllowed(actorOf(row)).catch(() => false))
+        )
+          return { kind: "UNAUTHORISED" };
+        const open = row.status === "LIVE" || row.status === "STARTING";
+        if (!open || row.endsAt.getTime() <= now().getTime()) {
+          return { kind: "LINE", text: ALREADY_OVER };
+        }
+        // The founder's latest words only; the provider's system messages
+        // (its own prompt, perception notes) are data and never forwarded.
+        const said = messages.filter((message) => message.role === "user");
+        const latest = said.at(-1)?.text.trim().slice(0, 4_000) ?? "";
+        if (latest.length === 0) return { kind: "SILENT" };
+        // A provider retry of the same utterance is answered from memory,
+        // never a second rehearsal turn.
+        const key = `${String(said.length)}:${latest}`;
+        const previous = answered.get(row.id);
+        if (previous?.key === key) return previous.reply;
+        const count = (lines.get(row.id) ?? 0) + 1;
+        if (count > MAX_BRIDGE_LINES)
+          return { kind: "LINE", text: ALREADY_OVER };
+        lines.set(row.id, count);
 
-      const result = await rehearsals.say(
-        actorOf(row),
-        row.rehearsalId,
-        { text: latest },
-        signal,
-      );
-      if (signal.aborted) return { kind: "SILENT" };
-      let reply: BridgeResult;
-      if (result.kind === "OK") {
-        const line = latestThemLine(result.rehearsal);
-        reply =
-          line === null
-            ? { kind: "SILENT" }
-            : { kind: "LINE", text: line.text };
-      } else if (result.kind === "FINISHED") {
-        reply = { kind: "LINE", text: ALREADY_OVER };
-      } else {
-        reply = { kind: "LINE", text: DID_NOT_CATCH };
-      }
-      // Only a kept turn is remembered: a failed one may be said again.
-      if (result.kind === "OK") answered.set(row.id, { key, reply });
-      return reply;
-    },
+        if (signal.aborted) return { kind: "SILENT" };
+        const result = await rehearsals.say(
+          actorOf(row),
+          row.rehearsalId,
+          { text: latest },
+          signal,
+        );
+        if (signal.aborted) return { kind: "SILENT" };
+        let reply: BridgeResult;
+        if (result.kind === "OK") {
+          const line = latestThemLine(result.rehearsal);
+          reply =
+            line === null
+              ? { kind: "SILENT" }
+              : { kind: "LINE", text: line.text };
+        } else if (result.kind === "FINISHED") {
+          reply = { kind: "LINE", text: ALREADY_OVER };
+        } else {
+          reply = { kind: "LINE", text: DID_NOT_CATCH };
+        }
+        // Only a kept turn is remembered: a failed one may be said again.
+        if (result.kind === "OK") answered.set(row.id, { key, reply });
+        return reply;
+      }),
 
     sweep: async () => {
       const due = await store.overdue(now());
       let ended = 0;
       for (const row of due) {
+        const compensating = allocations.has(row.id);
         const closed =
           row.status === "ENDED"
             ? row
-            : await closeSession(row, "TIME_LIMIT").catch(() => null);
-        if (closed !== null && closed.endedReason !== "CONTINUED_BY_VOICE") {
+            : await closeSession(
+                row,
+                compensating ? "PROVIDER_UNAVAILABLE" : "TIME_LIMIT",
+                compensating ? "FAILED" : "ENDED",
+              ).catch(() => null);
+        if (
+          closed !== null &&
+          closed.status !== "FAILED" &&
+          closed.endedReason !== "CONTINUED_BY_VOICE"
+        ) {
           await finishAs(closed).catch(() => undefined);
           ended += 1;
         }
