@@ -51,6 +51,10 @@ import { QPageState, QSection, useQDialog } from "@/features/q/q-section";
 
 import { QNavIcon } from "@/components/app-shell/q-nav-icon";
 
+import {
+  ApplicationComparison,
+  GATEQ_COMPARE_MAX,
+} from "./application-comparison";
 import { SubmittedBrief, SubmittedTranscript } from "./submitted-brief";
 
 import { FitGlyph } from "../fit-glyph";
@@ -127,7 +131,8 @@ type Sheet =
   | { readonly kind: "assign"; readonly ids: readonly string[] }
   | { readonly kind: "label"; readonly ids: readonly string[] }
   | { readonly kind: "keys" }
-  | { readonly kind: "triage" };
+  | { readonly kind: "triage" }
+  | { readonly kind: "compare"; readonly ids: readonly string[] };
 
 function key(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -574,6 +579,22 @@ export function InboxView({
         aria-label={`${checked.size} selected`}
       >
         <b className="px-2 font-medium">{checked.size} selected</b>
+        <button
+          type="button"
+          disabled={
+            checked.size < 2 ||
+            checked.size > GATEQ_COMPARE_MAX ||
+            selectedRefs.length !== checked.size
+          }
+          onClick={() => setSheet({ kind: "compare", ids: [...checked] })}
+        >
+          Compare
+        </button>
+        {checked.size > GATEQ_COMPARE_MAX ? (
+          <span className="cq-caption">
+            Select up to {GATEQ_COMPARE_MAX} applications to compare.
+          </span>
+        ) : null}
         <button
           type="button"
           onClick={() => setSheet({ kind: "label", ids: [...checked] })}
@@ -1510,15 +1531,33 @@ function Sheets({
                 ? "Label"
                 : sheet.kind === "triage"
                   ? "Q's triage"
-                  : "Keyboard shortcuts";
+                  : sheet.kind === "compare"
+                    ? "Compare submitted applications"
+                    : "Keyboard shortcuts";
   return (
     <SheetRoot
       open={sheet !== null}
       onOpenChange={(open) => (open ? undefined : onClose())}
     >
       {sheet === null ? null : (
-        <SheetContent title={title} side="side">
-          {sheet.kind === "pass" ? (
+        <SheetContent
+          title={title}
+          side={sheet.kind === "compare" ? "full" : "side"}
+        >
+          {sheet.kind === "compare" ? (
+            <ApplicationComparison
+              key={JSON.stringify([
+                inbox.gateway.id,
+                inbox.viewer.userId,
+                sheet.ids,
+                items.map((item) => item.applicationId),
+              ])}
+              gatewayId={inbox.gateway.id}
+              ids={sheet.ids}
+              allowedIds={items.map((item) => item.applicationId)}
+              demoDetails={demo ? details : undefined}
+            />
+          ) : sheet.kind === "pass" ? (
             <PassSheet
               ids={sheet.ids}
               items={items}
