@@ -4,6 +4,7 @@ import type {
   MemoryItem,
   MemoryRehearsalDigest,
 } from "./contracts.js";
+import { renderConnectedRecall } from "./graph.js";
 
 /**
  * From a memory bundle to the bounded text a prompt receives (doc 14
@@ -149,6 +150,9 @@ export function renderMemoryBundle(
   // First when present: it is only read when the turn is about pitch
   // practice, so it is what the person is asking about.
   sections.push(renderRehearsals(bundle.rehearsals));
+  // Read only when the turn asks across linked things, so when present it
+  // is the spine of the answer; bounded on its own (CONNECTED_MAX).
+  sections.push(renderConnectedRecall(bundle.connected));
   // First, because it is what the person is asking about: an earlier
   // conversation found by subject or name, however long ago. Each summary
   // is clipped so a few long ones cannot push everything else past the
@@ -177,7 +181,11 @@ export function renderMemoryBundle(
       }:\n${bundle.thisConversation.summary}`,
     );
   }
-  if (bundle.otherConversations.length > 0) {
+  // Asked "last time", the connected section lists them, dated, with jobs.
+  if (
+    bundle.otherConversations.length > 0 &&
+    bundle.connected?.recent === undefined
+  ) {
     sections.push(
       `Other recent conversations:\n${bundle.otherConversations
         .map((c) => `- ${digestLine(c)}`)

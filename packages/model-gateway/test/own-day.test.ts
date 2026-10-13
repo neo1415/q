@@ -68,6 +68,58 @@ describe("their own day, read for them", () => {
     expect(fact).toContain("Rehearsals finished: none yet.");
   });
 
+  it("keeps all five questions whole when the reviewer's findings are long (live 2026-10-13)", () => {
+    // Live: eight long findings filled the job's room and the clip cut the
+    // questions; Q said it had only a summary of them.
+    const questions = Array.from(
+      { length: 5 },
+      (_, i) =>
+        `Question ${String(i + 1)}: please provide the monthly cohort, repayment and write-off data behind the 3.8% portfolio-at-risk figure, with definitions, denominators and the period it covers.`,
+    );
+    const finding = (n: number) => ({
+      kind: "UNSUPPORTED",
+      section: `Section ${String(n)}`,
+      problem: `Finding ${String(n)}: `.concat(
+        "the memo states a material figure without its source, period, definition or the evidence that would let an investor rely on it. ".repeat(
+          3,
+        ),
+      ),
+    });
+    const fact = ownDayFact({
+      now: NOW,
+      timeZone: "Africa/Lagos",
+      schedule: null,
+      approvals: null,
+      work: {
+        items: [],
+        errands: [],
+        jobs: [
+          {
+            jobId: "43b7bdb4-bcb6-431c-85f5-aef2e40f5d65",
+            goal: "Research Ledgerfold, write a memo, have it reviewed and prepare founder diligence questions",
+            state: "COMPLETED",
+            finishedAt: "2026-10-02T06:00:00.000Z",
+            inThisConversation: false,
+            review: {
+              outcome: "REVISED",
+              documentTitle: "Ledgerfold memo",
+              findings: Array.from({ length: 8 }, (_, i) => finding(i + 1)),
+              fromVersion: 1,
+              toVersion: 2,
+              revisionNote: "Address every finding. ".repeat(40),
+              sectionsChanged: ["Traction", "Risks", "The raise"],
+            },
+            diligence: { questions, filedForApproval: true },
+          },
+        ],
+      },
+      rehearsals: [],
+    }).statement;
+    for (const question of questions) expect(fact).toContain(question);
+    expect(fact).toContain("filed for their approval; not sent");
+    expect(fact).toContain("Reviewer revised");
+  });
+
   it("carries list_q_work's jobs: the reviewer's changes and the questions word for word (live 2026-10-12)", () => {
     // Asked in a new conversation "what were the diligence questions your
     // team prepared for Ledgerfold, and what did the reviewer change?",

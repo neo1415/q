@@ -13,7 +13,7 @@ const JOBS_SCANNED = 10;
 const JOBS_REPORTED = 3;
 
 /** A critique step's persisted verdict (jobs.ts writes `outputs.review`). */
-const ReviewOutputSchema = z.object({
+export const ReviewOutputSchema = z.object({
   artifactId: z.string().uuid(),
   review: z.object({
     // Older or partial records may lack these; absence is unknown, never "no change".
@@ -32,7 +32,7 @@ const ReviewOutputSchema = z.object({
 });
 
 /** A diligence step's persisted questions (jobs.ts writes `outputs.questions`). */
-const DiligenceOutputSchema = z.object({
+export const DiligenceOutputSchema = z.object({
   questions: z.array(z.string()).min(1).max(20),
   qActionId: z.string().uuid().optional(),
 });
@@ -42,7 +42,9 @@ const DoneStepSchema = z.object({
   outputs: z.record(z.string(), z.unknown()),
 });
 
-function doneOutputs(row: WorkRow | undefined): readonly unknown[] {
+export function doneOutputs(
+  row: Pick<WorkRow, "results"> | undefined,
+): readonly unknown[] {
   return Object.values(row?.results ?? {}).flatMap((result) => {
     const parsed = DoneStepSchema.safeParse(result);
     return parsed.success ? [parsed.data.outputs] : [];
