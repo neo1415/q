@@ -4048,6 +4048,9 @@ export function createModelGatewayQAnswer(
       if (
         sweep !== null &&
         sweep.ask.fitAsked &&
+        // Only the existing structured reading can certify ranking alone.
+        // A warmed lexical sweep must not erase a compound question.
+        request.questionKind === "FIT" &&
         sweep.fits.length > 0 &&
         // Read again on the turn's own reading: the prepare may have been
         // warmed before the turn was read.

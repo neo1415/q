@@ -1,5 +1,30 @@
 # Performance baseline and measured first improvements
 
+## October 13 connected-memory live baseline (before PR #38 deployment)
+
+Production revision `1165b92e3869832aedb4b54c63e5bf4cbd00bfd6`; existing authorized fictional investor, two fresh internal Q conversations. No contact, approval, account creation or paid audiovisual session. These are single observations, not p50/p95 or a causal speedup.
+
+| Question                                                                       | API first nonempty persisted Q text (ms) | Completed run (ms) | Product observation                                                                                                          |
+| ------------------------------------------------------------------------------ | ---------------------------------------: | -----------------: | ---------------------------------------------------------------------------------------------------------------------------- |
+| Which memos were revised, reviewer findings and remaining decisions            |                                   19,712 |             19,730 | Genuine Ledgerfold review/memo and missing-evidence discussion recalled.                                                     |
+| Recently discussed companies, mandate fit, agent findings and unresolved risks |                                    2,763 |              3,635 | Answer mentioned Ledgerfold and the mandate; no memo, reviewer or unresolved-risk discussion. Not full multi-hop acceptance. |
+
+Times include network/authentication and creation. First text is an upper bound observed through 500ms GET polling, not browser paint, semantic useful-content verification or first audio. Private receipts: `/tmp/cq-memory-live-sEqz6I`. Repeat exactly after the memory release before claiming improvement. A corrected SSE collector records `q.message.delta.data.text` separately; do not compare that metric directly with the earlier polling bound.
+
+Code-observed PR #38 memory defects: graph rendering clipped diligence questions at 140 characters, although all five questions in the inspected actual owned job were 147–164 characters and canonical questions allow 180. It also inferred a current pending approval from a historical action ID. The follow-up patch keeps up to 180 characters and says the questions were filed for approval with current status unchecked. It preserves the bounded read-only graph and does not add another approval or memory truth. It also retains complete evidence lines when repeated jobs make one company exceed the 2,000-character context budget; the original renderer discarded that whole company. Live deployment/acceptance of this follow-up remains pending.
+
+The production compound mandate question followed the deterministic fit-card early return: it made no dialogue synthesis call and omitted the requested work and risk analysis. The follow-up keeps the existing authorized fit reads but sends questions mentioning history, agent work, reviewers or risks through the existing answer synthesis. Pure ranking questions retain their deterministic fast path.
+
+Reproduction: `CQ_PUBLIC_JSON=<public-config file> CQ_SESSION_FILE=<existing fictional investor session> CQ_BENCH_REVISION=<verified deployed SHA> NODE_USE_ENV_PROXY=1 node scripts/handoff/live/memory-recall-benchmark.mjs`. The runner reports polling and SSE timing separately; it never approves or sends anything.
+
+A second baseline with the corrected stream collector, on the same production revision and exact prompts, recorded review/diligence first nonempty streamed text 6,663ms, persisted text 22,606ms and completion 22,607ms; compound mandate emitted no message deltas and completed with the same 418-character fit-only answer in 2,591ms. These are separate stochastic samples, not repeatable speed claims. Private receipts: `/tmp/cq-memory-live-bon622`. The runner additionally records a 20-character threshold on subsequent runs; earlier stream numbers establish only the first nonempty delta, not semantic usefulness.
+
+Real-record replay of the graph overflow: the existing authenticated investor's API returned five owned jobs and four authorized documents. An owner-fenced canonical queue read joined matching job/queue tenant and user IDs and restricted IDs to the authenticated API results. Feeding those actual records into the existing graph produced one company's 3,608-character history. Original rendering retained only 257 characters, with no memo or reviewer; patched rendering retained 1,875 characters including both, within the unchanged 2,000-character budget. This is an offline replay of actual authorized records, not a synthetic fixture or deployed conversational acceptance. Private evidence: `/tmp/cq-owned-memory-gkXD9o`.
+
+LOCAL TESTED follow-up: 52package builds successful; 98tests passed across graph recall, fit sweep and answer-tool integration. Before the graph fixes, the 2 new question/status regressions failed; removing the compound guard made the compound integration regression fail while the pure-fit control passed. Root types are deferred to release-owner coordination while other workers use the heavy typecheck slots. CI, deployment and live verification of the follow-up remain pending.
+
+Scoped recorded model phases before release: review/diligence classification 801ms, dialogue 15,071ms, extraction 2,435ms ($0.006439 total ledger cost); compound mandate classification 792ms and extraction 2,195ms ($0.001377), no dialogue. Summed model durations are not a sequential critical-path measurement.
+
 ## Latest live browser acceptance — 2026-10-11 21:28 UTC
 
 Exact deployed application `06872c7c7a4d0e6c3e6fa3b848e0b5a298181ce6`, all four Railway services SUCCESS; CI `38173610861` quality + pgTAP SUCCESS (manual e2e SKIPPED). Full tracked cold investor rehearsal PASS, including known authorized founder profile/follow-up.
