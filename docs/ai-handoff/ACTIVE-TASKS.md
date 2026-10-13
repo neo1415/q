@@ -1,5 +1,17 @@
 # Active tasks — authoritative cross-model board
 
+## 2026-10-13 21:40 UTC — GateQ text journey: integrated, release #70 in CI
+
+- **Evidence stage:** #66, #68 and #69 are MERGED to int-rc (47d87665). The migration is APPLIED. Release PR #70 is in CI. Not deployed, not live-verified.
+- **Next actions, in order:**
+  1. Merge #70 once green, then confirm Railway web and api SUCCESS on the merge SHA.
+  2. Run `node scripts/handoff/live/gateq-acceptance.mjs` with the public sign-in config, and record turn latency in PERFORMANCE-BASELINE.md.
+  3. Do a browser pass of `/g/<publicId>` → inbox dossier view on fictional accounts.
+  4. Only after a PASS, set `GATEQ_CONTACT_REQUIRED_FROM`.
+  5. Add the nonbinding Q synthesis record (reuse existing Q intelligence; cite dossier fact ids).
+  6. Implement ADR 0067 guest uploads.
+- **Blocked on the owner:** a valid `SUPABASE_ACCESS_TOKEN`, and `CQ_SB_URL` / `CQ_SB_PUBLISHABLE` in this environment.
+
 ## 2026-10-13 — Q Pitch lane opened; GateQ lane continues (integration owner: Claude)
 
 - **Read first:** before starting or modifying Q Pitch, demo identities, scripted tours, navigation, narration or showcase features, read `docs/specs/q-pitch/Q_PITCH_MASTER_BLUEPRINT.md`.
