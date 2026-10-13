@@ -178,6 +178,7 @@ function world(initial: GatewayPolicy): World {
         if (row !== undefined) applications.set(id, { ...row, declaredName });
         return Promise.resolve();
       },
+      lock: (_tx, id) => Promise.resolve(applications.get(id) ?? null),
     },
     sessions: {
       create: (_tx, session) => {

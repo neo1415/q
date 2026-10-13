@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type RefObject,
+} from "react";
 
 import type {
   ApplicationSummaryDto,
@@ -43,6 +49,122 @@ import {
  */
 
 type Line = { readonly from: "Q" | "YOU"; readonly text: string };
+
+/**
+ * The conversation, in order. Shared with the GateQ form's interview step
+ * (slice 1), so the fit check and the interview read the same.
+ */
+export function ChatTranscript({
+  lines,
+  thinking,
+  endRef,
+  label = "Conversation with Q",
+}: {
+  readonly lines: readonly Line[];
+  readonly thinking: boolean;
+  readonly endRef?: RefObject<HTMLDivElement | null>;
+  readonly label?: string;
+}) {
+  return (
+    <ol
+      className="flex flex-col gap-3"
+      aria-live="polite"
+      aria-busy={thinking}
+      aria-label={label}
+    >
+      {lines.map((line, index) => (
+        <li
+          // The conversation only grows; its order is its identity.
+          key={index}
+          className={
+            line.from === "YOU"
+              ? "cq-body max-w-[85%] self-end rounded-2xl bg-(--cq-surface-raised) px-4 py-2 text-(--cq-text-primary)"
+              : "flex max-w-[92%] items-start gap-2.5 self-start"
+          }
+        >
+          {line.from === "YOU" ? (
+            <>
+              <span className="sr-only">You: </span>
+              {line.text}
+            </>
+          ) : (
+            <>
+              <span className="mt-0.5 shrink-0" aria-hidden="true">
+                <QSwarm state="IDLE" pixels={24} />
+              </span>
+              <span className="cq-body whitespace-pre-line text-(--cq-text-primary)">
+                <span className="sr-only">Q: </span>
+                {line.text}
+              </span>
+            </>
+          )}
+        </li>
+      ))}
+      {thinking ? (
+        <li className="flex items-center gap-2.5 self-start" role="status">
+          <QSwarm state="THINKING" pixels={32} />
+          <span className="cq-caption text-(--cq-text-tertiary)">
+            Q is thinking
+          </span>
+        </li>
+      ) : null}
+      <div ref={endRef} />
+    </ol>
+  );
+}
+
+/** One answer at a time: Enter sends, Shift+Enter is a new line. */
+export function ChatComposer({
+  inputRef,
+  value,
+  onChange,
+  onSend,
+  pending,
+  label = "Your answer",
+  placeholder = "Answer, or paste a link",
+}: {
+  readonly inputRef?: RefObject<HTMLTextAreaElement | null>;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly onSend: () => void;
+  readonly pending: boolean;
+  readonly label?: string;
+  readonly placeholder?: string;
+}) {
+  return (
+    <form
+      className="flex items-end gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSend();
+      }}
+    >
+      <textarea
+        ref={inputRef}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            onSend();
+          }
+        }}
+        rows={1}
+        maxLength={2000}
+        aria-label={label}
+        placeholder={placeholder}
+        className="cq-body min-h-11 flex-1 resize-none rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+      />
+      <Button
+        type="submit"
+        variant="primary"
+        disabled={pending || value.trim() === ""}
+      >
+        Send
+      </Button>
+    </form>
+  );
+}
 
 type Problem = { readonly message: string; readonly rateLimited: boolean };
 
@@ -375,82 +497,22 @@ export function ApplyExperience({
   );
 
   const transcript = (
-    <ol
-      className="flex flex-col gap-3"
-      aria-live="polite"
-      aria-busy={pending}
-      aria-label="Conversation with Q"
-    >
-      {lines.map((line, index) => (
-        <li
-          // The conversation only grows; its order is its identity.
-          key={index}
-          className={
-            line.from === "YOU"
-              ? "cq-body max-w-[85%] self-end rounded-2xl bg-(--cq-surface-raised) px-4 py-2 text-(--cq-text-primary)"
-              : "flex max-w-[92%] items-start gap-2.5 self-start"
-          }
-        >
-          {line.from === "YOU" ? (
-            line.text
-          ) : (
-            <>
-              <span className="mt-0.5 shrink-0" aria-hidden="true">
-                <QSwarm state="IDLE" pixels={24} />
-              </span>
-              <span className="cq-body whitespace-pre-line text-(--cq-text-primary)">
-                <span className="sr-only">Q: </span>
-                {line.text}
-              </span>
-            </>
-          )}
-        </li>
-      ))}
-      {pending && stage !== "INTRO" ? (
-        <li className="flex items-center gap-2.5 self-start" role="status">
-          <QSwarm state="THINKING" pixels={32} />
-          <span className="cq-caption text-(--cq-text-tertiary)">
-            Q is thinking
-          </span>
-        </li>
-      ) : null}
-      <div ref={end} />
-    </ol>
+    <ChatTranscript
+      lines={lines}
+      thinking={pending && stage !== "INTRO"}
+      endRef={end}
+    />
   );
 
   const composer = (
     <div className="flex flex-col gap-1">
-      <form
-        className="flex items-end gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          send();
-        }}
-      >
-        <textarea
-          ref={input}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              send();
-            }
-          }}
-          rows={1}
-          maxLength={2000}
-          aria-label="Your answer"
-          placeholder="Answer, or paste a link"
-          className="cq-body min-h-11 flex-1 resize-none rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-        />
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={pending || draft.trim() === ""}
-        >
-          Send
-        </Button>
-      </form>
+      <ChatComposer
+        inputRef={input}
+        value={draft}
+        onChange={setDraft}
+        onSend={send}
+        pending={pending}
+      />
       {answered > 0 ? (
         <button
           type="button"

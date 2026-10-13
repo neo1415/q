@@ -64,28 +64,60 @@ export {
   type QuestionNeed,
 } from "./application/question-needs.js";
 export {
+  coverageFor,
+  DIMENSION_LABELS,
+  explainQualification,
+  factSummary,
+  INVESTMENT_DIMENSIONS,
+} from "./application/coverage.js";
+export { buildDossier } from "./application/dossier.js";
+export {
+  contactCodeMatches,
+  contactDto,
+  CONTACT_CODE_MAX_ATTEMPTS,
+  CONTACT_CODE_TTL_MINUTES,
   createIntakeService,
+  transcriptDto,
+  type ContactCodeMailer,
+  type ContactDetails,
   type GuestContext,
   type IntakeDependencies,
   type IntakeService,
   type StartApplicationResult,
 } from "./application/intake-service.js";
 export type {
+  ApplicationContactRepository,
   ApplicationDocumentRepository,
   ApplicationFactRepository,
   ApplicationRepository,
   ApplicationSessionRepository,
   ApplicationSubmissionRepository,
+  ApplicationTurnRepository,
   BoundPolicyPort,
+  ContactChannel,
+  DocumentTitlesPort,
+  StoredContact,
+  StoredTurn,
   TaxonomyResolutionPort,
 } from "./application/ports.js";
+// GateQ slice 1: the dossier and coverage contracts live with the HTTP
+// contracts so the inbox DTO can carry them; re-exported here as intake's.
+export {
+  GATEQ_DOSSIER_SCHEMA_VERSION,
+  GateqCoverageV1Schema,
+  GateqDossierV1Schema,
+  type GateqCoverageV1,
+  type GateqDossierV1,
+} from "@capital-q/contracts";
 
 export {
+  createPostgresApplicationContactRepository,
   createPostgresApplicationDocumentRepository,
   createPostgresApplicationFactRepository,
   createPostgresApplicationRepository,
   createPostgresApplicationSessionRepository,
   createPostgresApplicationSubmissionRepository,
+  createPostgresApplicationTurnRepository,
 } from "./infrastructure/postgres-intake-repositories.js";
 
 export {
@@ -141,6 +173,7 @@ export {
 // P14: founders hear GateQ answers by email.
 export {
   recipientDomain as gateqRecipientDomain,
+  renderApplicationContactCodeEmail,
   renderClaimCodeEmail,
   renderGateqAnswerEmail,
   sendLogged as sendGateqEmailLogged,

@@ -4,6 +4,19 @@
 
 **Continuity (2026-10-11):** Codex Cloud is completing the current demo release; Claude Code may continue immediately from the prominent latest status in STATE.md. Shared handoff files and branch SHAs govern continuity; no model-specific memory or replacement application.
 
+## Q Pitch — canonical specification (all agents)
+
+- **Read first:** before starting or modifying Q Pitch, demo identities, scripted tours, navigation, narration or showcase features, read `docs/specs/q-pitch/Q_PITCH_MASTER_BLUEPRINT.md`.
+- **Shared baseline:** its approved experience design, 12-minute investor script, Feature Atlas, wow moments, interruption rules, performance targets and certification requirements are the baseline for Claude, Codex, subagents and every future agent.
+- **No alternatives:** do not invent a different Q Pitch architecture, script, experience or demo account system.
+- **Precedence:** the locked PADL and higher-priority Capital Q specifications still take precedence. Flag conflicts; never silently override.
+- **Changes:** a material change is a proposed revision for product-owner approval. Approved revisions go in the blueprint's changelog.
+- **Status and claims:**
+  - Feature status: `docs/specs/q-pitch/IMPLEMENTATION_STATUS.md`. PLANNED is not certified.
+  - Every demonstration claim must map to `docs/specs/q-pitch/CERTIFICATION_MANIFEST.md`.
+- **Shared handoff:** progress, release evidence, risks and branch ownership stay in `docs/ai-handoff/`.
+- **Parallel lanes:** GateQ and Q Pitch run in parallel lanes with one integration owner. No conflicting changes to shared contracts, authorization, Q orchestration or migrations.
+
 ## Read in this order (stop when you have enough)
 
 1. [`STATE.md`](STATE.md) — branch roles, deployed revision per service, migrations, CI, environment facts.

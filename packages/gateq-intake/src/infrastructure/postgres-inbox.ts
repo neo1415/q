@@ -19,6 +19,7 @@ type Row = {
   submitted_at: Date;
   snapshot: unknown;
   qualification: unknown;
+  dossier: unknown;
   folder: string | null;
   assignee_user_id: string | null;
   starred: boolean | null;
@@ -36,6 +37,7 @@ function toRow(row: Row): InboxRow {
     submittedAt: new Date(row.submitted_at).toISOString(),
     snapshot: row.snapshot,
     qualification: row.qualification,
+    dossier: row.dossier,
     folder: folderOf(row.folder),
     assigneeUserId: row.assignee_user_id,
     starred: row.starred === true,
@@ -56,7 +58,7 @@ export function createPostgresInboxRepository(options: {
     userId: string;
     applicationId?: string | undefined;
   }) => sql<Row[]>`
-    select s.application_id, s.submitted_at, s.snapshot, s.qualification,
+    select s.application_id, s.submitted_at, s.snapshot, s.qualification, s.dossier,
            i.folder, i.assignee_user_id, u.starred, u.read_at,
            (select coalesce(array_agg(l.name order by l.name), '{}')
               from gateq.inbox_item_labels il

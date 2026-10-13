@@ -17,6 +17,30 @@ import {
 } from "@capital-q/taxonomy";
 
 /**
+ * GateQ slice 1: a signed-in person's own verified account email, so an
+ * applicant contact at that address is confirmed without a code. Read by
+ * the actor's server-resolved user id, never from a request body; an
+ * address the auth provider has not confirmed does not count.
+ */
+export function createAccountEmailPort(dependencies: {
+  readonly sql: DatabaseExecutor;
+}): (userId: string) => Promise<string | null> {
+  const { sql } = dependencies;
+  return async (userId) => {
+    const rows = await sql<{ email: string | null }[]>`
+      select u.email
+        from identity.user_profiles p
+        join auth.users u on u.id = p.auth_user_id
+       where p.id = ${userId}
+         and p.status = 'active'
+         and u.email_confirmed_at is not null
+       limit 1`;
+    const email = rows[0]?.email ?? null;
+    return email === null ? null : email.toLowerCase();
+  };
+}
+
+/**
  * What intake borrows from the contexts around it (CQ-GATE-002R §8).
  *
  * Wired here rather than inside `@capital-q/gateq-intake` for the same

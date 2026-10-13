@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import {
+  ApplicationTranscriptTurnDtoSchema,
+  GATEQ_TRANSCRIPT_MAX_TURNS,
+  GateqDossierV1Schema,
+} from "./gateq-intake.js";
+
 /**
  * F4 (2026-10-06): an investor organisation's GateQ inbox, modelled on a
  * mail client. Every founder who applied through its gate, what the engine
@@ -229,6 +235,21 @@ export const GateqInboxDetailDtoSchema = z
           .strict(),
       )
       .max(50),
+    /**
+     * GateQ slice 1: the deterministic dossier frozen with the submission.
+     * Null for a submission made before dossiers existed. Optional on the
+     * wire so an older API and a newer client still agree.
+     */
+    dossier: GateqDossierV1Schema.nullable().optional(),
+    /**
+     * The interview transcript exactly as submitted (snapshot v2). Null
+     * when the submission carried none (v1, or a form-only application).
+     */
+    transcript: z
+      .array(ApplicationTranscriptTurnDtoSchema)
+      .max(GATEQ_TRANSCRIPT_MAX_TURNS)
+      .nullable()
+      .optional(),
   })
   .strict();
 export type GateqInboxDetailDto = z.infer<typeof GateqInboxDetailDtoSchema>;
