@@ -181,7 +181,11 @@ export function renderMemoryBundle(
       }:\n${bundle.thisConversation.summary}`,
     );
   }
-  if (bundle.otherConversations.length > 0) {
+  // Asked "last time", the connected section lists them, dated, with jobs.
+  if (
+    bundle.otherConversations.length > 0 &&
+    bundle.connected?.recent === undefined
+  ) {
     sections.push(
       `Other recent conversations:\n${bundle.otherConversations
         .map((c) => `- ${digestLine(c)}`)

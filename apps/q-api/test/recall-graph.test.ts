@@ -215,7 +215,7 @@ async function setup(
 describe("persisted step outputs become typed edges", () => {
   it("links the job to its document and company, its review and its questions", () => {
     const parsed = jobOf(
-      { id: "j-1", goal: "Memo on Tensorgate", status: "DONE" },
+      { id: "j-1", goal: "Memo on Tensorgate", status: "DONE", updated_at: at },
       workRow(ownerA, "j-1"),
     );
     expect(parsed.documents).toEqual([{ artifactId, companyId }]);
@@ -237,7 +237,7 @@ describe("persisted step outputs become typed edges", () => {
 
   it("a job with no queue row says what it knows and nothing more", () => {
     const parsed = jobOf(
-      { id: "j-2", goal: "x", status: "RUNNING" },
+      { id: "j-2", goal: "x", status: "RUNNING", updated_at: at },
       undefined,
     );
     expect(parsed).toMatchObject({
@@ -341,7 +341,7 @@ describe("mandate fit", () => {
 describe("an older persisted review", () => {
   it("without material or revisedToVersion reads them as unknown", () => {
     const parsed = jobOf(
-      { id: "j-3", goal: "x", status: "DONE" },
+      { id: "j-3", goal: "x", status: "DONE", updated_at: at },
       {
         ...workRow(ownerA, "j-3"),
         results: {

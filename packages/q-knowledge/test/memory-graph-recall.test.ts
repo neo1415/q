@@ -223,6 +223,7 @@ function world(): World {
         goal: "Write an investment memo on Tensorgate and review it",
         state: "COMPLETED",
         finishedAt: daysAgo(9),
+        updatedAt: daysAgo(9),
         conversationId: "30000000-0000-4000-8000-000000000001",
         documents: [{ artifactId: MEMO_V2, companyId: TENSORGATE }],
         review: {
@@ -255,6 +256,7 @@ function world(): World {
         goal: "Colleague memo",
         state: "COMPLETED",
         finishedAt: daysAgo(4),
+        updatedAt: daysAgo(4),
         conversationId: null,
         documents: [{ artifactId: COLLEAGUE_MEMO, companyId: SECRET_CO }],
         review: {
@@ -406,11 +408,16 @@ function digestPort(w: World): MemoryConversationDigestPort {
     lastMessageAt: c.at,
   });
   return {
-    digestOf: () => Promise.resolve(null),
+    digestOf: (actor, id) => {
+      const c = own(actor).find((one) => one.conversationId === id);
+      return Promise.resolve(
+        c === undefined ? null : { title: c.title, summary: c.summary },
+      );
+    },
     recentDigests: (actor, except, limit) =>
       Promise.resolve(
         own(actor)
-          .filter((c) => c.conversationId !== except)
+          .filter((c) => c.conversationId !== except && c.summary !== null)
           .sort((a, b) => b.at.localeCompare(a.at))
           .slice(0, limit)
           .map(digest),
@@ -854,5 +861,135 @@ describe("an older review record", () => {
       /Reviewer \(Q's reviewer, Q inference; 2026-10-03; outcome not recorded\)/u,
     );
     expect(text).not.toMatch(/no material change needed|kept as written/u);
+  });
+});
+
+// --- "What did we talk about last time?" (live defect 2026-10-13) -----------
+
+describe("last-time recall covers recent distinct conversations and jobs", () => {
+  const LEDGERFOLD = "10000000-0000-4000-8000-0000000000aa";
+  const CURRENT = "30000000-0000-4000-8000-0000000000ff";
+  function lastTimeWorld(): World {
+    NAMES[LEDGERFOLD] = "Ledgerfold";
+    const w = world();
+    w.conversations = [
+      // This conversation: its turn from a minute ago is all today's recall had.
+      {
+        tenantId: SAVANNA_TENANT,
+        userId: investor.userId,
+        conversationId: CURRENT,
+        title: null,
+        summary: "Asked Q what they talked about last time.",
+        at: new Date(NOW - 60_000).toISOString(),
+        companyIds: [],
+      },
+      // Earlier conversations the extractor never summarised.
+      {
+        tenantId: SAVANNA_TENANT,
+        userId: investor.userId,
+        conversationId: "30000000-0000-4000-8000-0000000000b1",
+        title: null,
+        summary: null,
+        at: daysAgo(1),
+        companyIds: [LEDGERFOLD],
+      },
+      {
+        tenantId: SAVANNA_TENANT,
+        userId: investor.userId,
+        conversationId: "30000000-0000-4000-8000-0000000000b2",
+        title: "Pipeline review",
+        summary: "Reviewed the energy pipeline; Kwara Grid first.",
+        at: daysAgo(3),
+        companyIds: [],
+      },
+      ...w.conversations.filter((c) => c.userId !== investor.userId),
+    ];
+    w.jobs = [
+      {
+        tenantId: SAVANNA_TENANT,
+        userId: investor.userId,
+        jobId: "40000000-0000-4000-8000-0000000000b1",
+        goal: "Research Ledgerfold and write me a memo",
+        state: "NEEDS_DECISION",
+        finishedAt: daysAgo(1),
+        updatedAt: daysAgo(1),
+        conversationId: "30000000-0000-4000-8000-0000000000b1",
+        documents: [],
+        review: null,
+        diligence: null,
+      },
+      ...w.jobs.filter((j) => j.userId !== investor.userId),
+    ];
+    return w;
+  }
+  const ASKED = "what did we talk about last time?";
+
+  it("is planned by code for 'last time' wording alone", () => {
+    expect(planGraphRecall(ASKED)?.cues.has("RECENT")).toBe(true);
+    expect(planGraphRecall("Catch me up")?.cues.has("RECENT")).toBe(true);
+    expect(planGraphRecall("Where did we leave it?")).not.toBeNull();
+    expect(planGraphRecall("What did we discuss?")).not.toBeNull();
+    expect(planGraphRecall("Last quarter's revenue?")).toBeNull();
+  });
+
+  it("baseline names only this conversation; after, the earlier ones and the Ledgerfold job, dated, newest first", async () => {
+    const before = await recallText(lastTimeWorld(), investor, ASKED, {
+      graph: false,
+    });
+    expect(before).toContain("Asked Q what they talked about last time.");
+    expect(before).not.toMatch(/Ledgerfold/u);
+    const after = await recallText(lastTimeWorld(), investor, ASKED, {
+      graph: true,
+    });
+    expect(after).toContain(
+      "- 2026-10-11 job (waiting for their decision): Research Ledgerfold and write me a memo",
+    );
+    expect(after).toContain(
+      "- 2026-10-11 conversation [about Ledgerfold]: not summarised yet",
+    );
+    expect(after).toContain(
+      '- 2026-10-09 conversation "Pipeline review": Reviewed the energy pipeline',
+    );
+    // This conversation is never listed as an earlier one, nor anyone else's.
+    const section = after.split("\n\n")[0] ?? "";
+    expect(section).not.toContain("Asked Q what they talked about last time.");
+    expect(after).not.toMatch(/Quietwater|another fund|COLLEAGUE/u);
+    // Only the conversations and jobs: no company section for this question.
+    expect(after).not.toContain(CONNECTED_LABEL);
+    // And the list is not repeated under "Other recent conversations".
+    expect(after).not.toContain("Other recent conversations:");
+  });
+
+  it("with nothing earlier, says none on record; with a failed read, unknown", async () => {
+    const empty: RecallGraphPort = {
+      conversations: () => Promise.resolve([]),
+      jobs: () => Promise.resolve([]),
+      documents: () => Promise.resolve([]),
+      mandateFit: () => Promise.resolve(null),
+      companies: () => Promise.resolve([]),
+    };
+    const plan = planGraphRecall(ASKED) ?? { cues: new Set(), windowDays: 92 };
+    const none = await buildConnectedRecall({
+      port: empty,
+      actor: investor,
+      plan,
+      seedCompanyIds: [],
+      memories: [],
+      now: NOW,
+    });
+    expect(renderConnectedRecall(none)).toMatch(
+      /None on record in the last 92 days besides this conversation\./u,
+    );
+    const failed = await buildConnectedRecall({
+      port: { ...empty, jobs: () => Promise.reject(new Error("down")) },
+      actor: investor,
+      plan,
+      seedCompanyIds: [],
+      memories: [],
+      now: NOW,
+    });
+    expect(renderConnectedRecall(failed)).toMatch(
+      /Could not be read this time \(unknown\)\./u,
+    );
   });
 });

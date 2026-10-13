@@ -316,6 +316,7 @@ export function createMemoryService(
                 plan: graphPlan,
                 seedCompanyIds: [...companyIds],
                 memories: items.filter((item) => !lapsed(item)),
+                conversationId: query.conversationId,
                 now: now(),
               },
               dependencies.graphBudgetMs,

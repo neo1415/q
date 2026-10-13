@@ -46,6 +46,7 @@ export function jobOf(
     readonly id: string;
     readonly goal: string;
     readonly status: string;
+    readonly updated_at: Date;
   },
   row:
     | {
@@ -82,6 +83,7 @@ export function jobOf(
     goal: job.goal,
     state: row?.state ?? job.status,
     finishedAt: row?.finished_at?.toISOString() ?? null,
+    updatedAt: job.updated_at.toISOString(),
     conversationId: row?.trace.conversationId ?? null,
     documents: [...documents].map(([artifactId, companyId]) => ({
       artifactId,
@@ -153,7 +155,6 @@ export function createRecallGraphPort(dependencies: {
           return [];
         const at = c.lastMessageAt ?? c.createdAt;
         if (Date.parse(at) < Date.parse(query.since)) return [];
-        if (c.summary === null && c.subjects.length === 0) return [];
         return [
           {
             conversationId: c.id,

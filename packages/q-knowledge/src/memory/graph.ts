@@ -53,6 +53,8 @@ export type GraphJob = {
   readonly goal: string;
   readonly state: string;
   readonly finishedAt: string | null;
+  /** When the job last moved (its row's updated_at). */
+  readonly updatedAt: string;
   readonly conversationId: string | null;
   /** Documents its steps prepared, with the company each was about. */
   readonly documents: readonly {
@@ -135,6 +137,9 @@ export const GRAPH_CUES = [
   "MANDATE",
   "CHANGE",
   "DILIGENCE",
+  // "What did we talk about last time?": their recent distinct
+  // conversations and jobs, dated. One cue is enough for this one.
+  "RECENT",
 ] as const;
 export type GraphCue = (typeof GRAPH_CUES)[number];
 
@@ -149,6 +154,8 @@ const CUE_PATTERNS: Record<GraphCue, RegExp> = {
   CHANGE:
     /\b(?:changed?|since (?:our|my|the|we) (?:last|first)|what'?s new|updated?|answered)\b/iu,
   DILIGENCE: /\b(?:diligence|questions? (?:for|to) the founders?)\b/iu,
+  RECENT:
+    /\b(?:last time|(?:the )?(?:last|previous|earlier) (?:conversation|chat|session|call)s?|where (?:were|did) we (?:leave|get|stop)|catch me up|what (?:have|had) we (?:been )?(?:talk(?:ed|ing)|discuss(?:ed|ing)|work(?:ed|ing)) (?:about|on)|what did we (?:talk|discuss|cover|work on))\b/iu,
 };
 
 export type GraphRecallPlan = {
@@ -188,7 +195,10 @@ export function planGraphRecall(
   const cues = new Set<GraphCue>(
     GRAPH_CUES.filter((cue) => CUE_PATTERNS[cue].test(utterance)),
   );
-  const multiHop = cues.size >= 2 || (cues.size >= 1 && companyIds.length > 0);
+  const multiHop =
+    cues.has("RECENT") ||
+    cues.size >= 2 ||
+    (cues.size >= 1 && companyIds.length > 0);
   if (!multiHop) return null;
   return { cues, windowDays: windowFrom(utterance) };
 }
@@ -257,9 +267,32 @@ export type ConnectedRecall = {
     readonly hasSlate: boolean;
   } | null;
   readonly companies: readonly ConnectedCompany[];
+  /**
+   * Asked "last time": their most recent other conversations and their
+   * jobs, newest first and dated. Absent: not asked.
+   */
+  readonly recent?: readonly RecentItem[] | undefined;
   /** Reads that failed: unknown, never "none". */
   readonly unread: readonly GraphFacet[];
 };
+
+export type RecentItem =
+  | {
+      readonly kind: "CONVERSATION";
+      readonly at: string;
+      readonly title: string | null;
+      /** Q's rolled-forward notes of it; null: not summarised yet. */
+      readonly summary: string | null;
+      readonly companyNames: readonly string[];
+    }
+  | {
+      readonly kind: "JOB";
+      readonly at: string;
+      readonly goal: string;
+      readonly state: string;
+    };
+
+export const RECENT_ITEMS = 8;
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -292,6 +325,8 @@ export type BuildConnectedRecallInput = {
   readonly seedCompanyIds: readonly string[];
   /** The person's live memory items (already owner-scoped by the service). */
   readonly memories: readonly MemoryItem[];
+  /** The conversation being had: never listed as an earlier one. */
+  readonly conversationId?: string | undefined;
   readonly now: number;
 };
 
@@ -479,6 +514,36 @@ export async function buildConnectedRecall(
     });
   }
   companies.sort((a, b) => b.score - a.score || b.latest - a.latest);
+  // "What did we talk about last time?" alone is about the conversations
+  // and jobs themselves, not about companies across them.
+  const onlyRecent =
+    plan.cues.has("RECENT") &&
+    seeds.length === 0 &&
+    [...plan.cues].every((cue) => cue === "RECENT" || cue === "DISCUSSED");
+  const recent: RecentItem[] | undefined = plan.cues.has("RECENT")
+    ? [
+        ...conversations
+          .filter((c) => c.conversationId !== input.conversationId)
+          .map((c): RecentItem => ({
+            kind: "CONVERSATION",
+            at: c.at,
+            title: c.title,
+            summary: c.summary,
+            companyNames: c.companyIds.flatMap((id) => {
+              const name = names.get(id);
+              return name === undefined ? [] : [name];
+            }),
+          })),
+        ...jobs.map((j): RecentItem => ({
+          kind: "JOB",
+          at: j.finishedAt ?? j.updatedAt,
+          goal: j.goal,
+          state: j.state,
+        })),
+      ]
+        .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+        .slice(0, RECENT_ITEMS)
+    : undefined;
   return {
     asOf: new Date(now).toISOString(),
     windowDays: plan.windowDays,
@@ -492,9 +557,12 @@ export async function buildConnectedRecall(
             slateGeneratedAt: mandate.slateGeneratedAt,
             hasSlate: mandate.companyIds !== null,
           },
-    companies: companies
-      .slice(0, GRAPH_LIMITS.reported)
-      .map(({ score: _score, latest: _latest, ...company }) => company),
+    companies: onlyRecent
+      ? []
+      : companies
+          .slice(0, GRAPH_LIMITS.reported)
+          .map(({ score: _score, latest: _latest, ...company }) => company),
+    ...(recent === undefined ? {} : { recent }),
     unread,
   };
 }
@@ -658,6 +726,58 @@ function companyLines(
   return rows.join("\n");
 }
 
+export const RECENT_LABEL =
+  "Their most recent other conversations and Q's jobs for them, newest first (their own records; a summary is Q's note of what was said, not evidence):";
+const STATE_WORDS: Readonly<Record<string, string>> = {
+  COMPLETED: "done",
+  DONE: "done",
+  FAILED: "failed",
+  CANCELLED: "stopped",
+  STOPPED: "stopped",
+  NEEDS_DECISION: "waiting for their decision",
+  BLOCKED: "blocked",
+  HELD: "held",
+  QUEUED: "queued",
+  RUNNING: "running",
+  RECOVERING: "running",
+  PLANNING: "being planned",
+};
+
+/** The "last time" lines, or "" when not asked. */
+function renderRecent(recall: ConnectedRecall, now: number): string {
+  if (recall.recent === undefined) return "";
+  const conversationsUnread = recall.unread.includes("conversations");
+  const jobsUnread = recall.unread.includes("jobs");
+  if (recall.recent.length === 0) {
+    return conversationsUnread || jobsUnread
+      ? `${RECENT_LABEL}\n- Could not be read this time (unknown).`
+      : `${RECENT_LABEL}\n- None on record in the last ${String(recall.windowDays)} days besides this conversation.`;
+  }
+  const lines = recall.recent.map((item) => {
+    if (item.kind === "JOB") {
+      return `- ${dated(item.at, now)} job (${STATE_WORDS[item.state] ?? item.state.toLowerCase()}): ${shorten(item.goal, 160)}`;
+    }
+    const about =
+      item.companyNames.length === 0
+        ? ""
+        : ` [about ${item.companyNames.join(", ")}]`;
+    const title = item.title === null ? "" : ` "${shorten(item.title, 60)}"`;
+    return `- ${dated(item.at, now)} conversation${title}${about}: ${
+      item.summary === null ? "not summarised yet" : shorten(item.summary, 240)
+    }`;
+  });
+  const missing =
+    conversationsUnread || jobsUnread
+      ? [
+          `- Not read this time (unknown, not none): ${[
+            ...(conversationsUnread ? ["conversations"] : []),
+            ...(jobsUnread ? ["jobs"] : []),
+          ].join(", ")}.`,
+        ]
+      : [];
+  return [RECENT_LABEL, ...lines, ...missing].join("\n");
+}
+
 /** The connected section, or "" when the turn did not need it. */
 export function renderConnectedRecall(
   recall: ConnectedRecall | undefined,
@@ -665,7 +785,17 @@ export function renderConnectedRecall(
 ): string {
   if (recall === undefined) return "";
   const now = Date.parse(recall.asOf);
-  const rows: string[] = [CONNECTED_LABEL];
+  const recent = renderRecent(recall, now);
+  const asksAcross = recall.cues.some(
+    (cue) => cue !== "RECENT" && cue !== "DISCUSSED",
+  );
+  if (recall.companies.length === 0 && recent.length > 0 && !asksAcross) {
+    return recent.length > max
+      ? `${recent.slice(0, max - 1).trimEnd()}…`
+      : recent;
+  }
+  const rows: string[] = recent.length === 0 ? [] : [recent, ""];
+  rows.push(CONNECTED_LABEL);
   if (recall.companies.length === 0) {
     rows.push(
       `- Nothing of theirs on record connects to what they asked (conversations of the last ${String(recall.windowDays)} days, their jobs and documents).`,
