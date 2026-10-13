@@ -4,8 +4,11 @@ import { z } from "zod";
 
 import {
   ApiProblemError,
+  endRehearsalVideo,
   entitlementOf,
   finishRehearsal,
+  getRehearsalInterviewers,
+  startRehearsalVideo,
   getRehearsal,
   getRehearsalPersona,
   sayInRehearsal,
@@ -15,8 +18,12 @@ import {
 import {
   RehearsalCounterpartKindSchema,
   RehearsalDifficultySchema,
+  RehearsalInterviewerIdSchema,
   REHEARSAL_SCREEN_MAX_CHARS,
+  type EndRehearsalVideoResponse,
   type EntitlementProblemExtension,
+  type RehearsalInterviewersDto,
+  type StartRehearsalVideoResponse,
   type QRehearsalDto,
   type QRehearsalPersonaDto,
 } from "@capital-q/contracts";
@@ -174,6 +181,49 @@ export async function shareScreenFrameAction(
     await sendRehearsalScreen(session, id.data, frame.data, which.data);
     return true as const;
   });
+}
+
+/** ADR 0066: the stock AI interviewers, and whether video is on. */
+export async function rehearsalInterviewersAction(): Promise<
+  RehearsalResult<RehearsalInterviewersDto>
+> {
+  return run((session) => getRehearsalInterviewers(session));
+}
+
+/**
+ * Meet the counterpart by video. The answer is either the live session
+ * (with its private room link) or "carry on in the voice room".
+ */
+export async function startRehearsalVideoAction(
+  rehearsalId: unknown,
+  interviewerId: unknown,
+): Promise<RehearsalResult<StartRehearsalVideoResponse>> {
+  const id = Id.safeParse(rehearsalId);
+  const interviewer = RehearsalInterviewerIdSchema.safeParse(interviewerId);
+  if (!id.success || !interviewer.success) {
+    return { ok: false, message: "Choose an interviewer first." };
+  }
+  return run((session) =>
+    startRehearsalVideo(session, id.data, { interviewerId: interviewer.data }),
+  );
+}
+
+/** Ends the video call; the review follows unless they carry on by voice. */
+export async function endRehearsalVideoAction(
+  rehearsalId: unknown,
+  continueByVoice: unknown,
+): Promise<RehearsalResult<EndRehearsalVideoResponse>> {
+  const id = Id.safeParse(rehearsalId);
+  if (!id.success)
+    return {
+      ok: false,
+      message: "We couldn't find that. Refresh the page and try again.",
+    };
+  return run((session) =>
+    endRehearsalVideo(session, id.data, {
+      continueByVoice: continueByVoice === true,
+    }),
+  );
 }
 
 export async function finishRehearsalAction(

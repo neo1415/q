@@ -307,6 +307,15 @@ export function createRunCompanies(limit = 200) {
  * establish it. Ambiguous or unread targets have no company attribution.
  */
 export function containsCompanyName(text: string, name: string): boolean {
+  return companyNameAt(text, name) >= 0;
+}
+
+/**
+ * Where a company's whole name first appears in the words (the same
+ * folded text `containsCompanyName` reads), or -1: the order a person
+ * named companies in, for a comparison laid out "in the order asked".
+ */
+export function companyNameAt(text: string, name: string): number {
   const words = (value: string) =>
     value
       .toLowerCase()
@@ -315,7 +324,7 @@ export function containsCompanyName(text: string, name: string): boolean {
       .replace(/[^a-z0-9]+/gu, " ")
       .trim();
   const phrase = words(name);
-  return phrase.length > 0 && ` ${words(text)} `.includes(` ${phrase} `);
+  return phrase.length === 0 ? -1 : ` ${words(text)} `.indexOf(` ${phrase} `);
 }
 
 export function namedCompanySubjects(

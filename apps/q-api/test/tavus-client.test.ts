@@ -37,6 +37,7 @@ describe("the Tavus adapter", () => {
       conversationId: "c123",
       conversationUrl: "https://tavus.daily.co/c123",
       status: "active",
+      meetingToken: null,
     });
     const [url, init] = fetch.mock.calls[0] ?? [];
     expect(url).toBe("https://tavusapi.com/v2/conversations");
@@ -50,6 +51,79 @@ describe("the Tavus adapter", () => {
     expect((init?.headers as Record<string, string>)["x-api-key"]).toBe(
       "k-secret",
     );
+  });
+
+  it("creates a PAL with the verified contract: default_face_id, our LLM, disclosure", async () => {
+    const fetch = fakeFetch(200, { pal_id: "p9abc" });
+    const made = await createTavusClient({ apiKey: "k", fetch }).createPal({
+      name: "cq",
+      systemPrompt: "Speak the lines you are given.",
+      faceId: "r1",
+      disclosure: { spoken: "This is an AI rehearsal.", shown: "AI rehearsal" },
+      layers: {
+        llm: {
+          model: "capital-q-rehearsal",
+          base_url: "https://q.example/v1/q/rehearsals/video/bridge/s1",
+          api_key: "session-bearer",
+          speculative_inference: false,
+        },
+      },
+    });
+    expect(made).toEqual({ palId: "p9abc" });
+    const [url, init] = fetch.mock.calls[0] ?? [];
+    expect(url).toBe("https://tavusapi.com/v2/pals");
+    const sent = JSON.parse(init?.body as string) as Record<string, unknown>;
+    expect(sent).toMatchObject({
+      pipeline_mode: "full",
+      default_face_id: "r1",
+      disclosure_type: "always",
+      verbal_disclosure: "This is an AI rehearsal.",
+      layers: { llm: { speculative_inference: false } },
+    });
+    expect(sent).not.toHaveProperty("face_id");
+  });
+
+  it("asks for a private two-person room and returns its join token", async () => {
+    const fetch = fakeFetch(200, {
+      conversation_id: "c1",
+      conversation_url: "https://tavus.daily.co/c1",
+      status: "active",
+      meeting_token: "jwt",
+    });
+    const made = await createTavusClient({
+      apiKey: "k",
+      fetch,
+    }).createConversation({
+      palId: "p1",
+      faceId: "r1",
+      name: "Rehearsal",
+      callbackUrl: null,
+      greeting: "Hello",
+      context: null,
+      maxCallSeconds: 180,
+      testMode: false,
+      requireAuth: true,
+    });
+    expect(made.meetingToken).toBe("jwt");
+    const sent = JSON.parse(
+      (fetch.mock.calls[0]?.[1]?.body as string | undefined) ?? "{}",
+    ) as Record<string, unknown>;
+    expect(sent).toMatchObject({
+      require_auth: true,
+      max_participants: 2,
+      custom_greeting: "Hello",
+    });
+  });
+
+  it("classifies a concurrency refusal as QUOTA without echoing the body", async () => {
+    const fetch = fakeFetch(400, {
+      message: "User has reached maximum concurrent conversations",
+    });
+    const failed = await createTavusClient({ apiKey: "k", fetch })
+      .endConversation("c1")
+      .catch((error: unknown) => error);
+    expect((failed as TavusError).kind).toBe("QUOTA");
+    expect(String(failed)).not.toContain("concurrent");
   });
 
   it("ends a conversation through the documented endpoint", async () => {
