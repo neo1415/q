@@ -1,0 +1,32 @@
+{
+  "name": "@capital-q/q-pitch",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Q Pitch foundations (blueprint P0-P1, Lane B): typed tour actions over the app's existing acknowledged navigation, UI-act and Q-run contracts; scene evidence; chapter and scene scripts bound to certified claim ids; a pure, framework-free tour director state machine; and the tour-start certification gate. No UI, no I/O, no new Q brain.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}
