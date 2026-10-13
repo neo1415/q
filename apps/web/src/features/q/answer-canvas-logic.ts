@@ -75,6 +75,97 @@ export function fitProvenance(card: QAnswerCard): string | null {
   return `${known} · ${sources}`;
 }
 
+/**
+ * Points a known measure adds to mandate fit (ADR 0053 answer cards, ADR
+ * 0059 platform fit: Strong 10, Partial 4, Mismatch 0; Good 7.5 exists only
+ * on answer-card levels). Presentation of the existing formula only: the
+ * score itself is computed upstream and is never recomputed for display.
+ */
+export const FIT_LEVEL_POINTS: Readonly<
+  Record<Exclude<QAnswerCardLevel, "UNKNOWN">, number>
+> = { STRONG: 10, GOOD: 7.5, PARTIAL: 4, MISMATCH: 0 };
+
+export type FitExplanation = {
+  readonly score: string;
+  /** Every measure on the card with what it added; null = left out. */
+  readonly rows: readonly {
+    readonly label: string;
+    readonly level: QAnswerCardLevel;
+    readonly points: number | null;
+  }[];
+  readonly unknown: readonly string[];
+  /** "(10 + 10 + 4) ÷ 3 = 8.0"; null when the card's measures do not
+   *  reproduce the stored score (then the sum is not shown, never a
+   *  second, contradicting number). */
+  readonly sum: string | null;
+  /** The points scale, only the levels that can occur on this card. */
+  readonly scale: string;
+};
+
+function points(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/**
+ * How a card's mandate fit out of 10 is worked out, in plain parts the
+ * person can open (2026-10-12 investor test: an "8.8" with no way to see
+ * what it measured, what went in and what was not known).
+ */
+export function fitExplanation(card: QAnswerCard): FitExplanation | null {
+  if (card.fit === null || card.measures.length === 0) return null;
+  const rows = card.measures.map((measure) => ({
+    label: measure.label,
+    level: measure.level,
+    points:
+      measure.level === "UNKNOWN" ? null : FIT_LEVEL_POINTS[measure.level],
+  }));
+  const known = rows.flatMap((row) =>
+    row.points === null ? [] : [row.points],
+  );
+  const unknown = rows
+    .filter((row) => row.points === null)
+    .map((row) => row.label);
+  const score = card.fit.score.toFixed(1);
+  const mean =
+    known.length === 0
+      ? null
+      : Math.round((known.reduce((a, b) => a + b, 0) / known.length) * 10) / 10;
+  const sum =
+    mean !== null &&
+    mean.toFixed(1) === score &&
+    known.length === card.fit.measured
+      ? `(${known.map(points).join(" + ")}) ÷ ${String(known.length)} = ${score}`
+      : null;
+  const hasGood = rows.some((row) => row.level === "GOOD");
+  const scale = [
+    `${LEVEL_WORD.STRONG} 10`,
+    ...(hasGood ? [`${LEVEL_WORD.GOOD} 7.5`] : []),
+    `${LEVEL_WORD.PARTIAL} 4`,
+    `${LEVEL_WORD.MISMATCH} 0`,
+  ].join(", ");
+  return { score, rows, unknown, sum, scale };
+}
+
+const PROVENANCE_SAID =
+  /^.{1,60}: mandate fit [\d.]+ out of 10, not a quality score\./u;
+
+/**
+ * What Q says about a card in the walk-through. The stored line for a
+ * scored card is the scoring method (INC-1 provenance); leading with the
+ * method is the opposite of progressive disclosure, and its point scale
+ * names levels the platform fit never uses. The method sits behind the
+ * card's "How this score is worked out"; Q leads with the card's insight.
+ */
+export function spokenLine(card: QAnswerCard): string {
+  const said = card.said;
+  if (said !== null && !PROVENANCE_SAID.test(said)) return said;
+  const reason = card.reasons[0];
+  if (card.fit !== null) {
+    return `${card.name}, ${card.fit.score.toFixed(1)} on mandate fit${reason === undefined ? "." : `: ${reason}`}`;
+  }
+  return `${card.name}: ${reason ?? ""}`.trim();
+}
+
 /** "Tied with Ledgerfold on mandate fit (8.0)": said, never implied by order. */
 export function tieLine(
   block: QAnswerCardsBlock,
@@ -166,7 +257,7 @@ export function playbackSteps(
   closing: string,
 ): readonly PlaybackStep[] {
   const steps: PlaybackStep[] = block.cards.map((card, focus) => {
-    const said = card.said ?? `${card.name}: ${card.reasons[0] ?? ""}`.trim();
+    const said = spokenLine(card);
     return { focus, said, ms: sayingMs(said) };
   });
   if (block.cards.length > 1) {

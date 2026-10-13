@@ -474,11 +474,12 @@ function DecisionCard({
 
   // Not a message (a plan, a grant, an email): its own approval view.
   if (view === null || message === null) {
+    // The plan view carries its own title, and the group row above names
+    // it too: a third copy is noise (live 2026-10-12, Work). Kept for
+    // screen readers so the card still announces what it decides.
     return (
       <Card>
-        <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
-          {decisionTitle(item)}
-        </p>
+        <p className="sr-only">{decisionTitle(item)}</p>
         {renderPlan(item.approvalId, onDecided)}
         <Drafts drafts={item.drafts} />
       </Card>
@@ -1003,7 +1004,9 @@ export function DoneForYou({
         Done for you
         {initial === null ? null : (
           <span className="cq-body font-normal cq-numeric text-(--cq-text-tertiary)">
-            {initial.thisWeek} this week
+            {/* Jobs finished this week are listed here too, so they count
+                (live 2026-10-12: "0 this week" above a memo done 6h ago). */}
+            {initial.thisWeek + finished.length} this week
           </span>
         )}
       </h2>

@@ -6,7 +6,7 @@ import type { QAnswerCardsBlock } from "@capital-q/contracts";
 
 import { Q_SAID_EVENT, saidText } from "@/features/q-swarm/q-said";
 
-import { focusForSaid, playbackSteps } from "./answer-canvas-logic";
+import { focusForSaid, playbackSteps, spokenLine } from "./answer-canvas-logic";
 
 export type AnswerPlayback = {
   /** The card Q is talking about; -1 for the overview. */
@@ -100,9 +100,13 @@ export function useAnswerPlayback(
         ...current,
         chosen: true,
         focus: current.focus === index ? -1 : index,
-        said:
-          block.cards[index]?.said ??
-          (current.focus === index ? closing : current.said),
+        said: (() => {
+          const card = block.cards[index];
+          if (card === undefined || current.focus === index) {
+            return current.focus === index ? closing : current.said;
+          }
+          return spokenLine(card);
+        })(),
       })),
   };
 }
