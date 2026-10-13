@@ -7,7 +7,9 @@ import {
   type QSubjectRef,
   type QConversationId,
 } from "@capital-q/contracts";
+import type { Logger } from "@capital-q/observability";
 import type { QActionService } from "@capital-q/q-actions";
+import { DILIGENCE_QUESTION_SENT_MAX_LENGTH } from "@capital-q/q-core";
 import {
   runRef,
   type ContextFirewallPort,
@@ -66,6 +68,9 @@ export function createWorkforceDiligence(dependencies: {
   readonly firewall: ContextFirewallPort;
   readonly currentVersion: ArtifactPreparation["port"]["currentVersion"];
   readonly questions: WorkforceModels["diligenceQuestions"];
+  /** The one bounded repair for drafted questions over the send limit. */
+  readonly shorten: WorkforceModels["shortenDiligenceQuestions"];
+  readonly logger?: Pick<Logger, "info" | "warn"> | undefined;
   readonly relationshipWith: (
     actor: ActorContext,
     companyId: string,
@@ -224,13 +229,64 @@ export function createWorkforceDiligence(dependencies: {
         document: critiqueText(current.content).slice(0, 16_000),
       },
     );
-    if (drafted === null)
-      return {
-        status: "FAILED",
-        message: "The questions could not be drafted; nothing was filed.",
-      };
+    const notDrafted: WorkforceDiligenceResult = {
+      status: "FAILED",
+      message: "The questions could not be drafted; nothing was filed.",
+    };
+    if (drafted === null) return notDrafted;
     const questions = drafted.questions.map((one) => one.question);
     const about = drafted.questions.map((one) => one.about);
+    // A question over the send limit is never cut and never filed: those
+    // questions alone are rewritten shorter, once, with the same meaning.
+    const tooLong = questions.flatMap((question, index) =>
+      question.length > DILIGENCE_QUESTION_SENT_MAX_LENGTH ? [index] : [],
+    );
+    if (tooLong.length > 0) {
+      const shortened = await dependencies.shorten(
+        { tenantId: actor.tenantId, userId: actor.userId },
+        { jobId: input.jobId, runId: input.runId },
+        {
+          companyName: companyName.slice(0, 120) || "the company",
+          questions: tooLong.map((index) => questions[index] ?? ""),
+        },
+      );
+      const repaired =
+        shortened !== null &&
+        shortened.length === tooLong.length &&
+        shortened.every(
+          (question) => question.length <= DILIGENCE_QUESTION_SENT_MAX_LENGTH,
+        );
+      // Counts only: never a question's words.
+      const counts = {
+        jobId: input.jobId,
+        drafted: questions.length,
+        overLimit: tooLong.length,
+        repaired,
+      };
+      if (!repaired) {
+        dependencies.logger?.warn(
+          counts,
+          "diligence questions over the send limit could not be shortened",
+        );
+        return notDrafted;
+      }
+      dependencies.logger?.info(
+        counts,
+        "diligence questions over the send limit rewritten shorter",
+      );
+      tooLong.forEach((index, at) => {
+        questions[index] = shortened[at] ?? "";
+      });
+    }
+    // The send action's own limit, checked again before anything is filed.
+    if (
+      questions.some(
+        (question) =>
+          question.length < 3 ||
+          question.length > DILIGENCE_QUESTION_SENT_MAX_LENGTH,
+      )
+    )
+      return notDrafted;
     if (!(await input.canContinue()))
       return unavailable("Diligence work stopped before the card was filed.");
     const relationship = await dependencies

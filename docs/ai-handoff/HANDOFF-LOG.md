@@ -459,3 +459,10 @@ The tracked runner creates internal Q turns for an existing authorized account o
 - Fresh GitHub confirms PRs #19–#22 merged, integrated 58812685. PR #23 exact CI 38242394741 and GitGuardian PASS; normal merge promotes deployment branch to 221ff996. Four-service rollout pending; previous all-four-success rollback 5d9837bf. PR18 also passed exact CI and merged a3a4eb6b. No migration or unverified WIP release.
 - Native Work approvals/context continuation changes now pass root/q-api/web types and final lint/format. Diligence tests parse captured unknown inputs rather than unsafe nested matcher assignments; missing original conversation explicitly fails. Code checkpoint still separate from already merged Work documents.
 - Attempted refreshed-fictional-session browser baseline failed before launch: documented /opt/pw-browsers/chromium does not exist. No product failure, timing or browser acceptance claim. Locate pinned browser and rerun after actual rollout. Latest user continuation directive stored verbatim; it explicitly authorizes independent parallel agent lanes.
+
+## 2026-10-12 18:25 UTC — Claude: releases #19–#33 live, voice trial configured, two live defects in fix
+
+- Production 047678e5 all four SUCCESS. See STATE top for contents, migration, voice-trial config (profile ids), live checks and rollback.
+- Live failures found and fixed this session: plan schema `cannot` line >200 refused whole plans (now 600 end to end); planner failures said "reword" (now FAILED, honest); "yes, plan it anyway" re-planned the word "yes" (now the original goal with proceed); voice trial config first set with auth ids (corrected to profile ids before the code deployed).
+- Open: diligence question length (bounded rewrite, branch claude/diligence-question-length); list_q_work v2 recall miss (branch claude/work-results-fix). Founder-contact card stays PENDING.
+- Measured: prompt-cache share and turn latency after A2/A3 still need real-traffic volume; recheck ai_ops.model_usage cached_input_tokens by hour.
