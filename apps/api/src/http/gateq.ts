@@ -1,6 +1,11 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  ApplicationContactAccountRequestSchema,
+  ApplicationContactResponseSchema,
+  GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+  type ApplicationContactAccountRequest,
+  type ApplicationContactResponse,
   CreateGatewayRequestSchema,
   ApplicationSummaryDtoSchema,
   GATEQ_GATEWAY_APPLICATIONS_PATH,
@@ -78,6 +83,7 @@ import {
   requireOnboardingActorHook,
 } from "../security/onboarding-actor.js";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
+import type { ActorContext } from "@capital-q/security";
 import type { CompanyClaims } from "@capital-q/companies";
 import { sendEntitlementRequired } from "./billing.js";
 import {
@@ -146,6 +152,17 @@ export type GateQRoutesDependencies = ActorContextDependencies & {
     ((publicId: GatewayPublicId) => Promise<number | null>) | undefined;
   /** F1: a signed-in founder sharing their own documents with an application. */
   readonly materials?: ApplicationMaterials | undefined;
+  /**
+   * GateQ slice 1: a signed-in founder's contact for an application. The
+   * account's own email (resolved on the server from the actor, never the
+   * body) confirms a matching address without a code. No membership.
+   */
+  readonly applicationContact?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly request: ApplicationContactAccountRequest;
+      }) => Promise<ApplicationContactResponse>)
+    | undefined;
   /** Submitted applications, read after GateQ authorises the gateway. */
   readonly inbox?: SubmissionInbox | undefined;
   /**
@@ -548,6 +565,39 @@ export function registerGateQRoutes(
           if (
             error instanceof IntakeRefusedError ||
             error instanceof MaterialNotSharableError
+          ) {
+            reply.callNotFound();
+            return undefined;
+          }
+          throw error;
+        }
+      },
+    );
+  }
+
+  const applicationContact = dependencies.applicationContact;
+  if (applicationContact !== undefined) {
+    app.post(
+      GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const input = parseContract(
+          ApplicationContactAccountRequestSchema,
+          request.body,
+          "The contact details are not valid.",
+        );
+        try {
+          const saved = await applicationContact({
+            actor: getActorContext(request),
+            request: input,
+          });
+          void reply.header("Cache-Control", "no-store");
+          return ApplicationContactResponseSchema.parse(saved);
+        } catch (error: unknown) {
+          // A wrong credential is the same answer as everywhere else.
+          if (
+            error instanceof IntakeRefusedError &&
+            error.refusal !== "TOO_MANY_REQUESTS"
           ) {
             reply.callNotFound();
             return undefined;

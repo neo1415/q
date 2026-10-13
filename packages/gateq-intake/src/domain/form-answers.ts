@@ -17,7 +17,7 @@ import type { NewApplicationFact } from "../contracts/index.js";
  * Two rules carry the weight:
  *
  * - **"I'd rather not say" is an answer.** It is recorded as UNKNOWN with
- *   no value, so the rule it feeds reads UNKNOWN (never a no) and the
+ *   no value (marked declined, apart from "don't know"), so the rule it feeds reads UNKNOWN (never a no) and the
  *   history shows the founder was asked.
  * - **A field left out is untouched.** Answers arrive a step at a time, and
  *   step two must not erase step one.
@@ -30,7 +30,11 @@ export function factsFromAnswers(
   const facts: NewApplicationFact[] = [];
   const given = (fact: NewApplicationFact) => facts.push(fact);
   const declined = (dimension: NewApplicationFact["dimension"]) =>
-    facts.push({ dimension, value: { kind: "NONE" }, provenance: "UNKNOWN" });
+    facts.push({
+      dimension,
+      value: { kind: "NONE", declined: true },
+      provenance: "UNKNOWN",
+    });
   const text = (dimension: NewApplicationFact["dimension"], value: string) =>
     given({
       dimension,

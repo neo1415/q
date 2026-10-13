@@ -79,6 +79,7 @@ function build() {
       if (token !== TOKEN) deny();
       return Promise.resolve(RESULT);
     },
+    transcript: () => Promise.resolve([]),
   };
   const security: ApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(null) },

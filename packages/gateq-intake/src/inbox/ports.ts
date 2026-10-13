@@ -41,6 +41,8 @@ export type InboxRow = {
   readonly submittedAt: string;
   readonly snapshot: unknown;
   readonly qualification: unknown;
+  /** GateQ slice 1: the frozen dossier; absent or null before it existed. */
+  readonly dossier?: unknown;
   readonly folder: InboxFolder;
   readonly assigneeUserId: string | null;
   readonly starred: boolean;

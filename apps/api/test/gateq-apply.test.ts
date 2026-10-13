@@ -134,6 +134,7 @@ function buildApp(options: {
       if (options.anyToken !== true && token !== TOKEN) deny();
       return Promise.resolve(result);
     },
+    transcript: () => Promise.resolve([]),
   };
 
   const security: ApiSecurityDependencies = {
