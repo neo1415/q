@@ -2,12 +2,11 @@
 
 ## CURRENT PRIORITIES — 2026-10-13 — Codex takeover
 
-1. PR #42 is shipped independently (all four SUCCESS `f3fe5520`, exact CI green). Finish real rendered investor journey with current rail/sheet selectors; keep current-question, exact company and no-leak assertions. Then Work/memo/review/diligence and selected-company continuity checks.
-2. PR #43 merged integration at `9da9f057`, migration 170000 applied/security read verified. Gate a voice-only production promotion from `f3fe5520`, drain old q-api replicas, then verify actual speech accounting/closure; physical cutoff is not established by unit tests.
+1. PR #42 is shipped independently (all four SUCCESS `f3fe5520`, exact CI green). Current-run rendered investor journey, Work exact memo v2 viewer, selected-company continuity and stored workforce deliverables PASS. Keep named-founder extension, actual voice/media and compound post-release evidence as separate checks.
+2. PR #43 merged integration at `9da9f057`, migration 170000 applied/security read verified. Gate voice-only production PR #46 / `c18be404` (local 179 tests PASS, CI `38352448737` running) from `f3fe5520`, drain old q-api replicas, then verify actual speech accounting/closure; physical cutoff is not established by unit tests.
 3. PR #44 `1fafd4f3` compensation/bridge fixes pushed; fix browser refresh, admission in test mode and finish-before-termination before new exact CI/migration 180000/restricted deployment. No paid room now: owner will join later. Preserve one fixed <=180 s entitlement, single replica/no restart, one profile; retain fail-closed fallback.
-4. PR #45 `1e5f16b8` compound evidence/graph completeness fixes pushed; await exact CI, merge independently and gate production promotion. Repeat live compound memo/reviewer/question recall and measure first useful text with evidence quality. Do not claim p95 from two samples.
+4. PR #45 `1e5f16b8` compound evidence/graph completeness fixes pushed; exact CI `38350806455` passed and merged integration `0a80ad76`; independently gate production promotion atop the voice release. Repeat live compound memo/reviewer/question recall and measure first useful text with evidence quality. Do not claim p95 from two samples.
 5. Keep shared checkpoint current after each merge/deployment. Do not retry local Supabase vfs image pulls; CI pgTAP + hosted HTTPS. Network is active; no restart needed. All provider test suites use disabled-local keys.
-
 
 ## ACTIVE WORKSTREAMS — owner directive 2026-10-12 18:40 UTC (product priority correction)
 
