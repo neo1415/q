@@ -166,6 +166,7 @@ try {
     }
     const body = await page.locator("main").innerText();
     if (!body.trim()) throw new Error("Gateway rendered no useful content");
+    const firstUsefulTextMs = Math.round(performance.now() - started);
     save(`${label}-browser.json`, { body, errors, forbidden });
     await page.screenshot({
       path: join(out, `${label}-desktop.png`),
@@ -190,7 +191,8 @@ try {
     receipts.push({
       phase: `${label}-browser-admission`,
       http: response.status(),
-      ms: Math.round(performance.now() - started),
+      firstUsefulTextMs,
+      totalBrowserMs: Math.round(performance.now() - started),
       mobileOverflow: false,
     });
     await context.close();
