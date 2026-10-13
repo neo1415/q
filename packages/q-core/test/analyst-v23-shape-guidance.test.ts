@@ -25,7 +25,7 @@ describe("COMPANY_ANALYST v23: precise shape beside tools", () => {
   it("activates the new guidance on the same strict result contract", () => {
     const registry = createDefaultPromptRegistry();
     const active = registry.getActive("COMPANY_ANALYST").definition;
-    expect(active.version).toBe(24);
+    expect(active.version).toBe(25);
     expect(active.output).toBe(COMPANY_ANALYST_V22.output);
     expect(registry.get("COMPANY_ANALYST", 22)?.definition.status).toBe(
       "DEPRECATED",
@@ -100,7 +100,7 @@ describe("COMPANY_ANALYST v23: precise shape beside tools", () => {
     if (typeof entries !== "object" || entries === null)
       throw new Error("Invalid prompt lock entries");
     const registry = createDefaultPromptRegistry();
-    for (let version = 1; version <= 23; version += 1) {
+    for (let version = 1; version <= 24; version += 1) {
       const historical = registry.get("COMPANY_ANALYST", version);
       expect(historical?.contentHash).toBe(
         Reflect.get(entries, `company-analyst/v${String(version)}`),
