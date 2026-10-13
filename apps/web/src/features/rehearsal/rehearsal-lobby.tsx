@@ -2,6 +2,7 @@
 
 import { primeMeetSounds } from "./meet-sounds";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import {
@@ -90,6 +91,7 @@ export function RehearsalLobby({
   readonly counterpartId: string;
   readonly meetingId?: string | undefined;
 }) {
+  const router = useRouter();
   const [persona, setPersona] = useState<QRehearsalPersonaDto | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -183,14 +185,28 @@ export function RehearsalLobby({
       if (result.ok && meetBy === "VIDEO" && interviewerId !== null) {
         // The same rehearsal, met by video; if video can't open, the voice
         // room carries on with it, nothing lost.
+        // Persist the owned canonical id before asking for any provider
+        // allocation. Refresh during allocation must not return to a lobby
+        // whose Join button can create another rehearsal and another room.
+        const livePath = `/rehearsals/live/${encodeURIComponent(result.value.id)}?video=1`;
+        window.history.replaceState(null, "", livePath);
         const opened = await startRehearsalVideoAction(
           result.value.id,
           interviewerId,
         );
         if (opened.ok && opened.value.mode === "VIDEO") {
           setVideo({ rehearsal: result.value, session: opened.value.session });
+          // The canonical id survives refresh. The destination reads this
+          // existing room only; it cannot create another paid conversation.
+          router.replace(livePath);
           return;
         }
+        // A confirmed fallback preserves the same canonical rehearsal URL.
+        // If allocation remains uncertain, recovery still sees its open
+        // row and fails closed rather than blindly entering another room.
+        const voicePath = `/rehearsals/live/${encodeURIComponent(result.value.id)}?video=0`;
+        window.history.replaceState(null, "", voicePath);
+        router.replace(voicePath);
         setVoiceNote(
           "Video isn’t available just now, so you’re in the voice room instead.",
         );

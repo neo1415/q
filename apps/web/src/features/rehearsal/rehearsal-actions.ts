@@ -29,6 +29,7 @@ import {
 } from "@capital-q/contracts";
 
 import { qApiSession } from "@/features/q/context";
+import { readRehearsalRoom } from "./read-rehearsal-room";
 
 /**
  * Rehearsals, server side (C12, generalised by REHEARSE 2026-10-01).
@@ -129,6 +130,14 @@ export async function readRehearsalAction(
       message: "We couldn't find that. Refresh the page and try again.",
     };
   return run((session) => getRehearsal(session, id.data));
+}
+
+/** Bounded client recovery uses existing authorized GETs, never start or finish. */
+export async function readRehearsalRoomAction(rehearsalId: unknown) {
+  const id = Id.safeParse(rehearsalId);
+  if (!id.success)
+    return { ok: false as const, message: "This rehearsal isn't available." };
+  return run((session) => readRehearsalRoom(session, id.data));
 }
 
 export async function sayInRehearsalAction(
