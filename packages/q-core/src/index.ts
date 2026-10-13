@@ -1546,3 +1546,11 @@ export {
 
 export { TURN_READER_V50, V50_FIT } from "./prompts/tasks/turn-reader.v50.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
+
+export {
+  COMPANY_ANALYST_V23,
+  V23_ALLOWED_ROOT_KEYS,
+  V23_RESULT_GUIDANCE,
+} from "./prompts/tasks/company-analyst.v23.js";
+
+export { COMPANY_ANALYST_V24 } from "./prompts/tasks/company-analyst.v24.js";
