@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import type { GatewayPolicy, PublicGateway } from "@capital-q/gateq";
+import {
+  GatewayPolicySchema,
+  QualificationResultSchema,
+  type PublicGateway,
+} from "@capital-q/gateq";
 import { createConversationService } from "../src/application/conversation-service.js";
-import type { IntakeService } from "../src/application/intake-service.js";
 import type {
   InterviewTurnInput,
   InterviewTurnOutcome,
@@ -13,6 +16,8 @@ import type {
 } from "../src/application/ports.js";
 import {
   ApplicationIdSchema,
+  ApplicationSchema,
+  ApplicationViewSchema,
   IntakeRefusedError,
 } from "../src/contracts/index.js";
 
@@ -21,6 +26,92 @@ import {
  * accounts, mail or application submission are involved in these tests. */
 function exchangeWorld() {
   const applicationId = ApplicationIdSchema.parse(randomUUID());
+  const tenantId = randomUUID();
+  const gatewayId = randomUUID();
+  const gatewayVersionId = randomUUID();
+  const sessionId = randomUUID();
+  const at = "2026-10-13T12:00:00.000Z";
+  const publicId = "gq_0123456789abcdefghjkmnpqrs";
+  const policy = GatewayPolicySchema.parse({
+    gateway: {
+      id: gatewayId,
+      tenantId,
+      investorOrganisationId: randomUUID(),
+      organisationId: randomUUID(),
+      publicId,
+      name: "QA gateway",
+      status: "ACTIVE",
+      createdByUserId: randomUUID(),
+      createdAt: at,
+      updatedAt: at,
+    },
+    version: {
+      id: gatewayVersionId,
+      gatewayId,
+      tenantId,
+      versionNumber: 1,
+      status: "PUBLISHED",
+      inboundMode: "OPEN",
+      publicTitle: "QA gateway",
+      publicDescription: null,
+      qualificationPolicyVersion: "gateq-qualification.v1",
+      createdByUserId: randomUUID(),
+      publishedByUserId: randomUUID(),
+      publishedAt: at,
+      supersededAt: null,
+      createdAt: at,
+      updatedAt: at,
+    },
+    criteria: [],
+  });
+  const application = ApplicationSchema.parse({
+    id: applicationId,
+    tenantId,
+    gatewayId,
+    gatewayVersionId,
+    status: "IN_PROGRESS",
+    declaredName: null,
+    submittedAt: null,
+    createdAt: at,
+    updatedAt: at,
+    publicReference: "ga_0123456789abcdefghjkmnpqrs",
+  });
+  const view = ApplicationViewSchema.parse({
+    reference: application.publicReference,
+    status: "IN_PROGRESS",
+    declaredName: null,
+    facts: [],
+    documentCount: 0,
+    submittedAt: null,
+  });
+  const qualification = QualificationResultSchema.parse({
+    gatewayId,
+    gatewayVersionId,
+    gatewayVersionNumber: 1,
+    qualificationPolicyVersion: "gateq-qualification.v1",
+    subject: { kind: "GATEQ_APPLICATION", applicationId, tenantId },
+    inboundMode: "OPEN",
+    outcome: "QUALIFIED",
+    access: "MAY_APPLY",
+    accessReasonCode: "GATEWAY_OPEN",
+    criteria: [],
+    principalMismatches: [],
+    unknowns: [],
+    evaluatedAt: at,
+  });
+  const publicGateway: PublicGateway = {
+    publicId,
+    organisationDisplayName: "QA investor",
+    title: "QA gateway",
+    description: null,
+    inboundMode: "OPEN",
+    acceptingApplications: true,
+    criteria: [],
+    publishedAt: at,
+  };
+  const unused = async (): Promise<never> => {
+    throw new Error("Unexpected QA fixture operation");
+  };
   const rows: StoredTurn[] = [];
   const seen: InterviewTurnInput[] = [];
   let activeClaim: string | null = null;
@@ -38,24 +129,17 @@ function exchangeWorld() {
     finish = resolve;
   });
   const intake = {
-    authorise: async () => ({
-      application: {
-        id: applicationId,
-        tenantId: randomUUID(),
-        gatewayId: randomUUID(),
-        gatewayVersionId: randomUUID(),
-        status: "IN_PROGRESS",
-      },
-      sessionId: randomUUID(),
-    }),
-    qualification: async () => ({
-      access: "MAY_APPLY",
-      principalMismatches: [],
-      unknowns: [],
-    }),
+    authorise: async () => ({ application, sessionId }),
+    qualification: async () => qualification,
     factsFor: async () => [],
-    resume: async () => ({}),
-    recordFacts: async () => ({}),
+    resume: async () => view,
+    recordFacts: async () => view,
+    start: unused,
+    attachDocument: unused,
+    submit: unused,
+    startContact: unused,
+    confirmContact: unused,
+    coverage: unused,
     completeTurn: async (input: {
       claimId: string;
       clientTurnId: string;
@@ -76,7 +160,7 @@ function exchangeWorld() {
       });
       activeClaim = null;
     },
-  } as unknown as IntakeService;
+  };
   const model = vi.fn(async (input: InterviewTurnInput) => {
     seen.push(input);
     return pending;
@@ -85,11 +169,10 @@ function exchangeWorld() {
     intake,
     interviewer: { turn: model },
     policies: {
-      policyByVersionId: async () =>
-        ({ criteria: [] }) as unknown as GatewayPolicy,
+      policyByVersionId: async () => policy,
       currentPolicyByPublicId: async () => null,
     },
-    publicGatewayFor: async () => ({}) as PublicGateway,
+    publicGatewayFor: async () => publicGateway,
     turnMemory: { lastTurn: async () => null, rememberTurn: async () => {} },
     turns: {
       claimExchange: async (input: { clientTurnId: string; text: string }) => {
@@ -112,6 +195,7 @@ function exchangeWorld() {
       releaseExchange: async (_applicationId: unknown, claimId: string) => {
         if (activeClaim === claimId) activeClaim = null;
       },
+      pendingFor: async () => activeClaim !== null,
       listFor: async () => [...rows],
       countFor: async () => rows.length,
       findExchange: async (_id: unknown, clientTurnId: string) => ({
@@ -145,7 +229,7 @@ function exchangeWorld() {
           createdAt: "2026-10-13T12:00:00.000Z",
         });
       },
-    } as ApplicationTurnRepository,
+    },
   });
   const turn = (message: string) =>
     conversation.turn({
