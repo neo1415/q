@@ -26,6 +26,7 @@ import type { VoiceSpeaker, VoiceTranscriptTurn } from "../provider.js";
 import {
   GPT_LIVE_USD_PER_SECOND,
   LiveProviderError,
+  OBSERVER_ATTACH_TIMEOUT_MS,
   type LiveVoiceProvider,
 } from "../providers/gpt-live.js";
 import {
@@ -224,7 +225,10 @@ type TrialLine = {
   /** The person's seconds on every other session, as last read. */
   othersSeconds: number;
   readonly meter: SpeechMeter;
-  observer: { readonly stop: () => void; readonly ready?: Promise<boolean> } | null;
+  observer: {
+    readonly stop: () => void;
+    readonly ready?: Promise<boolean>;
+  } | null;
   /**
    * Observation was lost here. The line ends immediately and its claim
    * stays held: unknown audio cannot be refunded or guessed as silence.
@@ -1229,7 +1233,21 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       lines.set(binding.voiceSessionId, line);
       startTrial(line);
       if (line.trial !== undefined) {
-        const attached = await line.trial.observer?.ready?.catch(() => false) ?? false;
+        // A provider handle alone proves nothing: never return usable SDP
+        // until the server can actually observe speech. Bound even an
+        // adapter whose readiness promise never settles.
+        let attachTimer: ReturnType<typeof setTimeout> | undefined;
+        const attached = await Promise.race([
+          line.trial.observer?.ready?.catch(() => false) ??
+            Promise.resolve(false),
+          new Promise<boolean>((resolve) => {
+            attachTimer = setTimeout(
+              () => resolve(false),
+              OBSERVER_ATTACH_TIMEOUT_MS,
+            );
+          }),
+        ]);
+        clearTimeout(attachTimer);
         if (!attached || lines.get(binding.voiceSessionId) !== line) {
           if (lines.get(binding.voiceSessionId) === line) {
             line.trial.lostAt = now();
@@ -1277,6 +1295,13 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         pronunciations,
         preparedEntities: deps.preparedEntityLines?.() ?? [],
       });
+      // Context/hint reads are asynchronous. The observer may have failed
+      // while they were in flight; a closed trial must never escape as OPEN.
+      if (
+        line.trial !== undefined &&
+        lines.get(binding.voiceSessionId) !== line
+      )
+        return { kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" };
       logger.info(
         { qVoiceSessionId: binding.voiceSessionId, model: created.model },
         "live voice line opened",

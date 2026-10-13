@@ -296,7 +296,9 @@ export function createGptLiveProvider(options: {
       let stopped = false;
       let lost = false;
       let settleReady: (attached: boolean) => void = () => undefined;
-      const ready = new Promise<boolean>((resolve) => { settleReady = resolve; });
+      const ready = new Promise<boolean>((resolve) => {
+        settleReady = resolve;
+      });
       let attachTimer: ReturnType<typeof setTimeout> | null = null;
       const finishReady = (attached: boolean) => {
         if (attachTimer !== null) clearTimeout(attachTimer);

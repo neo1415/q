@@ -188,6 +188,8 @@ function instance(
     readonly observe?: boolean;
     readonly closeConfirmed?: boolean;
     readonly observerReady?: boolean;
+    readonly observerReadiness?: Promise<boolean>;
+    readonly contextRead?: Promise<null>;
     readonly closeAvailable?: boolean;
     readonly createError?: Error;
     readonly missingClaims?: boolean;
@@ -209,10 +211,14 @@ function instance(
       created.push(id);
       return Promise.resolve({ sessionId: id, sdp: "v=0 answer", model: null });
     },
-    ...(options.closeAvailable === false ? {} : { closeSession: (id: string) => {
-      closed.push(id);
-      return Promise.resolve(options.closeConfirmed !== false);
-    } }),
+    ...(options.closeAvailable === false
+      ? {}
+      : {
+          closeSession: (id: string) => {
+            closed.push(id);
+            return Promise.resolve(options.closeConfirmed !== false);
+          },
+        }),
     ...(options.observe === false
       ? {}
       : {
@@ -226,7 +232,9 @@ function instance(
             const sideband: Sideband = { ...handlers, stopped: false };
             sidebands.push(sideband);
             return {
-              ready: Promise.resolve(options.observerReady !== false),
+              ready:
+                options.observerReadiness ??
+                Promise.resolve(options.observerReady !== false),
               stop: () => {
                 sideband.stopped = true;
               },
@@ -259,6 +267,7 @@ function instance(
     syntheticDemo: false,
     logger,
     now: () => clock.now,
+    contextFor: () => options.contextRead ?? Promise.resolve(null),
     trialUsage: store,
     trialClaims:
       store === undefined || options.missingClaims === true
@@ -457,10 +466,70 @@ describe("measuring active speech", () => {
 });
 
 describe("the trial line (broker)", () => {
+  it("does not return OPEN after observer loss during context loading", async () => {
+    let finishContext: (context: null) => void = () => undefined;
+    const contextRead = new Promise<null>((resolve) => {
+      finishContext = resolve;
+    });
+    const store = memoryStore();
+    const line = instance(store, { contextRead });
+    const opening = openLine(line);
+    await settle();
+    line.sidebands[0]?.onLost();
+    finishContext(null);
+    expect((await opening).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "LEDGER_UNAVAILABLE",
+    });
+    expect(line.closed).toHaveLength(1);
+    expect(store.claims.size).toBe(1);
+  });
+
+  it("withholds usable SDP until the server observer confirms readiness", async () => {
+    let confirm: (ready: boolean) => void = () => undefined;
+    const readiness = new Promise<boolean>((resolve) => {
+      confirm = resolve;
+    });
+    const line = instance(memoryStore(), { observerReadiness: readiness });
+    let resolved = false;
+    const opening = openLine(line).then((result) => {
+      resolved = true;
+      return result;
+    });
+    await settle();
+    expect(line.created).toHaveLength(1);
+    expect(resolved).toBe(false);
+    confirm(true);
+    expect((await opening).outcome.kind).toBe("OPEN");
+  });
+
+  it("bounds a never-settled observer and retains the unknown claim", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryStore();
+      const line = instance(store, {
+        observerReadiness: new Promise<boolean>(() => undefined),
+      });
+      const opening = openLine(line);
+      await vi.advanceTimersByTimeAsync(5_001);
+      expect((await opening).outcome).toEqual({
+        kind: "REFUSED",
+        reason: "LEDGER_UNAVAILABLE",
+      });
+      expect(line.closed).toHaveLength(1);
+      expect(store.claims.size).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("refuses usable SDP and retains unknown allowance if observer readiness fails", async () => {
     const store = memoryStore();
     const line = instance(store, { observerReady: false });
-    expect((await openLine(line)).outcome).toEqual({ kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" });
+    expect((await openLine(line)).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "LEDGER_UNAVAILABLE",
+    });
     expect(line.closed).toEqual([line.created[0]]);
     await settle();
     expect(store.claims.size).toBe(1);
@@ -468,7 +537,10 @@ describe("the trial line (broker)", () => {
 
   it("refuses before paid creation without server termination capability", async () => {
     const line = instance(memoryStore(), { closeAvailable: false });
-    expect((await openLine(line)).outcome).toEqual({ kind: "REFUSED", reason: "LEDGER_UNAVAILABLE" });
+    expect((await openLine(line)).outcome).toEqual({
+      kind: "REFUSED",
+      reason: "LEDGER_UNAVAILABLE",
+    });
     expect(line.created).toEqual([]);
   });
 
