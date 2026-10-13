@@ -339,8 +339,7 @@ export type ApiModules = {
   readonly gateqMaterials?: GateQRoutesDependencies["materials"] | undefined;
   /** GateQ slice 1: a signed-in founder's application contact. */
   readonly gateqApplicationContact?:
-    | GateQRoutesDependencies["applicationContact"]
-    | undefined;
+    GateQRoutesDependencies["applicationContact"] | undefined;
   readonly gateqInboxService?:
     GateQRoutesDependencies["inboxService"] | undefined;
   /** F3: find and claim a company; an investor's saved startup search. */

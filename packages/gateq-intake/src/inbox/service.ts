@@ -966,10 +966,8 @@ function readTranscript(snapshot: unknown) {
   if (typeof snapshot !== "object" || snapshot === null) return null;
   const turns = (snapshot as { readonly transcript?: unknown }).transcript;
   if (!Array.isArray(turns)) return null;
-  return turns
-    .slice(0, GATEQ_TRANSCRIPT_MAX_TURNS)
-    .flatMap((turn: unknown) => {
-      const parsed = ApplicationTranscriptTurnDtoSchema.safeParse(turn);
-      return parsed.success ? [parsed.data] : [];
-    });
+  return turns.slice(0, GATEQ_TRANSCRIPT_MAX_TURNS).flatMap((turn: unknown) => {
+    const parsed = ApplicationTranscriptTurnDtoSchema.safeParse(turn);
+    return parsed.success ? [parsed.data] : [];
+  });
 }

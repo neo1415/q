@@ -556,8 +556,7 @@ export function createIntakeService(
       // Everything is read before the transaction and built
       // deterministically; the transaction only writes the one row.
       let v2:
-        | { readonly snapshot: unknown; readonly dossier: unknown }
-        | undefined;
+        { readonly snapshot: unknown; readonly dossier: unknown } | undefined;
       if (turns !== undefined) {
         const policy = await policyFor(application);
         const current = await facts.currentFor(application.id);

@@ -316,9 +316,7 @@ const ContactFields = {
   preferredChannel: GateqContactChannelSchema.optional(),
 } as const;
 
-export const ApplicationContactRequestSchema = z
-  .object(ContactFields)
-  .strict();
+export const ApplicationContactRequestSchema = z.object(ContactFields).strict();
 export type ApplicationContactRequest = z.infer<
   typeof ApplicationContactRequestSchema
 >;
@@ -453,7 +451,11 @@ export const GateqCoverageMissingSchema = z
   })
   .strict();
 
-const AccessSchema = z.enum(["MAY_APPLY", "MAY_NOT_APPLY", "NEEDS_INFORMATION"]);
+const AccessSchema = z.enum([
+  "MAY_APPLY",
+  "MAY_NOT_APPLY",
+  "NEEDS_INFORMATION",
+]);
 
 /**
  * The deterministic completeness check before submission (v1).

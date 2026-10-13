@@ -116,6 +116,8 @@ function harness(
   options: {
     readonly now?: string;
     readonly mail?: GateqOutboundSender;
+    /** GateQ slice 1: a v2 submission for APP_FIT (dossier + transcript). */
+    readonly v2?: { readonly dossier: unknown; readonly transcript: unknown };
   } = {},
 ) {
   const emailEvents: GateqEmailEvent[] = [];
@@ -185,8 +187,16 @@ function harness(
     return {
       applicationId: id,
       submittedAt: s.at,
-      snapshot: s.snapshot,
+      snapshot:
+        id === APP_FIT && options.v2 !== undefined
+          ? {
+              ...(s.snapshot as object),
+              snapshotVersion: 2,
+              transcript: options.v2.transcript,
+            }
+          : s.snapshot,
       qualification: s.qualification,
+      dossier: id === APP_FIT ? (options.v2?.dossier ?? null) : null,
       folder: state.folder.get(id) ?? "INBOX",
       assigneeUserId: state.assignee.get(id) ?? null,
       starred: state.stars.get(`${id}:${userId}`) ?? false,
@@ -667,5 +677,90 @@ describe("the reply promise (F4)", () => {
         now: submittedAt,
       }).state,
     ).toBe("NONE");
+  });
+});
+
+describe("the dossier in the inbox (GateQ slice 1)", () => {
+  const dossier = {
+    schemaVersion: "gateq-dossier.v1",
+    generatedAt: "2026-10-05T09:00:00.000Z",
+    application: {
+      reference: "ga_0123456789abcdefghjkmnpqrs",
+      submittedAt: "2026-10-05T09:00:00.000Z",
+    },
+    company: {
+      name: "Sunline",
+      description: null,
+      website: null,
+      country: "Nigeria",
+      stage: "Seed",
+      sectorPhrases: [],
+      note: null,
+    },
+    contact: {
+      name: "Amara Obi",
+      email: "amara@confirmed.example",
+      role: "CEO",
+      companyName: "Sunline",
+      phone: null,
+      preferredChannel: "EMAIL",
+      emailConfirmed: true,
+      confirmedVia: "EMAIL_CODE",
+    },
+    qualification: {
+      outcome: "QUALIFIED",
+      access: "MAY_APPLY",
+      criteria: [{ label: "Seed", requiredness: "REQUIRED", status: "MATCH" }],
+    },
+    dimensions: [],
+    unknowns: [],
+    declined: [],
+    missing: [],
+    contradictions: [],
+    documents: [],
+    diligenceQuestions: [],
+    transcript: { turnCount: 2 },
+    synthesis: null,
+  };
+  const transcript = [
+    {
+      seq: 1,
+      role: "PERSON",
+      text: "We help clinics get paid.",
+      at: "2026-10-05T08:00:00.000Z",
+    },
+    {
+      seq: 2,
+      role: "Q",
+      text: "Who pays you?",
+      at: "2026-10-05T08:00:01.000Z",
+    },
+  ];
+
+  it("shows the frozen dossier and transcript to the receiving organisation", async () => {
+    const { service } = harness({ v2: { dossier, transcript } });
+    const detail = await service.detail(actor(MEMBER), GATEWAY, APP_FIT);
+    if (!("item" in detail)) throw new Error("refused");
+    expect(detail.dossier?.company.name).toBe("Sunline");
+    expect(detail.dossier?.synthesis).toBeNull();
+    expect(detail.transcript?.map((t) => t.role)).toEqual(["PERSON", "Q"]);
+    // The confirmed contact is the one the investor reaches.
+    expect(detail.contact.email).toBe("amara@confirmed.example");
+  });
+
+  it("answers null for a submission made before dossiers existed", async () => {
+    const { service } = harness();
+    const detail = await service.detail(actor(MEMBER), GATEWAY, APP_PARTIAL);
+    if (!("item" in detail)) throw new Error("refused");
+    expect(detail.dossier).toBeNull();
+    expect(detail.transcript).toBeNull();
+    expect(detail.contact.email).toBe("amara@sunline.example");
+  });
+
+  it("never shows another gateway's dossier", async () => {
+    const { service } = harness({ v2: { dossier, transcript } });
+    expect(await service.detail(actor(ADMIN), OTHER_GATEWAY, APP_FIT)).toEqual({
+      ok: false,
+    });
   });
 });

@@ -1,4 +1,7 @@
-import type { GateqCoverageV1, GateqInvestmentGroup } from "@capital-q/contracts";
+import type {
+  GateqCoverageV1,
+  GateqInvestmentGroup,
+} from "@capital-q/contracts";
 import type { GatewayPolicy, QualificationResult } from "@capital-q/gateq";
 
 import type {

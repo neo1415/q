@@ -300,9 +300,7 @@ export function createConversationService(
       // The interviewer gets this turn as the utterance, not twice.
       const prior = stored.filter(
         (turn) =>
-          !(
-            turn.role === "PERSON" && turn.clientTurnId === input.clientTurnId
-          ),
+          !(turn.role === "PERSON" && turn.clientTurnId === input.clientTurnId),
       );
       const history = historyFrom(prior);
 

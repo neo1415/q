@@ -19,10 +19,7 @@ export type GateqOutboundSender = {
 };
 
 export type GateqEmailKind =
-  | "PASS"
-  | "REPLY"
-  | "CLAIM_CODE"
-  | "APPLICATION_CONTACT_CODE";
+  "PASS" | "REPLY" | "CLAIM_CODE" | "APPLICATION_CONTACT_CODE";
 
 /** Outcome per email, for the service log: recipient domain only. */
 export type GateqEmailEvent = {

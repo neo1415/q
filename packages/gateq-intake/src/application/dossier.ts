@@ -13,7 +13,11 @@ import type {
   FactProvenance,
 } from "../contracts/index.js";
 import { profileOf } from "../inbox/domain.js";
-import { DIMENSION_LABELS, factSummary, INVESTMENT_DIMENSIONS } from "./coverage.js";
+import {
+  DIMENSION_LABELS,
+  factSummary,
+  INVESTMENT_DIMENSIONS,
+} from "./coverage.js";
 
 /**
  * The investor-ready GateQ dossier, built in the submission transaction
@@ -53,7 +57,8 @@ const DILIGENCE_TEMPLATES: Readonly<Record<ApplicationDimension, string>> = {
     "Who are the founders and key hires, and what is their relevant experience?",
   "company.business_model":
     "How does the company make money, and what are the unit economics?",
-  "company.sector_phrases": "Which sector and sub-sector best describe the company?",
+  "company.sector_phrases":
+    "Which sector and sub-sector best describe the company?",
   "claims.revenue":
     "What is current revenue (period, recognition basis), and can it be supported with management accounts?",
   "claims.traction":
@@ -63,7 +68,8 @@ const DILIGENCE_TEMPLATES: Readonly<Record<ApplicationDimension, string>> = {
   "raise.instrument": "What instrument and terms are proposed for the round?",
   "raise.use_of_funds":
     "How will the funds be used, and what milestones will they reach?",
-  "raise.lead_status": "Is there a lead investor, and what is committed so far?",
+  "raise.lead_status":
+    "Is there a lead investor, and what is committed so far?",
   "application.note": "Is there anything else the investor should know?",
 };
 
@@ -137,8 +143,7 @@ export function buildDossier(input: {
     }),
   }));
 
-  const diligenceQuestions: GateqDossierV1["diligenceQuestions"][number][] =
-    [];
+  const diligenceQuestions: GateqDossierV1["diligenceQuestions"][number][] = [];
   for (const contradiction of input.coverage.contradictions) {
     diligenceQuestions.push({
       dimension: null,
@@ -151,12 +156,15 @@ export function buildDossier(input: {
     gaps: readonly { readonly dimension: string }[],
   ) => {
     for (const gap of gaps) {
-      const template =
-        DILIGENCE_TEMPLATES[gap.dimension as ApplicationDimension] as
-          | string
-          | undefined;
+      const template = DILIGENCE_TEMPLATES[
+        gap.dimension as ApplicationDimension
+      ] as string | undefined;
       if (template === undefined) continue;
-      diligenceQuestions.push({ dimension: gap.dimension, basis, question: template });
+      diligenceQuestions.push({
+        dimension: gap.dimension,
+        basis,
+        question: template,
+      });
     }
   };
   ask("UNKNOWN", input.coverage.unknown);
