@@ -313,7 +313,8 @@ describe("score integrity (INC-1)", () => {
       // 4 strong + 1 partial of 5 known: (4×10 + 4) / 5 = 8.8.
       expect(card.fit).toEqual({ score: 8.8, measured: 5, of: 7 });
       expect(card.said).toBe(
-        `${card.name}: mandate fit 8.8 out of 10, not a quality score. 5 of 7 measures known (strong 10, good 7.5, partial 4, mismatch 0; unknown left out). No source documents yet.`,
+        // D2: the insight leads; the platform scale has no Good 7.5.
+        `${card.name} is strong on stage, sector, geography and business model, partial on traction; cheque compatibility and round terms not known yet. Capital Q mandate fit 8.8 out of 10, 5 of 7 measures known; not a quality score. No source documents yet. (Capital Q scale: strong 10, partial 4, mismatch 0.)`,
       );
     }
   });
