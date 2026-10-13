@@ -1,6 +1,14 @@
-import { randomUUID } from "node:crypto";
+import type * as Crypto from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
+
+// The real primitive, observed: the code check must go through Node's
+// constant-time comparison, never a string `===`.
+vi.mock("node:crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof Crypto>();
+  return { ...actual, timingSafeEqual: vi.fn(actual.timingSafeEqual) };
+});
 
 import {
   CriterionConfigSchema,
@@ -16,6 +24,7 @@ import {
 } from "@capital-q/contracts";
 
 import {
+  IntakeRefusedError,
   type Application,
   type ApplicationFact,
   type ApplicationSession,
@@ -149,10 +158,47 @@ function world(options: { contactRequiredFrom?: string } = {}) {
   const contactRows = new Map<string, StoredContact>();
   const mailed: { to: string; code: string }[] = [];
   let nextCode = 100_000;
+  /** Every log line either service wrote, for the no-secret checks. */
+  const logs: unknown[] = [];
+  const capture = (fields: unknown, message?: unknown) => {
+    logs.push({ fields, message });
+  };
+  const logger = {
+    info: capture,
+    debug: capture,
+    warn: capture,
+    error: capture,
+  };
 
+  // A fake of the row lock: `applications.lock` queues behind whoever
+  // holds the application, and the hold ends when that transaction ends,
+  // exactly as SELECT ... FOR UPDATE does. It is what lets the race cases
+  // below interleave for real.
+  const lockTails = new Map<string, Promise<void>>();
+  const txReleases = new WeakMap<object, (() => void)[]>();
   const transactions = {
-    run: async <T>(work: (tx: { sql: unknown }) => Promise<T>): Promise<T> =>
-      work({ sql: null }),
+    run: async <T>(work: (tx: { sql: unknown }) => Promise<T>): Promise<T> => {
+      const tx = { sql: null };
+      txReleases.set(tx, []);
+      try {
+        return await work(tx);
+      } finally {
+        for (const release of txReleases.get(tx) ?? []) release();
+      }
+    },
+  };
+  const lockRow = async (tx: object, id: string): Promise<void> => {
+    const prior = lockTails.get(id) ?? Promise.resolve();
+    let release: () => void = () => undefined;
+    const mine = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    lockTails.set(
+      id,
+      prior.then(() => mine),
+    );
+    await prior;
+    txReleases.get(tx)?.push(release);
   };
 
   const turns = {
@@ -173,6 +219,8 @@ function world(options: { contactRequiredFrom?: string } = {}) {
         q: rows.find((row) => row.role === "Q") ?? null,
       });
     },
+    // As the Postgres repository: under the application's lock, refused
+    // once submitted, one row per (client turn id, role).
     append: vi.fn(
       (input: {
         applicationId: string;
@@ -181,32 +229,40 @@ function world(options: { contactRequiredFrom?: string } = {}) {
         clientTurnId: string;
         askingDimension?: StoredTurn["askingDimension"] | null | undefined;
         intent?: string | null | undefined;
-      }) => {
-        const mine = turnRows.filter(
-          (row) => row.applicationId === input.applicationId,
-        );
-        // The unique (application, client turn id, role) index.
-        if (
-          mine.some(
+        latencyMs?: number | null | undefined;
+      }) =>
+        transactions.run(async (tx) => {
+          await lockRow(tx, input.applicationId);
+          const application = applications.get(input.applicationId);
+          if (application === undefined) {
+            throw new IntakeRefusedError("NOT_FOUND");
+          }
+          if (application.status === "SUBMITTED") {
+            throw new IntakeRefusedError("ALREADY_SUBMITTED");
+          }
+          const mine = turnRows.filter(
+            (row) => row.applicationId === input.applicationId,
+          );
+          const existing = mine.find(
             (row) =>
               row.clientTurnId === input.clientTurnId &&
               row.role === input.role,
-          )
-        ) {
-          return Promise.resolve();
-        }
-        turnRows.push({
-          applicationId: input.applicationId,
-          seq: mine.length + 1,
-          role: input.role,
-          text: input.text,
-          clientTurnId: input.clientTurnId,
-          askingDimension: input.askingDimension ?? null,
-          intent: input.intent ?? null,
-          createdAt: now.toISOString(),
-        });
-        return Promise.resolve();
-      },
+          );
+          if (existing !== undefined) return { seq: existing.seq };
+          const seq = mine.length + 1;
+          turnRows.push({
+            applicationId: input.applicationId,
+            seq,
+            role: input.role,
+            text: input.text,
+            clientTurnId: input.clientTurnId,
+            askingDimension: input.askingDimension ?? null,
+            intent: input.intent ?? null,
+            latencyMs: input.latencyMs ?? null,
+            createdAt: now.toISOString(),
+          });
+          return { seq };
+        }),
     ),
     countFor: (applicationId: string) =>
       Promise.resolve(
@@ -218,6 +274,7 @@ function world(options: { contactRequiredFrom?: string } = {}) {
     findFor: (applicationId: string) =>
       Promise.resolve(contactRows.get(applicationId) ?? null),
     save: (
+      _tx: unknown,
       input: Omit<StoredContact, "codeAttempts"> & { tenantId: string },
     ) => {
       const { tenantId: _tenant, ...rest } = input;
@@ -225,7 +282,7 @@ function world(options: { contactRequiredFrom?: string } = {}) {
       contactRows.set(input.applicationId, row);
       return Promise.resolve(row);
     },
-    recordFailedAttempt: (applicationId: string) => {
+    recordFailedAttempt: (_tx: unknown, applicationId: string) => {
       const row = contactRows.get(applicationId);
       if (row !== undefined) {
         contactRows.set(applicationId, {
@@ -235,11 +292,14 @@ function world(options: { contactRequiredFrom?: string } = {}) {
       }
       return Promise.resolve();
     },
-    confirm: (input: {
-      applicationId: string;
-      at: string;
-      via: "EMAIL_CODE" | "ACCOUNT";
-    }) => {
+    confirm: (
+      _tx: unknown,
+      input: {
+        applicationId: string;
+        at: string;
+        via: "EMAIL_CODE" | "ACCOUNT";
+      },
+    ) => {
       const row = contactRows.get(input.applicationId);
       if (row === undefined) return Promise.resolve(null);
       const next: StoredContact = {
@@ -277,6 +337,10 @@ function world(options: { contactRequiredFrom?: string } = {}) {
         const row = applications.get(id);
         if (row !== undefined) applications.set(id, { ...row, declaredName });
         return Promise.resolve();
+      },
+      lock: async (tx, id) => {
+        await lockRow(tx, id);
+        return applications.get(id) ?? null;
       },
     },
     sessions: {
@@ -338,6 +402,7 @@ function world(options: { contactRequiredFrom?: string } = {}) {
             provenance: proposed.provenance,
             recordedAt: input.at,
             supersededAt: null,
+            sourceTurnSeq: input.sourceTurnSeq ?? null,
           };
           factRows.push(row);
           written.push(row);
@@ -417,6 +482,7 @@ function world(options: { contactRequiredFrom?: string } = {}) {
       return Promise.resolve(true);
     },
     newContactCode: () => String((nextCode += 1)),
+    logger: logger as never,
     ...(options.contactRequiredFrom === undefined
       ? {}
       : { contactRequiredFrom: options.contactRequiredFrom }),
@@ -424,11 +490,15 @@ function world(options: { contactRequiredFrom?: string } = {}) {
 
   const seen: InterviewTurnInput[] = [];
   const script: Scripted[] = [];
+  /** A turn the test holds open until it chooses, to interleave a race. */
+  const holds: Promise<void>[] = [];
   const interviewer = {
-    turn: vi.fn((input: InterviewTurnInput) => {
+    turn: vi.fn(async (input: InterviewTurnInput) => {
       seen.push(input);
       const next = script.shift() ?? {};
-      return Promise.resolve<InterviewTurnOutcome>({
+      const hold = holds.shift();
+      if (hold !== undefined) await hold;
+      return {
         reply: "Tell me more.",
         intent: "ANSWER",
         facts: [],
@@ -437,10 +507,12 @@ function world(options: { contactRequiredFrom?: string } = {}) {
         questionForQ: null,
         readyToReview: false,
         ...next,
-      });
+      } satisfies InterviewTurnOutcome;
     }),
   };
 
+  // Each turn reads the clock twice (received, replied): 75 ms apart.
+  let tick = 0;
   const conversation = createConversationService({
     intake,
     interviewer,
@@ -457,6 +529,8 @@ function world(options: { contactRequiredFrom?: string } = {}) {
       rememberTurn: () => Promise.resolve(),
     },
     turns: turns,
+    logger: logger as never,
+    now: () => (tick += 75),
   });
 
   return {
@@ -465,6 +539,10 @@ function world(options: { contactRequiredFrom?: string } = {}) {
     interviewer,
     seen,
     script,
+    holds,
+    logs,
+    applications,
+    factRows,
     turnRows,
     contactRows,
     submissions,
@@ -946,5 +1024,379 @@ describe("submission v2", () => {
     await expect(
       w.intake.startContact({ token, contact: CONTACT }),
     ).rejects.toMatchObject({ refusal: "ALREADY_SUBMITTED" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review focus (lead, 2026-10-13): each property below has its own case.
+// ---------------------------------------------------------------------------
+
+/** An application that may be submitted, with a confirmed contact. */
+async function readyToSubmit(w: ReturnType<typeof world>) {
+  const started = await w.start();
+  await w.intake.recordFacts({ token: started.token, facts: QUALIFYING });
+  await w.intake.startContact({ token: started.token, contact: CONTACT });
+  await w.intake.confirmContact({
+    token: started.token,
+    code: w.mailed.at(-1)?.code ?? "",
+  });
+  return started;
+}
+
+describe("review: the six-digit email code", () => {
+  it("is checked with a constant-time comparison of equal-length digests", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    const compare = vi.mocked(timingSafeEqual);
+    // The guest credential is compared the same way; measure it alone,
+    // so what remains is exactly one comparison per code check.
+    compare.mockClear();
+    await w.intake.coverage(token);
+    const perAuthorise = compare.mock.calls.length;
+    for (const code of ["000000", w.mailed[0]?.code ?? ""]) {
+      compare.mockClear();
+      await w.intake.confirmContact({ token, code });
+      expect(compare).toHaveBeenCalledTimes(perAuthorise + 1);
+      const [left, right] = compare.mock.calls.at(-1) ?? [];
+      expect(left?.byteLength).toBe(32);
+      expect(right?.byteLength).toBe(32);
+    }
+  });
+
+  it("never appears in a response, a log line or the stored row", async () => {
+    const w = world();
+    const { token } = await w.start();
+    const started = await w.intake.startContact({ token, contact: CONTACT });
+    const code = w.mailed[0]?.code ?? "";
+    const wrong = await w.intake.confirmContact({ token, code: "000000" });
+    const right = await w.intake.confirmContact({ token, code });
+    const coverage = await w.intake.coverage(token);
+    for (const visible of [
+      started,
+      wrong,
+      right,
+      coverage,
+      w.logs,
+      [...w.contactRows.values()],
+    ]) {
+      expect(JSON.stringify(visible)).not.toContain(code);
+    }
+  });
+
+  it("works once: after confirmation it is spent", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    await w.intake.confirmContact({ token, code: w.mailed[0]?.code ?? "" });
+    expect(w.contactRows.values().next().value?.codeHash).toBeNull();
+  });
+
+  it("counts racing guesses one after another, never past the limit", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    const results = await Promise.all(
+      Array.from({ length: 9 }, () =>
+        w.intake.confirmContact({ token, code: "999999" }),
+      ),
+    );
+    expect(results.filter((r) => r.status === "WRONG_CODE")).toHaveLength(
+      CONTACT_CODE_MAX_ATTEMPTS,
+    );
+    expect(results.filter((r) => r.status === "EXPIRED")).toHaveLength(
+      9 - CONTACT_CODE_MAX_ATTEMPTS,
+    );
+  });
+
+  it("a resend replaces the code: the old one stops working and attempts restart", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    const first = w.mailed[0]?.code ?? "";
+    for (let i = 0; i < CONTACT_CODE_MAX_ATTEMPTS - 1; i += 1) {
+      await w.intake.confirmContact({ token, code: "999999" });
+    }
+    const resent = await w.intake.startContact({ token, contact: CONTACT });
+    expect(resent.codeSent).toBe(true);
+    const second = w.mailed[1]?.code ?? "";
+    expect(second).not.toBe(first);
+    expect((await w.intake.confirmContact({ token, code: first })).status).toBe(
+      "WRONG_CODE",
+    );
+    expect(
+      (await w.intake.confirmContact({ token, code: second })).status,
+    ).toBe("CONFIRMED");
+  });
+});
+
+describe("review: a confirmed contact is mandatory for new applications", () => {
+  it("refuses a new application without one, and admits it once confirmed", async () => {
+    const w = world({ contactRequiredFrom: "2026-10-01T00:00:00.000Z" });
+    const { token } = await w.start();
+    await w.intake.recordFacts({ token, facts: QUALIFYING });
+    await expect(
+      w.intake.submit({ token, clientRequestId: "req-000000000001" }),
+    ).rejects.toMatchObject({ refusal: "CONTACT_NOT_CONFIRMED" });
+    await w.intake.startContact({ token, contact: CONTACT });
+    await expect(
+      w.intake.submit({ token, clientRequestId: "req-000000000001" }),
+    ).rejects.toMatchObject({ refusal: "CONTACT_NOT_CONFIRMED" });
+    await w.intake.confirmContact({ token, code: w.mailed[0]?.code ?? "" });
+    const submitted = await w.intake.submit({
+      token,
+      clientRequestId: "req-000000000001",
+    });
+    expect(submitted.deduplicated).toBe(false);
+    expect(w.submissions).toHaveLength(1);
+  });
+});
+
+describe("review: one application never reaches another", () => {
+  it("keeps facts, coverage, contact and transcript per application", async () => {
+    const w = world();
+    const a = await w.start();
+    const b = await w.start();
+    await w.intake.recordFacts({ token: a.token, facts: QUALIFYING });
+    await w.intake.startContact({ token: a.token, contact: CONTACT });
+    w.script.push({ reply: "A only." });
+    await w.conversation.turn({
+      token: a.token,
+      message: "A's secret.",
+      clientTurnId: "turn-000001",
+      correlationId: "c1",
+    });
+    const bCoverage = await w.intake.coverage(b.token);
+    expect(bCoverage.coverage.answered).toEqual([]);
+    expect(bCoverage.contact.confirmed).toBe(false);
+    expect(bCoverage.transcriptTurns).toBe(0);
+    expect(await w.conversation.transcript(b.token)).toEqual([]);
+    expect(
+      (await w.intake.confirmContact({ token: b.token, code: "000000" }))
+        .status,
+    ).toBe("NOT_FOUND");
+  });
+
+  it("refuses a forged credential on every new operation", async () => {
+    const w = world();
+    const forged = `gqs_${"q".repeat(43)}`;
+    for (const call of [
+      () => w.intake.startContact({ token: forged, contact: CONTACT }),
+      () => w.intake.confirmContact({ token: forged, code: "123456" }),
+      () => w.intake.coverage(forged),
+      () => w.conversation.transcript(forged),
+    ]) {
+      await expect(call()).rejects.toMatchObject({
+        refusal: "SESSION_INVALID",
+      });
+    }
+  });
+});
+
+describe("review: races", () => {
+  it("a final turn racing Submit is either in the snapshot or refused, never appended after", async () => {
+    const w = world();
+    const { token } = await readyToSubmit(w);
+    let release: () => void = () => undefined;
+    w.holds.push(
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    );
+    w.script.push({
+      reply: "Thanks.",
+      facts: [fact("company.team", { kind: "TEXT", text: "Two founders" })],
+    });
+    const turn = w.conversation.turn({
+      token,
+      message: "One last thing about the team.",
+      clientTurnId: "turn-final1",
+      correlationId: "c1",
+    });
+    // The model is still thinking; the founder presses Submit.
+    await vi.waitFor(() => {
+      expect(w.seen).toHaveLength(1);
+    });
+    await w.intake.submit({ token, clientRequestId: "req-000000000001" });
+    release();
+    await expect(turn).rejects.toMatchObject({ refusal: "ALREADY_SUBMITTED" });
+
+    expect(w.submissions).toHaveLength(1);
+    // The person's line was on the record before Submit took the lock, so
+    // it is in what the investor received; Q's reply and the fact are not
+    // anywhere, because they arrived after.
+    expect(w.turnRows.map((t) => t.role)).toEqual(["PERSON"]);
+    expect(w.factRows.some((f) => f.dimension === "company.team")).toBe(false);
+    const row = w.submissions[0];
+    const snapshot = row?.snapshot as { transcript: unknown[] };
+    expect(snapshot.transcript).toHaveLength(1);
+    expect(GateqDossierV1Schema.parse(row?.dossier).transcript.turnCount).toBe(
+      1,
+    );
+  });
+
+  it("two concurrent Submits with one key make one submission", async () => {
+    const w = world();
+    const { token } = await readyToSubmit(w);
+    const [first, second] = await Promise.all([
+      w.intake.submit({ token, clientRequestId: "req-000000000001" }),
+      w.intake.submit({ token, clientRequestId: "req-000000000001" }),
+    ]);
+    expect(w.submissions).toHaveLength(1);
+    expect([first.deduplicated, second.deduplicated].sort()).toEqual([
+      false,
+      true,
+    ]);
+    expect(second.submittedAt).toBe(first.submittedAt);
+  });
+
+  it("two concurrent Submits with different keys: one wins, one is refused", async () => {
+    const w = world();
+    const { token } = await readyToSubmit(w);
+    const results = await Promise.allSettled([
+      w.intake.submit({ token, clientRequestId: "req-000000000001" }),
+      w.intake.submit({ token, clientRequestId: "req-000000000002" }),
+    ]);
+    expect(w.submissions).toHaveLength(1);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const refused = results.find((r) => r.status === "rejected");
+    expect(
+      refused?.status === "rejected" ? refused.reason : null,
+    ).toMatchObject({ refusal: "ALREADY_SUBMITTED" });
+  });
+});
+
+describe("review: the snapshot, transcript and dossier are one view", () => {
+  it("agree with each other in every shared part", async () => {
+    const w = world();
+    const { token } = await readyToSubmit(w);
+    w.script.push({ reply: "Who pays?", asking: "company.customers" });
+    await w.conversation.turn({
+      token,
+      message: "Banks pay us.",
+      clientTurnId: "turn-000001",
+      correlationId: "c1",
+    });
+    await w.intake.submit({ token, clientRequestId: "req-000000000001" });
+    const row = w.submissions[0];
+    const snapshot = row?.snapshot as {
+      transcript: unknown[];
+      contact: unknown;
+      coverage: {
+        unknown: unknown;
+        declined: unknown;
+        missing: unknown;
+        contradictions: unknown;
+      };
+      facts: { dimension: string }[];
+    };
+    const dossier = GateqDossierV1Schema.parse(row?.dossier);
+    expect(dossier.transcript.turnCount).toBe(snapshot.transcript.length);
+    expect(dossier.contact).toEqual(snapshot.contact);
+    expect(dossier.unknowns).toEqual(snapshot.coverage.unknown);
+    expect(dossier.declined).toEqual(snapshot.coverage.declined);
+    expect(dossier.missing).toEqual(snapshot.coverage.missing);
+    expect(dossier.contradictions).toEqual(snapshot.coverage.contradictions);
+    const dossierDimensions = dossier.dimensions
+      .flatMap((d) => d.facts)
+      .map((f) => f.dimension)
+      .sort();
+    const snapshotInvestment = snapshot.facts
+      .map((f) => f.dimension)
+      .filter((d) => dossierDimensions.includes(d))
+      .sort();
+    expect(dossierDimensions).toEqual(snapshotInvestment);
+    expect(dossier.application.submittedAt).toBe(row?.submittedAt);
+  });
+});
+
+describe("review: retries are idempotent", () => {
+  it("a retried Submit returns the first answer and writes nothing", async () => {
+    const w = world();
+    const { token } = await readyToSubmit(w);
+    const first = await w.intake.submit({
+      token,
+      clientRequestId: "req-000000000001",
+    });
+    const retry = await w.intake.submit({
+      token,
+      clientRequestId: "req-000000000001",
+    });
+    expect(retry).toMatchObject({
+      deduplicated: true,
+      submittedAt: first.submittedAt,
+    });
+    expect(w.submissions).toHaveLength(1);
+  });
+
+  it("a retried confirmation is confirmed, without another attempt counted", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    const code = w.mailed[0]?.code ?? "";
+    await w.intake.confirmContact({ token, code });
+    expect((await w.intake.confirmContact({ token, code })).status).toBe(
+      "CONFIRMED",
+    );
+    expect(w.contactRows.values().next().value?.codeAttempts).toBe(0);
+  });
+});
+
+describe("review: dossier evidence lineage", () => {
+  it("every dossier fact names its provenance, its fact and the turn it was heard in", async () => {
+    const w = world();
+    const { token } = await readyToSubmit(w);
+    w.script.push({
+      reply: "Noted.",
+      facts: [
+        fact("company.customers", { kind: "TEXT", text: "Tier-2 banks" }),
+      ],
+    });
+    await w.conversation.turn({
+      token,
+      message: "Our customers are tier-2 banks.",
+      clientTurnId: "turn-000001",
+      correlationId: "c1",
+    });
+    await w.intake.submit({ token, clientRequestId: "req-000000000001" });
+    const dossier = GateqDossierV1Schema.parse(w.submissions[0]?.dossier);
+    const facts = dossier.dimensions.flatMap((d) => d.facts);
+    expect(facts.length).toBeGreaterThan(0);
+    for (const entry of facts) {
+      const source = w.factRows.find((f) => f.id === entry.sourceFactId);
+      expect(source?.dimension).toBe(entry.dimension);
+      expect(source?.provenance).toBe(entry.provenance);
+      expect(source?.supersededAt).toBeNull();
+    }
+    const heard = facts.find((f) => f.dimension === "company.customers");
+    const personTurn = w.turnRows.find(
+      (t) => t.role === "PERSON" && t.clientTurnId === "turn-000001",
+    );
+    expect(heard?.sourceTurnSeq).toBe(personTurn?.seq);
+    // A form answer was never said in a turn.
+    expect(
+      facts.find((f) => f.dimension === "company.country")?.sourceTurnSeq,
+    ).toBeNull();
+  });
+});
+
+describe("review: interview turn latency", () => {
+  it("records the server time to Q's reply on the Q turn only", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.conversation.turn({
+      token,
+      message: "Hello.",
+      clientTurnId: "turn-000001",
+      correlationId: "c1",
+    });
+    const transcript = await w.conversation.transcript(token);
+    expect(transcript.map((t) => [t.role, t.latencyMs])).toEqual([
+      ["PERSON", null],
+      ["Q", 75],
+    ]);
+    expect(
+      w.logs.some((line) => JSON.stringify(line).includes('"latencyMs":75')),
+    ).toBe(true);
   });
 });

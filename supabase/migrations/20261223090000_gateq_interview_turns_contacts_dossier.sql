@@ -35,12 +35,15 @@ create table gateq.application_turns (
   -- against closed vocabularies before they are written.
   asking_dimension  text check (asking_dimension is null or asking_dimension ~ '^[a-z][a-z0-9_.]{0,63}$'),
   intent            text check (intent is null or intent ~ '^[A-Z][A-Z_]{0,39}$'),
+  -- Q turns only: server time from receiving the person's turn to having
+  -- Q's reply, so live acceptance can report interview turn times.
+  latency_ms        integer check (latency_ms is null or latency_ms between 0 and 600000),
   created_at        timestamptz not null default clock_timestamp(),
 
   unique (application_id, seq),
   -- One row per role per exchange: a retried turn writes nothing new.
   unique (application_id, client_turn_id, role),
-  check (role = 'Q' or (asking_dimension is null and intent is null))
+  check (role = 'Q' or (asking_dimension is null and intent is null and latency_ms is null))
 );
 
 comment on table gateq.application_turns is
@@ -49,7 +52,9 @@ comment on table gateq.application_turns is
 create index application_turns_by_application_idx
   on gateq.application_turns (application_id, seq desc);
 
--- The turn's tenant is its application's tenant, always.
+-- The turn's tenant is its application's tenant, always; and nothing is
+-- said into an application after it was submitted. The service checks the
+-- same under a row lock on the application; this is the floor beneath it.
 create or replace function gateq.application_turn_tenant_matches()
 returns trigger
 language plpgsql
@@ -63,6 +68,13 @@ begin
   ) then
     raise exception 'a turn belongs to its application''s tenant'
       using errcode = 'check_violation';
+  end if;
+  if exists (
+    select 1 from gateq.applications a
+     where a.id = new.application_id and a.status = 'SUBMITTED'
+  ) then
+    raise exception 'a submitted application''s interview is closed'
+      using errcode = 'restrict_violation';
   end if;
   return new;
 end;
@@ -149,6 +161,16 @@ revoke all on function gateq.application_contact_tenant_matches() from public;
 create trigger application_contacts_tenant
   before insert or update of tenant_id, application_id on gateq.application_contacts
   for each row execute function gateq.application_contact_tenant_matches();
+
+-- ---------------------------------------------------------------------------
+-- Evidence lineage: which turn a fact was heard in.
+-- ---------------------------------------------------------------------------
+
+alter table gateq.application_facts
+  add column source_turn_seq integer check (source_turn_seq is null or source_turn_seq >= 1);
+
+comment on column gateq.application_facts.source_turn_seq is
+  'The application_turns.seq of the PERSON turn this fact was read from. Null for the form, a document or anything recorded before transcripts existed.';
 
 -- ---------------------------------------------------------------------------
 -- The submission's dossier and snapshot version, set at INSERT only.

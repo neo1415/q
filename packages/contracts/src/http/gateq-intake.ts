@@ -382,6 +382,11 @@ export const ApplicationTranscriptTurnDtoSchema = z
     role: z.enum(["PERSON", "Q"]),
     text: z.string().max(4000),
     at: z.string(),
+    /**
+     * Q turns: server milliseconds from receiving the person's turn to
+     * having Q's reply. Null for person turns and the opening line.
+     */
+    latencyMs: z.number().int().min(0).nullable().optional(),
   })
   .strict();
 export type ApplicationTranscriptTurnDto = z.infer<
@@ -574,6 +579,13 @@ export const GateqDossierV1Schema = z
                     label: z.string().max(80),
                     summary: z.string().max(2000),
                     provenance: GateqFactProvenanceSchema,
+                    /** Lineage: the recorded application fact this reads. */
+                    sourceFactId: z.string().uuid(),
+                    /**
+                     * Lineage: the transcript turn (seq) it was heard in;
+                     * null for the form, a document or an older fact.
+                     */
+                    sourceTurnSeq: z.number().int().min(1).nullable(),
                     truthClass: z.enum(["USER_CLAIM", "ESTIMATE", "UNKNOWN"]),
                     evidenceStatus: z.enum([
                       "NO_EVIDENCE",

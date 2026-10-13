@@ -190,6 +190,11 @@ export const ApplicationFactSchema = z
     recordedAt: z.string().datetime({ offset: true }),
     /** Null while current; set when a correction superseded it. */
     supersededAt: z.string().datetime({ offset: true }).nullable(),
+    /**
+     * GateQ slice 1 lineage: the transcript turn (seq) the fact was heard
+     * in. Absent or null for the form, a document, or an older fact.
+     */
+    sourceTurnSeq: z.number().int().min(1).nullable().optional(),
   })
   .strict();
 export type ApplicationFact = z.infer<typeof ApplicationFactSchema>;

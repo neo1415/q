@@ -8,6 +8,7 @@ import {
 } from "@capital-q/database";
 
 import {
+  IntakeRefusedError,
   ApplicationDimensionSchema,
   ApplicationFactSchema,
   ApplicationSchema,
@@ -119,6 +120,7 @@ const FactRow = z.object({
   provenance: z.string(),
   recorded_at: z.unknown(),
   superseded_at: z.unknown(),
+  source_turn_seq: z.number().int().nullable().optional(),
 });
 
 function toFact(row: unknown): ApplicationFact {
@@ -134,6 +136,7 @@ function toFact(row: unknown): ApplicationFact {
     provenance: r.provenance,
     recordedAt: iso(r.recorded_at),
     supersededAt: isoOrNull(r.superseded_at),
+    sourceTurnSeq: r.source_turn_seq ?? null,
   });
 }
 
@@ -185,6 +188,13 @@ export function createPostgresApplicationRepository(options: {
         update gateq.applications
            set declared_name = ${declaredName}, updated_at = now()
          where id = ${id}`;
+    },
+
+    lock: async (tx, id) => {
+      const rows = await tx.sql`
+        select * from gateq.applications where id = ${id} for update`;
+      const row = rows[0];
+      return row === undefined ? null : toApplication(row);
     },
   };
 }
@@ -297,10 +307,12 @@ export function createPostgresApplicationFactRepository(options: {
         // already answered as unanswered.
         const inserted = await tx.sql`
           insert into gateq.application_facts (
-            application_id, tenant_id, dimension, value, provenance, recorded_at
+            application_id, tenant_id, dimension, value, provenance, recorded_at,
+            source_turn_seq
           ) values (
             ${input.applicationId}, ${input.tenantId}, ${fact.dimension},
-            ${jsonbParam(tx.sql, fact.value)}, ${fact.provenance}, ${input.at}
+            ${jsonbParam(tx.sql, fact.value)}, ${fact.provenance}, ${input.at},
+            ${input.sourceTurnSeq ?? null}
           )
           returning *`;
         const row = inserted[0];
@@ -406,6 +418,7 @@ const TurnRow = z.object({
   client_turn_id: z.string(),
   asking_dimension: z.string().nullable(),
   intent: z.string().nullable(),
+  latency_ms: z.number().int().nullable(),
   created_at: z.unknown(),
 });
 
@@ -421,6 +434,7 @@ function toTurn(row: unknown): StoredTurn {
     clientTurnId: r.client_turn_id,
     askingDimension: asking.success ? asking.data : null,
     intent: r.intent,
+    latencyMs: r.latency_ms,
     createdAt: iso(r.created_at),
   };
 }
@@ -442,14 +456,14 @@ export function createPostgresApplicationTurnRepository(options: {
       const rows =
         limit === undefined
           ? await sql`
-              select seq, role, text, client_turn_id, asking_dimension, intent, created_at
+              select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at
                 from gateq.application_turns
                where application_id = ${applicationId}
                order by seq asc
                limit 400`
           : await sql`
               select * from (
-                select seq, role, text, client_turn_id, asking_dimension, intent, created_at
+                select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at
                   from gateq.application_turns
                  where application_id = ${applicationId}
                  order by seq desc
@@ -460,7 +474,7 @@ export function createPostgresApplicationTurnRepository(options: {
 
     findExchange: async (applicationId, clientTurnId) => {
       const rows = await sql`
-        select seq, role, text, client_turn_id, asking_dimension, intent, created_at
+        select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at
           from gateq.application_turns
          where application_id = ${applicationId}
            and client_turn_id = ${clientTurnId}`;
@@ -471,26 +485,40 @@ export function createPostgresApplicationTurnRepository(options: {
       };
     },
 
-    append: async (input) => {
-      await transactions.run(async (tx) => {
-        await tx.sql`
-          select id from gateq.applications
+    append: async (input) =>
+      transactions.run(async (tx) => {
+        // The same lock the submission takes: a turn either lands before
+        // the submission reads the transcript or is refused after it.
+        const locked = await tx.sql`
+          select status from gateq.applications
            where id = ${input.applicationId}
            for update`;
+        const status = (locked[0] as { status?: string } | undefined)?.status;
+        if (status === undefined) throw new IntakeRefusedError("NOT_FOUND");
+        if (status === "SUBMITTED") {
+          throw new IntakeRefusedError("ALREADY_SUBMITTED");
+        }
         await tx.sql`
           insert into gateq.application_turns (
             application_id, tenant_id, seq, role, text, client_turn_id,
-            asking_dimension, intent
+            asking_dimension, intent, latency_ms
           )
           select ${input.applicationId}, ${input.tenantId},
                  coalesce(max(seq), 0) + 1, ${input.role}, ${input.text},
                  ${input.clientTurnId}, ${input.askingDimension ?? null},
-                 ${input.intent ?? null}
+                 ${input.intent ?? null}, ${input.latencyMs ?? null}
             from gateq.application_turns
            where application_id = ${input.applicationId}
           on conflict (application_id, client_turn_id, role) do nothing`;
-      });
-    },
+        const rows = await tx.sql`
+          select seq from gateq.application_turns
+           where application_id = ${input.applicationId}
+             and client_turn_id = ${input.clientTurnId}
+             and role = ${input.role}`;
+        const seq = (rows[0] as { seq?: number } | undefined)?.seq;
+        if (seq === undefined) throw new Error("turn append returned nothing");
+        return { seq };
+      }),
 
     countFor: async (applicationId) => {
       const rows = await sql`
@@ -551,8 +579,8 @@ export function createPostgresApplicationContactRepository(options: {
       return row === undefined ? null : toContact(row);
     },
 
-    save: async (input) => {
-      const rows = await sql`
+    save: async (tx, input) => {
+      const rows = await tx.sql`
         insert into gateq.application_contacts (
           application_id, tenant_id, name, email, role, company_name, phone,
           preferred_channel, code_hash, code_expires_at, code_attempts,
@@ -582,15 +610,15 @@ export function createPostgresApplicationContactRepository(options: {
       return toContact(row);
     },
 
-    recordFailedAttempt: async (applicationId) => {
-      await sql`
+    recordFailedAttempt: async (tx, applicationId) => {
+      await tx.sql`
         update gateq.application_contacts
            set code_attempts = code_attempts + 1, updated_at = now()
          where application_id = ${applicationId} and code_attempts < 10`;
     },
 
-    confirm: async (input) => {
-      const rows = await sql`
+    confirm: async (tx, input) => {
+      const rows = await tx.sql`
         update gateq.application_contacts
            set email_confirmed_at = ${input.at},
                confirmed_via = ${input.via},

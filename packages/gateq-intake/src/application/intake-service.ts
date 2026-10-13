@@ -136,10 +136,28 @@ const hashContactCode = (applicationId: string, code: string): string =>
     .update(`gateq-contact-code:${applicationId}:${code}`, "utf8")
     .digest("hex");
 
-const sameHash = (a: string, b: string): boolean => {
-  const left = Buffer.from(a, "hex");
-  const right = Buffer.from(b, "hex");
+/**
+ * Does this code verify against the stored hash? Constant-time over the
+ * digests, so the comparison leaks nothing about how close a guess was.
+ */
+export function contactCodeMatches(
+  applicationId: string,
+  code: string,
+  storedHash: string,
+): boolean {
+  const left = Buffer.from(hashContactCode(applicationId, code), "hex");
+  const right = Buffer.from(storedHash, "hex");
   return left.length === right.length && timingSafeEqual(left, right);
+}
+
+/** The same current facts, by identity: nothing was recorded in between. */
+const sameFacts = (
+  a: readonly { readonly id: string }[],
+  b: readonly { readonly id: string }[],
+): boolean => {
+  if (a.length !== b.length) return false;
+  const ids = new Set(a.map((fact) => fact.id));
+  return b.every((fact) => ids.has(fact.id));
 };
 
 /** What a guest may see of their own contact. Never the code or its hash. */
@@ -164,6 +182,7 @@ export function transcriptDto(
     role: turn.role,
     text: turn.text,
     at: turn.createdAt,
+    latencyMs: turn.latencyMs,
   }));
 }
 
@@ -196,6 +215,8 @@ export type IntakeService = {
   readonly recordFacts: (input: {
     readonly token: string;
     readonly facts: readonly NewApplicationFact[];
+    /** Lineage: the transcript turn these were heard in, if any. */
+    readonly sourceTurnSeq?: number | undefined;
   }) => Promise<ApplicationView>;
   readonly attachDocument: (input: {
     readonly token: string;
@@ -380,6 +401,19 @@ export function createIntakeService(
     return { contact: null, required, confirmed: false };
   };
 
+  /** Take the application's lock; refuse if it was submitted meanwhile. */
+  const lockOpen = async (
+    tx: Parameters<ApplicationRepository["lock"]>[0],
+    id: Application["id"],
+  ): Promise<Application> => {
+    const locked = await applications.lock(tx, id);
+    if (locked === null) throw new IntakeRefusedError("NOT_FOUND");
+    if (locked.status === "SUBMITTED") {
+      throw new IntakeRefusedError("ALREADY_SUBMITTED");
+    }
+    return locked;
+  };
+
   const policyFor = async (application: Application) => {
     const policy = await policies.policyByVersionId({
       gatewayId: application.gatewayId,
@@ -470,11 +504,17 @@ export function createIntakeService(
 
       const at = clock().toISOString();
       await transactions.run(async (tx) => {
+        // Re-checked under the lock the submission takes, so a fact can
+        // never land in an application after it was submitted.
+        await lockOpen(tx, application.id);
         await facts.record(tx, {
           applicationId: application.id,
           tenantId: application.tenantId,
           facts: proposed,
           at,
+          ...(input.sourceTurnSeq === undefined
+            ? {}
+            : { sourceTurnSeq: input.sourceTurnSeq }),
         });
         const name = proposed.find((fact) => fact.dimension === "company.name");
         if (name !== undefined && name.value.kind === "TEXT") {
@@ -495,6 +535,7 @@ export function createIntakeService(
         throw new IntakeRefusedError("ALREADY_SUBMITTED");
       }
       await transactions.run(async (tx) => {
+        await lockOpen(tx, application.id);
         await documents.attach(tx, {
           applicationId: application.id,
           tenantId: application.tenantId,
@@ -518,8 +559,9 @@ export function createIntakeService(
 
       // Idempotence first: a double-click and a retried request are one
       // submission, and the second one gets the first one's answer.
-      const existing = await submissions.findForApplication(application.id);
-      if (existing !== null) {
+      const replay = async () => {
+        const existing = await submissions.findForApplication(application.id);
+        if (existing === null) return null;
         if (existing.clientRequestId !== input.clientRequestId) {
           throw new IntakeRefusedError("ALREADY_SUBMITTED");
         }
@@ -528,126 +570,162 @@ export function createIntakeService(
           qualification: await qualificationFor(application),
           deduplicated: true,
         };
-      }
+      };
+      const earlier = await replay();
+      if (earlier !== null) return earlier;
 
-      const qualification = await qualificationFor(application);
-      // Only an application the door would actually admit is submitted.
-      // A QUALIFIED gateway that has already established a required
-      // mismatch is not a form to finish (§26): the applicant is told
-      // plainly and offered a correction, not another twenty questions.
-      // A required unknown is not a refusal either — it is a question
-      // still to answer, and submitting over it would hand the
-      // organisation an application nobody could assess.
-      if (qualification.access !== "MAY_APPLY") {
-        throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
-      }
-      // Who the organisation may contact must be reachable before anything
-      // is disclosed to it (slice 1). A guest is told this one apart.
-      const standing = await contactStanding(application);
-      if (standing.required && !standing.confirmed) {
-        throw new IntakeRefusedError("CONTACT_NOT_CONFIRMED");
-      }
+      // The engine's answer is computed outside any transaction (the
+      // taxonomy lookup may reach a search index); the transaction then
+      // proves the facts it judged are still the current ones, and starts
+      // again if a write slipped in between.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const judgedFacts = await facts.currentFor(application.id);
+        const qualification = await qualificationFor(application);
+        // Only an application the door would actually admit is submitted.
+        // A QUALIFIED gateway that has already established a required
+        // mismatch is not a form to finish (§26): the applicant is told
+        // plainly and offered a correction, not another twenty questions.
+        // A required unknown is not a refusal either — it is a question
+        // still to answer, and submitting over it would hand the
+        // organisation an application nobody could assess.
+        if (qualification.access !== "MAY_APPLY") {
+          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+        }
+        const policy =
+          turns === undefined ? null : await policyFor(application);
 
-      const submittedAt = clock().toISOString();
-      const snapshot = await viewOf(application);
-      const documentIds = await documents.listFor(application.id);
+        const outcome = await transactions.run(async (tx) => {
+          // Every writer to this application takes the same row lock, so
+          // from here to commit nothing changes underneath: the snapshot,
+          // the transcript, the coverage and the dossier are one view, and
+          // a turn or fact that arrives later is refused, not lost.
+          const locked = await applications.lock(tx, application.id);
+          if (locked === null) throw new IntakeRefusedError("NOT_FOUND");
+          if (locked.status === "SUBMITTED") {
+            // A concurrent submit won the lock. Same key: its answer.
+            return { kind: "REPLAY" as const };
+          }
+          const current = await facts.currentFor(application.id);
+          if (!sameFacts(judgedFacts, current)) {
+            return { kind: "STALE" as const };
+          }
+          // Who the organisation may contact must be reachable before
+          // anything is disclosed to it (slice 1).
+          const standing = await contactStanding(locked);
+          if (standing.required && !standing.confirmed) {
+            throw new IntakeRefusedError("CONTACT_NOT_CONFIRMED");
+          }
 
-      // Snapshot v2 and the dossier, when the composition stores turns.
-      // Everything is read before the transaction and built
-      // deterministically; the transaction only writes the one row.
-      let v2:
-        { readonly snapshot: unknown; readonly dossier: unknown } | undefined;
-      if (turns !== undefined) {
-        const policy = await policyFor(application);
-        const current = await facts.currentFor(application.id);
-        const transcript = transcriptDto(await turns.listFor(application.id));
-        let budget = SNAPSHOT_TRANSCRIPT_CHARS;
-        const kept = transcript.filter((turn) => {
-          budget -= turn.text.length;
-          return budget >= 0;
-        });
-        const coverage = coverageFor({
-          policy,
-          qualification,
-          facts: current,
-        });
-        const contact =
-          standing.contact === null ? null : contactDto(standing.contact);
-        const titles =
-          documentTitles === undefined || documentIds.length === 0
-            ? new Map<string, string>()
-            : await documentTitles
-                .titles(documentIds)
-                .catch(() => new Map<string, string>());
-        v2 = {
-          snapshot: {
-            ...snapshot,
-            documentIds,
-            snapshotVersion: 2,
-            contact,
-            transcript: kept,
-            transcriptTruncated: kept.length < transcript.length,
-            coverage,
-          },
-          dossier: buildDossier({
-            reference: application.publicReference,
-            declaredName: application.declaredName,
-            submittedAt,
-            generatedAt: submittedAt,
-            facts: current,
+          const submittedAt = clock().toISOString();
+          const snapshot = await viewOf(locked);
+          const documentIds = await documents.listFor(application.id);
+
+          let v2:
+            | { readonly snapshot: unknown; readonly dossier: unknown }
+            | undefined;
+          if (turns !== undefined && policy !== null) {
+            const transcript = transcriptDto(
+              await turns.listFor(application.id),
+            );
+            let budget = SNAPSHOT_TRANSCRIPT_CHARS;
+            const kept = transcript.filter((turn) => {
+              budget -= turn.text.length;
+              return budget >= 0;
+            });
+            const coverage = coverageFor({
+              policy,
+              qualification,
+              facts: current,
+            });
+            const contact =
+              standing.contact === null ? null : contactDto(standing.contact);
+            const titles =
+              documentTitles === undefined || documentIds.length === 0
+                ? new Map<string, string>()
+                : await documentTitles
+                    .titles(documentIds)
+                    .catch(() => new Map<string, string>());
+            v2 = {
+              snapshot: {
+                ...snapshot,
+                documentIds,
+                snapshotVersion: 2,
+                contact,
+                transcript: kept,
+                transcriptTruncated: kept.length < transcript.length,
+                coverage,
+              },
+              dossier: buildDossier({
+                reference: locked.publicReference,
+                declaredName: locked.declaredName,
+                submittedAt,
+                generatedAt: submittedAt,
+                facts: current,
+                qualification,
+                coverage,
+                contact,
+                documents: documentIds.map((documentId) => ({
+                  documentId,
+                  title: (titles.get(documentId) ?? "Shared document").slice(
+                    0,
+                    200,
+                  ),
+                })),
+                turnCount: transcript.length,
+              }),
+            };
+          }
+
+          const result = await submissions.record(tx, {
+            applicationId: application.id,
+            tenantId: application.tenantId,
+            gatewayVersionId: application.gatewayVersionId,
+            // Frozen. A later edit cannot rewrite what was received,
+            // because what was received is this row and it is immutable.
+            snapshot: v2?.snapshot ?? { ...snapshot, documentIds },
             qualification,
-            coverage,
-            contact,
-            documents: documentIds.map((documentId) => ({
-              documentId,
-              title: (titles.get(documentId) ?? "Shared document").slice(
-                0,
-                200,
-              ),
-            })),
-            turnCount: transcript.length,
-          }),
+            clientRequestId: input.clientRequestId,
+            submittedAt,
+            ...(v2 === undefined
+              ? {}
+              : { dossier: v2.dossier, snapshotVersion: 2 as const }),
+          });
+          await applications.setStatus(
+            tx,
+            application.id,
+            "SUBMITTED",
+            submittedAt,
+          );
+          return {
+            kind: "SUBMITTED" as const,
+            submittedAt: result.submittedAt,
+            documents: documentIds.length,
+          };
+        });
+
+        if (outcome.kind === "STALE") continue;
+        if (outcome.kind === "REPLAY") {
+          const replayed = await replay();
+          if (replayed !== null) return replayed;
+          throw new IntakeRefusedError("ALREADY_SUBMITTED");
+        }
+        logger?.info(
+          {
+            gatewayId: application.gatewayId,
+            outcome: qualification.outcome,
+            access: qualification.access,
+            documents: outcome.documents,
+          },
+          "gateq application submitted",
+        );
+        return {
+          submittedAt: outcome.submittedAt,
+          qualification,
+          deduplicated: false,
         };
       }
-
-      const recorded = await transactions.run(async (tx) => {
-        const result = await submissions.record(tx, {
-          applicationId: application.id,
-          tenantId: application.tenantId,
-          gatewayVersionId: application.gatewayVersionId,
-          // Frozen. A later edit cannot rewrite what was received, because
-          // what was received is this row and this row is immutable.
-          snapshot: v2?.snapshot ?? { ...snapshot, documentIds },
-          qualification,
-          clientRequestId: input.clientRequestId,
-          submittedAt,
-          ...(v2 === undefined
-            ? {}
-            : { dossier: v2.dossier, snapshotVersion: 2 as const }),
-        });
-        await applications.setStatus(
-          tx,
-          application.id,
-          "SUBMITTED",
-          submittedAt,
-        );
-        return result;
-      });
-
-      logger?.info(
-        {
-          gatewayId: application.gatewayId,
-          outcome: qualification.outcome,
-          access: qualification.access,
-          documents: documentIds.length,
-        },
-        "gateq application submitted",
-      );
-      return {
-        submittedAt: recorded.submittedAt,
-        qualification,
-        deduplicated: false,
-      };
+      // Still changing under three attempts: the founder is still typing.
+      throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
     },
 
     startContact: async (input) => {
@@ -666,71 +744,85 @@ export function createIntakeService(
         preferredChannel: input.contact.preferredChannel ?? null,
       };
       const now = clock();
-      const existing = await contacts.findFor(application.id);
       const base = {
         applicationId: application.id,
         tenantId: application.tenantId,
         ...details,
       };
-
-      // A signed-in founder's own verified account address needs no code.
-      // It confirms reachability only: no membership, no organisation.
-      if (
+      const accountMatches =
         input.accountEmail !== undefined &&
-        input.accountEmail.trim().toLowerCase() === details.email
-      ) {
-        const saved = await contacts.save({
-          ...base,
-          codeHash: null,
-          codeExpiresAt: null,
-          emailConfirmedAt: now.toISOString(),
-          confirmedVia: "ACCOUNT",
-        });
-        return {
-          contact: contactDto(saved),
-          codeSent: false,
-          codeExpiresInMinutes: null,
-        };
-      }
+        input.accountEmail.trim().toLowerCase() === details.email;
 
-      // The same address, already confirmed: the details change, the
-      // confirmation stands, and nobody is sent another code.
-      if (
-        existing !== null &&
-        existing.emailConfirmedAt !== null &&
-        existing.email === details.email
-      ) {
-        const saved = await contacts.save({
-          ...base,
-          codeHash: null,
-          codeExpiresAt: null,
-          emailConfirmedAt: existing.emailConfirmedAt,
-          confirmedVia: existing.confirmedVia,
-        });
-        return {
-          contact: contactDto(saved),
-          codeSent: false,
-          codeExpiresInMinutes: null,
-        };
-      }
+      const written = await transactions.run(async (tx) => {
+        await lockOpen(tx, application.id);
+        const existing = await contacts.findFor(application.id);
 
-      const code = newContactCode();
-      const saved = await contacts.save({
-        ...base,
-        codeHash: hashContactCode(application.id, code),
-        codeExpiresAt: new Date(
-          now.getTime() + CONTACT_CODE_TTL_MINUTES * 60_000,
-        ).toISOString(),
-        emailConfirmedAt: null,
-        confirmedVia: null,
+        // A signed-in founder's own verified account address needs no
+        // code. It confirms reachability only: no membership, no
+        // organisation.
+        if (accountMatches) {
+          return {
+            saved: await contacts.save(tx, {
+              ...base,
+              codeHash: null,
+              codeExpiresAt: null,
+              emailConfirmedAt: now.toISOString(),
+              confirmedVia: "ACCOUNT",
+            }),
+            code: null,
+          };
+        }
+        // The same address, already confirmed: the details change, the
+        // confirmation stands, and nobody is sent another code.
+        if (
+          existing !== null &&
+          existing.emailConfirmedAt !== null &&
+          existing.email === details.email
+        ) {
+          return {
+            saved: await contacts.save(tx, {
+              ...base,
+              codeHash: null,
+              codeExpiresAt: null,
+              emailConfirmedAt: existing.emailConfirmedAt,
+              confirmedVia: existing.confirmedVia,
+            }),
+            code: null,
+          };
+        }
+        // A new code replaces any earlier one (a resend): the old code
+        // stops working and the attempt count starts again.
+        const code = newContactCode();
+        return {
+          saved: await contacts.save(tx, {
+            ...base,
+            codeHash: hashContactCode(application.id, code),
+            codeExpiresAt: new Date(
+              now.getTime() + CONTACT_CODE_TTL_MINUTES * 60_000,
+            ).toISOString(),
+            emailConfirmedAt: null,
+            confirmedVia: null,
+          }),
+          code,
+        };
       });
+
+      if (written.code === null) {
+        return {
+          contact: contactDto(written.saved),
+          codeSent: false,
+          codeExpiresInMinutes: null,
+        };
+      }
+      // Sent after the commit, never inside the transaction. The code goes
+      // to the mailer and nowhere else: not a log line, not a response.
       const codeSent =
         contactCodeMailer === undefined
           ? false
           : await contactCodeMailer({
               to: details.email,
               companyName: details.companyName,
-              code,
+              code: written.code,
               expiresInMinutes: CONTACT_CODE_TTL_MINUTES,
             }).catch(() => false);
       logger?.info(
@@ -738,7 +830,7 @@ export function createIntakeService(
         "gateq applicant contact code issued",
       );
       return {
-        contact: contactDto(saved),
+        contact: contactDto(written.saved),
         codeSent,
         codeExpiresInMinutes: CONTACT_CODE_TTL_MINUTES,
       };
@@ -747,36 +839,44 @@ export function createIntakeService(
     confirmContact: async (input) => {
       const { application } = await authorise(input.token);
       if (contacts === undefined) return { status: "NOT_FOUND", contact: null };
-      const contact = await contacts.findFor(application.id);
-      if (contact === null) return { status: "NOT_FOUND", contact: null };
-      // Confirming twice is confirmed: a retried request is harmless.
-      if (contact.emailConfirmedAt !== null) {
-        return { status: "CONFIRMED", contact: contactDto(contact) };
-      }
-      if (contact.codeHash === null || contact.codeExpiresAt === null) {
-        return { status: "NOT_FOUND", contact: null };
-      }
-      if (
-        Date.parse(contact.codeExpiresAt) <= clock().getTime() ||
-        contact.codeAttempts >= CONTACT_CODE_MAX_ATTEMPTS
-      ) {
-        return { status: "EXPIRED", contact: contactDto(contact) };
-      }
-      if (
-        !/^[0-9]{6}$/.test(input.code) ||
-        !sameHash(contact.codeHash, hashContactCode(application.id, input.code))
-      ) {
-        await contacts.recordFailedAttempt(application.id);
-        return { status: "WRONG_CODE", contact: contactDto(contact) };
-      }
-      const confirmed = await contacts.confirm({
-        applicationId: application.id,
-        at: clock().toISOString(),
-        via: "EMAIL_CODE",
-      });
-      return confirmed === null
-        ? { status: "NOT_FOUND", contact: null }
-        : { status: "CONFIRMED", contact: contactDto(confirmed) };
+      // Under the application's lock, so two guesses racing each other
+      // are counted one after the other and cannot both slip under the
+      // attempt limit.
+      return transactions.run(
+        async (tx): Promise<ApplicationContactConfirmResponse> => {
+          await applications.lock(tx, application.id);
+          const contact = await contacts.findFor(application.id);
+          if (contact === null) return { status: "NOT_FOUND", contact: null };
+          // Confirming twice is confirmed: a retried request is harmless.
+          if (contact.emailConfirmedAt !== null) {
+            return { status: "CONFIRMED", contact: contactDto(contact) };
+          }
+          if (contact.codeHash === null || contact.codeExpiresAt === null) {
+            return { status: "NOT_FOUND", contact: null };
+          }
+          if (
+            Date.parse(contact.codeExpiresAt) <= clock().getTime() ||
+            contact.codeAttempts >= CONTACT_CODE_MAX_ATTEMPTS
+          ) {
+            return { status: "EXPIRED", contact: contactDto(contact) };
+          }
+          if (
+            !/^[0-9]{6}$/.test(input.code) ||
+            !contactCodeMatches(application.id, input.code, contact.codeHash)
+          ) {
+            await contacts.recordFailedAttempt(tx, application.id);
+            return { status: "WRONG_CODE", contact: contactDto(contact) };
+          }
+          const confirmed = await contacts.confirm(tx, {
+            applicationId: application.id,
+            at: clock().toISOString(),
+            via: "EMAIL_CODE",
+          });
+          return confirmed === null
+            ? { status: "NOT_FOUND", contact: null }
+            : { status: "CONFIRMED", contact: contactDto(confirmed) };
+        },
+      );
     },
 
     coverage: async (token) => {
