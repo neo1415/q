@@ -466,6 +466,23 @@ describe("measuring active speech", () => {
 });
 
 describe("the trial line (broker)", () => {
+  it("releases accounted use after a real server closed event without reattaching a dead session", async () => {
+    const store = memoryStore();
+    const line = instance(store, { closeConfirmed: false });
+    await openLine(line);
+    speak(line, "user", 8);
+    line.emit("session.closed");
+    await settle();
+    expect(store.claims.size).toBe(0);
+    expect(await store.usedSeconds(TRIAL)).toBe(8);
+    expect(line.closed).toEqual([]);
+    const reconnect = await openLine(line);
+    expect(
+      reconnect.outcome.kind === "OPEN" &&
+        reconnect.outcome.result.trial?.remainingSeconds,
+    ).toBe(292);
+  });
+
   it("does not return OPEN after observer loss during context loading", async () => {
     let finishContext: (context: null) => void = () => undefined;
     const contextRead = new Promise<null>((resolve) => {

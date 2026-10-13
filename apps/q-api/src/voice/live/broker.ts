@@ -221,6 +221,8 @@ type LiveLine = {
 type TrialLine = {
   readonly claimId: string;
   closing: Promise<boolean> | null;
+  /** Only a server sideband session.closed event establishes this. */
+  providerTerminated: boolean;
   readonly allowanceSeconds: number;
   /** The person's seconds on every other session, as last read. */
   othersSeconds: number;
@@ -690,6 +692,12 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           const signal = speechSignalOf(event);
           if (signal === null) return;
           trial.meter.signal(signal, now());
+          if (signal.kind === "closed") {
+            trial.providerTerminated = true;
+            if (lines.get(line.voiceSessionId) === line)
+              forget(line, "provider_closed");
+            return;
+          }
           checkTrial(line);
         },
         onLost: lose,
@@ -752,8 +760,10 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     // line never keeps billing because its browser did not close it.
     if (!line.finalReported || line.trial !== undefined) {
       const closing = (
-        provider?.closeSession?.(line.providerSessionId) ??
-        Promise.resolve(false)
+        line.trial?.providerTerminated === true
+          ? Promise.resolve(true)
+          : (provider?.closeSession?.(line.providerSessionId) ??
+            Promise.resolve(false))
       )
         .then(async (confirmed) => {
           logger.info(
@@ -1210,6 +1220,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
               trial: {
                 claimId: trialClaim.claimId,
                 closing: null,
+                providerTerminated: false,
                 allowanceSeconds: allowance,
                 othersSeconds: trialUsed,
                 meter: createSpeechMeter({ authoritativeOpen: true }),
