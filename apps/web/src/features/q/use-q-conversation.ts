@@ -25,6 +25,7 @@ import type { PendingTurn } from "./conversation";
 import { navigationHeard } from "./control/fast-navigation";
 import { askQ } from "./ask-route";
 import { noteLiveRun, noteTypedRun } from "./follow-navigation";
+import { loadWire } from "./wire";
 import { currentScreen, currentViewing } from "./screen";
 import {
   forgetPendingAsk,
@@ -219,6 +220,13 @@ export function useQConversation(
     const controller = new AbortController();
     abort.current = controller;
     setStreaming(true);
+    // The answer's cards arrive with its completed message and stay hidden
+    // until their code and contracts are in. Those load as the run starts,
+    // so a card shows the moment it lands, rather than after the stage's
+    // idle prefetch (800 ms + idle, up to 5 s).
+    void loadWire().catch(() => undefined);
+    void import("./answer-canvas").catch(() => undefined);
+    void import("./stage-canvas").catch(() => undefined);
     // W7: the stream (and the contracts it checks events against) loads
     // with the first run followed, not with the page.
     void import("./q-stream-transport")
