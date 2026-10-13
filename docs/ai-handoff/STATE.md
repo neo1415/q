@@ -1,5 +1,12 @@
 # Capital Q — Current shared engineering state
 
+## 2026-10-13 11:18 UTC — human Tavus pilot completed; bounded finish authorized
+
+- Production remains f4c2e603, all four services previously verified SUCCESS/drained; production push CI38384891335 SUCCESS. One human paid Tavus room allocated at10:58:35.640Z, original deadline11:01:35.640Z. Seven Q exchanges/15 canonical turns, TIME_LIMIT, provider confirmed ended, canonical FINISHED and nonprovisional review persisted. End confirmation timestamp11:01:39.328Z is3688ms after deadline; exact physical cutoff instant is not separately proven. No engineer finish POST or second paid room.
+- Ordinary resume reads retained identical room/private URL/original deadline. Authenticated saved-review browser PASS/private receipt /tmp/cq-investor-demo-I0Ti3y, correct counterpart/nonprovisional review. Checker originally used heading “review”; actual product heading is “Your rehearsal with”; fixed checker and reran, no product change. Human interruption/reconnect still not explicitly confirmed. User reports vendor UI displacement, narrow emotions, perceived3–5second reply delay, no spoken closing; do not claim those acceptance gates passed.
+- Paid pilot window closed after provider end/review: only CQ_TAVUS_TEST_MODE restoredtrue. Same gated code configuration deployment9b1324c8-ac86-49ca-88fe-c568c042646a SUCCESS, exactly one active instance and prior paid configuration drained at11:15Z. Live voice settings untouched.
+- New standing authorization: all legitimate accounts, one-time two allocations/six minutes total per account, max180sec each including reconnect. No automatic allowance reset. See session-directives/2026-10-13-close-tavus-product-completion.md. Implement durable account/global concurrency limits before broader paid access; no new paid allocation during source work. Finish only bounded UI/coverage/automatic stock avatar/closing/measurement slice, then immediately prioritize Q speed, intelligence, real founder/investor journeys, GateQ and locked InvestIQ.
+
 ## 2026-10-13 10:57 UTC — rehearsal repair deployed and explicit Video lobby browser verified
 
 - Final production PR53 sourcef031c152 exactCI38382841674 required quality/pgTAP and GitGuardian SUCCESS, normal mergef4c2e6035cff54cbd286664fa1adae02853e6f41. Source/merge trees identicalc8e2bef33b15910de6d2d39b5ecb86545e1e5dbd. Role integration PR54 a76275d8 CI38382772779 SUCCESS/merged50b833930a6a76aaaf1569fcc7efe12bdac269f7; core PR52 also green/merged. Root fast-forwarded to integration before this factual checkpoint.
