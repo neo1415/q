@@ -550,7 +550,17 @@ export function createRehearsalVideoService(dependencies: {
     if (row.conversationId !== null) {
       // Keep the row open if provider termination is unconfirmed. The
       // fixed cap and sweep retry; do not report a successful end.
-      await client.endConversation(row.conversationId);
+      try {
+        await client.endConversation(row.conversationId);
+      } catch (error: unknown) {
+        // A prior end may have reached the provider while its response or
+        // the local DB write failed. Only an authoritative ended read makes
+        // that retry successful; unknown/active still fail closed.
+        const confirmed = await client
+          .getConversation(row.conversationId)
+          .catch(() => null);
+        if (confirmed?.status !== "ended") throw error;
+      }
     }
     if (row.palId !== null) {
       await client.deletePal(row.palId).catch(() => undefined);

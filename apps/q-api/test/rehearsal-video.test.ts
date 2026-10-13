@@ -751,6 +751,27 @@ describe("ending", () => {
     expect(harness.rehearsals.finished).toEqual([REHEARSAL_ID]);
   });
 
+  it("recovers an unacknowledged prior provider end only after an authoritative ended read", async () => {
+    const harness = setup();
+    await startVideo(harness);
+    const client = harness.tavus.pool.clientAt(0);
+    if (client === null) throw new Error("missing fake client");
+    vi.spyOn(client, "endConversation").mockRejectedValue(
+      new TavusError("end conversation", 409),
+    );
+    vi.spyOn(client, "getConversation").mockResolvedValue({
+      conversationId: "conv0",
+      conversationUrl: null,
+      status: "ended",
+    });
+    const recovered = await harness.service.end(FOUNDER, REHEARSAL_ID, {
+      continueByVoice: false,
+    });
+    expect(recovered.kind).toBe("OK");
+    expect([...harness.store.rows.values()][0]?.status).toBe("ENDED");
+    expect(harness.rehearsals.finished).toEqual([REHEARSAL_ID]);
+  });
+
   it("recovers a saved video end whose canonical review failed, after restart", async () => {
     const harness = setup();
     await startVideo(harness);

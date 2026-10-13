@@ -11,7 +11,7 @@ import {
   tavusKeysFrom,
 } from "../src/composition/tavus/key-pool.js";
 
-/** Owner directive 2026-10-12: every configured key is used, by index. */
+/** October 13: one entitled account; refusals must never rotate accounts. */
 
 const KEY = (n: number) => `tavus_test_key_${String(n).padStart(20, "0")}`;
 
@@ -29,7 +29,7 @@ function fakeClients(count: number) {
 }
 
 describe("Tavus keys from configuration", () => {
-  it("reads a comma or whitespace separated list, in order, de-duplicated", () => {
+  it("rejects a list resolving to more than one provider account", () => {
     expect(
       tavusKeysFrom({
         CQ_TAVUS_API_KEYS: `${KEY(1)}, ${KEY(2)}\n${KEY(3)} ${KEY(1)}`,

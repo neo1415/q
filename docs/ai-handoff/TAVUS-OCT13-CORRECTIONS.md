@@ -3,8 +3,8 @@
 This continues the existing video rehearsal slice; Q's canonical rehearsal
 service remains the interviewer intelligence, transcript and review owner.
 
-Local targeted verification: 60 tests across four files passed (25 session/route,
-19 account/refusal, 12 adapter, four UI). No provider calls. Full build/types and
+Local targeted verification: 61 tests across four files passed (26 session/route,
+19 account/refusal, 12 adapter, four UI). No provider calls. Package build passed 52/52; capability-parity passed 11 tests. Full types and
 release CI/migrations/deployment remain separate gates.
 
 Implemented focused safeguards:
@@ -25,7 +25,8 @@ Implemented focused safeguards:
 - Reads and repeated starts recover the same room after a restart. They never
   allocate another room or extend the fixed 180-second creation deadline.
 - Unconfirmed provider end does not close the canonical session or finish its
-  review. The sweep retries at the existing deadline. ENDED non-voice rows
+  review. A failed end can recover only through an authoritative provider
+  read explicitly reporting ended. The sweep retries at the existing deadline. ENDED non-voice rows
   whose canonical rehearsal remains ACTIVE are also selected for review retry.
 - A closing-soon notice is shown during the last 30 seconds. This is a UI
   notice, not proof of a spoken closing cue.

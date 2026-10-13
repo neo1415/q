@@ -5915,7 +5915,7 @@ const voiceTurn = timedVoiceTurns(
 );
 // ADR 0066: the rehearsal met by video. Tavus is the face and voice; every
 // line is the rehearsal service's, reached through the bridge. Keys come
-// only from server configuration (CQ_TAVUS_API_KEYS; never logged, the
+// only from server configuration (one TAVUS_API_KEY; never logged, the
 // session records the key's index). Without keys or a public origin the
 // interviewer list says video is unavailable and a start answers "carry on
 // by voice".
@@ -5945,7 +5945,7 @@ const rehearsalVideo = createRehearsalVideoService({
           onKeyFailure: ({ keyIndex, kind, status }) => {
             logger.warn(
               { keyIndex, kind, status },
-              "rehearsal video: Tavus key passed over",
+              "rehearsal video: Tavus account refused",
             );
           },
         }),
