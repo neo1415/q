@@ -6,6 +6,12 @@ import { z } from "zod";
 import {
   ApiProblemError,
   applicationTurn,
+  saveApplicationContact,
+  confirmAccountApplicationContact,
+  confirmApplicationContact,
+  getApplicationTranscript,
+  getApplicationCoverage,
+  resumeApplication,
   saveApplicationAnswers,
   startApplication,
   submitApplication,
@@ -13,8 +19,11 @@ import {
 import type { ApplicationSummaryDto } from "@capital-q/contracts";
 import {
   ApplicationAnswersRequestSchema,
+  ApplicationContactRequestSchema,
+  ApplicationContactConfirmRequestSchema,
   GATEQ_TURN_MAX_CHARS,
 } from "@capital-q/contracts";
+import { apiSession } from "@/features/q/context";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 /**
@@ -188,7 +197,9 @@ export type FormResult =
       readonly rateLimited?: boolean;
     };
 
-function formFailure(error: unknown): FormResult {
+function formFailure(
+  error: unknown,
+): Extract<FormResult, { readonly ok: false }> {
   const failed = failure(error);
   return failed.ok
     ? { ok: false, message: "Please try again." }
@@ -235,6 +246,68 @@ export async function saveAnswersAction(
       sessionToken: token.data,
       application: saved.application,
     };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+
+export async function contactAction(sessionToken: string, input: unknown) {
+  const token = Token.safeParse(sessionToken);
+  const parsed = ApplicationContactRequestSchema.safeParse(input);
+  const url = base();
+  if (!token.success || !parsed.success || url === null)
+    return {
+      ok: false as const,
+      message: "Please check your contact details.",
+    };
+  try {
+    const account = await apiSession();
+    return {
+      ok: true as const,
+      ...(account === null
+        ? await saveApplicationContact(url, token.data, parsed.data)
+        : await confirmAccountApplicationContact(account, {
+            ...parsed.data,
+            sessionToken: token.data,
+          })),
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function confirmContactAction(sessionToken: string, code: string) {
+  const token = Token.safeParse(sessionToken);
+  const parsed = ApplicationContactConfirmRequestSchema.safeParse({ code });
+  const url = base();
+  if (!token.success || !parsed.success || url === null)
+    return {
+      ok: false as const,
+      message: "Enter the six-digit code from your email.",
+    };
+  try {
+    return {
+      ok: true as const,
+      ...(await confirmApplicationContact(url, token.data, parsed.data.code)),
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function interviewProgressAction(sessionToken: string) {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return {
+      ok: false as const,
+      message: "Couldn't restore your application.",
+    };
+  try {
+    const [application, transcript, coverage] = await Promise.all([
+      resumeApplication(url, token.data),
+      getApplicationTranscript(url, token.data),
+      getApplicationCoverage(url, token.data),
+    ]);
+    return { ok: true as const, application, transcript, coverage };
   } catch (error: unknown) {
     return formFailure(error);
   }

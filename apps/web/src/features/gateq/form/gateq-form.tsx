@@ -30,8 +30,10 @@ import {
 import {
   saveAnswersAction,
   startFormAction,
-  submitApplicationAction,
+  interviewProgressAction,
 } from "../apply-actions";
+import { ApplyExperience } from "../apply-experience";
+import { readRecovery, saveRecovery } from "./session-recovery";
 import { FitGlyph, type GlyphKind } from "../fit-glyph";
 import "../gateq.css";
 import { shareMaterialsAction } from "../materials-actions";
@@ -74,11 +76,10 @@ import {
  * A founder checks their fit with an investor in four short steps, with
  * tappable answers and "I'd rather not say" everywhere. The investor's rules
  * are on screen first; after each step the API's deterministic engine
- * answers rule by rule. Sending is a separate press at the end: until the
- * founder presses "Send to <fund>", the investor receives nothing (the API's
- * submission is the disclosure boundary). In the embed the credential lives
- * only in this component's memory: a third-party frame has no cookie to
- * lean on.
+ * answers rule by rule. Confirmed contact and the existing Q interview follow.
+ * The founder reviews and explicitly submits; submission is the disclosure
+ * boundary. A tab-scoped bearer credential supports recovery without relying
+ * on third-party cookies.
  */
 
 const icon = {
@@ -123,8 +124,18 @@ export type GateQFormProps = {
   readonly preview?: GateQFormPreview;
 };
 
-function key(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID()}`;
+async function formRequest<T>(
+  operation: () => Promise<T>,
+): Promise<T | { readonly ok: false; readonly message: string }> {
+  try {
+    return await operation();
+  } catch {
+    return {
+      ok: false,
+      message:
+        "The connection was interrupted. Your saved answers are still here; please try again.",
+    };
+  }
 }
 
 export function GateQForm({
@@ -158,9 +169,50 @@ export function GateQForm({
   );
   const [pending, startTransition] = useTransition();
   const token = useRef<string | null>(null);
-  const submitKey = useRef<string>("");
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [interview, setInterview] = useState(false);
+  const [recovering, setRecovering] = useState(preview === undefined);
   const heading = useRef<HTMLHeadingElement | null>(null);
   const firstRender = useRef(true);
+
+  useEffect(() => {
+    if (preview !== undefined) return;
+    startTransition(async () => {
+      // Storage is browser-only; restore after hydration before showing inputs.
+      await Promise.resolve();
+      const restored = readRecovery(gateway.publicId);
+      if (restored === null) {
+        setRecovering(false);
+        return;
+      }
+      token.current = restored.token;
+      setSessionToken(restored.token);
+      setAnswers(restored.answers);
+      setStep(restored.step);
+      setInterview(restored.interview);
+      const progress = await formRequest(() =>
+        interviewProgressAction(restored.token),
+      );
+      if (progress.ok) {
+        setApplication(progress.application);
+        if (progress.application.submittedAt !== null) setStep("sent");
+      } else setProblem(progress.message);
+      setRecovering(false);
+    });
+  }, [gateway.publicId, preview]);
+
+  useEffect(() => {
+    if (preview !== undefined || recovering || token.current === null) return;
+    const old = readRecovery(gateway.publicId);
+    saveRecovery(gateway.publicId, {
+      token: token.current,
+      answers,
+      step,
+      interview,
+      pendingTurn: old?.pendingTurn ?? null,
+      submitKey: old?.submitKey ?? "",
+    });
+  }, [answers, step, interview, recovering, gateway.publicId, preview]);
 
   const lines = ruleLines(gateway, application);
   const verdict = verdictFor(application);
@@ -183,12 +235,22 @@ export function GateQForm({
 
   const ensureToken = async (): Promise<string | null> => {
     if (token.current !== null) return token.current;
-    const started = await startFormAction(gateway.publicId);
+    const started = await formRequest(() => startFormAction(gateway.publicId));
     if (!started.ok) {
       setProblem(started.message);
       return null;
     }
     token.current = started.sessionToken;
+    setSessionToken(started.sessionToken);
+    setApplication(started.application);
+    saveRecovery(gateway.publicId, {
+      token: started.sessionToken,
+      answers,
+      step,
+      interview: false,
+      pendingTurn: null,
+      submitKey: "",
+    });
     return started.sessionToken;
   };
 
@@ -210,9 +272,8 @@ export function GateQForm({
     startTransition(async () => {
       const credential = await ensureToken();
       if (credential === null) return;
-      const saved = await saveAnswersAction(
-        credential,
-        requestFor(step, answers),
+      const saved = await formRequest(() =>
+        saveAnswersAction(credential, requestFor(step, answers)),
       );
       if (!saved.ok) {
         setProblem(saved.message);
@@ -230,30 +291,8 @@ export function GateQForm({
   const onSend = () => {
     if (preview !== undefined || !maySend(verdict)) return;
     setProblem(null);
-    if (submitKey.current === "") submitKey.current = key("send");
-    startTransition(async () => {
-      const credential = token.current;
-      if (credential === null) return;
-      if (!anonymous) {
-        // Only what the founder ticked (maybe nothing); the API checks each
-        // is theirs and links the application to them for their GateQ page.
-        const shared = await shareMaterialsAction(
-          credential,
-          answers.materials,
-        );
-        if (!shared.ok) {
-          setProblem(shared.message);
-          return;
-        }
-      }
-      const sent = await submitApplicationAction(credential, submitKey.current);
-      if (!sent.ok) {
-        setProblem(sent.message);
-        return;
-      }
-      setApplication(sent.application);
-      setStep("sent");
-    });
+    if (token.current === null) return;
+    setInterview(true);
   };
 
   const onBack = () => {
@@ -269,7 +308,7 @@ export function GateQForm({
     step === "check" || step === "sent" || application !== null;
   const shell = `gq-form${compact ? " gq-compact" : ""}${inApp ? " gq-in-app" : ""}`;
 
-  if (preview?.loading === true) {
+  if (preview?.loading === true || recovering) {
     return (
       <div className={shell} aria-busy="true">
         <div
@@ -292,6 +331,39 @@ export function GateQForm({
           />
         </div>
       </div>
+    );
+  }
+
+  if (
+    interview &&
+    gateway.acceptingApplications &&
+    !needsCompany &&
+    verdict !== "NOT_A_FIT" &&
+    sessionToken !== null &&
+    application !== null &&
+    step !== "sent"
+  ) {
+    return (
+      <ApplyExperience
+        gateway={gateway}
+        compact={compact}
+        initialSession={{
+          token: sessionToken,
+          application,
+          contactName: answers.contactName,
+          contactEmail: answers.contactEmail,
+          companyName: answers.companyName,
+          materialNames: materials
+            .filter((material) => answers.materials.includes(material.id))
+            .map((material) => material.name),
+        }}
+        onCorrectAnswers={() => setInterview(false)}
+        prepareSubmission={() =>
+          anonymous
+            ? Promise.resolve({ ok: true })
+            : shareMaterialsAction(token.current ?? "", answers.materials)
+        }
+      />
     );
   }
 
@@ -527,7 +599,7 @@ export function GateQForm({
                 onClick={onSend}
                 disabled={pending || !maySend(verdict)}
               >
-                {pending ? "Sending…" : `Send to ${fund}`}
+                {pending ? "Preparing…" : "Continue with Q"}
               </Button>
             ) : (
               <Button
@@ -641,7 +713,7 @@ function GateCard({
             </ul>
           )}
           <p className="cq-caption gq-t3">
-            Nothing is sent until you press Send.
+            Nothing is sent until you review and press Submit.
           </p>
         </div>
       </details>

@@ -335,6 +335,12 @@ export {
 } from "./outcomes.js";
 export {
   applicationTurn,
+  saveApplicationContact,
+  confirmAccountApplicationContact,
+  confirmApplicationContact,
+  getApplicationTranscript,
+  getApplicationCoverage,
+  resumeApplication,
   createGateway,
   draftGatewayVersion,
   extractGatewayPolicy,
