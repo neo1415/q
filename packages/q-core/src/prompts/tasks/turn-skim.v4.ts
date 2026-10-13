@@ -50,7 +50,7 @@ export const TURN_SKIM_V4: PromptDefinition<
 > = {
   id: "TURN_SKIM",
   version: 4,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "FAST_CLASSIFICATION",
   owner: "q-core",

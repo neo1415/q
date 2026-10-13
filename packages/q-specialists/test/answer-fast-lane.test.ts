@@ -204,6 +204,39 @@ describe("the fast lane (K)", () => {
     expect(s.delegated[0]?.questionKind).toBe("ADVICE");
   });
 
+  it.each([
+    "Which companies fit my mandate and what did Q learn about them?",
+    "Which companies fit my mandate and what are their weaknesses?",
+  ])("compound reading waits for the normal answer: %s", async (text) => {
+    const s = seam(text, {
+      kind: "OTHER",
+      confidence: "HIGH",
+      count: null,
+      discover: null,
+      person: null,
+    });
+    await s.answer.answer(request());
+    expect(s.skims()).toBe(1);
+    expect(s.reads()).toBe(1);
+    expect(s.delegated[0]?.fitQuestion).toBeUndefined();
+    expect(s.delegated[0]?.questionKind).toBe("ADVICE");
+  });
+
+  it("pure fit is handed over directly after the existing skim", async () => {
+    const s = seam("Which companies fit my mandate and why?", {
+      kind: "FIT",
+      confidence: "HIGH",
+      count: null,
+      discover: null,
+      person: null,
+    });
+    const started = Date.now();
+    await s.answer.answer(request());
+    expect(Date.now() - started).toBeLessThan(READ_MS - 100);
+    expect(s.skims()).toBe(1);
+    expect(s.delegated[0]?.questionKind).toBe("FIT");
+  });
+
   it("a skim that is not sure waits for the full reading", async () => {
     const s = seam("fintech?", { ...SKIM_DISCOVER, confidence: "MEDIUM" });
     await s.answer.answer(request());
