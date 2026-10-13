@@ -50,8 +50,11 @@ import { sendEntitlementRequired } from "./entitlement-problem.js";
  * same 404 as none, and a counterpart they may not see is the same 404 too.
  */
 
+import type { RehearsalVideoService } from "../composition/rehearsal-video.js";
+
 export type RehearsalRoutesDependencies = ActorContextDependencies & {
   readonly rehearsals: RehearsalService;
+  readonly video?: Pick<RehearsalVideoService, "finish"> | undefined;
   // BILLING block (ADR 0034): each rehearsal started draws one unit from
   // the plan, taken before any model work and given back if it does not
   // start. Absent: rehearsals are not plan-controlled (tests).
@@ -383,14 +386,18 @@ export function registerRehearsalRoutes(
     async (request, reply) => {
       const params = RehearsalParamsSchema.safeParse(request.params);
       if (!params.success) return reply.callNotFound();
-      return answer(
-        request,
-        reply,
-        await rehearsals.finish(
-          getActorContext(request),
-          params.data.rehearsalId,
-        ),
-      );
+      const actor = getActorContext(request);
+      const result = await (dependencies.video === undefined
+        ? rehearsals.finish(actor, params.data.rehearsalId)
+        : dependencies.video.finish(actor, params.data.rehearsalId));
+      if (result.kind === "PROVIDER_UNAVAILABLE")
+        return problem(
+          request,
+          reply,
+          "PROVIDER_UNAVAILABLE",
+          "The video provider has not confirmed the call ended. Try again in a moment.",
+        );
+      return answer(request, reply, result);
     },
   );
 }

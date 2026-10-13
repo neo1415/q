@@ -54,7 +54,7 @@ import {
 } from "@capital-q/gateq-intake";
 import { createCounterpartNames } from "./composition/counterpart-names.js";
 import { createWaitingLines } from "./composition/waiting-lines.js";
-import { randomUUID } from "node:crypto";
+import { hkdfSync, randomUUID } from "node:crypto";
 
 import {
   loadDatabaseConfig,
@@ -289,6 +289,7 @@ import {
   CorrelationIdSchema,
   QApprovalIdSchema,
   QRunIdSchema,
+  qRehearsalVideoBridgeBasePath,
   createEventRegistry,
   type ModelDataPosture,
   type QViewingMoment,
@@ -484,6 +485,7 @@ import {
   createPostgresMemoryRepository,
 } from "@capital-q/q-knowledge";
 import {
+  AuthUserIdSchema,
   OrganisationIdSchema,
   TenantIdSchema,
   createAuthorizationService,
@@ -673,9 +675,19 @@ import {
 } from "./composition/memory-learner.js";
 import { createRecallGraphPort } from "./composition/recall-graph.js";
 import { createRehearsalRecallPort } from "./composition/rehearsal-recall.js";
+import {
+  createPostgresRehearsalVideoStore,
+  createRehearsalVideoService,
+  enabledInterviewersFrom,
+} from "./composition/rehearsal-video.js";
+import {
+  createTavusKeyPool,
+  tavusKeysFrom,
+} from "./composition/tavus/key-pool.js";
 import { ownRecordTerms } from "./voice/vocabulary.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
+  createTokenCipher,
   composeGoogleIntegrations,
   createPostgresCounterpartDirectory,
   createInboundEmailService,
@@ -5916,6 +5928,95 @@ const voiceTurn = timedVoiceTurns(
   }),
   voiceTimings,
 );
+// ADR 0066: the rehearsal met by video. Tavus is the face and voice; every
+// line is the rehearsal service's, reached through the bridge. Keys come
+// only from server configuration (one TAVUS_API_KEY; never logged, the
+// session records the key's index). Without keys or a public origin the
+// interviewer list says video is unavailable and a start answers "carry on
+// by voice".
+const tavusKeys = tavusKeysFrom({
+  CQ_TAVUS_API_KEYS: process.env.CQ_TAVUS_API_KEYS,
+  TAVUS_API_KEY: process.env.TAVUS_API_KEY,
+});
+const rehearsalVideoActorResolver = createPostgresActorContextResolver({
+  sql: database.sql,
+});
+const rehearsalVideo = createRehearsalVideoService({
+  store: createPostgresRehearsalVideoStore(database.sql),
+  stillAllowed: async (actor) => {
+    if (actor.organisationId === undefined || actor.membershipId === undefined)
+      return false;
+    const [profiles, suspended] = await Promise.all([
+      database.sql<{ auth_user_id: string }[]>`
+        select auth_user_id from identity.user_profiles
+         where id = ${actor.userId} and status = 'active' limit 1`,
+      isAccountSuspended(database.sql, actor.userId),
+    ]);
+    const identity = AuthUserIdSchema.safeParse(profiles[0]?.auth_user_id);
+    if (suspended || !identity.success) return false;
+    const resolution = await rehearsalVideoActorResolver.resolveHumanContext({
+      principal: { authUserId: identity.data },
+      selection: { organisationId: actor.organisationId },
+    });
+    return (
+      resolution.status === "RESOLVED" &&
+      resolution.context.userId === actor.userId &&
+      resolution.context.tenantId === actor.tenantId &&
+      resolution.context.organisationId === actor.organisationId &&
+      resolution.context.membershipId === actor.membershipId
+    );
+  },
+  joinCipher: createTokenCipher(
+    Buffer.from(
+      hkdfSync(
+        "sha256",
+        voiceSessionSecret,
+        "capital-q/rehearsal-video",
+        "join-url.v1",
+        32,
+      ),
+    ).toString("base64"),
+  ),
+  rehearsals,
+  pool:
+    tavusKeys.length === 0
+      ? null
+      : createTavusKeyPool({
+          keys: tavusKeys,
+          onKeyFailure: ({ keyIndex, kind, status }) => {
+            logger.warn(
+              { keyIndex, kind, status },
+              "rehearsal video: Tavus account refused",
+            );
+          },
+        }),
+  publicBaseUrl: process.env.Q_API_PUBLIC_URL?.trim() || null,
+  bridgePath: qRehearsalVideoBridgeBasePath,
+  enabledInterviewers: enabledInterviewersFrom(
+    process.env.CQ_REHEARSAL_VIDEO_INTERVIEWERS,
+  ),
+  testMode: process.env.CQ_TAVUS_TEST_MODE === "true",
+  paidUserIds: new Set(
+    (process.env.CQ_TAVUS_PAID_USER_IDS ?? "")
+      .split(/[\s,]+/u)
+      .filter((id) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(
+          id,
+        ),
+      ),
+  ),
+  logger,
+});
+logger.info(
+  { tavusKeys: tavusKeys.length },
+  "rehearsal video: configured key count",
+);
+setInterval(() => {
+  void rehearsalVideo.sweep().catch((error: unknown) => {
+    logger.warn({ err: error }, "rehearsal video sweep failed");
+  });
+}, 30_000).unref();
+
 // REHEARSE: a rehearsal's voice line speaks only as the person Q plays.
 const rehearsalVoiceTurn = createRehearsalAwareTurn({
   rehearsals,
@@ -6282,6 +6383,7 @@ const { app, logger: appLogger } = createApp(
       },
     }),
     rehearsals,
+    rehearsalVideo,
     // BILLING block (ADR 0034)
     rehearsalEntitlements: entitlements,
     // end BILLING block
