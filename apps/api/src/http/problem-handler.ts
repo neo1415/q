@@ -274,6 +274,18 @@ function toProblem(
   ) {
     return createProblemDetails({ code: "RATE_LIMITED", requestId });
   }
+  // GateQ slice 1: Submit before the contact's email is confirmed. The
+  // applicant fixes it on the same screen; nothing else is said.
+  if (
+    error instanceof IntakeRefusedError &&
+    error.refusal === "CONTACT_NOT_CONFIRMED"
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: "Confirm your contact email before submitting.",
+    });
+  }
 
   if (error instanceof SlateCursorRejectedError) {
     return createProblemDetails({

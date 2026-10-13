@@ -173,7 +173,9 @@ function renderFacts(facts: readonly ApplicationFact[]): string {
               ? `${fact.value.amount} ${fact.value.currency}`
               : fact.value.kind === "PHRASES"
                 ? fact.value.phrases.join(", ")
-                : "(they do not know)";
+                : fact.value.declined === true
+                  ? "(they preferred not to say)"
+                  : "(they do not know)";
       return `${fact.dimension}: ${value} [${fact.provenance}]`;
     })
     .join("\n");

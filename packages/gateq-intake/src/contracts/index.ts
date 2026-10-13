@@ -168,8 +168,15 @@ export const FactValueSchema = z.discriminatedUnion("kind", [
       phrases: z.array(z.string().min(1).max(120)).min(1).max(12),
     })
     .strict(),
-  /** Asked and not known. Carries no value on purpose. */
-  z.object({ kind: z.literal("NONE") }).strict(),
+  /**
+   * Asked and not known. Carries no value on purpose. `declined` (GateQ
+   * slice 1) marks "I'd rather not say" apart from "I don't know": both
+   * leave the rule UNKNOWN, never a no, but an investor reads them
+   * differently. Absent means not known.
+   */
+  z
+    .object({ kind: z.literal("NONE"), declined: z.literal(true).optional() })
+    .strict(),
 ]);
 export type FactValue = z.infer<typeof FactValueSchema>;
 
@@ -183,6 +190,11 @@ export const ApplicationFactSchema = z
     recordedAt: z.string().datetime({ offset: true }),
     /** Null while current; set when a correction superseded it. */
     supersededAt: z.string().datetime({ offset: true }).nullable(),
+    /**
+     * GateQ slice 1 lineage: the transcript turn (seq) the fact was heard
+     * in. Absent or null for the form, a document, or an older fact.
+     */
+    sourceTurnSeq: z.number().int().min(1).nullable().optional(),
   })
   .strict();
 export type ApplicationFact = z.infer<typeof ApplicationFactSchema>;
@@ -285,6 +297,12 @@ export const INTAKE_REFUSALS = [
    * founder who exhausts theirs must not throttle anybody else.
    */
   "TOO_MANY_REQUESTS",
+  /**
+   * GateQ slice 1: an application with a contact on record cannot be
+   * submitted until that contact's email is confirmed. The one refusal a
+   * guest is told apart, because they can fix it on the same screen.
+   */
+  "CONTACT_NOT_CONFIRMED",
 ] as const;
 export const IntakeRefusalSchema = z.enum(INTAKE_REFUSALS);
 export type IntakeRefusal = z.infer<typeof IntakeRefusalSchema>;
