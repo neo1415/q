@@ -843,6 +843,8 @@ describe("answer seam tool loop", () => {
       "USER",
       // What this run can do, built by code (CQ-QX-008).
       "SYSTEM",
+      // Which findings channel the conversation shows.
+      "SYSTEM",
       // The order note that puts a lookup before an answer.
       "SYSTEM",
       "ASSISTANT",
@@ -851,7 +853,7 @@ describe("answer seam tool loop", () => {
     expect(second[2]?.content).toContain(
       "WHAT YOU CAN DO IN THIS CONVERSATION",
     );
-    const toolTurn = second[5];
+    const toolTurn = second[6];
     expect(toolTurn?.role).toBe("TOOL");
     expect(toolTurn?.content).toContain('"ok":true');
     expect(toolTurn?.content).toContain("Northwind (synthetic)");
@@ -1026,7 +1028,7 @@ describe("answer seam tool loop", () => {
       tools,
     });
     await seam.answer(request);
-    const toolTurn = alpha.calls[1]?.request.messages[5];
+    const toolTurn = alpha.calls[1]?.request.messages[6];
     expect(toolTurn?.content).toContain('"ok":false');
     expect(toolTurn?.content).toContain("NOT_AVAILABLE");
     expect(JSON.stringify(alpha.calls)).not.toContain(PRIVATE);

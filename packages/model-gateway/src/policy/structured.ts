@@ -131,6 +131,15 @@ export function acceptStructuredOutput<T>(
      * the lobby could not open.
      */
     readonly enumFallbacks?: Readonly<Record<string, string>> | undefined;
+    /**
+     * Keys at the root that the schema does not know. DROP removes them
+     * (counted in `dropped`, never named: the names are the model's
+     * words) and the rest is validated as usual; REFUSE (the default)
+     * refuses the object. Live 2026-10-13: an answer that added a root
+     * `followUps` beside a valid reading was refused whole, and the turn
+     * paid two more full model rounds (~31 s) to say the same thing.
+     */
+    readonly unknownRootKeys?: "REFUSE" | "DROP" | undefined;
   } = {},
 ): StructuredOutcome<T> {
   const fenced = FENCE.exec(text);
@@ -142,6 +151,28 @@ export function acceptStructuredOutput<T>(
     return { ok: false, stage: "JSON" };
   }
   const lenientDropped: string[] = [];
+  if (
+    options.unknownRootKeys === "DROP" &&
+    decoded !== null &&
+    typeof decoded === "object" &&
+    !Array.isArray(decoded)
+  ) {
+    const probe = schema.safeParse(decoded);
+    if (!probe.success) {
+      const unknown = new Set<string>();
+      for (const issue of probe.error.issues as readonly Issue[]) {
+        if (issue.code === "unrecognized_keys" && issue.path.length === 0) {
+          for (const key of issue.keys ?? []) unknown.add(key);
+        }
+      }
+      if (unknown.size > 0) {
+        const record = { ...(decoded as Record<string, unknown>) };
+        for (const key of unknown) delete record[key];
+        decoded = record;
+        lenientDropped.push(`(root):unrecognized_keys:${unknown.size}`);
+      }
+    }
+  }
   const lenient = options.lenientFields ?? [];
   if (
     lenient.length > 0 &&

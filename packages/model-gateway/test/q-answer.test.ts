@@ -253,12 +253,15 @@ describe("Q answer seam over the Prompt Registry", () => {
     expect(messages.at(-1)?.content).toContain("2,000,000");
 
     const sent = alpha.calls[0]?.request;
-    // The charter, the fenced task, and what this run can do (CQ-QX-008).
+    // The charter, the fenced task, what this run can do (CQ-QX-008), and
+    // which findings channel the conversation shows.
     expect(sent?.messages.map((m) => m.role)).toEqual([
       "SYSTEM",
       "USER",
       "SYSTEM",
+      "SYSTEM",
     ]);
+    expect(sent?.messages[3]?.content).toContain("IN THIS CONVERSATION");
     expect(sent?.messages[2]?.content).toContain(
       "WHAT YOU CAN DO IN THIS CONVERSATION",
     );

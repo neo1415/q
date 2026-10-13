@@ -325,6 +325,44 @@ export function couldNotAnswer(result: AnalystResultLike): boolean {
   return answer.length < SUBSTANTIVE_ANSWER_CHARS;
 }
 
+/**
+ * The conversation's findings, read from the specialist channel when the
+ * model left its own empty. Live 2026-10-13: a risks follow-up wrote nine
+ * evidence-backed points as companyFindings (the company specialist's
+ * channel, which no conversation surface renders) and none as findings,
+ * so the person saw a long answer with no findings beside it. Each point
+ * keeps its own statement, type, truth class and confidence; it carries
+ * no evidence status of its own, so the renderer's weakest honest reading
+ * applies (never a stronger one). Its own findings, when any, win.
+ */
+export function withConversationFindings<
+  T extends AnalystResultLike & {
+    readonly companyFindings?:
+      | readonly {
+          readonly statement: string;
+          readonly type?: string | undefined;
+          readonly confidence?: string | undefined;
+          readonly truthClass?: string | undefined;
+          readonly dimension?: string | undefined;
+        }[]
+      | undefined;
+  },
+>(result: T): T {
+  if ((result.findings?.length ?? 0) > 0) return result;
+  const specialist = result.companyFindings ?? [];
+  if (specialist.length === 0) return result;
+  return {
+    ...result,
+    findings: specialist.map((finding) => ({
+      statement: finding.statement,
+      type: finding.type,
+      confidence: finding.confidence,
+      truthClass: finding.truthClass,
+      dimension: finding.dimension,
+    })),
+  };
+}
+
 export function analystResultBlocks(input: {
   readonly result: AnalystResultLike;
   readonly subjects: readonly QSubjectRef[];
