@@ -266,3 +266,150 @@ describe("workforce job results for Q's conversation", () => {
     expect(bare?.diligence).toBeNull();
   });
 });
+
+describe("live 2026-10-12: the Ledgerfold job as production persisted it", () => {
+  // q_runtime.agent_work_queue.results of job 43b7bdb4 (shape, not text):
+  // the critique's review carried only its issues.
+  const LEDGERFOLD_QUESTIONS = [
+    "Of the 31 pilot ledgers you report, how many are in paid production today, and what is the median contract value?",
+    "Your memo cites reconciliation error rates falling to 0.4%; which customers measured that, and over what period?",
+    "Which licence or regulatory approval does Ledgerfold rely on to hold or move client funds, and who issued it?",
+    "What share of revenue comes from your three largest customers, and when do their current contracts renew?",
+    "How many months of runway do you have at today's burn, and what does the round you are raising extend that to?",
+  ];
+
+  async function ledgerfold() {
+    const store = createInMemoryWorkforceStore();
+    const { job } = await store.ensureJob(ownerA, {
+      source: { kind: "JOB", id: "ledgerfold" },
+      goal: "Research Ledgerfold, write a memo, have it reviewed and prepare founder diligence questions",
+      budgetUsd: 0.5,
+      threshold: 80,
+      maxRedrafts: 2,
+      rubricVersion: "rubric/v1",
+    });
+    const row: WorkRow = {
+      job_id: job.id,
+      tenant_id: ownerA.tenantId,
+      user_id: ownerA.userId,
+      state: "COMPLETED",
+      plan: {},
+      trace: { conversationId: randomUUID() },
+      results: {
+        critique_revise_memo: {
+          status: "DONE",
+          summary: "Reviewed the document.",
+          outputs: {
+            review: {
+              issues: [
+                {
+                  kind: "UNSUPPORTED",
+                  problem: "The 0.4% error rate is stated without a source.",
+                  section: "Traction",
+                },
+                {
+                  kind: "MISSING_RISK",
+                  problem: "Regulatory licensing risk is not discussed.",
+                  section: "Risks",
+                },
+              ],
+            },
+            companyId: randomUUID(),
+            artifactId,
+          },
+        },
+        prepare_founder_diligence: {
+          status: "DONE",
+          summary: "Prepared 5 founder questions.",
+          outputs: { qActionId: randomUUID(), questions: LEDGERFOLD_QUESTIONS },
+        },
+      },
+      attempts: 1,
+      max_attempts: 3,
+      reason: null,
+      created_at: at,
+      updated_at: at,
+      finished_at: at,
+    };
+    return { store, row };
+  }
+
+  it("reports the five questions and the reviewer's changes without material/revisedToVersion", async () => {
+    const { store, row } = await ledgerfold();
+    const results = createWorkforceJobResults({
+      store,
+      work: { forOwner: () => Promise.resolve([row]) },
+      artifacts: {
+        // The artifact's own history marks the reviewer's version.
+        read: () =>
+          Promise.resolve(
+            QArtifactDetailSchema.parse({
+              ...version(2, "x", []),
+              history: [
+                {
+                  version: 2,
+                  title: "Kestrel Heat memo",
+                  instruction: `${REVIEWER_REVISION_PREFIX} ${NOTE}`,
+                  createdAt: at.toISOString(),
+                },
+                {
+                  version: 1,
+                  title: "Kestrel Heat memo",
+                  createdAt: at.toISOString(),
+                },
+              ],
+            }),
+          ),
+        readVersion: (_actor, _id, n) =>
+          Promise.resolve(
+            n === 1
+              ? version(1, "Growing 40% a quarter.", [])
+              : version(2, "The founder states 40% growth; no source.", []),
+          ),
+      },
+      // Asked in a NEW conversation, as live.
+      conversationOf: () => Promise.resolve(randomUUID()),
+    });
+    const [found] = await results(actorOf(ownerA), { runId: randomUUID() });
+    expect(found?.inThisConversation).toBe(false);
+    expect(found?.diligence).toEqual({
+      questions: LEDGERFOLD_QUESTIONS,
+      filedForApproval: true,
+    });
+    expect(found?.review).toMatchObject({
+      outcome: "REVISED",
+      findings: [
+        {
+          kind: "UNSUPPORTED",
+          section: "Traction",
+          problem: "The 0.4% error rate is stated without a source.",
+        },
+        {
+          kind: "MISSING_RISK",
+          section: "Risks",
+          problem: "Regulatory licensing risk is not discussed.",
+        },
+      ],
+      fromVersion: 1,
+      toVersion: 2,
+      revisionNote: NOTE,
+      sectionsChanged: ["Traction"],
+    });
+  });
+
+  it("keeps the findings and says the revision is unknown when nothing marks it", async () => {
+    const { store, row } = await ledgerfold();
+    const results = createWorkforceJobResults({
+      store,
+      work: { forOwner: () => Promise.resolve([row]) },
+    });
+    const [found] = await results(actorOf(ownerA), { runId: randomUUID() });
+    expect(found?.review).toMatchObject({
+      outcome: "UNKNOWN",
+      toVersion: null,
+      sectionsChanged: null,
+    });
+    expect(found?.review?.findings).toHaveLength(2);
+    expect(found?.diligence?.questions).toEqual(LEDGERFOLD_QUESTIONS);
+  });
+});

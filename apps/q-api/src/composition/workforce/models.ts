@@ -20,9 +20,12 @@ import {
   SubstanceCritiqueResultSchema,
   type SubstanceCritiqueResult,
   type SubstanceCritiqueVariables,
-  DiligenceQuestionsResultSchema,
-  type DiligenceQuestionsResult,
+  DiligenceQuestionsDraftResultSchema,
+  type DiligenceQuestionsDraftResult,
   type DiligenceQuestionsVariables,
+  DiligenceQuestionsShortenResultSchema,
+  type DiligenceQuestionsShortenResult,
+  type DiligenceQuestionsShortenVariables,
   ReplyReaderResultSchema,
   type DraftRedraftResult,
   type DraftRedraftVariables,
@@ -62,6 +65,11 @@ export type ReplyVariables = Omit<ReplyReaderVariables, Frame>;
 export type PlanVariables = Omit<JobPlanVariables, Frame>;
 export type CritiqueVariables = Omit<SubstanceCritiqueVariables, Frame>;
 export type DiligenceVariables = Omit<DiligenceQuestionsVariables, Frame>;
+export type ShortenQuestionsInput = {
+  readonly companyName: string;
+  /** Only the drafted questions over the send limit, in order. */
+  readonly questions: readonly string[];
+};
 
 const SMALL = {
   maxAttempts: 2,
@@ -119,7 +127,17 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     variables: DiligenceVariables,
-  ) => Promise<DiligenceQuestionsResult | null>;
+  ) => Promise<DiligenceQuestionsDraftResult | null>;
+  /**
+   * The repair for drafted questions over the send limit: the same number
+   * back, in order, each rewritten under it (schema-checked). Null when the
+   * call fails or the count differs; the caller then files nothing.
+   */
+  readonly shortenDiligenceQuestions: (
+    who: Who,
+    trace: Trace,
+    input: ShortenQuestionsInput,
+  ) => Promise<readonly string[] | null>;
 };
 
 export function createWorkforceModels(dependencies: {
@@ -139,7 +157,8 @@ export function createWorkforceModels(dependencies: {
       | "REPLY_READER"
       | "JOB_PLAN"
       | "SUBSTANCE_CRITIQUE"
-      | "DILIGENCE_QUESTIONS";
+      | "DILIGENCE_QUESTIONS"
+      | "DILIGENCE_QUESTIONS_SHORTEN";
     readonly taskClass: ModelTextTaskClass;
     readonly who: Who;
     readonly trace: Trace;
@@ -273,17 +292,46 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     diligenceQuestions: (who, trace, variables) =>
-      call<DiligenceVariables, DiligenceQuestionsResult>({
+      call<DiligenceVariables, DiligenceQuestionsDraftResult>({
         task: "DILIGENCE_QUESTIONS",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: DiligenceQuestionsResultSchema,
+        schema: DiligenceQuestionsDraftResultSchema,
         budget: SMALL,
         environmentNotes:
           "You are drafting questions for the person's approval. Nothing is sent until they approve.",
         etiquette: null,
       }),
+    shortenDiligenceQuestions: async (who, trace, input) => {
+      const count = input.questions.length;
+      if (count < 1 || count > 5) return null;
+      const result = await call<
+        Omit<DiligenceQuestionsShortenVariables, Frame>,
+        DiligenceQuestionsShortenResult
+      >({
+        task: "DILIGENCE_QUESTIONS_SHORTEN",
+        taskClass: "STRUCTURED_EXTRACTION",
+        who,
+        trace,
+        variables: {
+          companyName: input.companyName,
+          count: String(count),
+          questions: input.questions
+            .map((question, index) => `${String(index + 1)}. ${question}`)
+            .join("\n"),
+        },
+        schema: DiligenceQuestionsShortenResultSchema,
+        budget: SMALL,
+        environmentNotes:
+          "You are shortening questions for the person's approval. Nothing is sent until they approve.",
+        etiquette: null,
+      });
+      // One rewrite per question given, or none: a merged or dropped
+      // question would silently change what the investor approves.
+      if (result === null || result.questions.length !== count) return null;
+      return result.questions.map((one) => one.question);
+    },
   };
 }
