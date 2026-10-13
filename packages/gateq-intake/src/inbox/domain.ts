@@ -173,7 +173,7 @@ export function rulesOf(read: QualificationRead) {
   };
 }
 
-const STAGE_WORDS: Readonly<Record<string, string>> = {
+export const STAGE_WORDS: Readonly<Record<string, string>> = {
   pre_seed: "Pre-seed",
   seed: "Seed",
   series_a: "Series A",
@@ -181,14 +181,14 @@ const STAGE_WORDS: Readonly<Record<string, string>> = {
   series_c_plus: "Series C or later",
 };
 
-const INSTRUMENT_WORDS: Readonly<Record<string, string>> = {
+export const INSTRUMENT_WORDS: Readonly<Record<string, string>> = {
   SAFE: "SAFE",
   EQUITY: "Equity",
   CONVERTIBLE_NOTE: "Convertible note",
   NOT_DECIDED: "Not decided",
 };
 
-const LEAD_WORDS: Readonly<Record<string, string>> = {
+export const LEAD_WORDS: Readonly<Record<string, string>> = {
   HAS_LEAD: "Has a lead",
   LOOKING: "Looking for a lead",
   NOT_NEEDED: "No lead needed",

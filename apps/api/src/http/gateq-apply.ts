@@ -100,7 +100,9 @@ function summaryDto(result: ApplicantTurnResult): unknown {
               ? `${fact.value.amount} ${fact.value.currency}`
               : fact.value.kind === "PHRASES"
                 ? fact.value.phrases.join(", ")
-                : "not known yet",
+                : fact.value.declined === true
+                  ? "preferred not to say"
+                  : "not known yet",
       provenance: fact.provenance,
     })),
     documentCount: result.view.documentCount,

@@ -275,3 +275,342 @@ export const GatewayApplicationListDtoSchema = z
 export type GatewayApplicationListDto = z.infer<
   typeof GatewayApplicationListDtoSchema
 >;
+
+// ---------------------------------------------------------------------------
+// GateQ slice 1 (2026-10-13): contact first, a durable interview, a
+// deterministic coverage check, and the dossier frozen with the submission.
+// ---------------------------------------------------------------------------
+
+/** The applicant's contact: saved, and a one-time code sent to the email. */
+export const GATEQ_APPLY_CONTACT_PATH = "/v1/gateq/apply/contact" as const;
+/** The six-digit code from that email. */
+export const GATEQ_APPLY_CONTACT_CONFIRM_PATH =
+  "/v1/gateq/apply/contact/confirm" as const;
+/**
+ * A signed-in founder's contact: when the email is their own account's,
+ * it is confirmed without a code. Needs an actor, like materials; the
+ * guest credential travels in the body. Creates no membership.
+ */
+export const GATEQ_APPLY_CONTACT_ACCOUNT_PATH =
+  "/v1/gateq/apply/contact/account" as const;
+/** The interview so far, both sides, in order. */
+export const GATEQ_APPLY_TRANSCRIPT_PATH =
+  "/v1/gateq/apply/transcript" as const;
+/** What is answered, unknown, declined, missing and contradictory. */
+export const GATEQ_APPLY_COVERAGE_PATH = "/v1/gateq/apply/coverage" as const;
+
+export const GATEQ_CONTACT_CHANNELS = ["EMAIL", "PHONE"] as const;
+export const GateqContactChannelSchema = z.enum(GATEQ_CONTACT_CHANNELS);
+export type GateqContactChannel = z.infer<typeof GateqContactChannelSchema>;
+
+const ContactFields = {
+  name: z.string().trim().min(1).max(200),
+  email: z.string().trim().toLowerCase().email().max(254),
+  role: z.string().trim().min(1).max(120),
+  companyName: z.string().trim().min(1).max(200),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+?[0-9 ().-]{6,32}$/, "expected a phone number")
+    .optional(),
+  preferredChannel: GateqContactChannelSchema.optional(),
+} as const;
+
+export const ApplicationContactRequestSchema = z
+  .object(ContactFields)
+  .strict();
+export type ApplicationContactRequest = z.infer<
+  typeof ApplicationContactRequestSchema
+>;
+
+export const ApplicationContactAccountRequestSchema = z
+  .object({ ...ContactFields, sessionToken: z.string().min(16).max(128) })
+  .strict();
+export type ApplicationContactAccountRequest = z.infer<
+  typeof ApplicationContactAccountRequestSchema
+>;
+
+export const ApplicationContactDtoSchema = z
+  .object({
+    name: z.string().max(200),
+    email: z.string().max(254),
+    role: z.string().max(120),
+    companyName: z.string().max(200),
+    phone: z.string().max(32).nullable(),
+    preferredChannel: GateqContactChannelSchema.nullable(),
+    emailConfirmed: z.boolean(),
+    /** How it was confirmed; null while unconfirmed. */
+    confirmedVia: z.enum(["EMAIL_CODE", "ACCOUNT"]).nullable(),
+  })
+  .strict();
+export type ApplicationContactDto = z.infer<typeof ApplicationContactDtoSchema>;
+
+export const ApplicationContactResponseSchema = z
+  .object({
+    contact: ApplicationContactDtoSchema,
+    /** False when no code was needed (already confirmed) or it could not go. */
+    codeSent: z.boolean(),
+    /** Minutes the code works for; null when no code was issued. */
+    codeExpiresInMinutes: z.number().int().min(1).max(120).nullable(),
+  })
+  .strict();
+export type ApplicationContactResponse = z.infer<
+  typeof ApplicationContactResponseSchema
+>;
+
+export const ApplicationContactConfirmRequestSchema = z
+  .object({
+    code: z.string().regex(/^[0-9]{6}$/, "expected a six-digit code"),
+  })
+  .strict();
+export type ApplicationContactConfirmRequest = z.infer<
+  typeof ApplicationContactConfirmRequestSchema
+>;
+
+export const ApplicationContactConfirmResponseSchema = z
+  .object({
+    /** EXPIRED covers both a timed-out code and spent attempts: ask again. */
+    status: z.enum(["CONFIRMED", "WRONG_CODE", "EXPIRED", "NOT_FOUND"]),
+    contact: ApplicationContactDtoSchema.nullable(),
+  })
+  .strict();
+export type ApplicationContactConfirmResponse = z.infer<
+  typeof ApplicationContactConfirmResponseSchema
+>;
+
+export const ApplicationTranscriptTurnDtoSchema = z
+  .object({
+    seq: z.number().int().min(1),
+    role: z.enum(["PERSON", "Q"]),
+    text: z.string().max(4000),
+    at: z.string(),
+  })
+  .strict();
+export type ApplicationTranscriptTurnDto = z.infer<
+  typeof ApplicationTranscriptTurnDtoSchema
+>;
+
+export const GATEQ_TRANSCRIPT_MAX_TURNS = 400;
+export const ApplicationTranscriptDtoSchema = z
+  .object({
+    turns: z
+      .array(ApplicationTranscriptTurnDtoSchema)
+      .max(GATEQ_TRANSCRIPT_MAX_TURNS),
+  })
+  .strict();
+export type ApplicationTranscriptDto = z.infer<
+  typeof ApplicationTranscriptDtoSchema
+>;
+
+/**
+ * The fixed, ordered investment dimensions an application's facts are
+ * grouped under. A reading order for a partner, not a weighting.
+ */
+export const GATEQ_INVESTMENT_GROUPS = [
+  "COMPANY",
+  "PRODUCT",
+  "MARKET",
+  "BUSINESS_MODEL",
+  "TRACTION",
+  "TEAM",
+  "FUNDRAISING",
+] as const;
+export const GateqInvestmentGroupSchema = z.enum(GATEQ_INVESTMENT_GROUPS);
+export type GateqInvestmentGroup = z.infer<typeof GateqInvestmentGroupSchema>;
+
+/** Where a value came from: the applicant's words, a document, an estimate. */
+export const GateqFactProvenanceSchema = z.enum([
+  "APPLICANT_PROVIDED",
+  "DOCUMENT_SUPPORTED",
+  "ESTIMATED",
+  "UNKNOWN",
+]);
+
+const CoverageDimension = {
+  dimension: z.string().max(64),
+  label: z.string().max(80),
+  group: GateqInvestmentGroupSchema,
+} as const;
+
+export const GateqCoverageAnsweredSchema = z
+  .object({
+    ...CoverageDimension,
+    summary: z.string().max(2000),
+    provenance: GateqFactProvenanceSchema,
+  })
+  .strict();
+export const GateqCoverageGapSchema = z.object(CoverageDimension).strict();
+export const GateqCoverageMissingSchema = z
+  .object({
+    ...CoverageDimension,
+    /** Why it matters, in bounded vocabulary; never the rule behind it. */
+    reason: z.enum([
+      "REQUIRED_BY_GATEWAY",
+      "PREFERRED_BY_GATEWAY",
+      "CONTRADICTION",
+      "UNDERSTANDING",
+    ]),
+  })
+  .strict();
+
+const AccessSchema = z.enum(["MAY_APPLY", "MAY_NOT_APPLY", "NEEDS_INFORMATION"]);
+
+/**
+ * The deterministic completeness check before submission (v1).
+ *
+ * No numbers and no weights: what is answered (with where it came from),
+ * what the founder does not know, what they preferred not to say, what was
+ * never covered, what disagrees, and GATE-001's own access answer with the
+ * investor's published labels.
+ */
+export const GateqCoverageV1Schema = z
+  .object({
+    version: z.literal(1),
+    access: AccessSchema,
+    unmet: z.array(z.string().max(120)).max(32),
+    stillNeeded: z.array(z.string().max(120)).max(32),
+    answered: z.array(GateqCoverageAnsweredSchema).max(64),
+    unknown: z.array(GateqCoverageGapSchema).max(64),
+    declined: z.array(GateqCoverageGapSchema).max(64),
+    missing: z.array(GateqCoverageMissingSchema).max(64),
+    contradictions: z.array(z.string().max(300)).max(16),
+  })
+  .strict();
+export type GateqCoverageV1 = z.infer<typeof GateqCoverageV1Schema>;
+
+/** The applicant's coverage view, with what still stands before Submit. */
+export const ApplicationCoverageDtoSchema = z
+  .object({
+    coverage: GateqCoverageV1Schema,
+    contact: z
+      .object({
+        /** False only for an application that may still submit without one. */
+        required: z.boolean(),
+        confirmed: z.boolean(),
+      })
+      .strict(),
+    documentCount: z.number().int().min(0),
+    transcriptTurns: z.number().int().min(0),
+  })
+  .strict();
+export type ApplicationCoverageDto = z.infer<
+  typeof ApplicationCoverageDtoSchema
+>;
+
+export const GATEQ_DOSSIER_SCHEMA_VERSION = "gateq-dossier.v1" as const;
+
+/**
+ * The investor-ready brief frozen with a submission (GateqDossierV1).
+ *
+ * Deterministic: built from the frozen view, the published criteria's
+ * labels and statuses, the transcript and the coverage check, with no model
+ * involved. Every fact keeps its provenance on ADR-001's separate axes, and
+ * nothing an applicant said is ever VERIFIED here. `synthesis` is reserved
+ * for a later, clearly labelled and nonbinding Q reading; it is always null
+ * in v1.
+ */
+export const GateqDossierV1Schema = z
+  .object({
+    schemaVersion: z.literal(GATEQ_DOSSIER_SCHEMA_VERSION),
+    generatedAt: z.string(),
+    application: z
+      .object({
+        reference: z.string().max(64),
+        submittedAt: z.string(),
+      })
+      .strict(),
+    company: z
+      .object({
+        name: z.string().max(200).nullable(),
+        description: z.string().max(2000).nullable(),
+        website: z.string().max(200).nullable(),
+        country: z.string().max(64).nullable(),
+        stage: z.string().max(64).nullable(),
+        sectorPhrases: z.array(z.string().max(120)).max(12),
+        note: z.string().max(2000).nullable(),
+      })
+      .strict(),
+    contact: ApplicationContactDtoSchema.nullable(),
+    qualification: z
+      .object({
+        outcome: z.enum([
+          "QUALIFIED",
+          "NOT_QUALIFIED",
+          "INSUFFICIENT_INFORMATION",
+        ]),
+        access: AccessSchema,
+        /** The published labels and their status; never the configuration. */
+        criteria: z
+          .array(
+            z
+              .object({
+                label: z.string().max(120),
+                requiredness: z.enum(["REQUIRED", "PREFERRED"]),
+                status: z.enum([
+                  "MATCH",
+                  "NO_MATCH",
+                  "UNKNOWN",
+                  "NOT_APPLICABLE",
+                ]),
+              })
+              .strict(),
+          )
+          .max(64),
+      })
+      .strict(),
+    dimensions: z
+      .array(
+        z
+          .object({
+            group: GateqInvestmentGroupSchema,
+            label: z.string().max(80),
+            facts: z
+              .array(
+                z
+                  .object({
+                    dimension: z.string().max(64),
+                    label: z.string().max(80),
+                    summary: z.string().max(2000),
+                    provenance: GateqFactProvenanceSchema,
+                    truthClass: z.enum(["USER_CLAIM", "ESTIMATE", "UNKNOWN"]),
+                    evidenceStatus: z.enum([
+                      "NO_EVIDENCE",
+                      "SELF_REPORTED",
+                      "DOCUMENT_SUPPORTED",
+                    ]),
+                  })
+                  .strict(),
+              )
+              .max(32),
+          })
+          .strict(),
+      )
+      .max(GATEQ_INVESTMENT_GROUPS.length),
+    unknowns: z.array(GateqCoverageGapSchema).max(64),
+    declined: z.array(GateqCoverageGapSchema).max(64),
+    missing: z.array(GateqCoverageMissingSchema).max(64),
+    contradictions: z.array(z.string().max(300)).max(16),
+    documents: z
+      .array(
+        z
+          .object({ documentId: z.string().uuid(), title: z.string().max(200) })
+          .strict(),
+      )
+      .max(20),
+    diligenceQuestions: z
+      .array(
+        z
+          .object({
+            dimension: z.string().max(64).nullable(),
+            basis: z.enum(["MISSING", "UNKNOWN", "DECLINED", "CONTRADICTION"]),
+            question: z.string().max(400),
+          })
+          .strict(),
+      )
+      .max(80),
+    transcript: z.object({ turnCount: z.number().int().min(0) }).strict(),
+    /** Nonbinding Q reading, added later. Always null in v1. */
+    synthesis: z.null(),
+  })
+  .strict();
+export type GateqDossierV1 = z.infer<typeof GateqDossierV1Schema>;

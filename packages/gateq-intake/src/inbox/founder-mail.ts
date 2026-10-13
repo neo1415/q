@@ -18,7 +18,11 @@ export type GateqOutboundSender = {
   }) => Promise<void>;
 };
 
-export type GateqEmailKind = "PASS" | "REPLY" | "CLAIM_CODE";
+export type GateqEmailKind =
+  | "PASS"
+  | "REPLY"
+  | "CLAIM_CODE"
+  | "APPLICATION_CONTACT_CODE";
 
 /** Outcome per email, for the service log: recipient domain only. */
 export type GateqEmailEvent = {
@@ -89,6 +93,35 @@ export function renderClaimCodeEmail(input: {
       },
     ],
     reason: `This address was entered to claim ${input.companyName} on Capital Q.`,
+    origin: null,
+  });
+}
+
+/**
+ * GateQ slice 1: the one-time code that confirms an applicant's email
+ * before their application can be submitted. Same layout as the claim code.
+ */
+export function renderApplicationContactCodeEmail(input: {
+  readonly companyName: string;
+  readonly code: string;
+  readonly expiresInMinutes: number;
+}) {
+  return renderEmail({
+    subject: `Your Capital Q code for ${input.companyName}'s application`,
+    preheader: `Enter ${input.code} to confirm your email. It works for ${String(input.expiresInMinutes)} minutes.`,
+    heading: `Your code: ${input.code}`,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: `Someone using this address is applying for ${input.companyName} through a GateQ link on Capital Q. Enter this code on the application screen; it works for ${String(input.expiresInMinutes)} minutes.`,
+      },
+      {
+        kind: "note",
+        text: "Confirming your email lets the investor reach you about this application. It does not create an account or join you to any organisation. If this wasn't you, ignore this email.",
+      },
+    ],
+    reason:
+      "This address was entered as the contact for an application to an investor on Capital Q.",
     origin: null,
   });
 }

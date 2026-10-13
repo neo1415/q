@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 
 import {
+  ApplicationTranscriptTurnDtoSchema,
   GATEQ_INBOX_VIEWS,
+  GATEQ_TRANSCRIPT_MAX_TURNS,
+  GateqDossierV1Schema,
   GateqPassReasonSchema,
   type GateqInboxDetailDto,
   type GateqInboxDto,
@@ -339,6 +342,19 @@ export function createInboxService(dependencies: {
       add("Instrument", profile.instrument);
       add("Lead investor", profile.lead);
       add("Website", profile.website);
+      // GateQ slice 1: the dossier and transcript frozen at submission.
+      // Only an authorised member of the receiving organisation reaches
+      // here, and only for a submitted application (the row is a
+      // submission). Older submissions carry neither: null, never a guess.
+      const dossier = GateqDossierV1Schema.safeParse(row.dossier ?? null);
+      const transcript = readTranscript(row.snapshot);
+      const contact =
+        dossier.success && dossier.data.contact !== null
+          ? {
+              name: dossier.data.contact.name,
+              email: dossier.data.contact.email,
+            }
+          : { name: profile.contactName, email: profile.contactEmail };
       return {
         item: { ...itemOf(row, replyWithinDays, byId), unread: false },
         rules: read.criteria
@@ -356,7 +372,7 @@ export function createInboxService(dependencies: {
           })),
         answers,
         note: profile.note,
-        contact: { name: profile.contactName, email: profile.contactEmail },
+        contact,
         shared: submitted.documentIds.map((documentId) => ({
           documentId,
           title: titles.get(documentId) ?? "Shared document",
@@ -391,6 +407,8 @@ export function createInboxService(dependencies: {
           body: message.body,
           at: message.createdAt,
         })),
+        dossier: dossier.success ? dossier.data : null,
+        transcript,
       } satisfies GateqInboxDetailDto;
     },
 
@@ -939,3 +957,19 @@ export function createInboxService(dependencies: {
 }
 
 export type InboxService = ReturnType<typeof createInboxService>;
+
+/**
+ * The transcript a v2 snapshot froze, read defensively: it is stored JSON.
+ * A v1 snapshot has none, which is null rather than an empty conversation.
+ */
+function readTranscript(snapshot: unknown) {
+  if (typeof snapshot !== "object" || snapshot === null) return null;
+  const turns = (snapshot as { readonly transcript?: unknown }).transcript;
+  if (!Array.isArray(turns)) return null;
+  return turns
+    .slice(0, GATEQ_TRANSCRIPT_MAX_TURNS)
+    .flatMap((turn: unknown) => {
+      const parsed = ApplicationTranscriptTurnDtoSchema.safeParse(turn);
+      return parsed.success ? [parsed.data] : [];
+    });
+}
