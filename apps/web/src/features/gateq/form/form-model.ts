@@ -596,7 +596,10 @@ export const QUICK_REPLIES = {
   DECLINED: "I'd rather not say.",
 } as const;
 
-export type InterviewLine = { readonly from: "Q" | "YOU"; readonly text: string };
+export type InterviewLine = {
+  readonly from: "Q" | "YOU";
+  readonly text: string;
+};
 
 export function linesFromTranscript(
   turns: readonly { readonly role: "PERSON" | "Q"; readonly text: string }[],
@@ -608,9 +611,7 @@ export function linesFromTranscript(
 }
 
 /** Q's most recent line, when it is the one waiting for an answer. */
-export function latestQuestion(
-  lines: readonly InterviewLine[],
-): string | null {
+export function latestQuestion(lines: readonly InterviewLine[]): string | null {
   const last = lines.at(-1);
   return last?.from === "Q" ? last.text : null;
 }
@@ -620,10 +621,7 @@ export function latestQuestion(
 // ---------------------------------------------------------------------------
 
 export type Provenance =
-  | "APPLICANT_PROVIDED"
-  | "DOCUMENT_SUPPORTED"
-  | "ESTIMATED"
-  | "UNKNOWN";
+  "APPLICANT_PROVIDED" | "DOCUMENT_SUPPORTED" | "ESTIMATED" | "UNKNOWN";
 
 /** The founder's own view of where an answer came from. */
 export const REVIEW_PROVENANCE_WORDS: Readonly<Record<Provenance, string>> = {

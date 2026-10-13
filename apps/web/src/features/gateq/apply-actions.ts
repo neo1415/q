@@ -380,8 +380,7 @@ export async function transcriptAction(
 }
 
 export type CoverageResult =
-  | { readonly ok: true; readonly coverage: ApplicationCoverageDto }
-  | Failed;
+  { readonly ok: true; readonly coverage: ApplicationCoverageDto } | Failed;
 
 /** The deterministic completeness check the review screen shows. */
 export async function coverageAction(

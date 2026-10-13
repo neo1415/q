@@ -509,8 +509,8 @@ export function GateQForm({
           <div className="gq-banner gq-banner-err" role="alert">
             <CircleAlert {...icon} />
             <span>
-              <b>{step === "review" ? "Not sent." : "Not saved."}</b>{" "}
-              {problem} Your answers are still here.{" "}
+              <b>{step === "review" ? "Not sent." : "Not saved."}</b> {problem}{" "}
+              Your answers are still here.{" "}
               <Button
                 size="compact"
                 className="ml-1.5"
@@ -1380,9 +1380,9 @@ function CheckStep({
         </div>
       ) : null}
       <p className="cq-body-sm gq-t2">
-        Next, a few questions from Q, then you review everything before it
-        goes. When you submit, {fund} gets:{" "}
-        {answers.companyName || "your company"}, your answers
+        Next, a few questions from Q, then you review everything before it goes.
+        When you submit, {fund} gets: {answers.companyName || "your company"},
+        your answers
         {amount !== null
           ? ` (raising ${formatMoney(amount, answers.currency)})`
           : ""}

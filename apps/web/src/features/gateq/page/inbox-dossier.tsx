@@ -115,8 +115,7 @@ export function DossierSection({
               </p>
               {contact.phone === null ? null : (
                 <p className="cq-body-sm">
-                  {contact.phone}{" "}
-                  <span className="gq-t2">(not confirmed)</span>
+                  {contact.phone} <span className="gq-t2">(not confirmed)</span>
                 </p>
               )}
               {contact.preferredChannel === null ? null : (

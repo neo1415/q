@@ -127,7 +127,8 @@ export function ReviewStep({
   }
 
   const c = coverage.coverage;
-  const contactBlocks = coverage.contact.required && !coverage.contact.confirmed;
+  const contactBlocks =
+    coverage.contact.required && !coverage.contact.confirmed;
   const ready = maySubmit(coverage);
 
   return (

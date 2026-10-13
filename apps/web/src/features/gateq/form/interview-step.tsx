@@ -167,8 +167,8 @@ export function InterviewStep({
         </h1>
         <p className="cq-body gq-t2">
           Everything you&apos;ve said is saved with your application. Pick up
-          where you left off whenever you&apos;re ready; keep this page open,
-          it holds your place. Nothing goes to {fund} until you submit.
+          where you left off whenever you&apos;re ready; keep this page open, it
+          holds your place. Nothing goes to {fund} until you submit.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={resume}>
@@ -203,8 +203,8 @@ export function InterviewStep({
 
       {loaded && lines.length === 0 ? (
         <p className="cq-body-sm gq-t2">
-          Say hello, or start with what you most want {fund} to know. Q takes
-          it from there.
+          Say hello, or start with what you most want {fund} to know. Q takes it
+          from there.
         </p>
       ) : null}
 

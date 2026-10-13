@@ -1340,7 +1340,8 @@ function Detail({
             )}
           </section>
 
-          {detail.transcript === null || detail.transcript === undefined ? null : (
+          {detail.transcript === null ||
+          detail.transcript === undefined ? null : (
             <TranscriptSection turns={detail.transcript} />
           )}
 
