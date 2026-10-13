@@ -44,7 +44,36 @@ type Work = {
     readonly counterpartName?: unknown;
     readonly status?: unknown;
   }[];
+  /** list_q_work v2: jobs of Q's team, from their persisted step results. */
+  readonly jobs?: readonly WorkJob[];
 };
+
+type WorkJob = {
+  readonly goal?: unknown;
+  readonly state?: unknown;
+  readonly finishedAt?: unknown;
+  readonly inThisConversation?: unknown;
+  readonly review?: {
+    readonly outcome?: unknown;
+    readonly documentTitle?: unknown;
+    readonly findings?: readonly {
+      readonly kind?: unknown;
+      readonly section?: unknown;
+      readonly problem?: unknown;
+    }[];
+    readonly fromVersion?: unknown;
+    readonly toVersion?: unknown;
+    readonly revisionNote?: unknown;
+    readonly sectionsChanged?: readonly unknown[] | null;
+  } | null;
+  readonly diligence?: {
+    readonly questions?: readonly unknown[];
+    readonly filedForApproval?: unknown;
+  } | null;
+};
+
+const JOB_TEXT_MAX = 2_600;
+const JOBS_TEXT_MAX = 4_200;
 
 const text = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -72,6 +101,81 @@ function dayKey(at: Date, zone: string): string {
     month: "2-digit",
     day: "2-digit",
   }).format(at);
+}
+
+/**
+ * One job as it persisted (live 2026-10-12: asked "what were the diligence
+ * questions and what did the reviewer change?", Q said none were on record
+ * while list_q_work had returned both: this fact dropped `jobs`, and the
+ * fact is how the turn reads list_q_work). The questions stay word for
+ * word; what was not recorded is said to be unknown.
+ */
+function jobLine(job: WorkJob, zone: string | null): string {
+  const bits: string[] = [];
+  const state = text(job.state) ?? "unknown state";
+  const finished =
+    typeof job.finishedAt === "string"
+      ? `, finished ${inZone(job.finishedAt, zone, true)}`
+      : "";
+  const here =
+    job.inThisConversation === true ? ", asked in this conversation" : "";
+  bits.push(`"${text(job.goal) ?? "a job"}" (${state}${finished}${here}).`);
+  const review = job.review ?? null;
+  if (review === null) {
+    bits.push("Reviewer's critique and changes: not recorded (unknown).");
+  } else {
+    const title = text(review.documentTitle);
+    const doc = title === null ? "the memo" : `"${title}"`;
+    const from =
+      typeof review.fromVersion === "number" ? review.fromVersion : null;
+    const to = typeof review.toVersion === "number" ? review.toVersion : null;
+    const span =
+      from !== null && to !== null
+        ? ` from version ${String(from)} to ${String(to)}`
+        : to !== null
+          ? ` to version ${String(to)}`
+          : "";
+    bits.push(
+      review.outcome === "REVISED"
+        ? `Reviewer revised ${doc}${span}.`
+        : review.outcome === "NO_CHANGE_NEEDED"
+          ? `Reviewer critiqued ${doc} and found no material change needed.`
+          : `Reviewer critiqued ${doc}; whether it then revised it is not recorded (unknown).`,
+    );
+    const findings = (review.findings ?? []).slice(0, 8).map((finding) => {
+      const kind = (text(finding.kind) ?? "issue")
+        .toLowerCase()
+        .replaceAll("_", " ");
+      return `${text(finding.section) ?? "a section"} (${kind}): ${text(finding.problem) ?? ""}`;
+    });
+    if (findings.length > 0)
+      bits.push(`Reviewer's findings: ${findings.join("; ")}.`);
+    const note = text(review.revisionNote);
+    if (note !== null) bits.push(`Revision instruction recorded: ${note}`);
+    const changed = (review.sectionsChanged ?? [])
+      .map(text)
+      .filter((one): one is string => one !== null);
+    if (changed.length > 0)
+      bits.push(`Sections whose text changed: ${changed.join(", ")}.`);
+    else if (review.outcome !== "NO_CHANGE_NEEDED")
+      bits.push("Which sections changed: not known.");
+  }
+  const diligence = job.diligence ?? null;
+  const questions = (diligence?.questions ?? [])
+    .map(text)
+    .filter((one): one is string => one !== null);
+  const filed =
+    diligence?.filedForApproval === true
+      ? "filed for their approval; not sent"
+      : "kept with the job; not sent";
+  bits.push(
+    questions.length === 0
+      ? "Founder diligence questions: none recorded."
+      : `Founder diligence questions prepared (${String(questions.length)}, ${filed}), word for word: ${questions
+          .map((question, i) => `${String(i + 1)}) ${question}`)
+          .join(" ")}`,
+  );
+  return bits.join(" ").slice(0, JOB_TEXT_MAX);
 }
 
 export function ownDayFact(input: {
@@ -162,6 +266,13 @@ export function ownDayFact(input: {
       ? "Q working for them right now: nothing."
       : `Q working for them right now: ${active.join("; ")}.`,
   );
+  const jobs = (work.jobs ?? []).slice(0, 3).map((job) => jobLine(job, zone));
+  if (jobs.length > 0)
+    parts.push(
+      `Jobs Q's team did for them (from their recorded results): ${jobs
+        .map((line, i) => `[${String(i + 1)}] ${line}`)
+        .join(" ")}`.slice(0, JOBS_TEXT_MAX),
+    );
   const rehearsals = input.rehearsals.slice(0, 3).map((r) => {
     const bits = [
       r.endedAt === null ? null : inZone(r.endedAt, zone, true),
@@ -180,10 +291,10 @@ export function ownDayFact(input: {
     statement:
       `Their own day and record on Capital Q (read for them this turn). ${parts.join(" ")}`.slice(
         0,
-        4_000,
+        8_000,
       ),
     truthClass: "VERIFIED",
     evidenceStatus: "PLATFORM_VERIFIED",
-    source: "Capital Q schedule, approvals, Q work and rehearsals",
+    source: "Capital Q schedule, approvals, Q work, team jobs and rehearsals",
   };
 }

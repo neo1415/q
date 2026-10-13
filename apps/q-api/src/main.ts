@@ -2169,6 +2169,7 @@ const workforceJobResults = createWorkforceJobResults({
   store: workforceStore,
   work: agentWorkQueue,
   artifacts: {
+    read: (actor, artifactId) => qArtifacts.service.read(actor, artifactId),
     readVersion: (actor, artifactId, version) =>
       qArtifacts.service.readVersion(actor, artifactId, version),
   },
@@ -4226,6 +4227,8 @@ const workforceDiligence = createWorkforceDiligence({
   firewall,
   currentVersion: qArtifacts.preparation.port.currentVersion,
   questions: workforceModels.diligenceQuestions,
+  shorten: workforceModels.shortenDiligenceQuestions,
+  logger,
   relationshipWith: async (actor, companyId) => {
     const relationship = await errandRelationships.withCompany?.(
       actor,

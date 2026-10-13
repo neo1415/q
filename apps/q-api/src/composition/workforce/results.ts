@@ -16,7 +16,8 @@ const JOBS_REPORTED = 3;
 export const ReviewOutputSchema = z.object({
   artifactId: z.string().uuid(),
   review: z.object({
-    material: z.boolean(),
+    // Older or partial records may lack these; absence is unknown, never "no change".
+    material: z.boolean().optional(),
     issues: z
       .array(
         z.object({
@@ -26,7 +27,7 @@ export const ReviewOutputSchema = z.object({
         }),
       )
       .max(50),
-    revisedToVersion: z.number().int().min(1).nullable(),
+    revisedToVersion: z.number().int().min(1).nullable().optional(),
   }),
 });
 
@@ -94,6 +95,13 @@ export function createWorkforceJobResults(dependencies: {
   readonly work: Pick<AgentWorkQueue, "forOwner">;
   readonly artifacts?:
     | {
+        /** The artifact with its version history (no content), as the person. */
+        readonly read?:
+          | ((
+              actor: ActorContext,
+              artifactId: string,
+            ) => Promise<QArtifactDetail>)
+          | undefined;
         readonly readVersion: (
           actor: ActorContext,
           artifactId: string,
@@ -117,8 +125,29 @@ export function createWorkforceJobResults(dependencies: {
       .map((parsed) => parsed.data)
       .at(-1);
     if (found === undefined) return null;
-    const to = found.review.revisedToVersion;
-    const revised = found.review.material && to !== null;
+    // The reviewer's revision: as recorded, else the version the artifact's
+    // own history marks as the reviewer's (read as the person).
+    let to = found.review.revisedToVersion ?? null;
+    if (
+      to === null &&
+      found.review.material !== false &&
+      dependencies.artifacts?.read !== undefined
+    ) {
+      const detail = await dependencies.artifacts
+        .read(actor, found.artifactId)
+        .catch(() => null);
+      to =
+        detail?.history.find(
+          (entry) =>
+            entry.instruction?.startsWith(REVIEWER_REVISION_PREFIX) === true,
+        )?.version ?? null;
+    }
+    const revised = found.review.material !== false && to !== null;
+    const outcome: NonNullable<QWorkJobResult["review"]>["outcome"] = revised
+      ? "REVISED"
+      : found.review.material === false
+        ? "NO_CHANGE_NEEDED"
+        : "UNKNOWN";
     let documentTitle: string | null = null;
     let revisionNote: string | null = null;
     let changed: readonly string[] | null = null;
@@ -142,7 +171,7 @@ export function createWorkforceJobResults(dependencies: {
       }
     }
     return {
-      outcome: revised ? "REVISED" : "NO_CHANGE_NEEDED",
+      outcome,
       documentTitle,
       findings: found.review.issues.map((issue) => ({
         kind: issue.kind,
@@ -152,7 +181,11 @@ export function createWorkforceJobResults(dependencies: {
       fromVersion: revised && to !== null && to > 1 ? to - 1 : null,
       toVersion: revised ? to : null,
       revisionNote,
-      sectionsChanged: revised ? changed : [],
+      sectionsChanged: revised
+        ? changed
+        : outcome === "NO_CHANGE_NEEDED"
+          ? []
+          : null,
     };
   }
 
