@@ -9,7 +9,10 @@ import type {
   QSlideImage,
 } from "@capital-q/contracts";
 import { inspectDeck, layOutDeck } from "@capital-q/deck-render";
-import type { CompanyIntelligenceDimension } from "@capital-q/q-core";
+import {
+  splitSentences,
+  type CompanyIntelligenceDimension,
+} from "@capital-q/q-core";
 
 import type { CompanyIntelligenceResult } from "./contracts.js";
 import { illustrateDeck, type StockPhotoPort } from "./deck-photos.js";
@@ -455,12 +458,13 @@ function trimToWords(text: string, max: number): string {
   const kept = text.split(/\s+/).filter((word) => word.length > 0);
   if (kept.length <= max) return text;
   // Whole sentences first; a cut mid-sentence only when one is all there is.
-  const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [];
+  // The kept text is a prefix of the original, never re-spaced, and a stop
+  // inside "3.8%" is not a sentence end (D9: "3. 8%" in a revised memo).
   let out = "";
-  for (const sentence of sentences) {
-    const next = `${out}${sentence}`.trim();
+  for (const sentence of splitSentences(text)) {
+    const next = `${out}${sentence}`;
     if (words(next) > max) break;
-    out = `${next} `;
+    out = next;
   }
   return out.trim().length > 0
     ? out.trim()

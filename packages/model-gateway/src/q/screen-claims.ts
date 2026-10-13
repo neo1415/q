@@ -13,6 +13,8 @@
  * alone.
  */
 
+import { splitSentences } from "@capital-q/q-core";
+
 export const NOT_ON_SCREEN_LINE =
   "I haven't been able to open that on your screen.";
 
@@ -82,8 +84,6 @@ export function createScreenClaimGuard(backed: () => boolean) {
   };
 }
 
-const SENTENCE = /[^.!?\n]+(?:[.!?]+["”’)]*|\n|$)/gu;
-
 /** The finished answer, under the same rule. */
 export function withoutUnbackedScreenClaims(
   text: string,
@@ -93,7 +93,8 @@ export function withoutUnbackedScreenClaims(
   const guard = createScreenClaimGuard(() => false);
   // Line by line, so a list or a heading without a claim is untouched.
   const lines = text.split("\n").map((line) => {
-    const sentences = (line.match(SENTENCE) ?? [])
+    // Real sentence ends only: "8.8/10" is one piece, never "8. 8/10" (D9).
+    const sentences = splitSentences(line)
       .map((sentence) => sentence.trim())
       .filter((sentence) => sentence.length > 0);
     if (!sentences.some(claimsOnScreen)) return line;

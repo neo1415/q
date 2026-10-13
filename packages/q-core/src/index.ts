@@ -1101,6 +1101,7 @@ export {
 
 export {
   createSentenceCutter,
+  splitSentences,
   type SentenceCutter,
 } from "./communication/sentences.js";
 

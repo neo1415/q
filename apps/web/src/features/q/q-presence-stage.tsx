@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import type { QAnswerCardsBlock } from "@capital-q/contracts";
+import { splitSentences } from "@capital-q/q-core/speech";
 
 import { History, ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
 
@@ -522,6 +523,7 @@ function askedBefore(
 function closingLine(turn: QTurn | undefined): string {
   if (turn === undefined || turn.kind !== "Q") return "";
   const plain = plainFromMarkdown(turn.text).replace(/\s+/gu, " ").trim();
-  const sentences = plain.match(/[^.!?]+[.!?]+/gu) ?? [plain];
+  // Real sentence ends only, so "8.8/10." is not cut to "8/10." (D9).
+  const sentences = splitSentences(plain);
   return (sentences.at(-1) ?? firstWords(plain) ?? "").trim();
 }
