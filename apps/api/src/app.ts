@@ -337,6 +337,10 @@ export type ApiModules = {
   /** A gateway's submitted applications, for its organisation. */
   readonly gateqInbox?: GateQRoutesDependencies["inbox"] | undefined;
   readonly gateqMaterials?: GateQRoutesDependencies["materials"] | undefined;
+  /** GateQ slice 1: a signed-in founder's application contact. */
+  readonly gateqApplicationContact?:
+    | GateQRoutesDependencies["applicationContact"]
+    | undefined;
   readonly gateqInboxService?:
     GateQRoutesDependencies["inboxService"] | undefined;
   /** F3: find and claim a company; an investor's saved startup search. */
@@ -932,6 +936,7 @@ export function createApp(
       gateq: modules.gateq,
       inbox: modules.gateqInbox,
       materials: modules.gateqMaterials,
+      applicationContact: modules.gateqApplicationContact,
       inboxService: modules.gateqInboxService,
       claimable: modules.companyClaims?.search,
       identities: security.identities,
