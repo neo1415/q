@@ -1,0 +1,42 @@
+# Q Pitch — implementation status
+
+Tracks every Q Pitch building block against the [master blueprint](Q_PITCH_MASTER_BLUEPRINT.md).
+
+**Statuses:**
+
+| Status        | Meaning                                                                 |
+| ------------- | ----------------------------------------------------------------------- |
+| PLANNED       | Specified, not built                                                    |
+| IMPLEMENTED   | Code exists on a branch                                                 |
+| TESTED        | Automated tests pass in CI                                              |
+| LIVE VERIFIED | Observed working on a named production/showcase revision with a receipt |
+| BLOCKED       | Cannot proceed; reason stated                                           |
+
+A planned or implemented item is never a certified demo claim. Claims require an entry in [`CERTIFICATION_MANIFEST.md`](CERTIFICATION_MANIFEST.md).
+
+**Updating:** update in the same PR that changes the status. Name the branch/PR, the revision and the evidence.
+
+## Foundations (Milestone P0–P1)
+
+| ID     | Item                                                                                              | Status  | Owner / branch             | Evidence / notes                                                      |
+| ------ | ------------------------------------------------------------------------------------------------- | ------- | -------------------------- | --------------------------------------------------------------------- |
+| QP-F01 | Route and navigation-action inventory (reusable Q actions)                                        | PLANNED | Lane B                     | —                                                                     |
+| QP-F02 | Dual-membership capability audit (one sign-in, founder + investor org)                            | PLANNED | Lane B                     | Must use existing identity/permissions; no new auth system            |
+| QP-F03 | Demo fixture isolation audit (Doc 23 seed separation, environment checks)                         | PLANNED | Lane B                     | —                                                                     |
+| QP-F04 | `TourAction` contract (typed primitives, acknowledgement results)                                 | PLANNED | Lane B                     | Separate from GateQ shared contracts                                  |
+| QP-F05 | `SceneEvidence` / scene manifest contract                                                         | PLANNED | Lane B                     | Fields per blueprint §9                                               |
+| QP-F06 | Chapter registry + sealed scene scripts (`approvedClaimIds`-bound)                                | PLANNED | Lane B                     | —                                                                     |
+| QP-F07 | Tour director state machine (`PREPARE_SCENE`…`COMPLETE`, PAUSED/INTERRUPTED/RESUME/SAFE_FALLBACK) | PLANNED | Lane B                     | —                                                                     |
+| QP-F08 | Persistent Q shell across routes during a tour                                                    | PLANNED | Lane B                     | Reuse the existing Q dock/stage                                       |
+| QP-F09 | Pause / resume / back / skip / jump controls, keyboard, captions                                  | PLANNED | Lane B                     | —                                                                     |
+| QP-F10 | Authorised workspace switch over existing memberships                                             | PLANNED | Lane B + integration owner | Server/RLS enforced; invalidates retrieval, prefetch and action scope |
+| QP-F11 | Read-only GateQ showcase/dossier view contract                                                    | PLANNED | Lane A (GateQ) → Lane B    | Lane A provides it after the GateQ dossier contract is stable         |
+| QP-F12 | Latency/audio baseline in a real browser (start, first audio, action ack, route, pause)           | PLANNED | Lane C                     | No new provider bills                                                 |
+| QP-P1  | Three-scene pilot: spoken start → Discover card → evidence-backed Q/comparison → pause/back       | PLANNED | Lane B                     | Acceptance per blueprint §11 P1                                       |
+
+## Dependencies
+
+| Depends on                                                      | Status                                                            | Notes                                                                           |
+| --------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| GateQ G1 text workflow (contact → interview → submit → dossier) | PLANNED (backend in progress on `claude/gateq-interview-backend`) | The GateQ premiere scene stays a labelled overview until GateQ is LIVE VERIFIED |
+| Guest document uploads (ADR 0067)                               | PLANNED                                                           | Required for full GateQ acceptance                                              |
