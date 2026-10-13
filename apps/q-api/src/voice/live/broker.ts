@@ -213,6 +213,8 @@ type LiveLine = {
    * delegated, and its transcript is kept as the rehearsal's turns.
    */
   rehearsalId?: string | undefined;
+  /** Q owns the dialogue; audio delegates through the existing rehearsal turn handler. */
+  qBackedRehearsal?: boolean;
   /** Set on a trial person's line: its allowance and speech meter. */
   trial?: TrialLine | undefined;
 };
@@ -318,9 +320,9 @@ export type LiveBrokerDependencies = {
   readonly syntheticDemo: boolean;
   readonly logger: Logger;
   /**
-   * The persona line for a rehearsal with a researched external person.
-   * Absent, or `prepare` answering null (any other rehearsal), a rehearsal
-   * line is refused as before and the standard rehearsal voice carries it.
+   * An authorized rehearsal audio mode: a prepared external persona or
+   * Q-backed dialogue. Absent or null refuses; trial owners never switch
+   * to an unmetered alternative provider.
    */
   readonly rehearsalLine?:
     | {
@@ -331,7 +333,10 @@ export type LiveBrokerDependencies = {
             readonly firstName?: string | undefined;
             readonly locale?: string | undefined;
           },
-        ) => Promise<{ readonly instructions: string } | null>;
+        ) => Promise<{
+          readonly instructions: string;
+          readonly qBacked?: boolean;
+        } | null>;
         readonly record: (
           actor: ActorContext,
           rehearsalId: string,
@@ -953,12 +958,10 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         const facts = speaker.held();
         delegation.ended = { said, facts };
         const approvalPending = said.endsWith(APPROVAL_QUESTION);
-        const commentary = commentaryFor({
-          request,
-          facts,
-          said,
-          approvalPending,
-        });
+        const commentary =
+          line.qBackedRehearsal === true
+            ? `Speak this Q-generated counterpart line exactly, without additions: ${JSON.stringify(said)}`
+            : commentaryFor({ request, facts, said, approvalPending });
         line.history.push(...lead, asked);
         line.referents = [
           ...referentsOf(facts?.mustSay),
@@ -1033,10 +1036,12 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     }) => {
       if (!enabled || provider === undefined)
         return { kind: "REFUSED", reason: "OFF" };
-      // A rehearsal line is GPT-Live only for a researched external person,
-      // from the persona prepared before the call; any other rehearsal
-      // speaks only as the person Q plays, on the standard line.
-      let persona: { readonly instructions: string } | null = null;
+      // Rehearsals must have an authorized prepared audio mode: a public
+      // external persona, or Q-backed dialogue on the canonical rehearsal.
+      let persona: {
+        readonly instructions: string;
+        readonly qBacked?: boolean;
+      } | null = null;
       const rehearsal = binding.thread.rehearsal;
       if (rehearsal !== undefined) {
         persona =
@@ -1221,7 +1226,9 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         referents: carried === null ? [] : [...carried.referents],
         ...(persona === null || rehearsal === undefined
           ? {}
-          : { rehearsalId: rehearsal.rehearsalId }),
+          : persona.qBacked === true
+            ? { qBackedRehearsal: true }
+            : { rehearsalId: rehearsal.rehearsalId }),
         ...(allowance === undefined || trialClaim === null
           ? {}
           : {
@@ -1410,7 +1417,10 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           running.partialSent = words;
           return {
             delegationId: delegation.delegationId,
-            commentary: partialCommentary(running.request, words),
+            commentary:
+              line.qBackedRehearsal === true
+                ? `Speak this Q-generated counterpart line exactly, without additions: ${JSON.stringify(words)}`
+                : partialCommentary(running.request, words),
             stale: line.latest !== delegation.delegationId,
             approvalPending: false,
             failed: false,

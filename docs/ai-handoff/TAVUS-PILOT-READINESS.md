@@ -1,6 +1,6 @@
 # Tavus pilot readiness
 
-User is now ready and confirms Tensorgate sign-in (2026-10-13). One paid <=180-second human pilot is authorized; no room is reserved for later joining.
+Human join failed: correct admitted Tensorgate profile saw no Video selector and entered a refused voice rehearsal. No Tavus room allocated. One paid <=180-second pilot remains authorized but NOT human audiovisual accepted. Repair and verify the browser join path before retrying.
 
 Release prerequisites (root owner): exact latest PR44 quality+database CI green; immutable migration 20261222175000 then additive 20261222180000 applied before code; exact q-api/web deployed SHA verified. One q-api replica; one explicitly entitled provider key. Stable existing voice-session secret across service instances. Q_API_PUBLIC_URL must equal the reachable HTTPS q-api origin.
 
