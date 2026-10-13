@@ -194,6 +194,7 @@ import { manifestFacts, manifestReads } from "./manifest-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
 import {
+  asComparison,
   namedCardCompanyIds,
   previousCardCompanyIds,
   tieLine,
@@ -4007,7 +4008,7 @@ export function createModelGatewayQAnswer(
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         // voice-cards: "the top three" is three cards, not ten.
-        const block = fitSweepCardsBlock(
+        const swept = fitSweepCardsBlock(
           sweep.ask.count === null
             ? sweep.fits
             : sweep.fits.slice(0, sweep.ask.count),
@@ -4015,6 +4016,10 @@ export function createModelGatewayQAnswer(
             ? "Fit against your mandate"
             : `Fit against your mandate: ${sweep.ask.place}`,
         );
+        // D7: "compare Ledgerfold and F2" is the comparison table, in the
+        // order named, and is said as a comparison, never "ranked".
+        const block =
+          swept === null ? null : asComparison(swept, latest.content);
         if (block !== null) {
           const text = fitSweepSummary({
             block,

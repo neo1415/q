@@ -10,9 +10,11 @@ import {
 } from "@capital-q/api-client";
 import {
   BriefingCommandRequestSchema,
+  fitScoreOutOf10,
   type BriefingCommandRequest,
   type BriefingCommandResultDto,
   type ChatThreadDto,
+  type FitProfileDto,
   type QApprovalView,
   type QWorkSinceDto,
 } from "@capital-q/contracts";
@@ -130,6 +132,12 @@ const BrowserInput = z
   .optional();
 export type ArrivalBrowserInput = z.input<typeof BrowserInput>;
 
+/** The canonical fit out of 10 Q and Discover order by; null when none. */
+function scoreOf(profile: FitProfileDto | null): number | null {
+  const shown = profile === null ? null : fitScoreOutOf10(profile);
+  return shown === null ? null : Number(shown);
+}
+
 /** How far into the slate the arrival looks for new matches. */
 const SLATE_LOOK = 20;
 /** Q.01: the questions put beside Q at once. */
@@ -176,6 +184,7 @@ async function readMatches(
         stage: item.currentStageCode,
         country: item.headquartersCountry,
         band: profile?.band ?? null,
+        score: scoreOf(profile),
         take: matchOpinion({ profile, reasons: item.reasons }),
       };
     }),

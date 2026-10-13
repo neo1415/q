@@ -295,6 +295,36 @@ describe("investor matches: grounded take, fit is not quality", () => {
       "One company in your feed fits your mandate: Tamu Pay.",
     );
   });
+
+  // D10 (production 2026-10-12, savanna-seed): Home said "F2 fits best"
+  // while Q and Discover put Ledgerfold first, 8.5 against 7.5. The best
+  // is the canonical fit score, never the band alone or the slate order.
+  it("names as best the highest canonical fit score, as Q and Discover do", () => {
+    const match = (n: number, name: string, score: number | null) => ({
+      companyId: uuid(n),
+      name,
+      line: null,
+      stage: null,
+      country: null,
+      band: "STRONG_FIT" as const,
+      score,
+      take: `A strong fit with your mandate: ${name}. x`,
+    });
+    const words = matchesWords({
+      label: "NOT_LOOKED_AT",
+      total: 2,
+      items: [match(1, "F2", 7.5), match(2, "Ledgerfold", 8.5)],
+    });
+    expect(words).toContain("Ledgerfold fits best.");
+    expect(words).not.toContain("F2 fits best");
+    // A tie on the score is not a "best".
+    const tied = matchesWords({
+      label: "NOT_LOOKED_AT",
+      total: 2,
+      items: [match(1, "F2", 8.5), match(2, "Ledgerfold", 8.5)],
+    });
+    expect(tied).not.toContain("fits best");
+  });
 });
 
 describe("cards follow what Q says", () => {
