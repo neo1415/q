@@ -601,3 +601,37 @@ The cumulative active-speech guard is preserved on pushed `codex/oct13-voice-tri
   4. **Turn reader.** The first attempt sometimes goes to Gemini and is aborted at 2.5 s (seen once, about 6 s lost before the answer started). Watch for it.
   5. **First-audio latency.** Not measured this sprint (no provider-verified browser first-audio stamp). Measure within GPT-Live/duplex with no new paid usage.
 - **NEXT PRIORITY (founder 2026-10-13):** GateQ complete adaptive interview, secure evidence collection and investor-facing dossier; see `session-directives/2026-10-13-gateq-adaptive-interview-and-inbox.txt`. Then the full voice/Tavus experience, then Q Pitch.
+
+## 2026-10-13 21:40 UTC — GateQ text journey integrated; release in CI (Claude, integration owner)
+
+- **MERGED to `build/int-rc`:**
+  - #66 backend (f375202e):
+    - append-only turns and contacts;
+    - the six-digit code verifier (timing-safe, application-salted);
+    - account-confirmed contact;
+    - coverage;
+    - submit v2 plus `GateqDossierV1`, written under one application lock.
+  - #68 web (9612b04e): the contact, interview and review steps, plus the inbox dossier view.
+  - #69 (47d87665): `POST /v1/gateq/apply/interview/open`, so Q asks the first question of a form-started interview.
+    - It is idempotent: an existing transcript is returned with no model call.
+    - The opening is stored once under client turn id `opening`.
+- **Migration** `20261223090000` was already APPLIED (hosted 208, none missing).
+- **RELEASE PR #70** (`claude/gateq-release` → `recovery/2026-09-12`) is in CI.
+  - Its tree equals int-rc 47d87665, plus two production-only files (a takeover transcript and `workforce-acceptance.mjs`).
+  - It is NOT deployed until #70 merges and Railway reports SUCCESS.
+- **#67 Q Pitch foundations:** the IMPLEMENTATION_STATUS add/add conflict was resolved to the branch side (c36864d9); CI is running. It is package-only and not in the release.
+- **LIVE ACCEPTANCE (not yet run):** `scripts/handoff/live/gateq-acceptance.mjs` covers:
+  - fictional founder → fictional investor gateway;
+  - account contact → answers → open → 3 timed turns (plus a dedup retry) → coverage → submit (plus a dedup retry);
+  - inbox holds exactly one item with dossier and transcript;
+  - a second fictional investor gets a 404.
+  - Needs `CQ_SB_URL` and `CQ_SB_PUBLISHABLE` (public sign-in config), `CQ_SEED_ACCOUNT_PASSWORD` and `NODE_USE_ENV_PROXY=1`.
+- **BLOCKERS:**
+  - This session's `SUPABASE_ACCESS_TOKEN` is rejected (401 "Invalid access token"), so no hosted SQL reads or migrations are possible.
+  - The public Supabase URL and publishable key are not in this environment.
+- **OPEN GATEQ GAPS:**
+  - guest document uploads (ADR 0067, required for full acceptance);
+  - the nonbinding Q synthesis record (dossier `synthesis` is null);
+  - quick answers ("I don't know" / "I'd rather not say") are sent as text;
+  - the guest token lives in memory only;
+  - `GATEQ_CONTACT_REQUIRED_FROM` is unset until live acceptance passes.
