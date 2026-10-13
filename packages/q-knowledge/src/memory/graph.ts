@@ -611,10 +611,10 @@ function companyLines(
   now: number,
 ): string {
   const head =
-    c.name ??
+    (c.name === null ? null : shorten(c.name, 100)) ??
     (c.documents[0] === undefined
       ? "A company not listed to the network"
-      : `The company of "${c.documents[0].title}"`);
+      : `The company of "${shorten(c.documents[0].title, 80)}"`);
   const rows = [`- ${head}`];
   if (c.discussed.length > 0) {
     rows.push(
@@ -674,22 +674,21 @@ function companyLines(
       r.documentNowAt === null
         ? ""
         : `; the document has changed since (now v${String(r.documentNowAt)})`;
-    rows.push(
-      `  Reviewer (Q's reviewer, Q inference; ${dated(r.at, now)}; ${what}${moved})${
-        r.issues.length === 0
-          ? ""
-          : ` flagged: ${r.issues
-              .map((i) => `${i.section}: ${shorten(i.problem, 140)}`)
-              .join("; ")}`
-      }`,
-    );
+    const source = `Reviewer (Q's reviewer, Q inference; ${dated(r.at, now)}; ${what}${moved})`;
+    if (r.issues.length === 0) rows.push(`  ${source}`);
+    for (const issue of r.issues) {
+      rows.push(
+        `  ${source} flagged: ${shorten(issue.section, 60)}: ${shorten(issue.problem, 140)}`,
+      );
+    }
   }
   for (const d of c.diligence) {
-    rows.push(
-      `  Diligence questions Q prepared (${d.filedForApproval ? "filed for approval; current approval status not checked" : "kept, not sent"}; ${dated(d.at, now)}): ${d.questions
-        .map((q) => shorten(q, 180))
-        .join(" | ")}`,
-    );
+    // Each question keeps its canonical final qualifier. Splitting the
+    // collection lets a large job keep useful questions inside the budget.
+    const source = `Diligence questions Q prepared (${d.filedForApproval ? "filed for approval; current approval status not checked" : "kept, not sent"}; ${dated(d.at, now)})`;
+    for (const question of d.questions) {
+      rows.push(`  ${source}: ${shorten(question, 180)}`);
+    }
   }
   for (const m of c.said) {
     rows.push(
@@ -789,33 +788,87 @@ export function renderConnectedRecall(
   const asksAcross = recall.cues.some(
     (cue) => cue !== "RECENT" && cue !== "DISCUSSED",
   );
-  if (recall.companies.length === 0 && recent.length > 0 && !asksAcross) {
-    return recent.length > max
-      ? `${recent.slice(0, max - 1).trimEnd()}…`
-      : recent;
+  const onlyRecent =
+    recall.companies.length === 0 && recent.length > 0 && !asksAcross;
+  const omittedDisclosure =
+    "Some recorded evidence omitted to fit this section; omitted is unknown, not none.";
+  const unreadDisclosure =
+    recall.unread.length === 0
+      ? ""
+      : `Not read this time (unknown, not none): ${recall.unread.join(", ")}.`;
+  // Reserve disclosures before selecting evidence. Failed reads cannot
+  // disappear merely because successful reads filled the context budget.
+  const reserved = omittedDisclosure.length + unreadDisclosure.length + 2;
+  const unknown = "Recorded evidence unknown: omitted or unread.";
+  if (
+    max <
+    reserved + (onlyRecent ? RECENT_LABEL.length : CONNECTED_LABEL.length)
+  ) {
+    // Never emit clipped evidence or a clipped disclaimer at tiny budgets.
+    return max >= unknown.length ? unknown : "";
   }
-  const rows: string[] = recent.length === 0 ? [] : [recent, ""];
-  rows.push(CONNECTED_LABEL);
-  if (recall.companies.length === 0) {
-    rows.push(
+  const evidenceMax = max - reserved;
+  const rows: string[] = [];
+  let used = 0;
+  let omitted = false;
+  const append = (line: string, limit = evidenceMax) => {
+    const size = line.length + (rows.length === 0 ? 0 : 1);
+    if (used + size > limit) {
+      omitted = true;
+      return false;
+    }
+    rows.push(line);
+    used += size;
+    return true;
+  };
+  const companyRows = recall.companies.map((company) =>
+    companyLines(company, recall, now).split("\n"),
+  );
+  const companyMinimum = companyRows.reduce(
+    (size, lines) =>
+      // Recent history must leave room for initial substantive evidence
+      // (the memo and first reviewer finding), beyond discussion metadata.
+      size + lines.slice(0, 5).reduce((sum, line) => sum + line.length + 1, 0),
+    0,
+  );
+  if (recent.length > 0) {
+    const recentLimit = Math.max(
+      0,
+      evidenceMax -
+        companyMinimum -
+        (onlyRecent ? 0 : CONNECTED_LABEL.length + 1),
+    );
+    const [label, ...items] = recent.split("\n");
+    if (label !== undefined && append(label, recentLimit)) {
+      for (const line of items) append(line, recentLimit);
+      append("");
+    }
+  }
+  if (!onlyRecent) append(CONNECTED_LABEL);
+  if (recall.companies.length === 0 && !onlyRecent) {
+    append(
       `- Nothing of theirs on record connects to what they asked (conversations of the last ${String(recall.windowDays)} days, their jobs and documents).`,
     );
   }
-  let out = rows.join("\n");
-  companies: for (const company of recall.companies) {
-    // Several historical jobs can make one company's evidence exceed the
-    // entire section budget. Keep complete lines instead of discarding
-    // that company, and never cut a question's final qualification.
-    const lines = companyLines(company, recall, now).split("\n");
-    for (const line of lines) {
-      const next = `${out}\n${line}`;
-      if (next.length > max) break companies;
-      out = next;
-    }
+  for (const [index, lines] of companyRows.entries()) {
+    // Leave room for the names and first evidence of later companies;
+    // repeated jobs on the first company cannot monopolise the section.
+    const laterMinimum = companyRows
+      .slice(index + 1)
+      .reduce(
+        (size, later) =>
+          size +
+          later.slice(0, 2).reduce((sum, line) => sum + line.length + 1, 0),
+        0,
+      );
+    const limit = Math.max(used, evidenceMax - laterMinimum);
+    const head = lines[0];
+    if (head === undefined || !append(head, limit)) continue;
+    // An oversized item does not suppress later evidence or companies.
+    for (const line of lines.slice(1)) append(line, limit);
   }
-  if (recall.unread.length > 0) {
-    const tail = `\nNot read this time (unknown, not none): ${recall.unread.join(", ")}.`;
-    if (out.length + tail.length <= max) out += tail;
-  }
+  if (unreadDisclosure.length > 0) rows.push(unreadDisclosure);
+  if (omitted) rows.push(omittedDisclosure);
+  const out = rows.join("\n");
   return out;
 }

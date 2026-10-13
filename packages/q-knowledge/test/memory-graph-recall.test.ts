@@ -1059,3 +1059,89 @@ describe("connected recall with several jobs for the same company", () => {
     expect(bounded).not.toMatch(/…$/u);
   });
 });
+
+describe("bounded recall preserves incomplete-evidence disclosures", () => {
+  async function oversizedRecall() {
+    const recall = await buildConnectedRecall({
+      port: portOver(world()),
+      actor: investor,
+      plan: { cues: new Set(["REVIEW" as const]), windowDays: 31 },
+      seedCompanyIds: [TENSORGATE],
+      memories: [],
+      now: NOW,
+    });
+    const company = recall.companies[0];
+    const review = company?.reviews[0];
+    if (company === undefined || review === undefined)
+      throw new Error("Missing connected review fixture");
+    return {
+      ...recall,
+      unread: ["jobs" as const, "mandate" as const],
+      companies: [
+        {
+          ...company,
+          reviews: [
+            {
+              ...review,
+              issues: Array.from({ length: 20 }, (_, index) => ({
+                kind: "UNSUPPORTED",
+                section: "Financials",
+                problem: `Issue ${String(index)}: ${"missing source ".repeat(12)}`,
+              })),
+            },
+          ],
+        },
+        {
+          ...company,
+          name: "Later company",
+          reviews: [],
+          diligence: [],
+          said: [],
+        },
+      ],
+    };
+  }
+
+  it("retains attributed reviewer evidence, a later company, and failed-read disclosure", async () => {
+    const text = renderConnectedRecall(await oversizedRecall());
+    expect(text.length).toBeLessThanOrEqual(CONNECTED_MAX);
+    expect(text).toContain("Reviewer (Q's reviewer, Q inference;");
+    expect(text).toContain("Issue 0:");
+    expect(text).toContain("- Later company");
+    expect(text).toContain(
+      "Not read this time (unknown, not none): jobs, mandate.",
+    );
+    expect(text).toContain("Some recorded evidence omitted");
+    expect(text).not.toMatch(/…$/u);
+  });
+
+  it("a long recent section cannot displace the company evidence or disclosures", async () => {
+    const recall = await oversizedRecall();
+    const text = renderConnectedRecall({
+      ...recall,
+      recent: Array.from({ length: 10 }, (_, index) => ({
+        kind: "JOB" as const,
+        at: "2026-10-12",
+        jobId: `job-${String(index)}`,
+        goal: "Long historical work ".repeat(20),
+        state: "COMPLETED",
+      })),
+    });
+    expect(text.length).toBeLessThanOrEqual(CONNECTED_MAX);
+    expect(text).toContain("- Later company");
+    expect(text).toContain("Memo (Q-prepared, Q inference)");
+    expect(text).toContain(
+      "Not read this time (unknown, not none): jobs, mandate.",
+    );
+    expect(text).toContain("Some recorded evidence omitted");
+  });
+
+  it("never emits over-budget or clipped evidence at small budgets", async () => {
+    const recall = await oversizedRecall();
+    for (const budget of [0, 1, 10, 43, 44, 100, 250, 400, 600, 1_000, 2_000]) {
+      const text = renderConnectedRecall(recall, budget);
+      expect(text.length).toBeLessThanOrEqual(budget);
+      if (text.length > 0) expect(text).toContain("unknown");
+    }
+  });
+});

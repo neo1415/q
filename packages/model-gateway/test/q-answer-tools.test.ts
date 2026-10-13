@@ -1424,9 +1424,26 @@ describe("a natural answer after a proposal (G-D3)", () => {
 });
 
 describe("compound fit questions retain the synthesis path", () => {
-  it.each([false, true])(
-    "reuses computed fit reads, synthesis=%s",
-    async (compound) => {
+  it.each([
+    ["Which companies fit my mandate?", "FIT", false],
+    [
+      "Which companies have we discussed recently that fit my mandate, what did your agents find, and which unresolved risks remain?",
+      "THEIR_OWN_RECORDS",
+      true,
+    ],
+    [
+      "Which companies fit my mandate and what did Q learn about them?",
+      "THEIR_OWN_RECORDS",
+      true,
+    ],
+    [
+      "Which companies fit my mandate and what are their weaknesses?",
+      "THEIR_OWN_RECORDS",
+      true,
+    ],
+  ] as const)(
+    "reuses authorized computed fit reads for %s (%s), synthesis=%s",
+    async (text, questionKind, compound) => {
       const companyId = randomUUID();
       const investorOrganisationId = randomUUID();
       const topOffer: QOfferedTool = {
@@ -1461,11 +1478,8 @@ describe("compound fit questions retain the synthesis path", () => {
         tools,
         script: [{ kind: "TEXT", text: JSON.stringify(analystResult(answer)) }],
       });
-      const text = compound
-        ? "Which companies have we discussed recently that fit my mandate, what did your agents find, and which unresolved risks remain?"
-        : "Which companies fit my mandate?";
       if (messages[0]) messages[0] = { ...messages[0], content: text };
-      await seam.answer({
+      const bound = {
         ...request,
         plan: PermittedContextPlanSchema.parse({
           ...request.plan,
@@ -1492,7 +1506,11 @@ describe("compound fit questions retain the synthesis path", () => {
             },
           ],
         }),
-      });
+      };
+      // The same authorized plan is prepared before the actual reading.
+      if (!seam.warm) throw new Error("Warm seam missing");
+      seam.warm(bound);
+      await seam.answer({ ...bound, questionKind });
       expect(
         tools.executed.filter((p) => p.name === "fit_top_candidates"),
       ).toHaveLength(1);
