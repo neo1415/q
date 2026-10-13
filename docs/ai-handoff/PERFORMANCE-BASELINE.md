@@ -1,5 +1,20 @@
 # Performance baseline and measured first improvements
 
+## October 13 16:15 UTC — after PR #59/#61 (production c2f08536), same journey
+
+Same fictional investor, same browser journey, one observation each (not p50/p95). First 20 rendered characters / settled:
+
+| Turn             | Before (cfc694b3)  | After (c2f08536)      | Answer model calls                              | Answer output tokens | Findings                                                               |
+| ---------------- | ------------------ | --------------------- | ----------------------------------------------- | -------------------- | ---------------------------------------------------------------------- |
+| Top three        | 3,500 / 3,969 ms   | 3,654 / 4,061 ms      | 0 (code)                                        | –                    | 3 cards                                                                |
+| Selected profile | 5,984 / 24,974 ms  | **5,035 / 15,536 ms** | 1 → 1 (21.5 s → **12.3 s**)                     | 2,104 → **1,206**    | 5 → **8**                                                              |
+| Risks follow-up  | 15,095 / 29,825 ms | **4,630 / 17,324 ms** | 3 → **1** (14.4 s; 26k/38.5k cached)            | 1,628 → 1,529        | 0 (FAILED) → **10**                                                    |
+| Comparison       | not reached        | 7,937 / 27,155 ms     | 2 (tool round 2.7 s + 20.9 s, 39k/40.8k cached) | 2,280                | 10; two canonical cards; table NOT rendered (uneven measures) → PR #62 |
+
+- The turn reader made no refusal or timeout retries this run.
+- The remaining dominant cost is answer output length (about 100 tokens/s). Unfocused own-records questions still offer 96 tools.
+- Cost per profile answer: $0.0102 before (from the ledger); the after cost is not separately computed.
+
 ## October 13 15:00 UTC — Claude takeover baseline before PR #59 (production cfc694b3)
 
 Single authenticated browser journey, fictional investor; private receipt in the newest `/tmp/cq-investor-demo-*`. First 20 rendered characters / settled:
