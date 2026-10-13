@@ -1552,3 +1552,5 @@ export {
   V23_ALLOWED_ROOT_KEYS,
   V23_RESULT_GUIDANCE,
 } from "./prompts/tasks/company-analyst.v23.js";
+
+export { COMPANY_ANALYST_V24 } from "./prompts/tasks/company-analyst.v24.js";
