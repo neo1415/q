@@ -187,6 +187,12 @@ describe("reading aloud", () => {
     expect(sentenceSaid(page, "The company is limited by shares.")).toBe(1);
     expect(sentenceSaid(page, "Anything else I can help with?")).toBeNull();
   });
+
+  it("never cuts a decimal into two read-along sentences (D9)", () => {
+    expect(
+      sentencesOf("Portfolio-at-risk of 3.8% in March. Fit is 8.8/10."),
+    ).toEqual(["Portfolio-at-risk of 3.8% in March.", "Fit is 8.8/10."]);
+  });
 });
 
 describe("closing as the conversation moves on (founder, 6 October)", () => {

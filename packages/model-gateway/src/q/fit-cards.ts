@@ -14,7 +14,7 @@ import {
   type QAnswerCardLevel,
   type QAnswerCardsBlock,
 } from "@capital-q/contracts";
-import { spokenFactsOf } from "@capital-q/q-core";
+import { splitSentences, spokenFactsOf } from "@capital-q/q-core";
 import type { QToolCallOutcome } from "@capital-q/q-runtime";
 
 import { nameKey } from "./card-subjects.js";
@@ -469,7 +469,6 @@ export function hasOrphanListItems(text: string): boolean {
   return /(?:^|[.!?]\s+)(?:Pros?|Cons?)\s*:/u.test(text);
 }
 
-const SPOKEN_SENTENCE = /[^.!?\n]+[.!?]+["”’)]*/gu;
 const ON_SCREEN = /\bon (?:your |the )?screen\b|\bin the cards?\b/iu;
 
 /**
@@ -483,7 +482,9 @@ export function spokenBeforeCards(text: string): string {
     .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)])\s+/u, "").trim())
     .filter((line) => line.length > 0 && !line.startsWith("|"))
     .join(" ");
-  const sentences = (flat.match(SPOKEN_SENTENCE) ?? [])
+  // splitSentences, never a per-stop regex: "8.8/10" must not become
+  // "8. 8/10" when the pieces are rejoined (D9).
+  const sentences = splitSentences(flat)
     .map((sentence) => sentence.trim())
     .filter((sentence) => sentence.length > 0 && !ON_SCREEN.test(sentence));
   if (sentences.length === 0) return text;

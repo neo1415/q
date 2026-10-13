@@ -1,4 +1,5 @@
 import type { QDocumentActIntent } from "@capital-q/contracts";
+import { splitSentences } from "@capital-q/q-core/speech";
 
 import type { QTurn } from "../conversation";
 import { wireNow } from "../wire";
@@ -121,12 +122,8 @@ export function citedLines(text: string): readonly CitedLine[] {
 
 /** A page's text as sentences, for the read-aloud highlight. */
 export function sentencesOf(text: string): readonly string[] {
-  return (
-    text
-      .replace(/\s+/gu, " ")
-      .trim()
-      .match(/[^.!?]+[.!?]*/gu) ?? []
-  )
+  // Real sentence ends only: "3.8%" is one piece, never "3." and "8%" (D9).
+  return splitSentences(text.replace(/\s+/gu, " ").trim())
     .map((sentence) => sentence.trim())
     .filter((sentence) => sentence.length > 0);
 }

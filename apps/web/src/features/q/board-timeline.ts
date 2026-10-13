@@ -1,4 +1,6 @@
 import type { QTurn, QTurnObjectBlock } from "./conversation";
+import { splitSentences } from "@capital-q/q-core/speech";
+
 import { plainFromMarkdown } from "./markdown";
 
 /**
@@ -130,7 +132,8 @@ function minisOf(blocks: readonly QTurnObjectBlock[]): BoardMini[] {
 export function firstWords(text: string, max = 180): string | null {
   const plain = plainFromMarkdown(text).replace(/\s+/gu, " ").trim();
   if (plain.length === 0) return null;
-  const sentences = plain.match(/[^.!?]+[.!?]+/gu) ?? [plain];
+  // Real sentence ends only, so "8.8/10" is never cut after "8." (D9).
+  const sentences = splitSentences(plain);
   let out = "";
   for (const sentence of sentences) {
     if (out.length > 0 && out.length + sentence.length > max) break;
