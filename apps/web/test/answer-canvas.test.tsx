@@ -18,6 +18,7 @@ import {
 import {
   answerChipFor,
   canvasLayout,
+  compareRows,
   comparesAsTable,
   focusForSaid,
   playbackSteps,
@@ -90,6 +91,26 @@ describe("layout for 1, 3, 5 and 10 cards (C1)", () => {
   it("shows a comparison with shared measures as one table", () => {
     expect(comparesAsTable(DEMO_COMPARE)).toBe(true);
     expect(comparesAsTable(demoTop(3))).toBe(false);
+  });
+
+  // Live 2026-10-13: one company carried a measure the other did not, and
+  // the comparison fell back to two loose cards.
+  it("lays a comparison whose cards' measures differ out as one table, the gap shown as not recorded", () => {
+    const [first, second] = DEMO_COMPARE.cards;
+    if (first === undefined || second === undefined) throw new Error("fixture");
+    const uneven = {
+      ...DEMO_COMPARE,
+      cards: [first, { ...second, measures: second.measures.slice(0, -1) }],
+    };
+    expect(comparesAsTable(uneven)).toBe(true);
+    expect(compareRows(uneven)).toEqual(first.measures.map((m) => m.label));
+    const { container } = render(
+      <AnswerCanvas block={uneven} focus={0} said="" />,
+    );
+    expect(container.querySelectorAll("[data-ac-compare]")).toHaveLength(1);
+    const gaps = container.querySelectorAll("[data-ac-not-recorded]");
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]?.textContent).toBe("Not recorded");
   });
 });
 
