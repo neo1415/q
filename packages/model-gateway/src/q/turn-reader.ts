@@ -307,6 +307,11 @@ export function createQTurnReader(dependencies: {
           },
           {
             schema: TurnReaderV49ResultSchema,
+            // Live 2026-10-13: a reading that wrote a tool's own fields at
+            // the root was refused and re-asked (~3.3 s of a ~6 s wait
+            // before the answer started). Those keys mean nothing at the
+            // root; the reading is kept and its tool stays unread (null).
+            unknownRootKeys: "DROP",
             ...(input.signal === undefined ? {} : { signal: input.signal }),
             ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
               ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
