@@ -106,6 +106,10 @@ import {
   type RehearsalRoutesDependencies,
 } from "./http/rehearsals.js";
 import {
+  registerRehearsalVideoRoutes,
+  type RehearsalVideoRoutesDependencies,
+} from "./http/rehearsal-video.js";
+import {
   registerReadinessBlueprintRoutes,
   type ReadinessBlueprintRoutesDependencies,
 } from "./http/readiness-blueprint.js";
@@ -201,6 +205,9 @@ export type QApiModules = {
   /** Zino 2026-10-08: the briefing's free-form words, read into card verbs. */
   readonly briefingCommand?: BriefingCommandReader | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
+  /** ADR 0066: the rehearsal met by video (a stock AI interviewer). */
+  readonly rehearsalVideo?:
+    RehearsalVideoRoutesDependencies["video"] | undefined;
   // BILLING block (ADR 0034): the plan's rehearsal allowance.
   readonly rehearsalEntitlements?:
     RehearsalRoutesDependencies["entitlements"] | undefined;
@@ -647,7 +654,21 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       rehearsals: modules.rehearsals,
+      video: modules.rehearsalVideo,
       entitlements: modules.rehearsalEntitlements,
+    });
+  }
+
+  if (modules.rehearsalVideo !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: rehearsal video routes require an actor context resolver",
+      );
+    }
+    registerRehearsalVideoRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      video: modules.rehearsalVideo,
     });
   }
 

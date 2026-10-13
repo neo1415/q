@@ -2,10 +2,17 @@ import { z } from "zod";
 
 /**
  * Tavus CVI behind a port (ADR 0066). The provider SDK is never used from
- * feature code; this adapter speaks the documented REST API
- * (docs.tavus.io, OpenAPI read 2026-10-12) with one server-side key, and
- * returns only what callers need. The key is never logged, returned or
- * sent anywhere but Tavus.
+ * feature code; this adapter speaks the documented REST API with one
+ * server-side key per client, and returns only what callers need. The key
+ * is never logged, returned or sent anywhere but Tavus.
+ *
+ * Contract verified 2026-10-12 against docs.tavus.io/openapi.yaml and the
+ * live API (read-only lists plus one test_mode lifecycle): PALs are
+ * `/v2/pals` with `pal_id` and `default_face_id` (`/v2/personas`,
+ * `persona_id` and `default_replica_id` are the older names and still
+ * answer); a conversation takes `pal_id` + `face_id`; `require_auth`
+ * returns a `meeting_token` for a private room on `tavus.daily.co`; ending
+ * is `POST /v2/conversations/{id}/end`; deleting a PAL answers 204.
  */
 
 const BASE_URL = "https://tavusapi.com";
@@ -18,10 +25,33 @@ const ConversationSchema = z
   })
   .passthrough();
 
+const ConversationCreatedSchema = ConversationSchema.extend({
+  meeting_token: z.string().min(1).max(4_000).optional(),
+});
+
 const PalSchema = z
   .object({
     pal_id: z.string().min(1).max(128).optional(),
     persona_id: z.string().min(1).max(128).optional(),
+  })
+  .passthrough();
+
+const FaceListSchema = z
+  .object({
+    data: z
+      .array(
+        z
+          .object({
+            face_id: z.string().max(128).optional(),
+            replica_id: z.string().max(128).optional(),
+            face_name: z.string().max(200).optional(),
+            replica_name: z.string().max(200).optional(),
+            model_name: z.string().max(80).optional(),
+            status: z.string().max(40).optional(),
+          })
+          .passthrough(),
+      )
+      .max(2_000),
   })
   .passthrough();
 
@@ -48,6 +78,18 @@ const VoiceListSchema = z
 export type TavusConversation = {
   readonly conversationId: string;
   readonly conversationUrl: string | null;
+  readonly status: string | null;
+};
+
+export type TavusCreatedConversation = TavusConversation & {
+  /** Present for a private room (`requireAuth`); joins as `?t=`. */
+  readonly meetingToken: string | null;
+};
+
+export type TavusFace = {
+  readonly faceId: string;
+  readonly name: string;
+  readonly model: string | null;
   readonly status: string | null;
 };
 
@@ -78,17 +120,54 @@ export type TavusPalLayers = {
     | undefined;
 };
 
+/**
+ * Why a call failed, as far as choosing a key goes: the key is refused
+ * (AUTH), its account is out of credit (CREDIT), or at a usage or
+ * concurrency limit (QUOTA); anything else is OTHER.
+ */
+export type TavusFailureKind = "AUTH" | "CREDIT" | "QUOTA" | "OTHER";
+
 export class TavusError extends Error {
   readonly operation: string;
   readonly status: number;
+  readonly kind: TavusFailureKind;
 
-  constructor(operation: string, status: number) {
+  constructor(
+    operation: string,
+    status: number,
+    kind: TavusFailureKind = "OTHER",
+  ) {
     // The body is never echoed: it can carry request details.
     super(`Tavus ${operation} failed with HTTP ${String(status)}`);
     this.name = "TavusError";
     this.operation = operation;
     this.status = status;
+    this.kind = kind;
   }
+}
+
+/**
+ * Classifies a refusal from its status and, for a 400, the provider's
+ * message words ("User has reached maximum concurrent conversations"). The
+ * words are matched here and dropped; they never reach a log or an error.
+ */
+export function tavusFailureKind(
+  status: number,
+  body: string,
+): TavusFailureKind {
+  if (status === 401 || status === 403) return "AUTH";
+  if (status === 402) return "CREDIT";
+  if (status === 429) return "QUOTA";
+  if (status === 400 || status === 422) {
+    const words = body.slice(0, 2_000).toLowerCase();
+    if (/\b(credits?|balance|payment|billing|insufficient)\b/u.test(words)) {
+      return "CREDIT";
+    }
+    if (/\b(concurrent|quota|limit|exceeded|maximum)\b/u.test(words)) {
+      return "QUOTA";
+    }
+  }
+  return "OTHER";
 }
 
 export type TavusClient = {
@@ -97,6 +176,9 @@ export type TavusClient = {
     readonly systemPrompt: string;
     readonly faceId: string;
     readonly layers: TavusPalLayers;
+    /** Spoken before the greeting and shown on screen, every call. */
+    readonly disclosure?:
+      { readonly spoken: string; readonly shown: string } | undefined;
   }) => Promise<{ readonly palId: string }>;
   readonly deletePal: (palId: string) => Promise<void>;
   readonly createConversation: (input: {
@@ -108,12 +190,16 @@ export type TavusClient = {
     readonly context: string | null;
     readonly maxCallSeconds: number;
     readonly testMode: boolean;
-  }) => Promise<TavusConversation>;
+    /** A private room: only the holder of the returned token joins. */
+    readonly requireAuth?: boolean | undefined;
+  }) => Promise<TavusCreatedConversation>;
   readonly endConversation: (conversationId: string) => Promise<void>;
   readonly getConversation: (
     conversationId: string,
   ) => Promise<TavusConversation>;
   readonly listVoices: () => Promise<readonly TavusVoice[]>;
+  /** Stock (system) faces, read-only. */
+  readonly listStockFaces: () => Promise<readonly TavusFace[]>;
 };
 
 export function createTavusClient(dependencies: {
@@ -141,7 +227,14 @@ export function createTavusClient(dependencies: {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!response.ok) throw new TavusError(operation, response.status);
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new TavusError(
+        operation,
+        response.status,
+        tavusFailureKind(response.status, text),
+      );
+    }
     const text = await response.text();
     if (text.length === 0) return null;
     try {
@@ -165,7 +258,15 @@ export function createTavusClient(dependencies: {
       const raw = await call("create PAL", "POST", "/v2/pals", {
         pal_name: input.name,
         system_prompt: input.systemPrompt,
-        face_id: input.faceId,
+        pipeline_mode: "full",
+        default_face_id: input.faceId,
+        ...(input.disclosure === undefined
+          ? {}
+          : {
+              disclosure_type: "always",
+              verbal_disclosure: input.disclosure.spoken,
+              visual_disclosure: input.disclosure.shown,
+            }),
         layers: input.layers,
       });
       const parsed = PalSchema.parse(raw);
@@ -190,8 +291,11 @@ export function createTavusClient(dependencies: {
       ) {
         throw new TavusError("conversation duration", 400);
       }
-      return conversationOf(
-        await call("create conversation", "POST", "/v2/conversations", {
+      const raw = await call(
+        "create conversation",
+        "POST",
+        "/v2/conversations",
+        {
           pal_id: input.palId,
           face_id: input.faceId,
           conversation_name: input.name,
@@ -205,6 +309,9 @@ export function createTavusClient(dependencies: {
             ? {}
             : { conversational_context: input.context }),
           test_mode: input.testMode,
+          ...(input.requireAuth === true
+            ? { require_auth: true, max_participants: 2 }
+            : {}),
           properties: {
             // The provider's own backstop: the call cannot outlive this.
             max_call_duration: input.maxCallSeconds,
@@ -212,8 +319,13 @@ export function createTavusClient(dependencies: {
             participant_absent_timeout: 90,
             enable_closed_captions: true,
           },
-        }),
+        },
       );
+      const created = ConversationCreatedSchema.parse(raw);
+      return {
+        ...conversationOf(created),
+        meetingToken: created.meeting_token ?? null,
+      };
     },
     endConversation: async (conversationId) => {
       await call(
@@ -241,6 +353,27 @@ export function createTavusClient(dependencies: {
         accent: voice.accent ?? null,
         gender: voice.gender ?? null,
       }));
+    },
+    listStockFaces: async () => {
+      const parsed = FaceListSchema.parse(
+        await call(
+          "list faces",
+          "GET",
+          "/v2/faces?face_type=system&verbose=true&limit=200",
+        ),
+      );
+      return parsed.data.flatMap((face) => {
+        const faceId = face.face_id ?? face.replica_id;
+        if (faceId === undefined) return [];
+        return [
+          {
+            faceId,
+            name: (face.face_name ?? face.replica_name ?? "face").trim(),
+            model: face.model_name ?? null,
+            status: face.status ?? null,
+          },
+        ];
+      });
     },
   };
 }
