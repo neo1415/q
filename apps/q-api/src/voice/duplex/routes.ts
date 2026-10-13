@@ -3,7 +3,10 @@ import type {
   FastifyReply,
   FastifyRequest,
   onRequestHookHandler,
+  onRequestAsyncHookHandler,
 } from "fastify";
+
+import type { ActorContext } from "@capital-q/security";
 
 import {
   parseContract,
@@ -58,6 +61,8 @@ export function registerDuplexVoiceRoutes(
     readonly broker: DuplexBroker;
     /** The same onRequest hook the other voice routes use. */
     readonly withContext: onRequestHookHandler;
+    /** Metered LIVE-only owners must not adopt or renew an unmetered line. */
+    readonly restricted?: ((actor: ActorContext) => boolean) | undefined;
     /**
      * A11 (C-16): the binding the request's sealed voice-session token
      * names, restored on this instance; null without a valid token.
@@ -74,6 +79,21 @@ export function registerDuplexVoiceRoutes(
   const actorOf = getActorContext;
   const idOf = (params: unknown) =>
     (params as { voiceSessionId?: string }).voiceSessionId ?? "";
+  const rejectRestricted: onRequestAsyncHookHandler = async (
+    request,
+    reply,
+  ) => {
+    const actor = actorOf(request);
+    if (dependencies.restricted?.(actor) !== true) return;
+    // Clean up an old owned line without minting, restoring or adopting one.
+    broker.end({
+      actor,
+      voiceSessionId: idOf(request.params),
+      reason: "trial_requires_metered_live",
+    });
+    return gone(reply);
+  };
+  const guardedContext = [withContext, rejectRestricted];
 
   /**
    * A11 (C-16): the broker's answer for this request, adopting the line
@@ -114,7 +134,7 @@ export function registerDuplexVoiceRoutes(
 
   app.post(
     Q_VOICE_DUPLEX_TOOL_PATH,
-    { onRequest: withContext },
+    { onRequest: guardedContext },
     async (request, reply) => {
       const call = parseContract(
         QVoiceDuplexToolCallSchema,
@@ -149,7 +169,7 @@ export function registerDuplexVoiceRoutes(
   // answers it, and runs Q for a substantive one.
   app.post(
     Q_VOICE_DUPLEX_HEARD_PATH,
-    { onRequest: withContext },
+    { onRequest: guardedContext },
     async (request, reply) => {
       const heard = parseContract(
         QVoiceDuplexHeardSchema,
@@ -182,7 +202,7 @@ export function registerDuplexVoiceRoutes(
   // VOICE-BRAIN: what the voice said, for the line's transcript.
   app.post(
     Q_VOICE_DUPLEX_SAID_PATH,
-    { onRequest: withContext },
+    { onRequest: guardedContext },
     async (request, reply) => {
       const said = parseContract(
         QVoiceDuplexSaidSchema,
@@ -206,7 +226,7 @@ export function registerDuplexVoiceRoutes(
 
   app.post(
     Q_VOICE_DUPLEX_USAGE_PATH,
-    { onRequest: withContext },
+    { onRequest: guardedContext },
     async (request, reply) => {
       const report = parseContract(
         QVoiceDuplexUsageReportSchema,
@@ -234,7 +254,7 @@ export function registerDuplexVoiceRoutes(
   // ADR 0062: the silence ladder's beats while ask_q works (long poll).
   app.post(
     Q_VOICE_DUPLEX_NARRATION_PATH,
-    { onRequest: withContext },
+    { onRequest: guardedContext },
     async (request, reply) => {
       const body = parseContract(
         QVoiceDuplexNarrationRequestSchema,
@@ -267,7 +287,7 @@ export function registerDuplexVoiceRoutes(
   // I1: a dropped line asks for a fresh call instead of falling back.
   app.post(
     Q_VOICE_DUPLEX_REJOIN_PATH,
-    { onRequest: withContext },
+    { onRequest: guardedContext },
     async (request, reply) => {
       const body = parseContract(
         QVoiceDuplexRejoinSchema,
@@ -295,7 +315,7 @@ export function registerDuplexVoiceRoutes(
   // RECOVERY A4: one turn's disposition and timings, for the server log.
   app.post(
     Q_VOICE_DUPLEX_OUTCOME_PATH,
-    { onRequest: withContext },
+    { onRequest: guardedContext },
     async (request, reply) => {
       const report = parseContract(
         QVoiceDuplexTurnReportSchema,
@@ -320,7 +340,7 @@ export function registerDuplexVoiceRoutes(
   // A8 SIDEBAND: the call's id; the server attaches only when it is on.
   app.post(
     Q_VOICE_DUPLEX_ATTACH_PATH,
-    { onRequest: withContext },
+    { onRequest: guardedContext },
     async (request, reply) => {
       const body = parseContract(
         QVoiceDuplexAttachSchema,
@@ -344,7 +364,7 @@ export function registerDuplexVoiceRoutes(
 
   app.post(
     Q_VOICE_DUPLEX_END_PATH,
-    { onRequest: withContext },
+    { onRequest: guardedContext },
     (request, reply) => {
       const body = parseContract(
         QVoiceDuplexEndSchema,

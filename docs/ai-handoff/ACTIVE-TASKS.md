@@ -627,3 +627,7 @@ Complete new directives are preserved under `session-directives/` and linked in 
 | Q-to-agent and agent-to-Q communications        | See the matrix                                                                         |
 | End-to-end founder and investor journeys        | NOT VERIFIED end to end                                                                |
 | Landing page and PADL promise fulfilment        | See [`PROMISE-COVERAGE.md`](PROMISE-COVERAGE.md)                                       |
+
+## October 13 independent voice reliability checkpoint
+
+The cumulative active-speech guard is preserved on pushed `codex/oct13-voice-trial-guard` (`5d748085`), based on `6f47fd5d`. See [VOICE-TRIAL-DURABLE-GUARD.md](VOICE-TRIAL-DURABLE-GUARD.md). Existing unfinished source was also backed up as WIP `71518a20` on `codex/voice-trial-audit-takeover`. The continuation restores the strict concurrent-consumption regression, requires bounded confirmed observer readiness before SDP, checks observation again after context reads, and flushes replacement accounting across owned tenant contexts. Package-build and fresh local gates are pending at this checkpoint; no CI-green, migration-applied, deployed or live-verification claim. Migration `20261222170000` remains unapplied. Tavus and independent product release ownership remain with the root engineer.
