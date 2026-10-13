@@ -25,6 +25,21 @@ function world(result: unknown) {
 }
 
 describe("durable voice trial claim adapter", () => {
+  it.each([true, false])(
+    "reads the account-global held status: %s",
+    async (held) => {
+      const { query, store } = world([{ held }]);
+      expect(await store.held(actor)).toBe(held);
+      expect(query.mock.calls[0]?.slice(1)).toEqual([actor.userId]);
+    },
+  );
+  it("fails closed for an unreadable held claim", async () => {
+    const { store } = world([]);
+    await expect(store.held(actor)).rejects.toThrow(
+      "unreadable held trial claim",
+    );
+  });
+
   it("uses actor ownership and the database's global remaining allowance", async () => {
     const { query, store } = world([{ remaining: "10.00" }]);
     const claim = await store.claim({

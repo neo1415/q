@@ -9,6 +9,7 @@ type TrialClaimQuery = (
 ) => PromiseLike<unknown>;
 
 const ClaimRows = z.array(z.object({ remaining: z.string().nullable() }));
+const HeldRows = z.array(z.object({ held: z.boolean() }));
 const ReleaseRows = z.array(z.object({ released: z.boolean() }));
 
 // The named-account five-minute trial is narrower than the platform grant maximum.
@@ -16,6 +17,7 @@ const TRIAL_ACCOUNT_LIMIT_SECONDS = 300;
 
 /** Exclusive coordination; canonical trial usage remains consumption truth. */
 export type LiveTrialClaimStore = {
+  readonly held: (actor: ActorContext) => Promise<boolean>;
   readonly claim: (input: {
     readonly actor: ActorContext;
     readonly allowanceSeconds: number;
@@ -39,6 +41,15 @@ export function createPostgresLiveTrialClaims(
   sql: TrialClaimQuery,
 ): LiveTrialClaimStore {
   return {
+    held: async (actor) => {
+      const rows = HeldRows.parse(
+        await sql`
+        select exists(select 1 from q_runtime.voice_live_trial_claims
+          where user_id = ${actor.userId}) as held`,
+      );
+      if (rows[0] === undefined) throw new Error("unreadable held trial claim");
+      return rows[0].held;
+    },
     claim: async ({ actor, allowanceSeconds, voiceSessionId }) => {
       if (
         !Number.isInteger(allowanceSeconds) ||

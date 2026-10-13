@@ -132,6 +132,7 @@ import { createExternalSubjectResolver } from "./composition/external-resolve.js
 import { createPostgresExternalSubjectStore } from "./composition/external-subjects.js";
 import { createLiveBroker } from "./voice/live/broker.js";
 import { createPostgresLiveSpend } from "./voice/live/spend.js";
+import { createPostgresLiveTrialClaims } from "./voice/live/trial-claim.js";
 import { createPostgresLiveTrialUsage } from "./voice/live/trial.js";
 import { liveConfigFrom } from "./voice/live/config.js";
 import { createGptLiveProvider } from "./voice/providers/gpt-live.js";
@@ -5991,6 +5992,7 @@ const liveBroker =
         spend: createPostgresLiveSpend(database.sql),
         // The trial's persisted use of active speech (CQ_VOICE_LIVE_TRIAL).
         trialUsage: createPostgresLiveTrialUsage(database.sql),
+        trialClaims: createPostgresLiveTrialClaims(database.sql),
         // The turn board the voice surface polls: a delegation that moved
         // the screen says so, so the move is followed before it is spoken.
         board: voiceTurnBoard,
