@@ -23,6 +23,7 @@ import {
 import {
   canvasLayout,
   comparesAsTable,
+  compareRows,
   fitNumber,
   fitExplanation,
   fitProvenance,
@@ -575,7 +576,7 @@ function CompareTable({
   readonly onPin?: (() => void) | undefined;
 }) {
   const cards = block.cards;
-  const labels = cards[0]?.measures.map((measure) => measure.label) ?? [];
+  const labels = compareRows(block);
   const hasView = cards.some((card) => card.view !== null);
   // E4 (Q.05): why each fits, from what they publish (code-written).
   const hasBasis = cards.some(
@@ -659,15 +660,28 @@ function CompareTable({
           </tr>
         </thead>
         <tbody>
-          {labels.map((label, row) => [
+          {labels.map((label) => [
             <tr key={`${label}-label`} className="label" aria-hidden="true">
               <td colSpan={cards.length}>{label}</td>
             </tr>,
             <tr key={label}>
               <th scope="row">{label}</th>
               {cards.map((card, index) => {
-                const measure = card.measures[row];
-                if (measure === undefined) return <td key={card.key} />;
+                const measure = card.measures.find(
+                  (candidate) => candidate.label === label,
+                );
+                if (measure === undefined) {
+                  return (
+                    <td
+                      key={card.key}
+                      className={cell(index)}
+                      data-hue={String(card.hue)}
+                      data-ac-not-recorded
+                    >
+                      <span className="s">Not recorded</span>
+                    </td>
+                  );
+                }
                 return (
                   <td
                     key={card.key}
