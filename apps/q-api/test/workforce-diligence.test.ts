@@ -36,6 +36,10 @@ function world(
     readonly state?: string | null;
     readonly drafted?: boolean;
     readonly authorised?: boolean;
+    /** Drafted questions in place of the default two. */
+    readonly draft?: readonly { question: string; about: string }[];
+    /** What the shortening repair returns (default: null). */
+    readonly shortened?: readonly string[] | null;
   } = {},
 ) {
   const plan = PermittedContextPlanSchema.parse({
@@ -83,21 +87,27 @@ function world(
     Promise.resolve(
       options.drafted === false
         ? null
-        : {
-            questions: [
-              {
-                question: "What was monthly burn over the last three months?",
-                about: "Monthly burn",
-              },
-              {
-                question:
-                  "What share of loans defaulted in the last two quarters?",
-                about: "Default rate",
-              },
-            ],
-          },
+        : options.draft !== undefined
+          ? { questions: [...options.draft] }
+          : {
+              questions: [
+                {
+                  question: "What was monthly burn over the last three months?",
+                  about: "Monthly burn",
+                },
+                {
+                  question:
+                    "What share of loans defaulted in the last two quarters?",
+                  about: "Default rate",
+                },
+              ],
+            },
     ),
   );
+  const shorten = vi.fn<WorkforceModels["shortenDiligenceQuestions"]>(() =>
+    Promise.resolve(options.shortened ?? null),
+  );
+  const logger = { info: vi.fn(), warn: vi.fn() };
   const propose = vi.fn((_input: unknown) =>
     Promise.resolve({ action: { id: "action-1" } } as never),
   );
@@ -128,6 +138,8 @@ function world(
     },
     currentVersion,
     questions,
+    shorten,
+    logger,
     relationshipWith: () =>
       Promise.resolve(
         options.state === null
@@ -161,6 +173,8 @@ function world(
     input,
     propose,
     questions,
+    shorten,
+    logger,
     createRun,
     conversationId,
     conversationForRun,
@@ -227,5 +241,72 @@ describe("the diligence specialist", () => {
     const denied = world({ authorised: false });
     expect((await denied.diligence(denied.input)).status).toBe("UNAVAILABLE");
     expect(denied.questions).not.toHaveBeenCalled();
+  });
+
+  const long = (stem: string) =>
+    `${stem} ${"including the period, the source document and how it was measured ".repeat(3)}?`;
+  const filedQuestions = (w: ReturnType<typeof world>) =>
+    (
+      w.propose.mock.calls[0]?.[0] as {
+        payload: { input: { questions: string[] } };
+      }
+    ).payload.input.questions;
+
+  it("makes no repair call when every drafted question fits", async () => {
+    const w = world();
+    expect((await w.diligence(w.input)).status).toBe("CARDED");
+    expect(w.shorten).not.toHaveBeenCalled();
+  });
+
+  it("rewrites only the over-long questions shorter, once, and files them in order", async () => {
+    const first = long("What was monthly burn");
+    const third = long("What share of loans defaulted");
+    expect(first.length).toBeGreaterThan(180);
+    const w = world({
+      draft: [
+        { question: first, about: "Monthly burn" },
+        {
+          question: "Who are your three largest customers?",
+          about: "Customers",
+        },
+        { question: third, about: "Default rate" },
+      ],
+      shortened: [
+        "What was monthly burn over the last three months, and from which accounts?",
+        "What share of loans defaulted in the last two quarters, per your loan book?",
+      ],
+    });
+    const result = await w.diligence(w.input);
+    expect(result.status).toBe("CARDED");
+    expect(w.shorten).toHaveBeenCalledTimes(1);
+    expect(w.shorten.mock.calls[0]?.[2].questions).toEqual([first, third]);
+    const filed = filedQuestions(w);
+    expect(filed).toEqual([
+      "What was monthly burn over the last three months, and from which accounts?",
+      "Who are your three largest customers?",
+      "What share of loans defaulted in the last two quarters, per your loan book?",
+    ]);
+    expect(filed.every((question) => question.length <= 180)).toBe(true);
+    // Counts only in the log, never a question's words.
+    const logged = JSON.stringify(w.logger.info.mock.calls);
+    expect(logged).toContain('"overLimit":2');
+    expect(logged).not.toContain("monthly burn");
+  });
+
+  it("fails without filing when the repair fails, miscounts or is still too long -- never truncating", async () => {
+    const draft = [{ question: long("What was monthly burn"), about: "Burn" }];
+    for (const shortened of [
+      null,
+      [],
+      ["One short question here?", "Two questions back for one given?"],
+      [long("Still too long about burn")],
+    ]) {
+      const w = world({ draft, shortened });
+      const result = await w.diligence(w.input);
+      expect(result.status).toBe("FAILED");
+      expect(w.shorten).toHaveBeenCalledTimes(1);
+      expect(w.propose).not.toHaveBeenCalled();
+      expect(w.logger.warn).toHaveBeenCalledTimes(1);
+    }
   });
 });
