@@ -8,7 +8,9 @@ import type {
 } from "@capital-q/contracts";
 
 const push = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push, refresh: vi.fn() }),
+}));
 const endAction = vi.fn();
 vi.mock("@/features/rehearsal/rehearsal-actions", () => ({
   endRehearsalVideoAction: (...args: unknown[]) =>

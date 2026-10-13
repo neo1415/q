@@ -2,6 +2,7 @@
 
 import { primeMeetSounds } from "./meet-sounds";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import {
@@ -11,7 +12,6 @@ import {
   type QRehearsalPersonaDto,
   type RehearsalDifficulty,
   type RehearsalInterviewersDto,
-  type RehearsalVideoSessionDto,
   type RehearsalCounterpartKind,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
@@ -31,7 +31,6 @@ import {
   startRehearsalAction,
   startRehearsalVideoAction,
 } from "./rehearsal-actions";
-import { RehearsalVideoStage } from "./rehearsal-video-stage";
 import { CounterpartIdentity } from "./counterpart-identity";
 import { RehearsalRoom } from "./rehearsal-room";
 
@@ -90,6 +89,7 @@ export function RehearsalLobby({
   readonly counterpartId: string;
   readonly meetingId?: string | undefined;
 }) {
+  const router = useRouter();
   const [persona, setPersona] = useState<QRehearsalPersonaDto | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -109,10 +109,6 @@ export function RehearsalLobby({
     useState<RehearsalInterviewersDto | null>(null);
   const [meetBy, setMeetBy] = useState<"VOICE" | "VIDEO">("VOICE");
   const [interviewerId, setInterviewerId] = useState<string | null>(null);
-  const [video, setVideo] = useState<{
-    readonly rehearsal: QRehearsalDto;
-    readonly session: RehearsalVideoSessionDto;
-  } | null>(null);
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
 
   useEffect(() => {
@@ -140,19 +136,6 @@ export function RehearsalLobby({
       live = false;
     };
   }, [kind, counterpartId, attempt]);
-
-  if (video !== null) {
-    return (
-      <RehearsalVideoStage
-        rehearsal={video.rehearsal}
-        session={video.session}
-        onContinueByVoice={(open) => {
-          setVideo(null);
-          setRehearsal(open);
-        }}
-      />
-    );
-  }
 
   if (rehearsal !== null) {
     return (
@@ -188,7 +171,9 @@ export function RehearsalLobby({
           interviewerId,
         );
         if (opened.ok && opened.value.mode === "VIDEO") {
-          setVideo({ rehearsal: result.value, session: opened.value.session });
+          // Store only the canonical rehearsal id in the URL. The server
+          // recovers the private owned room; no room token goes into history.
+          router.push(`/rehearsals/r/${result.value.id}`);
           return;
         }
         setVoiceNote(

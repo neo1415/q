@@ -5,6 +5,7 @@ import {
   qRehearsalVideoEndPath,
   qRehearsalVideoPath,
   RehearsalInterviewersDtoSchema,
+  RehearsalVideoSessionDtoSchema,
   StartRehearsalVideoResponseSchema,
   type EndRehearsalVideoRequest,
   type StartRehearsalVideoRequest,
@@ -165,6 +166,16 @@ export function startRehearsalVideo(
     qRehearsalVideoPath(rehearsalId),
     StartRehearsalVideoResponseSchema,
     { body },
+  );
+}
+
+/** Recover this actor's existing room; GET never allocates a provider session. */
+export function getRehearsalVideo(session: ApiSession, rehearsalId: string) {
+  return call(
+    session,
+    "GET",
+    qRehearsalVideoPath(rehearsalId),
+    RehearsalVideoSessionDtoSchema,
   );
 }
 

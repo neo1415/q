@@ -57,6 +57,7 @@ export function RehearsalVideoStage({
       }
       // The existing review page reads the finished rehearsal.
       router.push(`/rehearsals/r/${rehearsal.id}`);
+      router.refresh();
     });
   }
 
