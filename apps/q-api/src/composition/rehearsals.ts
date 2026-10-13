@@ -860,6 +860,7 @@ export type RehearsalService = {
     rehearsalId: string,
     said: RehearsalSay,
     signal?: AbortSignal,
+    options?: { readonly closingSoon: boolean },
   ) => Promise<RehearsalResult>;
   /**
    * A frame of the person's shared screen, or (with their consent) their
@@ -2001,6 +2002,7 @@ export function createRehearsalService(dependencies: {
     cue: RehearsalTurnVariables["cue"],
     viewerOrganisation: string,
     signal: AbortSignal | undefined,
+    closingSoon = false,
   ): Promise<{
     readonly result: RehearsalTurnResult;
     readonly sawScreen: boolean;
@@ -2049,7 +2051,9 @@ export function createRehearsalService(dependencies: {
     );
     const wrapUp =
       cue === "NONE" &&
-      (minutes >= WRAP_UP_MINUTES || turns.length >= WRAP_UP_TURNS);
+      (closingSoon ||
+        minutes >= WRAP_UP_MINUTES ||
+        turns.length >= WRAP_UP_TURNS);
     // The temperament so far: carried on their last line, or where the
     // persona and difficulty start them.
     // This person's own temperament profile (founder feedback 2026-10-03):
@@ -2103,7 +2107,11 @@ export function createRehearsalService(dependencies: {
       viewerOrganisation: viewerOrganisation.slice(0, 200),
       counterpartName: row.counterpartName,
       counterpartRole: counterpartRoleOf(row.counterpartKind),
-      persona: personaText(persona).slice(0, 10_000),
+      persona:
+        personaText(persona).slice(0, closingSoon ? 9_700 : 10_000) +
+        (closingSoon
+          ? "\nMeeting time is almost over. In character, courteously acknowledge that you need to leave shortly. Close naturally in one or two sentences, without another question."
+          : ""),
       meetingMaterial: (await meetingMaterial(actor, row)).slice(0, 16_000),
       rehearsal: transcriptOf(turns, row.counterpartName, row.userRole),
       turnsSoFar: Math.min(turns.length, 400),
@@ -2288,7 +2296,7 @@ export function createRehearsalService(dependencies: {
     readonly category?: TurnCategory;
     readonly warning?: 1 | 2;
   }> {
-    const [actor, row, turns, cue, organisation, signal] = args;
+    const [actor, row, turns, cue, organisation, signal, closingSoon] = args;
     // One deadline for the whole turn, retry included (founder live
     // 2026-10-02: the room sat on "thinking"): past it, the holding line.
     const deadline = new AbortController();
@@ -2298,7 +2306,8 @@ export function createRehearsalService(dependencies: {
       signal === undefined
         ? deadline.signal
         : AbortSignal.any([signal, deadline.signal]);
-    const attempt = () => reply(actor, row, turns, cue, organisation, within);
+    const attempt = () =>
+      reply(actor, row, turns, cue, organisation, within, closingSoon);
     try {
       const first = await attempt();
       if (first !== null || signal?.aborted === true) {
@@ -2598,7 +2607,7 @@ export function createRehearsalService(dependencies: {
       };
     },
 
-    say: async (actor, rehearsalId, said, signal) => {
+    say: async (actor, rehearsalId, said, signal, options) => {
       const row = await store.own(actor, rehearsalId);
       if (row === null) return { kind: "NOT_FOUND" };
       if (row.status !== "ACTIVE" || row.endedAt !== null) {
@@ -2655,6 +2664,7 @@ export function createRehearsalService(dependencies: {
             words.length > 0 ? "NONE" : "SILENCE",
             viewer.organisationName,
             signal,
+            options?.closingSoon,
           );
       // Spoken over: the person carried on, and their grown words come as
       // the next turn. Nothing of this one is kept.

@@ -79,7 +79,7 @@ export function RehearsalVideoStage({
   const name = rehearsal.counterpart.name;
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="cq-stage fixed inset-0 z-(--cq-z-modal) flex flex-col gap-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="cq-title-md text-(--cq-text-primary)">
@@ -98,7 +98,14 @@ export function RehearsalVideoStage({
         </p>
       </div>
 
-      {session.joinUrl === null ? (
+      {left === 0 ? (
+        <div
+          role="status"
+          className="cq-stage flex min-h-80 flex-1 items-center justify-center rounded-(--cq-radius-xl) p-8 text-center"
+        >
+          Time is up. Q is saving your transcript and review.
+        </div>
+      ) : session.joinUrl === null ? (
         <div className="cq-stage flex min-h-80 flex-col items-center justify-center gap-3 rounded-(--cq-radius-xl) p-8 text-center">
           <p className="cq-body text-(--cq-stage-text)">
             This call can’t be rejoined from here.
@@ -108,7 +115,7 @@ export function RehearsalVideoStage({
           </p>
         </div>
       ) : (
-        <div className="cq-stage relative aspect-video w-full overflow-hidden rounded-(--cq-radius-xl)">
+        <div className="cq-stage relative min-h-0 flex-1 overflow-hidden rounded-(--cq-radius-xl)">
           <iframe
             src={session.joinUrl}
             title={`Video rehearsal with ${name} (AI interviewer)`}
@@ -142,7 +149,9 @@ export function RehearsalVideoStage({
       <p className="cq-caption text-(--cq-text-tertiary)">
         Video calls last up to {Math.round(session.maxSeconds / 60)} minutes.
         Your camera and microphone go to the video room only while this call is
-        open.
+        open. This video room cannot speak over continuous speech to announce
+        its closing; Q will attempt a spoken close on the next reply near the
+        deadline. The room still ends at three minutes.
       </p>
       {message === null ? null : (
         <p role="alert" className="cq-body-sm text-(--cq-text-secondary)">

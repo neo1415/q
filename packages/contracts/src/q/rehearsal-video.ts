@@ -127,7 +127,12 @@ export const StartRehearsalVideoResponseSchema = z.discriminatedUnion("mode", [
   z
     .object({
       mode: z.literal("VOICE_FALLBACK"),
-      reason: z.enum(["NOT_CONFIGURED", "PROVIDER_UNAVAILABLE"]),
+      reason: z.enum([
+        "NOT_CONFIGURED",
+        "PROVIDER_UNAVAILABLE",
+        "ALLOWANCE_EXHAUSTED",
+        "CONCURRENCY_LIMIT",
+      ]),
     })
     .strict(),
 ]);
