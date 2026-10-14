@@ -921,27 +921,54 @@ const SUMMARISE = defineAppAction<
     "item" in out
       ? `${out.item.companyName}${out.item.oneLiner === null ? "" : `: ${out.item.oneLiner.length > 150 ? `${out.item.oneLiner.slice(0, 149)}…` : out.item.oneLiner}`}. Mandate: ${{ FITS: "meets the published mandate", PARTIAL: "more information needed", NOT_A_FIT: "outside the published mandate" }[out.item.fit]}. Applicant claims are not independently verified; mandate fit is not an investment decision.`
       : "That isn’t in your GateQ inbox.",
-  reading: (out) =>
-    "item" in out
-      ? [
-          `${out.item.companyName}${out.item.oneLiner === null ? "" : `: ${out.item.oneLiner}`}`,
-          `Their answers (their own claims, not verified): ${out.answers.map((a) => `${a.label} ${a.value}`).join("; ") || "none"}.`,
-          `Your gate's rules: ${out.rules.map((r) => `${r.label} ${STAND_WORDS[r.standing]}`).join("; ") || "none published"}.`,
-          out.note === null ? "No note." : `Their note: "${out.note}"`,
-          `Shared: ${out.shared.map((d) => d.title).join(", ") || "nothing beyond the form"}.`,
-          submittedReading(out.dossier),
-          out.notes.length === 0
-            ? "No team notes."
-            : `Team notes: ${out.notes.map((n) => `${n.author.name}: ${n.body}`).join(" | ")}`,
-          out.messages.length === 0
-            ? "Not answered yet."
-            : `Already ${out.messages.some((m) => m.kind === "PASS") ? "passed" : "replied"}.`,
-        ].join("\n")
-      : "That isn't in your GateQ inbox.",
+  reading: (out, input) => {
+    if (!("item" in out) || out.item.applicationId !== input.applicationId)
+      return undefined;
+    if (
+      out.dossier &&
+      (out.dossier.application.reference !== out.item.reference ||
+        out.dossier.application.submittedAt !== out.item.submittedAt)
+    )
+      return undefined;
+    const text = [
+      `${out.item.companyName}${out.item.oneLiner === null ? "" : `: ${out.item.oneLiner}`}`,
+      submittedReading(out.dossier),
+      out.dossier
+        ? "Form and interview findings are included above; no duplicate or live company profile is substituted."
+        : `Their answers (their own claims, not verified): ${out.answers.map((a) => `${a.label} ${a.value}`).join("; ") || "none"}.`,
+      `Your gate's rules: ${out.rules.map((r) => `${r.label} ${STAND_WORDS[r.standing]}`).join("; ") || "none published"}.`,
+      out.note === null ? "No note." : `Their note: "${out.note}"`,
+      `Shared: ${out.shared.map((d) => d.title).join(", ") || "nothing beyond the form"}.`,
+      out.notes.length === 0
+        ? "No team notes."
+        : `Team notes: ${out.notes.map((n) => `${n.author.name}: ${n.body}`).join(" | ")}`,
+      out.messages.length === 0
+        ? "Not answered yet."
+        : `Already ${out.messages.some((m) => m.kind === "PASS") ? "passed" : "replied"}.`,
+    ].join("\n");
+    return {
+      v: 1,
+      subject: {
+        kind: "GATEQ_SUBMISSION",
+        gatewayId: input.gatewayId,
+        applicationId: out.item.applicationId,
+        reference: out.item.reference,
+        submittedAt: out.item.submittedAt,
+        dossierSchemaVersion: out.dossier?.schemaVersion ?? null,
+      },
+      text,
+      sources: (out.dossier?.dimensions.flatMap((group) => group.facts) ?? [])
+        .filter((fact) => text.includes(fact.sourceFactId))
+        .map((fact) => ({
+          factId: fact.sourceFactId,
+          transcriptSeq: fact.sourceTurnSeq,
+        })),
+    };
+  },
   tool: {
     name: "gateq_inbox_summarise",
     description:
-      "Reads one application in the investor's own GateQ inbox, by the company's name: the founder's answers (their claims, not verified), each gate rule's standing, what was shared, and the firm's team notes. Use to summarise a submission or before drafting a reply in their style; a reply or a pass is then sent from the inbox screen, where they approve the exact words.",
+      "Reads one application in the investor's own GateQ inbox, by exact application id or the company's name: the founder's answers (their claims, not verified), each gate rule's standing, what was shared, and the firm's team notes. Use to summarise a submission or before drafting a reply in their style; a reply or a pass is then sent from the inbox screen, where they approve the exact words.",
     input: z
       .object({
         company: CompanyTool.optional(),

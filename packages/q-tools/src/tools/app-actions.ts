@@ -10,6 +10,7 @@ import {
   readOwn,
   resolveReference,
   type AnyAppAction,
+  type AppActionReading,
   type AppActionContext,
   type OwnReadKind,
   type OwnReadPorts,
@@ -66,7 +67,33 @@ export const AppToolOutputSchema = z
     /** What to tell the person, from the action's own words. */
     says: z.string().max(600),
     /** Only a successful READ may provide this server-derived context. */
-    reading: z.string().max(14_000).optional(),
+    reading: z
+      .object({
+        v: z.literal(1),
+        subject: z
+          .object({
+            kind: z.literal("GATEQ_SUBMISSION"),
+            gatewayId: z.string().uuid(),
+            applicationId: z.string().uuid(),
+            reference: z.string().min(1).max(64),
+            submittedAt: z.string().datetime(),
+            dossierSchemaVersion: z.literal("gateq-dossier.v1").nullable(),
+          })
+          .strict(),
+        text: z.string().max(14_000),
+        sources: z
+          .array(
+            z
+              .object({
+                factId: z.string().uuid(),
+                transcriptSeq: z.number().int().min(1).nullable(),
+              })
+              .strict(),
+          )
+          .max(64),
+      })
+      .strict()
+      .optional(),
     /**
      * PREPARED: the card's own summary. The engine says the card's status
      * after the turn, so a caller can leave it to that one line.
@@ -349,12 +376,15 @@ function toolFor(
 }
 
 /** Keep complete evidence lines; disclose omissions instead of cutting a claim. */
-function boundedReading(reading: string): string {
-  if (reading.length <= 14_000) return reading;
+function boundedReading(
+  reading: AppActionReading,
+): NonNullable<z.infer<typeof AppToolOutputSchema>["reading"]> {
+  if (reading.text.length <= 14_000)
+    return { ...reading, sources: [...reading.sources] };
   const lines: string[] = [];
   let used = 0;
   let omitted = 0;
-  for (const line of reading.split("\n")) {
+  for (const line of reading.text.split("\n")) {
     if (used + line.length + 1 > 13_700) {
       omitted++;
       continue;
@@ -365,7 +395,12 @@ function boundedReading(reading: string): string {
   lines.push(
     `${omitted} complete lines exceeded the reading budget. Consult the submitted dossier before answering about omitted information.`,
   );
-  return lines.join("\n");
+  const text = lines.join("\n");
+  return {
+    ...reading,
+    text,
+    sources: reading.sources.filter((source) => text.includes(source.factId)),
+  };
 }
 
 export const READ_MY = "app.own.read" as const;

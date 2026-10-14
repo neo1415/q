@@ -1,5 +1,13 @@
 # Capital Q — Current shared engineering state
 
+## Verified continuation — 14 October 2026, 19:43 WAT
+
+- Production is **dcb2b107e5d6eba914dd1eb90e34e0245ff8538d**, PR94 merged normally after exact CI38608939221 passed. All four Railway services SUCCESS on this revision; prior72d revisions drained. No migration.
+- Fresh native signed-in Maji Loop founder confirmed contact, completed structured form, answered interview, reloaded, explicitly submitted and reached receipt. Investor exact frozen brief retains business model, dated38/96-kiosk traction and150-kiosk use of funds as applicant claims/SELF_REPORTED; revenue UNKNOWN. Exact current submission has3 transcript turns and zero documents. Other investor gateway and dossier reads both404. Opening4116ms; answer7811ms (individual samples, not p50/p95). Transcript browser harness failed on an obsolete exact Q phrase; this is not substantive investor-Q acceptance.
+- Selected-dossier Q source repair is implemented on `codex/gateq-investor-q-context`, not deployed or browser-certified: versioned bounded READ payload separate from600-character acknowledgement, exact application/reference/date/schema binding, canonical server authorization, selected source facts independent of overview budget. Dependency build33/33 PASS; selected Q tools28/28 PASS; model-gateway/app-actions13/13 PASS. Changed lint/format gates running/recorded separately. Strict browser driver now verifies refreshed actor and current-run rendered answer. Existing unavailable-content Q defect remains production until release and actual substantive acceptance.
+- Hub PR96 exact75cf166c CI38615008776 all protected checks PASS; not yet released or native H2 certified. Server views d7c5ebd7 are separate WIP with migration24120000/pgTAP932 unapplied. Guest Evidence PR97 is separate gated foundation; SQL test/query alias correction in progress, selected-only lineage projection unwired, migrations2312–2315 unapplied. Excluded-document derived facts and Q turns must remain confidential before exposure.
+- Preserve prior checkpoints below. Q Pitch untouched. No Tavus room/minutes started.
+
 ## Latest continuation checkpoint — 14 October 2026, 17:55 WAT
 
 - Latest integrated branch `build/int-rc`: **80f5cd2551a9aa6061126cfc32653eecf0624a59**. Handoff PR91 passed protected CI **38597949683** and merged normally. Latest handoff branch is `codex/oct14-final-continuity-checkpoint`, PR93; this commit supersedes its earlier checkpoint471ae5cd. Historical entries below retain their original dates and are not current deployment authority.
