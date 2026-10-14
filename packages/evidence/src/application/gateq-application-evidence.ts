@@ -84,11 +84,15 @@ const SessionRow = z.object({
   document_version_id: DocumentVersionIdSchema.nullable(),
   guest_request_hash: z.string(),
 });
+export type GateQApplicationDocumentStatus =
+  "UPLOADING" | "PROCESSING" | "READY" | "BLOCKED" | "FAILED";
 export type GateQApplicationEvidenceItem = {
   readonly documentId: string;
   readonly versionId: string | null;
   readonly fileName: string;
-  readonly status: "PROCESSING" | "READY" | "BLOCKED" | "FAILED";
+  readonly status: GateQApplicationDocumentStatus;
+  readonly includedInSubmission: boolean;
+  readonly removable: boolean;
   readonly uploadStatus: string;
   readonly byteSize: number;
   readonly pages: number | null;
@@ -99,6 +103,45 @@ export type GateQApplicationEvidenceItem = {
 };
 function hash(value: string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * The one readiness rule for application custody. READY means processed,
+ * extracted and either scanned clean or recorded NOT_SCANNED under the
+ * interim policy (ADR 0042); it never means verified. Shared with the
+ * intake port so the applicant's list and Q's view cannot disagree.
+ */
+export function gateqApplicationDocumentStatus(row: {
+  readonly uploadStatus: string;
+  readonly versionId: string | null;
+  readonly processingStatus: string | null;
+  readonly malwareStatus: string | null;
+  readonly extractionStatus: string | null;
+}): GateQApplicationDocumentStatus {
+  if (row.malwareStatus === "BLOCKED") return "BLOCKED";
+  if (
+    ["REJECTED", "EXPIRED", "CANCELLED"].includes(row.uploadStatus) ||
+    row.processingStatus === "FAILED" ||
+    row.extractionStatus === "FAILED" ||
+    row.malwareStatus === "ERROR"
+  )
+    return "FAILED";
+  if (row.versionId === null) return "UPLOADING";
+  if (
+    row.processingStatus === "COMPLETED" &&
+    row.extractionStatus === "COMPLETED" &&
+    ["CLEAN", "NOT_SCANNED"].includes(row.malwareStatus ?? "")
+  )
+    return "READY";
+  return "PROCESSING";
+}
+
+/** A disclosed (submitted) document, or one of a submitted application. */
+export class GateQApplicationDocumentDisclosedError extends Error {
+  constructor() {
+    super("This document was submitted and can no longer be removed.");
+    this.name = "GateQApplicationDocumentDisclosedError";
+  }
 }
 
 /** Application-private custody over the same documents, versions and ingestion pipeline. */
@@ -409,7 +452,8 @@ export function createGateQApplicationEvidenceService(
     const rows = await deps.sql`
       select d.id as document_id,v.id as version_id,u.original_filename,u.status as upload_status,u.declared_size_bytes,
       v.processing_status,v.malware_scan_status,v.text_extraction_status,v.sha256,
-      x.page_count,x.instruction_risk_signals
+      x.page_count,x.instruction_risk_signals,
+      exists(select 1 from evidence.gateq_application_document_disclosures g where g.document_id=d.id and g.tenant_id=d.tenant_id) as disclosed
       from evidence.documents d join evidence.document_upload_sessions u on u.document_id=d.id and u.tenant_id=d.tenant_id
       left join evidence.document_versions v on v.id=d.current_version_id and v.tenant_id=d.tenant_id
       left join lateral (select page_count,instruction_risk_signals from evidence.document_extractions where document_version_id=v.id and tenant_id=d.tenant_id order by created_at desc limit 1) x on true
@@ -428,25 +472,23 @@ export function createGateQApplicationEvidenceService(
           sha256: z.string().nullable(),
           page_count: z.number().nullable(),
           instruction_risk_signals: z.number().nullable(),
+          disclosed: z.boolean().default(false),
         })
         .parse(row);
-      const status =
-        r.malware_scan_status === "BLOCKED"
-          ? "BLOCKED"
-          : ["REJECTED", "EXPIRED", "CANCELLED"].includes(r.upload_status) ||
-              r.processing_status === "FAILED" ||
-              r.malware_scan_status === "ERROR"
-            ? "FAILED"
-            : r.processing_status === "COMPLETED" &&
-                r.text_extraction_status === "COMPLETED" &&
-                ["CLEAN", "NOT_SCANNED"].includes(r.malware_scan_status ?? "")
-              ? "READY"
-              : "PROCESSING";
+      const status = gateqApplicationDocumentStatus({
+        uploadStatus: r.upload_status,
+        versionId: r.version_id,
+        processingStatus: r.processing_status,
+        malwareStatus: r.malware_scan_status,
+        extractionStatus: r.text_extraction_status,
+      });
       return {
         documentId: r.document_id,
         versionId: r.version_id,
         fileName: r.original_filename,
         status,
+        includedInSubmission: r.disclosed,
+        removable: s.open && !r.disclosed,
         uploadStatus: r.upload_status,
         byteSize: r.declared_size_bytes,
         pages: r.page_count,
@@ -566,7 +608,65 @@ export function createGateQApplicationEvidenceService(
     }
     return { deleted, pending };
   }
-  return { create, complete, list, readReadyPages, cleanupExpired };
+  /**
+   * The applicant removes a document before Submit (ADR 0067 §5).
+   *
+   * Recorded, never silent: the document is archived (not deleted) and an
+   * unfinished reservation is cancelled with its bytes queued for cleanup.
+   * A completed version's bytes stay private until retention removes them,
+   * and its attempt and bytes stay charged, so upload/remove cycling cannot
+   * mint quota. A submitted application, or a document already frozen into
+   * a submission, refuses the removal. Idempotent: removing a removed
+   * document succeeds again.
+   */
+  async function remove(command: {
+    readonly credential: string;
+    readonly documentId: string;
+  }): Promise<void> {
+    const s = await scope(command.credential);
+    const parsed = DocumentIdSchema.safeParse(command.documentId);
+    if (!parsed.success) throw new GateQApplicationEvidenceScopeError();
+    const documentId = parsed.data;
+    await deps.transactions.run(async (tx) => {
+      // The same row lock as every guest write and as Submit, but it reads
+      // the status instead of filtering on it, so "already submitted" is
+      // told apart from "not yours" only for the credential's own
+      // application.
+      const application = z.array(z.object({ status: z.string() })).parse(
+        await tx.sql`
+        select a.status from gateq.applications a join gateq.application_sessions s on s.application_id=a.id and s.tenant_id=a.tenant_id
+        where a.id=${s.applicationId} and a.tenant_id=${s.tenantId} and s.id=${s.sessionId}
+        and s.revoked_at is null and s.expires_at > now() for update of a`,
+      );
+      const status = application[0]?.status;
+      if (status === undefined) throw new GateQApplicationEvidenceScopeError();
+      const documents = z
+        .array(z.object({ status: z.string(), disclosed: z.boolean() }))
+        .parse(
+          await tx.sql`
+        select d.status,exists(select 1 from evidence.gateq_application_document_disclosures g where g.document_id=d.id and g.tenant_id=d.tenant_id) as disclosed
+        from evidence.documents d where d.id=${documentId} and d.tenant_id=${s.tenantId}
+        and d.owner_kind='GATEQ_APPLICATION' and d.gateq_application_id=${s.applicationId} and d.gateq_session_id=${s.sessionId} for update of d`,
+        );
+      const document = documents[0];
+      if (document === undefined)
+        throw new GateQApplicationEvidenceScopeError();
+      if (
+        document.disclosed ||
+        !["IN_PROGRESS", "READY_TO_SUBMIT"].includes(status)
+      )
+        throw new GateQApplicationDocumentDisclosedError();
+      if (document.status === "ARCHIVED") return;
+      await tx.sql`update evidence.documents set status='ARCHIVED',version=version+1
+        where id=${documentId} and tenant_id=${s.tenantId} and gateq_application_id=${s.applicationId} and status='ACTIVE'`;
+      await tx.sql`update evidence.document_upload_sessions set status='CANCELLED',cleanup_pending=true,version=version+1
+        where document_id=${documentId} and tenant_id=${s.tenantId} and gateq_application_id=${s.applicationId}
+        and document_version_id is null and status in ('PENDING_AUTHORIZATION','AUTHORIZED','FINALIZING')`;
+    });
+    // Best effort: cancelled bytes left behind stay recorded as cleanup debt.
+    await releaseTerminalReservations(s).catch(() => undefined);
+  }
+  return { create, complete, list, remove, readReadyPages, cleanupExpired };
 }
 export type GateQApplicationEvidenceService = ReturnType<
   typeof createGateQApplicationEvidenceService
