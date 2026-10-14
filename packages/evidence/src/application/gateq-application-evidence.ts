@@ -238,10 +238,10 @@ export function createGateQApplicationEvidenceService(
       } // Retained bytes keep their reservation during an outage.
       await deps.transactions.run(async (tx) => {
         await lockScope(tx, s);
-        await tx.sql`update evidence.document_upload_sessions set cleanup_pending=false,version=version+1
+        await tx.sql`update evidence.document_upload_sessions u set cleanup_pending=false,version=version+1
           where id=${d.id} and tenant_id=${s.tenantId} and gateq_application_id=${s.applicationId}
           and document_version_id is null and status in ('REJECTED','CANCELLED','EXPIRED')
-          and evidence.gateq_upload_authorization_retired(evidence.document_upload_sessions)`;
+          and evidence.gateq_upload_authorization_retired(u)`;
       });
     }
   }
@@ -299,10 +299,10 @@ export function createGateQApplicationEvidenceService(
             await tx.sql`
         select count(*) as count, coalesce(sum(case when cleanup_pending then ${deps.maxTotalBytes}
           when document_version_id is not null then declared_size_bytes
-          when status in ('REJECTED','CANCELLED','EXPIRED') and evidence.gateq_upload_authorization_retired(evidence.document_upload_sessions) then 0
+          when status in ('REJECTED','CANCELLED','EXPIRED') and evidence.gateq_upload_authorization_retired(u) then 0
           else greatest(declared_size_bytes, ${deps.uploads.maxBytes}) end),0) as bytes,
         count(*) filter (where status in ('PENDING_AUTHORIZATION','AUTHORIZED','FINALIZING')) as open
-        from evidence.document_upload_sessions where tenant_id=${s.tenantId} and gateq_application_id=${s.applicationId}`
+        from evidence.document_upload_sessions u where tenant_id=${s.tenantId} and gateq_application_id=${s.applicationId}`
           )[0],
         );
       if (
