@@ -680,7 +680,8 @@ export function createGateQApplicationEvidenceService(
     });
   }
   /** Trusted worker retention, not a guest HTTP operation. No valid session
-   * and no submitted disclosure may exist when cleanup begins. */
+   * and no disclosure may exist when cleanup begins. Undisclosed leftovers
+   * of a submitted application follow the same retention boundary. */
   async function cleanupExpired(command: {
     readonly limit: number;
   }): Promise<{ readonly deleted: number; readonly pending: number }> {
@@ -688,9 +689,10 @@ export function createGateQApplicationEvidenceService(
     const candidates = await deps.sql`
       select d.id,d.tenant_id,d.gateq_application_id from evidence.documents d
       join gateq.applications a on a.id=d.gateq_application_id and a.tenant_id=d.tenant_id
-      where d.owner_kind='GATEQ_APPLICATION' and d.custody_deleted_at is null and a.status <> 'SUBMITTED'
+      where d.owner_kind='GATEQ_APPLICATION' and d.custody_deleted_at is null
+      and not exists(select 1 from evidence.gateq_application_document_disclosures g where g.document_id=d.id and g.tenant_id=d.tenant_id)
       and not exists(select 1 from evidence.document_upload_sessions u where u.document_id=d.id and u.tenant_id=d.tenant_id and not evidence.gateq_upload_authorization_retired(u))
-      and not exists (select 1 from gateq.application_sessions s where s.application_id=a.id and s.tenant_id=a.tenant_id and s.revoked_at is null and s.expires_at > now())
+      and not exists (select 1 from gateq.application_sessions s where s.application_id=a.id and s.tenant_id=a.tenant_id and s.expires_at > now())
       order by d.created_at,d.id limit ${limit}`;
     let deleted = 0;
     let pending = 0;
@@ -704,10 +706,22 @@ export function createGateQApplicationEvidenceService(
         .parse(candidate);
       const objects = await deps.transactions.run(async (tx) => {
         const permitted = await tx.sql`
-          select a.id from gateq.applications a where a.id=${c.gateq_application_id} and a.tenant_id=${c.tenant_id} and a.status <> 'SUBMITTED'
+          select a.id from gateq.applications a where a.id=${c.gateq_application_id} and a.tenant_id=${c.tenant_id}
+          and not exists(select 1 from evidence.gateq_application_document_disclosures g where g.document_id=${c.id} and g.tenant_id=${c.tenant_id})
           and not exists(select 1 from evidence.document_upload_sessions u where u.document_id=${c.id} and u.tenant_id=${c.tenant_id} and not evidence.gateq_upload_authorization_retired(u))
-          and not exists(select 1 from gateq.application_sessions s where s.application_id=a.id and s.tenant_id=a.tenant_id and s.revoked_at is null and s.expires_at > now()) for update`;
+          and not exists(select 1 from gateq.application_sessions s where s.application_id=a.id and s.tenant_id=a.tenant_id and s.expires_at > now()) for update`;
         if (permitted.length !== 1) return null;
+        // Processing-run registration takes a share lock on this same doc.
+        // Lock first, then recheck active runs using a fresh statement so an
+        // in-flight extractor cannot write an orphan artifact after deletion.
+        const document =
+          await tx.sql`select d.id from evidence.documents d where d.id=${c.id} and d.tenant_id=${c.tenant_id}
+          and d.owner_kind='GATEQ_APPLICATION' and d.gateq_application_id=${c.gateq_application_id} for update`;
+        if (document.length !== 1) return null;
+        const processing =
+          await tx.sql`select r.id from evidence.document_processing_runs r join evidence.document_versions v on v.id=r.document_version_id
+          where v.document_id=${c.id} and v.tenant_id=${c.tenant_id} and r.status in ('QUEUED','RUNNING') limit 1`;
+        if (processing.length !== 0) return null;
         await tx.sql`update evidence.documents set status='ARCHIVED',custody_cleanup_started_at=coalesce(custody_cleanup_started_at,now()),version=version+1 where id=${c.id} and tenant_id=${c.tenant_id} and owner_kind='GATEQ_APPLICATION'`;
         return tx.sql`
           select storage_bucket as bucket,storage_key as key from evidence.document_upload_sessions where document_id=${c.id} and tenant_id=${c.tenant_id}
