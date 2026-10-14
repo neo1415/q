@@ -86,6 +86,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('core', 'kyb_submissions',               'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'identity_submissions',          'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objective_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('network', 'relationship_views',      'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'relationships',            'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'relationship_events',      'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'interests',                'INTERNAL_SERVER_ONLY', '{}'),

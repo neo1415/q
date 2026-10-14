@@ -1,3 +1,4 @@
+import { createRelationshipViewStore } from "../infrastructure/postgres-relationship-views.js";
 import type { ActorContext } from "@capital-q/security";
 
 import type { Interest } from "../contracts/index.js";
@@ -137,6 +138,8 @@ export function createNetworkService(
 
 /** Express Interest and the investor's own status read (CQ-NET-010). */
 export type InterestService = {
+  readonly relationshipViews?:
+    ReturnType<typeof createRelationshipViewStore> | undefined;
   readonly expressInterest: (
     command: ExpressInterestCommand,
   ) => Promise<ExpressInterestResult>;
@@ -243,6 +246,7 @@ export function createInterestService(
 ): InterestService {
   const dependencies = interestDependencies(options);
   return {
+    relationshipViews: createRelationshipViewStore(dependencies),
     expressInterest: createExpressInterest(dependencies),
     getOwnInterest: createGetOwnInterest(dependencies),
     mayExpressInterest: createMayExpressInterest(dependencies),

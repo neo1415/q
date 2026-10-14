@@ -16,6 +16,7 @@ create table network.relationship_views (
     and definition - array['query','layout','columns']='{}'::jsonb
     and jsonb_typeof(definition->'query')='object'
     and (definition->'query') - array['q','state','sort','pageSize']='{}'::jsonb
+    and jsonb_typeof(definition->'layout')='string'
     and definition->>'layout' in ('table','board')
     and jsonb_typeof(definition->'columns')='array'
   ),

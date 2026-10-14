@@ -8,6 +8,8 @@ import {
 import type { DatabaseExecutor } from "@capital-q/database";
 import {
   ActorContextRequiredError,
+  MembershipIdSchema,
+  OrganisationIdSchema,
   capability,
   type ActorContext,
 } from "@capital-q/security";
@@ -57,7 +59,8 @@ export function createRelationshipViewStore(dependencies: Dependencies) {
       actor,
       companyId,
     );
-    const organisationId = UuidSchema.parse(actor.organisationId);
+    const organisationId = OrganisationIdSchema.parse(actor.organisationId);
+    const membershipId = MembershipIdSchema.parse(actor.membershipId);
     const teamEditable =
       (
         await dependencies.authorization.authorize({
@@ -74,6 +77,7 @@ export function createRelationshipViewStore(dependencies: Dependencies) {
       ).outcome === "ALLOW";
     return {
       organisationId,
+      membershipId,
       companyId:
         party.party === "COMPANY" ? UuidSchema.parse(party.partyId) : null,
       investorId:
@@ -139,7 +143,7 @@ export function createRelationshipViewStore(dependencies: Dependencies) {
         // Scope/owner are immutable; compare-and-swap never overwrites another editor.
         const rows =
           data.expectedVersion === 0
-            ? await sql`insert into network.relationship_views (id,tenant_id,organisation_id,company_id,investor_organisation_id,owner_user_id,owner_membership_id,name,scope,definition) values (${viewId},${actor.tenantId},${view.organisationId},${view.companyId},${view.investorId},${actor.userId},${actor.membershipId},${data.name},${data.scope},${sql.json(definition)}) on conflict (id) do nothing returning *`
+            ? await sql`insert into network.relationship_views (id,tenant_id,organisation_id,company_id,investor_organisation_id,owner_user_id,owner_membership_id,name,scope,definition) values (${viewId},${actor.tenantId},${view.organisationId},${view.companyId},${view.investorId},${actor.userId},${view.membershipId},${data.name},${data.scope},${sql.json(definition)}) on conflict (id) do nothing returning *`
             : await sql`update network.relationship_views set name=${data.name},definition=${sql.json(definition)},version=version+1,updated_at=now() where id=${viewId} and tenant_id=${actor.tenantId} and organisation_id=${view.organisationId} and company_id is not distinct from ${view.companyId} and investor_organisation_id is not distinct from ${view.investorId} and scope=${data.scope} and version=${data.expectedVersion} and ((scope='PERSONAL' and owner_user_id=${actor.userId}) or (scope='ORGANISATION' and ${view.teamEditable})) returning *`;
         if (rows[0] === undefined) throw new InterestNotFoundError();
         return dto(rows[0], actor, view.teamEditable);

@@ -1,6 +1,17 @@
+import { z } from "zod";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  NETWORK_RELATIONSHIP_VIEWS_PATH,
+  NETWORK_RELATIONSHIP_VIEW_PATH,
+  NETWORK_COMPANY_RELATIONSHIP_VIEWS_PATH,
+  NETWORK_COMPANY_RELATIONSHIP_VIEW_PATH,
+  SavedRelationshipViewListSchema,
+  SavedRelationshipViewSchema,
+  SaveRelationshipViewRequestSchema,
+  DeleteRelationshipViewRequestSchema,
+  DeleteRelationshipViewResponseSchema,
+  UuidSchema,
   CompanyInterestStatusDtoSchema,
   ConnectionStatusDtoSchema,
   IncomingConnectionRequestListDtoSchema,
@@ -444,6 +455,67 @@ export function registerNetworkInterestRoutes(
     { onRequest: withContext },
     (request, reply) => exportPipeline(request, reply, true),
   );
+
+  // Non-consequential presentation preferences; canonical state is never written.
+  const views = service.relationshipViews;
+  if (views !== undefined) {
+    for (const [viewsPath, viewPath, company] of [
+      [NETWORK_RELATIONSHIP_VIEWS_PATH, NETWORK_RELATIONSHIP_VIEW_PATH, false],
+      [
+        NETWORK_COMPANY_RELATIONSHIP_VIEWS_PATH,
+        NETWORK_COMPANY_RELATIONSHIP_VIEW_PATH,
+        true,
+      ],
+    ] as const) {
+      const ownCompany = (request: FastifyRequest) =>
+        company ? companyIdOf(request) : undefined;
+      const viewId = (request: FastifyRequest) =>
+        parseContract(
+          z.object({ viewId: UuidSchema }).passthrough(),
+          request.params,
+        ).viewId;
+      app.get(viewsPath, { onRequest: withContext }, async (request, reply) => {
+        parseContract(z.object({}).strict(), request.query);
+        void reply.header("Cache-Control", "no-store");
+        return SavedRelationshipViewListSchema.parse(
+          await views.list(getActorContext(request), ownCompany(request)),
+        );
+      });
+      app.put(viewPath, { onRequest: withContext }, async (request, reply) => {
+        const input = parseContract(
+          SaveRelationshipViewRequestSchema,
+          request.body,
+        );
+        void reply.header("Cache-Control", "no-store");
+        return SavedRelationshipViewSchema.parse(
+          await views.save(
+            getActorContext(request),
+            viewId(request),
+            input,
+            ownCompany(request),
+          ),
+        );
+      });
+      app.delete(
+        viewPath,
+        { onRequest: withContext },
+        async (request, reply) => {
+          const input = parseContract(
+            DeleteRelationshipViewRequestSchema,
+            request.body,
+          );
+          await views.remove(
+            getActorContext(request),
+            viewId(request),
+            input.expectedVersion,
+            ownCompany(request),
+          );
+          void reply.header("Cache-Control", "no-store");
+          return DeleteRelationshipViewResponseSchema.parse({ deleted: true });
+        },
+      );
+    }
+  }
 
   // Each side's own relationships (CQ-WEB-030), each row the per-party fold.
   app.get(

@@ -509,3 +509,8 @@ export {
   recordDealTerms,
   tickDealChecklist,
 } from "./deal-close.js";
+export {
+  listRelationshipViews,
+  saveRelationshipView,
+  deleteRelationshipView,
+} from "./relationship-views.js";

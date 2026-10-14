@@ -369,3 +369,6 @@ export {
   relationshipPipelineScopeBinding,
   relationshipPipelineExportRows,
 } from "./application/relationship-pipeline.js";
+
+export { RelationshipViewLimitError } from "./domain/errors.js";
+export { createRelationshipViewStore } from "./infrastructure/postgres-relationship-views.js";
