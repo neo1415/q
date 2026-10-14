@@ -166,7 +166,12 @@ try {
         .last()
         .textContent()
         .catch(() => "");
-      if (firstTextMs === null && rendered.trim().length >= 20 && runId)
+      if (
+        firstTextMs === null &&
+        rendered.trim().length >= 20 &&
+        !priorAnswerTexts.has(rendered) &&
+        runId
+      )
         firstTextMs = Math.round(performance.now() - started);
       if (runId) {
         write("observed-run.json", { runId });
