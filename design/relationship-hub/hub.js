@@ -415,7 +415,7 @@
   function invRecord() {
     const c = company(S.recordId) || company("halden");
     const t = S.recordTab;
-    let body = "";
+    let body;
     if (t === "overview") body = recOverview(c);
     else if (t === "evidence") body = recEvidence(c);
     else if (t === "gateq") body = recGateq(c);
@@ -427,7 +427,7 @@
     else body = recHistory(c);
     return `${recordHeader(c)}${axes(c)}${recordTabs(INV_TABS)}${body}`;
   }
-  function recOverview(c) {
+  function recOverview() {
     return `${briefing(
       [
         `<strong>Where you are:</strong> in diligence since 26 Sep. The founder asked for your next step by 23 Oct.`,
@@ -466,7 +466,7 @@
     const lcls = cl.life === "CONTRADICTORY" ? "warn" : "outline";
     return `<span class="label ${tcls}">${D.truthWords[cl.truth]}</span><span class="label outline">${D.evidenceWords[cl.evidence]}</span><span class="label ${lcls}">${D.lifeWords[cl.life]}</span>`;
   }
-  function recEvidence(c) {
+  function recEvidence() {
     return `<div class="grid two"><section class="panel" ${q("section.claims")}><header><h2>Material claims</h2><span class="faint">${D.claims.length}</span><span class="right faint" style="font-size:12px">Truth · evidence · lifecycle, separately</span></header><div class="rows" ${q("list.claims")}>
       ${D.claims.map((cl, i) => `<div class="claim${cl.contradiction ? " contradiction" : ""}" ${q("item.claim-" + (i + 1))}><div><div class="what">${cl.what}</div><div class="tags">${claimTags(cl)}</div><div class="src" style="margin-top:6px">${cl.src}</div></div><div>${cl.page ? `<button class="btn sm" data-action="page:${cl.page}" ${q("button.claim-" + (i + 1) + "-source")}>Open page ${cl.page}</button>` : cl.src.includes("14:32") ? `<button class="btn sm" data-action="jump:14:32">Jump to 14:32</button>` : cl.src.includes("03:41") ? `<button class="btn sm" data-action="rtab:gateq">Open transcript</button>` : ""}</div></div>`).join("")}
     </div></section>
@@ -597,7 +597,7 @@
       )
       .join("")}</div></section>`;
   }
-  function recHistory(c) {
+  function recHistory() {
     const ev = [
       [
         "14",
@@ -735,7 +735,7 @@ Thank you for Thursday. We have model v3, thanks. Two items remain before we dec
   function fndRecord() {
     const c = investor(S.recordId) || investor("northgate");
     const t = S.recordTab;
-    let body = "";
+    let body;
     const privacy = `<p class="faint" style="font-size:12px;display:flex;gap:6px;align-items:center;margin:0 0 14px">${icon("lock").replace("<svg", '<svg style="width:13px;height:13px"')} You see what ${c.name} shared with you. Their internal notes, deliberations and scores are private to them and never shown here.</p>`;
     if (t === "overview")
       body = `${privacy}<div class="grid halves"><section class="panel"><header><h2>Where you are</h2></header><div class="body"><p style="margin-top:0">${sw(c.state)} since 26 Sep. They said they will tell you their next step by <strong>23 Oct</strong> (meeting 9 Oct, 44:02).</p><p class="muted">Fit: ${c.fit}. This compares your round to their declared mandate; it says nothing about their interest.</p></div></section>
@@ -970,7 +970,7 @@ Asks: introductions to two Nordic grid operators.</div>
     window.scrollTo(0, 0);
   }
 
-  function handle(action, el) {
+  function handle(action) {
     const [k, ...rest] = action.split(":");
     const v = rest.join(":");
     switch (k) {

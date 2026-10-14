@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
 const { chromium } = require(
   require.resolve("@playwright/test", {
     paths: [process.cwd(), process.env.CQ_TOOL_CHECKOUT ?? "/workspace/q"],
@@ -7,7 +9,7 @@ const { chromium } = require(
   const b = await chromium.launch({
     executablePath: process.env.CQ_CHROMIUM ?? "/usr/bin/chromium",
   });
-  let receipts = [];
+  const receipts = [];
   for (const width of [1440, 390]) {
     const p = await b.newPage({ viewport: { width, height: 900 } });
     await p.goto(

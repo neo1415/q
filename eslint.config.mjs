@@ -429,6 +429,42 @@ export default tseslint.config(
       globals: { document: "readonly", URL: "readonly" },
     },
   },
+  // Standalone synthetic Relationship Hub design prototype and its browser
+  // recording/audit harnesses. Explicit environments; no production imports.
+  {
+    files: ["design/relationship-hub/*.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: Object.fromEntries(
+        [
+          "window",
+          "document",
+          "location",
+          "history",
+          "localStorage",
+          "URLSearchParams",
+          "getComputedStyle",
+          "setTimeout",
+        ].map((name) => [name, "readonly"]),
+      ),
+    },
+  },
+  {
+    files: ["design/relationship-hub/scripts/*.mjs"],
+    languageOptions: {
+      globals: Object.fromEntries(
+        [
+          "process",
+          "console",
+          "window",
+          "document",
+          "location",
+          "innerWidth",
+          "getComputedStyle",
+        ].map((name) => [name, "readonly"]),
+      ),
+    },
+  },
   // Parser sandbox fixtures: tiny Node programs a test spawns as a child
   // process to exercise the sandbox's containment (timeout, output bound,
   // scrubbed environment). They are never imported by application code.
