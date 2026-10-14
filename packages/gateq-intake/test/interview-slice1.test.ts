@@ -145,7 +145,11 @@ const QUALIFYING: readonly NewApplicationFact[] = [
 type Scripted = Partial<InterviewTurnOutcome>;
 
 function world(
-  options: { contactRequiredFrom?: string; contactCodeSecret?: string } = {},
+  options: {
+    contactRequiredFrom?: string;
+    contactCodeSecret?: string;
+    transcript?: false;
+  } = {},
 ) {
   let now = NOW;
   const policy = policyOf([GEO, STAGE]);
@@ -648,6 +652,18 @@ function world(
 
   // Each turn reads the clock twice (received, replied): 75 ms apart.
   let tick = 0;
+  const lastTurns = new Map<string, { clientTurnId: string; reply: string }>();
+  const rememberTurn = vi.fn(
+    (input: { sessionId: string; clientTurnId: string; reply: string }) => {
+      // Enforce the real application's session CHECK, not just a no-op mock.
+      if (input.clientTurnId.length < 8 || input.clientTurnId.length > 128)
+        return Promise.reject(
+          new Error("application_sessions_last_turn_id_check"),
+        );
+      lastTurns.set(input.sessionId, input);
+      return Promise.resolve();
+    },
+  );
   const conversation = createConversationService({
     intake,
     interviewer,
@@ -660,10 +676,10 @@ function world(
     },
     publicGatewayFor: () => Promise.resolve(PUBLIC_GATEWAY),
     turnMemory: {
-      lastTurn: () => Promise.resolve(null),
-      rememberTurn: () => Promise.resolve(),
+      lastTurn: (id) => Promise.resolve(lastTurns.get(id) ?? null),
+      rememberTurn,
     },
-    turns: turns,
+    ...(options.transcript === false ? {} : { turns }),
     logger: logger as never,
     now: () => (tick += 75),
   });
@@ -671,6 +687,7 @@ function world(
   return {
     intake,
     conversation,
+    rememberTurn,
     interviewer,
     seen,
     script,
@@ -875,6 +892,25 @@ describe("the interview transcript", () => {
     await w.conversation.openingFor({ token, correlationId: "c2" });
     expect(w.turnRows.filter((t) => t.role === "Q")).toHaveLength(1);
     expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+    expect(w.rememberTurn).not.toHaveBeenCalled();
+    expect(w.turnRows[0]?.clientTurnId).toBe("opening");
+  });
+  it("replays a transcript-free opening with a database-valid session key", async () => {
+    const w = world({ transcript: false });
+    const { token } = await w.start();
+    w.script.push({ reply: "Welcome. What do you build?", intent: "OPENING" });
+    await expect(
+      w.conversation.openingFor({ token, correlationId: "legacy-1" }),
+    ).resolves.toBe("Welcome. What do you build?");
+    await expect(
+      w.conversation.openingFor({ token, correlationId: "legacy-2" }),
+    ).resolves.toBe("Welcome. What do you build?");
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+    expect(w.rememberTurn).toHaveBeenCalledTimes(1);
+    expect(w.rememberTurn.mock.calls[0]?.[0].clientTurnId).toBe(
+      "gateq-opening",
+    );
+    expect(w.turnRows).toHaveLength(0);
   });
   it("claims concurrent opening requests before spending and records no invented applicant turn", async () => {
     const w = world();
