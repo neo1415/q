@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ownIndex, type GateqInboxPort } from "@capital-q/app-actions";
+import { ownIndex, type AppActionPorts } from "@capital-q/app-actions";
 import type { PermittedContextPlan } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
 import type { MediaAsset } from "@capital-q/media";
@@ -128,6 +128,8 @@ function world(options: { refuse?: boolean } = {}) {
   return { executor, decided, prepared };
 }
 
+type GateqInboxPort = NonNullable<AppActionPorts["gateqInbox"]>;
+
 const call = (name: string, args: Record<string, unknown>) => ({
   callId: `c-${name}`,
   name,
@@ -243,7 +245,6 @@ describe("the selected GateQ application's authorized reading", () => {
         reading: {
           v: 1,
           subject: { applicationId, gatewayId, reference: "ga_waterworks" },
-          text: expect.stringContaining("sourceTurnSeq=2"),
         },
       },
     });
@@ -252,6 +253,7 @@ describe("the selected GateQ application's authorized reading", () => {
     const data = out.result.data as { says: string; reading: { text: string } };
     expect(data.says.length).toBeLessThanOrEqual(600);
     expect(data.reading.text.length).toBeGreaterThan(600);
+    expect(data.reading.text).toContain("sourceTurnSeq=2");
     expect(data.reading.text).toContain(
       "truth=USER_CLAIM; evidence=SELF_REPORTED",
     );
