@@ -258,6 +258,13 @@ export function ApplyExperience({
     setApplication(result.application);
     setCoverage(result.coverage);
     setConfirmed(result.coverage.contact.confirmed);
+    const savedContact = result.coverage.contact.details;
+    if (savedContact) {
+      setContactName(savedContact.name);
+      setContactEmail(savedContact.email);
+      setCompanyName(savedContact.companyName);
+      setRole(savedContact.role);
+    }
     setLines(
       result.transcript.turns.map((turn) => ({
         from: turn.role === "Q" ? "Q" : "YOU",
@@ -911,6 +918,17 @@ export function ApplyExperience({
           chose to share. Applicant claims remain unverified unless supporting
           evidence is recorded.
         </p>
+        {coverage.contact.details ? (
+          <div>
+            <h2 className="cq-title-sm">Contact details to share</h2>
+            <p className="cq-body-sm">
+              {coverage.contact.details.name} · {coverage.contact.details.email}
+              <br />
+              {coverage.contact.details.role} ·{" "}
+              {coverage.contact.details.companyName}
+            </p>
+          </div>
+        ) : null}
         {initialSession?.materialNames?.length ? (
           <div>
             <h2 className="cq-title-sm">Documents selected for submission</h2>

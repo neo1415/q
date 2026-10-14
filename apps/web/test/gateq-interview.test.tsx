@@ -135,11 +135,34 @@ beforeEach(() => {
 afterEach(cleanup);
 describe("founder interview and review", () => {
   it("restores ordered turns with the same credential and keeps submission separate", async () => {
+    calls.progress.mockResolvedValue({
+      ok: true,
+      application,
+      transcript: { turns },
+      coverage: {
+        ...coverage,
+        contact: {
+          ...coverage.contact,
+          details: {
+            name: "Amara Confirmed",
+            email: "confirmed@example.test",
+            role: "Founder",
+            companyName: "Kora Confirmed",
+            phone: null,
+            preferredChannel: null,
+            emailConfirmed: true,
+            confirmedVia: "EMAIL_CODE",
+          },
+        },
+      },
+    });
     await mount();
     expect(calls.progress).toHaveBeenCalledWith(token);
     expect(screen.getByText("What revenue supports that?")).toBeTruthy();
     expect(calls.submit).not.toHaveBeenCalled();
     await press("Review my application");
+    expect(screen.getByText(/Amara Confirmed/)).toBeTruthy();
+    expect(screen.getByText(/confirmed@example.test/)).toBeTruthy();
     expect(screen.getByText("Revenue figures differ")).toBeTruthy();
     expect(screen.getByText("Revenue")).toBeTruthy();
     expect(
