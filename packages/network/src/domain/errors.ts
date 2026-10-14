@@ -156,3 +156,12 @@ export class RelationshipPipelineQueryError extends Error {
     this.name = "RelationshipPipelineQueryError";
   }
 }
+
+export class RelationshipViewLimitError extends Error {
+  constructor() {
+    super(
+      "This workspace has reached its saved view limit. Remove an unused view and try again.",
+    );
+    this.name = "RelationshipViewLimitError";
+  }
+}

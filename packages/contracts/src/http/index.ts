@@ -1447,3 +1447,5 @@ export * from "./gateq-find.js";
 export * from "./deal-close.js";
 
 export * from "./relationship-pipeline.js";
+
+export * from "./relationship-views.js";

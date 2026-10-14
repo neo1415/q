@@ -1,20 +1,15 @@
 import { z } from "zod";
 import { RelationshipPipelineQuerySchema } from "@capital-q/contracts";
 
-export const PipelineColumnsSchema = z
-  .array(z.enum(["state", "since", "next"]))
-  .max(3);
-export type PipelineColumn = z.infer<typeof PipelineColumnsSchema>[number];
-export const PipelineSavedViewSchema = z
-  .object({
-    id: z.string().uuid(),
-    name: z.string().trim().min(1).max(64),
-    query: RelationshipPipelineQuerySchema.omit({ cursor: true }),
-    layout: z.enum(["table", "board"]),
-    columns: PipelineColumnsSchema,
-  })
-  .strict();
-export type PipelineSavedView = z.infer<typeof PipelineSavedViewSchema>;
+export {
+  PipelineColumnsSchema,
+  PipelineSavedViewSchema,
+} from "@capital-q/contracts";
+export type { PipelineColumn, PipelineSavedView } from "@capital-q/contracts";
+import {
+  PipelineColumnsSchema,
+  PipelineSavedViewSchema,
+} from "@capital-q/contracts";
 const PreferencesSchema = z
   .object({
     views: z.array(PipelineSavedViewSchema).max(20),
