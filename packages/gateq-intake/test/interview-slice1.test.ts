@@ -1045,7 +1045,18 @@ describe("coverage", () => {
         outcome: "INSUFFICIENT_INFORMATION",
         access: "NEEDS_INFORMATION",
         accessReasonCode: "REQUIRED_INFORMATION_MISSING",
-        criteria: [],
+        criteria: [
+          {
+            criterionId: policy.criteria[0]?.id ?? "",
+            requiredness: "REQUIRED",
+            status: "NO_MATCH",
+          },
+          {
+            criterionId: policy.criteria[1]?.id ?? "",
+            requiredness: "REQUIRED",
+            status: "UNKNOWN",
+          },
+        ],
         principalMismatches: [policy.criteria[0]?.id ?? ""],
         unknowns: [policy.criteria[1]?.id ?? ""],
         evaluatedAt: NOW.toISOString(),
