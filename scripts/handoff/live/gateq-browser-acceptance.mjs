@@ -450,6 +450,13 @@ try {
       await investorPage
         .getByRole("heading", { name: "Interview transcript", exact: true })
         .waitFor();
+      await investorPage
+        .getByRole("heading", { name: "Interview transcript", exact: true })
+        .click();
+      await investorPage.getByText(reply, { exact: true }).waitFor();
+      const lastQ = transcript.turns.filter((turn) => turn.role === "Q").at(-1);
+      assert.ok(lastQ);
+      await investorPage.getByText(lastQ.text, { exact: true }).waitFor();
       await investorPage.screenshot({
         path: join(receipts, "investor-dossier.png"),
         fullPage: true,
