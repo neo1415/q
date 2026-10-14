@@ -97,7 +97,10 @@ describe("real pipeline controls", () => {
     page.rerender(
       <RelationshipPipeline
         {...props}
-        data={{ ...data, items: [data.items[1]!] }}
+        data={{
+          ...data,
+          items: data.items.slice(1, 2),
+        }}
         query={{ cursor: "second" }}
       />,
     );
@@ -105,7 +108,7 @@ describe("real pipeline controls", () => {
       screen
         .getByRole("link", { name: "Export 1 selected" })
         .getAttribute("href"),
-    ).toContain(data.items[0]!.relationshipId);
+    ).toContain(data.items.at(0)?.relationshipId);
     page.rerender(
       <RelationshipPipeline
         {...props}
@@ -167,9 +170,9 @@ describe("real pipeline controls", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Rename view" }));
     expect(screen.getByRole("option", { name: "Conversations" })).toBeDefined();
-    const id = (
-      screen.getByRole("option", { name: "Conversations" }) as HTMLOptionElement
-    ).value;
+    const id = screen.getByRole<HTMLOptionElement>("option", {
+      name: "Conversations",
+    }).value;
     fireEvent.change(screen.getByRole("combobox", { name: "Saved view" }), {
       target: { value: id },
     });

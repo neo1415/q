@@ -18,7 +18,7 @@ describe("authorized pipeline export proxy", () => {
     });
     context.own.mockResolvedValue({ kind: "INVESTOR" });
     const fetch = vi
-      .fn()
+      .fn<typeof globalThis.fetch>()
       .mockResolvedValue(new Response("csv", { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     expect(

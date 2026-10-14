@@ -74,15 +74,21 @@ export function RelationshipPipeline({
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     const stored = readPipelinePreferences(scopeKey, localStorageOrNull());
+    // Synchronize external device preferences after SSR; never canonical data.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreferences(stored);
   }, [scopeKey]);
   useEffect(() => {
+    // Server navigation replaces the form baseline after a verified page load.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearch(query.q ?? "");
     setPreview(null);
     setLayout(initialLayout);
   }, [query.q, query.state, query.sort, query.cursor, initialLayout]);
   // Pagination and layout preserve selection; authorization/filter changes do not.
   useEffect(() => {
+    // Security boundary change invalidates local selection before any new action.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelected([]);
   }, [scopeKey, data.scope]);
   const persist = (next: PipelinePreferences) => {
