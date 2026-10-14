@@ -60,6 +60,9 @@ const TANGENT_INTENTS: ReadonlySet<string> = new Set([
 
 /** The client turn id Q's opening line is stored under, once. */
 const OPENING_TURN_ID = "opening";
+// The old session cache accepts only keys of 8–128 characters. Keep the
+// historical durable key above so pending exchanges still resume correctly.
+const LEGACY_OPENING_TURN_ID = "gateq-opening";
 
 export type ConversationDependencies = {
   readonly intake: IntakeService;
@@ -332,13 +335,16 @@ export function createConversationService(
           });
         }
       }
-      // Kept as well: the single slot still answers for a composition, or
-      // an older client, that has no transcript store.
-      await turnMemory.rememberTurn({
-        sessionId: guest.sessionId,
-        clientTurnId: input.clientTurnId,
-        reply: outcome.reply,
-      });
+      // Durable openings are already committed in the transcript. Their
+      // historical seven-character key cannot be written to the legacy slot.
+      // Keep the slot for applicant turns and transcript-free compositions.
+      if (!opening || turns === undefined) {
+        await turnMemory.rememberTurn({
+          sessionId: guest.sessionId,
+          clientTurnId: input.clientTurnId,
+          reply: outcome.reply,
+        });
+      }
 
       logger?.debug(
         {
@@ -386,7 +392,12 @@ export function createConversationService(
       }
       return (
         await executeTurn(
-          { ...input, message: "", clientTurnId: OPENING_TURN_ID },
+          {
+            ...input,
+            message: "",
+            clientTurnId:
+              turns === undefined ? LEGACY_OPENING_TURN_ID : OPENING_TURN_ID,
+          },
           true,
         )
       ).reply;

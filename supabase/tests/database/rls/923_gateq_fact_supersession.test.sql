@@ -4,7 +4,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
-select plan(20);
+select plan(22);
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
   ('00000000-0000-4000-8000-00000000dd01', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), 'VC', 'Interview Capital');
 
@@ -113,5 +113,15 @@ select throws_ok($$select pg_temp.fact_bad_link('00000000-0000-4000-8000-0000000
   '23514', null, 'successor cannot belong to another application');
 select throws_ok($$select pg_temp.fact_insert('00000000-0000-4000-8000-00000000dd47')$$,
   '23505', null, 'partial unique index remains strict after repeated correction and rollback');
+select throws_ok($$insert into gateq.application_sessions
+  (application_id, tenant_id, token_hash, expires_at, last_turn_id, last_turn_reply)
+  values ('00000000-0000-4000-8000-00000000dd31', pg_temp.rls_id('tenant_b'),
+          repeat('c',64), now() + interval '14 days', 'opening', 'Welcome')$$,
+  '23514', null, 'historical durable opening key cannot be copied into the legacy session cache');
+select lives_ok($$insert into gateq.application_sessions
+  (application_id, tenant_id, token_hash, expires_at, last_turn_id, last_turn_reply)
+  values ('00000000-0000-4000-8000-00000000dd31', pg_temp.rls_id('tenant_b'),
+          repeat('c',64), now() + interval '14 days', 'gateq-opening', 'Welcome')$$,
+  'the transcript-free opening key satisfies the unchanged session CHECK');
 select * from finish();
 rollback;
