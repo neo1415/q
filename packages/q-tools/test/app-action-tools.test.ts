@@ -218,7 +218,7 @@ describe("the selected GateQ application's authorized reading", () => {
       registry: createQToolRegistry(
         createDefaultQTools(
           fakePorts({
-            appActions: { gateqInbox: gateqInbox as GateqInboxPort },
+            appActions: { gateqInbox: gateqInbox as unknown as GateqInboxPort },
           }),
         ),
       ),

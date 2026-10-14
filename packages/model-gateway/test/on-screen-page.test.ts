@@ -190,7 +190,7 @@ describe("the selected GateQ dossier", () => {
       "Use of funds: 150 additional kiosks",
     );
     expect(facts.every((f) => f.statement.length <= 7_800)).toBe(true);
-    expect(facts.every((f) => f.source.includes(`/gateq?item=${id(7)}`))).toBe(
+    expect(facts.every((f) => f.source?.includes(`/gateq?item=${id(7)}`))).toBe(
       true,
     );
   });
