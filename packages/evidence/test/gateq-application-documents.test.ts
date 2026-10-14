@@ -414,8 +414,10 @@ describe("the GateQ intake document port", () => {
     };
     let inserted = false;
     const { sql, calls } = recordingSql((q) => {
-      if (q.startsWith("select id from gateq.applications"))
-        return [{ id: applicationId }];
+      if (q.startsWith("select id,status from gateq.applications"))
+        return [
+          { id: applicationId, status: inserted ? "SUBMITTED" : "IN_PROGRESS" },
+        ];
       if (q.startsWith("select g.document_id"))
         return inserted ? [frozenRow] : [];
       if (
@@ -453,6 +455,7 @@ describe("the GateQ intake document port", () => {
     const first = await port.freezeForSubmission(tx, {
       tenantId,
       applicationId,
+      selectedDocuments: [{ documentId, versionId, sha256: "b".repeat(64) }],
     });
     expect(first.deduplicated).toBe(false);
     expect(first.documents).toEqual([
@@ -465,14 +468,14 @@ describe("the GateQ intake document port", () => {
         frozenAt: "2026-10-14T00:00:00.000Z",
       },
     ]);
-    expect(first.notReady).toHaveLength(1);
-    expect(first.notReady[0]?.status).toBe("PROCESSING");
+    expect(first.notReady).toEqual([]);
     const inserts = () =>
       calls.filter((c) => c.query.startsWith("insert into")).length;
     expect(inserts()).toBe(1);
     const second = await port.freezeForSubmission(tx, {
       tenantId,
       applicationId,
+      selectedDocuments: [{ documentId, versionId, sha256: "b".repeat(64) }],
     });
     expect(second.deduplicated).toBe(true);
     expect(second.documents).toEqual(first.documents);
@@ -485,11 +488,217 @@ describe("the GateQ intake document port", () => {
     await expect(
       port.freezeForSubmission(
         { sql: sql as TransactionContext["sql"] },
-        { tenantId, applicationId },
+        { tenantId, applicationId, selectedDocuments: [] },
       ),
     ).rejects.toThrow();
     await expect(
       port.readyDocuments({ tenantId, applicationId: "not-a-uuid" }),
     ).rejects.toThrow();
+  });
+  it("an explicit empty selection discloses no ready or draft document and performs no readiness retrieval", async () => {
+    const { sql, calls } = recordingSql((q) =>
+      q.startsWith("select id,status")
+        ? [{ id: applicationId, status: "IN_PROGRESS" }]
+        : [],
+    );
+    const port = createGateQApplicationDocumentPort({ sql });
+    expect(
+      await port.freezeForSubmission(
+        { sql: sql as TransactionContext["sql"] },
+        { tenantId, applicationId, selectedDocuments: [] },
+      ),
+    ).toEqual({ documents: [], notReady: [], deduplicated: false });
+    expect(calls.some((c) => c.query.startsWith("insert"))).toBe(false);
+    expect(
+      calls.some((c) => c.query.startsWith("select d.id as document_id")),
+    ).toBe(false);
+  });
+  it.each(["stale version", "stale hash", "foreign document", "not ready"])(
+    "refuses the entire selection when one tuple is %s",
+    async (problem) => {
+      const otherId = randomUUID();
+      const otherVersion = randomUUID();
+      const { sql, calls } = recordingSql((q) => {
+        if (q.startsWith("select id,status"))
+          return [{ id: applicationId, status: "IN_PROGRESS" }];
+        if (q.startsWith("select d.id as document_id"))
+          return problem === "not ready" || problem === "foreign document"
+            ? [ready()]
+            : [
+                ready(),
+                ready({
+                  document_id: otherId,
+                  version_id:
+                    problem === "stale version" ? randomUUID() : otherVersion,
+                  sha256:
+                    problem === "stale hash" ? "c".repeat(64) : "b".repeat(64),
+                }),
+              ];
+        return [];
+      });
+      const port = createGateQApplicationDocumentPort({ sql });
+      await expect(
+        port.freezeForSubmission(
+          { sql: sql as TransactionContext["sql"] },
+          {
+            tenantId,
+            applicationId,
+            selectedDocuments: [
+              { documentId, versionId, sha256: "b".repeat(64) },
+              {
+                documentId: otherId,
+                versionId: otherVersion,
+                sha256: "b".repeat(64),
+              },
+            ],
+          },
+        ),
+      ).rejects.toThrow("Review the document selection again");
+      expect(calls.some((c) => c.query.startsWith("insert"))).toBe(false);
+    },
+  );
+  it("refuses omitted selection and duplicate document ids before any disclosure write", async () => {
+    const { sql, calls } = recordingSql(() => []);
+    const port = createGateQApplicationDocumentPort({ sql });
+    const tx = { sql: sql as TransactionContext["sql"] };
+    await expect(
+      port.freezeForSubmission(tx, {
+        tenantId,
+        applicationId,
+        selectedDocuments: undefined as unknown as [],
+      }),
+    ).rejects.toThrow();
+    const selected = { documentId, versionId, sha256: "b".repeat(64) };
+    await expect(
+      port.freezeForSubmission(tx, {
+        tenantId,
+        applicationId,
+        selectedDocuments: [selected, selected],
+      }),
+    ).rejects.toThrow();
+    expect(calls).toEqual([]);
+  });
+  it("refuses a changed selection after submission, including an attempted empty replacement", async () => {
+    const { sql, calls } = recordingSql((q) =>
+      q.startsWith("select id,status")
+        ? [{ id: applicationId, status: "SUBMITTED" }]
+        : q.startsWith("select g.document_id")
+          ? [
+              {
+                document_id: documentId,
+                document_version_id: versionId,
+                title: "deck.pdf",
+                mime_type: "application/pdf",
+                sha256: "b".repeat(64),
+                frozen_at: new Date(),
+              },
+            ]
+          : [],
+    );
+    const port = createGateQApplicationDocumentPort({ sql });
+    await expect(
+      port.freezeForSubmission(
+        { sql: sql as TransactionContext["sql"] },
+        { tenantId, applicationId, selectedDocuments: [] },
+      ),
+    ).rejects.toThrow();
+    expect(calls.some((c) => c.query.startsWith("insert"))).toBe(false);
+  });
+  it("resolves only the exact submitted tuple, and keeps storage coordinates out of page excerpts", async () => {
+    const { sql, calls } = recordingSql((q) =>
+      q.includes("v.storage_bucket,v.storage_key")
+        ? [
+            ready({
+              title: "deck.pdf",
+              storage_bucket: "cq-documents-private",
+              storage_key: "uploads/frozen.pdf",
+            }),
+          ]
+        : q.startsWith("select page_number")
+          ? [{ page_number: 2, text: "Authorized evidence", full_length: 19 }]
+          : [],
+    );
+    const port = createGateQApplicationDocumentPort({ sql });
+    const input = {
+      tenantId,
+      applicationId,
+      documentId,
+      versionId,
+      sha256: "b".repeat(64),
+    };
+    const object = await port.frozenDocumentObject(input);
+    expect(object).toMatchObject({
+      documentId,
+      versionId,
+      object: { bucket: "cq-documents-private", key: "uploads/frozen.pdf" },
+      malwareStatus: "NOT_SCANNED",
+    });
+    const doc = await port.readFrozenDocument(input);
+    expect(doc?.excerpts).toEqual([{ page: 2, text: "Authorized evidence" }]);
+    expect(doc).not.toHaveProperty("object");
+    expect(doc).not.toHaveProperty("storage_key");
+    const guard = calls.find((c) =>
+      c.query.includes("v.storage_bucket,v.storage_key"),
+    );
+    expect(guard?.query).toContain("a.status='SUBMITTED'");
+    expect(guard?.query).toContain("g.document_version_id=? and g.sha256=?");
+    expect(guard?.query).not.toContain("d.current_version_id");
+    expect(guard?.values).toEqual([
+      tenantId,
+      applicationId,
+      documentId,
+      versionId,
+      "b".repeat(64),
+    ]);
+  });
+  it("returns no object or excerpts for an undisclosed, foreign, blocked or unavailable submitted tuple", async () => {
+    const { sql, calls } = recordingSql(() => []);
+    const port = createGateQApplicationDocumentPort({ sql });
+    const input = {
+      tenantId,
+      applicationId,
+      documentId,
+      versionId,
+      sha256: "b".repeat(64),
+    };
+    expect(await port.frozenDocumentObject(input)).toBeNull();
+    expect(await port.readFrozenDocument(input)).toBeNull();
+    expect(calls.some((c) => c.query.startsWith("select page_number"))).toBe(
+      false,
+    );
+  });
+  it("withholds instruction-like submitted text using the same readiness policy", async () => {
+    const { sql, calls } = recordingSql((q) =>
+      q.includes("v.storage_bucket,v.storage_key")
+        ? [
+            ready({
+              storage_bucket: "cq-documents-private",
+              storage_key: "uploads/frozen.pdf",
+              instruction_risk_signals: 1,
+            }),
+          ]
+        : [],
+    );
+    const port = createGateQApplicationDocumentPort({ sql });
+    expect(
+      await port.readFrozenDocument({
+        tenantId,
+        applicationId,
+        documentId,
+        versionId,
+        sha256: "b".repeat(64),
+      }),
+    ).toMatchObject({ instructionRisk: true, excerpts: [], truncated: true });
+    expect(calls.some((c) => c.query.startsWith("select page_number"))).toBe(
+      false,
+    );
+  });
+  it("frozen summaries require SUBMITTED in the same SQL read, not a separate stale preflight", async () => {
+    const { sql, calls } = recordingSql(() => []);
+    const port = createGateQApplicationDocumentPort({ sql });
+    expect(await port.frozenDocuments({ tenantId, applicationId })).toEqual([]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.query).toContain("a.status='SUBMITTED'");
+    expect(calls[0]?.values).toContain(false);
   });
 });

@@ -307,6 +307,9 @@ export {
 // ADR 0067: the port GateQ intake reads and freezes application documents through.
 export {
   createGateQApplicationDocumentPort,
+  GateQApplicationDocumentSelectionError,
+  type GateQSelectedApplicationDocument,
+  type GateQFrozenApplicationDocumentObject,
   type GateQApplicationDocumentPort,
   type GateQApplicationDocumentRef,
   type GateQApplicationDocumentFreeze,
