@@ -238,6 +238,13 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_CONFIRM_PATH": PUBLIC,
   "api/http/gateq-apply.ts GET GATEQ_APPLY_TRANSCRIPT_PATH": PUBLIC,
   "api/http/gateq-apply.ts GET GATEQ_APPLY_COVERAGE_PATH": PUBLIC,
+  // ADR 0067: the applicant's own documents; the same anonymous applicant
+  // surface, authorised by the guest credential alone.
+  "api/http/gateq-apply-documents.ts POST GATEQ_APPLY_DOCUMENTS_PATH": PUBLIC,
+  "api/http/gateq-apply-documents.ts POST GATEQ_APPLY_DOCUMENT_COMPLETE_PATH":
+    PUBLIC,
+  "api/http/gateq-apply-documents.ts GET GATEQ_APPLY_DOCUMENTS_PATH": PUBLIC,
+  "api/http/gateq-apply-documents.ts DELETE GATEQ_APPLY_DOCUMENT_PATH": PUBLIC,
   ...Object.fromEntries(
     [
       "POST GATEQ_GATEWAYS_PATH",
@@ -1134,6 +1141,11 @@ const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
   // Q's opening question for a form-started interview, under the same
   // guest credential. Pending the lead's decision.
   "api/http/gateq-apply.ts POST GATEQ_APPLY_INTERVIEW_OPEN_PATH",
+  // ADR 0067: the applicant's own document upload, completion and removal,
+  // under the same guest credential. Pending the lead's decision.
+  "api/http/gateq-apply-documents.ts POST GATEQ_APPLY_DOCUMENTS_PATH",
+  "api/http/gateq-apply-documents.ts POST GATEQ_APPLY_DOCUMENT_COMPLETE_PATH",
+  "api/http/gateq-apply-documents.ts DELETE GATEQ_APPLY_DOCUMENT_PATH",
   // P14: authorised by a one-time code only the claimant's inbox holds; no
   // actor carries it, so no declared action can. Pending the lead's decision.
   "api/http/gateq.ts POST COMPANY_CLAIM_CONFIRM_PATH",

@@ -129,6 +129,10 @@ import {
   type GateQApplyRoutesDependencies,
 } from "./http/gateq-apply.js";
 import {
+  registerGateQApplyDocumentRoutes,
+  type GateQApplyDocumentsRoutesDependencies,
+} from "./http/gateq-apply-documents.js";
+import {
   registerGateQRoutes,
   type GateQRoutesDependencies,
 } from "./http/gateq.js";
@@ -360,6 +364,9 @@ export type ApiModules = {
   readonly gateqPublicImages?: GateQRoutesDependencies["publicImages"];
   /** CQ-GATE-002: the public applicant surface. Anonymous by design. */
   readonly gateqApply?: GateQApplyRoutesDependencies | undefined;
+  /** ADR 0067: the applicant's own documents, guest-credential scoped. */
+  readonly gateqApplyDocuments?:
+    GateQApplyDocumentsRoutesDependencies | undefined;
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
   readonly onboardingNudges?: OnboardingRoutesDependencies["nudges"];
@@ -953,6 +960,9 @@ export function createApp(
   // holding a link is the whole audience.
   if (modules.gateqApply !== undefined) {
     registerGateQApplyRoutes(app, modules.gateqApply);
+  }
+  if (modules.gateqApplyDocuments !== undefined) {
+    registerGateQApplyDocumentRoutes(app, modules.gateqApplyDocuments);
   }
 
   // Handles and the Q Card (BIZ-004): the owner's card routes and the two

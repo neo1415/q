@@ -94,6 +94,7 @@ import {
   EvidenceRuleError,
   EvidenceSourceNotFoundError,
   EvidenceSubjectNotFoundError,
+  GateQApplicationDocumentDisclosedError,
 } from "@capital-q/evidence";
 import {
   MediaAssetConflictError,
@@ -516,6 +517,16 @@ function toProblem(
   if (error instanceof DocumentUploadStateError) {
     return createProblemDetails({
       code: "UPLOAD_NOT_READY",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // ADR 0067: the applicant's own document is already part of their
+  // submitted application. Only their own credential can reach this.
+  if (error instanceof GateQApplicationDocumentDisclosedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
       requestId,
       detail: error.message,
     });

@@ -292,3 +292,24 @@ export {
   type DeckExtractionRow,
   type PostgresDataRoom,
 } from "./infrastructure/postgres-data-room.js";
+export {
+  createGateQApplicationEvidenceService,
+  GateQApplicationEvidenceScopeSchema,
+  GateQApplicationEvidenceScopeError,
+  GateQApplicationDocumentDisclosedError,
+  gateqApplicationDocumentStatus,
+  type GateQApplicationDocumentStatus,
+  type GateQApplicationEvidenceScope,
+  type GateQApplicationEvidenceDependencies,
+  type GateQApplicationEvidenceItem,
+  type GateQApplicationEvidenceService,
+} from "./application/gateq-application-evidence.js";
+// ADR 0067: the port GateQ intake reads and freezes application documents through.
+export {
+  createGateQApplicationDocumentPort,
+  type GateQApplicationDocumentPort,
+  type GateQApplicationDocumentRef,
+  type GateQApplicationDocumentFreeze,
+  type GateQReadyApplicationDocument,
+  type GateQFrozenApplicationDocument,
+} from "./application/gateq-application-document-port.js";

@@ -388,3 +388,24 @@ export function documentDetailsChangedEvent(
     data,
   );
 }
+
+/** Application-private version fact; no human actor or organisation attribution. */
+export function applicationDocumentVersionCreatedEvent(
+  context: { readonly tenantId: string; readonly correlationId: CorrelationId },
+  data: z.infer<typeof DocumentVersionCreatedEvent.dataSchema>,
+): CapitalQEvent<z.infer<typeof DocumentVersionCreatedEvent.dataSchema>> {
+  return {
+    specVersion: "1.0",
+    id: EventIdSchema.parse(randomUUID()),
+    type: DocumentVersionCreatedEvent.name,
+    source: DocumentVersionCreatedEvent.producer,
+    time: UtcTimestampSchema.parse(new Date().toISOString()),
+    subject: `document_version/${data.documentVersionId}`,
+    dataContentType: "application/json",
+    eventVersion: 1,
+    tenantId: context.tenantId,
+    correlationId: context.correlationId,
+    aggregate: { type: "document", id: data.documentId, version: 2 },
+    data,
+  };
+}
