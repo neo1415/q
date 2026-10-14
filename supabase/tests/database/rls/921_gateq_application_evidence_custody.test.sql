@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
-select plan(16);
+select plan(19);
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
   ('00000000-0000-4000-8000-00000000dd01', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), 'VC', 'Interview Capital');
 
@@ -45,5 +45,17 @@ select is((select count(*)::int from pg_class c join pg_namespace n on n.oid=c.r
 select throws_ok($$delete from evidence.document_versions where id='00000000-0000-4000-8000-00000000dd61'$$,'23514',null,'file version identity remains immutable');
 select is((select count(*)::int from evidence.documents where owner_organisation_id=pg_temp.rls_id('org_b') and id='00000000-0000-4000-8000-00000000dd51'),0,'guest custody is absent from receiving organisation document set');
 select throws_ok($$insert into gateq.application_sessions(application_id,tenant_id,token_hash,expires_at) values('00000000-0000-4000-8000-00000000dd31',pg_temp.rls_id('tenant_a'),repeat('d',64),now()+interval '14 days')$$,'23503',null,'session itself cannot bind the application to another tenant');
+-- A failed full-budget upload releases bytes, while every issued session
+-- continues consuming an attempt and a real version remains chargeable.
+insert into evidence.document_upload_sessions (tenant_id,document_id,gateq_application_id,gateq_session_id,guest_idempotency_hash,guest_request_hash,storage_bucket,storage_key,original_filename,declared_mime_type,declared_size_bytes,authorising_capability,expires_at,status,document_version_id,finalized_at) values
+(pg_temp.rls_id('tenant_b'),'00000000-0000-4000-8000-00000000dd51','00000000-0000-4000-8000-00000000dd31','00000000-0000-4000-8000-00000000dd41',repeat('e',64),repeat('f',64),'cq-documents-private','uploads/completed.pdf','pitch.pdf','application/pdf',128,'gateq.application.upload',now()+interval '1 hour','COMPLETED','00000000-0000-4000-8000-00000000dd61',now());
+insert into evidence.documents(id,tenant_id,owner_kind,gateq_application_id,gateq_session_id,title,visibility_scope) values
+('00000000-0000-4000-8000-00000000dd52',pg_temp.rls_id('tenant_b'),'GATEQ_APPLICATION','00000000-0000-4000-8000-00000000dd31','00000000-0000-4000-8000-00000000dd41','Failed pitch','personal_private');
+insert into evidence.document_upload_sessions (tenant_id,document_id,gateq_application_id,gateq_session_id,guest_idempotency_hash,guest_request_hash,storage_bucket,storage_key,original_filename,declared_mime_type,declared_size_bytes,authorising_capability,expires_at,status,failure_code) values
+(pg_temp.rls_id('tenant_b'),'00000000-0000-4000-8000-00000000dd52','00000000-0000-4000-8000-00000000dd31','00000000-0000-4000-8000-00000000dd41',repeat('1',64),repeat('2',64),'cq-documents-private','uploads/rejected.pdf','failed.pdf','application/pdf',26214400,'gateq.application.upload',now()+interval '1 hour','REJECTED','SIZE_MISMATCH');
+select is((select coalesce(sum(declared_size_bytes) filter (where document_version_id is not null or cleanup_pending or status not in ('REJECTED','CANCELLED','EXPIRED')),0)::bigint from evidence.document_upload_sessions where gateq_application_id='00000000-0000-4000-8000-00000000dd31'),128::bigint,'failed full-budget unversioned upload releases its reservation; completed version retains bytes');
+select is((select count(*)::int from evidence.document_upload_sessions where gateq_application_id='00000000-0000-4000-8000-00000000dd31'),2,'both successful and failed issuances remain in the bounded attempt history');
+update evidence.document_upload_sessions set cleanup_pending=true where document_id='00000000-0000-4000-8000-00000000dd52';
+select is((select coalesce(sum(declared_size_bytes) filter (where document_version_id is not null or cleanup_pending or status not in ('REJECTED','CANCELLED','EXPIRED')),0)::bigint from evidence.document_upload_sessions where gateq_application_id='00000000-0000-4000-8000-00000000dd31'),26214528::bigint,'failed upload with undeleted storage debt retains bytes until cleanup succeeds');
 select * from finish();
 rollback;
