@@ -714,3 +714,8 @@ Source101 old CI38644691732 failed an asynchronous exact-manifest assertion in e
 ## October14 — isolated Evidence97 fixture repair preserved
 
 Existing PR97 advancedb76→364d286e normally after exacthead recheck; only disposable concurrency bootstrap adds canonical231600 before241000. Old pgTAP step passed; later concurrency proof failed8wrapped42703 missing application_turns.disclosure_lineage errors. Actual PostgreSQL17.11 baseline confirmed; unchanged full corrected concurrency/idempotency/rollback/MVCC/submission-lock proof PASS. New protectedCI38648329522 running, no hosted migration/release/runtime change. Own worktree clean and old19914537 branch preserved. This independent fixture repair stays OUT of H2.
+
+
+## October14 — isolated investorQ98 fixture repair preserved
+
+Existing PR98 exact802 safely fast-forwarded629fced0; only explicit applicationId fixture added for XOR schema. Baseline1211PASS/1FAIL; corrected1212PASS,53builds/roottypes/staticPASS. Recoverable branch codex/gateq-pr98-capability-fixture-oct14 pushed, originalef515 untouched, checkoutclean. NewprotectedCI38648657456 running. No product/schema/security change or live answer claim. H2 candidate102 CI38647145307 nowALLPASS; source101 test stillrunning, so promotion still waits.
