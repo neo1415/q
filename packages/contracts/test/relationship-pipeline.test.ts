@@ -32,8 +32,9 @@ describe("pipeline trust boundary", () => {
         selected: "not-a-uuid",
       }).success,
     ).toBe(false);
-    expect(RelationshipPipelineExportQuerySchema.parse({}).selected).toEqual(
-      [],
-    );
+    expect(
+      RelationshipPipelineExportQuerySchema.parse({ scope: "1".repeat(64) })
+        .selected,
+    ).toEqual([]);
   });
 });

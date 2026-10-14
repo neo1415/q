@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushSync } from "react-dom";
 import type {
   RelationshipPipelineDto,
   RelationshipPipelineQuery,
@@ -26,6 +27,7 @@ const mock = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mock.push }) }));
 const data: RelationshipPipelineDto = {
   total: 2,
+  scope: "1".repeat(64),
   nextCursor: "next-cursor",
   items: [
     {
@@ -103,7 +105,9 @@ describe("real pipeline controls", () => {
       screen
         .getByRole("link", { name: "Export filtered CSV" })
         .getAttribute("href"),
-    ).toBe("/relationships/export?q=Kivu&state=IN_DILIGENCE");
+    ).toBe(
+      `/relationships/export?scope=${"1".repeat(64)}&q=Kivu&state=IN_DILIGENCE`,
+    );
     fireEvent.click(
       screen.getByRole("checkbox", { name: "Select Kivu Freight" }),
     );
@@ -124,7 +128,12 @@ describe("real pipeline controls", () => {
       target: { value: "Connected" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save view" }));
-    expect(screen.getByRole("option", { name: "Connected" })).toBeDefined();
+    expect(
+      within(screen.getByRole("combobox", { name: "Saved view" })).getByRole(
+        "option",
+        { name: "Connected" },
+      ),
+    ).toBeDefined();
     fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
       target: { value: "Conversations" },
     });
@@ -198,18 +207,20 @@ describe("real pipeline controls", () => {
   it("Q filter receipt waits for settled route and actual returned data", async () => {
     const page = render(<RelationshipPipeline {...props} />);
     mock.push.mockImplementation((path: string) => {
-      page.rerender(
-        <RelationshipPipeline
-          {...props}
-          query={{ state: "IN_DILIGENCE" }}
-          data={{
-            ...data,
-            items: [data.items[0] ?? data.items[1]].filter(
-              (row) => row !== undefined,
-            ),
-            total: 1,
-          }}
-        />,
+      flushSync(() =>
+        page.rerender(
+          <RelationshipPipeline
+            {...props}
+            query={{ state: "IN_DILIGENCE" }}
+            data={{
+              ...data,
+              items: [data.items[0] ?? data.items[1]].filter(
+                (row) => row !== undefined,
+              ),
+              total: 1,
+            }}
+          />,
+        ),
       );
       noteRoute(path);
     });

@@ -13,6 +13,7 @@ import {
   InterestAlreadyAnsweredError,
   InterestIdSchema,
   InterestNotFoundError,
+  relationshipPipelineScopeBinding,
   InterestNotPermittedError,
   InterestResponseIdSchema,
   MatchIdSchema,
@@ -768,13 +769,13 @@ describe("Hub pipeline HTTP boundary", () => {
     const { app } = buildApp();
     const response = await app.inject({
       method: "GET",
-      url: "/v1/network/relationships/pipeline/export?state=IN_DILIGENCE",
+      url: `/v1/network/relationships/pipeline/export?state=IN_DILIGENCE&scope=${relationshipPipelineScopeBinding({ state: "IN_DILIGENCE" }, [CONTEXT.userId, CONTEXT.tenantId, CONTEXT.organisationId, "INVESTOR"].join(":"))}`,
     });
     expect(response.statusCode).toBe(200);
     expect(response.body).not.toContain("Kora");
     const denied = await app.inject({
       method: "GET",
-      url: "/v1/network/relationships/pipeline/export?selected=a0000000-0000-4000-8000-999999999999",
+      url: `/v1/network/relationships/pipeline/export?selected=a0000000-0000-4000-8000-999999999999&scope=${relationshipPipelineScopeBinding({}, [CONTEXT.userId, CONTEXT.tenantId, CONTEXT.organisationId, "INVESTOR"].join(":"))}`,
     });
     expect(denied.statusCode).toBe(404);
   });
@@ -782,7 +783,7 @@ describe("Hub pipeline HTTP boundary", () => {
     const { app } = buildApp({ failWith: new InterestNotPermittedError() });
     for (const path of [
       "/v1/network/relationships/pipeline",
-      "/v1/network/relationships/pipeline/export",
+      `/v1/network/relationships/pipeline/export?scope=${"1".repeat(64)}`,
     ]) {
       expect((await app.inject({ method: "GET", url: path })).statusCode).toBe(
         403,

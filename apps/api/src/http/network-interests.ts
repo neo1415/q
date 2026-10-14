@@ -26,6 +26,8 @@ import {
   NETWORK_RELATIONSHIP_PASS_PATH,
   PassReasonListDtoSchema,
   RelationshipListDtoSchema,
+  parseContract,
+  RelationshipSummaryDtoSchema,
   NETWORK_INVESTOR_PIPELINE_PATH,
   NETWORK_COMPANY_PIPELINE_PATH,
   RelationshipPipelineQuerySchema,
@@ -38,6 +40,8 @@ import {
 import {
   InterestNotFoundError,
   selectRelationshipPipeline,
+  relationshipPipelineScopeBinding,
+  RelationshipPipelineQueryError,
   relationshipPipelineExportRows,
   toConnectionRequestDto,
   toIncomingConnectionRequestDto,
@@ -333,7 +337,9 @@ export function registerNetworkInterestRoutes(
         })
       : await service.listRelationshipsForInvestor({ actor, scanLimit: 1001 });
     return listings.map((listing) =>
-      toRelationshipSummaryDto(listing, company ? "COMPANY" : "INVESTOR"),
+      RelationshipSummaryDtoSchema.parse(
+        toRelationshipSummaryDto(listing, company ? "COMPANY" : "INVESTOR"),
+      ),
     );
   };
   const pipelineScope = (request: FastifyRequest, company: boolean) => {
@@ -349,7 +355,10 @@ export function registerNetworkInterestRoutes(
     NETWORK_INVESTOR_PIPELINE_PATH,
     { onRequest: withContext },
     async (request, reply) => {
-      const query = RelationshipPipelineQuerySchema.parse(request.query);
+      const query = parseContract(
+        RelationshipPipelineQuerySchema,
+        request.query,
+      );
       const page = selectRelationshipPipeline(
         await pipelineRows(request, false),
         query,
@@ -366,7 +375,10 @@ export function registerNetworkInterestRoutes(
     NETWORK_COMPANY_PIPELINE_PATH,
     { onRequest: withContext },
     async (request, reply) => {
-      const query = RelationshipPipelineQuerySchema.parse(request.query);
+      const query = parseContract(
+        RelationshipPipelineQuerySchema,
+        request.query,
+      );
       const page = selectRelationshipPipeline(
         await pipelineRows(request, true),
         query,
@@ -384,9 +396,18 @@ export function registerNetworkInterestRoutes(
     reply: import("fastify").FastifyReply,
     company: boolean,
   ) => {
-    const query = RelationshipPipelineExportQuerySchema.parse(request.query);
+    const query = parseContract(
+      RelationshipPipelineExportQuerySchema,
+      request.query,
+    );
+    const authorisedRows = await pipelineRows(request, company);
+    if (
+      query.scope !==
+      relationshipPipelineScopeBinding(query, pipelineScope(request, company))
+    )
+      throw new RelationshipPipelineQueryError();
     const rows = relationshipPipelineExportRows(
-      await pipelineRows(request, company),
+      authorisedRows,
       query,
       query.selected,
     );

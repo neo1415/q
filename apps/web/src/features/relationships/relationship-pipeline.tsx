@@ -17,6 +17,7 @@ import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 import { effectShown } from "@/features/q/control/perform";
 import { currentRoute } from "@/features/q/control/route-state";
 import { QPageState, useQDialog } from "@/features/q/q-section";
+import { formatDay } from "@/components/date-format";
 import { PIPELINE_NEXT_WORDS } from "./pipeline-presentation";
 import { STATE_WORDS } from "./relationship-words";
 import {
@@ -119,8 +120,9 @@ export function RelationshipPipeline({
     kind: "INPUT",
     ref: searchRef,
     onAct: async (intent) => {
+      if (intent.act !== "SET") return "NOT_APPLICABLE";
       if (typeof intent.value !== "string" || intent.value.trim().length > 120)
-        return "NOT_APPLICABLE";
+        return "FAILED";
       const next = { ...query, q: intent.value.trim(), cursor: undefined };
       const target = pipelineHref(next, layout);
       move(next);
@@ -238,7 +240,7 @@ export function RelationshipPipeline({
         : preferences.columns.filter((entry) => entry !== column),
     });
   }
-  const exports = new URLSearchParams();
+  const exports = new URLSearchParams({ scope: data.scope });
   for (const [key, value] of Object.entries(query))
     if (key !== "cursor" && key !== "pageSize" && value !== undefined)
       exports.set(key, String(value));
@@ -265,6 +267,9 @@ export function RelationshipPipeline({
         <input
           ref={searchRef}
           aria-label={
+            side === "INVESTOR" ? "Search companies" : "Search investors"
+          }
+          placeholder={
             side === "INVESTOR" ? "Search companies" : "Search investors"
           }
           value={search}
@@ -360,6 +365,7 @@ export function RelationshipPipeline({
         </select>
         <input
           aria-label="View name"
+          placeholder="View name"
           className={inputClass}
           value={viewName}
           maxLength={64}
@@ -484,20 +490,22 @@ export function RelationshipPipeline({
                   className="border-t border-(--cq-border-subtle)"
                 >
                   <td className="p-3">
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${row.counterpart.name}`}
-                      checked={selected.includes(row.relationshipId)}
-                      onChange={(event) =>
-                        setSelected(
-                          event.target.checked
-                            ? [...selected, row.relationshipId]
-                            : selected.filter(
-                                (id) => id !== row.relationshipId,
-                              ),
-                        )
-                      }
-                    />
+                    <label className="inline-flex min-h-11 min-w-11 items-center justify-center">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${row.counterpart.name}`}
+                        checked={selected.includes(row.relationshipId)}
+                        onChange={(event) =>
+                          setSelected(
+                            event.target.checked
+                              ? [...selected, row.relationshipId]
+                              : selected.filter(
+                                  (id) => id !== row.relationshipId,
+                                ),
+                          )
+                        }
+                      />
+                    </label>
                   </td>
                   <td className="p-3">
                     <Link
@@ -514,7 +522,7 @@ export function RelationshipPipeline({
                   {preferences.columns.includes("since") ? (
                     <td className="p-3">
                       <time dateTime={row.stateSince}>
-                        {new Date(row.stateSince).toLocaleDateString("en-GB")}
+                        {formatDay(row.stateSince)}
                       </time>
                     </td>
                   ) : null}

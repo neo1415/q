@@ -26,6 +26,7 @@ export const RelationshipPipelineDtoSchema = z
   .object({
     items: z.array(RelationshipSummaryDtoSchema).max(50),
     total: z.number().int().min(0),
+    scope: z.string().regex(/^[a-f0-9]{64}$/),
     nextCursor: z.string().max(1024).nullable(),
   })
   .strict();
@@ -35,6 +36,7 @@ export type RelationshipPipelineDto = z.infer<
 export const RelationshipPipelineExportQuerySchema =
   RelationshipPipelineQuerySchema.omit({ cursor: true, pageSize: true })
     .extend({
+      scope: z.string().regex(/^[a-f0-9]{64}$/),
       selected: z
         .string()
         .max(8192)

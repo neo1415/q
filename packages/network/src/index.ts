@@ -366,5 +366,6 @@ export {
 } from "./domain/errors.js";
 export {
   selectRelationshipPipeline,
+  relationshipPipelineScopeBinding,
   relationshipPipelineExportRows,
 } from "./application/relationship-pipeline.js";

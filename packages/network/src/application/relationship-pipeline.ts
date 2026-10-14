@@ -45,6 +45,22 @@ function sortedRows(
     key,
   };
 }
+/** Coherence fingerprint, not an access token: every read still authorises. */
+export function relationshipPipelineScopeBinding(
+  query: RelationshipPipelineQuery,
+  actorScope: string,
+): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        actorScope,
+        (query.q ?? "").trim().toLowerCase(),
+        query.state ?? null,
+        query.sort ?? "recent",
+      ]),
+    )
+    .digest("hex");
+}
 export function selectRelationshipPipeline(
   rows: readonly RelationshipSummaryDto[],
   query: RelationshipPipelineQuery,
@@ -86,6 +102,7 @@ export function selectRelationshipPipeline(
   return {
     items,
     total: sorted.rows.length,
+    scope: relationshipPipelineScopeBinding(query, actorScope),
     nextCursor:
       last === undefined || start + items.length >= sorted.rows.length
         ? null
