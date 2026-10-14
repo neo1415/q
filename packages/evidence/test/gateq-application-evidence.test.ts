@@ -512,4 +512,102 @@ describe("application-owned canonical Evidence", () => {
     expect(f.calls).toHaveLength(1);
     expect(f.createUploadAuthorization).not.toHaveBeenCalled();
   });
+  it("allows a smaller retry after a failed full-budget unversioned upload without deleting its history", async () => {
+    const f = fixture((q) =>
+      q.startsWith("select a.id")
+        ? [{ id: applicationId }]
+        : q.startsWith("select count(*)")
+          ? [{ count: 1, bytes: 0, open: 0 }]
+          : q.startsWith("insert into evidence.documents")
+            ? [{ id: documentId }]
+            : q.startsWith("insert into evidence.document_upload_sessions")
+              ? [row("PENDING_AUTHORIZATION")]
+              : [],
+    );
+    expect(
+      (await f.service.create({ credential: "opaque-session", input }))
+        .documentId,
+    ).toBe(documentId);
+    expect(f.calls.some((c) => c.query.startsWith("delete"))).toBe(false);
+    expect(
+      f.calls.some((c) =>
+        c.query.includes("document_version_id is null and expires_at <= now()"),
+      ),
+    ).toBe(true);
+    expect(f.createUploadAuthorization).toHaveBeenCalledOnce();
+  });
+  it("keeps the issue-attempt ceiling after terminal uploads release every byte reservation", async () => {
+    const f = fixture((q) =>
+      q.startsWith("select a.id")
+        ? [{ id: applicationId }]
+        : q.startsWith("select count(*)")
+          ? [{ count: 5, bytes: 0, open: 0 }]
+          : [],
+    );
+    await expect(
+      f.service.create({ credential: "opaque-session", input }),
+    ).rejects.toBeInstanceOf(EvidenceRuleError);
+    expect(f.createUploadAuthorization).not.toHaveBeenCalled();
+    expect(f.calls.some((c) => c.query.startsWith("insert"))).toBe(false);
+  });
+  it("cleans terminal unversioned storage before allocating a retry reservation", async () => {
+    let debt = true;
+    const f = fixture((q) => {
+      if (q.startsWith("select a.id")) return [{ id: applicationId }];
+      if (q.startsWith("select id,storage_bucket"))
+        return debt
+          ? [
+              {
+                id: uploadId,
+                storage_bucket: "cq-documents-private",
+                storage_key: "uploads/failed.pdf",
+              },
+            ]
+          : [];
+      if (q.includes("set cleanup_pending=false")) debt = false;
+      if (q.startsWith("select count(*)"))
+        return [{ count: 1, bytes: debt ? 3 * 1024 * 1024 : 0, open: 0 }];
+      if (q.startsWith("insert into evidence.documents"))
+        return [{ id: documentId }];
+      if (q.startsWith("insert into evidence.document_upload_sessions"))
+        return [row("PENDING_AUTHORIZATION")];
+      return [];
+    });
+    expect(
+      (await f.service.create({ credential: "opaque-session", input }))
+        .documentId,
+    ).toBe(documentId);
+    expect(f.deleteObject).toHaveBeenCalledExactlyOnceWith({
+      bucket: "cq-documents-private",
+      key: "uploads/failed.pdf",
+    });
+    expect(debt).toBe(false);
+    expect(f.createUploadAuthorization).toHaveBeenCalledOnce();
+  });
+  it("retains a failed byte reservation during storage cleanup failure instead of lifting the cap", async () => {
+    const f = fixture((q) =>
+      q.startsWith("select a.id")
+        ? [{ id: applicationId }]
+        : q.startsWith("select id,storage_bucket")
+          ? [
+              {
+                id: uploadId,
+                storage_bucket: "cq-documents-private",
+                storage_key: "uploads/failed.pdf",
+              },
+            ]
+          : q.startsWith("select count(*)")
+            ? [{ count: 1, bytes: 3 * 1024 * 1024, open: 0 }]
+            : [],
+    );
+    f.deleteObject.mockRejectedValue(new Error("Storage unavailable"));
+    await expect(
+      f.service.create({ credential: "opaque-session", input }),
+    ).rejects.toBeInstanceOf(EvidenceRuleError);
+    expect(f.createUploadAuthorization).not.toHaveBeenCalled();
+    expect(
+      f.calls.some((c) => c.query.includes("set cleanup_pending=false")),
+    ).toBe(false);
+    expect(f.calls.some((c) => c.query.startsWith("insert"))).toBe(false);
+  });
 });
