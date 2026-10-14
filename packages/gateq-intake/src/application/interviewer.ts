@@ -25,6 +25,7 @@ import {
 
 import {
   APPLICATION_DIMENSIONS,
+  ApplicationFactProposalShapeSchema,
   ApplicationDimensionSchema,
   NewApplicationFactSchema,
   type ApplicationDimension,
@@ -132,15 +133,32 @@ export type InterviewTurnOutcome = {
 };
 
 /** Persisted output is revalidated before replay, never treated as authority. */
-export const InterviewTurnOutcomeSchema = z.object({
-  reply: z.string().min(1).max(4000),
-  intent: GateQTurnIntentSchema,
-  facts: z.array(NewApplicationFactSchema).max(40),
-  rejectedFacts: z.number().int().nonnegative(),
-  asking: ApplicationDimensionSchema.nullable(),
-  questionForQ: z.string().nullable(),
-  readyToReview: z.boolean(),
-});
+export const InterviewTurnOutcomeSchema = z
+  .object({
+    reply: z.string().min(1).max(4000),
+    intent: GateQTurnIntentSchema,
+    facts: z.array(ApplicationFactProposalShapeSchema).max(40),
+    rejectedFacts: z.number().int().nonnegative(),
+    asking: ApplicationDimensionSchema.nullable(),
+    questionForQ: z.string().nullable(),
+    readyToReview: z.boolean(),
+  })
+  .transform((outcome) => {
+    // Reuse the paid reply from an older checkpoint without reinstating a
+    // proposal whose shape would erase a usable qualification value.
+    const facts: NewApplicationFact[] = [];
+    let rejected = 0;
+    for (const fact of outcome.facts) {
+      const parsed = NewApplicationFactSchema.safeParse(fact);
+      if (parsed.success) facts.push(parsed.data);
+      else rejected += 1;
+    }
+    return {
+      ...outcome,
+      facts,
+      rejectedFacts: outcome.rejectedFacts + rejected,
+    };
+  });
 
 /**
  * What the applicant gets when the model is unavailable (§38).
