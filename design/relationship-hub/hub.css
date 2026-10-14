@@ -379,3 +379,14 @@ td .sub { font-size: 12px; color: var(--cq-text-secondary); }
   .record-head.compact h1 { font-size: 20px; }
   .proto-bar .seg button { white-space: nowrap; padding: 4px 8px; }
 }
+
+/* The role switch must remain fully readable on narrow phones. */
+@media (max-width: 767px) {
+  .proto-bar { flex-wrap: wrap; }
+  .proto-bar .seg { flex-shrink: 0; margin-left: auto; }
+  .proto-bar .show-m { flex: 1; }
+  .q-cmd input:focus-visible, button:focus-visible, a:focus-visible {
+    outline: 2px solid var(--cq-accent);
+    outline-offset: 3px;
+  }
+}

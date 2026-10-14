@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Relationship Hub design review</title
+  ><style>
+    body {
+      font: 16px system-ui;
+      max-width: 1100px;
+      margin: auto;
+      padding: 24px;
+      color: #19212c;
+      background: #faf9f7;
+    }
+    a {
+      color: #0058c7;
+    }
+    video {
+      width: 100%;
+      max-height: 70vh;
+      background: #111;
+    }
+    section {
+      margin: 32px 0;
+    }
+    img {
+      width: 100%;
+      height: auto;
+    }
+    summary {
+      cursor: pointer;
+      padding: 12px;
+    }
+    a:focus-visible,
+    summary:focus-visible {
+      outline: 3px solid #006aff;
+    }
+    nav {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+  </style>
+  <h1>Relationship Hub — design review</h1>
+  <p>
+    <strong
+      >Proposal only. All records are fictional; Q interactions and approvals
+      are scripted. Nothing is saved or sent. These recordings demonstrate
+      design behavior, not production capability.</strong
+    >
+  </p>
+  <nav aria-label="Review sections">
+    <a href="#walkthroughs">Walkthroughs</a><a href="#screens">Screenshots</a
+    ><a href="../index.html">Clickable prototype</a
+    ><a href="../README.md">Review notes and reproduction</a>
+  </nav>
+  <h2 id="walkthroughs">Recorded walkthroughs</h2>
+  <p>
+    Silent screen recordings. Each description below provides a text equivalent.
+    Standard video controls support pause, seek and fullscreen.
+  </p>
+  <section>
+    <h3>Investor</h3>
+    <p>
+      Overview → pipeline table and board → company record → evidence → meeting
+      transcript → approval → reports. Approval stays simulated; nothing is
+      sent.
+    </p>
+    <video
+      controls
+      preload="metadata"
+      aria-label="investor design walkthrough"
+      src="videos/investor.mp4"
+    ></video>
+    <p><a href="videos/investor.mp4" download>Download MP4</a></p>
+  </section>
+  <section>
+    <h3>Founder</h3>
+    <p>
+      Overview → investor list → Northgate requests → fundraising → updates →
+      scripted Q recommends references and opens the requests.
+    </p>
+    <video
+      controls
+      preload="metadata"
+      aria-label="founder design walkthrough"
+      src="videos/founder.mp4"
+    ></video>
+    <p><a href="videos/founder.mp4" download>Download MP4</a></p>
+  </section>
+  <section>
+    <h3>Q Navigation</h3>
+    <p>
+      Scripted Q navigates through pipeline, evidence, document page 7,
+      timestamped meeting passage and Q Work, then returns. A missing term sheet
+      returns a failed receipt instead of claiming it opened.
+    </p>
+    <video
+      controls
+      preload="metadata"
+      aria-label="q-navigation design walkthrough"
+      src="videos/q-navigation.mp4"
+    ></video>
+    <p><a href="videos/q-navigation.mp4" download>Download MP4</a></p>
+  </section>
+  <section>
+    <h3>Mobile</h3>
+    <p>
+      390 × 844 mobile overview, pipeline, company record, founder overview and
+      requests; scripted Q recommends the next step.
+    </p>
+    <video
+      controls
+      preload="metadata"
+      aria-label="mobile design walkthrough"
+      src="videos/mobile.mp4"
+    ></video>
+    <p><a href="videos/mobile.mp4" download>Download MP4</a></p>
+  </section>
+  <h2 id="screens">Desktop and mobile · light and dark</h2>
+  <p>
+    Expand a screenshot to inspect. Names describe the role, surface, device and
+    theme.
+  </p>
+  <details>
+    <summary>fnd fundraising desktop dark</summary>
+    <a href="screens/fnd-fundraising-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-fundraising-desktop-dark.png"
+        alt="Synthetic Relationship Hub: fnd fundraising desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd fundraising desktop light</summary>
+    <a href="screens/fnd-fundraising-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-fundraising-desktop-light.png"
+        alt="Synthetic Relationship Hub: fnd fundraising desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd fundraising mobile dark</summary>
+    <a href="screens/fnd-fundraising-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-fundraising-mobile-dark.png"
+        alt="Synthetic Relationship Hub: fnd fundraising mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd fundraising mobile light</summary>
+    <a href="screens/fnd-fundraising-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-fundraising-mobile-light.png"
+        alt="Synthetic Relationship Hub: fnd fundraising mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd investors desktop dark</summary>
+    <a href="screens/fnd-investors-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-investors-desktop-dark.png"
+        alt="Synthetic Relationship Hub: fnd investors desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd investors desktop light</summary>
+    <a href="screens/fnd-investors-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-investors-desktop-light.png"
+        alt="Synthetic Relationship Hub: fnd investors desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd investors mobile dark</summary>
+    <a href="screens/fnd-investors-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-investors-mobile-dark.png"
+        alt="Synthetic Relationship Hub: fnd investors mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd investors mobile light</summary>
+    <a href="screens/fnd-investors-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-investors-mobile-light.png"
+        alt="Synthetic Relationship Hub: fnd investors mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd overview desktop dark</summary>
+    <a href="screens/fnd-overview-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-overview-desktop-dark.png"
+        alt="Synthetic Relationship Hub: fnd overview desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd overview desktop light</summary>
+    <a href="screens/fnd-overview-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-overview-desktop-light.png"
+        alt="Synthetic Relationship Hub: fnd overview desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd overview mobile dark</summary>
+    <a href="screens/fnd-overview-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-overview-mobile-dark.png"
+        alt="Synthetic Relationship Hub: fnd overview mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd overview mobile light</summary>
+    <a href="screens/fnd-overview-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-overview-mobile-light.png"
+        alt="Synthetic Relationship Hub: fnd overview mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd q recommend desktop dark</summary>
+    <a href="screens/fnd-q-recommend-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-q-recommend-desktop-dark.png"
+        alt="Synthetic Relationship Hub: fnd q recommend desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd q recommend desktop light</summary>
+    <a href="screens/fnd-q-recommend-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-q-recommend-desktop-light.png"
+        alt="Synthetic Relationship Hub: fnd q recommend desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd q recommend mobile dark</summary>
+    <a href="screens/fnd-q-recommend-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-q-recommend-mobile-dark.png"
+        alt="Synthetic Relationship Hub: fnd q recommend mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd q recommend mobile light</summary>
+    <a href="screens/fnd-q-recommend-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-q-recommend-mobile-light.png"
+        alt="Synthetic Relationship Hub: fnd q recommend mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd record desktop dark</summary>
+    <a href="screens/fnd-record-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-record-desktop-dark.png"
+        alt="Synthetic Relationship Hub: fnd record desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd record desktop light</summary>
+    <a href="screens/fnd-record-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-record-desktop-light.png"
+        alt="Synthetic Relationship Hub: fnd record desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd record mobile dark</summary>
+    <a href="screens/fnd-record-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-record-mobile-dark.png"
+        alt="Synthetic Relationship Hub: fnd record mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd record mobile light</summary>
+    <a href="screens/fnd-record-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-record-mobile-light.png"
+        alt="Synthetic Relationship Hub: fnd record mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd requests desktop dark</summary>
+    <a href="screens/fnd-requests-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-requests-desktop-dark.png"
+        alt="Synthetic Relationship Hub: fnd requests desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd requests desktop light</summary>
+    <a href="screens/fnd-requests-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-requests-desktop-light.png"
+        alt="Synthetic Relationship Hub: fnd requests desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd requests mobile dark</summary>
+    <a href="screens/fnd-requests-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-requests-mobile-dark.png"
+        alt="Synthetic Relationship Hub: fnd requests mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd requests mobile light</summary>
+    <a href="screens/fnd-requests-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-requests-mobile-light.png"
+        alt="Synthetic Relationship Hub: fnd requests mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd updates desktop dark</summary>
+    <a href="screens/fnd-updates-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-updates-desktop-dark.png"
+        alt="Synthetic Relationship Hub: fnd updates desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd updates desktop light</summary>
+    <a href="screens/fnd-updates-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-updates-desktop-light.png"
+        alt="Synthetic Relationship Hub: fnd updates desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd updates mobile dark</summary>
+    <a href="screens/fnd-updates-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-updates-mobile-dark.png"
+        alt="Synthetic Relationship Hub: fnd updates mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>fnd updates mobile light</summary>
+    <a href="screens/fnd-updates-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/fnd-updates-mobile-light.png"
+        alt="Synthetic Relationship Hub: fnd updates mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv approval desktop dark</summary>
+    <a href="screens/inv-approval-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-approval-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv approval desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv approval desktop light</summary>
+    <a href="screens/inv-approval-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-approval-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv approval desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv approval mobile dark</summary>
+    <a href="screens/inv-approval-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-approval-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv approval mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv approval mobile light</summary>
+    <a href="screens/inv-approval-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-approval-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv approval mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv document p7 desktop dark</summary>
+    <a href="screens/inv-document-p7-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-document-p7-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv document p7 desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv document p7 desktop light</summary>
+    <a href="screens/inv-document-p7-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-document-p7-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv document p7 desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv document p7 mobile dark</summary>
+    <a href="screens/inv-document-p7-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-document-p7-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv document p7 mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv document p7 mobile light</summary>
+    <a href="screens/inv-document-p7-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-document-p7-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv document p7 mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv evidence desktop dark</summary>
+    <a href="screens/inv-evidence-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-evidence-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv evidence desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv evidence desktop light</summary>
+    <a href="screens/inv-evidence-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-evidence-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv evidence desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv evidence mobile dark</summary>
+    <a href="screens/inv-evidence-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-evidence-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv evidence mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv evidence mobile light</summary>
+    <a href="screens/inv-evidence-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-evidence-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv evidence mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv gateq desktop dark</summary>
+    <a href="screens/inv-gateq-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-gateq-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv gateq desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv gateq desktop light</summary>
+    <a href="screens/inv-gateq-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-gateq-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv gateq desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv gateq mobile dark</summary>
+    <a href="screens/inv-gateq-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-gateq-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv gateq mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv gateq mobile light</summary>
+    <a href="screens/inv-gateq-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-gateq-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv gateq mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv overview desktop dark</summary>
+    <a href="screens/inv-overview-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-overview-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv overview desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv overview desktop light</summary>
+    <a href="screens/inv-overview-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-overview-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv overview desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv overview mobile dark</summary>
+    <a href="screens/inv-overview-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-overview-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv overview mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv overview mobile light</summary>
+    <a href="screens/inv-overview-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-overview-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv overview mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv pipeline board desktop dark</summary>
+    <a href="screens/inv-pipeline-board-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-pipeline-board-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv pipeline board desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv pipeline board desktop light</summary>
+    <a href="screens/inv-pipeline-board-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-pipeline-board-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv pipeline board desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv pipeline board mobile dark</summary>
+    <a href="screens/inv-pipeline-board-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-pipeline-board-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv pipeline board mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv pipeline board mobile light</summary>
+    <a href="screens/inv-pipeline-board-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-pipeline-board-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv pipeline board mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv pipeline table desktop dark</summary>
+    <a href="screens/inv-pipeline-table-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-pipeline-table-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv pipeline table desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv pipeline table desktop light</summary>
+    <a href="screens/inv-pipeline-table-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-pipeline-table-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv pipeline table desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv pipeline table mobile dark</summary>
+    <a href="screens/inv-pipeline-table-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-pipeline-table-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv pipeline table mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv pipeline table mobile light</summary>
+    <a href="screens/inv-pipeline-table-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-pipeline-table-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv pipeline table mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv q failed desktop dark</summary>
+    <a href="screens/inv-q-failed-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-q-failed-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv q failed desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv q failed desktop light</summary>
+    <a href="screens/inv-q-failed-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-q-failed-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv q failed desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv q failed mobile dark</summary>
+    <a href="screens/inv-q-failed-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-q-failed-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv q failed mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv q failed mobile light</summary>
+    <a href="screens/inv-q-failed-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-q-failed-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv q failed mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv record desktop dark</summary>
+    <a href="screens/inv-record-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-record-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv record desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv record desktop light</summary>
+    <a href="screens/inv-record-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-record-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv record desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv record mobile dark</summary>
+    <a href="screens/inv-record-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-record-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv record mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv record mobile light</summary>
+    <a href="screens/inv-record-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-record-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv record mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv reports desktop dark</summary>
+    <a href="screens/inv-reports-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-reports-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv reports desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv reports desktop light</summary>
+    <a href="screens/inv-reports-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-reports-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv reports desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv reports mobile dark</summary>
+    <a href="screens/inv-reports-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-reports-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv reports mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv reports mobile light</summary>
+    <a href="screens/inv-reports-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-reports-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv reports mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv transcript desktop dark</summary>
+    <a href="screens/inv-transcript-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-transcript-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv transcript desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv transcript desktop light</summary>
+    <a href="screens/inv-transcript-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-transcript-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv transcript desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv transcript mobile dark</summary>
+    <a href="screens/inv-transcript-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-transcript-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv transcript mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv transcript mobile light</summary>
+    <a href="screens/inv-transcript-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-transcript-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv transcript mobile light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv work running desktop dark</summary>
+    <a href="screens/inv-work-running-desktop-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-work-running-desktop-dark.png"
+        alt="Synthetic Relationship Hub: inv work running desktop dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv work running desktop light</summary>
+    <a href="screens/inv-work-running-desktop-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-work-running-desktop-light.png"
+        alt="Synthetic Relationship Hub: inv work running desktop light"
+    /></a>
+  </details>
+  <details>
+    <summary>inv work running mobile dark</summary>
+    <a href="screens/inv-work-running-mobile-dark.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-work-running-mobile-dark.png"
+        alt="Synthetic Relationship Hub: inv work running mobile dark"
+    /></a>
+  </details>
+  <details>
+    <summary>inv work running mobile light</summary>
+    <a href="screens/inv-work-running-mobile-light.png"
+      ><img
+        loading="lazy"
+        src="screens/inv-work-running-mobile-light.png"
+        alt="Synthetic Relationship Hub: inv work running mobile light"
+    /></a>
+  </details>
+</html>
