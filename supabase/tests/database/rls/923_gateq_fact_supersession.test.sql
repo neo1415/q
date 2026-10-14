@@ -45,7 +45,7 @@ returns void language plpgsql as $f$
 begin
   perform 1 from gateq.applications
    where id = '00000000-0000-4000-8000-00000000dd31' for update;
-  set constraints application_facts_superseded_by_fkey deferred;
+  set constraints gateq.application_facts_superseded_by_fkey deferred;
   update gateq.application_facts set superseded_at = now(), superseded_by = successor_id
    where id = previous_id and superseded_at is null;
   perform pg_temp.fact_insert(successor_id, 'company.name',
