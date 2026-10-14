@@ -666,3 +666,7 @@ ActualPG17.11 pgTAP20PASS and root independentlyrerun compiledrepository retry/M
 ## 2026-10-14 06:32 UTC — GateQ merged and migration applied
 
 PR76 source9c6c2607 passed protectedCI38520775540 including fullpgTAP and actual compiled-repository concurrency proof, normally merged f584f0bb. Reviewed241000 migration applied to hosted DB;211 recorded/nonepending; constraints read back correctly. Release77 exact75deba0d CI38521203727 still waits test/quality; deployment not claimed. Actual authorized test founder correction returned500; rollback preserved five original facts. Design75 original formatter failure fixed at1d49922a; a11y/video repeated PASS, latestfullCI pending. All prior unfinished GateQ work protected on explicit WIP branches. Next release gate then actual live second-answer verification.
+
+## 2026-10-14 06:50 UTC — real correction verified; separate opening fix
+
+PR77 exactCI38521203727 fully passed, normally merged23a65ce3 and allfourservicesSUCCESS. Same live form correction now succeeds; real first interview answer3.971s, second existing-country correction3.783s, completed retry646ms deduplicated, exactly2PERSONturns. First cold opening separatelyfailed23514/sessioncache7-characterkeyafterQtranscriptcommit; recovered byreopen. Narrow repair preservesdurablehistoricalkey and usesvalidlegacyfallback,121targetedtests/22realpgTAP PASS. ProtectedCI/release/coldfreshacceptance remain. Design75 nowaac14fd0 with real scopedlint/a11y/playback proof, fullCIpending.

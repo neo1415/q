@@ -815,3 +815,7 @@ GateQ second-answer supersession repair: `codex/gateq-supersession-fix-oct14`; r
 ## October14 release checkpoint
 
 GateQ correction source merged f584f0bb with exact CI38520775540 fully green. Hosted fix-forward migration241000 applied/read back;211 recorded, none pending. Release77 at75deba0d waits only test/quality; no deployment yet. Saved authorized founder application reproduced real500 and retains original5facts. Next: gated promotion, service revision readback, live two-answer correction/retry and provenance/history check. Design75 latest1d49922a: four playable videos/76screens/a11y checks pass, formatting repaired; fullCI pending. No production CRM approval.
+
+## October14 cold-opening blocker
+
+Original fact correction is deployed23a65ce3 across four SUCCESS services and real first/second interview corrections/retry passed. Newly found cold opening500 is separate: seven-character historical opening key written to8–128-character legacy session slot after transcript commit. Source repair on codex/gateq-opening-cache-fix-oct14 preserves durable key and valid legacy fallback;121 tests/22pgTAP pass. ExactCI/release/fresh cold live acceptance pending. Design75 latestaac14fd0 fixes scoped lint and audit harness; fullCI pending, no production CRM.
