@@ -132,7 +132,11 @@ export function RelationshipPipeline({
       if (intent.act !== "SET") return "NOT_APPLICABLE";
       if (typeof intent.value !== "string" || intent.value.trim().length > 120)
         return "FAILED";
-      const next = { ...query, q: intent.value.trim(), cursor: undefined };
+      const next = {
+        ...query,
+        q: intent.value.trim() || undefined,
+        cursor: undefined,
+      };
       const target = pipelineHref(next, layout);
       move(next);
       return (await effectShown(() => shown(target, next))) ? "DONE" : "FAILED";
