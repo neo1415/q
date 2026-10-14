@@ -185,11 +185,7 @@ export function coverageFor(input: {
   readonly qualification: QualificationResult;
   readonly facts: readonly ApplicationFact[];
 }): GateqCoverageV1 {
-  const current = new Map(
-    input.facts
-      .filter((fact) => fact.supersededAt === null)
-      .map((fact) => [fact.dimension, fact] as const),
-  );
+  const current = input.facts.filter((fact) => fact.supersededAt === null);
   // Every reason a dimension could matter, not only the next six to ask.
   const reasons = new Map(
     questionNeedsFor({
@@ -212,8 +208,8 @@ export function coverageFor(input: {
         label: DIMENSION_LABELS[dimension],
         group: entry.group,
       };
-      const fact = current.get(dimension);
-      if (fact === undefined) {
+      const recorded = current.filter((fact) => fact.dimension === dimension);
+      if (recorded.length === 0) {
         if (!NOT_REPORTED_MISSING.has(dimension)) {
           missing.push({
             ...base,
@@ -222,18 +218,20 @@ export function coverageFor(input: {
         }
         continue;
       }
-      if (fact.value.kind === "NONE") {
-        // Asked and answered "I'd rather not say" or "I don't know": a
-        // real answer, never converted into a no or a zero.
-        if (fact.value.declined === true) declined.push(base);
-        else unknown.push(base);
-        continue;
+      for (const fact of recorded) {
+        if (fact.value.kind === "NONE") {
+          // Asked and answered "I'd rather not say" or "I don't know": a
+          // real answer, never converted into a no or a zero.
+          if (fact.value.declined === true) declined.push(base);
+          else unknown.push(base);
+          continue;
+        }
+        answered.push({
+          ...base,
+          summary: factSummary(dimension, fact.value).slice(0, 2000),
+          provenance: fact.provenance,
+        });
       }
-      answered.push({
-        ...base,
-        summary: factSummary(dimension, fact.value).slice(0, 2000),
-        provenance: fact.provenance,
-      });
     }
   }
 

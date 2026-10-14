@@ -63,8 +63,13 @@ const UNDERSTANDING_ORDER: readonly ApplicationDimension[] = [
   "company.solution",
   "company.customers",
   "company.market",
-  "company.team",
+  "company.business_model",
+  "claims.revenue",
   "claims.traction",
+  "company.team",
+  "raise.amount",
+  "raise.instrument",
+  "raise.lead_status",
   "raise.use_of_funds",
   "contact.name",
 ];
@@ -90,6 +95,10 @@ export function questionNeedsFor(input: {
     reason: QuestionNeed["reason"],
   ): void => {
     if (dimension === undefined) return;
+    // NONE is an answer too. Qualification can remain UNKNOWN without
+    // repeatedly pressing someone who has already said they do not know
+    // or declined. A new answer/correction can still change it later.
+    if (answered.has(dimension)) return;
     if (seen.has(dimension)) return;
     if (!APPLICATION_DIMENSIONS.includes(dimension)) return;
     seen.add(dimension);
@@ -145,25 +154,48 @@ export function questionNeedsFor(input: {
 export function contradictionsIn(
   facts: readonly ApplicationFact[],
 ): readonly string[] {
+  const current = new Map<ApplicationDimension, ApplicationFact[]>();
+  for (const fact of facts) {
+    if (fact.supersededAt !== null || fact.value.kind === "NONE") continue;
+    const group = current.get(fact.dimension) ?? [];
+    group.push(fact);
+    current.set(fact.dimension, group);
+  }
   const out: string[] = [];
-  const raise = facts.find(
-    (fact) => fact.dimension === "raise.amount" && fact.supersededAt === null,
-  );
-  const revenue = facts.find(
-    (fact) => fact.dimension === "claims.revenue" && fact.supersededAt === null,
-  );
-  // The one pair that is worth raising with a founder unprompted: a round
-  // far smaller than the revenue it is supposedly needed for usually means
-  // one of the two numbers means something else.
-  if (
-    raise?.value.kind === "AMOUNT" &&
-    revenue?.value.kind === "AMOUNT" &&
-    raise.value.currency === revenue.value.currency &&
-    Number(revenue.value.amount) > Number(raise.value.amount)
-  ) {
+  for (const [dimension, group] of current) {
+    // Only conflicting answers to the SAME dimension constitute a
+    // deterministic contradiction. Revenue larger than a financing round
+    // is entirely plausible; without periods/bases no verdict is possible.
+    const values = new Map<string, ApplicationFact>();
+    for (const fact of group) {
+      const value = fact.value;
+      const key =
+        value.kind === "PHRASES"
+          ? JSON.stringify({
+              kind: value.kind,
+              phrases: [...value.phrases].sort(),
+            })
+          : JSON.stringify(value);
+      values.set(key, fact);
+    }
+    if (values.size < 2) continue;
+    const summaries = [...values.values()].slice(0, 3).map((fact) => {
+      const value = fact.value;
+      const summary =
+        value.kind === "TEXT"
+          ? value.text
+          : value.kind === "CODE"
+            ? value.code
+            : value.kind === "AMOUNT"
+              ? `${value.amount} ${value.currency}`
+              : value.kind === "PHRASES"
+                ? value.phrases.join(", ")
+                : "unknown";
+      return `${summary.slice(0, 48)} [${fact.provenance}]`;
+    });
     out.push(
-      "the stated revenue is larger than the raise; worth checking which period each figure covers",
+      `${dimension} has conflicting current answers: ${summaries.join(" versus ")}`,
     );
   }
-  return out;
+  return out.slice(0, 16);
 }

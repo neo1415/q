@@ -127,19 +127,21 @@ export function buildDossier(input: {
     group: entry.group,
     label: entry.label,
     facts: entry.dimensions.flatMap((dimension) => {
-      const fact = byDimension.get(dimension);
-      // Unknown and declined are reported as such below, never as values.
-      if (fact === undefined || fact.value.kind === "NONE") return [];
-      return [
-        {
+      // Preserve every current source when claims conflict. Choosing the
+      // last map entry would silently discard competing founder/evidence
+      // claims from the immutable dossier.
+      return current
+        .filter(
+          (fact) => fact.dimension === dimension && fact.value.kind !== "NONE",
+        )
+        .map((fact) => ({
           dimension,
           label: DIMENSION_LABELS[dimension],
           summary: factSummary(dimension, fact.value).slice(0, 2000),
           provenance: fact.provenance,
           truthClass: truthClassOf(fact.provenance),
           evidenceStatus: evidenceStatusOf(fact.provenance),
-        },
-      ];
+        }));
     }),
   }));
 

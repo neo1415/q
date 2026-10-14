@@ -83,6 +83,7 @@ export {
 } from "./personality.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
+export { GATEQ_INTERVIEWER_V2 } from "./prompts/tasks/gateq-interviewer.v2.js";
 export {
   GATEQ_INTERVIEWER_SCHEMA_NAME,
   GATEQ_INTERVIEWER_SCHEMA_VERSION,

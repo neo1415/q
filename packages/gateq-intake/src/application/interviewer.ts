@@ -26,6 +26,7 @@ import {
   NewApplicationFactSchema,
   type ApplicationDimension,
   type ApplicationFact,
+  type FactValue,
   type NewApplicationFact,
 } from "../contracts/index.js";
 import {
@@ -90,10 +91,31 @@ export type InterviewTurnInput = {
         readonly policy: GatewayPolicy;
         readonly qualification: QualificationResult;
         readonly facts: readonly ApplicationFact[];
+        /** Current extracted evidence authorised for THIS application only.
+         * Supplied by the Evidence boundary, never accepted from a browser.
+         * Excerpts are untrusted data and do not become recorded facts.
+         */
+        readonly documentEvidence?:
+          | readonly {
+              readonly documentId: string;
+              readonly title: string;
+              readonly documentVersionId: string;
+              readonly extractionVersionId: string;
+              readonly excerpt: string;
+              readonly page?: number | undefined;
+              readonly section?: string | undefined;
+              readonly evidenceStatus: "DOCUMENT_SUPPORTED";
+            }[]
+          | undefined;
         /** Values a document proposed, awaiting confirmation. */
         readonly documentProposals: readonly {
           readonly dimension: ApplicationDimension;
           readonly summary: string;
+          /** Optional authenticated Evidence binding, not a model assertion. */
+          readonly documentId?: string | undefined;
+          readonly documentVersionId?: string | undefined;
+          readonly extractionVersionId?: string | undefined;
+          readonly value?: FactValue | undefined;
         }[];
       }
     | undefined;
@@ -122,6 +144,19 @@ export type InterviewTurnOutcome = {
   readonly facts: readonly NewApplicationFact[];
   /** Proposals the model made that did not survive. Diagnostics only. */
   readonly rejectedFacts: number;
+  /** Server-owned source bindings aligned to the accepted facts array.
+   * Other accepted facts bind to the canonical PERSON turn at persistence.
+   */
+  readonly factSources?:
+    | readonly {
+        readonly factIndex: number;
+        readonly documentId: string;
+        readonly documentVersionId: string;
+        readonly extractionId: string;
+        readonly page?: number | undefined;
+        readonly section?: string | undefined;
+      }[]
+    | undefined;
   readonly asking: ApplicationDimension | null;
   readonly questionForQ: string | null;
   /** Advisory. GATE-001 decides whether submission is possible. */
@@ -162,7 +197,21 @@ const DIMENSIONS = new Set<string>(APPLICATION_DIMENSIONS);
 function renderFacts(facts: readonly ApplicationFact[]): string {
   const current = facts.filter((fact) => fact.supersededAt === null);
   if (current.length === 0) return "(nothing yet)";
-  return current
+  const displayed = current.slice(-24);
+  const overhead = displayed.reduce(
+    (total, fact) =>
+      total +
+      fact.dimension.length +
+      fact.provenance.length +
+      fact.id.length +
+      15,
+    0,
+  );
+  const valueLimit = Math.min(
+    2000,
+    Math.floor((7900 - overhead) / displayed.length),
+  );
+  const lines = displayed
     .map((fact) => {
       const value =
         fact.value.kind === "TEXT"
@@ -176,9 +225,50 @@ function renderFacts(facts: readonly ApplicationFact[]): string {
                 : fact.value.declined === true
                   ? "(they preferred not to say)"
                   : "(they do not know)";
-      return `${fact.dimension}: ${value} [${fact.provenance}]`;
+      return `${fact.dimension}: ${excerpt(value, valueLimit)} [${fact.provenance}; fact ${fact.id}]`;
     })
     .join("\n");
+  return current.length > displayed.length
+    ? `${lines}\n(${current.length - displayed.length} earlier records omitted; current topics shown as excerpts)`
+    : lines;
+}
+
+/** Explicitly labelled excerpts keep legitimate long records within the
+ * existing prompt schema. No model call or extra retrieval is needed. */
+function excerpt(value: string, limit: number): string {
+  return value.length <= limit
+    ? value
+    : `${value.slice(0, limit - 12)} [excerpt]`;
+}
+
+function renderHistory(turns: InterviewTurnInput["recentTurns"]): string {
+  if (turns.length === 0) return "(this is the first thing said)";
+  return turns
+    .slice(-8)
+    .map(
+      (turn) =>
+        `${turn.role}: ${excerpt(turn.text, Math.min(4000, Math.floor(7900 / Math.min(8, turns.length)) - 10))}`,
+    )
+    .join("\n");
+}
+
+function renderDocuments(
+  application: InterviewTurnInput["application"],
+): string {
+  if (application === undefined) return "(none)";
+  const proposals = application.documentProposals
+    .slice(0, 8)
+    .map(
+      (proposal) =>
+        `${proposal.dimension}: ${excerpt(proposal.summary, 120)} [unconfirmed proposal]`,
+    );
+  const sources = (application.documentEvidence ?? [])
+    .slice(0, 6)
+    .map(
+      (source) =>
+        `[document ${excerpt(source.documentId, 40)}; version ${excerpt(source.documentVersionId, 40)}; extraction ${excerpt(source.extractionVersionId, 40)}${source.page === undefined ? "" : `; page ${source.page}`}${source.section === undefined ? "" : `; section ${excerpt(source.section, 40)}`}; DOCUMENT_SUPPORTED] ${excerpt(source.title, 60)}: ${excerpt(source.excerpt, 100)}`,
+    );
+  return excerpt([...proposals, ...sources].join("\n"), 4000) || "(none)";
 }
 
 function renderNeeds(needs: readonly QuestionNeed[]): string {
@@ -236,9 +326,9 @@ export function createGateQInterviewer(
           : `${application.facts.filter((f) => f.supersededAt === null).length} items`
       }`,
       `documents of theirs that were read for you: ${
-        application === undefined || application.documentProposals.length === 0
+        application === undefined
           ? "none"
-          : `${application.documentProposals.length} values from their documents`
+          : `${Math.min(8, application.documentProposals.length)} unconfirmed values; ${Math.min(6, application.documentEvidence?.length ?? 0)} authorised extracted excerpts (not the full documents)`
       }`,
       "anything from the public web: no",
     ];
@@ -247,6 +337,7 @@ export function createGateQInterviewer(
 
   return {
     turn: async (input) => {
+      const startedAt = performance.now();
       const application = input.application;
       const needs =
         application === undefined
@@ -268,34 +359,23 @@ export function createGateQInterviewer(
         personality: personality.manner,
         channel: input.channel,
         stage: input.stage,
-        publicGateway: renderPublicGateway(input.publicGateway),
+        publicGateway: excerpt(renderPublicGateway(input.publicGateway), 4000),
         knownFacts:
           application === undefined
             ? "(no application yet)"
             : renderFacts(application.facts),
         questionNeeds: renderNeeds(needs),
-        documentProposals:
-          application === undefined ||
-          application.documentProposals.length === 0
-            ? "(none)"
-            : application.documentProposals
-                .map((p) => `${p.dimension}: ${p.summary}`)
-                .join("\n"),
+        documentProposals: renderDocuments(application),
         contradictions:
           application === undefined
             ? "(none)"
-            : contradictionsIn(application.facts).join("\n") || "(none)",
+            : excerpt(contradictionsIn(application.facts).join("\n"), 2000) ||
+              "(none)",
         askedAlready:
           input.askedAlready.length === 0
             ? "(nothing yet)"
             : input.askedAlready.join(", "),
-        recentTurns:
-          input.recentTurns.length === 0
-            ? "(this is the first thing said)"
-            : input.recentTurns
-                .slice(-8)
-                .map((t) => `${t.role}: ${t.text}`)
-                .join("\n"),
+        recentTurns: renderHistory(input.recentTurns),
         utterance: input.utterance.slice(0, 4000),
         tangents: Math.min(99, Math.max(0, input.tangents)),
         contextAvailable: contextAvailableFor(input),
@@ -336,6 +416,23 @@ export function createGateQInterviewer(
         result = GateQInterviewerResultSchema.parse(
           (response.output as { readonly value: unknown }).value,
         );
+        logger?.info(
+          {
+            correlationId: input.attribution.correlationId,
+            stage: input.stage,
+            channel: input.channel,
+            promptVersion: rendered.bundle.task,
+            promptCharacters: rendered.characters,
+            gatewayCalls: 1,
+            providerAttempts: response.attempts?.length,
+            inputTokens: response.usage?.inputTokens,
+            cachedInputTokens: response.usage?.cachedInputTokens,
+            outputTokens: response.usage?.outputTokens,
+            gatewayLatencyMs: response.latencyMs,
+            interviewerDurationMs: Math.round(performance.now() - startedAt),
+          },
+          "gateq interview performance",
+        );
       } catch (error: unknown) {
         // A provider failure is not something the applicant needs the
         // detail of, and it must never become an invented answer.
@@ -362,6 +459,9 @@ export function createGateQInterviewer(
       const proposed = discardedByIntent ? [] : result.facts;
 
       const facts: NewApplicationFact[] = [];
+      const factSources: NonNullable<
+        InterviewTurnOutcome["factSources"]
+      >[number][] = [];
       // Counted, not silently dropped. A model that proposes a country
       // while the applicant is making a joke -- or while they are trying
       // to talk Q into something -- is the signal worth seeing in a log,
@@ -381,7 +481,55 @@ export function createGateQInterviewer(
           rejected += 1;
           continue;
         }
-        facts.push(parsed.data);
+        const proposedFact = parsed.data;
+        if (proposedFact.provenance === "DOCUMENT_SUPPORTED") {
+          const proposal = application?.documentProposals.find(
+            (candidate) =>
+              candidate.dimension === proposedFact.dimension &&
+              candidate.value !== undefined &&
+              candidate.documentId !== undefined &&
+              candidate.documentVersionId !== undefined &&
+              candidate.extractionVersionId !== undefined &&
+              JSON.stringify(candidate.value) ===
+                JSON.stringify(proposedFact.value),
+          );
+          const source =
+            proposal === undefined
+              ? undefined
+              : application?.documentEvidence?.find(
+                  (document) =>
+                    document.documentId === proposal.documentId &&
+                    document.documentVersionId === proposal.documentVersionId &&
+                    document.extractionVersionId ===
+                      proposal.extractionVersionId &&
+                    document.evidenceStatus === "DOCUMENT_SUPPORTED",
+                );
+          if (source === undefined) {
+            // A missing source binding is not an applicant claim: the model
+            // may have invented this value while interpreting a document.
+            // Summary-only legacy proposals cannot prove document lineage.
+            rejected += 1;
+            logger?.debug(
+              {
+                correlationId: input.attribution.correlationId,
+                dimension: proposedFact.dimension,
+              },
+              "gateq unsupported document provenance rejected",
+            );
+            continue;
+          }
+          factSources.push({
+            factIndex: facts.length,
+            documentId: source.documentId,
+            documentVersionId: source.documentVersionId,
+            extractionId: source.extractionVersionId,
+            ...(source.page === undefined ? {} : { page: source.page }),
+            ...(source.section === undefined
+              ? {}
+              : { section: source.section }),
+          });
+        }
+        facts.push(proposedFact);
       }
 
       const asking =
@@ -405,6 +553,7 @@ export function createGateQInterviewer(
         intent: result.intent,
         facts,
         rejectedFacts: rejected,
+        factSources,
         asking,
         questionForQ: result.questionForQ,
         // Advisory only. Whether the application may actually be submitted
