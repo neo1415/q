@@ -64,11 +64,15 @@ function floored(value: {
 
 function cell(value: string | number): string {
   const text = String(value);
-  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  const safe = /^(?:[\s\p{Cc}]*[=+\-@]|[\p{Cc}])/u.test(text)
+    ? `'${text}`
+    : text;
   return `"${safe.replaceAll('"', '""')}"`;
 }
 
-function csv(rows: readonly (readonly (string | number)[])[]): string {
+export function reportCsvRows(
+  rows: readonly (readonly (string | number)[])[],
+): string {
   return `${rows.map((row) => row.map(cell).join(",")).join("\r\n")}\r\n`;
 }
 
@@ -176,7 +180,7 @@ export function resultsCsv(results: FounderResults | InvestorResults): string {
       ]);
     }
   }
-  return csv(rows);
+  return reportCsvRows(rows);
 }
 
 // --- PDF -----------------------------------------------------------------------

@@ -13,6 +13,7 @@ import {
   InterestAlreadyAnsweredError,
   InterestIdSchema,
   InterestNotFoundError,
+  relationshipPipelineScopeBinding,
   InterestNotPermittedError,
   InterestResponseIdSchema,
   MatchIdSchema,
@@ -735,5 +736,78 @@ describe("the Relationship Brief (R1)", () => {
     const response = await get(app);
     expect(response.statusCode).toBe(404);
     expect(JSON.stringify(response.json())).not.toContain("Tensorgate");
+  });
+});
+
+describe("Hub pipeline HTTP boundary", () => {
+  it("filters the same authorised side projection and requests a complete bounded scan", async () => {
+    const { app, reads } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/network/relationships/pipeline?state=CONNECTED&q=Kora&pageSize=1",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      total: 1,
+      nextCursor: null,
+      items: [{ counterpart: { name: "Kora" }, state: "CONNECTED" }],
+    });
+    expect(reads).toEqual([
+      { side: "INVESTOR_LIST", actor: CONTEXT, scanLimit: 1001 },
+    ]);
+  });
+  it("refuses client tenant authority before a domain read", async () => {
+    const { app, reads } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/network/relationships/pipeline?tenantId=forged",
+    });
+    expect(response.statusCode).toBe(422);
+    expect(reads).toHaveLength(0);
+  });
+  it("exports only the matching filter and refuses out-of-scope selections", async () => {
+    const { app } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/network/relationships/pipeline/export?state=IN_DILIGENCE&scope=${relationshipPipelineScopeBinding({ state: "IN_DILIGENCE" }, [CONTEXT.userId, CONTEXT.tenantId, CONTEXT.organisationId, "INVESTOR"].join(":"))}`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain("Kora");
+    const denied = await app.inject({
+      method: "GET",
+      url: `/v1/network/relationships/pipeline/export?selected=a0000000-0000-4000-8000-999999999999&scope=${relationshipPipelineScopeBinding({}, [CONTEXT.userId, CONTEXT.tenantId, CONTEXT.organisationId, "INVESTOR"].join(":"))}`,
+    });
+    expect(denied.statusCode).toBe(404);
+  });
+  it("rejects exports after actor or filter scope changes", async () => {
+    const { app } = buildApp();
+    const actorScope = [
+      CONTEXT.userId,
+      CONTEXT.tenantId,
+      CONTEXT.organisationId,
+      "INVESTOR",
+    ].join(":");
+    for (const scope of [
+      relationshipPipelineScopeBinding({}, "other-organization"),
+      relationshipPipelineScopeBinding({ q: "Other" }, actorScope),
+    ]) {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/network/relationships/pipeline/export?scope=${scope}`,
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.body).not.toContain("Kora");
+    }
+  });
+  it("keeps domain permission denial for query and download", async () => {
+    const { app } = buildApp({ failWith: new InterestNotPermittedError() });
+    for (const path of [
+      "/v1/network/relationships/pipeline",
+      `/v1/network/relationships/pipeline/export?scope=${"1".repeat(64)}`,
+    ]) {
+      expect((await app.inject({ method: "GET", url: path })).statusCode).toBe(
+        403,
+      );
+    }
   });
 });

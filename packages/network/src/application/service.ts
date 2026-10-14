@@ -193,10 +193,12 @@ export type InterestService = {
   /** An investor organisation's own relationships (CQ-WEB-030). */
   readonly listRelationshipsForInvestor: (query: {
     readonly actor: ActorContext;
+    readonly scanLimit?: number;
   }) => Promise<readonly RelationshipListing[]>;
   /** A company's own relationships it can see anything of (CQ-WEB-030). */
   readonly listRelationshipsForCompany: (query: {
     readonly actor: ActorContext;
+    readonly scanLimit?: number;
     readonly companyId: string;
   }) => Promise<readonly RelationshipListing[]>;
 };

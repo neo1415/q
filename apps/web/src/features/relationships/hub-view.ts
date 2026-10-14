@@ -5,11 +5,11 @@ import type {
 } from "@capital-q/contracts";
 
 /** URL-owned Hub state: old relationship links still open the existing board. */
-export type HubView = "overview" | "relationships";
+export type HubView = "overview" | "relationships" | "pipeline";
 export type HubSide = "INVESTOR" | "COMPANY" | "NONE";
 
 export function hubViewOf(value: string | undefined): HubView {
-  return value === "overview" ? "overview" : "relationships";
+  return value === "overview" || value === "pipeline" ? value : "relationships";
 }
 
 export function hubTitle(side: HubSide): string {
