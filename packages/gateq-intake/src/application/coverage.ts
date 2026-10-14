@@ -173,10 +173,19 @@ export function explainQualification(
 } {
   const label = (criterionId: string) =>
     policy.criteria.find((c) => c.id === criterionId)?.label ?? "a criterion";
+  // Every published rule, required or preferred: the form shows a rule
+  // absent from both lists as "Meets". Live 2026-10-14: a Climate company
+  // was told it met a preferred Fintech/Lending/Software/Logistics sector
+  // rule because only required misses were listed. Access still comes from
+  // the engine alone; a preferred miss never gates.
   return {
     access: qualification.access,
-    unmet: qualification.principalMismatches.map(label),
-    stillNeeded: qualification.unknowns.map(label),
+    unmet: qualification.criteria
+      .filter((criterion) => criterion.status === "NO_MATCH")
+      .map((criterion) => label(criterion.criterionId)),
+    stillNeeded: qualification.criteria
+      .filter((criterion) => criterion.status === "UNKNOWN")
+      .map((criterion) => label(criterion.criterionId)),
   };
 }
 

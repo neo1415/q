@@ -300,32 +300,39 @@ export function createPostgresApplicationFactRepository(options: {
     },
 
     record: async (tx, input) => {
+      // Every writer uses the same application lock as interview finalization
+      // and submission. Readers outside this transaction retain the old MVCC
+      // value until the replacement and its lineage commit together.
+      const applications = await tx.sql`
+        select id from gateq.applications
+         where id = ${input.applicationId} and tenant_id = ${input.tenantId}
+         for update`;
+      if (applications.length !== 1) throw new IntakeRefusedError("NOT_FOUND");
+      await tx.sql`set constraints gateq.application_facts_superseded_by_fkey deferred`;
       const written: ApplicationFact[] = [];
       for (const fact of input.facts) {
-        // Insert first, then point the predecessor at it. Doing it the
-        // other way round would leave a moment with no current value, and
-        // a concurrent read would see a dimension the applicant had
-        // already answered as unanswered.
+        // Vacate the nondeferrable partial unique index first. Both paired
+        // supersession fields change together; the forward FK is checked once
+        // the real successor exists, never by temporarily linking to itself.
+        const id = randomUUID();
+        await tx.sql`
+          update gateq.application_facts
+             set superseded_at = ${input.at}, superseded_by = ${id}
+           where application_id = ${input.applicationId}
+             and dimension = ${fact.dimension} and superseded_at is null`;
         const inserted = await tx.sql`
           insert into gateq.application_facts (
-            application_id, tenant_id, dimension, value, provenance, recorded_at, source_turn_seq
+            id, application_id, tenant_id, dimension, value, provenance, recorded_at, source_turn_seq
           ) values (
-            ${input.applicationId}, ${input.tenantId}, ${fact.dimension},
+            ${id}, ${input.applicationId}, ${input.tenantId}, ${fact.dimension},
             ${jsonbParam(tx.sql, fact.value)}, ${fact.provenance}, ${input.at}, ${input.sourceTurnSeq ?? null}
           )
           returning *`;
         const row = inserted[0];
         if (row === undefined) throw new Error("fact insert returned nothing");
-        const parsed = FactRow.parse(row);
-        await tx.sql`
-          update gateq.application_facts
-             set superseded_at = ${input.at}, superseded_by = ${parsed.id}
-           where application_id = ${input.applicationId}
-             and dimension = ${fact.dimension}
-             and id <> ${parsed.id}
-             and superseded_at is null`;
         written.push(toFact(row));
       }
+      await tx.sql`set constraints gateq.application_facts_superseded_by_fkey immediate`;
       return written;
     },
   };

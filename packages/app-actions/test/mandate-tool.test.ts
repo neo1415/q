@@ -72,6 +72,20 @@ describe("change_my_mandate from their words (follow-55)", () => {
     });
   });
 
+  it("refuses an empty update by naming the tool that owns profile answers (live 2026-10-14)", async () => {
+    const tool = family?.tool;
+    expect(tool).toBeDefined();
+    if (tool === undefined) return;
+    const said = tool.input.safeParse({});
+    expect(said.success).toBe(true);
+    if (!said.success) return;
+    const canonical = await tool.toCanonical(said.data, context, ports);
+    expect(canonical).toHaveProperty("refused");
+    expect(JSON.stringify(canonical)).toContain(
+      "propose_profile_answer_change",
+    );
+  });
+
   it("names the stage codes, and refuses words where a code belongs", () => {
     const tool = family?.tool;
     if (tool === undefined) throw new Error("change_my_mandate missing");
