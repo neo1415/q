@@ -144,3 +144,13 @@ describe("resultsPdf", () => {
     }
   });
 });
+
+// Hub exports reuse this exact report encoder.
+describe("CSV spreadsheet safety", () => {
+  it("quotes delimiters and neutralizes whitespace/control-prefixed formulas", async () => {
+    const { reportCsvRows } = await import("../src/report.js");
+    expect(reportCsvRows([[" =SUM(A1)", "\n=SUM(A1)", 'name,"quoted"']])).toBe(
+      '"\' =SUM(A1)","\'\n=SUM(A1)","name,""quoted"""\r\n',
+    );
+  });
+});

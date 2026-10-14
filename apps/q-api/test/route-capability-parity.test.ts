@@ -499,6 +499,16 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/network-interests.ts GET NETWORK_INVESTOR_RELATIONSHIP_PATH": cap(
     "tool.get_relationship",
   ),
+  "api/http/network-interests.ts GET NETWORK_INVESTOR_PIPELINE_PATH": cap(
+    "navigate.RELATIONSHIPS",
+  ),
+  "api/http/network-interests.ts GET NETWORK_COMPANY_PIPELINE_PATH": cap(
+    "navigate.RELATIONSHIPS",
+  ),
+  "api/http/network-interests.ts GET `${NETWORK_INVESTOR_PIPELINE_PATH}/export`":
+    DOWNLOAD,
+  "api/http/network-interests.ts GET `${NETWORK_COMPANY_PIPELINE_PATH}/export`":
+    DOWNLOAD,
   "api/http/network-interests.ts GET NETWORK_INVESTOR_RELATIONSHIPS_PATH": cap(
     "navigate.RELATIONSHIPS",
   ),
