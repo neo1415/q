@@ -27,6 +27,10 @@ import {
   RelationshipBriefListSchema,
   RelationshipBriefSchema,
   RelationshipListDtoSchema,
+  NETWORK_INVESTOR_PIPELINE_PATH,
+  NETWORK_COMPANY_PIPELINE_PATH,
+  RelationshipPipelineDtoSchema,
+  type RelationshipPipelineQuery,
   RelationshipStatusResponseDtoSchema,
   type ExpressInterestRequest,
 } from "@capital-q/contracts";
@@ -273,5 +277,28 @@ export function answerConnectionRequest(
     template.replace(":interestId", encodeURIComponent(interestId)),
     ConnectionRequestAnswerDtoSchema,
     { body: {}, headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+  );
+}
+
+/** Exact server-filtered party projection. Cursor carries no authority. */
+export function queryRelationshipPipeline(
+  session: ApiSession,
+  query: RelationshipPipelineQuery,
+  companyId?: string,
+) {
+  const path =
+    companyId === undefined
+      ? NETWORK_INVESTOR_PIPELINE_PATH
+      : companyPath(NETWORK_COMPANY_PIPELINE_PATH, companyId);
+  const search = new URLSearchParams(
+    Object.entries(query)
+      .filter((entry) => entry[1] !== undefined)
+      .map(([key, value]) => [key, String(value)]),
+  );
+  return call(
+    session,
+    "GET",
+    `${path}?${search.toString()}`,
+    RelationshipPipelineDtoSchema,
   );
 }
