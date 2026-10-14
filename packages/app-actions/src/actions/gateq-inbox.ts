@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { submittedReading } from "./gateq-submitted-reading.js";
+import { submittedSourceReading } from "./gateq-submitted-reading.js";
 
 import {
   GATEQ_INBOX_ARCHIVE_PATH,
@@ -894,15 +894,10 @@ type SummaryOut = GateqInboxDetailDto | Refused;
 const SummaryIn = z
   .object({ gatewayId: UuidSchema, applicationId: UuidSchema })
   .strict();
-const STAND_WORDS = {
-  MEETS: "meets",
-  DOES_NOT_MEET: "doesn't meet",
-  NOT_ANSWERED: "not answered",
-} as const;
 const SUMMARISE = defineAppAction<
   z.infer<typeof SummaryIn>,
   SummaryOut,
-  { company: string }
+  { company?: string | undefined; applicationId?: string | undefined }
 >({
   name: "gateq.inbox.summarise",
   short: "summarise a GateQ application",
@@ -912,32 +907,44 @@ const SUMMARISE = defineAppAction<
   input: SummaryIn,
   output: z.custom<SummaryOut>(),
   authorize: serviceDecides,
-  run: (ports, context, input) =>
-    port(ports).detail(context.actor, input.gatewayId, input.applicationId),
+  run: async (ports, context, input) => {
+    const out = await port(ports).detail(
+      context.actor,
+      input.gatewayId,
+      input.applicationId,
+    );
+    return submittedSourceReading(out, input.gatewayId, input.applicationId) ===
+      null
+      ? { ok: false as const }
+      : out;
+  },
   targets: () => [],
   card: () => ({ summary: "Summary", preview: "" }),
   done: (out) =>
     "item" in out
-      ? [
-          `${out.item.companyName}${out.item.oneLiner === null ? "" : `: ${out.item.oneLiner}`}`,
-          `Their answers (their own claims, not verified): ${out.answers.map((a) => `${a.label} ${a.value}`).join("; ") || "none"}.`,
-          `Your gate's rules: ${out.rules.map((r) => `${r.label} ${STAND_WORDS[r.standing]}`).join("; ") || "none published"}.`,
-          out.note === null ? "No note." : `Their note: "${out.note}"`,
-          `Shared: ${out.shared.map((d) => d.title).join(", ") || "nothing beyond the form"}.`,
-          submittedReading(out.dossier),
-          out.notes.length === 0
-            ? "No team notes."
-            : `Team notes: ${out.notes.map((n) => `${n.author.name}: ${n.body}`).join(" | ")}`,
-          out.messages.length === 0
-            ? "Not answered yet."
-            : `Already ${out.messages.some((m) => m.kind === "PASS") ? "passed" : "replied"}.`,
-        ].join("\n")
+      ? `Read ${out.item.companyName}'s submitted application.`
       : "That isn't in your GateQ inbox.",
+  succeeded: (out) => "item" in out && out.dossier != null,
+  sourceReading: (out, input) =>
+    submittedSourceReading(out, input.gatewayId, input.applicationId),
   tool: {
     name: "gateq_inbox_summarise",
     description:
       "Reads one application in the investor's own GateQ inbox, by the company's name: the founder's answers (their claims, not verified), each gate rule's standing, what was shared, and the firm's team notes. Use to summarise a submission or before drafting a reply in their style; a reply or a pass is then sent from the inbox screen, where they approve the exact words.",
-    input: z.object({ company: CompanyTool }).strict(),
+    input: z
+      .object({
+        company: CompanyTool.optional(),
+        applicationId: UuidSchema.optional(),
+      })
+      .strict()
+      .refine(
+        (input) =>
+          (input.company !== undefined) !== (input.applicationId !== undefined),
+        {
+          message:
+            "Provide the applying company name or exact applicationId, not both.",
+        },
+      ),
     references: {},
     purposes: PURPOSES,
     eval: {
@@ -947,7 +954,17 @@ const SUMMARISE = defineAppAction<
       ],
     },
     toCanonical: async (tool, context, ports) => {
-      const found = await resolveApplication(ports, context, tool.company);
+      if (tool.applicationId !== undefined) {
+        const gatewayId = await port(ports).ownGatewayId(context.actor);
+        return gatewayId === null
+          ? refusal("That isn't in your GateQ inbox.")
+          : { gatewayId, applicationId: tool.applicationId };
+      }
+      const found = await resolveApplication(
+        ports,
+        context,
+        tool.company ?? "",
+      );
       return isRefusal(found)
         ? found
         : { gatewayId: found.gatewayId, applicationId: found.applicationId };
@@ -978,11 +995,35 @@ export const GATEQ_INBOX_ACTIONS: readonly AnyAppAction[] = [
 export async function gateqItems(
   ports: AppActionPorts,
   actor: ActorContext,
+  applicationId?: string,
 ): Promise<readonly OwnReadItem[] | null> {
   const inbox = ports.gateqInbox;
-  if (inbox?.list === undefined) return null;
+  if (inbox === undefined) return null;
   const gatewayId = await inbox.ownGatewayId(actor).catch(() => null);
   if (gatewayId === null) return null;
+  if (applicationId !== undefined) {
+    const detail = await inbox
+      .detail(actor, gatewayId, applicationId)
+      .catch(() => null);
+    const sourceReading = submittedSourceReading(
+      detail,
+      gatewayId,
+      applicationId,
+    );
+    if (sourceReading === null || detail === null || !("item" in detail))
+      return [];
+    return [
+      {
+        id: applicationId,
+        title: detail.item.companyName,
+        status: "submitted frozen dossier",
+        at: detail.item.submittedAt,
+        facts: { reference: sourceReading.reference },
+        sourceReading,
+      },
+    ];
+  }
+  if (inbox.list === undefined) return null;
   const listed = await inbox.list(actor, gatewayId, "INBOX").catch(() => null);
   if (listed === null || "ok" in listed) return null;
   return listed.items.slice(0, 50).map((item) => ({

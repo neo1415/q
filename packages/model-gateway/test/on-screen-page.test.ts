@@ -247,3 +247,52 @@ describe("the page on their screen", () => {
     );
   });
 });
+
+describe("exact frozen GateQ dossier hydration", () => {
+  function page(selected = id(101)) {
+    return QPageManifestSchema.parse({ v: 2, seq: 1, focus: { kind: "GATEQ_APPLICATION", id: selected }, inView: ["dossier"], sections: [{ id: "dossier", kind: "GATEQ_APPLICATION", refs: [{ kind: "GATEQ_APPLICATION", id: selected }], total: 1 }, { id: "inbox", kind: "GATEQ_INBOX", refs: [{ kind: "GATEQ_APPLICATION", id: id(102) }], total: 2 }], dialogs: [] });
+  }
+  const source = {
+    kind: "GATEQ_SUBMITTED_APPLICATION", gatewayId: id(200), applicationId: id(101), reference: "ga_synthetic_frozen", submittedAt: "2026-10-14T08:00:00.000Z", dossierSchemaVersion: "gateq-dossier.v1", generatedAt: "2026-10-14T08:00:00.000Z", omittedLines: 0,
+    statement: "Frozen applicant claims: 500 paying customers; production tooling use of funds. truth=USER_CLAIM; evidence=SELF_REPORTED; sourceFactId=20000000-0000-4000-8000-000000000001; sourceTurnSeq=7. Qualification is separate. Unknown: gross margin. No document contents were read.",
+  };
+  function results(overrides = {}) {
+    const detail = manifestReads(page(), ALL).find(read => read.arguments["applicationId"] === id(101));
+    if (!detail) throw new Error("Selected detail read missing");
+    return new Map<string, unknown>([[detail.key, { kind: "gateq", available: true, items: [{ id: id(101), title: "Synthetic Waterworks", status: "submitted frozen dossier", facts: {}, at: source.submittedAt, sourceReading: { ...source, ...overrides } }] }], ['read_my:{"kind":"gateq"}', { items: [{ id: id(102), title: "Other Applicant", status: "unread", facts: {} }] }]]);
+  }
+
+  it("reads the focused application once and keeps all other applications as inbox metadata", () => {
+    const reads = manifestReads(page(), ALL);
+    expect(reads.filter(read => read.arguments["applicationId"] !== undefined)).toEqual([{ key: `read_my:{"kind":"gateq","applicationId":"${id(101)}"}`, name: "read_my", arguments: { kind: "gateq", applicationId: id(101) } }]);
+    expect(reads).toHaveLength(2);
+    const facts = manifestFacts(page(), results());
+    expect(facts.map(fact => fact.statement).join("\n")).toContain("500 paying customers");
+    expect(facts.map(fact => fact.statement).join("\n")).toContain(source.applicationId);
+    expect(facts.map(fact => fact.statement).join("\n")).toContain(source.reference);
+    expect(facts.map(fact => fact.statement).join("\n")).toContain("sourceTurnSeq=7");
+    for (const fact of facts) expect(AuthorisedFactSchema.safeParse(fact).success).toBe(true);
+  });
+
+  it("does not hydrate dossier content from a plain inbox or an unavailable read", () => {
+    const manifest = page(); delete manifest.focus;
+    expect(manifestReads(manifest, ALL).every(read => read.arguments["applicationId"] === undefined)).toBe(true);
+    expect(manifestFacts(manifest, results()).map(fact => fact.statement).join("\n")).not.toContain("500 paying customers");
+    expect(manifestReads(page(), new Set())).toEqual([]);
+    expect(manifestFacts(page(), new Map()).map(fact => fact.statement).join("\n")).not.toContain("500 paying customers");
+  });
+
+  it("drops a wrong or malformed selected source instead of substituting another dossier", () => {
+    for (const over of [{ applicationId: id(102) }, { dossierSchemaVersion: "draft" }, { statement: "x".repeat(7001) }]) {
+      expect(manifestFacts(page(), results(over)).map(fact => fact.statement).join("\n")).not.toContain("500 paying customers");
+    }
+  });
+
+  it("drops stale context on switching records and reads the dossier again on return", () => {
+    const first = manifestFacts(page(), results()).map(fact => fact.statement).join("\n");
+    const different = QPageManifestSchema.parse({ v: 2, seq: 2, sections: [], dialogs: [], inView: [], focus: { kind: "COMPANY", id: id(300) } });
+    expect(manifestFacts(different, results()).map(fact => fact.statement).join("\n")).not.toContain("500 paying customers");
+    expect(manifestFacts(page(), results()).map(fact => fact.statement).join("\n")).toBe(first);
+    expect(manifestFacts(page(id(102)), results()).map(fact => fact.statement).join("\n")).not.toContain("500 paying customers");
+  });
+});

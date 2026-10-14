@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AppSourceReadingSchema } from "./source-reading.js";
 
 import type { MediaAsset } from "@capital-q/media";
 import type { ActorContext } from "@capital-q/security";
@@ -62,6 +63,7 @@ export const OwnReadItemSchema = z
     title: z.string().max(200),
     status: z.string().max(120),
     at: z.string().max(40).nullable(),
+    sourceReading: AppSourceReadingSchema.optional(),
     facts: z.record(
       z.string(),
       z.union([z.string().max(200), z.number(), z.boolean(), z.null()]),
@@ -172,6 +174,7 @@ export async function readOwn(
   ports: OwnReadPorts,
   actor: ActorContext,
   kind: OwnReadKind,
+  selection?: { readonly applicationId: string },
 ): Promise<readonly OwnReadItem[] | null> {
   switch (kind) {
     case "media": {
@@ -212,7 +215,7 @@ export async function readOwn(
     case "team":
       return teamItems(ports, actor);
     case "gateq":
-      return gateqItems(ports, actor);
+      return gateqItems(ports, actor, selection?.applicationId);
     case "readiness":
     case "plan":
     case "questions":

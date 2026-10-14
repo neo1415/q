@@ -10,6 +10,8 @@ import type {
 import type { OnboardingActor } from "@capital-q/onboarding";
 import type { ActorContext } from "@capital-q/security";
 
+import type { AppSourceReading } from "./source-reading.js";
+
 import type { AppActionPorts } from "./ports.js";
 import type { ReferenceKind } from "./references.js";
 
@@ -259,6 +261,9 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
     input: In,
     names: Readonly<Record<string, string>>,
   ) => string;
+  /** Typed authorized source data, separate from the brief receipt. */
+  readonly sourceReading?:
+    ((out: Out, input: In) => AppSourceReading | null) | undefined;
   /** Whether it did what was asked (a refusal can be an outcome). Default: yes. */
   readonly succeeded?: ((out: Out) => boolean) | undefined;
   readonly http?: AppActionHttp<In, Out> | undefined;

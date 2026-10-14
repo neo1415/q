@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   APP_ACTIONS,
+  AppSourceReadingSchema,
   isRefusal,
   OwnReadItemSchema,
   OwnReadKindSchema,
@@ -70,6 +71,7 @@ export const AppToolOutputSchema = z
      * after the turn, so a caller can leave it to that one line.
      */
     summary: z.string().max(600).optional(),
+    sourceReading: AppSourceReadingSchema.optional(),
   })
   .strict();
 export type AppToolOutput = z.infer<typeof AppToolOutputSchema>;
@@ -332,7 +334,9 @@ function toolFor(
         };
       }
       const out = await action.run(own, grant.context, grant.canonical);
+      const sourceReading = action.sourceReading?.(out, grant.canonical);
       return {
+        ...(sourceReading == null ? {} : { sourceReading }),
         status: (action.succeeded?.(out) ?? true) ? "DONE" : "NOT_DONE",
         says: action.done(out, grant.canonical, grant.names),
       };
@@ -347,6 +351,13 @@ export const ReadMyInputSchema = z
     kind: OwnReadKindSchema.describe(
       "media (their pitch videos), documents (what Q made for them), rehearsals (their rehearsals with investors Q played), feed (the companies in their Discover feed now, for an investor), calls (their recent calls with Q's notes: what was agreed, their follow-ups, what was proposed to Q in the call), uploads (the files their company uploaded: pitch deck, financials and the like, with type and status), diligence (their relationships' diligence areas: requests, which are answered, shared documents), capital (their rounds and commitments), team (the people in their company or firm, each one's role, and invitations waiting), gateq (for an investor, the founders' applications in their GateQ inbox: company, fit, rules met, read or unread, reply due), readiness (a founder's own: what could stop their raise, ranked, and each readiness pillar's status in words with what would move it), plan (a founder's own action plan: each step, why it matters to investors, what to do next, who does it, done or not), questions (the questions Q still wants answered about their company, with ids, why Q asks and quick answers).",
     ),
+    applicationId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe(
+        "For gateq only: the exact selected submitted application ID. Reads its frozen dossier under the investor's own gateway authority; never all inbox dossiers.",
+      ),
     text: z
       .string()
       .trim()
@@ -354,7 +365,11 @@ export const ReadMyInputSchema = z
       .optional()
       .describe("Only records whose title contains this, when they named one."),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) => input.applicationId === undefined || input.kind === "gateq",
+    { message: "applicationId is only valid for gateq." },
+  );
 
 export const ReadMyOutputSchema = z
   .object({
@@ -399,7 +414,14 @@ export function createReadMyTool(own: OwnReadPorts): AnyQToolDefinition {
           : deny<ActorContext>("NOT_AVAILABLE"),
       ),
     execute: async (input, _context, actor) => {
-      const items = await readOwn(own, actor, input.kind);
+      const items = await readOwn(
+        own,
+        actor,
+        input.kind,
+        input.applicationId === undefined
+          ? undefined
+          : { applicationId: input.applicationId },
+      );
       const wanted = input.text?.toLowerCase();
       return {
         kind: input.kind,

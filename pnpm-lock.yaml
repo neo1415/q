@@ -1302,6 +1302,9 @@ importers:
 
   packages/model-gateway:
     dependencies:
+      '@capital-q/app-actions':
+        specifier: workspace:*
+        version: link:../app-actions
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../contracts

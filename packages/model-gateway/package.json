@@ -76,7 +76,8 @@
     "@google/genai": "2.21.0",
     "groq-sdk": "1.6.0",
     "openai": "7.21.0",
-    "zod": "4.5.4"
+    "zod": "4.5.4",
+    "@capital-q/app-actions": "workspace:*"
   },
   "devDependencies": {
     "@capital-q/config": "workspace:*",
