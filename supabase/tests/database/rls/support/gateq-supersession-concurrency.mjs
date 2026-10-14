@@ -10,6 +10,10 @@
  * This is complementary to 923 pgTAP and never substitutes for protected CI.
  */
 import assert from "node:assert/strict";
+import console from "node:console";
+import process from "node:process";
+import { setTimeout } from "node:timers";
+import { URL } from "node:url";
 import { createRequire } from "node:module";
 const repository = new URL("../../../../../", import.meta.url);
 const require = createRequire(
@@ -142,14 +146,100 @@ try {
   );
   assert.deepEqual(await facts.historyFor(applicationId, 100), before);
   assert.equal((await turns.listFor(applicationId)).length, 6);
+  // Hold a genuine correction open and inspect it from independent connections.
+  // Ordinary readers retain the prior MVCC fact. A submission-shaped snapshot
+  // acquires the same application lock and cannot read a half-written correction.
+  const input = {
+    applicationId,
+    tenantId,
+    clientTurnId: "mvcc-correction-4",
+    text: "MVCC correction",
+  };
+  const claimId = await turns.claimExchange(input);
+  assert.ok(claimId);
+  let markPrepared;
+  const prepared = new Promise((resolve) => {
+    markPrepared = resolve;
+  });
+  let releaseCommit;
+  const commitGate = new Promise((resolve) => {
+    releaseCommit = resolve;
+  });
+  const correction = transactions.run(async (tx) => {
+    assert.equal(await turns.assertClaim(tx, applicationId, claimId), true);
+    await facts.record(tx, {
+      applicationId,
+      tenantId,
+      at: new Date().toISOString(),
+      sourceTurnSeq: 7,
+      facts: [
+        {
+          dimension: "company.name",
+          value: { kind: "TEXT", text: input.text },
+          provenance: "APPLICANT_PROVIDED",
+        },
+      ],
+    });
+    await turns.appendInTransaction(tx, {
+      ...input,
+      role: "Q",
+      text: "Recorded MVCC correction",
+      intent: "ANSWER",
+      askingDimension: "company.name",
+    });
+    await turns.finishExchange(tx, applicationId, claimId);
+    markPrepared();
+    await commitGate;
+  });
+  await prepared;
+  let snapshot;
+  try {
+    assert.equal(
+      (await facts.currentFor(applicationId))[0].value.text,
+      "Corrected applicant claim again",
+    );
+    snapshot = transactions.run(async (tx) => {
+      await tx.sql`set local application_name = 'cq_gateq_supersession_snapshot'`;
+      await tx.sql`select id from gateq.applications where id = ${applicationId} for update`;
+      return tx.sql`select value from gateq.application_facts where application_id = ${applicationId} and superseded_at is null`;
+    });
+    let blocked = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const waiting =
+        await sql`select count(*)::int as count from pg_stat_activity where application_name = 'cq_gateq_supersession_snapshot' and wait_event_type = 'Lock'`;
+      if (waiting[0].count === 1) {
+        blocked = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(
+      blocked,
+      true,
+      "The submission-shaped snapshot must wait on the real application lock",
+    );
+  } finally {
+    releaseCommit();
+    await correction;
+  }
+  const snapshotRows = await snapshot;
+  assert.equal(snapshotRows.length, 1);
+  assert.equal(snapshotRows[0].value.text, input.text);
+  assert.equal((await facts.historyFor(applicationId, 100)).length, 4);
+  assert.equal((await turns.listFor(applicationId)).length, 8);
+  const version =
+    await sql`select current_setting('server_version_num')::int as version`;
   console.log(
     JSON.stringify({
       passed: true,
       actualRepository: true,
-      postgresVersion: 17,
+      postgresVersion: version[0].version,
       rounds: outcomes,
       rollbackHistoryUnchanged: true,
-      personAndQTurns: 6,
+      personAndQTurns: 8,
+      mvccPreviousVisibleUntilCommit: true,
+      submissionSnapshotBlockedUntilCommit: true,
+      snapshotContainsCommittedCorrection: true,
     }),
   );
 } finally {
