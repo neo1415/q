@@ -387,6 +387,8 @@ describe("fresh selected-company follow-ups reuse authorized identity", () => {
     (
       [
         ["What are the risks for this company?", "FRESH", false],
+        ["What are the risks for this company?", "MULTIPLE", false],
+        ["What are the risks for this company?", "OTHER_ONLY", true],
         [
           "What traction, material risks and missing evidence are on record for this company? Distinguish claims from verified facts.",
           "FRESH",
@@ -409,14 +411,21 @@ describe("fresh selected-company follow-ups reuse authorized identity", () => {
     "%s / %s preserves lookup=%s on %s",
     async (text, access, lookup, route) => {
       const companyId = randomUUID();
+      const otherId = randomUUID();
       const tools = toolPort(access === "UNREAD" ? [] : [GET_COMPANY], (p) =>
         access === "REVOKED"
           ? denied(p)
           : access === "MALFORMED"
             ? succeeded(p, { companyId, canonicalName: "Selected Company" })
             : succeeded(p, {
-                companyId,
-                canonicalName: "Selected Company",
+                companyId:
+                  access === "OTHER_ONLY" || p.callId === "additional-profile"
+                    ? otherId
+                    : companyId,
+                canonicalName:
+                  access === "OTHER_ONLY" || p.callId === "additional-profile"
+                    ? "Other Company"
+                    : "Selected Company",
                 legalName: null,
                 websiteUrl: null,
                 foundedDate: null,
@@ -433,6 +442,9 @@ describe("fresh selected-company follow-ups reuse authorized identity", () => {
       const { seam, request, messages, alpha, completed } = build({
         tools,
         script: [
+          ...(access === "MULTIPLE"
+            ? [call("additional-profile", { companyId: otherId })]
+            : []),
           {
             kind: "TEXT",
             text: JSON.stringify({
@@ -482,7 +494,7 @@ describe("fresh selected-company follow-ups reuse authorized identity", () => {
         expect(prompt).toContain("freshly read authorized profile");
         expect(
           tools.executed.filter((p) => p.name === "get_company"),
-        ).toHaveLength(1);
+        ).toHaveLength(access === "MULTIPLE" ? 2 : 1);
       }
     },
   );
