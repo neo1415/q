@@ -273,6 +273,16 @@ jobs:
       - name: pgTAP
         run: pnpm exec supabase test db
 
+      - name: GateQ real-repository concurrent correction proof
+        env:
+          CQ_GATEQ_CONCURRENCY_URL: postgres://postgres:postgres@127.0.0.1:54322/cq_gateq_supersession_test
+        run: |
+          pnpm exec turbo run build --filter=@capital-q/gateq-intake... --concurrency=2
+          docker exec supabase_db_capital-q createdb -U postgres -T template0 cq_gateq_supersession_test
+          docker cp supabase supabase_db_capital-q:/tmp/cq-supersession
+          docker exec supabase_db_capital-q psql -X -v ON_ERROR_STOP=1 -U postgres -d cq_gateq_supersession_test -f /tmp/cq-supersession/tests/database/rls/support/gateq-supersession-local-bootstrap.psql
+          node supabase/tests/database/rls/support/gateq-supersession-concurrency.mjs
+
       - name: Stop the local database
         if: always()
         run: pnpm exec supabase stop --no-backup
