@@ -1719,6 +1719,31 @@ describe("review: races", () => {
 });
 
 describe("review: the snapshot, transcript and dossier are one view", () => {
+  it("keeps phrase-based applicant descriptions in the submitted company summary", async () => {
+    const w = world();
+    const { token } = await readyToSubmit(w);
+    const phrases = ["Metered water kiosks", "Residents pay by the litre"];
+    await w.intake.recordFacts({
+      token,
+      facts: [fact("company.description", { kind: "PHRASES", phrases })],
+    });
+    await w.intake.submit({ token, clientRequestId: "req-description-001" });
+    const dossier = GateqDossierV1Schema.parse(w.submissions[0]?.dossier);
+    expect(dossier.company.description).toBe(
+      "Metered water kiosks, Residents pay by the litre",
+    );
+    expect(
+      dossier.dimensions
+        .flatMap((d) => d.facts)
+        .find((f) => f.dimension === "company.description"),
+    ).toMatchObject({
+      summary: "Metered water kiosks, Residents pay by the litre",
+      provenance: "APPLICANT_PROVIDED",
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+    });
+  });
+
   it("agree with each other in every shared part", async () => {
     const w = world();
     const { token } = await readyToSubmit(w);
