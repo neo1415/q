@@ -279,9 +279,14 @@ const SET_THEME_OFFERED: QOfferedTool = {
 };
 
 describe("named-company evidence binding", () => {
-  it.each([false, true])(
-    "binds findings to the explicitly named authorised profile, including warmed reads (%s)",
-    async (warm) => {
+  it.each([
+    [false, "COMPANY"],
+    [true, "COMPANY"],
+    [false, "DISCOVER"],
+    [true, "DISCOVER"],
+  ] as const)(
+    "binds findings to the explicitly named authorised profile, warm=%s screen=%s",
+    async (warm, route) => {
       const screen = randomUUID();
       const target = randomUUID();
       const profile = (companyId: string, canonicalName: string) => ({
@@ -343,7 +348,7 @@ describe("named-company evidence binding", () => {
         subjects: [{ kind: "COMPANY" as const, companyId: screen }],
         plan: {
           ...request.plan,
-          screen: { route: "COMPANY" as const, companyId: screen },
+          screen: { route, companyId: screen },
         },
       };
       if (warm) {
@@ -378,81 +383,122 @@ describe("named-company evidence binding", () => {
 });
 
 describe("fresh selected-company follow-ups reuse authorized identity", () => {
-  it.each([
-    ["What are the risks for this company?", "FRESH", false],
-    ["What does Different Target do?", "FRESH", true],
-    ["Compare this company with Different Target", "FRESH", true],
-    ["What are the risks for these companies?", "FRESH", true],
-    ["What are the risks for this company?", "MALFORMED", true],
-    ["What are the risks for this company?", "REVOKED", true],
-    ["What are the risks for this company?", "UNREAD", true],
-  ] as const)("%s / %s preserves lookup=%s", async (text, access, lookup) => {
-    const companyId = randomUUID();
-    const tools = toolPort(access === "UNREAD" ? [] : [GET_COMPANY], (p) =>
-      access === "REVOKED"
-        ? denied(p)
-        : access === "MALFORMED"
-          ? succeeded(p, { companyId, canonicalName: "Selected Company" })
-          : succeeded(p, {
-              companyId,
-              canonicalName: "Selected Company",
-              legalName: null,
-              websiteUrl: null,
-              foundedDate: null,
-              headquartersCountry: null,
-              headquartersCity: null,
-              currentStageCode: "seed",
-              shortDescription: "Declared company profile",
-              primaryDescription: null,
-              companyStatus: "active",
-              relationToYou: "SHARED",
-              truthClass: "USER_CLAIM",
-            }),
-    );
-    const { seam, request, messages, alpha } = build({
-      tools,
-      script: [
-        {
-          kind: "TEXT",
-          text: JSON.stringify(
-            analystResult(
-              "The authorized profile has declared claims; missing evidence stays unknown.",
-            ),
-          ),
-        },
-      ],
-    });
-    if (messages[0]) messages[0] = { ...messages[0], content: text };
-    await seam.answer({
-      ...request,
-      aboutNamedOther: true,
-      subjects: [{ kind: "COMPANY", companyId }],
-      plan: { ...request.plan, screen: { route: "COMPANY", companyId } },
-    });
-    const prompt = JSON.stringify(alpha.calls[0]?.request);
-    expect(
-      prompt.includes(
-        "Resolve the company named in the current question through search_companies and get_company",
+  it.each(
+    (
+      [
+        ["What are the risks for this company?", "FRESH", false],
+        [
+          "What traction, material risks and missing evidence are on record for this company? Distinguish claims from verified facts.",
+          "FRESH",
+          false,
+        ],
+        ["What does Different Target do?", "FRESH", true],
+        ["Compare this company with Different Target", "FRESH", true],
+        ["What are the risks for these companies?", "FRESH", true],
+        ["What are the risks for this company?", "MALFORMED", true],
+        ["What are the risks for this company?", "REVOKED", true],
+        ["What are the risks for this company?", "UNREAD", true],
+        ["What are the risks for this company?", "NO_SELECTED_CONTEXT", true],
+      ] as const
+    ).flatMap(([text, access, lookup]) =>
+      (["COMPANY", "DISCOVER"] as const).map(
+        (route) => [text, access, lookup, route] as const,
       ),
-    ).toBe(lookup);
-    if (!lookup) {
-      expect(prompt).toContain("freshly read authorized profile");
+    ),
+  )(
+    "%s / %s preserves lookup=%s on %s",
+    async (text, access, lookup, route) => {
+      const companyId = randomUUID();
+      const tools = toolPort(access === "UNREAD" ? [] : [GET_COMPANY], (p) =>
+        access === "REVOKED"
+          ? denied(p)
+          : access === "MALFORMED"
+            ? succeeded(p, { companyId, canonicalName: "Selected Company" })
+            : succeeded(p, {
+                companyId,
+                canonicalName: "Selected Company",
+                legalName: null,
+                websiteUrl: null,
+                foundedDate: null,
+                headquartersCountry: null,
+                headquartersCity: null,
+                currentStageCode: "seed",
+                shortDescription: "Declared company profile",
+                primaryDescription: null,
+                companyStatus: "active",
+                relationToYou: "SHARED",
+                truthClass: "USER_CLAIM",
+              }),
+      );
+      const { seam, request, messages, alpha, completed } = build({
+        tools,
+        script: [
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult(
+                "The authorized profile has declared claims; missing evidence stays unknown.",
+              ),
+              findings: [
+                {
+                  statement: "Declared seed stage.",
+                  type: "FACT",
+                  confidence: "MODERATE",
+                  truthClass: "USER_CLAIM",
+                  evidenceStatus: "SELF_REPORTED",
+                },
+              ],
+            }),
+          },
+        ],
+      });
+      if (messages[0]) messages[0] = { ...messages[0], content: text };
+      await seam.answer({
+        ...request,
+        aboutNamedOther: true,
+        subjects: [{ kind: "COMPANY", companyId }],
+        plan: {
+          ...request.plan,
+          screen:
+            access === "NO_SELECTED_CONTEXT" ? { route } : { route, companyId },
+        },
+      });
+      const prompt = JSON.stringify(alpha.calls[0]?.request);
       expect(
-        tools.executed.filter((p) => p.name === "get_company"),
-      ).toHaveLength(1);
-    }
-  });
+        prompt.includes(
+          "Resolve the company named in the current question through search_companies and get_company",
+        ),
+      ).toBe(lookup);
+      const payload = completed.at(-1) as {
+        message: {
+          blocks: Array<{ kind: string; finding?: { subjects: unknown[] } }>;
+        };
+      };
+      expect(
+        payload.message.blocks.find((block) => block.kind === "FINDING")
+          ?.finding?.subjects,
+      ).toEqual(lookup ? [] : [{ kind: "COMPANY", companyId }]);
+      if (!lookup) {
+        expect(prompt).toContain("freshly read authorized profile");
+        expect(
+          tools.executed.filter((p) => p.name === "get_company"),
+        ).toHaveLength(1);
+      }
+    },
+  );
 });
 
 describe("selected-company analysis stays out of the candidate sweep", () => {
   it.each([
-    [false, false],
-    [true, false],
-    [false, true],
-    [true, true],
+    [false, false, "COMPANY"],
+    [true, false, "COMPANY"],
+    [false, true, "COMPANY"],
+    [true, true, "COMPANY"],
+    [false, true, "DISCOVER"],
+    [true, true, "DISCOVER"],
   ])(
-    "answers the profile question with a late FIT reading, warm=%s, other=%s",
-    async (warm, aboutNamedOther) => {
+    "answers the profile question with a late FIT reading, warm=%s, other=%s, screen=%s",
+    async (warm, aboutNamedOther, screenRoute) => {
       const companyId = randomUUID();
       const investorOrganisationId = randomUUID();
       const topOffer = {
@@ -551,7 +597,7 @@ describe("selected-company analysis stays out of the candidate sweep", () => {
         subjects: [{ kind: "COMPANY" as const, companyId }],
         plan: PermittedContextPlanSchema.parse({
           ...request.plan,
-          screen: { route: "COMPANY" as const, companyId },
+          screen: { route: screenRoute, companyId },
           scopes: [
             {
               kind: "INVESTOR_MANDATE" as const,

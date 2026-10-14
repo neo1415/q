@@ -3301,7 +3301,8 @@ export function createModelGatewayQAnswer(
           // unread/revoked targets keep the existing resolution rule.
           const read = runCompanies.read(request.runId);
           const screenCompanyId =
-            plan.screen?.route === "COMPANY"
+            plan.screen?.route === "COMPANY" ||
+            plan.screen?.route === "DISCOVER"
               ? (plan.screen.companyId ?? null)
               : null;
           const selectedTarget =
@@ -5373,13 +5374,17 @@ export function createModelGatewayQAnswer(
         // screen profile. Explicit names take precedence; ambiguity stays
         // unbound. Never establish the screen target without a fresh read.
         const screenCompanyId =
-          plan.screen?.route === "COMPANY"
+          plan.screen?.route === "COMPANY" || plan.screen?.route === "DISCOVER"
             ? (plan.screen.companyId ?? null)
             : null;
         const selectedCompanySubjects =
           !mentionsReadName &&
           isSingleCompanyQuestion(latest.content) &&
+          !/\b(?:compar(?:e|ed|ing|ison)|versus|vs|against|alongside|relative to)\b/iu.test(
+            latest.content,
+          ) &&
           screenCompanyId !== null &&
+          companiesRead.profiles.size === 1 &&
           companiesRead.profiles.has(screenCompanyId)
             ? askedSubjects(request.subjects, plan).filter(
                 (subject) =>
