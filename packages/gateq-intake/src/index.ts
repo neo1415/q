@@ -180,3 +180,11 @@ export {
   type GateqEmailKind,
   type GateqOutboundSender,
 } from "./inbox/founder-mail.js";
+
+export {
+  DisclosureDocumentIdentitySchema,
+  DisclosureLineageSchema,
+  projectSelectedDisclosure,
+  type DisclosureDocumentIdentity,
+  type DisclosureLineage,
+} from "./application/disclosure-projection.js";
