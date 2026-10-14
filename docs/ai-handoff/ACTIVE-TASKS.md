@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## Latest continuation priorities
+
+Description90 is deployed72d across four SUCCESS services; fresh description browser proof remains pending. Claim capture PR92/08cacfd4:53 builds, root/API/package types,149 suite tests and40 focused tests PASS; exact CI38601112916 quality still running, database/build/types PASS. No live adherence proof or release. Next primary implementation: exact selected-dossier manifest hydration and full authorized source payload beside the600-character receipt; no investor-Q repair exists yet. Canonical H2 pipeline2d9dfa1e and guest expiry553316c5 follow; cloud-view and product-inventory WIPs are preserved, not release-ready. STATE top supersedes historical task entries below.
+
 ## Current priority — October14, 17:23 WAT
 
 P0: protectedrelease90 (description89). P1: exactauthorizedsubmitted-dossier Q context/largefinding contract; interruptedrepairnotfoundlocally. P2: recordvalidtraction/use-of-funds independentofnextquestions, thensecureguestEvidence. P3: existinghub-h2-pipeline2d9dfa1e, notanotherrewrite; cloudviewb4a2a68e isunverifiedadd-onwith2test/typefailures. Research86/88andproductinventoryaed12b0c secondary. Production71c5 allfourSUCCESS, existingtextsubmissionandH1productionproofpreserved. See STATEtopforexactSHAs/reproduction/risks.
