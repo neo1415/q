@@ -137,3 +137,22 @@ export class ConnectionNotPermittedError extends Error {
     this.name = "ConnectionNotPermittedError";
   }
 }
+
+/** Fail closed rather than publish a truncated pipeline or export. */
+export class RelationshipPipelineLimitError extends Error {
+  constructor() {
+    super(
+      "The pipeline read could not be completed within its safe processing limit.",
+    );
+    this.name = "RelationshipPipelineLimitError";
+  }
+}
+
+export class RelationshipPipelineQueryError extends Error {
+  constructor() {
+    super(
+      "This pipeline view changed or its cursor is invalid. Start the view again.",
+    );
+    this.name = "RelationshipPipelineQueryError";
+  }
+}
