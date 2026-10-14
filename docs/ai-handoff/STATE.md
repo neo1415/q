@@ -1,5 +1,14 @@
 # Capital Q — Current shared engineering state
 
+## October 14 — fact-supersession repair and Relationship Hub review
+
+- Integrated PR #74 at `96d26b957d0824e267487ee6fc3e4a6972df3116` on `build/int-rc`; exact head `5ec42dabb1f73808d80bd14b797732d0db2973c9`, protected CI `38516516121` PASS (manual e2e skipped). Its republishing 500 fix is separate from the second-answer fact-supersession defect.
+- Railway readback: all four services SUCCESS at production `10c81bdaaa189630aea8a5dffbfe5f831e4815ec`. This repair is NOT deployed. API deployment `27499ee1-9653-49fa-9386-f59b7f66a904`; q-api `cc6f2c81-7837-4156-9527-581684d2bd08`; web `986480a9-1c47-4789-b063-d63d05eb98de`; workers `045d44da-ff36-4900-8bb1-ec06d4f81f74`.
+- Repair branch `codex/gateq-supersession-fix-oct14`: retire old current fact before inserting actual successor UUID under the canonical application lock; defer only successor FK, retain immediate current-fact unique index/paired CHECK, reject self/scope links. New migration `20261224100000`. Recovered older repair concept from uncommitted backend work; did not merge its stale migrations. IMPLEMENTED, database validation pending; no release claim.
+- PostgreSQL proof pending: new 923 pgTAP tests cover original 23505, repeated corrections, retained provenance/history/turns, rollback and invalid lineage. Canonical local setup initially blocked by ECR 403; alternate ghcr registry image download is progressing. No false test PASS.
+- Design-only PR #75: `codex/relationship-design-review` at `444070cd1d55a518055e70b8d22db9d011152da3`, based on existing `9a0ce187`. 76 desktop/mobile light/dark screenshots, four MP4 walkthroughs; Chromium playback/ffmpeg decode passed. Real mobile role clipping fixed. Review `design/relationship-hub/review/index.html`. All data synthetic/Q interactions scripted. No production CRM implementation; user design approval required.
+- Exact next task: prove supersession against actual PostgreSQL, including durable concurrent retries/rollback; affected application gates and exact protected CI before migration/release. Preserve Q intelligence, memory, context firewall, Work and fast navigation; no duplicate brain/platform or Q Pitch edits.
+
 ## GateQ exact-head CI correction — 2026-10-14
 
 - Reconciled source checkpoint336cf8c4 pushed in PR72. Local53 package builds PASS;122 domain tests PASS. Combined UI suite67tests ran:65PASS and2 legacy/display mismatches, then corrected actual legacy transcript display and test labels; affected inbox + intake rerun42tests PASS. Founder contact-first/recovery, comparison and dossier source assertions remain intact.
