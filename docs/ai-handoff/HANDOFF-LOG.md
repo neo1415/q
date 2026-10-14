@@ -670,3 +670,9 @@ PR76 source9c6c2607 passed protectedCI38520775540 including fullpgTAP and actual
 ## 2026-10-14 06:50 UTC — real correction verified; separate opening fix
 
 PR77 exactCI38521203727 fully passed, normally merged23a65ce3 and allfourservicesSUCCESS. Same live form correction now succeeds; real first interview answer3.971s, second existing-country correction3.783s, completed retry646ms deduplicated, exactly2PERSONturns. First cold opening separatelyfailed23514/sessioncache7-characterkeyafterQtranscriptcommit; recovered byreopen. Narrow repair preservesdurablehistoricalkey and usesvalidlegacyfallback,121targetedtests/22realpgTAP PASS. ProtectedCI/release/coldfreshacceptance remain. Design75 nowaac14fd0 with real scopedlint/a11y/playback proof, fullCIpending.
+
+## October 14, 07:35 UTC — verified GateQ release and independent Q follow-up repair
+
+PR78/79 exact protected CI38524475537/38524638454 PASS; production62bd144a all four services SUCCESS. Fresh cold-opening3.558s, retry299ms; two real country corrections3.160/3.817s; completed retry589ms, exactly2 PERSON/3 Q turns. Fact repair remains strict, migration211 recorded, PostgreSQL22 assertions plus compiled concurrent repository proof PASS. Design75/aac14fd0 exactCI38523459354 PASS, review-only.
+
+Existing investor browser rehearsal actually failed follow-up reference binding; selected company saved under DISCOVER, finding subjects empty. Independent patch8412bef3/5be2e476 preserves authorized profile checks and existing wide-read COMPANY attribution;62 targeted tests PASS, protected CI/release/live rerun pending. Navigation route race is not yet explained. Per-run known proxy-CA SPKI helper added after automatic review rejected persistent NSS import; no persistent trust expansion. Private records/logs/credentials remain outside Git. Latest STATE supplies exact release IDs, measurements, pending branches and reproduction.
