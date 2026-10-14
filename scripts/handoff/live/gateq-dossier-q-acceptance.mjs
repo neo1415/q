@@ -189,9 +189,6 @@ try {
       await page.locator("[data-q-dock-button]:visible").first().click();
     await input.waitFor({ timeout: 30000 });
     const before = new Set(runs);
-    const priorAnswerTexts = new Set(
-      await page.locator("[data-q-answer]:visible").allTextContents(),
-    );
     await input.fill(
       "Read the selected submitted GateQ dossier. Explain this founder's business, supplied traction and use of funds, qualification, missing evidence and next review actions. Distinguish applicant claims from verified evidence and cite the submitted sources. Do not send anything.",
     );
@@ -210,15 +207,13 @@ try {
       firstTextMs = null;
     for (let i = 0; i < 180; i++) {
       runId = runs.findLast((id) => !before.has(id));
-      const rendered = await page
-        .locator("[data-q-answer]:visible")
-        .last()
-        .textContent()
-        .catch(() => "");
+      const rendered = await page.evaluate(renderedInvestorAnswer, {
+        priorRuns: [...before],
+      });
       if (
         firstTextMs === null &&
-        rendered.trim().length >= 20 &&
-        !priorAnswerTexts.has(rendered) &&
+        rendered?.textLength >= 20 &&
+        rendered.runId === runId &&
         runId
       )
         firstTextMs = Math.round(performance.now() - started);
