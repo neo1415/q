@@ -1,5 +1,57 @@
 # Capital Q — Current shared engineering state
 
+## Latest lossless checkpoint — 14 October 2026, 17:23 WAT
+
+This checkpoint supersedes dated status claims below. [Latest owner continuation](session-directives/2026-10-14-gateq-hub-continuation.txt) and [consolidated takeover](session-directives/2026-10-14-1500WAT-gateq-hub-takeover.md) govern task priorities, subordinate to locked PADL/Product Specification/Final System Review. Functional Hub is approved with existing UI; rejected prototype75 CSS must not enter production.
+
+### Released, integrated and gated
+
+- Production `recovery/2026-09-12`: **71c5d4a58c314eca7981c08265b2e29015bc2b7b**, allfourRailwaySUCCESS directly refreshed this session. API **14fabee5-bfd9-428a-898e-02d68ad9d25a**; q-api **f558643c-50de-4f5b-8045-8467375aca81**; workers **e8f0f8d5-07be-4038-a37c-f09b5d2959aa**; web **853b7ebb-5814-4322-b19d-fd2165ec5a67**. ProductionCI38556079265 PASS. GateQ83/84 and Hub81/85 included; no new migration applied this session. Rollback71c5 remains available for subsequent releases; earlier37b5414e lacks the qualification repair/Hub.
+- Integration `build/int-rc`: **1b72e44dc2dd701dd2800231784f8cefee96de69**. PR89 source **ac6cd481e738a97352eb81c7b197e423fd35c926**, exactCI38572329768 allprotectedPASS, merged. Phrase-based applicant description preserved in frozen brief; inbox preview bounded280. Not deployed.
+- Separate PR90 production candidate, `codex/gateq-description-release-takeover-oct14`: **fb882ffa83b86ca191c6bb6d8b6449f651aff1f7**, CI **38596902328 pending**. Source89 alreadygreen; candidate must independently pass quality+database before normal promotion. No migration, scoring change or historical rewrite.
+- Earlier GateQ83 exactCI38539226759, release84 exactCI38552751739, reconciledHub81 exactCI38552582766 and release85 exactCI38554347785 allPASS. Manualbrowser job skipped; separate real acceptance below.
+- Research source86/6aae43781e910cb959976ac956de596743e968fc CI38554902165 PASS; release88/c8374d6b4b2d3821aa21f592897f5ca79d2813bf CI38555784901 PASS, bothOPEN/unreleased. Secondary priority. Reconcile with89 before promotion to avoid losing its changes. Old acceptance87/4a02425d CI38555416557 PASS, OPEN; new handoff preserves its browser driver without overwriting newer production evidence.
+
+### Product evidence and defects
+
+- Existing engineering handoff/operator evidence reports **production** founder confirmedcontact→four-stepform→adaptiveinterview→reload→explicitSubmit→exactinvestordossier/expandedtranscript PASS on71c5; otherinvestor404 forforeigngateway/dossier. Preserve this completed text slice. This resumed session independently refreshed deployment SHAs; it did not rerun these paid model turns or claim independent recovery of private operator receipts. Zeroattacheddocuments; guestOTP/Evidence/Qdossier analysis not certified.
+- Existing handoff reports production H1 investor/founder desktop1440×960/mobile390×844 PASS and typedQ DONEreceipts. Production individual timings: finalwords→push62/7ms, heading5.529/3.912s. Root earlier local real-API H1 fourcases alsoPASS: push2/3ms, heading1.540/2.305s. Private evidence `/tmp/cq-hub-acceptance-N1b5dQ` may exist here; production operator receipts may be in another environment. No p50/p95, firstaudio, fullCRM or Tavus audiovisual certification.
+- **Immediate investor-Q defect:** submitted dossier visible inUI but Q claims contentunavailable (~23.5s reported). All accessible worktrees inspected: no interrupted nine-file investor-Q repair found. Existing UI already publishes GATEQ_APPLICATION focus/section/dialog; inspect backend screen read rather than blindly rebuilding UI. Code observed: `gateq.inbox.summarise` composes full `submittedReading()` (12k finding budget plus other context), but generated AppToolOutput.says is capped600. Selectedscreen read must retrieve exact authorized submitted application, not only inbox list. Root has not implemented/validated this repair yet.
+- **Claimcapture defect:** next-question dimensions restrict otherwise validrecordable traction/use-of-funds. Decouple factcapture from questionselection, keep canonicalshape/provenance/retries/history/immutableSubmit; test actual frozenclaims. Not fixed.
+- GuestEvidence remainsunreleased; do not equateupload withdisclosure, knowledgewithcurrentactorpermissions, orGateQ withinterest/relationship.
+
+### Protected work, branches and limitations
+
+- Canonical nextH2 startingpoint **codex/hub-h2-pipeline / 2d9dfa1ef8687bc4827a70a8070c30f35a1bb97e**, fetchedverified. Substantial27-pathWIP, unverified/unreleased; serverpipeline/filter/cursor/export plus per-device localStorageviews, notcloud/teamviews. Reconcilecurrentint carefully; no secondH2 rewrite.
+- Additional recoverable cloudview extension **codex/hub-h2-scoped-views / b4a2a68e** pushed, explicitlyWIP;18files/1339additions. Newunappliedmigration **20261224110000_network_relationship_views.sql** and14plannedpgTAP checks.53packagebuildsPASS;52targetedtests ran50PASS/2FAIL and roottypesFAIL from undefined `RELATIONSHIP_ID` in newAPItests (actual fixture constantRELATIONSHIP). No protectedCI/pgTAP/browser/release. Sourcequery conservativelymarks200-row previsibilitybound aspossiblypartial; do notclaimglobalexhaustiveness/fullH2. Reuse selectedsafecloudpreferences atop canonicalpipeline afterreview; do notwholesalemerge overlappingqueries/UIs orapplymigrationwithoutgates.
+- Guest **codex/gateq-guest-upload-expiry / 553316c5136a8e6e624b33a4a9af42dffe9f7762**, fetchedverified; earlier **codex/gateq-guest-evidence-recovery / b35813def71c4bf5293580e4243d64c989c11dca**, historicalclaude5858eb1d/integration05e7ab62.231200/231300/231400 proposals require canonicalinventory/security/fix-forward reconciliation; not applied here.
+- **codex/q-product-capabilities-oct14 / aed12b0c** pushedWIP,9files/229additions. Governedpublic-safe5-rowinventorytool withhistorical/currentstatusseparation, existingon-demandcatalogue, sanitizedq-apiSHA. No build/types/lint/test/CI/live certification. Snapshotstale afternewproductionacceptance; secondary, donotpublishunverifiedstatus or treateligibilityasLIVE. No secrets/privateaccounts/receipts indata.
+- NativeGateQ driver **codex/gateq-pr83-acceptance-oct14 / 22ec4e7cf8173954e5fdcbf6a72ef486a1e1bcb3**, clean/pushedcheckpoint. Read-only companyactor/gateway preflight1.759sPASS; independent68tests plus26canonicalstagepreservationtestsPASS. This driver itself not fullsubmitverified here. Avoid duplicatepaidapplications whencompletedoperatorproofcanberecovered.
+- HistoricalfourGateQ WIPbranches remainpushed/unverified/superseded; sourceSTATE earliersections listexactSHA. Allaccessibleworktrees reinspected; only generated untrackednode_modules indesigncheckout isexcludedfromGit. No credentials/session/privateartifacts committed. Agents paused forpreservation; do not assume anactiveworker ownsunfinished repairs.
+
+### Exact next tasks and reproduction
+
+1. Finish PR90 protected gates, normallypromote, readactualRailwayrevisions, verifydescriptioninexactsubmittedbrief/inbox. Never certifyfromsourceCIalone.
+2. Implement narrow selected-dossier screenread + typedlargefinding Q reader repair usingexistingapp-actions/GateQauthority. Prove wronginvestor/wrongapp/pre-submit/stalefocus/multipleapp/longfinding cases, then genuineinvestorQ substantive sourcedanswer/context. Existingcomponentpaths: `apps/web/src/features/gateq/page/inbox-view.tsx`; `packages/app-actions/src/actions/gateq-inbox.ts`; `gateq-submitted-reading.ts`; `packages/q-tools/src/tools/app-actions.ts` (says600); owning screenreadcomposition. No secondQruntime.
+3. Claimcapture then guestEvidence endtoend; canonicalH2pipeline recovery next, cloudviewWIPselectivelyafterward. Research88/productinventory secondary; QPitch/scoring/voice/workforcepreserved.
+
+Production Hub rehearsal (privateauthorizedsessions mustbe present/refreshed androlesverified; no credentials inGit):
+
+```bash
+CQ_BROWSER_PROXY_CA_FILE=/usr/local/share/ca-certificates/environment-proxy-ca.crt \
+NODE_OPTIONS=--import=./scripts/handoff/live/browser-proxy-pin.mjs \
+CQ_HUB_WEB_URL=https://capital-qweb-production.up.railway.app \
+CQ_HUB_PUBLIC_KEY_FILE=/workspace/cq-secrets/public.key \
+CQ_HUB_INVESTOR_SESSION_FILE=/workspace/cq-secrets/investor-session.json \
+CQ_HUB_FOUNDER_SESSION_FILE=/workspace/cq-secrets/trial-session-0.json \
+CQ_HUB_VERIFY_Q=1 NODE_USE_ENV_PROXY=1 \
+node scripts/handoff/live/relationship-hub-acceptance.mjs
+```
+
+FullDiscover rehearsal remains `scripts/handoff/live/investor-demo-rehearsal.mjs` using CQ_DEMO_SESSION_FILE/CQ_DEMO_PUBLIC_KEY_FILE/CQ_DEMO_FOUNDER_RECORD_FILE andverifiedper-runproxyhelper. GateQ actualnative driver ison22ec4e7c branch; read itsheader/arguments beforeusing `--submit` (creates paidinternaltestapplication). Verifyactualownership: trial0 COMPANY; trial1 FIRM; workforce FIRMownsfictionalgateway; investor-session ownsnone. Filenamesneverproveidentity. Missingexternaloperatorfixtures require legitimateauthorizedread/recovery, not inventedfinancialclaims or seedbypass.
+
+No current environment/accountaction confirmedblocking implementation. Private external testfixtures/unfinishedINVQfiles may beinaccessible; do not claim recovered withoutactualread. PersistentNSSCA import was rejected earlier; process-local verifiedknownCA pin isavailable, no globalTLSdisable. No newTavusminutes spent. No prototypeCSS, competingCRMdatabase, genericQmemorysource, inventedscoring, undeployedWIPorunauthorizeddisclosure.
+
 ## October 14 — deployed acceptance and full GateQ / Hub continuation
 
 - **Fresh production verified:** `71c5d4a58c314eca7981c08265b2e29015bc2b7b`; protected CI38556079265 SUCCESS. All four Railway services SUCCESS on this revision; previous revisions drained. GateQ canonical qualification-shape repair (PR83/84) and Hub H1 (PR81/85) are released. Historical checkpoints below are preserved, not current release authority.
