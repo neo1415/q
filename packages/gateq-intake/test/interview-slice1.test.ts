@@ -127,7 +127,13 @@ const QUALIFYING: readonly NewApplicationFact[] = [
 
 type Scripted = Partial<InterviewTurnOutcome>;
 
-function world(options: { contactRequiredFrom?: string } = {}) {
+function world(
+  options: {
+    contactRequiredFrom?: string;
+    mailFails?: boolean;
+    noCodeKey?: boolean;
+  } = {},
+) {
   let now = NOW;
   const policy = policyOf([GEO, STAGE]);
   const applications = new Map<string, Application>();
@@ -150,12 +156,41 @@ function world(options: { contactRequiredFrom?: string } = {}) {
   const mailed: { to: string; code: string }[] = [];
   let nextCode = 100_000;
 
+  let transactionTail: Promise<void> = Promise.resolve();
   const transactions = {
-    run: async <T>(work: (tx: { sql: unknown }) => Promise<T>): Promise<T> =>
-      work({ sql: null }),
+    run: async <T>(work: (tx: { sql: unknown }) => Promise<T>): Promise<T> => {
+      const previous = transactionTail;
+      let unlock = () => {};
+      transactionTail = new Promise<void>((resolve) => {
+        unlock = resolve;
+      });
+      await previous;
+      try {
+        return await work({ sql: null });
+      } finally {
+        unlock();
+      }
+    },
   };
 
+  const claims = new Map<string, string>();
   const turns = {
+    pendingFor: async (_tx: unknown, applicationId: string) =>
+      claims.has(applicationId),
+    claimExchange: async (input: {
+      applicationId: string;
+      clientTurnId: string;
+      text: string;
+    }) => {
+      const claim = randomUUID();
+      claims.set(input.applicationId, claim);
+      return claim;
+    },
+    assertClaim: async (_tx: unknown, applicationId: string, claimId: string) =>
+      claims.get(applicationId) === claimId,
+    releaseExchange: async (applicationId: string, claimId: string) => {
+      if (claims.get(applicationId) === claimId) claims.delete(applicationId);
+    },
     listFor: (applicationId: string, limit?: number) => {
       const rows = turnRows
         .filter((row) => row.applicationId === applicationId)
@@ -215,6 +250,19 @@ function world(options: { contactRequiredFrom?: string } = {}) {
   };
 
   const contacts = {
+    invalidateCode: async (
+      _tx: unknown,
+      applicationId: string,
+      expectedHash: string,
+    ) => {
+      const row = contactRows.get(applicationId);
+      if (row?.codeHash === expectedHash)
+        contactRows.set(applicationId, {
+          ...row,
+          codeHash: null,
+          codeExpiresAt: null,
+        });
+    },
     findFor: (applicationId: string) =>
       Promise.resolve(contactRows.get(applicationId) ?? null),
     save: (
@@ -255,7 +303,11 @@ function world(options: { contactRequiredFrom?: string } = {}) {
   };
 
   const intake = createIntakeService({
+    contactCodeKey: options.noCodeKey
+      ? undefined
+      : "local-test-key-only-32-chars-or-more",
     applications: {
+      lockForUpdate: (_tx, id) => Promise.resolve(applications.get(id) ?? null),
       create: (_tx, application) => {
         const row: Application = {
           ...application,
@@ -413,6 +465,7 @@ function world(options: { contactRequiredFrom?: string } = {}) {
         Promise.resolve(new Map(ids.map((id) => [id, "Pitch deck"]))),
     },
     contactCodeMailer: (input) => {
+      if (options.mailFails) return Promise.resolve(false);
       mailed.push({ to: input.to, code: input.code });
       return Promise.resolve(true);
     },
@@ -717,6 +770,37 @@ describe("coverage", () => {
 });
 
 describe("the applicant contact", () => {
+  it("throttles durable resends instead of resetting failed attempts", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    await w.intake.confirmContact({ token, code: "999999" });
+    await expect(
+      w.intake.startContact({ token, contact: CONTACT }),
+    ).rejects.toMatchObject({ refusal: "TOO_MANY_REQUESTS" });
+    expect([...w.contactRows.values()][0]?.codeAttempts).toBe(1);
+    expect(w.mailed).toHaveLength(1);
+  });
+  it("does not accept a code whose email failed delivery", async () => {
+    const w = world({ mailFails: true });
+    const { token } = await w.start();
+    const sent = await w.intake.startContact({ token, contact: CONTACT });
+    expect(sent.codeSent).toBe(false);
+    expect(sent.codeExpiresInMinutes).toBeNull();
+    expect([...w.contactRows.values()][0]?.codeHash).toBeNull();
+    expect(
+      (await w.intake.confirmContact({ token, code: "100001" })).status,
+    ).toBe("NOT_FOUND");
+  });
+  it("refuses guest issuance when no stable verification key is configured", async () => {
+    const w = world({ noCodeKey: true });
+    const { token } = await w.start();
+    await expect(
+      w.intake.startContact({ token, contact: CONTACT }),
+    ).rejects.toMatchObject({ refusal: "CONTACT_NOT_CONFIRMED" });
+    expect(w.mailed).toHaveLength(0);
+  });
+
   it("is confirmed by the code that was mailed, and only that code", async () => {
     const w = world();
     const { token } = await w.start();
@@ -947,4 +1031,43 @@ describe("submission v2", () => {
       w.intake.startContact({ token, contact: CONTACT }),
     ).rejects.toMatchObject({ refusal: "ALREADY_SUBMITTED" });
   });
+});
+
+it("holds explicit submission while an applicant exchange has no persisted Q completion", async () => {
+  const w = world();
+  const { token } = await w.start();
+  await w.intake.recordFacts({ token, facts: QUALIFYING });
+  w.turnRows.push({
+    applicationId: [...w.contactRows.keys()][0] ?? "",
+    seq: 1,
+    role: "PERSON",
+    text: "Final answer",
+    clientTurnId: "unfinished",
+    askingDimension: null,
+    intent: null,
+    createdAt: NOW.toISOString(),
+  });
+  // Bind the real application from authorisation, not a client-supplied id.
+  const guest = await w.intake.authorise(token);
+  const last = w.turnRows.at(-1);
+  if (last !== undefined) last.applicationId = guest.application.id;
+  await expect(
+    w.intake.submit({ token, clientRequestId: "pending-turn-submit" }),
+  ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+  expect(w.submissions).toHaveLength(0);
+});
+
+it("simultaneous matching submit retries freeze exactly one snapshot", async () => {
+  const w = world();
+  const { token } = await w.start();
+  await w.intake.recordFacts({ token, facts: QUALIFYING });
+  const results = await Promise.all([
+    w.intake.submit({ token, clientRequestId: "concurrent-submit" }),
+    w.intake.submit({ token, clientRequestId: "concurrent-submit" }),
+  ]);
+  expect(w.submissions).toHaveLength(1);
+  expect(results.map((result) => result.deduplicated).sort()).toEqual([
+    false,
+    true,
+  ]);
 });

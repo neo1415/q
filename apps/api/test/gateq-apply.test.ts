@@ -60,6 +60,7 @@ const RESULT: ApplicantTurnResult = {
 };
 
 type Recorded = {
+  readonly openings: string[];
   readonly starts: string[];
   readonly turns: { token: string; message: string; clientTurnId: string }[];
   readonly submits: { token: string; clientRequestId: string }[];
@@ -71,14 +72,23 @@ function buildApp(options: {
   readonly submitDeduplicated?: boolean;
   readonly throttle?: GuestThrottle | undefined;
   readonly anyToken?: boolean;
+  readonly contactRequired?: boolean;
 }): { readonly app: FastifyInstance; readonly recorded: Recorded } {
-  const recorded: Recorded = { starts: [], turns: [], submits: [] };
+  const recorded: Recorded = {
+    starts: [],
+    turns: [],
+    submits: [],
+    openings: [],
+  };
   const deny = () => {
     throw new IntakeRefusedError("SESSION_INVALID");
   };
   const result = options.result ?? RESULT;
 
   const intake = {
+    coverage: async () => ({
+      contact: { required: options.contactRequired ?? false, confirmed: false },
+    }),
     // `charge` verifies before it counts, so the double must refuse an
     // unrecognised credential here exactly as the real service does --
     // otherwise a forged token would appear to earn a quota.
@@ -113,6 +123,7 @@ function buildApp(options: {
 
   const conversation: ConversationService = {
     openingFor: () => {
+      recorded.openings.push("model");
       if (options.refuse === true) deny();
       return Promise.resolve("Hi — what are you building?");
     },
@@ -585,4 +596,19 @@ describe("consent (P7): nothing reaches the investor without the founder's Share
     // No submission, so nothing in the organisation's inbox.
     expect(recorded.submits).toEqual([]);
   });
+});
+
+it("returns the newly issued session with a contact prompt without paying for an unconfirmed opening", async () => {
+  const { app, recorded } = buildApp({ contactRequired: true });
+  const response = await app.inject({
+    method: "POST",
+    url: GATEQ_APPLY_START_PATH,
+    payload: { gatewayPublicId: PUBLIC_ID },
+  });
+  expect(response.statusCode).toBe(201);
+  expect(response.json()).toMatchObject({
+    sessionToken: TOKEN,
+    reply: "Confirm your contact email to begin your interview with Q.",
+  });
+  expect(recorded.openings).toHaveLength(0);
 });

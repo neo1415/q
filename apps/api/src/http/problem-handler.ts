@@ -283,7 +283,20 @@ function toProblem(
     return createProblemDetails({
       code: "RESOURCE_CONFLICT",
       requestId,
-      detail: "Confirm your contact email before submitting.",
+      detail:
+        "Confirm your contact email before starting your interview or submitting.",
+    });
+  }
+
+  if (
+    error instanceof IntakeRefusedError &&
+    error.refusal === "NOT_READY_TO_SUBMIT"
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail:
+        "Finish the current interview exchange and review the application before submitting. A changed answer needs a new turn.",
     });
   }
 

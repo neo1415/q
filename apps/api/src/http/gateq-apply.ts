@@ -146,7 +146,8 @@ export function registerGateQApplyRoutes(
     if (
       error instanceof IntakeRefusedError &&
       error.refusal !== "TOO_MANY_REQUESTS" &&
-      error.refusal !== "CONTACT_NOT_CONFIRMED"
+      error.refusal !== "CONTACT_NOT_CONFIRMED" &&
+      error.refusal !== "NOT_READY_TO_SUBMIT"
     ) {
       reply.callNotFound();
       return undefined;
@@ -210,13 +211,19 @@ export function registerGateQApplyRoutes(
         gatewayPublicId: input.gatewayPublicId,
       });
       // F1: the form needs no opening line, so it reaches no model.
+      const contact =
+        input.mode === "form"
+          ? null
+          : (await intake.coverage(started.token)).contact;
       const opening =
         input.mode === "form"
           ? ""
-          : await conversation.openingFor({
-              token: started.token,
-              correlationId: randomUUID(),
-            });
+          : contact !== null && contact.required && !contact.confirmed
+            ? "Confirm your contact email to begin your interview with Q."
+            : await conversation.openingFor({
+                token: started.token,
+                correlationId: randomUUID(),
+              });
       const summary = await conversation.summary(started.token);
       void reply.code(201).header("Cache-Control", "no-store");
       return StartApplicationResponseSchema.parse({

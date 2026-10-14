@@ -152,6 +152,7 @@ function world(initial: GatewayPolicy): World {
 
   const service = createIntakeService({
     applications: {
+      lockForUpdate: (_tx, id) => Promise.resolve(applications.get(id) ?? null),
       create: (_tx, application) => {
         const row: Application = {
           ...application,
@@ -800,4 +801,16 @@ describe("resume", () => {
     ]);
     expect(resumed.status).toBe("IN_PROGRESS");
   });
+});
+
+it("refuses direct starts against a disabled gateway even with a published open policy", async () => {
+  const policy = policyOf("OPEN", []);
+  const w = world({
+    ...policy,
+    gateway: { ...policy.gateway, status: "DISABLED" },
+  });
+  await expect(
+    w.service.start({ gatewayPublicId: PUBLIC_ID }),
+  ).rejects.toMatchObject({ refusal: "GATEWAY_NOT_ACCEPTING" });
+  expect(w.applications.size).toBe(0);
 });

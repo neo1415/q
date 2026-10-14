@@ -25,6 +25,10 @@ export type ApplicationRepository = {
     tx: TransactionContext,
     application: Omit<Application, "createdAt" | "updatedAt">,
   ) => Promise<Application>;
+  readonly lockForUpdate: (
+    tx: TransactionContext,
+    id: ApplicationId,
+  ) => Promise<Application | null>;
   readonly findById: (id: ApplicationId) => Promise<Application | null>;
   readonly setStatus: (
     tx: TransactionContext,
@@ -85,6 +89,7 @@ export type ApplicationFactRepository = {
   /** Current facts: superseded rows are history and are not returned. */
   readonly currentFor: (
     applicationId: ApplicationId,
+    tx?: TransactionContext,
   ) => Promise<readonly ApplicationFact[]>;
   readonly historyFor: (
     applicationId: ApplicationId,
@@ -107,7 +112,10 @@ export type ApplicationFactRepository = {
 };
 
 export type ApplicationSubmissionRepository = {
-  readonly findForApplication: (applicationId: ApplicationId) => Promise<{
+  readonly findForApplication: (
+    applicationId: ApplicationId,
+    tx?: TransactionContext,
+  ) => Promise<{
     readonly submittedAt: string;
     readonly clientRequestId: string;
   } | null>;
@@ -150,10 +158,32 @@ export type StoredTurn = {
  * twice for one client turn id is written once.
  */
 export type ApplicationTurnRepository = {
+  readonly pendingFor: (
+    tx: TransactionContext,
+    applicationId: ApplicationId,
+  ) => Promise<boolean>;
+  readonly claimExchange: (input: {
+    readonly applicationId: ApplicationId;
+    readonly tenantId: string;
+    readonly clientTurnId: string;
+    readonly text: string;
+  }) => Promise<string | null>;
+  readonly assertClaim: (
+    tx: TransactionContext,
+    applicationId: ApplicationId,
+    claimId: string,
+  ) => Promise<boolean>;
+  readonly releaseExchange: (
+    applicationId: ApplicationId,
+    claimId: string,
+    tx?: TransactionContext,
+  ) => Promise<void>;
+
   /** Oldest first. `limit` keeps the newest that many. */
   readonly listFor: (
     applicationId: ApplicationId,
     limit?: number,
+    tx?: TransactionContext,
   ) => Promise<readonly StoredTurn[]>;
   readonly findExchange: (
     applicationId: ApplicationId,
@@ -163,16 +193,22 @@ export type ApplicationTurnRepository = {
     readonly q: StoredTurn | null;
   }>;
   /** Appends; an existing (client turn id, role) row is left as it is. */
-  readonly append: (input: {
-    readonly applicationId: ApplicationId;
-    readonly tenantId: string;
-    readonly role: "PERSON" | "Q";
-    readonly text: string;
-    readonly clientTurnId: string;
-    readonly askingDimension?: ApplicationDimension | null | undefined;
-    readonly intent?: string | null | undefined;
-  }) => Promise<void>;
-  readonly countFor: (applicationId: ApplicationId) => Promise<number>;
+  readonly append: (
+    input: {
+      readonly applicationId: ApplicationId;
+      readonly tenantId: string;
+      readonly role: "PERSON" | "Q";
+      readonly text: string;
+      readonly clientTurnId: string;
+      readonly askingDimension?: ApplicationDimension | null | undefined;
+      readonly intent?: string | null | undefined;
+    },
+    tx?: TransactionContext,
+  ) => Promise<void>;
+  readonly countFor: (
+    applicationId: ApplicationId,
+    tx?: TransactionContext,
+  ) => Promise<number>;
 };
 
 export type ContactChannel = "EMAIL" | "PHONE";
@@ -188,6 +224,7 @@ export type StoredContact = {
   readonly preferredChannel: ContactChannel | null;
   readonly codeHash: string | null;
   readonly codeExpiresAt: string | null;
+  readonly codeIssuedAt: string | null;
   readonly codeAttempts: number;
   readonly emailConfirmedAt: string | null;
   readonly confirmedVia: "EMAIL_CODE" | "ACCOUNT" | null;
@@ -195,33 +232,49 @@ export type StoredContact = {
 
 /** One contact per application (GateQ slice 1). */
 export type ApplicationContactRepository = {
+  readonly invalidateCode: (
+    tx: TransactionContext,
+    applicationId: ApplicationId,
+    expectedHash: string,
+  ) => Promise<void>;
   readonly findFor: (
     applicationId: ApplicationId,
+    tx?: TransactionContext,
   ) => Promise<StoredContact | null>;
   /**
    * Insert or replace the details. A changed email loses its confirmation;
    * attempts reset whenever a new code is issued.
    */
-  readonly save: (input: {
-    readonly applicationId: ApplicationId;
-    readonly tenantId: string;
-    readonly name: string;
-    readonly email: string;
-    readonly role: string;
-    readonly companyName: string;
-    readonly phone: string | null;
-    readonly preferredChannel: ContactChannel | null;
-    readonly codeHash: string | null;
-    readonly codeExpiresAt: string | null;
-    readonly emailConfirmedAt: string | null;
-    readonly confirmedVia: "EMAIL_CODE" | "ACCOUNT" | null;
-  }) => Promise<StoredContact>;
-  readonly recordFailedAttempt: (applicationId: ApplicationId) => Promise<void>;
-  readonly confirm: (input: {
-    readonly applicationId: ApplicationId;
-    readonly at: string;
-    readonly via: "EMAIL_CODE" | "ACCOUNT";
-  }) => Promise<StoredContact | null>;
+  readonly save: (
+    input: {
+      readonly applicationId: ApplicationId;
+      readonly tenantId: string;
+      readonly name: string;
+      readonly email: string;
+      readonly role: string;
+      readonly companyName: string;
+      readonly phone: string | null;
+      readonly preferredChannel: ContactChannel | null;
+      readonly codeHash: string | null;
+      readonly codeExpiresAt: string | null;
+      readonly codeIssuedAt: string | null;
+      readonly emailConfirmedAt: string | null;
+      readonly confirmedVia: "EMAIL_CODE" | "ACCOUNT" | null;
+    },
+    tx?: TransactionContext,
+  ) => Promise<StoredContact>;
+  readonly recordFailedAttempt: (
+    applicationId: ApplicationId,
+    tx?: TransactionContext,
+  ) => Promise<void>;
+  readonly confirm: (
+    input: {
+      readonly applicationId: ApplicationId;
+      readonly at: string;
+      readonly via: "EMAIL_CODE" | "ACCOUNT";
+    },
+    tx?: TransactionContext,
+  ) => Promise<StoredContact | null>;
 };
 
 /** Titles of Evidence-owned documents, by id. Display only. */
@@ -240,9 +293,13 @@ export type ApplicationDocumentRepository = {
       readonly documentId: string;
     },
   ) => Promise<void>;
-  readonly countFor: (applicationId: ApplicationId) => Promise<number>;
+  readonly countFor: (
+    applicationId: ApplicationId,
+    tx?: TransactionContext,
+  ) => Promise<number>;
   readonly listFor: (
     applicationId: ApplicationId,
+    tx?: TransactionContext,
   ) => Promise<readonly string[]>;
 };
 

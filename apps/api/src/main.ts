@@ -707,13 +707,15 @@ const wordsReaders =
       });
 
 /**
- * GateQ slice 1: `GATEQ_CONTACT_REQUIRED_FROM`, an ISO instant. A value
- * that does not parse is ignored rather than locking every applicant out.
+ * Existing applications retain their rollout boundary; new applications
+ * require verified contact. Invalid configuration must never waive it.
  */
-function gateqContactRequiredFrom(): string | undefined {
+function gateqContactRequiredFrom(): string {
   const raw = process.env["GATEQ_CONTACT_REQUIRED_FROM"]?.trim();
-  if (raw === undefined || raw === "") return undefined;
-  return Number.isNaN(Date.parse(raw)) ? undefined : raw;
+  if (raw === undefined || raw === "") return "2026-10-13T00:00:00.000Z";
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(raw) || Number.isNaN(Date.parse(raw)))
+    throw new Error("GATEQ_CONTACT_REQUIRED_FROM must be an ISO instant");
+  return raw;
 }
 
 const gateqApply =
@@ -788,8 +790,9 @@ const gateqApply =
           },
           // When set (an ISO instant), applications created from then on
           // must confirm a contact before Submit even if they never gave
-          // one. Unset until the web form asks for the contact first.
+          // one. The release epoch is the safe default.
           contactRequiredFrom: gateqContactRequiredFrom(),
+          contactCodeKey: process.env["GATEQ_CONTACT_CODE_KEY"],
         });
         const conversation = createConversationService({
           intake,
