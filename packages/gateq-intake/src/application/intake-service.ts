@@ -179,6 +179,8 @@ const SNAPSHOT_TRANSCRIPT_CHARS = 150_000;
 export type GuestContext = {
   readonly application: Application;
   readonly sessionId: string;
+  /** Server-verified expiry, for scoped direct-upload authorizations. */
+  readonly expiresAt?: string | undefined;
 };
 
 export type StartApplicationResult = {
@@ -217,7 +219,10 @@ export type IntakeService = {
   }>;
   /** Internal: the verified guest, for the interview layer above. */
   readonly authorise: (token: string) => Promise<GuestContext>;
-  readonly assertInterviewReady: (token: string) => Promise<void>;
+  readonly assertInterviewReady: (
+    token: string,
+    requireConfirmedContact?: boolean,
+  ) => Promise<void>;
   /**
    * GateQ slice 1: save the applicant's contact and send a one-time code.
    * With `accountEmail` (a signed-in founder's own verified address,
@@ -308,7 +313,11 @@ export function createIntakeService(
     );
     if (application === null) throw new IntakeRefusedError("SESSION_INVALID");
     await sessions.touch(found.session.id, now.toISOString());
-    return { application, sessionId: found.session.id };
+    return {
+      application,
+      sessionId: found.session.id,
+      expiresAt: found.session.expiresAt,
+    };
   };
 
   const viewOf = async (application: Application): Promise<ApplicationView> => {
@@ -411,10 +420,10 @@ export function createIntakeService(
   };
 
   return {
-    assertInterviewReady: async (token) => {
+    assertInterviewReady: async (token, requireConfirmedContact = false) => {
       const { application } = await authorise(token);
       const standing = await contactStanding(application);
-      if (standing.required && !standing.confirmed)
+      if ((standing.required || requireConfirmedContact) && !standing.confirmed)
         throw new IntakeRefusedError("CONTACT_NOT_CONFIRMED");
     },
     completeTurn: async (input) => {

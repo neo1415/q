@@ -1442,6 +1442,7 @@ export * from "./explore.js";
 // G1/G2 block: organisations as teams.
 export * from "./team.js";
 export * from "./gateq-inbox.js";
+export * from "./gateq-application-documents.js";
 export * from "./gateq-find.js";
 // Deal close (2026-10-08): terms, signature, close and stage reports.
 export * from "./deal-close.js";
