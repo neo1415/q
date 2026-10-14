@@ -33,6 +33,8 @@ const calls = {
   open: vi.fn<Action>(),
   turn: vi.fn<Action>(),
   coverage: vi.fn<Action>(),
+  progress: vi.fn<Action>(),
+  transcript: vi.fn<Action>(),
 };
 /** Every server call, in order, by name: the flow's order is the assertion. */
 const order: string[] = [];
@@ -44,6 +46,8 @@ const tracked =
   };
 
 vi.mock("../src/features/gateq/apply-actions", () => ({
+  interviewProgressAction: tracked("progress"),
+  transcriptAction: tracked("transcript"),
   startFormAction: tracked("start"),
   saveAnswersAction: tracked("save"),
   submitApplicationAction: tracked("submit"),
@@ -165,6 +169,7 @@ const coverageDto = (
 });
 
 beforeEach(() => {
+  sessionStorage.clear();
   order.length = 0;
   for (const fn of Object.values(calls)) fn.mockReset();
   calls.start.mockResolvedValue({
@@ -207,6 +212,40 @@ beforeEach(() => {
     application: summary({ access: "MAY_APPLY" }),
   });
   calls.coverage.mockResolvedValue({ ok: true, coverage: coverageDto() });
+  calls.progress.mockResolvedValue({
+    ok: true,
+    application: summary({ access: "MAY_APPLY" }),
+    transcript: { turns: [] },
+    coverage: coverageDto(),
+  });
+  calls.transcript.mockImplementation(() =>
+    Promise.resolve({
+      ok: true,
+      turns: [
+        {
+          seq: 1,
+          role: "Q",
+          text: "Who pays you today, clinics or patients?",
+          at: "2026-10-13",
+        },
+        {
+          seq: 2,
+          role: "PERSON",
+          text:
+            typeof calls.turn.mock.calls.at(-1)?.[1] === "string"
+              ? calls.turn.mock.calls.at(-1)?.[1]
+              : "",
+          at: "2026-10-13",
+        },
+        {
+          seq: 3,
+          role: "Q",
+          text: "Thanks. What does a clinic pay per month?",
+          at: "2026-10-13",
+        },
+      ],
+    }),
+  );
   calls.save.mockResolvedValue({
     ok: true,
     sessionToken: TOKEN,
@@ -402,6 +441,7 @@ function type(label: RegExp | string, value: string) {
 
 /** A guest through the contact step with an emailed code. */
 async function guestContact() {
+  await flush();
   type("Full name", "Amara Okafor");
   type(/^Email/, "amara@kora.ng");
   type("Your role", "Founder & CEO");
@@ -436,8 +476,46 @@ async function toReview() {
 }
 
 describe("the form, driven like a founder", () => {
-  it("shows the investor's rules first and starts with who is applying", () => {
+  it("restores the same application and server-authorized contact in review after refresh", async () => {
+    const { saveRecovery } =
+      await import("../src/features/gateq/form/session-recovery");
+    const canonical = contactDto({
+      name: "Canonical contact",
+      email: "canonical@example.test",
+      role: "CEO",
+    });
+    const restoredCoverage = {
+      ...coverageDto(),
+      contact: { ...coverageDto().contact, details: canonical },
+    };
+    calls.progress.mockResolvedValue({
+      ok: true,
+      application: summary({ access: "MAY_APPLY" }),
+      transcript: { turns: [] },
+      coverage: restoredCoverage,
+    });
+    calls.coverage.mockResolvedValue({ ok: true, coverage: restoredCoverage });
+    saveRecovery(GATEWAY.publicId, {
+      token: TOKEN,
+      answers: model.EMPTY_ANSWERS,
+      step: "review",
+      interview: true,
+      contact: contactDto(),
+      pendingTurn: null,
+      submitKey: "",
+    });
     render(<GateQForm gateway={GATEWAY} />);
+    await flush();
+    expect(calls.start).not.toHaveBeenCalled();
+    expect(calls.progress).toHaveBeenCalledWith(TOKEN);
+    expect(screen.getByText(/Canonical contact.*CEO/)).toBeTruthy();
+    expect(screen.getByText(/canonical@example.test/)).toBeTruthy();
+    expect(calls.open).not.toHaveBeenCalled();
+  });
+
+  it("shows the investor's rules first and starts with who is applying", async () => {
+    render(<GateQForm gateway={GATEWAY} />);
+    await flush();
     expect(screen.getByText("West Africa")).toBeTruthy();
     expect(
       screen.getByText(/Nothing is sent until you press Submit/),
@@ -514,7 +592,9 @@ describe("the form, driven like a founder", () => {
       "save",
       "open",
       "turn",
+      "transcript",
       "coverage",
+      "progress",
       "submit",
     ]);
     // Q closes: thanks, may contact through the confirmed channel.
@@ -641,6 +721,7 @@ describe("the form, driven like a founder", () => {
         ]}
       />,
     );
+    await flush();
     expect(screen.getByLabelText<HTMLInputElement>(/^Email/).value).toBe(
       "amara@kora.ng",
     );

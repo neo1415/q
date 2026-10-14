@@ -1,0 +1,380 @@
+# CAPITAL Q — GATEQ EXECUTION RECOVERY AND COMPLETION
+## Second Codex account · October 13, 2026
+
+You are taking over an interrupted GateQ engineering task in the existing Capital Q repository:
+
+**https://github.com/neo1415/q**
+
+The previous Claude Code and Codex sessions exhausted their usage limits. They left valuable implementation, investigations and regression tests on GitHub.
+
+**YOUR FIRST RESPONSIBILITY IS TO RECOVER AND FINISH THAT WORK — NOT REPEAT THEIR INVESTIGATIONS OR BUILD ANOTHER SYSTEM.**
+
+Your sole product assignment is GateQ, including necessary performance, reliability and security improvements within GateQ.
+
+Do not work on Q Pitch. Another agent owns that product.
+
+---
+
+## 1. Critical recovery information
+
+The following was externally verified immediately before this handoff. Refresh it against GitHub before editing.
+
+**Production**
+- Branch: `recovery/2026-09-12`
+- SHA: `5ce3d76b871fd682ac9e8abb02cc057bce3676b9`
+- Existing investor discovery, company analysis, findings and comparison journey passed on production.
+
+**Integration**
+- Branch: `build/int-rc`
+- SHA: `be2ab28a4377d02db89c610ce1c218e80de60263`
+
+**Claude's GateQ backend**
+- Branch: `claude/gateq-interview-backend`
+- SHA: `0552c4f73edf868198a02ee614b7bd359e7b6167`
+- Four commits containing durable interview turns, contact verification, coverage, deterministic dossiers, migrations, routes and tests.
+- NOT merged into integration or production.
+
+**First Codex account's preserved QA work**
+- Branch: `codex/gateq-independent-qa`
+- SHA: `f03c963c20fa2f204ac9bc842b9f63bb8c5d4e34`
+- Eight commits ahead of Claude's backend branch when last verified.
+- Contains the complete recovered backend baseline plus additional independent test and handoff work.
+- Important files:
+  - `packages/gateq-intake/test/conversation-concurrency.qa.test.ts`
+  - `scripts/handoff/live/gateq-acceptance.mjs`
+  - Changes to the established `docs/ai-handoff/` files.
+- No successful CI or completed production repair was established for that QA branch.
+
+**Q Pitch specification and GateQ guest upload ADR**
+- PR #65: https://github.com/neo1415/q/pull/65
+- Contains the canonical Q Pitch blueprint and proposed ADR 0067 for guest application-scoped documents.
+- Last observed OPEN, pending CI.
+- Do not take ownership of Q Pitch.
+- Read ADR 0067 for GateQ guest uploads after confirming its latest approval status.
+
+### How to recover
+
+1. Inspect your current checkout for uncommitted changes. Never discard another session's work.
+2. Fetch the remote branches.
+3. Verify the QA branch includes Claude's backend commits and inspect its diff from integration.
+4. Continue on a NEW isolated branch based on the latest verified QA branch, unless an existing active GateQ repair branch already contains newer correct work.
+5. Preserve the original branches unchanged.
+6. Do not cherry-pick the same backend implementation twice or merge unrelated work.
+
+Use an appropriate branch such as:
+
+`codex/gateq-completion-recovery`
+
+The exact branch name matters less than preserving every existing commit.
+
+## 2. Read only the necessary governing documents
+
+Start with:
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `docs/ai-handoff/START-HERE.md`
+- `docs/ai-handoff/ACTIVE-TASKS.md`
+- `docs/ai-handoff/STATE.md`
+- `docs/ai-handoff/session-directives/2026-10-13-gateq-adaptive-interview-and-inbox.txt`
+
+Read the relevant locked PADL, product specification, GateQ source documents, ADRs and existing code before changing architectural decisions.
+
+Use the established authority hierarchy.
+
+Do not repeatedly load enormous handoff files into context if their relevant sections already establish the current state.
+
+Do not repeat broad architectural research already completed unless you encounter a specific unresolved conflict.
+
+## 3. IMPORTANT — change how this task is executed
+
+The previous Codex account launched backend, frontend, performance, evidence and QA agents almost simultaneously, then exhausted its allowance before completing the implementation.
+
+**DO NOT REPEAT THIS.**
+
+For the initial repair, use one primary coding agent.
+
+Avoid launching multiple expensive coding subagents. Delegate only genuinely independent, bounded work when necessary and when the remaining usage budget permits it.
+
+Work in small executable slices:
+
+**Inspect → Reproduce → Fix → Test → Commit → Push → Continue.**
+
+Do not wait until the entire GateQ feature is complete before committing.
+
+After each completed slice:
+- Run its focused tests.
+- Commit the implementation and regression coverage.
+- Push the branch immediately.
+- Record a concise result and remaining work.
+
+Use the full CI suite at meaningful integration checkpoints rather than repeatedly running it after every small edit.
+
+Keep progress messages concise. Spend execution resources on working code.
+
+Do not stop after writing another plan. Begin repairing the existing implementation.
+
+---
+
+## 4. FIRST PRIORITY — repair the four reproduced backend problems
+
+The previous account reported these findings:
+
+### Defect A — insecure email-code verification
+
+The existing six-digit verification code is stored using an application-bound but unkeyed SHA-256 hash.
+
+The previous investigation identified potential offline enumeration if the database is exposed.
+
+Inspect the existing code and implement a secure solution using the established project's authentication/verification infrastructure wherever possible.
+
+If a keyed verifier is needed:
+- Use a properly scoped server-side secret.
+- Never expose it to clients or commit it.
+- Preserve existing verification semantics.
+- Explicitly report any additional environment variable and exact setup before deployment.
+
+Test expiry, invalid codes, replay, brute-force protection and successful confirmation.
+
+### Defect B — resend resets attempt limits
+
+Repeated code issuance reportedly resets verification attempts.
+
+Repair this so resend cannot reset the effective abuse budget.
+
+Enforce appropriate application-, session- and destination-scoped throttling, including concurrent attempts and server-instance boundaries as applicable.
+
+Do not simply add a frontend timer.
+
+### Defect C — final interview turn races submission
+
+The previous inspection found that submission can race the final interview turn.
+
+Ensure submission freezes one logically consistent version of:
+
+- Submitted facts
+- Interview transcript
+- Associated authorized documents
+- Coverage
+- Qualification
+- Contact information
+- Investor dossier
+
+Use the existing transaction and locking conventions.
+
+A turn started during finalization must have defined, deterministic behavior. It must not silently appear outside the frozen submission while influencing its facts or dossier.
+
+Test the race explicitly.
+
+### Defect D — duplicate model calls on concurrent retry
+
+Independent QA reportedly reproduced multiple model calls for the same applicant exchange when simultaneous retries arrive.
+
+Reuse the new regression tests.
+
+Make the exchange lifecycle properly idempotent across concurrent requests and process instances, including provider failures, abandoned attempts and recovery.
+
+Do not solve this only by placing a mutex in one Node.js process.
+
+A retry must not create duplicate transcript turns, duplicate facts or unnecessary repeated model spending.
+
+### First delivery checkpoint
+
+Complete these four repairs and publish a focused PR with:
+
+- Actual code fixes
+- Regression tests
+- Targeted test results
+- Migration impact
+- Known remaining risks
+
+Do not merge or deploy until the relevant protected checks are satisfied.
+
+**Do not spend the whole session on these issues if they are resolved. Continue to the remaining GateQ product work.**
+
+---
+
+## 5. SECOND PRIORITY — complete the GateQ user experience
+
+Once the backend is safe, implement the actual application-to-dossier journey through the EXISTING web interfaces.
+
+Required journey:
+
+**Contact confirmation → Application form → Published gateway qualification → Q interview → Evidence collection → Founder review → Explicit submission → Investor dossier → Human review.**
+
+The original form submitted directly to the investor without a complete interview step.
+
+Repair that flow.
+
+### Founder and guest experience
+
+Use Capital Q's established visual system.
+
+The application should feel conversational, professional and fast.
+
+Requirements:
+
+- Confirm founder/contact identity through the correct existing account or guest workflow.
+- Show the investor's published application requirements.
+- Collect structured company information.
+- Transition naturally into the adaptive Q interview.
+- Maintain the full durable interview transcript.
+- Resume an interrupted interview without duplicating work.
+- Show progressive coverage without turning the interview into a rigid checklist.
+- Ask context-aware investment questions and targeted follow-ups.
+- Distinguish unknown, declined, stated and supported information.
+- Allow the founder to inspect answers, evidence gaps and disclosure choices.
+- Require explicit Submit.
+
+Q must behave like an intelligent investment analyst, not a static questionnaire.
+
+### Secure documents
+
+Review proposed ADR 0067 and existing Evidence infrastructure.
+
+Implement authenticated-founder document sharing and application-scoped guest uploads using the approved ownership design.
+
+Do not create fake organization memberships.
+
+Preserve quarantine, file validation, malware scanning, permissions, extraction, confidence and document-source lineage.
+
+Q should genuinely use authorized document content when interviewing the founder.
+
+Do not allow submitted documents to inject instructions into Q.
+
+Document disclosure remains controlled by the applicant's explicit submission.
+
+### Investor dossier
+
+Reuse Claude's deterministic dossier implementation.
+
+Then integrate the existing Q intelligence for a separate, clearly nonbinding analysis with source-linked:
+
+- Investment proposition
+- Strengths and opportunities
+- Business model and traction
+- Financial risks
+- Contradictions
+- Unsupported claims
+- Evidence gaps
+- Diligence questions
+- Mandate relevance
+
+Preserve immutable submitted facts.
+
+Do not introduce a new GateQ score or change the locked InvestIQ methodology.
+
+Make the existing GateQ inbox useful: it should show a clear executive summary, evidence status, relevant documents, findings, unanswered questions, transcript and human-review actions.
+
+Never create a second inbox or a parallel source of truth.
+
+## 6. THIRD PRIORITY — GateQ performance improvements
+
+Optimize the exact workflow you implement.
+
+Measure:
+
+- First useful interview response
+- Full model completion time
+- Model calls per exchange
+- Duplicate/retried model calls
+- Input/output tokens and cache behavior
+- Interview resume latency
+- Document processing/readiness
+- Submission-to-dossier visibility
+- Browser interaction responsiveness
+
+Fix verified bottlenecks without weakening correctness or reducing the substance of investment findings.
+
+Reuse existing Q orchestration, model gateway, retrieval, streaming, context caching and voice contracts.
+
+Do not embark on unrelated platform-wide performance rewrites.
+
+Text-first completion remains the critical path. Voice adaptation should reuse existing Q infrastructure and be measured separately.
+
+No unauthorized Tavus minutes, new subscriptions or paid tests.
+
+## 7. Integration and safety constraints
+
+Capital Q is an institutional investment intelligence system.
+
+Preserve:
+
+- The locked PADL and modular architecture.
+- One canonical company and investor organization.
+- Correct canonical company-investor relationships.
+- Person ≠ Organisation ≠ Membership.
+- Server-side authorization and Supabase RLS.
+- Context Firewall between founder, investor, organization and shared information.
+- Provenance, confidence and source time.
+- Human approval for consequential actions.
+- Existing versioned contracts and typed trust boundaries.
+- Deterministic GateQ qualification separate from Q's opinions.
+
+Do not introduce competing architectures, rewrite existing Q orchestration, replace vendors unnecessarily or create a separate interview intelligence system.
+
+Do not modify Q Pitch's scene engine, scripts, blueprint, presentation architecture or certification manifest.
+
+Avoid touching another active agent's branch.
+
+## 8. Verification and release
+
+Before declaring a slice complete, run relevant tests and inspect the actual diff.
+
+For final GateQ acceptance, demonstrate BOTH authenticated-founder and guest applicant flows in a real browser.
+
+Verify:
+
+- Contact confirmation and gateway restrictions.
+- Intelligent multistep interviewing.
+- No duplicate model calls under concurrent retries.
+- Safe final-turn/submission concurrency.
+- Secure document evidence and useful follow-ups.
+- Proper session resumption.
+- Founder review and actual submission.
+- One correct immutable investor dossier.
+- Evidence-linked Q synthesis.
+- Human investor review.
+- Negative permission and cross-tenant tests.
+- Malicious document/prompt-injection handling.
+- Failure handling and browser responsiveness.
+
+Run applicable lint, formatting, typecheck, tests, build, pgTAP, migrations, security checks and full browser acceptance.
+
+Use protected PR and release workflows.
+
+Never claim production success based only on code compilation.
+
+Verify deployed SHAs, hosted migrations and actual authenticated user behavior.
+
+Preserve the existing production investor journey as a regression gate.
+
+## 9. Preserve progress before hitting another usage limit
+
+You are working under a potentially constrained execution allowance.
+
+Therefore:
+
+- Prioritize repairs over analysis.
+- Push verified work frequently.
+- Do not create unnecessary subagents.
+- Do not run repeated, expensive repository-wide investigations.
+- Save meaningful progress in Git, not merely your private session context.
+- Record the latest exact branch/commit and remaining work in the established handoff docs.
+- Never leave valuable completed work only in an inaccessible cloud worktree.
+
+If your execution capacity becomes insufficient, preserve all changed files and honest test status in a clearly marked WIP branch before stopping, without claiming unverified success.
+
+## 10. Begin execution
+
+Your immediate assignment:
+
+**Recover `codex/gateq-independent-qa`, reproduce the four identified backend defects, repair them, test and push the fixes.**
+
+Then continue the actual founder interview and investor dossier interfaces, followed by secure documents and measured optimization.
+
+Use small, testable vertical slices. Do not start five simultaneous coding agents.
+
+Your success is measured by shipped, independently verified GateQ behavior—not how many files you inspected, agents you launched or plans you wrote.
+
+**START NOW.**

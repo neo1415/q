@@ -164,6 +164,51 @@ export type StoredTurn = {
  * twice for one client turn id is written once.
  */
 export type ApplicationTurnRepository = {
+  readonly readOutcome: (
+    applicationId: ApplicationId,
+    claimId: string,
+  ) => Promise<unknown>;
+  readonly checkpointOutcome: (
+    applicationId: ApplicationId,
+    claimId: string,
+    outcome: unknown,
+  ) => Promise<void>;
+  readonly claimExchange: (input: {
+    readonly applicationId: ApplicationId;
+    readonly tenantId: string;
+    readonly clientTurnId: string;
+    readonly text: string;
+    /** Server-owned openings have no applicant utterance to record. */
+    readonly recordPerson?: boolean | undefined;
+  }) => Promise<string | null>;
+  readonly assertClaim: (
+    tx: TransactionContext,
+    applicationId: ApplicationId,
+    claimId: string,
+  ) => Promise<boolean>;
+  readonly releaseExchange: (
+    applicationId: ApplicationId,
+    claimId: string,
+  ) => Promise<void>;
+  readonly finishExchange: (
+    tx: TransactionContext,
+    applicationId: ApplicationId,
+    claimId: string,
+  ) => Promise<void>;
+  readonly pendingFor: (applicationId: ApplicationId) => Promise<boolean>;
+  readonly appendInTransaction: (
+    tx: TransactionContext,
+    input: {
+      readonly applicationId: ApplicationId;
+      readonly tenantId: string;
+      readonly role: "PERSON" | "Q";
+      readonly text: string;
+      readonly clientTurnId: string;
+      readonly askingDimension?: ApplicationDimension | null | undefined;
+      readonly intent?: string | null | undefined;
+      readonly latencyMs?: number | null | undefined;
+    },
+  ) => Promise<void>;
   /** Oldest first. `limit` keeps the newest that many. */
   readonly listFor: (
     applicationId: ApplicationId,
@@ -215,42 +260,46 @@ export type StoredContact = {
 
 /** One contact per application (GateQ slice 1). */
 export type ApplicationContactRepository = {
+  readonly issue: (
+    input: Parameters<ApplicationContactRepository["save"]>[0] & {
+      readonly sessionId: string;
+      readonly destinationHash: string;
+      readonly maximumAttempts: number;
+    },
+  ) => Promise<StoredContact>;
+  readonly verify: (input: {
+    readonly applicationId: ApplicationId;
+    readonly sessionId: string;
+    readonly destinationHash: string;
+    readonly expectedCodeHash: string;
+    readonly candidateHash: string;
+    readonly at: string;
+    readonly maximumAttempts: number;
+  }) => Promise<{
+    readonly status: "CONFIRMED" | "WRONG_CODE" | "EXPIRED" | "NOT_FOUND";
+    readonly contact: StoredContact | null;
+  }>;
   readonly findFor: (
     applicationId: ApplicationId,
   ) => Promise<StoredContact | null>;
   /**
    * Insert or replace the details. A changed email loses its confirmation;
-   * attempts reset whenever a new code is issued.
+   * Resending never resets the current verification abuse window.
    */
-  readonly save: (
-    tx: TransactionContext,
-    input: {
-      readonly applicationId: ApplicationId;
-      readonly tenantId: string;
-      readonly name: string;
-      readonly email: string;
-      readonly role: string;
-      readonly companyName: string;
-      readonly phone: string | null;
-      readonly preferredChannel: ContactChannel | null;
-      readonly codeHash: string | null;
-      readonly codeExpiresAt: string | null;
-      readonly emailConfirmedAt: string | null;
-      readonly confirmedVia: "EMAIL_CODE" | "ACCOUNT" | null;
-    },
-  ) => Promise<StoredContact>;
-  readonly recordFailedAttempt: (
-    tx: TransactionContext,
-    applicationId: ApplicationId,
-  ) => Promise<void>;
-  readonly confirm: (
-    tx: TransactionContext,
-    input: {
-      readonly applicationId: ApplicationId;
-      readonly at: string;
-      readonly via: "EMAIL_CODE" | "ACCOUNT";
-    },
-  ) => Promise<StoredContact | null>;
+  readonly save: (input: {
+    readonly applicationId: ApplicationId;
+    readonly tenantId: string;
+    readonly name: string;
+    readonly email: string;
+    readonly role: string;
+    readonly companyName: string;
+    readonly phone: string | null;
+    readonly preferredChannel: ContactChannel | null;
+    readonly codeHash: string | null;
+    readonly codeExpiresAt: string | null;
+    readonly emailConfirmedAt: string | null;
+    readonly confirmedVia: "EMAIL_CODE" | "ACCOUNT" | null;
+  }) => Promise<StoredContact>;
 };
 
 /** Titles of Evidence-owned documents, by id. Display only. */

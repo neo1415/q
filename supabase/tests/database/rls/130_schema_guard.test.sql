@@ -32,7 +32,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 
 create temporary table guarded_schemas (schema_name text primary key) on commit drop;
-insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation'), ('billing'), ('integrations');
+insert into guarded_schemas values ('identity'), ('permissions'), ('events'), ('audit'), ('core'), ('network'), ('taxonomy'), ('onboarding'), ('evidence'), ('media'), ('q_runtime'), ('ai_ops'), ('q_knowledge'), ('recommendation'), ('billing'), ('integrations'), ('gateq');
 
 create temporary table rls_inventory (
   schema_name text not null,
@@ -286,6 +286,29 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('recommendation', 'interaction_state',      'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_contacts', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_documents', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_facts', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_founders', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_sessions', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_submissions', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_turns', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'applications', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'contact_verification_limits', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'gateway_criteria', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'gateway_versions', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'gateways', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'inbox_activity', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'inbox_item_labels', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'inbox_items', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'inbox_labels', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'inbox_messages', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'inbox_notes', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'inbox_settings', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'inbox_user_state', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'pass_reasons', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'policy_extractions', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'startup_alerts', 'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'security_events',             'INTERNAL_SERVER_ONLY', '{}');
 
 select plan(12);
