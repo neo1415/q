@@ -1,3 +1,7 @@
+## H2 execution update — 14 October, 23:30 WAT
+
+Native H2 is production-verified in all four role/device cases. Q repair source101 f2b6ce5d / CI38647138262 and production candidate102 83b1def3 / CI38647145307 remain gated. Prior source comparison-manifest race fixed with waitFor, exact assertions retained (9 tests PASS); prior candidate all-green is not a waiver. Root owns integration/deploy/full browser replay. Isolated pr98_ci_fix worker owns only packages/q-tools/test/capability-harness.test.ts on codex/gateq-pr98-capability-fixture-oct14 from current PR98 head8027487a; preserve originalalternativeef515bc6. No source98/97 in H2. See STATE and HUB-H2-LIVE-ACCEPTANCE-2026-10-14.md.
+
 # Active tasks — authoritative cross-model board
 
 ## Current mandatory H2 gate
