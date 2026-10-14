@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## Active execution — October14, 18:50 WAT
+
+Investor-Q failure is reproduced on an authorized frozen submitted application: identity-only Q response with unavailable content is FAIL. Existing read/tool repair underway; root owns browser driver and handoff, Q lane owns source contracts/hydration. Claim92 merged d2c259d2 after full exact CI; release94/98bd8cb7 CI38608939221 pending quality, no live proof. Canonical H2 recovered from2d9dfa1e; export active-org and cross-page selection defects being repaired separately, no migration/production claim. Guest Evidence remains next after these immediate slices. STATE top is current authority; historical entries below are preserved.
+
 ## Latest continuation priorities
 
 Description90 is deployed72d across four SUCCESS services; fresh description browser proof remains pending. Claim capture PR92/08cacfd4:53 builds, root/API/package types,149 suite tests and40 focused tests PASS; exact CI38601112916 quality still running, database/build/types PASS. No live adherence proof or release. Next primary implementation: exact selected-dossier manifest hydration and full authorized source payload beside the600-character receipt; no investor-Q repair exists yet. Canonical H2 pipeline2d9dfa1e and guest expiry553316c5 follow; cloud-view and product-inventory WIPs are preserved, not release-ready. STATE top supersedes historical task entries below.
