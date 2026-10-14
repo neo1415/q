@@ -200,13 +200,43 @@ export const ApplicationFactSchema = z
 export type ApplicationFact = z.infer<typeof ApplicationFactSchema>;
 
 /** What a caller proposes to record. The store assigns identity and time. */
-export const NewApplicationFactSchema = z
+/** Shape-only decoder for historical checkpoints; not permission to write a fact. */
+export const ApplicationFactProposalShapeSchema = z
   .object({
     dimension: ApplicationDimensionSchema,
     value: FactValueSchema,
     provenance: FactProvenanceSchema,
   })
   .strict();
+export const NewApplicationFactSchema =
+  ApplicationFactProposalShapeSchema.superRefine((fact, context) => {
+    // NONE is an explicit unknown/decline, never a guessed value. Other
+    // qualifying values must retain the shape the deterministic projector reads.
+    if (fact.value.kind === "NONE") return;
+    const expected: Partial<Record<ApplicationDimension, FactValue["kind"]>> = {
+      "company.country": "CODE",
+      "company.stage": "CODE",
+      "company.sector_phrases": "PHRASES",
+      "raise.amount": "AMOUNT",
+      "raise.currency": "CODE",
+    };
+    const kind = expected[fact.dimension];
+    const codeValid =
+      fact.value.kind !== "CODE" ||
+      (fact.dimension === "company.country"
+        ? /^[A-Z]{2}$/.test(fact.value.code)
+        : fact.dimension === "raise.currency"
+          ? /^[A-Z]{3}$/.test(fact.value.code)
+          : fact.dimension === "company.stage"
+            ? /^[a-z][a-z0-9_]{0,63}$/.test(fact.value.code)
+            : true);
+    if ((kind !== undefined && fact.value.kind !== kind) || !codeValid)
+      context.addIssue({
+        code: "custom",
+        path: ["value"],
+        message: "Fact value must use the dimension's canonical shape",
+      });
+  });
 export type NewApplicationFact = z.infer<typeof NewApplicationFactSchema>;
 
 // ---------------------------------------------------------------------------
