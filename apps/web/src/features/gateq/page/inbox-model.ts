@@ -67,7 +67,9 @@ export function fitGlyphFor(
 export function rulesWords(rules: GateqInboxItemDto["rules"]): string {
   if (rules.total === 0) return "Nothing checked";
   const base = `${rules.met} of ${rules.total} rules`;
-  return rules.unknown === 0 ? base : `${base}, ${rules.unknown} unanswered`;
+  return rules.unknown === 0
+    ? base
+    : `${base}, ${rules.unknown} needing clarification`;
 }
 
 export function replyWords(
@@ -140,7 +142,7 @@ export function qView(item: GateqInboxItemDto): {
   if (item.fit === "PARTIAL" || item.rules.unknown > 0) {
     return {
       lead: "Too early to say",
-      why: `${item.rules.unknown} of your rules ${item.rules.unknown === 1 ? "is" : "are"} unanswered. Unanswered isn't a no; ask them.`,
+      why: `${item.rules.unknown} of your rules ${item.rules.unknown === 1 ? "is" : "are"} not yet established. An unclear rule is not a rejection; clarify it with the founder.`,
     };
   }
   return {
