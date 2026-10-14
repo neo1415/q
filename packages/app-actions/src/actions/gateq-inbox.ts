@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { submittedReading } from "./gateq-submitted-reading.js";
 
 import {
   GATEQ_INBOX_ARCHIVE_PATH,
@@ -923,6 +924,7 @@ const SUMMARISE = defineAppAction<
           `Your gate's rules: ${out.rules.map((r) => `${r.label} ${STAND_WORDS[r.standing]}`).join("; ") || "none published"}.`,
           out.note === null ? "No note." : `Their note: "${out.note}"`,
           `Shared: ${out.shared.map((d) => d.title).join(", ") || "nothing beyond the form"}.`,
+          submittedReading(out.dossier),
           out.notes.length === 0
             ? "No team notes."
             : `Team notes: ${out.notes.map((n) => `${n.author.name}: ${n.body}`).join(" | ")}`,

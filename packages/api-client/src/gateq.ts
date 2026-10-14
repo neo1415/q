@@ -1,18 +1,23 @@
 import { z } from "zod";
 
 import {
-  ApplicationContactConfirmResponseSchema,
-  ApplicationContactResponseSchema,
-  ApplicationCoverageDtoSchema,
-  ApplicationTranscriptDtoSchema,
-  GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
-  GATEQ_APPLY_CONTACT_CONFIRM_PATH,
-  GATEQ_APPLY_CONTACT_PATH,
-  GATEQ_APPLY_COVERAGE_PATH,
-  GATEQ_APPLY_INTERVIEW_OPEN_PATH,
-  GATEQ_APPLY_TRANSCRIPT_PATH,
-  type ApplicationContactRequest,
   ApplicationTurnResponseSchema,
+  ApplicationContactRequestSchema,
+  ApplicationContactAccountRequestSchema,
+  GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+  type ApplicationContactAccountRequest,
+  ApplicationContactResponseSchema,
+  ApplicationContactConfirmResponseSchema,
+  ApplicationTranscriptDtoSchema,
+  ApplicationCoverageDtoSchema,
+  ApplicationSummaryDtoSchema,
+  GATEQ_APPLY_CONTACT_PATH,
+  GATEQ_APPLY_INTERVIEW_OPEN_PATH,
+  GATEQ_APPLY_CONTACT_CONFIRM_PATH,
+  GATEQ_APPLY_TRANSCRIPT_PATH,
+  GATEQ_APPLY_COVERAGE_PATH,
+  GATEQ_APPLY_SESSION_PATH,
+  type ApplicationContactRequest,
   ApplicationAnswersResponseSchema,
   GATEQ_APPLY_ANSWERS_PATH,
   GATEQ_APPLY_MATERIALS_PATH,
@@ -235,26 +240,19 @@ export function shareApplicationMaterials(
   );
 }
 
-// ---------------------------------------------------------------------------
-// GateQ slice 1: contact first, the durable transcript and the coverage check.
-// ---------------------------------------------------------------------------
-
-/** Anonymous: saves the applicant's contact and emails a six-digit code. */
 export function saveApplicationContact(
   baseUrl: string,
   sessionToken: string,
-  contact: ApplicationContactRequest,
+  input: ApplicationContactRequest,
 ) {
   return call(
     { baseUrl, accessToken: sessionToken },
     "POST",
     GATEQ_APPLY_CONTACT_PATH,
     ApplicationContactResponseSchema,
-    { body: contact },
+    { body: ApplicationContactRequestSchema.parse(input) },
   );
 }
-
-/** Anonymous: the code from that email. A wrong code is a status, not an error. */
 export function confirmApplicationContact(
   baseUrl: string,
   sessionToken: string,
@@ -268,26 +266,6 @@ export function confirmApplicationContact(
     { body: { code } },
   );
 }
-
-/**
- * A signed-in founder's contact. The account's own email, resolved by the
- * server from the actor (never this body), confirms a matching address
- * without a code; the guest credential travels in the body.
- */
-export function saveAccountApplicationContact(
-  session: ApiSession,
-  input: ApplicationContactRequest & { readonly sessionToken: string },
-) {
-  return call(
-    session,
-    "POST",
-    GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
-    ApplicationContactResponseSchema,
-    { body: input },
-  );
-}
-
-/** Anonymous: the interview so far, both sides, in order. */
 export function getApplicationTranscript(
   baseUrl: string,
   sessionToken: string,
@@ -299,11 +277,42 @@ export function getApplicationTranscript(
     ApplicationTranscriptDtoSchema,
   );
 }
+export function getApplicationCoverage(baseUrl: string, sessionToken: string) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "GET",
+    GATEQ_APPLY_COVERAGE_PATH,
+    ApplicationCoverageDtoSchema,
+  );
+}
+export function resumeApplication(baseUrl: string, sessionToken: string) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "GET",
+    GATEQ_APPLY_SESSION_PATH,
+    ApplicationSummaryDtoSchema,
+  );
+}
 
-/**
- * Anonymous: opens the interview. Q asks the first question when nothing
- * has been said yet; otherwise this is the transcript, with no model call.
- */
+export function confirmAccountApplicationContact(
+  session: ApiSession,
+  input: ApplicationContactAccountRequest,
+) {
+  return call(
+    session,
+    "POST",
+    GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+    ApplicationContactResponseSchema,
+    { body: ApplicationContactAccountRequestSchema.parse(input) },
+  );
+}
+
+export function saveAccountApplicationContact(
+  session: ApiSession,
+  input: ApplicationContactAccountRequest,
+) {
+  return confirmAccountApplicationContact(session, input);
+}
 export function openApplicationInterview(
   baseUrl: string,
   sessionToken: string,
@@ -313,15 +322,5 @@ export function openApplicationInterview(
     "POST",
     GATEQ_APPLY_INTERVIEW_OPEN_PATH,
     ApplicationTranscriptDtoSchema,
-  );
-}
-
-/** Anonymous: the deterministic completeness check before Submit. */
-export function getApplicationCoverage(baseUrl: string, sessionToken: string) {
-  return call(
-    { baseUrl, accessToken: sessionToken },
-    "GET",
-    GATEQ_APPLY_COVERAGE_PATH,
-    ApplicationCoverageDtoSchema,
   );
 }

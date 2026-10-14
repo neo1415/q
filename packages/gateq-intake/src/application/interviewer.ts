@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type {
   GatewayPolicy,
   PublicGateway,
@@ -14,6 +15,7 @@ import {
   personalityOf,
   renderPrompt,
   GateQInterviewerResultSchema,
+  GateQTurnIntentSchema,
   type GateQInterviewerResult,
   type GateQInterviewerVariables,
   type GateQTurnIntent,
@@ -23,6 +25,7 @@ import {
 
 import {
   APPLICATION_DIMENSIONS,
+  ApplicationDimensionSchema,
   NewApplicationFactSchema,
   type ApplicationDimension,
   type ApplicationFact,
@@ -127,6 +130,17 @@ export type InterviewTurnOutcome = {
   /** Advisory. GATE-001 decides whether submission is possible. */
   readonly readyToReview: boolean;
 };
+
+/** Persisted output is revalidated before replay, never treated as authority. */
+export const InterviewTurnOutcomeSchema = z.object({
+  reply: z.string().min(1).max(4000),
+  intent: GateQTurnIntentSchema,
+  facts: z.array(NewApplicationFactSchema).max(40),
+  rejectedFacts: z.number().int().nonnegative(),
+  asking: ApplicationDimensionSchema.nullable(),
+  questionForQ: z.string().nullable(),
+  readyToReview: z.boolean(),
+});
 
 /**
  * What the applicant gets when the model is unavailable (§38).
@@ -381,7 +395,21 @@ export function createGateQInterviewer(
           rejected += 1;
           continue;
         }
-        facts.push(parsed.data);
+        const current = input.application?.facts.find(
+          (fact) =>
+            fact.dimension === parsed.data.dimension &&
+            fact.supersededAt === null &&
+            fact.provenance === "DOCUMENT_SUPPORTED" &&
+            JSON.stringify(fact.value) === JSON.stringify(parsed.data.value),
+        );
+        // A model cannot mint evidence support. New document-derived values
+        // need the authorized Evidence confirmation path and exact lineage.
+        facts.push(
+          parsed.data.provenance === "DOCUMENT_SUPPORTED" &&
+            current === undefined
+            ? { ...parsed.data, provenance: "APPLICANT_PROVIDED" }
+            : parsed.data,
+        );
       }
 
       const asking =

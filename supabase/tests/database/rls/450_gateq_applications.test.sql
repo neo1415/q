@@ -176,7 +176,7 @@ select is(
          where table_schema = 'gateq' order by 1),
   array['application_contacts', 'application_documents', 'application_facts', 'application_founders',
         'application_sessions', 'application_submissions', 'application_turns', 'applications',
-        'gateway_criteria', 'gateway_versions', 'gateways',
+        'contact_verification_limits', 'gateway_criteria', 'gateway_versions', 'gateways',
         'inbox_activity', 'inbox_item_labels', 'inbox_items', 'inbox_labels',
         'inbox_messages', 'inbox_notes', 'inbox_settings', 'inbox_user_state',
         'pass_reasons', 'policy_extractions', 'startup_alerts']::text[],

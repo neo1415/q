@@ -8,8 +8,10 @@ import {
   type RefObject,
 } from "react";
 
+import { ApplicationContactDtoSchema } from "@capital-q/contracts";
 import type {
   ApplicationSummaryDto,
+  ApplicationCoverageDto,
   PublicGatewayDto,
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
@@ -27,9 +29,13 @@ import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import {
   applicationTurnAction,
+  contactAction,
+  confirmContactAction,
+  interviewProgressAction,
   startApplicationAction,
   submitApplicationAction,
 } from "./apply-actions";
+import { readRecovery, amendRecovery } from "./form/session-recovery";
 import {
   criterionLines,
   mayShare,
@@ -45,15 +51,12 @@ import {
  * Sharing is a separate, explicit choice at the end: until the founder
  * presses Share, the investor receives nothing (the API's submission is
  * the disclosure boundary). The session token lives only in this page's
- * memory; the embed is a third-party frame, so there is no cookie to lean on.
+ * memory in the fit-check preview. The form interview also recovers it from
+ * gateway-scoped sessionStorage; embeds need no third-party cookie.
  */
 
 type Line = { readonly from: "Q" | "YOU"; readonly text: string };
 
-/**
- * The conversation, in order. Shared with the GateQ form's interview step
- * (slice 1), so the fit check and the interview read the same.
- */
 export function ChatTranscript({
   lines,
   thinking,
@@ -181,6 +184,25 @@ export type ApplyPreview = {
   readonly consenting?: boolean;
 };
 
+async function applicantRequest<T>(operation: () => Promise<T>): Promise<
+  | T
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly rateLimited?: boolean;
+    }
+> {
+  try {
+    return await operation();
+  } catch {
+    return {
+      ok: false,
+      message:
+        "The connection was interrupted. Your application is still here; please try again.",
+    };
+  }
+}
+
 function key(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
@@ -276,18 +298,37 @@ export function ApplyExperience({
   gateway,
   compact = false,
   preview,
+  initialSession,
+  onCorrectAnswers,
+  prepareSubmission,
 }: {
   readonly gateway: PublicGatewayDto;
   /** Inside someone else's page: a panel, not a page. */
   readonly compact?: boolean;
   readonly preview?: ApplyPreview;
+  readonly initialSession?: {
+    readonly token: string;
+    readonly application: ApplicationSummaryDto;
+    readonly contactName: string;
+    readonly contactEmail: string;
+    readonly companyName: string;
+    readonly materialNames?: readonly string[];
+  };
+  readonly onCorrectAnswers?: () => void;
+  readonly prepareSubmission?: () => Promise<
+    { readonly ok: true } | { readonly ok: false; readonly message: string }
+  >;
 }) {
   const fund = gateway.organisationDisplayName;
-  const [token, setToken] = useState<string | null>(null);
-  const [stage, setStage] = useState<Stage>(preview?.stage ?? "INTRO");
+  const [token, setToken] = useState<string | null>(
+    initialSession?.token ?? null,
+  );
+  const [stage, setStage] = useState<Stage>(
+    preview?.stage ?? (initialSession === undefined ? "INTRO" : "TALKING"),
+  );
   const [lines, setLines] = useState<readonly Line[]>(preview?.lines ?? []);
   const [application, setApplication] = useState<ApplicationSummaryDto | null>(
-    preview?.application ?? null,
+    preview?.application ?? initialSession?.application ?? null,
   );
   const [draft, setDraft] = useState("");
   const [problem, setProblem] = useState<Problem | null>(
@@ -303,6 +344,79 @@ export function ApplyExperience({
   const input = useRef<HTMLTextAreaElement>(null);
   const lastTurn = useRef<{ id: string; text: string } | null>(null);
 
+  const interview = initialSession !== undefined;
+  const [coverage, setCoverage] = useState<ApplicationCoverageDto | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [contactName, setContactName] = useState(
+    initialSession?.contactName ?? "",
+  );
+  const [contactEmail, setContactEmail] = useState(
+    initialSession?.contactEmail ?? "",
+  );
+  const [companyName, setCompanyName] = useState(
+    initialSession?.companyName ?? "",
+  );
+  const [role, setRole] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [loaded, setLoaded] = useState(!interview);
+  const submitKey = useRef("");
+  const [submissionStarted, setSubmissionStarted] = useState(false);
+  const [unconfirmedTurn, setUnconfirmedTurn] = useState(false);
+
+  const loadProgress = async () => {
+    if (token === null) return false;
+    const result = await applicantRequest(() => interviewProgressAction(token));
+    if (!result.ok) {
+      setProblem({
+        message: result.message,
+        rateLimited: result.rateLimited === true,
+      });
+      return false;
+    }
+    setApplication(result.application);
+    setCoverage(result.coverage);
+    setConfirmed(result.coverage.contact.confirmed);
+    const contactRead = ApplicationContactDtoSchema.safeParse(
+      Reflect.get(result.coverage.contact, "details"),
+    );
+    const savedContact = contactRead.success ? contactRead.data : null;
+    if (savedContact) {
+      setContactName(savedContact.name);
+      setContactEmail(savedContact.email);
+      setCompanyName(savedContact.companyName);
+      setRole(savedContact.role);
+    }
+    setLines(
+      result.transcript.turns.map((turn) => ({
+        from: turn.role === "Q" ? "Q" : "YOU",
+        text: turn.text,
+      })),
+    );
+    if (result.application.submittedAt !== null) setStage("SHARED");
+    return true;
+  };
+  useEffect(() => {
+    if (!interview) return;
+    const recovered = readRecovery(gateway.publicId);
+    lastTurn.current = recovered?.pendingTurn ?? null;
+    submitKey.current = recovered?.submitKey ?? "";
+    setSubmissionStarted(submitKey.current !== "");
+    setUnconfirmedTurn(lastTurn.current !== null);
+    startTransition(async () => {
+      await loadProgress();
+      setLoaded(true);
+      if (lastTurn.current !== null)
+        setProblem({
+          message:
+            "Your last answer needs confirmation. Retry it to recover Q's reply.",
+          rateLimited: false,
+        });
+    });
+    // One restoration per credential, never a new application.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, interview]);
+
   const scroll = () =>
     requestAnimationFrame(() => end.current?.scrollIntoView({ block: "end" }));
 
@@ -314,7 +428,7 @@ export function ApplyExperience({
 
   const answered = lines.filter((line) => line.from === "YOU").length;
   const verdict =
-    stage === "INTRO" || answered === 0 || revising
+    interview || stage === "INTRO" || answered === 0 || revising
       ? null
       : verdictOf(application, stage === "STOPPED");
   const criteria = criterionLines(gateway, application);
@@ -355,15 +469,20 @@ export function ApplyExperience({
     if (token === null) return;
     startTransition(async () => {
       setProblem(null);
-      const result = await applicationTurnAction(token, text, turnId);
+      const result = await applicantRequest(() =>
+        applicationTurnAction(token, text, turnId),
+      );
       if (!result.ok) {
         fail(result);
         return;
       }
       lastTurn.current = null;
+      setUnconfirmedTurn(false);
+      if (interview) amendRecovery(gateway.publicId, { pendingTurn: null });
       setRevising(false);
       setApplication(result.application);
-      if (result.reply !== null) {
+      if (interview) await loadProgress();
+      else if (result.reply !== null) {
         const reply = result.reply;
         setLines((current) => [...current, { from: "Q", text: reply }]);
       }
@@ -373,7 +492,8 @@ export function ApplyExperience({
 
   const send = () => {
     const text = draft.trim();
-    if (token === null || text === "" || pending) return;
+    if (token === null || text === "" || pending || lastTurn.current !== null)
+      return;
     setDraft("");
     setStage("TALKING");
     setLines((current) => [...current, { from: "YOU", text }]);
@@ -381,6 +501,8 @@ export function ApplyExperience({
     // with the first answer instead of running a second turn.
     const turn = { id: key("turn"), text };
     lastTurn.current = turn;
+    setUnconfirmedTurn(true);
+    if (interview) amendRecovery(gateway.publicId, { pendingTurn: turn });
     scroll();
     sendText(turn.text, turn.id);
   };
@@ -389,6 +511,13 @@ export function ApplyExperience({
     const turn = lastTurn.current;
     if (turn !== null) sendText(turn.text, turn.id);
     else if (token === null) start();
+    else if (interview && stage === "STOPPED" && submitKey.current !== "")
+      share();
+    else if (interview)
+      startTransition(async () => {
+        setProblem(null);
+        await loadProgress();
+      });
     else setProblem(null);
   };
 
@@ -396,7 +525,36 @@ export function ApplyExperience({
     startTransition(async () => {
       if (token === null) return;
       setProblem(null);
-      const result = await submitApplicationAction(token, key("share"));
+      // A lost receipt may mean Submit already succeeded. Recover it before
+      // repeating the legacy materials attachment, which locks on submission.
+      if (interview && submitKey.current !== "") {
+        const restored = await applicantRequest(() =>
+          interviewProgressAction(token),
+        );
+        if (!restored.ok) {
+          fail(restored);
+          return;
+        }
+        if (restored.application.submittedAt !== null) {
+          setApplication(restored.application);
+          setStage("SHARED");
+          return;
+        }
+      }
+      if (submitKey.current === "") submitKey.current = key("share");
+      setSubmissionStarted(true);
+      if (interview)
+        amendRecovery(gateway.publicId, { submitKey: submitKey.current });
+      if (prepareSubmission !== undefined) {
+        const prepared = await applicantRequest(prepareSubmission);
+        if (!prepared.ok) {
+          fail(prepared);
+          return;
+        }
+      }
+      const result = await applicantRequest(() =>
+        submitApplicationAction(token, submitKey.current),
+      );
       if (!result.ok) {
         fail(result);
         return;
@@ -432,7 +590,7 @@ export function ApplyExperience({
             {fund}
           </span>
           <span className="cq-caption text-(--cq-text-tertiary)">
-            Fit check with Q
+            {interview ? "Founder interview with Q" : "Fit check with Q"}
           </span>
         </div>
       </div>
@@ -497,29 +655,107 @@ export function ApplyExperience({
   );
 
   const transcript = (
-    <ChatTranscript
-      lines={lines}
-      thinking={pending && stage !== "INTRO"}
-      endRef={end}
-    />
+    <ol
+      className="flex flex-col gap-3"
+      aria-live="polite"
+      aria-busy={pending}
+      aria-label="Conversation with Q"
+    >
+      {lines.map((line, index) => (
+        <li
+          // The conversation only grows; its order is its identity.
+          key={index}
+          className={
+            line.from === "YOU"
+              ? "cq-body max-w-[85%] self-end rounded-2xl bg-(--cq-surface-raised) px-4 py-2 text-(--cq-text-primary)"
+              : "flex max-w-[92%] items-start gap-2.5 self-start"
+          }
+        >
+          {line.from === "YOU" ? (
+            line.text
+          ) : (
+            <>
+              <span className="mt-0.5 shrink-0" aria-hidden="true">
+                <QSwarm state="IDLE" pixels={24} />
+              </span>
+              <span className="cq-body whitespace-pre-line text-(--cq-text-primary)">
+                <span className="sr-only">Q: </span>
+                {line.text}
+              </span>
+            </>
+          )}
+        </li>
+      ))}
+      {pending && stage !== "INTRO" ? (
+        <li className="flex items-center gap-2.5 self-start" role="status">
+          <QSwarm state="THINKING" pixels={32} />
+          <span className="cq-caption text-(--cq-text-tertiary)">
+            Q is thinking
+          </span>
+        </li>
+      ) : null}
+      <div ref={end} />
+    </ol>
   );
 
   const composer = (
     <div className="flex flex-col gap-1">
-      <ChatComposer
-        inputRef={input}
-        value={draft}
-        onChange={setDraft}
-        onSend={send}
-        pending={pending}
-      />
+      <form
+        className="flex items-end gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          send();
+        }}
+      >
+        <textarea
+          ref={input}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              send();
+            }
+          }}
+          rows={1}
+          maxLength={2000}
+          aria-label="Your answer"
+          placeholder="Answer, or paste a link"
+          className="cq-body min-h-11 flex-1 resize-none rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+        />
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={pending || draft.trim() === "" || unconfirmedTurn}
+        >
+          Send
+        </Button>
+      </form>
+      {interview ? (
+        <Button
+          variant="quiet"
+          onClick={() => setStage("DECLINED")}
+          disabled={pending}
+        >
+          Pause interview
+        </Button>
+      ) : null}
       {answered > 0 ? (
         <button
           type="button"
-          onClick={() => setStage("STOPPED")}
+          onClick={() => {
+            setStage("STOPPED");
+            if (interview)
+              startTransition(async () => {
+                setProblem(null);
+                await loadProgress();
+              });
+          }}
           className="cq-caption min-h-11 self-start text-(--cq-text-secondary) underline-offset-4 hover:underline"
         >
-          That&apos;s all I can share for now
+          {interview
+            ? "Review my application"
+            : "That’s all I can share for now"}
         </button>
       ) : null}
     </div>
@@ -619,7 +855,7 @@ export function ApplyExperience({
           {application === null || application.reference === ""
             ? ""
             : ` (reference ${application.reference})`}
-          . They review every one; you don&apos;t need an account.
+          . The investment team may contact you through your confirmed email.
         </p>
       </section>
     ) : stage === "DECLINED" ? (
@@ -653,7 +889,7 @@ export function ApplyExperience({
           <p className="cq-body-sm text-(--cq-text-primary)">
             {problem.message}
           </p>
-          {problem.rateLimited ? null : (
+          {problem.rateLimited && !interview ? null : (
             <div>
               <Button size="compact" variant="secondary" onClick={retry}>
                 <RotateCw
@@ -670,10 +906,266 @@ export function ApplyExperience({
     );
 
   const showComposer =
-    (stage === "TALKING" || stage === "STOPPED") && verdict === null;
+    (stage === "TALKING" || (!interview && stage === "STOPPED")) &&
+    verdict === null &&
+    (!interview || (confirmed && loaded));
+
+  const contactPanel = (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (token === null || pending) return;
+        startTransition(async () => {
+          setProblem(null);
+          const result = await applicantRequest(() =>
+            contactAction(token, {
+              name: contactName,
+              email: contactEmail,
+              companyName,
+              role,
+            }),
+          );
+          if (!result.ok) {
+            fail(result);
+            return;
+          }
+          setConfirmed(result.contact.emailConfirmed);
+          setCodeSent(result.codeSent);
+          if (!result.codeSent && !result.contact.emailConfirmed)
+            fail({
+              message:
+                "The confirmation email couldn't be sent. Check your address and try again.",
+            });
+        });
+      }}
+    >
+      <h1 className="cq-title-lg">Confirm your contact details</h1>
+      <p className="cq-body text-(--cq-text-secondary)">
+        Your application is for {fund}. Nothing is submitted until you review it
+        and press Submit.
+      </p>
+      {(
+        [
+          ["Full name", contactName, setContactName],
+          ["Company", companyName, setCompanyName],
+          ["Role", role, setRole],
+          ["Email", contactEmail, setContactEmail],
+        ] as const
+      ).map(([label, value, update]) => (
+        <label key={label} className="cq-body-sm flex flex-col gap-1">
+          {label}
+          <input
+            required
+            type={label === "Email" ? "email" : "text"}
+            value={value}
+            maxLength={label === "Email" ? 254 : label === "Role" ? 120 : 200}
+            onChange={(event) => {
+              update(event.target.value);
+              setCodeSent(false);
+            }}
+            className="min-h-11 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-3"
+          />
+        </label>
+      ))}
+      <Button type="submit" disabled={pending}>
+        {pending
+          ? "Sending…"
+          : codeSent
+            ? "Send a new code"
+            : "Send confirmation code"}
+      </Button>
+      {codeSent ? (
+        <>
+          <label className="cq-body-sm flex flex-col gap-1">
+            Email confirmation code
+            <input
+              value={code}
+              onChange={(event) =>
+                setCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))
+              }
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              className="min-h-11 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-3"
+            />
+          </label>
+          <Button
+            type="button"
+            disabled={pending || code.length !== 6}
+            onClick={() => {
+              if (token === null) return;
+              startTransition(async () => {
+                setProblem(null);
+                const result = await applicantRequest(() =>
+                  confirmContactAction(token, code),
+                );
+                if (!result.ok) {
+                  fail(result);
+                  return;
+                }
+                if (result.status === "CONFIRMED") {
+                  setConfirmed(true);
+                  await loadProgress();
+                } else
+                  fail({
+                    message:
+                      result.status === "WRONG_CODE"
+                        ? "That code didn't match. Please try again."
+                        : "That code has expired. Send a new code.",
+                  });
+              });
+            }}
+          >
+            Confirm email
+          </Button>
+        </>
+      ) : null}
+      <Button type="button" variant="quiet" onClick={onCorrectAnswers}>
+        Back to my answers
+      </Button>
+    </form>
+  );
+
+  const contactRead =
+    coverage === null
+      ? null
+      : ApplicationContactDtoSchema.safeParse(
+          Reflect.get(coverage.contact, "details"),
+        );
+  const reviewContact = contactRead?.success ? contactRead.data : null;
+  const review =
+    coverage === null ? null : (
+      <section
+        className="flex flex-col gap-4"
+        aria-label="Review your application"
+      >
+        <h1 className="cq-title-lg">Review before submitting</h1>
+        <p className="cq-body text-(--cq-text-secondary)">
+          {fund} will receive your confirmed contact details, form answers, the
+          interview transcript and the {coverage.documentCount} documents you
+          chose to share. Applicant claims remain unverified unless supporting
+          evidence is recorded.
+        </p>
+        {reviewContact ? (
+          <div>
+            <h2 className="cq-title-sm">Contact details to share</h2>
+            <p className="cq-body-sm">
+              {reviewContact.name} · {reviewContact.email}
+              <br />
+              {reviewContact.role} · {reviewContact.companyName}
+            </p>
+          </div>
+        ) : null}
+        {initialSession?.materialNames?.length ? (
+          <div>
+            <h2 className="cq-title-sm">Documents selected for submission</h2>
+            <ul className="cq-body-sm">
+              {initialSession.materialNames.map((name) => (
+                <li key={name}>{name}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="cq-body-sm">
+            {coverage.documentCount} documents attached to this application.
+          </p>
+        )}
+        <Criteria lines={criteria} />
+        <h2 className="cq-title-sm">Answered</h2>
+        <ul className="cq-body-sm flex flex-col gap-2">
+          {coverage.coverage.answered.map((item) => (
+            <li key={item.dimension}>
+              <b>{item.label}:</b> {item.summary} ·{" "}
+              {item.provenance.replaceAll("_", " ").toLowerCase()}
+            </li>
+          ))}
+        </ul>
+        {(
+          [
+            ["Unknown", coverage.coverage.unknown],
+            ["Declined", coverage.coverage.declined],
+            ["Still missing", coverage.coverage.missing],
+          ] as const
+        ).map(([label, items]) =>
+          items.length === 0 ? null : (
+            <div key={label}>
+              <h2 className="cq-title-sm">{label}</h2>
+              <ul className="cq-body-sm">
+                {items.map((item) => (
+                  <li key={item.dimension}>{item.label}</li>
+                ))}
+              </ul>
+            </div>
+          ),
+        )}
+        {coverage.coverage.contradictions.length === 0 ? null : (
+          <div>
+            <h2 className="cq-title-sm">Answers that disagree</h2>
+            <ul>
+              {coverage.coverage.contradictions.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {coverage.coverage.access !== "MAY_APPLY" ? (
+          <p role="status">
+            Your application needs corrections before {fund} can receive it:{" "}
+            {[
+              ...coverage.coverage.unmet,
+              ...coverage.coverage.stillNeeded,
+            ].join(", ")}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={share}
+            disabled={
+              pending ||
+              !coverage.contact.confirmed ||
+              coverage.coverage.access !== "MAY_APPLY" ||
+              unconfirmedTurn
+            }
+          >
+            {pending ? "Submitting…" : `Submit to ${fund}`}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setStage("TALKING")}
+            disabled={pending}
+          >
+            Keep answering
+          </Button>
+          <Button
+            variant="quiet"
+            onClick={onCorrectAnswers}
+            disabled={pending || submissionStarted}
+          >
+            Correct form answers
+          </Button>
+        </div>
+        <p className="cq-caption text-(--cq-text-tertiary)">
+          The investment team will review your application and may contact you
+          at your confirmed email address.
+        </p>
+        <details>
+          <summary className="min-h-11 cursor-pointer">
+            Review full transcript
+          </summary>
+          {transcript}
+        </details>
+      </section>
+    );
 
   const body =
-    stage === "INTRO" ? (
+    interview && !loaded ? (
+      <p role="status">Restoring your application…</p>
+    ) : interview && !confirmed && stage !== "SHARED" ? (
+      contactPanel
+    ) : interview && stage === "STOPPED" ? (
+      review
+    ) : stage === "INTRO" ? (
       intro
     ) : closing !== null ? (
       closing
@@ -682,6 +1174,31 @@ export function ApplyExperience({
         {criteria.length === 0 || verdict !== null ? null : (
           <Criteria lines={criteria} compact />
         )}
+        {interview && lines.length === 0 ? (
+          <div className="flex flex-col gap-3">
+            <h1 className="cq-title-lg">Let’s understand your company</h1>
+            <p className="cq-body text-(--cq-text-secondary)">
+              Q uses your answers and shared materials to ask focused
+              follow-ups. You can say “I don’t know” or decline any question,
+              and pause by closing this tab’s page.
+            </p>
+            <Button
+              disabled={pending || unconfirmedTurn}
+              onClick={() => {
+                const turn = {
+                  id: key("turn"),
+                  text: "I'm ready to begin the investment interview.",
+                };
+                lastTurn.current = turn;
+                setUnconfirmedTurn(true);
+                amendRecovery(gateway.publicId, { pendingTurn: turn });
+                sendText(turn.text, turn.id);
+              }}
+            >
+              Begin interview
+            </Button>
+          </div>
+        ) : null}
         {transcript}
         {result}
         <div ref={resultEnd} />
