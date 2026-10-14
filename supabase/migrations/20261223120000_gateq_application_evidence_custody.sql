@@ -83,7 +83,10 @@ begin
     if tg_op='UPDATE' and new.gateq_session_id is distinct from old.gateq_session_id then
       raise exception 'version custody is immutable' using errcode='check_violation'; end if;
   else
-    if new.owner_organisation_id is distinct from d.owner_organisation_id or new.visibility_scope is distinct from d.visibility_scope or new.sensitivity_class is distinct from d.sensitivity_class then
+    -- Scope equality binds application custody only: organisation-owned
+    -- derived content keeps its existing inheritance rules unchanged.
+    if new.owner_organisation_id is distinct from d.owner_organisation_id
+      or (d.owner_kind='GATEQ_APPLICATION' and (new.visibility_scope is distinct from d.visibility_scope or new.sensitivity_class is distinct from d.sensitivity_class)) then
       raise exception 'derived content must preserve document custody' using errcode='check_violation'; end if;
   end if;
   return new;

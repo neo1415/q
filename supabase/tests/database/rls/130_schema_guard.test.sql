@@ -129,6 +129,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('evidence', 'sources',                  'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'documents',                'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'document_versions',        'INTERNAL_SERVER_ONLY', '{}'),
+  -- ADR 0067: exact document versions frozen into a GateQ submission.
+  ('evidence', 'gateq_application_document_disclosures', 'INTERNAL_SERVER_ONLY', '{}'),
   -- Overnight A3/A5: the data room and Q's reading of the deck.
   ('evidence', 'data_room_folders',              'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'data_room_checklist_items',      'INTERNAL_SERVER_ONLY', '{}'),
