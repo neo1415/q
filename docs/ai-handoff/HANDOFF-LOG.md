@@ -709,3 +709,8 @@ PR99 merged48c6 normally after exactcandidateCI38617987342PASS; allfourRailwaySU
 ## October14 23:30 WAT — protected source gate repaired without waiver
 
 Source101 old CI38644691732 failed an asynchronous exact-manifest assertion in existing GateQ comparison test; candidate102 old CI38644695976 passed with identical app/package code. Test now waits for manifest publication and preserves both exact application refs and dialog state;9 tests/lint/format PASS. Pushed sourcef2b6ce5d and candidate83b1def3; fresh CI38647138262/38647145307 running. Four Railway services remain SUCCESS48c6, native fourcases verified, Q repairs still unreleased/unverified. Isolated PR98 fixture worker active, no runtime/schema overlap. All production promotion waits for both exact protected gates.
+
+
+## October14 — isolated Evidence97 fixture repair preserved
+
+Existing PR97 advancedb76→364d286e normally after exacthead recheck; only disposable concurrency bootstrap adds canonical231600 before241000. Old pgTAP step passed; later concurrency proof failed8wrapped42703 missing application_turns.disclosure_lineage errors. Actual PostgreSQL17.11 baseline confirmed; unchanged full corrected concurrency/idempotency/rollback/MVCC/submission-lock proof PASS. New protectedCI38648329522 running, no hosted migration/release/runtime change. Own worktree clean and old19914537 branch preserved. This independent fixture repair stays OUT of H2.
