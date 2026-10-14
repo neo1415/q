@@ -130,6 +130,7 @@ const ownerContext = async (file) => {
     context,
     session: { baseUrl: api, accessToken: signed.data.session.access_token },
     email: signed.data.session.user.email,
+    userId: signed.data.session.user.id,
   };
 };
 let page;
@@ -148,7 +149,23 @@ try {
     required("CQ_GATEQ_INVESTOR_SESSION_FILE"),
   );
   const other = await ownerContext(required("CQ_GATEQ_OTHER_SESSION_FILE"));
+  assert.notEqual(
+    founder.userId,
+    investor.userId,
+    "Founder and receiving investor must be distinct actors",
+  );
+  assert.notEqual(
+    other.userId,
+    investor.userId,
+    "Negative access check requires an unrelated actor",
+  );
+  const otherOrg = await getCurrentInvestorOrganisation(other.session);
   const org = await getCurrentInvestorOrganisation(investor.session);
+  assert.notEqual(
+    otherOrg.id,
+    org.id,
+    "Negative access check requires a different investor organisation",
+  );
   const gates = await listGateways(investor.session, org.id);
   const gateway = gates.gateways.find(
     (item) => item.publicId === publicId && item.status === "ACTIVE",
