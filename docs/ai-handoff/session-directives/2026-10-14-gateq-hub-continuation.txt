@@ -1,0 +1,153 @@
+# CAPITAL Q — GATEQ + RELATIONSHIP HUB CONTINUATION
+
+Repository: https://github.com/neo1415/q
+
+You are taking over a working Capital Q implementation following an interrupted Codex session.
+
+**Read the attached `Capital_Q_GateQ_Hub_Takeover_2026-10-14_1500WAT.md` in full.**
+
+It contains the latest GitHub checkpoints, completed production acceptance, unreleased implementation branches, exact defects, complete investor/founder CRM requirements and architectural constraints.
+
+Read the current repository handoff, locked PADL, Real Product Specification, Final System Review and relevant engineering specs.
+
+**This is a continuation. Do not restart GateQ, replace the CRM architecture, or repeat already released repairs.**
+
+## Immediate takeover
+
+First refresh GitHub, CI, Railway and all worktrees.
+
+The last verified production GitHub head is `71c5d4a58c314eca7981c08265b2e29015bc2b7b`.
+
+The previous agent completed a real production founder GateQ application through explicit Submit, and the investor successfully opened the exact submitted dossier and transcript.
+
+Preserve this achievement.
+
+### Recover these specific branches
+
+**GateQ description repair**
+
+PR #89 is merged into integration at `1b72e44d`, but is not established as released to production. Its source CI passed.
+
+Finish its normal production release and browser verification.
+
+**Investor Q — INTERRUPTED HIGH-PRIORITY FIX**
+
+The previous agent found that investor Q could see a submitted GateQ dossier in the UI but claimed its contents were unavailable.
+
+It diagnosed two issues:
+
+1. The current Q screen context provides the inbox list, not the selected submitted application/dossier.
+2. The existing Q dossier-reading tool places long findings in a field limited to 600 characters.
+
+A partial repair was being edited when the session ended.
+
+Recover any available dirty files/worktrees first and push a clearly labeled checkpoint. If that environment is inaccessible, use the established diagnosis to inspect and repair the existing Q contracts.
+
+Do NOT build another Q runtime.
+
+End-to-end acceptance requires Q to read the actual authorized selected dossier, answer substantively, distinguish claims from evidence, cite supporting records and correctly retain application/company context.
+
+Test wrong-investor, wrong-application, pre-submission, stale-selection and long-finding cases.
+
+Do not claim success because Q merely rendered an answer.
+
+**GateQ claim capture**
+
+The interviewer currently risks omitting traction, use-of-funds and other meaningful founder statements because permitted recordable dimensions are coupled to its next-question list.
+
+Separate valid fact capture from conversational question selection.
+
+Preserve typed validation, provenance, deterministic qualification, immutable submission and historical turns.
+
+Verify the resulting investor dossier actually includes the supplied supported claims.
+
+**H2 CRM — EXISTING PUSHED WIP**
+
+Branch: `codex/hub-h2-pipeline`
+
+HEAD: `2d9dfa1ef8687bc4827a70a8070c30f35a1bb97e`
+
+This branch contains substantial implementation for authorized pipeline queries, search/filter/sort, cursor pagination, table/board presentation, saved views, exports and Q controls.
+
+It has diverged from current integration. Reconcile and test it carefully.
+
+Do not start another H2 implementation without reading this code.
+
+Review the localStorage-based saved views, authorization, filtered export scope, pagination and server contracts. Finish and release bounded, functional H2 slices.
+
+**Guest Evidence — EXISTING PUSHED WIP**
+
+Branch: `codex/gateq-guest-upload-expiry`
+
+HEAD: `553316c5136a8e6e624b33a4a9af42dffe9f7762`
+
+It includes application evidence custody, document disclosure, upload expiry/cleanup and relevant migrations/tests.
+
+Review alongside `codex/gateq-guest-evidence-recovery` and earlier approved Evidence contracts.
+
+Do not blindly merge historical migrations.
+
+Finish secure guest upload → extraction → document-grounded Q interview → founder disclosure → immutable Submit → authorized investor evidence.
+
+## Delivery priorities
+
+**P0:** Recover unfinished work and release the safe GateQ description fix.
+
+**P1:** Fix investor Q's selected GateQ dossier understanding and missing claim capture. Test and release complete, source-grounded behavior.
+
+**P2:** Finish the existing guest Evidence work end to end with proper isolation, disclosure and document versioning.
+
+**P3:** Finish and release Hub H2 from its preserved branch, then progress into H3/H4: relationship activity, GateQ integration, meetings, transcripts, documents, Q Work and approvals.
+
+These are the two active product priorities: **GateQ and the Relationship Hub**.
+
+You may run genuinely independent work in parallel with clear file ownership, but do not scatter effort across excessive agents or unrelated research.
+
+## Product requirements
+
+The attached document is the complete functional CRM scope.
+
+Maintain:
+
+- Investor Investment Hub and founder Fundraising Hub.
+- One canonical company, investor organization and relationship.
+- Existing Capital Q design system; premium visual redesign deferred.
+- Comprehensive CRM capabilities with progressive disclosure.
+- Real exports, filters, saved views, timelines and records.
+- GateQ, Evidence, meetings and Q Work within relationship context.
+- Fast Q semantic control of pages, tabs, searches, filters, sections, scrolling, documents, transcript positions and agent outputs.
+- One permission-aware contextual Q, never a duplicate brain.
+- Founder-private, investor-private and relationship-shared boundaries.
+- Provenance, confidence, authorization, RLS and human approval.
+- Correct loading, empty, running, error, recovery and approval states.
+
+Do not merge the rejected visual prototype into production.
+
+## Secondary work
+
+The competitor-research continuity fix is preserved in PRs #86/#88. Check their status and complete normal safe release when it does not compete with primary delivery.
+
+Do not spend today's core engineering window on a new market-research project.
+
+## Execution rules
+
+Execute small complete vertical slices.
+
+For each: preflight relevant code/ADRs, implement, run relevant tests, lint, types, pgTAP and security checks, commit, push, protected CI, integrate and verify deployed behavior.
+
+Keep source, integration, production and live-browser verification clearly distinguished.
+
+Do not falsely claim a feature works because a test or PR passed.
+
+**Mandatory account-limit safeguard:** At the beginning and after every meaningful slice, push recoverable work and update the engineering handoff. Before capacity runs low, stop launching agents and preserve every dirty worktree, branch, pending test and blocker.
+
+At the end, report:
+
+- What truly works.
+- Exact commits/PRs.
+- Deployment revisions.
+- Actual browser acceptance.
+- What remains.
+- Next integration point.
+
+**Start immediately by recovering the current work, particularly the interrupted investor Q fix and pushed H2 pipeline. Continue implementation without rebuilding or rewriting existing systems.**
