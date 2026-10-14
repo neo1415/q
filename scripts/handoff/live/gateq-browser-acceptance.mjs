@@ -139,8 +139,8 @@ try {
   assert.ok(
     memberships.items.some(
       (item) =>
-        item.organisation.organisationType === "COMPANY" &&
-        item.membership.status === "ACTIVE",
+        item.organisation.organisationType === "company" &&
+        item.membership.status === "active",
     ),
     "Native founder proof requires a real active COMPANY membership",
   );
@@ -163,254 +163,299 @@ try {
   await timed("native-contact-page", () =>
     page.goto(`${web}/g/${publicId}`, { waitUntil: "domcontentloaded" }),
   );
-  await page
-    .getByLabel("Full name", { exact: true })
-    .fill(fixture.contactName ?? "Authorized test founder");
-  await page.getByLabel("Email", { exact: true }).fill(founder.email);
-  await page
-    .getByLabel("Your role", { exact: true })
-    .fill(fixture.role ?? "Founder & CEO");
-  await page.getByLabel("Company", { exact: true }).fill(fixture.companyName);
-  await timed("native-contact-confirmation", async () => {
+  if (process.argv.includes("--preflight")) {
     await page
       .getByRole("button", { name: "Confirm and continue", exact: true })
-      .click();
-    await page
-      .getByRole("heading", { name: "Your company", exact: true })
       .waitFor();
-  });
-  await page.locator("#gq-name").fill(fixture.companyName);
-  await page.locator("#gq-line").fill(fixture.oneLiner);
-  await page
-    .getByRole("radiogroup", { name: "Stage", exact: true })
-    .getByRole("radio", { name: fixture.stageLabel, exact: true })
-    .click();
-  const sector = page
-    .getByRole("group", { name: /^Sector/ })
-    .getByRole("button", { name: fixture.sectorLabel, exact: true });
-  if ((await sector.getAttribute("aria-pressed")) !== "true")
-    await sector.click();
-  await page
-    .getByRole("radio", { name: fixture.countryLabel, exact: true })
-    .click();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page
-    .getByRole("heading", { name: "Your round", exact: true })
-    .waitFor();
-  await page
-    .getByLabel("Currency", { exact: true })
-    .selectOption(fixture.currency);
-  await page.getByLabel("Exact amount", { exact: true }).fill(fixture.amount);
-  await page
-    .getByRole("radiogroup", { name: "How are you raising?", exact: true })
-    .getByRole("radio", { name: "I'd rather not say", exact: true })
-    .click();
-  await page
-    .getByRole("radiogroup", {
-      name: "Do you have a lead investor?",
-      exact: true,
-    })
-    .getByRole("radio", { name: "I'd rather not say", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page
-    .getByRole("heading", { name: "What to share", exact: true })
-    .waitFor();
-  // The owned document checkboxes stay unchecked: this slice certifies text.
-  assert.equal(await page.locator('input[type="checkbox"]:checked').count(), 0);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page
-    .getByRole("heading", { name: "A short note", exact: true })
-    .waitFor();
-  await page
-    .locator("#gq-msg")
-    .fill(
-      "Authorized product acceptance; figures are applicant declarations, not independently verified evidence.",
+    assert.equal(
+      await page.getByLabel("Email", { exact: true }).inputValue(),
+      founder.email,
     );
-  await page.getByRole("button", { name: "Check my fit", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Continue to interview", exact: true })
-    .waitFor();
-  const recover = () =>
-    page.evaluate(
-      (gatewayId) =>
-        JSON.parse(sessionStorage.getItem(`cq:gateq:${gatewayId}`)),
-      publicId,
+    assert.ok(
+      (await page.getByLabel("Company", { exact: true }).inputValue()).trim(),
     );
-  let state = await recover();
-  assert.ok(state.token);
-  const before = await resumeApplication(api, state.token);
-  assert.equal(
-    before.access,
-    "MAY_APPLY",
-    "Native form must satisfy the frozen mandate",
-  );
-  await timed("native-first-q-question", async () => {
-    await page
-      .getByRole("button", { name: "Continue to interview", exact: true })
-      .click();
-    await page
-      .getByRole("textbox", { name: "Your answer", exact: true })
-      .waitFor();
-    await page.waitForFunction(
-      () => {
-        const input = document.querySelector(
-          'textarea[aria-label="Your answer"]',
-        );
-        return input && !input.disabled;
-      },
-      undefined,
-      { timeout: 180_000 },
-    );
-  });
-  const reply = `As recorded on the form, our stage is ${fixture.stageLabel.toLowerCase()} and our country is ${fixture.countryLabel}. Please use our recorded answers. Any revenue or traction not provided remains unknown, and supporting evidence has not been independently verified.`;
-  await page
-    .getByRole("textbox", { name: "Your answer", exact: true })
-    .fill(reply);
-  await timed("native-answer-to-completed-q-reply", async () => {
-    await page.getByRole("button", { name: "Send", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Finish and review", exact: true })
-      .waitFor();
-    await page.waitForFunction(
-      () => {
-        const button = [...document.querySelectorAll("button")].find(
-          (item) => item.textContent?.trim() === "Finish and review",
-        );
-        return button && !button.disabled;
-      },
-      undefined,
-      { timeout: 180_000 },
-    );
-  });
-  const after = await resumeApplication(api, state.token);
-  assert.equal(
-    after.access,
-    "MAY_APPLY",
-    "Adaptive answer must not corrupt canonical qualification facts",
-  );
-  const transcript = await getApplicationTranscript(api, state.token);
-  assert.equal(
-    transcript.turns.filter((item) => item.role === "PERSON").length,
-    1,
-  );
-  assert.equal(transcript.turns.filter((item) => item.role === "Q").length, 2);
-  write("before-after.json", { before, after, transcript });
-  await timed("native-review", async () => {
-    await page
-      .getByRole("button", { name: "Finish and review", exact: true })
-      .click();
-    await page
-      .getByRole("heading", { name: "Review before you submit", exact: true })
-      .waitFor();
-  });
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page
-    .getByRole("heading", { name: "Review before you submit", exact: true })
-    .waitFor();
-  const resumed = await recover();
-  assert.equal(resumed.token, state.token);
-  assert.equal(
-    (await getApplicationTranscript(api, state.token)).turns.length,
-    transcript.turns.length,
-  );
-  const coverage = await getApplicationCoverage(api, state.token);
-  assert.equal(coverage.contact.confirmed, true);
-  assert.equal(coverage.coverage.access, "MAY_APPLY");
-  await page.screenshot({
-    path: join(receipts, "native-review.png"),
-    fullPage: true,
-  });
-  if (!process.argv.includes("--submit")) {
-    write("result.json", { passed: true, submitted: false, metrics });
-    console.log(
-      JSON.stringify({
-        passed: true,
-        submitted: false,
-        receiptDirectory: receipts,
-      }),
-    );
-  } else {
-    await timed("native-explicit-submit", async () => {
-      await page.getByRole("button", { name: /^Submit to / }).click();
-      await page.waitForFunction(
-        (gatewayId) => {
-          const value = JSON.parse(
-            sessionStorage.getItem(`cq:gateq:${gatewayId}`) ?? "null",
-          );
-          return value?.step === "sent";
-        },
-        publicId,
-        { timeout: 120_000 },
-      );
-    });
-    state = await recover();
-    const submitted = await resumeApplication(api, state.token);
-    assert.ok(submitted.submittedAt);
-    assert.equal(submitted.status, "SUBMITTED");
-    const retry = await submitApplication(api, state.token, state.submitKey);
-    assert.equal(retry.deduplicated, true);
-    const inbox = await getGateqInbox(investor.session, gateway.id, "INBOX");
-    const matching = inbox.items.filter(
-      (item) => item.reference === submitted.reference,
-    );
-    assert.equal(matching.length, 1);
-    const detail = await timed("investor-frozen-dossier", () =>
-      getGateqInboxItem(
-        investor.session,
-        gateway.id,
-        matching[0].applicationId,
-      ),
-    );
-    assert.ok(detail.dossier);
-    assert.equal(detail.transcript.length, transcript.turns.length);
-    assert.deepEqual(
-      detail.transcript.map((turn) => turn.text),
-      transcript.turns.map((turn) => turn.text),
-    );
-    assert.equal(detail.dossier.qualification.access, "MAY_APPLY");
-    assert.equal(detail.shared.length, 0);
-    await assert.rejects(
-      () =>
-        getGateqInboxItem(other.session, gateway.id, matching[0].applicationId),
-      (error) => error.status === 404,
-    );
-    write("frozen-dossier.json", detail);
-    const investorPage = await investor.context.newPage();
-    await timed("investor-native-inbox", () =>
-      investorPage.goto(`${web}/gateq?tab=inbox`, {
-        waitUntil: "domcontentloaded",
-      }),
-    );
-    await investorPage
-      .getByText(fixture.companyName, { exact: true })
-      .first()
-      .click();
-    await investorPage
-      .getByRole("heading", { name: "Interview transcript", exact: true })
-      .waitFor();
-    await investorPage.screenshot({
-      path: join(receipts, "investor-dossier.png"),
+    await page.screenshot({
+      path: join(receipts, "native-founder-preflight.png"),
       fullPage: true,
     });
     write("result.json", {
       passed: true,
-      submitted: true,
-      transcriptTurns: transcript.turns.length,
-      uniqueSubmission: true,
-      crossActorDenied: true,
+      preflightOnly: true,
+      applicationCreated: false,
+      modelCalls: 0,
       metrics,
     });
     console.log(
       JSON.stringify({
         passed: true,
+        preflightOnly: true,
+        applicationCreated: false,
+        modelCalls: 0,
+        receiptDirectory: receipts,
+      }),
+    );
+  } else {
+    await page
+      .getByLabel("Full name", { exact: true })
+      .fill(fixture.contactName ?? "Authorized test founder");
+    await page.getByLabel("Email", { exact: true }).fill(founder.email);
+    await page
+      .getByLabel("Your role", { exact: true })
+      .fill(fixture.role ?? "Founder & CEO");
+    await page.getByLabel("Company", { exact: true }).fill(fixture.companyName);
+    await timed("native-contact-confirmation", async () => {
+      await page
+        .getByRole("button", { name: "Confirm and continue", exact: true })
+        .click();
+      await page
+        .getByRole("heading", { name: "Your company", exact: true })
+        .waitFor();
+    });
+    await page.locator("#gq-name").fill(fixture.companyName);
+    await page.locator("#gq-line").fill(fixture.oneLiner);
+    await page
+      .getByRole("radiogroup", { name: "Stage", exact: true })
+      .getByRole("radio", { name: fixture.stageLabel, exact: true })
+      .click();
+    const sector = page
+      .getByRole("group", { name: /^Sector/ })
+      .getByRole("button", { name: fixture.sectorLabel, exact: true });
+    if ((await sector.getAttribute("aria-pressed")) !== "true")
+      await sector.click();
+    await page
+      .getByRole("radio", { name: fixture.countryLabel, exact: true })
+      .click();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "Your round", exact: true })
+      .waitFor();
+    await page
+      .getByLabel("Currency", { exact: true })
+      .selectOption(fixture.currency);
+    await page.getByLabel("Exact amount", { exact: true }).fill(fixture.amount);
+    await page
+      .getByRole("radiogroup", { name: "How are you raising?", exact: true })
+      .getByRole("radio", { name: "I'd rather not say", exact: true })
+      .click();
+    await page
+      .getByRole("radiogroup", {
+        name: "Do you have a lead investor?",
+        exact: true,
+      })
+      .getByRole("radio", { name: "I'd rather not say", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "What to share", exact: true })
+      .waitFor();
+    // The owned document checkboxes stay unchecked: this slice certifies text.
+    assert.equal(
+      await page.locator('input[type="checkbox"]:checked').count(),
+      0,
+    );
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "A short note", exact: true })
+      .waitFor();
+    await page
+      .locator("#gq-msg")
+      .fill(
+        "Authorized product acceptance; figures are applicant declarations, not independently verified evidence.",
+      );
+    await page
+      .getByRole("button", { name: "Check my fit", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Continue to interview", exact: true })
+      .waitFor();
+    const recover = () =>
+      page.evaluate(
+        (gatewayId) =>
+          JSON.parse(sessionStorage.getItem(`cq:gateq:${gatewayId}`)),
+        publicId,
+      );
+    let state = await recover();
+    assert.ok(state.token);
+    const before = await resumeApplication(api, state.token);
+    assert.equal(
+      before.access,
+      "MAY_APPLY",
+      "Native form must satisfy the frozen mandate",
+    );
+    await timed("native-first-q-question", async () => {
+      await page
+        .getByRole("button", { name: "Continue to interview", exact: true })
+        .click();
+      await page
+        .getByRole("textbox", { name: "Your answer", exact: true })
+        .waitFor();
+      await page.waitForFunction(
+        () => {
+          const input = document.querySelector(
+            'textarea[aria-label="Your answer"]',
+          );
+          return input && !input.disabled;
+        },
+        undefined,
+        { timeout: 180_000 },
+      );
+    });
+    const reply = `As recorded on the form, our stage is ${fixture.stageLabel.toLowerCase()} and our country is ${fixture.countryLabel}. Please use our recorded answers. Any revenue or traction not provided remains unknown, and supporting evidence has not been independently verified.`;
+    await page
+      .getByRole("textbox", { name: "Your answer", exact: true })
+      .fill(reply);
+    await timed("native-answer-to-completed-q-reply", async () => {
+      await page.getByRole("button", { name: "Send", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Finish and review", exact: true })
+        .waitFor();
+      await page.waitForFunction(
+        () => {
+          const button = [...document.querySelectorAll("button")].find(
+            (item) => item.textContent?.trim() === "Finish and review",
+          );
+          return button && !button.disabled;
+        },
+        undefined,
+        { timeout: 180_000 },
+      );
+    });
+    const after = await resumeApplication(api, state.token);
+    assert.equal(
+      after.access,
+      "MAY_APPLY",
+      "Adaptive answer must not corrupt canonical qualification facts",
+    );
+    const transcript = await getApplicationTranscript(api, state.token);
+    assert.equal(
+      transcript.turns.filter((item) => item.role === "PERSON").length,
+      1,
+    );
+    assert.equal(
+      transcript.turns.filter((item) => item.role === "Q").length,
+      2,
+    );
+    write("before-after.json", { before, after, transcript });
+    await timed("native-review", async () => {
+      await page
+        .getByRole("button", { name: "Finish and review", exact: true })
+        .click();
+      await page
+        .getByRole("heading", { name: "Review before you submit", exact: true })
+        .waitFor();
+    });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page
+      .getByRole("heading", { name: "Review before you submit", exact: true })
+      .waitFor();
+    const resumed = await recover();
+    assert.equal(resumed.token, state.token);
+    assert.equal(
+      (await getApplicationTranscript(api, state.token)).turns.length,
+      transcript.turns.length,
+    );
+    const coverage = await getApplicationCoverage(api, state.token);
+    assert.equal(coverage.contact.confirmed, true);
+    assert.equal(coverage.coverage.access, "MAY_APPLY");
+    await page.screenshot({
+      path: join(receipts, "native-review.png"),
+      fullPage: true,
+    });
+    if (!process.argv.includes("--submit")) {
+      write("result.json", { passed: true, submitted: false, metrics });
+      console.log(
+        JSON.stringify({
+          passed: true,
+          submitted: false,
+          receiptDirectory: receipts,
+        }),
+      );
+    } else {
+      await timed("native-explicit-submit", async () => {
+        await page.getByRole("button", { name: /^Submit to / }).click();
+        await page.waitForFunction(
+          (gatewayId) => {
+            const value = JSON.parse(
+              sessionStorage.getItem(`cq:gateq:${gatewayId}`) ?? "null",
+            );
+            return value?.step === "sent";
+          },
+          publicId,
+          { timeout: 120_000 },
+        );
+      });
+      state = await recover();
+      const submitted = await resumeApplication(api, state.token);
+      assert.ok(submitted.submittedAt);
+      assert.equal(submitted.status, "SUBMITTED");
+      const retry = await submitApplication(api, state.token, state.submitKey);
+      assert.equal(retry.deduplicated, true);
+      const inbox = await getGateqInbox(investor.session, gateway.id, "INBOX");
+      const matching = inbox.items.filter(
+        (item) => item.reference === submitted.reference,
+      );
+      assert.equal(matching.length, 1);
+      const detail = await timed("investor-frozen-dossier", () =>
+        getGateqInboxItem(
+          investor.session,
+          gateway.id,
+          matching[0].applicationId,
+        ),
+      );
+      assert.ok(detail.dossier);
+      assert.equal(detail.transcript.length, transcript.turns.length);
+      assert.deepEqual(
+        detail.transcript.map((turn) => turn.text),
+        transcript.turns.map((turn) => turn.text),
+      );
+      assert.equal(detail.dossier.qualification.access, "MAY_APPLY");
+      assert.equal(detail.shared.length, 0);
+      await assert.rejects(
+        () =>
+          getGateqInboxItem(
+            other.session,
+            gateway.id,
+            matching[0].applicationId,
+          ),
+        (error) => error.status === 404,
+      );
+      write("frozen-dossier.json", detail);
+      const investorPage = await investor.context.newPage();
+      await timed("investor-native-inbox", () =>
+        investorPage.goto(`${web}/gateq?tab=inbox`, {
+          waitUntil: "domcontentloaded",
+        }),
+      );
+      await investorPage
+        .getByText(fixture.companyName, { exact: true })
+        .first()
+        .click();
+      await investorPage
+        .getByRole("heading", { name: "Interview transcript", exact: true })
+        .waitFor();
+      await investorPage.screenshot({
+        path: join(receipts, "investor-dossier.png"),
+        fullPage: true,
+      });
+      write("result.json", {
+        passed: true,
         submitted: true,
         transcriptTurns: transcript.turns.length,
         uniqueSubmission: true,
         crossActorDenied: true,
-        receiptDirectory: receipts,
-      }),
-    );
+        metrics,
+      });
+      console.log(
+        JSON.stringify({
+          passed: true,
+          submitted: true,
+          transcriptTurns: transcript.turns.length,
+          uniqueSubmission: true,
+          crossActorDenied: true,
+          receiptDirectory: receipts,
+        }),
+      );
+    }
   }
 } catch (error) {
   if (page)
