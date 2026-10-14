@@ -802,3 +802,28 @@ describe("resume", () => {
     expect(resumed.status).toBe("IN_PROGRESS");
   });
 });
+
+it("rejects a wrongly shaped replacement before superseding a usable qualification fact", async () => {
+  const w = world(policyOf("QUALIFIED", [GEO, STAGE]));
+  const started = await w.service.start({ gatewayPublicId: PUBLIC_ID });
+  await w.service.recordFacts({ token: started.token, facts: QUALIFYING });
+  const original = w.factRows.find((row) => row.dimension === "company.stage");
+  expect((await w.service.qualification(started.token)).access).toBe(
+    "MAY_APPLY",
+  );
+  await expect(
+    w.service.recordFacts({
+      token: started.token,
+      facts: [fact("company.stage", { kind: "TEXT", text: "seed" })],
+    }),
+  ).rejects.toThrow();
+  const current = w.factRows.filter(
+    (row) => row.dimension === "company.stage" && row.supersededAt === null,
+  );
+  expect(current).toHaveLength(1);
+  expect(current[0]?.id).toBe(original?.id);
+  expect(current[0]?.value).toEqual({ kind: "CODE", code: "seed" });
+  expect((await w.service.qualification(started.token)).access).toBe(
+    "MAY_APPLY",
+  );
+});

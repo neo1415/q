@@ -161,7 +161,7 @@ try {
   page = await founder.context.newPage();
   page.setDefaultTimeout(60_000);
   await timed("native-contact-page", () =>
-    page.goto(`${web}/g/${publicId}/apply`, { waitUntil: "domcontentloaded" }),
+    page.goto(`${web}/g/${publicId}`, { waitUntil: "domcontentloaded" }),
   );
   await page
     .getByLabel("Full name", { exact: true })
