@@ -175,7 +175,11 @@ export function createInboxService(dependencies: {
       applicationId: row.applicationId,
       reference: submitted.reference,
       companyName: profile.companyName,
-      oneLiner: profile.oneLiner,
+      // The list preview is bounded; the frozen dossier retains the full claim.
+      oneLiner:
+        profile.oneLiner !== null && profile.oneLiner.length > 280
+          ? `${profile.oneLiner.slice(0, 279)}…`
+          : profile.oneLiner,
       stage: profile.stage,
       sector: profile.sector,
       country: profile.country,

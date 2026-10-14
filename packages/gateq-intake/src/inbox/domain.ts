@@ -217,13 +217,19 @@ export function profileOf(submitted: Submitted) {
     const value = current.get(dimension);
     return value?.kind === "CODE" ? value.code : null;
   };
+  // Interview facts may retain a description as several applicant phrases.
+  // Preserve those claims in the brief rather than falsely saying it is absent.
+  const description = current.get("company.description");
   const amount = current.get("raise.amount");
   const sectors = current.get("company.sector_phrases");
   const stage = code("company.stage");
   const country = code("company.country");
   return {
     companyName: submitted.declaredName ?? text("company.name") ?? "A company",
-    oneLiner: text("company.description"),
+    oneLiner:
+      description?.kind === "PHRASES"
+        ? description.phrases.join(", ")
+        : text("company.description"),
     website: text("company.website"),
     stage: stage === null ? null : (STAGE_WORDS[stage] ?? stage),
     sector: sectors?.kind === "PHRASES" ? sectors.phrases.join(", ") : null,

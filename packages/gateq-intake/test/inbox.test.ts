@@ -1,5 +1,6 @@
 import type { GateqEmailEvent, GateqOutboundSender } from "../src/index.js";
 import { describe, expect, it } from "vitest";
+import { GateqInboxDtoSchema } from "@capital-q/contracts";
 
 import type { ActorContext } from "@capital-q/security";
 import type {
@@ -118,6 +119,7 @@ function harness(
     readonly mail?: GateqOutboundSender;
     /** GateQ slice 1: a v2 submission for APP_FIT (dossier + transcript). */
     readonly v2?: { readonly dossier: unknown; readonly transcript: unknown };
+    readonly descriptionPhrases?: readonly string[];
   } = {},
 ) {
   const emailEvents: GateqEmailEvent[] = [];
@@ -184,6 +186,20 @@ function harness(
   const rowOf = (id: string, userId: string): InboxRow => {
     const s = submitted.get(id);
     if (s === undefined) throw new Error("no such application");
+    if (id === APP_FIT && options.descriptionPhrases !== undefined) {
+      const original = snapshot("Sunline");
+      s.snapshot = {
+        ...original,
+        facts: [
+          ...original.facts,
+          {
+            dimension: "company.description",
+            value: { kind: "PHRASES", phrases: options.descriptionPhrases },
+            provenance: "APPLICANT_PROVIDED",
+          },
+        ],
+      };
+    }
     return {
       applicationId: id,
       submittedAt: s.at,
@@ -384,6 +400,21 @@ function harness(
 }
 
 describe("reading the inbox (F4)", () => {
+  it("returns a valid bounded list preview for a long phrase-based description", async () => {
+    const { service } = harness({
+      descriptionPhrases: ["a".repeat(120), "b".repeat(120), "c".repeat(120)],
+    });
+    const inbox = GateqInboxDtoSchema.parse(
+      await service.list(actor(ADMIN), GATEWAY, "INBOX"),
+    );
+    const preview = inbox.items.find(
+      (i) => i.applicationId === APP_FIT,
+    )?.oneLiner;
+    expect(preview).toHaveLength(280);
+    expect(preview).toContain("a".repeat(120));
+    expect(preview?.endsWith("…")).toBe(true);
+  });
+
   it("shows every application to the gate with the engine's band, ordered by the reply promise", async () => {
     const { service } = harness();
     const inbox = await service.list(actor(ADMIN), GATEWAY, "INBOX");
