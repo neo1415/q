@@ -335,6 +335,8 @@ export {
 } from "./outcomes.js";
 export {
   applicationTurn,
+  openApplicationInterview,
+  saveAccountApplicationContact,
   saveApplicationContact,
   confirmAccountApplicationContact,
   confirmApplicationContact,

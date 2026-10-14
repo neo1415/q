@@ -136,6 +136,10 @@ export function buildDossier(input: {
           label: DIMENSION_LABELS[dimension],
           summary: factSummary(dimension, fact.value).slice(0, 2000),
           provenance: fact.provenance,
+          // Lineage: the recorded fact itself, and the turn it was heard
+          // in when it came from the interview.
+          sourceFactId: fact.id,
+          sourceTurnSeq: fact.sourceTurnSeq ?? null,
           truthClass: truthClassOf(fact.provenance),
           evidenceStatus: evidenceStatusOf(fact.provenance),
         },

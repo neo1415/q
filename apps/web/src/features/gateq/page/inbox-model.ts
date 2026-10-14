@@ -4,6 +4,7 @@ import type {
   GateqInboxItemDto,
   GateqInboxView,
   GateqPassReason,
+  GateqDossierV1,
 } from "@capital-q/contracts";
 
 /**
@@ -268,4 +269,77 @@ export function matchesSearch(item: GateqInboxItemDto, text: string): boolean {
 
 export function unreadCount(inbox: Pick<GateqInboxDto, "counts">): number {
   return inbox.counts.INBOX;
+}
+
+// ---------------------------------------------------------------------------
+// GateQ slice 1: the dossier frozen with a submission
+// ---------------------------------------------------------------------------
+
+type DossierFact = GateqDossierV1["dimensions"][number]["facts"][number];
+
+/**
+ * Where a fact stands, in an investor's words. Read from ADR-001's
+ * separate axes, evidence first: nothing becomes "Document-supported"
+ * without its evidence status saying so, and the v1 dossier has no
+ * verified state at all, so nothing here ever reads as verified.
+ */
+export function factProvenanceWords(
+  fact: Pick<DossierFact, "evidenceStatus" | "truthClass">,
+): "Document-supported" | "Estimated" | "Unknown" | "Founder stated" {
+  if (fact.evidenceStatus === "DOCUMENT_SUPPORTED") return "Document-supported";
+  if (fact.truthClass === "ESTIMATE") return "Estimated";
+  if (fact.truthClass === "UNKNOWN") return "Unknown";
+  return "Founder stated";
+}
+
+export const CRITERION_STATUS_WORDS: Readonly<
+  Record<GateqDossierV1["qualification"]["criteria"][number]["status"], string>
+> = {
+  MATCH: "Meets",
+  NO_MATCH: "Doesn't meet",
+  UNKNOWN: "Unknown",
+  NOT_APPLICABLE: "Not applicable",
+};
+
+export const CRITERION_STATUS_GLYPH: Readonly<
+  Record<
+    GateqDossierV1["qualification"]["criteria"][number]["status"],
+    "fit" | "no" | "unk"
+  >
+> = {
+  MATCH: "fit",
+  NO_MATCH: "no",
+  UNKNOWN: "unk",
+  NOT_APPLICABLE: "unk",
+};
+
+export const OUTCOME_WORDS: Readonly<
+  Record<GateqDossierV1["qualification"]["outcome"], string>
+> = {
+  QUALIFIED: "Qualifies under your published rules",
+  NOT_QUALIFIED: "Doesn't qualify under your published rules",
+  INSUFFICIENT_INFORMATION: "Not enough information to decide",
+};
+
+export const DILIGENCE_BASIS_WORDS: Readonly<
+  Record<GateqDossierV1["diligenceQuestions"][number]["basis"], string>
+> = {
+  MISSING: "Not covered",
+  UNKNOWN: "Founder didn't know",
+  DECLINED: "Founder preferred not to say",
+  CONTRADICTION: "Answers disagree",
+};
+
+export const MISSING_WORDS: Readonly<
+  Record<GateqDossierV1["missing"][number]["reason"], string>
+> = {
+  REQUIRED_BY_GATEWAY: "Required by your rules",
+  PREFERRED_BY_GATEWAY: "Preferred by your rules",
+  CONTRADICTION: "Answers disagree",
+  UNDERSTANDING: "For understanding",
+};
+
+/** "Founder" and "Q": the transcript's two voices, never a model's name. */
+export function speakerWords(role: "PERSON" | "Q"): string {
+  return role === "Q" ? "Q" : "Founder";
 }

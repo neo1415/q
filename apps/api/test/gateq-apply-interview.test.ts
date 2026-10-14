@@ -9,6 +9,7 @@ import {
   GATEQ_APPLY_CONTACT_CONFIRM_PATH,
   GATEQ_APPLY_CONTACT_PATH,
   GATEQ_APPLY_COVERAGE_PATH,
+  GATEQ_APPLY_INTERVIEW_OPEN_PATH,
   GATEQ_APPLY_SUBMIT_PATH,
   GATEQ_APPLY_TRANSCRIPT_PATH,
   type ApplicationContactResponse,
@@ -23,6 +24,15 @@ import {
   type ConversationService,
   type IntakeService,
 } from "@capital-q/gateq-intake";
+import {
+  AuthUserIdSchema,
+  MembershipIdSchema,
+  OrganisationIdSchema,
+  TenantIdSchema,
+  UserIdSchema,
+  type ActorContext,
+  type AuthenticatedPrincipal,
+} from "@capital-q/security";
 
 import { createApp, type ApiSecurityDependencies } from "../src/app.js";
 
@@ -105,7 +115,15 @@ function build(options: { readonly contactUnconfirmed?: boolean } = {}) {
     contacts: [] as { token: string; contact: ContactDetails }[],
     codes: [] as string[],
     accountCalls: 0,
+    openings: 0,
   };
+  // OTHER's interview starts empty; its opening is stored on first open.
+  const otherTurns: {
+    seq: number;
+    role: "PERSON" | "Q";
+    text: string;
+    at: string;
+  }[] = [];
   const deny = () => {
     throw new IntakeRefusedError("SESSION_INVALID");
   };
@@ -155,7 +173,19 @@ function build(options: { readonly contactUnconfirmed?: boolean } = {}) {
     },
   } as unknown as IntakeService;
   const conversation: ConversationService = {
-    openingFor: () => Promise.resolve("Hi"),
+    openingFor: (input) => {
+      if (input.token !== TOKEN && input.token !== OTHER) deny();
+      recorded.openings += 1;
+      if (input.token === OTHER && otherTurns.length === 0) {
+        otherTurns.push({
+          seq: 1,
+          role: "Q",
+          text: "What does Rails sell, and to whom?",
+          at: "2026-10-13T11:00:00.000Z",
+        });
+      }
+      return Promise.resolve("What does Rails sell, and to whom?");
+    },
     turn: () => Promise.reject(new Error("not used")),
     summary: (token) => {
       if (token !== TOKEN) deny();
@@ -180,7 +210,7 @@ function build(options: { readonly contactUnconfirmed?: boolean } = {}) {
                 at: "2026-10-13T11:00:01.000Z",
               },
             ]
-          : [],
+          : [...otherTurns],
       );
     },
   };
@@ -358,6 +388,59 @@ describe("the transcript and coverage over HTTP (GateQ slice 1)", () => {
     );
   });
 
+  it("opens a fresh interview with Q's question, stored once", async () => {
+    const { app, recorded } = build();
+    const open = () =>
+      app.inject({
+        method: "POST",
+        url: GATEQ_APPLY_INTERVIEW_OPEN_PATH,
+        headers: bearer(OTHER),
+      });
+    const first = await open();
+    expect(first.statusCode).toBe(200);
+    expect(first.headers["cache-control"]).toBe("no-store");
+    expect(
+      ApplicationTranscriptDtoSchema.parse(first.json()).turns.map(
+        (t) => t.role,
+      ),
+    ).toEqual(["Q"]);
+    const again = await open();
+    expect(ApplicationTranscriptDtoSchema.parse(again.json()).turns).toEqual(
+      ApplicationTranscriptDtoSchema.parse(first.json()).turns,
+    );
+    // The second open resumes; it asks the model nothing.
+    expect(recorded.openings).toBe(1);
+  });
+
+  it("resumes a started interview without asking for an opening", async () => {
+    const { app, recorded } = build();
+    const response = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_INTERVIEW_OPEN_PATH,
+      headers: bearer(TOKEN),
+    });
+    expect(response.statusCode).toBe(200);
+    expect(
+      ApplicationTranscriptDtoSchema.parse(response.json()).turns.map(
+        (t) => t.role,
+      ),
+    ).toEqual(["PERSON", "Q"]);
+    expect(recorded.openings).toBe(0);
+  });
+
+  it("refuses a forged or missing credential on open with a 404", async () => {
+    const { app, recorded } = build();
+    for (const headers of [bearer("gqs_forged"), {}]) {
+      const response = await app.inject({
+        method: "POST",
+        url: GATEQ_APPLY_INTERVIEW_OPEN_PATH,
+        headers,
+      });
+      expect(response.statusCode).toBe(404);
+    }
+    expect(recorded.openings).toBe(0);
+  });
+
   it("refuses a missing credential with a 404", async () => {
     const { app } = build();
     for (const url of [
@@ -382,5 +465,101 @@ describe("the transcript and coverage over HTTP (GateQ slice 1)", () => {
       "company.team",
     ]);
     expect(body.contact).toEqual({ required: true, confirmed: false });
+  });
+});
+
+describe("the signed-in founder's contact over HTTP (GateQ slice 1)", () => {
+  const PRINCIPAL: AuthenticatedPrincipal = {
+    authUserId: AuthUserIdSchema.parse("a0000000-0000-4000-8000-000000000001"),
+  };
+  const CONTEXT: ActorContext = {
+    userId: UserIdSchema.parse("b0000000-0000-4000-8000-000000000001"),
+    tenantId: TenantIdSchema.parse("c0000000-0000-4000-8000-000000000001"),
+    organisationId: OrganisationIdSchema.parse(
+      "d0000000-0000-4000-8000-000000000001",
+    ),
+    membershipId: MembershipIdSchema.parse(
+      "e0000000-0000-4000-8000-000000000001",
+    ),
+    actorType: "HUMAN",
+  };
+
+  function signedIn() {
+    const calls: { actor: ActorContext; sessionToken: string }[] = [];
+    const security: ApiSecurityDependencies = {
+      authenticator: { authenticate: () => Promise.resolve(PRINCIPAL) },
+      resolver: {
+        resolveHumanContext: () =>
+          Promise.resolve({ status: "RESOLVED", context: CONTEXT }),
+      },
+      identities: { lookup: () => Promise.resolve(null) },
+    };
+    const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
+      gateq: {} as never,
+      gateqApplicationContact: ({ actor, request }) => {
+        calls.push({ actor, sessionToken: request.sessionToken });
+        // As the composition: the guest credential is verified first.
+        if (request.sessionToken !== TOKEN) {
+          throw new IntakeRefusedError("SESSION_INVALID");
+        }
+        return Promise.resolve({
+          ...CONTACT_RESPONSE,
+          contact: {
+            ...CONTACT_RESPONSE.contact,
+            emailConfirmed: true,
+            confirmedVia: "ACCOUNT",
+          },
+          codeSent: false,
+          codeExpiresInMinutes: null,
+        });
+      },
+    });
+    return { app, calls };
+  }
+
+  it("confirms through the server-resolved actor, never the body", async () => {
+    const { app, calls } = signedIn();
+    const response = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+      payload: { ...CONTACT_BODY, sessionToken: TOKEN },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(
+      response.json<ApplicationContactResponse>().contact.confirmedVia,
+    ).toBe("ACCOUNT");
+    expect(calls[0]?.actor.userId).toBe(CONTEXT.userId);
+    const forged = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+      payload: {
+        ...CONTACT_BODY,
+        sessionToken: TOKEN,
+        accountEmail: "ada@example.test",
+        userId: "someone-else",
+      },
+    });
+    expect(forged.statusCode).toBe(422);
+  });
+
+  it("answers another application's credential with the same 404", async () => {
+    const { app } = signedIn();
+    const response = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+      payload: { ...CONTACT_BODY, sessionToken: OTHER },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("refuses a forged credential on the code confirmation with a 404", async () => {
+    const { app } = build();
+    const response = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_CONTACT_CONFIRM_PATH,
+      headers: bearer(`gqs_${"z".repeat(43)}`),
+      payload: { code: "123456" },
+    });
+    expect(response.statusCode).toBe(404);
   });
 });

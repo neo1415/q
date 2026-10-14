@@ -76,6 +76,8 @@ export type ConversationDependencies = {
    */
   readonly turns?: ApplicationTurnRepository | undefined;
   readonly logger?: Logger | undefined;
+  /** Monotonic milliseconds, for turn latency. Test seam. */
+  readonly now?: (() => number) | undefined;
 };
 
 export type ApplicantTurnResult = {
@@ -159,6 +161,7 @@ export function createConversationService(
     turns,
     logger,
   } = dependencies;
+  const now = dependencies.now ?? (() => performance.now());
 
   /**
    * The published criteria an applicant may be told about, by the
@@ -257,6 +260,8 @@ export function createConversationService(
     },
 
     turn: async (input) => {
+      // Server latency, from the turn arriving to Q's reply being ready.
+      const receivedAt = now();
       const { guest, policy, publicGateway } = await stateFor(input.token);
       const applicationId = guest.application.id;
 
@@ -269,7 +274,10 @@ export function createConversationService(
         if (exchange.q !== null) {
           return resultFor(input.token, exchange.q.text, true);
         }
-      } else {
+      }
+      // The single slot as well: a turn answered just before the
+      // transcript store existed is still the same turn on retry.
+      {
         const last = await turnMemory.lastTurn(guest.sessionId);
         if (last !== null && last.clientTurnId === input.clientTurnId) {
           return resultFor(input.token, last.reply, true);
@@ -283,15 +291,18 @@ export function createConversationService(
       // What the person said is on the record before the model is asked,
       // so a failed model call loses nothing and a retry resumes it. A
       // retried append of the same exchange writes nothing.
-      if (turns !== undefined) {
-        await turns.append({
-          applicationId,
-          tenantId: guest.application.tenantId,
-          role: "PERSON",
-          text: input.message,
-          clientTurnId: input.clientTurnId,
-        });
-      }
+      const personSeq =
+        turns === undefined
+          ? undefined
+          : (
+              await turns.append({
+                applicationId,
+                tenantId: guest.application.tenantId,
+                role: "PERSON",
+                text: input.message,
+                clientTurnId: input.clientTurnId,
+              })
+            ).seq;
 
       const qualification = await intake.qualification(input.token);
       const facts = await intake.factsFor(input.token);
@@ -331,8 +342,11 @@ export function createConversationService(
         await intake.recordFacts({
           token: input.token,
           facts: outcome.facts,
+          // Lineage: these were heard in this person turn.
+          ...(personSeq === undefined ? {} : { sourceTurnSeq: personSeq }),
         });
       }
+      const latencyMs = Math.max(0, Math.round(now() - receivedAt));
       if (turns !== undefined) {
         await turns.append({
           applicationId,
@@ -342,6 +356,7 @@ export function createConversationService(
           clientTurnId: input.clientTurnId,
           askingDimension: outcome.asking,
           intent: outcome.intent,
+          latencyMs,
         });
       }
       // Kept as well: the single slot still answers for a composition, or
@@ -359,6 +374,7 @@ export function createConversationService(
           recorded: outcome.facts.length,
           rejected: outcome.rejectedFacts,
           history: history.recentTurns.length,
+          latencyMs,
         },
         "gateq applicant turn",
       );

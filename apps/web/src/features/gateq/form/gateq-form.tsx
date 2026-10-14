@@ -11,6 +11,9 @@ import {
 
 import {
   GATEQ_NOTE_MAX_CHARS,
+  ApplicationContactDtoSchema,
+  type ApplicationContactDto,
+  type ApplicationCoverageDto,
   type ApplicationSummaryDto,
   type PublicGatewayDto,
 } from "@capital-q/contracts";
@@ -28,23 +31,26 @@ import {
 } from "@capital-q/ui/icons";
 
 import {
+  interviewProgressAction,
   saveAnswersAction,
   startFormAction,
-  interviewProgressAction,
+  submitApplicationAction,
 } from "../apply-actions";
-import { ApplyExperience } from "../apply-experience";
-import { readRecovery, saveRecovery } from "./session-recovery";
 import { FitGlyph, type GlyphKind } from "../fit-glyph";
 import "../gateq.css";
 import { shareMaterialsAction } from "../materials-actions";
+import { readRecovery, saveRecovery, amendRecovery } from "./session-recovery";
+import { ContactStep } from "./contact-step";
 import {
   answersFromProfile,
   bandFor,
+  contactFromProfile,
   COUNTRY_CHOICES,
   CURRENCIES,
   DECLINED,
   dimensionWord,
   draftNote,
+  FLOW_PROGRESS,
   FORM_STEPS,
   formatMoney,
   INSTRUMENT_CHOICES,
@@ -52,7 +58,9 @@ import {
   maySend,
   MORE_COUNTRIES,
   normaliseAmount,
+  progressFor,
   RAISE_BANDS,
+  reachWords,
   requestFor,
   ruleLines,
   SECTOR_CHOICES,
@@ -64,11 +72,14 @@ import {
   type FormAnswers,
   type FormPrefill,
   type FormStep,
+  type InterviewLine,
   type Material,
   type RuleLine,
   type RuleStanding,
   type StepErrors,
 } from "./form-model";
+import { InterviewStep } from "./interview-step";
+import { ReviewStep } from "./review-step";
 
 /**
  * The GateQ form (F1, 2026-10-06; design a/gateq.html "Founder: GateQ form").
@@ -76,10 +87,16 @@ import {
  * A founder checks their fit with an investor in four short steps, with
  * tappable answers and "I'd rather not say" everywhere. The investor's rules
  * are on screen first; after each step the API's deterministic engine
- * answers rule by rule. Confirmed contact and the existing Q interview follow.
- * The founder reviews and explicitly submits; submission is the disclosure
- * boundary. A tab-scoped bearer credential supports recovery without relying
- * on third-party cookies.
+ * answers rule by rule. Sending is a separate press at the end: until the
+ * founder presses "Submit to <fund>", the investor receives nothing (the
+ * API's submission is the disclosure boundary). In the embed the credential
+ * lives only in this component's memory: a third-party frame has no cookie
+ * to lean on.
+ *
+ * GateQ slice 1 (2026-10-13): contact first (confirmed by account or by an
+ * emailed code), then the four steps and the rule check, then an interview
+ * with Q whose turns the server keeps, then a review of the API's coverage
+ * check. Submit exists only on the review.
  */
 
 const icon = {
@@ -107,6 +124,10 @@ export type GateQFormPreview = {
   readonly application?: ApplicationSummaryDto | null;
   readonly problem?: string | null;
   readonly loading?: boolean;
+  /** Slice 1: the confirmed contact, the interview so far, the review. */
+  readonly contact?: ApplicationContactDto | null;
+  readonly transcript?: readonly InterviewLine[];
+  readonly coverage?: ApplicationCoverageDto;
 };
 
 export type GateQFormProps = {
@@ -124,6 +145,10 @@ export type GateQFormProps = {
   readonly preview?: GateQFormPreview;
 };
 
+function key(prefix: string): string {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
 async function formRequest<T>(
   operation: () => Promise<T>,
 ): Promise<T | { readonly ok: false; readonly message: string }> {
@@ -133,7 +158,7 @@ async function formRequest<T>(
     return {
       ok: false,
       message:
-        "The connection was interrupted. Your saved answers are still here; please try again.",
+        "The connection was interrupted. Your saved application is still here; please try again.",
     };
   }
 }
@@ -159,7 +184,15 @@ export function GateQForm({
       : { ...base, materials: [deck.id] };
   });
   const fromProfile = initial.fromProfile;
-  const [step, setStep] = useState<FormStep>(preview?.step ?? "company");
+  const [step, setStep] = useState<FormStep>(preview?.step ?? "contact");
+  // Slice 1: the contact as the API holds it, and why we came back to it.
+  const [contact, setContact] = useState<ApplicationContactDto | null>(
+    preview?.contact ?? null,
+  );
+  const [contactNotice, setContactNotice] = useState<string | null>(null);
+  // The credential, for the steps that render from it. The ref is the
+  // synchronous copy the handlers use.
+  const [credential, setCredential] = useState<string | null>(null);
   const [errors, setErrors] = useState<StepErrors>({});
   const [application, setApplication] = useState<ApplicationSummaryDto | null>(
     preview?.application ?? null,
@@ -169,16 +202,15 @@ export function GateQForm({
   );
   const [pending, startTransition] = useTransition();
   const token = useRef<string | null>(null);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const [interview, setInterview] = useState(false);
+  const submitKey = useRef<string>("");
   const [recovering, setRecovering] = useState(preview === undefined);
+  const [submissionStarted, setSubmissionStarted] = useState(false);
   const heading = useRef<HTMLHeadingElement | null>(null);
   const firstRender = useRef(true);
 
   useEffect(() => {
     if (preview !== undefined) return;
     startTransition(async () => {
-      // Storage is browser-only; restore after hydration before showing inputs.
       await Promise.resolve();
       const restored = readRecovery(gateway.publicId);
       if (restored === null) {
@@ -186,21 +218,49 @@ export function GateQForm({
         return;
       }
       token.current = restored.token;
-      setSessionToken(restored.token);
+      setCredential(restored.token);
       setAnswers(restored.answers);
-      setStep(restored.step);
-      setInterview(restored.interview);
+      submitKey.current = restored.submitKey;
+      setSubmissionStarted(restored.submitKey !== "");
       const progress = await formRequest(() =>
         interviewProgressAction(restored.token),
       );
-      if (progress.ok) {
-        setApplication(progress.application);
-        if (progress.application.submittedAt !== null) setStep("sent");
-      } else setProblem(progress.message);
+      if (!progress.ok) {
+        setProblem(progress.message);
+        setStep("contact");
+        setRecovering(false);
+        return;
+      }
+      setApplication(progress.application);
+      const details = ApplicationContactDtoSchema.safeParse(
+        Reflect.get(progress.coverage.contact, "details"),
+      );
+      const canonical = details.success
+        ? details.data
+        : (restored.contact ?? null);
+      setContact(
+        canonical === null
+          ? null
+          : {
+              ...canonical,
+              emailConfirmed: progress.coverage.contact.confirmed,
+              confirmedVia: progress.coverage.contact.confirmed
+                ? canonical.confirmedVia
+                : null,
+            },
+      );
+      setStep(
+        progress.application.submittedAt !== null
+          ? "sent"
+          : !progress.coverage.contact.confirmed
+            ? "contact"
+            : restored.interview && restored.step === "check"
+              ? "interview"
+              : restored.step,
+      );
       setRecovering(false);
     });
   }, [gateway.publicId, preview]);
-
   useEffect(() => {
     if (preview !== undefined || recovering || token.current === null) return;
     const old = readRecovery(gateway.publicId);
@@ -208,11 +268,12 @@ export function GateQForm({
       token: token.current,
       answers,
       step,
-      interview,
+      contact,
+      interview: step === "interview" || step === "review",
       pendingTurn: old?.pendingTurn ?? null,
-      submitKey: old?.submitKey ?? "",
+      submitKey: submitKey.current,
     });
-  }, [answers, step, interview, recovering, gateway.publicId, preview]);
+  }, [answers, step, contact, recovering, gateway.publicId, preview]);
 
   const lines = ruleLines(gateway, application);
   const verdict = verdictFor(application);
@@ -229,6 +290,7 @@ export function GateQForm({
     field: K,
     value: FormAnswers[K],
   ) => {
+    if (submissionStarted && field === "materials") return;
     setAnswers((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
@@ -241,17 +303,35 @@ export function GateQForm({
       return null;
     }
     token.current = started.sessionToken;
-    setSessionToken(started.sessionToken);
+    setCredential(started.sessionToken);
     setApplication(started.application);
     saveRecovery(gateway.publicId, {
       token: started.sessionToken,
       answers,
       step,
       interview: false,
+      contact,
       pendingTurn: null,
       submitKey: "",
     });
     return started.sessionToken;
+  };
+
+  const onContactConfirmed = (confirmed: ApplicationContactDto) => {
+    setContact(confirmed);
+    setContactNotice(null);
+    // The form's reply-to answer follows the confirmed contact, so the
+    // investor never gets an address nobody confirmed.
+    setAnswers((current) => ({
+      ...current,
+      contactName: confirmed.name,
+      contactEmail: confirmed.email,
+      companyName:
+        current.companyName.trim() === ""
+          ? confirmed.companyName
+          : current.companyName,
+    }));
+    setStep("company");
   };
 
   const next = (from: FormStep): FormStep => {
@@ -288,24 +368,99 @@ export function GateQForm({
     });
   };
 
-  const onSend = () => {
-    if (preview !== undefined || !maySend(verdict)) return;
+  // Slice 1: the check admits; the interview comes before the review.
+  const onToInterview = () => {
+    if (!maySend(verdict)) return;
     setProblem(null);
-    if (token.current === null) return;
-    setInterview(true);
+    setStep("interview");
+  };
+
+  // The only submission path: the review's Submit button.
+  const onSubmit = () => {
+    if (preview !== undefined || step !== "review") return;
+    setProblem(null);
+    if (submitKey.current === "") submitKey.current = key("send");
+    setSubmissionStarted(true);
+    amendRecovery(gateway.publicId, { submitKey: submitKey.current });
+    startTransition(async () => {
+      const credential = token.current;
+      if (credential === null) return;
+      const resumed = await formRequest(() =>
+        interviewProgressAction(credential),
+      );
+      if (!resumed.ok) {
+        setProblem(resumed.message);
+        return;
+      }
+      if (resumed.application.submittedAt !== null) {
+        setApplication(resumed.application);
+        setStep("sent");
+        return;
+      }
+      if (readRecovery(gateway.publicId)?.pendingTurn != null) {
+        setProblem("Recover your last interview answer before submitting.");
+        setStep("interview");
+        return;
+      }
+      if (!anonymous) {
+        // Only what the founder ticked (maybe nothing); the API checks each
+        // is theirs and links the application to them for their GateQ page.
+        const shared = await formRequest(() =>
+          shareMaterialsAction(credential, answers.materials),
+        );
+        if (!shared.ok) {
+          setProblem(shared.message);
+          return;
+        }
+      }
+      const sent = await formRequest(() =>
+        submitApplicationAction(credential, submitKey.current),
+      );
+      if (!sent.ok) {
+        if (
+          "contactNotConfirmed" in sent &&
+          sent.contactNotConfirmed === true
+        ) {
+          // 409: back to the contact step; everything else is kept. The
+          // refused request recorded nothing, so the next Submit is new.
+          submitKey.current = "";
+          setContact((current) =>
+            current === null
+              ? null
+              : { ...current, emailConfirmed: false, confirmedVia: null },
+          );
+          setContactNotice(
+            "Confirm your contact email before submitting. Your answers and interview are saved.",
+          );
+          setStep("contact");
+          return;
+        }
+        setProblem(sent.message);
+        return;
+      }
+      setApplication(sent.application);
+      setStep("sent");
+    });
   };
 
   const onBack = () => {
     setProblem(null);
+    if (step === "company") return setStep("contact");
     if (step === "check") return setStep("note");
+    if (step === "interview") return setStep("check");
+    if (step === "review") return setStep("interview");
     const index = FORM_STEPS.indexOf(step as (typeof FORM_STEPS)[number]);
     if (index > 0) setStep(FORM_STEPS[index - 1] ?? "company");
   };
 
-  const n =
-    step === "check" || step === "sent" ? 5 : FORM_STEPS.indexOf(step) + 1;
-  const showResults =
-    step === "check" || step === "sent" || application !== null;
+  const n = progressFor(step);
+  const formStep = (FORM_STEPS as readonly FormStep[]).includes(step);
+  const pastCheck =
+    step === "check" ||
+    step === "interview" ||
+    step === "review" ||
+    step === "sent";
+  const showResults = pastCheck || application !== null;
   const shell = `gq-form${compact ? " gq-compact" : ""}${inApp ? " gq-in-app" : ""}`;
 
   if (preview?.loading === true || recovering) {
@@ -334,47 +489,11 @@ export function GateQForm({
     );
   }
 
-  if (
-    interview &&
-    gateway.acceptingApplications &&
-    !needsCompany &&
-    verdict !== "NOT_A_FIT" &&
-    sessionToken !== null &&
-    application !== null &&
-    step !== "sent"
-  ) {
-    return (
-      <ApplyExperience
-        gateway={gateway}
-        compact={compact}
-        initialSession={{
-          token: sessionToken,
-          application,
-          contactName: answers.contactName,
-          contactEmail: answers.contactEmail,
-          companyName: answers.companyName,
-          materialNames: materials
-            .filter((material) => answers.materials.includes(material.id))
-            .map((material) => material.name),
-        }}
-        onCorrectAnswers={() => setInterview(false)}
-        prepareSubmission={() =>
-          anonymous
-            ? Promise.resolve({ ok: true })
-            : shareMaterialsAction(token.current ?? "", answers.materials)
-        }
-      />
-    );
-  }
-
   const card = (
     <GateCard
       gateway={gateway}
       lines={lines}
-      showResults={
-        showResults &&
-        (step === "check" || step === "sent" || verdict === "NOT_A_FIT")
-      }
+      showResults={showResults && (pastCheck || verdict === "NOT_A_FIT")}
       openByDefault={!compact}
     />
   );
@@ -420,7 +539,9 @@ export function GateQForm({
   }
 
   // A required rule established as unmet: say so plainly, offer the fix.
-  if (verdict === "NOT_A_FIT" && step !== "sent") {
+  // (The interview and review show the API's own access answer instead of
+  // swapping the screen out from under the founder mid-conversation.)
+  if (verdict === "NOT_A_FIT" && (formStep || step === "check")) {
     const miss = lines.find((line) => line.standing === "DOES_NOT_MEET");
     const met = lines.filter((line) => line.standing === "MEETS").length;
     return (
@@ -471,19 +592,32 @@ export function GateQForm({
     );
   }
 
+  const stage =
+    step === "contact"
+      ? "Your details"
+      : formStep
+        ? `Step ${FORM_STEPS.indexOf(step as (typeof FORM_STEPS)[number]) + 1} of 4`
+        : step === "check"
+          ? "Your fit"
+          : step === "interview"
+            ? "Interview with Q"
+            : "Review";
   const head = (
     <div className="flex flex-col gap-2.5">
       <p className="cq-caption gq-t2">
-        Apply to {fund}
-        {n <= 4 ? ` · Step ${n} of 4` : ""}
+        Apply to {fund} · {stage}
       </p>
       <div className="gq-steps" aria-hidden="true">
-        {[1, 2, 3, 4].map((i) => (
-          <i key={i} className={i <= n ? "on" : ""} />
+        {FLOW_PROGRESS.map((segment, i) => (
+          <i key={segment} className={i + 1 <= n ? "on" : ""} />
         ))}
       </div>
     </div>
   );
+
+  // The steps that carry their own buttons.
+  const ownBar =
+    step === "contact" || step === "interview" || step === "review";
 
   return (
     <div className={shell}>
@@ -494,12 +628,12 @@ export function GateQForm({
           <div className="gq-banner gq-banner-err" role="alert">
             <CircleAlert {...icon} />
             <span>
-              <b>{step === "check" ? "Not sent." : "Not saved."}</b> {problem}{" "}
+              <b>{step === "review" ? "Not sent." : "Not saved."}</b> {problem}{" "}
               Your answers are still here.{" "}
               <Button
                 size="compact"
                 className="ml-1.5"
-                onClick={step === "check" ? onSend : onContinue}
+                onClick={step === "review" ? onSubmit : onContinue}
                 disabled={pending}
               >
                 <RotateCw {...icon} />
@@ -508,6 +642,30 @@ export function GateQForm({
             </span>
           </div>
         )}
+        {step === "contact" ? (
+          <ContactStep
+            headingRef={heading}
+            fund={fund}
+            signedIn={!anonymous}
+            initial={{
+              ...contactFromProfile(prefill),
+              ...(contact === null
+                ? {}
+                : {
+                    name: contact.name,
+                    email: contact.email,
+                    role: contact.role,
+                    companyName: contact.companyName,
+                    phone: contact.phone ?? "",
+                    preferredChannel: contact.preferredChannel ?? "",
+                  }),
+            }}
+            saved={contact}
+            ensureToken={ensureToken}
+            onConfirmed={onContactConfirmed}
+            notice={contactNotice}
+          />
+        ) : null}
         {step === "company" ? (
           <CompanyStep
             headingRef={heading}
@@ -533,6 +691,7 @@ export function GateQForm({
             errors={errors}
             materials={materials}
             anonymous={anonymous}
+            confirmed={contact?.emailConfirmed === true ? contact : null}
             set={set}
           />
         ) : null}
@@ -558,21 +717,57 @@ export function GateQForm({
             onAnswer={(dimension) => setStep(stepForDimension(dimension))}
           />
         ) : null}
+        {step === "interview" ? (
+          <InterviewStep
+            headingRef={heading}
+            fund={fund}
+            companyName={answers.companyName}
+            sessionToken={credential}
+            gatewayPublicId={gateway.publicId}
+            onFinish={() => setStep("review")}
+            onApplication={setApplication}
+            preview={
+              preview?.transcript === undefined
+                ? undefined
+                : { lines: preview.transcript }
+            }
+          />
+        ) : null}
+        {step === "review" ? (
+          <ReviewStep
+            headingRef={heading}
+            fund={fund}
+            sessionToken={credential}
+            contact={contact}
+            sharedDocuments={materials
+              .filter((m) => answers.materials.includes(m.id))
+              .map((m) => m.name)}
+            hasNote={answers.note.trim() !== ""}
+            pending={pending}
+            submissionStarted={submissionStarted}
+            onSubmit={onSubmit}
+            onContact={() => setStep("contact")}
+            onInterview={() => setStep("interview")}
+            preview={preview?.coverage}
+          />
+        ) : null}
         {step === "sent" ? (
           <div className="gq-result" style={{ padding: "8px 0" }}>
             <span className="text-(--cq-positive)">
               <FitGlyph kind="fit" size={40} />
             </span>
             <h1 ref={heading} tabIndex={-1} className="cq-title-lg">
-              Sent to {fund}
+              Thank you. {fund} has your application
             </h1>
             <p className="cq-body gq-t2" style={{ maxWidth: "52ch" }}>
+              Their team will review it, and may contact you
+              {contact === null ? "" : ` ${reachWords(contact)}`}.{" "}
               {gateway.replyWithinDays
-                ? `They promise to reply within ${gateway.replyWithinDays} working days. `
+                ? `${fund} has committed to reply within ${gateway.replyWithinDays} working days. `
                 : ""}
               {inApp
-                ? "You'll see every step on your GateQ page, and Q will tell you when they answer."
-                : "They'll reply to the email you gave."}
+                ? "You'll see every step on your GateQ page, and Q will tell you if they reply."
+                : ""}
             </p>
             {inApp ? (
               <div className="flex flex-wrap gap-2">
@@ -582,13 +777,9 @@ export function GateQForm({
               </div>
             ) : null}
           </div>
-        ) : (
+        ) : ownBar ? null : (
           <div className="gq-formbar">
-            <Button
-              variant="quiet"
-              onClick={onBack}
-              disabled={step === "company" || pending}
-            >
+            <Button variant="quiet" onClick={onBack} disabled={pending}>
               <ChevronLeft {...icon} />
               Back
             </Button>
@@ -596,10 +787,10 @@ export function GateQForm({
               <Button
                 variant="primary"
                 style={{ minWidth: 160 }}
-                onClick={onSend}
+                onClick={onToInterview}
                 disabled={pending || !maySend(verdict)}
               >
-                {pending ? "Preparing…" : "Continue with Q"}
+                Continue to interview
               </Button>
             ) : (
               <Button
@@ -713,7 +904,7 @@ function GateCard({
             </ul>
           )}
           <p className="cq-caption gq-t3">
-            Nothing is sent until you review and press Submit.
+            Nothing is sent until you press Submit.
           </p>
         </div>
       </details>
@@ -1116,11 +1307,14 @@ function ShareStep({
   errors,
   materials,
   anonymous,
+  confirmed,
   set,
 }: StepProps & {
   readonly fund: string;
   readonly materials: readonly Material[];
   readonly anonymous: boolean;
+  /** Slice 1: the contact confirmed on the first step replaces the fields. */
+  readonly confirmed: ApplicationContactDto | null;
 }) {
   return (
     <>
@@ -1159,7 +1353,12 @@ function ShareStep({
           ))}
         </ul>
       ) : null}
-      {anonymous ? (
+      {confirmed !== null ? (
+        <p className="cq-body-sm gq-t2">
+          {fund} may contact you at <b>{confirmed.email}</b>, the email you
+          confirmed.
+        </p>
+      ) : anonymous ? (
         <div className="flex flex-col gap-3">
           <div className="gq-field">
             <label className="gq-label" htmlFor="gq-cname">
@@ -1302,7 +1501,9 @@ function CheckStep({
         </div>
       ) : null}
       <p className="cq-body-sm gq-t2">
-        Sending shares: {answers.companyName || "your company"}, your answers
+        Next, a few questions from Q, then you review everything before it goes.
+        When you submit, {fund} gets: {answers.companyName || "your company"},
+        your answers
         {amount !== null
           ? ` (raising ${formatMoney(amount, answers.currency)})`
           : ""}

@@ -37,6 +37,16 @@ export type ApplicationRepository = {
     id: ApplicationId,
     declaredName: string,
   ) => Promise<void>;
+  /**
+   * GateQ slice 1: take the application's row lock for the rest of the
+   * transaction and read it as it now is. Every writer to an application
+   * (facts, turns, documents, contact) and the submission take it, so a
+   * submission sees one consistent application and nothing lands after it.
+   */
+  readonly lock: (
+    tx: TransactionContext,
+    id: ApplicationId,
+  ) => Promise<Application | null>;
 };
 
 export type ApplicationSessionRepository = {
@@ -102,6 +112,8 @@ export type ApplicationFactRepository = {
       readonly tenantId: string;
       readonly facts: readonly NewApplicationFact[];
       readonly at: string;
+      /** Lineage: the PERSON turn these were read from, when one was. */
+      readonly sourceTurnSeq?: number | null | undefined;
     },
   ) => Promise<readonly ApplicationFact[]>;
 };
@@ -141,6 +153,8 @@ export type StoredTurn = {
   readonly askingDimension: ApplicationDimension | null;
   /** Q turns only: the model's reading of the person's turn. */
   readonly intent: string | null;
+  /** Q turns only: server time to the reply, in milliseconds. */
+  readonly latencyMs: number | null;
   readonly createdAt: string;
 };
 
@@ -162,7 +176,12 @@ export type ApplicationTurnRepository = {
     readonly person: StoredTurn | null;
     readonly q: StoredTurn | null;
   }>;
-  /** Appends; an existing (client turn id, role) row is left as it is. */
+  /**
+   * Appends under the application's row lock and answers the row's seq;
+   * an existing (client turn id, role) row is left as it is and its seq
+   * returned. Throws IntakeRefusedError("ALREADY_SUBMITTED") once the
+   * application is submitted: nothing is said into it afterwards.
+   */
   readonly append: (input: {
     readonly applicationId: ApplicationId;
     readonly tenantId: string;
@@ -171,7 +190,8 @@ export type ApplicationTurnRepository = {
     readonly clientTurnId: string;
     readonly askingDimension?: ApplicationDimension | null | undefined;
     readonly intent?: string | null | undefined;
-  }) => Promise<void>;
+    readonly latencyMs?: number | null | undefined;
+  }) => Promise<{ readonly seq: number }>;
   readonly countFor: (applicationId: ApplicationId) => Promise<number>;
 };
 
@@ -202,26 +222,35 @@ export type ApplicationContactRepository = {
    * Insert or replace the details. A changed email loses its confirmation;
    * attempts reset whenever a new code is issued.
    */
-  readonly save: (input: {
-    readonly applicationId: ApplicationId;
-    readonly tenantId: string;
-    readonly name: string;
-    readonly email: string;
-    readonly role: string;
-    readonly companyName: string;
-    readonly phone: string | null;
-    readonly preferredChannel: ContactChannel | null;
-    readonly codeHash: string | null;
-    readonly codeExpiresAt: string | null;
-    readonly emailConfirmedAt: string | null;
-    readonly confirmedVia: "EMAIL_CODE" | "ACCOUNT" | null;
-  }) => Promise<StoredContact>;
-  readonly recordFailedAttempt: (applicationId: ApplicationId) => Promise<void>;
-  readonly confirm: (input: {
-    readonly applicationId: ApplicationId;
-    readonly at: string;
-    readonly via: "EMAIL_CODE" | "ACCOUNT";
-  }) => Promise<StoredContact | null>;
+  readonly save: (
+    tx: TransactionContext,
+    input: {
+      readonly applicationId: ApplicationId;
+      readonly tenantId: string;
+      readonly name: string;
+      readonly email: string;
+      readonly role: string;
+      readonly companyName: string;
+      readonly phone: string | null;
+      readonly preferredChannel: ContactChannel | null;
+      readonly codeHash: string | null;
+      readonly codeExpiresAt: string | null;
+      readonly emailConfirmedAt: string | null;
+      readonly confirmedVia: "EMAIL_CODE" | "ACCOUNT" | null;
+    },
+  ) => Promise<StoredContact>;
+  readonly recordFailedAttempt: (
+    tx: TransactionContext,
+    applicationId: ApplicationId,
+  ) => Promise<void>;
+  readonly confirm: (
+    tx: TransactionContext,
+    input: {
+      readonly applicationId: ApplicationId;
+      readonly at: string;
+      readonly via: "EMAIL_CODE" | "ACCOUNT";
+    },
+  ) => Promise<StoredContact | null>;
 };
 
 /** Titles of Evidence-owned documents, by id. Display only. */

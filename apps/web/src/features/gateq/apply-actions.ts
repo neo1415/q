@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   ApiProblemError,
   applicationTurn,
+  openApplicationInterview,
   saveApplicationContact,
   confirmAccountApplicationContact,
   confirmApplicationContact,
@@ -74,6 +75,7 @@ export type ApplyResult =
       readonly message: string;
       /** A spent allowance: wait, nothing is lost (P7 rate-limited state). */
       readonly rateLimited?: boolean;
+      readonly contactNotConfirmed?: boolean;
     };
 
 const PublicId = z.string().regex(/^[A-Za-z0-9_-]{4,64}$/);
@@ -177,6 +179,15 @@ export async function submitApplicationAction(
       application: submitted.application,
     };
   } catch (error: unknown) {
+    if (
+      error instanceof ApiProblemError &&
+      error.code === "CONTACT_NOT_CONFIRMED"
+    )
+      return {
+        ok: false,
+        contactNotConfirmed: true,
+        message: "Confirm your contact email before submitting.",
+      };
     return failure(error);
   }
 }
@@ -308,6 +319,70 @@ export async function interviewProgressAction(sessionToken: string) {
       getApplicationCoverage(url, token.data),
     ]);
     return { ok: true as const, application, transcript, coverage };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+
+export async function saveContactAction(
+  sessionToken: string,
+  contact: unknown,
+) {
+  const token = Token.safeParse(sessionToken);
+  const parsed = ApplicationContactRequestSchema.safeParse(contact);
+  const url = base();
+  if (!token.success || !parsed.success || url === null)
+    return {
+      ok: false as const,
+      message: "Please check your contact details.",
+    };
+  try {
+    return {
+      ok: true as const,
+      ...(await saveApplicationContact(url, token.data, parsed.data)),
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function transcriptAction(sessionToken: string) {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false as const, message: "Please try again." };
+  try {
+    return {
+      ok: true as const,
+      turns: (await getApplicationTranscript(url, token.data)).turns,
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function openInterviewAction(sessionToken: string) {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false as const, message: "Please try again." };
+  try {
+    return {
+      ok: true as const,
+      turns: (await openApplicationInterview(url, token.data)).turns,
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function coverageAction(sessionToken: string) {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false as const, message: "Please try again." };
+  try {
+    return {
+      ok: true as const,
+      coverage: await getApplicationCoverage(url, token.data),
+    };
   } catch (error: unknown) {
     return formFailure(error);
   }

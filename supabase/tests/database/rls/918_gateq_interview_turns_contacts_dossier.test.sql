@@ -12,7 +12,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(23);
+select plan(26);
 
 -- Fixtures ------------------------------------------------------------------------
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
@@ -96,6 +96,13 @@ select throws_ok($$
   delete from gateq.application_turns where seq = 1
 $$, '23001', null, 'nor deleted');
 
+select throws_ok($$
+  insert into gateq.application_turns (application_id, tenant_id, seq, role, text, client_turn_id, latency_ms)
+  values ('00000000-0000-4000-8000-00000000dd31', pg_temp.rls_id('tenant_b'), 3, 'PERSON', 'x', 'turn-0000003', 10)
+$$, '23514', null, 'only a Q turn carries a latency');
+
+select has_column('gateq', 'application_facts', 'source_turn_seq', 'a fact can name the turn it was heard in');
+
 -- Contacts: one per application, verifier only ------------------------------------------
 insert into gateq.application_contacts (application_id, tenant_id, name, email, role, company_name, code_hash, code_expires_at) values
   ('00000000-0000-4000-8000-00000000dd31', pg_temp.rls_id('tenant_b'), 'Ada Founder', 'ada@example.test', 'CEO', 'Rails Ltd',
@@ -139,6 +146,14 @@ select throws_ok($$
   update gateq.application_submissions set dossier = '{"schemaVersion":"rewritten"}'::jsonb
    where id = '00000000-0000-4000-8000-00000000dd61'
 $$, '23001', null, 'the dossier is never rewritten after submission');
+
+update gateq.applications set status = 'SUBMITTED', submitted_at = now()
+ where id = '00000000-0000-4000-8000-00000000dd31';
+
+select throws_ok($$
+  insert into gateq.application_turns (application_id, tenant_id, seq, role, text, client_turn_id)
+  values ('00000000-0000-4000-8000-00000000dd31', pg_temp.rls_id('tenant_b'), 3, 'PERSON', 'too late', 'turn-0000004')
+$$, '23001', null, 'nothing is said into an application after it was submitted');
 
 select throws_ok($$
   insert into gateq.application_submissions

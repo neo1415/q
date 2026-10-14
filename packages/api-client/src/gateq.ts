@@ -12,6 +12,7 @@ import {
   ApplicationCoverageDtoSchema,
   ApplicationSummaryDtoSchema,
   GATEQ_APPLY_CONTACT_PATH,
+  GATEQ_APPLY_INTERVIEW_OPEN_PATH,
   GATEQ_APPLY_CONTACT_CONFIRM_PATH,
   GATEQ_APPLY_TRANSCRIPT_PATH,
   GATEQ_APPLY_COVERAGE_PATH,
@@ -303,5 +304,23 @@ export function confirmAccountApplicationContact(
     GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
     ApplicationContactResponseSchema,
     { body: ApplicationContactAccountRequestSchema.parse(input) },
+  );
+}
+
+export function saveAccountApplicationContact(
+  session: ApiSession,
+  input: ApplicationContactAccountRequest,
+) {
+  return confirmAccountApplicationContact(session, input);
+}
+export function openApplicationInterview(
+  baseUrl: string,
+  sessionToken: string,
+) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "POST",
+    GATEQ_APPLY_INTERVIEW_OPEN_PATH,
+    ApplicationTranscriptDtoSchema,
   );
 }

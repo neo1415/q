@@ -63,6 +63,8 @@ function submission(n: number): GateqInboxDetailDto {
         label: "Traction",
         facts: [
           {
+            sourceFactId: id(500 + n),
+            sourceTurnSeq: null,
             dimension: "REVENUE",
             label: "Revenue",
             summary: `${n * 100} customers`,
@@ -77,6 +79,8 @@ function submission(n: number): GateqInboxDetailDto {
         label: "Business model",
         facts: [
           {
+            sourceFactId: id(600 + n),
+            sourceTurnSeq: null,
             dimension: "MODEL",
             label: "Model",
             summary: "Subscription",

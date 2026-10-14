@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ApplicationContactDtoSchema,
   GATEQ_DECLINED,
   GATEQ_INSTRUMENTS,
   GATEQ_LEAD_STATUSES,
@@ -11,8 +12,19 @@ const text = z.string().max(4000);
 const RecoverySchema = z
   .object({
     token: z.string().min(16).max(128),
-    step: z.enum(["company", "round", "share", "note", "check", "sent"]),
+    step: z.enum([
+      "contact",
+      "company",
+      "round",
+      "share",
+      "note",
+      "check",
+      "interview",
+      "review",
+      "sent",
+    ]),
     interview: z.boolean(),
+    contact: ApplicationContactDtoSchema.nullable().optional(),
     answers: z
       .object({
         companyName: text,
