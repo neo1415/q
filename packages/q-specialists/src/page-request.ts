@@ -118,6 +118,10 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   "handle search": d("PEOPLE_SEARCH"),
   // Relationships
   relationships: d("RELATIONSHIPS"),
+  hub: d("RELATIONSHIPS"),
+  "relationship hub": d("RELATIONSHIPS"),
+  "investment hub": d("RELATIONSHIPS"),
+  "fundraising hub": d("RELATIONSHIPS"),
   relationship: d("RELATIONSHIPS"),
   pipeline: d("RELATIONSHIPS"),
   deals: d("RELATIONSHIPS"),

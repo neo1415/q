@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
+  getResults,
   getChatUnread,
   getFitProfiles,
   listNotifications,
@@ -14,10 +15,12 @@ import {
   type RelationshipSummaryDto,
   type ReminderDto,
 } from "@capital-q/contracts";
+import { EmptyState, ErrorState } from "@capital-q/ui/states";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 
 import { PageContainer } from "@/components/app-shell/page-container";
+import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
 import {
   apiSession,
@@ -28,6 +31,14 @@ import {
   ownRelationships,
   relationshipDigests,
 } from "@/features/relationships/relationship-data";
+import { HubNavigation } from "@/features/relationships/hub-navigation";
+import {
+  hubOverviewRefs,
+  hubTitle,
+  hubViewOf,
+} from "@/features/relationships/hub-view";
+import { ResultsDashboard } from "@/features/results/results-dashboard";
+import { rangeOf } from "@/features/results/results-words";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
 import {
   listOrder,
@@ -45,19 +56,99 @@ export const dynamic = "force-dynamic";
  * relationship page. State and dates come from the API's projection over
  * relationship events; nothing here recomputes them.
  */
-export default async function RelationshipsPage() {
+export default async function RelationshipsPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const params = await searchParams;
+  const view = hubViewOf(params["view"]);
   const context = await resolveOwnContext();
-  const [items, unread, needs] = await Promise.all([
-    ownRelationships(context),
-    unreadByRelationship(),
-    noticesAndReminders(),
-  ]);
   const side =
     context.kind === "FOUNDER"
       ? "COMPANY"
       : context.kind === "INVESTOR"
         ? "INVESTOR"
         : "NONE";
+  if (view === "overview") {
+    const range = rangeOf(params["range"]);
+    const stage =
+      params["stage"] !== undefined && /^[A-Z_]{2,40}$/.test(params["stage"])
+        ? params["stage"]
+        : null;
+    const session = side === "NONE" ? null : await apiSession();
+    const results =
+      session === null
+        ? null
+        : await getResults(session, { range }).catch(() => null);
+    // The Results endpoint authorises each projection. A conflicting role read
+    // is unavailable, never silently rendered as the other party's perspective.
+    const available =
+      results !== null &&
+      ((side === "INVESTOR" && results.side === "INVESTOR") ||
+        (side === "COMPANY" && results.side === "FOUNDER"));
+    return (
+      <PageContainer className="flex flex-col gap-4">
+        <h1 className="cq-title-lg text-(--cq-text-primary)">
+          {hubTitle(side)}
+        </h1>
+        <HubNavigation side={side} view={view} />
+        {side === "NONE" &&
+        context.kind === "NONE" &&
+        context.unavailable !== true ? (
+          <EmptyState
+            title="Set up your organisation"
+            description="Your relationships and capital activity will gather here."
+            action={
+              <Link className={buttonClassName("primary")} href="/welcome">
+                Set up
+              </Link>
+            }
+          />
+        ) : !available || results === null ? (
+          <ErrorState
+            title="Overview couldn't load"
+            description="Your records are unchanged. Try again in a moment."
+            action={
+              <Link
+                className={buttonClassName("secondary")}
+                href="/relationships?view=overview"
+              >
+                Try again
+              </Link>
+            }
+          />
+        ) : (
+          <QSection
+            id="hub-overview"
+            kind="RELATIONSHIP_LIST"
+            refs={hubOverviewRefs(results, stage)}
+            total={hubOverviewRefs(results, stage).length}
+            label="Relationships in the overview"
+          >
+            <QControl id="section.hub-overview" kind="SECTION">
+              <ResultsDashboard
+                heading="Overview"
+                headingLevel={2}
+                showReports={false}
+                basePath="/relationships?view=overview"
+                range={range}
+                stage={stage}
+                download={new URLSearchParams({ range }).toString()}
+                usage={null}
+                results={results}
+              />
+            </QControl>
+          </QSection>
+        )}
+      </PageContainer>
+    );
+  }
+  const [items, unread, needs] = await Promise.all([
+    ownRelationships(context),
+    unreadByRelationship(),
+    noticesAndReminders(),
+  ]);
   // The first page's cards are read in full (later pages by cursor), beside
   // the investor's fit read: both need only the list (L1 latency sweep).
   const [digests, fits] = await Promise.all([
@@ -77,7 +168,7 @@ export default async function RelationshipsPage() {
           2026-10-04); adding one is a small control beside the title. */}
       <div className="flex items-center gap-2">
         <h1 className="cq-title-lg min-w-0 flex-1 text-(--cq-text-primary)">
-          Relationships
+          {hubTitle(side)}
         </h1>
         {side === "INVESTOR" ? (
           // ADR 0023: founders' Connection Requests wait on the investor here.
@@ -102,6 +193,7 @@ export default async function RelationshipsPage() {
           </Link>
         )}
       </div>
+      <HubNavigation side={side} view={view} />
       {/* Q room R1: every relationship on this page, by id, for Q. */}
       <QSection
         id="relationships"

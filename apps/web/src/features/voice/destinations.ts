@@ -11,7 +11,8 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   CAPITAL: "/capital",
   DISCOVER: "/discover",
   COMPANY_VISIBILITY: "/company/visibility",
-  RELATIONSHIPS: "/relationships",
+  // Hub overview is the Q entry; existing direct record-list links stay valid.
+  RELATIONSHIPS: "/relationships?view=overview",
   SETTINGS: "/settings",
   VERIFICATION: "/verification",
   PITCH: "/pitch",
