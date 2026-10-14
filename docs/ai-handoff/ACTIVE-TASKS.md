@@ -1,8 +1,8 @@
 # Active tasks — authoritative cross-model board
 
-## October 14 owner continuation
+## October14 active product ownership
 
-Finish gated Q PR80 release and actual investor rehearsal first. Functional Relationship Hub H1 is explicitly authorized using the current design system; PR75 visual design remains deferred. Continue isolated GateQ guest Evidence recovery and native submission/dossier acceptance. Current authority and exact evidence are at the top of STATE.md.
+Q attribution is deployed37b5414e and the actual investor cards/profile/risks/comparison journey passes. Close the newly proven GateQ typed-stage corruption through protected release and native submission/dossier acceptance. Functional Hub H1 is approved; finish PR81 exact checks and role-aware browser acceptance. Guest Evidence b35813de is tested foundations, not disclosure-ready. See STATE top for exact source authority, receipts and remaining speed gaps.
 
 ## Current execution board — October 14, 07:35 UTC
 
