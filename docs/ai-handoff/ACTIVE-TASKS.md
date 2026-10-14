@@ -1,8 +1,16 @@
 # Active tasks — authoritative cross-model board
 
-## Active takeover — October14
+## October 14 — deployed acceptance and full GateQ / Hub continuation
 
-Finish isolated GateQ83/84 qualification safeguards, Hub81 real role/mobile/Q navigation acceptance and protected release, then H2 scoped queries/saved views/exports. Parallel research lane repairs lost public aviation competitor target; Capital Q product inventory is separate. Functional owner approval supersedes historical prototype-approval blocker. See latest STATE for exact evidence, fixtures and CI. No prototype styling, duplicate CRM or Q runtime.
+- **Fresh production verified:** `71c5d4a58c314eca7981c08265b2e29015bc2b7b`; protected CI38556079265 SUCCESS. All four Railway services SUCCESS on this revision; previous revisions drained. GateQ canonical qualification-shape repair (PR83/84) and Hub H1 (PR81/85) are released. Historical checkpoints below are preserved, not current release authority.
+- **Hub H1 LIVE VERIFIED:** authenticated fictional investor and founder, desktop1440×960 and mobile390×844, actual production UI. Role-aware headings/GateQ controls, Relationships/Overview tabs, Work return, no horizontal overflow PASS. Desktop typed Q generated successful navigation receipts to the existing overview; final-words-to-push62/7ms, settled heading5529/3912ms (single samples, not p50/p95). No voice certification, full CRM claim or Tavus room. Private browser evidence stays outside Git.
+- **GateQ remains immediate priority:** native confirmed-account founder form → contextual Q interview → reload recovery → explicit reviewed Submit → exact-reference investor brief and expanded frozen three-turn transcript PASS on production71c. Separate existing fictional investor received404 for both foreign gateway and exact submitted dossier. All recorded facts remain applicant claims/self-reported; zero attached documents. No guest email OTP, uploaded documents, investor Q or p50/p95 certification claimed. Prior pre-repair session/history preserved; no historical fact rewrite or seed bypass. Guest Evidence is not released or evidence-complete.
+- **Parallel ownership:** root owns native GateQ acceptance, intake/Q/disclosure/investor composition and integration. `hub_foundation` owns bounded H2 server-authorized list/filter/cursor/export, scoped personal saved views/columns, existing table/board and Q controls. `guest_evidence_recovery` owns actual signed-provider expiry/fencing, canonical Evidence storage/contracts/tests and draft migrations only. No duplicate CRM or Q engine; Q Pitch untouched.
+- **Preservation:** unrelated older contact source/tests committed and pushed as `codex/wip-product-contact-preserved-oct14` at5049a718; not a merge target. No recoverable H2 branch or dirty Hub work found; continuing H2 from merged H1. PR86/87/88 preserved; research secondary.
+
+## October14 active product ownership
+
+Q attribution is deployed37b5414e and the actual investor cards/profile/risks/comparison journey passes. Close the newly proven GateQ typed-stage corruption through protected release and native submission/dossier acceptance. Functional Hub H1 is approved; finish PR81 exact checks and role-aware browser acceptance. Guest Evidence b35813de is tested foundations, not disclosure-ready. See STATE top for exact source authority, receipts and remaining speed gaps.
 
 ## Current execution board — October 14, 07:35 UTC
 
