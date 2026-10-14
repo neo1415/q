@@ -665,3 +665,59 @@ describe("pipeline commands use the registered controls without a model", () => 
     ).toBe(false);
   });
 });
+
+describe("opening an exact pipeline relationship uses its native link", () => {
+  it.each(["COMPANY", "INVESTOR_ORGANISATION"] as const)(
+    "uses the visible %s pipeline rather than page aliases or old cards",
+    async (kind) => {
+      const page: QPageManifest = {
+        ...CAPITAL_PAGE,
+        sections: [
+          {
+            id: "pipeline",
+            kind: "RELATIONSHIP_LIST",
+            refs: [
+              { kind, id: AJOPOT },
+              { kind, id: KORA },
+            ],
+            total: 2,
+          },
+        ],
+        controls: [{ id: "list.pipeline", kind: "LIST", count: 2 }],
+      };
+      const run = seam([message("Q", "Older companies", [companyCards])]);
+      const answer = await run.say(
+        "Open the first relationship in this pipeline.",
+        page,
+      );
+      expect(run.delegatedWith).toHaveLength(0);
+      expect(answer?.blocks).toEqual([
+        {
+          kind: "UI_INTENT",
+          intent: expect.objectContaining({
+            kind: "UI_ACT",
+            act: "SELECT_ITEM",
+            target: "list.pipeline",
+            index: 1,
+          }) as unknown,
+        },
+      ]);
+    },
+  );
+  it("does not treat a question about the first relationship as navigation", async () => {
+    const page: QPageManifest = {
+      ...CAPITAL_PAGE,
+      controls: [{ id: "list.pipeline", kind: "LIST", count: 2 }],
+    };
+    const run = seam();
+    const answer = await run.say(
+      "Explain the first relationship in this pipeline",
+      page,
+    );
+    expect(
+      (answer?.blocks ?? []).some(
+        (b) => b.kind === "UI_INTENT" && b.intent.kind === "UI_ACT",
+      ),
+    ).toBe(false);
+  });
+});

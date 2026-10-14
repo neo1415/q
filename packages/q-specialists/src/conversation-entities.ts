@@ -412,6 +412,34 @@ function pipelineControlBinding(
     .replace(/^please\s+/iu, "")
     .replace(/[.!?]$/u, "");
   const normalized = command.toLowerCase().replace(/[–—]/gu, "-");
+  // An explicit pipeline ordinal addresses the native relationship link,
+  // even when older company cards remain in conversation history.
+  if (
+    /\bpipeline\b/iu.test(command) &&
+    /\b(?:relationships?|records?)\b/iu.test(command) &&
+    DO_IT.test(command)
+  ) {
+    const ask = referenceAskOf(command);
+    const list = controls.find(
+      (control) => control.id === "list.pipeline" && control.kind === "LIST",
+    );
+    if (ask?.kind === "ORDINAL" && list !== undefined) {
+      const index = ask.position === -1 ? list.count : ask.position;
+      if (
+        index !== undefined &&
+        index > 0 &&
+        (list.count === undefined || index <= list.count)
+      ) {
+        return {
+          target: list.id,
+          act: "SELECT_ITEM",
+          index,
+          note: `RESOLVED: item ${String(index)} of the registered pipeline list.`,
+        };
+      }
+    }
+  }
+
   let target: string | undefined;
   let value: string | undefined;
   const sort = /^sort\s+(?:(?:this|the)\s+)?pipeline\s+by\s+(.+)$/iu.exec(
