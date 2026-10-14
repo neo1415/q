@@ -14,6 +14,7 @@ import type { ApplicationFact } from "../src/contracts/index.js";
 import {
   createGateQInterviewer,
   InterviewUnavailableError,
+  InterviewTurnOutcomeSchema,
   type InterviewTurnInput,
 } from "../src/application/interviewer.js";
 import { questionNeedsFor } from "../src/application/question-needs.js";
@@ -101,6 +102,87 @@ const turn = (
 });
 
 describe("what survives validation", () => {
+  it.each([
+    ["company.stage", { kind: "TEXT", text: "seed" }],
+    ["company.country", { kind: "CODE", code: "Kenya" }],
+    ["company.sector_phrases", { kind: "TEXT", text: "Climate" }],
+    ["raise.amount", { kind: "TEXT", text: "1500000 USD" }],
+    ["raise.currency", { kind: "TEXT", text: "USD" }],
+  ] as const)(
+    "rejects %s proposals that would erase usable qualification data",
+    async (dimension, value) => {
+      const { service } = interviewer({
+        ...RESULT,
+        facts: [
+          {
+            dimension,
+            value,
+            provenance: "APPLICANT_PROVIDED",
+            correction: false,
+          },
+        ],
+      });
+      const outcome = await service.turn(turn());
+      expect(outcome.facts).toEqual([]);
+      expect(outcome.rejectedFacts).toBe(1);
+      expect(outcome.reply).toBe(RESULT.reply);
+    },
+  );
+
+  it("replays an older paid checkpoint without restoring a wrongly shaped stage", () => {
+    const outcome = InterviewTurnOutcomeSchema.parse({
+      reply: RESULT.reply,
+      intent: "ANSWER",
+      facts: [
+        {
+          dimension: "company.stage",
+          value: { kind: "TEXT", text: "seed" },
+          provenance: "APPLICANT_PROVIDED",
+        },
+        {
+          dimension: "company.country",
+          value: { kind: "CODE", code: "KE" },
+          provenance: "APPLICANT_PROVIDED",
+        },
+      ],
+      rejectedFacts: 2,
+      asking: null,
+      questionForQ: null,
+      readyToReview: false,
+    });
+    expect(outcome.reply).toBe(RESULT.reply);
+    expect(outcome.facts.map((fact) => fact.dimension)).toEqual([
+      "company.country",
+    ]);
+    expect(outcome.rejectedFacts).toBe(3);
+  });
+
+  it("keeps a stated canonical stage and explicit unknown as separate valid proposals", async () => {
+    const { service } = interviewer({
+      ...RESULT,
+      facts: [
+        {
+          dimension: "company.stage",
+          value: { kind: "CODE", code: "seed" },
+          provenance: "APPLICANT_PROVIDED",
+          correction: true,
+        },
+        {
+          dimension: "raise.amount",
+          value: { kind: "NONE" },
+          provenance: "UNKNOWN",
+          correction: false,
+        },
+      ],
+    });
+    const outcome = await service.turn(turn());
+    expect(outcome.facts.map((fact) => fact.value)).toEqual([
+      { kind: "CODE", code: "seed" },
+      { kind: "NONE" },
+    ]);
+    expect(outcome.rejectedFacts).toBe(0);
+  });
+
   it("never upgrades a new founder claim to document-supported based on model assertion alone", async () => {
     const { service } = interviewer({
       ...RESULT,
