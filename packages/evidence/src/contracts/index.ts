@@ -439,6 +439,16 @@ export type Document = {
   readonly version: number;
 };
 
+/** Only trusted processing may resolve this owner; organisation reads exclude it. */
+export type ApplicationOwnedDocument = Omit<Document, "ownerOrganisationId" | "createdByUserId" | "companyId"> & {
+  readonly ownerKind: "GATEQ_APPLICATION";
+  readonly applicationId: string;
+  readonly ownerOrganisationId: null;
+  readonly createdByUserId: null;
+  readonly companyId: null;
+};
+export type ProcessingDocument = Document | ApplicationOwnedDocument;
+
 export type DocumentVersion = {
   readonly id: DocumentVersionId;
   readonly tenantId: TenantId;
@@ -450,7 +460,7 @@ export type DocumentVersion = {
   readonly mimeType: string;
   readonly sizeBytes: number;
   readonly sha256: string;
-  readonly uploadedByUserId: UserId;
+  readonly uploadedByUserId: UserId | null;
   readonly uploadedAt: UtcTimestamp;
   readonly supersedesVersionId: DocumentVersionId | null;
   readonly processingStatus: ProcessingStatus;

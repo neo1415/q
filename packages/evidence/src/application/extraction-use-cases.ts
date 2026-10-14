@@ -117,7 +117,7 @@ export function createRecordDocumentExtraction(
     if (version === null) {
       throw new DocumentVersionNotFoundError();
     }
-    const document = await repositories.documents.findInTenant(
+    const document = await (repositories.documents.findForProcessing ?? repositories.documents.findInTenant)(
       dependencies.sql,
       tenantId,
       version.documentId,

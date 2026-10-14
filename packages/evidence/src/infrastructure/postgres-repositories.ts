@@ -61,6 +61,7 @@ import {
   type ClaimEvidenceLink,
   type ClaimRevision,
   type Document,
+  type ApplicationOwnedDocument,
   type DocumentProcessingRun,
   type DocumentVersion,
   type EvidenceItem,
@@ -226,7 +227,7 @@ function toDocument(row: unknown): Document {
 
 function selectDocuments(executor: DatabaseExecutor) {
   return executor`
-    select d.id, d.tenant_id, d.company_id, d.owner_organisation_id, d.document_type, d.title,
+    select d.id, d.tenant_id, d.company_id, d.owner_organisation_id, d.owner_kind, d.application_id, d.document_type, d.title,
            d.visibility_scope, d.sensitivity_class, d.download_audience,
            d.current_version_id, d.status,
            d.created_by_user_id, d.created_at, d.updated_at, d.version
@@ -272,8 +273,26 @@ export function createPostgresDocumentRepository(): DocumentRepository {
     findById,
     findInTenant: async (executor, tenantId, documentId) => {
       const rows = await executor`
-        ${selectDocuments(executor)} where d.id = ${documentId} and d.tenant_id = ${tenantId}`;
+        ${selectDocuments(executor)} where d.id = ${documentId} and d.tenant_id = ${tenantId} and d.owner_kind = 'ORGANISATION'`;
       return rows.length === 0 ? null : toDocument(rows[0]);
+    },
+    findForProcessing: async (executor, tenantId, documentId) => {
+      const rows = await executor`
+        ${selectDocuments(executor)} where d.id = ${documentId} and d.tenant_id = ${tenantId}`;
+      if (rows.length === 0) return null;
+      const scope = z.object({ owner_kind: z.enum(["ORGANISATION", "GATEQ_APPLICATION"]), application_id: z.string().uuid().nullable() }).parse(rows[0]);
+      if (scope.owner_kind === "ORGANISATION") return toDocument(rows[0]);
+      const r = DocumentRow.extend({ owner_organisation_id: z.null(), created_by_user_id: z.null(), company_id: z.null() }).parse(rows[0]);
+      const applicationId = z.string().uuid().parse(scope.application_id);
+      const document: ApplicationOwnedDocument = {
+        id: r.id, tenantId: r.tenant_id, companyId: null, ownerOrganisationId: null,
+        ownerKind: "GATEQ_APPLICATION", applicationId, createdByUserId: null,
+        documentType: r.document_type, title: r.title, visibilityScope: r.visibility_scope,
+        sensitivityClass: r.sensitivity_class, downloadAudience: r.download_audience,
+        currentVersionId: r.current_version_id, status: r.status, createdAt: r.created_at,
+        updatedAt: r.updated_at, version: r.version,
+      };
+      return document;
     },
     lockById: async (tx, tenantId, ownerOrganisationId, documentId) => {
       const rows = await tx.sql`
@@ -440,7 +459,7 @@ const VersionRow = z.object({
   mime_type: z.string(),
   size_bytes: z.union([z.number(), z.string()]).transform(Number),
   sha256: z.string(),
-  uploaded_by_user_id: UserIdSchema,
+  uploaded_by_user_id: UserIdSchema.nullable(),
   uploaded_at: Timestamp,
   supersedes_version_id: DocumentVersionIdSchema.nullable(),
   processing_status: ProcessingStatusSchema,

@@ -116,6 +116,8 @@ export type DocumentRepository = {
     documentId: DocumentId,
   ) => Promise<Document | null>;
   /** Tenant-scoped lookup for the read port; ownership is returned, not filtered. */
+  /** Server processing only; no user-facing read may use this scope. */
+  readonly findForProcessing?: (executor: DatabaseExecutor, tenantId: TenantId, documentId: DocumentId) => Promise<import("../contracts/index.js").ProcessingDocument | null>;
   readonly findInTenant: (
     executor: DatabaseExecutor,
     tenantId: TenantId,

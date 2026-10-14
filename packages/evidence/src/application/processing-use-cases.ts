@@ -15,7 +15,7 @@ import {
   ProcessingRunStatusSchema,
   ProcessingStatusSchema,
   TextExtractionStatusSchema,
-  type Document,
+  type ProcessingDocument,
   type DocumentProcessingRun,
   type DocumentVersion,
 } from "../contracts/index.js";
@@ -228,7 +228,7 @@ export function createAdvanceVersionProcessingState(
  */
 export type ProcessingTarget = {
   readonly version: DocumentVersion;
-  readonly document: Document;
+  readonly document: ProcessingDocument;
 };
 
 export function createResolveProcessingTarget(
@@ -246,7 +246,7 @@ export function createResolveProcessingTarget(
     if (version === null) {
       return null;
     }
-    const document = await repositories.documents.findInTenant(
+    const document = await (repositories.documents.findForProcessing ?? repositories.documents.findInTenant)(
       sql,
       version.tenantId,
       version.documentId,
@@ -351,7 +351,7 @@ export function createCompleteDocumentProcessing(
       if (version === null) {
         throw new DocumentVersionNotFoundError();
       }
-      const document = await repositories.documents.findInTenant(
+      const document = await (repositories.documents.findForProcessing ?? repositories.documents.findInTenant)(
         tx.sql,
         tenantId,
         version.documentId,
@@ -368,7 +368,8 @@ export function createCompleteDocumentProcessing(
           ? {}
           : { provenance: parsed.provenance }),
       });
-      await outbox.enqueue(
+      // Guest documents never emit the organisation onboarding trigger.
+      if (document.ownerOrganisationId !== null) await outbox.enqueue(
         tx,
         documentReadyEvent(
           {
