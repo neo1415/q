@@ -231,6 +231,14 @@ function pointedAt(
   manifest: QPageManifest | null | undefined,
 ): PointedAt | null {
   const ask = referenceAskOf(text);
+  const control = controlBindingOf(text, manifest?.controls);
+  if (
+    control?.target === "list.pipeline" &&
+    /\bpipeline\b/iu.test(text) &&
+    asksToOperate(text)
+  ) {
+    return { ask, resolved: null, note: control.note, control };
+  }
   if (ask !== null) {
     const latestQ = [...history].reverse().find((one) => one.role === "Q");
     const resolved = resolveReference(ask, {
@@ -247,7 +255,6 @@ function pointedAt(
   }
   // C's request: the page's own controls ("open the readiness tab", "the
   // second one" on a list the page registered without record refs).
-  const control = controlBindingOf(text, manifest?.controls);
   return control === null
     ? null
     : { ask, resolved: null, note: control.note, control };
@@ -265,6 +272,7 @@ function controlActBlock(control: ControlBinding): QResultBlock {
       act: control.act,
       target: control.target,
       ...(control.index === undefined ? {} : { index: control.index }),
+      ...(control.value === undefined ? {} : { value: control.value }),
     },
   };
 }
