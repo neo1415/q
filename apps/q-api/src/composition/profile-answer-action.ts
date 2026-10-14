@@ -173,6 +173,27 @@ function resolveCategories(
   return { ids, unknown };
 }
 
+/**
+ * A short vocabulary's own names, so a refusal can name what fits. Live
+ * 2026-10-14: "B2B SaaS and subscription software" was refused with only
+ * generic examples, and Q then wrote the business models into the
+ * person's headline through another tool. Long vocabularies (industries)
+ * keep the examples; listing hundreds of names would not help.
+ */
+function categoryChoices(step: OnboardingStepManifest): readonly string[] {
+  const c = step.configuration;
+  const vocabularies = new Set(
+    c.stepType === "reference_select" ? c.vocabularyCodes : [],
+  );
+  const names = REFERENCE_TAXONOMY.nodes
+    .filter(
+      (node) =>
+        vocabularies.has(node.vocabularyCode) && node.status === "ACTIVE",
+    )
+    .map((node) => node.displayName);
+  return names.length <= 40 ? names : [];
+}
+
 function categoryName(id: string): string {
   return (
     REFERENCE_TAXONOMY.nodes.find((node) => node.id === id)?.displayName ?? id
@@ -213,8 +234,12 @@ export function resolveProfileAnswer(
     );
     const { ids, unknown } = resolveCategories(step, split);
     if (unknown.length > 0 || ids.length === 0) {
+      const choices = categoryChoices(step);
       return {
-        reason: `Not a category Capital Q knows for "${title}": ${unknown.join(", ") || "nothing named"}. Use the taxonomy's own names (for example Fintech, B2B SaaS, Nigeria, West Africa).`,
+        reason:
+          choices.length > 0
+            ? `Not a category Capital Q knows for "${title}": ${unknown.join(", ") || "nothing named"}. Choose from: ${choices.join(", ")}. Ask them which fit rather than changing another record.`
+            : `Not a category Capital Q knows for "${title}": ${unknown.join(", ") || "nothing named"}. Use the taxonomy's own names (for example Fintech, B2B SaaS, Nigeria, West Africa).`,
       };
     }
     if (ids.length < c.minItems || ids.length > c.maxItems) {
