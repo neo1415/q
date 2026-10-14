@@ -1,0 +1,50 @@
+\set ON_ERROR_STOP on
+select current_database() = 'cq_gateq_supersession_test' as disposable \gset
+\if :disposable
+\else
+  \echo 'Refusing: use the disposable cq_gateq_supersession_test database'
+  \quit 1
+\endif
+-- DISPOSABLE LOCAL DATABASE ONLY: cq_gateq_supersession_test.
+-- Thin ancestor tables supply synthetic identities/gateways. They do NOT
+-- reproduce the platform RLS/authentication schema. The actual applications,
+-- facts, transcript, exchange claims, index, CHECK/FK and correction migration
+-- below come directly from immutable canonical migrations.
+-- Protected full-Supabase pgTAP CI is still required before any release.
+do $$ begin if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon; end if; if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated; end if; end $$;
+create schema extensions; create schema identity; create schema core; create schema gateq;
+create table identity.tenants(id uuid primary key);
+create table core.investor_organisations(id uuid primary key, tenant_id uuid, organisation_id uuid, investor_type text, display_name text);
+create table gateq.gateways(id uuid primary key, tenant_id uuid, investor_organisation_id uuid, organisation_id uuid, public_id text, name text, created_by_user_id uuid);
+create table gateq.gateway_versions(id uuid primary key, gateway_id uuid, tenant_id uuid, version_number integer, status text, inbound_mode text, public_title text, qualification_policy_version text, created_by_user_id uuid, published_by_user_id uuid, published_at timestamptz);
+\ir ../../../../migrations/20261002090000_gateq_applications.sql
+\ir ../../../../migrations/20261223090000_gateq_interview_turns_contacts_dossier.sql
+\ir ../../../../migrations/20261223100000_gateq_exchange_claims.sql
+\ir ../../../../migrations/20261224100000_gateq_fact_supersession.sql
+insert into identity.tenants values ('00000000-0000-4000-8000-0000000000a3'), ('00000000-0000-4000-8000-0000000000b3');
+insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
+  ('00000000-0000-4000-8000-00000000dd01', '00000000-0000-4000-8000-0000000000b3'::uuid, '00000000-0000-4000-8000-0000000000b4'::uuid, 'VC', 'Interview Capital');
+
+insert into gateq.gateways (id, tenant_id, investor_organisation_id, organisation_id, public_id, name, created_by_user_id) values
+  ('00000000-0000-4000-8000-00000000dd11', '00000000-0000-4000-8000-0000000000b3'::uuid, '00000000-0000-4000-8000-00000000dd01', '00000000-0000-4000-8000-0000000000b4'::uuid,
+   'gq_23456789abcdefghjkmnpqrs01', 'Seed programme', '00000000-0000-4000-8000-0000000000b1'::uuid);
+
+insert into gateq.gateway_versions
+  (id, gateway_id, tenant_id, version_number, status, inbound_mode, public_title, qualification_policy_version,
+   created_by_user_id, published_by_user_id, published_at)
+values
+  ('00000000-0000-4000-8000-00000000dd21', '00000000-0000-4000-8000-00000000dd11', '00000000-0000-4000-8000-0000000000b3'::uuid, 1,
+   'PUBLISHED', 'QUALIFIED', 'Seed-stage fintech', 'gateq-qualification.v1',
+   '00000000-0000-4000-8000-0000000000b1'::uuid, '00000000-0000-4000-8000-0000000000b1'::uuid, now());
+
+insert into gateq.applications (id, tenant_id, gateway_id, gateway_version_id, public_reference) values
+  ('00000000-0000-4000-8000-00000000dd31', '00000000-0000-4000-8000-0000000000b3'::uuid, '00000000-0000-4000-8000-00000000dd11',
+   '00000000-0000-4000-8000-00000000dd21', 'ga_23456789abcdefghjkmnpqrs01');
+
+
+
+insert into gateq.applications (id, tenant_id, gateway_id, gateway_version_id, public_reference)
+select '00000000-0000-4000-8000-00000000dd32', tenant_id, gateway_id, gateway_version_id,
+       'ga_23456789abcdefghjkmnpqrs02'
+from gateq.applications where id = '00000000-0000-4000-8000-00000000dd31';
+

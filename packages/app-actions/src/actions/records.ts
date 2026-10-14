@@ -499,7 +499,7 @@ const PERSON_PROFILE = defineAppAction<
     name: "update_my_profile",
     purposes: ["GENERAL_QUESTION", ...OWN_TURNS],
     description:
-      "Prepares a change to the person's own profile: displayName (what to call them), headline (one line about themselves; null clears it) and timeZone (IANA, such as Africa/Lagos). Not their title or role: at their company that is set_my_company_role, at their investor organisation set_my_investor_role. Nothing changes until they approve exactly it.",
+      "Prepares a change to the person's own profile: displayName (what to call them), headline (one line about themselves; null clears it) and timeZone (IANA, such as Africa/Lagos). Not their title or role: at their company that is set_my_company_role, at their investor organisation set_my_investor_role. Never for what they invest in or look for (sectors, business models, customer types, founder preferences, green flags, exclusions): those are propose_profile_answer_change, and a headline is never a place to store them. Nothing changes until they approve exactly it.",
     input: PersonTool,
     references: {},
     eval: {
@@ -828,7 +828,7 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     tool: {
       name: "update_investor_profile",
       description:
-        "Prepares a change to their own investor organisation's declared profile, as its page makes it: displayName, investorType, websiteUrl, hqCountry (two-letter code), publicDescription, deploymentState, inboundPreference. Every field to change in one call; null clears one. Not anyone's own title at the fund: that is set_my_investor_role. Nothing changes until they approve exactly it.",
+        "Prepares a change to their own investor organisation's declared profile, as its page makes it: displayName, investorType, websiteUrl, hqCountry (two-letter code), publicDescription, deploymentState, inboundPreference. Every field to change in one call; null clears one. Change publicDescription only when they ask to change the fund's public description: mandate and preference answers (sectors, business models, customer types, founder preferences, green flags, exclusions) are propose_profile_answer_change, never this. Not anyone's own title at the fund: that is set_my_investor_role. Nothing changes until they approve exactly it.",
       input: InvestorTool,
       references: {},
       scopes: INVESTOR_SCOPES,

@@ -53,7 +53,7 @@ type CriterionSpec = {
 };
 
 type PolicyOverrides = {
-  readonly status?: "DRAFT" | "PUBLISHED";
+  readonly status?: "DRAFT" | "PUBLISHED" | "SUPERSEDED";
   readonly gatewayStatus?: "ACTIVE" | "DISABLED";
   readonly versionNumber?: number;
 };
@@ -65,7 +65,8 @@ function policyOf(
 ): GatewayPolicy {
   const gatewayId = randomUUID();
   const versionId = randomUUID();
-  const published = (overrides.status ?? "PUBLISHED") === "PUBLISHED";
+  const status = overrides.status ?? "PUBLISHED";
+  const published = status === "PUBLISHED" || status === "SUPERSEDED";
   const criteria: GatewayCriterion[] = specs.map((spec, index) => ({
     id: randomUUID() as GatewayCriterion["id"],
     versionId: versionId as GatewayCriterion["versionId"],
@@ -100,7 +101,7 @@ function policyOf(
       createdByUserId: USER,
       publishedByUserId: published ? USER : null,
       publishedAt: published ? NOW : null,
-      supersededAt: null,
+      supersededAt: status === "SUPERSEDED" ? NOW : null,
       createdAt: NOW,
       updatedAt: NOW,
     },
@@ -180,6 +181,16 @@ describe("the door and the fit are two questions", () => {
     );
     expect(result.access).toBe("MAY_NOT_APPLY");
     expect(result.accessReasonCode).toBe("GATEWAY_DISABLED");
+  });
+
+  it("still judges an application under the version it was bound to after a republish (live 2026-10-14)", () => {
+    // §15: the policy an application was bound to is the policy it is
+    // judged under. Refusing a superseded version made every in-progress
+    // application a 500 the moment its investor published new rules.
+    const result = run(
+      policyOf("QUALIFIED", [{ config: SECTOR }], { status: "SUPERSEDED" }),
+    );
+    expect(result.criteria).toHaveLength(1);
   });
 
   it("refuses to decide anything from a draft", () => {
