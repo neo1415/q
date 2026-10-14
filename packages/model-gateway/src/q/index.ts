@@ -5384,7 +5384,6 @@ export function createModelGatewayQAnswer(
             latest.content,
           ) &&
           screenCompanyId !== null &&
-          companiesRead.profiles.size === 1 &&
           companiesRead.profiles.has(screenCompanyId)
             ? askedSubjects(request.subjects, plan).filter(
                 (subject) =>
