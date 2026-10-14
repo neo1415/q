@@ -387,6 +387,15 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
       const filled = Object.fromEntries(
         Object.entries(fields).filter(([, value]) => value !== undefined),
       );
+      if (operation === "UPDATE" && Object.keys(filled).length === 0) {
+        // Live 2026-10-14: a mandate described in business models, customer
+        // types, green flags and exclusions reached this tool with nothing
+        // it owns, and the empty update surfaced as a contract error. Name
+        // the tool that does own those answers so Q can use it instead.
+        return refusal(
+          "None of that is a mandate field this changes (name, discovery mode, cheque range, stages or the mandate in their own words). Sectors, geographies, business models, customer types, founder preferences, green flags and exclusions are changed with propose_profile_answer_change.",
+        );
+      }
       if (operation === "CREATE") {
         return {
           operation,
