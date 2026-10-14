@@ -121,6 +121,12 @@ export type DocumentRepository = {
     tenantId: TenantId,
     documentId: DocumentId,
   ) => Promise<Document | null>;
+  /** Trusted pipeline only; guest custody never reaches organisation APIs. */
+  readonly findForProcessing?: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    documentId: DocumentId,
+  ) => Promise<import("../contracts/index.js").ProcessingDocument | null>;
   /** Row lock for a version registration; same visibility rule as findById. */
   readonly lockById: (
     tx: TransactionContext,
