@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## Latest continuation priorities
+
+Description90 protectedgreen/promoted72d, rollout/browserproof pending. Claimcapture92/3fe079b0 local149tests+package/staticgatesPASS; roottypes/CI/liveproof pending. Primaryfixnext: exactselected-dossier manifest hydration plus fullsource payload beside600-charreceipt. NoINVQimplementationyet. CanonicalH2pipeline2d9dfa1e/guestexpiry553316c5 next; cloudview/productinventoryWIPs preserved, notnewproductionplatforms. See STATEtop for exactevidence/commands.
+
 ## Current priority — October14, 17:23 WAT
 
 P0: protectedrelease90 (description89). P1: exactauthorizedsubmitted-dossier Q context/largefinding contract; interruptedrepairnotfoundlocally. P2: recordvalidtraction/use-of-funds independentofnextquestions, thensecureguestEvidence. P3: existinghub-h2-pipeline2d9dfa1e, notanotherrewrite; cloudviewb4a2a68e isunverifiedadd-onwith2test/typefailures. Research86/88andproductinventoryaed12b0c secondary. Production71c5 allfourSUCCESS, existingtextsubmissionandH1productionproofpreserved. See STATEtopforexactSHAs/reproduction/risks.
