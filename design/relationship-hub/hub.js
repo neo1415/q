@@ -22,7 +22,8 @@
     compass: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm3.5 5.5l-2 5-5 2 2-5z",
     grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
     bank: "M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18",
-    users: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6",
+    users:
+      "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6",
     hub: "M4 5h16M4 12h10M4 19h6M18 15l3 3-3 3",
     gate: "M4 21V8l8-5 8 5v13M9 21v-6h6v6",
     work: "M4 7h16v12H4zM9 7V4h6v3",
@@ -43,8 +44,10 @@
     msg: "M4 5h16v11H8l-4 4z",
     chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   };
-  const icon = (n) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[n]}"/></svg>`;
-  const qMark = (working) => `<span class="aperture${working ? " working" : ""}" aria-hidden="true"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="var(--cq-surface-raised)"/><g class="ring"><circle cx="18" cy="18" r="10" fill="none" stroke="var(--cq-q-light)" stroke-width="3" stroke-dasharray="52 12"/></g><path d="M24 24l5 5" stroke="var(--cq-q-light)" stroke-width="3" stroke-linecap="round"/><circle cx="18" cy="18" r="4" fill="var(--cq-q-core)" stroke="var(--cq-q-light)" stroke-width="1"/></svg></span>`;
+  const icon = (n) =>
+    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[n]}"/></svg>`;
+  const qMark = (working) =>
+    `<span class="aperture${working ? " working" : ""}" aria-hidden="true"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="var(--cq-surface-raised)"/><g class="ring"><circle cx="18" cy="18" r="10" fill="none" stroke="var(--cq-q-light)" stroke-width="3" stroke-dasharray="52 12"/></g><path d="M24 24l5 5" stroke="var(--cq-q-light)" stroke-width="3" stroke-linecap="round"/><circle cx="18" cy="18" r="4" fill="var(--cq-q-core)" stroke="var(--cq-q-light)" stroke-width="1"/></svg></span>`;
   const fict = `<span class="fictional">fictional</span>`;
   const q = (id) => `data-q="${id}"`;
 
@@ -72,16 +75,55 @@
     returnTo: null,
   };
 
-  const INV_AREAS = [["overview", "Overview"], ["pipeline", "Pipeline"], ["gateq", "GateQ"], ["meetings", "Meetings & activity"], ["portfolio", "Portfolio"], ["reports", "Reports"]];
-  const FND_AREAS = [["overview", "Overview"], ["investors", "Investors"], ["fundraising", "Fundraising"], ["requests", "Meetings & requests"], ["updates", "Updates"], ["reports", "Reports"]];
-  const INV_TABS = [["overview", "Overview"], ["evidence", "Intelligence & evidence"], ["gateq", "GateQ dossier"], ["meetings", "Meetings"], ["documents", "Documents"], ["notes", "Messages, notes & tasks"], ["diligence", "Diligence"], ["work", "Q Work"], ["history", "History"]];
-  const FND_TABS = [["overview", "Overview"], ["meetings", "Meetings"], ["requests", "Requests"], ["documents", "Shared documents"], ["messages", "Messages"], ["intel", "Q intelligence"], ["history", "History"]];
+  const INV_AREAS = [
+    ["overview", "Overview"],
+    ["pipeline", "Pipeline"],
+    ["gateq", "GateQ"],
+    ["meetings", "Meetings & activity"],
+    ["portfolio", "Portfolio"],
+    ["reports", "Reports"],
+  ];
+  const FND_AREAS = [
+    ["overview", "Overview"],
+    ["investors", "Investors"],
+    ["fundraising", "Fundraising"],
+    ["requests", "Meetings & requests"],
+    ["updates", "Updates"],
+    ["reports", "Reports"],
+  ];
+  const INV_TABS = [
+    ["overview", "Overview"],
+    ["evidence", "Intelligence & evidence"],
+    ["gateq", "GateQ dossier"],
+    ["meetings", "Meetings"],
+    ["documents", "Documents"],
+    ["notes", "Messages, notes & tasks"],
+    ["diligence", "Diligence"],
+    ["work", "Q Work"],
+    ["history", "History"],
+  ];
+  const FND_TABS = [
+    ["overview", "Overview"],
+    ["meetings", "Meetings"],
+    ["requests", "Requests"],
+    ["documents", "Shared documents"],
+    ["messages", "Messages"],
+    ["intel", "Q intelligence"],
+    ["history", "History"],
+  ];
 
   const company = (id) => D.companies.find((c) => c.id === id);
   const investor = (id) => D.investors.find((c) => c.id === id);
   const sw = (s) => D.stateWords[s] || s;
   const stateLabel = (s) => {
-    const cls = s === "INVESTED" ? "pos" : s === "IN_DILIGENCE" || s === "MEETING_HELD" ? "accent" : s === "PAUSED" ? "warn" : "";
+    const cls =
+      s === "INVESTED"
+        ? "pos"
+        : s === "IN_DILIGENCE" || s === "MEETING_HELD"
+          ? "accent"
+          : s === "PAUSED"
+            ? "warn"
+            : "";
     return `<span class="label ${cls}">${sw(s)}</span>`;
   };
 
@@ -92,11 +134,15 @@
     if (S.area === "work") parts.push(S.workId);
     let h = "#" + parts.join("/");
     const qs = [];
-    if (S.area === "pipeline" || S.area === "investors") qs.push("view=" + S.view);
-    if (S.recordTab === "documents" && S.area === "record") qs.push("page=" + S.docPage);
-    if (S.transcriptAt && S.area === "record") qs.push("t=" + S.transcriptAt.replace(":", ""));
+    if (S.area === "pipeline" || S.area === "investors")
+      qs.push("view=" + S.view);
+    if (S.recordTab === "documents" && S.area === "record")
+      qs.push("page=" + S.docPage);
+    if (S.transcriptAt && S.area === "record")
+      qs.push("t=" + S.transcriptAt.replace(":", ""));
     if (qs.length) h += "?" + qs.join("&");
-    if (location.hash !== h) history.replaceState(null, "", location.pathname + location.search + h);
+    if (location.hash !== h)
+      history.replaceState(null, "", location.pathname + location.search + h);
   }
   function fromHash() {
     const raw = location.hash.replace(/^#/, "");
@@ -105,12 +151,16 @@
     const [role, area, a, b] = path.split("/");
     if (role === "investor" || role === "founder") S.role = role;
     if (area) S.area = area;
-    if (S.area === "record") { S.recordId = a || (S.role === "investor" ? "halden" : "northgate"); S.recordTab = b || "overview"; }
+    if (S.area === "record") {
+      S.recordId = a || (S.role === "investor" ? "halden" : "northgate");
+      S.recordTab = b || "overview";
+    }
     if (S.area === "work") S.workId = a || "w1";
     const p = new URLSearchParams(qs || "");
     if (p.get("view")) S.view = p.get("view");
     if (p.get("page")) S.docPage = Number(p.get("page"));
-    if (p.get("t")) S.transcriptAt = p.get("t").replace(/(\d\d)(\d\d)/, "$1:$2");
+    if (p.get("t"))
+      S.transcriptAt = p.get("t").replace(/(\d\d)(\d\d)/, "$1:$2");
     if (p.get("q") === "open") S.qOpen = true;
     if (p.get("drawer")) S.drawer = p.get("drawer");
     if (p.get("compare")) S.compare = true;
@@ -118,9 +168,11 @@
 
   /* ---------------- shell ---------------- */
   function sidebar() {
-    const hubLabel = S.role === "investor" ? "Investment Hub" : "Fundraising Hub";
+    const hubLabel =
+      S.role === "investor" ? "Investment Hub" : "Fundraising Hub";
     const inHub = !["work"].includes(S.area);
-    const item = (ic, label, active, act, hint = "") => `<button class="nav-item" ${active ? 'aria-current="page"' : ""} data-action="${act}">${icon(ic)}<span>${label}</span>${hint ? `<span class="hint">${hint}</span>` : ""}</button>`;
+    const item = (ic, label, active, act, hint = "") =>
+      `<button class="nav-item" ${active ? 'aria-current="page"' : ""} data-action="${act}">${icon(ic)}<span>${label}</span>${hint ? `<span class="hint">${hint}</span>` : ""}</button>`;
     return `<nav class="sidebar" aria-label="Main">
       <div class="brand">${qMark(false).replace('class="aperture"', 'class="aperture" style="width:26px;height:26px"')}<span>Capital Q</span></div>
       ${item("compass", "Discover", false, "noop")}
@@ -140,7 +192,8 @@
     </nav>`;
   }
   function bottomNav() {
-    const b = (ic, label, act, cur) => `<button data-action="${act}" ${cur ? 'aria-current="page"' : ""}>${icon(ic)}<span>${label}</span></button>`;
+    const b = (ic, label, act, cur) =>
+      `<button data-action="${act}" ${cur ? 'aria-current="page"' : ""}>${icon(ic)}<span>${label}</span></button>`;
     return `<nav class="bottom-nav" aria-label="Main">${b("compass", "Discover", "noop")}${b("bank", "Capital", "noop")}${b("home", "Q", "q-open")}${b("hub", "Hub", "go:overview", S.area !== "work")}${b("more", "More", "noop")}</nav>`;
   }
   function areaTabs() {
@@ -158,11 +211,17 @@
     return `<section class="briefing" ${q("section.briefing")} aria-label="Q briefing">${qMark(false)}<div>${lines.map((l) => `<p>${l}</p>`).join("")}<div class="scope">${icon("lock").replace("<svg", '<svg style="width:12px;height:12px;vertical-align:-2px"')} Briefing from records you are allowed to see. ${scope} <span class="fictional">simulated</span></div></div><div><button class="btn sm" data-action="q-investigate">Investigate further</button></div></section>`;
   }
   function invOverview() {
-    const counts = D.pipelineOrder.map((s) => [s, D.companies.filter((c) => c.state === s).length]);
-    return `${briefing([
-      "<strong>Three things need you.</strong> Halden Grid asked for a diligence decision by 23 Oct. Q's follow-up to them is waiting for your approval. Corvid Health has had no decision since its 7 Oct meeting.",
-      "Since Monday, 2 GateQ applications arrived that fit your mandate, and Kestrel Robotics moved into diligence.",
-    ], "Read from the Results read and 61 relationship events.")}
+    const counts = D.pipelineOrder.map((s) => [
+      s,
+      D.companies.filter((c) => c.state === s).length,
+    ]);
+    return `${briefing(
+      [
+        "<strong>Three things need you.</strong> Halden Grid asked for a diligence decision by 23 Oct. Q's follow-up to them is waiting for your approval. Corvid Health has had no decision since its 7 Oct meeting.",
+        "Since Monday, 2 GateQ applications arrived that fit your mandate, and Kestrel Robotics moved into diligence.",
+      ],
+      "Read from the Results read and 61 relationship events.",
+    )}
     <div class="stages" style="--n:5" ${q("list.stage-strip")}>${counts.map(([s, n]) => `<button class="stage" data-action="stage:${s}" ${q("filter.stage-" + s.toLowerCase())}><div class="n">${n}</div><div class="l">${sw(s)}</div></button>`).join("")}</div>
     <p class="faint" style="font-size:12px;margin:6px 2px 0">Stages are derived from each relationship's event history. Picking one opens the pipeline filtered to it.</p>
     <div class="grid two" style="margin-top:20px">
@@ -189,7 +248,12 @@
       </div></section>
     </div>`;
   }
-  const workWord = (s) => ({ RUNNING: "Running · step 3 of 4", NEEDS_APPROVAL: "Needs your approval", DONE: "Completed Mon 08:01" }[s]);
+  const workWord = (s) =>
+    ({
+      RUNNING: "Running · step 3 of 4",
+      NEEDS_APPROVAL: "Needs your approval",
+      DONE: "Completed Mon 08:01",
+    })[s];
   function needRow(id, t, m, cta, act) {
     const c = company(id);
     return `<div class="row"><span class="avatar sm">${c.initials}</span><div class="grow"><div class="title">${t}</div><div class="meta">${m}</div></div><button class="btn sm" data-action="${act}">${cta}</button></div>`;
@@ -201,19 +265,44 @@
   /* ---------------- investor: pipeline ---------------- */
   function filtered() {
     let list = D.companies.filter((c) => c.state !== "PASSED");
-    if (S.saved === "mine") list = list.filter((c) => c.owner === D.viewerInvestor.person);
-    if (S.saved === "diligence") list = list.filter((c) => c.state === "IN_DILIGENCE");
+    if (S.saved === "mine")
+      list = list.filter((c) => c.owner === D.viewerInvestor.person);
+    if (S.saved === "diligence")
+      list = list.filter((c) => c.state === "IN_DILIGENCE");
     if (S.saved === "gateq") list = list.filter((c) => c.source === "GateQ");
     if (S.saved === "active") list = list.filter((c) => c.state !== "INVESTED");
     if (S.stage) list = list.filter((c) => c.state === S.stage);
-    if (S.search) list = list.filter((c) => c.name.toLowerCase().includes(S.search.toLowerCase()));
+    if (S.search)
+      list = list.filter((c) =>
+        c.name.toLowerCase().includes(S.search.toLowerCase()),
+      );
     return list;
   }
   function pipelineToolbar(kind) {
-    const saved = kind === "inv"
-      ? [["active", "All active"], ["mine", "My relationships"], ["diligence", "In diligence"], ["gateq", "From GateQ"]]
-      : [["active", "All active"], ["mine", "Need my reply"], ["diligence", "In diligence"], ["gateq", "Committed"]];
-    const stages = kind === "inv" ? D.pipelineOrder : ["INTEREST_EXPRESSED", "CONNECTED", "MEETING_HELD", "IN_DILIGENCE", "INVESTED"];
+    const saved =
+      kind === "inv"
+        ? [
+            ["active", "All active"],
+            ["mine", "My relationships"],
+            ["diligence", "In diligence"],
+            ["gateq", "From GateQ"],
+          ]
+        : [
+            ["active", "All active"],
+            ["mine", "Need my reply"],
+            ["diligence", "In diligence"],
+            ["gateq", "Committed"],
+          ];
+    const stages =
+      kind === "inv"
+        ? D.pipelineOrder
+        : [
+            "INTEREST_EXPRESSED",
+            "CONNECTED",
+            "MEETING_HELD",
+            "IN_DILIGENCE",
+            "INVESTED",
+          ];
     return `<div class="views" role="tablist" aria-label="Saved views" ${q("list.saved-views")}>${saved.map(([k, l]) => `<button class="view" role="tab" aria-selected="${S.saved === k}" data-action="saved:${k}" ${q("tab.view-" + k)}>${l}</button>`).join("")}<button class="view" data-action="toast:Saved views belong to you; a team default needs admin rights (simulated)">+ Save view</button></div>
     <div class="toolbar">
       <label class="search">${icon("search")}<span class="sr">Search</span><input id="pipe-search" placeholder="Search ${kind === "inv" ? "companies" : "investors"}" value="${S.search}" ${q("input.pipeline-search")} /></label>
@@ -227,22 +316,26 @@
   }
   function invPipeline() {
     const list = filtered();
-    const body = S.view === "table"
-      ? `<div class="table-wrap stack-mobile"><table ${q("list.pipeline")} data-count="${list.length}"><thead><tr><th>Company</th><th>Stage</th><th>Mandate fit</th><th>Evidence</th><th>Owner</th><th>Next action</th><th>Last activity</th></tr></thead><tbody>
+    const body =
+      S.view === "table"
+        ? `<div class="table-wrap stack-mobile"><table ${q("list.pipeline")} data-count="${list.length}"><thead><tr><th>Company</th><th>Stage</th><th>Mandate fit</th><th>Evidence</th><th>Owner</th><th>Next action</th><th>Last activity</th></tr></thead><tbody>
         ${list.map((c, i) => `<tr data-action="open:${c.id}:overview" ${q("item.pipeline-" + (i + 1))}><td><div style="display:flex;gap:10px;align-items:center"><span class="avatar sm">${c.initials}</span><div><div class="name">${c.name}</div><div class="sub">${c.sector} · ${c.geo} · ${c.stage}</div></div></div></td><td>${stateLabel(c.state)}</td><td class="hide-m">${c.fit.word}</td><td class="hide-m">${c.quality.word.replace("Evidence: ", "")}</td><td class="hide-m">${c.owner}</td><td class="hide-m">${c.next}</td><td class="num hide-m">${c.last}</td></tr>`).join("")}
         ${list.length === 0 ? `<tr><td colspan="7" class="muted">No relationships match. Clear the filter to see all.</td></tr>` : ""}
       </tbody></table></div>`
-      : `<p class="board-note">Columns are derived states. Moving a card opens the action that records the event (for example "Start diligence"); it never edits a stage directly.</p><div class="board" ${q("list.pipeline")}>${D.pipelineOrder.map((s) => {
-          const items = list.filter((c) => c.state === s);
-          return `<div class="col"><h3>${sw(s)} <span class="faint">${items.length}</span></h3>${items.map((c) => `<div class="tile" data-action="open:${c.id}:overview"><div class="name">${c.name}</div><div class="meta">${c.sector} · ${c.owner}</div><div class="next">Next: ${c.next}</div></div>`).join("")}</div>`;
-        }).join("")}</div>`;
+        : `<p class="board-note">Columns are derived states. Moving a card opens the action that records the event (for example "Start diligence"); it never edits a stage directly.</p><div class="board" ${q("list.pipeline")}>${D.pipelineOrder
+            .map((s) => {
+              const items = list.filter((c) => c.state === s);
+              return `<div class="col"><h3>${sw(s)} <span class="faint">${items.length}</span></h3>${items.map((c) => `<div class="tile" data-action="open:${c.id}:overview"><div class="name">${c.name}</div><div class="meta">${c.sector} · ${c.owner}</div><div class="next">Next: ${c.next}</div></div>`).join("")}</div>`;
+            })
+            .join("")}</div>`;
     return `${pipelineToolbar("inv")}${body}<p class="faint" style="font-size:12px;margin-top:10px">${list.length} relationships · one row per canonical company relationship · cursor pagination after 50 rows</p>`;
   }
 
   /* ---------------- investor: GateQ ---------------- */
   function invGateq() {
     const sel = D.gateq.find((g) => g.id === S.gateqSel);
-    const bandCls = (b) => (b === "FITS" ? "pos" : b === "PARTIAL" ? "warn" : "");
+    const bandCls = (b) =>
+      b === "FITS" ? "pos" : b === "PARTIAL" ? "warn" : "";
     return `<div class="grid two">
       <section class="panel"><header><h2>Applications</h2><span class="faint">${D.gateq.length}</span><span class="right faint" style="font-size:12px">Fit is GateQ's rule check, not a judgement of the company</span></header><div class="rows" ${q("list.gateq-applications")}>
         ${D.gateq.map((g) => `<div class="row link" data-action="gsel:${g.id}" ${S.gateqSel === g.id ? 'style="background:var(--cq-surface-subtle)"' : ""}><span class="avatar sm">${g.initials}</span><div class="grow"><div class="title">${g.name}${fict}</div><div class="meta">${g.ask} · ${g.rules}</div></div><span class="label ${bandCls(g.band)}">${g.bandWord}</span><span class="faint" style="font-size:12px;width:80px;text-align:right">${g.when}</span></div>`).join("")}
@@ -309,8 +402,10 @@
   function axes(c) {
     // Progressive disclosure: the reasons show on Overview; other tabs keep the five words only.
     const full = S.recordTab === "overview";
-    const a = (k, o) => `<div class="axis"><div class="k">${k}</div><div class="v">${o.word}</div>${full && o.detail ? `<div class="w">${o.detail}</div>` : ""}</div>`;
-    if (!full) return `<div class="axes compact" aria-label="Separate assessments">${a("Mandate fit", c.fit)}${a("Business evidence", c.quality)}${a("Interest", c.interest)}${a("Readiness", c.readiness)}${a("Outcome", c.outcome)}</div>`;
+    const a = (k, o) =>
+      `<div class="axis"><div class="k">${k}</div><div class="v">${o.word}</div>${full && o.detail ? `<div class="w">${o.detail}</div>` : ""}</div>`;
+    if (!full)
+      return `<div class="axes compact" aria-label="Separate assessments">${a("Mandate fit", c.fit)}${a("Business evidence", c.quality)}${a("Interest", c.interest)}${a("Readiness", c.readiness)}${a("Outcome", c.outcome)}</div>`;
     return `<div class="axes" aria-label="Separate assessments">${a("Mandate fit", c.fit)}${a("Business evidence", c.quality)}${a("Interest", c.interest)}${a("Readiness", c.readiness)}${a("Outcome", c.outcome)}</div>
     <p class="faint" style="font-size:12px;margin:6px 2px 0">Five separate readings, never one score. Fit compares to your declared mandate; it is not a judgement of quality.</p>`;
   }
@@ -333,11 +428,14 @@
     return `${recordHeader(c)}${axes(c)}${recordTabs(INV_TABS)}${body}`;
   }
   function recOverview(c) {
-    return `${briefing([
-      `<strong>Where you are:</strong> in diligence since 26 Sep. The founder asked for your next step by 23 Oct.`,
-      `<strong>What changed:</strong> model v3 (10 Oct) raises gross margin to 71%; deck v2 said 64%. Both stay on record until reconciled.`,
-      `<strong>What they need:</strong> a decision on diligence. <strong>What you asked for:</strong> revised model (received) and two references (not yet).`,
-    ], "From 14 events, 3 documents and 1 meeting on this relationship.")}
+    return `${briefing(
+      [
+        `<strong>Where you are:</strong> in diligence since 26 Sep. The founder asked for your next step by 23 Oct.`,
+        `<strong>What changed:</strong> model v3 (10 Oct) raises gross margin to 71%; deck v2 said 64%. Both stay on record until reconciled.`,
+        `<strong>What they need:</strong> a decision on diligence. <strong>What you asked for:</strong> revised model (received) and two references (not yet).`,
+      ],
+      "From 14 events, 3 documents and 1 meeting on this relationship.",
+    )}
     <div class="grid halves">
       <section class="panel"><header><h2>Open items</h2></header><div class="rows">
         <div class="row">${icon("clock")}<div class="grow"><div class="title">Two customer references</div><div class="meta">Requested 9 Oct · due Mon 13 Oct · overdue 1 day</div></div><span class="label warn">Open</span></div>
@@ -346,12 +444,25 @@
       </div></section>
       <section class="panel"><header><h2>Latest meeting</h2><span class="right"><button class="btn sm ghost" data-action="rtab:meetings">Open</button></span></header><div class="body">
         <div class="muted" style="margin-bottom:8px">${D.meeting.when}</div>
-        <ul class="summary-list" style="padding:0 0 0 18px">${D.meeting.summary.slice(0, 3).map((s) => `<li>${s.text} <button class="linkish mono" data-action="jump:${s.at}">${s.at}</button></li>`).join("")}</ul>
+        <ul class="summary-list" style="padding:0 0 0 18px">${D.meeting.summary
+          .slice(0, 3)
+          .map(
+            (s) =>
+              `<li>${s.text} <button class="linkish mono" data-action="jump:${s.at}">${s.at}</button></li>`,
+          )
+          .join("")}</ul>
       </div></section>
     </div>`;
   }
   function claimTags(cl) {
-    const tcls = cl.truth === "VERIFIED" ? "pos" : cl.truth === "Q_INFERENCE" ? "accent" : cl.truth === "UNKNOWN" ? "outline" : "";
+    const tcls =
+      cl.truth === "VERIFIED"
+        ? "pos"
+        : cl.truth === "Q_INFERENCE"
+          ? "accent"
+          : cl.truth === "UNKNOWN"
+            ? "outline"
+            : "";
     const lcls = cl.life === "CONTRADICTORY" ? "warn" : "outline";
     return `<span class="label ${tcls}">${D.truthWords[cl.truth]}</span><span class="label outline">${D.evidenceWords[cl.evidence]}</span><span class="label ${lcls}">${D.lifeWords[cl.life]}</span>`;
   }
@@ -370,7 +481,8 @@
     ${S.compare ? compareTable() : ""}`;
   }
   function compareTable() {
-    const row = (k, a, as, b, bs) => `<tr><td class="muted">${k}</td><td>${a}<span class="src">${as}</span></td><td>${b}<span class="src">${bs}</span></td></tr>`;
+    const row = (k, a, as, b, bs) =>
+      `<tr><td class="muted">${k}</td><td>${a}<span class="src">${as}</span></td><td>${b}<span class="src">${bs}</span></td></tr>`;
     return `<section class="panel compare" style="margin-top:20px" ${q("section.comparison")}><header><h2>Comparison · Halden Grid and Kestrel Robotics</h2><span class="label accent">Prepared by Q · source-backed</span><span class="right"><button class="btn sm ghost" data-action="compare-off">Close</button></span></header>
     <div class="table-wrap" style="border:0;border-radius:0"><table style="min-width:620px"><thead><tr><th>Measure</th><th>Halden Grid ${fict}</th><th>Kestrel Robotics ${fict}</th></tr></thead><tbody>
       ${row("Gross margin", "71% <span class='label warn'>Contradictory</span>", "Model v3 p. 7 · deck v2 slide 9 says 64%", "58%", "Management accounts Q3 p. 2 · document-supported")}
@@ -389,7 +501,26 @@
         <div class="row"><div class="grow"><div class="title">Rules</div><div class="meta">Stage, sector, geography, cheque, revenue evidence, full-time founders, no conflict</div></div></div>
       </div></div></section>
       <section class="panel"><header><h2>Interview transcript</h2><span class="right faint" style="font-size:12px">Q asked · founder answered</span></header><div class="rows">
-        ${[["00:20", "Q", "What does a customer pay for first?"], ["00:41", "Tomas Reyes", "Day-ahead load forecasting for regional grid operators."], ["03:41", "Tomas Reyes", "Net revenue retention is above 120% across our first cohort."], ["04:05", "Q", "Is that measured over a full year?"], ["04:22", "Tomas Reyes", "Over nine months, for two customers."]].map(([t, w, x]) => `<div class="line"><span class="ts">${t}</span><span class="who">${w}</span><span class="text">${x}</span></div>`).join("")}
+        ${[
+          ["00:20", "Q", "What does a customer pay for first?"],
+          [
+            "00:41",
+            "Tomas Reyes",
+            "Day-ahead load forecasting for regional grid operators.",
+          ],
+          [
+            "03:41",
+            "Tomas Reyes",
+            "Net revenue retention is above 120% across our first cohort.",
+          ],
+          ["04:05", "Q", "Is that measured over a full year?"],
+          ["04:22", "Tomas Reyes", "Over nine months, for two customers."],
+        ]
+          .map(
+            ([t, w, x]) =>
+              `<div class="line"><span class="ts">${t}</span><span class="who">${w}</span><span class="text">${x}</span></div>`,
+          )
+          .join("")}
       </div></section></div>`;
   }
   function recMeeting() {
@@ -411,9 +542,12 @@
   function recDocument() {
     const d = D.document;
     const pageBody = (n) => {
-      if (n === 4) return `<h4>Revenue build</h4><p>Recurring revenue by customer, monthly. <mark>Annual recurring revenue at September 2026: EUR 1.2m.</mark></p><div class="bar" style="width:80%"></div><div class="bar" style="width:62%"></div><div class="bar" style="width:70%"></div>`;
-      if (n === 7) return `<h4>Cost of revenue</h4><p>Hosting moved in-house in July; inference costs per forecast fell by about half.</p><div class="bar" style="width:76%"></div><div class="bar" style="width:40%"></div><p><mark>Gross margin, Q3 2026: 71%.</mark> Q2 2026: 63%.</p><div class="bar" style="width:66%"></div>`;
-      if (n === 9) return `<h4>Cash and runway</h4><p>Cash at 30 Sep and monthly net burn. Runway is computed in the model.</p><div class="bar" style="width:72%"></div><div class="bar" style="width:52%"></div>`;
+      if (n === 4)
+        return `<h4>Revenue build</h4><p>Recurring revenue by customer, monthly. <mark>Annual recurring revenue at September 2026: EUR 1.2m.</mark></p><div class="bar" style="width:80%"></div><div class="bar" style="width:62%"></div><div class="bar" style="width:70%"></div>`;
+      if (n === 7)
+        return `<h4>Cost of revenue</h4><p>Hosting moved in-house in July; inference costs per forecast fell by about half.</p><div class="bar" style="width:76%"></div><div class="bar" style="width:40%"></div><p><mark>Gross margin, Q3 2026: 71%.</mark> Q2 2026: 63%.</p><div class="bar" style="width:66%"></div>`;
+      if (n === 9)
+        return `<h4>Cash and runway</h4><p>Cash at 30 Sep and monthly net burn. Runway is computed in the model.</p><div class="bar" style="width:72%"></div><div class="bar" style="width:52%"></div>`;
       return `<h4>${["Cover", "Summary", "Assumptions", "", "Pipeline", "Headcount", "", "Operating costs", "", "Scenarios", "Use of funds", "Appendix"][n - 1]}</h4><p>Fictional sheet content for the prototype.</p><div class="bar" style="width:${50 + ((n * 13) % 40)}%"></div><div class="bar" style="width:${40 + ((n * 7) % 50)}%"></div><div class="bar" style="width:${55 + ((n * 11) % 35)}%"></div>`;
     };
     return `<div class="doc-meta"><strong style="color:var(--cq-text-primary);font-size:14px">${d.title} ${d.version}</strong>${fict}<span>Immutable version · fingerprint <span class="mono">${d.sha}…</span></span><span>Shared by ${d.sharedBy} · ${d.sharedAt}</span><span class="scope-mark">${icon("share")} relationship_shared</span>
@@ -435,14 +569,73 @@
   }
   function recDiligence() {
     return `<section class="panel"><header><h2>Diligence requests</h2><span class="faint">5</span></header><div class="rows">
-      ${[["Financial model, monthly", "Received v3 · 10 Oct", "pos", "Received"], ["Two customer references", "Due 13 Oct", "warn", "Overdue"], ["Pilot contracts", "Received · 2 of 3", "", "Partly"], ["Hosting invoices Q2–Q3", "Suggested by Q · not requested", "outline", "Draft"], ["Cap table", "Requested 9 Oct", "", "Open"]].map(([t, m, c, l]) => `<div class="row"><div class="grow"><div class="title">${t}</div><div class="meta">${m}</div></div><span class="label ${c}">${l}</span></div>`).join("")}
+      ${[
+        ["Financial model, monthly", "Received v3 · 10 Oct", "pos", "Received"],
+        ["Two customer references", "Due 13 Oct", "warn", "Overdue"],
+        ["Pilot contracts", "Received · 2 of 3", "", "Partly"],
+        [
+          "Hosting invoices Q2–Q3",
+          "Suggested by Q · not requested",
+          "outline",
+          "Draft",
+        ],
+        ["Cap table", "Requested 9 Oct", "", "Open"],
+      ]
+        .map(
+          ([t, m, c, l]) =>
+            `<div class="row"><div class="grow"><div class="title">${t}</div><div class="meta">${m}</div></div><span class="label ${c}">${l}</span></div>`,
+        )
+        .join("")}
     </div></section>`;
   }
   function recWork() {
-    return `<section class="panel"><header><h2>Q Work on this relationship</h2></header><div class="rows">${D.work.slice(0, 2).map((w) => `<div class="row link" data-action="work:${w.id}">${qMark(w.state === "RUNNING").replace('class="aperture', 'style="width:24px;height:24px" class="aperture')}<div class="grow"><div class="title">${w.title}</div><div class="meta">${workWord(w.state)}</div></div><button class="btn sm">Open</button></div>`).join("")}</div></section>`;
+    return `<section class="panel"><header><h2>Q Work on this relationship</h2></header><div class="rows">${D.work
+      .slice(0, 2)
+      .map(
+        (w) =>
+          `<div class="row link" data-action="work:${w.id}">${qMark(w.state === "RUNNING").replace('class="aperture', 'style="width:24px;height:24px" class="aperture')}<div class="grow"><div class="title">${w.title}</div><div class="meta">${workWord(w.state)}</div></div><button class="btn sm">Open</button></div>`,
+      )
+      .join("")}</div></section>`;
   }
   function recHistory(c) {
-    const ev = [["14", "10 Oct 08:14", "document_shared", "HUMAN", "Financial model v3 shared (relationship_shared)"], ["13", "9 Oct 14:52", "meeting_held", "SYSTEM", "Meeting held · 52 min"], ["12", "26 Sep", "diligence_started", "HUMAN", "Diligence started by Amara Okafor"], ["9", "25 Sep", "connection_accepted", "HUMAN", "Founder accepted connection"], ["8", "24 Sep", "interest_expressed", "HUMAN", "Interest expressed by Amara Okafor"], ["1", "21 Sep", "gateq_application", "CONNECTED_SYSTEM", "Applied through GateQ"]];
+    const ev = [
+      [
+        "14",
+        "10 Oct 08:14",
+        "document_shared",
+        "HUMAN",
+        "Financial model v3 shared (relationship_shared)",
+      ],
+      ["13", "9 Oct 14:52", "meeting_held", "SYSTEM", "Meeting held · 52 min"],
+      [
+        "12",
+        "26 Sep",
+        "diligence_started",
+        "HUMAN",
+        "Diligence started by Amara Okafor",
+      ],
+      [
+        "9",
+        "25 Sep",
+        "connection_accepted",
+        "HUMAN",
+        "Founder accepted connection",
+      ],
+      [
+        "8",
+        "24 Sep",
+        "interest_expressed",
+        "HUMAN",
+        "Interest expressed by Amara Okafor",
+      ],
+      [
+        "1",
+        "21 Sep",
+        "gateq_application",
+        "CONNECTED_SYSTEM",
+        "Applied through GateQ",
+      ],
+    ];
     return `<section class="panel"><header><h2>History</h2><span class="right faint" style="font-size:12px">Append-only events · state is derived from them</span></header><div class="table-wrap stack-mobile" style="border:0"><table><thead><tr><th>#</th><th>When</th><th>Event</th><th>Actor</th><th>What happened</th></tr></thead><tbody>${ev.map((e) => `<tr><td class="num hide-m">${e[0]}</td><td class="num">${e[1]}</td><td class="mono hide-m" style="font-size:12px">${e[2]}</td><td class="hide-m">${e[3]}</td><td>${e[4]}</td></tr>`).join("")}</tbody></table></div></section>`;
   }
 
@@ -459,7 +652,12 @@
   }
   function approvalCard() {
     const st = S.approval;
-    const status = { OPEN: ["warn", "Waiting for you"], SENDING: ["accent", "Sending… (acknowledged by server)"], SENT: ["pos", "Sent 14 Oct 10:21 · receipt rcpt_7Q2"], REJECTED: ["", "Rejected · nothing sent"] }[st];
+    const status = {
+      OPEN: ["warn", "Waiting for you"],
+      SENDING: ["accent", "Sending… (acknowledged by server)"],
+      SENT: ["pos", "Sent 14 Oct 10:21 · receipt rcpt_7Q2"],
+      REJECTED: ["", "Rejected · nothing sent"],
+    }[st];
     return `<section class="approval" style="margin-top:20px" ${q("section.approval")}><header style="display:flex;gap:10px;align-items:center;padding:14px 16px 10px"><h2 style="margin:0;font-size:15px">Approve message to Tomas Reyes (Halden Grid ${fict})</h2><span class="label ${status[0]}" ${q("section.approval-status")}>${status[1]}</span></header>
     <div class="payload">To: Tomas Reyes · Channel: Capital Q messages · Visibility: relationship_shared
 
@@ -473,10 +671,13 @@ Thank you for Thursday. We have model v3, thanks. Two items remain before we dec
   /* ---------------- founder ---------------- */
   function fndOverview() {
     const r = D.round;
-    return `${briefing([
-      "<strong>Two investors are waiting on you.</strong> Northgate asked for two customer references (due Monday, now overdue). Pell & Co expressed interest yesterday and has no answer yet.",
-      "Your round: EUR 150,000 confirmed and EUR 400,000 stated (not yet committed) against a EUR 2.5m target.",
-    ], "Read from your relationships and your round.")}
+    return `${briefing(
+      [
+        "<strong>Two investors are waiting on you.</strong> Northgate asked for two customer references (due Monday, now overdue). Pell & Co expressed interest yesterday and has no answer yet.",
+        "Your round: EUR 150,000 confirmed and EUR 400,000 stated (not yet committed) against a EUR 2.5m target.",
+      ],
+      "Read from your relationships and your round.",
+    )}
     <div class="stages" style="--n:5">${["INTEREST_EXPRESSED", "CONNECTED", "MEETING_HELD", "IN_DILIGENCE", "INVESTED"].map((s) => `<button class="stage" data-action="fstage:${s}"><div class="n">${D.investors.filter((i) => i.state === s).length}</div><div class="l">${sw(s)}</div></button>`).join("")}</div>
     <div class="grid two" style="margin-top:20px">
       <section class="panel"><header><h2>Needs you</h2><span class="faint">3</span></header><div class="rows">
@@ -501,14 +702,34 @@ Thank you for Thursday. We have model v3, thanks. Two items remain before we dec
   function fndInvestors() {
     let list = D.investors;
     if (S.stage) list = list.filter((c) => c.state === S.stage);
-    if (S.search) list = list.filter((c) => c.name.toLowerCase().includes(S.search.toLowerCase()));
-    if (S.saved === "active") list = list.filter((c) => !["PASSED", "INVESTED"].includes(c.state));
-    if (S.saved === "mine") list = list.filter((c) => ["ANSWER_INTEREST", "FOLLOW_UP"].includes(c.nextStep));
-    if (S.saved === "diligence") list = list.filter((c) => c.state === "IN_DILIGENCE");
+    if (S.search)
+      list = list.filter((c) =>
+        c.name.toLowerCase().includes(S.search.toLowerCase()),
+      );
+    if (S.saved === "active")
+      list = list.filter((c) => !["PASSED", "INVESTED"].includes(c.state));
+    if (S.saved === "mine")
+      list = list.filter((c) =>
+        ["ANSWER_INTEREST", "FOLLOW_UP"].includes(c.nextStep),
+      );
+    if (S.saved === "diligence")
+      list = list.filter((c) => c.state === "IN_DILIGENCE");
     if (S.saved === "gateq") list = list.filter((c) => c.commitment);
-    const body = S.view === "table"
-      ? `<div class="table-wrap stack-mobile"><table ${q("list.investors")}><thead><tr><th>Investor</th><th>Stage</th><th>Mandate fit</th><th>Cheque</th><th>Next action</th><th>Last activity</th></tr></thead><tbody>${list.map((c, i) => `<tr data-action="fopen:${c.id}:overview" ${q("item.investor-" + (i + 1))}><td><div style="display:flex;gap:10px;align-items:center"><span class="avatar sm">${c.initials}</span><div><div class="name">${c.name}</div><div class="sub">${c.type} · ${c.geo}</div></div></div></td><td>${stateLabel(c.state)}</td><td class="hide-m">${c.fit}</td><td class="hide-m">${c.cheque}</td><td class="hide-m">${c.next}</td><td class="num hide-m">${c.last}</td></tr>`).join("")}</tbody></table></div>`
-      : `<div class="board">${["INTEREST_EXPRESSED", "CONNECTED", "MEETING_HELD", "IN_DILIGENCE", "INVESTED"].map((s) => { const it = list.filter((c) => c.state === s); return `<div class="col"><h3>${sw(s)} <span class="faint">${it.length}</span></h3>${it.map((c) => `<div class="tile" data-action="fopen:${c.id}:overview"><div class="name">${c.name}</div><div class="meta">${c.type}</div><div class="next">Next: ${c.next}</div></div>`).join("")}</div>`; }).join("")}</div>`;
+    const body =
+      S.view === "table"
+        ? `<div class="table-wrap stack-mobile"><table ${q("list.investors")}><thead><tr><th>Investor</th><th>Stage</th><th>Mandate fit</th><th>Cheque</th><th>Next action</th><th>Last activity</th></tr></thead><tbody>${list.map((c, i) => `<tr data-action="fopen:${c.id}:overview" ${q("item.investor-" + (i + 1))}><td><div style="display:flex;gap:10px;align-items:center"><span class="avatar sm">${c.initials}</span><div><div class="name">${c.name}</div><div class="sub">${c.type} · ${c.geo}</div></div></div></td><td>${stateLabel(c.state)}</td><td class="hide-m">${c.fit}</td><td class="hide-m">${c.cheque}</td><td class="hide-m">${c.next}</td><td class="num hide-m">${c.last}</td></tr>`).join("")}</tbody></table></div>`
+        : `<div class="board">${[
+            "INTEREST_EXPRESSED",
+            "CONNECTED",
+            "MEETING_HELD",
+            "IN_DILIGENCE",
+            "INVESTED",
+          ]
+            .map((s) => {
+              const it = list.filter((c) => c.state === s);
+              return `<div class="col"><h3>${sw(s)} <span class="faint">${it.length}</span></h3>${it.map((c) => `<div class="tile" data-action="fopen:${c.id}:overview"><div class="name">${c.name}</div><div class="meta">${c.type}</div><div class="next">Next: ${c.next}</div></div>`).join("")}</div>`;
+            })
+            .join("")}</div>`;
     return `${pipelineToolbar("fnd")}${body}<p class="faint" style="font-size:12px;margin-top:10px">The same canonical relationships the investors see, from your side. Investors are never created here.</p>`;
   }
   function fndRecord() {
@@ -516,17 +737,44 @@ Thank you for Thursday. We have model v3, thanks. Two items remain before we dec
     const t = S.recordTab;
     let body = "";
     const privacy = `<p class="faint" style="font-size:12px;display:flex;gap:6px;align-items:center;margin:0 0 14px">${icon("lock").replace("<svg", '<svg style="width:13px;height:13px"')} You see what ${c.name} shared with you. Their internal notes, deliberations and scores are private to them and never shown here.</p>`;
-    if (t === "overview") body = `${privacy}<div class="grid halves"><section class="panel"><header><h2>Where you are</h2></header><div class="body"><p style="margin-top:0">${sw(c.state)} since 26 Sep. They said they will tell you their next step by <strong>23 Oct</strong> (meeting 9 Oct, 44:02).</p><p class="muted">Fit: ${c.fit}. This compares your round to their declared mandate; it says nothing about their interest.</p></div></section>
+    if (t === "overview")
+      body = `${privacy}<div class="grid halves"><section class="panel"><header><h2>Where you are</h2></header><div class="body"><p style="margin-top:0">${sw(c.state)} since 26 Sep. They said they will tell you their next step by <strong>23 Oct</strong> (meeting 9 Oct, 44:02).</p><p class="muted">Fit: ${c.fit}. This compares your round to their declared mandate; it says nothing about their interest.</p></div></section>
       <section class="panel"><header><h2>Open requests from them</h2></header><div class="rows"><div class="row link" data-action="go-rtab:requests"><div class="grow"><div class="title">Two customer references</div><div class="meta">Due 13 Oct · overdue</div></div><span class="label warn">Open</span></div><div class="row"><div class="grow"><div class="title">Cap table</div><div class="meta">Asked 9 Oct</div></div><span class="label">Open</span></div></div></section></div>`;
-    else if (t === "meetings") body = `${privacy}${recMeeting().replace("Q's notes", "Q's notes for you")}`;
-    else if (t === "requests") body = `${privacy}<section class="panel" ${q("section.requests")}><header><h2>Requests from ${c.name}</h2></header><div class="rows">
+    else if (t === "meetings")
+      body = `${privacy}${recMeeting().replace("Q's notes", "Q's notes for you")}`;
+    else if (t === "requests")
+      body = `${privacy}<section class="panel" ${q("section.requests")}><header><h2>Requests from ${c.name}</h2></header><div class="rows">
       <div class="row"><div class="grow"><div class="title">Two customer references</div><div class="meta">Asked 9 Oct in the meeting (47:50) · due 13 Oct</div></div><button class="btn sm primary" data-action="toast:Choosing references opens a share with relationship_shared scope; you confirm before it is sent (simulated)">Respond</button></div>
       <div class="row"><div class="grow"><div class="title">Revised financial model</div><div class="meta">Shared v3 on 10 Oct</div></div><span class="label pos">Done</span></div>
       <div class="row"><div class="grow"><div class="title">Cap table</div><div class="meta">Asked 9 Oct</div></div><button class="btn sm">Respond</button></div></div></section>`;
-    else if (t === "documents") body = `${privacy}<section class="panel"><header><h2>Shared with ${c.name}</h2></header><div class="rows">${[["Financial model v3", "10 Oct · they opened it 10 Oct"], ["Deck v2", "24 Sep"], ["Pilot letters (2)", "26 Sep"]].map(([t2, m]) => `<div class="row">${icon("file")}<div class="grow"><div class="title">${t2}</div><div class="meta">${m}</div></div><span class="scope-mark">${icon("share")} relationship_shared</span></div>`).join("")}</div></section>`;
-    else if (t === "messages") body = `${privacy}${recNotes().split('<section class="panel"><header><h2>Team notes')[0]}</div>`;
-    else if (t === "intel") body = `${privacy}<section class="panel"><header><h2>Q intelligence on ${c.name}</h2><span class="label accent">From public and shared sources</span></header><div class="body"><p style="margin-top:0">Northgate has made 4 seed investments in energy software in the last two years (public announcements). Their declared cheque range is EUR 500k–1.5m.</p><p class="muted">Q does not infer their interest from their activity. "They opened the model" is a recorded event, not a signal of intent.</p></div></section>`;
-    else body = `${privacy}<section class="panel"><header><h2>History</h2></header><div class="rows">${[["10 Oct", "You shared Financial model v3"], ["9 Oct", "Meeting held"], ["26 Sep", "Diligence started"], ["25 Sep", "You accepted their connection"], ["24 Sep", "They expressed interest"]].map(([a, b]) => `<div class="row"><span class="num faint" style="width:60px">${a}</span><div class="grow">${b}</div></div>`).join("")}</div></section>`;
+    else if (t === "documents")
+      body = `${privacy}<section class="panel"><header><h2>Shared with ${c.name}</h2></header><div class="rows">${[
+        ["Financial model v3", "10 Oct · they opened it 10 Oct"],
+        ["Deck v2", "24 Sep"],
+        ["Pilot letters (2)", "26 Sep"],
+      ]
+        .map(
+          ([t2, m]) =>
+            `<div class="row">${icon("file")}<div class="grow"><div class="title">${t2}</div><div class="meta">${m}</div></div><span class="scope-mark">${icon("share")} relationship_shared</span></div>`,
+        )
+        .join("")}</div></section>`;
+    else if (t === "messages")
+      body = `${privacy}${recNotes().split('<section class="panel"><header><h2>Team notes')[0]}</div>`;
+    else if (t === "intel")
+      body = `${privacy}<section class="panel"><header><h2>Q intelligence on ${c.name}</h2><span class="label accent">From public and shared sources</span></header><div class="body"><p style="margin-top:0">Northgate has made 4 seed investments in energy software in the last two years (public announcements). Their declared cheque range is EUR 500k–1.5m.</p><p class="muted">Q does not infer their interest from their activity. "They opened the model" is a recorded event, not a signal of intent.</p></div></section>`;
+    else
+      body = `${privacy}<section class="panel"><header><h2>History</h2></header><div class="rows">${[
+        ["10 Oct", "You shared Financial model v3"],
+        ["9 Oct", "Meeting held"],
+        ["26 Sep", "Diligence started"],
+        ["25 Sep", "You accepted their connection"],
+        ["24 Sep", "They expressed interest"],
+      ]
+        .map(
+          ([a, b]) =>
+            `<div class="row"><span class="num faint" style="width:60px">${a}</span><div class="grow">${b}</div></div>`,
+        )
+        .join("")}</div></section>`;
     return `${recordHeader(c)}<div style="height:16px"></div>${recordTabs(FND_TABS)}${body}`;
   }
   function fndFundraising() {
@@ -558,7 +806,14 @@ Asks: introductions to two Nordic grid operators.</div>
 
   /* ---------------- Q panel ---------------- */
   function qPanel() {
-    const about = S.area === "record" ? (S.role === "investor" ? company(S.recordId)?.name : investor(S.recordId)?.name) : S.role === "investor" ? "Investment Hub" : "Fundraising Hub";
+    const about =
+      S.area === "record"
+        ? S.role === "investor"
+          ? company(S.recordId)?.name
+          : investor(S.recordId)?.name
+        : S.role === "investor"
+          ? "Investment Hub"
+          : "Fundraising Hub";
     return `<button class="q-dock" data-action="q-toggle" aria-expanded="${S.qOpen}" ${q("button.q-dock")}>${qMark(S.qWorking)}<span class="state">${S.qWorking ? "Q is working" : "Q"}<span class="faint">${S.qWorking ? "on your request" : "About: " + about}</span></span></button>
     <section class="q-panel" ${S.qOpen ? "" : "hidden"} aria-label="Q">
       <header>${qMark(S.qWorking)}<div><div class="t">Q</div><div class="about">About: ${about}</div></div><button class="btn sm ghost" style="margin-left:auto" data-action="q-toggle">Close</button></header>
@@ -580,37 +835,87 @@ Asks: introductions to two Nordic grid operators.</div>
     else if (S.area === "work") content = workView();
     else {
       const map = inv
-        ? { overview: invOverview, pipeline: invPipeline, gateq: invGateq, meetings: invMeetings, portfolio: invPortfolio, reports }
-        : { overview: fndOverview, investors: fndInvestors, fundraising: fndFundraising, requests: fndRequests, updates: fndUpdates, reports };
+        ? {
+            overview: invOverview,
+            pipeline: invPipeline,
+            gateq: invGateq,
+            meetings: invMeetings,
+            portfolio: invPortfolio,
+            reports,
+          }
+        : {
+            overview: fndOverview,
+            investors: fndInvestors,
+            fundraising: fndFundraising,
+            requests: fndRequests,
+            updates: fndUpdates,
+            reports,
+          };
       content = `${hubHead()}${areaTabs()}${(map[S.area] || map.overview)()}`;
     }
     const focusId = document.activeElement && document.activeElement.id;
     // Keep inner scroll positions across re-renders; animate only when the target changes.
     keep.pages = $("#pages")?.scrollTop ?? null;
     keep.transcript = $("#transcript")?.scrollTop ?? null;
-    $("#app").innerHTML = `<div class="shell">${sidebar()}<main class="main" id="main"><div class="page">${content}</div></main></div>${bottomNav()}${qPanel()}${S.drawer ? drawer() : ""}`;
-    $("#role-seg").innerHTML = ["investor", "founder"].map((r) => `<button data-action="role:${r}" aria-pressed="${S.role === r}">${r === "investor" ? "Investor view" : "Founder view"}</button>`).join("");
-    if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); if (el.setSelectionRange) el.setSelectionRange(el.value.length, el.value.length); } }
+    $("#app").innerHTML =
+      `<div class="shell">${sidebar()}<main class="main" id="main"><div class="page">${content}</div></main></div>${bottomNav()}${qPanel()}${S.drawer ? drawer() : ""}`;
+    $("#role-seg").innerHTML = ["investor", "founder"]
+      .map(
+        (r) =>
+          `<button data-action="role:${r}" aria-pressed="${S.role === r}">${r === "investor" ? "Investor view" : "Founder view"}</button>`,
+      )
+      .join("");
+    if (focusId) {
+      const el = document.getElementById(focusId);
+      if (el) {
+        el.focus();
+        if (el.setSelectionRange)
+          el.setSelectionRange(el.value.length, el.value.length);
+      }
+    }
     toHash();
     afterRender();
   }
   const keep = { pages: null, transcript: null, page: null, ts: null };
   function glide(box, prev, top, changed) {
     if (prev !== null) box.scrollTop = prev;
-    if (changed || prev === null) box.scrollTo({ top, behavior: changed && prev !== null ? "smooth" : "auto" });
+    if (changed || prev === null)
+      box.scrollTo({
+        top,
+        behavior: changed && prev !== null ? "smooth" : "auto",
+      });
   }
   function afterRender() {
     if (S.area === "record" && S.recordTab === "documents") {
-      const p = $("#page-" + S.docPage), box = $("#pages");
-      if (p && box) { glide(box, keep.pages, p.offsetTop - 12, keep.page !== S.docPage); keep.page = S.docPage; }
-      const th = $('.thumb[aria-current="true"]'), tb = $(".thumbs");
-      if (th && tb) { if (getComputedStyle(tb).gridAutoFlow.startsWith("column")) tb.scrollLeft = th.offsetLeft - 8; else tb.scrollTop = th.offsetTop - 8; }
+      const p = $("#page-" + S.docPage),
+        box = $("#pages");
+      if (p && box) {
+        glide(box, keep.pages, p.offsetTop - 12, keep.page !== S.docPage);
+        keep.page = S.docPage;
+      }
+      const th = $('.thumb[aria-current="true"]'),
+        tb = $(".thumbs");
+      if (th && tb) {
+        if (getComputedStyle(tb).gridAutoFlow.startsWith("column"))
+          tb.scrollLeft = th.offsetLeft - 8;
+        else tb.scrollTop = th.offsetTop - 8;
+      }
     }
     if (S.transcriptAt) {
-      const l = $("#ts-" + S.transcriptAt.replace(":", "")), box = $("#transcript");
-      if (l && box) { glide(box, keep.transcript, l.offsetTop - 60, keep.ts !== S.transcriptAt); keep.ts = S.transcriptAt; }
+      const l = $("#ts-" + S.transcriptAt.replace(":", "")),
+        box = $("#transcript");
+      if (l && box) {
+        glide(
+          box,
+          keep.transcript,
+          l.offsetTop - 60,
+          keep.ts !== S.transcriptAt,
+        );
+        keep.ts = S.transcriptAt;
+      }
     }
-    const qb = $("#q-body"); if (qb) qb.scrollTop = qb.scrollHeight;
+    const qb = $("#q-body");
+    if (qb) qb.scrollTop = qb.scrollHeight;
   }
   function drawer() {
     return `<div class="drawer-scrim" data-action="drawer-close"></div><aside class="drawer" role="dialog" aria-label="Evidence"><header><h2>Evidence · gross margin</h2><button class="btn sm ghost" style="margin-left:auto" data-action="drawer-close">Close</button></header><div class="content">
@@ -619,9 +924,19 @@ Asks: introductions to two Nordic grid operators.</div>
   }
 
   /* ---------------- theme ---------------- */
-  function themeChoice() { try { return localStorage.getItem("cq.theme") || "device"; } catch { return "device"; } }
+  function themeChoice() {
+    try {
+      return localStorage.getItem("cq.theme") || "device";
+    } catch {
+      return "device";
+    }
+  }
   function applyTheme(t) {
-    try { localStorage.setItem("cq.theme", t); } catch { /* storage may be blocked; the choice still applies now */ }
+    try {
+      localStorage.setItem("cq.theme", t);
+    } catch {
+      /* storage may be blocked; the choice still applies now */
+    }
     if (t === "device") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", t);
   }
@@ -629,49 +944,205 @@ Asks: introductions to two Nordic grid operators.</div>
   /* ---------------- actions ---------------- */
   function toast(msg) {
     $$(".toast").forEach((t) => t.remove());
-    const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t);
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
     setTimeout(() => t.remove(), 3200);
   }
-  function go(area) { S.area = area; S.recordId = null; S.stage = S.stage && (area === "pipeline" || area === "investors") ? S.stage : null; S.transcriptAt = null; S.compare = false; render(); window.scrollTo(0, 0); }
-  function openRecord(id, tab) { S.area = "record"; S.recordId = id; S.recordTab = tab || "overview"; S.transcriptAt = null; S.compare = false; render(); window.scrollTo(0, 0); }
+  function go(area) {
+    S.area = area;
+    S.recordId = null;
+    S.stage =
+      S.stage && (area === "pipeline" || area === "investors") ? S.stage : null;
+    S.transcriptAt = null;
+    S.compare = false;
+    render();
+    window.scrollTo(0, 0);
+  }
+  function openRecord(id, tab) {
+    S.area = "record";
+    S.recordId = id;
+    S.recordTab = tab || "overview";
+    S.transcriptAt = null;
+    S.compare = false;
+    render();
+    window.scrollTo(0, 0);
+  }
 
   function handle(action, el) {
     const [k, ...rest] = action.split(":");
     const v = rest.join(":");
     switch (k) {
-      case "noop": toast("Outside the Hub prototype"); break;
-      case "go": go(v); break;
-      case "role": S.role = v; S.area = "overview"; S.stage = null; S.search = ""; S.saved = "active"; S.qLog = []; S.qSay = null; render(); break;
-      case "theme": applyTheme(v); render(); break;
-      case "stage": S.stage = S.stage === v ? null : v; if (S.area !== "pipeline") S.area = "pipeline"; render(); break;
-      case "fstage": S.stage = v; S.area = "investors"; render(); break;
-      case "clear": S.stage = null; S.search = ""; render(); break;
-      case "view": S.view = v; render(); break;
-      case "saved": S.saved = v; render(); break;
-      case "open": { const [id, tab] = v.split(":"); openRecord(id, tab); break; }
-      case "fopen": { const [id, tab] = v.split(":"); openRecord(id, tab); break; }
-      case "rtab": S.recordTab = v; if (v !== "meetings") S.transcriptAt = null; render(); break;
-      case "go-rtab": S.recordTab = v; render(); break;
-      case "back": go(S.role === "investor" ? "pipeline" : "investors"); break;
-      case "jump": S.recordTab = "meetings"; S.transcriptAt = v; render(); break;
-      case "page": S.area = "record"; S.recordId = S.recordId || "halden"; S.recordTab = "documents"; S.docPage = Number(v); S.drawer = null; render(); break;
-      case "page-next": S.docPage = Math.min(D.document.pages, S.docPage + 1); render(); break;
-      case "page-prev": S.docPage = Math.max(1, S.docPage - 1); render(); break;
-      case "gsel": S.gateqSel = v; render(); break;
-      case "work": if (S.area === "record") S.returnTo = { label: company(S.recordId)?.name || "record", area: "record", recordId: S.recordId, recordTab: S.recordTab }; S.area = "work"; S.workId = v; render(); window.scrollTo(0, 0); break;
-      case "return": { const r = S.returnTo; S.returnTo = null; if (r) { S.area = r.area; S.recordId = r.recordId; S.recordTab = r.recordTab; render(); } else go("overview"); break; }
-      case "compare": S.compare = true; render(); $('[data-q="section.comparison"]')?.scrollIntoView({ behavior: "smooth", block: "start" }); break;
-      case "compare-off": S.compare = false; render(); break;
-      case "approve": S.approval = "SENDING"; render(); setTimeout(() => { S.approval = "SENT"; render(); }, 1400); break;
-      case "reject": S.approval = "REJECTED"; render(); break;
-      case "approval-reset": S.approval = "OPEN"; render(); break;
-      case "toast": toast(v); break;
-      case "q-toggle": S.qOpen = !S.qOpen; render(); if (S.qOpen) $("#q-input")?.focus(); break;
-      case "q-open": S.qOpen = true; render(); $("#q-input")?.focus(); break;
-      case "q-investigate": S.qOpen = true; runCommand("Investigate further"); break;
-      case "qcmd": S.qOpen = true; runCommand(v); break;
-      case "drawer-close": S.drawer = null; render(); break;
-      default: break;
+      case "noop":
+        toast("Outside the Hub prototype");
+        break;
+      case "go":
+        go(v);
+        break;
+      case "role":
+        S.role = v;
+        S.area = "overview";
+        S.stage = null;
+        S.search = "";
+        S.saved = "active";
+        S.qLog = [];
+        S.qSay = null;
+        render();
+        break;
+      case "theme":
+        applyTheme(v);
+        render();
+        break;
+      case "stage":
+        S.stage = S.stage === v ? null : v;
+        if (S.area !== "pipeline") S.area = "pipeline";
+        render();
+        break;
+      case "fstage":
+        S.stage = v;
+        S.area = "investors";
+        render();
+        break;
+      case "clear":
+        S.stage = null;
+        S.search = "";
+        render();
+        break;
+      case "view":
+        S.view = v;
+        render();
+        break;
+      case "saved":
+        S.saved = v;
+        render();
+        break;
+      case "open": {
+        const [id, tab] = v.split(":");
+        openRecord(id, tab);
+        break;
+      }
+      case "fopen": {
+        const [id, tab] = v.split(":");
+        openRecord(id, tab);
+        break;
+      }
+      case "rtab":
+        S.recordTab = v;
+        if (v !== "meetings") S.transcriptAt = null;
+        render();
+        break;
+      case "go-rtab":
+        S.recordTab = v;
+        render();
+        break;
+      case "back":
+        go(S.role === "investor" ? "pipeline" : "investors");
+        break;
+      case "jump":
+        S.recordTab = "meetings";
+        S.transcriptAt = v;
+        render();
+        break;
+      case "page":
+        S.area = "record";
+        S.recordId = S.recordId || "halden";
+        S.recordTab = "documents";
+        S.docPage = Number(v);
+        S.drawer = null;
+        render();
+        break;
+      case "page-next":
+        S.docPage = Math.min(D.document.pages, S.docPage + 1);
+        render();
+        break;
+      case "page-prev":
+        S.docPage = Math.max(1, S.docPage - 1);
+        render();
+        break;
+      case "gsel":
+        S.gateqSel = v;
+        render();
+        break;
+      case "work":
+        if (S.area === "record")
+          S.returnTo = {
+            label: company(S.recordId)?.name || "record",
+            area: "record",
+            recordId: S.recordId,
+            recordTab: S.recordTab,
+          };
+        S.area = "work";
+        S.workId = v;
+        render();
+        window.scrollTo(0, 0);
+        break;
+      case "return": {
+        const r = S.returnTo;
+        S.returnTo = null;
+        if (r) {
+          S.area = r.area;
+          S.recordId = r.recordId;
+          S.recordTab = r.recordTab;
+          render();
+        } else go("overview");
+        break;
+      }
+      case "compare":
+        S.compare = true;
+        render();
+        $('[data-q="section.comparison"]')?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        break;
+      case "compare-off":
+        S.compare = false;
+        render();
+        break;
+      case "approve":
+        S.approval = "SENDING";
+        render();
+        setTimeout(() => {
+          S.approval = "SENT";
+          render();
+        }, 1400);
+        break;
+      case "reject":
+        S.approval = "REJECTED";
+        render();
+        break;
+      case "approval-reset":
+        S.approval = "OPEN";
+        render();
+        break;
+      case "toast":
+        toast(v);
+        break;
+      case "q-toggle":
+        S.qOpen = !S.qOpen;
+        render();
+        if (S.qOpen) $("#q-input")?.focus();
+        break;
+      case "q-open":
+        S.qOpen = true;
+        render();
+        $("#q-input")?.focus();
+        break;
+      case "q-investigate":
+        S.qOpen = true;
+        runCommand("Investigate further");
+        break;
+      case "qcmd":
+        S.qOpen = true;
+        runCommand(v);
+        break;
+      case "drawer-close":
+        S.drawer = null;
+        render();
+        break;
+      default:
+        break;
     }
   }
 
@@ -680,80 +1151,272 @@ Asks: introductions to two Nordic grid operators.</div>
   // read-back of the page, not assumed.
   async function act(label, a, target, perform, verify, note) {
     const entry = { label, act: a, target, status: "requested", note };
-    S.qLog.push(entry); render(); await sleep(450);
+    S.qLog.push(entry);
+    render();
+    await sleep(450);
     const el = $(`[data-q="${target}"]`);
-    if (!el) { entry.status = "failed"; entry.note = "TARGET_MISSING: not on this page"; render(); return false; }
-    entry.status = "acknowledged"; render();
-    mark(target); await sleep(700);
-    try { await perform(); } catch { entry.status = "failed"; render(); return false; }
+    if (!el) {
+      entry.status = "failed";
+      entry.note = "TARGET_MISSING: not on this page";
+      render();
+      return false;
+    }
+    entry.status = "acknowledged";
+    render();
+    mark(target);
+    await sleep(700);
+    try {
+      await perform();
+    } catch {
+      entry.status = "failed";
+      render();
+      return false;
+    }
     await sleep(350);
     const ok = verify ? verify() : true;
     entry.status = ok ? "completed" : "failed";
     if (!ok) entry.note = "read-back did not match";
-    render(); mark(target); await sleep(500); unmark();
+    render();
+    mark(target);
+    await sleep(500);
+    unmark();
     return ok;
   }
   function mark(target) {
     unmark();
-    const el = $(`[data-q="${target}"]`); if (!el) return;
+    const el = $(`[data-q="${target}"]`);
+    if (!el) return;
     el.classList.add("q-target");
     const r = el.getBoundingClientRect();
-    const tag = document.createElement("div"); tag.className = "q-target-tag"; tag.textContent = "Q · " + target;
-    tag.style.left = Math.max(8, r.left + window.scrollX) + "px"; tag.style.top = Math.max(40, r.top + window.scrollY - 22) + "px";
+    const tag = document.createElement("div");
+    tag.className = "q-target-tag";
+    tag.textContent = "Q · " + target;
+    tag.style.left = Math.max(8, r.left + window.scrollX) + "px";
+    tag.style.top = Math.max(40, r.top + window.scrollY - 22) + "px";
     document.body.appendChild(tag);
   }
-  function unmark() { $$(".q-target").forEach((e) => e.classList.remove("q-target")); $$(".q-target-tag").forEach((e) => e.remove()); }
-  const selected = (id) => () => $(`[data-q="${id}"]`)?.getAttribute("aria-selected") === "true";
-  const pressed = (id) => () => $(`[data-q="${id}"]`)?.getAttribute("aria-pressed") === "true";
+  function unmark() {
+    $$(".q-target").forEach((e) => e.classList.remove("q-target"));
+    $$(".q-target-tag").forEach((e) => e.remove());
+  }
+  const selected = (id) => () =>
+    $(`[data-q="${id}"]`)?.getAttribute("aria-selected") === "true";
+  const pressed = (id) => () =>
+    $(`[data-q="${id}"]`)?.getAttribute("aria-pressed") === "true";
   const exists = (id) => () => !!$(`[data-q="${id}"]`);
 
-  async function say(html) { S.qSay = html; render(); await sleep(300); }
+  async function say(html) {
+    S.qSay = html;
+    render();
+    await sleep(300);
+  }
   let running = false;
   async function runCommand(text) {
-    if (running) return; running = true;
-    S.qOpen = true; S.qLog = []; S.qWorking = true; S.qSay = `<span class="muted">“${text}”</span>`; render();
+    if (running) return;
+    running = true;
+    S.qOpen = true;
+    S.qLog = [];
+    S.qWorking = true;
+    S.qSay = `<span class="muted">“${text}”</span>`;
+    render();
     const t = text.toLowerCase();
     try {
       if (t.includes("brief me")) {
-        await say(`<span class="muted">“${text}”</span><br><br><strong>Halden Grid</strong> ${fict}: in diligence since 26 Sep. Model v3 says 71% gross margin; deck v2 said 64%. Both are kept. They want your decision by 23 Oct. References are overdue by one day.<div class="src faint">Briefing: permission-filtered read of 14 events · no model reasoning shown · simulated</div>`);
-        await act("Open Halden Grid", "NAVIGATE", "item.pipeline-1", async () => openRecord("halden", "overview"), exists("section.next-action")).catch(() => {});
-      } else if (t.includes("margin") || t.includes("evidence") || t === "investigate further") {
+        await say(
+          `<span class="muted">“${text}”</span><br><br><strong>Halden Grid</strong> ${fict}: in diligence since 26 Sep. Model v3 says 71% gross margin; deck v2 said 64%. Both are kept. They want your decision by 23 Oct. References are overdue by one day.<div class="src faint">Briefing: permission-filtered read of 14 events · no model reasoning shown · simulated</div>`,
+        );
+        await act(
+          "Open Halden Grid",
+          "NAVIGATE",
+          "item.pipeline-1",
+          async () => openRecord("halden", "overview"),
+          exists("section.next-action"),
+        ).catch(() => {});
+      } else if (
+        t.includes("margin") ||
+        t.includes("evidence") ||
+        t === "investigate further"
+      ) {
         await tour(true);
       } else if (t.includes("compare")) {
-        if (S.area !== "record" || S.recordTab !== "evidence") { await act("Open Halden Grid", "OPEN_RECORD_PAGE", "button.q-dock", async () => openRecord("halden", "evidence"), exists("section.claims")); }
-        await act("Compare with Kestrel Robotics", "ACTIVATE", "button.compare-kestrel", async () => { S.compare = true; render(); }, exists("section.comparison"));
-        $('[data-q="section.comparison"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
-        await say(`Here is the comparison, every figure with its source. Halden's margin is contradictory, and Kestrel's runway is unknown. No winner is declared.<div class="src faint">From documents shared with Northgate only · simulated</div>`);
+        if (S.area !== "record" || S.recordTab !== "evidence") {
+          await act(
+            "Open Halden Grid",
+            "OPEN_RECORD_PAGE",
+            "button.q-dock",
+            async () => openRecord("halden", "evidence"),
+            exists("section.claims"),
+          );
+        }
+        await act(
+          "Compare with Kestrel Robotics",
+          "ACTIVATE",
+          "button.compare-kestrel",
+          async () => {
+            S.compare = true;
+            render();
+          },
+          exists("section.comparison"),
+        );
+        $('[data-q="section.comparison"]')?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        await say(
+          `Here is the comparison, every figure with its source. Halden's margin is contradictory, and Kestrel's runway is unknown. No winner is declared.<div class="src faint">From documents shared with Northgate only · simulated</div>`,
+        );
       } else if (t.includes("term sheet")) {
-        await say(`<span class="muted">“${text}”</span><br><br>Looking for a term sheet on this relationship…`);
-        await act("Open the term sheet", "OPEN_RECORD_PAGE", "item.document-term-sheet", async () => {}, () => false);
-        await say(`I couldn't open it: <strong>no term sheet has been shared with you</strong> on Halden Grid. I did not open anything else in its place.<div class="src faint">Receipt: failed (TARGET_MISSING) · nothing changed</div>`);
+        await say(
+          `<span class="muted">“${text}”</span><br><br>Looking for a term sheet on this relationship…`,
+        );
+        await act(
+          "Open the term sheet",
+          "OPEN_RECORD_PAGE",
+          "item.document-term-sheet",
+          async () => {},
+          () => false,
+        );
+        await say(
+          `I couldn't open it: <strong>no term sheet has been shared with you</strong> on Halden Grid. I did not open anything else in its place.<div class="src faint">Receipt: failed (TARGET_MISSING) · nothing changed</div>`,
+        );
       } else if (t.includes("next") || t.includes("requests")) {
-        await act("Open Northgate Partners", "OPEN_RECORD_PAGE", "button.q-dock", async () => openRecord("northgate", "requests"), exists("section.requests"));
-        await say(`Send Northgate the two references first. They are the only investor in diligence and named the references in the meeting (47:50).<div class="src faint">Sources: request 9 Oct · meeting 9 Oct · simulated</div>`);
+        await act(
+          "Open Northgate Partners",
+          "OPEN_RECORD_PAGE",
+          "button.q-dock",
+          async () => openRecord("northgate", "requests"),
+          exists("section.requests"),
+        );
+        await say(
+          `Send Northgate the two references first. They are the only investor in diligence and named the references in the meeting (47:50).<div class="src faint">Sources: request 9 Oct · meeting 9 Oct · simulated</div>`,
+        );
       } else {
-        await say(`<span class="muted">“${text}”</span><br><br>In this prototype I can brief you, show the margin evidence, compare with Kestrel, or try to open a term sheet.`);
+        await say(
+          `<span class="muted">“${text}”</span><br><br>In this prototype I can brief you, show the margin evidence, compare with Kestrel, or try to open a term sheet.`,
+        );
       }
-    } finally { S.qWorking = false; running = false; render(); }
+    } finally {
+      S.qWorking = false;
+      running = false;
+      render();
+    }
   }
 
   // Video 3: Q drives the workspace by semantic control ids, then returns.
   async function tour() {
-    await say(`I'll find Halden Grid's margin evidence: the pipeline first, then the record, the model page and the meeting passage.`);
-    if (S.area !== "pipeline") await act("Go to Pipeline", "SELECT_TAB", "tab.hub-pipeline", async () => go("pipeline"), selected("tab.hub-pipeline"));
-    await act("Search “Halden”", "FOCUS + INPUT", "input.pipeline-search", async () => { S.search = "Halden"; render(); }, () => $("#pipe-search")?.value === "Halden");
-    await act("Filter: In diligence", "FILTER", "filter.stage-in_diligence", async () => { S.stage = "IN_DILIGENCE"; render(); }, pressed("filter.stage-in_diligence"));
-    await act("Open the first result", "SELECT_ITEM 1", "item.pipeline-1", async () => openRecord("halden", "overview"), exists("section.next-action"));
-    await act("Tab: Intelligence & evidence", "SELECT_TAB", "tab.record-evidence", async () => { S.recordTab = "evidence"; render(); }, selected("tab.record-evidence"));
-    await act("Scroll to the margin claim", "SCROLL_TO", "item.claim-2", async () => { $('[data-q="item.claim-2"]').scrollIntoView({ behavior: "smooth", block: "center" }); }, exists("item.claim-2"));
-    await act("Open model v3 at page 7", "DOCUMENT_ACT GO_TO_PAGE 7", "button.claim-2-source", async () => { S.recordTab = "documents"; S.docPage = 7; render(); }, () => $('[data-q="section.document-page"] strong')?.textContent === "7");
-    await act("Jump to transcript 22:05", "SELECT_TAB + SCROLL_TO", "tab.record-meetings", async () => { S.recordTab = "meetings"; S.transcriptAt = "22:05"; render(); }, () => !!$("#ts-2205.hit"));
-    await say(`At 22:05 Amara asks which margin is current; at 22:41 the founder says hosting moved in-house. Next, the diligence brief job.`);
-    await act("Tab: Q Work", "SELECT_TAB", "tab.record-work", async () => { S.recordTab = "work"; render(); }, selected("tab.record-work"));
-    await act("Open job: diligence brief", "ACTIVATE", "tab.record-work", async () => handle("work:w1"), exists("section.work-steps"));
+    await say(
+      `I'll find Halden Grid's margin evidence: the pipeline first, then the record, the model page and the meeting passage.`,
+    );
+    if (S.area !== "pipeline")
+      await act(
+        "Go to Pipeline",
+        "SELECT_TAB",
+        "tab.hub-pipeline",
+        async () => go("pipeline"),
+        selected("tab.hub-pipeline"),
+      );
+    await act(
+      "Search “Halden”",
+      "FOCUS + INPUT",
+      "input.pipeline-search",
+      async () => {
+        S.search = "Halden";
+        render();
+      },
+      () => $("#pipe-search")?.value === "Halden",
+    );
+    await act(
+      "Filter: In diligence",
+      "FILTER",
+      "filter.stage-in_diligence",
+      async () => {
+        S.stage = "IN_DILIGENCE";
+        render();
+      },
+      pressed("filter.stage-in_diligence"),
+    );
+    await act(
+      "Open the first result",
+      "SELECT_ITEM 1",
+      "item.pipeline-1",
+      async () => openRecord("halden", "overview"),
+      exists("section.next-action"),
+    );
+    await act(
+      "Tab: Intelligence & evidence",
+      "SELECT_TAB",
+      "tab.record-evidence",
+      async () => {
+        S.recordTab = "evidence";
+        render();
+      },
+      selected("tab.record-evidence"),
+    );
+    await act(
+      "Scroll to the margin claim",
+      "SCROLL_TO",
+      "item.claim-2",
+      async () => {
+        $('[data-q="item.claim-2"]').scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      },
+      exists("item.claim-2"),
+    );
+    await act(
+      "Open model v3 at page 7",
+      "DOCUMENT_ACT GO_TO_PAGE 7",
+      "button.claim-2-source",
+      async () => {
+        S.recordTab = "documents";
+        S.docPage = 7;
+        render();
+      },
+      () => $('[data-q="section.document-page"] strong')?.textContent === "7",
+    );
+    await act(
+      "Jump to transcript 22:05",
+      "SELECT_TAB + SCROLL_TO",
+      "tab.record-meetings",
+      async () => {
+        S.recordTab = "meetings";
+        S.transcriptAt = "22:05";
+        render();
+      },
+      () => !!$("#ts-2205.hit"),
+    );
+    await say(
+      `At 22:05 Amara asks which margin is current; at 22:41 the founder says hosting moved in-house. Next, the diligence brief job.`,
+    );
+    await act(
+      "Tab: Q Work",
+      "SELECT_TAB",
+      "tab.record-work",
+      async () => {
+        S.recordTab = "work";
+        render();
+      },
+      selected("tab.record-work"),
+    );
+    await act(
+      "Open job: diligence brief",
+      "ACTIVATE",
+      "tab.record-work",
+      async () => handle("work:w1"),
+      exists("section.work-steps"),
+    );
     await sleep(1400);
-    await act("Return to Halden Grid", "BACK", "button.work-back", async () => handle("return"), exists("section.next-action"));
-    await say(`Back on Halden Grid where you were. The margin stays contradictory until the hosting invoices arrive; I've suggested requesting them in Diligence.<div class="src faint">9 acts · all receipts from page read-back · simulated</div>`);
+    await act(
+      "Return to Halden Grid",
+      "BACK",
+      "button.work-back",
+      async () => handle("return"),
+      exists("section.next-action"),
+    );
+    await say(
+      `Back on Halden Grid where you were. The margin stays contradictory until the hosting invoices arrive; I've suggested requesting them in Diligence.<div class="src faint">9 acts · all receipts from page read-back · simulated</div>`,
+    );
   }
 
   /* ---------------- events ---------------- */
@@ -764,14 +1427,30 @@ Asks: introductions to two Nordic grid operators.</div>
     handle(el.getAttribute("data-action"), el);
   });
   document.addEventListener("input", (e) => {
-    if (e.target.id === "pipe-search") { S.search = e.target.value; render(); }
+    if (e.target.id === "pipe-search") {
+      S.search = e.target.value;
+      render();
+    }
   });
   document.addEventListener("submit", (e) => {
-    if (e.target.matches('[data-form="q"]')) { e.preventDefault(); const v = $("#q-input").value.trim(); if (v) runCommand(v); }
+    if (e.target.matches('[data-form="q"]')) {
+      e.preventDefault();
+      const v = $("#q-input").value.trim();
+      if (v) runCommand(v);
+    }
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && S.drawer) { S.drawer = null; render(); }
-    if (e.key === "/" && document.activeElement?.tagName !== "INPUT") { const s = $("#pipe-search"); if (s) { e.preventDefault(); s.focus(); } }
+    if (e.key === "Escape" && S.drawer) {
+      S.drawer = null;
+      render();
+    }
+    if (e.key === "/" && document.activeElement?.tagName !== "INPUT") {
+      const s = $("#pipe-search");
+      if (s) {
+        e.preventDefault();
+        s.focus();
+      }
+    }
   });
 
   // Prototype API for scripted walkthroughs (Playwright recordings).
@@ -782,7 +1461,18 @@ Asks: introductions to two Nordic grid operators.</div>
   fromHash();
   render();
   window.addEventListener("hashchange", () => {
-    Object.assign(S, { compare: false, qLog: [], qSay: null, drawer: null, transcriptAt: null, stage: null, search: "", qOpen: false });
-    fromHash(); render(); window.scrollTo(0, 0);
+    Object.assign(S, {
+      compare: false,
+      qLog: [],
+      qSay: null,
+      drawer: null,
+      transcriptAt: null,
+      stage: null,
+      search: "",
+      qOpen: false,
+    });
+    fromHash();
+    render();
+    window.scrollTo(0, 0);
   });
 })();
