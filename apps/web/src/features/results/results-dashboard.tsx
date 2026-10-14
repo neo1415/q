@@ -49,6 +49,10 @@ const REASON_WORDS: Readonly<Record<string, string>> = {
 
 export type ResultsDashboardProps = {
   readonly basePath: string;
+  readonly heading?: string;
+  readonly headingLevel?: 1 | 2;
+  /** Hub filters do not yet bind report exports; keep them on Results. */
+  readonly showReports?: boolean;
   readonly range: KnownRange;
   readonly stage: string | null;
   /** Query string for the report downloads (the period asked for). */
@@ -147,10 +151,13 @@ function Header({
   readonly props: ResultsDashboardProps;
   readonly name: string;
 }) {
+  const Heading = props.headingLevel === 2 ? "h2" : "h1";
   return (
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="cq-title-xl text-(--cq-text-primary)">Results</h1>
+        <Heading className="cq-title-xl text-(--cq-text-primary)">
+          {props.heading ?? "Results"}
+        </Heading>
         <p className="cq-body-sm text-(--cq-text-secondary)">
           {name} · {props.results.window.label.toLowerCase()}
         </p>
@@ -179,20 +186,24 @@ function Header({
             );
           })}
         </nav>
-        <a
-          href={`/results/report?format=pdf&${props.download}`}
-          className={buttonClassName("secondary")}
-          download
-        >
-          Download PDF
-        </a>
-        <a
-          href={`/results/report?format=csv&${props.download}`}
-          className={buttonClassName("quiet")}
-          download
-        >
-          CSV
-        </a>
+        {props.showReports === false ? null : (
+          <>
+            <a
+              href={`/results/report?format=pdf&${props.download}`}
+              className={buttonClassName("secondary")}
+              download
+            >
+              Download PDF
+            </a>
+            <a
+              href={`/results/report?format=csv&${props.download}`}
+              className={buttonClassName("quiet")}
+              download
+            >
+              CSV
+            </a>
+          </>
+        )}
       </div>
     </header>
   );
