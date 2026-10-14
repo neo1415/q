@@ -1,3 +1,5 @@
+import { createReadProductCapabilitiesTool } from "./tools/read-product-capabilities.js";
+
 import type { Logger } from "@capital-q/observability";
 import type { QToolPort } from "@capital-q/q-runtime";
 
@@ -125,6 +127,7 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
   const research = ports.research;
   const profiles = ports.profiles;
   return [
+    createReadProductCapabilitiesTool(ports.productRuntime?.qApiRevision),
     createGetCompanyTool(ports),
     createGetCapitalObjectiveTool(ports),
     createGetInvestorMandateTool(ports),

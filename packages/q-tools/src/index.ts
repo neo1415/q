@@ -740,3 +740,6 @@ export {
   type BriefPublicEntityInput,
   type BriefPublicEntityOutput,
 } from "./tools/brief-public-entity.js";
+
+export { ProductRevisionSchema, ProductCapabilitySnapshotSchema } from "./product-capabilities/schema.js";
+export { createReadProductCapabilitiesTool, ReadProductCapabilitiesInputSchema, ReadProductCapabilitiesOutputSchema } from "./tools/read-product-capabilities.js";

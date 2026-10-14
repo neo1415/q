@@ -1206,6 +1206,11 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Lists a company's claims as assumptions to test, with evidence labels and questions for the founder.",
   ),
   tool(
+    "read_product_capabilities",
+    "RESEARCH",
+    "Reads Capital Q product implementation status, revisioned evidence and limits before competitor product comparisons; absence stays unknown.",
+  ),
+  tool(
     "research_public_web",
     "RESEARCH",
     "Researches public web sources, cited.",

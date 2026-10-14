@@ -438,6 +438,7 @@ import { Q_ACTION_EVENTS } from "@capital-q/q-actions/events";
 import { createContextFirewall } from "@capital-q/q-firewall";
 import {
   createQTools,
+  ProductRevisionSchema,
   readOwnThesis,
   type DocumentStudioPort,
   type InvestorGatesPort,
@@ -2754,8 +2755,10 @@ const pushSettings = createPushSubscriptionStore(database.sql);
 // Q room W4b: what each run's own authorised tool calls named, so the
 // silence ladder can say whose deck it is reading (never a browser id).
 const runSubjects = createRunSubjects();
+const publicProductRevision = ProductRevisionSchema.safeParse(process.env["RAILWAY_GIT_COMMIT_SHA"]);
 const qTools = createQTools({
   ports: {
+    productRuntime: { qApiRevision: publicProductRevision.success ? publicProductRevision.data : null },
     // BILLING block
     entitlements: createQEntitlementPort(entitlements),
     // end BILLING block

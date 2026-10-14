@@ -444,6 +444,8 @@ export type CompanyPitchTranscript = {
  * optional; without a configured provider the research tools do not exist.
  */
 export type QToolPorts = {
+  /** Sanitized public deployment metadata only, never environment variables or secrets. */
+  readonly productRuntime?: { readonly qApiRevision: string | null } | undefined;
   // BILLING block (ADR 0034): the plan gate and "what does my plan include".
   // Absent: nothing is gated and there is no plan tool.
   readonly entitlements?: QEntitlementPort | undefined;
