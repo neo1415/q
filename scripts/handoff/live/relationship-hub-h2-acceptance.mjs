@@ -190,12 +190,16 @@ try {
         exact: true,
       });
       await nav.getByRole("link", { name: "Pipeline", exact: true }).click();
-      await page.locator("[data-pipeline-root]").waitFor({ timeout: 45000 });
+      await page
+        .locator("[data-pipeline-root]:visible")
+        .waitFor({ timeout: 45000 });
       await page.goto(
         `${web}/relationships?view=pipeline&pageSize=1&sort=name`,
         { waitUntil: "domcontentloaded", timeout: 60000 },
       );
-      await page.locator("[data-pipeline-root]").waitFor({ timeout: 45000 });
+      await page
+        .locator("[data-pipeline-root]:visible")
+        .waitFor({ timeout: 45000 });
       await closeBriefing();
       const first = baseline.items[0];
       const second = baseline.items[1];
@@ -262,7 +266,7 @@ try {
         fullPage: true,
       });
       await page.getByRole("link", { name: "Table", exact: true }).click();
-      await page.locator("table[data-pipeline-records]").waitFor();
+      await page.locator("table[data-pipeline-records]:visible").waitFor();
       const search = page.getByRole("textbox", {
         name: role === "investor" ? "Search companies" : "Search investors",
         exact: true,
@@ -341,7 +345,7 @@ try {
         .getByRole("option", { name: `Acceptance ${size}`, exact: true })
         .waitFor({ state: "attached" });
       await page.reload({ waitUntil: "domcontentloaded" });
-      await page.locator("[data-pipeline-root]").waitFor();
+      await page.locator("[data-pipeline-root]:visible").waitFor();
       await closeBriefing();
       await view.selectOption({ label: `Acceptance ${size}` });
       await page
@@ -373,7 +377,7 @@ try {
       });
       await page.locator("main").waitFor();
       await page.goBack({ waitUntil: "domcontentloaded" });
-      await page.locator("[data-pipeline-root]").waitFor();
+      await page.locator("[data-pipeline-root]:visible").waitFor();
       await closeBriefing();
       assert.equal(
         await page.evaluate(
@@ -451,7 +455,9 @@ try {
           () => page.waitForURL(/view=overview/, { timeout: 90000 }),
         );
         await ask("Select the Pipeline tab in this Hub.", () =>
-          page.locator("[data-pipeline-root]").waitFor({ timeout: 90000 }),
+          page
+            .locator("[data-pipeline-root]:visible")
+            .waitFor({ timeout: 90000 }),
         );
         await ask("Switch this pipeline to Board view.", () =>
           page
@@ -469,7 +475,9 @@ try {
           }),
         );
         await ask("Open the Relationship Hub pipeline.", () =>
-          page.locator("[data-pipeline-root]").waitFor({ timeout: 90000 }),
+          page
+            .locator("[data-pipeline-root]:visible")
+            .waitFor({ timeout: 90000 }),
         );
         qVerified = true;
       }
