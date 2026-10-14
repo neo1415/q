@@ -247,15 +247,18 @@ describe("submitted application comparison", () => {
     ).toHaveLength(2);
     expect(actions.loadDetailAction).toHaveBeenCalledWith(gatewayId, id(1));
     expect(actions.loadDetailAction).toHaveBeenCalledWith(gatewayId, id(2));
-    expect(
-      currentManifest()?.sections.find(
-        (section) => section.id === "gateq-comparison",
-      )?.refs,
-    ).toEqual([
-      { kind: "GATEQ_APPLICATION", id: id(1) },
-      { kind: "GATEQ_APPLICATION", id: id(2) },
-    ]);
-    expect(currentManifest()?.dialogs.at(-1)?.refs).toHaveLength(2);
+    // The table can render before Q sections/dialogs publish their manifest.
+    await waitFor(() => {
+      expect(
+        currentManifest()?.sections.find(
+          (section) => section.id === "gateq-comparison",
+        )?.refs,
+      ).toEqual([
+        { kind: "GATEQ_APPLICATION", id: id(1) },
+        { kind: "GATEQ_APPLICATION", id: id(2) },
+      ]);
+      expect(currentManifest()?.dialogs.at(-1)?.refs).toHaveLength(2);
+    });
     mounted.unmount();
     expect(currentManifest()).toBeUndefined();
     expect(actions.passAction).not.toHaveBeenCalled();
