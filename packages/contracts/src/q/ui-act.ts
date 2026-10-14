@@ -104,15 +104,29 @@ export const QUiActIntentSchema = z
     /** SELECT_ITEM: 1-based position. */
     index: z.number().int().min(1).max(500).optional(),
     /** SET: on/off; FILTER: a code value or null to clear. */
-    value: z
-      .union([
-        z.boolean(),
-        z.string().regex(/^[A-Za-z0-9_.,:-]{1,64}$/),
-        z.null(),
-      ])
-      .optional(),
+    value: z.union([z.boolean(), z.string().max(120), z.null()]).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((intent, context) => {
+    if (typeof intent.value !== "string") return;
+    const pipelineSearch =
+      intent.act === "FILTER" && intent.target === "filter.pipeline-search";
+    if (
+      pipelineSearch
+        ? Array.from(intent.value).some(
+            (character) =>
+              character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+          )
+        : !/^[A-Za-z0-9_.,:-]{1,64}$/u.test(intent.value)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["value"],
+        message:
+          "Use a bounded search string only for the pipeline search filter; other filters take code values.",
+      });
+    }
+  });
 export type QUiActIntent = z.infer<typeof QUiActIntentSchema>;
 
 export const Q_UI_ACT_STATUSES = [

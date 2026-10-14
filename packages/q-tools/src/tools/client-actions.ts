@@ -1396,15 +1396,33 @@ export const OperateScreenInputSchema = z
       .optional()
       .describe("SELECT_ITEM: which item, 1-based (the second one is 2)."),
     value: z
-      .union([
-        z.boolean(),
-        z.string().regex(/^[A-Za-z0-9_.,:-]{1,64}$/),
-        z.null(),
-      ])
+      .union([z.boolean(), z.string().max(120), z.null()])
       .optional()
-      .describe("SET: true or false. FILTER: a code value, or null to clear."),
+      .describe(
+        "SET: true or false. FILTER: a code value, or null to clear. filter.pipeline-search alone accepts search text up to120 characters. filter.pipeline-sort uses name, name-desc, recent or oldest.",
+      ),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    if (typeof input.value !== "string") return;
+    const search =
+      input.act === "FILTER" && input.target === "filter.pipeline-search";
+    if (
+      search
+        ? Array.from(input.value).some(
+            (character) =>
+              character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+          )
+        : !/^[A-Za-z0-9_.,:-]{1,64}$/u.test(input.value)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["value"],
+        message:
+          "Only filter.pipeline-search accepts bounded search text; other controls take code values.",
+      });
+    }
+  });
 export type OperateScreenInput = z.infer<typeof OperateScreenInputSchema>;
 
 /** The run's own screen, when its composition carries the page manifest. */

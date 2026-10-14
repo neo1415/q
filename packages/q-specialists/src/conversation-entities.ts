@@ -1,3 +1,4 @@
+import { RELATIONSHIP_STATES_V2 } from "@capital-q/contracts";
 import type {
   QPageManifest,
   QManifestRefKind,
@@ -386,16 +387,86 @@ export type ControlBinding = {
   readonly target: string;
   readonly act: QUiAct;
   readonly index?: number | undefined;
+  readonly value?: string | undefined;
   readonly note: string;
 };
 
 /** Words that ask for the act itself, not a question about the control. */
 const DO_IT =
-  /^\s*(?:(?:can|could|would)\s+you\s+|please\s+|q[,\s]+)*(?:open|show(?:\s+me)?|go\s+to|switch\s+to|take\s+me\s+to|jump\s+to|scroll\s+(?:down\s+|up\s+)?to|select|pick|click(?:\s+on)?|bring\s+up|pull\s+up)\b/iu;
+  /^\s*(?:(?:can|could|would)\s+you\s+|please\s+|q[,\s]+)*(?:sort|search|filter|clear|open|show(?:\s+me)?|go\s+to|switch\s+to|take\s+me\s+to|jump\s+to|scroll\s+(?:down\s+|up\s+)?to|select|pick|click(?:\s+on)?|bring\s+up|pull\s+up)\b/iu;
 
 /** True when the words ask Q to work the control now ("open the X tab"). */
 export function asksToOperate(text: string): boolean {
   return DO_IT.test(text.replace(/[’]/gu, "'"));
+}
+
+/** Closed pipeline operations use the existing screen-act/receipt path.
+ * Only registered filters can be addressed; the server still owns each query.
+ */
+function pipelineControlBinding(
+  text: string,
+  controls: readonly ManifestControl[],
+): ControlBinding | null {
+  const command = text
+    .trim()
+    .replace(/^please\s+/iu, "")
+    .replace(/[.!?]$/u, "");
+  const normalized = command.toLowerCase().replace(/[–—]/gu, "-");
+  let target: string | undefined;
+  let value: string | undefined;
+  const sort = /^sort\s+(?:(?:this|the)\s+)?pipeline\s+by\s+(.+)$/iu.exec(
+    normalized,
+  );
+  if (sort !== null) {
+    const sorts: Readonly<Record<string, string>> = {
+      "name a-z": "name",
+      "name a to z": "name",
+      name: "name",
+      "name z-a": "name-desc",
+      "name z to a": "name-desc",
+      "latest state change": "recent",
+      "earliest state change": "oldest",
+    };
+    target = "filter.pipeline-sort";
+    value = sorts[(sort[1] ?? "").replace(/\s*-\s*/gu, "-")];
+  } else if (
+    /^clear\s+(?:(?:this|the)\s+)?pipeline\s+search$/iu.test(command)
+  ) {
+    target = "filter.pipeline-search";
+    value = "";
+  } else {
+    const state = /^filter\s+(?:(?:this|the)\s+)?pipeline\s+to\s+(.+)$/iu.exec(
+      normalized,
+    );
+    if (state !== null) {
+      target = "filter.pipeline-state";
+      value = RELATIONSHIP_STATES_V2.find(
+        (code) => code.toLowerCase().replaceAll("_", " ") === state[1],
+      );
+    } else {
+      const search =
+        /^search\s+(?:(?:this|the)\s+)?pipeline\s+for\s+(.+)$/iu.exec(command);
+      if (search !== null) {
+        target = "filter.pipeline-search";
+        value = (search[1] ?? "").replace(/^"(.*)"$/u, "$1").trim();
+        if (value.length === 0 || value.length > 120) return null;
+      }
+    }
+  }
+  if (
+    target === undefined ||
+    value === undefined ||
+    !controls.some(
+      (control) => control.id === target && control.kind === "FILTER",
+    )
+  )
+    return null;
+  return {
+    target,
+    act: "FILTER",
+    value,
+    note: `RESOLVED: the registered pipeline filter ${target} (operate_screen FILTER).`,
+  };
 }
 
 export function controlBindingOf(
@@ -404,6 +475,8 @@ export function controlBindingOf(
 ): ControlBinding | null {
   if (controls === undefined || controls.length === 0) return null;
   const said = text.replace(/[’]/gu, "'");
+  const pipeline = pipelineControlBinding(said, controls);
+  if (pipeline !== null) return pipeline;
   const named = NAMED_CONTROL.exec(said);
   if (named !== null) {
     // The control's name is the word or two before "tab"/"section"

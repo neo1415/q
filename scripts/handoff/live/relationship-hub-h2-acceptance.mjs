@@ -129,6 +129,8 @@ try {
       ["desktop", { width: 1440, height: 960 }],
       ["mobile", { width: 390, height: 844 }],
     ]) {
+      if (process.env.CQ_HUB_DEVICE && size !== process.env.CQ_HUB_DEVICE)
+        continue;
       const context = await browser.newContext({
         viewport,
         ignoreHTTPSErrors: false,
@@ -156,7 +158,10 @@ try {
         const match = /\/q\/runs\/([0-9a-f-]{36})\/events/i.exec(
           new URL(r.url()).pathname,
         );
-        if (match) qRuns.push(match[1]);
+        if (match) {
+          qRuns.push(match[1]);
+          write(`${role}-${size}-observed-q-runs.json`, qRuns);
+        }
         if (
           new URL(r.url()).pathname === "/api/q-ui-acts" &&
           r.method() === "POST"
@@ -444,7 +449,7 @@ try {
           assert.ok(
             fresh.some(
               (x) =>
-                (x.reports ?? []).some((r) => r.status === "DONE") ||
+                (x.reports ?? []).some((r) => r.receipt?.status === "DONE") ||
                 (x.navigations ?? []).some((r) => r.status === "DONE"),
             ),
             "Q operation lacks real DONE receipt",
@@ -469,12 +474,33 @@ try {
             timeout: 90000,
           }),
         );
+        await ask(`Search this pipeline for "${first.counterpart.name}"`, () =>
+          page.waitForURL(
+            (u) => u.searchParams.get("q") === first.counterpart.name,
+            { timeout: 90000 },
+          ),
+        );
+        await ask("Clear the pipeline search", () =>
+          page.waitForURL((u) => !u.searchParams.has("q"), { timeout: 90000 }),
+        );
+        await ask(
+          `Filter this pipeline to ${first.state.toLowerCase().replaceAll("_", " ")}`,
+          () =>
+            page.waitForURL(
+              (u) => u.searchParams.get("state") === first.state,
+              { timeout: 90000 },
+            ),
+        );
         await ask("Open the first relationship in this pipeline.", () =>
           page.waitForURL(/\/relationships\/(company|investor)\//, {
             timeout: 90000,
           }),
         );
-        await ask("Open the Relationship Hub pipeline.", () =>
+        await ask(
+          role === "investor" ? "Open investment hub" : "Open fundraising hub",
+          () => page.waitForURL(/view=overview/, { timeout: 90000 }),
+        );
+        await ask("Select the Pipeline tab in this Hub.", () =>
           page
             .locator("[data-pipeline-root]:visible")
             .waitFor({ timeout: 90000 }),
