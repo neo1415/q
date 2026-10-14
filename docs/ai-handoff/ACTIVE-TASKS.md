@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## Active takeover — October14
+
+Finish isolated GateQ83/84 qualification safeguards, Hub81 real role/mobile/Q navigation acceptance and protected release, then H2 scoped queries/saved views/exports. Parallel research lane repairs lost public aviation competitor target; Capital Q product inventory is separate. Functional owner approval supersedes historical prototype-approval blocker. See latest STATE for exact evidence, fixtures and CI. No prototype styling, duplicate CRM or Q runtime.
+
 ## October14 active product ownership
 
 Q attribution is deployed37b5414e and the actual investor cards/profile/risks/comparison journey passes. Close the newly proven GateQ typed-stage corruption through protected release and native submission/dossier acceptance. Functional Hub H1 is approved; finish PR81 exact checks and role-aware browser acceptance. Guest Evidence b35813de is tested foundations, not disclosure-ready. See STATE top for exact source authority, receipts and remaining speed gaps.
