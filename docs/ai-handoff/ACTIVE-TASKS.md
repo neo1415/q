@@ -1,5 +1,12 @@
 # Active tasks — authoritative cross-model board
 
+## GateQ shared contact limits and evidence labels — 2026-10-14
+
+- IMPLEMENTED / LOCAL TESTED: transactional server-owned contact issue/verify budgets across application, intake session and keyed destination; resend preserves attempts within the hourly window. Parallel wrong-code attempts stop at five. New application interviews require confirmed contact before any paid model call; resume reuses the saved Q opening. Existing confirmed contacts remain usable.
+- Q cannot promote a new applicant claim to document-supported without an existing authorized document-supported fact. Coverage now returns the owner-authorized contact details for review recovery, never verifier fields.
+- All52 package builds and102 GateQ tests PASS. Changed-source lint produced no diagnostics; root combined type gate pending. New immutable migration20261223110000 and seven pgTAP assertions plus schema inventory guards are implemented but not CI tested or hosted. Existing Brevo sender configuration checked; dedicated API-only verifier secret still unbound. Not deployed or browser accepted.
+- Founder flow and immutable investor dossier UI are pushed on the isolated frontend branch; integrating next. Selected application comparison is in progress there. Guest Evidence integration, immutable source versions, investor Q source access and follow-ups remain incomplete; see GATEQ-V1-CAPABILITIES.md. Q Pitch untouched.
+
 ## GateQ durable exchange slice — 2026-10-13
 
 - IMPLEMENTED / LOCAL TESTED, not released: database-owned per-application exchange claim before model spend; exact retry text binding; checkpointed typed model reply reused after final write failure; atomically commits facts, Q transcript and claim completion. Five-minute fenced claim recovery for the same pending key, with a120second bounded interviewer call; completed exchanges replay without another model call. A crash after provider completion but before the reply checkpoint can still require a necessary recovery call; no universal exactly-once provider claim.

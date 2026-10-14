@@ -395,7 +395,21 @@ export function createGateQInterviewer(
           rejected += 1;
           continue;
         }
-        facts.push(parsed.data);
+        const current = input.application?.facts.find(
+          (fact) =>
+            fact.dimension === parsed.data.dimension &&
+            fact.supersededAt === null &&
+            fact.provenance === "DOCUMENT_SUPPORTED" &&
+            JSON.stringify(fact.value) === JSON.stringify(parsed.data.value),
+        );
+        // A model cannot mint evidence support. New document-derived values
+        // need the authorized Evidence confirmation path and exact lineage.
+        facts.push(
+          parsed.data.provenance === "DOCUMENT_SUPPORTED" &&
+            current === undefined
+            ? { ...parsed.data, provenance: "APPLICANT_PROVIDED" }
+            : parsed.data,
+        );
       }
 
       const asking =

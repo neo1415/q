@@ -209,6 +209,23 @@ export function createConversationService(
   return {
     openingFor: async (input) => {
       const { guest, policy, publicGateway } = await stateFor(input.token);
+      try {
+        await intake.assertInterviewReady(input.token);
+      } catch (error) {
+        if (
+          error instanceof IntakeRefusedError &&
+          error.refusal === "CONTACT_NOT_CONFIRMED"
+        )
+          return "Please confirm your contact details before starting your investment interview.";
+        throw error;
+      }
+      if (turns !== undefined) {
+        const existing = await turns.listFor(guest.application.id);
+        const lastQuestion = [...existing]
+          .reverse()
+          .find((turn) => turn.role === "Q");
+        if (lastQuestion !== undefined) return lastQuestion.text;
+      }
       const qualification = await intake.qualification(input.token);
       // Everything already established, so a resumed application opens on
       // what is still open rather than on a greeting from nowhere (§35).
@@ -282,6 +299,7 @@ export function createConversationService(
         }
       }
 
+      await intake.assertInterviewReady(input.token);
       if (guest.application.status === "SUBMITTED") {
         throw new IntakeRefusedError("ALREADY_SUBMITTED");
       }

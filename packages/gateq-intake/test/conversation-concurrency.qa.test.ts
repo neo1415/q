@@ -131,6 +131,7 @@ function exchangeWorld() {
     finish = resolve;
   });
   const intake = {
+    assertInterviewReady: () => Promise.resolve(),
     authorise: () => Promise.resolve({ application, sessionId }),
     qualification: () => Promise.resolve(qualification),
     factsFor: () => Promise.resolve([]),

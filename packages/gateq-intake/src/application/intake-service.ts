@@ -1,9 +1,4 @@
-import {
-  createHmac,
-  randomInt,
-  randomUUID,
-  timingSafeEqual,
-} from "node:crypto";
+import { createHmac, randomInt, randomUUID } from "node:crypto";
 
 import {
   ApplicationContactDtoSchema,
@@ -142,12 +137,6 @@ const hashContactCode = (
     .update(`gateq-contact-code:v1:${applicationId}:${code}`, "utf8")
     .digest("hex");
 
-const sameHash = (a: string, b: string): boolean => {
-  const left = Buffer.from(a, "hex");
-  const right = Buffer.from(b, "hex");
-  return left.length === right.length && timingSafeEqual(left, right);
-};
-
 /** What a guest may see of their own contact. Never the code or its hash. */
 export function contactDto(contact: StoredContact): ApplicationContactDto {
   return ApplicationContactDtoSchema.parse({
@@ -221,6 +210,7 @@ export type IntakeService = {
   }>;
   /** Internal: the verified guest, for the interview layer above. */
   readonly authorise: (token: string) => Promise<GuestContext>;
+  readonly assertInterviewReady: (token: string) => Promise<void>;
   /**
    * GateQ slice 1: save the applicant's contact and send a one-time code.
    * With `accountEmail` (a signed-in founder's own verified address,
@@ -412,6 +402,12 @@ export function createIntakeService(
   };
 
   return {
+    assertInterviewReady: async (token) => {
+      const { application } = await authorise(token);
+      const standing = await contactStanding(application);
+      if (standing.required && !standing.confirmed)
+        throw new IntakeRefusedError("CONTACT_NOT_CONFIRMED");
+    },
     completeTurn: async (input) => {
       const { application } = await authorise(input.token);
       if (turns === undefined) throw new IntakeRefusedError("NOT_FOUND");
@@ -727,7 +723,7 @@ export function createIntakeService(
     },
 
     startContact: async (input) => {
-      const { application } = await authorise(input.token);
+      const { application, sessionId } = await authorise(input.token);
       if (contacts === undefined) throw new IntakeRefusedError("NOT_FOUND");
       if (application.status === "SUBMITTED") {
         // The contact the organisation received is the one in its dossier.
@@ -791,7 +787,13 @@ export function createIntakeService(
       }
 
       const code = newContactCode();
-      const saved = await contacts.save({
+      const secret = contactCodeSecret();
+      const saved = await contacts.issue({
+        sessionId,
+        destinationHash: createHmac("sha256", secret)
+          .update(`gateq-contact-destination:v1:${details.email}`)
+          .digest("hex"),
+        maximumAttempts: CONTACT_CODE_MAX_ATTEMPTS,
         ...base,
         codeHash: hashContactCode(contactCodeSecret(), application.id, code),
         codeExpiresAt: new Date(
@@ -821,41 +823,32 @@ export function createIntakeService(
     },
 
     confirmContact: async (input) => {
-      const { application } = await authorise(input.token);
+      const { application, sessionId } = await authorise(input.token);
       if (contacts === undefined) return { status: "NOT_FOUND", contact: null };
       const contact = await contacts.findFor(application.id);
       if (contact === null) return { status: "NOT_FOUND", contact: null };
-      // Confirming twice is confirmed: a retried request is harmless.
-      if (contact.emailConfirmedAt !== null) {
+      if (contact.emailConfirmedAt !== null)
         return { status: "CONFIRMED", contact: contactDto(contact) };
-      }
-      if (contact.codeHash === null || contact.codeExpiresAt === null) {
+      if (contact.codeHash === null || contact.codeExpiresAt === null)
         return { status: "NOT_FOUND", contact: null };
-      }
-      if (
-        Date.parse(contact.codeExpiresAt) <= clock().getTime() ||
-        contact.codeAttempts >= CONTACT_CODE_MAX_ATTEMPTS
-      ) {
-        return { status: "EXPIRED", contact: contactDto(contact) };
-      }
-      if (
-        !/^[0-9]{6}$/.test(input.code) ||
-        !sameHash(
-          contact.codeHash,
-          hashContactCode(contactCodeSecret(), application.id, input.code),
-        )
-      ) {
-        await contacts.recordFailedAttempt(application.id);
-        return { status: "WRONG_CODE", contact: contactDto(contact) };
-      }
-      const confirmed = await contacts.confirm({
+      const secret = contactCodeSecret();
+      const result = await contacts.verify({
         applicationId: application.id,
+        sessionId,
+        destinationHash: createHmac("sha256", secret)
+          .update(`gateq-contact-destination:v1:${contact.email}`)
+          .digest("hex"),
+        expectedCodeHash: contact.codeHash,
+        candidateHash: /^[0-9]{6}$/.test(input.code)
+          ? hashContactCode(secret, application.id, input.code)
+          : "0".repeat(64),
+        maximumAttempts: CONTACT_CODE_MAX_ATTEMPTS,
         at: clock().toISOString(),
-        via: "EMAIL_CODE",
       });
-      return confirmed === null
-        ? { status: "NOT_FOUND", contact: null }
-        : { status: "CONFIRMED", contact: contactDto(confirmed) };
+      return {
+        status: result.status,
+        contact: result.contact === null ? null : contactDto(result.contact),
+      };
     },
 
     coverage: async (token) => {
@@ -866,7 +859,12 @@ export function createIntakeService(
       const standing = await contactStanding(application);
       return ApplicationCoverageDtoSchema.parse({
         coverage: coverageFor({ policy, qualification, facts: current }),
-        contact: { required: standing.required, confirmed: standing.confirmed },
+        contact: {
+          required: standing.required,
+          confirmed: standing.confirmed,
+          details:
+            standing.contact === null ? null : contactDto(standing.contact),
+        },
         documentCount: await documents.countFor(application.id),
         transcriptTurns:
           turns === undefined ? 0 : await turns.countFor(application.id),

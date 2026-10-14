@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import {
@@ -605,20 +605,14 @@ function toContact(row: unknown): StoredContact {
 /** GateQ slice 1: the applicant's one contact. Only a code's hash is kept. */
 export function createPostgresApplicationContactRepository(options: {
   readonly sql: DatabaseExecutor;
+  readonly transactions: TransactionManager;
 }): ApplicationContactRepository {
-  const { sql } = options;
-  return {
-    findFor: async (applicationId) => {
-      const rows = await sql`
-        select * from gateq.application_contacts
-         where application_id = ${applicationId}
-         limit 1`;
-      const row = rows[0];
-      return row === undefined ? null : toContact(row);
-    },
-
-    save: async (input) => {
-      const rows = await sql`
+  const { sql, transactions } = options;
+  const saveWith = async (
+    executor: DatabaseExecutor,
+    input: Parameters<ApplicationContactRepository["save"]>[0],
+  ): Promise<StoredContact> => {
+    const rows = await executor`
         insert into gateq.application_contacts (
           application_id, tenant_id, name, email, role, company_name, phone,
           preferred_channel, code_hash, code_expires_at, code_attempts,
@@ -638,35 +632,139 @@ export function createPostgresApplicationContactRepository(options: {
           preferred_channel = excluded.preferred_channel,
           code_hash = excluded.code_hash,
           code_expires_at = excluded.code_expires_at,
-          code_attempts = 0,
+          code_attempts = case when gateq.application_contacts.attempt_window_started_at <= clock_timestamp() - interval '1 hour' then 0 else gateq.application_contacts.code_attempts end,
+          attempt_window_started_at = case when gateq.application_contacts.attempt_window_started_at <= clock_timestamp() - interval '1 hour' then clock_timestamp() else gateq.application_contacts.attempt_window_started_at end,
           email_confirmed_at = excluded.email_confirmed_at,
           confirmed_via = excluded.confirmed_via,
           updated_at = now()
         returning *`;
-      const row = rows[0];
-      if (row === undefined) throw new Error("contact save returned nothing");
-      return toContact(row);
+    const row = rows[0];
+    if (row === undefined) throw new Error("contact save returned nothing");
+    return toContact(row);
+  };
+  const readContact = async (
+    applicationId: string,
+  ): Promise<StoredContact | null> => {
+    const rows =
+      await sql`select * from gateq.application_contacts where application_id = ${applicationId} limit 1`;
+    return rows[0] === undefined ? null : toContact(rows[0]);
+  };
+  const charge = async (
+    tx: TransactionContext,
+    input: {
+      applicationId: string;
+      sessionId: string;
+      destinationHash: string;
+    },
+    operation: "SEND" | "VERIFY",
+  ): Promise<void> => {
+    const scopes = [
+      {
+        scope: "APPLICATION",
+        key: createHash("sha256").update(input.applicationId).digest("hex"),
+        limit: 5,
+      },
+      {
+        scope: "DESTINATION",
+        key: input.destinationHash,
+        limit: operation === "SEND" ? 10 : 20,
+      },
+      {
+        scope: "SESSION",
+        key: createHash("sha256").update(input.sessionId).digest("hex"),
+        limit: 5,
+      },
+    ];
+    for (const bucket of scopes) {
+      const rows = await tx.sql`
+        insert into gateq.contact_verification_limits (scope, key_hash, window_started_at, send_count, attempt_count)
+        values (${bucket.scope}, ${bucket.key}, clock_timestamp(), ${operation === "SEND" ? 1 : 0}, ${operation === "VERIFY" ? 1 : 0})
+        on conflict (scope, key_hash) do update set
+          window_started_at = case when gateq.contact_verification_limits.window_started_at <= clock_timestamp() - interval '1 hour' then clock_timestamp() else gateq.contact_verification_limits.window_started_at end,
+          send_count = case when gateq.contact_verification_limits.window_started_at <= clock_timestamp() - interval '1 hour' then ${operation === "SEND" ? 1 : 0} else gateq.contact_verification_limits.send_count + ${operation === "SEND" ? 1 : 0} end,
+          attempt_count = case when gateq.contact_verification_limits.window_started_at <= clock_timestamp() - interval '1 hour' then ${operation === "VERIFY" ? 1 : 0} else gateq.contact_verification_limits.attempt_count + ${operation === "VERIFY" ? 1 : 0} end
+        where gateq.contact_verification_limits.window_started_at <= clock_timestamp() - interval '1 hour'
+           or (${operation} = 'SEND' and gateq.contact_verification_limits.send_count < ${bucket.limit})
+           or (${operation} = 'VERIFY' and gateq.contact_verification_limits.attempt_count < ${bucket.limit})
+        returning key_hash`;
+      if (rows.length !== 1) throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+    }
+  };
+  return {
+    issue: async (input) =>
+      transactions.run(async (tx) => {
+        const app =
+          await tx.sql`select id from gateq.applications where id = ${input.applicationId} and tenant_id = ${input.tenantId} and status <> 'SUBMITTED' for update`;
+        if (app.length !== 1) throw new IntakeRefusedError("ALREADY_SUBMITTED");
+        await charge(tx, input, "SEND");
+        const saved = await saveWith(tx.sql, input);
+        if (saved.codeAttempts >= input.maximumAttempts)
+          throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+        return saved;
+      }),
+    verify: async (input) => {
+      try {
+        return await transactions.run(async (tx) => {
+          await tx.sql`select id from gateq.applications where id = ${input.applicationId} for update`;
+          const rows =
+            await tx.sql`select * from gateq.application_contacts where application_id = ${input.applicationId} for update`;
+          const contact = rows[0] === undefined ? null : toContact(rows[0]);
+          if (contact === null)
+            return { status: "NOT_FOUND" as const, contact: null };
+          if (contact.emailConfirmedAt !== null)
+            return { status: "CONFIRMED" as const, contact };
+          if (
+            contact.codeHash !== input.expectedCodeHash ||
+            contact.codeExpiresAt === null ||
+            Date.parse(contact.codeExpiresAt) <= Date.parse(input.at) ||
+            contact.codeAttempts >= input.maximumAttempts
+          )
+            return { status: "EXPIRED" as const, contact };
+          await charge(tx, input, "VERIFY");
+          const updated = await tx.sql`
+            update gateq.application_contacts set
+              code_attempts = code_attempts + 1,
+              email_confirmed_at = case when code_hash = ${input.candidateHash} then ${input.at}::timestamptz else null end,
+              confirmed_via = case when code_hash = ${input.candidateHash} then 'EMAIL_CODE' else null end,
+              code_expires_at = case when code_hash = ${input.candidateHash} then null else code_expires_at end,
+              code_hash = case when code_hash = ${input.candidateHash} then null else code_hash end,
+              updated_at = clock_timestamp()
+            where application_id = ${input.applicationId} and code_hash = ${input.expectedCodeHash}
+              and code_attempts < ${input.maximumAttempts} and code_expires_at > clock_timestamp()
+            returning *`;
+          if (updated[0] === undefined)
+            return { status: "EXPIRED" as const, contact };
+          const saved = toContact(updated[0]);
+          return {
+            status:
+              saved.emailConfirmedAt === null
+                ? ("WRONG_CODE" as const)
+                : ("CONFIRMED" as const),
+            contact: saved,
+          };
+        });
+      } catch (error) {
+        if (
+          error instanceof IntakeRefusedError &&
+          error.refusal === "TOO_MANY_REQUESTS"
+        )
+          return {
+            status: "EXPIRED" as const,
+            contact: await readContact(input.applicationId),
+          };
+        throw error;
+      }
     },
 
-    recordFailedAttempt: async (applicationId) => {
-      await sql`
-        update gateq.application_contacts
-           set code_attempts = code_attempts + 1, updated_at = now()
-         where application_id = ${applicationId} and code_attempts < 10`;
-    },
-
-    confirm: async (input) => {
+    findFor: async (applicationId) => {
       const rows = await sql`
-        update gateq.application_contacts
-           set email_confirmed_at = ${input.at},
-               confirmed_via = ${input.via},
-               code_hash = null,
-               code_expires_at = null,
-               updated_at = now()
-         where application_id = ${input.applicationId}
-        returning *`;
+        select * from gateq.application_contacts
+         where application_id = ${applicationId}
+         limit 1`;
       const row = rows[0];
       return row === undefined ? null : toContact(row);
     },
+
+    save: (input) => saveWith(sql, input),
   };
 }

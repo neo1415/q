@@ -174,7 +174,7 @@ select is((select count(*)::int from information_schema.columns
 select is(
   array(select table_name::text from information_schema.tables
          where table_schema = 'gateq' order by 1),
-  array['application_contacts', 'application_documents', 'application_facts', 'application_founders',
+  array['contact_verification_limits', 'application_contacts', 'application_documents', 'application_facts', 'application_founders',
         'application_sessions', 'application_submissions', 'application_turns', 'applications',
         'gateway_criteria', 'gateway_versions', 'gateways',
         'inbox_activity', 'inbox_item_labels', 'inbox_items', 'inbox_labels',

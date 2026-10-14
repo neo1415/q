@@ -101,6 +101,28 @@ const turn = (
 });
 
 describe("what survives validation", () => {
+  it("never upgrades a new founder claim to document-supported based on model assertion alone", async () => {
+    const { service } = interviewer({
+      ...RESULT,
+      facts: [
+        {
+          ...RESULT.facts[0],
+          dimension: "claims.revenue",
+          value: { kind: "TEXT", text: "$100k revenue" },
+          provenance: "DOCUMENT_SUPPORTED",
+          correction: false,
+        },
+      ],
+    });
+    const outcome = await service.turn(
+      turn({ utterance: "We have $100k revenue." }),
+    );
+    expect(outcome.facts[0]?.provenance).toBe("APPLICANT_PROVIDED");
+    expect(outcome.facts[0]?.value).toEqual({
+      kind: "TEXT",
+      text: "$100k revenue",
+    });
+  });
   it("44: a dimension nobody defined never becomes state", async () => {
     const { service } = interviewer({
       ...RESULT,

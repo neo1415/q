@@ -18,7 +18,7 @@ import {
 } from "@capital-q/contracts";
 
 import {
-  ApplicationFactSchema,
+  ApplicationViewSchema,
   IntakeRefusedError,
   type Application,
   type ApplicationFact,
@@ -36,6 +36,7 @@ import type {
   InterviewTurnOutcome,
 } from "../src/application/interviewer.js";
 import type {
+  ApplicationContactRepository,
   ApplicationTurnRepository,
   StoredContact,
   StoredTurn,
@@ -170,12 +171,9 @@ function world(
     { id: string | null; turnId: string; outcome: unknown }
   >();
   const turns: ApplicationTurnRepository = {
-    claimExchange: async (input: {
-      applicationId: string;
-      tenantId: string;
-      clientTurnId: string;
-      text: string;
-    }) => {
+    claimExchange: async (
+      input: Parameters<ApplicationTurnRepository["claimExchange"]>[0],
+    ) => {
       const prior = claims.get(input.applicationId);
       const person = turnRows.find(
         (row) =>
@@ -289,43 +287,107 @@ function world(
       ),
   };
 
-  const contacts = {
+  const contactWindows = new Map<string, number>();
+  const buckets = new Map<string, { start: number; count: number }>();
+  const consume = (keys: readonly { key: string; limit: number }[]) => {
+    for (const item of keys) {
+      const bucket = buckets.get(item.key);
+      if (
+        bucket !== undefined &&
+        now.getTime() - bucket.start < 3600_000 &&
+        bucket.count >= item.limit
+      )
+        throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+    }
+    for (const item of keys) {
+      const bucket = buckets.get(item.key);
+      buckets.set(item.key, {
+        start:
+          bucket === undefined || now.getTime() - bucket.start >= 3600_000
+            ? now.getTime()
+            : bucket.start,
+        count:
+          bucket === undefined || now.getTime() - bucket.start >= 3600_000
+            ? 1
+            : bucket.count + 1,
+      });
+    }
+  };
+  const contacts: ApplicationContactRepository = {
+    issue: (input) =>
+      Promise.resolve().then(async () => {
+        const existing = contactRows.get(input.applicationId);
+        if (
+          existing !== undefined &&
+          existing.codeAttempts >= input.maximumAttempts &&
+          now.getTime() - (contactWindows.get(input.applicationId) ?? 0) <
+            3600_000
+        )
+          throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+        consume([
+          { key: `send-app:${input.applicationId}`, limit: 5 },
+          { key: `send-session:${input.sessionId}`, limit: 5 },
+          { key: `send-destination:${input.destinationHash}`, limit: 10 },
+        ]);
+        return await contacts.save(input);
+      }),
+    verify: (input) =>
+      Promise.resolve().then(() => {
+        const contact = contactRows.get(input.applicationId);
+        if (contact === undefined)
+          return { status: "NOT_FOUND" as const, contact: null };
+        if (contact.emailConfirmedAt !== null)
+          return { status: "CONFIRMED" as const, contact };
+        if (
+          contact.codeHash !== input.expectedCodeHash ||
+          contact.codeExpiresAt === null ||
+          Date.parse(contact.codeExpiresAt) <= now.getTime() ||
+          contact.codeAttempts >= input.maximumAttempts
+        )
+          return { status: "EXPIRED" as const, contact };
+        try {
+          consume([
+            { key: `verify-app:${input.applicationId}`, limit: 5 },
+            { key: `verify-session:${input.sessionId}`, limit: 5 },
+            { key: `verify-destination:${input.destinationHash}`, limit: 20 },
+          ]);
+        } catch {
+          return { status: "EXPIRED" as const, contact };
+        }
+        const valid = contact.codeHash === input.candidateHash;
+        const updated = {
+          ...contact,
+          codeAttempts: contact.codeAttempts + 1,
+          emailConfirmedAt: valid ? input.at : null,
+          confirmedVia: valid ? ("EMAIL_CODE" as const) : null,
+          codeHash: valid ? null : contact.codeHash,
+          codeExpiresAt: valid ? null : contact.codeExpiresAt,
+        };
+        contactRows.set(input.applicationId, updated);
+        return {
+          status: valid ? ("CONFIRMED" as const) : ("WRONG_CODE" as const),
+          contact: updated,
+        };
+      }),
     findFor: (applicationId: string) =>
       Promise.resolve(contactRows.get(applicationId) ?? null),
     save: (
       input: Omit<StoredContact, "codeAttempts"> & { tenantId: string },
     ) => {
       const { tenantId: _tenant, ...rest } = input;
-      const row: StoredContact = { ...rest, codeAttempts: 0 };
+      const existing = contactRows.get(input.applicationId);
+      const expired =
+        now.getTime() - (contactWindows.get(input.applicationId) ?? 0) >=
+        3600_000;
+      if (existing === undefined || expired)
+        contactWindows.set(input.applicationId, now.getTime());
+      const row: StoredContact = {
+        ...rest,
+        codeAttempts:
+          existing === undefined || expired ? 0 : existing.codeAttempts,
+      };
       contactRows.set(input.applicationId, row);
       return Promise.resolve(row);
-    },
-    recordFailedAttempt: (applicationId: string) => {
-      const row = contactRows.get(applicationId);
-      if (row !== undefined) {
-        contactRows.set(applicationId, {
-          ...row,
-          codeAttempts: row.codeAttempts + 1,
-        });
-      }
-      return Promise.resolve();
-    },
-    confirm: (input: {
-      applicationId: string;
-      at: string;
-      via: "EMAIL_CODE" | "ACCOUNT";
-    }) => {
-      const row = contactRows.get(input.applicationId);
-      if (row === undefined) return Promise.resolve(null);
-      const next: StoredContact = {
-        ...row,
-        emailConfirmedAt: input.at,
-        confirmedVia: input.via,
-        codeHash: null,
-        codeExpiresAt: null,
-      };
-      contactRows.set(input.applicationId, next);
-      return Promise.resolve(next);
     },
   };
 
@@ -565,6 +627,35 @@ const CONTACT = {
 };
 
 describe("the interview transcript", () => {
+  it("does not spend on a new interview before required contact confirmation", async () => {
+    const w = world({ contactRequiredFrom: NOW.toISOString() });
+    const { token } = await w.start();
+    const opening = await w.conversation.openingFor({
+      token,
+      correlationId: "unconfirmed-opening",
+    });
+    expect(opening).toContain("confirm your contact");
+    await expect(
+      w.conversation.turn({
+        token,
+        message: "We build payment rails.",
+        clientTurnId: "unconfirmed-turn",
+        correlationId: "unconfirmed-turn",
+      }),
+    ).rejects.toMatchObject({ refusal: "CONTACT_NOT_CONFIRMED" });
+    expect(w.interviewer.turn).not.toHaveBeenCalled();
+    expect(w.turnRows).toHaveLength(0);
+    await w.intake.startContact({ token, contact: CONTACT });
+    await w.intake.confirmContact({ token, code: w.mailed[0]?.code ?? "" });
+    await w.conversation.turn({
+      token,
+      message: "We build payment rails.",
+      clientTurnId: "confirmed-turn",
+      correlationId: "confirmed-turn",
+    });
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+  });
+
   it("blocks submission during the final model turn, then freezes its facts and complete transcript", async () => {
     const w = world();
     const { token } = await w.start();
@@ -602,7 +693,7 @@ describe("the interview transcript", () => {
     expect(w.submissions).toHaveLength(1);
     const frozen = z
       .object({
-        facts: z.array(ApplicationFactSchema),
+        facts: ApplicationViewSchema.shape.facts,
         transcript: z.array(ApplicationTranscriptTurnDtoSchema),
       })
       .parse(w.submissions[0]?.snapshot);
@@ -710,6 +801,7 @@ describe("the interview transcript", () => {
     await w.conversation.openingFor({ token, correlationId: "c1" });
     await w.conversation.openingFor({ token, correlationId: "c2" });
     expect(w.turnRows.filter((t) => t.role === "Q")).toHaveLength(1);
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -870,6 +962,75 @@ describe("coverage", () => {
 });
 
 describe("the applicant contact", () => {
+  it("keeps failed attempts across resend and refuses another challenge after the budget is spent", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    await w.intake.confirmContact({ token, code: "000000" });
+    await w.intake.startContact({ token, contact: CONTACT });
+    expect([...w.contactRows.values()][0]?.codeAttempts).toBe(1);
+    for (let i = 0; i < 4; i += 1)
+      await w.intake.confirmContact({ token, code: "000000" });
+    expect(
+      (
+        await w.intake.confirmContact({
+          token,
+          code: w.mailed.at(-1)?.code ?? "",
+        })
+      ).status,
+    ).toBe("EXPIRED");
+    await expect(
+      w.intake.startContact({ token, contact: CONTACT }),
+    ).rejects.toMatchObject({ refusal: "TOO_MANY_REQUESTS" });
+    expect(w.mailed).toHaveLength(2);
+  });
+  it("serializes concurrent verification attempts at the effective budget", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    const attempts = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        w.intake.confirmContact({ token, code: "000000" }),
+      ),
+    );
+    expect(
+      attempts.filter((item) => item.status === "WRONG_CODE"),
+    ).toHaveLength(5);
+    expect(attempts.filter((item) => item.status === "EXPIRED")).toHaveLength(
+      7,
+    );
+    expect([...w.contactRows.values()][0]?.codeAttempts).toBe(5);
+  });
+  it("bounds issuance to the same destination across distinct application sessions", async () => {
+    const w = world();
+    for (let i = 0; i < 10; i += 1) {
+      const { token } = await w.start();
+      await w.intake.startContact({ token, contact: CONTACT });
+    }
+    const { token } = await w.start();
+    await expect(
+      w.intake.startContact({ token, contact: CONTACT }),
+    ).rejects.toMatchObject({ refusal: "TOO_MANY_REQUESTS" });
+    expect(w.mailed).toHaveLength(10);
+  });
+  it("allows a fresh verification window without resends extending the old abuse allowance", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    for (let i = 0; i < 5; i += 1)
+      await w.intake.confirmContact({ token, code: "000000" });
+    w.setNow(new Date(NOW.getTime() + 61 * 60_000));
+    await w.intake.startContact({ token, contact: CONTACT });
+    expect(
+      (
+        await w.intake.confirmContact({
+          token,
+          code: w.mailed.at(-1)?.code ?? "",
+        })
+      ).status,
+    ).toBe("CONFIRMED");
+  });
+
   it("does not store an offline-enumerable legacy verifier or accept it after recovery", async () => {
     const w = world();
     const { token } = await w.start();
@@ -1027,6 +1188,7 @@ describe("submission v2", () => {
     expect((await w.intake.coverage(token)).contact).toEqual({
       required: true,
       confirmed: false,
+      details: null,
     });
   });
 
