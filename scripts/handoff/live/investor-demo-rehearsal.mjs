@@ -56,6 +56,7 @@ const browser = await chromium.launch({
   proxy: { server: process.env.HTTPS_PROXY },
   args: ["--no-sandbox"],
 });
+const routeHistory = [];
 async function rehearse() {
   try {
     const context = await browser.newContext({
@@ -80,6 +81,12 @@ async function rehearse() {
       sessionStorage.setItem("cq.splash.seen", "1"),
     );
     const page = await context.newPage();
+    page.on("framenavigated", (frame) => {
+      if (frame !== page.mainFrame()) return;
+      const url = new URL(frame.url());
+      // Paths prove settled navigation without retaining query credentials.
+      routeHistory.push({ at: Date.now(), path: url.pathname });
+    });
     const r = await page.goto(new URL("/discover", webUrl).href, {
       waitUntil: "domcontentloaded",
       timeout: 45000,
@@ -520,6 +527,11 @@ async function rehearse() {
       }),
     );
   } finally {
+    writeFileSync(
+      join(evidenceDir, "route-history.json"),
+      JSON.stringify(routeHistory),
+      { mode: 0o600 },
+    );
     await browser.close();
   }
 }
