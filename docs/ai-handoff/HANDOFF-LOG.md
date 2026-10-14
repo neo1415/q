@@ -658,3 +658,7 @@ The cumulative active-speech guard is preserved on pushed `codex/oct13-voice-tri
 ## 2026-10-14 — resumed latest GitHub work
 
 Preserved PR74 and normally merged its exact-green head into integration96d26b95. Recovered supersession concept from stale uncommitted backend work and implemented a narrow current-source retire-before-insert repair; no self-FK workaround. Actual PostgreSQL tests pending. Independently completed existing Relationship Hub design in PR75, preserving researched prototype; four playable synthetic walkthroughs and76 screenshots. Production remains10c81bda across four SUCCESS Railway services.
+
+## October14 PostgreSQL proof checkpoint
+
+ActualPG17.11 pgTAP20PASS and root independentlyrerun compiledrepository retry/MVCC/submissionlock/rollback proofPASS.53packagebuilds/root+API+webtypes/182GateQtests/67APItestsPASS. FullcanonicalpgTAP protectedCI38519705651 PASS on08821767; remainingstatic/tests pending then finalhead mustrepeatincluding newlywired concurrencydriver. Hostedpreflight0invalidlineage. AllfourstaleGateQlanes preservedon explicitlyUNVERIFIED/SUPERSEDED WIPbranches; doNOTapplyoldmigrations. No migration/deployment yet.
