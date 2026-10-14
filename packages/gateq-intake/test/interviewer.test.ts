@@ -409,6 +409,14 @@ describe("what the model is given", () => {
     expect(needs.map((n) => n.dimension)).not.toContain("company.name");
     // And what a partner would read first comes first.
     expect(needs[0]?.dimension).toBe("company.description");
+    expect(needs).toHaveLength(6);
+    // Supported new claims fall outside this bounded next-question window.
+    expect(needs.map((need) => need.dimension)).not.toContain(
+      "claims.traction",
+    );
+    expect(needs.map((need) => need.dimension)).not.toContain(
+      "raise.use_of_funds",
+    );
   });
 
   it("22: a required criterion outranks everything a partner merely wants", () => {
