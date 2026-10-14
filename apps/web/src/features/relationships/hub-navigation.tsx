@@ -24,6 +24,7 @@ export function HubNavigation({
     ref,
     ids: {
       "tab.overview": '[data-hub-view="overview"]',
+      "tab.pipeline": '[data-hub-view="pipeline"]',
       "tab.relationships": '[data-hub-view="relationships"]',
     },
   });
@@ -48,7 +49,7 @@ export function HubNavigation({
         {...(view === "overview" ? { tab: "overview" as const } : {})}
         filters={{ view }}
       />
-      {(["overview", "relationships"] as const).map((entry) => (
+      {(["overview", "pipeline", "relationships"] as const).map((entry) => (
         <Link
           key={entry}
           href={`/relationships?view=${entry}`}
@@ -61,7 +62,11 @@ export function HubNavigation({
               : "text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)",
           )}
         >
-          {entry === "overview" ? "Overview" : "Relationships"}
+          {entry === "overview"
+            ? "Overview"
+            : entry === "pipeline"
+              ? "Pipeline"
+              : "Relationships"}
         </Link>
       ))}
       {hubDestinations(side).map((entry) => (

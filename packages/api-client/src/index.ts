@@ -235,6 +235,7 @@ export {
   listCompanyRelationships,
   listIncomingInterest,
   listInvestorRelationships,
+  queryRelationshipPipeline,
 } from "./network.js";
 
 export {

@@ -15,6 +15,7 @@ import { RelationshipIdSchema, type Relationship } from "../contracts/index.js";
 import {
   InterestCompanyNotFoundError,
   InterestNotPermittedError,
+  RelationshipPipelineLimitError,
 } from "../domain/errors.js";
 import {
   nextStepFor,
@@ -170,6 +171,7 @@ export function createListRelationshipsForInvestor(
 ) {
   return async (query: {
     readonly actor: ActorContext;
+    readonly scanLimit?: number;
   }): Promise<readonly RelationshipListing[]> => {
     const { actor } = query;
     if (actor.organisationId === undefined) {
@@ -196,8 +198,10 @@ export function createListRelationshipsForInvestor(
       await dependencies.repositories.relationships.listByInvestorOrganisation(
         dependencies.sql,
         investorOrganisationId,
-        LIST_LIMIT,
+        Math.min(query.scanLimit ?? LIST_LIMIT, 1001),
       );
+    if (query.scanLimit !== undefined && relationships.length >= 1001)
+      throw new RelationshipPipelineLimitError();
     const listed = await inBatches(relationships, async (relationship) => {
       // The same rule as the single read: a company that has since gone
       // out of this investor's sight is not listed, and nothing more of it
@@ -230,6 +234,7 @@ export function createListRelationshipsForCompany(
   return async (query: {
     readonly actor: ActorContext;
     readonly companyId: string;
+    readonly scanLimit?: number;
   }): Promise<readonly RelationshipListing[]> => {
     const { actor } = query;
     if (actor.organisationId === undefined) {
@@ -262,8 +267,10 @@ export function createListRelationshipsForCompany(
       await dependencies.repositories.relationships.listByCompany(
         dependencies.sql,
         company.id,
-        LIST_LIMIT,
+        Math.min(query.scanLimit ?? LIST_LIMIT, 1001),
       );
+    if (query.scanLimit !== undefined && relationships.length >= 1001)
+      throw new RelationshipPipelineLimitError();
     const listed = await inBatches(relationships, async (relationship) => {
       const view = viewOf(
         relationship,

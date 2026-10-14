@@ -26,12 +26,19 @@ import {
   NETWORK_RELATIONSHIP_PASS_PATH,
   PassReasonListDtoSchema,
   RelationshipListDtoSchema,
+  NETWORK_INVESTOR_PIPELINE_PATH,
+  NETWORK_COMPANY_PIPELINE_PATH,
+  RelationshipPipelineQuerySchema,
+  RelationshipPipelineExportQuerySchema,
+  RelationshipPipelineDtoSchema,
   RelationshipPassResponseDtoSchema,
   RelationshipStatusResponseDtoSchema,
   type RelationshipSummaryDto,
 } from "@capital-q/contracts";
 import {
   InterestNotFoundError,
+  selectRelationshipPipeline,
+  relationshipPipelineExportRows,
   toConnectionRequestDto,
   toIncomingConnectionRequestDto,
   toIncomingInterestDto,
@@ -44,6 +51,7 @@ import {
   type RelationshipBriefSources,
   type RelationshipOutcomeService,
 } from "@capital-q/network";
+import { reportCsvRows } from "@capital-q/results";
 import type { DiligenceService } from "@capital-q/permissions";
 
 import { photoLookup, type NamedPhotos } from "./named-photos.js";
@@ -312,6 +320,109 @@ export function registerNetworkInterestRoutes(
       },
     );
   }
+
+  // Filter/page/export the same fresh authorised per-party projections. No
+  // cached all-party state, private notes, events or document payloads leave.
+  const pipelineRows = async (request: FastifyRequest, company: boolean) => {
+    const actor = getActorContext(request);
+    const listings = company
+      ? await service.listRelationshipsForCompany({
+          actor,
+          companyId: companyIdOf(request),
+          scanLimit: 1001,
+        })
+      : await service.listRelationshipsForInvestor({ actor, scanLimit: 1001 });
+    return listings.map((listing) =>
+      toRelationshipSummaryDto(listing, company ? "COMPANY" : "INVESTOR"),
+    );
+  };
+  const pipelineScope = (request: FastifyRequest, company: boolean) => {
+    const actor = getActorContext(request);
+    return [
+      actor.userId,
+      actor.tenantId,
+      actor.organisationId,
+      company ? companyIdOf(request) : "INVESTOR",
+    ].join(":");
+  };
+  app.get(
+    NETWORK_INVESTOR_PIPELINE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const query = RelationshipPipelineQuerySchema.parse(request.query);
+      const page = selectRelationshipPipeline(
+        await pipelineRows(request, false),
+        query,
+        pipelineScope(request, false),
+      );
+      void reply.header("Cache-Control", "no-store");
+      return RelationshipPipelineDtoSchema.parse({
+        ...page,
+        items: await withCounterpartPhotos(page.items),
+      });
+    },
+  );
+  app.get(
+    NETWORK_COMPANY_PIPELINE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const query = RelationshipPipelineQuerySchema.parse(request.query);
+      const page = selectRelationshipPipeline(
+        await pipelineRows(request, true),
+        query,
+        pipelineScope(request, true),
+      );
+      void reply.header("Cache-Control", "no-store");
+      return RelationshipPipelineDtoSchema.parse({
+        ...page,
+        items: await withCounterpartPhotos(page.items),
+      });
+    },
+  );
+  const exportPipeline = async (
+    request: FastifyRequest,
+    reply: import("fastify").FastifyReply,
+    company: boolean,
+  ) => {
+    const query = RelationshipPipelineExportQuerySchema.parse(request.query);
+    const rows = relationshipPipelineExportRows(
+      await pipelineRows(request, company),
+      query,
+      query.selected,
+    );
+    void reply.header("Cache-Control", "no-store");
+    void reply.header("Content-Type", "text/csv; charset=utf-8");
+    void reply.header(
+      "Content-Disposition",
+      'attachment; filename="capital-q-relationships.csv"',
+    );
+    return reportCsvRows([
+      [
+        "Counterpart",
+        "Relationship state",
+        "Since",
+        "Next step",
+        "Relationship ID",
+      ],
+      ...rows.map((row) => [
+        row.counterpart.name,
+        row.state,
+        row.stateSince,
+        row.nextStep,
+        row.relationshipId,
+      ]),
+    ]);
+  };
+  app.get(
+    `${NETWORK_INVESTOR_PIPELINE_PATH}/export`,
+    { onRequest: withContext },
+    (request, reply) => exportPipeline(request, reply, false),
+  );
+  app.get(
+    `${NETWORK_COMPANY_PIPELINE_PATH}/export`,
+    { onRequest: withContext },
+    (request, reply) => exportPipeline(request, reply, true),
+  );
 
   // Each side's own relationships (CQ-WEB-030), each row the per-party fold.
   app.get(

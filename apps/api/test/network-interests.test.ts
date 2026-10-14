@@ -737,3 +737,56 @@ describe("the Relationship Brief (R1)", () => {
     expect(JSON.stringify(response.json())).not.toContain("Tensorgate");
   });
 });
+
+describe("Hub pipeline HTTP boundary", () => {
+  it("filters the same authorised side projection and requests a complete bounded scan", async () => {
+    const { app, reads } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/network/relationships/pipeline?state=CONNECTED&q=Kora&pageSize=1",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      total: 1,
+      nextCursor: null,
+      items: [{ counterpart: { name: "Kora" }, state: "CONNECTED" }],
+    });
+    expect(reads).toEqual([
+      { side: "INVESTOR_LIST", actor: CONTEXT, scanLimit: 1001 },
+    ]);
+  });
+  it("refuses client tenant authority before a domain read", async () => {
+    const { app, reads } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/network/relationships/pipeline?tenantId=forged",
+    });
+    expect(response.statusCode).toBe(422);
+    expect(reads).toHaveLength(0);
+  });
+  it("exports only the matching filter and refuses out-of-scope selections", async () => {
+    const { app } = buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/network/relationships/pipeline/export?state=IN_DILIGENCE",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain("Kora");
+    const denied = await app.inject({
+      method: "GET",
+      url: "/v1/network/relationships/pipeline/export?selected=a0000000-0000-4000-8000-999999999999",
+    });
+    expect(denied.statusCode).toBe(404);
+  });
+  it("keeps domain permission denial for query and download", async () => {
+    const { app } = buildApp({ failWith: new InterestNotPermittedError() });
+    for (const path of [
+      "/v1/network/relationships/pipeline",
+      "/v1/network/relationships/pipeline/export",
+    ]) {
+      expect((await app.inject({ method: "GET", url: path })).statusCode).toBe(
+        403,
+      );
+    }
+  });
+});

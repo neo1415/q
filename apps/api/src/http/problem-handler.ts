@@ -54,6 +54,8 @@ import {
   InterestCompanyNotFoundError,
   InterestIdempotencyConflictError,
   InterestNotFoundError,
+  RelationshipPipelineLimitError,
+  RelationshipPipelineQueryError,
   InterestNotPermittedError,
 } from "@capital-q/network";
 import {
@@ -397,6 +399,16 @@ function toProblem(
   }
 
   // Describes the caller, never a company: safe to say plainly.
+  if (
+    error instanceof RelationshipPipelineLimitError ||
+    error instanceof RelationshipPipelineQueryError
+  ) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: error.message,
+    });
+  }
   if (error instanceof InterestNotPermittedError) {
     return createProblemDetails({
       code: "PERMISSION_DENIED",

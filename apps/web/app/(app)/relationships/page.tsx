@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import {
   getResults,
+  queryRelationshipPipeline,
   getChatUnread,
   getFitProfiles,
   listNotifications,
@@ -10,6 +11,7 @@ import {
 } from "@capital-q/api-client";
 import {
   FIT_IDS_MAX,
+  RelationshipPipelineQuerySchema,
   type FitProfileDto,
   type NotificationDto,
   type RelationshipSummaryDto,
@@ -19,6 +21,10 @@ import { EmptyState, ErrorState } from "@capital-q/ui/states";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 
+import { getSessionUser } from "@/auth/session";
+import { RelationshipPipeline } from "@/features/relationships/relationship-pipeline";
+import { pipelinePresentedRows } from "@/features/relationships/pipeline-presentation";
+import { pipelineStorageKey } from "@/features/relationships/pipeline-preferences";
 import { PageContainer } from "@/components/app-shell/page-container";
 import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
@@ -70,6 +76,81 @@ export default async function RelationshipsPage({
       : context.kind === "INVESTOR"
         ? "INVESTOR"
         : "NONE";
+  if (view === "pipeline") {
+    const [session, user] = await Promise.all([apiSession(), getSessionUser()]);
+    const parsed = RelationshipPipelineQuerySchema.safeParse(
+      Object.fromEntries(
+        Object.entries(params).filter(([key]) =>
+          ["q", "state", "sort", "cursor", "pageSize"].includes(key),
+        ),
+      ),
+    );
+    const data =
+      session === null || side === "NONE" || !parsed.success
+        ? null
+        : await queryRelationshipPipeline(
+            session,
+            parsed.data,
+            context.kind === "FOUNDER" ? context.companyId : undefined,
+          ).catch(() => null);
+    const subjectId =
+      context.kind === "FOUNDER"
+        ? context.companyId
+        : context.kind === "INVESTOR"
+          ? context.investorOrganisationId
+          : null;
+    return (
+      <PageContainer className="flex flex-col gap-4">
+        <h1 className="cq-title-lg text-(--cq-text-primary)">
+          {hubTitle(side)}
+        </h1>
+        <HubNavigation side={side} view={view} />
+        {data === null ||
+        user === null ||
+        subjectId === null ||
+        side === "NONE" ||
+        !parsed.success ? (
+          <ErrorState
+            title="Pipeline couldn't load"
+            description="Start this view again. Your relationships are unchanged."
+            action={
+              <Link
+                className={buttonClassName("secondary")}
+                href="/relationships?view=pipeline"
+              >
+                Start again
+              </Link>
+            }
+          />
+        ) : (
+          <QSection
+            id="pipeline"
+            kind="RELATIONSHIP_LIST"
+            refs={pipelinePresentedRows(
+              data.items,
+              params["layout"] === "board" ? "board" : "table",
+            )
+              .slice(0, 12)
+              .map((row) => ({
+                kind: row.counterpart.kind,
+                id: row.counterpart.id,
+              }))}
+            total={data.total}
+            label="Pipeline relationships"
+          >
+            <RelationshipPipeline
+              key={pipelineStorageKey(user.authUserId, side, subjectId)}
+              scopeKey={pipelineStorageKey(user.authUserId, side, subjectId)}
+              side={side}
+              data={data}
+              query={parsed.data}
+              layout={params["layout"] === "board" ? "board" : "table"}
+            />
+          </QSection>
+        )}
+      </PageContainer>
+    );
+  }
   if (view === "overview") {
     const range = rangeOf(params["range"]);
     const stage =
