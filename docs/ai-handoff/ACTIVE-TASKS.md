@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## Active takeover — October14
+
+Finish isolated GateQ83/84 qualification safeguards, Hub81 real role/mobile/Q navigation acceptance and protected release, then H2 scoped queries/saved views/exports. Parallel research lane repairs lost public aviation competitor target; Capital Q product inventory is separate. Functional owner approval supersedes historical prototype-approval blocker. See latest STATE for exact evidence, fixtures and CI. No prototype styling, duplicate CRM or Q runtime.
+
 ## Current execution board — October 14, 07:35 UTC
 
 GateQ supersession and cold-opening repairs are CI-green, deployed at62bd144a, and fresh live verified. Relationship Hub PR75/aac14fd0 is CI-green and ready for design approval only. Immediate engineering task: finish isolated Q DISCOVER follow-up attribution patch protected CI, release normally, rerun full investor browser rehearsal; route settling remains unexplained. See latest STATE checkpoint for exact SHAs, timings, commands and preserved WIPs. No production CRM implementation.
