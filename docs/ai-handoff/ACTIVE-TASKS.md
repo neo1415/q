@@ -811,3 +811,7 @@ The cumulative active-speech guard is preserved on pushed `codex/oct13-voice-tri
 ## October 14 active takeover
 
 GateQ second-answer supersession repair: `codex/gateq-supersession-fix-oct14`; real PostgreSQL and concurrent retry proof pending. PR74 merged separately at96d26b95, protected CI38516516121 PASS. Relationship Hub design review PR75 pushed444070cd, screenshots/videos verified; no production CRM authorization. See STATE top for exact deploy baseline.
+
+## October14 release checkpoint
+
+GateQ correction source merged f584f0bb with exact CI38520775540 fully green. Hosted fix-forward migration241000 applied/read back;211 recorded, none pending. Release77 at75deba0d waits only test/quality; no deployment yet. Saved authorized founder application reproduced real500 and retains original5facts. Next: gated promotion, service revision readback, live two-answer correction/retry and provenance/history check. Design75 latest1d49922a: four playable videos/76screens/a11y checks pass, formatting repaired; fullCI pending. No production CRM approval.

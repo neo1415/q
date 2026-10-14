@@ -662,3 +662,7 @@ Preserved PR74 and normally merged its exact-green head into integration96d26b95
 ## October14 PostgreSQL proof checkpoint
 
 ActualPG17.11 pgTAP20PASS and root independentlyrerun compiledrepository retry/MVCC/submissionlock/rollback proofPASS.53packagebuilds/root+API+webtypes/182GateQtests/67APItestsPASS. FullcanonicalpgTAP protectedCI38519705651 PASS on08821767; remainingstatic/tests pending then finalhead mustrepeatincluding newlywired concurrencydriver. Hostedpreflight0invalidlineage. AllfourstaleGateQlanes preservedon explicitlyUNVERIFIED/SUPERSEDED WIPbranches; doNOTapplyoldmigrations. No migration/deployment yet.
+
+## 2026-10-14 06:32 UTC — GateQ merged and migration applied
+
+PR76 source9c6c2607 passed protectedCI38520775540 including fullpgTAP and actual compiled-repository concurrency proof, normally merged f584f0bb. Reviewed241000 migration applied to hosted DB;211 recorded/nonepending; constraints read back correctly. Release77 exact75deba0d CI38521203727 still waits test/quality; deployment not claimed. Actual authorized test founder correction returned500; rollback preserved five original facts. Design75 original formatter failure fixed at1d49922a; a11y/video repeated PASS, latestfullCI pending. All prior unfinished GateQ work protected on explicit WIP branches. Next release gate then actual live second-answer verification.
