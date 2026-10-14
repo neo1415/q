@@ -291,7 +291,7 @@ export function createGateQInterviewer(
 
       // The renderer supplies the charter-level four; this is the rest.
       const variables: Omit<
-        GateQInterviewerVariables,
+        GateQInterviewerVariables & { readonly recordableDimensions?: string },
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -306,6 +306,11 @@ export function createGateQInterviewer(
             ? "(no application yet)"
             : renderFacts(application.facts),
         questionNeeds: renderNeeds(needs),
+        // Historical injected registries retain their original variable schema.
+        // Only v3 receives the independent server-owned recording inventory.
+        ...(registry.getActive("GATEQ_INTERVIEWER").definition.version >= 3
+          ? { recordableDimensions: APPLICATION_DIMENSIONS.join("\n") }
+          : {}),
         documentProposals:
           application === undefined ||
           application.documentProposals.length === 0
