@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ownIndex } from "@capital-q/app-actions";
+import { ownIndex, type GateqInboxPort } from "@capital-q/app-actions";
 import type { PermittedContextPlan } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
 import type { MediaAsset } from "@capital-q/media";
@@ -132,6 +132,116 @@ const call = (name: string, args: Record<string, unknown>) => ({
   callId: `c-${name}`,
   name,
   arguments: args,
+});
+
+describe("the selected GateQ application's authorized reading", () => {
+  const applicationId = "55555555-0000-4000-8000-0000000000a2";
+  const gatewayId = "55555555-0000-4000-8000-0000000000a3";
+  function selected(refused = false) {
+    const reads: { actor: string; gatewayId: string; applicationId: string }[] =
+      [];
+    const gateqInbox = {
+      ownGatewayId: () => Promise.resolve(gatewayId),
+      detail: (actor, gateway, application) => {
+        reads.push({
+          actor: actor.userId,
+          gatewayId: gateway,
+          applicationId: application,
+        });
+        return Promise.resolve(
+          refused
+            ? { ok: false as const }
+            : ({
+                item: {
+                  applicationId,
+                  companyName: "Waterworks",
+                  oneLiner: "Water sold by the litre",
+                  fit: "FITS",
+                },
+                answers: [],
+                rules: [],
+                note: null,
+                shared: [],
+                notes: [],
+                messages: [],
+                dossier: {
+                  dimensions: [
+                    {
+                      group: "COMPANY",
+                      facts: [
+                        {
+                          label: "Description",
+                          summary: "Waterworks uses metered kiosks. ".repeat(
+                            30,
+                          ),
+                          truthClass: "USER_CLAIM",
+                          evidenceStatus: "SELF_REPORTED",
+                          provenance: "APPLICANT_PROVIDED",
+                          sourceFactId: applicationId,
+                          sourceTurnSeq: 2,
+                        },
+                      ],
+                    },
+                  ],
+                  unknowns: [],
+                  declined: [],
+                  missing: [{ label: "Revenue evidence" }],
+                  contradictions: [],
+                },
+              } as never),
+        );
+      },
+      findApplication: () =>
+        Promise.reject(new Error("Exact ids must not resolve by company name")),
+    } satisfies Pick<
+      GateqInboxPort,
+      "ownGatewayId" | "detail" | "findApplication"
+    >;
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            appActions: { gateqInbox: gateqInbox as GateqInboxPort },
+          }),
+        ),
+      ),
+    });
+    return { executor, reads };
+  }
+  it("keeps long source-linked findings outside the short receipt contract", async () => {
+    const { executor, reads } = selected();
+    const out = await executor.execute(
+      call("gateq_inbox_summarise", { applicationId }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(out.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "DONE",
+        reading: expect.stringContaining("sourceTurnSeq=2"),
+      },
+    });
+    expect(reads).toEqual([{ actor: actorA.userId, gatewayId, applicationId }]);
+    if (!out.result.ok) throw new Error("Read failed");
+    const data = out.result.data as { says: string; reading: string };
+    expect(data.says.length).toBeLessThanOrEqual(600);
+    expect(data.reading.length).toBeGreaterThan(600);
+    expect(data.reading).toContain("truth=USER_CLAIM; evidence=SELF_REPORTED");
+    expect(data.reading).toContain("Missing: Revenue evidence");
+  });
+  it("retains the inbox refusal and returns no reading", async () => {
+    const { executor } = selected(true);
+    const out = await executor.execute(
+      call("gateq_inbox_summarise", { applicationId }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(out.result).toMatchObject({
+      ok: true,
+      data: { status: "NOT_DONE" },
+    });
+    if (!out.result.ok) throw new Error("Read failed");
+    expect(out.result.data).not.toHaveProperty("reading");
+  });
 });
 
 describe("the feed's decisions, generated from the registry", () => {

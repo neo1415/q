@@ -65,6 +65,8 @@ export const AppToolOutputSchema = z
     status: z.enum(["DONE", "PREPARED", "ONE_PER_TURN", "NOT_DONE"]),
     /** What to tell the person, from the action's own words. */
     says: z.string().max(600),
+    /** Only a successful READ may provide this server-derived context. */
+    reading: z.string().max(14_000).optional(),
     /**
      * PREPARED: the card's own summary. The engine says the card's status
      * after the turn, so a caller can leave it to that one line.
@@ -332,12 +334,38 @@ function toolFor(
         };
       }
       const out = await action.run(own, grant.context, grant.canonical);
+      const succeeded = action.succeeded?.(out) ?? true;
+      const reading =
+        action.classification === "READ" && succeeded
+          ? action.reading?.(out, grant.canonical)
+          : undefined;
       return {
-        status: (action.succeeded?.(out) ?? true) ? "DONE" : "NOT_DONE",
+        status: succeeded ? "DONE" : "NOT_DONE",
         says: action.done(out, grant.canonical, grant.names),
+        ...(reading === undefined ? {} : { reading: boundedReading(reading) }),
       };
     },
   });
+}
+
+/** Keep complete evidence lines; disclose omissions instead of cutting a claim. */
+function boundedReading(reading: string): string {
+  if (reading.length <= 14_000) return reading;
+  const lines: string[] = [];
+  let used = 0;
+  let omitted = 0;
+  for (const line of reading.split("\n")) {
+    if (used + line.length + 1 > 13_700) {
+      omitted++;
+      continue;
+    }
+    lines.push(line);
+    used += line.length + 1;
+  }
+  lines.push(
+    `${omitted} complete lines exceeded the reading budget. Consult the submitted dossier before answering about omitted information.`,
+  );
+  return lines.join("\n");
 }
 
 export const READ_MY = "app.own.read" as const;

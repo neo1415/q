@@ -259,6 +259,8 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
     input: In,
     names: Readonly<Record<string, string>>,
   ) => string;
+  /** Authorized READ data for reasoning, separate from the short action receipt. */
+  readonly reading?: ((out: Out, input: In) => string) | undefined;
   /** Whether it did what was asked (a refusal can be an outcome). Default: yes. */
   readonly succeeded?: ((out: Out) => boolean) | undefined;
   readonly http?: AppActionHttp<In, Out> | undefined;

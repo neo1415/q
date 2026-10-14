@@ -902,7 +902,7 @@ const STAND_WORDS = {
 const SUMMARISE = defineAppAction<
   z.infer<typeof SummaryIn>,
   SummaryOut,
-  { company: string }
+  { company?: string | undefined; applicationId?: string | undefined }
 >({
   name: "gateq.inbox.summarise",
   short: "summarise a GateQ application",
@@ -916,7 +916,12 @@ const SUMMARISE = defineAppAction<
     port(ports).detail(context.actor, input.gatewayId, input.applicationId),
   targets: () => [],
   card: () => ({ summary: "Summary", preview: "" }),
+  succeeded: (out) => "item" in out,
   done: (out) =>
+    "item" in out
+      ? `${out.item.companyName}${out.item.oneLiner === null ? "" : `: ${out.item.oneLiner.length > 150 ? `${out.item.oneLiner.slice(0, 149)}…` : out.item.oneLiner}`}. Mandate: ${{ FITS: "meets the published mandate", PARTIAL: "more information needed", NOT_A_FIT: "outside the published mandate" }[out.item.fit]}. Applicant claims are not independently verified; mandate fit is not an investment decision.`
+      : "That isn’t in your GateQ inbox.",
+  reading: (out) =>
     "item" in out
       ? [
           `${out.item.companyName}${out.item.oneLiner === null ? "" : `: ${out.item.oneLiner}`}`,
@@ -937,7 +942,17 @@ const SUMMARISE = defineAppAction<
     name: "gateq_inbox_summarise",
     description:
       "Reads one application in the investor's own GateQ inbox, by the company's name: the founder's answers (their claims, not verified), each gate rule's standing, what was shared, and the firm's team notes. Use to summarise a submission or before drafting a reply in their style; a reply or a pass is then sent from the inbox screen, where they approve the exact words.",
-    input: z.object({ company: CompanyTool }).strict(),
+    input: z
+      .object({
+        company: CompanyTool.optional(),
+        applicationId: UuidSchema.optional(),
+      })
+      .strict()
+      .refine(
+        (value) =>
+          (value.company !== undefined) !== (value.applicationId !== undefined),
+        "Provide a company name or an exact application id, not both.",
+      ),
     references: {},
     purposes: PURPOSES,
     eval: {
@@ -947,6 +962,14 @@ const SUMMARISE = defineAppAction<
       ],
     },
     toCanonical: async (tool, context, ports) => {
+      if (tool.applicationId !== undefined) {
+        const gatewayId = await port(ports).ownGatewayId(context.actor);
+        return gatewayId === null
+          ? refusal("That isn’t in your GateQ inbox.")
+          : { gatewayId, applicationId: tool.applicationId };
+      }
+      if (tool.company === undefined)
+        return refusal("Which application do you mean?");
       const found = await resolveApplication(ports, context, tool.company);
       return isRefusal(found)
         ? found

@@ -22,6 +22,7 @@ import {
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const ALL = new Set([
+  "gateq_inbox_summarise",
   "get_company",
   "list_my_relationships",
   "list_my_documents",
@@ -31,6 +32,71 @@ const ALL = new Set([
   "list_q_work",
   "read_my",
 ]);
+
+describe("the selected GateQ dossier", () => {
+  const manifest = QPageManifestSchema.parse({
+    v: 2,
+    seq: 1,
+    inView: [],
+    sections: [],
+    dialogs: [],
+    focus: { kind: "GATEQ_APPLICATION", id: id(7) },
+  });
+  it("reads the exact focused application rather than treating the inbox list as its content", () => {
+    const reads = manifestReads(manifest, ALL);
+    expect(reads).toContainEqual({
+      key: `gateq_inbox_summarise:${id(7)}`,
+      name: "gateq_inbox_summarise",
+      arguments: { applicationId: id(7) },
+    });
+    const facts = manifestFacts(
+      manifest,
+      new Map([
+        [
+          `gateq_inbox_summarise:${id(7)}`,
+          {
+            status: "DONE",
+            says: "Read the application.",
+            reading:
+              "Customers pay by the litre [truth=USER_CLAIM; evidence=SELF_REPORTED; sourceTurnSeq=2]\nMissing: revenue evidence.",
+          },
+        ],
+      ]),
+    );
+    const text = facts.map((f) => f.statement).join("\n");
+    expect(text).toContain("Customers pay by the litre");
+    expect(text).toContain("truth=USER_CLAIM; evidence=SELF_REPORTED");
+    expect(text).toContain("Missing: revenue evidence");
+    expect(text).toContain("not an investment decision");
+  });
+  it("does not hydrate refused, malformed, different or unoffered dossier reads", () => {
+    expect(
+      manifestReads(manifest, new Set(["read_my"])).some(
+        (r) => r.name === "gateq_inbox_summarise",
+      ),
+    ).toBe(false);
+    for (const [key, result] of [
+      [
+        `gateq_inbox_summarise:${id(7)}`,
+        { status: "NOT_DONE", says: "Refused", reading: "Foreign secret" },
+      ],
+      [
+        `gateq_inbox_summarise:${id(7)}`,
+        { status: "DONE", reading: "Foreign secret" },
+      ],
+      [
+        `gateq_inbox_summarise:${id(8)}`,
+        { status: "DONE", says: "Read", reading: "Foreign secret" },
+      ],
+    ] as const) {
+      expect(
+        manifestFacts(manifest, new Map([[key, result]]))
+          .map((f) => f.statement)
+          .join("\n"),
+      ).not.toContain("Foreign secret");
+    }
+  });
+});
 
 function discover(): QPageManifest {
   return QPageManifestSchema.parse({
