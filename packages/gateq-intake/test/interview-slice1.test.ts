@@ -38,6 +38,7 @@ import { coverageFor } from "../src/application/coverage.js";
 import {
   CONTACT_CODE_MAX_ATTEMPTS,
   createIntakeService,
+  type IntakeDependencies,
 } from "../src/application/intake-service.js";
 import type {
   InterviewTurnInput,
@@ -149,6 +150,7 @@ function world(
     contactRequiredFrom?: string;
     contactCodeSecret?: string;
     transcript?: false;
+    documentDisclosure?: IntakeDependencies["documentDisclosure"];
   } = {},
 ) {
   let now = NOW;
@@ -452,6 +454,9 @@ function world(
   };
 
   const intake = createIntakeService({
+    ...(options.documentDisclosure === undefined
+      ? {}
+      : { documentDisclosure: options.documentDisclosure }),
     applications: {
       create: (_tx, application) => {
         const row: Application = {
@@ -1852,5 +1857,108 @@ describe("review: interview turn latency", () => {
     expect(
       w.logs.some((line) => JSON.stringify(line).includes('"latencyMs":75')),
     ).toBe(true);
+  });
+});
+
+describe("explicit document-informed submission", () => {
+  const chosen = {
+    documentId: "11111111-1111-4111-8111-111111111111",
+    versionId: "22222222-2222-4222-8222-222222222222",
+    sha256: "a".repeat(64),
+  };
+  const privateDoc = {
+    ...chosen,
+    documentId: "33333333-3333-4333-8333-333333333333",
+  };
+  const complete = (documents: (typeof chosen)[] = []) => ({
+    state: "COMPLETE" as const,
+    documents,
+    turnSeqs: [],
+  });
+  const port: NonNullable<IntakeDependencies["documentDisclosure"]> = {
+    freezeForSubmission: (_tx, input) =>
+      Promise.resolve({
+        documents: input.selectedDocuments.map((d) => ({
+          ...d,
+          title: "Selected pitch",
+        })),
+      }),
+  };
+  it("requires an explicit selection before any document-informed submission", async () => {
+    const w = world({ documentDisclosure: port });
+    const { token } = await readyToSubmit(w);
+    await expect(
+      w.intake.submit({ token, clientRequestId: "req-doc-00000001" }),
+    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    expect(w.submissions).toHaveLength(0);
+  });
+  it("uses selected-only facts, transcript and coverage throughout the frozen submission", async () => {
+    const w = world({ documentDisclosure: port });
+    const { token } = await readyToSubmit(w);
+    await w.intake.recordFacts({
+      token,
+      facts: [
+        fact(
+          "claims.traction",
+          { kind: "TEXT", text: "PRIVATE DOCUMENT METRIC" },
+          "DOCUMENT_SUPPORTED",
+        ),
+      ],
+    });
+    w.factRows.forEach((row, i) => {
+      w.factRows[i] = {
+        ...row,
+        disclosureLineage: complete(
+          row.dimension === "claims.traction" ? [privateDoc] : [],
+        ),
+      };
+    });
+    const app = [...w.applications.values()][0];
+    if (app === undefined) throw new Error("application fixture missing");
+    w.turnRows.push({
+      applicationId: app.id,
+      seq: 1,
+      role: "Q",
+      text: "PRIVATE DOCUMENT QUESTION",
+      clientTurnId: "doc-context",
+      askingDimension: null,
+      intent: null,
+      latencyMs: null,
+      createdAt: NOW.toISOString(),
+      disclosureLineage: complete([chosen, privateDoc]),
+    });
+    const result = await w.intake.submit({
+      token,
+      clientRequestId: "req-doc-00000002",
+      selectedDocuments: [chosen],
+    });
+    expect(result.deduplicated).toBe(false);
+    const frozen = JSON.stringify(w.submissions[0]);
+    expect(frozen).not.toContain("PRIVATE DOCUMENT");
+    expect(frozen).not.toContain(privateDoc.documentId);
+    expect(frozen).toContain(chosen.documentId);
+    expect(frozen).toContain(chosen.versionId);
+    expect(frozen).toContain(chosen.sha256);
+    expect(frozen).toContain('"turnCount":0');
+  });
+  it("requalifies from disclosed facts and refuses when required support is excluded", async () => {
+    const w = world({ documentDisclosure: port });
+    const { token } = await readyToSubmit(w);
+    w.factRows.forEach((row, i) => {
+      w.factRows[i] = {
+        ...row,
+        disclosureLineage: complete(
+          row.dimension === "company.country" ? [privateDoc] : [],
+        ),
+      };
+    });
+    await expect(
+      w.intake.submit({
+        token,
+        clientRequestId: "req-doc-00000003",
+        selectedDocuments: [],
+      }),
+    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    expect(w.submissions).toHaveLength(0);
   });
 });
