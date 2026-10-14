@@ -1,5 +1,13 @@
 # Active tasks — authoritative cross-model board
 
+## October14 active product ownership
+
+Q attribution is deployed37b5414e and the actual investor cards/profile/risks/comparison journey passes. Close the newly proven GateQ typed-stage corruption through protected release and native submission/dossier acceptance. Functional Hub H1 is approved; finish PR81 exact checks and role-aware browser acceptance. Guest Evidence b35813de is tested foundations, not disclosure-ready. See STATE top for exact source authority, receipts and remaining speed gaps.
+
+## Current execution board — October 14, 07:35 UTC
+
+GateQ supersession and cold-opening repairs are CI-green, deployed at62bd144a, and fresh live verified. Relationship Hub PR75/aac14fd0 is CI-green and ready for design approval only. Immediate engineering task: finish isolated Q DISCOVER follow-up attribution patch protected CI, release normally, rerun full investor browser rehearsal; route settling remains unexplained. See latest STATE checkpoint for exact SHAs, timings, commands and preserved WIPs. No production CRM implementation.
+
 ## GateQ exact-head CI correction — 2026-10-14
 
 - Reconciled source checkpoint336cf8c4 pushed in PR72. Local53 package builds PASS;122 domain tests PASS. Combined UI suite67tests ran:65PASS and2 legacy/display mismatches, then corrected actual legacy transcript display and test labels; affected inbox + intake rerun42tests PASS. Founder contact-first/recovery, comparison and dossier source assertions remain intact.

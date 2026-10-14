@@ -25,7 +25,7 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   DISCOVER: "/discover",
   EXPLORE: "/explore",
   COMPANY_VISIBILITY: "/company/visibility",
-  RELATIONSHIPS: "/relationships",
+  RELATIONSHIPS: "/relationships?view=overview",
   SETTINGS: "/settings",
   VERIFICATION: "/verification",
   PITCH: "/pitch",

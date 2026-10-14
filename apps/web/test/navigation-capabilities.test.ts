@@ -22,8 +22,8 @@ const EXCLUDED: Readonly<Record<string, string>> = {};
 describe("every navigation screen is a screen Q can open", () => {
   it("maps each navigation href to a Q destination, or states why not", () => {
     const reachable = new Set(
-      Q_NAVIGATE_DESTINATIONS.map((destination) =>
-        destinationPath(destination),
+      Q_NAVIGATE_DESTINATIONS.map(
+        (destination) => destinationPath(destination)?.split(/[?#]/u)[0],
       ),
     );
     // Every section either side can reach, on the desktop and the phone.
