@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## Current mandatory H2 gate
+
+Production48c6 is all-fourSUCCESS and merge CI38639947138PASS; native H2 bothroles/desktop/mobile is verified. Q sort and investor ordinal row opening failed. Fix source101/a6d9d701 and candidate102/a2ff07ae are pushed/local-tested, protected CI38644691732/38644695976 running. Complete both gates, promote normally, confirm four revisions and full Q replay before claiming H2 complete. Then final ClaudeMax handoff, dossier98, Evidence97, H3/H4 and server views. No failing sibling merge, new CRM runtime, prototype75 CSS or paid Tavus room. STATE top contains exact proof/branches/limitations.
+
 ## Latest continuation priorities
 
 Description90 is deployed72d across four SUCCESS services; fresh description browser proof remains pending. Claim capture PR92/08cacfd4:53 builds, root/API/package types,149 suite tests and40 focused tests PASS; exact CI38601112916 quality still running, database/build/types PASS. No live adherence proof or release. Next primary implementation: exact selected-dossier manifest hydration and full authorized source payload beside the600-character receipt; no investor-Q repair exists yet. Canonical H2 pipeline2d9dfa1e and guest expiry553316c5 follow; cloud-view and product-inventory WIPs are preserved, not release-ready. STATE top supersedes historical task entries below.
