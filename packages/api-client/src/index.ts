@@ -508,3 +508,4 @@ export {
   recordDealTerms,
   tickDealChecklist,
 } from "./deal-close.js";
+export * from "./relationship-views.js";

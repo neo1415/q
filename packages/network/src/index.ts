@@ -359,3 +359,9 @@ export {
 } from "./domain/event-registry.js";
 
 export const PACKAGE_NAME = "@capital-q/network" as const;
+
+export {
+  filterRelationshipView,
+  queryRelationships,
+  relationshipViewCsv,
+} from "./application/relationship-query.js";

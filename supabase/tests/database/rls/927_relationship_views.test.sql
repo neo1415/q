@@ -1,0 +1,25 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+\ir support/fixture.psql
+select pg_temp.rls_setup();
+select plan(14);
+select ok((select relrowsecurity from pg_class where oid='network.relationship_views'::regclass),'views have RLS');
+select is((select count(*)::int from pg_policies where schemaname='network' and tablename='relationship_views'),0,'no permissive client policies');
+select ok(not has_table_privilege('anon','network.relationship_views','SELECT'),'anonymous cannot read');
+select ok(not has_table_privilege('authenticated','network.relationship_views','SELECT'),'members cannot bypass API scoped read');
+select ok(not has_table_privilege('authenticated','network.relationship_views','INSERT'),'members cannot bypass team writer authorization');
+select ok(not has_table_privilege('authenticated','network.relationship_views','UPDATE'),'members cannot bypass version and ownership');
+select ok(not has_table_privilege('authenticated','network.relationship_views','DELETE'),'members cannot delete another person view');
+select ok(has_table_privilege('service_role','network.relationship_views','SELECT'),'server adapter may read');
+select throws_ok($$insert into network.relationship_views(id,tenant_id,organisation_id,owner_user_id,name,scope,definition) values(gen_random_uuid(),pg_temp.rls_id('tenant_a'),pg_temp.rls_id('org_b'),pg_temp.rls_id('user_a'),'Wrong tenant','PERSONAL','{}')$$,'23503',null,'organisation cannot be paired with a foreign tenant');
+select throws_ok($$insert into network.relationship_views(id,tenant_id,organisation_id,owner_user_id,name,scope,definition) values(gen_random_uuid(),pg_temp.rls_id('tenant_a'),pg_temp.rls_id('org_a'),pg_temp.rls_id('user_a'),'View','PERSONAL','[]')$$,'23514',null,'definition must be object');
+select pg_temp.act_as_user_a();
+select throws_ok('select * from network.relationship_views','42501',null,'active member cannot bypass scoped server read');
+select throws_ok('update network.relationship_views set name=''Tampered''','42501',null,'active member cannot bypass team-write check');
+select pg_temp.act_as_user_b();
+select throws_ok('select * from network.relationship_views','42501',null,'foreign tenant cannot read views directly');
+select pg_temp.act_as_revoked_user();
+select throws_ok('select * from network.relationship_views','42501',null,'revoked member cannot read');
+reset role;
+select * from finish();
+rollback;

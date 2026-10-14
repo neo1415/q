@@ -737,3 +737,63 @@ describe("the Relationship Brief (R1)", () => {
     expect(JSON.stringify(response.json())).not.toContain("Tensorgate");
   });
 });
+
+describe("Hub H2 canonical scope", () => {
+  it("searches only the actor's authorized list", async () => {
+    const { app, reads } = buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/network/relationship-query",
+      payload: { nameQuery: "kora", sort: "NAME" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().items).toHaveLength(1);
+    expect(reads).toEqual([
+      expect.objectContaining({ side: "INVESTOR_LIST", actor: CONTEXT }),
+    ]);
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+  it("returns no matches without broadening scope", async () => {
+    const { app } = buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/network/relationship-query",
+      payload: { nameQuery: "invisible" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().items).toEqual([]);
+  });
+  it("denied list cannot become an export", async () => {
+    const { app } = buildApp({ failWith: new InterestNotPermittedError() });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/network/relationship-export",
+      payload: { query: {} },
+    });
+    expect(response.statusCode).toBe(403);
+  });
+  it("refuses selected IDs outside exact filter rather than exporting other rows", async () => {
+    const { app } = buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/network/relationship-export",
+      payload: {
+        query: { nameQuery: "invisible" },
+        selectedIds: [RELATIONSHIP_ID],
+      },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+  it("CSV contains only filtered authorized counterpart fields", async () => {
+    const { app } = buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/network/relationship-export",
+      payload: { query: { nameQuery: "kora" } },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().csv).toContain('"Kora"');
+    expect(response.json().csv).not.toContain(RELATIONSHIP_ID);
+    expect(response.json().sourceMayBeTruncated).toBe(true);
+  });
+});

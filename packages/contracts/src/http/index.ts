@@ -1445,3 +1445,5 @@ export * from "./gateq-inbox.js";
 export * from "./gateq-find.js";
 // Deal close (2026-10-08): terms, signature, close and stage reports.
 export * from "./deal-close.js";
+
+export * from "./relationship-views.js";

@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { RelationshipViewControls } from "./relationship-view-controls";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 
 import type {
   FitProfileDto,
   RelationshipSummaryDto,
+  RelationshipViewDefinition,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { cx } from "@capital-q/ui";
@@ -156,6 +158,11 @@ export function RelationshipsBoard({
   /** When the page was read, so server and browser say the same "2h". */
   readonly now: number;
 }) {
+  const [serverItems, setServerItems] = useState<
+    readonly RelationshipSummaryDto[] | null
+  >(null);
+  const [viewDefinition, setViewDefinition] =
+    useState<RelationshipViewDefinition | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
   // RECOVERY-2026-10 (C1): the board's search, list and filter, for Q. The
@@ -186,7 +193,10 @@ export function RelationshipsBoard({
   });
   const [digests, setDigests] = useState(initialDigests);
   const [cursor, setCursor] = useState(firstCursor);
-  const ordered = useMemo(() => items.toSorted(listOrder), [items]);
+  const ordered = useMemo(
+    () => serverItems ?? items.toSorted(listOrder),
+    [items, serverItems],
+  );
   const [shown, setShown] = useState(
     () => pageAfter(ordered, null).items.length,
   );
@@ -242,7 +252,8 @@ export function RelationshipsBoard({
   );
   // The cursor window applies to the whole list; a filter or a search
   // reads across everything already listed.
-  const paging = filter === "ALL" && needle.length === 0;
+  const paging =
+    serverItems === null && filter === "ALL" && needle.length === 0;
   const visible = paging ? filtered.slice(0, shown) : filtered;
 
   const more = () => {
@@ -270,6 +281,14 @@ export function RelationshipsBoard({
       className="flex flex-col gap-5"
       data-relationships-board
     >
+      <RelationshipViewControls
+        onResult={(rows, definition) => {
+          setServerItems(rows);
+          setViewDefinition(definition);
+          setQuery("");
+          setFilter("ALL");
+        }}
+      />
       <label className="flex min-h-12 items-center gap-2.5 rounded-xl border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
         <Search
           size={ICON_SIZE.regular}
@@ -331,7 +350,52 @@ export function RelationshipsBoard({
         <NeedsYouStrip cards={needsYou} now={now} />
       ) : null}
 
-      {visible.length === 0 ? (
+      {viewDefinition?.presentation === "TABLE" && visible.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table
+            className="cq-body-sm w-full text-left"
+            aria-label="Relationships table"
+          >
+            <thead>
+              <tr>
+                {viewDefinition.columns.map((column) => (
+                  <th key={column} scope="col" className="p-3">
+                    {column.toLowerCase().replaceAll("_", " ")}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((row) => (
+                <tr
+                  key={row.item.relationshipId}
+                  data-relationship-id={row.item.relationshipId}
+                  className="border-t border-(--cq-border-subtle)"
+                >
+                  {viewDefinition.columns.map((column) => (
+                    <td key={column} className="p-3">
+                      {column === "NAME" ? (
+                        <Link
+                          href={relationshipHref(row.item)}
+                          className="underline"
+                        >
+                          {row.item.counterpart.name}
+                        </Link>
+                      ) : column === "STATE" ? (
+                        STATE_WORDS[row.item.state]
+                      ) : column === "SINCE" ? (
+                        new Date(row.item.stateSince).toLocaleDateString()
+                      ) : (
+                        row.item.nextStep.toLowerCase().replaceAll("_", " ")
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : visible.length === 0 ? (
         <p
           className="cq-body text-(--cq-text-secondary)"
           role="status"

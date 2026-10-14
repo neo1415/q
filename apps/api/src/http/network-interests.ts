@@ -1,3 +1,24 @@
+import {
+  createProblemDetails,
+  PROBLEM_CONTENT_TYPE,
+  RelationshipQuerySchema,
+  RelationshipQueryResponseSchema,
+  RelationshipExportRequestSchema,
+  RelationshipExportResponseSchema,
+  SavedRelationshipViewListSchema,
+  SavedRelationshipViewSchema,
+  SaveRelationshipViewRequestSchema,
+  DeleteRelationshipViewRequestSchema,
+  NETWORK_RELATIONSHIP_QUERY_PATH,
+  NETWORK_RELATIONSHIP_VIEWS_PATH,
+  NETWORK_RELATIONSHIP_VIEW_PATH,
+  NETWORK_RELATIONSHIP_EXPORT_PATH,
+} from "@capital-q/contracts";
+import {
+  queryRelationships,
+  filterRelationshipView,
+  relationshipViewCsv,
+} from "@capital-q/network";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
@@ -309,6 +330,107 @@ export function registerNetworkInterestRoutes(
         }
         void reply.header("Cache-Control", "no-store");
         return DiligenceDownloadDtoSchema.parse(link);
+      },
+    );
+  }
+
+  // H2 reads reuse the canonical party-authorized list, not a Hub data copy.
+  const querySource = async (request: FastifyRequest, companyId?: string) => {
+    const actor = getActorContext(request);
+    const side = companyId === undefined ? "INVESTOR" : "COMPANY";
+    const rows =
+      companyId === undefined
+        ? await service.listRelationshipsForInvestor({ actor })
+        : await service.listRelationshipsForCompany({ actor, companyId });
+    return rows.map((row) => toRelationshipSummaryDto(row, side));
+  };
+  app.post(
+    NETWORK_RELATIONSHIP_QUERY_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const query = RelationshipQuerySchema.parse(request.body);
+      const source = await querySource(request, query.companyId);
+      void reply.header("Cache-Control", "no-store");
+      try {
+        return RelationshipQueryResponseSchema.parse(
+          queryRelationships(await withCounterpartPhotos(source), query),
+        );
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "RELATIONSHIP_CURSOR_STALE"
+        )
+          return reply.code(409).type(PROBLEM_CONTENT_TYPE).send(createProblemDetails({code:"VERSION_CONFLICT",requestId:request.id,detail:"The authorized relationship view changed. Apply the view again."}));
+        throw error;
+      }
+    },
+  );
+  app.post(
+    NETWORK_RELATIONSHIP_EXPORT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const input = RelationshipExportRequestSchema.parse(request.body);
+      const source = await querySource(request, input.query.companyId);
+      const filtered = filterRelationshipView(source, input.query);
+      const ids =
+        input.selectedIds === undefined ? null : new Set(input.selectedIds);
+      // Selection cannot smuggle another party's relationship into an export.
+      if (
+        ids !== null &&
+        input.selectedIds?.some(
+          (id) => !filtered.some((item) => item.relationshipId === id),
+        )
+      )
+        throw new InterestNotFoundError();
+      const selected =
+        ids === null
+          ? filtered
+          : filtered.filter((item) => ids.has(item.relationshipId));
+      void reply.header("Cache-Control", "no-store");
+      return RelationshipExportResponseSchema.parse({
+        fileName: "relationships.csv",
+        csv: relationshipViewCsv(selected),
+        sourceLimit: 200,
+        sourceMayBeTruncated: true,
+      });
+    },
+  );
+  const views = service.relationshipViews;
+  if (views !== undefined) {
+    app.get(
+      NETWORK_RELATIONSHIP_VIEWS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        void reply.header("Cache-Control", "no-store");
+        return SavedRelationshipViewListSchema.parse({
+          items: await views.list(getActorContext(request)),
+        });
+      },
+    );
+    app.put(
+      NETWORK_RELATIONSHIP_VIEW_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const input = SaveRelationshipViewRequestSchema.parse(request.body);
+        const viewId = String((request.params as { viewId: unknown }).viewId);
+        void reply.header("Cache-Control", "no-store");
+        return SavedRelationshipViewSchema.parse(
+          await views.save(getActorContext(request), viewId, input),
+        );
+      },
+    );
+    app.delete(
+      NETWORK_RELATIONSHIP_VIEW_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const input = DeleteRelationshipViewRequestSchema.parse(request.body);
+        await views.remove(
+          getActorContext(request),
+          String((request.params as { viewId: unknown }).viewId),
+          input.expectedVersion,
+        );
+        void reply.header("Cache-Control", "no-store");
+        return { deleted: true };
       },
     );
   }
