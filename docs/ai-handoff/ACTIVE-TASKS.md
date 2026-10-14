@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## October 14 owner continuation
+
+Finish gated Q PR80 release and actual investor rehearsal first. Functional Relationship Hub H1 is explicitly authorized using the current design system; PR75 visual design remains deferred. Continue isolated GateQ guest Evidence recovery and native submission/dossier acceptance. Current authority and exact evidence are at the top of STATE.md.
+
 ## Current execution board — October 14, 07:35 UTC
 
 GateQ supersession and cold-opening repairs are CI-green, deployed at62bd144a, and fresh live verified. Relationship Hub PR75/aac14fd0 is CI-green and ready for design approval only. Immediate engineering task: finish isolated Q DISCOVER follow-up attribution patch protected CI, release normally, rerun full investor browser rehearsal; route settling remains unexplained. See latest STATE checkpoint for exact SHAs, timings, commands and preserved WIPs. No production CRM implementation.
