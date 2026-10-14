@@ -162,7 +162,6 @@ function world(initial: GatewayPolicy): World {
         return Promise.resolve(row);
       },
       findById: (id) => Promise.resolve(applications.get(id) ?? null),
-      lock: (_tx, id) => Promise.resolve(applications.get(id) ?? null),
       setStatus: (_tx, id, status, submittedAt) => {
         const row = applications.get(id);
         if (row === undefined) throw new Error("no such application");

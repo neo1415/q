@@ -450,11 +450,7 @@ describe("the submitted investor brief", () => {
     show({ dossier: null, transcript: null });
     expect(screen.getByText("Legacy-only answer")).toBeTruthy();
     expect(screen.getByText(/Legacy-only note/)).toBeTruthy();
-    expect(
-      screen.getByText(
-        "No interview transcript was included in this submission.",
-      ),
-    ).toBeTruthy();
+    expect(screen.queryByText(/Interview transcript/)).toBeNull();
     expect(
       screen.queryByRole("region", { name: "Submitted investment brief" }),
     ).toBeNull();

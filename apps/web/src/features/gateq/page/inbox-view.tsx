@@ -1391,10 +1391,12 @@ function Detail({
           ) : (
             <SubmittedBrief dossier={detail.dossier} />
           )}
-          <SubmittedTranscript
-            turns={detail.transcript}
-            recordedTurnCount={detail.dossier?.transcript.turnCount}
-          />
+          {detail.transcript != null || detail.dossier != null ? (
+            <SubmittedTranscript
+              turns={detail.transcript}
+              recordedTurnCount={detail.dossier?.transcript.turnCount}
+            />
+          ) : null}
 
           <section className="gq-sect">
             <h3 className="cq-title-sm">What they shared</h3>

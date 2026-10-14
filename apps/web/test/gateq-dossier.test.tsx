@@ -348,12 +348,18 @@ function renderDetail(value: GateqInboxDetailDto) {
 describe("the inbox detail", () => {
   it("adds the dossier and transcript when the submission has them, keeping every action", () => {
     renderDetail(detail({ dossier: DOSSIER, transcript: TRANSCRIPT }));
-    expect(screen.getByRole("heading", { name: "Dossier" })).toBeTruthy();
-    expect(screen.getByText("Interview transcript")).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Submitted investment brief" }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Interview transcript ·/)).toBeTruthy();
     for (const name of ["Reply", "Pass", "Assign", "Download pack"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
-    expect(screen.getByRole("heading", { name: "Their answers" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", {
+        name: "Company evidence by investment dimension",
+      }),
+    ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Team notes" })).toBeTruthy();
   });
 
