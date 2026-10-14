@@ -401,6 +401,8 @@ describe("fresh selected-company follow-ups reuse authorized identity", () => {
         ["What are the risks for this company?", "REVOKED", true],
         ["What are the risks for this company?", "UNREAD", true],
         ["What are the risks for this company?", "NO_SELECTED_CONTEXT", true],
+        ["What are the risks for this company?", "MISMATCHED_CONTEXT", true],
+        ["What are the risks for this company?", "NO_SELECTED_SUBJECT", true],
       ] as const
     ).flatMap(([text, access, lookup]) =>
       (["COMPANY", "DISCOVER"] as const).map(
@@ -468,11 +470,20 @@ describe("fresh selected-company follow-ups reuse authorized identity", () => {
       await seam.answer({
         ...request,
         aboutNamedOther: true,
-        subjects: [{ kind: "COMPANY", companyId }],
+        subjects:
+          access === "NO_SELECTED_SUBJECT"
+            ? [{ kind: "COMPANY", companyId: otherId }]
+            : [{ kind: "COMPANY", companyId }],
         plan: {
           ...request.plan,
           screen:
-            access === "NO_SELECTED_CONTEXT" ? { route } : { route, companyId },
+            access === "NO_SELECTED_CONTEXT"
+              ? { route }
+              : {
+                  route,
+                  companyId:
+                    access === "MISMATCHED_CONTEXT" ? otherId : companyId,
+                },
         },
       });
       const prompt = JSON.stringify(alpha.calls[0]?.request);

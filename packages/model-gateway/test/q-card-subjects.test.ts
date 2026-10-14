@@ -126,6 +126,25 @@ describe("explicit company finding attribution", () => {
       [],
     );
   });
+  it("does not reuse a previous run's authorized profile or a consumed answer", () => {
+    const runs = createRunCompanies();
+    runs.note("previous", complete());
+    expect(runs.read("current").profiles.has(HALYARD)).toBe(false);
+    expect(
+      namedCompanySubjects("Halyard Security", runs.take("current")),
+    ).toEqual([]);
+    expect(runs.take("previous").profiles.has(HALYARD)).toBe(true);
+    expect(runs.read("previous").profiles.has(HALYARD)).toBe(false);
+    runs.note("previous", {
+      ...complete(),
+      status: "DENIED",
+      result: {
+        ok: false,
+        error: { code: "NOT_AVAILABLE", safeMessage: "Access revoked" },
+      },
+    });
+    expect(runs.read("previous").profiles.has(HALYARD)).toBe(false);
+  });
   it.each(["search", "denied", "malformed", "failed", "unclassified"])(
     "does not attribute findings from %s output",
     (kind) => {
