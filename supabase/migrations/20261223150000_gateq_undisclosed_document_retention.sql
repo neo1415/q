@@ -28,7 +28,7 @@ declare d record;
 begin
   select x.owner_kind,x.custody_cleanup_started_at into d from evidence.documents x
     join evidence.document_versions v on v.document_id=x.id and v.tenant_id=x.tenant_id
-    where v.id=new.document_version_id for share of x;
+    where v.id=new.document_version_id and x.owner_kind='GATEQ_APPLICATION' for share of x;
   if found and d.owner_kind='GATEQ_APPLICATION' and d.custody_cleanup_started_at is not null
     and (tg_op='INSERT' or new.status in ('QUEUED','RUNNING')) then
     raise exception 'application document custody has expired' using errcode='check_violation';

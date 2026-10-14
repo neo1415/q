@@ -54,7 +54,7 @@ function providerExpiryFromToken(token: string): string {
     const decoded: unknown = JSON.parse(
       Buffer.from(parts[1], "base64url").toString("utf8"),
     );
-    const exp =
+    const exp: unknown =
       typeof decoded === "object" && decoded !== null
         ? Reflect.get(decoded, "exp")
         : undefined;

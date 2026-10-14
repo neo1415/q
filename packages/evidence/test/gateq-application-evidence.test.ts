@@ -899,14 +899,14 @@ describe("application-owned canonical Evidence", () => {
           ? [row()]
           : [],
     );
-    f.createUploadAuthorization.mockImplementationOnce(async () => {
+    f.createUploadAuthorization.mockImplementationOnce(() => {
       closed = true;
-      return {
+      return Promise.resolve({
         method: "PUT",
         url: "https://storage.invalid/hidden",
         headers: {},
         providerExpiresAt: validScope.expiresAt,
-      };
+      });
     });
     await expect(
       f.service.create({ credential: "opaque-session", input }),
