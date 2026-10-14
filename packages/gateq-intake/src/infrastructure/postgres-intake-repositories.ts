@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 
+import { DisclosureLineageSchema } from "../contracts/disclosure-lineage.js";
+
 import {
   decodeJsonbString,
   jsonbParam,
@@ -123,6 +125,7 @@ const FactRow = z.object({
   recorded_at: z.unknown(),
   superseded_at: z.unknown(),
   source_turn_seq: z.number().int().nullable().optional(),
+  disclosure_lineage: z.unknown().optional(),
 });
 
 function toFact(row: unknown): ApplicationFact {
@@ -139,6 +142,13 @@ function toFact(row: unknown): ApplicationFact {
     recordedAt: iso(r.recorded_at),
     supersededAt: isoOrNull(r.superseded_at),
     sourceTurnSeq: r.source_turn_seq ?? null,
+    ...(r.disclosure_lineage == null
+      ? {}
+      : {
+          disclosureLineage: DisclosureLineageSchema.parse(
+            decodeJsonbString(r.disclosure_lineage),
+          ),
+        }),
   });
 }
 
@@ -322,10 +332,10 @@ export function createPostgresApplicationFactRepository(options: {
              and dimension = ${fact.dimension} and superseded_at is null`;
         const inserted = await tx.sql`
           insert into gateq.application_facts (
-            id, application_id, tenant_id, dimension, value, provenance, recorded_at, source_turn_seq
+            id, application_id, tenant_id, dimension, value, provenance, recorded_at, source_turn_seq, disclosure_lineage
           ) values (
             ${id}, ${input.applicationId}, ${input.tenantId}, ${fact.dimension},
-            ${jsonbParam(tx.sql, fact.value)}, ${fact.provenance}, ${input.at}, ${input.sourceTurnSeq ?? null}
+            ${jsonbParam(tx.sql, fact.value)}, ${fact.provenance}, ${input.at}, ${input.sourceTurnSeq ?? null}, ${input.disclosureLineage === undefined ? null : jsonbParam(tx.sql, DisclosureLineageSchema.parse(input.disclosureLineage))}
           )
           returning *`;
         const row = inserted[0];
@@ -426,6 +436,7 @@ const TurnRow = z.object({
   intent: z.string().nullable(),
   latency_ms: z.number().int().nullable(),
   created_at: z.unknown(),
+  disclosure_lineage: z.unknown().optional(),
 });
 
 function toTurn(row: unknown): StoredTurn {
@@ -442,6 +453,13 @@ function toTurn(row: unknown): StoredTurn {
     intent: r.intent,
     latencyMs: r.latency_ms,
     createdAt: iso(r.created_at),
+    ...(r.disclosure_lineage == null
+      ? {}
+      : {
+          disclosureLineage: DisclosureLineageSchema.parse(
+            decodeJsonbString(r.disclosure_lineage),
+          ),
+        }),
   };
 }
 
@@ -465,9 +483,9 @@ export function createPostgresApplicationTurnRepository(options: {
       if (locked[0]["status"] === "SUBMITTED")
         throw new IntakeRefusedError("ALREADY_SUBMITTED");
       await tx.sql`
-      insert into gateq.application_turns (application_id, tenant_id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms)
+      insert into gateq.application_turns (application_id, tenant_id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, disclosure_lineage)
       select ${input.applicationId}, ${input.tenantId}, coalesce(max(seq), 0) + 1,
-             ${input.role}, ${input.text}, ${input.clientTurnId}, ${input.askingDimension ?? null}, ${input.intent ?? null}, ${input.latencyMs ?? null}
+             ${input.role}, ${input.text}, ${input.clientTurnId}, ${input.askingDimension ?? null}, ${input.intent ?? null}, ${input.latencyMs ?? null}, ${input.disclosureLineage === undefined ? null : jsonbParam(tx.sql, DisclosureLineageSchema.parse(input.disclosureLineage))}
         from gateq.application_turns where application_id = ${input.applicationId}
       on conflict (application_id, client_turn_id, role) do nothing`;
     };

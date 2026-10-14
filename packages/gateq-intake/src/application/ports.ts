@@ -115,6 +115,7 @@ export type ApplicationFactRepository = {
       readonly at: string;
       /** Lineage: the PERSON turn these were read from, when one was. */
       readonly sourceTurnSeq?: number | null | undefined;
+      readonly disclosureLineage?: DisclosureLineage | undefined;
     },
   ) => Promise<readonly ApplicationFact[]>;
 };
@@ -210,6 +211,7 @@ export type ApplicationTurnRepository = {
       readonly askingDimension?: ApplicationDimension | null | undefined;
       readonly intent?: string | null | undefined;
       readonly latencyMs?: number | null | undefined;
+      readonly disclosureLineage?: DisclosureLineage | undefined;
     },
   ) => Promise<void>;
   /** Oldest first. `limit` keeps the newest that many. */
@@ -239,6 +241,7 @@ export type ApplicationTurnRepository = {
     readonly askingDimension?: ApplicationDimension | null | undefined;
     readonly intent?: string | null | undefined;
     readonly latencyMs?: number | null | undefined;
+    readonly disclosureLineage?: DisclosureLineage | undefined;
   }) => Promise<{ readonly seq: number }>;
   readonly countFor: (applicationId: ApplicationId) => Promise<number>;
 };

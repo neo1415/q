@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   projectSelectedDisclosure,
+  disclosureLineageFromContext,
   type DisclosureDocumentIdentity,
   type DisclosureLineage,
 } from "../src/application/disclosure-projection.js";
@@ -105,5 +106,26 @@ describe("selected disclosure confidentiality", () => {
         turns: [{ seq: 1 }, { seq: 1 }],
       }),
     ).toThrow("Duplicate disclosure turn identity");
+  });
+});
+
+describe("server context lineage", () => {
+  it("unions all document, fact and prior reply dependencies", () => {
+    expect(
+      disclosureLineageFromContext({
+        documents: [selected],
+        facts: [{ disclosureLineage: complete([excluded]) }],
+        turns: [{ seq: 4, disclosureLineage: complete([selected], [1]) }],
+      }),
+    ).toEqual(complete([selected, excluded], [1, 4]));
+  });
+  it("does not turn missing historical context lineage into text-only proof", () => {
+    expect(
+      disclosureLineageFromContext({
+        documents: [],
+        facts: [],
+        turns: [{ seq: 1 }],
+      }),
+    ).toEqual({ state: "UNKNOWN" });
   });
 });

@@ -72,3 +72,44 @@ export function projectSelectedDisclosure<
     turns: input.turns.filter((turn) => permitsTurn(turn.seq)),
   };
 }
+
+/** Stamp from actual server-loaded context, never from the model's output. */
+export function disclosureLineageFromContext(input: {
+  readonly documents: readonly DisclosureDocumentIdentity[];
+  readonly facts: readonly {
+    readonly disclosureLineage?: DisclosureLineage | undefined;
+    readonly sourceTurnSeq?: number | null | undefined;
+  }[];
+  readonly turns: readonly {
+    readonly seq: number;
+    readonly disclosureLineage?: DisclosureLineage | undefined;
+  }[];
+}): DisclosureLineage {
+  const documents = new Map<string, DisclosureDocumentIdentity>();
+  const seqs = new Set<number>();
+  for (const document of input.documents) {
+    const parsed = DisclosureDocumentIdentitySchema.safeParse(document);
+    if (!parsed.success) return { state: "UNKNOWN" };
+    documents.set(identityKey(parsed.data), parsed.data);
+  }
+  for (const entry of [...input.facts, ...input.turns]) {
+    const parsed = DisclosureLineageSchema.safeParse(entry.disclosureLineage);
+    if (!parsed.success || parsed.data.state !== "COMPLETE") {
+      return { state: "UNKNOWN" };
+    }
+    for (const document of parsed.data.documents) {
+      documents.set(identityKey(document), document);
+    }
+    for (const seq of parsed.data.turnSeqs) seqs.add(seq);
+  }
+  for (const turn of input.turns) seqs.add(turn.seq);
+  for (const fact of input.facts) {
+    if (fact.sourceTurnSeq != null) seqs.add(fact.sourceTurnSeq);
+  }
+  const parsed = DisclosureLineageSchema.safeParse({
+    state: "COMPLETE",
+    documents: [...documents.values()],
+    turnSeqs: [...seqs],
+  });
+  return parsed.success ? parsed.data : { state: "UNKNOWN" };
+}
