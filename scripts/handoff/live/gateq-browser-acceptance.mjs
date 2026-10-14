@@ -187,7 +187,7 @@ try {
     .click();
   const sector = page
     .getByRole("group", { name: /^Sector/ })
-    .getByRole("checkbox", { name: fixture.sectorLabel, exact: true });
+    .getByRole("button", { name: fixture.sectorLabel, exact: true });
   if ((await sector.getAttribute("aria-pressed")) !== "true")
     await sector.click();
   await page
