@@ -21,6 +21,11 @@ export type QControlCatalogEntry = {
 };
 
 export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
+  { id: "button.hub-capital", kind: "BUTTON" },
+  { id: "button.hub-discover", kind: "BUTTON" },
+  { id: "button.hub-gateq", kind: "BUTTON" },
+  { id: "button.hub-results", kind: "BUTTON" },
+  { id: "button.hub-work", kind: "BUTTON" },
   { id: "carousel.feed", kind: "CAROUSEL" },
   { id: "filter.relationships", kind: "FILTER" },
   { id: "input.document-search", kind: "INPUT" },
@@ -65,6 +70,7 @@ export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
   { id: "section.flags", kind: "SECTION" },
   { id: "section.grant", kind: "SECTION" },
   { id: "section.how", kind: "SECTION" },
+  { id: "section.hub-overview", kind: "SECTION" },
   { id: "section.interview", kind: "SECTION" },
   { id: "section.latency", kind: "SECTION" },
   { id: "section.mandate", kind: "SECTION" },
@@ -133,6 +139,7 @@ export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
   { id: "tab.plan", kind: "TAB" },
   { id: "tab.raise", kind: "TAB" },
   { id: "tab.readiness", kind: "TAB" },
+  { id: "tab.relationships", kind: "TAB" },
   { id: "tab.requested", kind: "TAB" },
   { id: "tab.team", kind: "TAB" },
   { id: "tab.work-cost", kind: "TAB" },
