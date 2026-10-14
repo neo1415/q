@@ -309,9 +309,16 @@ export class GateQPolicyNotPublishedError extends Error {
  */
 export function qualify(input: QualifyInput): QualificationResult {
   const { policy, projection, evaluatedAt } = input;
-  if (policy.version.status !== "PUBLISHED") {
-    // A draft is a work in progress. Deciding anybody's access on one would
-    // make an unsaved thought into policy.
+  // A draft is a work in progress: deciding anybody's access on one would
+  // make an unsaved thought into policy. A version that was published and
+  // then superseded is not a draft: an application bound to it is still
+  // judged under it (§15). Live 2026-10-14: refusing it turned every
+  // in-progress application into a 500 the moment its investor republished.
+  const wasPublished =
+    policy.version.status === "PUBLISHED" ||
+    (policy.version.status === "SUPERSEDED" &&
+      policy.version.publishedAt !== null);
+  if (!wasPublished) {
     throw new GateQPolicyNotPublishedError();
   }
 
