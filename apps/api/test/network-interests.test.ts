@@ -779,6 +779,26 @@ describe("Hub pipeline HTTP boundary", () => {
     });
     expect(denied.statusCode).toBe(404);
   });
+  it("rejects exports after actor or filter scope changes", async () => {
+    const { app } = buildApp();
+    const actorScope = [
+      CONTEXT.userId,
+      CONTEXT.tenantId,
+      CONTEXT.organisationId,
+      "INVESTOR",
+    ].join(":");
+    for (const scope of [
+      relationshipPipelineScopeBinding({}, "other-organization"),
+      relationshipPipelineScopeBinding({ q: "Other" }, actorScope),
+    ]) {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/network/relationships/pipeline/export?scope=${scope}`,
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.body).not.toContain("Kora");
+    }
+  });
   it("keeps domain permission denial for query and download", async () => {
     const { app } = buildApp({ failWith: new InterestNotPermittedError() });
     for (const path of [
