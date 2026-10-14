@@ -265,6 +265,7 @@ function controlActBlock(control: ControlBinding): QResultBlock {
       act: control.act,
       target: control.target,
       ...(control.index === undefined ? {} : { index: control.index }),
+      ...(control.value === undefined ? {} : { value: control.value }),
     },
   };
 }

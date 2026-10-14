@@ -364,9 +364,15 @@ describe("GET /v1/companies/:companyId/pitch", () => {
     const failed = await failingApp.inject({ method: "GET", url: pitchUrl });
     expect(failed.statusCode).toBe(503);
     expect(failed.json()).toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
-    expect(failed.payload).not.toContain("CLOUDFLARE");
-    expect(failed.payload).not.toContain("401");
-    expect(failed.payload).not.toContain("10000");
+    const publicFailure = failed.json<Record<string, unknown>>();
+    expect(publicFailure["requestId"]).toEqual(expect.any(String));
+    // A random correlation UUID may contain provider status/code digits.
+    // Check the public error fields without mistaking the opaque ID for a leak.
+    delete publicFailure["requestId"];
+    const publicFailureText = JSON.stringify(publicFailure);
+    expect(publicFailureText).not.toContain("CLOUDFLARE");
+    expect(publicFailureText).not.toContain("401");
+    expect(publicFailureText).not.toContain("10000");
     await failingApp.close();
 
     // Every other error still reaches the application's own handler.
