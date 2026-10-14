@@ -8,9 +8,17 @@ import type {
   PublicGateway,
   QualificationResult,
 } from "@capital-q/gateq";
-import type { GateQInterviewerResult } from "@capital-q/q-core";
+import {
+  createPromptRegistry,
+  PROMPT_DEFINITIONS,
+  type PromptRegistry,
+  type GateQInterviewerResult,
+} from "@capital-q/q-core";
 
-import type { ApplicationFact } from "../src/contracts/index.js";
+import {
+  APPLICATION_DIMENSIONS,
+  type ApplicationFact,
+} from "../src/contracts/index.js";
 import {
   createGateQInterviewer,
   InterviewUnavailableError,
@@ -69,6 +77,7 @@ const RESULT: GateQInterviewerResult = {
 function interviewer(
   result: GateQInterviewerResult | Error,
   captured?: { prompt?: string },
+  registry?: PromptRegistry,
 ) {
   const execute = vi.fn((request: unknown) => {
     if (captured !== undefined) {
@@ -83,6 +92,7 @@ function interviewer(
     execute,
     service: createGateQInterviewer({
       gateway: { execute } as never,
+      registry,
     }),
   };
 }
@@ -505,4 +515,79 @@ describe("one brain, either modality", () => {
     );
     expect(typed.prompt).not.toBe(spoken.prompt);
   });
+});
+
+describe("recordable claims versus next-question priority", () => {
+  it("gives Q the full recordable contract independently of the next questions", async () => {
+    const captured: { prompt?: string } = {};
+    const { service } = interviewer(
+      { ...RESULT, facts: [], asking: null },
+      captured,
+    );
+    await service.turn(
+      turn({
+        utterance:
+          "We have fourteen paying sites; the raise funds inventory and engineers.",
+      }),
+    );
+    const prompt = captured.prompt ?? "";
+    expect(prompt).toContain("RECORDABLE DIMENSIONS");
+    expect(prompt).toContain("claims.traction");
+    expect(prompt).toContain("raise.use_of_funds");
+    for (const dimension of APPLICATION_DIMENSIONS)
+      expect(prompt).toContain(dimension);
+    expect(prompt).not.toContain(
+      "Only dimensions that appear in KNOWN FACTS or QUESTION NEEDS",
+    );
+  });
+
+  it("accepts stated traction and use of funds without making them the next question", async () => {
+    const { service } = interviewer({
+      ...RESULT,
+      asking: "company.team",
+      facts: [
+        {
+          dimension: "claims.traction",
+          value: { kind: "TEXT", text: "Fourteen paying sites" },
+          provenance: "APPLICANT_PROVIDED",
+          correction: false,
+        },
+        {
+          dimension: "raise.use_of_funds",
+          value: { kind: "TEXT", text: "Inventory and two field engineers" },
+          provenance: "APPLICANT_PROVIDED",
+          correction: false,
+        },
+      ],
+    });
+    const outcome = await service.turn(
+      turn({
+        utterance:
+          "We have fourteen paying sites; the raise funds inventory and two field engineers.",
+      }),
+    );
+    expect(outcome.asking).toBe("company.team");
+    expect(outcome.facts.map((fact) => fact.dimension)).toEqual([
+      "claims.traction",
+      "raise.use_of_funds",
+    ]);
+    expect(outcome.rejectedFacts).toBe(0);
+  });
+});
+
+it("retains the historical variable contract for an explicitly pinned interviewer registry", async () => {
+  const registry = createPromptRegistry(
+    PROMPT_DEFINITIONS.filter(
+      (definition) =>
+        definition.id !== "GATEQ_INTERVIEWER" || definition.version === 2,
+    ).map((definition) =>
+      definition.id === "GATEQ_INTERVIEWER"
+        ? { ...definition, status: "ACTIVE" as const }
+        : definition,
+    ),
+  );
+  const captured: { prompt?: string } = {};
+  const { service } = interviewer(RESULT, captured, registry);
+  expect((await service.turn(turn())).facts).toHaveLength(1);
+  expect(captured.prompt).not.toContain("RECORDABLE DIMENSIONS");
 });
