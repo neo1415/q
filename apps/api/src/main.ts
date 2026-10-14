@@ -58,6 +58,7 @@ import { createOutboxWriter } from "@capital-q/eventing";
 import { connectedCompanies } from "./http/your-companies.js";
 import { createInvestorAnswers } from "./investor-answers.js";
 import { createProfileMaterial } from "./profile-material.js";
+import { createGateQApplicationDocumentsModule } from "./gateq-application-documents.js";
 import {
   createCorrelationId,
   createLogger,
@@ -960,6 +961,27 @@ const evidence = createEvidenceService({
         },
       }),
 });
+
+// ADR 0067: a GateQ applicant's own documents. Application custody over
+// the same Evidence pipeline; needs both the applicant surface and private
+// storage, and is simply absent (404) without either.
+const gateqApplyDocuments =
+  gateqApply === undefined || storage === undefined
+    ? undefined
+    : createGateQApplicationDocumentsModule({
+        sql: database.sql,
+        transactions: database.transactions,
+        storage,
+        outbox,
+        uploads: {
+          bucket: DOCUMENT_STORAGE_BUCKET,
+          maxBytes: config.public.documentUploadMaxBytes,
+          sessionTtlSeconds: DOCUMENT_UPLOAD_SESSION_TTL_SECONDS,
+          maxOpenSessions: DOCUMENT_UPLOAD_MAX_OPEN_SESSIONS,
+        },
+        intake: gateqApply.intake,
+        throttle: gateqApply.throttle,
+      });
 
 // Pitch media. The Cloudflare Stream adapter is composed only when its
 // credential is configured (CQ-MEDIA-010); the token is revealed here and
@@ -2541,6 +2563,7 @@ const { app, logger } = createApp(config, security, {
     });
   },
   gateqApply,
+  gateqApplyDocuments,
   // GateQ slice 1: a signed-in founder's contact; their own verified
   // account email confirms a matching address without a code.
   gateqApplicationContact:
