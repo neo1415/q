@@ -30,3 +30,5 @@ Please review information density, mobile navigation, evidence provenance, the d
 76 screenshots were rendered in Chromium. Desktop overview, mobile investor/founder overview, mobile record/request layout, dark evidence and failed-Q sheet were visually inspected. The clipped mobile role selector was corrected and the corrected screenshot inspected. Full screenshot availability is not a claim that every screenshot received manual review.
 
 Four MP4s decoded fully without ffmpeg errors. H.264/yuv420p and fast-start metadata provide browser playback compatibility. Durations: investor 18.52s, founder 13.56s, Q-navigation 32.88s, mobile 13.60s. Recorder captured no browser runtime errors; final desktop/mobile document widths equaled their 1440px/390px viewports. `review/videos/validation.json` records these measurements. This is design validation, not protected application CI or production acceptance.
+
+The accessible review page was opened in actual Chromium and all four native video players advanced beyond 0.30s with `readyState=4`, correct dimensions and the expected durations. This verifies playable browser output as well as file decoding.
