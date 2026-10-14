@@ -32,3 +32,9 @@ Please review information density, mobile navigation, evidence provenance, the d
 Four MP4s decoded fully without ffmpeg errors. H.264/yuv420p and fast-start metadata provide browser playback compatibility. Durations: investor 18.52s, founder 13.56s, Q-navigation 32.88s, mobile 13.60s. Recorder captured no browser runtime errors; final desktop/mobile document widths equaled their 1440px/390px viewports. `review/videos/validation.json` records these measurements. This is design validation, not protected application CI or production acceptance.
 
 The accessible review page was opened in actual Chromium and all four native video players advanced beyond 0.30s with `readyState=4`, correct dimensions and the expected durations. This verifies playable browser output as well as file decoding.
+
+## Accessibility verification
+
+An actual Chromium axe-core audit at 1440px and 390px found missing main/content landmarks in the review landing page; those were fixed with semantic HTML. The repeated audit reports **zero automated violations** across WCAG 2 A/AA, WCAG 2.1 AA and best-practice checks (24 passing rules at each width). Keyboard Tab reached navigation links and native video controls, with a visible solid focus outline. Native pause/seek/fullscreen controls remain enabled. The committed `review/accessibility-validation.json` records both viewport results; reproduce with `node design/relationship-hub/scripts/accessibility.cjs`.
+
+Axe leaves `video-caption` for manual review. All four recordings are silent (no audio stream); the review page provides adjacent descriptions of the visual sequences. This limited audit does not certify full accessibility of the clickable prototype or replace an assistive-technology user review.
