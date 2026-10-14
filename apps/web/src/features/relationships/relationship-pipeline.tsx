@@ -125,16 +125,17 @@ export function RelationshipPipeline({
     },
   });
   useQControl({
-    id: "input.pipeline-search",
-    kind: "INPUT",
+    id: "filter.pipeline-search",
+    kind: "FILTER",
     ref: searchRef,
     onAct: async (intent) => {
-      if (intent.act !== "SET") return "NOT_APPLICABLE";
-      if (typeof intent.value !== "string" || intent.value.trim().length > 120)
+      if (intent.act !== "FILTER") return "NOT_APPLICABLE";
+      const value = intent.value === null ? "" : intent.value;
+      if (typeof value !== "string" || value.trim().length > 120)
         return "FAILED";
       const next = {
         ...query,
-        q: intent.value.trim() || undefined,
+        q: value.trim() || undefined,
         cursor: undefined,
       };
       const target = pipelineHref(next, layout);

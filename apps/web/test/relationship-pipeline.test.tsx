@@ -288,3 +288,43 @@ describe("real pipeline controls", () => {
     expect(mock.push).not.toHaveBeenCalled();
   });
 });
+
+it("Q search filters through the server and confirms the resulting query", async () => {
+  const page = render(<RelationshipPipeline {...props} />);
+  mock.push.mockImplementation((path: string) => {
+    flushSync(() =>
+      page.rerender(
+        <RelationshipPipeline
+          {...props}
+          query={{ q: "Maji" }}
+          data={{
+            ...data,
+            items: data.items.filter((row) => row.counterpart.name === "Maji"),
+            total: 1,
+          }}
+        />,
+      ),
+    );
+    noteRoute(path);
+  });
+  const entry = controlOf("filter.pipeline-search");
+  if (!entry) throw new Error("Missing executable search filter");
+  let status: string | undefined;
+  await act(async () => {
+    status = await performOnControl(entry, {
+      kind: "UI_ACT",
+      actId: "uia_searchpipeline01",
+      act: "FILTER",
+      target: "filter.pipeline-search",
+      value: "Maji",
+    });
+  });
+  expect(status).toBe("DONE");
+  expect(mock.push).toHaveBeenLastCalledWith(
+    "/relationships?view=pipeline&layout=table&q=Maji",
+  );
+  expect(
+    screen.getByRole<HTMLInputElement>("textbox", { name: "Search companies" })
+      .value,
+  ).toBe("Maji");
+});
