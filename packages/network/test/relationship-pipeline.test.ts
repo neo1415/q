@@ -144,3 +144,8 @@ describe("authorised relationship pipeline", () => {
     ).toThrow(InterestNotFoundError);
   });
 });
+
+describe("pipeline snapshot changes away from the cursor boundary",()=>{
+ it("rejects a renamed row moving before an unchanged boundary",()=>{const page=selectRelationshipPipeline(rows,{sort:'name',pageSize:1},'actor');const changed=rows.map(row=>row.relationshipId===rows[0]?.relationshipId?{...row,counterpart:{...row.counterpart,name:'Ahead'}}:row);expect(()=>selectRelationshipPipeline(changed,{sort:'name',pageSize:1,cursor:page.nextCursor??undefined},'actor')).toThrow(RelationshipPipelineQueryError);});
+ it("rejects a previously read row moving beyond an unchanged boundary",()=>{const page=selectRelationshipPipeline(rows,{sort:'name',pageSize:2},'actor');const changed=rows.map(row=>row.relationshipId===rows[2]?.relationshipId?{...row,counterpart:{...row.counterpart,name:'Zzz'}}:row);expect(()=>selectRelationshipPipeline(changed,{sort:'name',pageSize:2,cursor:page.nextCursor??undefined},'actor')).toThrow(RelationshipPipelineQueryError);});
+});

@@ -246,3 +246,63 @@ describe("real pipeline controls", () => {
     expect(mock.push).not.toHaveBeenCalled();
   });
 });
+
+describe("pipeline selection authority across navigation", () => {
+  it("retains selected IDs across cursor pages within the same scope", () => {
+    const { rerender } = render(<RelationshipPipeline {...props} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select Kivu Freight" }),
+    );
+    const first = data.items[0];
+    const second = data.items[1];
+    if (first === undefined || second === undefined)
+      throw new Error("Fixture missing");
+    rerender(
+      <RelationshipPipeline
+        {...props}
+        query={{ cursor: "next" }}
+        data={{ ...data, items: [second], nextCursor: null }}
+      />,
+    );
+    const link = screen.getByRole("link", { name: "Export 1 selected" });
+    expect(link.getAttribute("href")).toContain(first.relationshipId);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Maji" }));
+    expect(
+      screen
+        .getByRole("link", { name: "Export 2 selected" })
+        .getAttribute("href"),
+    ).toContain(second.relationshipId);
+  });
+  it("clears selection and private preview when actor scope changes", () => {
+    const { rerender } = render(<RelationshipPipeline {...props} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select Kivu Freight" }),
+    );
+    rerender(
+      <RelationshipPipeline {...props} scopeKey="other:user:organisation" />,
+    );
+    expect(
+      screen.queryByRole("link", { name: "Export 1 selected" }),
+    ).toBeNull();
+    expect((screen.getByRole("checkbox", { name: "Select Kivu Freight" }) as HTMLInputElement).checked).toBe(false);
+  });
+  it("clears previous selection after a filter changes", () => {
+    const { rerender } = render(<RelationshipPipeline {...props} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select Kivu Freight" }),
+    );
+    rerender(
+      <RelationshipPipeline
+        {...props}
+        query={{ q: "Maji" }}
+        data={{
+          ...data,
+          items: data.items.filter((row) => row.counterpart.name === "Maji"),
+        }}
+      />,
+    );
+    expect(
+      screen.queryByRole("link", { name: "Export 1 selected" }),
+    ).toBeNull();
+  });
+});

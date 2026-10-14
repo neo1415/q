@@ -59,6 +59,10 @@ export function selectRelationshipPipeline(
         query.state ?? null,
         query.sort ?? "recent",
         query.pageSize ?? 25,
+        // Bind the same fresh authorized projection, not just the boundary.
+        // Otherwise a renamed/reclassified row can jump across that boundary
+        // and be omitted or repeated on a later page. Hash stays opaque.
+        sorted.rows.map((row) => [row.relationshipId, sorted.key(row), row.state]),
       ]),
     )
     .digest("hex");

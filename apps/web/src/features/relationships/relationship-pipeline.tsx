@@ -74,13 +74,19 @@ export function RelationshipPipeline({
   useEffect(() => {
     const stored = readPipelinePreferences(scopeKey, localStorageOrNull());
     setPreferences(stored);
+    setSavedId("");
+    setViewName("");
+    setNotice(null);
   }, [scopeKey]);
   useEffect(() => {
     setSearch(query.q ?? "");
     setSelected([]);
     setPreview(null);
+  }, [scopeKey, query.q, query.state, query.sort]);
+  useEffect(() => {
+    setPreview(null);
     setLayout(initialLayout);
-  }, [query.q, query.state, query.sort, query.cursor, initialLayout]);
+  }, [scopeKey, query.cursor, initialLayout]);
   const persist = (next: PipelinePreferences) => {
     setPreferences(next);
     if (!writePipelinePreferences(scopeKey, next, localStorageOrNull()))
@@ -238,6 +244,7 @@ export function RelationshipPipeline({
         : preferences.columns.filter((entry) => entry !== column),
     });
   }
+  // Selection is retained across pages in this exact actor/filter scope.
   const exports = new URLSearchParams();
   for (const [key, value] of Object.entries(query))
     if (key !== "cursor" && key !== "pageSize" && value !== undefined)
@@ -488,6 +495,10 @@ export function RelationshipPipeline({
                       type="checkbox"
                       aria-label={`Select ${row.counterpart.name}`}
                       checked={selected.includes(row.relationshipId)}
+                      disabled={
+                        selected.length >= 200 &&
+                        !selected.includes(row.relationshipId)
+                      }
                       onChange={(event) =>
                         setSelected(
                           event.target.checked

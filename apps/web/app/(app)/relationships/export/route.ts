@@ -29,7 +29,12 @@ export async function GET(request: Request): Promise<Response> {
   const upstream = await fetch(
     `${session.baseUrl.replace(/\/$/, "")}${path}/export?${url.searchParams.toString()}`,
     {
-      headers: { authorization: `Bearer ${session.accessToken}` },
+      headers: {
+        authorization: `Bearer ${session.accessToken}`,
+        ...(session.organisationId === undefined
+          ? {}
+          : { "x-organisation-id": session.organisationId }),
+      },
       cache: "no-store",
     },
   ).catch(() => null);
@@ -38,7 +43,10 @@ export async function GET(request: Request): Promise<Response> {
       "The selected view could not be exported. Reload it and try again.",
       {
         status:
-          upstream?.status === 404 ? 404 : upstream?.status === 400 ? 400 : 502,
+          upstream !== null &&
+          [400, 401, 403, 404, 409, 429, 503].includes(upstream.status)
+            ? upstream.status
+            : 502,
       },
     );
   return new Response(upstream.body, {

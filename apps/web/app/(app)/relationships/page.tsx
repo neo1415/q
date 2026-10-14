@@ -140,6 +140,7 @@ export default async function RelationshipsPage({
           >
             <RelationshipPipeline
               key={pipelineStorageKey(user.authUserId, side, subjectId)}
+              key={pipelineStorageKey(user.authUserId, side, subjectId)}
               scopeKey={pipelineStorageKey(user.authUserId, side, subjectId)}
               side={side}
               data={data}
