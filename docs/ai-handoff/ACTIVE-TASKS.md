@@ -2,7 +2,7 @@
 
 ## Latest continuation priorities
 
-Description90 protectedgreen/promoted72d, rollout/browserproof pending. Claimcapture92/3fe079b0 local149tests+package/staticgatesPASS; roottypes/CI/liveproof pending. Primaryfixnext: exactselected-dossier manifest hydration plus fullsource payload beside600-charreceipt. NoINVQimplementationyet. CanonicalH2pipeline2d9dfa1e/guestexpiry553316c5 next; cloudview/productinventoryWIPs preserved, notnewproductionplatforms. See STATEtop for exactevidence/commands.
+Description90 is deployed72d across four SUCCESS services; fresh description browser proof remains pending. Claim capture PR92/08cacfd4:53 builds, root/API/package types,149 suite tests and40 focused tests PASS; exact CI38601112916 quality still running, database/build/types PASS. No live adherence proof or release. Next primary implementation: exact selected-dossier manifest hydration and full authorized source payload beside the600-character receipt; no investor-Q repair exists yet. Canonical H2 pipeline2d9dfa1e and guest expiry553316c5 follow; cloud-view and product-inventory WIPs are preserved, not release-ready. STATE top supersedes historical task entries below.
 
 ## Current priority — October14, 17:23 WAT
 
