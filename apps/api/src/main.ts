@@ -708,12 +708,14 @@ const wordsReaders =
 
 /**
  * GateQ slice 1: `GATEQ_CONTACT_REQUIRED_FROM`, an ISO instant. A value
- * that does not parse is ignored rather than locking every applicant out.
+ * Explicit overrides must be valid; absence must not disable confirmation.
  */
 function gateqContactRequiredFrom(): string | undefined {
   const raw = process.env["GATEQ_CONTACT_REQUIRED_FROM"]?.trim();
-  if (raw === undefined || raw === "") return undefined;
-  return Number.isNaN(Date.parse(raw)) ? undefined : raw;
+  if (raw === undefined || raw === "") return "2026-10-13T00:00:00.000Z";
+  if (Number.isNaN(Date.parse(raw)))
+    throw new Error("Invalid GateQ contact confirmation boundary");
+  return raw;
 }
 
 const gateqApply =
@@ -753,8 +755,10 @@ const gateqApply =
             level: config.observability.logLevel,
           }),
           turns: applicationTurns,
+          contactCodeSecret: process.env["GATEQ_CONTACT_CODE_SECRET"],
           contacts: createPostgresApplicationContactRepository({
             sql: database.sql,
+            transactions: database.transactions,
           }),
           // Display titles of the documents the founder shared, for the
           // dossier. The same read the inbox uses.

@@ -11,6 +11,7 @@ import {
 
 import {
   GATEQ_NOTE_MAX_CHARS,
+  ApplicationContactDtoSchema,
   type ApplicationContactDto,
   type ApplicationCoverageDto,
   type ApplicationSummaryDto,
@@ -30,6 +31,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import {
+  interviewProgressAction,
   saveAnswersAction,
   startFormAction,
   submitApplicationAction,
@@ -37,6 +39,7 @@ import {
 import { FitGlyph, type GlyphKind } from "../fit-glyph";
 import "../gateq.css";
 import { shareMaterialsAction } from "../materials-actions";
+import { readRecovery, saveRecovery, amendRecovery } from "./session-recovery";
 import { ContactStep } from "./contact-step";
 import {
   answersFromProfile,
@@ -146,6 +149,20 @@ function key(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+async function formRequest<T>(
+  operation: () => Promise<T>,
+): Promise<T | { readonly ok: false; readonly message: string }> {
+  try {
+    return await operation();
+  } catch {
+    return {
+      ok: false,
+      message:
+        "The connection was interrupted. Your saved application is still here; please try again.",
+    };
+  }
+}
+
 export function GateQForm({
   gateway,
   compact = false,
@@ -186,8 +203,77 @@ export function GateQForm({
   const [pending, startTransition] = useTransition();
   const token = useRef<string | null>(null);
   const submitKey = useRef<string>("");
+  const [recovering, setRecovering] = useState(preview === undefined);
+  const [submissionStarted, setSubmissionStarted] = useState(false);
   const heading = useRef<HTMLHeadingElement | null>(null);
   const firstRender = useRef(true);
+
+  useEffect(() => {
+    if (preview !== undefined) return;
+    startTransition(async () => {
+      await Promise.resolve();
+      const restored = readRecovery(gateway.publicId);
+      if (restored === null) {
+        setRecovering(false);
+        return;
+      }
+      token.current = restored.token;
+      setCredential(restored.token);
+      setAnswers(restored.answers);
+      submitKey.current = restored.submitKey;
+      setSubmissionStarted(restored.submitKey !== "");
+      const progress = await formRequest(() =>
+        interviewProgressAction(restored.token),
+      );
+      if (!progress.ok) {
+        setProblem(progress.message);
+        setStep("contact");
+        setRecovering(false);
+        return;
+      }
+      setApplication(progress.application);
+      const details = ApplicationContactDtoSchema.safeParse(
+        Reflect.get(progress.coverage.contact, "details"),
+      );
+      const canonical = details.success
+        ? details.data
+        : (restored.contact ?? null);
+      setContact(
+        canonical === null
+          ? null
+          : {
+              ...canonical,
+              emailConfirmed: progress.coverage.contact.confirmed,
+              confirmedVia: progress.coverage.contact.confirmed
+                ? canonical.confirmedVia
+                : null,
+            },
+      );
+      setStep(
+        progress.application.submittedAt !== null
+          ? "sent"
+          : !progress.coverage.contact.confirmed
+            ? "contact"
+            : restored.interview && restored.step === "check"
+              ? "interview"
+              : restored.step,
+      );
+      setRecovering(false);
+    });
+  }, [gateway.publicId, preview]);
+  useEffect(() => {
+    if (preview !== undefined || recovering || token.current === null) return;
+    const old = readRecovery(gateway.publicId);
+    saveRecovery(gateway.publicId, {
+      token: token.current,
+      answers,
+      step,
+      contact,
+      interview: step === "interview" || step === "review",
+      pendingTurn: old?.pendingTurn ?? null,
+      submitKey: submitKey.current,
+    });
+  }, [answers, step, contact, recovering, gateway.publicId, preview]);
 
   const lines = ruleLines(gateway, application);
   const verdict = verdictFor(application);
@@ -204,19 +290,30 @@ export function GateQForm({
     field: K,
     value: FormAnswers[K],
   ) => {
+    if (submissionStarted && field === "materials") return;
     setAnswers((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
   const ensureToken = async (): Promise<string | null> => {
     if (token.current !== null) return token.current;
-    const started = await startFormAction(gateway.publicId);
+    const started = await formRequest(() => startFormAction(gateway.publicId));
     if (!started.ok) {
       setProblem(started.message);
       return null;
     }
     token.current = started.sessionToken;
     setCredential(started.sessionToken);
+    setApplication(started.application);
+    saveRecovery(gateway.publicId, {
+      token: started.sessionToken,
+      answers,
+      step,
+      interview: false,
+      contact,
+      pendingTurn: null,
+      submitKey: "",
+    });
     return started.sessionToken;
   };
 
@@ -255,9 +352,8 @@ export function GateQForm({
     startTransition(async () => {
       const credential = await ensureToken();
       if (credential === null) return;
-      const saved = await saveAnswersAction(
-        credential,
-        requestFor(step, answers),
+      const saved = await formRequest(() =>
+        saveAnswersAction(credential, requestFor(step, answers)),
       );
       if (!saved.ok) {
         setProblem(saved.message);
@@ -284,24 +380,47 @@ export function GateQForm({
     if (preview !== undefined || step !== "review") return;
     setProblem(null);
     if (submitKey.current === "") submitKey.current = key("send");
+    setSubmissionStarted(true);
+    amendRecovery(gateway.publicId, { submitKey: submitKey.current });
     startTransition(async () => {
       const credential = token.current;
       if (credential === null) return;
+      const resumed = await formRequest(() =>
+        interviewProgressAction(credential),
+      );
+      if (!resumed.ok) {
+        setProblem(resumed.message);
+        return;
+      }
+      if (resumed.application.submittedAt !== null) {
+        setApplication(resumed.application);
+        setStep("sent");
+        return;
+      }
+      if (readRecovery(gateway.publicId)?.pendingTurn != null) {
+        setProblem("Recover your last interview answer before submitting.");
+        setStep("interview");
+        return;
+      }
       if (!anonymous) {
         // Only what the founder ticked (maybe nothing); the API checks each
         // is theirs and links the application to them for their GateQ page.
-        const shared = await shareMaterialsAction(
-          credential,
-          answers.materials,
+        const shared = await formRequest(() =>
+          shareMaterialsAction(credential, answers.materials),
         );
         if (!shared.ok) {
           setProblem(shared.message);
           return;
         }
       }
-      const sent = await submitApplicationAction(credential, submitKey.current);
+      const sent = await formRequest(() =>
+        submitApplicationAction(credential, submitKey.current),
+      );
       if (!sent.ok) {
-        if (sent.contactNotConfirmed === true) {
+        if (
+          "contactNotConfirmed" in sent &&
+          sent.contactNotConfirmed === true
+        ) {
           // 409: back to the contact step; everything else is kept. The
           // refused request recorded nothing, so the next Submit is new.
           submitKey.current = "";
@@ -344,7 +463,7 @@ export function GateQForm({
   const showResults = pastCheck || application !== null;
   const shell = `gq-form${compact ? " gq-compact" : ""}${inApp ? " gq-in-app" : ""}`;
 
-  if (preview?.loading === true) {
+  if (preview?.loading === true || recovering) {
     return (
       <div className={shell} aria-busy="true">
         <div
@@ -604,6 +723,7 @@ export function GateQForm({
             fund={fund}
             companyName={answers.companyName}
             sessionToken={credential}
+            gatewayPublicId={gateway.publicId}
             onFinish={() => setStep("review")}
             onApplication={setApplication}
             preview={
@@ -624,6 +744,7 @@ export function GateQForm({
               .map((m) => m.name)}
             hasNote={answers.note.trim() !== ""}
             pending={pending}
+            submissionStarted={submissionStarted}
             onSubmit={onSubmit}
             onContact={() => setStep("contact")}
             onInterview={() => setStep("interview")}

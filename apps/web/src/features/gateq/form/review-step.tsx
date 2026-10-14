@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type RefObject } from "react";
 
+import { ApplicationContactDtoSchema } from "@capital-q/contracts";
 import type {
   ApplicationContactDto,
   ApplicationCoverageDto,
@@ -48,6 +49,7 @@ export function ReviewStep({
   sharedDocuments,
   hasNote,
   pending,
+  submissionStarted = false,
   onSubmit,
   onContact,
   onInterview,
@@ -61,6 +63,7 @@ export function ReviewStep({
   readonly sharedDocuments: readonly string[];
   readonly hasNote: boolean;
   readonly pending: boolean;
+  readonly submissionStarted?: boolean;
   readonly onSubmit: () => void;
   readonly onContact: () => void;
   readonly onInterview: () => void;
@@ -75,14 +78,19 @@ export function ReviewStep({
   useEffect(() => {
     if (preview !== undefined || sessionToken === null) return;
     let current = true;
-    void coverageAction(sessionToken).then((result) => {
-      if (!current) return;
-      if (!result.ok) {
-        setProblem(result.message);
-        return;
-      }
-      setCoverage(result.coverage);
-    });
+    void coverageAction(sessionToken)
+      .then((result) => {
+        if (!current) return;
+        if (!result.ok) {
+          setProblem(result.message);
+          return;
+        }
+        setCoverage(result.coverage);
+      })
+      .catch(() => {
+        if (current)
+          setProblem("The connection was interrupted. Please try again.");
+      });
     return () => {
       current = false;
     };
@@ -127,6 +135,10 @@ export function ReviewStep({
   }
 
   const c = coverage.coverage;
+  const contactRead = ApplicationContactDtoSchema.safeParse(
+    Reflect.get(coverage.contact, "details"),
+  );
+  const actualContact = contactRead.success ? contactRead.data : contact;
   const contactBlocks =
     coverage.contact.required && !coverage.contact.confirmed;
   const ready = maySubmit(coverage);
@@ -281,14 +293,14 @@ export function ReviewStep({
             <Check {...icon} />
             <span>
               Your contact details
-              {contact === null
+              {actualContact === null
                 ? ""
                 : `: ${[
-                    contact.name,
-                    contact.role,
-                    contact.companyName,
-                    contact.email,
-                    contact.phone,
+                    actualContact.name,
+                    actualContact.role,
+                    actualContact.companyName,
+                    actualContact.email,
+                    actualContact.phone,
                   ]
                     .filter((part) => part !== null && part !== "")
                     .join(", ")}`}
@@ -337,7 +349,11 @@ export function ReviewStep({
       </section>
 
       <div className="gq-formbar">
-        <Button variant="quiet" onClick={onInterview} disabled={pending}>
+        <Button
+          variant="quiet"
+          onClick={onInterview}
+          disabled={pending || submissionStarted}
+        >
           Back to the interview
         </Button>
         <Button

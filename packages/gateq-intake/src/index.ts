@@ -72,7 +72,6 @@ export {
 } from "./application/coverage.js";
 export { buildDossier } from "./application/dossier.js";
 export {
-  contactCodeMatches,
   contactDto,
   CONTACT_CODE_MAX_ATTEMPTS,
   CONTACT_CODE_TTL_MINUTES,

@@ -601,3 +601,56 @@ The cumulative active-speech guard is preserved on pushed `codex/oct13-voice-tri
   4. **Turn reader.** The first attempt sometimes goes to Gemini and is aborted at 2.5 s (seen once, about 6 s lost before the answer started). Watch for it.
   5. **First-audio latency.** Not measured this sprint (no provider-verified browser first-audio stamp). Measure within GPT-Live/duplex with no new paid usage.
 - **NEXT PRIORITY (founder 2026-10-13):** GateQ complete adaptive interview, secure evidence collection and investor-facing dossier; see `session-directives/2026-10-13-gateq-adaptive-interview-and-inbox.txt`. Then the full voice/Tavus experience, then Q Pitch.
+
+## 2026-10-13 21:40 UTC — GateQ text journey integrated; release in CI (Claude, integration owner)
+
+- **MERGED to `build/int-rc`:**
+  - #66 backend (f375202e):
+    - append-only turns and contacts;
+    - the six-digit code verifier (timing-safe, application-salted);
+    - account-confirmed contact;
+    - coverage;
+    - submit v2 plus `GateqDossierV1`, written under one application lock.
+  - #68 web (9612b04e): the contact, interview and review steps, plus the inbox dossier view.
+  - #69 (47d87665): `POST /v1/gateq/apply/interview/open`, so Q asks the first question of a form-started interview.
+    - It is idempotent: an existing transcript is returned with no model call.
+    - The opening is stored once under client turn id `opening`.
+- **Migration** `20261223090000` was already APPLIED (hosted 208, none missing).
+- **RELEASE PR #70** (`claude/gateq-release` → `recovery/2026-09-12`) is in CI.
+  - Its tree equals int-rc 47d87665, plus two production-only files (a takeover transcript and `workforce-acceptance.mjs`).
+  - It is NOT deployed until #70 merges and Railway reports SUCCESS.
+- **#67 Q Pitch foundations:** the IMPLEMENTATION_STATUS add/add conflict was resolved to the branch side (c36864d9); CI is running. It is package-only and not in the release.
+- **LIVE ACCEPTANCE (not yet run):** `scripts/handoff/live/gateq-acceptance.mjs` covers:
+  - fictional founder → fictional investor gateway;
+  - account contact → answers → open → 3 timed turns (plus a dedup retry) → coverage → submit (plus a dedup retry);
+  - inbox holds exactly one item with dossier and transcript;
+  - a second fictional investor gets a 404.
+  - Needs `CQ_SB_URL` and `CQ_SB_PUBLISHABLE` (public sign-in config), `CQ_SEED_ACCOUNT_PASSWORD` and `NODE_USE_ENV_PROXY=1`.
+- **BLOCKERS:**
+  - This session's `SUPABASE_ACCESS_TOKEN` is rejected (401 "Invalid access token"), so no hosted SQL reads or migrations are possible.
+  - The public Supabase URL and publishable key are not in this environment.
+- **OPEN GATEQ GAPS:**
+  - guest document uploads (ADR 0067, required for full acceptance);
+  - the nonbinding Q synthesis record (dossier `synthesis` is null);
+  - quick answers ("I don't know" / "I'd rather not say") are sent as text;
+  - the guest token lives in memory only;
+  - `GATEQ_CONTACT_REQUIRED_FROM` is unset until live acceptance passes.
+
+## GateQ shared contact limits and evidence labels — 2026-10-14
+
+- IMPLEMENTED / LOCAL TESTED: transactional server-owned contact issue/verify budgets across application, intake session and keyed destination; resend preserves attempts within the hourly window. Parallel wrong-code attempts stop at five. New application interviews require confirmed contact before any paid model call; resume reuses the saved Q opening. Existing confirmed contacts remain usable.
+- Q cannot promote a new applicant claim to document-supported without an existing authorized document-supported fact. Coverage now returns the owner-authorized contact details for review recovery, never verifier fields.
+- All52 package builds and102 GateQ tests PASS. Changed-source lint produced no diagnostics; root combined type gate pending. New immutable migration20261223110000 and seven pgTAP assertions plus schema inventory guards are implemented but not CI tested or hosted. Existing Brevo sender configuration checked; dedicated API-only verifier secret still unbound. Not deployed or browser accepted.
+- Founder flow and immutable investor dossier UI are pushed on the isolated frontend branch; integrating next. Selected application comparison is in progress there. Guest Evidence integration, immutable source versions, investor Q source access and follow-ups remain incomplete; see GATEQ-V1-CAPABILITIES.md. Q Pitch untouched.
+
+## GateQ reconciliation and release preparation — 2026-10-14
+
+- Integration advanced to f49e8c84 and production to20cb347e while the environment was paused. Railway API metadata now confirms20cb347e/SUCCESS; this is the previously released text journey, not the current repair. Normal merge reconciliation in progress, preserving contact-first form, authoritative Q opening, dossier fact/turn lineage and latency instrumentation. Q Pitch incoming ancestry is preserved without edits or ownership changes.
+- LOCAL TESTED:122 tests/10files PASS after reconciling stricter contact and submission behavior. Concurrent openings now use the same durable claim/checkpoint/finalization path as answers, with no invented applicant utterance. Frozen investor Q summaries now include actual interview findings, source references and evidence labels rather than only the old form. Findings context is bounded and omissions disclosed; no extra model call or document-reading claim.
+- Dedicated GATEQ_CONTACT_CODE_SECRET generated privately and bound to API only with skipDeploys:true. Readback confirms present; existing Brevo HTTPS sender configured. No secret value in Git/logs, no deployment triggered. Default contact-required boundary remains code-owned, not disabled by missing configuration.
+- PR72 opened against build/int-rc; conflicts with newer shared GateQ work are being reconciled before protected CI. Guest uploads/exact document-version disclosure/investor source access and follow-ups remain incomplete. New migrations231000/231100 not CI tested/applied. Latest local frontend53tests passed before reconciliation; repeat combined gates required after source merge. No new live acceptance claimed.
+
+## GateQ exact-head CI correction — 2026-10-14
+
+- Reconciled source checkpoint336cf8c4 pushed in PR72. Local53 package builds PASS;122 domain tests PASS. Combined UI suite67tests ran:65PASS and2 legacy/display mismatches, then corrected actual legacy transcript display and test labels; affected inbox + intake rerun42tests PASS. Founder contact-first/recovery, comparison and dossier source assertions remain intact.
+- Protected CI run38504152785 on336cf8c4: build and format/lint PASS; GitGuardian PASS. Database failed solely the strict inventory array's alphabetical order; all new claim/contact pgTAP suites passed. Typecheck failed a duplicate applications.lock property introduced by automatic fixture merge. Both corrected without weakening gates; fresh exact-head CI required. Current local root/API/web gates still completing. No hosted migration or new deployment.

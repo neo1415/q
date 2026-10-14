@@ -1,6 +1,7 @@
 import type * as Crypto from "node:crypto";
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 
+import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
 // The real primitive, observed: the code check must go through Node's
@@ -19,11 +20,13 @@ import {
   type PublicGateway,
 } from "@capital-q/gateq";
 import {
+  ApplicationTranscriptTurnDtoSchema,
   GateqDossierV1Schema,
   GateqCoverageV1Schema,
 } from "@capital-q/contracts";
 
 import {
+  ApplicationViewSchema,
   IntakeRefusedError,
   type Application,
   type ApplicationFact,
@@ -40,7 +43,12 @@ import type {
   InterviewTurnInput,
   InterviewTurnOutcome,
 } from "../src/application/interviewer.js";
-import type { StoredContact, StoredTurn } from "../src/application/ports.js";
+import type {
+  ApplicationContactRepository,
+  ApplicationTurnRepository,
+  StoredContact,
+  StoredTurn,
+} from "../src/application/ports.js";
 
 /**
  * GateQ slice 1 over an in-memory store: the durable interview, the
@@ -136,7 +144,9 @@ const QUALIFYING: readonly NewApplicationFact[] = [
 
 type Scripted = Partial<InterviewTurnOutcome>;
 
-function world(options: { contactRequiredFrom?: string } = {}) {
+function world(
+  options: { contactRequiredFrom?: string; contactCodeSecret?: string } = {},
+) {
   let now = NOW;
   const policy = policyOf([GEO, STAGE]);
   const applications = new Map<string, Application>();
@@ -201,7 +211,70 @@ function world(options: { contactRequiredFrom?: string } = {}) {
     txReleases.get(tx)?.push(release);
   };
 
-  const turns = {
+  const claims = new Map<
+    string,
+    { id: string | null; turnId: string; outcome: unknown }
+  >();
+  const turns: ApplicationTurnRepository = {
+    claimExchange: async (
+      input: Parameters<ApplicationTurnRepository["claimExchange"]>[0],
+    ) => {
+      const prior = claims.get(input.applicationId);
+      const person = turnRows.find(
+        (row) =>
+          row.applicationId === input.applicationId &&
+          row.clientTurnId === input.clientTurnId &&
+          row.role === "PERSON",
+      );
+      if (person !== undefined && person.text !== input.text)
+        throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+      if (
+        prior !== undefined &&
+        (prior.id !== null || prior.turnId !== input.clientTurnId)
+      )
+        throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+      const id = randomUUID();
+      claims.set(input.applicationId, {
+        id,
+        turnId: input.clientTurnId,
+        outcome: prior?.outcome ?? null,
+      });
+      if (input.recordPerson !== false)
+        await turns.append({ ...input, role: "PERSON" });
+      return id;
+    },
+    readOutcome: (applicationId: string) =>
+      Promise.resolve(claims.get(applicationId)?.outcome ?? null),
+    checkpointOutcome: (
+      applicationId: string,
+      _claimId: string,
+      outcome: unknown,
+    ) => {
+      return Promise.resolve().then(() => {
+        const claim = claims.get(applicationId);
+        if (claim !== undefined)
+          claims.set(applicationId, { ...claim, outcome });
+      });
+    },
+    assertClaim: (_tx: unknown, applicationId: string, id: string) =>
+      Promise.resolve(claims.get(applicationId)?.id === id),
+    releaseExchange: (applicationId: string, id: string) => {
+      return Promise.resolve().then(() => {
+        const claim = claims.get(applicationId);
+        if (claim?.id === id) claims.set(applicationId, { ...claim, id: null });
+      });
+    },
+    finishExchange: (_tx: unknown, applicationId: string, id: string) => {
+      return Promise.resolve().then(() => {
+        if (claims.get(applicationId)?.id === id) claims.delete(applicationId);
+      });
+    },
+    pendingFor: (applicationId: string) =>
+      Promise.resolve(claims.has(applicationId)),
+    appendInTransaction: (
+      _tx: unknown,
+      input: Parameters<ApplicationTurnRepository["append"]>[0],
+    ) => turns.append(input).then(() => undefined),
     listFor: (applicationId: string, limit?: number) => {
       const rows = turnRows
         .filter((row) => row.applicationId === applicationId)
@@ -270,47 +343,107 @@ function world(options: { contactRequiredFrom?: string } = {}) {
       ),
   };
 
-  const contacts = {
+  const contactWindows = new Map<string, number>();
+  const buckets = new Map<string, { start: number; count: number }>();
+  const consume = (keys: readonly { key: string; limit: number }[]) => {
+    for (const item of keys) {
+      const bucket = buckets.get(item.key);
+      if (
+        bucket !== undefined &&
+        now.getTime() - bucket.start < 3600_000 &&
+        bucket.count >= item.limit
+      )
+        throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+    }
+    for (const item of keys) {
+      const bucket = buckets.get(item.key);
+      buckets.set(item.key, {
+        start:
+          bucket === undefined || now.getTime() - bucket.start >= 3600_000
+            ? now.getTime()
+            : bucket.start,
+        count:
+          bucket === undefined || now.getTime() - bucket.start >= 3600_000
+            ? 1
+            : bucket.count + 1,
+      });
+    }
+  };
+  const contacts: ApplicationContactRepository = {
+    issue: (input) =>
+      Promise.resolve().then(async () => {
+        const existing = contactRows.get(input.applicationId);
+        if (
+          existing !== undefined &&
+          existing.codeAttempts >= input.maximumAttempts &&
+          now.getTime() - (contactWindows.get(input.applicationId) ?? 0) <
+            3600_000
+        )
+          throw new IntakeRefusedError("TOO_MANY_REQUESTS");
+        consume([
+          { key: `send-app:${input.applicationId}`, limit: 5 },
+          { key: `send-session:${input.sessionId}`, limit: 5 },
+          { key: `send-destination:${input.destinationHash}`, limit: 10 },
+        ]);
+        return await contacts.save(input);
+      }),
+    verify: (input) =>
+      Promise.resolve().then(() => {
+        const contact = contactRows.get(input.applicationId);
+        if (contact === undefined)
+          return { status: "NOT_FOUND" as const, contact: null };
+        if (contact.emailConfirmedAt !== null)
+          return { status: "CONFIRMED" as const, contact };
+        if (
+          contact.codeHash !== input.expectedCodeHash ||
+          contact.codeExpiresAt === null ||
+          Date.parse(contact.codeExpiresAt) <= now.getTime() ||
+          contact.codeAttempts >= input.maximumAttempts
+        )
+          return { status: "EXPIRED" as const, contact };
+        try {
+          consume([
+            { key: `verify-app:${input.applicationId}`, limit: 5 },
+            { key: `verify-session:${input.sessionId}`, limit: 5 },
+            { key: `verify-destination:${input.destinationHash}`, limit: 20 },
+          ]);
+        } catch {
+          return { status: "EXPIRED" as const, contact };
+        }
+        const valid = contact.codeHash === input.candidateHash;
+        const updated = {
+          ...contact,
+          codeAttempts: contact.codeAttempts + 1,
+          emailConfirmedAt: valid ? input.at : null,
+          confirmedVia: valid ? ("EMAIL_CODE" as const) : null,
+          codeHash: valid ? null : contact.codeHash,
+          codeExpiresAt: valid ? null : contact.codeExpiresAt,
+        };
+        contactRows.set(input.applicationId, updated);
+        return {
+          status: valid ? ("CONFIRMED" as const) : ("WRONG_CODE" as const),
+          contact: updated,
+        };
+      }),
     findFor: (applicationId: string) =>
       Promise.resolve(contactRows.get(applicationId) ?? null),
     save: (
-      _tx: unknown,
       input: Omit<StoredContact, "codeAttempts"> & { tenantId: string },
     ) => {
       const { tenantId: _tenant, ...rest } = input;
-      const row: StoredContact = { ...rest, codeAttempts: 0 };
+      const existing = contactRows.get(input.applicationId);
+      const expired =
+        now.getTime() - (contactWindows.get(input.applicationId) ?? 0) >=
+        3600_000;
+      if (existing === undefined || expired)
+        contactWindows.set(input.applicationId, now.getTime());
+      const row: StoredContact = {
+        ...rest,
+        codeAttempts:
+          existing === undefined || expired ? 0 : existing.codeAttempts,
+      };
       contactRows.set(input.applicationId, row);
       return Promise.resolve(row);
-    },
-    recordFailedAttempt: (_tx: unknown, applicationId: string) => {
-      const row = contactRows.get(applicationId);
-      if (row !== undefined) {
-        contactRows.set(applicationId, {
-          ...row,
-          codeAttempts: row.codeAttempts + 1,
-        });
-      }
-      return Promise.resolve();
-    },
-    confirm: (
-      _tx: unknown,
-      input: {
-        applicationId: string;
-        at: string;
-        via: "EMAIL_CODE" | "ACCOUNT";
-      },
-    ) => {
-      const row = contactRows.get(input.applicationId);
-      if (row === undefined) return Promise.resolve(null);
-      const next: StoredContact = {
-        ...row,
-        emailConfirmedAt: input.at,
-        confirmedVia: input.via,
-        codeHash: null,
-        codeExpiresAt: null,
-      };
-      contactRows.set(input.applicationId, next);
-      return Promise.resolve(next);
     },
   };
 
@@ -473,6 +606,8 @@ function world(options: { contactRequiredFrom?: string } = {}) {
     clock: () => now,
     turns: turns,
     contacts: contacts,
+    contactCodeSecret:
+      options.contactCodeSecret ?? "test-only-contact-verifier-secret-32-bytes",
     documentTitles: {
       titles: (ids) =>
         Promise.resolve(new Map(ids.map((id) => [id, "Pitch deck"]))),
@@ -544,6 +679,7 @@ function world(options: { contactRequiredFrom?: string } = {}) {
     applications,
     factRows,
     turnRows,
+    turns,
     contactRows,
     submissions,
     mailed,
@@ -564,6 +700,109 @@ const CONTACT = {
 };
 
 describe("the interview transcript", () => {
+  it("does not spend on a new interview before required contact confirmation", async () => {
+    const w = world({ contactRequiredFrom: NOW.toISOString() });
+    const { token } = await w.start();
+    const opening = await w.conversation.openingFor({
+      token,
+      correlationId: "unconfirmed-opening",
+    });
+    expect(opening).toContain("confirm your contact");
+    await expect(
+      w.conversation.turn({
+        token,
+        message: "We build payment rails.",
+        clientTurnId: "unconfirmed-turn",
+        correlationId: "unconfirmed-turn",
+      }),
+    ).rejects.toMatchObject({ refusal: "CONTACT_NOT_CONFIRMED" });
+    expect(w.interviewer.turn).not.toHaveBeenCalled();
+    expect(w.turnRows).toHaveLength(0);
+    await w.intake.startContact({ token, contact: CONTACT });
+    await w.intake.confirmContact({ token, code: w.mailed[0]?.code ?? "" });
+    await w.conversation.turn({
+      token,
+      message: "We build payment rails.",
+      clientTurnId: "confirmed-turn",
+      correlationId: "confirmed-turn",
+    });
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks submission during the final model turn, then freezes its facts and complete transcript", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.recordFacts({ token, facts: QUALIFYING });
+    let release: ((outcome: InterviewTurnOutcome) => void) | undefined;
+    const result = new Promise<InterviewTurnOutcome>((resolve) => {
+      release = resolve;
+    });
+    w.interviewer.turn.mockImplementationOnce(() => result);
+    const running = w.conversation.turn({
+      token,
+      message: "Annual revenue is $100k.",
+      clientTurnId: "final-turn",
+      correlationId: "final-turn",
+    });
+    await vi.waitFor(() => expect(w.interviewer.turn).toHaveBeenCalledTimes(1));
+    await expect(
+      w.intake.submit({ token, clientRequestId: "submit-final" }),
+    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    expect(w.submissions).toHaveLength(0);
+    if (release === undefined) throw new Error("model not started");
+    release({
+      reply: "Thank you. Please review your disclosure.",
+      intent: "ANSWER",
+      facts: [
+        fact("claims.revenue", { kind: "TEXT", text: "$100k annual revenue" }),
+      ],
+      rejectedFacts: 0,
+      asking: null,
+      questionForQ: null,
+      readyToReview: true,
+    });
+    await running;
+    await w.intake.submit({ token, clientRequestId: "submit-final" });
+    expect(w.submissions).toHaveLength(1);
+    const frozen = z
+      .object({
+        facts: ApplicationViewSchema.shape.facts,
+        transcript: z.array(ApplicationTranscriptTurnDtoSchema),
+      })
+      .parse(w.submissions[0]?.snapshot);
+    expect(
+      frozen.facts.find((item) => item.dimension === "claims.revenue")?.value,
+    ).toEqual({ kind: "TEXT", text: "$100k annual revenue" });
+    expect(frozen.transcript.map((item) => item.role)).toEqual(["PERSON", "Q"]);
+    expect(frozen.transcript[1]?.text).toBe(
+      "Thank you. Please review your disclosure.",
+    );
+  });
+
+  it("reuses a checkpointed model reply when finalization fails, without another model call", async () => {
+    const w = world();
+    const { token } = await w.start();
+    vi.spyOn(w.turns, "appendInTransaction").mockRejectedValueOnce(
+      new Error("temporary write failure"),
+    );
+    const input = {
+      token,
+      message: "We sell to banks.",
+      clientTurnId: "recover-turn",
+      correlationId: "recover-turn",
+    };
+    await expect(w.conversation.turn(input)).rejects.toThrow(
+      "temporary write failure",
+    );
+    await w.conversation.turn(input);
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+    expect(w.turnRows.map((turn) => turn.role)).toEqual(["PERSON", "Q"]);
+    await expect(
+      w.conversation.turn({ ...input, message: "We sell to schools instead." }),
+    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+  });
+
   it("stores both sides of a turn, in order", async () => {
     const w = world();
     const { token } = await w.start();
@@ -635,6 +874,31 @@ describe("the interview transcript", () => {
     await w.conversation.openingFor({ token, correlationId: "c1" });
     await w.conversation.openingFor({ token, correlationId: "c2" });
     expect(w.turnRows.filter((t) => t.role === "Q")).toHaveLength(1);
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+  });
+  it("claims concurrent opening requests before spending and records no invented applicant turn", async () => {
+    const w = world();
+    const { token } = await w.start();
+    let release: (() => void) | undefined;
+    w.holds.push(
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const first = w.conversation.openingFor({
+      token,
+      correlationId: "opening-first",
+    });
+    await vi.waitFor(() => expect(w.interviewer.turn).toHaveBeenCalledTimes(1));
+    await expect(
+      w.conversation.openingFor({ token, correlationId: "opening-second" }),
+    ).rejects.toMatchObject({ refusal: "TOO_MANY_REQUESTS" });
+    if (!release) throw new Error("opening model not started");
+    release();
+    await first;
+    await w.conversation.openingFor({ token, correlationId: "opening-resume" });
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
+    expect(w.turnRows.map((turn) => turn.role)).toEqual(["Q"]);
   });
 });
 
@@ -795,6 +1059,117 @@ describe("coverage", () => {
 });
 
 describe("the applicant contact", () => {
+  it("keeps failed attempts across resend and refuses another challenge after the budget is spent", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    await w.intake.confirmContact({ token, code: "000000" });
+    await w.intake.startContact({ token, contact: CONTACT });
+    expect([...w.contactRows.values()][0]?.codeAttempts).toBe(1);
+    for (let i = 0; i < 4; i += 1)
+      await w.intake.confirmContact({ token, code: "000000" });
+    expect(
+      (
+        await w.intake.confirmContact({
+          token,
+          code: w.mailed.at(-1)?.code ?? "",
+        })
+      ).status,
+    ).toBe("EXPIRED");
+    await expect(
+      w.intake.startContact({ token, contact: CONTACT }),
+    ).rejects.toMatchObject({ refusal: "TOO_MANY_REQUESTS" });
+    expect(w.mailed).toHaveLength(2);
+  });
+  it("serializes concurrent verification attempts at the effective budget", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    const attempts = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        w.intake.confirmContact({ token, code: "000000" }),
+      ),
+    );
+    expect(
+      attempts.filter((item) => item.status === "WRONG_CODE"),
+    ).toHaveLength(5);
+    expect(attempts.filter((item) => item.status === "EXPIRED")).toHaveLength(
+      7,
+    );
+    expect([...w.contactRows.values()][0]?.codeAttempts).toBe(5);
+  });
+  it("bounds issuance to the same destination across distinct application sessions", async () => {
+    const w = world();
+    for (let i = 0; i < 10; i += 1) {
+      const { token } = await w.start();
+      await w.intake.startContact({ token, contact: CONTACT });
+    }
+    const { token } = await w.start();
+    await expect(
+      w.intake.startContact({ token, contact: CONTACT }),
+    ).rejects.toMatchObject({ refusal: "TOO_MANY_REQUESTS" });
+    expect(w.mailed).toHaveLength(10);
+  });
+  it("allows a fresh verification window without resends extending the old abuse allowance", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    for (let i = 0; i < 5; i += 1)
+      await w.intake.confirmContact({ token, code: "000000" });
+    w.setNow(new Date(NOW.getTime() + 61 * 60_000));
+    await w.intake.startContact({ token, contact: CONTACT });
+    expect(
+      (
+        await w.intake.confirmContact({
+          token,
+          code: w.mailed.at(-1)?.code ?? "",
+        })
+      ).status,
+    ).toBe("CONFIRMED");
+  });
+
+  it("does not store an offline-enumerable legacy verifier or accept it after recovery", async () => {
+    const w = world();
+    const { token } = await w.start();
+    await w.intake.startContact({ token, contact: CONTACT });
+    const entry = [...w.contactRows.entries()][0];
+    expect(entry).toBeDefined();
+    if (entry === undefined) throw new Error("missing contact fixture");
+    const [applicationId, contact] = entry;
+    const code = w.mailed[0]?.code ?? "";
+    const legacy = createHash("sha256")
+      .update(`gateq-contact-code:${applicationId}:${code}`)
+      .digest("hex");
+    expect(contact.codeHash).not.toBe(legacy);
+    w.contactRows.set(applicationId, { ...contact, codeHash: legacy });
+    expect((await w.intake.confirmContact({ token, code })).status).toBe(
+      "WRONG_CODE",
+    );
+  });
+
+  it("refuses code issuance with an absent or weak verifier secret before sending mail", async () => {
+    const w = world({ contactCodeSecret: "" });
+    const { token } = await w.start();
+    await expect(
+      w.intake.startContact({ token, contact: CONTACT }),
+    ).rejects.toThrow("not configured");
+    expect(w.contactRows.size).toBe(0);
+    expect(w.mailed).toHaveLength(0);
+  });
+
+  it("keeps verified-account contact confirmation available without a code secret", async () => {
+    const w = world({ contactCodeSecret: "" });
+    const { token } = await w.start();
+    const result = await w.intake.startContact({
+      token,
+      contact: CONTACT,
+      accountEmail: CONTACT.email,
+    });
+    expect(result.contact.emailConfirmed).toBe(true);
+    expect(result.codeSent).toBe(false);
+    expect(w.mailed).toHaveLength(0);
+  });
+
   it("is confirmed by the code that was mailed, and only that code", async () => {
     const w = world();
     const { token } = await w.start();
@@ -811,6 +1186,10 @@ describe("the applicant contact", () => {
     const right = await w.intake.confirmContact({ token, code });
     expect(right.status).toBe("CONFIRMED");
     expect(right.contact?.confirmedVia).toBe("EMAIL_CODE");
+    expect([...w.contactRows.values()][0]?.codeHash).toBeNull();
+    expect((await w.intake.confirmContact({ token, code })).status).toBe(
+      "CONFIRMED",
+    );
   });
 
   it("expires after its time", async () => {
@@ -843,6 +1222,10 @@ describe("the applicant contact", () => {
     const a = await w.start();
     const b = await w.start();
     await w.intake.startContact({ token: a.token, contact: CONTACT });
+    await w.intake.confirmContact({
+      token: a.token,
+      code: w.mailed[0]?.code ?? "",
+    });
     await w.intake.startContact({ token: b.token, contact: CONTACT });
     const aCode = w.mailed[0]?.code ?? "";
     expect(
@@ -906,6 +1289,7 @@ describe("submission v2", () => {
     expect((await w.intake.coverage(token)).contact).toEqual({
       required: true,
       confirmed: false,
+      details: null,
     });
   });
 
@@ -1109,7 +1493,7 @@ describe("review: the six-digit email code", () => {
     );
   });
 
-  it("a resend replaces the code: the old one stops working and attempts restart", async () => {
+  it("a resend replaces the code without resetting the attempt budget", async () => {
     const w = world();
     const { token } = await w.start();
     await w.intake.startContact({ token, contact: CONTACT });
@@ -1126,7 +1510,10 @@ describe("review: the six-digit email code", () => {
     );
     expect(
       (await w.intake.confirmContact({ token, code: second })).status,
-    ).toBe("CONFIRMED");
+    ).toBe("EXPIRED");
+    expect(w.contactRows.values().next().value?.codeAttempts).toBe(
+      CONTACT_CODE_MAX_ATTEMPTS,
+    );
   });
 });
 
@@ -1159,6 +1546,14 @@ describe("review: one application never reaches another", () => {
     const b = await w.start();
     await w.intake.recordFacts({ token: a.token, facts: QUALIFYING });
     await w.intake.startContact({ token: a.token, contact: CONTACT });
+    expect(
+      (
+        await w.intake.confirmContact({
+          token: a.token,
+          code: w.mailed[0]?.code ?? "",
+        })
+      ).status,
+    ).toBe("CONFIRMED");
     w.script.push({ reply: "A only." });
     await w.conversation.turn({
       token: a.token,
@@ -1217,22 +1612,32 @@ describe("review: races", () => {
     await vi.waitFor(() => {
       expect(w.seen).toHaveLength(1);
     });
-    await w.intake.submit({ token, clientRequestId: "req-000000000001" });
+    await expect(
+      w.intake.submit({ token, clientRequestId: "req-000000000001" }),
+    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    expect(w.submissions).toHaveLength(0);
     release();
-    await expect(turn).rejects.toMatchObject({ refusal: "ALREADY_SUBMITTED" });
-
+    await turn;
+    await w.intake.submit({ token, clientRequestId: "req-000000000001" });
     expect(w.submissions).toHaveLength(1);
-    // The person's line was on the record before Submit took the lock, so
-    // it is in what the investor received; Q's reply and the fact are not
-    // anywhere, because they arrived after.
-    expect(w.turnRows.map((t) => t.role)).toEqual(["PERSON"]);
-    expect(w.factRows.some((f) => f.dimension === "company.team")).toBe(false);
+    expect(w.turnRows.map((t) => t.role)).toEqual(["PERSON", "Q"]);
+    expect(w.factRows.some((f) => f.dimension === "company.team")).toBe(true);
     const row = w.submissions[0];
     const snapshot = row?.snapshot as { transcript: unknown[] };
-    expect(snapshot.transcript).toHaveLength(1);
+    expect(snapshot.transcript).toHaveLength(2);
     expect(GateqDossierV1Schema.parse(row?.dossier).transcript.turnCount).toBe(
-      1,
+      2,
     );
+    await expect(
+      w.conversation.turn({
+        token,
+        message: "Too late",
+        clientTurnId: "after-submit",
+        correlationId: "late",
+      }),
+    ).rejects.toMatchObject({ refusal: "ALREADY_SUBMITTED" });
+    expect(w.turnRows).toHaveLength(2);
+    expect(w.interviewer.turn).toHaveBeenCalledTimes(1);
   });
 
   it("two concurrent Submits with one key make one submission", async () => {
@@ -1335,10 +1740,12 @@ describe("review: retries are idempotent", () => {
     await w.intake.startContact({ token, contact: CONTACT });
     const code = w.mailed[0]?.code ?? "";
     await w.intake.confirmContact({ token, code });
+    const attempts = w.contactRows.values().next().value?.codeAttempts;
+    expect(attempts).toBe(1);
     expect((await w.intake.confirmContact({ token, code })).status).toBe(
       "CONFIRMED",
     );
-    expect(w.contactRows.values().next().value?.codeAttempts).toBe(0);
+    expect(w.contactRows.values().next().value?.codeAttempts).toBe(attempts);
   });
 });
 

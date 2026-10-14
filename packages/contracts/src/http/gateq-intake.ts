@@ -501,6 +501,8 @@ export const ApplicationCoverageDtoSchema = z
         /** False only for an application that may still submit without one. */
         required: z.boolean(),
         confirmed: z.boolean(),
+        /** Own scoped contact, never verification secrets; older responses may omit it. */
+        details: ApplicationContactDtoSchema.nullable().optional(),
       })
       .strict(),
     documentCount: z.number().int().min(0),

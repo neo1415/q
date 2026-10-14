@@ -18,7 +18,12 @@ import {
 } from "@capital-q/ui/icons";
 
 import { ChatComposer, ChatTranscript } from "../apply-experience";
-import { applicationTurnAction, openInterviewAction } from "../apply-actions";
+import {
+  applicationTurnAction,
+  openInterviewAction,
+  transcriptAction,
+} from "../apply-actions";
+import { readRecovery, amendRecovery } from "./session-recovery";
 import {
   latestQuestion,
   linesFromTranscript,
@@ -61,6 +66,7 @@ export function InterviewStep({
   fund,
   companyName,
   sessionToken,
+  gatewayPublicId,
   onFinish,
   onApplication,
   preview,
@@ -69,6 +75,7 @@ export function InterviewStep({
   readonly fund: string;
   readonly companyName: string;
   readonly sessionToken: string | null;
+  readonly gatewayPublicId?: string | undefined;
   readonly onFinish: () => void;
   /** GATE-001's answer after each turn, for the rules card. */
   readonly onApplication?: (application: ApplicationSummaryDto) => void;
@@ -94,19 +101,39 @@ export function InterviewStep({
   useEffect(() => {
     if (preview !== undefined || sessionToken === null) return;
     let current = true;
-    void openInterviewAction(sessionToken).then((result) => {
-      if (!current) return;
-      if (!result.ok) {
-        setProblem(result.message);
-        return;
-      }
-      setLines(linesFromTranscript(result.turns));
-      setLoaded(true);
-    });
+    const held =
+      gatewayPublicId === undefined
+        ? null
+        : (readRecovery(gatewayPublicId)?.pendingTurn ?? null);
+    void (
+      held === null
+        ? openInterviewAction(sessionToken)
+        : transcriptAction(sessionToken)
+    )
+      .then((result) => {
+        if (!current) return;
+        if (held !== null) setUnsent(held);
+        if (!result.ok) {
+          setProblem(result.message);
+          return;
+        }
+        setLines(linesFromTranscript(result.turns));
+        setLoaded(true);
+        if (held !== null) {
+          setUnsent(held);
+          setProblem(
+            "Your last answer needs confirmation. Retry to recover Q’s reply.",
+          );
+        }
+      })
+      .catch(() => {
+        if (current)
+          setProblem("The connection was interrupted. Please try again.");
+      });
     return () => {
       current = false;
     };
-  }, [sessionToken, preview, reads]);
+  }, [sessionToken, preview, reads, gatewayPublicId]);
 
   const sendTurn = (turn: Turn) => {
     if (sessionToken === null) return;
@@ -116,16 +143,27 @@ export function InterviewStep({
         sessionToken,
         turn.text,
         turn.id,
-      );
+      ).catch(() => ({
+        ok: false as const,
+        message:
+          "The connection was interrupted. Your answer is still here; please try again.",
+      }));
       if (!result.ok) {
         setProblem(result.message);
         return;
       }
       setUnsent(null);
+      if (gatewayPublicId !== undefined)
+        amendRecovery(gatewayPublicId, { pendingTurn: null });
       onApplication?.(result.application);
-      const reply = result.reply;
-      if (reply !== null && reply !== "") {
-        setLines((current) => [...current, { from: "Q", text: reply }]);
+      const transcript = await transcriptAction(sessionToken).catch(() => ({
+        ok: false as const,
+        message: "Couldn't restore Q's reply. Please try again.",
+      }));
+      if (transcript.ok) setLines(linesFromTranscript(transcript.turns));
+      else {
+        setProblem(transcript.message);
+        setLoaded(false);
       }
       requestAnimationFrame(() =>
         end.current?.scrollIntoView({ block: "end" }),
@@ -140,6 +178,8 @@ export function InterviewStep({
     if (unsent !== null) return;
     const turn = { id: turnId(), text };
     setUnsent(turn);
+    if (gatewayPublicId !== undefined)
+      amendRecovery(gatewayPublicId, { pendingTurn: turn });
     setDraft("");
     setLines((current) => [...current, { from: "YOU", text }]);
     sendTurn(turn);
@@ -175,7 +215,11 @@ export function InterviewStep({
           <Button variant="primary" onClick={resume}>
             Resume the interview
           </Button>
-          <Button variant="quiet" onClick={onFinish}>
+          <Button
+            variant="quiet"
+            onClick={onFinish}
+            disabled={unsent !== null || !loaded}
+          >
             Review instead
           </Button>
         </div>
@@ -282,7 +326,7 @@ export function InterviewStep({
           variant="primary"
           style={{ minWidth: 160 }}
           onClick={onFinish}
-          disabled={pending}
+          disabled={pending || unsent !== null || !loaded}
         >
           {answered ? "Finish and review" : "Skip to review"}
         </Button>
