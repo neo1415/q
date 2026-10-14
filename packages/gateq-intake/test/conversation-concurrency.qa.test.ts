@@ -160,6 +160,7 @@ function exchangeWorld() {
           clientTurnId: input.clientTurnId,
           askingDimension: input.asking,
           intent: input.intent,
+          latencyMs: null,
           createdAt: "2026-10-13T12:00:00.000Z",
         });
         activeClaim = null;
@@ -216,6 +217,7 @@ function exchangeWorld() {
               clientTurnId: input.clientTurnId,
               askingDimension: null,
               intent: null,
+              latencyMs: null,
               createdAt: at,
             });
           return activeClaim;
@@ -245,14 +247,12 @@ function exchangeWorld() {
         }),
       append: (input: Parameters<ApplicationTurnRepository["append"]>[0]) => {
         return Promise.resolve().then(() => {
-          if (
-            rows.some(
-              (row) =>
-                row.clientTurnId === input.clientTurnId &&
-                row.role === input.role,
-            )
-          )
-            return;
+          const existing = rows.find(
+            (row) =>
+              row.clientTurnId === input.clientTurnId &&
+              row.role === input.role,
+          );
+          if (existing) return { seq: existing.seq };
           rows.push({
             seq: rows.length + 1,
             role: input.role,
@@ -260,8 +260,10 @@ function exchangeWorld() {
             clientTurnId: input.clientTurnId,
             askingDimension: input.askingDimension ?? null,
             intent: input.intent ?? null,
+            latencyMs: input.latencyMs ?? null,
             createdAt: "2026-10-13T12:00:00.000Z",
           });
+          return { seq: rows.length };
         });
       },
     },

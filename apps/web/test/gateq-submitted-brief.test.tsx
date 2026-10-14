@@ -92,6 +92,8 @@ const dossier: GateqDossierV1 = {
       label: "Traction",
       facts: [
         {
+          sourceFactId: id(501),
+          sourceTurnSeq: null,
           dimension: "REVENUE",
           label: "Revenue",
           summary: "120 paying customers",
@@ -100,6 +102,8 @@ const dossier: GateqDossierV1 = {
           evidenceStatus: "DOCUMENT_SUPPORTED",
         },
         {
+          sourceFactId: id(502),
+          sourceTurnSeq: null,
           dimension: "GROWTH",
           label: "Growth",
           summary: "Growth is estimated at 10%",

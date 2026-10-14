@@ -1,4 +1,9 @@
-import { createHmac, randomInt, randomUUID } from "node:crypto";
+import {
+  createHmac,
+  randomInt,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 
 import {
   ApplicationContactDtoSchema,
@@ -159,6 +164,7 @@ export function transcriptDto(
     role: turn.role,
     text: turn.text,
     at: turn.createdAt,
+    latencyMs: turn.latencyMs,
   }));
 }
 
@@ -191,6 +197,7 @@ export type IntakeService = {
   readonly recordFacts: (input: {
     readonly token: string;
     readonly facts: readonly NewApplicationFact[];
+    readonly sourceTurnSeq?: number | undefined;
   }) => Promise<ApplicationView>;
   readonly attachDocument: (input: {
     readonly token: string;
@@ -235,6 +242,8 @@ export type IntakeService = {
     readonly asking: StoredTurn["askingDimension"];
     readonly intent: string;
     readonly facts: readonly NewApplicationFact[];
+    readonly sourceTurnSeq?: number | undefined;
+    readonly latencyMs?: number | undefined;
   }) => Promise<void>;
 };
 
@@ -423,6 +432,7 @@ export function createIntakeService(
             tenantId: application.tenantId,
             facts: proposed,
             at: clock().toISOString(),
+            sourceTurnSeq: input.sourceTurnSeq,
           });
           const name = proposed.find(
             (fact) => fact.dimension === "company.name",
@@ -442,6 +452,7 @@ export function createIntakeService(
           clientTurnId: input.clientTurnId,
           askingDimension: input.asking,
           intent: input.intent,
+          latencyMs: input.latencyMs,
         });
         await turns.finishExchange(tx, application.id, input.claimId);
       });
@@ -537,6 +548,7 @@ export function createIntakeService(
           tenantId: application.tenantId,
           facts: proposed,
           at,
+          sourceTurnSeq: input.sourceTurnSeq,
         });
         const name = proposed.find((fact) => fact.dimension === "company.name");
         if (name !== undefined && name.value.kind === "TEXT") {
@@ -832,6 +844,14 @@ export function createIntakeService(
       if (contact.codeHash === null || contact.codeExpiresAt === null)
         return { status: "NOT_FOUND", contact: null };
       const secret = contactCodeSecret();
+      const candidate = /^[0-9]{6}$/.test(input.code)
+        ? hashContactCode(secret, application.id, input.code)
+        : "0".repeat(64);
+      const expectedBytes = Buffer.from(contact.codeHash, "hex");
+      const candidateBytes = Buffer.from(candidate, "hex");
+      const matches =
+        expectedBytes.length === candidateBytes.length &&
+        timingSafeEqual(expectedBytes, candidateBytes);
       const result = await contacts.verify({
         applicationId: application.id,
         sessionId,
@@ -839,9 +859,7 @@ export function createIntakeService(
           .update(`gateq-contact-destination:v1:${contact.email}`)
           .digest("hex"),
         expectedCodeHash: contact.codeHash,
-        candidateHash: /^[0-9]{6}$/.test(input.code)
-          ? hashContactCode(secret, application.id, input.code)
-          : "0".repeat(64),
+        candidateHash: matches ? candidate : "0".repeat(64),
         maximumAttempts: CONTACT_CODE_MAX_ATTEMPTS,
         at: clock().toISOString(),
       });

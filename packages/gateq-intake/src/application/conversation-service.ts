@@ -80,6 +80,8 @@ export type ConversationDependencies = {
    */
   readonly turns?: ApplicationTurnRepository | undefined;
   readonly logger?: Logger | undefined;
+  /** Monotonic milliseconds, for turn latency. Test seam. */
+  readonly now?: (() => number) | undefined;
 };
 
 export type ApplicantTurnResult = {
@@ -163,6 +165,7 @@ export function createConversationService(
     turns,
     logger,
   } = dependencies;
+  const now = dependencies.now ?? (() => performance.now());
 
   /**
    * The published criteria an applicant may be told about, by the
@@ -206,9 +209,164 @@ export function createConversationService(
     return { reply, deduplicated, view, ...explain(policy, qualification) };
   };
 
+  const executeTurn = async (
+    input: Parameters<ConversationService["turn"]>[0],
+    opening = false,
+  ): Promise<ApplicantTurnResult> => {
+    // Server latency, from the turn arriving to Q's reply being ready.
+    const receivedAt = now();
+    const { guest, policy, publicGateway } = await stateFor(input.token);
+    const applicationId = guest.application.id;
+
+    // A retry is the same turn. Before anything is spent or recorded.
+    if (turns !== undefined) {
+      const exchange = await turns.findExchange(
+        applicationId,
+        input.clientTurnId,
+      );
+      if (exchange.person !== null && exchange.person.text !== input.message)
+        throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+      if (exchange.q !== null) {
+        return resultFor(input.token, exchange.q.text, true);
+      }
+    }
+    // The single slot as well: a turn answered just before the
+    // transcript store existed is still the same turn on retry.
+    {
+      const last = await turnMemory.lastTurn(guest.sessionId);
+      if (last !== null && last.clientTurnId === input.clientTurnId) {
+        return resultFor(input.token, last.reply, true);
+      }
+    }
+
+    await intake.assertInterviewReady(input.token);
+    if (guest.application.status === "SUBMITTED") {
+      throw new IntakeRefusedError("ALREADY_SUBMITTED");
+    }
+
+    const claimId =
+      turns === undefined
+        ? null
+        : await turns.claimExchange({
+            applicationId,
+            tenantId: guest.application.tenantId,
+            clientTurnId: input.clientTurnId,
+            text: input.message,
+            recordPerson: !opening,
+          });
+    if (turns !== undefined && claimId === null) {
+      const completed = await turns.findExchange(
+        applicationId,
+        input.clientTurnId,
+      );
+      if (completed.q === null)
+        throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+      return resultFor(input.token, completed.q.text, true);
+    }
+    try {
+      const qualification = await intake.qualification(input.token);
+      const facts = await intake.factsFor(input.token);
+      const stored =
+        turns === undefined ? [] : await turns.listFor(applicationId);
+      // The interviewer gets this turn as the utterance, not twice.
+      const prior = stored.filter(
+        (turn) =>
+          !(turn.role === "PERSON" && turn.clientTurnId === input.clientTurnId),
+      );
+      const history = historyFrom(prior);
+
+      const cached =
+        turns === undefined || claimId === null
+          ? null
+          : await turns.readOutcome(applicationId, claimId);
+      const outcome =
+        cached === null
+          ? await interviewer.turn({
+              stage: "APPLICATION",
+              channel: input.channel ?? "text",
+              publicGateway,
+              application: {
+                policy,
+                qualification,
+                facts,
+                // See openingFor: no authorised document-text port for a guest.
+                documentProposals: [],
+              },
+              utterance: input.message,
+              recentTurns: history.recentTurns,
+              // The model is told how far off the application the conversation
+              // has drifted; it decides how much of a person to be about it.
+              tangents: history.tangents,
+              askedAlready: history.askedAlready,
+              attribution: {
+                tenantId: guest.application.tenantId,
+                correlationId: input.correlationId,
+              },
+              signal: AbortSignal.timeout(120_000),
+            })
+          : InterviewTurnOutcomeSchema.parse(cached);
+      const latencyMs = Math.max(0, Math.round(now() - receivedAt));
+      if (turns !== undefined && claimId !== null) {
+        if (cached === null)
+          await turns.checkpointOutcome(applicationId, claimId, outcome);
+        await intake.completeTurn({
+          token: input.token,
+          claimId,
+          clientTurnId: input.clientTurnId,
+          reply: outcome.reply,
+          asking: outcome.asking,
+          intent: outcome.intent,
+          facts: opening ? [] : outcome.facts,
+          sourceTurnSeq: stored.find(
+            (turn) =>
+              turn.role === "PERSON" &&
+              turn.clientTurnId === input.clientTurnId,
+          )?.seq,
+          latencyMs,
+        });
+      } else {
+        if (!opening && outcome.facts.length > 0) {
+          await intake.recordFacts({
+            token: input.token,
+            facts: outcome.facts,
+          });
+        }
+      }
+      // Kept as well: the single slot still answers for a composition, or
+      // an older client, that has no transcript store.
+      await turnMemory.rememberTurn({
+        sessionId: guest.sessionId,
+        clientTurnId: input.clientTurnId,
+        reply: outcome.reply,
+      });
+
+      logger?.debug(
+        {
+          correlationId: input.correlationId,
+          intent: outcome.intent,
+          recorded: outcome.facts.length,
+          rejected: outcome.rejectedFacts,
+          history: history.recentTurns.length,
+          latencyMs,
+        },
+        "gateq applicant turn",
+      );
+
+      // Recomputed from what is now recorded, by the deterministic engine.
+      // The model's sentence and the applicant's standing come from
+      // different places on purpose: a reply that says "looks like you
+      // qualify" changes nothing here.
+      return await resultFor(input.token, outcome.reply, false);
+    } catch (error) {
+      if (turns !== undefined && claimId !== null)
+        await turns.releaseExchange(applicationId, claimId);
+      throw error;
+    }
+  };
+
   return {
     openingFor: async (input) => {
-      const { guest, policy, publicGateway } = await stateFor(input.token);
+      const guest = await intake.authorise(input.token);
       try {
         await intake.assertInterviewReady(input.token);
       } catch (error) {
@@ -226,196 +384,15 @@ export function createConversationService(
           .find((turn) => turn.role === "Q");
         if (lastQuestion !== undefined) return lastQuestion.text;
       }
-      const qualification = await intake.qualification(input.token);
-      // Everything already established, so a resumed application opens on
-      // what is still open rather than on a greeting from nowhere (§35).
-      const facts = await intake.factsFor(input.token);
-      const stored =
-        turns === undefined ? [] : await turns.listFor(guest.application.id);
-      const history = historyFrom(stored);
-      const outcome = await interviewer.turn({
-        stage: "APPLICATION",
-        channel: input.channel ?? "text",
-        publicGateway,
-        application: {
-          policy,
-          qualification,
-          facts,
-          // No document reading reaches the interview in this slice: the
-          // only document text an applicant's session could see is
-          // Evidence extraction, and no port exposes it to a guest
-          // credential without new authority. Values stay unproposed.
-          documentProposals: [],
-        },
-        utterance: "",
-        recentTurns: history.recentTurns,
-        tangents: history.tangents,
-        askedAlready: history.askedAlready,
-        attribution: {
-          tenantId: guest.application.tenantId,
-          correlationId: input.correlationId,
-        },
-      });
-      // Stored once, so the transcript begins with the question the
-      // founder was answering. A later opening (a resume) is not stored
-      // again: the first one already is.
-      if (
-        turns !== undefined &&
-        stored.length === 0 &&
-        guest.application.status !== "SUBMITTED"
-      ) {
-        await turns.append({
-          applicationId: guest.application.id,
-          tenantId: guest.application.tenantId,
-          role: "Q",
-          text: outcome.reply,
-          clientTurnId: OPENING_TURN_ID,
-          askingDimension: outcome.asking,
-          intent: outcome.intent,
-        });
-      }
-      return outcome.reply;
+      return (
+        await executeTurn(
+          { ...input, message: "", clientTurnId: OPENING_TURN_ID },
+          true,
+        )
+      ).reply;
     },
 
-    turn: async (input) => {
-      const { guest, policy, publicGateway } = await stateFor(input.token);
-      const applicationId = guest.application.id;
-
-      // A retry is the same turn. Before anything is spent or recorded.
-      if (turns !== undefined) {
-        const exchange = await turns.findExchange(
-          applicationId,
-          input.clientTurnId,
-        );
-        if (exchange.person !== null && exchange.person.text !== input.message)
-          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
-        if (exchange.q !== null) {
-          return resultFor(input.token, exchange.q.text, true);
-        }
-      } else {
-        const last = await turnMemory.lastTurn(guest.sessionId);
-        if (last !== null && last.clientTurnId === input.clientTurnId) {
-          return resultFor(input.token, last.reply, true);
-        }
-      }
-
-      await intake.assertInterviewReady(input.token);
-      if (guest.application.status === "SUBMITTED") {
-        throw new IntakeRefusedError("ALREADY_SUBMITTED");
-      }
-
-      const claimId =
-        turns === undefined
-          ? null
-          : await turns.claimExchange({
-              applicationId,
-              tenantId: guest.application.tenantId,
-              clientTurnId: input.clientTurnId,
-              text: input.message,
-            });
-      if (turns !== undefined && claimId === null) {
-        const completed = await turns.findExchange(
-          applicationId,
-          input.clientTurnId,
-        );
-        if (completed.q === null)
-          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
-        return resultFor(input.token, completed.q.text, true);
-      }
-      try {
-        const qualification = await intake.qualification(input.token);
-        const facts = await intake.factsFor(input.token);
-        const stored =
-          turns === undefined ? [] : await turns.listFor(applicationId);
-        // The interviewer gets this turn as the utterance, not twice.
-        const prior = stored.filter(
-          (turn) =>
-            !(
-              turn.role === "PERSON" && turn.clientTurnId === input.clientTurnId
-            ),
-        );
-        const history = historyFrom(prior);
-
-        const cached =
-          turns === undefined || claimId === null
-            ? null
-            : await turns.readOutcome(applicationId, claimId);
-        const outcome =
-          cached === null
-            ? await interviewer.turn({
-                stage: "APPLICATION",
-                channel: input.channel ?? "text",
-                publicGateway,
-                application: {
-                  policy,
-                  qualification,
-                  facts,
-                  // See openingFor: no authorised document-text port for a guest.
-                  documentProposals: [],
-                },
-                utterance: input.message,
-                recentTurns: history.recentTurns,
-                // The model is told how far off the application the conversation
-                // has drifted; it decides how much of a person to be about it.
-                tangents: history.tangents,
-                askedAlready: history.askedAlready,
-                attribution: {
-                  tenantId: guest.application.tenantId,
-                  correlationId: input.correlationId,
-                },
-                signal: AbortSignal.timeout(120_000),
-              })
-            : InterviewTurnOutcomeSchema.parse(cached);
-        if (turns !== undefined && claimId !== null) {
-          if (cached === null)
-            await turns.checkpointOutcome(applicationId, claimId, outcome);
-          await intake.completeTurn({
-            token: input.token,
-            claimId,
-            clientTurnId: input.clientTurnId,
-            reply: outcome.reply,
-            asking: outcome.asking,
-            intent: outcome.intent,
-            facts: outcome.facts,
-          });
-        } else {
-          if (outcome.facts.length > 0) {
-            await intake.recordFacts({
-              token: input.token,
-              facts: outcome.facts,
-            });
-          }
-        }
-        // Kept as well: the single slot still answers for a composition, or
-        // an older client, that has no transcript store.
-        await turnMemory.rememberTurn({
-          sessionId: guest.sessionId,
-          clientTurnId: input.clientTurnId,
-          reply: outcome.reply,
-        });
-
-        logger?.debug(
-          {
-            correlationId: input.correlationId,
-            intent: outcome.intent,
-            recorded: outcome.facts.length,
-            rejected: outcome.rejectedFacts,
-            history: history.recentTurns.length,
-          },
-          "gateq applicant turn",
-        );
-
-        // Recomputed from what is now recorded, by the deterministic engine.
-        // The model's sentence and the applicant's standing come from
-        // different places on purpose: a reply that says "looks like you
-        // qualify" changes nothing here.
-        return await resultFor(input.token, outcome.reply, false);
-      } catch (error) {
-        if (turns !== undefined && claimId !== null)
-          await turns.releaseExchange(applicationId, claimId);
-        throw error;
-      }
-    },
+    turn: (input) => executeTurn(input),
 
     summary: async (token) => resultFor(token, "", false),
 

@@ -26,10 +26,6 @@ export type ApplicationRepository = {
     application: Omit<Application, "createdAt" | "updatedAt">,
   ) => Promise<Application>;
   readonly findById: (id: ApplicationId) => Promise<Application | null>;
-  readonly lock: (
-    tx: TransactionContext,
-    id: ApplicationId,
-  ) => Promise<Application | null>;
   readonly setStatus: (
     tx: TransactionContext,
     id: ApplicationId,
@@ -41,6 +37,16 @@ export type ApplicationRepository = {
     id: ApplicationId,
     declaredName: string,
   ) => Promise<void>;
+  /**
+   * GateQ slice 1: take the application's row lock for the rest of the
+   * transaction and read it as it now is. Every writer to an application
+   * (facts, turns, documents, contact) and the submission take it, so a
+   * submission sees one consistent application and nothing lands after it.
+   */
+  readonly lock: (
+    tx: TransactionContext,
+    id: ApplicationId,
+  ) => Promise<Application | null>;
 };
 
 export type ApplicationSessionRepository = {
@@ -106,6 +112,8 @@ export type ApplicationFactRepository = {
       readonly tenantId: string;
       readonly facts: readonly NewApplicationFact[];
       readonly at: string;
+      /** Lineage: the PERSON turn these were read from, when one was. */
+      readonly sourceTurnSeq?: number | null | undefined;
     },
   ) => Promise<readonly ApplicationFact[]>;
 };
@@ -145,6 +153,8 @@ export type StoredTurn = {
   readonly askingDimension: ApplicationDimension | null;
   /** Q turns only: the model's reading of the person's turn. */
   readonly intent: string | null;
+  /** Q turns only: server time to the reply, in milliseconds. */
+  readonly latencyMs: number | null;
   readonly createdAt: string;
 };
 
@@ -168,6 +178,8 @@ export type ApplicationTurnRepository = {
     readonly tenantId: string;
     readonly clientTurnId: string;
     readonly text: string;
+    /** Server-owned openings have no applicant utterance to record. */
+    readonly recordPerson?: boolean | undefined;
   }) => Promise<string | null>;
   readonly assertClaim: (
     tx: TransactionContext,
@@ -194,6 +206,7 @@ export type ApplicationTurnRepository = {
       readonly clientTurnId: string;
       readonly askingDimension?: ApplicationDimension | null | undefined;
       readonly intent?: string | null | undefined;
+      readonly latencyMs?: number | null | undefined;
     },
   ) => Promise<void>;
   /** Oldest first. `limit` keeps the newest that many. */
@@ -208,7 +221,12 @@ export type ApplicationTurnRepository = {
     readonly person: StoredTurn | null;
     readonly q: StoredTurn | null;
   }>;
-  /** Appends; an existing (client turn id, role) row is left as it is. */
+  /**
+   * Appends under the application's row lock and answers the row's seq;
+   * an existing (client turn id, role) row is left as it is and its seq
+   * returned. Throws IntakeRefusedError("ALREADY_SUBMITTED") once the
+   * application is submitted: nothing is said into it afterwards.
+   */
   readonly append: (input: {
     readonly applicationId: ApplicationId;
     readonly tenantId: string;
@@ -217,7 +235,8 @@ export type ApplicationTurnRepository = {
     readonly clientTurnId: string;
     readonly askingDimension?: ApplicationDimension | null | undefined;
     readonly intent?: string | null | undefined;
-  }) => Promise<void>;
+    readonly latencyMs?: number | null | undefined;
+  }) => Promise<{ readonly seq: number }>;
   readonly countFor: (applicationId: ApplicationId) => Promise<number>;
 };
 

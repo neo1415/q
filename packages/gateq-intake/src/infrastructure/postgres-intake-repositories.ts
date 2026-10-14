@@ -122,6 +122,7 @@ const FactRow = z.object({
   provenance: z.string(),
   recorded_at: z.unknown(),
   superseded_at: z.unknown(),
+  source_turn_seq: z.number().int().nullable().optional(),
 });
 
 function toFact(row: unknown): ApplicationFact {
@@ -137,6 +138,7 @@ function toFact(row: unknown): ApplicationFact {
     provenance: r.provenance,
     recordedAt: iso(r.recorded_at),
     supersededAt: isoOrNull(r.superseded_at),
+    sourceTurnSeq: r.source_turn_seq ?? null,
   });
 }
 
@@ -306,10 +308,10 @@ export function createPostgresApplicationFactRepository(options: {
         // already answered as unanswered.
         const inserted = await tx.sql`
           insert into gateq.application_facts (
-            application_id, tenant_id, dimension, value, provenance, recorded_at
+            application_id, tenant_id, dimension, value, provenance, recorded_at, source_turn_seq
           ) values (
             ${input.applicationId}, ${input.tenantId}, ${fact.dimension},
-            ${jsonbParam(tx.sql, fact.value)}, ${fact.provenance}, ${input.at}
+            ${jsonbParam(tx.sql, fact.value)}, ${fact.provenance}, ${input.at}, ${input.sourceTurnSeq ?? null}
           )
           returning *`;
         const row = inserted[0];
@@ -415,6 +417,7 @@ const TurnRow = z.object({
   client_turn_id: z.string(),
   asking_dimension: z.string().nullable(),
   intent: z.string().nullable(),
+  latency_ms: z.number().int().nullable(),
   created_at: z.unknown(),
 });
 
@@ -430,6 +433,7 @@ function toTurn(row: unknown): StoredTurn {
     clientTurnId: r.client_turn_id,
     askingDimension: asking.success ? asking.data : null,
     intent: r.intent,
+    latencyMs: r.latency_ms,
     createdAt: iso(r.created_at),
   };
 }
@@ -454,9 +458,9 @@ export function createPostgresApplicationTurnRepository(options: {
       if (locked[0]["status"] === "SUBMITTED")
         throw new IntakeRefusedError("ALREADY_SUBMITTED");
       await tx.sql`
-      insert into gateq.application_turns (application_id, tenant_id, seq, role, text, client_turn_id, asking_dimension, intent)
+      insert into gateq.application_turns (application_id, tenant_id, seq, role, text, client_turn_id, asking_dimension, intent, latency_ms)
       select ${input.applicationId}, ${input.tenantId}, coalesce(max(seq), 0) + 1,
-             ${input.role}, ${input.text}, ${input.clientTurnId}, ${input.askingDimension ?? null}, ${input.intent ?? null}
+             ${input.role}, ${input.text}, ${input.clientTurnId}, ${input.askingDimension ?? null}, ${input.intent ?? null}, ${input.latencyMs ?? null}
         from gateq.application_turns where application_id = ${input.applicationId}
       on conflict (application_id, client_turn_id, role) do nothing`;
     };
@@ -519,21 +523,22 @@ export function createPostgresApplicationTurnRepository(options: {
           throw new IntakeRefusedError("TOO_MANY_REQUESTS");
         const claimId = randomUUID();
         await tx.sql`update gateq.applications set interview_claim_id = ${claimId}, interview_claim_turn_id = ${input.clientTurnId}, interview_claim_expires_at = clock_timestamp() + interval '5 minutes' where id = ${input.applicationId}`;
-        await appendInTransaction(tx, { ...input, role: "PERSON" });
+        if (input.recordPerson !== false)
+          await appendInTransaction(tx, { ...input, role: "PERSON" });
         return claimId;
       }),
     listFor: async (applicationId, limit) => {
       const rows =
         limit === undefined
           ? await sql`
-              select seq, role, text, client_turn_id, asking_dimension, intent, created_at
+              select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at
                 from gateq.application_turns
                where application_id = ${applicationId}
                order by seq asc
                limit 400`
           : await sql`
               select * from (
-                select seq, role, text, client_turn_id, asking_dimension, intent, created_at
+                select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at
                   from gateq.application_turns
                  where application_id = ${applicationId}
                  order by seq desc
@@ -544,7 +549,7 @@ export function createPostgresApplicationTurnRepository(options: {
 
     findExchange: async (applicationId, clientTurnId) => {
       const rows = await sql`
-        select seq, role, text, client_turn_id, asking_dimension, intent, created_at
+        select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at
           from gateq.application_turns
          where application_id = ${applicationId}
            and client_turn_id = ${clientTurnId}`;
@@ -556,7 +561,15 @@ export function createPostgresApplicationTurnRepository(options: {
     },
 
     append: async (input) =>
-      transactions.run((tx) => appendInTransaction(tx, input)),
+      transactions.run(async (tx) => {
+        await appendInTransaction(tx, input);
+        const rows =
+          await tx.sql`select seq from gateq.application_turns where application_id = ${input.applicationId} and client_turn_id = ${input.clientTurnId} and role = ${input.role}`;
+        const seq: unknown = rows[0]?.["seq"];
+        if (typeof seq !== "number")
+          throw new Error("turn append returned nothing");
+        return { seq };
+      }),
 
     countFor: async (applicationId) => {
       const rows = await sql`

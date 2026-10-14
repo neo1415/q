@@ -228,6 +228,7 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq-apply.ts POST GATEQ_APPLY_START_PATH": PUBLIC,
   "api/http/gateq-apply.ts GET GATEQ_APPLY_SESSION_PATH": PUBLIC,
   "api/http/gateq-apply.ts POST GATEQ_APPLY_TURN_PATH": PUBLIC,
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_INTERVIEW_OPEN_PATH": PUBLIC,
   "api/http/gateq-apply.ts POST GATEQ_APPLY_SUBMIT_PATH": PUBLIC,
   // F1: the GateQ form, the same anonymous applicant surface.
   "api/http/gateq-apply.ts POST GATEQ_APPLY_ANSWERS_PATH": PUBLIC,
@@ -1130,6 +1131,9 @@ const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_PATH",
   "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_CONFIRM_PATH",
   "api/http/gateq.ts POST GATEQ_APPLY_CONTACT_ACCOUNT_PATH",
+  // Q's opening question for a form-started interview, under the same
+  // guest credential. Pending the lead's decision.
+  "api/http/gateq-apply.ts POST GATEQ_APPLY_INTERVIEW_OPEN_PATH",
   // P14: authorised by a one-time code only the claimant's inbox holds; no
   // actor carries it, so no declared action can. Pending the lead's decision.
   "api/http/gateq.ts POST COMPANY_CLAIM_CONFIRM_PATH",

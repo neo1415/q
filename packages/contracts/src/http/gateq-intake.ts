@@ -296,6 +296,13 @@ export const GATEQ_APPLY_CONTACT_ACCOUNT_PATH =
 /** The interview so far, both sides, in order. */
 export const GATEQ_APPLY_TRANSCRIPT_PATH =
   "/v1/gateq/apply/transcript" as const;
+/**
+ * Opens the interview: when nothing has been said yet, Q asks the first
+ * question (stored once); otherwise the transcript is returned as it is,
+ * with no model call. Idempotent, so a reload or a double click is safe.
+ */
+export const GATEQ_APPLY_INTERVIEW_OPEN_PATH =
+  "/v1/gateq/apply/interview/open" as const;
 /** What is answered, unknown, declined, missing and contradictory. */
 export const GATEQ_APPLY_COVERAGE_PATH = "/v1/gateq/apply/coverage" as const;
 
@@ -382,6 +389,11 @@ export const ApplicationTranscriptTurnDtoSchema = z
     role: z.enum(["PERSON", "Q"]),
     text: z.string().max(4000),
     at: z.string(),
+    /**
+     * Q turns: server milliseconds from receiving the person's turn to
+     * having Q's reply. Null for person turns and the opening line.
+     */
+    latencyMs: z.number().int().min(0).nullable().optional(),
   })
   .strict();
 export type ApplicationTranscriptTurnDto = z.infer<
@@ -576,6 +588,13 @@ export const GateqDossierV1Schema = z
                     label: z.string().max(80),
                     summary: z.string().max(2000),
                     provenance: GateqFactProvenanceSchema,
+                    /** Lineage: the recorded application fact this reads. */
+                    sourceFactId: z.string().uuid(),
+                    /**
+                     * Lineage: the transcript turn (seq) it was heard in;
+                     * null for the form, a document or an older fact.
+                     */
+                    sourceTurnSeq: z.number().int().min(1).nullable(),
                     truthClass: z.enum(["USER_CLAIM", "ESTIMATE", "UNKNOWN"]),
                     evidenceStatus: z.enum([
                       "NO_EVIDENCE",
