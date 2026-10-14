@@ -75,6 +75,39 @@ const detail = await getGateqInboxItem(
 assert.equal(detail.item.applicationId, fixture.applicationId);
 assert.ok(detail.dossier, "Fixture must be a real frozen submitted dossier");
 write("authorized-source.json", detail);
+if (process.env.CQ_OTHER_SESSION_FILE) {
+  const otherFile = process.env.CQ_OTHER_SESSION_FILE;
+  const otherClient = createServerClient(
+    config.NEXT_PUBLIC_SUPABASE_URL,
+    config.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    { cookies: { getAll: () => [], setAll: () => {} } },
+  );
+  const other = await otherClient.auth.setSession(
+    JSON.parse(readFileSync(otherFile, "utf8")),
+  );
+  assert.ifError(other.error);
+  assert.ok(other.data.session);
+  assert.notEqual(
+    other.data.session.user.id,
+    session.user.id,
+    "Negative actor must differ",
+  );
+  writeFileSync(otherFile, JSON.stringify(other.data.session), { mode: 0o600 });
+  await assert.rejects(
+    () =>
+      getGateqInboxItem(
+        { baseUrl: api, accessToken: other.data.session.access_token },
+        fixture.gatewayId,
+        fixture.applicationId,
+      ),
+    (error) => error?.status === 404 || error?.problem?.status === 404,
+    "Another investor must not read the exact frozen dossier",
+  );
+  console.log(
+    JSON.stringify({ phase: "foreign-investor", denied: true, status: 404 }),
+  );
+}
+
 const browser = await chromium.launch({
   executablePath: process.env.CQ_DEMO_CHROMIUM_PATH ?? "/usr/bin/chromium",
   proxy: { server: process.env.HTTPS_PROXY, bypass: "localhost,127.0.0.1" },
