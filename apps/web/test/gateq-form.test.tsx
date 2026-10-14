@@ -25,12 +25,24 @@ const calls = {
   save: vi.fn<Action>(),
   submit: vi.fn<Action>(),
   share: vi.fn<Action>(),
+  contact: vi.fn<Action>(),
+  resume: vi.fn<Action>(),
 };
 
 vi.mock("../src/features/gateq/apply-actions", () => ({
   startFormAction: (...args: unknown[]) => calls.start(...args),
   saveAnswersAction: (...args: unknown[]) => calls.save(...args),
   submitApplicationAction: (...args: unknown[]) => calls.submit(...args),
+}));
+vi.mock("../src/features/gateq/interview-actions", () => ({
+  contactApplicationAction: (...args: unknown[]) => calls.contact(...args),
+  confirmContactAction: vi.fn(),
+  resumeGatewayApplicationAction: () =>
+    Promise.resolve({
+      ok: false,
+      message: "No saved application.",
+    }),
+  resumeInterviewAction: (...args: unknown[]) => calls.resume(...args),
 }));
 vi.mock("../src/features/gateq/materials-actions", () => ({
   shareMaterialsAction: (...args: unknown[]) => calls.share(...args),
@@ -77,6 +89,48 @@ const summary = (
 
 beforeEach(() => {
   for (const fn of Object.values(calls)) fn.mockReset();
+  calls.contact.mockResolvedValue({
+    ok: true,
+    value: { contact: { emailConfirmed: true } },
+  });
+  calls.resume.mockResolvedValue({
+    ok: true,
+    value: {
+      application: summary({ access: "MAY_APPLY" }),
+      transcript: {
+        turns: [
+          {
+            seq: 1,
+            role: "PERSON",
+            text: "We are pre-revenue",
+            at: "2026-10-13T00:00:00Z",
+          },
+          {
+            seq: 2,
+            role: "Q",
+            text: "What supports your customer traction?",
+            at: "2026-10-13T00:00:01Z",
+          },
+        ],
+      },
+      coverage: {
+        contact: { required: true, confirmed: true },
+        documentCount: 0,
+        transcriptTurns: 0,
+        coverage: {
+          version: 1,
+          access: "MAY_APPLY",
+          answered: [],
+          unknown: [],
+          declined: [],
+          missing: [],
+          contradictions: [],
+          unmet: [],
+          stillNeeded: [],
+        },
+      },
+    },
+  });
   calls.start.mockResolvedValue({
     ok: true,
     sessionToken: "gqs_token_aaaaaaaaaaaaaaaa",
@@ -195,17 +249,31 @@ async function press(name: RegExp | string) {
   });
 }
 
+async function confirmContact() {
+  await screen.findByLabelText("Full name");
+  fireEvent.change(screen.getByLabelText("Full name"), {
+    target: { value: "Amara" },
+  });
+  fireEvent.change(screen.getByLabelText("Company"), {
+    target: { value: "Kora Health" },
+  });
+  fireEvent.change(screen.getByLabelText("Email"), {
+    target: { value: "amara@kora.ng" },
+  });
+  await press("Confirm contact");
+}
+
 describe("the form, driven like a founder", () => {
-  it("shows the investor's rules before asking anything", () => {
+  it("shows the investor's rules before asking anything", async () => {
     render(<GateQForm gateway={GATEWAY} />);
     expect(screen.getByText("West Africa")).toBeTruthy();
     expect(
-      screen.getByText(/Nothing is sent until you press Send/),
+      await screen.findByText(/Confirming your email does not create/),
     ).toBeTruthy();
     expect(calls.start).not.toHaveBeenCalled();
   });
 
-  it("checks the answers, then sends only when the founder presses Send", async () => {
+  it("confirms contact, checks form and submits only after interview review consent", async () => {
     calls.save.mockResolvedValue({
       ok: true,
       sessionToken: "gqs_token_aaaaaaaaaaaaaaaa",
@@ -218,6 +286,7 @@ describe("the form, driven like a founder", () => {
       application: summary({ access: "MAY_APPLY", status: "SUBMITTED" }),
     });
     render(<GateQForm gateway={GATEWAY} />);
+    await confirmContact();
     fireEvent.change(screen.getByLabelText("Company name"), {
       target: { value: "Kora Health" },
     });
@@ -254,7 +323,16 @@ describe("the form, driven like a founder", () => {
     // Nothing has been sent yet: checking is not sharing.
     expect(calls.submit).not.toHaveBeenCalled();
 
-    await press("Send to Sahel Capital");
+    await press("Continue to Q interview");
+    expect(calls.submit).not.toHaveBeenCalled();
+    await press("Review before submitting");
+    expect(
+      screen
+        .getByRole("button", { name: "Submit to Sahel Capital" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: /I have reviewed/ }));
+    await press("Submit to Sahel Capital");
     expect(calls.submit).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Sent to Sahel Capital")).toBeTruthy();
   });
@@ -278,7 +356,7 @@ describe("the form, driven like a founder", () => {
     expect(screen.queryByRole("button", { name: /Send to/ })).toBeNull();
   });
 
-  it("shares only the documents the founder ticked, and only on Send", async () => {
+  it("prepares only ticked documents for the interview without submitting", async () => {
     calls.share.mockResolvedValue({ ok: true });
     calls.save.mockResolvedValue({
       ok: true,
@@ -310,6 +388,7 @@ describe("the form, driven like a founder", () => {
         ]}
       />,
     );
+    await confirmContact();
     fireEvent.click(screen.getByRole("button", { name: "Health" }));
     await press("Continue");
     fireEvent.click(screen.getByRole("radio", { name: "$1M–$3M" }));
@@ -328,7 +407,8 @@ describe("the form, driven like a founder", () => {
     await press("Continue");
     await press("Check my fit");
     expect(calls.share).not.toHaveBeenCalled();
-    await press("Send to Sahel Capital");
+    await press("Continue to Q interview");
+    expect(calls.submit).not.toHaveBeenCalled();
     expect(calls.share).toHaveBeenCalledWith("gqs_token_aaaaaaaaaaaaaaaa", [
       deck,
     ]);

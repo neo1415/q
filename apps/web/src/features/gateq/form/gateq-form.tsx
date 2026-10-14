@@ -27,11 +27,11 @@ import {
   RotateCw,
 } from "@capital-q/ui/icons";
 
-import {
-  saveAnswersAction,
-  startFormAction,
-  submitApplicationAction,
-} from "../apply-actions";
+import { saveAnswersAction, startFormAction } from "../apply-actions";
+import { recoverableAction } from "../recoverable-action";
+import { resumeGatewayApplicationAction } from "../interview-actions";
+import { ContactStep } from "../contact-step";
+import { InterviewStep } from "../interview-step";
 import { FitGlyph, type GlyphKind } from "../fit-glyph";
 import "../gateq.css";
 import { shareMaterialsAction } from "../materials-actions";
@@ -47,7 +47,6 @@ import {
   formatMoney,
   INSTRUMENT_CHOICES,
   LEAD_CHOICES,
-  maySend,
   MORE_COUNTRIES,
   normaliseAmount,
   RAISE_BANDS,
@@ -75,7 +74,7 @@ import {
  * tappable answers and "I'd rather not say" everywhere. The investor's rules
  * are on screen first; after each step the API's deterministic engine
  * answers rule by rule. Sending is a separate press at the end: until the
- * founder presses "Send to <fund>", the investor receives nothing (the API's
+ * founder presses "Submit to <fund>", the investor receives nothing (the API's
  * submission is the disclosure boundary). In the embed the credential lives
  * only in this component's memory: a third-party frame has no cookie to
  * lean on.
@@ -123,10 +122,6 @@ export type GateQFormProps = {
   readonly preview?: GateQFormPreview;
 };
 
-function key(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID()}`;
-}
-
 export function GateQForm({
   gateway,
   compact = false,
@@ -149,6 +144,13 @@ export function GateQForm({
   });
   const fromProfile = initial.fromProfile;
   const [step, setStep] = useState<FormStep>(preview?.step ?? "company");
+  const [restoring, setRestoring] = useState(preview === undefined);
+  const [resumeProblem, setResumeProblem] = useState<string | null>(null);
+  const [resumeAttempt, setResumeAttempt] = useState(0);
+  const [contactConfirmed, setContactConfirmed] = useState(
+    preview !== undefined,
+  );
+  const [interview, setInterview] = useState(false);
   const [errors, setErrors] = useState<StepErrors>({});
   const [application, setApplication] = useState<ApplicationSummaryDto | null>(
     preview?.application ?? null,
@@ -158,9 +160,39 @@ export function GateQForm({
   );
   const [pending, startTransition] = useTransition();
   const token = useRef<string | null>(null);
-  const submitKey = useRef<string>("");
+  const [interviewToken, setInterviewToken] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement | null>(null);
   const firstRender = useRef(true);
+
+  useEffect(() => {
+    if (preview !== undefined) return;
+    let active = true;
+    void recoverableAction(() =>
+      resumeGatewayApplicationAction(gateway.publicId),
+    ).then((result) => {
+      if (!active) return;
+      setRestoring(false);
+      if (!result.ok) {
+        if (result.message !== "No saved application.")
+          setResumeProblem(result.message);
+        return;
+      }
+      if (token.current !== null) return;
+      token.current = result.value.sessionToken;
+      setInterviewToken(result.value.sessionToken);
+      setApplication(result.value.application);
+      setContactConfirmed(result.value.coverage.contact.confirmed);
+      if (result.value.application.status === "SUBMITTED") setStep("sent");
+      else if (
+        result.value.transcript.turns.length > 0 ||
+        result.value.application.facts.length > 0
+      )
+        setInterview(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [gateway.publicId, preview, resumeAttempt]);
 
   const lines = ruleLines(gateway, application);
   const verdict = verdictFor(application);
@@ -183,12 +215,15 @@ export function GateQForm({
 
   const ensureToken = async (): Promise<string | null> => {
     if (token.current !== null) return token.current;
-    const started = await startFormAction(gateway.publicId);
+    const started = await recoverableAction(() =>
+      startFormAction(gateway.publicId),
+    );
     if (!started.ok) {
       setProblem(started.message);
       return null;
     }
     token.current = started.sessionToken;
+    setInterviewToken(started.sessionToken);
     return started.sessionToken;
   };
 
@@ -210,9 +245,8 @@ export function GateQForm({
     startTransition(async () => {
       const credential = await ensureToken();
       if (credential === null) return;
-      const saved = await saveAnswersAction(
-        credential,
-        requestFor(step, answers),
+      const saved = await recoverableAction(() =>
+        saveAnswersAction(credential, requestFor(step, answers)),
       );
       if (!saved.ok) {
         setProblem(saved.message);
@@ -228,31 +262,23 @@ export function GateQForm({
   };
 
   const onSend = () => {
-    if (preview !== undefined || !maySend(verdict)) return;
+    if (preview !== undefined) return;
     setProblem(null);
-    if (submitKey.current === "") submitKey.current = key("send");
     startTransition(async () => {
       const credential = token.current;
       if (credential === null) return;
       if (!anonymous) {
         // Only what the founder ticked (maybe nothing); the API checks each
         // is theirs and links the application to them for their GateQ page.
-        const shared = await shareMaterialsAction(
-          credential,
-          answers.materials,
+        const shared = await recoverableAction(() =>
+          shareMaterialsAction(credential, answers.materials),
         );
         if (!shared.ok) {
           setProblem(shared.message);
           return;
         }
       }
-      const sent = await submitApplicationAction(credential, submitKey.current);
-      if (!sent.ok) {
-        setProblem(sent.message);
-        return;
-      }
-      setApplication(sent.application);
-      setStep("sent");
+      setInterview(true);
     });
   };
 
@@ -343,6 +369,76 @@ export function GateQForm({
             Their gate is closed. You can still read what they look for.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (restoring || resumeProblem !== null) {
+    return (
+      <div className={shell}>
+        {card}
+        <section className="gq-card p-5" aria-busy={restoring}>
+          <p role={resumeProblem === null ? "status" : "alert"}>
+            {restoring ? "Checking for your saved application…" : resumeProblem}
+          </p>
+          {resumeProblem === null ? null : (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setRestoring(true);
+                setResumeProblem(null);
+                setResumeAttempt((value) => value + 1);
+              }}
+            >
+              Retry saved application
+            </Button>
+          )}
+        </section>
+      </div>
+    );
+  }
+
+  if (!contactConfirmed && preview === undefined) {
+    return (
+      <div className={shell}>
+        {card}
+        <ContactStep
+          initial={{
+            name: answers.contactName,
+            email: answers.contactEmail,
+            companyName: answers.companyName,
+            role: "Founder",
+          }}
+          account={!anonymous}
+          ensureToken={ensureToken}
+          onConfirmed={(contact) => {
+            set("contactName", contact.name);
+            set("contactEmail", contact.email);
+            set("companyName", contact.companyName);
+            setContactConfirmed(true);
+          }}
+        />
+        {problem === null ? null : <p role="alert">{problem}</p>}
+      </div>
+    );
+  }
+
+  if (interview && interviewToken !== null && step !== "sent") {
+    return (
+      <div className={shell}>
+        {card}
+        <InterviewStep
+          token={interviewToken}
+          documents={materials.filter((material) =>
+            answers.materials.includes(material.id),
+          )}
+          fund={fund}
+          onApplication={setApplication}
+          onSubmitted={(submitted) => {
+            setApplication(submitted);
+            setStep("sent");
+          }}
+        />
       </div>
     );
   }
@@ -525,9 +621,9 @@ export function GateQForm({
                 variant="primary"
                 style={{ minWidth: 160 }}
                 onClick={onSend}
-                disabled={pending || !maySend(verdict)}
+                disabled={pending}
               >
-                {pending ? "Sending…" : `Send to ${fund}`}
+                {pending ? "Preparing interview…" : "Continue to Q interview"}
               </Button>
             ) : (
               <Button
@@ -641,7 +737,7 @@ function GateCard({
             </ul>
           )}
           <p className="cq-caption gq-t3">
-            Nothing is sent until you press Send.
+            Nothing is disclosed until you review and press Submit.
           </p>
         </div>
       </details>
@@ -1230,7 +1326,8 @@ function CheckStep({
         </div>
       ) : null}
       <p className="cq-body-sm gq-t2">
-        Sending shares: {answers.companyName || "your company"}, your answers
+        Submitting discloses: {answers.companyName || "your company"}, your
+        answers
         {amount !== null
           ? ` (raising ${formatMoney(amount, answers.currency)})`
           : ""}

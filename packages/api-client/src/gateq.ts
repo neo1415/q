@@ -2,6 +2,18 @@ import { z } from "zod";
 
 import {
   ApplicationTurnResponseSchema,
+  ApplicationContactResponseSchema,
+  ApplicationContactConfirmResponseSchema,
+  ApplicationTranscriptDtoSchema,
+  ApplicationCoverageDtoSchema,
+  ApplicationSummaryDtoSchema,
+  GATEQ_APPLY_SESSION_PATH,
+  GATEQ_APPLY_CONTACT_PATH,
+  GATEQ_APPLY_CONTACT_CONFIRM_PATH,
+  GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+  GATEQ_APPLY_TRANSCRIPT_PATH,
+  GATEQ_APPLY_COVERAGE_PATH,
+  type ApplicationContactRequest,
   ApplicationAnswersResponseSchema,
   GATEQ_APPLY_ANSWERS_PATH,
   GATEQ_APPLY_MATERIALS_PATH,
@@ -221,5 +233,70 @@ export function shareApplicationMaterials(
     GATEQ_APPLY_MATERIALS_PATH,
     ShareApplicationMaterialsResponseSchema,
     { body: input },
+  );
+}
+
+/** Contact confirmation does not grant company membership. */
+export function saveApplicationContact(
+  baseUrl: string,
+  token: string,
+  input: ApplicationContactRequest,
+) {
+  return call(
+    { baseUrl, accessToken: token },
+    "POST",
+    GATEQ_APPLY_CONTACT_PATH,
+    ApplicationContactResponseSchema,
+    { body: input },
+  );
+}
+export function confirmApplicationContact(
+  baseUrl: string,
+  token: string,
+  code: string,
+) {
+  return call(
+    { baseUrl, accessToken: token },
+    "POST",
+    GATEQ_APPLY_CONTACT_CONFIRM_PATH,
+    ApplicationContactConfirmResponseSchema,
+    { body: { code } },
+  );
+}
+export function confirmAccountApplicationContact(
+  session: ApiSession,
+  token: string,
+  input: ApplicationContactRequest,
+) {
+  return call(
+    session,
+    "POST",
+    GATEQ_APPLY_CONTACT_ACCOUNT_PATH,
+    ApplicationContactResponseSchema,
+    { body: { ...input, sessionToken: token } },
+  );
+}
+export function getApplicationSession(baseUrl: string, token: string) {
+  return call(
+    { baseUrl, accessToken: token },
+    "GET",
+    GATEQ_APPLY_SESSION_PATH,
+    ApplicationSummaryDtoSchema,
+  );
+}
+export function getApplicationTranscript(baseUrl: string, token: string) {
+  return call(
+    { baseUrl, accessToken: token },
+    "GET",
+    GATEQ_APPLY_TRANSCRIPT_PATH,
+    ApplicationTranscriptDtoSchema,
+  );
+}
+export function getApplicationCoverage(baseUrl: string, token: string) {
+  return call(
+    { baseUrl, accessToken: token },
+    "GET",
+    GATEQ_APPLY_COVERAGE_PATH,
+    ApplicationCoverageDtoSchema,
   );
 }

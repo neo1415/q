@@ -48,6 +48,7 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { QNavIcon } from "@/components/app-shell/q-nav-icon";
 
+import { DossierView } from "./dossier-view";
 import { FitGlyph } from "../fit-glyph";
 import {
   archiveAction,
@@ -1289,6 +1290,8 @@ function Detail({
               </p>
             </section>
           </div>
+
+          <DossierView detail={detail} />
 
           <section className="gq-sect">
             <h3 className="cq-title-sm">Their note</h3>

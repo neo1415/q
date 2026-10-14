@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
 import {
@@ -128,8 +128,14 @@ export async function applicationTurnAction(
 ): Promise<ApplyResult> {
   const token = Token.safeParse(sessionToken);
   const key = Key.safeParse(clientTurnId);
-  const text = message.trim().slice(0, GATEQ_TURN_MAX_CHARS);
+  const text = message.trim();
   const url = base();
+  if (text.length > GATEQ_TURN_MAX_CHARS) {
+    return {
+      ok: false,
+      message: `Keep each answer within ${GATEQ_TURN_MAX_CHARS} characters. Your answer has not been cut or saved.`,
+    };
+  }
   if (!token.success || !key.success || text === "" || url === null) {
     return { ok: false, message: "Please try again." };
   }
@@ -206,6 +212,13 @@ export async function startFormAction(publicId: string): Promise<FormResult> {
   if (!(await visitorMayStart())) return RATE_LIMITED;
   try {
     const started = await startApplication(url, id.data, "form");
+    (await cookies()).set(`cq-gateq-${id.data}`, started.sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: new Date(started.expiresAt),
+    });
     return {
       ok: true,
       sessionToken: started.sessionToken,
