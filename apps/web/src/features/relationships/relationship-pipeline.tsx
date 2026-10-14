@@ -78,10 +78,13 @@ export function RelationshipPipeline({
   }, [scopeKey]);
   useEffect(() => {
     setSearch(query.q ?? "");
-    setSelected([]);
     setPreview(null);
     setLayout(initialLayout);
   }, [query.q, query.state, query.sort, query.cursor, initialLayout]);
+  // Pagination and layout preserve selection; authorization/filter changes do not.
+  useEffect(() => {
+    setSelected([]);
+  }, [scopeKey, data.scope]);
   const persist = (next: PipelinePreferences) => {
     setPreferences(next);
     if (!writePipelinePreferences(scopeKey, next, localStorageOrNull()))

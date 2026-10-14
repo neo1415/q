@@ -29,7 +29,12 @@ export async function GET(request: Request): Promise<Response> {
   const upstream = await fetch(
     `${session.baseUrl.replace(/\/$/, "")}${path}/export?${url.searchParams.toString()}`,
     {
-      headers: { authorization: `Bearer ${session.accessToken}` },
+      headers: {
+        authorization: `Bearer ${session.accessToken}`,
+        ...(session.organisationId === undefined
+          ? {}
+          : { "x-organisation-id": session.organisationId }),
+      },
       cache: "no-store",
     },
   ).catch(() => null);

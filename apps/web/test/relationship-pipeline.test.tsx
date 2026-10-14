@@ -89,6 +89,34 @@ describe("real pipeline controls", () => {
       "/relationships?view=pipeline&layout=table&state=IN_DILIGENCE",
     );
   });
+  it("preserves selection across pages and clears it on authorized scope change", () => {
+    const page = render(<RelationshipPipeline {...props} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select Kivu Freight" }),
+    );
+    page.rerender(
+      <RelationshipPipeline
+        {...props}
+        data={{ ...data, items: [data.items[1]!] }}
+        query={{ cursor: "second" }}
+      />,
+    );
+    expect(
+      screen
+        .getByRole("link", { name: "Export 1 selected" })
+        .getAttribute("href"),
+    ).toContain(data.items[0]!.relationshipId);
+    page.rerender(
+      <RelationshipPipeline
+        {...props}
+        data={{ ...data, scope: "2".repeat(64) }}
+        query={{ state: "CONNECTED" }}
+      />,
+    );
+    expect(
+      screen.queryByRole("link", { name: "Export 1 selected" }),
+    ).toBeNull();
+  });
   it("exports exactly filtered scope or selection without a page cursor", () => {
     render(
       <RelationshipPipeline
