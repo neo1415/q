@@ -154,6 +154,7 @@ try {
           .getAttribute("aria-current")) !== "page"
       )
         throw new Error(`${role}/${size}: tab not settled`);
+      await closeBriefing();
       await nav.getByRole("link", { name: "Overview", exact: true }).click();
       await page.waitForURL(/view=overview/, { timeout: 45000 });
       await page.getByRole("heading", { name: heading, exact: true }).waitFor();
@@ -173,6 +174,10 @@ try {
         await page.waitForURL(/view=relationships/, { timeout: 45000 });
         await page.evaluate(() => {
           window.__cqHubNavigation = [];
+          window.__cqHubNavigationReceipts = [];
+          window.addEventListener("cq:navigation-receipt", (event) =>
+            window.__cqHubNavigationReceipts.push(event.detail),
+          );
           window.addEventListener("cq:fast-navigation", (event) =>
             window.__cqHubNavigation.push(event.detail),
           );
@@ -187,13 +192,28 @@ try {
         );
         await input.press("Enter");
         await page.waitForURL(/view=overview/, { timeout: 45000 });
+        // Q's modal intentionally hides background landmarks from accessibility.
+        // Close via Escape before asserting the newly opened page's heading.
+        await page.keyboard.press("Escape");
         await page
           .getByRole("heading", { name: heading, exact: true })
           .waitFor({ timeout: 45000 });
         const timings = await page.evaluate(() => window.__cqHubNavigation);
         if (!timings.some((t) => t.path === "/relationships?view=overview"))
           throw new Error(`${role}: Q navigation timing evidence missing`);
+        const receipts = await page.evaluate(
+          () => window.__cqHubNavigationReceipts,
+        );
+        if (
+          !receipts.some(
+            (r) =>
+              r.status === "DONE" &&
+              r.expected === "/relationships?view=overview",
+          )
+        )
+          throw new Error(`${role}: completed navigation receipt missing`);
         qNavigation = {
+          receiptDone: true,
           finalWordsToPushMs: timings.at(-1).ms,
           settledHeadingMs: Math.round(performance.now() - qStarted),
         };
