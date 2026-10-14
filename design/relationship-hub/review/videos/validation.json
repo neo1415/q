@@ -1,0 +1,82 @@
+[
+  {
+    "name": "investor",
+    "errors": [],
+    "overflow": {
+      "viewport": 1440,
+      "document": 1440
+    },
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "format": {
+      "duration": "18.520000"
+    }
+  },
+  {
+    "name": "founder",
+    "errors": [],
+    "overflow": {
+      "viewport": 1440,
+      "document": 1440
+    },
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "format": {
+      "duration": "13.560000"
+    }
+  },
+  {
+    "name": "q-navigation",
+    "errors": [],
+    "overflow": {
+      "viewport": 1440,
+      "document": 1440
+    },
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 1440,
+        "height": 900
+      }
+    ],
+    "format": {
+      "duration": "32.880000"
+    }
+  },
+  {
+    "name": "mobile",
+    "errors": [],
+    "overflow": {
+      "viewport": 390,
+      "document": 390
+    },
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 390,
+        "height": 844
+      }
+    ],
+    "format": {
+      "duration": "13.600000"
+    }
+  }
+]

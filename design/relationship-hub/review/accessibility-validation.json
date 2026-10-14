@@ -1,0 +1,100 @@
+[
+  {
+    "width": 1440,
+    "violations": [],
+    "passes": 24,
+    "incomplete": ["video-caption"],
+    "keyboard": [
+      {
+        "tag": "A",
+        "text": "Walkthroughs",
+        "outline": "solid"
+      },
+      {
+        "tag": "A",
+        "text": "Screenshots",
+        "outline": "solid"
+      },
+      {
+        "tag": "A",
+        "text": "Clickable prototype",
+        "outline": "solid"
+      },
+      {
+        "tag": "A",
+        "text": "Review notes and reproduction",
+        "outline": "solid"
+      },
+      {
+        "tag": "VIDEO",
+        "text": "",
+        "outline": "solid"
+      },
+      {
+        "tag": "VIDEO",
+        "text": "",
+        "outline": "solid"
+      },
+      {
+        "tag": "VIDEO",
+        "text": "",
+        "outline": "solid"
+      },
+      {
+        "tag": "VIDEO",
+        "text": "",
+        "outline": "solid"
+      }
+    ],
+    "nativeVideoControls": true
+  },
+  {
+    "width": 390,
+    "violations": [],
+    "passes": 24,
+    "incomplete": ["video-caption"],
+    "keyboard": [
+      {
+        "tag": "A",
+        "text": "Walkthroughs",
+        "outline": "solid"
+      },
+      {
+        "tag": "A",
+        "text": "Screenshots",
+        "outline": "solid"
+      },
+      {
+        "tag": "A",
+        "text": "Clickable prototype",
+        "outline": "solid"
+      },
+      {
+        "tag": "A",
+        "text": "Review notes and reproduction",
+        "outline": "solid"
+      },
+      {
+        "tag": "VIDEO",
+        "text": "",
+        "outline": "solid"
+      },
+      {
+        "tag": "VIDEO",
+        "text": "",
+        "outline": "solid"
+      },
+      {
+        "tag": "VIDEO",
+        "text": "",
+        "outline": "solid"
+      },
+      {
+        "tag": "VIDEO",
+        "text": "",
+        "outline": "solid"
+      }
+    ],
+    "nativeVideoControls": true
+  }
+]
