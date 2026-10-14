@@ -189,9 +189,9 @@ try {
       await page.locator("[data-q-dock-button]:visible").first().click();
     await input.waitFor({ timeout: 30000 });
     const before = new Set(runs);
-    await input.fill(
-      "Read the selected submitted GateQ dossier. Explain this founder's business, supplied traction and use of funds, qualification, missing evidence and next review actions. Distinguish applicant claims from verified evidence and cite the submitted sources. Do not send anything.",
-    );
+    const question =
+      "Read the selected submitted GateQ dossier. Explain this founder's business, supplied traction and use of funds, qualification, missing evidence and next review actions. Distinguish applicant claims from verified evidence and cite the submitted sources. Do not send anything.";
+    await input.fill(question);
     const started = performance.now();
     await input.press("Enter");
     await page.waitForFunction(
@@ -250,6 +250,7 @@ try {
       runId,
       messageId: message.messageId,
       text: message.text,
+      question,
       cards: (message.blocks ?? [])
         .filter((b) => b.kind === "ANSWER_CARDS")
         .flatMap((b) => b.cards),
