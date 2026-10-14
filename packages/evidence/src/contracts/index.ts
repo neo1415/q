@@ -439,6 +439,18 @@ export type Document = {
   readonly version: number;
 };
 
+/** Trusted pipeline only: application custody is never an organisation resource. */
+export type ApplicationOwnedDocument = Omit<
+  Document,
+  "ownerOrganisationId" | "createdByUserId"
+> & {
+  readonly ownerOrganisationId: null;
+  readonly createdByUserId: null;
+  readonly applicationId: string;
+  readonly applicationSessionId: string;
+};
+export type ProcessingDocument = Document | ApplicationOwnedDocument;
+
 export type DocumentVersion = {
   readonly id: DocumentVersionId;
   readonly tenantId: TenantId;
@@ -450,7 +462,7 @@ export type DocumentVersion = {
   readonly mimeType: string;
   readonly sizeBytes: number;
   readonly sha256: string;
-  readonly uploadedByUserId: UserId;
+  readonly uploadedByUserId: UserId | null;
   readonly uploadedAt: UtcTimestamp;
   readonly supersedesVersionId: DocumentVersionId | null;
   readonly processingStatus: ProcessingStatus;

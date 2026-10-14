@@ -292,3 +292,12 @@ export {
   type DeckExtractionRow,
   type PostgresDataRoom,
 } from "./infrastructure/postgres-data-room.js";
+export {
+  createGateQApplicationEvidenceService,
+  GateQApplicationEvidenceScopeSchema,
+  GateQApplicationEvidenceScopeError,
+  type GateQApplicationEvidenceScope,
+  type GateQApplicationEvidenceDependencies,
+  type GateQApplicationEvidenceItem,
+  type GateQApplicationEvidenceService,
+} from "./application/gateq-application-evidence.js";
