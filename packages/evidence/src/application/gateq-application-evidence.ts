@@ -152,6 +152,43 @@ export function createGateQApplicationEvidenceService(
     if (rows.length !== 1) throw new GateQApplicationEvidenceScopeError();
     return SessionRow.parse(rows[0]);
   }
+  async function releaseTerminalReservations(s: GateQApplicationEvidenceScope) {
+    const debts = await deps.transactions.run(async (tx) => {
+      await lockScope(tx, s);
+      await tx.sql`update evidence.document_upload_sessions
+        set status='EXPIRED',failure_code='UPLOAD_EXPIRED',cleanup_pending=true,version=version+1
+        where tenant_id=${s.tenantId} and gateq_application_id=${s.applicationId}
+        and document_version_id is null and expires_at <= now()
+        and status in ('PENDING_AUTHORIZATION','AUTHORIZED','FINALIZING')`;
+      return tx.sql`select id,storage_bucket,storage_key from evidence.document_upload_sessions
+        where tenant_id=${s.tenantId} and gateq_application_id=${s.applicationId}
+        and document_version_id is null and cleanup_pending
+        and status in ('REJECTED','CANCELLED','EXPIRED') limit ${deps.maxDocuments}`;
+    });
+    for (const debt of debts) {
+      const d = z
+        .object({
+          id: z.string().uuid(),
+          storage_bucket: z.string(),
+          storage_key: z.string(),
+        })
+        .parse(debt);
+      try {
+        await deps.storage.deleteObject({
+          bucket: d.storage_bucket,
+          key: d.storage_key,
+        });
+      } catch {
+        continue;
+      } // Retained bytes keep their reservation during an outage.
+      await deps.transactions.run(async (tx) => {
+        await lockScope(tx, s);
+        await tx.sql`update evidence.document_upload_sessions set cleanup_pending=false,version=version+1
+          where id=${d.id} and tenant_id=${s.tenantId} and gateq_application_id=${s.applicationId}
+          and document_version_id is null and status in ('REJECTED','CANCELLED','EXPIRED')`;
+      });
+    }
+  }
   async function create(command: {
     readonly credential: string;
     readonly input: z.input<typeof CreateInput>;
@@ -181,6 +218,7 @@ export function createGateQApplicationEvidenceService(
         input.declaredSizeBytes,
       ]),
     );
+    await releaseTerminalReservations(s);
     const result = await deps.transactions.run(async (tx) => {
       await lockScope(tx, s);
       const previous =
@@ -191,6 +229,8 @@ export function createGateQApplicationEvidenceService(
           throw new DocumentUploadCreationConflictError();
         return replay;
       }
+      // Every issued session still consumes the bounded attempt allowance.
+      // Only terminal sessions without a version release reserved bytes.
       const counts = z
         .object({
           count: z.coerce.number(),
@@ -200,7 +240,9 @@ export function createGateQApplicationEvidenceService(
         .parse(
           (
             await tx.sql`
-        select count(*) as count, coalesce(sum(declared_size_bytes),0) as bytes,
+        select count(*) as count, coalesce(sum(declared_size_bytes) filter (
+          where document_version_id is not null or cleanup_pending or status not in ('REJECTED','CANCELLED','EXPIRED')
+        ),0) as bytes,
         count(*) filter (where status in ('PENDING_AUTHORIZATION','AUTHORIZED','FINALIZING')) as open
         from evidence.document_upload_sessions where tenant_id=${s.tenantId} and gateq_application_id=${s.applicationId}`
           )[0],
