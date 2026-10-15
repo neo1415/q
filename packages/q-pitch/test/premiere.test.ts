@@ -38,6 +38,7 @@ describe("r3 premiere and the certification gate", () => {
     // Q-to-Q stays CODE_VERIFIED until the microphone "skip" test runs.
     const suppressed = gate.decisions.filter((d) => d.verdict === "SUPPRESSED");
     expect(suppressed.map((d) => d.sceneId)).toEqual([
+      "s.premiere.subject",
       "s.premiere.gateq-interview",
       "s.premiere.rehearsal",
     ]);
@@ -50,7 +51,7 @@ describe("r3 premiere and the certification gate", () => {
       audience: "INTERNAL_REHEARSAL",
       acceptedStatuses: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     });
-    expect(gate.scenes).toHaveLength(15);
+    expect(gate.scenes).toHaveLength(16);
     expect(gate.rejectedLines).toEqual([]);
   });
 
@@ -243,6 +244,8 @@ describe("coverage (slice 7)", () => {
       ["show me the q daily", "ch.premiere.daily"],
       ["demo rehearsals", "ch.premiere.rehearsal"],
       ["show me privacy", "ch.premiere.privacy"],
+      ["show me capital q", "ch.premiere.subject"],
+      ["show me the gateq interview", "ch.premiere.gateq-interview"],
     ] as const) {
       expect(said(text), text).toBe(chapterId);
     }

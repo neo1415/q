@@ -204,6 +204,27 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
       validUntil: { invalidatedBy: "Next relationship hub release" },
     },
     codeEntry({
+      featureId: "QP-SUBJECT",
+      fixture:
+        "Capital Q's own company record (CQ_Q_PITCH_SUBJECT_COMPANY_ID ee75a7d8-d457-4b59-9ad8-0d64b3026a3d), re-read per viewer",
+      receipt:
+        "apps/web/test/q-pitch-host.test.ts 'the tour's subject company' (2) PASS; browser receipt pending (production auth 504/500 at 13:48-13:51 UTC)",
+      claimsAllowed: [
+        {
+          claimId: "QP-SUBJECT.c1",
+          text: "The tour's subject company is Capital Q's own record on the platform, opened only when the viewer may read it",
+        },
+      ],
+      claimsForbidden: [
+        "The raise, valuation or any figure as verified (the USD 2,000,000 raise is the founder's claim)",
+        "That Capital Q is assessed more favourably than other companies",
+      ],
+      validUntil: {
+        invalidatedBy:
+          "Next change to subject resolution or the subject record",
+      },
+    }),
+    codeEntry({
       featureId: "GATEQ-INBOX-DOSSIER",
       fixture:
         "test fixtures only (gateq-intake inbox, gateq authority, api inbox routes)",
@@ -541,6 +562,56 @@ const daily = viewScene({
   ],
 });
 
+/**
+ * Slice 8 (owner 15 Oct): the example company everyone recognises is Capital
+ * Q itself, read by Q under the same rules as any company. Named only by
+ * the server (`subject`), re-checked for the viewer; the scene falls back
+ * honestly when there is no subject.
+ */
+const subjectScene: SceneScript = {
+  sceneId: "s.premiere.subject",
+  chapterId: "ch.premiere.subject",
+  title: "Capital Q, on its own platform",
+  featureIds: ["QP-SUBJECT", "INV-PROFILE-FINDINGS"],
+  approvedClaimIds: ["QP-SUBJECT.c1", "INV-PROFILE-FINDINGS.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/company/[companyId]",
+  actions: [
+    { actionId: "ta_open-subject", kind: "openCompany", company: "subject" },
+    {
+      actionId: "ta_ask-subject",
+      kind: "askApprovedQuestion",
+      question: "q.company-profile",
+      subject: "subject",
+    },
+  ],
+  lines: [
+    line(
+      "l.subject.open",
+      "Now a company you'll recognise: Capital Q itself, on its own platform.",
+      "BEFORE_ACK",
+      "r4 slice 8",
+      ["QP-SUBJECT.c1"],
+    ),
+    line(
+      "l.subject.rules",
+      "I read it by the same rules as every other company.",
+      "BEFORE_ACK",
+      "r4 slice 8",
+    ),
+    line(
+      "l.subject.findings",
+      "What the founders state, what documents support, and what is still unknown, kept apart. Their raise is their own claim until evidence says otherwise.",
+      "AFTER_ACK",
+      "CERTIFICATION INV-PROFILE-FINDINGS (r4 wording); QP-SUBJECT forbidden list",
+      ["INV-PROFILE-FINDINGS.c1"],
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 45_000,
+};
+
 /** A pilot scene with premiere wording (same actions and claims). */
 function withLines(
   id: string,
@@ -592,7 +663,7 @@ const premiereCompany = withLines("s.pilot.company", (scene) => [
  */
 const gateqInterview: SceneScript = {
   sceneId: "s.premiere.gateq-interview",
-  chapterId: "ch.premiere.gateq",
+  chapterId: "ch.premiere.gateq-interview",
   title: "A first conversation with an applicant, Q to Q",
   featureIds: ["REH-Q2Q-SHORT"],
   approvedClaimIds: ["REH-Q2Q-SHORT.c1"],
@@ -862,6 +933,19 @@ const SPOKEN_NAMES: Readonly<Record<string, readonly string[]>> = {
     "practice",
     "meeting rehearsal",
   ],
+  "ch.premiere.gateq-interview": [
+    "gateq interview",
+    "applicant conversation",
+    "first conversation",
+    "interview",
+    "interviews",
+  ],
+  "ch.premiere.subject": [
+    "capital q",
+    "capital q itself",
+    "your own company",
+    "the subject company",
+  ],
   "ch.premiere.explore": ["explore", "search", "the network", "find companies"],
   "ch.premiere.work": [
     "q work",
@@ -897,7 +981,7 @@ const PREMIERE_SCENES: SceneScript[] = [
   pilotSceneOf("s.pilot.compare"),
   ...candidates.flatMap((scene) =>
     scene.sceneId === "s.premiere.privacy"
-      ? [scene, explore]
+      ? [scene, subjectScene, explore]
       : scene.sceneId === "s.premiere.gateq"
         ? [scene, gateqInterview]
         : scene.sceneId === "s.premiere.relationship"
@@ -908,6 +992,7 @@ const PREMIERE_SCENES: SceneScript[] = [
 
 const ATLAS_TAB: Readonly<Record<string, Chapter["atlasTab"]>> = {
   "ch.premiere.gateq": "GATEQ",
+  "ch.premiere.gateq-interview": "GATEQ",
   "ch.premiere.privacy": "TRUST",
   "ch.premiere.rehearsal": "REHEARSALS",
   "ch.premiere.work": "Q_WORK",
