@@ -238,6 +238,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_CONFIRM_PATH": PUBLIC,
   "api/http/gateq-apply.ts GET GATEQ_APPLY_TRANSCRIPT_PATH": PUBLIC,
   "api/http/gateq-apply.ts GET GATEQ_APPLY_COVERAGE_PATH": PUBLIC,
+  // C3: the applicant's own video interview session (guest credential) and
+  // the provider's bridge (per-session bearer), no signed-in actor.
+  "api/http/gateq-video.ts GET GATEQ_APPLY_VIDEO_PATH": PUBLIC,
+  "api/http/gateq-video.ts POST GATEQ_APPLY_VIDEO_PATH": PUBLIC,
+  "api/http/gateq-video.ts POST GATEQ_APPLY_VIDEO_END_PATH": PUBLIC,
+  "api/http/gateq-video.ts POST GATEQ_VIDEO_BRIDGE_PATH": WEBHOOK,
   ...Object.fromEntries(
     [
       "POST GATEQ_GATEWAYS_PATH",
@@ -1147,6 +1153,11 @@ const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_PATH",
   "api/http/gateq-apply.ts POST GATEQ_APPLY_CONTACT_CONFIRM_PATH",
   "api/http/gateq.ts POST GATEQ_APPLY_CONTACT_ACCOUNT_PATH",
+  // C3: the applicant's video interview start/end (guest credential only)
+  // and the provider's bridge (a per-session bearer, not a person).
+  "api/http/gateq-video.ts POST GATEQ_APPLY_VIDEO_PATH",
+  "api/http/gateq-video.ts POST GATEQ_APPLY_VIDEO_END_PATH",
+  "api/http/gateq-video.ts POST GATEQ_VIDEO_BRIDGE_PATH",
   // Q's opening question for a form-started interview, under the same
   // guest credential. Pending the lead's decision.
   "api/http/gateq-apply.ts POST GATEQ_APPLY_INTERVIEW_OPEN_PATH",

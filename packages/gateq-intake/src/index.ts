@@ -190,3 +190,21 @@ export {
   type DisclosureDocumentIdentity,
   type DisclosureLineage,
 } from "./application/disclosure-projection.js";
+
+// C3: the GateQ video interview session (provider-neutral) and its store.
+export {
+  createGateqVideoInterview,
+  effectiveMaxSeconds,
+  GATEQ_VIDEO_DEFAULTS,
+  gateqVideoConfigFrom,
+  GateqVideoRefusedError,
+  type GateqVideoConfig,
+  type GateqVideoInterview,
+  type GateqVideoProvider,
+  type GateqVideoRefusal,
+  type GateqVideoSealer,
+  type GateqVideoSessionRow,
+  type GateqVideoSessionStore,
+  type GateqVideoSessionView,
+} from "./video/video-interview.js";
+export { createPostgresGateqVideoSessions } from "./video/postgres-video-sessions.js";

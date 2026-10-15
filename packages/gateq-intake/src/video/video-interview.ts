@@ -1,6 +1,9 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
-import type { ApplicantTurnResult, ConversationService } from "../application/conversation-service.js";
+import type {
+  ApplicantTurnResult,
+  ConversationService,
+} from "../application/conversation-service.js";
 import type { IntakeService } from "../application/intake-service.js";
 import { IntakeRefusedError } from "../contracts/index.js";
 
@@ -43,7 +46,11 @@ export const GATEQ_VIDEO_DEFAULTS: GateqVideoConfig = {
   testMode: true,
 };
 
-const positiveInt = (raw: string | undefined, fallback: number, max: number) => {
+const positiveInt = (
+  raw: string | undefined,
+  fallback: number,
+  max: number,
+) => {
   if (raw === undefined || raw.trim() === "") return fallback;
   const n = Number(raw);
   return Number.isSafeInteger(n) && n >= 1 && n <= max ? n : fallback;
@@ -112,7 +119,8 @@ export type GateqVideoSessionStore = {
   }) => Promise<
     | { readonly kind: "CREATED"; readonly row: GateqVideoSessionRow }
     | { readonly kind: "EXISTING"; readonly row: GateqVideoSessionRow }
-    | { readonly kind: "ALLOWANCE" | "CONCURRENCY" }
+    | { readonly kind: "ALLOWANCE" }
+    | { readonly kind: "CONCURRENCY" }
   >;
   readonly markLive: (input: {
     readonly id: string;
@@ -155,16 +163,18 @@ export type GateqVideoSealer = {
   readonly open: (sealed: string) => string;
 };
 
+export type GateqVideoRefusal =
+  | "DISABLED"
+  | "ALLOWANCE_EXHAUSTED"
+  | "CONCURRENCY_LIMIT"
+  | "PROVIDER_UNAVAILABLE";
+
 export class GateqVideoRefusedError extends Error {
-  constructor(
-    readonly reason:
-      | "DISABLED"
-      | "ALLOWANCE_EXHAUSTED"
-      | "CONCURRENCY_LIMIT"
-      | "PROVIDER_UNAVAILABLE",
-  ) {
+  readonly reason: GateqVideoRefusal;
+  constructor(reason: GateqVideoRefusal) {
     super(`GateQ video interview refused: ${reason}`);
     this.name = "GateqVideoRefusedError";
+    this.reason = reason;
   }
 }
 
@@ -349,10 +359,7 @@ export function createGateqVideoInterview(deps: {
       let failed = 0;
       for (const row of await deps.store.expired(limit)) {
         try {
-          await endRow(
-            row,
-            row.status === "STARTING" ? "SWEPT" : "TIME_LIMIT",
-          );
+          await endRow(row, row.status === "STARTING" ? "SWEPT" : "TIME_LIMIT");
           ended++;
         } catch {
           failed++;
