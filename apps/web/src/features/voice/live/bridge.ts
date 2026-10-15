@@ -170,6 +170,15 @@ export type LiveBridge = {
    * does not hear them), the verified answer spoken like any other.
    */
   readonly typed: (text: string) => void;
+  /**
+   * Q Pitch narration: one approved, pre-written line for Q to say aloud,
+   * verbatim, on this same call (owner 15 Oct: the tour speaks in Q's live
+   * voice). Commentary, so it is spoken now; never a delegation, so it is
+   * not a request and Q Brain does not answer it.
+   */
+  readonly narrate: (text: string) => void;
+  /** Standing instructions for the rest of the call (a Q Pitch tour brief). */
+  readonly brief: (text: string) => void;
   readonly state: () => LiveBridgeState;
 };
 
@@ -650,6 +659,25 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       order.push(id);
       run(record, words);
     },
+    narrate: (text) => {
+      const words = text.trim();
+      if (words.length === 0) return;
+      send("session.commentary.append", null, narrationContent(words));
+    },
+    brief: (text) => {
+      const words = text.trim();
+      if (words.length === 0) return;
+      send("session.instructions.append", null, words);
+    },
     state: snapshot,
   };
+}
+
+/**
+ * The commentary for one narrated line. Verbatim and nothing else: the line
+ * is pre-approved (its claims are certified), so a paraphrase or an added
+ * question would be an uncertified claim spoken in Q's voice.
+ */
+export function narrationContent(line: string): string {
+  return `Say exactly the following words aloud, as yourself, and nothing else: no greeting, no question, no comment before or after it. Words: ${line}`;
 }

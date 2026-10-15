@@ -29,6 +29,8 @@ import {
 import { useQSessionOptional } from "@/features/q/q-session";
 
 import type { TourSubject } from "./subject-model";
+import { setNarrationVoice, standardVoicePlaying } from "./narrator";
+import { openTourVoice } from "./tour-voice";
 import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
 
 /**
@@ -144,6 +146,21 @@ export function QPitchHost({
   const transcript: TranscriptSink = useRef(null);
   const ports = useTourPorts(choice.script, transcript, subject);
   const session = useQSessionOptional();
+  // The tour starts on the person's press (a gesture, so Q's voice may
+  // play), after Q's live line is open when it is offered (owner 15 Oct).
+  const [phase, setPhase] = useState<"WAITING" | "STARTING" | "RUNNING">(
+    "WAITING",
+  );
+  const sessionRef = useRef(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+  const begin = useCallback(async (withVoice: boolean) => {
+    setNarrationVoice(withVoice);
+    setPhase("STARTING");
+    if (withVoice) await openTourVoice(() => sessionRef.current);
+    setPhase("RUNNING");
+  }, []);
   // The live runner, held in a tiny external store: the effect that owns
   // its lifetime publishes it, so a remount (Strict Mode) builds a fresh one.
   const slot = useMemo(() => createSlot<TourRunner>(), []);
@@ -157,7 +174,7 @@ export function QPitchHost({
   const seen = useRef<Set<string> | null>(null);
 
   useEffect(() => {
-    if (actor === null || ports === null) return;
+    if (actor === null || ports === null || phase !== "RUNNING") return;
     const gate = certifyTour(choice.script, choice.ledger, {
       now: new Date().toISOString(),
       // Rehearsal: the integration owner marks stale ids before any audience run.
@@ -199,7 +216,7 @@ export function QPitchHost({
       slot.set(null);
       heard.set(null);
     };
-  }, [actor, ports, slot, heard, choice, transcript, chapter]);
+  }, [actor, ports, slot, heard, choice, transcript, chapter, phase]);
 
   // The voice line's transcript. The person's lines are AUDIENCE_MIC and
   // offered to the gate; Q's own spoken lines are recorded as NARRATOR_Q
@@ -227,7 +244,9 @@ export function QPitchHost({
             final: true,
           },
           {
-            narratorPlaying: qSpeaking,
+            // Q's live line (narration included) is Q_SPEAKING; a line read
+            // in the standard TTS voice is the narrator's own audio too.
+            narratorPlaying: qSpeaking || standardVoicePlaying(),
             counterpartPlaying: false,
             // The voice providers ask for echo cancellation but do not
             // report it back, so it is not assumed: spoken control while
@@ -254,6 +273,30 @@ export function QPitchHost({
           Q Pitch runs only on a fictional demo account. This account is not
           one, so the tour has not started.
         </p>
+      </TourFrame>
+    );
+  }
+  if (phase !== "RUNNING") {
+    return (
+      <TourFrame label={choice.label} onExit={onExit}>
+        <p className="cq-body text-(--cq-text-primary)">
+          {phase === "STARTING"
+            ? "Opening Q's voice…"
+            : "Q will present this tour aloud, in its own voice. Turn your sound on."}
+        </p>
+        {phase === "WAITING" ? (
+          <div className="flex flex-wrap gap-2">
+            <TourButton
+              label="Start the tour"
+              primary
+              onPress={() => void begin(true)}
+            />
+            <TourButton
+              label="Captions only"
+              onPress={() => void begin(false)}
+            />
+          </div>
+        ) : null}
       </TourFrame>
     );
   }
